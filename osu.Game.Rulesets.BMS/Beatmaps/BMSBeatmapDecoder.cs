@@ -26,7 +26,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     /// </remarks>
     public class BMSBeatmapDecoder : Decoder<Beatmap>
     {
-        private const string BMS_LOG_PREFIX = "[BMS]";
+        private const string bms_log_prefix = "[BMS]";
 
         protected override Beatmap CreateTemplateObject() => new BMSBeatmap();
 
@@ -96,7 +96,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             events.Clear();
             eventSequence = 0;
 
-            Logger.Log($"{BMS_LOG_PREFIX} Starting BMS beatmap decoding");
+            Logger.Log($"{bms_log_prefix} Starting BMS beatmap decoding");
 
             string? line;
 
@@ -495,12 +495,12 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                              .ThenBy(e => e.Position)
                              .ToList();
 
-            Logger.Log($"{BMS_LOG_PREFIX} Found {noteEvents.Count} note events", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log($"{bms_log_prefix} Found {noteEvents.Count} note events", LoggingTarget.Runtime, LogLevel.Debug);
 
             foreach (var evt in noteEvents)
             {
                 int column = getColumn(evt.Channel);
-                bool isScratch = isScratchChannel(evt.Channel);
+                bool isScratch = BmsLaneMapping.IsScratchChannel(evt.Channel);
                 bool isLongNote = isLongNoteChannel(evt.Channel);
                 double time = eventTimes[evt];
 
@@ -620,43 +620,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                    channel >= 61 && channel <= 69;
         }
 
-        private bool isScratchChannel(int channel)
-        {
-            // Channel 16/56 = 1P scratch, 26/66 = 2P scratch
-            return channel == 16 || channel == 26 || channel == 56 || channel == 66;
-        }
-
-        private int getColumn(int channel)
-        {
-            // Map BMS channels to column indices
-            // 1P: 11=0, 12=1, 13=2, 14=3, 15=4, 16=scratch, 18=5, 19=6
-            // Standard 7-key mapping: 16, 11, 12, 13, 14, 15, 18, 19
-
-            return channel switch
-            {
-                // 1P side (channels 11-19, 51-59)
-                16 or 56 => 0, // Scratch
-                11 or 51 => 1, // Key 1
-                12 or 52 => 2, // Key 2
-                13 or 53 => 3, // Key 3
-                14 or 54 => 4, // Key 4
-                15 or 55 => 5, // Key 5
-                18 or 58 => 6, // Key 6
-                19 or 59 => 7, // Key 7
-
-                // 2P side (channels 21-29, 61-69)
-                26 or 66 => 8, // Scratch 2
-                21 or 61 => 9, // Key 8
-                22 or 62 => 10, // Key 9
-                23 or 63 => 11, // Key 10
-                24 or 64 => 12, // Key 11
-                25 or 65 => 13, // Key 12
-                28 or 68 => 14, // Key 13
-                29 or 69 => 15, // Key 14
-
-                _ => 0
-            };
-        }
+        private int getColumn(int channel) => BmsLaneMapping.ChannelToColumn(channel);
 
         private class BMSEvent
         {

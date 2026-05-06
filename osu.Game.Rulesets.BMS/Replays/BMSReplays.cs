@@ -13,9 +13,12 @@ namespace osu.Game.Rulesets.BMS.Replays
 {
     public class BMSAutoGenerator : AutoGenerator<BMSReplayFrame>
     {
+        private readonly BMSStageLayout stageLayout;
+
         public BMSAutoGenerator(IBeatmap beatmap)
             : base(beatmap)
         {
+            stageLayout = BMSStageLayout.FromBeatmap(beatmap);
         }
 
         protected override void GenerateFrames()
@@ -27,7 +30,7 @@ namespace osu.Game.Rulesets.BMS.Replays
 
             foreach (var hitObject in Beatmap.HitObjects.OfType<BMSHitObject>())
             {
-                var action = GetActionForColumn(hitObject.Column);
+                var action = stageLayout.ActionFor(hitObject);
 
                 // Press
                 currentActions.Add(action);
@@ -41,22 +44,6 @@ namespace osu.Game.Rulesets.BMS.Replays
                 currentActions.Remove(action);
                 Frames.Add(new BMSReplayFrame(releaseTime, currentActions.ToList()));
             }
-        }
-
-        private static BMSAction GetActionForColumn(int column)
-        {
-            return column switch
-            {
-                0 => BMSAction.Scratch1,
-                1 => BMSAction.Key1,
-                2 => BMSAction.Key2,
-                3 => BMSAction.Key3,
-                4 => BMSAction.Key4,
-                5 => BMSAction.Key5,
-                6 => BMSAction.Key6,
-                7 => BMSAction.Key7,
-                _ => BMSAction.Key1
-            };
         }
     }
 

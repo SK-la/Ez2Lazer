@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// <summary>
         /// List of charts (difficulties) in this song folder.
         /// </summary>
-        public List<BMSChartCache> Charts { get; set; } = new();
+        public List<BMSChartCache> Charts { get; set; } = new List<BMSChartCache>();
 
         /// <summary>
         /// Last modified time of the folder (for detecting changes).
@@ -196,7 +196,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// <summary>
         /// List of keysound file paths used in this chart (relative to folder).
         /// </summary>
-        public List<string> KeysoundFiles { get; set; } = new();
+        public List<string> KeysoundFiles { get; set; } = new List<string>();
 
         /// <summary>
         /// MD5 hash of the BMS file for identification.
@@ -233,7 +233,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// <summary>
         /// All configured root paths that were scanned.
         /// </summary>
-        public List<string> RootPaths { get; set; } = new();
+        public List<string> RootPaths { get; set; } = new List<string>();
 
         /// <summary>
         /// When the cache was last updated.
@@ -243,7 +243,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// <summary>
         /// All songs in the library.
         /// </summary>
-        public List<BMSSongCache> Songs { get; set; } = new();
+        public List<BMSSongCache> Songs { get; set; } = new List<BMSSongCache>();
 
         /// <summary>
         /// Total number of charts.
@@ -260,7 +260,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
         }
 
-        private static readonly JsonSerializerOptions JsonOptions = new()
+        private static readonly JsonSerializerOptions json_options = new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -271,7 +271,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// </summary>
         public void Save(string filePath)
         {
-            string json = JsonSerializer.Serialize(this, JsonOptions);
+            string json = JsonSerializer.Serialize(this, json_options);
             File.WriteAllText(filePath, json);
         }
 
@@ -286,7 +286,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             try
             {
                 string json = File.ReadAllText(filePath);
-                return JsonSerializer.Deserialize<BMSLibraryCache>(json, JsonOptions);
+                return JsonSerializer.Deserialize<BMSLibraryCache>(json, json_options);
             }
             catch
             {
@@ -303,9 +303,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     {
         public int Version { get; set; } = 1;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-        public List<BMSSourceReference> Sources { get; set; } = new();
+        public List<BMSSourceReference> Sources { get; set; } = new List<BMSSourceReference>();
 
-        private static readonly JsonSerializerOptions JsonOptions = new()
+        private static readonly JsonSerializerOptions json_options = new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -313,7 +313,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public void Save(string filePath)
         {
-            string json = JsonSerializer.Serialize(this, JsonOptions);
+            string json = JsonSerializer.Serialize(this, json_options);
             File.WriteAllText(filePath, json);
         }
 
@@ -325,7 +325,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             try
             {
                 string json = File.ReadAllText(filePath);
-                return JsonSerializer.Deserialize<BMSExternalLinkIndex>(json, JsonOptions);
+                return JsonSerializer.Deserialize<BMSExternalLinkIndex>(json, json_options);
             }
             catch
             {

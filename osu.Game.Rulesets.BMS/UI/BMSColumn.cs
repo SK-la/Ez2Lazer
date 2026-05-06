@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -18,9 +17,9 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.BMS.UI
 {
     /// <summary>
-    /// A single column in the BMS playfield. Mania default skin drawables require a <see cref="Mania.UI.Column"/>
-    /// in the dependency tree; we keep a hidden <see cref="Column"/> (see <see cref="skinDependencyColumn"/>) for that, same idea as
-    /// <c>ColumnTestContainer</c> in mania tests.
+    /// A single column in the BMS playfield. Reuses mania skin components via a hidden <see cref="Mania.UI.Column"/>
+    /// (<see cref="skinDependencyColumn"/>): <see cref="Mania.UI.Column.Index"/> matches this lane,
+    /// <see cref="Mania.UI.Column.IsSpecial"/> mirrors BMS scratch, and <see cref="Mania.UI.Column.Action"/> follows <see cref="BMSStageLayout.ManiaSkinActionForColumn"/>.
     /// </summary>
     public partial class BMSColumn : ScrollingPlayfield
     {
@@ -48,7 +47,7 @@ namespace osu.Game.Rulesets.BMS.UI
             {
                 Alpha = 0,
                 RelativeSizeAxes = Axes.Both,
-                Action = { Value = maniaActionForColumnIndex(columnIndex) }
+                Action = { Value = BMSStageLayout.ManiaSkinActionForColumn(columnIndex) }
             };
 
             InternalChildren = new Drawable[]
@@ -97,9 +96,6 @@ namespace osu.Game.Rulesets.BMS.UI
             skinHitTarget.ApplyGameWideClock(host);
             skinKeyArea.ApplyGameWideClock(host);
         }
-
-        private static ManiaAction maniaActionForColumnIndex(int index)
-            => (ManiaAction)Math.Min(index, (int)ManiaAction.Key20);
 
         public static Color4 GetColumnColour(int columnIndex)
         {

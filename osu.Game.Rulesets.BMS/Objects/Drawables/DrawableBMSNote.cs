@@ -18,6 +18,9 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
     {
         private const float note_height = 20f;
 
+        [Resolved]
+        private BMSStageLayout stageLayout { get; set; } = null!;
+
         private Drawable noteBody = null!;
 
         public DrawableBMSNote()
@@ -69,7 +72,7 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
 
         public bool OnPressed(KeyBindingPressEvent<BMSAction> e)
         {
-            if (e.Action == GetActionForColumn(HitObject.Column))
+            if (e.Action == stageLayout.ActionFor(HitObject))
             {
                 return UpdateResult(true);
             }
@@ -79,30 +82,6 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
 
         public void OnReleased(KeyBindingReleaseEvent<BMSAction> e)
         {
-        }
-
-        private static BMSAction GetActionForColumn(int column)
-        {
-            return column switch
-            {
-                0 => BMSAction.Scratch1,
-                1 => BMSAction.Key1,
-                2 => BMSAction.Key2,
-                3 => BMSAction.Key3,
-                4 => BMSAction.Key4,
-                5 => BMSAction.Key5,
-                6 => BMSAction.Key6,
-                7 => BMSAction.Key7,
-                8 => BMSAction.Scratch2,
-                9 => BMSAction.Key8,
-                10 => BMSAction.Key9,
-                11 => BMSAction.Key10,
-                12 => BMSAction.Key11,
-                13 => BMSAction.Key12,
-                14 => BMSAction.Key13,
-                15 => BMSAction.Key14,
-                _ => BMSAction.Key1
-            };
         }
 
         protected override void UpdateHitStateTransforms(ArmedState state)

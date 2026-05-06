@@ -67,6 +67,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         ///     Get the cache file path.
         /// </summary>
         private string cacheFilePath => Path.Combine(cacheDirectory, cache_filename);
+
         private string sourceMapFilePath => Path.Combine(cacheDirectory, source_map_filename);
 
         private CancellationTokenSource? scanCts;

@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -16,7 +17,7 @@ namespace osu.Game.Rulesets.BMS.UI
     /// <summary>
     /// BMS playfield layout. Double-play stage gap (<see cref="BMSRulesetSetting.DpStageSpacing"/>) is implemented here on the BMS side
     /// (not mania <see cref="Mania.UI.Stage"/>) until/unless promoted upstream.
-    /// Scratch lane identity follows decoder/global column mapping; DP spacing only affects layout between the two stages.
+    /// Scratch lane width uses <see cref="BMSStageLayout.ScratchColumnIndices"/> when present; otherwise a legacy heuristic by column count.
     /// </summary>
     [Cached]
     public partial class BMSPlayfield : ScrollingPlayfield
@@ -34,9 +35,10 @@ namespace osu.Game.Rulesets.BMS.UI
         private readonly Container<BMSColumn> columns;
         private readonly BindableDouble dpStageSpacing = new BindableDouble();
 
-        public BMSPlayfield(int totalColumns)
+        public BMSPlayfield(BMSStageLayout layout)
         {
-            this.totalColumns = totalColumns;
+            var scratchSet = new HashSet<int>(layout.ScratchColumnIndices);
+            totalColumns = layout.TotalColumns;
             StageDefinition = new StageDefinition(totalColumns);
 
             RelativeSizeAxes = Axes.Y;
@@ -52,12 +54,10 @@ namespace osu.Game.Rulesets.BMS.UI
 
             for (int i = 0; i < totalColumns; i++)
             {
-                bool isScratch = totalColumns switch
-                {
-                    6 or 8 => i == 0,
-                    12 or 16 => i == 0 || i == totalColumns / 2,
-                    _ => false,
-                };
+                bool isScratch = scratchSet.Count > 0
+                    ? scratchSet.Contains(i)
+                    : legacyScratchHeuristic(i, totalColumns);
+
                 float width = isScratch ? SCRATCH_WIDTH : COLUMN_WIDTH;
 
                 columns.Add(new BMSColumn(i, isScratch)
@@ -69,6 +69,17 @@ namespace osu.Game.Rulesets.BMS.UI
 
             updateColumnLayout();
         }
+
+        /// <summary>
+        /// Fallback when beatmap does not mark scratch lanes (empty <see cref="BMSStageLayout.ScratchColumnIndices"/>).
+        /// </summary>
+        private static bool legacyScratchHeuristic(int columnIndex, int columnsTotal) =>
+            columnsTotal switch
+            {
+                6 or 8 => columnIndex == 0,
+                12 or 16 => columnIndex == 0 || columnIndex == columnsTotal / 2,
+                _ => false,
+            };
 
         [BackgroundDependencyLoader]
         private void load(BMSRulesetConfigManager config)
