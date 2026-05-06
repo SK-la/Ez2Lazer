@@ -34,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         }
     }
 
-    public partial class Ez2AcDrawableLNeHead : DrawableHoldNoteHead
+    public partial class Ez2AcDrawableLNHead : DrawableHoldNoteHead
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
@@ -88,19 +88,20 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            // if (!userTriggered && timeOffset >= 0)
-            // {
-            //     if (!HitObject.HitWindows.CanBeHit(timeOffset))
-            //         ApplyMinResult();
-            //
-            //     return;
-            // }
+            // Holding to the tail should auto-judge at/past 0 offset.
+            // Before the tail, only an early release should judge using the timing table below.
+            if (!userTriggered && timeOffset < 0)
+                return;
 
-            // 无论用户是否触发，都进行判定
             var result = HitObject.HitWindows.ResultFor(timeOffset);
 
             if (result == HitResult.None)
+            {
+                if (!userTriggered && !HitObject.HitWindows.CanBeHit(timeOffset))
+                    ApplyMinResult();
+
                 return;
+            }
 
             // 放宽1级
             switch (result)

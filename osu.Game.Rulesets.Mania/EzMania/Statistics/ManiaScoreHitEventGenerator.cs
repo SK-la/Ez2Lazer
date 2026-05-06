@@ -443,7 +443,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             if (result == HitResult.None)
                 return HitResult.None;
 
-            // Align with Ez2AcDrawableLNeHead / Ez2AcDrawableLNTail: LN head/tail are softened by one level.
+            // Align with Ez2AcDrawableLNHead / Ez2AcDrawableLNTail: LN head/tail are softened by one level.
             if (target is HeadNote or TailNote)
                 result = softenEz2AcLnResult(result);
 
