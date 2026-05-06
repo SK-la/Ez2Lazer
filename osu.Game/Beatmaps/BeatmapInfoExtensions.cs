@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using osu.Framework.Localisation;
 using osu.Game.Online.API;
@@ -71,6 +72,12 @@ namespace osu.Game.Beatmaps
         {
             if (beatmap.Ruleset.ShortName == ruleset.ShortName)
                 return true;
+
+            // External BMS folders linked into the library use BeatmapSet.Hash "bms-ext:set:…".
+            // Those entries must stay on the BMS ruleset only (do not treat as convertible osu!/mania maps).
+            if (beatmap.BeatmapSet is BeatmapSetInfo { Hash: var setHash }
+                && setHash.StartsWith("bms-ext:set:", StringComparison.Ordinal))
+                return false;
 
             if (allowConversion && beatmap.Ruleset.OnlineID == 0 && ruleset.OnlineID != 0)
                 return true;

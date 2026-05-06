@@ -58,6 +58,21 @@ namespace osu.Game.Database
             return file;
         }
 
+        /// <summary>
+        /// Registers a <see cref="RealmFile"/> row for an existing on-disk file identified by its SHA-256 hash, without copying bytes into the game file store.
+        /// Used for external libraries where content is read from the original path (see working beatmap external path resolution).
+        /// </summary>
+        public RealmFile RegisterExternalHash(string sha256Hash, Realm realm, bool addToRealm = true)
+        {
+            var existing = realm.Find<RealmFile>(sha256Hash);
+            var file = existing ?? new RealmFile { Hash = sha256Hash };
+
+            if (addToRealm && !file.IsManaged)
+                realm.Add(file);
+
+            return file;
+        }
+
         private void copyToStore(RealmFile file, Stream data, bool preferHardLinks)
         {
             if (data is FileStream fs && preferHardLinks)
