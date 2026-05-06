@@ -1,10 +1,15 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Platform;
+using osu.Game.Extensions;
 using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
@@ -13,13 +18,25 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.BMS.UI
 {
     /// <summary>
-    /// A single column in the BMS playfield.
+    /// A single column in the BMS playfield. Mania default skin drawables require a <see cref="Mania.UI.Column"/>
+    /// in the dependency tree; we keep a hidden <see cref="Column"/> (see <see cref="skinDependencyColumn"/>) for that, same idea as
+    /// <c>ColumnTestContainer</c> in mania tests.
     /// </summary>
     public partial class BMSColumn : ScrollingPlayfield
     {
         public readonly int ColumnIndex;
 
-        public BMSColumn(int columnIndex)
+        /// <summary>
+        /// Provides <c>Resolved</c> <see cref="Column"/> for <see cref="DefaultColumnBackground"/>, <see cref="DefaultHitTarget"/>, <see cref="DefaultKeyArea"/> and skin colour lookup.
+        /// </summary>
+        [Cached]
+        private readonly Column skinDependencyColumn;
+
+        private readonly SkinnableDrawable skinColumnBackground;
+        private readonly SkinnableDrawable skinHitTarget;
+        private readonly SkinnableDrawable skinKeyArea;
+
+        public BMSColumn(int columnIndex, bool isScratch)
         {
             ColumnIndex = columnIndex;
 
@@ -27,15 +44,21 @@ namespace osu.Game.Rulesets.BMS.UI
             Anchor = Anchor.TopLeft;
             Origin = Anchor.TopLeft;
 
+            skinDependencyColumn = new Column(columnIndex, isScratch)
+            {
+                Alpha = 0,
+                RelativeSizeAxes = Axes.Both,
+                Action = { Value = maniaActionForColumnIndex(columnIndex) }
+            };
+
             InternalChildren = new Drawable[]
             {
-                // Background
-                new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.ColumnBackground), _ => new DefaultColumnBackground())
+                skinDependencyColumn,
+                skinColumnBackground = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.ColumnBackground), _ => new DefaultColumnBackground())
                 {
                     RelativeSizeAxes = Axes.Both,
                     Alpha = 0.3f,
                 },
-                // Border
                 new Box
                 {
                     RelativeSizeAxes = Axes.Y,
@@ -45,43 +68,52 @@ namespace osu.Game.Rulesets.BMS.UI
                     Anchor = Anchor.TopRight,
                     Origin = Anchor.TopRight,
                 },
-                // Hit target area
                 new Container
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 20,
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
-                    Y = -100, // Position from bottom
-                    Child = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.HitTarget), _ => new DefaultHitTarget())
+                    Y = -100,
+                    Child = skinHitTarget = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.HitTarget), _ => new DefaultHitTarget())
                     {
                         RelativeSizeAxes = Axes.Both,
                     }
                 },
-                new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.KeyArea), _ => new DefaultKeyArea())
+                skinKeyArea = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.KeyArea), _ => new DefaultKeyArea())
                 {
                     RelativeSizeAxes = Axes.Both,
                     Alpha = 0.15f,
                 },
-                // Hit object container
                 HitObjectContainer,
             };
         }
 
+        [BackgroundDependencyLoader]
+        private void load(GameHost host)
+        {
+            skinDependencyColumn.ApplyGameWideClock(host);
+            skinColumnBackground.ApplyGameWideClock(host);
+            skinHitTarget.ApplyGameWideClock(host);
+            skinKeyArea.ApplyGameWideClock(host);
+        }
+
+        private static ManiaAction maniaActionForColumnIndex(int index)
+            => (ManiaAction)Math.Min(index, (int)ManiaAction.Key20);
+
         public static Color4 GetColumnColour(int columnIndex)
         {
-            // Standard BMS color scheme
             return columnIndex switch
             {
-                0 => new Color4(255, 0, 0, 255), // Scratch - Red
-                1 => new Color4(255, 255, 255, 255), // White
-                2 => new Color4(0, 150, 255, 255), // Blue
-                3 => new Color4(255, 255, 255, 255), // White
-                4 => new Color4(0, 150, 255, 255), // Blue
-                5 => new Color4(255, 255, 255, 255), // White
-                6 => new Color4(0, 150, 255, 255), // Blue
-                7 => new Color4(255, 255, 255, 255), // White
-                _ => new Color4(200, 200, 200, 255), // Default gray
+                0 => new Color4(255, 0, 0, 255),
+                1 => new Color4(255, 255, 255, 255),
+                2 => new Color4(0, 150, 255, 255),
+                3 => new Color4(255, 255, 255, 255),
+                4 => new Color4(0, 150, 255, 255),
+                5 => new Color4(255, 255, 255, 255),
+                6 => new Color4(0, 150, 255, 255),
+                7 => new Color4(255, 255, 255, 255),
+                _ => new Color4(200, 200, 200, 255),
             };
         }
     }
