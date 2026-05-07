@@ -113,7 +113,8 @@ namespace osu.Game.Storyboards
                     // Similar to StartTime, limit the drawable lifetime to the last point where the sprite can still be visible.
                     // This avoids keeping fully transparent sprites alive solely because trailing non-visual transforms continue later.
                     var lastAlpha = alphaCommands.MaxBy(c => c.displayEndTime);
-                    var lastRealAlpha = alphaCommands.Where(c => visibleAtStartOrEnd(c.command)).MaxBy(c => c.displayEndTime);
+                    var visibleAlphaCommands = alphaCommands.Where(c => visibleAtStartOrEnd(c.command)).ToList();
+                    var lastRealAlpha = visibleAlphaCommands.Count > 0 ? visibleAlphaCommands.MaxBy(c => c.displayEndTime) : default;
 
                     if (lastAlpha.command.EndValue == 0 && lastRealAlpha.command != null)
                         return lastRealAlpha.displayEndTime;
