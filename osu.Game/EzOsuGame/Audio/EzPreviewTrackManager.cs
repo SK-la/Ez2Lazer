@@ -33,6 +33,8 @@ namespace osu.Game.EzOsuGame.Audio
     /// 1. 在选歌界面实现最完整的游戏音轨预览。
     /// <para>2. 提供拓展支持，自定义预览时间、循环次数和间隔、关联游戏时钟、开关note音效等。</para>
     /// </summary>
+    // TODO: step1, 未来添加，在非官方4模式时(OnlineID > 3)，开放更宽松API允许外部介入。
+    // TODO: step2, 下一步要修改音乐控制器，改为基于谱面时长/音乐时长，选更长的为基准，然后让预览音轨管理器与游戏时钟同步。让音乐控制器负责更强的音频音效播放。
     public partial class EzPreviewTrackManager : CompositeDrawable
     {
         // 单例/实例都可用，但我们使用实例级 Bindable 以便在 `SongSelect` 中直接 BindTo。
@@ -55,7 +57,7 @@ namespace osu.Game.EzOsuGame.Audio
         private ISampleStore? previewSampleStore;
         private IBeatmapSetInfo? lastPreviewSet;
 
-        // LRU 缓存：按 BeatmapSetID 缓存样本数据
+        // LRU 缓存：按 BeatmapID 缓存样本数据，避免跨难度复用调度数据。
         private readonly LinkedList<string> beatmapAccessOrder = new LinkedList<string>();
         private readonly Dictionary<string, BeatmapSampleCache> sampleCache = new Dictionary<string, BeatmapSampleCache>();
 
@@ -149,6 +151,13 @@ namespace osu.Game.EzOsuGame.Audio
             {
                 currentTrack.Volume.Value = 1f;
                 currentTrack.Stop();
+
+                // 预览结束后归一化轨道状态，避免将 loop/restart 配置泄露到后续游戏流程。
+                currentTrack.Looping = false;
+                currentTrack.RestartPoint = 0;
+
+                currentTrack.Seek(0);
+
                 if (ownsCurrentTrack)
                     currentTrack.Dispose();
             }
@@ -882,16 +891,18 @@ namespace osu.Game.EzOsuGame.Audio
         /// </summary>
         private void saveCurrentBeatmapToCache()
         {
-            if (currentBeatmap == null || currentBeatmap.BeatmapInfo?.BeatmapSet?.OnlineID <= 0)
+            if (currentBeatmap == null)
                 return;
 
-            string beatmapSetId = currentBeatmap.BeatmapInfo!.BeatmapSet!.OnlineID.ToString();
+            string? beatmapCacheKey = getBeatmapCacheKey(currentBeatmap.BeatmapInfo);
+            if (string.IsNullOrEmpty(beatmapCacheKey))
+                return;
 
             // 保存到缓存
-            if (!sampleCache.TryGetValue(beatmapSetId, out var value))
+            if (!sampleCache.TryGetValue(beatmapCacheKey, out var value))
             {
                 value = new BeatmapSampleCache();
-                sampleCache[beatmapSetId] = value;
+                sampleCache[beatmapCacheKey] = value;
             }
 
             var cache = value;
@@ -902,8 +913,8 @@ namespace osu.Game.EzOsuGame.Audio
             cache.LongestStoryboardTime = sampleScheduler.LongestStoryboardTime;
 
             // 更新访问顺序（LRU）
-            beatmapAccessOrder.Remove(beatmapSetId);
-            beatmapAccessOrder.AddFirst(beatmapSetId);
+            beatmapAccessOrder.Remove(beatmapCacheKey);
+            beatmapAccessOrder.AddFirst(beatmapCacheKey);
 
             // 如果超过缓存上限，移除最旧的
             while (beatmapAccessOrder.Count > max_cached_beatmaps)
@@ -923,12 +934,11 @@ namespace osu.Game.EzOsuGame.Audio
         /// </summary>
         private bool restoreFromCache(IWorkingBeatmap beatmap)
         {
-            if (beatmap.BeatmapInfo?.BeatmapSet?.OnlineID <= 0)
+            string? beatmapCacheKey = getBeatmapCacheKey(beatmap.BeatmapInfo);
+            if (string.IsNullOrEmpty(beatmapCacheKey))
                 return false;
 
-            string beatmapSetId = beatmap.BeatmapInfo!.BeatmapSet!.OnlineID.ToString();
-
-            if (!sampleCache.TryGetValue(beatmapSetId, out var cache))
+            if (!sampleCache.TryGetValue(beatmapCacheKey, out var cache))
                 return false;
 
             // 从缓存恢复数据（使用 Clear + AddRange 方式避免 readonly 字段赋值错误）
@@ -949,10 +959,24 @@ namespace osu.Game.EzOsuGame.Audio
             sampleScheduler.LongestStoryboardTime = cache.LongestStoryboardTime;
 
             // 更新访问顺序（LRU）
-            beatmapAccessOrder.Remove(beatmapSetId);
-            beatmapAccessOrder.AddFirst(beatmapSetId);
+            beatmapAccessOrder.Remove(beatmapCacheKey);
+            beatmapAccessOrder.AddFirst(beatmapCacheKey);
 
             return true;
+        }
+
+        private static string? getBeatmapCacheKey(IBeatmapInfo? beatmapInfo)
+        {
+            if (beatmapInfo == null)
+                return null;
+
+            if (beatmapInfo is BeatmapInfo localBeatmap && localBeatmap.ID != Guid.Empty)
+                return localBeatmap.ID.ToString();
+
+            if (!string.IsNullOrWhiteSpace(beatmapInfo.MD5Hash))
+                return beatmapInfo.MD5Hash;
+
+            return beatmapInfo.GetDisplayTitle();
         }
 
         private struct ScheduledHitSound
