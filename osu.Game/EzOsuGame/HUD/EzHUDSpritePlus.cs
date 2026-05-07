@@ -15,12 +15,14 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
+using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Skinning;
 using osu.Game.Utils;
+using osu.Game.Rulesets.Difficulty.Utils;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.HUD
@@ -67,10 +69,24 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_BLENDING_LABEL), nameof(EzHUDStrings.HITRESULT_BLENDING_DESCRIPTION))]
         public Bindable<BlendMode> Blend { get; } = new Bindable<BlendMode>(BlendMode.Mixture);
 
+        [SettingSource("Use Beatmap BPM")]
+        public Bindable<bool> UseBeatmapBPM { get; } = new Bindable<bool>(false);
+
+        [SettingSource("Beat Division (1/n)")]
+        public BindableNumber<int> BeatDivision { get; } = new BindableNumber<int>(4)
+        {
+            MinValue = 1,
+            MaxValue = 32,
+            Precision = 1
+        };
+
         public bool UsesFixedAnchor { get; set; }
 
         [Resolved]
         private EzResourceProvider resourceProvider { get; set; } = null!;
+
+        [Resolved]
+        private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
         private Drawable? currentDrawable;
 
@@ -88,6 +104,8 @@ namespace osu.Game.EzOsuGame.HUD
             SpriteName.BindValueChanged(_ => scheduleReload());
             FrameTemplate.BindValueChanged(_ => scheduleReload());
             FPS.BindValueChanged(_ => scheduleReload());
+            UseBeatmapBPM.BindValueChanged(_ => scheduleReload());
+            BeatDivision.BindValueChanged(_ => scheduleReload());
             TextureScale.BindValueChanged(_ => applyVisualSettings(), true);
             AccentColour.BindValueChanged(_ => applyVisualSettings(), true);
             Blend.BindValueChanged(_ => applyVisualSettings(), true);
@@ -137,7 +155,7 @@ namespace osu.Game.EzOsuGame.HUD
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Loop = true,
-                DefaultFrameLength = 1000f / Math.Clamp(FPS.Value, 1f, 240f),
+                DefaultFrameLength = (float)getFrameLengthFromSettings(),
             };
 
             for (int i = 0; i < max_animation_frames; i++)
@@ -152,6 +170,22 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             return animation.FrameCount > 0 ? animation : null;
+        }
+
+        private double getFrameLengthFromSettings()
+        {
+            if (UseBeatmapBPM.Value && beatmap?.Value?.BeatmapInfo != null)
+            {
+                double bpm = beatmap.Value.BeatmapInfo.BPM;
+
+                if (bpm > 0)
+                {
+                    int division = Math.Clamp(BeatDivision.Value, 1, 32);
+                    return DifficultyCalculationUtils.BPMToMilliseconds(bpm, division);
+                }
+            }
+
+            return 1000.0 / Math.Clamp(FPS.Value, 1f, 240f);
         }
 
         private Drawable? createSingleDrawable(string baseLookup)
