@@ -28,6 +28,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
+using osu.Game.Rulesets.BMS.Audio;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Screens;
@@ -352,7 +353,10 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         private void startFallbackPreviewTrack(BMSWorkingBeatmap beatmap, BMSChartCache chart)
         {
-            fallbackPreviewTrack = beatmap.Track;
+            stopFallbackPreviewTrack();
+
+            // Prefer loading an actual BGM track from BMS definitions for fallback preview.
+            fallbackPreviewTrack = BmsBackgroundMusicLoader.TryLoadBgmTrack(audioManager, chart.FullPath) ?? beatmap.Track;
 
             if (fallbackPreviewTrack == null)
                 return;

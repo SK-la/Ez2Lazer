@@ -47,6 +47,7 @@ using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Logging;
 using System.IO;
 
 namespace osu.Game.Rulesets.BMS
@@ -65,7 +66,72 @@ namespace osu.Game.Rulesets.BMS
         public override string PlayingVerb => "Playing BMS";
 
         public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
-            => new ManiaRuleset().CreateDrawableRulesetWith(ManiaConvertedWorkingBeatmap.ConvertToManiaBeatmap(beatmap), mods);
+        {
+            var maniaDrawableRuleset = new ManiaRuleset().CreateDrawableRulesetWith(ManiaConvertedWorkingBeatmap.ConvertToManiaBeatmap(beatmap), mods);
+
+            attachBmsRuntimeComponents(maniaDrawableRuleset, beatmap);
+
+            return maniaDrawableRuleset;
+        }
+
+        private static void attachBmsRuntimeComponents(DrawableRuleset drawableRuleset, IBeatmap beatmap)
+        {
+            // Always register the AudioManager for non-Drawable BMS helpers (e.g. BMSExternalSampleSkin).
+            drawableRuleset.Overlays.Add(new BmsRuntimeAudioRegistrar());
+
+            // Only attach the BGM driver when this beatmap is actually backed by an external BMS folder
+            // and we can resolve some background sound events.
+            if (!BMSExternalPath.TryDecode(beatmap.BeatmapInfo.BeatmapSet?.Hash, out string folder))
+                return;
+
+            var bgmEvents = tryLoadBackgroundSoundEvents(beatmap, folder);
+
+            if (bgmEvents.Count == 0)
+                return;
+
+            drawableRuleset.Overlays.Add(new BmsBackgroundSoundDriver(folder, bgmEvents));
+        }
+
+        private static IReadOnlyList<BmsBackgroundSoundEvent> tryLoadBackgroundSoundEvents(IBeatmap beatmap, string folder)
+        {
+            if (beatmap is BMSBeatmap directBmsBeatmap && directBmsBeatmap.BackgroundSoundEvents.Count > 0)
+                return directBmsBeatmap.BackgroundSoundEvents;
+
+            // The standard play path runs the chart through the mania converter, which strips top-level
+            // BMS metadata. As a last-resort fallback, locate the original .bms file in the folder and
+            // re-decode it just to fish out the BGM event list.
+            try
+            {
+                if (!Directory.Exists(folder))
+                    return Array.Empty<BmsBackgroundSoundEvent>();
+
+                string? chartFile = Directory.EnumerateFiles(folder)
+                                             .FirstOrDefault(path =>
+                                             {
+                                                 string ext = Path.GetExtension(path);
+                                                 return string.Equals(ext, ".bms", StringComparison.OrdinalIgnoreCase)
+                                                        || string.Equals(ext, ".bme", StringComparison.OrdinalIgnoreCase)
+                                                        || string.Equals(ext, ".bml", StringComparison.OrdinalIgnoreCase)
+                                                        || string.Equals(ext, ".pms", StringComparison.OrdinalIgnoreCase);
+                                             });
+
+                if (chartFile == null)
+                    return Array.Empty<BmsBackgroundSoundEvent>();
+
+                using var stream = File.OpenRead(chartFile);
+                using var reader = new osu.Game.IO.LineBufferedReader(stream);
+                var decoder = new BMSBeatmapDecoder();
+
+                if (decoder.Decode(reader) is BMSBeatmap decoded)
+                    return decoded.BackgroundSoundEvents;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[BMS] Failed to load background sound events from '{folder}': {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
+            }
+
+            return Array.Empty<BmsBackgroundSoundEvent>();
+        }
 
         public override ScoreProcessor CreateScoreProcessor() => new BMSScoreProcessor();
 
@@ -81,6 +147,18 @@ namespace osu.Game.Rulesets.BMS
         public override IEzAnalysisProvider CreateEzAnalysisProvider() => new EzManiaAnalysisProvider();
 
         public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap)
+        {
+            var inner = createInnerSkinTransformer(skin, beatmap) ?? skin;
+
+            // Only wrap with the external sample skin when this beatmap is actually backed by an
+            // external BMS folder; for in-Realm beatmaps the inner transformer is sufficient.
+            if (!BMSExternalPath.TryDecode(beatmap.BeatmapInfo.BeatmapSet?.Hash, out string folder))
+                return ReferenceEquals(inner, skin) ? null : inner;
+
+            return new BMSExternalSampleSkin(inner, folder, () => BmsRuntimeAudioContext.Audio);
+        }
+
+        private ISkin? createInnerSkinTransformer(ISkin skin, IBeatmap beatmap)
         {
             var maniaRuleset = new ManiaRuleset();
 
