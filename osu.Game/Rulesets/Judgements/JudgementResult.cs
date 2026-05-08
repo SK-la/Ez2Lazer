@@ -142,6 +142,8 @@ namespace osu.Game.Rulesets.Judgements
         {
             Type = HitResult.None;
             RawTime = null;
+            IsComboHit = null;
+            IsFinal = true;
         }
 
         public override string ToString() => $"{Type} ({Judgement})";
