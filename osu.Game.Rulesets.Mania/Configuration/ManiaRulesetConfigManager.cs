@@ -65,16 +65,15 @@ namespace osu.Game.Rulesets.Mania.Configuration
 
     public enum ManiaRulesetSetting
     {
-        ScrollStyle,
-        ScrollTime,
-        ScrollBaseSpeed,
-        ScrollTimePerSpeed,
-
         //官方设置
         ScrollSpeed,
         ScrollDirection,
         TimingBasedNoteColouring,
         MobileLayout,
         TouchOverlay,
+
+        ScrollStyle = 6,
+        ScrollBaseSpeed = 7,
+        ScrollTimePerSpeed = 8,
     }
 }
