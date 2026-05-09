@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
@@ -289,6 +290,63 @@ namespace osu.Game.EzOsuGame
         public string BuildStagePath(string component)
         {
             return $"Stage/{stageName.Value}/Stage/{component}";
+        }
+
+        #endregion
+
+        #region 流读取 API
+
+        /// <summary>
+        /// 从 EzResources 或内置 Resources 获取资源流。
+        /// </summary>
+        /// <param name="path">资源路径（可为绝对路径或相对路径）</param>
+        /// <returns>可读流，未找到时返回 null</returns>
+        public Stream? GetEzResourceStream(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return null;
+
+            // 允许直接传入绝对路径。
+            if (Path.IsPathRooted(path))
+            {
+                try
+                {
+                    return File.Exists(path) ? File.OpenRead(path) : null;
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            foreach (string candidate in getPathCandidates(path))
+            {
+                Stream? stream = Files.GetStream(candidate);
+                if (stream != null)
+                    return stream;
+
+                // Resources 已 namespaced 到 "Resources"，因此这里传相对路径。
+                stream = Resources.GetStream(candidate);
+                if (stream != null)
+                    return stream;
+            }
+
+            return null;
+        }
+
+        private static IEnumerable<string> getPathCandidates(string originalPath)
+        {
+            string normalized = originalPath.Replace('\\', '/').TrimStart('/');
+
+            const string ez_prefix = "EzResources/";
+
+            if (normalized.StartsWith(ez_prefix, StringComparison.OrdinalIgnoreCase))
+                normalized = normalized.Substring(ez_prefix.Length);
+
+            yield return normalized;
+
+            // 兼容某些内置资源仍保留 EzResources 前缀的情况。
+            yield return ez_prefix + normalized;
         }
 
         #endregion

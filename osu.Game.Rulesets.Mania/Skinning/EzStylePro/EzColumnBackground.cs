@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania;
@@ -52,11 +53,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load(TextureStore textures)
+        private void load(EzResourceProvider textures)
         {
             // 计算 drawSeparator 结果（基于不变的列数和列索引）
             hasSeparator = stageDefinition.HasSeparator(column.Index);
-            sharedTexture ??= textures.Get("EzResources/note/ColumnLight");
+
+            sharedTexture ??= textures.Get("EzResources/Column/ColumnLight");
 
             hitOverlay = new Sprite
             {

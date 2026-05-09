@@ -13,5 +13,8 @@ namespace osu.Game.EzOsuGame
         public const string STAGE_PATH = @"EzResources/Stage";
         public const string GAME_THEME_PATH = @"EzResources/GameTheme";
         public const string FULL_COMBO = @"EzResources/Modify/FullCombo";
+
+        public const string VIDEO_PATH = @"EzResources/Video";
+        public const string BG_PATH = @"EzResources/BG";
     }
 }

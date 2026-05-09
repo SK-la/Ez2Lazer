@@ -18,10 +18,10 @@ namespace osu.Game.Configuration
         [LocalisableDescription(typeof(UserInterfaceStrings), nameof(UserInterfaceStrings.BeatmapWithStoryboard))]
         BeatmapWithStoryboard,
 
-        [Description("'EzResource/Webm/*' from osu data folder ")]
-        WebmSource,
+        [Description("'EzResources/Video/*' from osu data folder")]
+        Video = 3,
 
-        [Description("'EzResource/BG/*' from local folders")]
-        Slides,
+        [Description("'EzResources/BG/*' from osu data folder")]
+        Picture = 4,
     }
 }
