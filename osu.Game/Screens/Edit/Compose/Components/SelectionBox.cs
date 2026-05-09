@@ -123,6 +123,7 @@ namespace osu.Game.Screens.Edit.Compose.Components
 
         private string secondaryText = string.Empty;
 
+        // 在右上角显示的次要文本（例如选中note所在的列号）
         public string SecondaryText
         {
             get => secondaryText;

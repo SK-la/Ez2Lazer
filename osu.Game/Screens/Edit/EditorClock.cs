@@ -30,7 +30,8 @@ namespace osu.Game.Screens.Edit
 
         private readonly Bindable<Track> track = new Bindable<Track>();
 
-        // 主音频和谱面长度取长者。未来应该实现可以自己加长谱面时长，来提高全key音谱面制作能力。
+        // 主音频和谱面长度取长者。
+        // TODO:未来应该实现可以自己加长谱面时长，来提高全key音谱面制作能力。
         public double TrackLength
         {
             get
@@ -113,8 +114,8 @@ namespace osu.Game.Screens.Edit
         /// <summary>
         /// 这个方法返回根据当前编辑器节拍除数配置进行捕捉的<paramref name="time"/>。
         /// 对其到显示的编辑器网格粒度。
-        /// TODO: 尽管如此，视觉上也依然难以发觉捕捉效果。最好在编辑器顶部的时间轴上同步显示光标位置。
         /// </summary>
+        // TODO: 尽管如此，视觉上也依然难以发觉捕捉效果。最好在编辑器顶部的时间轴上同步显示光标位置。
         public double GetSnappedTime(double time)
         {
             double snapped = ControlPointInfo.GetClosestSnappedTime(time, beatDivisor.Value);
