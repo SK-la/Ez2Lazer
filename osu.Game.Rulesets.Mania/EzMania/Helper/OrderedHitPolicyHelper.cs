@@ -55,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
                     double postJudgedDistance = distanceToNonBadWindow(nearestPostJudged, time);
 
-                        double nearestUnjudgedDistance = getOverlappingCandidates(time)
+                    double nearestUnjudgedDistance = getOverlappingCandidates(time)
                                                      .Where(o => !o.IsJudged)
                                                      .Select(o => distanceToNonBadWindow(o, time))
                                                      .DefaultIfEmpty(double.PositiveInfinity)
@@ -264,12 +264,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             {
                 case EzEnumJudgePrecedence.Duration:
                     var orderedD = candidateList.OrderBy(c => c.StartTime).ToList();
-                    var pickedD = SelectFoldCandidate(orderedD, time, comboAlgorithm: false);
+                    var pickedD = selectFoldCandidate(orderedD, time, comboAlgorithm: false);
                     return pickedD ?? (allowFallbackToEarliest ? orderedD[0] : null);
 
                 case EzEnumJudgePrecedence.Combo:
                     var orderedC = candidateList.OrderBy(c => c.StartTime).ToList();
-                    var pickedC = SelectFoldCandidate(orderedC, time, comboAlgorithm: true);
+                    var pickedC = selectFoldCandidate(orderedC, time, comboAlgorithm: true);
                     return pickedC ?? (allowFallbackToEarliest ? orderedC[0] : null);
 
                 case EzEnumJudgePrecedence.Earliest:
@@ -295,7 +295,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 comboAlgorithm);
         }
 
-        private static PrecedenceCandidate? SelectFoldCandidate(IReadOnlyList<PrecedenceCandidate> sortedByStartTime, double pressTime, bool comboAlgorithm)
+        private static PrecedenceCandidate? selectFoldCandidate(IReadOnlyList<PrecedenceCandidate> sortedByStartTime, double pressTime, bool comboAlgorithm)
         {
             return SelectFold(
                 sortedByStartTime,

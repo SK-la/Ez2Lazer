@@ -3,7 +3,6 @@
 
 using System.Collections.Generic;
 using osu.Framework.Extensions.IEnumerableExtensions;
-using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
@@ -20,7 +19,6 @@ namespace osu.Game.Rulesets.Mania.UI
     {
         private readonly HitObjectContainer hitObjectContainer;
         private readonly OrderedHitPolicyHelper helper;
-        private const string log_prefix = "[JudgeDiag][OrderedHitPolicy]";
 
         public OrderedHitPolicy(HitObjectContainer hitObjectContainer)
         {
@@ -41,16 +39,10 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             // 非Earliest模式下，允许独立的优先级算法。
             if (GlobalConfigStore.EzConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence) != EzEnumJudgePrecedence.Earliest)
-            {
-                bool result = helper.IsHittableWithPrecedence(hitObject, time);
-                logDiag($"isHittable-precedence t={time:F3} target={describe(hitObject)} result={result}");
-                return result;
-            }
+                return helper.IsHittableWithPrecedence(hitObject, time);
 
             var nextObject = hitObjectContainer.AliveObjects.GetNext(hitObject);
-            bool isHittable = nextObject == null || time < nextObject.HitObject.StartTime;
-            logDiag($"isHittable-earliest t={time:F3} target={describe(hitObject)} next={describe(nextObject)} result={isHittable}");
-            return isHittable;
+            return nextObject == null || time < nextObject.HitObject.StartTime;
         }
 
         /// <summary>
@@ -60,8 +52,6 @@ namespace osu.Game.Rulesets.Mania.UI
         public void HandleHit(DrawableHitObject hitObject)
         {
             double judgementTime = hitObject.Result.TimeAbsolute;
-            var forcedMisses = new List<string>();
-            var preserved = new List<string>();
 
             foreach (var obj in enumerateHitObjectsUpTo(hitObject.HitObject.StartTime))
             {
@@ -69,18 +59,10 @@ namespace osu.Game.Rulesets.Mania.UI
                     continue;
 
                 if (OrderedHitPolicyHelper.IsUserTriggerJudgeableNow(obj, judgementTime))
-                {
-                    preserved.Add(describe(obj));
                     continue;
-                }
 
                 ((DrawableManiaHitObject)obj).MissForcefully();
-                forcedMisses.Add(describe(obj));
             }
-
-            logDiag(
-                $"handleHit source={describe(hitObject)} t={judgementTime:F3} " +
-                $"forcedMisses=[{string.Join(", ", forcedMisses)}] preserved=[{string.Join(", ", preserved)}]");
         }
 
         private IEnumerable<DrawableHitObject> enumerateHitObjectsUpTo(double targetTime)
@@ -100,22 +82,6 @@ namespace osu.Game.Rulesets.Mania.UI
                     yield return nestedObj;
                 }
             }
-        }
-
-        private static string describe(DrawableHitObject? obj)
-        {
-            if (obj == null)
-                return "null";
-
-            return $"{obj.GetType().Name}@{obj.HitObject.StartTime:F3} judged={obj.Judged}";
-        }
-
-        private static void logDiag(string message)
-        {
-            if (!GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled))
-                return;
-
-            Logger.Log($"{log_prefix} {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
         }
     }
 }
