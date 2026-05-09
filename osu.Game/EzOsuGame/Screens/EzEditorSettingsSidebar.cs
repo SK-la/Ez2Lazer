@@ -10,7 +10,7 @@ using osu.Game.Screens.Edit.Components;
 
 namespace osu.Game.EzOsuGame.Screens
 {
-    internal partial class EzSkinSettingsSidebar : EditorSidebar
+    internal partial class EzEditorSettingsSidebar : EditorSidebar
     {
         public enum SidebarTab
         {
@@ -21,11 +21,11 @@ namespace osu.Game.EzOsuGame.Screens
             Column = 2
         }
 
-        private EzSkinSettings? ezSkinSettings;
+        private EzEditorSectionSettingsSidebar? ezSkinSettings;
         private SidebarTab currentTab = SidebarTab.Select;
         private Action<Container<EditorSidebarSection>>? lastPopulator;
 
-        public EzSkinSettingsSidebar()
+        public EzEditorSettingsSidebar()
         {
             OsuTabControl<SidebarTab> tabControl;
             // 添加tabControl背景，防止内容遮挡tab标签
@@ -73,7 +73,7 @@ namespace osu.Game.EzOsuGame.Screens
 
         private void showEzSettings()
         {
-            ezSkinSettings = new EzSkinSettings
+            ezSkinSettings = new EzEditorSectionSettingsSidebar
             {
                 RelativeSizeAxes = Axes.X
             };

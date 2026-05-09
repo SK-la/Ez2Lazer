@@ -84,8 +84,8 @@ namespace osu.Game.Overlays.SkinEditor
 
         private Container? content;
 
-        private EzSkinComponentsSidebar componentsSidebar = null!;
-        private EzSkinSettingsSidebar settingsSidebar = null!;
+        private EzEditorComponentsSidebar componentsSidebar = null!;
+        private EzEditorSettingsSidebar settingsSidebar = null!;
 
         private SkinEditorChangeHandler? changeHandler;
 
@@ -223,13 +223,13 @@ namespace osu.Game.Overlays.SkinEditor
                                     {
                                         new Drawable[]
                                         {
-                                            componentsSidebar = new EzSkinComponentsSidebar(),
+                                            componentsSidebar = new EzEditorComponentsSidebar(),
                                             content = new Container
                                             {
                                                 Depth = float.MaxValue,
                                                 RelativeSizeAxes = Axes.Both,
                                             },
-                                            settingsSidebar = new EzSkinSettingsSidebar(),
+                                            settingsSidebar = new EzEditorSettingsSidebar(),
                                         }
                                     }
                                 }

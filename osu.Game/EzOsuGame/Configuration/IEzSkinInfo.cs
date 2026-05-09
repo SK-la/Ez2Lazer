@@ -10,6 +10,10 @@ namespace osu.Game.EzOsuGame.Configuration
 {
     public interface IEzSkinInfo
     {
+        Bindable<ColumnWidthStyle> ColumnWidthStyle { get; }
+        Bindable<bool> HitPositionGlobalEnable { get; }
+        Bindable<bool> ManiaLNGradientEnable { get; }
+
         Bindable<double> ColumnWidth { get; }
         Bindable<double> SpecialFactor { get; }
 
@@ -47,6 +51,10 @@ namespace osu.Game.EzOsuGame.Configuration
 
     public class EzSkinInfo : IEzSkinInfo
     {
+        public Bindable<ColumnWidthStyle> ColumnWidthStyle { get; } = new Bindable<ColumnWidthStyle>();
+        public Bindable<bool> HitPositionGlobalEnable { get; } = new Bindable<bool>();
+        public Bindable<bool> ManiaLNGradientEnable { get; } = new Bindable<bool>();
+
         public Bindable<double> ColumnWidth { get; } = new Bindable<double>();
         public Bindable<double> SpecialFactor { get; }  = new Bindable<double>();
         public Bindable<double> NoteHeightScaleToWidth { get; } = new Bindable<double>();
@@ -64,6 +72,10 @@ namespace osu.Game.EzOsuGame.Configuration
 
         public void BindWith(Ez2ConfigManager ezConfig)
         {
+            ezConfig.BindWith(Ez2Setting.ColumnWidthStyle, ColumnWidthStyle);
+            ezConfig.BindWith(Ez2Setting.HitPositionGlobalEnable, HitPositionGlobalEnable);
+            ezConfig.BindWith(Ez2Setting.ManiaLNGradientEnable, ManiaLNGradientEnable);
+
             ezConfig.BindWith(Ez2Setting.ColumnWidth, ColumnWidth);
             ezConfig.BindWith(Ez2Setting.SpecialFactor, SpecialFactor);
             ezConfig.BindWith(Ez2Setting.NoteHeightScaleToWidth, NoteHeightScaleToWidth);

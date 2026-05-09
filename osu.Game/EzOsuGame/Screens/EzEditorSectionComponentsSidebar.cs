@@ -24,7 +24,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Screens
 {
-    public partial class EzSkinComponents : EditorSidebarSection
+    public partial class EzEditorSectionComponentsSidebar : EditorSidebarSection
     {
         private const float item_width = 106;
         private const float item_height = 124;
@@ -39,9 +39,9 @@ namespace osu.Game.EzOsuGame.Screens
         private EzResourceProvider textures { get; set; } = null!;
 
         private FillFlowContainer cardFlow = null!;
-        private Bindable<string> componentType = new Bindable<string>("Note");
+        private readonly Bindable<string> componentType = new Bindable<string>("Note");
 
-        public EzSkinComponents()
+        public EzEditorSectionComponentsSidebar()
             : base("Ez Pro Skin") { }
 
         private Bindable<string>? noteSetName;

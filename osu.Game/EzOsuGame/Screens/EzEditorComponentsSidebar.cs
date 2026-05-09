@@ -10,7 +10,7 @@ using osu.Game.Screens.Edit.Components;
 
 namespace osu.Game.EzOsuGame.Screens
 {
-    internal partial class EzSkinComponentsSidebar : EditorSidebar
+    internal partial class EzEditorComponentsSidebar : EditorSidebar
     {
         public enum SidebarTab
         {
@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.Screens
         private SidebarTab currentTab = SidebarTab.Select;
         private readonly List<EditorSidebarSection> selectSections = new List<EditorSidebarSection>();
 
-        public EzSkinComponentsSidebar()
+        public EzEditorComponentsSidebar()
         {
             OsuTabControl<SidebarTab> tabControl1;
             AddInternal(new Box
@@ -63,7 +63,7 @@ namespace osu.Game.EzOsuGame.Screens
 
             if (currentTab == SidebarTab.EzSkins)
             {
-                Content.Add(new EzSkinComponents
+                Content.Add(new EzEditorSectionComponentsSidebar
                 {
                     RelativeSizeAxes = Axes.X
                 });

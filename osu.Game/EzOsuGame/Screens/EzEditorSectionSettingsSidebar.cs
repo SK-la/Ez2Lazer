@@ -20,7 +20,7 @@ using osuTK;
 
 namespace osu.Game.EzOsuGame.Screens
 {
-    public partial class EzSkinSettings : EditorSidebarSection
+    public partial class EzEditorSectionSettingsSidebar : EditorSidebarSection
     {
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
@@ -28,7 +28,7 @@ namespace osu.Game.EzOsuGame.Screens
         [Resolved]
         private Storage storage { get; set; } = null!;
 
-        public EzSkinSettings()
+        public EzEditorSectionSettingsSidebar()
             : base("Ez Skin Settings") { }
 
         private static readonly Dictionary<string, string> resource_paths = new Dictionary<string, string>
@@ -219,7 +219,7 @@ namespace osu.Game.EzOsuGame.Screens
                 if (!Directory.Exists(dataFolderPath))
                 {
                     Directory.CreateDirectory(dataFolderPath);
-                    Logger.Log($"EzSkinSettings create {type} Path: {dataFolderPath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                    Logger.Log($"EzEditorSectionSettingsSidebar create {type} Path: {dataFolderPath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 }
 
                 string[] directories = Directory.GetDirectories(dataFolderPath);
@@ -229,7 +229,7 @@ namespace osu.Game.EzOsuGame.Screens
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, $"EzSkinSettings Load {type} FolderSets Error");
+                Logger.Error(ex, $"EzEditorSectionSettingsSidebar Load {type} FolderSets Error");
             }
         }
     }
