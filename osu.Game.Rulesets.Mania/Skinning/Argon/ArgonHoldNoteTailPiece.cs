@@ -4,7 +4,6 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
-using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
@@ -126,7 +125,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Argon
         {
             base.Dispose(isDisposing);
 
-            if (drawableObject.IsNotNull())
+            if (drawableObject != null)
                 drawableObject.HitObjectApplied -= hitObjectApplied;
         }
     }
