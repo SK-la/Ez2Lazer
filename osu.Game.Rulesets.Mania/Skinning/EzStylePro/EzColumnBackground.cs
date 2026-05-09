@@ -58,7 +58,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // 计算 drawSeparator 结果（基于不变的列数和列索引）
             hasSeparator = stageDefinition.HasSeparator(column.Index);
 
-            sharedTexture ??= textures.Get("EzResources/Column/ColumnLight");
+            sharedTexture ??= textures.Get("Column/ColumnLight");
 
             hitOverlay = new Sprite
             {
