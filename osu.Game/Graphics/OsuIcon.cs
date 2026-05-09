@@ -684,8 +684,8 @@ namespace osu.Game.Graphics
                 return null;
             }
 
-            public ITexturedCharacterGlyph? Get(string? fontName, int codepoint)
-                => codepoint <= char.MaxValue ? Get(fontName, (char)codepoint) : null;
+            // 有限的特殊字符集，用于emoji解析
+            public ITexturedCharacterGlyph? Get(string? fontName, int codepoint) => codepoint <= char.MaxValue ? Get(fontName, (char)codepoint) : null;
 
             public Task<ITexturedCharacterGlyph?> GetAsync(string fontName, char character) => Task.Run(() => Get(fontName, character));
             public Task<ITexturedCharacterGlyph?> GetAsync(string fontName, int codepoint) => Task.Run(() => Get(fontName, codepoint));

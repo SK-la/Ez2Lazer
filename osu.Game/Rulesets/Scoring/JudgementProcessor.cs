@@ -72,7 +72,7 @@ namespace osu.Game.Rulesets.Scoring
                 throw new ArgumentException(@$"A {nameof(HitResult.LegacyComboIncrease)} hit result cannot be applied.");
 #pragma warning restore CS0618
 
-            // Only count towards judged hits if this result is a final result.
+            // 非最终判定不处理
             if (result.IsFinal)
                 JudgedHits++;
 
@@ -89,7 +89,7 @@ namespace osu.Game.Rulesets.Scoring
         /// <param name="result">The judgement scoring result.</param>
         public void RevertResult(JudgementResult result)
         {
-            // Only decrement judged hits if this result was previously counted as a final result.
+            // 非最终判定不处理
             if (result.IsFinal)
                 JudgedHits--;
 

@@ -18,6 +18,9 @@ using osuTK.Graphics;
 
 namespace osu.Game.Graphics.UserInterfaceV2
 {
+    /// <summary>
+    /// 适配V2版UI的 MarkdownTooltip 组件，提供Markdown格式的鼠标悬浮提示框
+    /// </summary>
     public partial class MarkdownTooltip : VisibilityContainer, osu.Framework.Graphics.Cursor.ITooltip<LocalisableString>
     {
         private const float max_width = 500;
