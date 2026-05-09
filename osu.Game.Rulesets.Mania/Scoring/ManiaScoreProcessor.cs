@@ -22,9 +22,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double calOD = 8;
         private EzEnumHitMode hitMode => GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
 
-        // 缓存 ApplyBeatmap 时的 hitMode，确保模拟和游戏使用相同的判定模式
-        private EzEnumHitMode cachedHitMode;
-
         public ManiaScoreProcessor()
             : base(new ManiaRuleset())
         {
@@ -38,16 +35,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
             return base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
         }
 
-        public override void ApplyBeatmap(IBeatmap beatmap)
-        {
-            // 在应用谱面时缓存当前的判定模式，确保模拟和游戏使用相同的模式
-            cachedHitMode = IsLegacyScore ? EzEnumHitMode.Classic : hitMode;
-            base.ApplyBeatmap(beatmap);
-        }
-
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
-            if (IsLegacyScore || cachedHitMode == EzEnumHitMode.Classic)
+            if (IsLegacyScore || hitMode == EzEnumHitMode.Classic)
             {
                 return 150000 * comboProgress
                        + 850000 * Math.Pow(AccuracyClassic.Value, 2 + 2 * AccuracyClassic.Value) * accuracyProgress
@@ -55,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
 
             // 由于Acc架构不同，非lazer模式在总分制下，只能依靠Acc反算分数。
-            if (cachedHitMode != EzEnumHitMode.Lazer && cachedHitMode != EzEnumHitMode.Classic)
+            if (hitMode != EzEnumHitMode.Lazer && hitMode != EzEnumHitMode.Classic)
             {
                 // 对于满分制，只考虑判定准确性，不考虑combo和奖励加分
                 return 1000000 * Accuracy.Value;
@@ -73,8 +63,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public override int GetBaseScoreForResult(HitResult result)
         {
-            if (cachedHitMode != EzEnumHitMode.Lazer)
-                return HitModeHelper.GetBaseScoreForResult(cachedHitMode, result);
+            if (hitMode != EzEnumHitMode.Lazer)
+                return HitModeHelper.GetBaseScoreForResult(hitMode, result);
 
             switch (result)
             {
