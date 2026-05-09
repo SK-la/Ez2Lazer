@@ -23,7 +23,6 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Bindable<SettingsNote.Data?> warningNote = new Bindable<SettingsNote.Data?>();
 
         private SettingsItemV2 poorCheckBox = null!;
-        private SettingsItemV2 judgePrecedenceDropDown = null!;
 
         private Bindable<double> sAcc = null!;
         private Bindable<double> aAcc = null!;
@@ -107,7 +106,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "ez", "mania", "bms", "poor" }
                 },
-                judgePrecedenceDropDown = new SettingsItemV2(new FormEnumDropdown<EzEnumJudgePrecedence>
+                new SettingsItemV2(new FormEnumDropdown<EzEnumJudgePrecedence>
                 {
                     Caption = EzSettingsStrings.JUDGE_PRECEDENCE,
                     HintText = EzSettingsStrings.JUDGE_PRECEDENCE_TOOLTIP,
@@ -156,21 +155,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 Schedule(updateScoreSubmitWarning);
             }, true);
 
-            maniaHitModeBindable.BindValueChanged(_ =>
-            {
-                switch (maniaHitModeBindable.Value)
-                {
-                    case EzEnumHitMode.Lazer:
-                        judgePrecedenceDropDown.Hide();
-                        break;
-
-                    default:
-                        judgePrecedenceDropDown.Show();
-                        break;
-                }
-
-                Schedule(updateScoreSubmitWarning);
-            }, true);
+            maniaHitModeBindable.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
 
             aAcc.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
             sAcc.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
@@ -183,6 +168,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             scoreSubmitWarning.Value = (!maniaHitModeBindable.IsDefault ||
                                         !maniaHealthModeBindable.IsDefault ||
+                                        !judgePrecedenceBindable.IsDefault ||
                                         !aAcc.IsDefault ||
                                         !sAcc.IsDefault ||
                                         !offsetManiaBindable.IsDefault ||
