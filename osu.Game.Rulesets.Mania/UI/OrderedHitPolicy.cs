@@ -19,11 +19,17 @@ namespace osu.Game.Rulesets.Mania.UI
     {
         private readonly HitObjectContainer hitObjectContainer;
         private readonly OrderedHitPolicyHelper helper;
+        private readonly bool enabledPrecedence;
 
         public OrderedHitPolicy(HitObjectContainer hitObjectContainer)
         {
             this.hitObjectContainer = hitObjectContainer;
             helper = new OrderedHitPolicyHelper(hitObjectContainer);
+
+            if (GlobalConfigStore.EzConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence) != EzEnumJudgePrecedence.Earliest)
+                enabledPrecedence = true;
+            else
+                enabledPrecedence = false;
         }
 
         /// <summary>
@@ -38,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.UI
         public bool IsHittable(DrawableHitObject hitObject, double time)
         {
             // 非Earliest模式下，允许独立的优先级算法。
-            if (GlobalConfigStore.EzConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence) != EzEnumJudgePrecedence.Earliest)
+            if (enabledPrecedence)
                 return helper.IsHittableWithPrecedence(hitObject, time);
 
             var nextObject = hitObjectContainer.AliveObjects.GetNext(hitObject);
@@ -51,17 +57,30 @@ namespace osu.Game.Rulesets.Mania.UI
         /// <param name="hitObject">The <see cref="HitObject"/> that was hit.</param>
         public void HandleHit(DrawableHitObject hitObject)
         {
-            double judgementTime = hitObject.Result.TimeAbsolute;
-
-            foreach (var obj in enumerateHitObjectsUpTo(hitObject.HitObject.StartTime))
+            if (enabledPrecedence)
             {
-                if (obj.Judged)
-                    continue;
+                double judgementTime = hitObject.Result.TimeAbsolute;
 
-                if (OrderedHitPolicyHelper.IsUserTriggerJudgeableNow(obj, judgementTime))
-                    continue;
+                foreach (var obj in enumerateHitObjectsUpTo(hitObject.HitObject.StartTime))
+                {
+                    if (obj.Judged)
+                        continue;
 
-                ((DrawableManiaHitObject)obj).MissForcefully();
+                    if (OrderedHitPolicyHelper.IsUserTriggerJudgeableNow(obj, judgementTime))
+                        continue;
+
+                    ((DrawableManiaHitObject)obj).MissForcefully();
+                }
+            }
+            else
+            {
+                foreach (var obj in enumerateHitObjectsUpTo(hitObject.HitObject.StartTime))
+                {
+                    if (obj.Judged)
+                        continue;
+
+                    ((DrawableManiaHitObject)obj).MissForcefully();
+                }
             }
         }
 

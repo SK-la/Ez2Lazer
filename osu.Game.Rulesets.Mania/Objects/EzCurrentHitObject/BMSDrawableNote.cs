@@ -281,10 +281,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 return;
 
             // LN特殊规则
-            if (HoldNote.Body.HasHoldBreak)
-                result = BMSJudgeMapping.Poor;
-
-            if (HoldNote.IsHolding.Value && timeOffset > badLate)
+            if (!HoldNote.IsHolding.Value && HoldNote.Body.HasHoldBreak)
                 result = BMSJudgeMapping.Poor;
 
             if (result == BMSJudgeMapping.KPoor)

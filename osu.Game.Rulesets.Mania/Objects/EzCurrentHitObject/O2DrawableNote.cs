@@ -14,6 +14,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            (HitObject.HitWindows as ManiaHitWindows)?.UpdateO2JamBpmFromTime(Time.Current);
+
             bool upgradeToPerfect = false;
 
             if (userTriggered)
@@ -23,8 +25,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!cont) return;
             }
 
-            // 此处有潜在的崩溃风险，与播放动画有关，待调查。
-            // Replicate base implementation to allow attaching combo semantics overrides.
             if (!userTriggered)
             {
                 if (!HitObject.HitWindows.CanBeHit(timeOffset))
@@ -33,13 +33,10 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 return;
             }
 
-            (HitObject.HitWindows as ManiaHitWindows)?.UpdateO2JamBpmFromTime(Time.Current);
             var result = HitObject.HitWindows.ResultFor(timeOffset);
 
             if (result == HitResult.None)
                 return;
-
-            result = GetCappedResult(result);
 
             if (upgradeToPerfect)
                 result = HitResult.Perfect;
@@ -58,6 +55,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            (HitObject.HitWindows as ManiaHitWindows)?.UpdateO2JamBpmFromTime(Time.Current);
+
             bool upgradeToPerfect = false;
 
             if (userTriggered)
@@ -67,7 +66,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!cont) return;
             }
 
-            // Replicate base implementation to allow attaching combo semantics overrides.
             if (!userTriggered)
             {
                 if (!HitObject.HitWindows.CanBeHit(timeOffset))
@@ -76,13 +74,10 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 return;
             }
 
-            (HitObject.HitWindows as ManiaHitWindows)?.UpdateO2JamBpmFromTime(Time.Current);
             var result = HitObject.HitWindows.ResultFor(timeOffset);
 
             if (result == HitResult.None)
                 return;
-
-            result = GetCappedResult(result);
 
             if (upgradeToPerfect)
                 result = HitResult.Perfect;
@@ -103,6 +98,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            (HitObject.HitWindows as ManiaHitWindows)?.UpdateO2JamBpmFromTime(Time.Current);
+
             bool upgradeToPerfect = false;
 
             if (userTriggered)
@@ -112,28 +109,35 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!cont) return;
             }
 
-            double adjustedOffset = timeOffset;
-
             if (!userTriggered)
             {
-                if (!HitObject.HitWindows.CanBeHit(adjustedOffset))
+                // 没按时MISS
+                if (HoldNote.Body.HasHoldBreak)
+                {
+                    if (timeOffset < 0)
+                        return;
+
+                    ApplyResult(HitResult.Miss);
+                    return;
+                }
+
+                if (!HitObject.HitWindows.CanBeHit(timeOffset))
                     ApplyMinResult();
 
                 return;
             }
 
-            (HitObject.HitWindows as ManiaHitWindows)?.UpdateO2JamBpmFromTime(Time.Current);
-            var result = HitObject.HitWindows.ResultFor(adjustedOffset);
+            var result = HitObject.HitWindows.ResultFor(timeOffset);
 
             if (result == HitResult.None)
                 return;
 
-            // 如果 Body 已断连，在到达尾点之前不应出任何判定，等待 adjustedOffset >= 0。
-            if (HoldNote.Body.HasHoldBreak && adjustedOffset < 0)
+            // 如果 Body 已断连，在到达尾点之前不应出任何判定，等待offset >= 0。
+            if (HoldNote.Body.HasHoldBreak && timeOffset < 0)
                 return;
 
             // 到达尾点（或其后）且玩家未按住时，因 Body 已断连而强制 Miss。
-            if (HoldNote.Body.HasHoldBreak && adjustedOffset >= 0)
+            if (HoldNote.Body.HasHoldBreak && timeOffset >= 0)
                 result = HitResult.Miss;
 
             if (upgradeToPerfect)

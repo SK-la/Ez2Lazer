@@ -415,12 +415,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             // start is judged on head timing and cannot start in tail late-lenience-only region.
             if (obj is DrawableHoldNote hold)
             {
+                // 检查头部是否可被击中
                 if (!hold.Head.HitObject.HitWindows.CanBeHit(time - hold.Head.HitObject.StartTime))
                     return false;
 
-                if (time > hold.Tail.HitObject.StartTime
-                    && !hold.Tail.HitObject.HitWindows.CanBeHit(time - hold.Tail.HitObject.StartTime))
-                    return false;
+                // 只有当时间在尾部开始时间之后，且尾部有判定窗口时才检查尾部
+                // 但如果头部已经被击中（玩家正在按住），则不应该因为尾部窗口而返回 false
+                // 因为尾部判定是自动的（基于释放或保持状态），不是用户主动触发的
+                if (time > hold.Tail.HitObject.StartTime)
+                {
+                    // 如果头部还未被击中，需要检查尾部窗口（防止在尾部晚期宽容区开始按住）
+                    if (!hold.Head.IsHit && !hold.Tail.HitObject.HitWindows.CanBeHit(time - hold.Tail.HitObject.StartTime))
+                        return false;
+
+                    // 如果头部已被击中，说明玩家正在按住LN，此时不应因为尾部窗口而拒绝
+                    // 尾部判定会在 CheckForResult 中自动处理
+                }
 
                 return true;
             }
