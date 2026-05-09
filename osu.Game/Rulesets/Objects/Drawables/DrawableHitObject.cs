@@ -14,10 +14,14 @@ using osu.Framework.Extensions.ListExtensions;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Extensions.TypeExtensions;
 using osu.Framework.Graphics;
+using osu.Framework.Input;
 using osu.Framework.Lists;
 using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Diagnostics;
+using osu.Game.EzOsuGame.Timing;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Pooling;
@@ -26,7 +30,6 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
-using osu.Game.EzOsuGame.Configuration;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Objects.Drawables
@@ -142,7 +145,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
         protected override bool RequiresChildrenUpdate => true;
 
-        public override bool IsPresent => base.IsPresent || (State.Value == ArmedState.Idle && Clock.IsNotNull() && Clock.CurrentTime >= LifetimeStart);
+        public override bool IsPresent => base.IsPresent || State.Value == ArmedState.Idle && Clock.IsNotNull() && Clock.CurrentTime >= LifetimeStart;
 
         private readonly Bindable<ArmedState> state = new Bindable<ArmedState>();
 
@@ -164,8 +167,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
         private Ez2ConfigManager ezConfig { get; set; }
 
         private bool autoplaySampleTriggered;
-        private IBindable<double> offsetBindable;
-        private IBindable<bool> hitObjectLifetimeUsesOwnTimeBindable = new BindableBool();
+        private bool ownerLifetime;
+        private double ezOffset;
 
         /// <summary>
         /// Whether the initialization logic in <see cref="Playfield" /> has applied.
@@ -225,15 +228,15 @@ namespace osu.Game.Rulesets.Objects.Drawables
             // Choose the appropriate offset bindable once during load to avoid runtime reflection/namespace checks.
             if (ezConfig != null)
             {
-                hitObjectLifetimeUsesOwnTimeBindable = ezConfig.GetBindable<bool>(Ez2Setting.HitObjectLifetimeUsesOwnTime);
+                ownerLifetime = ezConfig.Get<bool>(Ez2Setting.HitObjectLifetimeUsesOwnTime);
 
                 if (drawableRuleset != null)
                 {
                     int onlineId = drawableRuleset.Ruleset.RulesetInfo.OnlineID;
-                    if (onlineId == 3) // Mania legacy ruleset id
-                        offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
-                    else
-                        offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
+
+                    ezOffset = onlineId == 3
+                        ? ezConfig.Get<double>(Ez2Setting.OffsetPlusMania)
+                        : ezConfig.Get<double>(Ez2Setting.OffsetPlusNonMania);
                 }
             }
         }
@@ -752,7 +755,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
         /// <summary>
         /// 控制命中后状态变换是否固定使用物件自身时间作为基准。
         /// </summary>
-        protected virtual bool HitObjectLifetimeUsesOwnTime => hitObjectLifetimeUsesOwnTimeBindable.Value;
+        protected virtual bool HitObjectLifetimeUsesOwnTime => ownerLifetime;
 
         /// <summary>
         /// 当前物件命中后状态变换所使用的时间基准。
@@ -878,20 +881,20 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
             double timeOffset = Time.Current - HitObject.GetEndTime();
 
-            if (offsetBindable != null)
-                timeOffset += offsetBindable.Value;
+            if (ezOffset != 0)
+                timeOffset += ezOffset;
 
-            // [Ez] Sub-frame timing correction: compensate for judgment using previous frame's clock value.
-            // The key was pressed between the last FSC clock update and now; interpolate to the actual press time.
+            // [Ez] 子帧时间修正：使用上一帧的时钟值进行判断后进行补偿。
+            // 按键在上一次 FSC 时钟更新和现在之间被按下；插值到实际按键时间。
             if (userTriggered)
             {
-                long keyTs = Framework.Input.InputManager.EzSubFrameTimestamp;
+                long keyTs = InputManager.EzSubFrameTimestamp;
                 double rate = (Clock as IGameplayClock)?.Rate ?? 1.0;
-                timeOffset += EzOsuGame.Timing.EzSubFrameCorrection.GetCorrectionMs(keyTs, rate);
+                timeOffset += EzSubFrameCorrection.GetCorrectionMs(keyTs, rate);
             }
 
             // === Ez judgment timing diagnostics ===
-            if (userTriggered && EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled)
+            if (userTriggered && EzJudgmentDiagnostics.Enabled)
             {
                 double interpDrift = 0, bassSource = 0, frameElapsed = Clock.ElapsedFrameTime;
 
@@ -902,7 +905,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
                     bassSource = gcc.BassSourceCurrentTime;
                 }
 
-                EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Record(
+                EzJudgmentDiagnostics.Record(
                     Time.Current,
                     HitObject.GetEndTime(),
                     timeOffset,
