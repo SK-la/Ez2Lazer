@@ -14,13 +14,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
     public partial class HitTargetInsetContainer : Container
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-        private Bindable<double> hitPositonBindable = new Bindable<double>();
-        private Bindable<bool> globalHitPosition = new Bindable<bool>();
+        private readonly IBindable<double> hitPositon = new Bindable<double>();
+        private readonly IBindable<bool> enableGlobalHitPosition = new Bindable<bool>();
 
         protected override Container<Drawable> Content => content;
         private readonly Container content;
 
         private float hitPosition;
+        private float skinHitPosition;
 
         public HitTargetInsetContainer()
         {
@@ -30,17 +31,33 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         }
 
         [BackgroundDependencyLoader]
-        private void load(ISkinSource skin, IScrollingInfo scrollingInfo, Ez2ConfigManager ezSkinConfig)
+        private void load(ISkinSource skin, IScrollingInfo scrollingInfo, IEzSkinInfo ezSkinInfo, Ez2ConfigManager ezConfig)
         {
-            globalHitPosition = ezSkinConfig.GetBindable<bool>(Ez2Setting.HitPositionGlobalEnable);
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            enableGlobalHitPosition.BindTo(ezConfig.GetBindable<bool>(Ez2Setting.HitPositionGlobalEnable));
+            enableGlobalHitPosition.BindValueChanged(_ => updateDrawable());
 
-            hitPosition = globalHitPosition.Value
-                ? (float)hitPositonBindable.Value
-                : skin.GetManiaSkinConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? (float)hitPositonBindable.Value;
+            hitPositon.BindTo(ezSkinInfo.HitPosition);
+            hitPositon.BindValueChanged(_ => updateDrawable());
+
+            skinHitPosition = skin.GetManiaSkinConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? (float)hitPositon.Value;
+            updateHitPosition();
 
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
+        }
+
+        private void updateHitPosition()
+        {
+            // 缓存 hitPosition 值，避免每次布局都查询 skin
+            hitPosition = enableGlobalHitPosition.Value
+                ? (float)hitPositon.Value
+                : skinHitPosition;
+        }
+
+        private void updateDrawable()
+        {
+            updateHitPosition();
+            onDirectionChanged(new ValueChangedEvent<ScrollingDirection>(direction.Value, direction.Value));
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)

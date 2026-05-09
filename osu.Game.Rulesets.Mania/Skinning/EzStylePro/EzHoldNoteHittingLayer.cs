@@ -1,12 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
-using osu.Game.EzOsuGame.Configuration;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -24,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         };
 
         public readonly Bindable<bool> IsHitting = new Bindable<bool>();
-        public IBindable<double> HitPosition = null!;
+        // public IBindable<double> HitPosition = null!;
 
         private TextureAnimation? animation;
 
@@ -36,12 +34,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Blending = additive_preserve_alpha;
         }
 
-        [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezSkinInfo)
-        {
-            HitPosition = ezSkinInfo.HitPosition;
-            HitPosition.BindValueChanged(_ => OnDrawableChanged());
-        }
+        // [BackgroundDependencyLoader]
+        // private void load(IEzSkinInfo ezSkinInfo)
+        // {
+        //     HitPosition = ezSkinInfo.HitPosition;
+        //     HitPosition.BindValueChanged(_ => OnDrawableChanged());
+        // }
 
         protected override void LoadComplete()
         {
@@ -99,7 +97,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateDrawable()
         {
-            float v = -(float)HitPosition.Value - NoteHeight / 2;
+            float v =  -NoteHeight / 2;
             Position = new Vector2(0, v);
         }
     }
