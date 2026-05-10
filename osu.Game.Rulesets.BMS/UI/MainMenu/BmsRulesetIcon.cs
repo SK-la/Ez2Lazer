@@ -7,6 +7,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Game.Graphics;
 using osuTK;
 
+// ReSharper disable once CheckNamespace
 namespace osu.Game.Rulesets.BMS.UI.MenuEntry
 {
     /// <summary>

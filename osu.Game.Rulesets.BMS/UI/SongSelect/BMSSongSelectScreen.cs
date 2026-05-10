@@ -95,6 +95,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         [Resolved]
         private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
 
+        [Resolved(canBeNull: true)]
+        private MusicController? musicController { get; set; }
+
+        // Snapshot of the global MusicController state at entry so we can restore it on exit.
+        private bool capturedMusicControllerState;
+        private bool savedAllowTrackControl;
+
         public BMSSongSelectScreen(BMSSongSelectScreenMode mode = BMSSongSelectScreenMode.RulesetEntry)
         {
             this.mode = mode;
@@ -595,8 +602,29 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         public override void OnEntering(ScreenTransitionEvent e)
         {
             base.OnEntering(e);
+            suspendGlobalMusicController();
             refreshSongList();
             this.FadeInFromZero(300);
+        }
+
+        public override void OnResuming(ScreenTransitionEvent e)
+        {
+            base.OnResuming(e);
+            // Returning from BMSPlayerLoader / Player: re-assert silence on the global MusicController so
+            // it doesn't restart the standard-ruleset preview on top of our BMS preview.
+            suspendGlobalMusicController();
+
+            // Re-arm BMS preview for the currently selected chart.
+            updatePreviewTrack(selectedChart.Value);
+            this.FadeIn(200);
+        }
+
+        public override void OnSuspending(ScreenTransitionEvent e)
+        {
+            // We're being suspended for player/loader: stop our own preview so it doesn't bleed into gameplay.
+            previewManager.StopPreview();
+            stopFallbackPreviewTrack();
+            base.OnSuspending(e);
         }
 
         public override bool OnExiting(ScreenExitEvent e)
@@ -604,8 +632,41 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             previewManager.StopPreview();
             stopFallbackPreviewTrack();
             previewBeatmap = null;
+            restoreGlobalMusicController();
             this.FadeOut(200);
             return base.OnExiting(e);
+        }
+
+        /// <summary>
+        /// Silence and lock down the global <see cref="MusicController"/> while BMS owns the audio output.
+        /// We snapshot AllowTrackControl so OnExiting can restore the previous value (some upstream callers
+        /// might have already disabled it).
+        /// </summary>
+        private void suspendGlobalMusicController()
+        {
+            if (musicController == null)
+                return;
+
+            if (!capturedMusicControllerState)
+            {
+                savedAllowTrackControl = musicController.AllowTrackControl.Value;
+                capturedMusicControllerState = true;
+            }
+
+            // Stop without setting UserPauseRequested: that flag would persist after exit and prevent
+            // the normal main-menu auto-resume. A non-user Stop() is enough — combined with locking
+            // AllowTrackControl below, no other system can flip the global track back on while BMS owns audio.
+            musicController.Stop();
+            musicController.AllowTrackControl.Value = false;
+        }
+
+        private void restoreGlobalMusicController()
+        {
+            if (musicController == null || !capturedMusicControllerState)
+                return;
+
+            musicController.AllowTrackControl.Value = savedAllowTrackControl;
+            capturedMusicControllerState = false;
         }
     }
 

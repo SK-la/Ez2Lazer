@@ -16,6 +16,8 @@ using osu.Game.Screens.Menu;
 using osuTK.Graphics;
 using osuTK.Input;
 
+// ReSharper disable CheckNamespace
+
 namespace osu.Game.Rulesets.BMS.UI.MenuEntry
 {
     /// <summary>
@@ -156,7 +158,7 @@ namespace osu.Game.Rulesets.BMS.UI.MenuEntry
                 var bmsButton = new MainMenuButton(
                     "bms",
                     @"button-default-select",
-                    FontAwesome.Solid.Drum,
+                    FontAwesome.Solid.Music,
                     new Color4(120, 80, 200, 255),
                     onBmsClicked,
                     Key.B)
