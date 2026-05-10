@@ -324,12 +324,11 @@ namespace osu.Game
             dependencies.Cache(Ez2ConfigManager);
             EzSkinInfo = new EzSkinInfo(Ez2ConfigManager);
             dependencies.CacheAs<IEzSkinInfo>(EzSkinInfo);
-            dependencies.Cache(NoteFactory = new EzLocalTextureFactory(
-                Ez2ConfigManager,
-                Host.Renderer,
-                Storage));
             dependencies.CacheAs(EzResourceProvider = new EzResourceProvider(Ez2ConfigManager, Host.Renderer, Audio, Storage, realm));
             dependencies.CacheAs<IStorageResourceProvider>(EzResourceProvider);
+            dependencies.Cache(NoteFactory = new EzLocalTextureFactory(
+                Ez2ConfigManager,
+                EzResourceProvider));
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
 

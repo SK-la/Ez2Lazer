@@ -47,7 +47,7 @@ namespace osu.Game.EzOsuGame
                         for (int i = 0; i < max_frames_to_load; i++)
                         {
                             string frameFile = $"{path}/{i:D3}";
-                            var texture = textureStore.Get(frameFile);
+                            var texture = resourceProvider.Get(frameFile);
 
                             if (texture == null)
                                 break;
@@ -83,7 +83,7 @@ namespace osu.Game.EzOsuGame
                     {
                         try
                         {
-                            var texture = textureStore.Get(framePath);
+                            var texture = resourceProvider.Get(framePath);
                             if (texture == null) continue;
 
                             var sprite = new Sprite { Texture = texture, Alpha = 0 };

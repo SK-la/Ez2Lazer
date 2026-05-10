@@ -4,19 +4,14 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
-using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.EzOsuGame
@@ -32,8 +27,7 @@ namespace osu.Game.EzOsuGame
         private static readonly ConcurrentDictionary<string, float> note_ratio_cache = new ConcurrentDictionary<string, float>();
 
         private readonly Ez2ConfigManager ezConfig;
-        private readonly LargeTextureStore largeTextureStore;
-        private readonly TextureStore textureStore;
+        private readonly EzResourceProvider resourceProvider;
 
         private readonly BindableDouble columnWidth = new BindableDouble();
         private readonly BindableDouble specialFactor = new BindableDouble();
@@ -74,20 +68,10 @@ namespace osu.Game.EzOsuGame
             public override int GetHashCode() => HashCode.Combine(KeyMode, ColumnIndex, NoSpecial);
         }
 
-        public EzLocalTextureFactory(Ez2ConfigManager ezConfig, IRenderer renderer, Storage storage)
+        public EzLocalTextureFactory(Ez2ConfigManager ezConfig, EzResourceProvider resourceProvider)
         {
             this.ezConfig = ezConfig;
-
-            IResourceStore<byte[]> userFiles = new StorageBackedResourceStore(storage.GetStorageForDirectory(EzModifyPath.RESOURCES_PATH));
-            var baseTextureLoaderStore = new TextureLoaderStore(userFiles);
-
-            // 创建尺寸限制的纹理加载器（使用官方的 MaxDimensionLimitedTextureLoaderStore）
-            var limitedLoader = new MaxDimensionLimitedTextureLoaderStore(baseTextureLoaderStore);
-            textureStore = new TextureStore(renderer, limitedLoader);
-            textureStore.AddTextureSource(baseTextureLoaderStore);
-
-            largeTextureStore = new LargeTextureStore(renderer, limitedLoader);
-            largeTextureStore.AddTextureSource(baseTextureLoaderStore);
+            this.resourceProvider = resourceProvider;
 
             ezConfig.BindWith(Ez2Setting.NoteSetName, noteSetName);
             ezConfig.BindWith(Ez2Setting.StageName, stageName);
@@ -192,10 +176,8 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         public Texture? GetNoteTexture(string path)
         {
-            // 直接加载纹理计算比例，不使用缓存
-            var sb = new StringBuilder(path.Length + 8);
-            Texture? texture = textureStore.Get(sb.Append(path).Append("/000.png").ToString()) ??
-                               textureStore.Get(sb.Clear().Append(path).Append("/001.png").ToString());
+            Texture? texture = resourceProvider.Get($@"{path.Length}/000") ?? resourceProvider.Get($@"{path.Length}/0");
+
             return texture;
         }
 
@@ -326,7 +308,7 @@ namespace osu.Game.EzOsuGame
                 Parallel.For(0, 60, i =>
                 {
                     string frameFile = $"{notePath}/{i:D3}";
-                    textures[i] = textureStore.Get(frameFile);
+                    textures[i] = resourceProvider.Get(frameFile);
                 });
 
                 // 按顺序收集非空纹理
@@ -341,7 +323,7 @@ namespace osu.Game.EzOsuGame
             else
             {
                 string frameFile = notePath;
-                var texture = textureStore.Get(frameFile);
+                var texture = resourceProvider.Get(frameFile);
 
                 if (texture != null)
                 {
@@ -409,8 +391,7 @@ namespace osu.Game.EzOsuGame
 
             for (int i = 0;; i++)
             {
-                Texture? texture = textureStore.Get($"{basePath}_{i}");
-
+                Texture? texture = resourceProvider.Get($"{basePath}_{i}");
                 if (texture == null) break;
 
                 Logger.Log($"[EzLocalTextureFactory] Added Stage Frames: {basePath}_{i}.png", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
@@ -420,7 +401,7 @@ namespace osu.Game.EzOsuGame
 
             if (frames.Count == 0)
             {
-                Texture? texture = largeTextureStore.Get($"{basePath}");
+                Texture? texture = resourceProvider.Get($"{basePath}", useLargeStore: true);
 
                 if (texture != null)
                 {
@@ -466,8 +447,7 @@ namespace osu.Game.EzOsuGame
             {
                 for (int i = 0;; i++)
                 {
-                    Texture? texture = textureStore.Get($"{basePath}_frame{i}");
-
+                    Texture? texture = resourceProvider.Get($"{basePath}_frame{i}");
                     if (texture == null) break;
 
                     Logger.Log($"[EzLocalTextureFactory] Added Keys Frames: {basePath}_{i}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
@@ -478,7 +458,7 @@ namespace osu.Game.EzOsuGame
                 // 如果没有帧，加载单个纹理作为单帧
                 if (frames.Count == 0)
                 {
-                    Texture? texture = textureStore.Get($"{basePath}");
+                    Texture? texture = resourceProvider.Get($"{basePath}");
 
                     if (texture != null)
                     {
