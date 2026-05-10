@@ -150,7 +150,7 @@ namespace osu.Game.Screens.Backgrounds
         private Storage storage { get; set; } = null!;
 
         [Resolved]
-        private EzResourceProvider textures { get; set; } = null!;
+        private EzResourceStore resources { get; set; } = null!;
 
         [Resolved]
         private LargeTextureStore largeTextures { get; set; } = null!;
@@ -248,7 +248,7 @@ namespace osu.Game.Screens.Backgrounds
                     if (tryGetRandomStorageFile(EzModifyPath.VIDEO_PATH, out string resourcePath, out string fullPath, new[] { ".webm", ".mp4", ".flv", ".mkv" }))
                         return new VideoBackgroundScreen(fullPath ?? resourcePath);
 
-                    Stream videoName = textures.GetEzResourceStream($"{EzModifyPath.VIDEO_PATH}/default_video.webm");
+                    Stream videoName = resources.GetEzResourceStream($"{EzModifyPath.VIDEO_PATH}/default_video.webm");
 
                     if (videoName != null)
                         return new StreamVideoBackgroundScreen(videoName);

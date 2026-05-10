@@ -87,7 +87,7 @@ namespace osu.Game.EzOsuGame.HUD
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
-        private EzResourceProvider textures { get; set; } = null!;
+        private EzResourceStore resources { get; set; } = null!;
 
         [Resolved]
         private ScoreProcessor processor { get; set; } = null!;
@@ -211,7 +211,7 @@ namespace osu.Game.EzOsuGame.HUD
             foreach (string rn in possibleResultNames)
             {
                 string path = $@"{baseDir}{rn}";
-                var singleTexture = textures.Get(path);
+                var singleTexture = resources.Get(path);
 
                 if (singleTexture != null)
                 {
@@ -254,7 +254,7 @@ namespace osu.Game.EzOsuGame.HUD
 
                 for (int i = 0;; i++)
                 {
-                    var texture = textures.Get($@"{path}/frame_{i}");
+                    var texture = resources.Get($@"{path}/frame_{i}");
                     if (texture == null)
                         break;
 
@@ -316,7 +316,7 @@ namespace osu.Game.EzOsuGame.HUD
                         Origin = Anchor.Centre,
                         Scale = new Vector2(1.5f),
                         Alpha = 1,
-                        Texture = textures.Get(@$"Modify/FullCombo/full-combo")
+                        Texture = resources.Get(@$"Modify/FullCombo/full-combo")
                     }
                 };
 

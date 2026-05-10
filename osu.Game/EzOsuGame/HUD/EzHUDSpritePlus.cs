@@ -28,7 +28,7 @@ using osuTK;
 namespace osu.Game.EzOsuGame.HUD
 {
     /// <summary>
-    /// A skinnable sprite that always loads from EzResources/Modify via <see cref="EzResourceProvider"/>.
+    /// A skinnable sprite that always loads from EzResources/Modify via <see cref="EzResourceStore"/>.
     /// Supports both single-image and frame animation loading.
     /// </summary>
     public partial class EzHUDSpritePlus : CompositeDrawable, ISerialisableDrawable
@@ -83,7 +83,7 @@ namespace osu.Game.EzOsuGame.HUD
         public bool UsesFixedAnchor { get; set; }
 
         [Resolved]
-        private EzResourceProvider resourceProvider { get; set; } = null!;
+        private EzResourceStore resource { get; set; } = null!;
 
         [Resolved]
         private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
@@ -162,7 +162,7 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 int frameIndex = start + i;
                 string frameSuffix = frameIndex.ToString($"D{width}");
-                Texture? texture = resourceProvider.Get($"{baseLookup}{frameSuffix}");
+                Texture? texture = resource.Get($"{baseLookup}{frameSuffix}");
                 if (texture == null)
                     break;
 
@@ -196,7 +196,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (!string.IsNullOrEmpty(template) && !template.Contains('{') && !template.Contains('}'))
                 lookup += template;
 
-            Texture? texture = resourceProvider.Get(lookup) ?? resourceProvider.Get(baseLookup);
+            Texture? texture = resource.Get(lookup) ?? resource.Get(baseLookup);
             if (texture == null)
                 return null;
 

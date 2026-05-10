@@ -39,7 +39,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private Storage storage { get; set; } = null!;
 
         [Resolved]
-        private EzResourceProvider resourceProvider { get; set; } = null!;
+        private EzResourceStore resource { get; set; } = null!;
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
@@ -260,7 +260,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private Drawable createCell(string key, bool selected)
         {
-            return new PreviewSelectCell(resourceProvider, storage, session!, key, selected, colours, () =>
+            return new PreviewSelectCell(resource, storage, session!, key, selected, colours, () =>
             {
                 pendingSelectionKey = key;
                 rebuild();
@@ -319,7 +319,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private sealed partial class PreviewSelectCell : CompositeDrawable
         {
-            private readonly EzResourceProvider provider;
+            private readonly EzResourceStore provider;
             private readonly Storage cellStorage;
             private readonly EzResourcePickerDescriptor descriptor;
             private readonly string key;
@@ -329,7 +329,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             private Box? hoverBox;
 
-            public PreviewSelectCell(EzResourceProvider provider, Storage cellStorage, EzResourcePickerDescriptor descriptor, string key, bool selected,
+            public PreviewSelectCell(EzResourceStore provider, Storage cellStorage, EzResourcePickerDescriptor descriptor, string key, bool selected,
                                      OsuColour osuColour, Action onCommit)
             {
                 this.provider = provider;

@@ -36,7 +36,7 @@ namespace osu.Game.EzOsuGame.Screens
         private Storage storage { get; set; } = null!;
 
         [Resolved]
-        private EzResourceProvider textures { get; set; } = null!;
+        private EzResourceStore resources { get; set; } = null!;
 
         private FillFlowContainer cardFlow = null!;
         private readonly Bindable<string> componentType = new Bindable<string>("Note");
@@ -165,7 +165,7 @@ namespace osu.Game.EzOsuGame.Screens
         }
 
         private Texture? createNotePreview(string noteSet)
-            => textures.Get($"note/{noteSet}/whitenote/000") ?? textures.Get($"note/{noteSet}/whitenote/001");
+            => resources.Get($"note/{noteSet}/whitenote/000") ?? resources.Get($"note/{noteSet}/whitenote/001");
 
         private Texture? createStagePreview(string stageSet)
         {
@@ -176,7 +176,7 @@ namespace osu.Game.EzOsuGame.Screens
             //         return t;
             // }
 
-            return textures.Get($"Stage/{stageSet}/Stage/eightkey/Body", useLargeStore: true);
+            return resources.Get($"Stage/{stageSet}/Stage/eightkey/Body", useLargeStore: true);
         }
 
         private partial class VisualTextureItem : CompositeDrawable

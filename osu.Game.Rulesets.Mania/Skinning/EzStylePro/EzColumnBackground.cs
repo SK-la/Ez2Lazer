@@ -52,12 +52,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load(EzResourceProvider textures)
+        private void load(EzResourceStore resources)
         {
             // 计算 drawSeparator 结果（基于不变的列数和列索引）
             hasSeparator = stageDefinition.HasSeparator(column.Index);
 
-            hitOverlay = textures.GetAnimation(overlay_texture_base_path) ?? Empty();
+            hitOverlay = resources.GetAnimation(overlay_texture_base_path) ?? Empty();
             hitOverlay.Name = "Hit Overlay";
             hitOverlay.RelativeSizeAxes = Axes.X;
             hitOverlay.Anchor = Anchor.TopLeft;

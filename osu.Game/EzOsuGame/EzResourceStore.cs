@@ -34,7 +34,7 @@ namespace osu.Game.EzOsuGame
     /// 3. 支持动态配置切换（note set、stage 等）
     /// 4. 与现有 EzLocalTextureFactory 共存，逐步迁移
     /// </summary>
-    public partial class EzResourceProvider : Component, IStorageResourceProvider
+    public partial class EzResourceStore : Component, IStorageResourceProvider
     {
         #region IStorageResourceProvider 实现
 
@@ -84,7 +84,7 @@ namespace osu.Game.EzOsuGame
 
         #region 构造函数
 
-        public EzResourceProvider(Ez2ConfigManager ezConfig, IRenderer renderer, AudioManager audioManager, Storage storage, RealmAccess realmAccess)
+        public EzResourceStore(Ez2ConfigManager ezConfig, IRenderer renderer, AudioManager audioManager, Storage storage, RealmAccess realmAccess)
         {
             this.ezConfig = ezConfig;
             this.storage = storage;
@@ -198,7 +198,7 @@ namespace osu.Game.EzOsuGame
             }
             catch (Exception ex)
             {
-                Logger.Log($"[EzResourceProvider] Error calculating ratio: {ex.Message}",
+                Logger.Log($"[EzTextureStore] Error calculating ratio: {ex.Message}",
                     level: LogLevel.Debug);
             }
 

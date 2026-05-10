@@ -14,7 +14,7 @@ using osu.Game.Graphics.Sprites;
 namespace osu.Game.EzOsuGame.HUD
 {
     /// <summary>
-    /// 基于 EzResourceProvider 的纹理字体基类
+    /// 基于 EzTextureStore 的纹理字体基类
     /// 提供通用的纹理加载和缓存机制，子类只需实现路径查找规则
     /// </summary>
     public abstract partial class EzSpriteText : OsuSpriteText
@@ -31,7 +31,7 @@ namespace osu.Game.EzOsuGame.HUD
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
-        private EzResourceProvider textures { get; set; } = null!;
+        private EzResourceStore resources { get; set; } = null!;
 
         protected EzSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> themeName)
         {
@@ -59,7 +59,7 @@ namespace osu.Game.EzOsuGame.HUD
 
                 // 清理旧的 GlyphStore 缓存，防止每次切换字体时，缓存堆积
                 glyphStore?.ClearCache();
-                glyphStore = CreateGlyphStore(textures, getLookup);
+                glyphStore = CreateGlyphStore(resources, getLookup);
             }, true);
         }
 
@@ -68,9 +68,9 @@ namespace osu.Game.EzOsuGame.HUD
         /// <summary>
         /// 创建 GlyphStore 实例（允许子类自定义）
         /// </summary>
-        protected virtual GlyphStore CreateGlyphStore(EzResourceProvider textures, Func<char, string> getLookup)
+        protected virtual GlyphStore CreateGlyphStore(EzResourceStore resources, Func<char, string> getLookup)
         {
-            return new GlyphStore(textures, getLookup, GetPossiblePaths);
+            return new GlyphStore(resources, getLookup, GetPossiblePaths);
         }
 
         /// <summary>
@@ -110,15 +110,15 @@ namespace osu.Game.EzOsuGame.HUD
         /// </summary>
         protected class GlyphStore : ITexturedGlyphLookupStore
         {
-            private readonly EzResourceProvider textures;
+            private readonly EzResourceStore resources;
             private readonly Func<char, string> getLookup;
             private readonly Func<string, string, char, string[]> getPathResolver;
 
             private readonly Dictionary<char, ITexturedCharacterGlyph?> cache = new Dictionary<char, ITexturedCharacterGlyph?>();
 
-            public GlyphStore(EzResourceProvider textures, Func<char, string> getLookup, Func<string, string, char, string[]> getPathResolver)
+            public GlyphStore(EzResourceStore resources, Func<char, string> getLookup, Func<string, string, char, string[]> getPathResolver)
             {
-                this.textures = textures;
+                this.resources = resources;
                 this.getLookup = getLookup;
                 this.getPathResolver = getPathResolver;
             }
@@ -141,7 +141,7 @@ namespace osu.Game.EzOsuGame.HUD
 
                     foreach (string path in possiblePaths)
                     {
-                        var texture = textures.Get(path);
+                        var texture = resources.Get(path);
 
                         if (texture != null)
                         {

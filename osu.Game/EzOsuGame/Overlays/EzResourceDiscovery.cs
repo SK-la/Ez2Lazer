@@ -66,7 +66,7 @@ namespace osu.Game.EzOsuGame.Overlays
         /// <summary>
         /// 获取缩略图纹理（可能为 null，调用方使用占位）。
         /// </summary>
-        public static Texture? TryGetPreviewTexture(EzResourceProvider provider, Storage storage, EzResourcePickerCategory category, string key)
+        public static Texture? TryGetPreviewTexture(EzResourceStore provider, Storage storage, EzResourcePickerCategory category, string key)
         {
             switch (category)
             {
@@ -84,7 +84,7 @@ namespace osu.Game.EzOsuGame.Overlays
             }
         }
 
-        private static Texture? tryGameThemeJudgementPreview(EzResourceProvider provider, Storage storage, string key)
+        private static Texture? tryGameThemeJudgementPreview(EzResourceStore provider, Storage storage, string key)
         {
             string judgementDir = Path.Combine(storage.GetFullPath(EzModifyPath.GAME_THEME_PATH), key, "judgement");
 
@@ -100,7 +100,7 @@ namespace osu.Game.EzOsuGame.Overlays
             return provider.Get($@"GameTheme/{key}/judgement/{fileName}");
         }
 
-        private static Texture? tryStagePreview(EzResourceProvider provider, string key)
+        private static Texture? tryStagePreview(EzResourceStore provider, string key)
         {
             const string groove_base = "GrooveLight";
 

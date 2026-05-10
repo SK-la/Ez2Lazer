@@ -35,7 +35,7 @@ namespace osu.Game.Skinning
             InstantiationInfo = typeof(EzStyleProSkin).GetInvariantInstantiationInfo()
         };
 
-        protected EzResourceProvider? EzResources;
+        protected EzResourceStore? EzResources;
 
         public EzStyleProSkin(IStorageResourceProvider resources)
             : this(CreateInfo(), resources)
@@ -46,7 +46,7 @@ namespace osu.Game.Skinning
         public EzStyleProSkin(SkinInfo skin, IStorageResourceProvider resources)
             : base(skin, resources)
         {
-            if (resources is EzResourceProvider ezProvider)
+            if (resources is EzResourceStore ezProvider)
             {
                 EzResources = ezProvider;
             }
