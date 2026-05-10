@@ -75,14 +75,34 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString HITRESULT_TEXT_FONT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择判定文本的字体样式", "Select the font style for hit result text.");
 
         public static readonly LocalisableString HITRESULT_VISUAL_THEME_PICK_LABEL = new EzLocalizationManager.EzLocalisableString("大图选择主题", "Visual theme picker");
+
         public static readonly LocalisableString HITRESULT_VISUAL_THEME_PICK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "打开覆盖层预览并切换全局 GameTheme（与 Ez 皮肤纹理一致）。", "Opens the visual picker overlay to change global GameTheme (Ez skin textures).");
 
         public static readonly LocalisableString PLAYBACK_FPS_LABEL = new EzLocalizationManager.EzLocalisableString("播放帧率", "Playback FPS");
         public static readonly LocalisableString PLAYBACK_FPS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画的帧率值", "The FPS value of this animation.");
 
+        public static readonly LocalisableString HITRESULT_ANIMATION_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "动画路径模板", "Animation Path Template");
+
+        public static readonly LocalisableString HITRESULT_ANIMATION_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "在 GameTheme/…/judgement/ 下按帧加载时的相对路径模板（在自动探测 result-0、result_0 之后尝试）。"
+            + "\n占位符：{result} 为判定资源名；{0}、{00} 等为帧序号。"
+            + "\n默认 {result}/frame_{0} 对应子目录帧，如 Cool/frame_0；{result}-{0} 对应同级命名 Cool-0。",
+            "Relative path template for frame lookup under GameTheme/…/judgement/ (after auto-detecting result-0 / result_0)."
+            + "\nPlaceholders: {result} is the judgement asset name; {0}, {00}, etc. are frame indices."
+            + "\nDefault {result}/frame_{0} → e.g. Cool/frame_0; {result}-{0} → e.g. Cool-0.");
+
         public static readonly LocalisableString HITRESULT_BLENDING_LABEL = new EzLocalizationManager.EzLocalisableString("混合模式", "Blending Mode");
         public static readonly LocalisableString HITRESULT_BLENDING_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设置混合模式", "Set the blending mode.");
+
+        public static readonly LocalisableString FULLCOMBO_EFFECT_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "开启Full Combo效果", "Enable Full Combo Effect");
+
+        public static readonly LocalisableString FULLCOMBO_EFFECT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "结尾时检查Full Combo，满足条件时在屏幕中心加载贴图及音效。"
+            + "\n资源路径：EzResources/FullComb/"
+            + "\n图片名称full-combo.png, 支持-0动画；音频名称full-combo-sound", "Use hit colour.");
 
         // EzHUDScoreCounter
         public static readonly LocalisableString SCORE_FONT_LABEL = new EzLocalizationManager.EzLocalisableString("分数文本字体", "Score Font");
@@ -90,6 +110,9 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SKIP_BETTER_JUDGEMENT = new EzLocalizationManager.EzLocalisableString(
             "跳过更好的判定结果", "Skip Better Judgment");
+
+        public static readonly LocalisableString SKIP_BETTER_JUDGEMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "跳过判定质量高于设定值的结果。", "Skip hit results that are better than the set value.");
 
         // EzHUDSpritePlus
         public static readonly LocalisableString SPRITE_PLUS_PATH_LABEL = new EzLocalizationManager.EzLocalisableString("路径", "Path");

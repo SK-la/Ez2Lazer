@@ -174,7 +174,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private double getFrameLengthFromSettings()
         {
-            if (UseBeatmapBPM.Value && beatmap?.Value?.BeatmapInfo != null)
+            if (UseBeatmapBPM.Value && beatmap.Value?.BeatmapInfo != null)
             {
                 double bpm = beatmap.Value.BeatmapInfo.BPM;
 

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
@@ -345,6 +346,51 @@ namespace osu.Game.EzOsuGame
 
         private static string buildIndexedFramePath(string componentName, string animationSeparator, int frameIndex)
             => $"{componentName}{animationSeparator}{frameIndex.ToString(CultureInfo.InvariantCulture)}";
+
+        /// <summary>
+        /// 使用帧路径模板加载纹理序列（相对 <paramref name="baseDirectory"/> 的路径）。
+        /// 占位符：<c>{result}</c> 为判定名；<c>{0}</c>、<c>{00}</c>、<c>{000}</c> 等为指定宽度的帧序号。
+        /// 示例：<c>{result}/frame_{0}</c> → <c>Cool/frame_0</c>；<c>{result}-{0}</c> → <c>Cool-0</c>。
+        /// </summary>
+        public Drawable? GetAnimationFromTemplate(
+            string baseDirectory,
+            string resultName,
+            string frameTemplate,
+            bool looping = true,
+            bool startAtCurrentTime = true,
+            double? frameLength = null,
+            bool useLargeStore = false)
+        {
+            if (string.IsNullOrWhiteSpace(frameTemplate))
+                return null;
+
+            var textures = new List<Texture>();
+
+            for (int i = 0;; i++)
+            {
+                string relativePath = formatJudgementFrameTemplate(frameTemplate, resultName, i);
+                string fullPath = $"{baseDirectory}{relativePath}";
+                Texture? texture = Get(fullPath, useLargeStore);
+
+                if (texture == null)
+                    break;
+
+                textures.Add(texture);
+            }
+
+            return createAnimationDrawable(textures.ToArray(), looping, startAtCurrentTime, frameLength);
+        }
+
+        private static string formatJudgementFrameTemplate(string template, string resultName, int frameIndex)
+        {
+            string formatted = template.Replace("{result}", resultName, StringComparison.Ordinal);
+
+            return Regex.Replace(formatted, @"\{(0+)\}", m =>
+            {
+                int width = Math.Clamp(m.Groups[1].Value.Length, 1, 9);
+                return frameIndex.ToString($"D{width}", CultureInfo.InvariantCulture);
+            });
+        }
 
         /// <summary>
         /// 加载 Stage 组件帧（支持多帧或单帧）
