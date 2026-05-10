@@ -7,7 +7,6 @@ using System.IO;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
-using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -20,7 +19,6 @@ using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Audio;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -28,7 +26,6 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
-using osu.Game.Rulesets.BMS.Audio;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Screens;
@@ -66,9 +63,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private FillFlowContainer<BMSSongCardV2> songList = null!;
         private LoadingSpinner loadingSpinner = null!;
         private SearchTextBox searchBox = null!;
-        private EzPreviewTrackManager previewManager = null!;
+        private BmsChartPreviewPlayer previewPlayer = null!;
         private BMSWorkingBeatmap? previewBeatmap;
-        private Track? fallbackPreviewTrack;
 
         private readonly Bindable<BMSSongCache?> selectedSong = new Bindable<BMSSongCache?>();
         private readonly Bindable<BMSChartCache?> selectedChart = new Bindable<BMSChartCache?>();
@@ -292,13 +288,12 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                             Origin = Anchor.Centre,
                             State = { Value = Visibility.Hidden },
                         },
-                        previewManager = new EzPreviewTrackManager(),
+                        previewPlayer = new BmsChartPreviewPlayer(),
                     }
                 },
             };
 
-            previewManager.EnabledBindable.Value = true;
-            previewManager.OverridePreviewStartTime = 0;
+            previewPlayer.EnabledBindable.Value = true;
 
             // Bind events
             searchBox.Current.BindValueChanged(e => filterSongs(e.NewValue));
@@ -335,8 +330,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         private void updatePreviewTrack(BMSChartCache? chart)
         {
-            previewManager.StopPreview();
-            stopFallbackPreviewTrack();
+            previewPlayer.StopPreview();
             previewBeatmap = null;
 
             if (chart == null)
@@ -345,45 +339,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             try
             {
                 previewBeatmap = new BMSWorkingBeatmap(chart.FullPath, audioManager, textures, chart);
-                previewBeatmap.LoadTrack();
-                previewManager.OverridePreviewStartTime = chart.PreviewTime >= 0 ? chart.PreviewTime : 0;
-                bool enhancedStarted = previewManager.StartPreview(previewBeatmap, true);
-
-                if (!enhancedStarted)
-                    startFallbackPreviewTrack(previewBeatmap, chart);
+                previewPlayer.OverridePreviewStartTime = chart.PreviewTime >= 0 ? chart.PreviewTime : 0;
+                previewPlayer.StartPreview(previewBeatmap);
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Failed to start BMS enhanced preview");
+                Logger.Error(ex, "Failed to start BMS chart preview");
             }
-        }
-
-        private void startFallbackPreviewTrack(BMSWorkingBeatmap beatmap, BMSChartCache chart)
-        {
-            stopFallbackPreviewTrack();
-
-            // Prefer loading an actual BGM track from BMS definitions for fallback preview.
-            fallbackPreviewTrack = BmsBackgroundMusicLoader.TryLoadBgmTrack(audioManager, chart.FullPath) ?? beatmap.Track;
-
-            if (fallbackPreviewTrack == null)
-                return;
-
-            beatmap.PrepareTrackForPreview(true);
-
-            double startTime = chart.PreviewTime >= 0 ? chart.PreviewTime : 0;
-            fallbackPreviewTrack.Seek(startTime);
-            fallbackPreviewTrack.RestartPoint = startTime;
-            fallbackPreviewTrack.Looping = true;
-            fallbackPreviewTrack.Start();
-        }
-
-        private void stopFallbackPreviewTrack()
-        {
-            if (fallbackPreviewTrack == null)
-                return;
-
-            fallbackPreviewTrack.Stop();
-            fallbackPreviewTrack = null;
         }
 
         private void refreshSongList()
@@ -622,15 +584,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         public override void OnSuspending(ScreenTransitionEvent e)
         {
             // We're being suspended for player/loader: stop our own preview so it doesn't bleed into gameplay.
-            previewManager.StopPreview();
-            stopFallbackPreviewTrack();
+            previewPlayer.StopPreview();
             base.OnSuspending(e);
         }
 
         public override bool OnExiting(ScreenExitEvent e)
         {
-            previewManager.StopPreview();
-            stopFallbackPreviewTrack();
+            previewPlayer.StopPreview();
             previewBeatmap = null;
             restoreGlobalMusicController();
             this.FadeOut(200);
