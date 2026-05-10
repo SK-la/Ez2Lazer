@@ -308,7 +308,19 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         ArtistUnicode = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
                         Source = "BMS",
                         Tags = buildTags(chart),
-                        AudioFile = sanitiseAudioReference(chart.PreviewFile ?? chart.AudioFile, chart.FolderPath) ?? string.Empty,
+                        // Deliberately leave AudioFile empty for BMS charts: BMS doesn't have a single
+                        // audio track (notes ARE the audio via key-sounds). Populating this field would
+                        // cause osu's BeatmapManagerWorkingBeatmap.GetBeatmapTrack() to load and return a
+                        // real track from the BMS folder, which the song-select → gameplay transition then
+                        // pulls into MusicController, producing a "fixed audio overlay" at gameplay start.
+                        // BmsChartPreviewPlayer renders previews from key-sounds directly, so no consumer
+                        // needs this metadata.
+                        AudioFile = string.Empty,
+                        // Use the song-folder stage image if scanned. osu's BeatmapManagerWorkingBeatmap
+                        // already knows how to resolve this through tryResolveExternalPath using the
+                        // BeatmapSet.Hash → folder mapping, so song-select carousel panel thumbnails and
+                        // the wedge background populate without needing to pull the image into Realm.
+                        BackgroundFile = song.StageFilePath ?? string.Empty,
                         PreviewTime = chart.PreviewTime,
                     };
 

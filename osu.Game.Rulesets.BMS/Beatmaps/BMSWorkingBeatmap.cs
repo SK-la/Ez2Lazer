@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
@@ -27,9 +28,14 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     {
         private readonly string bmsFilePath;
         private readonly AudioManager audioManager;
-        private readonly TextureStore? textures;
-        private readonly IResourceStore<TextureUpload>? backgroundTextureLoader;
         private readonly BMSChartCache? chartCache;
+
+        /// <summary>
+        /// Per-instance texture store rooted at <see cref="FolderPath"/>. Each chart owns its own cache so
+        /// folders that share a filename (e.g. every chart having a "bg.png") never collide on the global
+        /// <c>TextureStore</c>'s key-by-filename cache.
+        /// </summary>
+        private readonly LargeTextureStore? localBackgroundStore;
 
         private BMSBeatmap? cachedBeatmap;
 
@@ -38,24 +44,40 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// </summary>
         public string FolderPath { get; }
 
+        /// <summary>
+        /// Construct a working beatmap directly from a BMS file on disk.
+        /// </summary>
+        /// <param name="bmsFilePath">Absolute path to the .bms / .bme / .bml / .pms chart.</param>
+        /// <param name="audioManager">Audio manager (mandatory; required for keysound playback).</param>
+        /// <param name="renderer">Optional renderer; required to load backgrounds. Pass null if backgrounds aren't needed (e.g. in headless tests).</param>
+        /// <param name="chartCache">Optional pre-parsed cache of chart metadata.</param>
+        /// <param name="beatmapInfoOverride">
+        /// Optional <see cref="BeatmapInfo"/> to use instead of the one synthesised from <paramref name="bmsFilePath"/>.
+        /// Pass a detached copy of the realm-managed BeatmapInfo for the chart so downstream consumers
+        /// (FooterButtonOptions etc.) can look it up by <see cref="BeatmapInfo.ID"/>.
+        /// </param>
         public BMSWorkingBeatmap(
             string bmsFilePath,
             AudioManager audioManager,
-            TextureStore? textures = null,
-            BMSChartCache? chartCache = null)
-            : base(createBeatmapInfo(bmsFilePath, chartCache), audioManager)
+            IRenderer? renderer = null,
+            BMSChartCache? chartCache = null,
+            BeatmapInfo? beatmapInfoOverride = null)
+            : base(beatmapInfoOverride ?? createBeatmapInfo(bmsFilePath, chartCache), audioManager)
         {
             this.bmsFilePath = bmsFilePath;
             FolderPath = Path.GetDirectoryName(bmsFilePath) ?? string.Empty;
             this.audioManager = audioManager;
-            this.textures = textures;
             this.chartCache = chartCache;
 
-            if (this.textures != null && Directory.Exists(FolderPath))
+            if (renderer != null && Directory.Exists(FolderPath))
             {
+                // Build a per-chart store rather than calling textures.AddTextureSource on the shared
+                // global TextureStore. The global cache keys by filename only, so multiple BMS folders
+                // each containing "bg.png" would all return the first cached texture → all charts ended
+                // up showing the same background.
                 var storage = new NativeStorage(FolderPath);
-                backgroundTextureLoader = new TextureLoaderStore(new StorageBackedResourceStore(storage));
-                this.textures.AddTextureSource(backgroundTextureLoader);
+                var loader = new TextureLoaderStore(new StorageBackedResourceStore(storage));
+                localBackgroundStore = new LargeTextureStore(renderer, loader);
             }
         }
 
@@ -188,14 +210,23 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public override Texture? GetBackground()
         {
-            if (textures == null)
+            if (localBackgroundStore == null)
                 return null;
 
+            // GetBackground() may run before GetBeatmap() has populated Metadata.BackgroundFile from the parsed
+            // chart, so eagerly trigger one chart parse to learn the actual filename.
             string backgroundFile = BeatmapInfo.Metadata.BackgroundFile;
+
+            if (string.IsNullOrEmpty(backgroundFile))
+            {
+                _ = GetBeatmap();
+                backgroundFile = BeatmapInfo.Metadata.BackgroundFile;
+            }
+
             if (string.IsNullOrEmpty(backgroundFile))
                 return null;
 
-            var texture = textures.Get(backgroundFile);
+            var texture = localBackgroundStore.Get(backgroundFile);
 
             if (texture == null)
             {

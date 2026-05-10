@@ -37,10 +37,12 @@ namespace osu.Game.Rulesets.BMS.UI.MenuEntry
     {
         /// <summary>
         /// Factory for the screen that the injected "BMS Game" button pushes onto the screen stack.
-        /// Exposed as a static factory so tests can assert that the click target is BMS-owned
-        /// (not a thin wrapper around <c>SoloSongSelect</c>) without exercising the full UI.
+        /// Returns a <see cref="BmsSoloSongSelect"/> — a <c>SoloSongSelect</c> derivative that reuses every
+        /// official song-select sub-component (title wedge, details area, filter control, beatmap carousel)
+        /// while routing gameplay launches to the BMS-owned <see cref="BMSPlayerLoader"/>.
+        /// Exposed as a static factory so tests can lock the click target type without exercising the full UI.
         /// </summary>
-        public static IScreen CreateBmsSongSelectScreen() => new BMSSongSelectScreen();
+        public static IScreen CreateBmsSongSelectScreen() => new BmsSoloSongSelect();
 
         // One MainMenu instance gets injected at most once. ConditionalWeakTable
         // means we don't keep MainMenus alive past their natural lifetime.
@@ -207,14 +209,14 @@ namespace osu.Game.Rulesets.BMS.UI.MenuEntry
 
             try
             {
-                // Push BMS's own song select screen so we bypass osu.Game's preview / asset pipeline entirely.
-                // This is the screen that drives previews via EzPreviewTrackManager and reads BMSBeatmapManager directly,
-                // which is what gives BMS-only entries a fully-functional preview + external asset loading.
+                // Push BMS's solo song-select derivative. It reuses osu.Game's full SongSelect UI tree but
+                // forces Ruleset.Value to BMS, syncs BMS catalog into Realm, and intercepts OnStart to push
+                // BMSPlayerLoader instead of the standard SoloPlayer launcher.
                 osuGame.PerformFromScreen(s => s.Push(CreateBmsSongSelectScreen()), new[] { typeof(MainMenu) });
             }
             catch (Exception ex)
             {
-                Logger.Log($"BMS main-menu injector: failed to push BMSSongSelectScreen: {ex.Message}", LoggingTarget.Runtime, LogLevel.Important);
+                Logger.Log($"BMS main-menu injector: failed to push BMS song select screen: {ex.Message}", LoggingTarget.Runtime, LogLevel.Important);
             }
         }
     }

@@ -112,18 +112,22 @@ namespace osu.Game.Rulesets.BMS.Tests
         }
 
         [Test]
-        public void TestClickTargetIsBmsOwnedSongSelect()
+        public void TestClickTargetIsBmsSoloSongSelect()
         {
-            // Regression guard for the redirect from BMSSoloSongSelect (which inherited SoloSongSelect and
-            // therefore reused osu.Game's preview/asset pipeline) to BMSSongSelectScreen (BMS-owned UI
-            // that drives previews via EzPreviewTrackManager and reads BMSBeatmapManager directly).
+            // BMS song select intentionally derives from osu.Game's SoloSongSelect now: the goal is to reuse
+            // every official song-select sub-component (title wedge / details area / filter control / carousel)
+            // verbatim, with BMS-specific behaviour layered in via OnStart override + Ruleset.Value pinning.
+            // Earlier history briefly bypassed this by pushing a fully BMS-owned OsuScreen, but the resulting
+            // UI drifted out of parity with osu's own. Lock the inheritance chain explicitly here.
             IScreen target = BmsMainMenuButtonInjector.CreateBmsSongSelectScreen();
 
             Assert.That(target, Is.Not.Null, "Injector factory must produce a screen.");
-            Assert.That(target, Is.InstanceOf<BMSSongSelectScreen>(),
-                "Main-menu BMS button must push BMSSongSelectScreen so the screen owns its own BMS-aware preview/loader pipeline.");
-            Assert.That(target, Is.Not.InstanceOf<SongSelect>(),
-                "BMSSongSelectScreen must not extend osu.Game.Screens.Select.SongSelect — that would re-introduce the standard preview pipeline.");
+            Assert.That(target, Is.InstanceOf<BmsSoloSongSelect>(),
+                "Main-menu BMS button must push BmsSoloSongSelect so it inherits the official SongSelect UI tree.");
+            Assert.That(target, Is.InstanceOf<SoloSongSelect>(),
+                "BmsSoloSongSelect must extend SoloSongSelect — that's how it reuses standard mod overlay / footer / wedges.");
+            Assert.That(target, Is.InstanceOf<SongSelect>(),
+                "BmsSoloSongSelect must extend SongSelect — that's how the official carousel + filter pipeline is reused.");
         }
 
         private static FieldInfo? walkHierarchy(Type? type, string name)

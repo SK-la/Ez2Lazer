@@ -496,7 +496,45 @@ namespace osu.Game.Rulesets.BMS
             : base((BeatmapInfo)source.BeatmapInfo, null)
         {
             this.source = source;
-            maniaBeatmap = ManiaConvertedWorkingBeatmap.ConvertToManiaBeatmap(source.Beatmap);
+            maniaBeatmap = ManiaConvertedWorkingBeatmap.ConvertToManiaBeatmap(resolveSourceBeatmap(source));
+        }
+
+        /// <summary>
+        /// BMS charts in Realm only register the .bms file as a generic realm file; osu's
+        /// <c>BeatmapManagerWorkingBeatmap</c> routes through <c>Decoder.GetDecoder&lt;Beatmap&gt;()</c>, which
+        /// doesn't recognise BMS, so <c>source.Beatmap.HitObjects</c> ends up empty and the mania
+        /// difficulty calculator returns 0★. Detect that and re-decode the chart with
+        /// <see cref="BMSBeatmapDecoder"/>, locating the on-disk file via <see cref="BMSExternalPath"/>.
+        /// </summary>
+        private static IBeatmap resolveSourceBeatmap(IWorkingBeatmap source)
+        {
+            IBeatmap? sourceBeatmap = source.Beatmap;
+
+            if (sourceBeatmap is BMSBeatmap || (sourceBeatmap?.HitObjects.OfType<BMSHitObject>().Any() ?? false))
+                return sourceBeatmap!;
+
+            if (source.BeatmapInfo is BeatmapInfo realmBeatmap
+                && BMSExternalPath.TryResolveExternalChartPath(
+                    realmBeatmap.BeatmapSet?.Hash,
+                    realmBeatmap.Path,
+                    realmBeatmap.BeatmapSet?.Files.Select(f => f.Filename) ?? Enumerable.Empty<string>(),
+                    out string chartPath))
+            {
+                try
+                {
+                    using var stream = File.OpenRead(chartPath);
+                    using var reader = new IO.LineBufferedReader(stream);
+
+                    if (new BMSBeatmapDecoder().Decode(reader) is BMSBeatmap bmsBeatmap)
+                        return bmsBeatmap;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[BMS] difficulty calc fallback decode failed for '{chartPath}': {ex.Message}", LoggingTarget.Runtime, LogLevel.Important);
+                }
+            }
+
+            return sourceBeatmap ?? new BMSBeatmap();
         }
 
         protected override IBeatmap GetBeatmap() => maniaBeatmap;

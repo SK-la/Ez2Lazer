@@ -25,6 +25,12 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     /// </summary>
     public class ManiaConvertedWorkingBeatmap : WorkingBeatmap
     {
+        /// <summary>
+        /// Gameplay, previews, and Ez analysis may call <see cref="GetPlayableBeatmap"/> concurrently on the same
+        /// instance; in-place ApplyDefaults mutates shared lists → lock for thread safety.
+        /// </summary>
+        private readonly object playableMutationLock = new object();
+
         private readonly ManiaBeatmap maniaBeatmap;
         private readonly AudioManager audioManager;
         private readonly double beatmapLength;
@@ -104,48 +110,51 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public override IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
         {
-            var rulesetInstance = ruleset.CreateInstance();
-
-            foreach (var mod in mods.OfType<IApplicableToDifficulty>())
+            lock (playableMutationLock)
             {
-                token.ThrowIfCancellationRequested();
-                mod.ApplyToDifficulty(maniaBeatmap.Difficulty);
-            }
+                var rulesetInstance = ruleset.CreateInstance();
 
-            foreach (var mod in mods.OfType<IApplicableAfterBeatmapConversion>())
-            {
-                token.ThrowIfCancellationRequested();
-                mod.ApplyToBeatmap(maniaBeatmap);
-            }
+                foreach (var mod in mods.OfType<IApplicableToDifficulty>())
+                {
+                    token.ThrowIfCancellationRequested();
+                    mod.ApplyToDifficulty(maniaBeatmap.Difficulty);
+                }
 
-            var processor = rulesetInstance.CreateBeatmapProcessor(maniaBeatmap);
+                foreach (var mod in mods.OfType<IApplicableAfterBeatmapConversion>())
+                {
+                    token.ThrowIfCancellationRequested();
+                    mod.ApplyToBeatmap(maniaBeatmap);
+                }
 
-            if (processor != null)
-            {
-                foreach (var mod in mods.OfType<IApplicableToBeatmapProcessor>())
-                    mod.ApplyToBeatmapProcessor(processor);
+                var processor = rulesetInstance.CreateBeatmapProcessor(maniaBeatmap);
 
-                processor.PreProcess();
-            }
+                if (processor != null)
+                {
+                    foreach (var mod in mods.OfType<IApplicableToBeatmapProcessor>())
+                        mod.ApplyToBeatmapProcessor(processor);
 
-            foreach (var obj in maniaBeatmap.HitObjects)
-            {
-                token.ThrowIfCancellationRequested();
-                obj.ApplyDefaults(maniaBeatmap.ControlPointInfo, maniaBeatmap.Difficulty, token);
-            }
+                    processor.PreProcess();
+                }
 
-            processor?.PostProcess();
-
-            foreach (var mod in mods.OfType<IApplicableToHitObject>())
-            {
                 foreach (var obj in maniaBeatmap.HitObjects)
                 {
                     token.ThrowIfCancellationRequested();
-                    mod.ApplyToHitObject(obj);
+                    obj.ApplyDefaults(maniaBeatmap.ControlPointInfo, maniaBeatmap.Difficulty, token);
                 }
-            }
 
-            return maniaBeatmap;
+                processor?.PostProcess();
+
+                foreach (var mod in mods.OfType<IApplicableToHitObject>())
+                {
+                    foreach (var obj in maniaBeatmap.HitObjects)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        mod.ApplyToHitObject(obj);
+                    }
+                }
+
+                return maniaBeatmap;
+            }
         }
 
         public override Texture? GetBackground() => SourceBeatmap.GetBackground();
