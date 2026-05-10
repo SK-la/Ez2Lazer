@@ -9,8 +9,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.EzOsuGame;
@@ -28,9 +26,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     /// </summary>
     public partial class EzColumnBackground : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private Sprite hitOverlay = null!;
+        private const string overlay_texture_base_path = "Column/ColumnLight";
+
+        private Drawable hitOverlay = null!;
         private Box? separator;
-        private static Texture? sharedTexture;
 
         private Bindable<Colour4> colourBindable = null!;
         private Bindable<double> hitPosition = null!;
@@ -58,18 +57,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // 计算 drawSeparator 结果（基于不变的列数和列索引）
             hasSeparator = stageDefinition.HasSeparator(column.Index);
 
-            sharedTexture ??= textures.Get("Column/ColumnLight");
-
-            hitOverlay = new Sprite
-            {
-                Name = "Hit Overlay",
-                RelativeSizeAxes = Axes.X,
-                Anchor = Anchor.TopLeft,
-                Origin = Anchor.TopLeft,
-                // Blending = BlendingParameters.Additive,
-                Alpha = 0,
-                Texture = sharedTexture,
-            };
+            hitOverlay = textures.GetAnimation(overlay_texture_base_path) ?? Empty();
+            hitOverlay.Name = "Hit Overlay";
+            hitOverlay.RelativeSizeAxes = Axes.X;
+            hitOverlay.Anchor = Anchor.TopLeft;
+            hitOverlay.Origin = Anchor.TopLeft;
+            hitOverlay.Alpha = 0;
 
             hitPosition = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
             hitPosition.BindValueChanged(_ => updateSeparator());

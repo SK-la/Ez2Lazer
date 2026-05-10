@@ -4,12 +4,16 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
@@ -133,7 +137,7 @@ namespace osu.Game.EzOsuGame
         /// <param name="path">完整路径</param>
         /// <param name="useLargeStore">是否使用大纹理存储</param>
         /// <returns>纹理对象</returns>
-        public Texture Get(string path, bool useLargeStore = false)
+        public Texture? Get(string path, bool useLargeStore = false)
         {
             return useLargeStore ? largeTextureStore.Get(path) : textureStore.Get(path);
         }
@@ -143,7 +147,7 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         /// <param name="component">组件名称（如 "whitenote"）</param>
         /// <returns>纹理对象</returns>
-        public Texture GetNote(string component)
+        public Texture? GetNote(string component)
         {
             string path = $"note/{noteSetName.Value}/{component}";
             return textureStore.Get(path);
@@ -154,7 +158,7 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         /// <param name="component">组件名称</param>
         /// <returns>纹理对象</returns>
-        public Texture GetStage(string component)
+        public Texture? GetStage(string component)
         {
             string path = $"Stage/{stageName.Value}/Stage/{component}";
             return largeTextureStore.Get(path);
@@ -206,30 +210,141 @@ namespace osu.Game.EzOsuGame
         #region 动画加载 API
 
         /// <summary>
-        /// 加载帧动画纹理列表
+        /// 获取纹理或动画纹理（默认按 "-" 再 "_" 作为动画分隔符探测）。
         /// </summary>
-        /// <param name="basePath">基础路径（如 "note/xxx/component"）</param>
-        /// <param name="maxFrames">最大帧数</param>
-        /// <param name="scaleAdjust">缩放调整（默认 2.0）</param>
-        /// <returns>纹理列表</returns>
-        public List<Texture> LoadAnimationFrames(string basePath, int maxFrames = 240, float scaleAdjust = 2.0f)
+        /// <param name="componentName">组件基础路径（例如 "Column/ColumnLight"）</param>
+        /// <param name="animatable">是否允许按帧动画探测</param>
+        /// <param name="looping">当存在多帧时是否循环</param>
+        /// <param name="startAtCurrentTime">是否从当前时间开始播放</param>
+        /// <param name="frameLength">动画帧时长（毫秒），未指定时使用默认 60FPS</param>
+        /// <param name="startFrameIndex">起始帧索引（默认 0）</param>
+        /// <param name="useLargeStore">是否使用大纹理存储</param>
+        public Drawable? GetAnimation(
+            string componentName,
+            bool animatable = true,
+            bool looping = true,
+            bool startAtCurrentTime = true,
+            double? frameLength = null,
+            int startFrameIndex = 0,
+            bool useLargeStore = false)
         {
-            var frames = new List<Texture>();
+            Texture[] textures = GetTextures(componentName, animatable, new[] { "-", "_" }, startFrameIndex, useLargeStore);
+            return createAnimationDrawable(textures, looping, startAtCurrentTime, frameLength);
+        }
 
-            for (int i = 0; i < maxFrames; i++)
+        /// <summary>
+        /// 获取纹理或动画纹理（使用指定动画分隔符探测，例如 "-" 或 "_"）。
+        /// </summary>
+        /// <param name="componentName">组件基础路径（例如 "Column/ColumnLight"）</param>
+        /// <param name="animationSeparator">动画分隔符（例如 "-" 或 "_"）</param>
+        /// <param name="animatable">是否允许按帧动画探测</param>
+        /// <param name="looping">当存在多帧时是否循环</param>
+        /// <param name="startAtCurrentTime">是否从当前时间开始播放</param>
+        /// <param name="frameLength">动画帧时长（毫秒），未指定时使用默认 60FPS</param>
+        /// <param name="startFrameIndex">起始帧索引（默认 0）</param>
+        /// <param name="useLargeStore">是否使用大纹理存储</param>
+        public Drawable? GetAnimation(
+            string componentName,
+            string animationSeparator,
+            bool animatable = true,
+            bool looping = true,
+            bool startAtCurrentTime = true,
+            double? frameLength = null,
+            int startFrameIndex = 0,
+            bool useLargeStore = false)
+        {
+            Texture[] textures = GetTextures(componentName, animatable, animationSeparator, startFrameIndex, useLargeStore);
+            return createAnimationDrawable(textures, looping, startAtCurrentTime, frameLength);
+        }
+
+        /// <summary>
+        /// 获取纹理序列；当 animatable 为 true 时优先探测动画帧，否则仅取静态纹理。
+        /// </summary>
+        /// <param name="componentName">组件基础路径（例如 "Column/ColumnLight"）</param>
+        /// <param name="animatable">是否允许按帧动画探测</param>
+        /// <param name="animationSeparators">动画分隔符列表，按顺序探测</param>
+        /// <param name="startFrameIndex">起始帧索引（默认 0）</param>
+        /// <param name="useLargeStore">是否使用大纹理存储</param>
+        /// <returns>纹理数组（0 张表示未找到）</returns>
+        public Texture[] GetTextures(
+            string componentName,
+            bool animatable,
+            IEnumerable<string> animationSeparators,
+            int startFrameIndex = 0,
+            bool useLargeStore = false)
+        {
+            if (animatable)
             {
-                string framePath = $"{basePath}/{i:D3}";
-                Texture texture = textureStore.Get(framePath);
+                foreach (string separator in animationSeparators)
+                {
+                    var textures = getAnimatedTextures(componentName, separator, startFrameIndex, useLargeStore).ToArray();
+                    if (textures.Length > 0)
+                        return textures;
+                }
+            }
+
+            Texture? singleTexture = Get(componentName, useLargeStore);
+            return singleTexture != null ? new[] { singleTexture } : Array.Empty<Texture>();
+        }
+
+        /// <summary>
+        /// 获取纹理序列；当 animatable 为 true 时优先探测动画帧，否则仅取静态纹理。
+        /// </summary>
+        /// <param name="componentName">组件基础路径（例如 "Column/ColumnLight"）</param>
+        /// <param name="animatable">是否允许按帧动画探测</param>
+        /// <param name="animationSeparator">动画分隔符（例如 "-" 或 "_"）</param>
+        /// <param name="startFrameIndex">起始帧索引，默认 0</param>
+        /// <param name="useLargeStore">是否使用大纹理存储</param>
+        /// <returns>纹理数组（0 张表示未找到）</returns>
+        public Texture[] GetTextures(
+            string componentName,
+            bool animatable,
+            string animationSeparator,
+            int startFrameIndex = 0,
+            bool useLargeStore = false)
+            => GetTextures(componentName, animatable, new[] { animationSeparator }, startFrameIndex, useLargeStore);
+
+        private static Drawable? createAnimationDrawable(Texture[] textures, bool looping, bool startAtCurrentTime, double? frameLength)
+        {
+            switch (textures.Length)
+            {
+                case 0:
+                    return null;
+
+                case 1:
+                    return new Sprite { Texture = textures[0] };
+
+                default:
+                    var animation = new TextureAnimation(startAtCurrentTime)
+                    {
+                        DefaultFrameLength = frameLength ?? 1000d / 60d,
+                        Loop = looping,
+                    };
+
+                    foreach (Texture texture in textures)
+                        animation.AddFrame(texture);
+
+                    return animation;
+            }
+        }
+
+        private IEnumerable<Texture> getAnimatedTextures(string componentName, string animationSeparator, int startFrameIndex, bool useLargeStore)
+        {
+            for (int i = 0;; i++)
+            {
+                int frameIndex = startFrameIndex + i;
+                string framePath = buildIndexedFramePath(componentName, animationSeparator, frameIndex);
+                Texture? texture = Get(framePath, useLargeStore);
 
                 if (texture == null)
                     break;
 
-                texture.ScaleAdjust = scaleAdjust;
-                frames.Add(texture);
+                yield return texture;
             }
-
-            return frames;
         }
+
+        private static string buildIndexedFramePath(string componentName, string animationSeparator, int frameIndex)
+            => $"{componentName}{animationSeparator}{frameIndex.ToString(CultureInfo.InvariantCulture)}";
 
         /// <summary>
         /// 加载 Stage 组件帧（支持多帧或单帧）
