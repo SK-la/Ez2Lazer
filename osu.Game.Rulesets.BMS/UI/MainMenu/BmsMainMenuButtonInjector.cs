@@ -33,6 +33,13 @@ namespace osu.Game.Rulesets.BMS.UI.MenuEntry
     /// </summary>
     public partial class BmsMainMenuButtonInjector : Drawable
     {
+        /// <summary>
+        /// Factory for the screen that the injected "BMS Game" button pushes onto the screen stack.
+        /// Exposed as a static factory so tests can assert that the click target is BMS-owned
+        /// (not a thin wrapper around <c>SoloSongSelect</c>) without exercising the full UI.
+        /// </summary>
+        public static IScreen CreateBmsSongSelectScreen() => new BMSSongSelectScreen();
+
         // One MainMenu instance gets injected at most once. ConditionalWeakTable
         // means we don't keep MainMenus alive past their natural lifetime.
         private static readonly ConditionalWeakTable<MainMenu, object> injected_menus = new ConditionalWeakTable<MainMenu, object>();
@@ -198,11 +205,14 @@ namespace osu.Game.Rulesets.BMS.UI.MenuEntry
 
             try
             {
-                osuGame.PerformFromScreen(s => s.Push(new BMSSoloSongSelect()), new[] { typeof(MainMenu) });
+                // Push BMS's own song select screen so we bypass osu.Game's preview / asset pipeline entirely.
+                // This is the screen that drives previews via EzPreviewTrackManager and reads BMSBeatmapManager directly,
+                // which is what gives BMS-only entries a fully-functional preview + external asset loading.
+                osuGame.PerformFromScreen(s => s.Push(CreateBmsSongSelectScreen()), new[] { typeof(MainMenu) });
             }
             catch (Exception ex)
             {
-                Logger.Log($"BMS main-menu injector: failed to push BMSSoloSongSelect: {ex.Message}", LoggingTarget.Runtime, LogLevel.Important);
+                Logger.Log($"BMS main-menu injector: failed to push BMSSongSelectScreen: {ex.Message}", LoggingTarget.Runtime, LogLevel.Important);
             }
         }
     }

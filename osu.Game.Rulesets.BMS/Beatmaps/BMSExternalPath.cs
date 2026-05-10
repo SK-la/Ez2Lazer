@@ -2,7 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
@@ -13,7 +15,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     /// </summary>
     public static class BMSExternalPath
     {
-        public const string HashPrefix = "bms-ext:set:";
+        public const string HASH_PREFIX = "bms-ext:set:";
 
         /// <summary>
         /// Encode an external folder path into the canonical BMS external set hash.
@@ -21,7 +23,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public static string Encode(string folderPath)
         {
             string encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(folderPath ?? string.Empty));
-            return HashPrefix + encoded;
+            return HASH_PREFIX + encoded;
         }
 
         /// <summary>
@@ -37,10 +39,10 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             if (string.IsNullOrEmpty(hash))
                 return false;
 
-            if (!hash.StartsWith(HashPrefix, StringComparison.Ordinal))
+            if (!hash.StartsWith(HASH_PREFIX, StringComparison.Ordinal))
                 return false;
 
-            string encoded = hash.Substring(HashPrefix.Length);
+            string encoded = hash.Substring(HASH_PREFIX.Length);
 
             if (string.IsNullOrEmpty(encoded))
                 return false;
@@ -66,6 +68,40 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
         }
 
+        private static readonly string[] chart_extensions = { ".bms", ".bme", ".bml", ".pms" };
+
+        /// <summary>
+        /// Resolve the on-disk chart file path for an external BMS beatmap, given its set hash and the
+        /// known filenames in that beatmap set. Falls back to scanning <paramref name="setFilenames"/>
+        /// for any standard BMS chart extension when <paramref name="beatmapPath"/> is missing.
+        /// </summary>
+        public static bool TryResolveExternalChartPath(string? setHash, string? beatmapPath, IEnumerable<string> setFilenames, out string chartPath)
+        {
+            chartPath = string.Empty;
+
+            if (!TryDecode(setHash, out string folderPath))
+                return false;
+
+            string? chartFilename = beatmapPath;
+
+            if (string.IsNullOrEmpty(chartFilename))
+            {
+                chartFilename = setFilenames.FirstOrDefault(name => name != null
+                                                                    && chart_extensions.Any(ext => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            if (string.IsNullOrEmpty(chartFilename))
+                return false;
+
+            string candidate = Path.Combine(folderPath, chartFilename);
+
+            if (!File.Exists(candidate))
+                return false;
+
+            chartPath = candidate;
+            return true;
+        }
+
         /// <summary>
         /// Try to recover the external folder path without verifying its existence on disk.
         /// Useful in test environments or when a probe fallback is desired.
@@ -77,10 +113,10 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             if (string.IsNullOrEmpty(hash))
                 return false;
 
-            if (!hash.StartsWith(HashPrefix, StringComparison.Ordinal))
+            if (!hash.StartsWith(HASH_PREFIX, StringComparison.Ordinal))
                 return false;
 
-            string encoded = hash.Substring(HashPrefix.Length);
+            string encoded = hash.Substring(HASH_PREFIX.Length);
 
             if (string.IsNullOrEmpty(encoded))
                 return false;

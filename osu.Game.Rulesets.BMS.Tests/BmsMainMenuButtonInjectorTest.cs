@@ -7,8 +7,11 @@ using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using osu.Framework.Graphics;
+using osu.Framework.Screens;
 using osu.Game.Rulesets.BMS.UI.MenuEntry;
+using osu.Game.Rulesets.BMS.UI.SongSelect;
 using osu.Game.Screens.Menu;
+using osu.Game.Screens.Select;
 using osuTK;
 
 namespace osu.Game.Rulesets.BMS.Tests
@@ -106,6 +109,21 @@ namespace osu.Game.Rulesets.BMS.Tests
             MethodInfo? performFromScreen = typeof(OsuGame).GetMethod("PerformFromScreen", BindingFlags.Instance | BindingFlags.Public);
 
             Assert.That(performFromScreen, Is.Not.Null, "OsuGame.PerformFromScreen has been moved/renamed; injector click handler is broken.");
+        }
+
+        [Test]
+        public void TestClickTargetIsBmsOwnedSongSelect()
+        {
+            // Regression guard for the redirect from BMSSoloSongSelect (which inherited SoloSongSelect and
+            // therefore reused osu.Game's preview/asset pipeline) to BMSSongSelectScreen (BMS-owned UI
+            // that drives previews via EzPreviewTrackManager and reads BMSBeatmapManager directly).
+            IScreen target = BmsMainMenuButtonInjector.CreateBmsSongSelectScreen();
+
+            Assert.That(target, Is.Not.Null, "Injector factory must produce a screen.");
+            Assert.That(target, Is.InstanceOf<BMSSongSelectScreen>(),
+                "Main-menu BMS button must push BMSSongSelectScreen so the screen owns its own BMS-aware preview/loader pipeline.");
+            Assert.That(target, Is.Not.InstanceOf<SongSelect>(),
+                "BMSSongSelectScreen must not extend osu.Game.Screens.Select.SongSelect — that would re-introduce the standard preview pipeline.");
         }
 
         private static FieldInfo? walkHierarchy(Type? type, string name)

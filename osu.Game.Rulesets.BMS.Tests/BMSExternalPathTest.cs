@@ -15,7 +15,7 @@ namespace osu.Game.Rulesets.BMS.Tests
         {
             string encoded = BMSExternalPath.Encode("F:/MUG BMS/MUG.MAP.BMS/Some Folder");
 
-            Assert.That(encoded, Does.StartWith(BMSExternalPath.HashPrefix));
+            Assert.That(encoded, Does.StartWith(BMSExternalPath.HASH_PREFIX));
         }
 
         [Test]
@@ -49,7 +49,7 @@ namespace osu.Game.Rulesets.BMS.Tests
         [Test]
         public void TestTryDecodeHandlesMalformedBase64()
         {
-            string malformed = BMSExternalPath.HashPrefix + "@@@@@";
+            string malformed = BMSExternalPath.HASH_PREFIX + "@@@@@";
 
             Assert.That(BMSExternalPath.TryDecode(malformed, out string folderPath), Is.False);
             Assert.That(folderPath, Is.EqualTo(string.Empty));

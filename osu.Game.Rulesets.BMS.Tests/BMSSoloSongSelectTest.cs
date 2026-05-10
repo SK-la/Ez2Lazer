@@ -6,30 +6,22 @@ using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using osu.Game.Rulesets.BMS.Beatmaps;
-using osu.Game.Rulesets.BMS.UI.SongSelect;
-using osu.Game.Screens.Select;
 
 namespace osu.Game.Rulesets.BMS.Tests
 {
     /// <summary>
-    /// Validates the chart-path resolution helper used by <see cref="BMSSoloSongSelect"/> when reconstructing
-    /// a <see cref="BMSWorkingBeatmap"/> for an external BMS entry. Also asserts the screen sits on the
-    /// standard <see cref="SoloSongSelect"/> stack so it inherits carousel / preview / footer behaviour.
+    /// Validates the chart-path resolution helper used when reconstructing a
+    /// <see cref="BMSWorkingBeatmap"/> for an external BMS entry coming from Realm.
+    /// (Previously lived on a now-deleted <c>BMSSoloSongSelect</c> wrapper; the helper itself
+    /// has moved to <see cref="BMSExternalPath"/>.)
     /// </summary>
     [TestFixture]
     public class BMSSoloSongSelectTest
     {
         [Test]
-        public void TestBmsSoloSongSelectInheritsSoloSongSelect()
-        {
-            Assert.That(typeof(SoloSongSelect).IsAssignableFrom(typeof(BMSSoloSongSelect)),
-                "BMSSoloSongSelect must derive from SoloSongSelect to reuse the standard carousel/preview/footer.");
-        }
-
-        [Test]
         public void TestResolveExternalChartPath_FailsForNonBmsHash()
         {
-            bool resolved = BMSSoloSongSelect.TryResolveExternalChartPath(
+            bool resolved = BMSExternalPath.TryResolveExternalChartPath(
                 setHash: "not-a-bms-hash",
                 beatmapPath: "foo.bms",
                 setFilenames: Array.Empty<string>(),
@@ -46,7 +38,7 @@ namespace osu.Game.Rulesets.BMS.Tests
 
             try
             {
-                bool resolved = BMSSoloSongSelect.TryResolveExternalChartPath(
+                bool resolved = BMSExternalPath.TryResolveExternalChartPath(
                     setHash: BMSExternalPath.Encode(folder),
                     beatmapPath: "explicit.bms",
                     setFilenames: new[] { "wrong.bms" },
@@ -68,7 +60,7 @@ namespace osu.Game.Rulesets.BMS.Tests
 
             try
             {
-                bool resolved = BMSSoloSongSelect.TryResolveExternalChartPath(
+                bool resolved = BMSExternalPath.TryResolveExternalChartPath(
                     setHash: BMSExternalPath.Encode(folder),
                     beatmapPath: null,
                     setFilenames: new List<string> { "irrelevant.txt", "fallback.bme" },
@@ -90,7 +82,7 @@ namespace osu.Game.Rulesets.BMS.Tests
 
             try
             {
-                bool resolved = BMSSoloSongSelect.TryResolveExternalChartPath(
+                bool resolved = BMSExternalPath.TryResolveExternalChartPath(
                     setHash: BMSExternalPath.Encode(folder),
                     beatmapPath: "missing.bms",
                     setFilenames: Array.Empty<string>(),
@@ -115,7 +107,7 @@ namespace osu.Game.Rulesets.BMS.Tests
 
                 try
                 {
-                    bool resolved = BMSSoloSongSelect.TryResolveExternalChartPath(
+                    bool resolved = BMSExternalPath.TryResolveExternalChartPath(
                         setHash: BMSExternalPath.Encode(folder),
                         beatmapPath: null,
                         setFilenames: new[] { filename },
