@@ -47,6 +47,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             this.audioProvider = audioProvider ?? throw new ArgumentNullException(nameof(audioProvider));
         }
 
+        /// <summary>Routed legacy / Mania skin without folder fallback.</summary>
+        public ISkin Inner => inner;
+
         private ISampleStore? ensureStore()
         {
             if (storeInitialised)

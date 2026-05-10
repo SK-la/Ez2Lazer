@@ -15,6 +15,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
@@ -23,12 +24,6 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
 {
-    public enum BMSGameplayRoute
-    {
-        ManiaCompatibility,
-        BmsNative
-    }
-
     /// <summary>
     /// Loader screen that prepares and starts BMS gameplay.
     /// Uses BMS ruleset gameplay pipeline directly.
@@ -40,7 +35,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         protected override bool InitialBackButtonVisibility => false;
 
         private readonly BMSWorkingBeatmap workingBeatmap;
-        private readonly BMSGameplayRoute gameplayRoute;
+        private readonly BMSGameplayRoute? gameplayRouteOverride;
         private LoadingSpinner loadingSpinner = null!;
         private OsuSpriteText statusText = null!;
         private OsuSpriteText titleText = null!;
@@ -51,10 +46,16 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         [Resolved]
         private AudioManager audioManager { get; set; } = null!;
 
-        public BMSPlayerLoader(BMSWorkingBeatmap workingBeatmap, BMSGameplayRoute gameplayRoute = BMSGameplayRoute.ManiaCompatibility)
+        [Resolved]
+        private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
+
+        /// <summary>
+        /// Construct a player loader with an explicit route override (mainly used by tests or special entries).
+        /// </summary>
+        public BMSPlayerLoader(BMSWorkingBeatmap workingBeatmap, BMSGameplayRoute? gameplayRouteOverride = null)
         {
             this.workingBeatmap = workingBeatmap;
-            this.gameplayRoute = gameplayRoute;
+            this.gameplayRouteOverride = gameplayRouteOverride;
         }
 
         [BackgroundDependencyLoader]
@@ -117,10 +118,10 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             base.LoadComplete();
 
             // Start loading after a brief delay
-            scheduledLoadBeatmap = Scheduler.AddDelayed(LoadBeatmap, 100);
+            scheduledLoadBeatmap = Scheduler.AddDelayed(loadBeatmap, 100);
         }
 
-        private void LoadBeatmap()
+        private void loadBeatmap()
         {
             if (!this.IsCurrentScreen())
                 return;
@@ -152,7 +153,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                         return;
 
                     loadingSpinner.Hide();
-                    PushPlayer();
+                    pushPlayer();
                 }, 500);
             }
             catch (Exception ex)
@@ -164,14 +165,16 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }
         }
 
-        private void PushPlayer()
+        private void pushPlayer()
         {
             if (!this.IsCurrentScreen())
                 return;
 
             try
             {
-                if (gameplayRoute == BMSGameplayRoute.BmsNative)
+                BMSGameplayRoute route = gameplayRouteOverride ?? resolveRouteFromConfig();
+
+                if (route == BMSGameplayRoute.BmsNative)
                 {
                     Beatmap.Value = workingBeatmap;
                     Ruleset.Value = new BMSNativeRuleset().RulesetInfo;
@@ -192,6 +195,21 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 statusText.Text = $"启动游戏失败: {ex.Message}";
                 scheduleExit(3000);
             }
+        }
+
+        private BMSGameplayRoute resolveRouteFromConfig()
+        {
+            try
+            {
+                if (rulesetConfigCache.GetConfigFor(new BMSRuleset()) is BMSRulesetConfigManager bmsConfig)
+                    return bmsConfig.Get<BMSGameplayRoute>(BMSRulesetSetting.GameplayRoute);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"BMSPlayerLoader: failed to read GameplayRoute config: {ex.Message}", LoggingTarget.Runtime, LogLevel.Important);
+            }
+
+            return BMSGameplayRoute.ManiaCompatibility;
         }
 
         private void scheduleExit(double delay)

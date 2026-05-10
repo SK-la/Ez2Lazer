@@ -238,13 +238,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             if (GetBeatmap() is not BMSBeatmap beatmap || beatmap.BackgroundSoundEvents.Count == 0)
                 return storyboard;
 
-            var sampleLayer = storyboard.GetLayer("BMSBackgroundSamples");
-
-            foreach (var backgroundEvent in beatmap.BackgroundSoundEvents)
-            {
-                sampleLayer.Add(new StoryboardSampleInfo(backgroundEvent.Filename.Replace('\\', '/'), backgroundEvent.Time, 100));
-            }
-
+            BmsStoryboardPreviewAugment.Augment(storyboard, beatmap.BackgroundSoundEvents);
             return storyboard;
         }
 

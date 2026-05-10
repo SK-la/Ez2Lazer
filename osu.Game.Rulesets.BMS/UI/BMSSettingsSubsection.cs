@@ -163,6 +163,12 @@ namespace osu.Game.Rulesets.BMS.UI
                     KeyboardStep = 1,
                     LabelFormat = v => $"{v:0}",
                 }),
+                new SettingsItemV2(new FormEnumDropdown<BMSGameplayRoute>
+                {
+                    Caption = "Gameplay 路由",
+                    HintText = "ManiaCompatibility：复用 Mania 渲染与判定（推荐）。BmsNative：使用 BMS 原生流水线（实验性）。",
+                    Current = bmsConfig.GetBindable<BMSGameplayRoute>(BMSRulesetSetting.GameplayRoute),
+                }),
             };
         }
 

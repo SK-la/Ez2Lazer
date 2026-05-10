@@ -26,6 +26,7 @@ namespace osu.Game.Rulesets.BMS.Configuration
             SetDefault(BMSRulesetSetting.AutoPreloadKeysounds, true);
             SetDefault(BMSRulesetSetting.KeysoundVolume, 1.0, 0.0, 1.0, 0.01);
             SetDefault(BMSRulesetSetting.DpStageSpacing, 0.0, 0.0, 200.0, 1.0);
+            SetDefault(BMSRulesetSetting.GameplayRoute, BMSGameplayRoute.ManiaCompatibility);
         }
 
         public static IReadOnlyList<string> ParseLibraryPaths(string? rawPaths, string? legacyRootPath = null)
@@ -92,5 +93,6 @@ namespace osu.Game.Rulesets.BMS.Configuration
         AutoPreloadKeysounds,
         KeysoundVolume,
         DpStageSpacing,
+        GameplayRoute,
     }
 }

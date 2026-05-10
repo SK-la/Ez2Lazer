@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
@@ -49,6 +48,7 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
 using System.IO;
+using osu.Game.Rulesets.BMS.UI.MenuEntry;
 
 namespace osu.Game.Rulesets.BMS
 {
@@ -119,7 +119,7 @@ namespace osu.Game.Rulesets.BMS
                     return Array.Empty<BmsBackgroundSoundEvent>();
 
                 using var stream = File.OpenRead(chartFile);
-                using var reader = new osu.Game.IO.LineBufferedReader(stream);
+                using var reader = new IO.LineBufferedReader(stream);
                 var decoder = new BMSBeatmapDecoder();
 
                 if (decoder.Decode(reader) is BMSBeatmap decoded)
@@ -148,10 +148,12 @@ namespace osu.Game.Rulesets.BMS
 
         public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap)
         {
-            var inner = createInnerSkinTransformer(skin, beatmap) ?? skin;
+            // WorkingBeatmap.Skin may already wrap LegacyBeatmapSkin with BMSExternalSampleSkin (song select preview).
+            // Unwrap so Mania skin transformers see LegacyBeatmapSkin once; then apply a single external wrapper.
+            ISkin chain = skin is BMSExternalSampleSkin ext ? ext.Inner : skin;
 
-            // Only wrap with the external sample skin when this beatmap is actually backed by an
-            // external BMS folder; for in-Realm beatmaps the inner transformer is sufficient.
+            var inner = createInnerSkinTransformer(chain, beatmap) ?? chain;
+
             if (!BMSExternalPath.TryDecode(beatmap.BeatmapInfo.BeatmapSet?.Hash, out string folder))
                 return ReferenceEquals(inner, skin) ? null : inner;
 
@@ -433,10 +435,7 @@ namespace osu.Game.Rulesets.BMS
             return new ManiaFilterCriteria();
         }
 
-        public override Drawable CreateIcon() => new SpriteIcon
-        {
-            Icon = OsuIcon.RulesetMania // TODO: Create BMS-specific icon
-        };
+        public override Drawable CreateIcon() => new BmsRulesetIcon();
 
         public override string RulesetAPIVersionSupported => CURRENT_RULESET_API_VERSION;
 

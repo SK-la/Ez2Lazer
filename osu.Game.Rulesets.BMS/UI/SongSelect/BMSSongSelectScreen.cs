@@ -561,11 +561,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
                 var workingBeatmap = new BMSWorkingBeatmap(chartPath, audioManager, textures, chart);
 
-                // Push to player
-                var route = mode == BMSSongSelectScreenMode.SpecialEntry
-                    ? BMSGameplayRoute.BmsNative
-                    : BMSGameplayRoute.ManiaCompatibility;
-                this.Push(new BMSPlayerLoader(workingBeatmap, route));
+                // Route is unified across entries: BMSPlayerLoader reads BMSRulesetConfigManager.GameplayRoute itself.
+                this.Push(new BMSPlayerLoader(workingBeatmap));
             }
             catch (Exception ex)
             {
