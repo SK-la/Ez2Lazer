@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
@@ -21,6 +22,7 @@ using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.BMS.Scoring.Lamp;
+using osu.Game.Rulesets.BMS.Scoring.Lamp.Persistence;
 using osu.Game.Screens.Footer;
 using osu.Game.Screens.Select;
 
@@ -62,6 +64,11 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         [Cached(typeof(IPanelAccentColourProvider))]
         private readonly BmsLampAccentColourProvider lampAccentColourProvider;
+
+        // Backed by a private SQLite file under the BMS cache dir. Attached in BDL once we have
+        // access to the resolved Storage. osu.Game's Realm is intentionally untouched — that
+        // would force a schema-version bump and break clients without the BMS ruleset installed.
+        private BmsLampSqliteRepository? lampRepository;
 
         // Snapshot of the global MusicController state at entry; restored on exit so the main-menu music
         // resumes naturally after the user backs out of song select.
@@ -121,6 +128,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             string cacheDir = storage.GetFullPath("bms_cache");
             beatmapManager = BMSBeatmapManager.GetShared(cacheDir);
             syncConfiguredPaths();
+
+            // Wire lamp persistence. The repository sits next to the chart cache (bms_cache/lamps.sqlite)
+            // so a single "wipe BMS data" gesture cleans both. Repository init is internally try/catch so
+            // a corrupt sqlite file degrades to "no lamps" rather than blocking song-select from opening.
+            string lampDbPath = Path.Combine(cacheDir, "lamps.sqlite");
+            lampRepository = new BmsLampSqliteRepository(lampDbPath);
+            lampStore.AttachRepository(lampRepository);
 
             // BDL runs on the load thread, NOT the update thread. We deliberately don't mutate any global
             // Bindable here (Ruleset / Beatmap / etc) — doing so would synchronously invoke ValueChanged
@@ -295,7 +309,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             if (!this.IsCurrentScreen())
                 return;
 
-            if (e.NewValue == null || string.Equals(e.NewValue.ShortName, "bms", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(e.NewValue.ShortName, "bms", StringComparison.OrdinalIgnoreCase))
                 return;
 
             // External ruleset switch (e.g. via toolbar): exit out of BMS selection cleanly.
