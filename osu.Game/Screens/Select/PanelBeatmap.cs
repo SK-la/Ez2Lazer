@@ -91,6 +91,9 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private ISongSelect? songSelect { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private IPanelAccentColourProvider? accentColourProvider { get; set; }
+
         private BeatmapInfo beatmap => ((GroupedBeatmap)Item!.Model).Beatmap;
 
         public PanelBeatmap()
@@ -444,12 +447,22 @@ namespace osu.Game.Screens.Select
             // I can't find a better way to do this.
             mainFill.Margin = new MarginPadding { Left = 1 / starRatingDisplay.Scale.X * (localRank.HasRank ? 0 : -3) };
 
-            var diffColour = starRatingDisplay.DisplayedDifficultyColour;
+            // Ruleset-supplied accent (e.g. BMS lamp colour) wins; otherwise fall back to the
+            // standard star-rating colour. The numeric star-counter always tracks the star spectrum
+            // so the "stars" graphic itself reads as difficulty regardless of what tinted the panel.
+            // `beatmap` resolves through Item!.Model, so guard against the pool-recycled state where
+            // Item is null (FreeAfterUse) — accessing `beatmap` there throws NRE.
+            var starColour = starRatingDisplay.DisplayedDifficultyColour;
+            var diffColour = Item != null
+                ? accentColourProvider?.GetAccentColourFor(beatmap) ?? starColour
+                : starColour;
+
+            if (starCounter.Colour != starColour)
+                starCounter.Colour = starColour;
 
             if (AccentColour != diffColour)
             {
                 AccentColour = diffColour;
-                starCounter.Colour = diffColour;
 
                 backgroundBorder.Colour = diffColour;
                 backgroundDifficultyTint.Colour = ColourInfo.GradientHorizontal(diffColour.Opacity(0.25f), diffColour.Opacity(0f));

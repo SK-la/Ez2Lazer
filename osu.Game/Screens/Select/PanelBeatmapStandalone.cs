@@ -48,6 +48,9 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private ISongSelect? songSelect { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private IPanelAccentColourProvider? accentColourProvider { get; set; }
+
         [Resolved]
         private BeatmapManager beatmaps { get; set; } = null!;
 
@@ -471,10 +474,18 @@ namespace osu.Game.Screens.Select
             // I can't find a better way to do this.
             mainFill.Margin = new MarginPadding { Left = 1 / starRatingDisplay.Scale.X * (localRank.HasRank ? 0 : -3) };
 
-            var diffColour = starRatingDisplay.DisplayedDifficultyColour;
+            // Ruleset-supplied accent (e.g. BMS lamp colour) wins; otherwise fall back to the
+            // standard star-rating colour. spread display keeps the star-rating gradient so the
+            // difficulty spread bar still maps to star colours visually.
+            // `beatmap` resolves through Item!.Model, so guard the pool-recycled state where
+            // Item is null (FreeAfterUse) to avoid NRE.
+            var starColour = starRatingDisplay.DisplayedDifficultyColour;
+            var diffColour = Item != null
+                ? accentColourProvider?.GetAccentColourFor(beatmap) ?? starColour
+                : starColour;
 
             AccentColour = diffColour;
-            spreadDisplay.Current.Colour = diffColour;
+            spreadDisplay.Current.Colour = starColour;
 
             backgroundBorder.Colour = diffColour;
             difficultyIcon.Colour = starRatingDisplay.DisplayedDifficultyTextColour;
