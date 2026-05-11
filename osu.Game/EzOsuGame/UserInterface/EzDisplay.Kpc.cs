@@ -67,6 +67,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             AutoSizeAxes = Axes.X;
             RelativeSizeAxes = Axes.Y;
+            Margin = new MarginPadding { Horizontal = 8f, Vertical = 2f };
 
             InternalChild = new Container
             {
@@ -86,6 +87,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
                         AutoSizeAxes = Axes.Both,
+                        Margin = new MarginPadding { Horizontal = 8f, Vertical = 2f },
                         Children = new[]
                         {
                             notesText = new OsuSpriteText

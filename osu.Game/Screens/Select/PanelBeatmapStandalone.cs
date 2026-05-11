@@ -259,6 +259,7 @@ namespace osu.Game.Screens.Select
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
+                                            Margin = new MarginPadding(2f),
                                         },
                                     },
                                 },
@@ -339,10 +340,12 @@ namespace osu.Game.Screens.Select
             if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
             {
                 displaySR.Show();
+                ezDisplayKpc.Show();
             }
             else
             {
                 ezDisplayKpc.ManiaSummary = null;
+                ezDisplayKpc.Hide();
                 displaySR.Current.Value = EzManiaSummary.EMPTY;
                 displaySR.Hide();
             }
