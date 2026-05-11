@@ -79,10 +79,40 @@ function Add-CategoryBlocks {
 }
 
 $range = "$FromRef..$ToRef"
+
+# Validate that the refs exist
+try {
+    $fromExists = git rev-parse --verify $FromRef 2>$null
+    if (-not $fromExists) {
+        throw "Reference '$FromRef' does not exist. Please check if it's a valid commit hash, branch, or tag."
+    }
+    
+    $toExists = git rev-parse --verify $ToRef 2>$null
+    if (-not $toExists) {
+        throw "Reference '$ToRef' does not exist. Please check if it's a valid commit hash, branch, or tag."
+    }
+}
+catch {
+    Write-Host "Error validating references:" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Available tags matching '2026':" -ForegroundColor Yellow
+    git tag | Select-String "2026" | Select-Object -First 10
+    throw "Invalid Git references provided"
+}
+
 $commits = Get-CommitItems -Range $range
 $commitCount = @($commits).Count
 
 if ($commitCount -eq 0) {
+    Write-Host "Warning: No commits found in range: $range" -ForegroundColor Yellow
+    Write-Host "From: $FromRef ($(git log -1 --format='%h %s' $FromRef))" -ForegroundColor Cyan
+    Write-Host "To:   $ToRef ($(git log -1 --format='%h %s' $ToRef))" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "This could mean:" -ForegroundColor Yellow
+    Write-Host "  1. Both refs point to the same commit" -ForegroundColor Yellow
+    Write-Host "  2. The FromRef is a descendant of ToRef" -ForegroundColor Yellow
+    Write-Host "  3. The refs are on different branches without common history" -ForegroundColor Yellow
     throw "No commits found in range: $range"
 }
 

@@ -21,3 +21,10 @@ exclude:
   - name: LocalizableElement
   - name: EditorConfigPartialOverride
   - name: JsonStandardCompliance
+  - name: HeapView.BoxingAllocation
+  - name: HeapView.ClosureAllocation
+  - name: HeapView.CanAvoidClosure
+  - name: HeapView.DelegateAllocation
+  - name: HeapView.ObjectAllocation.Evident
+  - name: HeapView.ObjectAllocation
+  - name: HeapView.PossibleBoxingAllocation
