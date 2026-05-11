@@ -1,12 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
@@ -16,6 +14,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.UI;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -28,14 +27,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     {
         private const string overlay_texture_base_path = "Column/ColumnLight";
 
-        private Drawable hitOverlay = null!;
+        private Container lightContainer = null!;
+        private Drawable light = null!;
         private Box? separator;
 
         private Bindable<Colour4> colourBindable = null!;
         private Bindable<double> hitPosition = null!;
-        private Color4 brightColour;
-        private Color4 dimColour;
+
+        // private Color4 brightColour;
+        // private Color4 dimColour;
+
         private bool hasSeparator;
+        private float lightPosition;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -55,17 +58,30 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void load(EzResourceStore resources)
         {
             // 计算 drawSeparator 结果（基于不变的列数和列索引）
+            // TODO: 以后要支持自定义
             hasSeparator = stageDefinition.HasSeparator(column.Index);
 
-            hitOverlay = resources.GetAnimation(overlay_texture_base_path) ?? Empty();
-            hitOverlay.Name = "Hit Overlay";
-            hitOverlay.RelativeSizeAxes = Axes.X;
-            hitOverlay.Anchor = Anchor.TopLeft;
-            hitOverlay.Origin = Anchor.TopLeft;
-            hitOverlay.Alpha = 0;
+            InternalChildren = new[]
+            {
+                lightContainer = new Container
+                {
+                    // Name = "mania-stage-light",
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    RelativeSizeAxes = Axes.Both,
+                    Child = light = resources.GetAnimation(overlay_texture_base_path)?.With(l =>
+                    {
+                        l.Anchor = Anchor.BottomCentre;
+                        l.Origin = Anchor.BottomCentre;
+                        l.RelativeSizeAxes = Axes.X;
+                        l.Width = 1;
+                        l.Alpha = 0;
+                    }) ?? Empty(),
+                }
+            };
 
             hitPosition = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
-            hitPosition.BindValueChanged(_ => updateSeparator());
+            hitPosition.BindValueChanged(_ => updateSeparator(), true);
         }
 
         protected override void LoadComplete()
@@ -87,8 +103,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 column.BackgroundContainer.Add(separator);
             }
 
-            if (!column.BackgroundContainer.Children.Contains(hitOverlay))
-                column.BackgroundContainer.Add(hitOverlay);
+            // if (!column.BackgroundContainer.Children.Contains(light))
+            //     column.BackgroundContainer.Add(light);
 
             Scheduler.AddOnce(updateSeparator);
 
@@ -96,17 +112,22 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             colourBindable.BindValueChanged(v =>
             {
                 var baseColour = v.NewValue;
-                brightColour = baseColour.Opacity(0.6f);
-                dimColour = baseColour.Opacity(0);
+                light.Colour = baseColour;
 
-                hitOverlay.Colour = ColourInfo.GradientVertical(dimColour, brightColour);
+                // brightColour = baseColour.Opacity(1f);
+                // dimColour = baseColour.Opacity(0);
+                // hitOverlay.Colour = ColourInfo.GradientVertical(dimColour, brightColour);
             }, true);
         }
 
         private void updateSeparator()
         {
-            float h = DrawHeight - (float)hitPosition.Value;
-            hitOverlay.Height = h;
+            lightPosition = (float)hitPosition.Value;
+            float h = DrawHeight - lightPosition;
+            // hitOverlay.Height = h;
+
+            lightContainer.Padding = new MarginPadding { Bottom = lightPosition };
+            lightContainer.Scale = Vector2.One;
 
             if (separator != null)
             {
@@ -118,14 +139,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
             if (e.Action == column.Action.Value)
-                hitOverlay.FadeTo(1, 50, Easing.OutQuint).Then().FadeTo(0.5f, 250, Easing.OutQuint);
+            {
+                light.FadeIn();
+                light.ScaleTo(Vector2.One);
+            }
+
             return false;
         }
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
         {
+            const double animation_length = 250;
+
             if (e.Action == column.Action.Value)
-                hitOverlay.FadeTo(0, 250, Easing.OutQuint);
+            {
+                light.FadeTo(0, animation_length);
+                light.ScaleTo(new Vector2(1, 0), animation_length);
+            }
         }
     }
 }
