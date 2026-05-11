@@ -45,6 +45,37 @@ namespace osu.Game.EzOsuGame.HUD
             }
         }
 
+        /// <summary>
+        /// 当某个判定资源找不到时，按优先级返回回退的判定名称。
+        /// 根据 wiki 规范的通用回退规则（与模板无关）：
+        /// - Bad 找不到 → Miss
+        /// - Miss 找不到 → Fail
+        /// - Fail 找不到 → 跳过显示
+        /// - Poor 找不到 → Fail
+        /// - Poor 不会作为其他判定的回退目标
+        /// </summary>
+        /// <param name="template">当前使用的命名模板</param>
+        /// <param name="missingResult">缺失资源的原始判定类型</param>
+        /// <returns>回退的判定资源名，若无可用的回退则返回空字符串</returns>
+        public static string GetFallbackResourceName(EzEnumHitMode template, HitResult missingResult)
+        {
+            // 获取原始资源名称
+            string originalName = GetResourceName(template, missingResult);
+
+            if (string.IsNullOrEmpty(originalName))
+                return string.Empty;
+
+            // 根据资源名称应用通用回退规则
+            return originalName switch
+            {
+                "Bad" => "Miss",           // Bad 找不到 → Miss
+                "Miss" => "Fail",          // Miss 找不到 → Fail
+                "Fail" => string.Empty,    // Fail 找不到 → 跳过
+                "Poor" => "Fail",          // Poor 找不到 → Fail
+                _ => string.Empty          // 其他情况不自动回退
+            };
+        }
+
         // Lazer / Classic 命名风格：与 HitResult 名一一对应
         private static string getLazerName(HitResult result)
         {
@@ -97,10 +128,10 @@ namespace osu.Game.EzOsuGame.HUD
 
                 case HitResult.Good:    return "Good";
 
-                case HitResult.Meh:     return "Miss";
+                case HitResult.Meh:     return "Bad";
 
                 case HitResult.Miss:
-                case HitResult.Poor:    return "Fail";
+                case HitResult.Poor:    return "Miss";
 
                 default:                return string.Empty;
             }

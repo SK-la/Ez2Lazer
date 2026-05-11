@@ -238,6 +238,7 @@ namespace osu.Game.EzOsuGame.HUD
             double frameLength = 1000.0 / FPS.Value;
             string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/frame_{0}";
 
+            // 首先尝试加载原始判定资源
             foreach (string rn in possibleResultNames)
             {
                 if (string.IsNullOrEmpty(rn))
@@ -273,12 +274,58 @@ namespace osu.Game.EzOsuGame.HUD
                 }
             }
 
+            // 如果原始资源找不到，尝试回退逻辑
+            var activeTemplate = resolveActiveTemplate();
+            string fallbackName = EzHitResultNameTemplate.GetFallbackResourceName(activeTemplate, result);
+
+            if (!string.IsNullOrEmpty(fallbackName))
+            {
+                // 尝试加载回退资源
+                string[] possibleFallbackNames = { fallbackName, fallbackName.ToLowerInvariant(), fallbackName.ToUpperInvariant() };
+
+                foreach (string fn in possibleFallbackNames)
+                {
+                    if (string.IsNullOrEmpty(fn))
+                        continue;
+
+                    string fallbackPath = $@"{baseDir}{fn}";
+
+                    hitAnimation = resources.GetAnimation(
+                        fallbackPath,
+                        animatable: true,
+                        looping: false,
+                        startAtCurrentTime: true,
+                        frameLength: frameLength);
+
+                    if (hitAnimation != null)
+                    {
+                        configureJudgementDrawable(result, hitAnimation, frameLength);
+                        return hitAnimation;
+                    }
+
+                    hitAnimation = resources.GetAnimationFromTemplate(
+                        baseDir,
+                        fn,
+                        template,
+                        looping: false,
+                        startAtCurrentTime: true,
+                        frameLength: frameLength);
+
+                    if (hitAnimation != null)
+                    {
+                        configureJudgementDrawable(result, hitAnimation, frameLength);
+                        return hitAnimation;
+                    }
+                }
+            }
+
+            // 所有尝试都失败，返回空动画（跳过显示）
             return new TextureAnimation
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
-                Scale = new Vector2(1.2f),
-                Loop = false
+                Loop = false,
+                Alpha = 0 // 完全透明，不显示
             };
         }
 
