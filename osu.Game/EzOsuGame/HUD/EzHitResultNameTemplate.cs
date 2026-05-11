@@ -93,8 +93,6 @@ namespace osu.Game.EzOsuGame.HUD
 
                 case HitResult.Miss:    return "Miss";
 
-                case HitResult.Poor:    return "Poor";
-
                 default:                return string.Empty;
             }
         }
@@ -112,8 +110,7 @@ namespace osu.Game.EzOsuGame.HUD
 
                 case HitResult.Meh:     return "Miss";
 
-                case HitResult.Miss:
-                case HitResult.Poor:    return "Fail";
+                case HitResult.Miss:    return "Fail";
 
                 default:                return string.Empty;
             }
@@ -130,8 +127,7 @@ namespace osu.Game.EzOsuGame.HUD
 
                 case HitResult.Meh:     return "Bad";
 
-                case HitResult.Miss:
-                case HitResult.Poor:    return "Miss";
+                case HitResult.Miss:    return "Miss";
 
                 default:                return string.Empty;
             }
@@ -170,8 +166,7 @@ namespace osu.Game.EzOsuGame.HUD
                 case HitResult.Good:    return "Good";
 
                 case HitResult.Meh:
-                case HitResult.Miss:
-                case HitResult.Poor:    return "Miss";
+                case HitResult.Miss:    return "Miss";
 
                 default:                return string.Empty;
             }
