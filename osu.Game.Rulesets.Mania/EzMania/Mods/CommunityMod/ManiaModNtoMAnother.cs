@@ -238,7 +238,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 }
 
                 //manyLine.Add(line);
-                int blankColumn = BlankColumn.Value;
 
                 sumTime += timingPoint.Key - lastTime;
                 lastTime = timingPoint.Key;
@@ -403,7 +402,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             while (num > 0)
             {
-                int copy = -1;
+                const int copy = -1;
                 copyColumn.Add((copy, true));
                 num--;
             }

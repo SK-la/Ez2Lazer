@@ -163,9 +163,6 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             var ruleset = lookup.Ruleset.CreateInstance();
 
-            if (ruleset == null)
-                return null;
-
             var performanceCalculator = ruleset.CreatePerformanceCalculator();
 
             if (performanceCalculator == null)

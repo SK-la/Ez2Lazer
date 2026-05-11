@@ -303,7 +303,7 @@ namespace osu.Game.EzOsuGame
 
             if (component != "JudgementLine")
             {
-                var textures = new Texture[60];
+                var textures = new Texture?[60];
 
                 Parallel.For(0, 60, i =>
                 {

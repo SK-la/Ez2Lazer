@@ -268,7 +268,7 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 var dynamicPart = provider.CreateDynamicPart(currentSkin);
 
-                leftPlaybackContainer!.Children = new Drawable[]
+                leftPlaybackContainer!.Children = new[]
                 {
                     dynamicPart.With(p =>
                     {
@@ -300,7 +300,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (provider != null)
             {
-                centerNoteDisplayContainer!.Children = new Drawable[]
+                centerNoteDisplayContainer!.Children = new[]
                 {
                     provider.CreateStaticPart(currentSkin)
                 };

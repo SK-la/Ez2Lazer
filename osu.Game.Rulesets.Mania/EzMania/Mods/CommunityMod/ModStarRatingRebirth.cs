@@ -479,7 +479,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             }
         }
 
-        private static bool contains(int[] array, int value)
+        private static bool contains(int[]? array, int value)
         {
             if (array == null) return false;
 
@@ -901,7 +901,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         /// <param name="cs"></param>
         /// <param name="keys"></param>
         /// <returns></returns>
-        public static List<ManiaHitObject>? NTM(List<ManiaHitObject> objects, int keys, int cs)
+        public static List<ManiaHitObject> NTM(List<ManiaHitObject> objects, int keys, int cs)
         {
             var Rng = new Random();
 
@@ -977,7 +977,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                     }
 
                     columnnum -= minuscolumn;
-                    int testcolumn = columnnum;
                     atLeast--;
 
                     if (locations[i].startTime == locations[i].endTime)
@@ -1434,15 +1433,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             foreach (var timingPoint in tempObjects.GroupBy(h => h.startTime))
             {
-                var newLocations = timingPoint.OfType<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>()
-                                              .Select(n => (Column: n.column, StartTime: n.startTime, EndTime: n.endTime, Samples: n.samples)).OrderBy(h => h.Column).ToList();
+                var newLocations = timingPoint.Select(n => (Column: n.column, StartTime: n.startTime, EndTime: n.endTime, Samples: n.samples)).OrderBy(h => h.Column).ToList();
 
                 var line = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
 
                 foreach (var note in newLocations) line.Add((note.Column, note.StartTime, note.EndTime, note.Samples));
 
                 //manyLine.Add(line);
-                int blankColumn = blank;
 
                 sumTime += timingPoint.Key - lastTime;
                 lastTime = timingPoint.Key;
@@ -1585,7 +1582,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             while (num > 0)
             {
-                int copy = -1;
+                const int copy = -1;
                 copyColumn.Add((copy, true));
                 num--;
             }
@@ -1607,7 +1604,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             foreach (var timingPoint in hitObjects.GroupBy(h => h.startTime))
             {
-                var locations = timingPoint.OfType<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>().ToList();
+                var locations = timingPoint.ToList();
                 var tempObjects = new List<ManiaHitObject>();
                 int length = copyColumn.Count;
 

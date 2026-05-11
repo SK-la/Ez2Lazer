@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             // Dense pattern: two close notes and a very late press.
             // Earlier note is already outside user-triggered hit range (Result=None).
             // Later note is still hittable; precedence must never route to the None candidate.
-            var noteTimes = new[] { 1000d, 1080d };
+            double[] noteTimes = new[] { 1000d, 1080d };
             var helper = new HitModeHelper(mode)
             {
                 OverallDifficulty = 5,
@@ -40,10 +40,10 @@ namespace osu.Game.Rulesets.Mania.Tests
         public void TestRajaKeepsJudgeableCandidateInLatePressRegion()
         {
             // Raja has BMS-like extended recognition (Poor/KPoor related), so this late press remains routable.
-            var noteTimes = new[] { 1000d, 1080d };
-            const double pressTime = 1240d;
+            double[] noteTimes = new[] { 1000d, 1080d };
+            const double press_time = 1240d;
 
-            double? selected = selectJudgeableByPrecedence(noteTimes, pressTime, EzEnumHitMode.Raja_NM, EzEnumJudgePrecedence.Duration);
+            double? selected = selectJudgeableByPrecedence(noteTimes, press_time, EzEnumHitMode.Raja_NM, EzEnumJudgePrecedence.Duration);
 
             Assert.That(selected, Is.Not.Null);
         }
@@ -58,10 +58,10 @@ namespace osu.Game.Rulesets.Mania.Tests
         {
             // Simulate short-LN boundary scenario: after releasing at tail time, a press on the same timestamp
             // should route to the nearest still-judgeable object in dense spacing.
-            var noteTimes = new[] { 1000d, 1012d, 1024d };
-            const double sameFramePress = 1024d;
+            double[] noteTimes = new[] { 1000d, 1012d, 1024d };
+            const double same_frame_press = 1024d;
 
-            double? selected = selectJudgeableByPrecedence(noteTimes, sameFramePress, mode, EzEnumJudgePrecedence.Duration);
+            double? selected = selectJudgeableByPrecedence(noteTimes, same_frame_press, mode, EzEnumJudgePrecedence.Duration);
 
             Assert.That(selected, Is.EqualTo(1024d), $"mode={mode} should route same-frame press to nearest judgeable note.");
         }

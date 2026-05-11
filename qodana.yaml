@@ -4,3 +4,20 @@ profile:
   name: qodana.recommended
 include:
   - name: CheckDependencyLicenses
+exclude:
+  - name: CppClangTidyClangDiagnosticShadow
+  - name: CppClangTidyClangDiagnosticUnusedMacros
+  - name: EditorConfigDeprecatedDescriptor
+  - name: EditorConfigNoMatchingFiles
+  - name: EditorConfigKeyCorrectness
+  - name: DuplicateSectionInFile
+  - name: All
+    paths:
+      - ..\osu-resources\
+      - osu.sln.DotSettings
+      - *.xml
+      - *.ini
+  - name: UnusedMember.Global
+  - name: LocalizableElement
+  - name: EditorConfigPartialOverride
+  - name: JsonStandardCompliance

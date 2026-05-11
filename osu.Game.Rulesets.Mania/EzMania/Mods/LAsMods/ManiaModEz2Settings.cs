@@ -222,7 +222,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             SampleControlPoint sampleControlPoint = (beatmap.ControlPointInfo as LegacyControlPointInfo)?.SamplePointAt(hitObject.GetEndTime() + 5)
                                                     ?? SampleControlPoint.DEFAULT;
-            hitObject.Samples = hitObject.Samples.Select(o => sampleControlPoint.ApplyTo(o)).ToList();
+            hitObject.Samples = hitObject.Samples.Select(sampleControlPoint.ApplyTo).ToList();
         }
 
         public ISample GetSample(ISampleInfo sampleInfo)

@@ -10,7 +10,6 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -66,9 +65,6 @@ namespace osu.Game.Rulesets.Mania.UI
 
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
-
-        [Resolved]
-        private OsuConfigManager osuConfig { get; set; } = null!;
 
         [Resolved(canBeNull: true)]
         private IBackdropCaptureSourceProvider? backdropCaptureSourceProvider { get; set; }

@@ -71,15 +71,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             if (!special_column_map.TryGetValue(currentKeys, out int sColumnIndex))
                 return;
+
             int newColumnCount = currentKeys + 1;
 
             Seed.Value ??= RNG.Next();
             var rng = new Random((int)Seed.Value);
 
             var sColumnHitObjects = maniaBeatmap.HitObjects
-                .Where(h => h.Column == sColumnIndex)
-                .OrderBy(h => h.StartTime)
-                .ToList();
+                                                .Where(h => h.Column == sColumnIndex)
+                                                .OrderBy(h => h.StartTime)
+                                                .ToList();
 
             int totalCount = sColumnHitObjects.Count;
 

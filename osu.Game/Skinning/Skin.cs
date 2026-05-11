@@ -323,9 +323,9 @@ namespace osu.Game.Skinning
                 }
                 else if (drawableInfoToken is JObject drawableMap)
                 {
-                    foreach ((string key, JToken value) in drawableMap)
+                    foreach ((string key, JToken? value) in drawableMap)
                     {
-                        var drawables = value.ToObject<SerialisedDrawableInfo[]>();
+                        var drawables = value?.ToObject<SerialisedDrawableInfo[]>();
                         if (drawables != null)
                             layout.DrawableInfo[key] = drawables;
                     }
@@ -334,7 +334,7 @@ namespace osu.Game.Skinning
             else
             {
                 // Legacy object style: { "Version": 1, "global": [...], "osu": [...] }.
-                foreach ((string key, JToken value) in root)
+                foreach ((string key, JToken? value) in root)
                 {
                     if (key == "Version" || value is not JArray array)
                         continue;

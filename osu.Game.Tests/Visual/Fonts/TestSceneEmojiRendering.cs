@@ -3,6 +3,8 @@
 
 #nullable disable
 
+using System;
+using System.Globalization;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Graphics;
@@ -12,6 +14,8 @@ using osu.Framework.Graphics.Sprites;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.Tests.Visual.Fonts
 {
@@ -25,20 +29,20 @@ namespace osu.Game.Tests.Visual.Fonts
             const string emojis = "😀😁😂🤣😅😊😍🤔🙌👍👎🎉🔥💯🙂😎❤️✨🎶";
 
             FillFlowContainer<Drawable> flow = null;
-            OsuTextBox input = null;
-            OsuSpriteText inputPreview = null;
+            OsuTextBox input;
+            OsuSpriteText inputPreview;
             OsuSpriteText[] staticEmojiTexts = null;
 
             AddStep("show emoji using Noto-Emoji font", () =>
             {
                 // Use StringInfo to split the string into text elements so surrogate-pair emoji are preserved.
-                var indices = System.Globalization.StringInfo.ParseCombiningCharacters(emojis);
+                int[] indices = StringInfo.ParseCombiningCharacters(emojis);
 
                 staticEmojiTexts = indices.Select(i =>
                 {
                     int nextIndex = i;
                     int current = i;
-                    int idxInList = System.Array.IndexOf(indices, i);
+                    int idxInList = Array.IndexOf(indices, i);
                     if (idxInList + 1 < indices.Length)
                         nextIndex = indices[idxInList + 1];
 
@@ -57,7 +61,7 @@ namespace osu.Game.Tests.Visual.Fonts
                 {
                     RelativeSizeAxes = Axes.Both,
                     Direction = FillDirection.Vertical,
-                    Spacing = new osuTK.Vector2(5),
+                    Spacing = new Vector2(5),
                     Padding = new MarginPadding(10),
                     Children = new Drawable[]
                     {
@@ -72,7 +76,7 @@ namespace osu.Game.Tests.Visual.Fonts
                         {
                             RelativeSizeAxes = Axes.X,
                             Height = 2,
-                            Colour = osuTK.Graphics.Color4.DimGray,
+                            Colour = Color4.DimGray,
                         },
                         new OsuSpriteText
                         {
@@ -103,10 +107,8 @@ namespace osu.Game.Tests.Visual.Fonts
             {
                 var zeros = staticEmojiTexts.Select((t, i) => (i, text: t.Text.ToString(), width: t.DrawWidth)).Where(x => x.width <= 0).ToArray();
                 if (zeros.Length > 0)
-                    NUnit.Framework.Assert.Fail($"emoji missing glyphs / zero width: {string.Join(", ", zeros.Select(z => $"#{z.i}='{z.text}'(w={z.width})"))}");
+                    Assert.Fail($"emoji missing glyphs / zero width: {string.Join(", ", zeros.Select(z => $"#{z.i}='{z.text}'(w={z.width})"))}");
             });
         }
     }
 }
-
-

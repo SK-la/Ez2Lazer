@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.IO;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
@@ -16,24 +17,31 @@ namespace osu.Game.Tests.EzOsuGame.Statistics
         [Test]
         public void TestApplyExportMetadataRemovesOnlineIdentityFromEncodedBeatmap()
         {
-            var beatmap = new Beatmap();
-            beatmap.Metadata.Artist = "artist";
-            beatmap.Metadata.Title = "title";
-            beatmap.Metadata.Author = new RealmUser
+            var beatmap = new Beatmap
             {
-                Username = "original_creator",
-                OnlineID = 1234,
-            };
-
-            beatmap.BeatmapInfo.DifficultyName = "difficulty";
-            beatmap.BeatmapInfo.OnlineID = 5678;
-            beatmap.BeatmapInfo.Status = BeatmapOnlineStatus.Ranked;
-            beatmap.BeatmapInfo.BeatmapSet = new BeatmapSetInfo
-            {
-                OnlineID = 9876,
-                Status = BeatmapOnlineStatus.Loved,
-                DateRanked = System.DateTimeOffset.UtcNow,
-                DateSubmitted = System.DateTimeOffset.UtcNow,
+                Metadata =
+                {
+                    Artist = "artist",
+                    Title = "title",
+                    Author = new RealmUser
+                    {
+                        Username = "original_creator",
+                        OnlineID = 1234,
+                    }
+                },
+                BeatmapInfo =
+                {
+                    DifficultyName = "difficulty",
+                    OnlineID = 5678,
+                    Status = BeatmapOnlineStatus.Ranked,
+                    BeatmapSet = new BeatmapSetInfo
+                    {
+                        OnlineID = 9876,
+                        Status = BeatmapOnlineStatus.Loved,
+                        DateRanked = DateTimeOffset.UtcNow,
+                        DateSubmitted = DateTimeOffset.UtcNow,
+                    }
+                }
             };
 
             BeatmapExportUtils.ApplyExportMetadata(beatmap, new[] { new OsuModHidden() });
