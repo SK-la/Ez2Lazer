@@ -20,6 +20,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
+using osu.Game.Rulesets.BMS.Scoring.Lamp;
 using osu.Game.Screens.Footer;
 using osu.Game.Screens.Select;
 
@@ -46,6 +47,21 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private Bindable<string> libraryPathsBindable = null!;
         private Bindable<string> legacyRootPathBindable = null!;
         private RulesetInfo bmsRulesetInfo = null!;
+
+        // Lamp template wiring: scheme picks lamp-from-context rules, store keeps the best lamp per
+        // beatmap, and the IPanelAccentColourProvider bridge feeds those colours into osu.Game's
+        // panel accent strip. All three are [Cached] below so child UI (PanelBeatmap and any future
+        // lamp HUD widgets) can [Resolved] them. Swap schemes here later — nothing else needs to change.
+        // If osu.Game panels omit IPanelAccentColourProvider resolution, they use [Resolved(canBeNull: true)]
+        // and fall back to star colours; BMS gameplay and this screen still run — lamp strip is optional UI only.
+        [Cached(typeof(IBmsLampScheme))]
+        private readonly IBmsLampScheme lampScheme = new BeatorajaLampScheme();
+
+        [Cached]
+        private readonly BmsLampStore lampStore;
+
+        [Cached(typeof(IPanelAccentColourProvider))]
+        private readonly BmsLampAccentColourProvider lampAccentColourProvider;
 
         // Snapshot of the global MusicController state at entry; restored on exit so the main-menu music
         // resumes naturally after the user backs out of song select.
@@ -75,6 +91,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         public BmsSoloSongSelect()
         {
+            lampStore = new BmsLampStore(lampScheme);
+            lampAccentColourProvider = new BmsLampAccentColourProvider(lampStore);
+
             // BMS audio is not stored in osu's RealmFileStore. Disable SongSelect's standard MusicController
             // preview loop and drive previews through BmsChartPreviewPlayer instead, which knows how to read
             // BMS folders + key-sound samples directly.

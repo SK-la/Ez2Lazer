@@ -327,7 +327,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     var beatmapInfo = new BeatmapInfo(bmsRulesetInfo, new BeatmapDifficulty(), metadata)
                     {
                         ID = createDeterministicGuid($"bms:chart:{chartPath}:{chart.Md5Hash}"),
-                        DifficultyName = !string.IsNullOrWhiteSpace(chart.SubTitle) ? chart.SubTitle : Path.GetFileNameWithoutExtension(chart.FileName),
+                        DifficultyName = formatDifficultyName(chart),
                         BPM = chart.Bpm,
                         Length = chart.Duration,
                         Hash = chart.Md5Hash,
@@ -360,6 +360,22 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             replaceSourceMap(newSourceMap);
             saveSourceMap(newSourceMap.Values);
             return result;
+        }
+
+        /// <summary>
+        /// Compose a human-readable difficulty label for the carousel / details panel.
+        /// Format: "★{PlayLevel} {SubTitle or filename}" (beatoraja-style), e.g. "★7 [SUPER HARD]".
+        /// PlayLevel ≤ 0 means the chart didn't declare one; fall back to just the label.
+        /// </summary>
+        private static string formatDifficultyName(BMSChartCache chart)
+        {
+            string label = !string.IsNullOrWhiteSpace(chart.SubTitle)
+                ? chart.SubTitle.Trim()
+                : Path.GetFileNameWithoutExtension(chart.FileName);
+
+            return chart.PlayLevel > 0
+                ? $"★{chart.PlayLevel} {label}".TrimEnd()
+                : label;
         }
 
         public bool TryGetSourceReference(Guid beatmapId, out BMSSourceReference sourceReference)
