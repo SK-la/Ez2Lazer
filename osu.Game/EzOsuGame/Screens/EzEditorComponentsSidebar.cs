@@ -59,7 +59,8 @@ namespace osu.Game.EzOsuGame.Screens
 
         private void applyCurrentTabView()
         {
-            Content.Clear();
+            // 清理后不释放资源，防止切换tab报错
+            Content.Clear(false);
 
             if (currentTab == SidebarTab.EzSkins)
             {
@@ -72,6 +73,14 @@ namespace osu.Game.EzOsuGame.Screens
 
             if (selectSections.Count > 0)
                 Content.AddRange(selectSections);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            // 清理保存的 section 引用，避免内存泄漏
+            selectSections.Clear();
         }
     }
 }
