@@ -32,6 +32,12 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_LABEL), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_DESCRIPTION))]
         public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_AUTO_MAP_HITMODE_LABEL), nameof(EzHUDStrings.HITRESULT_AUTO_MAP_HITMODE_DESCRIPTION))]
+        public BindableBool AutoMapHitMode { get; } = new BindableBool();
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_HITMODE_TEMPLATE_LABEL), nameof(EzHUDStrings.HITRESULT_HITMODE_TEMPLATE_DESCRIPTION))]
+        public Bindable<EzEnumHitMode> HitModeTemplate { get; } = new Bindable<EzEnumHitMode>(EzEnumHitMode.EZ2AC);
+
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SKIP_BETTER_JUDGEMENT), nameof(EzHUDStrings.SKIP_BETTER_JUDGEMENT_DESCRIPTION))]
         public Bindable<EzEnumHitResult> SkipBetterJudgement { get; } = new Bindable<EzEnumHitResult>();
 
@@ -101,10 +107,8 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private JudgementCountController judgementCountController { get; set; } = null!;
 
-        [Resolved]
-        private ISampleStore sampleStore { get; set; } = null!;
-
         private Bindable<EzEnumGameThemeName> themeName = null!;
+        private Bindable<EzEnumHitMode> maniaHitModeConfig = null!;
 
         public EzHUDHitResultScore()
         {
@@ -129,6 +133,28 @@ namespace osu.Game.EzOsuGame.HUD
                 ClearInternal();
                 hitAnimation?.Invalidate();
             }, true);
+
+            // HitMode 模板：自动模式跟随 Ez 全局 HitMode 配置；手动模式使用下拉栏的固定值。
+            maniaHitModeConfig = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+
+            AutoMapHitMode.BindValueChanged(e =>
+            {
+                // 自动映射开启时锁定手动下拉栏（灰显），关闭时解锁。
+                HitModeTemplate.Disabled = e.NewValue;
+                invalidateCurrentAnimation();
+            }, true);
+
+            HitModeTemplate.BindValueChanged(_ =>
+            {
+                if (!AutoMapHitMode.Value)
+                    invalidateCurrentAnimation();
+            });
+
+            maniaHitModeConfig.BindValueChanged(_ =>
+            {
+                if (AutoMapHitMode.Value)
+                    invalidateCurrentAnimation();
+            });
 
             HitResultBlendModeSetting.BindValueChanged(mode =>
             {
@@ -286,22 +312,21 @@ namespace osu.Game.EzOsuGame.HUD
             }
         }
 
+        /// <summary>
+        /// 计算当前生效的命名模板：自动映射开启时跟随 Ez 全局 HitMode 配置，关闭时使用手动下拉栏选择。
+        /// </summary>
+        private EzEnumHitMode resolveActiveTemplate()
+            => AutoMapHitMode.Value ? maniaHitModeConfig.Value : HitModeTemplate.Value;
+
         // 如果考虑拓展能力，则倾向nameof(HitResult)，并回退到这个方法
         private string getHitResultToString(HitResult hitResult)
-        {
-            string resultName = hitResult switch
-            {
-                HitResult.Poor => "Fail",
-                HitResult.Miss => "Fail",
-                HitResult.Meh => "Miss",
-                HitResult.Ok => "",
-                HitResult.Good => "Good",
-                HitResult.Great => "Cool",
-                HitResult.Perfect => "Kool",
-                _ => string.Empty
-            };
+            => EzHitResultNameTemplate.GetResourceName(resolveActiveTemplate(), hitResult);
 
-            return resultName;
+        private void invalidateCurrentAnimation()
+        {
+            hitAnimation?.FinishTransforms();
+            ClearInternal();
+            hitAnimation = null;
         }
 
         private void checkFullCombo()

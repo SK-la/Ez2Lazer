@@ -104,6 +104,24 @@ namespace osu.Game.EzOsuGame.Localization
             + "\n资源路径：EzResources/FullComb/"
             + "\n图片名称full-combo.png, 支持-0动画；音频名称full-combo-sound", "Use hit colour.");
 
+        public static readonly LocalisableString HITRESULT_AUTO_MAP_HITMODE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "自动映射 HitMode", "Auto Map HitMode");
+
+        public static readonly LocalisableString HITRESULT_AUTO_MAP_HITMODE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后根据当前的 HitMode 配置自动选择判定贴图命名模板；"
+            + "\n关闭后将使用下方手动选择的模板。",
+            "When enabled, the judgement texture mapping template is auto-selected based on current HitMode setting."
+            + "\nWhen disabled, the manually selected template below is used.");
+
+        public static readonly LocalisableString HITRESULT_HITMODE_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "HitMode 映射模板", "HitMode Mapping Template");
+
+        public static readonly LocalisableString HITRESULT_HITMODE_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "手动指定判定贴图命名模板。"
+            + "\n仅在「自动映射 HitMode」关闭时生效。",
+            "Manually pick the judgement texture naming template."
+            + "\nOnly takes effect when 'Auto Map HitMode' is disabled.");
+
         // EzHUDScoreCounter
         public static readonly LocalisableString SCORE_FONT_LABEL = new EzLocalizationManager.EzLocalisableString("分数文本字体", "Score Font");
         public static readonly LocalisableString SCORE_FONT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择分数文本的字体样式", "Select the font style for score text.");
