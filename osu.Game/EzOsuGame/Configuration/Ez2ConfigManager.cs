@@ -84,11 +84,10 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
             SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, true);
 
-            SetDefault(Ez2Setting.StoryboardAutoVideoSize, true);
+            SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
             SetDefault(Ez2Setting.BeatmapPreviewMode, EzBeatmapPreviewMode.Static);
             SetDefault(Ez2Setting.SqliteFilter, false);
-            SetDefault(Ez2Setting.KpcDisplayMode, EzEnumChartDisplay.BarChart);
             SetDefault(Ez2Setting.EzSelectCsMode, string.Empty);
             SetDefault(Ez2Setting.ColumnTypeListSelect, 4);
 
@@ -746,7 +745,6 @@ namespace osu.Game.EzOsuGame.Configuration
         KeySoundPreviewMode,
         BeatmapPreviewMode,
         SqliteFilter,
-        KpcDisplayMode,
         EzSelectCsMode,
         ColumnTypeListSelect,
 

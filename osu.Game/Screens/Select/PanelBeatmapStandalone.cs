@@ -279,7 +279,6 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
-            ezConfig.BindWith(Ez2Setting.KpcDisplayMode, ezDisplayKpc.KpcDisplayModeBindable);
             // 不订阅 ez 分析开关变更；统一依赖 panel 生命周期（PrepareForUse/FreeAfterUse）进行刷新。
             // 这样可减少滚动场景下的回调抖动与绑定链复杂度。
             bool ezAnalysisCacheEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled);

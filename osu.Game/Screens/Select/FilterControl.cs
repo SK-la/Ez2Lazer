@@ -58,7 +58,6 @@ namespace osu.Game.Screens.Select
         private EzKeyModeSelector csSelector = null!;
         private ShearedKSPreviewButton ksPreviewButton = null!;
         private ShearedToggleButton sqliteFilterButton = null!;
-        private ShearedDropdown<EzEnumChartDisplay> kpcDropdown = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -208,7 +207,6 @@ namespace osu.Game.Screens.Select
                                         new Dimension(maxSize: 180),
                                         new Dimension(GridSizeMode.Absolute, 5),
                                         new Dimension(),
-                                        new Dimension(maxSize: 120),
                                         new Dimension(GridSizeMode.AutoSize),
                                     },
                                     Content = new[]
@@ -229,11 +227,6 @@ namespace osu.Game.Screens.Select
                                             collectionDropdown = new CollectionDropdown
                                             {
                                                 RelativeSizeAxes = Axes.X,
-                                            },
-                                            kpcDropdown = new ShearedDropdown<EzEnumChartDisplay>("KPC")
-                                            {
-                                                RelativeSizeAxes = Axes.X,
-                                                Items = Enum.GetValues<EzEnumChartDisplay>(),
                                             },
                                         }
                                     }
@@ -294,7 +287,6 @@ namespace osu.Game.Screens.Select
             config.BindWith(OsuSetting.ShowConvertedBeatmaps, showConvertedBeatmapsButton.Active);
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
 
-            ezConfig.BindWith(Ez2Setting.KpcDisplayMode, kpcDropdown.Current);
             ezConfig.BindWith(Ez2Setting.SqliteFilter, sqliteFilterButton.Active);
             ezConfig.BindWith(Ez2Setting.KeySoundPreviewMode, ksPreviewButton.State);
 
@@ -383,7 +375,6 @@ namespace osu.Game.Screens.Select
             if (id == 3)
             {
                 csSelector.Show();
-                kpcDropdown.Show();
 
                 return;
             }
@@ -391,13 +382,11 @@ namespace osu.Game.Screens.Select
             if (id == 1) // Taiko
             {
                 csSelector.Hide();
-                kpcDropdown.Show();
 
                 return;
             }
 
             csSelector.Show();
-            kpcDropdown.Hide();
         }
 
         private void updateVisibleResultsActionAvailability()

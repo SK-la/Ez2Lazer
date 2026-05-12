@@ -262,8 +262,6 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
-            ezConfig.BindWith(Ez2Setting.KpcDisplayMode, ezDisplayKpc.KpcDisplayModeBindable);
-
             bool ezAnalysisCacheEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled);
             bool ezAnalysisSqliteEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
 
