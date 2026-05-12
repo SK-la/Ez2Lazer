@@ -280,6 +280,7 @@ namespace osu.Game.Screens.Select
                 {
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
                     ezDisplayKpc.ManiaSummary = null;
+                    ezDisplayKpc.Hide();
                     return;
                 }
 
@@ -323,12 +324,17 @@ namespace osu.Game.Screens.Select
                                 return;
 
                             ezDisplayKpc.ManiaSummary = maniaSummary;
+                            ezDisplayKpc.Show();
                         });
                     }
                     else
                     {
                         // 非 Mania 情况隐藏组件
-                        Schedule(() => ezDisplayKpc.ManiaSummary = null);
+                        Schedule(() =>
+                        {
+                            ezDisplayKpc.ManiaSummary = null;
+                            ezDisplayKpc.Hide();
+                        });
                     }
 
                     Schedule(() =>

@@ -5,24 +5,35 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterfaceV2;
 using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
-    public partial class EzDisplayKpc : CompositeDrawable
+    public partial class EzDisplayKpc : CompositeDrawable, IHasCustomTooltip<LocalisableString>
     {
         public Bindable<EzEnumChartDisplay> KpcDisplayModeBindable { get; } = new Bindable<EzEnumChartDisplay>(EzEnumChartDisplay.BarChart);
+
+        internal static readonly LocalisableString KPC_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "每列Note数:蓝色是note，黄色是LN",
+            "Notes per column: blue is notes, yellow is LNs");
+
+        // public LocalisableString TooltipText => generateTooltipText();
 
         private EzManiaSummary? maniaSummary;
 
@@ -626,5 +637,65 @@ namespace osu.Game.EzOsuGame.UserInterface
                 clear();
             }
         }
+
+        /// <summary>
+        /// 生成动态的 tooltip 文本（Markdown 表格格式）
+        /// </summary>
+        private LocalisableString generateTooltipText()
+        {
+            if (maniaSummary == null || lastKnownColumns == null)
+                return KPC_TOOLTIP;
+
+            // 构建 Markdown 表格
+            var sb = new StringBuilder();
+
+            // 表头（第一列为空）
+            sb.Append("|  | ");
+
+            for (int i = 0; i < lastKnownCount; i++)
+            {
+                sb.Append($"N{i + 1} | ");
+            }
+
+            sb.AppendLine();
+
+            // 分隔线（第一列为空）
+            sb.Append("| --- |");
+
+            for (int i = 0; i < lastKnownCount; i++)
+            {
+                sb.Append(" ------ |");
+            }
+
+            sb.AppendLine();
+
+            // Note 行
+            sb.Append("| notes |");
+
+            for (int i = 0; i < lastKnownCount; i++)
+            {
+                int count = lastKnownColumns[i];
+                sb.Append($" {(count > 0 ? count.ToString() : "-")} |");
+            }
+
+            sb.AppendLine();
+
+            // LN 行
+            sb.Append("| LNs |");
+
+            for (int i = 0; i < lastKnownCount; i++)
+            {
+                int count = lastKnownHolds?[i] ?? 0;
+                sb.Append($" {(count > 0 ? count.ToString() : "-")} |");
+            }
+
+            sb.AppendLine();
+
+            return sb.ToString();
+        }
+
+        public ITooltip<LocalisableString> GetCustomTooltip() => new MarkdownTooltip();
+
+        public LocalisableString TooltipContent => generateTooltipText();
     }
 }
