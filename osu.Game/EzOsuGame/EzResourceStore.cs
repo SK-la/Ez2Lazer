@@ -135,7 +135,7 @@ namespace osu.Game.EzOsuGame
         /// <summary>
         /// 获取纹理（自定义路径）
         /// </summary>
-        /// <param name="path">完整路径</param>
+        /// <param name="path">完整路径（不含后缀）</param>
         /// <param name="useLargeStore">是否使用大纹理存储</param>
         /// <returns>纹理对象</returns>
         public Texture? Get(string path, bool useLargeStore = false)
