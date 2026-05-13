@@ -87,6 +87,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                 var original = beatmap.HitObjects[index];
                 int alignment = original is HoldNote ? options.LNAlignment : options.Alignment;
                 double adjustedLength = applyLnAlignment(length, original.StartTime, beatmap, alignment);
+
+                // 检查是否需要将过短的LN转换为普通note
+                if (options.MinLnToNoteThreshold > 0 && shouldConvertToNote(adjustedLength, original.StartTime, beatmap, options.MinLnToNoteThreshold))
+                {
+                    // 保持为普通note，不做任何修改
+                    continue;
+                }
+
                 double newEnd = original.StartTime + adjustedLength;
 
                 if (original is HoldNote hold)
@@ -126,6 +134,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 
             const double epsilon = 0.99;
             return (int)((int)((length + epsilon) / denominator) * denominator);
+        }
+
+        private static bool shouldConvertToNote(double length, double startTime, ManiaBeatmap beatmap, int thresholdDenominator)
+        {
+            if (thresholdDenominator <= 0) return false;
+
+            double beatLength = beatmap.ControlPointInfo.TimingPointAt(startTime).BeatLength;
+            double thresholdLength = beatLength / thresholdDenominator;
+
+            return length < thresholdLength;
         }
 
         private static HoldNote createHoldFrom(ManiaHitObject original, double endTime)

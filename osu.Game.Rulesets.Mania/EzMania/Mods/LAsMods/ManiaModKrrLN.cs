@@ -104,6 +104,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             MaxValue = 8,
         };
 
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_MIN_LN_TO_NOTE_THRESHOLD_LABEL), nameof(KrrLNStrings.KRR_LN_MIN_LN_TO_NOTE_THRESHOLD_DESCRIPTION))]
+        public BindableNumber<int> MinLnToNoteThreshold { get; } = new BindableInt(0)
+        {
+            MinValue = 0,
+            MaxValue = 64,
+        };
+
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
 
@@ -136,6 +143,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 yield return (KrrLNStrings.KRR_LN_ALIGNMENT_LABEL, $"{Alignment.Value}");
                 yield return (KrrLNStrings.KRR_LN_LN_ALIGNMENT_LABEL, $"{LNAlignment.Value}");
 
+                if (MinLnToNoteThreshold.Value > 0)
+                    yield return (KrrLNStrings.KRR_LN_MIN_LN_TO_NOTE_THRESHOLD_LABEL, $"1/{MinLnToNoteThreshold.Value}");
+
                 if (Seed.Value is null)
                     yield return (EzCommonModStrings.SEED_LABEL, "Null");
 
@@ -164,6 +174,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 ShortRandom = ShortRandom.Value,
                 Alignment = Alignment.Value,
                 LNAlignment = LNAlignment.Value,
+                MinLnToNoteThreshold = MinLnToNoteThreshold.Value,
                 Seed = Seed.Value,
             };
 
@@ -171,33 +182,52 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         }
     }
 
-    public static class KrrLNStrings
+    internal static class KrrLNStrings
     {
-        public static readonly LocalisableString KRR_LN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("[KrrTool] LN转换器", "[KrrTool] LN Converter");
-        public static readonly LocalisableString KRR_LN_LONG_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString("长按等级", "Long Level");
-        public static readonly LocalisableString KRR_LN_LONG_LEVEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按长度强度（0-100）", "Long length level (0-100).");
-        public static readonly LocalisableString KRR_LN_SHORT_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString("短按等级", "Short Level");
-        public static readonly LocalisableString KRR_LN_SHORT_LEVEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("短按长度强度（0-256）", "Short length level (0-256).");
-        public static readonly LocalisableString KRR_LN_PROCESS_ORIGINAL_LABEL = new EzLocalizationManager.EzLocalisableString("处理原始LN", "Process Original LN");
-        public static readonly LocalisableString KRR_LN_PROCESS_ORIGINAL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭时跳过原始LN", "Skip original LN when disabled.");
-        public static readonly LocalisableString KRR_LN_LENGTH_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("长度阈值", "Length Threshold");
-        public static readonly LocalisableString KRR_LN_LENGTH_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长短按判定阈值", "Threshold between long/short.");
-        public static readonly LocalisableString KRR_LN_LONG_PERCENTAGE_LABEL = new EzLocalizationManager.EzLocalisableString("长按比例", "Long Percentage");
-        public static readonly LocalisableString KRR_LN_LONG_PERCENTAGE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按转换比例", "Percentage of long conversion.");
-        public static readonly LocalisableString KRR_LN_SHORT_PERCENTAGE_LABEL = new EzLocalizationManager.EzLocalisableString("短按比例", "Short Percentage");
-        public static readonly LocalisableString KRR_LN_SHORT_PERCENTAGE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("短按转换比例", "Percentage of short conversion.");
-        public static readonly LocalisableString KRR_LN_LONG_LIMIT_LABEL = new EzLocalizationManager.EzLocalisableString("长按上限", "Long Limit");
-        public static readonly LocalisableString KRR_LN_LONG_LIMIT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每行长按上限", "Max long notes per row.");
-        public static readonly LocalisableString KRR_LN_SHORT_LIMIT_LABEL = new EzLocalizationManager.EzLocalisableString("短按上限", "Short Limit");
-        public static readonly LocalisableString KRR_LN_SHORT_LIMIT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每行短按上限", "Max short notes per row.");
-        public static readonly LocalisableString KRR_LN_LONG_RANDOM_LABEL = new EzLocalizationManager.EzLocalisableString("长按随机", "Long Random");
-        public static readonly LocalisableString KRR_LN_LONG_RANDOM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按随机强度", "Randomness for long notes.");
-        public static readonly LocalisableString KRR_LN_SHORT_RANDOM_LABEL = new EzLocalizationManager.EzLocalisableString("短按随机", "Short Random");
-        public static readonly LocalisableString KRR_LN_SHORT_RANDOM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("短按随机强度", "Randomness for short notes.");
-        public static readonly LocalisableString KRR_LN_ALIGNMENT_LABEL = new EzLocalizationManager.EzLocalisableString("对齐", "Alignment");
-        public static readonly LocalisableString KRR_LN_ALIGNMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("普通音符对齐节拍", "Snap normal notes to beat grid.");
-        public static readonly LocalisableString KRR_LN_LN_ALIGNMENT_LABEL = new EzLocalizationManager.EzLocalisableString("LN对齐", "LN Alignment");
-        public static readonly LocalisableString KRR_LN_LN_ALIGNMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按尾部对齐节拍", "Snap hold tails to beat grid.");
+        internal static readonly LocalisableString KRR_LN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("[KrrTool] LN转换器", "[KrrTool] LN Converter");
+
+        internal static readonly LocalisableString KRR_LN_LONG_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString("长按等级", "Long Level");
+        internal static readonly LocalisableString KRR_LN_LONG_LEVEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按长度强度（0-100）", "Long length level (0-100).");
+
+        internal static readonly LocalisableString KRR_LN_SHORT_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString("短按等级", "Short Level");
+        internal static readonly LocalisableString KRR_LN_SHORT_LEVEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("短按长度强度（0-256）", "Short length level (0-256).");
+
+        internal static readonly LocalisableString KRR_LN_PROCESS_ORIGINAL_LABEL = new EzLocalizationManager.EzLocalisableString("处理原始LN", "Process Original LN");
+        internal static readonly LocalisableString KRR_LN_PROCESS_ORIGINAL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭时跳过原始LN", "Skip original LN when disabled.");
+
+        internal static readonly LocalisableString KRR_LN_LENGTH_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("长度阈值", "Length Threshold");
+        internal static readonly LocalisableString KRR_LN_LENGTH_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长短按判定阈值", "Threshold between long/short.");
+
+        internal static readonly LocalisableString KRR_LN_LONG_PERCENTAGE_LABEL = new EzLocalizationManager.EzLocalisableString("长按比例", "Long Percentage");
+        internal static readonly LocalisableString KRR_LN_LONG_PERCENTAGE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按转换比例", "Percentage of long conversion.");
+
+        internal static readonly LocalisableString KRR_LN_SHORT_PERCENTAGE_LABEL = new EzLocalizationManager.EzLocalisableString("短按比例", "Short Percentage");
+        internal static readonly LocalisableString KRR_LN_SHORT_PERCENTAGE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("短按转换比例", "Percentage of short conversion.");
+
+        internal static readonly LocalisableString KRR_LN_LONG_LIMIT_LABEL = new EzLocalizationManager.EzLocalisableString("长按上限", "Long Limit");
+        internal static readonly LocalisableString KRR_LN_LONG_LIMIT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每行长按上限", "Max long notes per row.");
+
+        internal static readonly LocalisableString KRR_LN_SHORT_LIMIT_LABEL = new EzLocalizationManager.EzLocalisableString("短按上限", "Short Limit");
+        internal static readonly LocalisableString KRR_LN_SHORT_LIMIT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每行短按上限", "Max short notes per row.");
+
+        internal static readonly LocalisableString KRR_LN_LONG_RANDOM_LABEL = new EzLocalizationManager.EzLocalisableString("长按随机", "Long Random");
+        internal static readonly LocalisableString KRR_LN_LONG_RANDOM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按随机强度", "Randomness for long notes.");
+
+        internal static readonly LocalisableString KRR_LN_SHORT_RANDOM_LABEL = new EzLocalizationManager.EzLocalisableString("短按随机", "Short Random");
+        internal static readonly LocalisableString KRR_LN_SHORT_RANDOM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("短按随机强度", "Randomness for short notes.");
+
+        internal static readonly LocalisableString KRR_LN_ALIGNMENT_LABEL = new EzLocalizationManager.EzLocalisableString("对齐", "Alignment");
+        internal static readonly LocalisableString KRR_LN_ALIGNMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("普通音符对齐节拍", "Snap normal notes to beat grid.");
+
+        internal static readonly LocalisableString KRR_LN_LN_ALIGNMENT_LABEL = new EzLocalizationManager.EzLocalisableString("LN对齐", "LN Alignment");
+        internal static readonly LocalisableString KRR_LN_LN_ALIGNMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按尾部对齐节拍", "Snap hold tails to beat grid.");
+
+        internal static readonly LocalisableString KRR_LN_MIN_LN_TO_NOTE_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "最短LN转Note", "Min LN to Note");
+
+        internal static readonly LocalisableString KRR_LN_MIN_LN_TO_NOTE_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "当LN长度小于此节拍比例时转换为普通note（分母），0为不启用",
+            "Convert LN to note when shorter than this beat fraction (denominator), 0 to disable.");
     }
 
     public class KrrLNOptions
@@ -222,6 +252,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         /// LN面尾对齐节拍，0为不启用
         /// </summary>
         public int LNAlignment { get; set; } = 6;
+
+        /// <summary>
+        /// 当LN长度小于此节拍比例时转换为普通note（分母），0为不启用。例如8表示1/8拍
+        /// </summary>
+        public int MinLnToNoteThreshold { get; set; } = 8;
 
         public int? Seed { get; set; }
     }
