@@ -38,10 +38,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             Random,
 
             /// <summary>循环滚动：轨道整体循环偏移</summary>
-            RRandom,
+            R_Random,
 
             /// <summary>行随机：按时间窗口合并行内单独打乱Note</summary>
-            SRandom,
+            S_Random,
+
+            /// <summary>大窗口随机：SRandom的大窗口版本（200ms窗口，150ms阈值）</summary>
+            H_Random,
+
+            /// <summary>螺旋随机：随时间线性变化的轨道旋转</summary>
+            Spiral,
 
             /// <summary>镜像：左右翻转轨道</summary>
             Mirror
@@ -261,6 +267,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 {
                     if (region.Mode == RandomizationMode.None) continue;
 
+                    // 为每个区域创建独立的 RNG 实例，避免 DP 分区时左右区域相互影响
+                    var regionRng = new Random(rng.Next());
+
                     switch (region.Mode)
                     {
                         case RandomizationMode.Mirror:
@@ -268,15 +277,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                             break;
 
                         case RandomizationMode.Random:
-                            applyRandom(maniaBeatmap, region, rng, lockedNotes);
+                            applyRandom(maniaBeatmap, region, regionRng, lockedNotes);
                             break;
 
-                        case RandomizationMode.RRandom:
-                            applyRRandom(maniaBeatmap, region, rng, lockedNotes);
+                        case RandomizationMode.R_Random:
+                            applyRRandom(maniaBeatmap, region, regionRng, lockedNotes);
                             break;
 
-                        case RandomizationMode.SRandom:
-                            applySRandom(maniaBeatmap, region, rng, lockedNotes);
+                        case RandomizationMode.S_Random:
+                            applySRandom(maniaBeatmap, region, regionRng, lockedNotes, 80, 60);
+                            break;
+
+                        case RandomizationMode.H_Random:
+                            applySRandom(maniaBeatmap, region, regionRng, lockedNotes, 200, 150);
+                            break;
+
+                        case RandomizationMode.Spiral:
+                            applySpiral(maniaBeatmap, region, regionRng, lockedNotes);
                             break;
                     }
                 }
@@ -454,14 +471,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         }
 
         /// <summary>
-        /// S-Random 模式：滑动窗口行内随机
+        /// S-Random 模式：滑动窗口行内随机（带跨窗口避连）
         /// </summary>
-        private void applySRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes)
+        private void applySRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes, double window_interval = 80, double threshold = 60)
         {
             var activeCols = region.GetActiveColumnList().ToList();
             if (activeCols.Count <= 1) return;
 
-            const double window_interval = 80;
+            // 初始化轨道时间追踪字典
+            var lastNoteTime = new Dictionary<int, double>();
+
+            foreach (int col in activeCols)
+            {
+                lastNoteTime[col] = -999999; // 初始化为极小值
+            }
 
             var allNotes = beatmap.HitObjects
                                   .Where(n => region.StartCol <= n.Column && n.Column <= region.EndCol)
@@ -496,8 +519,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 windowGroups[windowIndex].Add(note);
             }
 
+            // 标记被 Hold Note 覆盖的窗口
             var mergedWindows = new HashSet<int>();
 
+            foreach (var (startWin, endWin) in holdNoteWindows)
+            {
+                for (int w = startWin; w <= endWin; w++)
+                    mergedWindows.Add(w);
+            }
+
+            // 构建按时间排序的所有窗口组
+            var allWindowGroups = new SortedDictionary<int, List<ManiaHitObject>>();
+
+            // 添加合并窗口组
             foreach (var (startWin, endWin) in holdNoteWindows)
             {
                 var combinedNotes = new List<ManiaHitObject>();
@@ -507,39 +541,185 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     if (windowGroups.TryGetValue(w, out var value))
                     {
                         combinedNotes.AddRange(value);
-                        mergedWindows.Add(w);
                     }
                 }
 
-                shuffleWindowNotes(combinedNotes, activeCols, rng, lockedNotes);
+                allWindowGroups[startWin] = combinedNotes.OrderBy(n => n.StartTime).ToList();
             }
 
+            // 添加未被合并的普通窗口
             foreach (var kvp in windowGroups)
             {
-                if (mergedWindows.Contains(kvp.Key)) continue;
+                if (!mergedWindows.Contains(kvp.Key))
+                {
+                    allWindowGroups[kvp.Key] = kvp.Value.OrderBy(n => n.StartTime).ToList();
+                }
+            }
 
-                shuffleWindowNotes(kvp.Value, activeCols, rng, lockedNotes);
+            // 按时间顺序处理所有窗口组
+            foreach (var kvp in allWindowGroups)
+            {
+                shuffleWindowNotes(kvp.Value, activeCols, rng, lockedNotes, lastNoteTime, threshold);
             }
         }
 
         /// <summary>
-        /// 窗口内 Note 随机打乱
+        /// 窗口内 Note 智能分配（带跨窗口避连）
         /// </summary>
-        private void shuffleWindowNotes(List<ManiaHitObject> notes, List<int> activeCols, Random rng, HashSet<ManiaHitObject> lockedNotes)
+        private void shuffleWindowNotes(
+            List<ManiaHitObject> notes,
+            List<int> activeCols,
+            Random rng,
+            HashSet<ManiaHitObject> lockedNotes,
+            Dictionary<int, double> lastNoteTime,
+            double threshold)
         {
             if (notes.Count == 0) return;
 
             var movableNotes = notes
                                .Where(n => activeCols.Contains(n.Column) && !lockedNotes.Contains(n))
+                               .OrderBy(n => n.StartTime) // 按时间排序，确保逐个处理
                                .ToList();
 
             if (movableNotes.Count == 0) return;
 
-            var randomSlots = activeCols.OrderBy(_ => rng.Next()).Take(movableNotes.Count).ToList();
-
-            for (int i = 0; i < movableNotes.Count; i++)
+            foreach (var note in movableNotes)
             {
-                movableNotes[i].Column = randomSlots[i];
+                // 第一阶段：筛选满足时间阈值的轨道（Primary Lanes）
+                var primaryLanes = activeCols
+                                   .Where(col => note.StartTime - lastNoteTime[col] > threshold)
+                                   .ToList();
+
+                // 第二阶段：不满足阈值的轨道（Inferior Lanes）
+                var inferiorLanes = activeCols
+                                    .Where(col => note.StartTime - lastNoteTime[col] <= threshold)
+                                    .ToList();
+
+                int targetLane;
+
+                // 分配逻辑：优先选择 Primary Lanes
+                if (primaryLanes.Count > 0)
+                {
+                    targetLane = primaryLanes[rng.Next(primaryLanes.Count)];
+                }
+                else if (inferiorLanes.Count > 0)
+                {
+                    // 退而求其次，从 Inferior Lanes 中随机选择
+                    targetLane = inferiorLanes[rng.Next(inferiorLanes.Count)];
+                }
+                else
+                {
+                    // 极端情况：所有轨道都被占用（理论上不会发生）
+                    continue;
+                }
+
+                // 应用分配并更新时间戳
+                note.Column = targetLane;
+                lastNoteTime[targetLane] = note.StartTime;
+            }
+        }
+
+        /// <summary>
+        /// Spiral 模式：螺旋随机（带智能分组与方向系数）
+        /// </summary>
+        private void applySpiral(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes)
+        {
+            var activeCols = region.GetActiveColumnList().ToList();
+            if (activeCols.Count <= 1) return;
+
+            int count = activeCols.Count;
+            int R = rng.Next(0, count); // 初始相位偏移
+            int k = rng.Next(0, 2) == 0 ? 1 : -1; // 随机方向：1为右旋，-1为左旋
+            int i = 0; // 分区计数器
+
+            // 获取区域内所有 Note 并按时间排序
+            var allNotes = beatmap.HitObjects
+                                  .Where(n => region.StartCol <= n.Column && n.Column <= region.EndCol && !lockedNotes.Contains(n))
+                                  .OrderBy(n => n.StartTime)
+                                  .ToList();
+
+            if (allNotes.Count == 0) return;
+
+            // 智能分组逻辑
+            var groups = new List<List<ManiaHitObject>>();
+            var currentGroup = new List<ManiaHitObject>();
+            double? lastEndTime = null; // 记录上一组中 LN 的最晚结束时间
+
+            foreach (var note in allNotes)
+            {
+                bool startNewGroup = false;
+
+                if (currentGroup.Count == 0)
+                {
+                    // 第一个 Note 直接加入
+                }
+                else
+                {
+                    double timeDiff = note.StartTime - currentGroup.Last().StartTime;
+
+                    // 约束1：如果离上一行太近（<60ms），强制合并
+                    if (timeDiff < 60)
+                    {
+                        startNewGroup = false;
+                    }
+                    // 约束2：如果超过了基础窗口（100ms），且没有 LN 约束，则新开一组
+                    else if (timeDiff >= 100)
+                    {
+                        // 检查是否受 LN 约束（LN 结束后 40ms 内）
+                        if (lastEndTime.HasValue && note.StartTime <= lastEndTime.Value + 40)
+                        {
+                            startNewGroup = false;
+                        }
+                        else
+                        {
+                            startNewGroup = true;
+                        }
+                    }
+                }
+
+                if (startNewGroup && currentGroup.Count > 0)
+                {
+                    groups.Add(currentGroup);
+                    currentGroup = new List<ManiaHitObject>();
+                    lastEndTime = null;
+                }
+
+                currentGroup.Add(note);
+
+                // 更新 LN 结束时间追踪
+                if (note is HoldNote holdNote)
+                {
+                    if (!lastEndTime.HasValue || holdNote.EndTime > lastEndTime.Value)
+                    {
+                        lastEndTime = holdNote.EndTime;
+                    }
+                }
+            }
+
+            if (currentGroup.Count > 0)
+                groups.Add(currentGroup);
+
+            // 应用螺旋偏移
+            foreach (var group in groups)
+            {
+                // 计算当前分区的总偏移量
+                int totalShift = (R + i * k) % count;
+                if (totalShift < 0) totalShift += count; // 处理负数取模
+
+                foreach (var note in group)
+                {
+                    // 找到 Note 当前轨道在 activeCols 里的索引
+                    int currentIndex = activeCols.IndexOf(note.Column);
+
+                    if (currentIndex != -1)
+                    {
+                        // 计算新索引并映射回实际轨道
+                        int newIndex = (currentIndex + totalShift) % count;
+                        note.Column = activeCols[newIndex];
+                    }
+                }
+
+                i++; // 螺旋递增
             }
         }
 
