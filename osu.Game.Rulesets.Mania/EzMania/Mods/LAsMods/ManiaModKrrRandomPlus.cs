@@ -38,10 +38,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             Random,
 
             /// <summary>循环滚动：轨道整体循环偏移</summary>
-            RRandom,
+            R_Random,
 
             /// <summary>行随机：按时间窗口合并行内单独打乱Note</summary>
-            SRandom,
+            S_Random,
+
+            /// <summary>大窗口随机：SRandom的大窗口版本（200ms窗口，150ms阈值）</summary>
+            H_Random,
+
+            /// <summary>螺旋随机：随时间线性变化的轨道旋转</summary>
+            Spiral,
 
             /// <summary>镜像：左右翻转轨道</summary>
             Mirror
@@ -52,7 +58,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override string Name => "Krr Random Plus";
         public override string Acronym => "RP";
         public override double ScoreMultiplier => 1.0;
-        public override LocalisableString Description => "添加不同的随机模式，支持固定轨道，DP左右分区独立随机";
+        public override LocalisableString Description => KrrRandomPlusStrings.MOD_DESCRIPTION;
         public override IconUsage? Icon => FontAwesome.Solid.Random;
         public override ModType Type => ModType.LA_Mod;
         public override bool Ranked => false;
@@ -64,27 +70,27 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         #region Mod设置控件
 
         /// <summary>主随机模式下拉框</summary>
-        [SettingSource("模式", "可选：无/Random轨道随机/R-Random循环滚动/S-Random每个note随机/Mirror镜像")]
+        [SettingSource(typeof(KrrRandomPlusStrings), nameof(KrrRandomPlusStrings.MODE_LABEL), nameof(KrrRandomPlusStrings.MODE_DESCRIPTION))]
         public Bindable<RandomizationMode> MainMode { get; } = new Bindable<RandomizationMode>();
 
         /// <summary>Flip开关：左右交换</summary>
-        [SettingSource("Flip", "左右轨道互换。偶数键：1234|5678→5678|1234；奇数键：1234|5|6789→6789|5|1234")]
+        [SettingSource(typeof(KrrRandomPlusStrings), nameof(KrrRandomPlusStrings.FLIP_LABEL), nameof(KrrRandomPlusStrings.FLIP_DESCRIPTION))]
         public BindableBool FlipEnabled { get; } = new BindableBool();
 
         /// <summary>带盘Flip开关：边缘包裹交换</summary>
-        [SettingSource("带盘Flip", "单独交换最外侧轨道，内部左右轨道互换。偶数键：1234|5678→8567|2341；奇数键：中间不动，两侧包裹交换")]
+        [SettingSource(typeof(KrrRandomPlusStrings), nameof(KrrRandomPlusStrings.WRAP_FLIP_LABEL), nameof(KrrRandomPlusStrings.WRAP_FLIP_DESCRIPTION))]
         public BindableBool WrapFlipEnabled { get; } = new BindableBool();
 
         /// <summary>固定轨道输入框</summary>
-        [SettingSource("固定轨道", "输入轨道号，如57；1-9、a-i对应1~18键，固定轨道不参与随机")]
+        [SettingSource(typeof(KrrRandomPlusStrings), nameof(KrrRandomPlusStrings.FIXED_COLUMNS_LABEL), nameof(KrrRandomPlusStrings.FIXED_COLUMNS_DESCRIPTION))]
         public Bindable<string> FixedColumnsInput { get; } = new Bindable<string>(string.Empty);
 
         /// <summary>DP左右分区开关</summary>
-        [SettingSource("DP分区模式", "拆分左右区域各自独立随机，奇数keys时中间轨道固定不参与随机，上边设置变成左侧区域随机模式")]
+        [SettingSource(typeof(KrrRandomPlusStrings), nameof(KrrRandomPlusStrings.DP_MODE_LABEL), nameof(KrrRandomPlusStrings.DP_MODE_DESCRIPTION))]
         public BindableBool DPModeEnabled { get; } = new BindableBool();
 
         /// <summary>右侧区域随机模式下拉框（仅DP开启生效）</summary>
-        [SettingSource("右侧模式", "DP分区开启时生效，右侧区域使用的随机模式")]
+        [SettingSource(typeof(KrrRandomPlusStrings), nameof(KrrRandomPlusStrings.RIGHT_MODE_LABEL), nameof(KrrRandomPlusStrings.RIGHT_MODE_DESCRIPTION))]
         public Bindable<RandomizationMode> RightMode { get; } = new Bindable<RandomizationMode>();
 
         /// <summary>随机种子输入框</summary>
@@ -92,7 +98,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         /// <summary>Mod应用顺序</summary>
-        [SettingSource("应用顺序", "控制该Mod在所有修改类Mod中的执行先后顺序")]
+        [SettingSource(typeof(KrrRandomPlusStrings), nameof(KrrRandomPlusStrings.APPLY_ORDER_LABEL), nameof(KrrRandomPlusStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
         {
             MinValue = 0,
@@ -132,19 +138,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             get
             {
-                yield return ("主模式", MainMode.Value.ToString());
+                yield return (KrrRandomPlusStrings.MAIN_MODE_LABEL, MainMode.Value.ToString());
 
                 if (FlipEnabled.Value)
-                    yield return ("Flip", "左右互换");
+                    yield return (KrrRandomPlusStrings.FLIP_LABEL, KrrRandomPlusStrings.FLIP_LEFT_RIGHT_SWAP);
                 else if (WrapFlipEnabled.Value)
-                    yield return ("带盘Flip", "边缘包裹");
+                    yield return (KrrRandomPlusStrings.WRAP_FLIP_LABEL, KrrRandomPlusStrings.WRAP_FLIP_EDGE_WRAP);
 
                 if (DPModeEnabled.Value)
-                    yield return ("右侧模式", RightMode.Value.ToString());
+                    yield return (KrrRandomPlusStrings.RIGHT_MODE_LABEL, RightMode.Value.ToString());
 
-                yield return ("固定轨道", string.IsNullOrWhiteSpace(FixedColumnsInput.Value) ? "无" : FixedColumnsInput.Value);
-                yield return (EzCommonModStrings.SEED_LABEL, Seed.Value?.ToString() ?? "随机");
-                yield return ("应用顺序", ApplyOrderIndex.Value.ToString());
+                yield return (KrrRandomPlusStrings.FIXED_COLUMNS_LABEL, string.IsNullOrWhiteSpace(FixedColumnsInput.Value) ? KrrRandomPlusStrings.NONE : FixedColumnsInput.Value);
+                yield return (EzCommonModStrings.SEED_LABEL, Seed.Value?.ToString() ?? KrrRandomPlusStrings.RANDOM);
+                yield return (KrrRandomPlusStrings.APPLY_ORDER_LABEL, ApplyOrderIndex.Value.ToString());
             }
         }
 
@@ -261,6 +267,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 {
                     if (region.Mode == RandomizationMode.None) continue;
 
+                    // 基于主种子和区域特征生成确定性子种子，确保可复现性
+                    var regionSeed = HashCode.Combine(seed, region.StartCol, region.EndCol, (int)region.Mode);
+                    var regionRng = new Random(regionSeed);
+
                     switch (region.Mode)
                     {
                         case RandomizationMode.Mirror:
@@ -268,21 +278,28 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                             break;
 
                         case RandomizationMode.Random:
-                            applyRandom(maniaBeatmap, region, rng, lockedNotes);
+                            applyRandom(maniaBeatmap, region, regionRng, lockedNotes);
                             break;
 
-                        case RandomizationMode.RRandom:
-                            applyRRandom(maniaBeatmap, region, rng, lockedNotes);
+                        case RandomizationMode.R_Random:
+                            applyRRandom(maniaBeatmap, region, regionRng, lockedNotes);
                             break;
 
-                        case RandomizationMode.SRandom:
-                            applySRandom(maniaBeatmap, region, rng, lockedNotes);
+                        case RandomizationMode.S_Random:
+                            applySRandom(maniaBeatmap, region, regionRng, lockedNotes, 80, 60);
+                            break;
+
+                        case RandomizationMode.H_Random:
+                            applySRandom(maniaBeatmap, region, regionRng, lockedNotes, 200, 150);
+                            break;
+
+                        case RandomizationMode.Spiral:
+                            applySpiral(maniaBeatmap, region, regionRng, lockedNotes);
                             break;
                     }
                 }
 
-                // 第五步：按时间重新排序物件
-                maniaBeatmap.HitObjects = maniaBeatmap.HitObjects.OrderBy(h => h.StartTime).ToList();
+
             }
             catch
             {
@@ -419,7 +436,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
             if (movableNotes.Count == 0) return;
 
-            var randomSlots = activeCols.OrderBy(_ => rng.Next()).Take(movableNotes.Count).ToList();
+            // 使用 Fisher-Yates 洗牌算法确保可复现性
+            var shuffledCols = new List<int>(activeCols);
+            for (int i = shuffledCols.Count - 1; i > 0; i--)
+            {
+                int j = rng.Next(0, i + 1);
+                (shuffledCols[i], shuffledCols[j]) = (shuffledCols[j], shuffledCols[i]);
+            }
+
+            var randomSlots = shuffledCols.Take(movableNotes.Count).ToList();
 
             for (int i = 0; i < movableNotes.Count; i++)
             {
@@ -454,14 +479,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         }
 
         /// <summary>
-        /// S-Random 模式：滑动窗口行内随机
+        /// S-Random 模式：滑动窗口行内随机（带跨窗口避连）
         /// </summary>
-        private void applySRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes)
+        private void applySRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes, double window_interval = 80, double threshold = 60)
         {
             var activeCols = region.GetActiveColumnList().ToList();
             if (activeCols.Count <= 1) return;
 
-            const double window_interval = 80;
+            // 初始化轨道时间追踪字典
+            var lastNoteTime = new Dictionary<int, double>();
+
+            foreach (int col in activeCols)
+            {
+                lastNoteTime[col] = -999999; // 初始化为极小值
+            }
 
             var allNotes = beatmap.HitObjects
                                   .Where(n => region.StartCol <= n.Column && n.Column <= region.EndCol)
@@ -496,8 +527,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 windowGroups[windowIndex].Add(note);
             }
 
+            // 标记被 Hold Note 覆盖的窗口
             var mergedWindows = new HashSet<int>();
 
+            foreach (var (startWin, endWin) in holdNoteWindows)
+            {
+                for (int w = startWin; w <= endWin; w++)
+                    mergedWindows.Add(w);
+            }
+
+            // 构建按时间排序的所有窗口组
+            var allWindowGroups = new SortedDictionary<int, List<ManiaHitObject>>();
+
+            // 添加合并窗口组
             foreach (var (startWin, endWin) in holdNoteWindows)
             {
                 var combinedNotes = new List<ManiaHitObject>();
@@ -507,39 +549,193 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     if (windowGroups.TryGetValue(w, out var value))
                     {
                         combinedNotes.AddRange(value);
-                        mergedWindows.Add(w);
                     }
                 }
 
-                shuffleWindowNotes(combinedNotes, activeCols, rng, lockedNotes);
+                allWindowGroups[startWin] = combinedNotes;
             }
 
+            // 添加未被合并的普通窗口
             foreach (var kvp in windowGroups)
             {
-                if (mergedWindows.Contains(kvp.Key)) continue;
+                if (!mergedWindows.Contains(kvp.Key))
+                {
+                    allWindowGroups[kvp.Key] = kvp.Value;
+                }
+            }
 
-                shuffleWindowNotes(kvp.Value, activeCols, rng, lockedNotes);
+            // 按时间顺序处理所有窗口组
+            foreach (var kvp in allWindowGroups)
+            {
+                shuffleWindowNotes(kvp.Value, activeCols, rng, lockedNotes, lastNoteTime, threshold);
             }
         }
 
         /// <summary>
-        /// 窗口内 Note 随机打乱
+        /// 窗口内 Note 智能分配（带跨窗口避连）
         /// </summary>
-        private void shuffleWindowNotes(List<ManiaHitObject> notes, List<int> activeCols, Random rng, HashSet<ManiaHitObject> lockedNotes)
+        private void shuffleWindowNotes(
+            List<ManiaHitObject> notes,
+            List<int> activeCols,
+            Random rng,
+            HashSet<ManiaHitObject> lockedNotes,
+            Dictionary<int, double> lastNoteTime,
+            double threshold)
         {
             if (notes.Count == 0) return;
 
+            // 注意：notes 已经按时间排序（allNotes 已排序，分组保持顺序），无需重复 OrderBy
             var movableNotes = notes
                                .Where(n => activeCols.Contains(n.Column) && !lockedNotes.Contains(n))
                                .ToList();
 
             if (movableNotes.Count == 0) return;
 
-            var randomSlots = activeCols.OrderBy(_ => rng.Next()).Take(movableNotes.Count).ToList();
-
-            for (int i = 0; i < movableNotes.Count; i++)
+            foreach (var note in movableNotes)
             {
-                movableNotes[i].Column = randomSlots[i];
+                // 第一阶段：筛选满足时间阈值的轨道（Primary Lanes）
+                var primaryLanes = activeCols
+                                   .Where(col => note.StartTime - lastNoteTime[col] > threshold)
+                                   .ToList();
+
+                // 第二阶段：不满足阈值的轨道（Inferior Lanes）
+                var inferiorLanes = activeCols
+                                    .Where(col => note.StartTime - lastNoteTime[col] <= threshold)
+                                    .ToList();
+
+                int targetLane;
+
+                // 分配逻辑：优先选择 Primary Lanes
+                if (primaryLanes.Count > 0)
+                {
+                    targetLane = primaryLanes[rng.Next(primaryLanes.Count)];
+                }
+                else if (inferiorLanes.Count > 0)
+                {
+                    // 退而求其次，从 Inferior Lanes 中随机选择
+                    targetLane = inferiorLanes[rng.Next(inferiorLanes.Count)];
+                }
+                else
+                {
+                    // 极端情况：所有轨道都被占用（理论上不会发生）
+                    continue;
+                }
+
+                // 应用分配并更新时间戳
+                note.Column = targetLane;
+                lastNoteTime[targetLane] = note.StartTime;
+            }
+        }
+
+        /// <summary>
+        /// Spiral 模式：螺旋随机（带智能分组与方向系数）
+        /// </summary>
+        private void applySpiral(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes)
+        {
+            var activeCols = region.GetActiveColumnList().ToList();
+            if (activeCols.Count <= 1) return;
+
+            int count = activeCols.Count;
+            int R = rng.Next(0, count); // 初始相位偏移
+            int k = rng.Next(0, 2) == 0 ? 1 : -1; // 随机方向：1为右旋，-1为左旋
+            int i = 0; // 分区计数器
+
+            // 获取区域内所有 Note 并按时间排序
+            var allNotes = beatmap.HitObjects
+                                  .Where(n => region.StartCol <= n.Column && n.Column <= region.EndCol && !lockedNotes.Contains(n))
+                                  .OrderBy(n => n.StartTime)
+                                  .ToList();
+
+            if (allNotes.Count == 0) return;
+
+            // 预构建轨道索引映射表，将 IndexOf 从 O(k) 降为 O(1)
+            var colToIndexMap = new Dictionary<int, int>();
+            for (int idx = 0; idx < count; idx++)
+            {
+                colToIndexMap[activeCols[idx]] = idx;
+            }
+
+            // 智能分组逻辑
+            var groups = new List<List<ManiaHitObject>>();
+            var currentGroup = new List<ManiaHitObject>();
+            double? lastEndTime = null; // 记录上一组中 LN 的最晚结束时间
+            ManiaHitObject lastNoteInGroup = null;
+
+            foreach (var note in allNotes)
+            {
+                bool startNewGroup = false;
+
+                if (currentGroup.Count == 0)
+                {
+                    // 第一个 Note 直接加入
+                }
+                else
+                {
+                    double timeDiff = note.StartTime - lastNoteInGroup.StartTime;
+
+                    // 约束1：如果离上一行太近（<60ms），强制合并
+                    if (timeDiff < 60)
+                    {
+                        startNewGroup = false;
+                    }
+                    // 约束2：如果超过了基础窗口（100ms），且没有 LN 约束，则新开一组
+                    else if (timeDiff >= 100)
+                    {
+                        // 检查是否受 LN 约束（LN 结束后 40ms 内）
+                        if (lastEndTime.HasValue && note.StartTime <= lastEndTime.Value + 40)
+                        {
+                            startNewGroup = false;
+                        }
+                        else
+                        {
+                            startNewGroup = true;
+                        }
+                    }
+                }
+
+                if (startNewGroup && currentGroup.Count > 0)
+                {
+                    groups.Add(currentGroup);
+                    currentGroup = new List<ManiaHitObject>();
+                    lastEndTime = null;
+                    lastNoteInGroup = null;
+                }
+
+                currentGroup.Add(note);
+                lastNoteInGroup = note;
+
+                // 更新 LN 结束时间追踪
+                if (note is HoldNote holdNote)
+                {
+                    if (!lastEndTime.HasValue || holdNote.EndTime > lastEndTime.Value)
+                    {
+                        lastEndTime = holdNote.EndTime;
+                    }
+                }
+            }
+
+            if (currentGroup.Count > 0)
+                groups.Add(currentGroup);
+
+            // 应用螺旋偏移
+            foreach (var group in groups)
+            {
+                // 计算当前分区的总偏移量
+                int totalShift = (R + i * k) % count;
+                if (totalShift < 0) totalShift += count; // 处理负数取模
+
+                foreach (var note in group)
+                {
+                    // 使用预构建的映射表，O(1) 查找
+                    if (colToIndexMap.TryGetValue(note.Column, out int currentIndex))
+                    {
+                        // 计算新索引并映射回实际轨道
+                        int newIndex = (currentIndex + totalShift) % count;
+                        note.Column = activeCols[newIndex];
+                    }
+                }
+
+                i++; // 螺旋递增
             }
         }
 
@@ -576,5 +772,75 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         }
 
         #endregion
+    }
+
+    public static class KrrRandomPlusStrings
+    {
+        public static readonly LocalisableString MOD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "添加不同的随机模式，支持固定轨道，DP左右分区独立随机",
+            "Add different randomization modes, support fixed columns, DP left-right partition independent randomization");
+
+        public static readonly LocalisableString MODE_LABEL = new EzLocalizationManager.EzLocalisableString("模式", "Mode");
+
+        public static readonly LocalisableString MODE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "可选："
+            + "\n无"
+            + "\nRandom（随机）：区域内可移动轨道顺序随机打乱。"
+            + "\nR-Random（循环滚动）：区域内可移动轨道循环平移。"
+            + "\nS-Random（按音符随机）：区域内每个音符独立随机分配轨道。"
+            + "\nH-Random（按音符随机优化版）：S-Random 优化版，自动规避同轨纵连。"
+            + "\nSpiral（螺旋随机）：音符按时序依次偏移排布轨道，形成螺旋错位效果。"
+            + "\nMirror（镜像）：区域内所有轨道沿中轴线做左右对称翻转。",
+            "Options:"
+            + "\nNone"
+            + "\nRandom: Randomly shuffle movable column order within the region."
+            + "\nR-Random: Cyclically shift movable columns within the region."
+            + "\nS-Random: Independently assign random columns to each note within the region."
+            + "\nH-Random: Optimized S-Random, automatically avoids same-column jacks."
+            + "\nSpiral: Notes are offset sequentially by time order, forming a spiral staggered effect."
+            + "\nMirror: All columns in the region are flipped symmetrically along the central axis.");
+
+        public static readonly LocalisableString FLIP_LABEL = new EzLocalizationManager.EzLocalisableString("Flip", "Flip");
+
+        public static readonly LocalisableString FLIP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "左右轨道互换。偶数键：1234|5678→5678|1234；奇数键：1234|5|6789→6789|5|1234",
+            "Swap left and right columns. Even keys: 1234|5678→5678|1234; Odd keys: 1234|5|6789→6789|5|1234");
+
+        public static readonly LocalisableString WRAP_FLIP_LABEL = new EzLocalizationManager.EzLocalisableString("带盘Flip", "Wrap Flip");
+
+        public static readonly LocalisableString WRAP_FLIP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "单独交换最外侧轨道，内部左右轨道互换。偶数键：1234|5678→8567|2341；奇数键：中间不动，两侧包裹交换",
+            "Swap outermost columns separately, inner left-right columns swap. Even keys: 1234|5678→8567|2341; Odd keys: center stays, sides wrap-swap");
+
+        public static readonly LocalisableString FIXED_COLUMNS_LABEL = new EzLocalizationManager.EzLocalisableString("固定轨道", "Fixed Columns");
+
+        public static readonly LocalisableString FIXED_COLUMNS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "输入轨道号，如57；1-9、a-i对应1~18键，固定轨道不参与随机",
+            "Enter column numbers, e.g., 57; 1-9, a-i correspond to keys 1~18, fixed columns do not participate in randomization");
+
+        public static readonly LocalisableString DP_MODE_LABEL = new EzLocalizationManager.EzLocalisableString("DP分区模式", "DP Partition Mode");
+
+        public static readonly LocalisableString DP_MODE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "拆分左右区域各自独立随机，奇数keys时中间轨道固定不参与随机，上边设置变成左侧区域随机模式",
+            "Split left-right regions for independent randomization, middle column is fixed for odd keys, above settings become left region randomization mode");
+
+        public static readonly LocalisableString RIGHT_MODE_LABEL = new EzLocalizationManager.EzLocalisableString("右侧模式", "Right Mode");
+
+        public static readonly LocalisableString RIGHT_MODE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "DP分区开启时生效，右侧区域使用的随机模式",
+            "Effective when DP partition is enabled, randomization mode used by the right region");
+
+        public static readonly LocalisableString APPLY_ORDER_LABEL = new EzLocalizationManager.EzLocalisableString("应用顺序", "Apply Order");
+
+        public static readonly LocalisableString APPLY_ORDER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "控制该Mod在所有修改类Mod中的执行先后顺序",
+            "Controls the execution order of this Mod among all modification Mods");
+
+        // SettingDescription 中使用的值字符串
+        public static readonly LocalisableString MAIN_MODE_LABEL = new EzLocalizationManager.EzLocalisableString("主模式", "Main Mode");
+        public static readonly LocalisableString FLIP_LEFT_RIGHT_SWAP = new EzLocalizationManager.EzLocalisableString("左右互换", "Left-Right Swap");
+        public static readonly LocalisableString WRAP_FLIP_EDGE_WRAP = new EzLocalizationManager.EzLocalisableString("边缘包裹", "Edge Wrap");
+        public static readonly LocalisableString NONE = new EzLocalizationManager.EzLocalisableString("无", "None");
+        public static readonly LocalisableString RANDOM = new EzLocalizationManager.EzLocalisableString("随机", "Random");
     }
 }
