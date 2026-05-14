@@ -1,9 +1,8 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -137,8 +136,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         private readonly BindableNumber<float> gap = new BindableNumber<float>();
 
-        private (HitResult result, double length)[] hitWindows = null!;
-
         public YuHUDFastSlowDisplay()
         {
             AutoSizeAxes = Axes.Both;
@@ -149,8 +146,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         {
             const int text_height = 20;
             const int text_width = 250;
-
-            hitWindows = HitWindows.GetAllAvailableWindows().ToArray();
 
             InternalChild = new Container
             {
@@ -254,37 +249,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             FastColourGradient.BindValueChanged(e => SetFastTextColour(FastColour.Value, e.NewValue), true);
             SlowColourGradient.BindValueChanged(e => SetSlowTextColour(SlowColour.Value, e.NewValue), true);
 
-            FastColourStyle.BindValueChanged(e =>
-            {
-                if (e.NewValue == YuColourStyle.SingleColour)
-                {
-                    SetFastTextColour(FastColour.Value);
-                }
-                else if (e.NewValue == YuColourStyle.HorizontalGradient)
-                {
-                    SetFastTextColour(FastColour.Value, FastColourGradient.Value);
-                }
-                else if (e.NewValue == YuColourStyle.VerticalGradient)
-                {
-                    SetFastTextColour(FastColour.Value, FastColourGradient.Value);
-                }
-            }, true);
-
-            SlowColourStyle.BindValueChanged(e =>
-            {
-                if (e.NewValue == YuColourStyle.SingleColour)
-                {
-                    SetSlowTextColour(SlowColour.Value);
-                }
-                else if (e.NewValue == YuColourStyle.HorizontalGradient)
-                {
-                    SetSlowTextColour(SlowColour.Value, SlowColourGradient.Value);
-                }
-                else if (e.NewValue == YuColourStyle.VerticalGradient)
-                {
-                    SetSlowTextColour(SlowColour.Value, SlowColourGradient.Value);
-                }
-            }, true);
+            FastColourStyle.BindValueChanged(e => applyFastColourStyle(e.NewValue), true);
+            SlowColourStyle.BindValueChanged(e => applySlowColourStyle(e.NewValue), true);
 
             FontSize.BindValueChanged(e => SetFontSize(e.NewValue), true);
             Font.BindValueChanged(e =>
@@ -311,6 +277,24 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             Test.BindValueChanged(e => testText.Alpha = e.NewValue ? 1 : 0, true);
         }
 
+        /// <summary>
+        /// 应用 Fast 颜色样式
+        /// </summary>
+        private void applyFastColourStyle(YuColourStyle style)
+        {
+            var colour = style == YuColourStyle.SingleColour ? FastColour.Value : FastColourGradient.Value;
+            SetFastTextColour(FastColour.Value, colour);
+        }
+
+        /// <summary>
+        /// 应用 Slow 颜色样式
+        /// </summary>
+        private void applySlowColourStyle(YuColourStyle style)
+        {
+            var colour = style == YuColourStyle.SingleColour ? SlowColour.Value : SlowColourGradient.Value;
+            SetSlowTextColour(SlowColour.Value, colour);
+        }
+
         protected void Reset()
         {
         }
@@ -326,23 +310,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private ColourInfo randomColourInfo()
         {
             var random = new Random();
-
-            switch (random.Next(3))
+            return random.Next(3) switch
             {
-                case 0:
-
-                    return ColourInfo.SingleColour(randomColour());
-
-                case 1:
-
-                    return ColourInfo.GradientHorizontal(randomColour(), randomColour());
-
-                case 2:
-
-                    return ColourInfo.GradientVertical(randomColour(), randomColour());
-            }
-
-            return ColourInfo.SingleColour(Colour4.White);
+                0 => ColourInfo.SingleColour(randomColour()),
+                1 => ColourInfo.GradientHorizontal(randomColour(), randomColour()),
+                2 => ColourInfo.GradientVertical(randomColour(), randomColour()),
+                _ => ColourInfo.SingleColour(Colour4.White)
+            };
         }
 
         private Colour4 randomColour()
@@ -353,23 +327,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         protected void SetDisplayStyle(bool value)
         {
+            float gapValue = Gap.Value;
+
             if (value)
             {
-                fast.Y = Gap.Value;
-                slow.Y = -Gap.Value;
-                test.X = Gap.Value;
-                fast.X = 0;
-                slow.X = 0;
-                test.Y = 0;
+                // 垂直布局
+                fast.X = slow.X = test.Y = 0;
+                fast.Y = gapValue;
+                slow.Y = -gapValue;
+                test.X = gapValue;
             }
             else
             {
-                fast.Y = 0;
-                slow.Y = 0;
-                test.X = 0;
-                fast.X = Gap.Value;
-                slow.X = -Gap.Value;
-                test.Y = Gap.Value;
+                // 水平布局
+                fast.Y = slow.Y = test.X = 0;
+                fast.X = gapValue;
+                slow.X = -gapValue;
+                test.Y = gapValue;
             }
         }
 
@@ -398,22 +372,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         protected void SetGap(float value)
         {
+            gap.Value = value;
+
             if (DisplayStyle.Value)
             {
-                gap.Value = value;
-                fast.X = 0;
-                slow.X = 0;
-                test.Y = 0;
+                // 垂直布局
+                fast.X = slow.X = test.Y = 0;
                 fast.Y = value;
                 slow.Y = -value;
                 test.X = value;
             }
             else
             {
-                gap.Value = value;
-                fast.Y = 0;
-                slow.Y = 0;
-                test.X = 0;
+                // 水平布局
+                fast.Y = slow.Y = test.X = 0;
                 fast.X = value;
                 slow.X = -value;
                 test.Y = value;
@@ -421,45 +393,37 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         }
 
         protected void SetFastTextColour(Colour4 colour, Colour4? gradient = null)
-
         {
             FastColour.Value = colour;
+            displayFastText.Colour = applyGradient(colour, gradient, FastColourStyle.Value);
 
-            displayFastText.Colour = colour;
-
-            if (gradient != null && FastColourStyle.Value != YuColourStyle.SingleColour)
-            {
+            if (gradient.HasValue && FastColourStyle.Value != YuColourStyle.SingleColour)
                 FastColourGradient.Value = gradient.Value;
-
-                if (FastColourStyle.Value == YuColourStyle.HorizontalGradient)
-                {
-                    displayFastText.Colour = ColourInfo.GradientHorizontal(colour, gradient.Value);
-                }
-                else if (FastColourStyle.Value == YuColourStyle.VerticalGradient)
-                {
-                    displayFastText.Colour = ColourInfo.GradientVertical(colour, gradient.Value);
-                }
-            }
         }
 
         protected void SetSlowTextColour(Colour4 colour, Colour4? gradient = null)
         {
             SlowColour.Value = colour;
-            displaySlowText.Colour = colour;
+            displaySlowText.Colour = applyGradient(colour, gradient, SlowColourStyle.Value);
 
-            if (gradient != null && FastColourStyle.Value != YuColourStyle.SingleColour)
-            {
+            if (gradient.HasValue && SlowColourStyle.Value != YuColourStyle.SingleColour)
                 SlowColourGradient.Value = gradient.Value;
+        }
 
-                if (SlowColourStyle.Value == YuColourStyle.HorizontalGradient)
-                {
-                    displaySlowText.Colour = ColourInfo.GradientHorizontal(colour, gradient.Value);
-                }
-                else if (SlowColourStyle.Value == YuColourStyle.VerticalGradient)
-                {
-                    displaySlowText.Colour = ColourInfo.GradientVertical(colour, gradient.Value);
-                }
-            }
+        /// <summary>
+        /// 根据颜色样式应用渐变效果
+        /// </summary>
+        private ColourInfo applyGradient(Colour4 baseColour, Colour4? gradient, YuColourStyle style)
+        {
+            if (!gradient.HasValue || style == YuColourStyle.SingleColour)
+                return baseColour;
+
+            return style switch
+            {
+                YuColourStyle.HorizontalGradient => ColourInfo.GradientHorizontal(baseColour, gradient.Value),
+                YuColourStyle.VerticalGradient =>   ColourInfo.GradientVertical(baseColour, gradient.Value),
+                _ => baseColour
+            };
         }
 
         public override void Clear()
@@ -485,42 +449,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             }
         }
 
+        /// <summary>
+        /// 检查判定是否应该显示在指定列上
+        /// </summary>
         private void checkColumn(JudgementResult judgement, IHasColumn? originalColumn)
         {
             if (originalColumn is null)
-            {
                 return;
-            }
 
             try
             {
                 int column = originalColumn.Column + 1;
-                var rulesetInstance = ruleset.Value.CreateInstance();
-                int keys = rulesetInstance.GetVariantForBeatmap(beatmap.Value.BeatmapInfo, mods.Value);
+                int keys = ruleset.Value.CreateInstance().GetVariantForBeatmap(beatmap.Value.BeatmapInfo, mods.Value);
 
-                if (SelectColumn.Value == YuColumnPosition.Middle && keys / 2.0 != Math.Truncate(keys / 2.0) && column == (keys / 2) + 1)
-                {
+                if (isTargetColumn(column, keys))
                     displayResult(judgement);
-                }
-                else if (SelectColumn.Value == YuColumnPosition.RightHalf && column > keys / 2.0)
-                {
-                    if (keys % 2 != 0 && column > (keys / 2) + 1)
-                    {
-                        displayResult(judgement);
-                    }
-                    else if (keys % 2 == 0)
-                    {
-                        displayResult(judgement);
-                    }
-                }
-                else if (SelectColumn.Value == YuColumnPosition.LeftHalf && column <= keys / 2.0)
-                {
-                    displayResult(judgement);
-                }
-                else if (column >= LowerColumnBound.Value && column <= UpperColumnBound.Value && SelectColumn.Value == YuColumnPosition.None)
-                {
-                    displayResult(judgement);
-                }
             }
             catch (Exception)
             {
@@ -528,82 +471,120 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             }
         }
 
+        /// <summary>
+        /// 判断是否为需要显示的目标列
+        /// </summary>
+        private bool isTargetColumn(int column, int keys)
+        {
+            return SelectColumn.Value switch
+            {
+                YuColumnPosition.Middle =>    keys % 2 != 0 && column == (keys / 2) + 1,
+                YuColumnPosition.RightHalf => column > (keys / 2.0) && (keys % 2 == 0 || column > (keys / 2) + 1),
+                YuColumnPosition.LeftHalf =>  column <= keys / 2.0,
+                YuColumnPosition.None =>      column >= LowerColumnBound.Value && column <= UpperColumnBound.Value,
+                _ => false
+            };
+        }
+
+        /// <summary>
+        /// 显示判定结果（Early/Late）
+        /// </summary>
         private void displayResult(JudgementResult judgement)
         {
+            // 测试模式
             if (Test.Value)
             {
-                displayFastText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
-                displaySlowText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
-                testText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
-
-                if (LNSwitch.Value)
-                {
-                    if (judgement.HitObject is TailNote)
-                    {
-                        displayFastText.Text = fastTextLNString;
-                        displaySlowText.Text = slowTextLNString;
-                    }
-                    else if (judgement.HitObject is Note)
-                    {
-                        displayFastText.Text = fastTextString;
-                        displaySlowText.Text = slowTextString;
-                    }
-                }
-
+                fadeOutAllTexts();
+                updateTextsForTest(judgement);
                 return;
             }
 
+            // 根据时间偏移显示 Early 或 Late
             if (judgement.TimeOffset < 0)
             {
-                if (LNSwitch.Value)
-                {
-                    if (judgement.HitObject is HeadNote)
-                    {
-                        displayFastText.Text = fastTextString;
-                    }
-                    else if (judgement.HitObject is TailNote)
-                    {
-                        displayFastText.Text = fastTextLNString;
-                    }
-                    else if (judgement.HitObject is Note)
-                    {
-                        displayFastText.Text = fastTextString;
-                    }
-                }
-
-                displayFastText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
-
-                if (OnlyDisplayOne.Value)
-                {
-                    displaySlowText.FadeOut(0);
-                }
+                showEarly(judgement);
             }
-
-            if (judgement.TimeOffset > 0)
+            else if (judgement.TimeOffset > 0)
             {
-                if (LNSwitch.Value)
-                {
-                    if (judgement.HitObject is HeadNote)
-                    {
-                        displaySlowText.Text = slowTextString;
-                    }
-                    else if (judgement.HitObject is TailNote)
-                    {
-                        displaySlowText.Text = slowTextLNString;
-                    }
-                    else if (judgement.HitObject is Note)
-                    {
-                        displaySlowText.Text = slowTextString;
-                    }
-                }
-
-                displaySlowText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
-
-                if (OnlyDisplayOne.Value)
-                {
-                    displayFastText.FadeOut(0);
-                }
+                showLate(judgement);
             }
+        }
+
+        /// <summary>
+        /// 淡出所有文本
+        /// </summary>
+        private void fadeOutAllTexts()
+        {
+            displayFastText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
+            displaySlowText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
+            testText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
+        }
+
+        /// <summary>
+        /// 测试模式下更新文本
+        /// </summary>
+        private void updateTextsForTest(JudgementResult judgement)
+        {
+            if (!LNSwitch.Value)
+                return;
+
+            bool isTailNote = judgement.HitObject is TailNote;
+            displayFastText.Text = isTailNote ? fastTextLNString : fastTextString;
+            displaySlowText.Text = isTailNote ? slowTextLNString : slowTextString;
+        }
+
+        /// <summary>
+        /// 显示 Early（按下过早）
+        /// </summary>
+        private void showEarly(JudgementResult judgement)
+        {
+            updateFastText(judgement);
+            displayFastText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
+
+            if (OnlyDisplayOne.Value)
+                displaySlowText.FadeOut(0);
+        }
+
+        /// <summary>
+        /// 显示 Late（按下过晚）
+        /// </summary>
+        private void showLate(JudgementResult judgement)
+        {
+            updateSlowText(judgement);
+            displaySlowText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
+
+            if (OnlyDisplayOne.Value)
+                displayFastText.FadeOut(0);
+        }
+
+        /// <summary>
+        /// 根据音符类型更新 Fast 文本
+        /// </summary>
+        private void updateFastText(JudgementResult judgement)
+        {
+            if (!LNSwitch.Value)
+                return;
+
+            displayFastText.Text = judgement.HitObject switch
+            {
+                TailNote => fastTextLNString,
+                _ =>        fastTextString
+            };
+        }
+
+        /// <summary>
+        /// 根据音符类型更新 Slow 文本
+        /// </summary>
+        private void updateSlowText(JudgementResult judgement)
+        {
+            if (!LNSwitch.Value)
+                return;
+
+            displaySlowText.Text = judgement.HitObject switch
+            {
+                TailNote => slowTextLNString,
+                _ =>        slowTextString
+            };
         }
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.LN_SWITCH), nameof(FastSlowDisplayStrings.LN_SWITCH_DESCRIPTION))]
