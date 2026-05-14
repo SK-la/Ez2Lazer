@@ -14,6 +14,12 @@ namespace osu.Game.Rulesets.Mania.UI
 {
     public partial class ManiaPlayfieldAdjustmentContainer : PlayfieldAdjustmentContainer
     {
+        /// <summary>
+        /// 测试开关：设为 true 启用真透视模式，false 使用原有伪 3D 透视。
+        /// 真透视模式下，ManiaPseudo3DRotation 设置的角度将映射为真透视参数。
+        /// </summary>
+        private const bool USE_TRUE_PERSPECTIVE = true;
+
         protected override Container<Drawable> Content { get; }
 
         private readonly DrawSizePreservingFillContainer scalingContainer;
@@ -43,7 +49,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
             var rotation = GlobalConfigStore.EzConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation);
 
-            if (!rotation.IsDefault)
+            // 真透视测试模式下总是创建 perspectiveContainer，以便运行时动态切换
+            if (USE_TRUE_PERSPECTIVE || !rotation.IsDefault)
             {
                 scalingContainer.Child = perspectiveContainer = new BufferedContainer(pixelSnapping: true)
                 {
@@ -72,7 +79,23 @@ namespace osu.Game.Rulesets.Mania.UI
             float angle = (float)maniaPseudo3DRotation.Value;
             float t = angle / 75f;
 
-            if (perspectiveContainer != null) perspectiveContainer.VerticalPerspective = t;
+            if (perspectiveContainer == null) return;
+
+            if (USE_TRUE_PERSPECTIVE)
+            {
+                // 将角度 (0~75°) 映射为真透视参数
+                // t=0 时无效果，t=1 时效果最强
+                perspectiveContainer.UseTruePerspective = t > 0;
+                perspectiveContainer.VerticalPerspective = 0; // 禁用旧模式
+                perspectiveContainer.TruePerspectiveTopHeightScale = 1.0f - t * 0.9f;      // 1.0 -> 0.1
+                perspectiveContainer.TruePerspectiveTopWidthScale = 1.0f - t * 0.8f;        // 1.0 -> 0.2
+                perspectiveContainer.TruePerspectiveGlobalHorizontalScale = 1.0f;
+                perspectiveContainer.TruePerspectiveVerticalOffset = 0.0f;
+            }
+            else
+            {
+                perspectiveContainer.VerticalPerspective = t;
+            }
         }
 
         protected override void Update()
