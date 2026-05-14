@@ -468,28 +468,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         protected override void OnNewJudgement(JudgementResult judgement)
         {
-            if ((!judgement.IsHit || judgement.HitObject.HitWindows?.WindowFor(HitResult.Miss) == 0) && judgement.Type != HitResult.Miss)
-            {
+            if (!judgement.IsHit || judgement.HitObject.HitWindows == null)
                 return;
-            }
 
-            if (!judgement.Type.IsScorable() || judgement.Type.IsBonus())
-            {
+            var hitResult = judgement.Type;
+
+            if (!hitResult.IsBasic())
                 return;
-            }
 
-            var originalColumn = (IHasColumn)judgement.HitObject;
+            bool shouldSkip = hitResult.GetIndexForOrderedDisplay() < Judgement.Value.GetIndexForOrderedDisplay();
 
-            if (checkHitResult(judgement.Type))
+            if (shouldSkip || Test.Value)
             {
-                checkColumn(judgement, originalColumn);
-            }
-            else // Higher than or equal to the selected judge.
-            {
-            }
-
-            if (Test.Value)
-            {
+                var originalColumn = (IHasColumn)judgement.HitObject;
                 checkColumn(judgement, originalColumn);
             }
         }
@@ -613,18 +604,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                     displayFastText.FadeOut(0);
                 }
             }
-        }
-
-        private bool checkHitResult(HitResult result)
-        {
-            int byHit = (int)result - 1;
-
-            if (byHit <= (int)Judgement.Value)
-            {
-                return true; // true for display judge.
-            }
-
-            return false;
         }
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.LN_SWITCH), nameof(FastSlowDisplayStrings.LN_SWITCH_DESCRIPTION))]

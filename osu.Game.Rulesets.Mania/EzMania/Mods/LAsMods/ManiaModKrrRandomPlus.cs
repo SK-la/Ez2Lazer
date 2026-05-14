@@ -268,7 +268,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     if (region.Mode == RandomizationMode.None) continue;
 
                     // 基于主种子和区域特征生成确定性子种子，确保可复现性
-                    var regionSeed = HashCode.Combine(seed, region.StartCol, region.EndCol, (int)region.Mode);
+                    int regionSeed = HashCode.Combine(seed, region.StartCol, region.EndCol, (int)region.Mode);
                     var regionRng = new Random(regionSeed);
 
                     switch (region.Mode)
@@ -298,8 +298,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                             break;
                     }
                 }
-
-
             }
             catch
             {
@@ -438,6 +436,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
             // 使用 Fisher-Yates 洗牌算法确保可复现性
             var shuffledCols = new List<int>(activeCols);
+
             for (int i = shuffledCols.Count - 1; i > 0; i--)
             {
                 int j = rng.Next(0, i + 1);
@@ -481,7 +480,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         /// <summary>
         /// S-Random 模式：滑动窗口行内随机（带跨窗口避连）
         /// </summary>
-        private void applySRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes, double window_interval = 80, double threshold = 60)
+        private void applySRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes, double windowInterval = 80, double threshold = 60)
         {
             var activeCols = region.GetActiveColumnList().ToList();
             if (activeCols.Count <= 1) return;
@@ -507,10 +506,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             {
                 if (note is HoldNote holdNote)
                 {
-                    int startWindow = (int)Math.Floor(holdNote.StartTime / window_interval);
-                    int endWindow = (int)Math.Floor(holdNote.EndTime / window_interval);
+                    int startWindow = (int)Math.Floor(holdNote.StartTime / windowInterval);
+                    int endWindow = (int)Math.Floor(holdNote.EndTime / windowInterval);
 
-                    if (Math.Abs(holdNote.EndTime - endWindow * window_interval) < 0.001)
+                    if (Math.Abs(holdNote.EndTime - endWindow * windowInterval) < 0.001)
                         endWindow += 1;
 
                     holdNoteWindows.Add((startWindow, endWindow));
@@ -521,7 +520,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
             foreach (var note in allNotes)
             {
-                int windowIndex = (int)Math.Floor(note.StartTime / window_interval);
+                int windowIndex = (int)Math.Floor(note.StartTime / windowInterval);
                 if (!windowGroups.ContainsKey(windowIndex))
                     windowGroups[windowIndex] = new List<ManiaHitObject>();
                 windowGroups[windowIndex].Add(note);
@@ -636,7 +635,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             if (activeCols.Count <= 1) return;
 
             int count = activeCols.Count;
-            int R = rng.Next(0, count); // 初始相位偏移
+            int r = rng.Next(0, count); // 初始相位偏移
             int k = rng.Next(0, 2) == 0 ? 1 : -1; // 随机方向：1为右旋，-1为左旋
             int i = 0; // 分区计数器
 
@@ -650,6 +649,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
             // 预构建轨道索引映射表，将 IndexOf 从 O(k) 降为 O(1)
             var colToIndexMap = new Dictionary<int, int>();
+
             for (int idx = 0; idx < count; idx++)
             {
                 colToIndexMap[activeCols[idx]] = idx;
@@ -659,7 +659,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             var groups = new List<List<ManiaHitObject>>();
             var currentGroup = new List<ManiaHitObject>();
             double? lastEndTime = null; // 记录上一组中 LN 的最晚结束时间
-            ManiaHitObject lastNoteInGroup = null;
+            ManiaHitObject? lastNoteInGroup = null;
 
             foreach (var note in allNotes)
             {
@@ -671,24 +671,27 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 }
                 else
                 {
-                    double timeDiff = note.StartTime - lastNoteInGroup.StartTime;
+                    if (lastNoteInGroup != null)
+                    {
+                        double timeDiff = note.StartTime - lastNoteInGroup.StartTime;
 
-                    // 约束1：如果离上一行太近（<60ms），强制合并
-                    if (timeDiff < 60)
-                    {
-                        startNewGroup = false;
-                    }
-                    // 约束2：如果超过了基础窗口（100ms），且没有 LN 约束，则新开一组
-                    else if (timeDiff >= 100)
-                    {
-                        // 检查是否受 LN 约束（LN 结束后 40ms 内）
-                        if (lastEndTime.HasValue && note.StartTime <= lastEndTime.Value + 40)
+                        // 约束1：如果离上一行太近（<60ms），强制合并
+                        if (timeDiff < 60)
                         {
                             startNewGroup = false;
                         }
-                        else
+                        // 约束2：如果超过了基础窗口（100ms），且没有 LN 约束，则新开一组
+                        else if (timeDiff >= 100)
                         {
-                            startNewGroup = true;
+                            // 检查是否受 LN 约束（LN 结束后 40ms 内）
+                            if (lastEndTime.HasValue && note.StartTime <= lastEndTime.Value + 40)
+                            {
+                                startNewGroup = false;
+                            }
+                            else
+                            {
+                                startNewGroup = true;
+                            }
                         }
                     }
                 }
@@ -698,7 +701,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     groups.Add(currentGroup);
                     currentGroup = new List<ManiaHitObject>();
                     lastEndTime = null;
-                    lastNoteInGroup = null;
                 }
 
                 currentGroup.Add(note);
@@ -721,7 +723,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             foreach (var group in groups)
             {
                 // 计算当前分区的总偏移量
-                int totalShift = (R + i * k) % count;
+                int totalShift = (r + i * k) % count;
                 if (totalShift < 0) totalShift += count; // 处理负数取模
 
                 foreach (var note in group)
