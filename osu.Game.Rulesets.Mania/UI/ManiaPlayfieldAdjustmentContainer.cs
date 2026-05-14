@@ -72,7 +72,17 @@ namespace osu.Game.Rulesets.Mania.UI
             float angle = (float)maniaPseudo3DRotation.Value;
             float t = angle / 75f;
 
-            if (perspectiveContainer != null) perspectiveContainer.VerticalPerspective = t;
+            if (perspectiveContainer == null) return;
+
+            if (t <= 0)
+            {
+                perspectiveContainer.VerticalPerspective = 0;
+                return;
+            }
+
+            perspectiveContainer.VerticalPerspective = t;
+            perspectiveContainer.PerspectiveScale = new Vector2(1.0f - t * 0.9f, 1.0f - t * 0.8f);
+            perspectiveContainer.PerspectiveVerticalOffset = 0.0f;
         }
 
         protected override void Update()
