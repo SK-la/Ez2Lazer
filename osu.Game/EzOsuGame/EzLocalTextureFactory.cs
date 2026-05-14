@@ -176,14 +176,9 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         public Texture? GetNoteTexture(string path)
         {
-            Texture? texture = resource.Get($@"{path.Length}/000") ?? resource.Get($@"{path.Length}/0");
+            Texture? texture = resource.Get($@"{path}/000") ?? resource.Get($@"{path}/0");
 
             return texture;
-        }
-
-        private float getTextureRatio(Texture? texture)
-        {
-            return texture?.Height / (texture?.Width ?? 1f) ?? 1.0f;
         }
 
         public float GetRatio(bool forceRecalculate = false)
@@ -195,8 +190,23 @@ namespace osu.Game.EzOsuGame
             {
                 string notePath = GetNotePath("whitenote");
                 Texture? note = GetNoteTexture(notePath);
-                float calculatedRatio = getTextureRatio(note);
-                ratio = calculatedRatio >= square_ratio_threshold ? 1.0f : calculatedRatio;
+                float calculatedRatio = 1;
+
+                if (note != null)
+                {
+                    float noteHeight = note.Height;
+                    float noteWidth = note.Width;
+                    calculatedRatio = noteHeight / noteWidth;
+
+                    // Logger.Log($"{noteSet} ratio: {calculatedRatio}");
+                }
+
+                ratio = calculatedRatio;
+
+                // if (noteHeightScaleToWidth.IsDefault)
+                //     ratio = calculatedRatio;
+                // else
+                //     ratio = calculatedRatio >= square_ratio_threshold ? 1.0f : calculatedRatio;
 
                 // 更新缓存
                 note_ratio_cache.AddOrUpdate(noteSet, ratio, (_, _) => ratio);
