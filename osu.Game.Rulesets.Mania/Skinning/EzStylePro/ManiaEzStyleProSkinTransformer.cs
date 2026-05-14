@@ -21,9 +21,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     {
         private readonly Ez2ConfigManager ezSkinConfig;
         private readonly ManiaBeatmap beatmap;
-        private readonly float columnWidth;
-        private readonly float specialFactor;
-        private readonly float hitPosition;
+        private readonly IBindable<double> columnWidthBindable;
+        private readonly IBindable<double> specialFactorBindable;
+        private readonly IBindable<double> hitPosition;
 
         public ManiaEzStyleProSkinTransformer(ISkin skin, IBeatmap beatmap)
             : base(skin)
@@ -32,9 +32,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             ezSkinConfig = GlobalConfigStore.EzConfig;
 
-            columnWidth = (float)ezSkinConfig.Get<double>(Ez2Setting.ColumnWidth);
-            specialFactor = (float)ezSkinConfig.Get<double>(Ez2Setting.SpecialFactor);
-            hitPosition = (float)ezSkinConfig.Get<double>(Ez2Setting.HitPosition);
+            columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
+            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
@@ -113,14 +113,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                 {
                                     keyCounter.Anchor = Anchor.BottomCentre;
                                     keyCounter.Origin = Anchor.TopCentre;
-                                    keyCounter.Position = new Vector2(0, -hitPosition - stage_padding_bottom);
+                                    keyCounter.Position = new Vector2(0, -(float)hitPosition.Value - stage_padding_bottom);
                                 }
 
                                 if (columnHitErrorMeter != null)
                                 {
                                     columnHitErrorMeter.Anchor = Anchor.BottomCentre;
                                     columnHitErrorMeter.Origin = Anchor.Centre;
-                                    columnHitErrorMeter.Position = new Vector2(0, -hitPosition - stage_padding_bottom);
+                                    columnHitErrorMeter.Position = new Vector2(0, -(float)hitPosition.Value - stage_padding_bottom);
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
@@ -228,6 +228,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         #region GetConfig
 
+        private float columnWidth;
+
         public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
         {
             if (lookup is ManiaSkinConfigurationLookup maniaLookup)
@@ -235,15 +237,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
                 bool isSpecialColumn = ezSkinConfig.IsSpecialColumnFast(stage.Columns, columnIndex);
-                float width = columnWidth * (isSpecialColumn ? specialFactor : 1f);
+                columnWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
+                // float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
 
                 if (stage.Columns == 14 && columnIndex == 13)
-                    width = 0f;
+                    columnWidth = 0f;
 
                 switch (maniaLookup.Lookup)
                 {
                     case LegacyManiaSkinConfigurationLookups.ColumnWidth:
-                        return SkinUtils.As<TValue>(new Bindable<float>(width));
+                        return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
 
                     // case LegacyManiaSkinConfigurationLookups.HitPosition:
                     //     return SkinUtils.As<TValue>(new Bindable<float>(hitPositionValue));
