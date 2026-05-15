@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.BMS.Audio
     /// </summary>
     public class BmsKeysoundManager
     {
-        private const string BMS_LOG_PREFIX = "[BMS]";
+        private const string bms_log_prefix = "[BMS]";
         private const int max_background_triggers_per_update = 32;
         private const double stale_background_event_threshold = 250;
 
@@ -41,8 +41,7 @@ namespace osu.Game.Rulesets.BMS.Audio
         private double lastBackgroundUpdateTime = double.MinValue;
         private bool loggedMissingBackgroundEvents;
         private bool loggedFirstBackgroundUpdate;
-        private bool isDisposed;
-        public bool IsDisposed => isDisposed;
+        public bool IsDisposed { get; private set; }
 
         public BmsKeysoundManager(AudioManager audioManager, string bmsFolder)
         {
@@ -54,8 +53,8 @@ namespace osu.Game.Rulesets.BMS.Audio
             var resourceStore = new StorageBackedResourceStore(storage);
             sampleStore = audioManager.GetSampleStore(resourceStore);
 
-            Logger.Log($"{BMS_LOG_PREFIX} Keysound manager created - AudioManager: {audioManager != null}, Folder: {bmsFolder}", LoggingTarget.Runtime, LogLevel.Important);
-            Logger.Log($"{BMS_LOG_PREFIX} Created SampleStore for BMS folder: {sampleStore != null}", LoggingTarget.Runtime, LogLevel.Important);
+            Logger.Log($"{bms_log_prefix} Keysound manager created - AudioManager: {true}, Folder: {bmsFolder}", LoggingTarget.Runtime, LogLevel.Important);
+            Logger.Log($"{bms_log_prefix} Created SampleStore for BMS folder: {sampleStore != null}", LoggingTarget.Runtime, LogLevel.Important);
         }
 
         /// <summary>
@@ -63,7 +62,7 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public void PreloadKeysounds(IEnumerable<HitObject> hitObjects)
         {
-            if (isDisposed)
+            if (IsDisposed)
                 return;
 
             var keysoundFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -86,7 +85,7 @@ namespace osu.Game.Rulesets.BMS.Audio
                 }
             }
 
-            Logger.Log($"{BMS_LOG_PREFIX} Preloading {keysoundFiles.Count} keysounds", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log($"{bms_log_prefix} Preloading {keysoundFiles.Count} keysounds", LoggingTarget.Runtime, LogLevel.Debug);
 
             foreach (string filename in keysoundFiles)
             {
@@ -96,14 +95,14 @@ namespace osu.Game.Rulesets.BMS.Audio
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log($"{BMS_LOG_PREFIX} Failed to preload keysound {filename}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
+                    Logger.Log($"{bms_log_prefix} Failed to preload keysound {filename}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
                 }
             }
         }
 
         public void SetBackgroundSoundEvents(IReadOnlyList<BmsBackgroundSoundEvent> events)
         {
-            if (isDisposed)
+            if (IsDisposed)
                 return;
 
             backgroundEvents = events
@@ -114,7 +113,7 @@ namespace osu.Game.Rulesets.BMS.Audio
             loggedMissingBackgroundEvents = false;
             loggedFirstBackgroundUpdate = false;
 
-            Logger.Log($"{BMS_LOG_PREFIX} Background sound events set: {backgroundEvents.Count}", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log($"{bms_log_prefix} Background sound events set: {backgroundEvents.Count}", LoggingTarget.Runtime, LogLevel.Debug);
         }
 
         /// <summary>
@@ -122,7 +121,7 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public ISample? LoadKeysound(string filename)
         {
-            if (isDisposed)
+            if (IsDisposed)
                 return null;
 
             if (string.IsNullOrEmpty(filename))
@@ -186,20 +185,20 @@ namespace osu.Game.Rulesets.BMS.Audio
                 // Log first few successful loads with more detail
                 if (keysoundCache.Count <= 5)
                 {
-                    Logger.Log($"{BMS_LOG_PREFIX} ✓ Loaded #{keysoundCache.Count}: {filename} -> {foundFilename}", LoggingTarget.Runtime, LogLevel.Important);
-                    Logger.Log($"{BMS_LOG_PREFIX}    Sample info: {sample != null}, Has volume: {sample?.Volume != null}, Volume value: {sample?.Volume?.Value ?? -1:F2}", LoggingTarget.Runtime,
+                    Logger.Log($"{bms_log_prefix} ✓ Loaded #{keysoundCache.Count}: {filename} -> {foundFilename}", LoggingTarget.Runtime, LogLevel.Important);
+                    Logger.Log($"{bms_log_prefix}    Sample info: {sample != null}, Has volume: {sample?.Volume != null}, Volume value: {sample?.Volume?.Value ?? -1:F2}", LoggingTarget.Runtime,
                         LogLevel.Important);
                 }
                 else if (keysoundCache.Count == 10)
                 {
-                    Logger.Log($"{BMS_LOG_PREFIX} ✓ Loaded 10 samples, suppressing further load logs...", LoggingTarget.Runtime, LogLevel.Debug);
+                    Logger.Log($"{bms_log_prefix} ✓ Loaded 10 samples, suppressing further load logs...", LoggingTarget.Runtime, LogLevel.Debug);
                 }
 
                 return sample;
             }
             catch (Exception ex)
             {
-                Logger.Log($"{BMS_LOG_PREFIX} ❌ Load exception: {filename}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"{bms_log_prefix} ❌ Load exception: {filename}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
                 return null;
             }
         }
@@ -209,7 +208,7 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public void TriggerKeysound(string filename)
         {
-            if (isDisposed)
+            if (IsDisposed)
                 return;
 
             if (string.IsNullOrEmpty(filename))
@@ -229,7 +228,7 @@ namespace osu.Game.Rulesets.BMS.Audio
                     // Log detailed playback info for first few triggers
                     if (nextBackgroundIndex < 5 || gameplayTime < 10000)
                     {
-                        Logger.Log($"{BMS_LOG_PREFIX} ▶ Playing: {filename} at {gameplayTime:F0}ms - Channel: {channel != null}, Volume: {sample.Volume?.Value ?? -1}", LoggingTarget.Runtime,
+                        Logger.Log($"{bms_log_prefix} ▶ Playing: {filename} at {gameplayTime:F0}ms - Channel: {channel != null}, Volume: {sample.Volume?.Value ?? -1}", LoggingTarget.Runtime,
                             LogLevel.Important);
                     }
                 }
@@ -240,7 +239,7 @@ namespace osu.Game.Rulesets.BMS.Audio
             }
             else
             {
-                Logger.Log($"{BMS_LOG_PREFIX} ⚠ Keysound not loaded: {filename}", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"{bms_log_prefix} ⚠ Keysound not loaded: {filename}", LoggingTarget.Runtime, LogLevel.Debug);
             }
         }
 
@@ -249,7 +248,7 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public void Update(double currentGameplayTime)
         {
-            if (isDisposed)
+            if (IsDisposed)
                 return;
 
             gameplayTime = currentGameplayTime;
@@ -259,7 +258,7 @@ namespace osu.Game.Rulesets.BMS.Audio
                 // Only log this once
                 if (!loggedMissingBackgroundEvents)
                 {
-                    Logger.Log($"{BMS_LOG_PREFIX} Update called but no background events loaded", LoggingTarget.Runtime, LogLevel.Debug);
+                    Logger.Log($"{bms_log_prefix} Update called but no background events loaded", LoggingTarget.Runtime, LogLevel.Debug);
                     loggedMissingBackgroundEvents = true;
                 }
 
@@ -269,7 +268,7 @@ namespace osu.Game.Rulesets.BMS.Audio
             // Log first update with background events
             if (!loggedFirstBackgroundUpdate)
             {
-                Logger.Log($"{BMS_LOG_PREFIX} First Update with {backgroundEvents.Count} background events, currentTime={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"{bms_log_prefix} First Update with {backgroundEvents.Count} background events, currentTime={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
                 loggedFirstBackgroundUpdate = true;
             }
 
@@ -307,11 +306,11 @@ namespace osu.Game.Rulesets.BMS.Audio
             }
 
             if (eventsTriggered > 0)
-                Logger.Log($"{BMS_LOG_PREFIX} Triggered {eventsTriggered} background sound events at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"{bms_log_prefix} Triggered {eventsTriggered} background sound events at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
             if (discardedEvents > 0)
-                Logger.Log($"{BMS_LOG_PREFIX} Discarded {discardedEvents} stale background events at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"{bms_log_prefix} Discarded {discardedEvents} stale background events at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
             if (eventsTriggered >= max_background_triggers_per_update && nextBackgroundIndex < backgroundEvents.Count)
-                Logger.Log($"{BMS_LOG_PREFIX} Background trigger cap reached ({max_background_triggers_per_update}) at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"{bms_log_prefix} Background trigger cap reached ({max_background_triggers_per_update}) at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
 
             lastBackgroundUpdateTime = currentGameplayTime;
         }
@@ -322,7 +321,7 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public void SetOffset(double offsetMs)
         {
-            if (isDisposed)
+            if (IsDisposed)
                 return;
 
             currentOffset = offsetMs;
@@ -330,7 +329,7 @@ namespace osu.Game.Rulesets.BMS.Audio
 
         public void SetVolume(double volume)
         {
-            if (isDisposed)
+            if (IsDisposed)
                 return;
 
             sampleVolume = Math.Clamp(volume, 0, 1);
@@ -341,10 +340,10 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public void Dispose()
         {
-            if (isDisposed)
+            if (IsDisposed)
                 return;
 
-            isDisposed = true;
+            IsDisposed = true;
 
             foreach (var sample in keysoundCache.Values)
             {

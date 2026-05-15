@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// <summary>
         /// Encode an external folder path into the canonical BMS external set hash.
         /// </summary>
-        public static string Encode(string folderPath)
+        public static string Encode(string? folderPath)
         {
             string encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(folderPath ?? string.Empty));
             return HASH_PREFIX + encoded;
@@ -86,8 +86,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             if (string.IsNullOrEmpty(chartFilename))
             {
-                chartFilename = setFilenames.FirstOrDefault(name => name != null
-                                                                    && chart_extensions.Any(ext => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
+                chartFilename = setFilenames.FirstOrDefault(name => chart_extensions.Any(ext => name.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
             }
 
             if (string.IsNullOrEmpty(chartFilename))

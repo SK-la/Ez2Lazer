@@ -82,7 +82,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         {
             this.storageDirectory = storageDirectory;
             Directory.CreateDirectory(storageDirectory);
-            indexRepository = new BmsLibraryIndexRepository(Path.Combine(storageDirectory, BmsStoragePaths.IndexDatabaseFile));
+            indexRepository = new BmsLibraryIndexRepository(Path.Combine(storageDirectory, BmsStoragePaths.INDEX_DATABASE_FILE));
         }
 
         public void LoadCache()

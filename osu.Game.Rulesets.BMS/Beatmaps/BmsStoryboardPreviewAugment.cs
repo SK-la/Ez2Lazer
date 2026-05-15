@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     /// </summary>
     public static class BmsStoryboardPreviewAugment
     {
-        public const string SampleLayerName = "BMSBackgroundSamples";
+        public const string SAMPLE_LAYER_NAME = "BMSBackgroundSamples";
 
         /// <summary>
         /// Re-decode a BMS chart file from disk and augment <paramref name="storyboard"/> with its BGM events.
@@ -42,7 +42,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// </summary>
         public static void Augment(Storyboard storyboard, IEnumerable<BmsBackgroundSoundEvent> backgroundSoundEvents)
         {
-            var sampleLayer = storyboard.GetLayer(SampleLayerName);
+            var sampleLayer = storyboard.GetLayer(SAMPLE_LAYER_NAME);
 
             foreach (var e in backgroundSoundEvents)
             {

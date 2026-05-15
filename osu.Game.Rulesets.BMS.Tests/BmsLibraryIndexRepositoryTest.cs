@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.BMS.Tests
 
             try
             {
-                string dbPath = Path.Combine(tempDir, BmsStoragePaths.IndexDatabaseFile);
+                string dbPath = Path.Combine(tempDir, BmsStoragePaths.INDEX_DATABASE_FILE);
                 var repository = new BmsLibraryIndexRepository(dbPath);
 
                 var chart = new BMSChartCache
@@ -75,7 +75,7 @@ namespace osu.Game.Rulesets.BMS.Tests
 
             try
             {
-                string dbPath = Path.Combine(tempDir, BmsStoragePaths.IndexDatabaseFile);
+                string dbPath = Path.Combine(tempDir, BmsStoragePaths.INDEX_DATABASE_FILE);
                 var repository = new BmsLibraryIndexRepository(dbPath);
 
                 var cache = new BMSLibraryCache

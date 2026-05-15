@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.BMS.Tests
             try
             {
                 var manager = new BMSBeatmapManager(tempDir);
-                var index = new BmsLibraryIndexRepository(Path.Combine(tempDir, BmsStoragePaths.IndexDatabaseFile));
+                var index = new BmsLibraryIndexRepository(Path.Combine(tempDir, BmsStoragePaths.INDEX_DATABASE_FILE));
                 index.ImportFromLibraryCache(new BMSLibraryCache
                 {
                     Songs =

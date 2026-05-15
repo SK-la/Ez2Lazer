@@ -33,22 +33,21 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private static readonly object load_log_gate = new object();
         private static int loadLogCount;
 
-        private readonly ISkin inner;
         private readonly string bmsFolder;
         private readonly Func<AudioManager?> audioProvider;
         private readonly Dictionary<string, ISample?> resolvedSamples = new Dictionary<string, ISample?>(StringComparer.OrdinalIgnoreCase);
         private ISampleStore? folderSampleStore;
         private bool storeInitialised;
 
-        public BMSExternalSampleSkin(ISkin inner, string bmsFolder, Func<AudioManager?> audioProvider)
+        public BMSExternalSampleSkin(ISkin inner, string? bmsFolder, Func<AudioManager?> audioProvider)
         {
-            this.inner = inner ?? throw new ArgumentNullException(nameof(inner));
+            Inner = inner ?? throw new ArgumentNullException(nameof(inner));
             this.bmsFolder = bmsFolder ?? string.Empty;
             this.audioProvider = audioProvider ?? throw new ArgumentNullException(nameof(audioProvider));
         }
 
         /// <summary>Routed legacy / Mania skin without folder fallback.</summary>
-        public ISkin Inner => inner;
+        public ISkin Inner { get; }
 
         private ISampleStore? ensureStore()
         {
@@ -77,18 +76,17 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return folderSampleStore;
         }
 
-        public Drawable? GetDrawableComponent(ISkinComponentLookup lookup) => inner.GetDrawableComponent(lookup);
+        public Drawable? GetDrawableComponent(ISkinComponentLookup lookup) => Inner.GetDrawableComponent(lookup);
 
-        public Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => inner.GetTexture(componentName, wrapModeS, wrapModeT);
+        public Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => Inner.GetTexture(componentName, wrapModeS, wrapModeT);
 
         public IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
             where TLookup : notnull
-            where TValue : notnull
-            => inner.GetConfig<TLookup, TValue>(lookup);
+            where TValue : notnull => Inner.GetConfig<TLookup, TValue>(lookup);
 
         public ISample? GetSample(ISampleInfo sampleInfo)
         {
-            var fromInner = inner.GetSample(sampleInfo);
+            var fromInner = Inner.GetSample(sampleInfo);
 
             if (fromInner != null)
                 return fromInner;

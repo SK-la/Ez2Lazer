@@ -262,7 +262,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
         }
 
-        internal static readonly JsonSerializerOptions json_options = new JsonSerializerOptions
+        internal static readonly JsonSerializerOptions JSON_OPTIONS = new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -279,7 +279,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             try
             {
                 string json = File.ReadAllText(filePath);
-                return JsonSerializer.Deserialize<BMSLibraryCache>(json, json_options);
+                return JsonSerializer.Deserialize<BMSLibraryCache>(json, JSON_OPTIONS);
             }
             catch
             {

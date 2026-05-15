@@ -106,7 +106,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return maniaBeatmap;
         }
 
-        protected override IBeatmap GetBeatmap() => maniaBeatmap;
+        protected override IBeatmap GetBeatmap()
+        {
+            lock (playableMutationLock)
+            {
+                return maniaBeatmap;
+            }
+        }
 
         public override IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
         {

@@ -13,18 +13,18 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     /// </summary>
     public static class BmsStoragePaths
     {
-        public const string StorageRoot = "EzBMS";
-        public const string IndexDatabaseFile = "index.sqlite";
-        public const string LampDatabaseFile = "lamps.sqlite";
+        public const string STORAGE_ROOT = "EzBMS";
+        public const string INDEX_DATABASE_FILE = "index.sqlite";
+        public const string LAMP_DATABASE_FILE = "lamps.sqlite";
 
-        public static string GetStorageRootPath(Storage storage) => storage.GetFullPath(StorageRoot);
+        public static string GetStorageRootPath(Storage storage) => storage.GetFullPath(STORAGE_ROOT);
 
-        public static string GetIndexDatabasePath(Storage storage) => Path.Combine(GetStorageRootPath(storage), IndexDatabaseFile);
+        public static string GetIndexDatabasePath(Storage storage) => Path.Combine(GetStorageRootPath(storage), INDEX_DATABASE_FILE);
 
-        public static string GetLampDatabasePath(Storage storage) => Path.Combine(GetStorageRootPath(storage), LampDatabaseFile);
+        public static string GetLampDatabasePath(Storage storage) => Path.Combine(GetStorageRootPath(storage), LAMP_DATABASE_FILE);
 
         /// <summary>
-        /// Ensures <see cref="StorageRoot"/> exists and migrates legacy <c>bms_cache</c> / <c>bms</c> data when needed.
+        /// Ensures <see cref="STORAGE_ROOT"/> exists and migrates legacy <c>bms_cache</c> / <c>bms</c> data when needed.
         /// </summary>
         public static string EnsureInitialized(Storage storage)
         {
@@ -44,7 +44,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public static void MigrateIfNeeded(Storage storage, string ezbmsRoot)
         {
-            string indexPath = Path.Combine(ezbmsRoot, BmsStoragePaths.IndexDatabaseFile);
+            string indexPath = Path.Combine(ezbmsRoot, BmsStoragePaths.INDEX_DATABASE_FILE);
             bool indexExists = File.Exists(indexPath);
 
             if (!indexExists)
@@ -77,14 +77,14 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         private static void migrateLampDatabase(Storage storage, string ezbmsRoot)
         {
-            string target = Path.Combine(ezbmsRoot, BmsStoragePaths.LampDatabaseFile);
+            string target = Path.Combine(ezbmsRoot, BmsStoragePaths.LAMP_DATABASE_FILE);
 
             if (File.Exists(target))
                 return;
 
-            foreach (string legacyDir in new[] { legacy_cache_directory, legacy_bms_directory, BmsStoragePaths.StorageRoot })
+            foreach (string legacyDir in new[] { legacy_cache_directory, legacy_bms_directory, BmsStoragePaths.STORAGE_ROOT })
             {
-                string candidate = Path.Combine(storage.GetFullPath(legacyDir), BmsStoragePaths.LampDatabaseFile);
+                string candidate = Path.Combine(storage.GetFullPath(legacyDir), BmsStoragePaths.LAMP_DATABASE_FILE);
 
                 if (!File.Exists(candidate) || string.Equals(Path.GetFullPath(candidate), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
                     continue;

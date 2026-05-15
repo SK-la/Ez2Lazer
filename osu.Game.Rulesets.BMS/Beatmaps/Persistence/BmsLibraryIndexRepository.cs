@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
@@ -40,6 +42,10 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
             }
         }
 
+        /// <summary>
+        /// Represents a snapshot of a chart file for change detection.
+        /// ChartPath is included for data integrity even though the dictionary key already contains the path.
+        /// </summary>
         public record ChartFileSnapshot(string ChartPath, long FileSize, long LastModifiedTicks);
 
         public Dictionary<string, ChartFileSnapshot> GetChartSnapshots()
@@ -477,7 +483,7 @@ ON CONFLICT(chart_path) DO UPDATE SET
 
         private static Guid createDeterministicGuid(string input)
         {
-            byte[] bytes = System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(input));
+            byte[] bytes = MD5.HashData(Encoding.UTF8.GetBytes(input));
             return new Guid(bytes);
         }
 
