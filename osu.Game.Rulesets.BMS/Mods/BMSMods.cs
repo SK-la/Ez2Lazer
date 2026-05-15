@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Localisation;
+using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BMS.Objects;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -48,13 +49,13 @@ namespace osu.Game.Rulesets.BMS.Mods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            Seed.Value ??= osu.Framework.Utils.RNG.Next();
+            Seed.Value ??= RNG.Next();
 
             var rng = new Random((int)Seed.Value);
 
             foreach (int[] group in BMSStageModHelper.GetRegularLaneGroups(beatmap))
             {
-                var shuffledColumns = group.OrderBy(_ => rng.Next()).ToArray();
+                int[] shuffledColumns = group.OrderBy(_ => rng.Next()).ToArray();
 
                 foreach (var hitObject in beatmap.HitObjects)
                     randomiseColumn(hitObject, group, shuffledColumns);
@@ -118,8 +119,7 @@ namespace osu.Game.Rulesets.BMS.Mods
         public override ModType Type => ModType.Conversion;
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description =>
-            "Places the scratch lane on the right (7K + 1S). Key order is unchanged; only the scratch column moves.";
+        public override LocalisableString Description => "Places the scratch lane on the right (7K + 1S). Key order is unchanged; only the scratch column moves.";
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
@@ -231,25 +231,22 @@ namespace osu.Game.Rulesets.BMS.Mods
             return m;
         }
 
-        private static bool isScratchObject(HitObject hitObject) =>
-            hitObject switch
-            {
-                BMSHitObject b => b.IsScratch,
-                BmsManiaNote n => n.IsScratch,
-                BmsManiaHoldNote h => h.IsScratch,
-                _ => false,
-            };
+        private static bool isScratchObject(HitObject hitObject) => hitObject switch
+        {
+            BMSHitObject b => b.IsScratch,
+            BmsManiaNote n => n.IsScratch,
+            BmsManiaHoldNote h => h.IsScratch,
+            _ => false,
+        };
 
-        public static bool HasColumn(HitObject hitObject) =>
-            hitObject is ManiaHitObject or BMSHitObject;
+        public static bool HasColumn(HitObject hitObject) => hitObject is ManiaHitObject or BMSHitObject;
 
-        public static int GetColumn(HitObject hitObject) =>
-            hitObject switch
-            {
-                ManiaHitObject m => m.Column,
-                BMSHitObject b => b.Column,
-                _ => 0,
-            };
+        public static int GetColumn(HitObject hitObject) => hitObject switch
+        {
+            ManiaHitObject m => m.Column,
+            BMSHitObject b => b.Column,
+            _ => 0,
+        };
 
         public static void SetColumn(HitObject hitObject, int column)
         {

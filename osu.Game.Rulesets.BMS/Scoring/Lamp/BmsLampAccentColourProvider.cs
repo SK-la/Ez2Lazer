@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.BMS.Scoring.Lamp
             this.lampStore = lampStore;
         }
 
-        public Color4? GetAccentColourFor(BeatmapInfo beatmap)
+        public Color4? GetAccentColourFor(BeatmapInfo? beatmap)
         {
             if (beatmap?.Ruleset == null)
                 return null;

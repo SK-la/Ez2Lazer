@@ -8,7 +8,6 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
-using osu.Framework.Logging;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
 {
@@ -157,6 +156,7 @@ LIMIT 1;";
                 using (var delete = connection.CreateCommand())
                 {
                     delete.Transaction = transaction;
+                    // Intentionally clear all roots before replacing with new list
                     delete.CommandText = $"DELETE FROM {table_roots};";
                     delete.ExecuteNonQuery();
                 }
@@ -529,9 +529,6 @@ WHERE folder_path NOT IN (SELECT DISTINCT folder_path FROM {table_charts});";
 
         private void ensureInitialized()
         {
-            if (initialized)
-                return;
-
             lock (writeLock)
             {
                 if (initialized)

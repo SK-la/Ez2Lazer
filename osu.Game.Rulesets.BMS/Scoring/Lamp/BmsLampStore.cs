@@ -31,21 +31,20 @@ namespace osu.Game.Rulesets.BMS.Scoring.Lamp
     /// </remarks>
     public class BmsLampStore
     {
-        private readonly IBmsLampScheme scheme;
         private readonly ConcurrentDictionary<Guid, BmsLampRecord> bestByBeatmap = new ConcurrentDictionary<Guid, BmsLampRecord>();
 
         private IBmsLampRepository? repository;
 
         public BmsLampStore(IBmsLampScheme scheme)
         {
-            this.scheme = scheme;
+            Scheme = scheme;
         }
 
         /// <summary>
         /// The lamp scheme currently in use. UI components that want lamp colours
         /// should route through this property rather than holding their own reference.
         /// </summary>
-        public IBmsLampScheme Scheme => scheme;
+        public IBmsLampScheme Scheme { get; }
 
         /// <summary>
         /// Wire up a persistence backend. Loads every persisted record into the
@@ -101,7 +100,7 @@ namespace osu.Game.Rulesets.BMS.Scoring.Lamp
         /// </summary>
         public BmsClearLamp ReportPlay(BeatmapInfo beatmap, BmsLampContext context)
         {
-            var lamp = scheme.ResolveLamp(context);
+            var lamp = Scheme.ResolveLamp(context);
 
             if (beatmap == null)
                 return lamp;

@@ -511,7 +511,7 @@ namespace osu.Game.Rulesets.BMS
             IBeatmap? sourceBeatmap = source.Beatmap;
 
             if (sourceBeatmap is BMSBeatmap || (sourceBeatmap?.HitObjects.OfType<BMSHitObject>().Any() ?? false))
-                return sourceBeatmap!;
+                return sourceBeatmap;
 
             if (source.BeatmapInfo is BeatmapInfo realmBeatmap
                 && BMSExternalPath.TryResolveExternalChartPath(

@@ -73,7 +73,7 @@ namespace osu.Game.Rulesets.BMS.Configuration
 
             foreach (string path in paths)
             {
-                string trimmed = path?.Trim() ?? string.Empty;
+                string trimmed = path.Trim();
 
                 if (string.IsNullOrEmpty(trimmed) || !seen.Add(trimmed))
                     continue;

@@ -29,10 +29,10 @@ namespace osu.Game.Rulesets.BMS.UI
     /// </summary>
     public partial class BmsPlayer : SoloPlayer
     {
-        private const string BMS_LOG_PREFIX = "[BMS]";
+        private const string bms_log_prefix = "[BMS]";
         private BmsKeysoundManager? keysoundManager;
-        private int updateCount = 0;
-        private int triggerCount = 0;
+        private int updateCount;
+        private int triggerCount;
         private Bindable<double>? bmsKeysoundVolume;
         private bool isDisposed;
 
@@ -109,7 +109,7 @@ namespace osu.Game.Rulesets.BMS.UI
             }
             catch (Exception ex)
             {
-                Logger.Log($"{BMS_LOG_PREFIX} Lamp report failed: {ex.Message}", LoggingTarget.Runtime, LogLevel.Important);
+                Logger.Log($"{bms_log_prefix} Lamp report failed: {ex.Message}", LoggingTarget.Runtime, LogLevel.Important);
             }
 
             return base.PrepareScoreForResultsAsync(score);
@@ -122,7 +122,7 @@ namespace osu.Game.Rulesets.BMS.UI
         /// </summary>
         /// <remarks>
         /// Cleared judgement: since BMS gameplay is force-NoFail (<see cref="CheckModsAllowFailure"/>),
-        /// the canonical osu <c>HasFailed</c> path never fires. We instead approximate beatoraja's NORMAL-gauge
+        /// the canonical osu <c>HasFailed</c> path never fires. We instead approximate beatoraja NORMAL-gauge
         /// rule (game must end with the gauge above the empty mark) by checking
         /// <see cref="HealthProcessor"/>.<c>Health</c> &gt; 0 at score-prep time.
         /// </remarks>
@@ -136,7 +136,7 @@ namespace osu.Game.Rulesets.BMS.UI
                 return;
 
             var stats = score.ScoreInfo.Statistics;
-            int get(HitResult r) => stats != null && stats.TryGetValue(r, out int v) ? v : 0;
+            int get(HitResult r) => stats.GetValueOrDefault(r, 0);
 
             int perfect = get(HitResult.Perfect);
             int great = get(HitResult.Great);
@@ -145,7 +145,7 @@ namespace osu.Game.Rulesets.BMS.UI
             int miss = get(HitResult.Miss);
             int total = perfect + great + good + bad + miss;
 
-            // Beatoraja's "cleared" check is gauge-end >= empty threshold. We approximate that with
+            // Beatoraja "cleared" check is gauge-end >= empty threshold. We approximate that with
             // the live HealthProcessor's final value because BMS gauge accounting isn't wired through
             // osu's HealthProcessor in detail yet — this still correctly distinguishes "kept the gauge
             // alive" from "drained to zero", which is what controls Easy/Normal/Hard/FullCombo branching
@@ -167,7 +167,7 @@ namespace osu.Game.Rulesets.BMS.UI
             var lamp = lampStore.ReportPlay(beatmapInfo, context);
 
             Logger.Log(
-                $"{BMS_LOG_PREFIX} Lamp reported for beatmap {beatmapInfo.ID}: {lamp} " +
+                $"{bms_log_prefix} Lamp reported for beatmap {beatmapInfo.ID}: {lamp} " +
                 $"(cleared={cleared}, pg={perfect}, gr={great}, gd={good}, bd={bad}, miss={miss}, total={total})",
                 LoggingTarget.Runtime, LogLevel.Debug);
         }
@@ -191,12 +191,10 @@ namespace osu.Game.Rulesets.BMS.UI
             }
             else
             {
-                Logger.Log($"{BMS_LOG_PREFIX} Unexpected working beatmap type: {Beatmap.Value?.GetType().Name}", LoggingTarget.Runtime, LogLevel.Error);
+                Logger.Log($"{bms_log_prefix} Unexpected working beatmap type: {Beatmap.Value?.GetType().Name}", LoggingTarget.Runtime, LogLevel.Error);
             }
 
-            var bmsConfig = rulesetConfigCache.GetConfigFor(new BMSRuleset()) as BMSRulesetConfigManager;
-
-            if (bmsConfig != null)
+            if (rulesetConfigCache.GetConfigFor(new BMSRuleset()) is BMSRulesetConfigManager bmsConfig)
             {
                 bmsKeysoundVolume = bmsConfig.GetBindable<double>(BMSRulesetSetting.KeysoundVolume);
                 bmsKeysoundVolume.BindValueChanged(onKeysoundVolumeChanged, true);
@@ -220,7 +218,7 @@ namespace osu.Game.Rulesets.BMS.UI
             if (DrawableRuleset != null)
             {
                 DrawableRuleset.NewResult += onNewResult;
-                Logger.Log($"{BMS_LOG_PREFIX} Subscribed to hit events", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"{bms_log_prefix} Subscribed to hit events", LoggingTarget.Runtime, LogLevel.Debug);
             }
         }
 
@@ -229,10 +227,11 @@ namespace osu.Game.Rulesets.BMS.UI
             base.Update();
 
             var manager = keysoundManager;
+
             if (isDisposed || manager == null || manager.IsDisposed)
             {
                 if (++updateCount == 1)
-                    Logger.Log($"{BMS_LOG_PREFIX} Update: keysoundManager is null", LoggingTarget.Runtime, LogLevel.Error);
+                    Logger.Log($"{bms_log_prefix} Update: keysoundManager is null", LoggingTarget.Runtime, LogLevel.Error);
                 return;
             }
 
@@ -242,7 +241,7 @@ namespace osu.Game.Rulesets.BMS.UI
             if (GameplayClockContainer == null)
             {
                 if (updateCount++ < 3)
-                    Logger.Log($"{BMS_LOG_PREFIX} GameplayClockContainer is null, skip keysound update.", LoggingTarget.Runtime, LogLevel.Debug);
+                    Logger.Log($"{bms_log_prefix} GameplayClockContainer is null, skip keysound update.", LoggingTarget.Runtime, LogLevel.Debug);
                 return;
             }
 
@@ -250,7 +249,7 @@ namespace osu.Game.Rulesets.BMS.UI
 
             // Log first few updates
             if (updateCount++ < 5)
-                Logger.Log($"{BMS_LOG_PREFIX} Update #{updateCount}: chartClock={currentTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"{bms_log_prefix} Update #{updateCount}: chartClock={currentTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
 
             // Only update after the game has started (after intro)
             if (currentTime < 0)
@@ -270,9 +269,6 @@ namespace osu.Game.Rulesets.BMS.UI
             if (!result.IsHit)
                 return;
 
-            if (result.HitObject == null)
-                return;
-
             // Get keysound samples
             IEnumerable<HitSampleInfo> samples = result.HitObject.Samples;
 
@@ -288,7 +284,7 @@ namespace osu.Game.Rulesets.BMS.UI
                 {
                     triggerCount++;
                     if (triggerCount <= 10)
-                        Logger.Log($"{BMS_LOG_PREFIX} Hit trigger #{triggerCount}: {fileSample.Filename} - {result.Type}", LoggingTarget.Runtime, LogLevel.Debug);
+                        Logger.Log($"{bms_log_prefix} Hit trigger #{triggerCount}: {fileSample.Filename} - {result.Type}", LoggingTarget.Runtime, LogLevel.Debug);
                     manager.TriggerKeysound(fileSample.Filename);
                     break;
                 }

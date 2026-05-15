@@ -19,13 +19,7 @@ namespace osu.Game.Rulesets.BMS.Objects
             set => Duration = value - StartTime;
         }
 
-        private double duration;
-
-        public double Duration
-        {
-            get => duration;
-            set => duration = value;
-        }
+        public double Duration { get; set; }
 
         /// <summary>
         /// The head of the hold note.
