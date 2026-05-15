@@ -9,7 +9,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Localisation;
 using osu.Framework.Screens;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -91,18 +93,20 @@ namespace osu.Game.Rulesets.BMS.UI
                                     Margin = new MarginPadding(10),
                                     Children = new Drawable[]
                                     {
-                                        new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 24))
+                                        new TooltipTextFlowContainer
                                         {
                                             Text = "BMS 曲库设置向导",
                                             TextAnchor = Anchor.TopCentre,
                                             RelativeSizeAxes = Axes.X,
                                             AutoSizeAxes = Axes.Y,
+                                            TooltipText = "BMS 曲库路径设置向导 - 用于配置 BMS 文件的扫描目录",
                                         },
-                                        new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 14))
+                                        new TooltipTextFlowContainer
                                         {
                                             Text = "先添加任意数量的文件夹路径。应用会立即保存并重建扫描，确定只关闭当前向导。",
                                             RelativeSizeAxes = Axes.X,
                                             AutoSizeAxes = Axes.Y,
+                                            TooltipText = "在此处选择包含 BMS 文件的文件夹，然后点击'添加当前路径'按钮将其添加到曲库列表中。您可以添加多个文件夹，每个文件夹都会被扫描以查找 BMS 文件。",
                                         }
                                     }
                                 }
@@ -330,6 +334,14 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             base.OnSuspending(e);
             this.FadeOut(250);
+        }
+
+        /// <summary>
+        /// A text flow container that shows a tooltip on hover.
+        /// </summary>
+        private partial class TooltipTextFlowContainer : OsuTextFlowContainer, IHasTooltip
+        {
+            public LocalisableString TooltipText { get; set; } = string.Empty;
         }
     }
 }
