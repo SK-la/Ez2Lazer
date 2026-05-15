@@ -191,6 +191,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public int TotalNotes { get; set; }
 
         /// <summary>
+        /// Long-note object count (channels 51–59 / 61–69) for mania conversion heuristics.
+        /// </summary>
+        public int LongNoteCount { get; set; }
+
+        /// <summary>
         /// Duration of the chart in milliseconds.
         /// </summary>
         public double Duration { get; set; }

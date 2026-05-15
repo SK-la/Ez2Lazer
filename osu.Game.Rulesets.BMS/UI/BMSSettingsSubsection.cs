@@ -280,43 +280,38 @@ namespace osu.Game.Rulesets.BMS.UI
 
             notificationOverlay?.Post(notification);
 
-            // Subscribe to progress updates
-            beatmapManager.ScanProgress.BindValueChanged(e =>
-            {
-                Schedule(() => notification.Progress = (float)e.NewValue);
-            });
+            void onScanProgress(ValueChangedEvent<double> e) =>
+                Schedule(() => notification.Progress = (float)BmsLibraryImportPipeline.MapScanProgress(e.NewValue));
 
-            beatmapManager.StatusMessage.BindValueChanged(e =>
-            {
+            void onScanStatus(ValueChangedEvent<string> e) =>
                 Schedule(() => notification.Text = e.NewValue);
-            });
+
+            beatmapManager.ScanProgress.BindValueChanged(onScanProgress, true);
+            beatmapManager.StatusMessage.BindValueChanged(onScanStatus, true);
 
             Task.Run(async () =>
             {
                 try
                 {
-                    await beatmapManager.ScanLibraryAsync(paths).ConfigureAwait(false);
+                    var result = await BmsLibraryImportPipeline.RunAsync(
+                        beatmapManager,
+                        storage,
+                        realm,
+                        new BMSRuleset().RulesetInfo,
+                        paths,
+                        p => Schedule(() =>
+                        {
+                            notification.Progress = (float)p.Progress;
+                            notification.Text = p.StatusMessage;
+                        })).ConfigureAwait(false);
 
                     Schedule(() =>
                     {
-                        try
-                        {
-                            BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, new BMSRuleset().RulesetInfo);
-
-                            // 确保进度条达到 100%
-                            notification.Progress = 1.0f;
-                            notification.State = ProgressNotificationState.Completed;
-
-                            if (beatmapManager.LibraryCache != null)
-                            {
-                                cacheStatusNote.Current.Value = new SettingsNote.Data($"扫描完成! {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面", SettingsNote.Type.Informational);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            notification.State = ProgressNotificationState.Cancelled;
-                            cacheStatusNote.Current.Value = new SettingsNote.Data($"同步失败: {ex.Message}", SettingsNote.Type.Critical);
-                        }
+                        notification.Progress = 1f;
+                        notification.State = ProgressNotificationState.Completed;
+                        cacheStatusNote.Current.Value = new SettingsNote.Data(
+                            $"扫描完成! {result.SongCount} 首歌曲, {result.ChartCount} 张谱面",
+                            SettingsNote.Type.Informational);
                     });
                 }
                 catch (Exception ex)
@@ -325,6 +320,14 @@ namespace osu.Game.Rulesets.BMS.UI
                     {
                         notification.State = ProgressNotificationState.Cancelled;
                         cacheStatusNote.Current.Value = new SettingsNote.Data($"扫描失败: {ex.Message}", SettingsNote.Type.Critical);
+                    });
+                }
+                finally
+                {
+                    Schedule(() =>
+                    {
+                        beatmapManager.ScanProgress.ValueChanged -= onScanProgress;
+                        beatmapManager.StatusMessage.ValueChanged -= onScanStatus;
                     });
                 }
             });

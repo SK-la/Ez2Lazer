@@ -167,8 +167,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 StatusMessage.Value = $"找到 {bmsFiles.Count} 个 BMS 文件，正在解析...";
 
                 var folderGroups = bmsFiles
-                    .GroupBy(f => Path.GetDirectoryName(f) ?? string.Empty)
-                    .ToList();
+                                   .GroupBy(f => Path.GetDirectoryName(f) ?? string.Empty)
+                                   .ToList();
 
                 var snapshots = indexRepository.GetChartSnapshots();
                 var seenChartPaths = new ConcurrentBag<string>();
@@ -339,7 +339,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         Hash = realmHash,
                         MD5Hash = pathKey,
                         TotalObjectCount = chart.TotalNotes,
-                        EndTimeObjectCount = chart.TotalNotes,
+                        EndTimeObjectCount = chart.LongNoteCount,
                         BeatmapSet = beatmapSet,
                         Difficulty =
                         {
@@ -800,6 +800,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             bool hasScrollChanges = false;
             bool hasBgaLayer = false;
             int noteCount = 0;
+            int longNoteCount = 0;
             int maxMeasure = 0;
             string? previewAudioFile = null;
             string? explicitPreviewFile = null;
@@ -898,13 +899,18 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     if (isNoteChannel(channelStr))
                     {
                         noteChannels.Add(channelStr);
-                        noteCount += countNotes(line.Substring(7));
+                        string data = line.Substring(7);
+                        int notesInChannel = countNotes(data);
+                        noteCount += notesInChannel;
 
                         if (isScratchChannel(channelStr))
                             hasScratch = true;
 
                         if (isLongNoteChannel(channelStr))
+                        {
                             hasLongNotes = true;
+                            longNoteCount += notesInChannel;
+                        }
                     }
                     else if (isBackgroundSoundChannel(channelStr))
                     {
@@ -931,6 +937,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             cache.MinBpm = bpmValues.Count > 0 ? bpmValues.Min() : baseBpm;
             cache.MaxBpm = bpmValues.Count > 0 ? bpmValues.Max() : baseBpm;
             cache.TotalNotes = noteCount;
+            cache.LongNoteCount = longNoteCount;
             cache.HasScratch = hasScratch;
             cache.HasLongNotes = hasLongNotes;
             cache.HasStopSequence = hasStopSequence;

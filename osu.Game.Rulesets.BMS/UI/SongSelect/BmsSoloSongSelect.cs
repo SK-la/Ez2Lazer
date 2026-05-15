@@ -432,53 +432,57 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             notifications?.Post(notification);
 
-            void onProgress(ValueChangedEvent<double> e) => Schedule(() => notification.Progress = (float)e.NewValue);
-            void onStatus(ValueChangedEvent<string> e) => Schedule(() => notification.Text = e.NewValue);
+            void onScanProgress(ValueChangedEvent<double> e) =>
+                Schedule(() => notification.Progress = (float)BmsLibraryImportPipeline.MapScanProgress(e.NewValue));
 
-            beatmapManager.ScanProgress.BindValueChanged(onProgress, true);
-            beatmapManager.StatusMessage.BindValueChanged(onStatus, true);
+            void onScanStatus(ValueChangedEvent<string> e) =>
+                Schedule(() => notification.Text = e.NewValue);
+
+            beatmapManager.ScanProgress.BindValueChanged(onScanProgress, true);
+            beatmapManager.StatusMessage.BindValueChanged(onScanStatus, true);
 
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await beatmapManager.ScanLibraryAsync(beatmapManager.RootPaths).ConfigureAwait(false);
+                    await BmsLibraryImportPipeline.RunAsync(
+                        beatmapManager,
+                        storage,
+                        realm,
+                        bmsRulesetInfo,
+                        beatmapManager.RootPaths,
+                        p => Schedule(() =>
+                        {
+                            notification.Progress = (float)p.Progress;
+                            notification.Text = p.StatusMessage;
+                        })).ConfigureAwait(false);
 
                     Schedule(() =>
                     {
-                        try
-                        {
-                            BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, new BMSRuleset().RulesetInfo);
-                            ensureBeatmapInfoExistsInRealm();
-                            notification.Progress = 1f;
-                            notification.State = ProgressNotificationState.Completed;
-                            // BeatmapStore subscribes to Realm and pushes new sets into the carousel automatically.
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Error(ex, "[BMS] synchronize failed after scan");
-                            notification.State = ProgressNotificationState.Cancelled;
-                            notifications?.Post(new SimpleNotification
-                            {
-                                Text = $"同步失败：{ex.Message}",
-                                Icon = FontAwesome.Solid.ExclamationTriangle,
-                            });
-                        }
-                        finally
-                        {
-                            beatmapManager.ScanProgress.ValueChanged -= onProgress;
-                            beatmapManager.StatusMessage.ValueChanged -= onStatus;
-                        }
+                        ensureBeatmapInfoExistsInRealm();
+                        notification.Progress = 1f;
+                        notification.State = ProgressNotificationState.Completed;
                     });
                 }
                 catch (Exception ex)
                 {
                     Schedule(() =>
                     {
-                        Logger.Error(ex, "[BMS] library scan failed");
+                        Logger.Error(ex, "[BMS] library import failed");
                         notification.State = ProgressNotificationState.Cancelled;
-                        beatmapManager.ScanProgress.ValueChanged -= onProgress;
-                        beatmapManager.StatusMessage.ValueChanged -= onStatus;
+                        notifications?.Post(new SimpleNotification
+                        {
+                            Text = $"刷新失败：{ex.Message}",
+                            Icon = FontAwesome.Solid.ExclamationTriangle,
+                        });
+                    });
+                }
+                finally
+                {
+                    Schedule(() =>
+                    {
+                        beatmapManager.ScanProgress.ValueChanged -= onScanProgress;
+                        beatmapManager.StatusMessage.ValueChanged -= onScanStatus;
                     });
                 }
             });

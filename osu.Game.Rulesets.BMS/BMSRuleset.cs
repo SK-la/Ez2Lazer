@@ -352,9 +352,23 @@ namespace osu.Game.Rulesets.BMS
                 perfectHitWindow /= ManiaModEasy.HIT_WINDOW_DIFFICULTY_MULTIPLIER;
 
             adjustedDifficulty.OverallDifficulty = (float)IBeatmapDifficultyInfo.InverseDifficultyRange(perfectHitWindow, ManiaHitWindows.PERFECT_WINDOW_RANGE);
-            adjustedDifficulty.CircleSize = ManiaBeatmapConverter.GetColumnCount(LegacyBeatmapConversionDifficultyInfo.FromBeatmapInfo(beatmapInfo), mods);
+            adjustedDifficulty.CircleSize = getDisplayKeyCount(beatmapInfo, mods);
 
             return adjustedDifficulty;
+        }
+
+        /// <summary>
+        /// BMS charts store key count in <see cref="BeatmapDifficulty.CircleSize"/> during indexing.
+        /// Mania conversion heuristics ignore that and collapse to 4–7K for non-mania sources.
+        /// </summary>
+        private const string bms_ruleset_short_name = "bms";
+
+        private static float getDisplayKeyCount(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod>? mods = null)
+        {
+            if (string.Equals(beatmapInfo.Ruleset.ShortName, bms_ruleset_short_name, StringComparison.OrdinalIgnoreCase))
+                return Math.Max(1, (int)Math.Round(beatmapInfo.Difficulty.CircleSize));
+
+            return ManiaBeatmapConverter.GetColumnCount(LegacyBeatmapConversionDifficultyInfo.FromBeatmapInfo(beatmapInfo), mods);
         }
 
         public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
@@ -365,7 +379,7 @@ namespace osu.Game.Rulesets.BMS
             // a special touch-up of key count is required to the original difficulty, since key conversion mods are not `IApplicableToDifficulty`
             var originalDifficulty = new BeatmapDifficulty(beatmapInfo.Difficulty)
             {
-                CircleSize = ManiaBeatmapConverter.GetColumnCount(LegacyBeatmapConversionDifficultyInfo.FromBeatmapInfo(beatmapInfo), [])
+                CircleSize = getDisplayKeyCount(beatmapInfo)
             };
             var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
 

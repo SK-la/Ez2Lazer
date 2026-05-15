@@ -100,15 +100,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         {
                             ID = virtualBeatmap.ID,
                             DifficultyName = virtualBeatmap.DifficultyName,
-                            BPM = virtualBeatmap.BPM,
-                            Length = virtualBeatmap.Length,
                             Hash = chartFileUsage.File.Hash,
                             MD5Hash = virtualBeatmap.MD5Hash,
-                            TotalObjectCount = virtualBeatmap.TotalObjectCount,
-                            EndTimeObjectCount = virtualBeatmap.EndTimeObjectCount,
                             Status = BeatmapOnlineStatus.LocallyModified,
                             BeatmapSet = newSet,
                         };
+
+                        applyVirtualBeatmapToRealm(beatmap, virtualBeatmap);
 
                         newSet.Beatmaps.Add(beatmap);
                         importedBeatmaps++;
@@ -125,6 +123,29 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             manager.MarkRealmSynchronized();
 
             Logger.Log($"[BMS] External library sync finished: imported {importedSets} sets/{importedBeatmaps} beatmaps, removed {removedSets} sets, skipped {skippedSets} unchanged sets.");
+        }
+
+        private static void applyVirtualBeatmapToRealm(BeatmapInfo beatmap, BeatmapInfo virtualBeatmap)
+        {
+            beatmap.BPM = virtualBeatmap.BPM;
+            beatmap.Length = virtualBeatmap.Length;
+            beatmap.TotalObjectCount = virtualBeatmap.TotalObjectCount;
+            beatmap.EndTimeObjectCount = virtualBeatmap.EndTimeObjectCount;
+
+            beatmap.Difficulty.CircleSize = virtualBeatmap.Difficulty.CircleSize;
+            beatmap.Difficulty.OverallDifficulty = virtualBeatmap.Difficulty.OverallDifficulty;
+            beatmap.Difficulty.DrainRate = virtualBeatmap.Difficulty.DrainRate;
+            beatmap.Difficulty.ApproachRate = virtualBeatmap.Difficulty.ApproachRate;
+
+            beatmap.Metadata.Title = virtualBeatmap.Metadata.Title;
+            beatmap.Metadata.TitleUnicode = virtualBeatmap.Metadata.TitleUnicode;
+            beatmap.Metadata.Artist = virtualBeatmap.Metadata.Artist;
+            beatmap.Metadata.ArtistUnicode = virtualBeatmap.Metadata.ArtistUnicode;
+            beatmap.Metadata.Source = virtualBeatmap.Metadata.Source;
+            beatmap.Metadata.Tags = virtualBeatmap.Metadata.Tags;
+            beatmap.Metadata.AudioFile = virtualBeatmap.Metadata.AudioFile;
+            beatmap.Metadata.BackgroundFile = virtualBeatmap.Metadata.BackgroundFile;
+            beatmap.Metadata.PreviewTime = virtualBeatmap.Metadata.PreviewTime;
         }
 
         private static bool setMatches(BeatmapSetInfo existingSet, BeatmapSetInfo targetSet)
@@ -163,10 +184,36 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                 if (!string.Equals(existingBeatmap.Metadata.BackgroundFile, targetBeatmap.Metadata.BackgroundFile, StringComparison.OrdinalIgnoreCase))
                     return false;
+
+                if (!string.Equals(existingBeatmap.Metadata.Tags, targetBeatmap.Metadata.Tags, StringComparison.Ordinal))
+                    return false;
+
+                if (!difficultyMatches(existingBeatmap, targetBeatmap))
+                    return false;
+
+                if (!floatEquals(existingBeatmap.BPM, targetBeatmap.BPM))
+                    return false;
+
+                if (!floatEquals(existingBeatmap.Length, targetBeatmap.Length))
+                    return false;
+
+                if (existingBeatmap.TotalObjectCount != targetBeatmap.TotalObjectCount)
+                    return false;
+
+                if (existingBeatmap.EndTimeObjectCount != targetBeatmap.EndTimeObjectCount)
+                    return false;
             }
 
             return true;
         }
+
+        private static bool difficultyMatches(BeatmapInfo existing, BeatmapInfo target)
+            => floatEquals(existing.Difficulty.CircleSize, target.Difficulty.CircleSize)
+               && floatEquals(existing.Difficulty.OverallDifficulty, target.Difficulty.OverallDifficulty)
+               && floatEquals(existing.Difficulty.DrainRate, target.Difficulty.DrainRate);
+
+        private static bool floatEquals(double a, double b)
+            => Math.Abs(a - b) < 0.01;
 
         private static string createExternalHash(string folderPath)
         {
