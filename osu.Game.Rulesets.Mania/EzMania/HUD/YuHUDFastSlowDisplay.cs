@@ -440,9 +440,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             if (!hitResult.IsBasic())
                 return;
 
-            bool shouldSkip = hitResult.GetIndexForOrderedDisplay() < Judgement.Value.GetIndexForOrderedDisplay();
+            bool shouldShow = hitResult.GetIndexForOrderedDisplay() >= Judgement.Value.GetIndexForOrderedDisplay();
 
-            if (shouldSkip || Test.Value)
+            if (shouldShow || Test.Value)
             {
                 var originalColumn = (IHasColumn)judgement.HitObject;
                 checkColumn(judgement, originalColumn);

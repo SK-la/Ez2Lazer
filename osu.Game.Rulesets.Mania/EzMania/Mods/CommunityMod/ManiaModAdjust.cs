@@ -82,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public DifficultyBindable OverallDifficulty { get; } = new DifficultyBindable
         {
             Precision = 0.1f,
-            MinValue = 0,
+            MinValue = -15,
             MaxValue = 10,
             ExtendedMaxValue = 15,
             ReadCurrentFromDifficulty = diff => diff.OverallDifficulty
