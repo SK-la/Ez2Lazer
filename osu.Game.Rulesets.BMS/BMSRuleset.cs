@@ -275,12 +275,15 @@ namespace osu.Game.Rulesets.BMS
 
         public override LocalisableString VariantDescription => "Keys";
 
-        public override IEnumerable<int> AvailableVariants => Enumerable.Range(1, 16);
+        public override IEnumerable<int> AvailableVariants => Enumerable.Range(1, 18);
 
         public override LocalisableString GetVariantName(int variant) => variant switch
         {
-            > 0 => $"{variant}K",
-            _ => "8K"
+            8 =>  @"SP",
+            9 =>  @"PMS",
+            10 => @"10K2S",
+            14 => @"DP",
+            _ =>  $"{variant}K",
         };
 
         public override IEnumerable<HitResult> GetValidHitResults()
