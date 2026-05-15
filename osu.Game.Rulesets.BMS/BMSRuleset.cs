@@ -277,6 +277,9 @@ namespace osu.Game.Rulesets.BMS
 
         public override IEnumerable<int> AvailableVariants => Enumerable.Range(1, 18);
 
+        public override int GetVariantForBeatmap(IBeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
+            => (int)getDisplayKeyCount(beatmapInfo, mods);
+
         public override LocalisableString GetVariantName(int variant) => variant switch
         {
             8 =>  @"SP",
@@ -447,10 +450,7 @@ namespace osu.Game.Rulesets.BMS
             };
         }
 
-        public override IRulesetFilterCriteria CreateRulesetFilterCriteria()
-        {
-            return new ManiaFilterCriteria();
-        }
+        public override IRulesetFilterCriteria CreateRulesetFilterCriteria() => new BmsFilterCriteria();
 
         public override Drawable CreateIcon() => new BmsRulesetIcon();
 

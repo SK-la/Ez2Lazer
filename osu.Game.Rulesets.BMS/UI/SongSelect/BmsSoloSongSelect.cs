@@ -146,10 +146,14 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         protected override void LoadComplete()
         {
+            // Ruleset must be BMS before base.LoadComplete builds the carousel; bms-ext sets return false
+            // from AllowGameplayWithRuleset for non-BMS rulesets and would be filtered out entirely.
+            Ruleset.Value = bmsRulesetInfo;
+
+            syncConfiguredPaths();
+
             // Sync before base.LoadComplete so the carousel binds to up-to-date Realm rows (stable beatmap IDs).
-            // Running sync after base would leave FooterButtonOptions / carousel on stale detached BeatmapInfo
-            // whose IDs were removed during re-import.
-            if (beatmapManager.NeedsRealmSynchronization)
+            if (beatmapManager.NeedsRealmSynchronization && beatmapManager.HasIndexedCharts)
             {
                 try
                 {
@@ -161,14 +165,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 }
             }
 
+            // BMS does not use EzKeyModeSelector; ignore any residual CircleSize range from FilterControl.
+            FilterControl.ApplyRequiredCriteria = criteria => criteria.CircleSize = default;
+
             base.LoadComplete();
 
-            // Lock ruleset to BMS so carousel filtering scopes to BMS panels via AllowGameplayWithRuleset's
-            // bms-ext: short-circuit. Must happen on the update thread because subscribers (FilterControl,
-            // BeatmapDifficultyCache, …) animate UI synchronously off this change.
-            Ruleset.Value = bmsRulesetInfo;
-
             ensureBeatmapInfoExistsInRealm();
+            Scheduler.AddOnce(requestCarouselCriteriaRefresh);
 
             Beatmap.BindValueChanged(_ => updatePreview(), true);
             Ruleset.BindValueChanged(onRulesetChanged);
@@ -206,6 +209,15 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             base.OnEntering(e);
             suspendGlobalMusicController();
+
+            if (!beatmapManager.HasIndexedCharts)
+            {
+                notifications?.Post(new SimpleNotification
+                {
+                    Text = "BMS 曲库索引为空，请在设置中添加路径或点「刷新曲库」扫描",
+                    Icon = FontAwesome.Solid.InfoCircle,
+                });
+            }
         }
 
         public override void OnResuming(ScreenTransitionEvent e)
@@ -410,6 +422,16 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private void syncConfiguredPaths() =>
             beatmapManager.SetRootPaths(BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value));
 
+        /// <summary>
+        /// Re-run carousel filtering after Realm catalog changes without adding APIs to <see cref="FilterControl"/>.
+        /// </summary>
+        private void requestCarouselCriteriaRefresh()
+        {
+            const string sentinel = "\u200b";
+            FilterControl.Search(sentinel);
+            FilterControl.Search(string.Empty);
+        }
+
         private void refreshLibrary()
         {
             syncConfiguredPaths();
@@ -460,6 +482,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                     Schedule(() =>
                     {
                         ensureBeatmapInfoExistsInRealm();
+                        requestCarouselCriteriaRefresh();
                         notification.Progress = 1f;
                         notification.State = ProgressNotificationState.Completed;
                     });

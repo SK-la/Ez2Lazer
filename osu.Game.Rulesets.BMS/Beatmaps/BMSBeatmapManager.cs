@@ -47,9 +47,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// Tracks whether Realm still needs a catalog pass. Revision equality alone is insufficient
         /// (both zero on a fresh index) and would skip the first sync, leaving the carousel on stale IDs.
         /// </summary>
-        private bool realmSyncRequired = true;
+        private bool realmSyncRequired;
 
         public bool NeedsRealmSynchronization => realmSyncRequired || LastScanRevision != LastSynchronizedScanRevision;
+
+        public bool HasIndexedCharts => LibraryCache?.TotalCharts > 0;
 
         private static readonly string[] bms_extensions = { ".bms", ".bme", ".bml", ".pms" };
 

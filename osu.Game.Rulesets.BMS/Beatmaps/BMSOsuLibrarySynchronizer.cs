@@ -28,6 +28,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 return;
 
             IReadOnlyList<BeatmapSetInfo> virtualSets = manager.BuildVirtualBeatmapCatalog(bmsRulesetInfo);
+
+            if (virtualSets.Count == 0)
+            {
+                Logger.Log("[BMS] Library index has no charts; skipping Realm sync to avoid clearing the carousel.", LoggingTarget.Database);
+                return;
+            }
+
             Dictionary<Guid, BMSSourceReference> sourceMap = manager.GetCurrentSourceMap();
 
             var realmFileStore = new RealmFileStore(realm, storage);
