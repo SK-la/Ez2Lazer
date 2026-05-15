@@ -24,7 +24,8 @@
     <ProjectReference Include="..\osu.Game.Rulesets.Taiko\osu.Game.Rulesets.Taiko.csproj" />
   </ItemGroup>
   <!-- BMS Ruleset only loads in Debug configuration -->
-  <ItemGroup Label="Debug-Only References" Condition="'$(Configuration)' == 'Debug'">
+<!--  <ItemGroup Label="Debug-Only References" Condition="'$(Configuration)' == 'Debug'">-->
+  <ItemGroup>
     <ProjectReference Include="..\osu.Game.Rulesets.BMS\osu.Game.Rulesets.BMS.csproj" />
   </ItemGroup>
   <ItemGroup Label="Package References">
