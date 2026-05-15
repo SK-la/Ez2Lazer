@@ -103,6 +103,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             var beatmapInfo = new BeatmapInfo(new BMSRuleset().RulesetInfo)
             {
+                ID = createDeterministicBeatmapId(bmsFilePath),
                 Metadata = new BeatmapMetadata
                 {
                     Title = title,
@@ -134,6 +135,12 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
 
             return beatmapInfo;
+        }
+
+        private static Guid createDeterministicBeatmapId(string chartPath)
+        {
+            byte[] bytes = System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes($"bms:chart:{chartPath}"));
+            return new Guid(bytes);
         }
 
         private static string? sanitiseAudioReference(string? raw, string? baseFolder)

@@ -78,8 +78,7 @@ namespace osu.Game.Rulesets.BMS.UI
             libraryPathsBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsLibraryPaths);
             legacyRootPathBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsRootPath);
 
-            string cacheDir = storage.GetFullPath("bms_cache");
-            beatmapManager = BMSBeatmapManager.GetShared(cacheDir);
+            beatmapManager = BMSBeatmapManager.GetShared(storage);
             beatmapManager.SetRootPaths(getConfiguredPaths());
             bindManiaScrollSettings();
 

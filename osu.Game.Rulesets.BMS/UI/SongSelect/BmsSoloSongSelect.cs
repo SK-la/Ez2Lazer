@@ -125,14 +125,12 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 legacyRootPathBindable = new Bindable<string>(string.Empty);
             }
 
-            string cacheDir = storage.GetFullPath("bms_cache");
-            beatmapManager = BMSBeatmapManager.GetShared(cacheDir);
+            beatmapManager = BMSBeatmapManager.GetShared(storage);
             syncConfiguredPaths();
 
-            // Wire lamp persistence. The repository sits next to the chart cache (bms_cache/lamps.sqlite)
-            // so a single "wipe BMS data" gesture cleans both. Repository init is internally try/catch so
+            // Lamp DB lives under EzBMS next to the chart index. Repository init is internally try/catch so
             // a corrupt sqlite file degrades to "no lamps" rather than blocking song-select from opening.
-            string lampDbPath = Path.Combine(cacheDir, "lamps.sqlite");
+            string lampDbPath = BmsStoragePaths.GetLampDatabasePath(storage);
             lampRepository = new BmsLampSqliteRepository(lampDbPath);
             lampStore.AttachRepository(lampRepository);
 
@@ -148,26 +146,60 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         protected override void LoadComplete()
         {
-            base.LoadComplete();
+            // Sync before base.LoadComplete so the carousel binds to up-to-date Realm rows (stable beatmap IDs).
+            // Running sync after base would leave FooterButtonOptions / carousel on stale detached BeatmapInfo
+            // whose IDs were removed during re-import.
+            if (beatmapManager.NeedsRealmSynchronization)
+            {
+                try
+                {
+                    BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, bmsRulesetInfo);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "[BMS] initial library sync failed");
+                }
+            }
 
-            // Sync external BMS folders into Realm. Done on the update thread (LoadComplete) so any UI
-            // updates triggered by realm.Write subscribers are dispatched cleanly.
-            try
-            {
-                BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, bmsRulesetInfo);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "[BMS] initial library sync failed");
-            }
+            base.LoadComplete();
 
             // Lock ruleset to BMS so carousel filtering scopes to BMS panels via AllowGameplayWithRuleset's
             // bms-ext: short-circuit. Must happen on the update thread because subscribers (FilterControl,
             // BeatmapDifficultyCache, …) animate UI synchronously off this change.
             Ruleset.Value = bmsRulesetInfo;
 
+            ensureBeatmapInfoExistsInRealm();
+
             Beatmap.BindValueChanged(_ => updatePreview(), true);
             Ruleset.BindValueChanged(onRulesetChanged);
+        }
+
+        /// <summary>
+        /// Rebind the global working beatmap to a Realm-backed instance when the current selection's
+        /// <see cref="BeatmapInfo.ID"/> is missing (stale carousel item after catalog re-sync).
+        /// </summary>
+        private void ensureBeatmapInfoExistsInRealm()
+        {
+            var info = Beatmap.Value?.BeatmapInfo;
+
+            if (info == null || info.Ruleset.ShortName != "bms")
+                return;
+
+            bool exists = realm.Run(r => r.Find<BeatmapInfo>(info.ID) != null);
+
+            if (exists)
+                return;
+
+            if (beatmapManager.TryGetSourceReference(info.ID, out BMSSourceReference sourceRef))
+            {
+                var replacement = realm.Run(r => r.All<BeatmapInfo>()
+                                                  .FirstOrDefault(b => b.BeatmapSet != null
+                                                                       && b.BeatmapSet.Hash.StartsWith("bms-ext:set:", StringComparison.Ordinal)
+                                                                       && string.Equals(b.Path, Path.GetFileName(sourceRef.ChartPath), StringComparison.OrdinalIgnoreCase)));
+
+                if (replacement != null)
+                    Beatmap.Value = beatmaps.GetWorkingBeatmap(replacement, true);
+            }
         }
 
         public override void OnEntering(ScreenTransitionEvent e)
@@ -417,6 +449,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                         try
                         {
                             BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, new BMSRuleset().RulesetInfo);
+                            ensureBeatmapInfoExistsInRealm();
                             notification.Progress = 1f;
                             notification.State = ProgressNotificationState.Completed;
                             // BeatmapStore subscribes to Realm and pushes new sets into the carousel automatically.

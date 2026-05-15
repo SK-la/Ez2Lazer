@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using osu.Framework.Extensions;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
@@ -23,6 +22,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public static void Synchronize(BMSBeatmapManager manager, Storage storage, RealmAccess realm, RulesetInfo bmsRulesetInfo)
         {
             if (manager.LibraryCache == null)
+                return;
+
+            if (!manager.NeedsRealmSynchronization)
                 return;
 
             IReadOnlyList<BeatmapSetInfo> virtualSets = manager.BuildVirtualBeatmapCatalog(bmsRulesetInfo);
@@ -120,6 +122,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 }
             });
 
+            manager.MarkRealmSynchronized();
+
             Logger.Log($"[BMS] External library sync finished: imported {importedSets} sets/{importedBeatmaps} beatmaps, removed {removedSets} sets, skipped {skippedSets} unchanged sets.");
         }
 
@@ -128,7 +132,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             if (!string.Equals(existingSet.Hash, createExternalHash(targetSet.Hash), StringComparison.Ordinal))
                 return false;
 
-            // Legacy sync registered every file in the folder; re-import so Files only lists chart entries.
             if (existingSet.Hash.StartsWith(bms_set_hash_prefix, StringComparison.Ordinal)
                 && existingSet.Files.Count > existingSet.Beatmaps.Count)
                 return false;
@@ -143,18 +146,22 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 if (!existingBeatmaps.TryGetValue(targetBeatmap.ID, out BeatmapInfo? existingBeatmap))
                     return false;
 
+                if (!string.Equals(existingBeatmap.Hash, targetBeatmap.Hash, StringComparison.OrdinalIgnoreCase))
+                    return false;
+
                 if (!string.Equals(existingBeatmap.MD5Hash, targetBeatmap.MD5Hash, StringComparison.OrdinalIgnoreCase))
                     return false;
 
                 if (!string.Equals(existingBeatmap.DifficultyName, targetBeatmap.DifficultyName, StringComparison.Ordinal))
                     return false;
 
-                // Force reimport of legacy entries that stored absolute audio paths.
                 if (Path.IsPathRooted(existingBeatmap.Metadata.AudioFile))
                     return false;
 
-                // Keep metadata in sync so audio path fixes (including subdirectories) are propagated.
                 if (!string.Equals(existingBeatmap.Metadata.AudioFile, targetBeatmap.Metadata.AudioFile, StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                if (!string.Equals(existingBeatmap.Metadata.BackgroundFile, targetBeatmap.Metadata.BackgroundFile, StringComparison.OrdinalIgnoreCase))
                     return false;
             }
 
@@ -167,10 +174,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return bms_set_hash_prefix + encoded;
         }
 
-        /// <summary>
-        /// Only the chart file is registered in Realm: <see cref="BeatmapInfo"/> links via <see cref="BeatmapInfo.Hash"/> / <see cref="BeatmapInfo.File"/>.
-        /// Audio, BGA and keysounds stay on disk and are resolved through <c>bms-ext:set:</c> + original folder in working beatmap.
-        /// </summary>
         private static void registerExternalChartFile(RealmFileStore realmFileStore, Realm realm, BeatmapSetInfo set, string chartPath)
         {
             string chartFilename = Path.GetFileName(chartPath);
@@ -181,11 +184,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             if (set.GetFile(chartFilename) != null)
                 return;
 
-            using (Stream stream = File.OpenRead(chartPath))
-            {
-                RealmFile file = realmFileStore.RegisterExternalHash(stream.ComputeSHA2Hash(), realm);
-                set.Files.Add(new RealmNamedFileUsage(file, chartFilename));
-            }
+            string syntheticHash = BmsPathKeys.ComputeRealmFileHash(chartPath);
+            RealmFile file = realmFileStore.RegisterExternalHash(syntheticHash, realm);
+            set.Files.Add(new RealmNamedFileUsage(file, chartFilename));
         }
 
         private static void removeSet(Realm realm, BeatmapSetInfo set)
@@ -200,4 +201,3 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         }
     }
 }
-

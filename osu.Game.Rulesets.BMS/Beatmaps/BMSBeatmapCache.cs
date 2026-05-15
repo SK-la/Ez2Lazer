@@ -7,6 +7,8 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+// Legacy JSON load remains for one-time migration from bms_cache.
+
 namespace osu.Game.Rulesets.BMS.Beatmaps
 {
     /// <summary>
@@ -199,7 +201,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public List<string> KeysoundFiles { get; set; } = new List<string>();
 
         /// <summary>
-        /// MD5 hash of the BMS file for identification.
+        /// Path-derived chart key (legacy field name retained for compatibility).
         /// </summary>
         public string Md5Hash { get; set; } = string.Empty;
 
@@ -260,25 +262,16 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
         }
 
-        private static readonly JsonSerializerOptions json_options = new JsonSerializerOptions
+        internal static readonly JsonSerializerOptions json_options = new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         };
 
         /// <summary>
-        /// Save the cache to a file.
+        /// Load legacy JSON cache (migration only).
         /// </summary>
-        public void Save(string filePath)
-        {
-            string json = JsonSerializer.Serialize(this, json_options);
-            File.WriteAllText(filePath, json);
-        }
-
-        /// <summary>
-        /// Load the cache from a file.
-        /// </summary>
-        public static BMSLibraryCache? Load(string filePath)
+        internal static BMSLibraryCache? Load(string filePath)
         {
             if (!File.Exists(filePath))
                 return null;
@@ -287,45 +280,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             {
                 string json = File.ReadAllText(filePath);
                 return JsonSerializer.Deserialize<BMSLibraryCache>(json, json_options);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Persistent external-link mapping from virtual beatmap identities to BMS source files.
-    /// </summary>
-    [Serializable]
-    public class BMSExternalLinkIndex
-    {
-        public int Version { get; set; } = 1;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-        public List<BMSSourceReference> Sources { get; set; } = new List<BMSSourceReference>();
-
-        private static readonly JsonSerializerOptions json_options = new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        };
-
-        public void Save(string filePath)
-        {
-            string json = JsonSerializer.Serialize(this, json_options);
-            File.WriteAllText(filePath, json);
-        }
-
-        public static BMSExternalLinkIndex? Load(string filePath)
-        {
-            if (!File.Exists(filePath))
-                return null;
-
-            try
-            {
-                string json = File.ReadAllText(filePath);
-                return JsonSerializer.Deserialize<BMSExternalLinkIndex>(json, json_options);
             }
             catch
             {

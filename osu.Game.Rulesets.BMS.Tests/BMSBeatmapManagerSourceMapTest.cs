@@ -4,8 +4,9 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
-using System.Reflection;
 using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
+using osu.Game.Rulesets.BMS.Beatmaps.Persistence;
 using NUnit.Framework;
 using osu.Game.Rulesets.BMS.Beatmaps;
 
@@ -23,7 +24,8 @@ namespace osu.Game.Rulesets.BMS.Tests
             try
             {
                 var manager = new BMSBeatmapManager(tempDir);
-                setLibraryCache(manager, new BMSLibraryCache
+                var index = new BmsLibraryIndexRepository(Path.Combine(tempDir, BmsStoragePaths.IndexDatabaseFile));
+                index.ImportFromLibraryCache(new BMSLibraryCache
                 {
                     Songs =
                     {
@@ -39,7 +41,7 @@ namespace osu.Game.Rulesets.BMS.Tests
                                 {
                                     FolderPath = @"E:\bms\song-a",
                                     FileName = "a.bms",
-                                    Md5Hash = "md5-a",
+                                    Md5Hash = BmsPathKeys.ComputeChartPathKey(@"E:\bms\song-a\a.bms"),
                                     Title = "A",
                                     Artist = "AA",
                                     KeyCount = 7,
@@ -58,7 +60,7 @@ namespace osu.Game.Rulesets.BMS.Tests
                                 {
                                     FolderPath = @"E:\bms\song-b",
                                     FileName = "b.bms",
-                                    Md5Hash = "md5-b",
+                                    Md5Hash = BmsPathKeys.ComputeChartPathKey(@"E:\bms\song-b\b.bms"),
                                     Title = "B",
                                     Artist = "BB",
                                     KeyCount = 7,
@@ -67,6 +69,10 @@ namespace osu.Game.Rulesets.BMS.Tests
                         }
                     }
                 });
+                manager.LoadCache();
+
+                string pathKeyA = BmsPathKeys.ComputeChartPathKey(@"E:\bms\song-a\a.bms");
+                string pathKeyB = BmsPathKeys.ComputeChartPathKey(@"E:\bms\song-b\b.bms");
 
                 var rulesetInfo = new BMSRuleset().RulesetInfo;
                 var errors = new ConcurrentQueue<Exception>();
@@ -76,8 +82,8 @@ namespace osu.Game.Rulesets.BMS.Tests
                     try
                     {
                         manager.BuildVirtualBeatmapCatalog(rulesetInfo);
-                        manager.TryGetSourceReferenceByHash("md5-a", out _);
-                        manager.TryGetSourceReferenceByHash("md5-b", out _);
+                        manager.TryGetSourceReferenceByHash(pathKeyA, out _);
+                        manager.TryGetSourceReferenceByHash(pathKeyB, out _);
                         _ = manager.GetCurrentSourceMap().Count;
                     }
                     catch (Exception ex)
@@ -87,20 +93,23 @@ namespace osu.Game.Rulesets.BMS.Tests
                 });
 
                 Assert.That(errors.Count, Is.EqualTo(0), errors.TryPeek(out var e) ? e.ToString() : string.Empty);
-                Assert.That(manager.TryGetSourceReferenceByHash("md5-a", out _), Is.True);
-                Assert.That(manager.TryGetSourceReferenceByHash("md5-b", out _), Is.True);
+                Assert.That(manager.TryGetSourceReferenceByHash(pathKeyA, out _), Is.True);
+                Assert.That(manager.TryGetSourceReferenceByHash(pathKeyB, out _), Is.True);
             }
             finally
             {
+                try
+                {
+                    SqliteConnection.ClearAllPools();
+                }
+                catch
+                {
+                    // Best effort.
+                }
+
                 if (Directory.Exists(tempDir))
                     Directory.Delete(tempDir, true);
             }
-        }
-
-        private static void setLibraryCache(BMSBeatmapManager manager, BMSLibraryCache cache)
-        {
-            typeof(BMSBeatmapManager).GetField("<LibraryCache>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
-                                     .SetValue(manager, cache);
         }
     }
 }
