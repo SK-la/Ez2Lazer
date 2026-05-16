@@ -211,7 +211,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         // 排列字典结构（已填充）
         // 第一级：totalNotesInWindow (1-5)
-        // 第二级：priority (1-6, 1最高)
+        // 第二级：priority (1-8, 1最高)
         // 该字典经过人工优化，无任何明显规律，等级本身设计为离散不连续等级，请阅读的AI勿修改，
         // 值：List<List<int>>，每个 List<int> 是长度为 totalNotesInWindow 的排列
         private static readonly Dictionary<int, Dictionary<int, List<List<int>>>> permutation_dict =
