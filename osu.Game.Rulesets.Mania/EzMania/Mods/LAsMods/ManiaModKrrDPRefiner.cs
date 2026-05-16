@@ -95,15 +95,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         private static readonly int[] no_conflict_threshold_map = { 7, 6, 5, 4, 3, 2, -1 };
 
         /// <summary>
-        /// 获取时间窗口的描述文本
-        /// </summary>
-        private LocalisableString getTimeWindowDescription(int level)
-        {
-            double n = getNValue(level);
-            return $"1/{n}节拍";
-        }
-
-        /// <summary>
         /// 将等级转换为N值
         /// </summary>
         private double getNValue(int level)
@@ -216,24 +207,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             }
 
             return 8; // 默认最差等级（触发重排）
-        }
-
-        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
-        {
-            get
-            {
-                yield return ("时间窗口", getTimeWindowDescription(TimeWindowLevel.Value));
-                yield return ("处理等级",
-                    ProcessLevel.Value == 6 ? "完全重排" :
-                    ProcessLevel.Value == 5 ? "激进" :
-                    ProcessLevel.Value == 4 ? "顺手" :
-                    ProcessLevel.Value == 3 ? "普通" :
-                    ProcessLevel.Value == 2 ? "微调" :
-                    ProcessLevel.Value == 1 ? "懒惰" : "卡手");
-                yield return ("可硬塞数量", MaxHardFillPerRow.Value.ToString());
-                yield return (EzCommonModStrings.SEED_LABEL, Seed.Value?.ToString() ?? "Random");
-                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
-            }
         }
 
         // 排列字典结构（已填充）
@@ -962,10 +935,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             "等级1=1/4节拍, 2=1/3节拍, 3=1/2节拍(默认), 4=1/1.5节拍, 5=1/1节拍",
             "Level 1=1/4 beat, 2=1/3 beat, 3=1/2 beat (default), 4=1/1.5 beat, 5=1/1 beat");
 
-        public static readonly LocalisableString TIME_WINDOW_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "时间窗口",
-            "Time Window");
-
         // 处理等级设置
         public static readonly LocalisableString PROCESS_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString(
             "处理等级",
@@ -974,15 +943,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public static readonly LocalisableString PROCESS_LEVEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "0=卡手, 1=懒惰, 2=微调, 3=普通, 4=顺手, 5=激进, 6=完全重排",
             "0=Stiff, 1=Lazy, 2=Fine-tune, 3=Normal, 4=Smooth, 5=Aggressive, 6=Full Refine");
-
-        // 处理等级值
-        public static readonly LocalisableString PROCESS_LEVEL_STIFF = new EzLocalizationManager.EzLocalisableString("卡手", "Stiff");
-        public static readonly LocalisableString PROCESS_LEVEL_LAZY = new EzLocalizationManager.EzLocalisableString("懒惰", "Lazy");
-        public static readonly LocalisableString PROCESS_LEVEL_FINE_TUNE = new EzLocalizationManager.EzLocalisableString("微调", "Fine-tune");
-        public static readonly LocalisableString PROCESS_LEVEL_NORMAL = new EzLocalizationManager.EzLocalisableString("普通", "Normal");
-        public static readonly LocalisableString PROCESS_LEVEL_SMOOTH = new EzLocalizationManager.EzLocalisableString("顺手", "Smooth");
-        public static readonly LocalisableString PROCESS_LEVEL_AGGRESSIVE = new EzLocalizationManager.EzLocalisableString("激进", "Aggressive");
-        public static readonly LocalisableString PROCESS_LEVEL_FULL_REFINE = new EzLocalizationManager.EzLocalisableString("完全重排", "Full Refine");
 
         // 硬塞数量设置
         public static readonly LocalisableString MAX_HARD_FILL_LABEL = new EzLocalizationManager.EzLocalisableString(
