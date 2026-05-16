@@ -273,6 +273,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModPatternShiftJack(),
                         new ManiaModPatternShiftChord(),
                         new ManiaModKrrRandomPlus(),
+                        new ManiaModKrrDPRefiner(),
                         new ManiaModKrrN2Nc(),
                         new ManiaModKrrLN(),
                         new ManiaModKrrDP(),
