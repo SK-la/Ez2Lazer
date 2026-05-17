@@ -276,6 +276,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModKrrN2Nc(),
                         new ManiaModKrrLN(),
                         new ManiaModKrrDP(),
+                        new ManiaModKrrDPRefiner(),
                         new ManiaModReconcile(),
                         new UniversalLoopPlayClip(),
                         new ManiaModSRAdjust(),
