@@ -95,6 +95,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         private static readonly int[] no_conflict_threshold_map = { 7, 6, 5, 4, 3, 2, -1 };
 
         /// <summary>
+        /// 获取时间窗口的描述文本
+        /// </summary>
+        private LocalisableString getTimeWindowDescription(int level)
+        {
+            return level switch
+            {
+                1 => KrrDPRefinerStrings.TIME_WINDOW_LEVEL_1,
+                2 => KrrDPRefinerStrings.TIME_WINDOW_LEVEL_2,
+                3 => KrrDPRefinerStrings.TIME_WINDOW_LEVEL_3,
+                4 => KrrDPRefinerStrings.TIME_WINDOW_LEVEL_4,
+                5 => KrrDPRefinerStrings.TIME_WINDOW_LEVEL_5,
+                _ => KrrDPRefinerStrings.TIME_WINDOW_LEVEL_3
+            };
+        }
+
+        /// <summary>
         /// 将等级转换为N值
         /// </summary>
         private double getNValue(int level)
@@ -207,6 +223,24 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             }
 
             return 8; // 默认最差等级（触发重排）
+        }
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return (KrrDPRefinerStrings.SETTING_TIME_WINDOW_LABEL, getTimeWindowDescription(TimeWindowLevel.Value));
+                yield return (KrrDPRefinerStrings.SETTING_PROCESS_LEVEL_LABEL,
+                    ProcessLevel.Value == 6 ? KrrDPRefinerStrings.PROCESS_LEVEL_FULL_REFINE :
+                    ProcessLevel.Value == 5 ? KrrDPRefinerStrings.PROCESS_LEVEL_AGGRESSIVE :
+                    ProcessLevel.Value == 4 ? KrrDPRefinerStrings.PROCESS_LEVEL_SMOOTH :
+                    ProcessLevel.Value == 3 ? KrrDPRefinerStrings.PROCESS_LEVEL_NORMAL :
+                    ProcessLevel.Value == 2 ? KrrDPRefinerStrings.PROCESS_LEVEL_FINE_TUNE :
+                    ProcessLevel.Value == 1 ? KrrDPRefinerStrings.PROCESS_LEVEL_LAZY : KrrDPRefinerStrings.PROCESS_LEVEL_STIFF);
+                yield return (KrrDPRefinerStrings.SETTING_MAX_HARD_FILL_LABEL, MaxHardFillPerRow.Value.ToString());
+                yield return (EzCommonModStrings.SEED_LABEL, Seed.Value?.ToString() ?? "Random");
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
+            }
         }
 
         // 排列字典结构（已填充）
@@ -445,8 +479,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 }
 
                 // 初始化随机数生成器
-                int oscSeed = Seed.Value ?? RNG.Next();
-                var random = new Random(oscSeed);
+                Seed.Value ??= RNG.Next();
+                var random = new Random(Seed.Value.Value);
 
                 int timeWindowLevel = TimeWindowLevel.Value;
                 double timeWindowN = getNValue(timeWindowLevel);
@@ -935,6 +969,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             "等级1=1/4节拍, 2=1/3节拍, 3=1/2节拍(默认), 4=1/1.5节拍, 5=1/1节拍",
             "Level 1=1/4 beat, 2=1/3 beat, 3=1/2 beat (default), 4=1/1.5 beat, 5=1/1 beat");
 
+        // 时间窗口等级描述
+        public static readonly LocalisableString TIME_WINDOW_LEVEL_1 = new EzLocalizationManager.EzLocalisableString("1/4节拍", "1/4 beat");
+        public static readonly LocalisableString TIME_WINDOW_LEVEL_2 = new EzLocalizationManager.EzLocalisableString("1/3节拍", "1/3 beat");
+        public static readonly LocalisableString TIME_WINDOW_LEVEL_3 = new EzLocalizationManager.EzLocalisableString("1/2节拍", "1/2 beat");
+        public static readonly LocalisableString TIME_WINDOW_LEVEL_4 = new EzLocalizationManager.EzLocalisableString("1/1.5节拍", "1/1.5 beat");
+        public static readonly LocalisableString TIME_WINDOW_LEVEL_5 = new EzLocalizationManager.EzLocalisableString("1/1节拍", "1/1 beat");
+
         // 处理等级设置
         public static readonly LocalisableString PROCESS_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString(
             "处理等级",
@@ -952,5 +993,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public static readonly LocalisableString MAX_HARD_FILL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "每行最多硬塞的Note数量：0=禁止硬塞, 1=最多1个(默认), 2=最多2个",
             "Maximum hard-filled notes per row: 0=Disable hard fill, 1=Max 1 (default), 2=Max 2");
+
+        // SettingDescription 中使用的标签和值
+        public static readonly LocalisableString SETTING_TIME_WINDOW_LABEL = new EzLocalizationManager.EzLocalisableString("时间窗口", "Time Window");
+
+        public static readonly LocalisableString SETTING_PROCESS_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString("处理等级", "Process Level");
+        public static readonly LocalisableString PROCESS_LEVEL_STIFF = new EzLocalizationManager.EzLocalisableString("卡手", "Stiff");
+        public static readonly LocalisableString PROCESS_LEVEL_LAZY = new EzLocalizationManager.EzLocalisableString("懒惰", "Lazy");
+        public static readonly LocalisableString PROCESS_LEVEL_FINE_TUNE = new EzLocalizationManager.EzLocalisableString("微调", "Fine-tune");
+        public static readonly LocalisableString PROCESS_LEVEL_NORMAL = new EzLocalizationManager.EzLocalisableString("普通", "Normal");
+        public static readonly LocalisableString PROCESS_LEVEL_SMOOTH = new EzLocalizationManager.EzLocalisableString("顺手", "Smooth");
+        public static readonly LocalisableString PROCESS_LEVEL_AGGRESSIVE = new EzLocalizationManager.EzLocalisableString("激进", "Aggressive");
+        public static readonly LocalisableString PROCESS_LEVEL_FULL_REFINE = new EzLocalizationManager.EzLocalisableString("完全重排", "Full Refine");
+
+        public static readonly LocalisableString SETTING_MAX_HARD_FILL_LABEL = new EzLocalizationManager.EzLocalisableString("可硬塞数量", "Max Hard Fill");
     }
 }
