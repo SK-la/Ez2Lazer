@@ -152,16 +152,19 @@ namespace osu.Game.Rulesets.Mania.Edit.Setup
         {
             actualKeyCount.Value = keyCount;
 
-            if (keyCount > 10)
-            {
-                dualStages.Current.Value = true;
-                singleStageKeyCount.Value = keyCount / 2;
-            }
-            else
-            {
-                dualStages.Current.Value = false;
-                singleStageKeyCount.Value = keyCount;
-            }
+            dualStages.Current.Value = false;
+            singleStageKeyCount.Value = keyCount;
+
+            // if (keyCount > 10)
+            // {
+            //     dualStages.Current.Value = true;
+            //     singleStageKeyCount.Value = keyCount / 2;
+            // }
+            // else
+            // {
+            //     dualStages.Current.Value = false;
+            //     singleStageKeyCount.Value = keyCount;
+            // }
 
             updateSingleStageKeyCountBounds();
         }
