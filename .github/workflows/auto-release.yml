@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '发布使用的 tag，留空则自动使用当前 UTC 日期（YYYY-M-D）'
+        description: '发布使用的 tag，留空则自动使用当前 UTC 日期（YYYY.M.DD）'
         required: false
         default: ''
       branch:
@@ -47,9 +47,10 @@ jobs:
         run: |
           $inputTag = '${{ github.event.inputs.tag }}'
           if ([string]::IsNullOrWhiteSpace($inputTag)) {
-            $inputTag = [DateTime]::UtcNow.ToString('yyyy-M-d')
-          } elseif ($inputTag -notmatch '^[0-9]{4}-(?:[1-9]|1[0-2])-(?:[1-9]|[12][0-9]|3[01])$') {
-            Write-Error 'Tag must match YYYY-M-D with no leading zero in month or day'
+            $now = [DateTime]::UtcNow
+            $inputTag = "$($now.Year).$($now.Month).$($now.Day.ToString('D2'))"
+          } elseif ($inputTag -notmatch '^[0-9]{4}\.(?:[1-9]|1[0-2])\.(?:[0-2][0-9]|3[01])$') {
+            Write-Error 'Tag must match YYYY.M.DD format (e.g., 2026.5.18)'
             exit 1
           }
 
