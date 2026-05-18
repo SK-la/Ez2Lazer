@@ -11,6 +11,7 @@ from datetime import datetime
 VELOPACK_TOOL_VERSION = '0.0.1298'
 VELOPACK_PACK_ID = 'ez2lazer'
 VELOPACK_GITHUB_REPO_URL = 'https://github.com/SK-la/Ez2Lazer'
+MACOS_BUNDLE_ID = 'com.sk-la.ez2lazer'
 
 
 def format_date_tag(dt: datetime | None = None) -> str:
@@ -323,6 +324,26 @@ def velopack_framework_for(runtime: str) -> str | None:
     return mapping.get(runtime)
 
 
+def velopack_channel_for(target_platform: str, arch_name: str) -> str:
+    if target_platform == 'windows':
+        return 'win'
+    if target_platform == 'linux':
+        return 'linux'
+    return f'osx-{arch_name}'
+
+
+def resolve_main_exe(release_dir: str, target_platform: str) -> str:
+    if target_platform == 'windows':
+        return 'Ez2osu!.exe'
+
+    for candidate in ('Ez2osu!', 'osu.Desktop'):
+        path = os.path.join(release_dir, candidate)
+        if os.path.isfile(path):
+            return candidate
+
+    return 'Ez2osu!'
+
+
 def velopack_pack(
     release_dir: str,
     pack_version: str,
@@ -346,7 +367,8 @@ def velopack_pack(
         print(f'Velopack: unsupported platform {target_platform}')
         return 1
 
-    main_exe = 'Ez2osu!.exe' if target_platform == 'windows' else 'Ez2osu!'
+    main_exe = resolve_main_exe(release_dir, target_platform)
+    channel = velopack_channel_for(target_platform, arch_name)
     vpk_tool_dir = os.path.join(workdir, '.vpk-tools')
     os.makedirs(vpk_tool_dir, exist_ok=True)
     vpk_exe = os.path.join(vpk_tool_dir, 'vpk.exe' if os.name == 'nt' else 'vpk')
@@ -370,6 +392,7 @@ def velopack_pack(
         vpk_exe, 'download', 'github',
         '--repoUrl', VELOPACK_GITHUB_REPO_URL,
         '--outputDir', vpk_out,
+        '--channel', channel,
     ]
     github_token = os.environ.get('GITHUB_TOKEN')
     if github_token:
@@ -390,23 +413,39 @@ def velopack_pack(
         '--packTitle', 'Ez2Lazer',
         '--outputDir', vpk_out,
         '--runtime', runtime,
-        '--noPortable',
+        '--channel', channel,
     ]
+    # Windows: skip redundant Portable.zip (manual zip already provided).
+    if target_platform == 'windows':
+        pack_cmd.append('--noPortable')
+    # Linux: must produce AppImage (portable); --noPortable breaks vpk pack.
+    # macOS: skip unsigned .pkg installer (often fails on CI); portable + nupkg is enough.
+    elif target_platform == 'macos':
+        pack_cmd.extend(['--noInst', '--bundleId', MACOS_BUNDLE_ID])
+
     bootstrap_framework = velopack_framework_for(runtime)
     if bootstrap_framework:
         pack_cmd.extend(['--framework', bootstrap_framework])
-    if os.path.isfile(icon_path):
+    if target_platform == 'windows' and os.path.isfile(icon_path):
         pack_cmd.extend(['--icon', icon_path])
 
     print('Running:', ' '.join(pack_cmd))
-    pack_res = subprocess.run(pack_cmd, cwd=workdir)
+    pack_res = subprocess.run(pack_cmd, cwd=workdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if pack_res.returncode != 0:
+        try:
+            print('Velopack pack failed (stdout):')
+            print(pack_res.stdout.decode('utf-8', errors='replace'))
+            print('Velopack pack failed (stderr):')
+            print(pack_res.stderr.decode('utf-8', errors='replace'))
+        except Exception:
+            pass
         print('Velopack: pack failed with code', pack_res.returncode)
         return pack_res.returncode
 
     # Flatten Velopack outputs into artifacts_dir for CI collection.
     import glob
-    for pattern in ('*.nupkg', 'RELEASES', 'releases*.json', '*-Setup.exe', 'assets*.json'):
+    output_patterns = ('*.nupkg', 'RELEASES', 'releases*.json', 'assets*.json', '*-Setup.exe', '*.AppImage')
+    for pattern in output_patterns:
         for src in glob.glob(os.path.join(vpk_out, '**', pattern), recursive=True):
             dest = os.path.join(artifacts_dir, os.path.basename(src))
             shutil.copy2(src, dest)
