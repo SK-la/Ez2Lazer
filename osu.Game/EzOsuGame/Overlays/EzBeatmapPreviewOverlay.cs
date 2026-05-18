@@ -835,8 +835,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 return;
 
             var ruleset = rulesetInfo.CreateInstance();
-
             var newDrawableRuleset = ruleset.CreateDrawableRulesetWith(playableBeatmap);
+
             newDrawableRuleset.Clock = framedPreviewClock;
             newDrawableRuleset.FrameStablePlayback = false;
             newDrawableRuleset.Playfield.DisplayJudgements.Value = false;
@@ -961,7 +961,7 @@ namespace osu.Game.EzOsuGame.Overlays
             }
 
             drawableRuleset = null;
-            densityController.Reset();
+            densityController.DisposeSession();
         }
 
         private float clampPanelWidth(float width)

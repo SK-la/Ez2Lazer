@@ -17,58 +17,56 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         private const float max_density = 5.0f;
         private const float density_step = 0.05f;
 
+        private readonly BindableDouble density;
+
         private double baselineTimeRange;
-        private float currentDensity = 1.0f;
         private bool hasBaseline;
         private IPreviewScrollDensityAdjustable? previewDensityAdjustable;
+
+        public PreviewDensityController(BindableDouble density)
+        {
+            this.density = density;
+        }
+
+        public float CurrentDensity => (float)density.Value;
 
         public void CaptureBaseline(IDrawableScrollingRuleset ruleset)
         {
             previewDensityAdjustable = ruleset as IPreviewScrollDensityAdjustable;
 
             if (previewDensityAdjustable != null)
-            {
-                previewDensityAdjustable.PreviewDensityMultiplier = 1;
-            }
+                applyDensity(previewDensityAdjustable, CurrentDensity);
             else
-            {
                 baselineTimeRange = ruleset.ScrollingInfo.TimeRange.Value;
-            }
 
-            currentDensity = 1.0f;
             hasBaseline = true;
         }
 
-        public void Reset()
+        public void DisposeSession()
         {
-            if (previewDensityAdjustable != null)
-                previewDensityAdjustable.PreviewDensityMultiplier = 1;
-
             previewDensityAdjustable = null;
             baselineTimeRange = 0;
-            currentDensity = 1.0f;
             hasBaseline = false;
         }
 
         public bool TryAdjust(IDrawableScrollingRuleset ruleset, int scrollDirection, out float displayDensity)
         {
-            displayDensity = currentDensity;
+            displayDensity = CurrentDensity;
 
             if (!hasBaseline || scrollDirection == 0)
                 return false;
 
-            float newDensity = Math.Clamp(currentDensity + scrollDirection * density_step, min_density, max_density);
+            float newDensity = Math.Clamp(CurrentDensity + scrollDirection * density_step, min_density, max_density);
 
-            if (Math.Abs(newDensity - currentDensity) <= 0.001f)
+            if (Math.Abs(newDensity - CurrentDensity) <= 0.001f)
                 return false;
 
-            currentDensity = newDensity;
-            displayDensity = currentDensity;
+            density.Value = newDensity;
+            displayDensity = newDensity;
 
             if (ruleset is IPreviewScrollDensityAdjustable adjustable)
             {
-                // Rulesets that recompute TimeRange every frame (e.g. mania) must apply density here.
-                adjustable.PreviewDensityMultiplier = currentDensity;
+                applyDensity(adjustable, newDensity);
                 previewDensityAdjustable = adjustable;
                 return true;
             }
@@ -76,10 +74,13 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             if (ruleset.ScrollingInfo.TimeRange is not BindableDouble bindableTimeRange)
                 return false;
 
-            double target = Math.Clamp(baselineTimeRange / currentDensity, bindableTimeRange.MinValue, bindableTimeRange.MaxValue);
+            double target = Math.Clamp(baselineTimeRange / newDensity, bindableTimeRange.MinValue, bindableTimeRange.MaxValue);
             bindableTimeRange.Value = target;
 
             return true;
         }
+
+        private static void applyDensity(IPreviewScrollDensityAdjustable adjustable, float value)
+            => adjustable.PreviewDensityMultiplier = value;
     }
 }

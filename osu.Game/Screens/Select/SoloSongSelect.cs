@@ -11,6 +11,7 @@ using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -123,6 +124,8 @@ namespace osu.Game.Screens.Select
             }
 
             sampleConfirmSelection?.Play();
+
+            BeatmapPreviewState.ResetForGameplay();
 
             this.Push(playerLoader = new PlayerLoader(createPlayer));
 
