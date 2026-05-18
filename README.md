@@ -16,10 +16,10 @@ Ez2Lazer is a heavily customized branch based on osu! lazer, focused on Mania/BM
 - 运行时要求 / Runtime: [.NET 8.0 Runtime](https://dotnet.microsoft.com/download)
 
 **自动更新（推荐）** / **Auto-update (recommended)**  
-- Windows：下载 Release 中的 `ez2lazer-Setup.exe` 安装；之后可在游戏内接收增量更新。  
-- Windows: use `ez2lazer-Setup.exe` from Releases for install; in-game updates will download deltas afterward.  
-- 仍可使用 zip 手动解压，但 zip 安装无法使用增量更新，需改用安装包一次。  
-- Zip archives remain available for manual installs, but they cannot receive delta updates until you switch to the installer once.
+- Windows：下载 Release 中的 `ez2lazer-win-Setup.exe` 安装（需已安装 [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download)）；之后可在游戏内接收增量更新。  
+- Windows: use `ez2lazer-win-Setup.exe` from Releases (requires [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download)); in-game updates download deltas afterward.  
+- 手动安装请用 `Ez2Lazer_release_*.zip` 解压运行；zip 无法使用增量更新，需改用 Setup 安装一次。  
+- For manual installs use `Ez2Lazer_release_*.zip`; zip installs cannot receive delta updates until you switch to Setup once.
 
 > 未安装 EzResources 时，Ez Pro Skin 和 Ez HUD 组件会缺失贴图。  
 > Without EzResources, Ez Pro Skin and Ez HUD widgets will miss textures.

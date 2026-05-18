@@ -229,7 +229,7 @@ jobs:
           if (-not $zipFound) { Write-Error "zip asset not found in $osuArtifacts"; exit 1 }
           Copy-Item -Path $zipFound.FullName -Destination (Join-Path $uploadDir $zipDest) -Force
 
-          $velopackPatterns = @('ez2lazer-*.nupkg', 'RELEASES', 'releases*.json', 'assets*.json', 'ez2lazer-*-Setup.exe', 'ez2lazer-*-Portable.zip')
+          $velopackPatterns = @('ez2lazer-*.nupkg', 'RELEASES', 'releases*.json', 'assets*.json', 'ez2lazer-*-Setup.exe')
           foreach ($pattern in $velopackPatterns) {
             Get-ChildItem -Path $osuArtifacts -Filter $pattern -ErrorAction SilentlyContinue | ForEach-Object {
               Copy-Item -Path $_.FullName -Destination (Join-Path $uploadDir $_.Name) -Force

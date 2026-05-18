@@ -50,7 +50,7 @@ def run_publish(
         return os_id
 
     rid = _rid_for(os_id)
-    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir, "--self-contained", "true"]
+    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir, "--self-contained", "false"]
     if rid:
         cmd.extend(["-r", rid])
     if msbuild_properties:
@@ -74,7 +74,7 @@ def run_publish(
     return res.returncode
 
 
-def run_cleanup(script_path: str, target_dir: str, platform: str = None) -> int:
+def run_cleanup(script_path: str, target_dir: str, platform: str = None, arch: str | None = None) -> int:
     # If an external script is provided and exists, run it. Otherwise use internal cleaner.
     if script_path and os.path.exists(script_path):
         print(f"Running external cleanup script: {script_path}")
@@ -82,10 +82,10 @@ def run_cleanup(script_path: str, target_dir: str, platform: str = None) -> int:
         return res.returncode
     else:
         print("External cleanup script not found, using internal cleanup logic")
-        return clean_publish_folder(target_dir, platform)
+        return clean_publish_folder(target_dir, platform, arch)
 
 
-def clean_publish_folder(release_dir=None, platform=None):
+def clean_publish_folder(release_dir=None, platform=None, arch: str | None = None):
     from pathlib import Path
     import fnmatch
 
@@ -130,17 +130,15 @@ def clean_publish_folder(release_dir=None, platform=None):
     if runtime_dir.exists():
         print(f"Processing runtime folder: {runtime_dir}")
         # choose keep list based on platform if provided
-        if platform is None:
-            keep_runtimes = {"win-x64", "win-x86"}
+        resolved_arch = resolve_arch(arch)
+        if platform == 'windows':
+            keep_runtimes = {f'win-{resolved_arch}', 'win-x86'}
+        elif platform == 'linux':
+            keep_runtimes = {f'linux-{resolved_arch}'}
+        elif platform == 'macos':
+            keep_runtimes = {f'osx-{resolved_arch}'}
         else:
-            if platform == 'windows':
-                keep_runtimes = {"win-x64", "win-x86"}
-            elif platform == 'linux':
-                keep_runtimes = {"linux-x64"}
-            elif platform == 'macos':
-                keep_runtimes = {"osx-x64", "osx-arm64"}
-            else:
-                keep_runtimes = {"win-x64", "win-x86"}
+            keep_runtimes = {f'win-{resolved_arch}', 'win-x86'}
 
         for runtime_folder in runtime_dir.iterdir():
             if runtime_folder.is_dir():
@@ -316,6 +314,15 @@ def _build_macos_launcher_script(executable_name: str | None) -> str:
     return '\n'.join(lines) + '\n'
 
 
+def velopack_framework_for(runtime: str) -> str | None:
+    """Velopack bootstrap frameworks for framework-dependent publishes (Windows only)."""
+    mapping = {
+        'win-x64': 'net8.0-x64-desktop',
+        'win-arm64': 'net8.0-arm64-desktop',
+    }
+    return mapping.get(runtime)
+
+
 def velopack_pack(
     release_dir: str,
     pack_version: str,
@@ -383,7 +390,11 @@ def velopack_pack(
         '--packTitle', 'Ez2Lazer',
         '--outputDir', vpk_out,
         '--runtime', runtime,
+        '--noPortable',
     ]
+    bootstrap_framework = velopack_framework_for(runtime)
+    if bootstrap_framework:
+        pack_cmd.extend(['--framework', bootstrap_framework])
     if os.path.isfile(icon_path):
         pack_cmd.extend(['--icon', icon_path])
 
@@ -395,7 +406,7 @@ def velopack_pack(
 
     # Flatten Velopack outputs into artifacts_dir for CI collection.
     import glob
-    for pattern in ('*.nupkg', 'RELEASES', 'releases*.json', '*-Setup.exe', '*-Portable.zip', 'assets*.json'):
+    for pattern in ('*.nupkg', 'RELEASES', 'releases*.json', '*-Setup.exe', 'assets*.json'):
         for src in glob.glob(os.path.join(vpk_out, '**', pattern), recursive=True):
             dest = os.path.join(artifacts_dir, os.path.basename(src))
             shutil.copy2(src, dest)
@@ -541,7 +552,7 @@ def main():
     else:
         print('Release publish succeeded')
         # optional cleanup (pass target platform so we don't remove required runtimes)
-        run_cleanup(args.cleanup_release, release_dir, target_platform)
+        run_cleanup(args.cleanup_release, release_dir, target_platform, arch_name)
         # cleanup done; removed verbose release_dir listing to reduce log noise
 
     if not args.release_only:
@@ -551,7 +562,7 @@ def main():
             print('Debug publish failed with code', rc2)
         else:
             print('Debug publish succeeded')
-            run_cleanup(args.cleanup_debug, debug_dir, target_platform)
+            run_cleanup(args.cleanup_debug, debug_dir, target_platform, arch_name)
 
     # Use asset names that match workflow-normalized names when tag present
     release_zip = os.path.join(artifacts_dir, f"Ez2Lazer_release_{target_platform}_{arch_name}{tag_suffix}.zip")

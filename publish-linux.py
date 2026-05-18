@@ -31,7 +31,7 @@ def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str
             # if caller passed a full RID already, use it
             rid = os
 
-    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir, "--self-contained", "true"]
+    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir, "--self-contained", "false"]
     if rid:
         cmd.extend(["-r", rid])
     print("Running:", " ".join(cmd))
