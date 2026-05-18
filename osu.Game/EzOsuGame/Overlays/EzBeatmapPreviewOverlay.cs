@@ -822,6 +822,7 @@ namespace osu.Game.EzOsuGame.Overlays
             newDrawableRuleset.FrameStablePlayback = false;
             newDrawableRuleset.Playfield.DisplayJudgements.Value = false;
 
+            // TODO : 改为使用 EditorSkinProvidingContainer，实现自定义调整网格间距。
             pendingPreviewRoot = new RulesetSkinProvidingContainer(ruleset, playableBeatmap, skin)
             {
                 RelativeSizeAxes = Axes.Both,
