@@ -67,17 +67,17 @@ namespace osu.Game.EzOsuGame.Mods
         public BindableNumber<double> MinAllowableRate { get; } = new BindableDouble(0.7)
         {
             MinValue = 0.1,
-            MaxValue = 1.0,
-            Precision = 0.1
+            MaxValue = 1.5,
+            Precision = 0.01
         };
 
         [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.MAX_ALLOWABLE_RATE_LABEL), nameof(NiceBPMStrings.MAX_ALLOWABLE_RATE_DESCRIPTION),
             SettingControlType = typeof(MultiplierSettingsSlider))]
-        public BindableNumber<double> MaxAllowableRate { get; } = new BindableDouble(1.5)
+        public BindableNumber<double> MaxAllowableRate { get; } = new BindableDouble(1.2)
         {
-            MinValue = 1.0,
-            MaxValue = 3.0,
-            Precision = 0.1
+            MinValue = 0.5,
+            MaxValue = 2.0,
+            Precision = 0.01
         };
 
         // 每次速度变化的阈值，如果有需要以后再增加设置。
@@ -138,14 +138,14 @@ namespace osu.Game.EzOsuGame.Mods
         {
             get
             {
-                yield return ("Free BPM", FreeBPM.Value.HasValue ? FreeBPM.Value.Value.ToString() : "Auto");
-                yield return ("Initial Rate", $"{InitialRate.Value:N2}");
-                yield return ("Dynamic BPM", EnableDynamicBPM.Value ? "On" : "Off");
-                yield return ("Adjust Pitch", AdjustPitch.Value ? "On" : "Off");
-                yield return ("Min Rate", $"{MinAllowableRate.Value:N2}");
-                yield return ("Max Rate", $"{MaxAllowableRate.Value:N2}");
-                yield return ("Miss Threshold", $"{MissThreshold.Value}");
-                yield return ("Rate Change On Miss", $"{RateChangeOnMiss.Value:N2}");
+                yield return (NiceBPMStrings.FREE_BPM_LABEL, FreeBPM.Value.HasValue ? FreeBPM.Value.Value.ToString() : "Auto");
+                yield return (NiceBPMStrings.INITIAL_RATE_LABEL, $"{InitialRate.Value:N2}");
+                yield return (NiceBPMStrings.ENABLE_DYNAMIC_BPM_LABEL, EnableDynamicBPM.Value ? "On" : "Off");
+                yield return (EzCommonModStrings.ADJUST_PITCH_LABEL, AdjustPitch.Value ? "On" : "Off");
+                yield return (NiceBPMStrings.MIN_ALLOWABLE_RATE_LABEL, $"{MinAllowableRate.Value:N2}");
+                yield return (NiceBPMStrings.MAX_ALLOWABLE_RATE_LABEL, $"{MaxAllowableRate.Value:N2}");
+                yield return (NiceBPMStrings.MISS_COUNT_THRESHOLD_LABEL, $"{MissThreshold.Value}");
+                yield return (NiceBPMStrings.RATE_CHANGE_ON_MISS_LABEL, $"{RateChangeOnMiss.Value:N2}");
             }
         }
 
@@ -492,7 +492,7 @@ namespace osu.Game.EzOsuGame.Mods
                 AutoSizeAxes = Axes.Both;
                 Anchor = Anchor.BottomLeft;
                 Origin = Anchor.BottomLeft;
-                Position = new Vector2(16, -16);
+                Position = new Vector2(50, -50);
             }
 
             protected override void LoadComplete()
@@ -505,7 +505,7 @@ namespace osu.Game.EzOsuGame.Mods
                 };
 
                 displayedRate.BindTo(sourceRate);
-                displayedRate.BindValueChanged(rate => rateText.Text = $"Speed: {rate.NewValue:0.00}x", true);
+                displayedRate.BindValueChanged(rate => rateText.Text = $"Speed Rate: {rate.NewValue:0.00}x", true);
             }
 
             protected override void Dispose(bool isDisposing)
