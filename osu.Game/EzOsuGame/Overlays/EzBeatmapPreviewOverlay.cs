@@ -14,17 +14,18 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
 using osu.Framework.Threading;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.UI;
+using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -115,6 +116,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private ScheduledDelegate? scheduledSelectionLoad;
         private Drawable? pendingPreviewRoot;
         private DrawableRuleset? drawableRuleset;
+        private readonly PreviewDensityController densityController = new PreviewDensityController();
 
         [Resolved(CanBeNull = true)]
         private ISkin? skin { get; set; }
@@ -732,6 +734,23 @@ namespace osu.Game.EzOsuGame.Overlays
             if (mouse.X < panelQuad.TopLeft.X || mouse.X > panelQuad.TopRight.X || mouse.Y < panelQuad.TopLeft.Y || mouse.Y > panelQuad.BottomLeft.Y)
                 return base.OnScroll(e);
 
+            // Alt + Scroll: 调整滚动规则集的时间跨度（note 疏密）
+            if (e.CurrentState.Keyboard.AltPressed
+                && drawableRuleset is IDrawableScrollingRuleset scrolling
+                && densityController.TryAdjust(scrolling, Math.Sign(e.ScrollDelta.Y), out float displayDensity))
+            {
+                string densityText = $"{displayDensity:F2}x";
+                setStateText(densityText);
+
+                Scheduler.AddDelayed(() =>
+                {
+                    if (stateText.Text == densityText)
+                        setStateText(string.Empty);
+                }, 1000);
+
+                return true;
+            }
+
             // In dynamic mode: fast-forward 3 seconds per scroll, keep playback running
             if (dynamicMode)
             {
@@ -822,11 +841,10 @@ namespace osu.Game.EzOsuGame.Overlays
             newDrawableRuleset.FrameStablePlayback = false;
             newDrawableRuleset.Playfield.DisplayJudgements.Value = false;
 
-            // TODO : 改为使用 EditorSkinProvidingContainer，实现自定义调整网格间距。
             pendingPreviewRoot = new RulesetSkinProvidingContainer(ruleset, playableBeatmap, skin)
             {
                 RelativeSizeAxes = Axes.Both,
-                Child = new NonInteractivePreviewContainer
+                Child = new NonHandleContainer
                 {
                     RelativeSizeAxes = Axes.Both,
                     Child = newDrawableRuleset,
@@ -846,6 +864,13 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 stageScaleContainer.Child = loaded;
                 drawableRuleset = newDrawableRuleset;
+
+                // Capture after the ruleset has finished loading so TargetTimeRange / TimeRange are initialised.
+                Schedule(() =>
+                {
+                    if (drawableRuleset is IDrawableScrollingRuleset scrollingRuleset)
+                        densityController.CaptureBaseline(scrollingRuleset);
+                });
             }, cancellationToken);
         }
 
@@ -936,6 +961,7 @@ namespace osu.Game.EzOsuGame.Overlays
             }
 
             drawableRuleset = null;
+            densityController.Reset();
         }
 
         private float clampPanelWidth(float width)
@@ -1100,69 +1126,5 @@ namespace osu.Game.EzOsuGame.Overlays
             double StartTime,
             double MinTime,
             double MaxTime);
-
-        private partial class NonInteractivePreviewContainer : Container
-        {
-            public override bool HandlePositionalInput => false;
-
-            public override bool HandleNonPositionalInput => false;
-
-            public override bool PropagateNonPositionalInputSubTree => false;
-        }
-
-        private partial class PreviewModeButton : OsuButton
-        {
-            private Color4 textColour = Color4.White;
-            private bool selected;
-
-            public bool Selected
-            {
-                set
-                {
-                    if (selected == value)
-                        return;
-
-                    selected = value;
-                    updateVisualState();
-                }
-            }
-
-            public Color4 TextColour
-            {
-                set
-                {
-                    textColour = value;
-                    SpriteText.FadeColour(textColour, 120, Easing.OutQuint);
-                }
-            }
-
-            public PreviewModeButton()
-            {
-                Size = new Vector2(108, 28);
-                Content.CornerRadius = 6;
-            }
-
-            protected override float HoverLayerFinalAlpha => 0.06f;
-
-            protected override void LoadComplete()
-            {
-                base.LoadComplete();
-                SpriteText.Colour = textColour;
-                updateVisualState();
-            }
-
-            private void updateVisualState()
-            {
-                BackgroundColour = selected ? Color4.CornflowerBlue.Opacity(0.85f) : Color4.Black.Opacity(0.5f);
-                TextColour = selected ? Color4.White : Color4.White.Opacity(0.9f);
-            }
-
-            protected override SpriteText CreateText() => new OsuSpriteText
-            {
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                Font = OsuFont.Default.With(size: 12, weight: FontWeight.SemiBold)
-            };
-        }
     }
 }

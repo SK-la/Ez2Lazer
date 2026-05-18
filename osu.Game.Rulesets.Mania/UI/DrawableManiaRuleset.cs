@@ -41,7 +41,7 @@ using osuTK.Input;
 
 namespace osu.Game.Rulesets.Mania.UI
 {
-    public partial class DrawableManiaRuleset : DrawableScrollingRuleset<ManiaHitObject>
+    public partial class DrawableManiaRuleset : DrawableScrollingRuleset<ManiaHitObject>, IPreviewScrollDensityAdjustable
     {
         /// <summary>
         /// The minimum time range. This occurs at a <see cref="ManiaRulesetSetting.ScrollSpeed"/> of 40.
@@ -71,6 +71,12 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly Bindable<bool> touchOverlay = new Bindable<bool>();
 
         public double TargetTimeRange { get; protected set; }
+
+        /// <summary>
+        /// Multiplier applied to <see cref="TargetTimeRange"/> when computing <see cref="DrawableScrollingRuleset{TObject}.TimeRange"/>.
+        /// Values greater than 1 increase density (notes closer together). Used by beatmap preview overlay.
+        /// </summary>
+        public double PreviewDensityMultiplier { get; set; } = 1;
 
         // Stores the current speed adjustment active in gameplay.
         private readonly Track speedAdjustmentTrack = new TrackVirtual(0);
@@ -355,7 +361,7 @@ namespace osu.Game.Rulesets.Mania.UI
                     break;
             }
 
-            TimeRange.Value = TargetTimeRange * speedAdjustmentTrack.AggregateTempo.Value * speedAdjustmentTrack.AggregateFrequency.Value * scale;
+            TimeRange.Value = TargetTimeRange / PreviewDensityMultiplier * speedAdjustmentTrack.AggregateTempo.Value * speedAdjustmentTrack.AggregateFrequency.Value * scale;
         }
 
         /// <summary>
