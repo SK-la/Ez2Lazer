@@ -61,10 +61,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
-        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(500)
         {
             MinValue = 0,
-            MaxValue = 100
+            MaxValue = 1000
         };
 
         public int ApplyOrder => ApplyOrderIndex.Value;
@@ -194,9 +194,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             // 从优先级1到maxLv查找
             for (int lv = 1; lv <= maxLv; lv++)
             {
-                if (!lvDict.ContainsKey(lv)) continue;
-
-                var candidates = lvDict[lv];
+                if (!lvDict.TryGetValue(lv, out var candidates)) continue;
 
                 foreach (var perm in candidates)
                 {
@@ -518,7 +516,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             // 步骤1：提取当前区域的Note并按StartTime排序
             var regionNotes = hitObjects
-                              .OfType<ManiaHitObject>()
                               .Where(h => h.Column >= leftColumn && h.Column <= rightColumn)
                               .OrderBy(n => n.StartTime)
                               .ToList();
@@ -644,7 +641,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 // ProcessLevel决定threshold阈值，currentLv是字典中查找到的排列等级
                 bool shouldRefine = false;
                 int startPriority = 1; // 重排时从哪个优先级开始选（往低数字查找）
-                int threshold = 0; // 用于优化getPermutationLevel的提前退出
 
                 if (hasColumnConflict)
                 {
@@ -669,7 +665,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     else
                     {
                         // 从映射表获取 threshold
-                        threshold = no_conflict_threshold_map[processLevel];
+                        int threshold = no_conflict_threshold_map[processLevel]; // 用于优化getPermutationLevel的提前退出
 
                         // 获取当前排列的 LV 等级，传入 threshold 以启用提前退出优化
                         int currentLv = getPermutationLevel(sortedAllDigits, threshold);
@@ -741,7 +737,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 }
 
                 // 3.4 查找排列字典
-                List<int> selectedPerm = null;
+                List<int>? selectedPerm = null;
                 int totalNotesInWindow = m + n;
 
                 if (n > 0 && permutation_dict.TryGetValue(totalNotesInWindow, out var nDict))
@@ -957,8 +953,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
     {
         // MOD 描述
         public static readonly LocalisableString DRE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "优化14k/16k谱面的DP（单手7键）排列，避免同指冲突和困难指法。通过智能重排Note到更舒适的列，提升DP的流畅度。",
-            "Optimize DP (single-hand 7-key) patterns in 14k/16k beatmaps to avoid same-finger conflicts and difficult fingerings. Intelligently reorders notes to more comfortable columns for smoother DP gameplay.");
+            "用于 14k/16k DP（单手7键）谱面，使用算法改进键型，得到更像BMS-DP的指法，避免冲突和困难指法。"
+            + "\n推荐搭配 PS Mod 先转换成 14k, 再用这个优化键型，体验更佳。",
+            "For 14k/16k DP (one-hand 7-key) beatmaps, uses algorithm to optimize key patterns for more natural BMS-DP fingering, avoiding conflicts and difficult fingerings."
+            + "\nRecommended to use with PS Mod to first convert to 14k, then optimize key patterns with this mod for a better experience.");
 
         // 时间窗口设置
         public static readonly LocalisableString TIME_WINDOW_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString(
