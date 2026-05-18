@@ -79,6 +79,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             hitModeBindable.BindValueChanged(v =>
             {
                 currentHitMode = v.NewValue;
+                hitWindowsV2.SetHitMode(currentHitMode);
                 // 重新计算并重绘。
                 Refresh();
             }, true);
