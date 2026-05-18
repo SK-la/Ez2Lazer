@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -9,6 +10,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.Edit.Tools;
 using osu.Game.Rulesets.Objects;
@@ -27,7 +29,9 @@ namespace osu.Game.Rulesets.Edit
         private Editor? editor { get; set; }
 
         private readonly Bindable<TernaryState> showSpeedChanges = new Bindable<TernaryState>();
+        private readonly Bindable<TernaryState> syncTimelineSpacing = new Bindable<TernaryState>();
         private Bindable<bool> configShowSpeedChanges = null!;
+        private Bindable<bool> configSyncTimelineSpacing = null!;
 
         private BeatSnapGrid? beatSnapGrid;
 
@@ -42,10 +46,41 @@ namespace osu.Game.Rulesets.Edit
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
             if (DrawableRuleset is ISupportConstantAlgorithmToggle toggleRuleset)
             {
+                var playfieldButtons = new List<Drawable>
+                {
+                    new DrawableTernaryButton
+                    {
+                        Current = showSpeedChanges,
+                        Description = "Show speed changes",
+                        CreateIcon = () => new SpriteIcon { Icon = FontAwesome.Solid.TachometerAlt },
+                    }
+                };
+
+                if (DrawableRuleset is ISupportTimelineSpacingSync spacingSyncRuleset)
+                {
+                    playfieldButtons.Add(new DrawableTernaryButton
+                    {
+                        Current = syncTimelineSpacing,
+                        Description = "Sync timeline spacing",
+                        CreateIcon = () => new SpriteIcon { Icon = FontAwesome.Solid.ArrowsAltV },
+                    });
+
+                    configSyncTimelineSpacing = ezConfig.GetBindable<bool>(Ez2Setting.EditorSyncTimelineSpacing);
+                    configSyncTimelineSpacing.BindValueChanged(enabled => syncTimelineSpacing.Value = enabled.NewValue ? TernaryState.True : TernaryState.False, true);
+
+                    syncTimelineSpacing.BindValueChanged(state =>
+                    {
+                        bool enabled = state.NewValue == TernaryState.True;
+
+                        spacingSyncRuleset.SyncTimelineSpacing.Value = enabled;
+                        configSyncTimelineSpacing.Value = enabled;
+                    }, true);
+                }
+
                 LeftToolbox.Add(new EditorToolboxGroup("playfield")
                 {
                     Child = new FillFlowContainer
@@ -54,15 +89,7 @@ namespace osu.Game.Rulesets.Edit
                         AutoSizeAxes = Axes.Y,
                         Direction = FillDirection.Vertical,
                         Spacing = new Vector2(0, 5),
-                        Children = new[]
-                        {
-                            new DrawableTernaryButton
-                            {
-                                Current = showSpeedChanges,
-                                Description = "Show speed changes",
-                                CreateIcon = () => new SpriteIcon { Icon = FontAwesome.Solid.TachometerAlt },
-                            }
-                        }
+                        Children = playfieldButtons.ToArray(),
                     },
                 });
 

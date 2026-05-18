@@ -17,13 +17,13 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         private const float max_density = 5.0f;
         private const float density_step = 0.05f;
 
-        private readonly BindableDouble density;
+        private readonly Bindable<double> density;
 
         private double baselineTimeRange;
         private bool hasBaseline;
         private IPreviewScrollDensityAdjustable? previewDensityAdjustable;
 
-        public PreviewDensityController(BindableDouble density)
+        public PreviewDensityController(Bindable<double> density)
         {
             this.density = density;
         }

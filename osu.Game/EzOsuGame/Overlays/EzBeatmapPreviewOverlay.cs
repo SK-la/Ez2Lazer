@@ -116,7 +116,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private ScheduledDelegate? scheduledSelectionLoad;
         private Drawable? pendingPreviewRoot;
         private DrawableRuleset? drawableRuleset;
-        private readonly PreviewDensityController densityController = new PreviewDensityController();
+        private PreviewDensityController densityController = null!;
+        private Bindable<double> previewDensity = null!;
 
         [Resolved(CanBeNull = true)]
         private ISkin? skin { get; set; }
@@ -307,6 +308,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private void load(Ez2ConfigManager ezConfig)
         {
             previewMode.BindTo(ezConfig.GetBindable<EzBeatmapPreviewMode>(Ez2Setting.BeatmapPreviewMode));
+            previewDensity = ezConfig.GetBindable<double>(Ez2Setting.BeatmapPreviewDensity);
+            densityController = new PreviewDensityController(previewDensity);
         }
 
         protected override void LoadComplete()

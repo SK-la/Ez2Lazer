@@ -15,9 +15,11 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Edit
 {
-    public partial class DrawableManiaEditorRuleset : DrawableManiaRuleset, ISupportConstantAlgorithmToggle
+    public partial class DrawableManiaEditorRuleset : DrawableManiaRuleset, ISupportConstantAlgorithmToggle, ISupportTimelineSpacingSync
     {
         public BindableBool ShowSpeedChanges { get; } = new BindableBool();
+
+        public BindableBool SyncTimelineSpacing { get; } = new BindableBool(true);
 
         public double? TimelineTimeRange { get; set; }
 
@@ -44,11 +46,16 @@ namespace osu.Game.Rulesets.Mania.Edit
 
         protected override void Update()
         {
-            // 使用ez2lazer特色调速系统
-            TimeRange.Value = TimelineTimeRange == null || ShowSpeedChanges.Value
-                ? ComputeScrollTime(Config.Get<double>(ManiaRulesetSetting.ScrollSpeed), Config.Get<double>(ManiaRulesetSetting.ScrollBaseSpeed),
-                    Config.Get<double>(ManiaRulesetSetting.ScrollTimePerSpeed))
-                : TimelineTimeRange.Value;
+            if (SyncTimelineSpacing.Value && TimelineTimeRange != null)
+                TargetTimeRange = TimelineTimeRange.Value;
+            else if (TimelineTimeRange == null || ShowSpeedChanges.Value)
+            {
+                TargetTimeRange = ComputeScrollTime(Config.Get<double>(ManiaRulesetSetting.ScrollSpeed), Config.Get<double>(ManiaRulesetSetting.ScrollBaseSpeed),
+                    Config.Get<double>(ManiaRulesetSetting.ScrollTimePerSpeed));
+            }
+            else
+                TargetTimeRange = TimelineTimeRange.Value;
+
             base.Update();
         }
     }
