@@ -13,8 +13,9 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
-using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Collections;
 using osu.Game.Database;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
@@ -312,6 +313,9 @@ namespace osu.Game.Rulesets.BMS.UI
                         cacheStatusNote.Current.Value = new SettingsNote.Data(
                             $"扫描完成! {result.SongCount} 首歌曲, {result.ChartCount} 张谱面",
                             SettingsNote.Type.Informational);
+
+                        // 扫描完成后，为每个路径创建独立的收藏夹
+                        createCollectionsFromPaths(paths);
                     });
                 }
                 catch (Exception ex)
@@ -331,6 +335,81 @@ namespace osu.Game.Rulesets.BMS.UI
                     });
                 }
             });
+        }
+
+        private void createCollectionsFromPaths(IReadOnlyList<string> paths)
+        {
+            if (paths.Count == 0 || beatmapManager?.LibraryCache == null)
+                return;
+
+            int createdCount = 0;
+            int totalCharts = 0;
+            // 用于跟踪已使用的收藏夹名称，避免重复
+            var usedCollectionNames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string path in paths)
+            {
+                if (!Directory.Exists(path))
+                    continue;
+
+                // 获取该路径下的所有谱面哈希值
+                var beatmapHashes = new List<string>();
+
+                // 从 LibraryCache 中查找属于该路径的谱面
+                foreach (var song in beatmapManager.LibraryCache.Songs)
+                {
+                    // 检查歌曲是否在该路径下
+                    if (song.FolderPath.StartsWith(path, StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach (var chart in song.Charts)
+                        {
+                            string md5Hash = BmsPathKeys.ComputeChartPathKey(chart.FullPath);
+                            beatmapHashes.Add(md5Hash);
+                        }
+                    }
+                }
+
+                if (beatmapHashes.Count == 0)
+                    continue;
+
+                // 使用路径的文件夹名称作为收藏夹名称
+                string collectionName = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                if (string.IsNullOrEmpty(collectionName))
+                    collectionName = Path.GetFileName(path); // 尝试再次获取
+                if (string.IsNullOrEmpty(collectionName))
+                    collectionName = "BMS Collection"; // 最后的默认值
+
+                // 检查名称是否已使用，如果已使用则追加序号
+                if (usedCollectionNames.TryGetValue(collectionName, out int value))
+                {
+                    // 增加该名称的计数器
+                    usedCollectionNames[collectionName] = ++value;
+                    collectionName = $"{collectionName} ({value})";
+                }
+                else
+                {
+                    // 首次使用该名称，计数器设为0
+                    usedCollectionNames[collectionName] = 0;
+                }
+
+                // 创建收藏夹
+                realm.Write(r =>
+                {
+                    var collection = new BeatmapCollection(collectionName, beatmapHashes);
+                    r.Add(collection);
+                });
+
+                createdCount++;
+                totalCharts += beatmapHashes.Count;
+            }
+
+            if (createdCount > 0)
+            {
+                notificationOverlay?.Post(new SimpleNotification
+                {
+                    Text = $"已为 {createdCount} 个路径创建收藏夹，共收藏 {totalCharts} 张谱面"
+                });
+            }
         }
     }
 }
