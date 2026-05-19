@@ -1,17 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Text.Json;
 using osu.Framework.Audio;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Logging;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Rulesets.BMS.Beatmaps;
-using osu.Game.Rulesets.Mania;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Scoring;
-using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
 {
@@ -23,117 +15,112 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
 
     public static class BmsAnalyticsScanService
     {
-        /// <summary>
-        /// Chart-only analysis is CPU-bound once keysound preload is disabled; allow more parallelism than disk-heavy scans.
-        /// </summary>
-        private static readonly int max_parallelism = Math.Clamp(Environment.ProcessorCount / 2, 2, 8);
+        public static bool IsRunning => BmsAnalyticsScanContext.IsRunning;
 
-        public static async Task RunAsync(
+        public static Task RunAsync(
             BMSBeatmapManager beatmapManager,
             BmsAnalyticsSqliteRepository repository,
             AudioManager audioManager,
-            IRenderer renderer,
             IProgress<BmsAnalyticsScanProgress>? progress = null,
             CancellationToken cancellationToken = default)
         {
             var charts = beatmapManager.GetAllCharts().ToList();
             if (charts.Count == 0)
-                return;
+                return Task.CompletedTask;
 
-            var ruleset = new BMSRuleset();
-            var performanceCalculator = ruleset.CreatePerformanceCalculator();
-            var analysisProvider = ruleset.CreateEzAnalysisProvider();
-            var maniaRuleset = new ManiaRuleset();
+            return Task.Run(() => runOnBackgroundThread(charts, repository, audioManager, progress, cancellationToken), cancellationToken);
+        }
 
-            using var gate = new SemaphoreSlim(max_parallelism);
-            int completed = 0;
+        private static void runOnBackgroundThread(
+            IReadOnlyList<BMSChartCache> charts,
+            BmsAnalyticsSqliteRepository repository,
+            AudioManager audioManager,
+            IProgress<BmsAnalyticsScanProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            using var scope = BmsAnalyticsScanContext.Enter(cancellationToken);
 
-            var tasks = charts.Select(async chart =>
+            int total = charts.Count;
+
+            report(progress, 0, total, "准备分析…");
+
+            try
             {
-                await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-                try
+                for (int index = 0; index < total; index++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+
+                    var chart = charts[index];
+                    int displayIndex = index + 1;
+
+                    report(progress, index, total, $"[{displayIndex}/{total}] 开始: {chart.Title}");
 
                     string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
                         ? BmsPathKeys.ComputeChartPathKey(chart.FullPath)
                         : chart.Md5Hash;
 
-                    // Chart stream only: no background textures, no keysound preload (avoids mass audio IO).
-                    var bmsWorking = new BMSWorkingBeatmap(chart.FullPath, audioManager, renderer: null, chart);
-                    var maniaWorking = new ManiaConvertedWorkingBeatmap(bmsWorking, audioManager, preloadKeysounds: false);
-                    var playable = maniaWorking.GetPlayableBeatmap(maniaRuleset.RulesetInfo);
-
-                    double star = maniaRuleset.CreateDifficultyCalculator(maniaWorking)
-                                              .Calculate(Array.Empty<Mod>()).StarRating;
-
-                    double? pp = null;
-                    double? xxySr = null;
-                    double? avgKps = null;
-                    double? maxKps = null;
-                    string? columnJson = null;
-
                     try
                     {
-                        var scoreInfo = new ScoreInfo
+                        using var heartbeat = startHeartbeat(progress, index, total, chart.Title, cancellationToken);
+                        var result = BmsChartAnalyticsProcessor.TryAnalyze(chart, audioManager, cancellationToken);
+
+                        if (result != null)
                         {
-                            Ruleset = maniaRuleset.RulesetInfo,
-                            Statistics =
+                            repository.Upsert(new BmsAnalyticsRecord
                             {
-                                [HitResult.Perfect] = Math.Max(1, chart.TotalNotes)
-                            }
-                        };
-                        pp = performanceCalculator.Calculate(scoreInfo, maniaWorking).Total;
+                                PathKey = pathKey,
+                                Pp = result.Value.Pp,
+                                XxySr = result.Value.XxySr,
+                                AvgKps = result.Value.AvgKps,
+                                MaxKps = result.Value.MaxKps,
+                                StarRating = result.Value.StarRating,
+                                ColumnCountsJson = result.Value.ColumnCountsJson,
+                                KpsListJson = result.Value.KpsListJson,
+                            });
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"[BMS] Analytics PP failed for {chart.FullPath}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
+                        Logger.Log($"[BMS] Analytics scan failed for {chart.FullPath}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
                     }
 
-                    if (playable is ManiaBeatmap maniaBeatmap)
-                    {
-                        var request = new EzAnalysisRequest(maniaBeatmap, 1.0, EzAnalysisScope.XxySr | EzAnalysisScope.RulesetSpecificRadarData);
-                        if (analysisProvider.TryCompute(request, cancellationToken, out var analysis)
-                            && analysis.TryGetValue(EzAnalysisFields.XXY_SR, out double sr))
-                            xxySr = sr;
-
-                        var (avg, max, _) = OptimizedBeatmapCalculator.GetKpsOptimized(maniaBeatmap);
-                        avgKps = avg;
-                        maxKps = max;
-
-                        var columnCounts = OptimizedBeatmapCalculator.GetColumnNoteCountsOptimized(maniaBeatmap);
-                        columnJson = JsonSerializer.Serialize(columnCounts);
-                    }
-
-                    repository.Upsert(new BmsAnalyticsRecord
-                    {
-                        PathKey = pathKey,
-                        Pp = pp,
-                        XxySr = xxySr,
-                        AvgKps = avgKps,
-                        MaxKps = maxKps,
-                        StarRating = star,
-                        ColumnCountsJson = columnJson,
-                    });
+                    report(progress, displayIndex, total, $"[{displayIndex}/{total}] 完成: {chart.Title}");
                 }
-                catch (Exception ex)
-                {
-                    Logger.Log($"[BMS] Analytics scan failed for {chart.FullPath}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
-                }
-                finally
-                {
-                    gate.Release();
-                    int done = Interlocked.Increment(ref completed);
-                    progress?.Report(new BmsAnalyticsScanProgress
-                    {
-                        Progress = (double)done / charts.Count,
-                        Status = $"分析中 {done}/{charts.Count}: {chart.Title}",
-                    });
-                }
+
+                report(progress, total, total, "分析完成");
+            }
+            catch (OperationCanceledException)
+            {
+                report(progress, 0, total, "分析已取消");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// While a single chart is parsing (can take minutes), keep nudging the UI so the notification does not look frozen.
+        /// </summary>
+        private static IDisposable startHeartbeat(IProgress<BmsAnalyticsScanProgress>? progress, int completed, int total, string title, CancellationToken cancellationToken)
+        {
+            return new Timer(_ =>
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+
+                report(progress, completed, total, $"[{completed + 1}/{total}] 解析中: {title}");
+            }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        }
+
+        private static void report(IProgress<BmsAnalyticsScanProgress>? progress, int completed, int total, string status)
+        {
+            progress?.Report(new BmsAnalyticsScanProgress
+            {
+                Progress = total > 0 ? (double)completed / total : 0,
+                Status = status,
             });
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
     }
 }

@@ -76,21 +76,35 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         private bool tryResolvePathKey(BeatmapInfo beatmap, out string pathKey)
         {
-            pathKey = beatmap.MD5Hash;
-
-            if (!string.IsNullOrEmpty(pathKey))
-                return true;
-
-            if (beatmapManager != null && beatmapManager.TryGetSourceReference(beatmap.ID, out BMSSourceReference sourceRef))
+            foreach (string candidate in enumeratePathKeyCandidates(beatmap))
             {
-                pathKey = string.IsNullOrEmpty(sourceRef.Md5Hash)
-                    ? BmsPathKeys.ComputeChartPathKey(sourceRef.ChartPath)
-                    : sourceRef.Md5Hash;
-                return true;
+                if (byPathKey.ContainsKey(candidate))
+                {
+                    pathKey = candidate;
+                    return true;
+                }
             }
 
             pathKey = string.Empty;
             return false;
+        }
+
+        private IEnumerable<string> enumeratePathKeyCandidates(BeatmapInfo beatmap)
+        {
+            if (!string.IsNullOrEmpty(beatmap.MD5Hash))
+                yield return beatmap.MD5Hash;
+
+            if (!string.IsNullOrEmpty(beatmap.Hash) && !string.Equals(beatmap.Hash, beatmap.MD5Hash, StringComparison.OrdinalIgnoreCase))
+                yield return beatmap.Hash;
+
+            if (beatmapManager != null && beatmapManager.TryGetSourceReference(beatmap.ID, out BMSSourceReference sourceRef))
+            {
+                if (!string.IsNullOrEmpty(sourceRef.Md5Hash))
+                    yield return sourceRef.Md5Hash;
+
+                if (!string.IsNullOrEmpty(sourceRef.ChartPath))
+                    yield return BmsPathKeys.ComputeChartPathKey(sourceRef.ChartPath);
+            }
         }
 
         private void reloadFromRepository()

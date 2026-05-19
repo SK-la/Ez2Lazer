@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Audio;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Overlays;
@@ -19,7 +18,6 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             BMSBeatmapManager beatmapManager,
             BmsAnalyticsSqliteRepository repository,
             AudioManager audioManager,
-            IRenderer renderer,
             INotificationOverlay? notifications,
             Action? onComplete = null,
             CancellationToken cancellationToken = default)
@@ -38,6 +36,10 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             notifications?.Post(notification);
 
+            using var scanCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, notification.CancellationToken);
+
+            var progress = new Progress<BmsAnalyticsScanProgress>(p => postProgress(notification, p));
+
             _ = Task.Run(async () =>
             {
                 try
@@ -46,21 +48,27 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                         beatmapManager,
                         repository,
                         audioManager,
-                        renderer,
-                        new Progress<BmsAnalyticsScanProgress>(p => scheduler.Add(() =>
-                        {
-                            notification.Progress = (float)p.Progress;
-                            notification.Text = p.Status;
-                        })),
-                        cancellationToken).ConfigureAwait(false);
+                        progress,
+                        scanCancellation.Token).ConfigureAwait(false);
+
+                    if (scanCancellation.Token.IsCancellationRequested)
+                    {
+                        scheduler.Add(() => markCancelled(notification));
+                        return;
+                    }
 
                     scheduler.Add(() =>
                     {
                         notification.Progress = 1f;
+                        notification.Text = "BMS 分析库构建完成";
                         notification.State = ProgressNotificationState.Completed;
                         notification.CompletionText = "BMS 分析库构建完成";
                         onComplete?.Invoke();
                     });
+                }
+                catch (OperationCanceledException)
+                {
+                    scheduler.Add(() => markCancelled(notification));
                 }
                 catch (Exception ex)
                 {
@@ -71,7 +79,26 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                         notifications?.Post(new SimpleNotification { Text = $"分析库构建失败：{ex.Message}" });
                     });
                 }
-            }, cancellationToken);
+            }, scanCancellation.Token);
+        }
+
+        private static void postProgress(ProgressNotification notification, BmsAnalyticsScanProgress p)
+        {
+            if (notification.State is ProgressNotificationState.Cancelled or ProgressNotificationState.Completed)
+                return;
+
+            // ProgressNotification.Progress/Text already marshal via their own Scheduler.AddOnce on the update thread.
+            notification.Progress = (float)Math.Clamp(p.Progress, 0, 1);
+            notification.Text = p.Status;
+        }
+
+        private static void markCancelled(ProgressNotification notification)
+        {
+            if (notification.State == ProgressNotificationState.Completed)
+                return;
+
+            notification.State = ProgressNotificationState.Cancelled;
+            notification.Text = "BMS 分析已取消";
         }
     }
 }

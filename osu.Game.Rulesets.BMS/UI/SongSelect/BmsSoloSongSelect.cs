@@ -329,6 +329,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             if (!this.IsCurrentScreen())
                 return;
 
+            if (BmsAnalyticsScanService.IsRunning)
+                return;
+
             var info = Beatmap.Value?.BeatmapInfo;
 
             if (info == null || info.Ruleset.ShortName != "bms")

@@ -16,7 +16,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             double avgKps = record.AvgKps ?? 0;
             double maxKps = record.MaxKps ?? 0;
-            var kpsSummary = new KpsSummary(avgKps, maxKps, Array.Empty<double>());
+            IReadOnlyList<double> kpsList = tryDeserializeKpsList(record.KpsListJson);
+            var kpsSummary = new KpsSummary(avgKps, maxKps, kpsList);
 
             Dictionary<int, int>? columnCounts = null;
 
@@ -34,6 +35,21 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts: null, xxySr: record.XxySr);
             return new EzAnalysisResult(kpsSummary, record.Pp, maniaSummary);
+        }
+
+        private static IReadOnlyList<double> tryDeserializeKpsList(string? json)
+        {
+            if (string.IsNullOrEmpty(json))
+                return Array.Empty<double>();
+
+            try
+            {
+                return JsonSerializer.Deserialize<List<double>>(json) ?? new List<double>();
+            }
+            catch
+            {
+                return Array.Empty<double>();
+            }
         }
     }
 }

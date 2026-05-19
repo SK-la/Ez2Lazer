@@ -13,6 +13,7 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.IO;
 using osu.Game.Rulesets.BMS.Objects;
+using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 using osu.Game.Rulesets.Objects.Legacy;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
@@ -105,12 +106,17 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             chartHasScrollDirective = false;
             lnType = 1;
 
-            Logger.Log($"{bms_log_prefix} Starting BMS beatmap decoding");
+            if (!BmsAnalyticsScanContext.SuppressDecoderVerboseLogging)
+                Logger.Log($"{bms_log_prefix} Starting BMS beatmap decoding");
 
             string? line;
+            var scanCancellation = BmsAnalyticsScanContext.ActiveCancellation;
 
             while ((line = stream.ReadLine()) != null)
             {
+                if (scanCancellation.IsCancellationRequested)
+                    throw new OperationCanceledException(scanCancellation);
+
                 line = line.Trim();
 
                 if (string.IsNullOrEmpty(line) || line.StartsWith('*'))

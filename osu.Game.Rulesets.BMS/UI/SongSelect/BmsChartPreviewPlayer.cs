@@ -13,6 +13,7 @@ using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
 
@@ -83,6 +84,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             StopPreview();
 
             if (!EnabledBindable.Value)
+                return false;
+
+            if (BmsAnalyticsScanService.IsRunning)
                 return false;
 
             currentBeatmap = beatmap;

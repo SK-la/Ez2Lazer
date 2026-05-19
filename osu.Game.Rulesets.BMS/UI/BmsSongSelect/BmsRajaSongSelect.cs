@@ -288,9 +288,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 beatmapManager,
                 analyticsRepository,
                 audioManager,
-                renderer,
                 notifications,
-                () => Schedule(() => barManager.ResetToRoot()));
+                onComplete: () => Schedule(() => barManager.ResetToRoot()));
         }
 
         private void refreshFilterDatabase()

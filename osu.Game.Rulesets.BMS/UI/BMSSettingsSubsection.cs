@@ -257,7 +257,6 @@ namespace osu.Game.Rulesets.BMS.UI
                 beatmapManager,
                 analyticsRepository,
                 audioManager,
-                renderer,
                 notificationOverlay);
         }
 
