@@ -1,9 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
@@ -188,6 +185,18 @@ namespace osu.Game.Rulesets.BMS.UI
             else if (Beatmap.Value is ManiaConvertedWorkingBeatmap maniaConverted)
             {
                 keysoundManager = maniaConverted.KeysoundManager;
+
+                // Analytics-only wrappers pass preloadKeysounds: false; fall back to runtime preload.
+                if (keysoundManager == null && maniaConverted.SourceBeatmap is BMSWorkingBeatmap bmsSource)
+                {
+                    keysoundManager = new BmsKeysoundManager(audioManager, bmsSource.FolderPath);
+
+                    if (bmsSource.Beatmap is BMSBeatmap bmsBeatmap)
+                    {
+                        keysoundManager.PreloadKeysounds(bmsBeatmap.HitObjects);
+                        keysoundManager.SetBackgroundSoundEvents(bmsBeatmap.BackgroundSoundEvents);
+                    }
+                }
             }
             else
             {

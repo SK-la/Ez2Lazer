@@ -1,11 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System;
-using System.Threading;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
@@ -35,7 +30,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private readonly AudioManager audioManager;
         private readonly double beatmapLength;
 
-        public ManiaConvertedWorkingBeatmap(BMSWorkingBeatmap source, AudioManager audioManager)
+        /// <param name="source">Parsed BMS working beatmap.</param>
+        /// <param name="audioManager">Used only for a virtual timeline track (no sample IO when <paramref name="preloadKeysounds"/> is false).</param>
+        /// <param name="preloadKeysounds">
+        /// When <see langword="false"/>, skips keysound sample IO (for offline analytics scans).
+        /// Gameplay and previews should keep the default <see langword="true"/>.
+        /// </param>
+        public ManiaConvertedWorkingBeatmap(BMSWorkingBeatmap source, AudioManager audioManager, bool preloadKeysounds = true)
             : base(source.BeatmapInfo, audioManager)
         {
             SourceBeatmap = source;
@@ -43,11 +44,14 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             maniaBeatmap = ConvertToManiaBeatmap(source.Beatmap);
 
-            KeysoundManager = new BmsKeysoundManager(audioManager, SourceBeatmap.FolderPath);
-            KeysoundManager.PreloadKeysounds(maniaBeatmap.HitObjects);
+            if (preloadKeysounds)
+            {
+                KeysoundManager = new BmsKeysoundManager(audioManager, SourceBeatmap.FolderPath);
+                KeysoundManager.PreloadKeysounds(maniaBeatmap.HitObjects);
 
-            if (source.Beatmap is BMSBeatmap bmsBeatmap)
-                KeysoundManager.SetBackgroundSoundEvents(bmsBeatmap.BackgroundSoundEvents);
+                if (source.Beatmap is BMSBeatmap bmsBeatmap)
+                    KeysoundManager.SetBackgroundSoundEvents(bmsBeatmap.BackgroundSoundEvents);
+            }
 
             if (maniaBeatmap.HitObjects.Count > 0)
                 beatmapLength = maniaBeatmap.HitObjects.Max(h => h.GetEndTime()) + 2000;
@@ -171,7 +175,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public override Stream? GetStream(string storagePath) => SourceBeatmap.GetStream(storagePath);
 
-        public BmsKeysoundManager KeysoundManager { get; }
+        public BmsKeysoundManager? KeysoundManager { get; }
 
         public BMSWorkingBeatmap SourceBeatmap { get; }
     }

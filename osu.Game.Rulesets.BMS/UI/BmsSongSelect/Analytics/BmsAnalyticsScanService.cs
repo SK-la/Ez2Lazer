@@ -23,7 +23,10 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
 
     public static class BmsAnalyticsScanService
     {
-        private const int max_parallelism = 2;
+        /// <summary>
+        /// Chart-only analysis is CPU-bound once keysound preload is disabled; allow more parallelism than disk-heavy scans.
+        /// </summary>
+        private static readonly int max_parallelism = Math.Clamp(Environment.ProcessorCount / 2, 2, 8);
 
         public static async Task RunAsync(
             BMSBeatmapManager beatmapManager,
@@ -57,8 +60,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                         ? BmsPathKeys.ComputeChartPathKey(chart.FullPath)
                         : chart.Md5Hash;
 
-                    var bmsWorking = new BMSWorkingBeatmap(chart.FullPath, audioManager, renderer, chart);
-                    var maniaWorking = new ManiaConvertedWorkingBeatmap(bmsWorking, audioManager);
+                    // Chart stream only: no background textures, no keysound preload (avoids mass audio IO).
+                    var bmsWorking = new BMSWorkingBeatmap(chart.FullPath, audioManager, renderer: null, chart);
+                    var maniaWorking = new ManiaConvertedWorkingBeatmap(bmsWorking, audioManager, preloadKeysounds: false);
                     var playable = maniaWorking.GetPlayableBeatmap(maniaRuleset.RulesetInfo);
 
                     double star = maniaRuleset.CreateDifficultyCalculator(maniaWorking)
