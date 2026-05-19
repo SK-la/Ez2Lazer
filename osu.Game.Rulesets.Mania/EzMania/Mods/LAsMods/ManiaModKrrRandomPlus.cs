@@ -173,7 +173,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 if (totalKeys < 1 || totalKeys > 18) return;
 
                 // 初始化随机器
-                int seed = Seed.Value ?? RNG.Next();
+                Seed.Value ??= RNG.Next();
+                int seed = Seed.Value.Value;
                 var rng = new Random(seed);
 
                 // 第一步：结构层 - 最先执行 Flip 逻辑（优先于固定轨道）
@@ -268,8 +269,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     if (region.Mode == RandomizationMode.None) continue;
 
                     // 基于主种子和区域特征生成确定性子种子，确保可复现性
-                    int regionSeed = HashCode.Combine(seed, region.StartCol, region.EndCol, (int)region.Mode);
-                    var regionRng = new Random(regionSeed);
+                    // 屏蔽，观察到了无法预测的随机数。
+                    // int regionSeed = HashCode.Combine(seed, region.StartCol, region.EndCol, (int)region.Mode);
+                    // var regionRng = new Random(regionSeed);
 
                     switch (region.Mode)
                     {
@@ -278,23 +280,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                             break;
 
                         case RandomizationMode.Random:
-                            applyRandom(maniaBeatmap, region, regionRng, lockedNotes);
+                            applyRandom(maniaBeatmap, region, rng, lockedNotes);
                             break;
 
                         case RandomizationMode.R_Random:
-                            applyRRandom(maniaBeatmap, region, regionRng, lockedNotes);
+                            applyRRandom(maniaBeatmap, region, rng, lockedNotes);
                             break;
 
                         case RandomizationMode.S_Random:
-                            applySRandom(maniaBeatmap, region, regionRng, lockedNotes, 80, 60);
+                            applySRandom(maniaBeatmap, region, rng, lockedNotes, 80, 60);
                             break;
 
                         case RandomizationMode.H_Random:
-                            applySRandom(maniaBeatmap, region, regionRng, lockedNotes, 200, 150);
+                            applySRandom(maniaBeatmap, region, rng, lockedNotes, 200, 150);
                             break;
 
                         case RandomizationMode.Spiral:
-                            applySpiral(maniaBeatmap, region, regionRng, lockedNotes);
+                            applySpiral(maniaBeatmap, region, rng, lockedNotes);
                             break;
                     }
                 }

@@ -478,7 +478,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
                 // 初始化随机数生成器
                 Seed.Value ??= RNG.Next();
-                var random = new Random(Seed.Value.Value);
+                int seed = Seed.Value.Value;
+                var random = new Random(seed);
 
                 int timeWindowLevel = TimeWindowLevel.Value;
                 double timeWindowN = getNValue(timeWindowLevel);
@@ -589,7 +590,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
                             if (digit >= 1 && digit <= 7)
                             {
-                                tl.Add(digit);
+                                // 对于HoldNote，如果它持续到当前时间或之后，也应该加入Tl
+                                if (note is HoldNote hold)
+                                {
+                                    // 如果HoldNote覆盖当前时间，加入Tl
+                                    if (hold.EndTime >= currentTime)
+                                    {
+                                        tl.Add(digit);
+                                    }
+                                }
+                                else
+                                {
+                                    tl.Add(digit);
+                                }
                             }
                         }
                     }
@@ -799,7 +812,28 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     {
                         if (!tl.Contains(digit))
                         {
-                            digitsToFill.Add(digit);
+                            // 检查是否有正在持续的HoldNote覆盖当前时间
+                            bool isInHoldDuration = false;
+
+                            foreach (var note in regionNotes)
+                            {
+                                if (note is HoldNote hold && note.Column != -1)
+                                {
+                                    int holdDigit = actualColumnToDigit(note.Column, isLeftHand, leftColumn);
+
+                                    if (holdDigit == digit && currentTime >= note.StartTime && currentTime <= hold.EndTime)
+                                    {
+                                        isInHoldDuration = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // 如果该列有正在持续的HoldNote，跳过此数字
+                            if (!isInHoldDuration)
+                            {
+                                digitsToFill.Add(digit);
+                            }
                         }
                     }
 
@@ -876,7 +910,25 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                             float timeDiff = currentTime - lastUsedTime[digit - 1];
 
                             // 检查1：不在60ms禁止区（使用原始lastUsedTime判断）
-                            if (timeDiff <= forbidden_window_ms)
+                            // 对于HoldNote，需要检查当前时间是否在Hold的持续时间内
+                            bool isInHoldDuration = false;
+
+                            // 检查是否有正在持续的HoldNote覆盖当前时间
+                            foreach (var note in regionNotes)
+                            {
+                                if (note is HoldNote hold && note.Column != -1)
+                                {
+                                    int holdDigit = actualColumnToDigit(note.Column, isLeftHand, leftColumn);
+
+                                    if (holdDigit == digit && currentTime >= note.StartTime && currentTime <= hold.EndTime)
+                                    {
+                                        isInHoldDuration = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (isInHoldDuration || timeDiff <= forbidden_window_ms)
                                 continue;
 
                             // 检查2：不在当前行已使用的数字列中
@@ -929,9 +981,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                         notesInRow[i].Column = actualCol;
 
                         // 立即更新lastUsedTime
-                        if (notesInRow[i] is HoldNote hold)
+                        if (notesInRow[i] is HoldNote hold1)
                         {
-                            lastUsedTime[selectedDigit - 1] = (float)hold.EndTime + 100f;
+                            lastUsedTime[selectedDigit - 1] = (float)hold1.EndTime + 100f;
                         }
                         else
                         {
