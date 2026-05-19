@@ -111,7 +111,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         public void SetKps(double? pp, double averageKps, double maxKps)
         {
             string ppValueText = pp is double ppValue ? $"PP {ppValue:F1}" : string.Empty;
-            string kpsValueText = averageKps > 0 ? $"{averageKps:F1} ({maxKps:F1})" : string.Empty;
+            string kpsValueText = averageKps > 0 || maxKps > 0 ? $"{averageKps:F1} ({maxKps:F1})" : string.Empty;
 
             // 更新PP显示
             if (string.IsNullOrEmpty(ppValueText))

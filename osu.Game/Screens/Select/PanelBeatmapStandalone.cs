@@ -51,6 +51,9 @@ namespace osu.Game.Screens.Select
         [Resolved(canBeNull: true)]
         private IPanelAccentColourProvider? accentColourProvider { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private IPanelEzAnalysisProvider? panelEzAnalysisProvider { get; set; }
+
         [Resolved]
         private BeatmapManager beatmaps { get; set; } = null!;
 
@@ -79,6 +82,10 @@ namespace osu.Game.Screens.Select
         private string? scratchText;
 
         private const int mania_ui_update_throttle_ms = 15;
+
+        private bool showManiaEzWidgets => ruleset.Value.OnlineID == 3 || panelEzAnalysisProvider?.SupportsEzDisplay(ruleset.Value) == true;
+
+        private bool ezAnalysisActive => ezAnalysisEnabled || panelEzAnalysisProvider?.SupportsEzDisplay(ruleset.Value) == true;
 
         #endregion
 
@@ -336,7 +343,7 @@ namespace osu.Game.Screens.Select
 
         private void resetEzDisplay()
         {
-            if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
+            if (ezAnalysisActive && showManiaEzWidgets)
             {
                 displaySR.Show();
                 ezDisplayKpc.Show();
@@ -403,7 +410,7 @@ namespace osu.Game.Screens.Select
             if (ezAnalysisEnabled && ezAnalysisResult.TagSummary != null)
                 ezDisplayTag.TagSummary = ezAnalysisResult.TagSummary;
 
-            if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
+            if (ezAnalysisActive && showManiaEzWidgets)
             {
                 var maniaSummary = ezAnalysisResult.ManiaSummary;
                 var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
@@ -417,7 +424,7 @@ namespace osu.Game.Screens.Select
 
         private void computeEzAnalysis()
         {
-            if (!ezAnalysisEnabled)
+            if (!ezAnalysisActive)
                 return;
 
             ezAnalysisCancellationSource?.Cancel();
@@ -428,7 +435,16 @@ namespace osu.Game.Screens.Select
                 return;
 
             resetEzDisplay();
-            ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+
+            if (panelEzAnalysisProvider?.SupportsEzDisplay(ruleset.Value) == true)
+            {
+                ezAnalysisBindable = panelEzAnalysisProvider.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            }
+            else
+            {
+                ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            }
+
             ezAnalysisBindable.BindValueChanged(result =>
             {
                 scheduledEzAnalysisUpdate?.Cancel();
