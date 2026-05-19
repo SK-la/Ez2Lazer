@@ -43,7 +43,7 @@ namespace osu.Game.EzOsuGame.Mods
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        public override Type[] IncompatibleMods => new[] { typeof(ModRateAdjust), typeof(ModTimeRamp), typeof(ModAutoplay) };
+        public override Type[] IncompatibleMods => new[] { typeof(ModRateAdjust), typeof(ModTimeRamp) };
 
         [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.FREE_BPM_LABEL), nameof(NiceBPMStrings.FREE_BPM_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> FreeBPM { get; } = new Bindable<int?>();
