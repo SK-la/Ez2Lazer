@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osuTK.Graphics;
 
@@ -44,11 +45,18 @@ namespace osu.Game.Rulesets.Mania.EzMania
 
         public static bool HasSeparator(this StageDefinition stage, int columnIndex)
         {
+            // 检查是否启用了跳过空边缘列功能
+            bool skipEmptyEdgeColumns = GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
+
             return stage.Columns switch
             {
                 12 => columnIndex is 0 or 10,
-                14 => columnIndex is 0 or 5 or 6 or 11,
-                16 => columnIndex is 0 or 5 or 9 or 14,
+                14 => skipEmptyEdgeColumns
+                    ? (columnIndex is 0 or 5 or 6 or 11)
+                    : (columnIndex is 7),
+                16 => skipEmptyEdgeColumns
+                    ? (columnIndex is 0 or 5 or 9 or 14)
+                    : (columnIndex is 0 or 7 or 14),
                 _ => false
             };
         }

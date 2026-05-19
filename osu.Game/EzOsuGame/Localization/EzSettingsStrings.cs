@@ -104,6 +104,20 @@ namespace osu.Game.EzOsuGame.Localization
             "When enabled, hit-state transforms and hit object lifetime end will use the hit object's own time instead of the actual judged interaction time."
             + "\nNotes will disappear consistently at the judgement line. Applies to all game modes.");
 
+        public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS = new EzLocalizationManager.EzLocalisableString("使用Ez2Ac 10k2s1p", "Use Ez2Ac 10k2s1p");
+
+        public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后，14k皮肤跳过最后一列，加载成13k，用于游玩Ez2Ac街机谱面。",
+            "When enabled, 14k skins will skip the last column and load as 13k, for playing Ez2Ac arcade beatmaps.");
+
+        // public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS = new EzLocalizationManager.EzLocalisableString("跳过空边缘列", "Skip Empty Edge Columns");
+        //
+        // public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+        //     "开启后，如果谱面第一列或最后一列是空的（没有音符），则实际加载时跳过这些空列，不显示它们。\n"
+        //     + "主要面向伪14k的13k谱面，隐藏空列按实际结果显示。",
+        //     "When enabled, if the first or last column of the beatmap is empty (no notes), those empty columns will be skipped during loading and not displayed.\n"
+        //     + "This fixes the issue where the last column of some 14K beatmaps was incorrectly hidden when it actually had content.");
+
         public static readonly LocalisableString HIT_MODE = new EzLocalizationManager.EzLocalisableString("Mania 判定系统", "Mania Hit Mode");
 
         public static readonly LocalisableString HIT_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(

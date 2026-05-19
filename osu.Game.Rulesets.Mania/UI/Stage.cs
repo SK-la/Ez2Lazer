@@ -170,11 +170,14 @@ namespace osu.Game.Rulesets.Mania.UI
                 }
             };
 
+            bool skipLastColumn = GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
+
             for (int i = 0; i < definition.Columns; i++)
             {
+                if (skipLastColumn && definition.Columns == 14 && i == definition.Columns - 1)
+                    continue;
+
                 bool isSpecial = definition.IsSpecialColumn(i);
-                // 必须使用全局静态，类型构造时无法获取自动注入
-                // bool isSpecial = GlobalConfigStore.EzConfig.IsSpecialColumnFast(definition.Columns, i);
 
                 var action = columnStartAction;
                 columnStartAction++;

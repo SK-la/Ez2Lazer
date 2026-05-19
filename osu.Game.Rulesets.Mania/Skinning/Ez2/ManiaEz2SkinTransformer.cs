@@ -232,9 +232,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 float width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
                 // float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
 
-                if (stage.Columns == 14 && columnIndex == 13)
-                    width = 0f;
-
                 switch (maniaLookup.Lookup)
                 {
                     case LegacyManiaSkinConfigurationLookups.ColumnWidth:

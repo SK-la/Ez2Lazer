@@ -65,6 +65,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "ez", "timing", "lifetime", "hitobject" }
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.SKIP_EMPTY_EDGE_COLUMNS,
+                    HintText = EzSettingsStrings.SKIP_EMPTY_EDGE_COLUMNS_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns),
+                })
+                {
+                    Keywords = new[] { "mania", "empty", "column" }
+                },
             });
         }
     }

@@ -145,6 +145,16 @@ namespace osu.Game.Rulesets.Mania.UI
 
             for (int i = 0; i < stageDefinition.Columns; i++)
             {
+                // 特殊处理：如果启用了跳过空边缘列功能，且是14k谱面的最后一列，则宽度设为0
+                bool skipLastColumn = GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
+
+                if (skipLastColumn && stageDefinition.Columns == 14 && i == stageDefinition.Columns - 1)
+                {
+                    columns[i].Width = 0;
+                    columns[i].Margin = new MarginPadding { Left = 0, Right = 0 };
+                    continue;
+                }
+
                 float leftSpacing = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
                                             new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.LeftColumnSpacing, i))
                                         ?.Value ?? Stage.COLUMN_SPACING;

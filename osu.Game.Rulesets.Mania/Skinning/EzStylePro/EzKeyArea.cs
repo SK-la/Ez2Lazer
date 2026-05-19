@@ -133,8 +133,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void loadAnimation()
         {
-            if (keyMode == 14 && columnIndex == 13) return;
-
             upSprite?.ClearFrames();
             downSprite?.ClearFrames();
 
