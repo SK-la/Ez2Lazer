@@ -175,8 +175,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             if (e.Action == column.Action.Value)
             {
-                upSprite.FadeTo(0);
-                downSprite.FadeTo(1);
+                upSprite?.FadeTo(0);
+                downSprite?.FadeTo(1);
             }
 
             return false;
