@@ -1,10 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
-using System.IO;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.Rulesets.BMS.Beatmaps.Persistence;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
 {
@@ -16,12 +15,18 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public const string STORAGE_ROOT = "EzBMS";
         public const string INDEX_DATABASE_FILE = "index.sqlite";
         public const string LAMP_DATABASE_FILE = "lamps.sqlite";
+        public const string FILTER_DATABASE_FILE = "filter.sqlite";
+        public const string ANALYTICS_DATABASE_FILE = "analytics.sqlite";
 
         public static string GetStorageRootPath(Storage storage) => storage.GetFullPath(STORAGE_ROOT);
 
         public static string GetIndexDatabasePath(Storage storage) => Path.Combine(GetStorageRootPath(storage), INDEX_DATABASE_FILE);
 
         public static string GetLampDatabasePath(Storage storage) => Path.Combine(GetStorageRootPath(storage), LAMP_DATABASE_FILE);
+
+        public static string GetFilterDatabasePath(Storage storage) => Path.Combine(GetStorageRootPath(storage), FILTER_DATABASE_FILE);
+
+        public static string GetAnalyticsDatabasePath(Storage storage) => Path.Combine(GetStorageRootPath(storage), ANALYTICS_DATABASE_FILE);
 
         /// <summary>
         /// Ensures <see cref="STORAGE_ROOT"/> exists and migrates legacy <c>bms_cache</c> / <c>bms</c> data when needed.
@@ -68,7 +73,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 if (cache == null)
                     continue;
 
-                var repository = new Persistence.BmsLibraryIndexRepository(indexPath);
+                var repository = new BmsLibraryIndexRepository(indexPath);
                 repository.ImportFromLibraryCache(cache);
                 Logger.Log($"[BMS] Migrated library cache from '{legacyDir}' into EzBMS index.", LoggingTarget.Database);
                 break;

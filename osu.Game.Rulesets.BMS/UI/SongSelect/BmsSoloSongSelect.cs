@@ -1,11 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
@@ -266,9 +261,6 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         protected override void OnStart()
         {
-            // Mirror the relevant tail of SoloSongSelect.OnStart but route into BMSPlayerLoader rather than
-            // PlayerLoader(SoloPlayer). We deliberately skip mods snapshot/restore here — BMS is not changing
-            // mods inside song select like SoloSongSelect does for autoplay.
             var beatmapInfo = Beatmap.Value?.BeatmapInfo;
 
             if (beatmapInfo == null || beatmapInfo.Ruleset.ShortName != "bms")
@@ -281,52 +273,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 return;
             }
 
-            if (!tryResolveBmsSource(beatmapInfo, out string chartPath, out var chartCache))
-            {
-                notifications?.Post(new SimpleNotification
-                {
-                    Text = "未能定位 BMS 源文件，请刷新曲库",
-                    Icon = FontAwesome.Solid.ExclamationTriangle,
-                });
-                return;
-            }
-
-            try
-            {
-                previewPlayer.StopPreview();
-
-                // Hand the realm-managed BeatmapInfo (detached copy keeps the same ID) to BMSWorkingBeatmap so the
-                // resulting WorkingBeatmap — including the ManiaConvertedWorkingBeatmap wrapper used in compatibility
-                // mode — exposes a BeatmapInfo whose ID can be looked up via realm.Find. Without this override
-                // BMSWorkingBeatmap synthesises a fresh Guid that's not in Realm, breaking consumers like
-                // FooterButtonOptions.beatmapChanged() which call realm.Find(...).ToLive(...) and would NRE on null.
-                var workingBeatmapInfo = beatmapInfo.Detach();
-                var workingBeatmap = new BMSWorkingBeatmap(chartPath, audioManager, renderer, chartCache, workingBeatmapInfo);
-
-                Logger.Log(
-                    $"[BMS] StartGame chart resolve: title={chartCache?.Title}, file={chartCache?.FileName}, md5={beatmapInfo.MD5Hash}, path={chartPath}",
-                    LoggingTarget.Runtime, LogLevel.Debug);
-
-                // Swap the global Beatmap to our BMSWorkingBeatmap *before* pushing BMSPlayerLoader.
-                // SoloSongSelect's SelectAndRun already set Beatmap.Value to a Realm-backed BeatmapManagerWorkingBeatmap,
-                // whose GetBeatmapTrack() resolves the chart's audio file from the BMS folder and returns a real Track.
-                // During the ~600ms BMSPlayerLoader prep phase that real track was being picked up by background screens
-                // / MusicController, producing the "fixed audio overlay" the user heard at gameplay start. BMSWorkingBeatmap.GetBeatmapTrack()
-                // returns a virtual silent track, so once Beatmap.Value points at it nothing else can play through.
-                Beatmap.Value = workingBeatmap;
-                musicController?.Stop();
-
-                this.Push(new BMSPlayerLoader(workingBeatmap));
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to launch BMS gameplay");
-                notifications?.Post(new SimpleNotification
-                {
-                    Text = $"加载谱面失败：{ex.Message}",
-                    Icon = FontAwesome.Solid.ExclamationTriangle,
-                });
-            }
+            previewPlayer.StopPreview();
+            BmsSongSelectPlayHelper.TryLaunchFromBeatmapInfo(this, beatmapInfo, beatmapManager, audioManager, renderer, musicController, notifications);
         }
 
         public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
@@ -389,38 +337,10 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }
         }
 
-        private bool tryResolveBmsSource(BeatmapInfo info, out string chartPath, out BMSChartCache? chartCache)
-        {
-            chartPath = string.Empty;
-            chartCache = null;
+        private bool tryResolveBmsSource(BeatmapInfo info, out string chartPath, out BMSChartCache? chartCache) =>
+            BmsSongSelectPlayHelper.TryResolveSource(beatmapManager, info, out chartPath, out chartCache);
 
-            // ID-based lookup is the cleanest path: BuildVirtualBeatmapCatalog uses deterministic guids.
-            if (beatmapManager.TryGetSourceReference(info.ID, out BMSSourceReference byId))
-            {
-                chartPath = byId.ChartPath;
-            }
-            else if (!string.IsNullOrEmpty(info.MD5Hash) && beatmapManager.TryGetSourceReferenceByHash(info.MD5Hash, out BMSSourceReference byHash))
-            {
-                chartPath = byHash.ChartPath;
-            }
-            else
-            {
-                return false;
-            }
-
-            // chartCache is optional but lets BMSWorkingBeatmap skip a parse round to learn key count etc.
-            if (beatmapManager.LibraryCache != null)
-            {
-                chartCache = beatmapManager.LibraryCache.Songs
-                                           .SelectMany(s => s.Charts)
-                                           .FirstOrDefault(c => string.Equals(c.Md5Hash, info.MD5Hash, StringComparison.OrdinalIgnoreCase));
-            }
-
-            return !string.IsNullOrEmpty(chartPath);
-        }
-
-        private void syncConfiguredPaths() =>
-            beatmapManager.SetRootPaths(BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value));
+        private void syncConfiguredPaths() => beatmapManager.SetRootPaths(BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value));
 
         /// <summary>
         /// Re-run carousel filtering after Realm catalog changes without adding APIs to <see cref="FilterControl"/>.
@@ -454,11 +374,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             notifications?.Post(notification);
 
-            void onScanProgress(ValueChangedEvent<double> e) =>
-                Schedule(() => notification.Progress = (float)BmsLibraryImportPipeline.MapScanProgress(e.NewValue));
+            void onScanProgress(ValueChangedEvent<double> e) => Schedule(() => notification.Progress = (float)BmsLibraryImportPipeline.MapScanProgress(e.NewValue));
 
-            void onScanStatus(ValueChangedEvent<string> e) =>
-                Schedule(() => notification.Text = e.NewValue);
+            void onScanStatus(ValueChangedEvent<string> e) => Schedule(() => notification.Text = e.NewValue);
 
             beatmapManager.ScanProgress.BindValueChanged(onScanProgress, true);
             beatmapManager.StatusMessage.BindValueChanged(onScanStatus, true);

@@ -1,27 +1,26 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
+using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Collections;
 using osu.Game.Database;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
-using osu.Game.Localisation;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
+using osu.Game.Rulesets.BMS.UI.BmsSongSelect;
+using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.UI;
@@ -63,6 +62,12 @@ namespace osu.Game.Rulesets.BMS.UI
         private RealmAccess realm { get; set; } = null!;
 
         [Resolved]
+        private AudioManager audioManager { get; set; } = null!;
+
+        [Resolved]
+        private IRenderer renderer { get; set; } = null!;
+
+        [Resolved]
         private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
 
         private BMSBeatmapManager? beatmapManager;
@@ -87,8 +92,18 @@ namespace osu.Game.Rulesets.BMS.UI
             {
                 new SettingsButtonV2
                 {
-                    Text = "进入 BMS 专用选歌界面（辅助入口）",
-                    Action = openBmsSongSelect,
+                    Text = "标准 BMS 选歌（Carousel）",
+                    Action = openStandardBmsSongSelect,
+                },
+                new SettingsButtonV2
+                {
+                    Text = "Raja 风格 BMS 选歌",
+                    Action = openRajaBmsSongSelect,
+                },
+                new SettingsButtonV2
+                {
+                    Text = "构建 BMS 分析库",
+                    Action = buildAnalyticsDatabase,
                 },
                 new SettingsButtonV2
                 {
@@ -196,12 +211,12 @@ namespace osu.Game.Rulesets.BMS.UI
             // Show initial cache status
             if (beatmapManager?.LibraryCache != null)
             {
-                cacheStatusNote.Current.Value = new SettingsNote.Data($"已缓存 {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面", SettingsNote.Type.Informational);
+                cacheStatusNote.Current.Value = new SettingsNote.Data($"已缓存 {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面",
+                    SettingsNote.Type.Informational);
             }
         }
 
-        private IReadOnlyList<string> getConfiguredPaths()
-            => BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value);
+        private IReadOnlyList<string> getConfiguredPaths() => BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value);
 
         private void updatePathDisplay()
         {
@@ -213,7 +228,11 @@ namespace osu.Game.Rulesets.BMS.UI
             //     pathDisplay.Text = $"当前路径 ({paths.Count}):{Environment.NewLine}{string.Join(Environment.NewLine, paths.Select(path => $"- {path}"))}";
         }
 
-        private void openBmsSongSelect()
+        private void openStandardBmsSongSelect() => openSongSelectScreen(new BmsUiSongSelect.BmsSoloSongSelect());
+
+        private void openRajaBmsSongSelect() => openSongSelectScreen(new BmsBmsSongSelect());
+
+        private void openSongSelectScreen(IScreen screen)
         {
             var runner = performFromScreen ?? game;
 
@@ -223,11 +242,23 @@ namespace osu.Game.Rulesets.BMS.UI
                 return;
             }
 
-            // Allow opening from main menu or song select (settings is often opened on top of either).
-            runner.PerformFromScreen(screen =>
-            {
-                screen.Push(new BmsUiSongSelect.BmsSoloSongSelect());
-            }, new[] { typeof(MainMenu), typeof(OsuSongSelect) });
+            runner.PerformFromScreen(s => s.Push(screen), new[] { typeof(MainMenu), typeof(OsuSongSelect) });
+        }
+
+        private void buildAnalyticsDatabase()
+        {
+            if (beatmapManager == null)
+                return;
+
+            var analyticsRepository = new BmsAnalyticsSqliteRepository(BmsStoragePaths.GetAnalyticsDatabasePath(storage));
+
+            BmsUiSongSelect.BmsSongSelectAnalyticsOperations.RunAnalyticsBuild(
+                Scheduler,
+                beatmapManager,
+                analyticsRepository,
+                audioManager,
+                renderer,
+                notificationOverlay);
         }
 
         private void selectPath()
@@ -281,11 +312,9 @@ namespace osu.Game.Rulesets.BMS.UI
 
             notificationOverlay?.Post(notification);
 
-            void onScanProgress(ValueChangedEvent<double> e) =>
-                Schedule(() => notification.Progress = (float)BmsLibraryImportPipeline.MapScanProgress(e.NewValue));
+            void onScanProgress(ValueChangedEvent<double> e) => Schedule(() => notification.Progress = (float)BmsLibraryImportPipeline.MapScanProgress(e.NewValue));
 
-            void onScanStatus(ValueChangedEvent<string> e) =>
-                Schedule(() => notification.Text = e.NewValue);
+            void onScanStatus(ValueChangedEvent<string> e) => Schedule(() => notification.Text = e.NewValue);
 
             beatmapManager.ScanProgress.BindValueChanged(onScanProgress, true);
             beatmapManager.StatusMessage.BindValueChanged(onScanStatus, true);
