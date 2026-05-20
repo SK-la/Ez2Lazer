@@ -1036,6 +1036,7 @@ private void load()
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=jumpjack/@EntryIndexedValue">True</s:Boolean>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=Katu/@EntryIndexedValue">True</s:Boolean>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=keymods/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=keysound/@EntryIndexedValue">True</s:Boolean>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=Kiai/@EntryIndexedValue">True</s:Boolean>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=krrcream/@EntryIndexedValue">True</s:Boolean>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=Kudosu/@EntryIndexedValue">True</s:Boolean>
@@ -1095,5 +1096,5 @@ private void load()
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=vocaloid/@EntryIndexedValue">True</s:Boolean>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=Welford_0027s/@EntryIndexedValue">True</s:Boolean>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=xxysr/@EntryIndexedValue">True</s:Boolean>
-    <s:Boolean x:Key="/Default/UserDictionary/Words/=XXY/@EntryIndexedValue">True</s:Boolean>
-    <s:Boolean x:Key="/Default/UserDictionary/Words/=Zoomable/@EntryIndexedValue">True</s:Boolean></wpf:ResourceDictionary>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=XXY/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=Zoomable/@EntryIndexedValue">True</s:Boolean></wpf:ResourceDictionary>

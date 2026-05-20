@@ -23,6 +23,7 @@ using osu.Game.Beatmaps.Formats;
 using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.IO;
+using osu.Game.Models;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
 
@@ -140,6 +141,8 @@ namespace osu.Game.Beatmaps
 
         private class BeatmapManagerWorkingBeatmap : WorkingBeatmap
         {
+            private const string bms_external_hash_prefix = "bms-ext:set:";
+
             [NotNull]
             private readonly IBeatmapResourceProvider resources;
 
@@ -209,6 +212,12 @@ namespace osu.Game.Beatmaps
 
                     if (texture == null)
                     {
+                        if (tryResolveExternalPath(Metadata.BackgroundFile, out string externalPath))
+                            texture = store.Get(externalPath);
+                    }
+
+                    if (texture == null)
+                    {
                         Logger.Log($"Beatmap background failed to load (file {Metadata.BackgroundFile} not found on disk at expected location {fileStorePath}).");
                         return null;
                     }
@@ -232,8 +241,20 @@ namespace osu.Game.Beatmaps
 
                 try
                 {
+                    if (tryGetAbsoluteTrack(Metadata.AudioFile, out var absoluteTrack))
+                        return absoluteTrack;
+
+                    if (tryGetExternalTrack(Metadata.AudioFile, out var externalTrack))
+                        return externalTrack;
+
                     string fileStorePath = BeatmapSetInfo.GetPathForFile(Metadata.AudioFile);
                     var track = resources.Tracks.Get(fileStorePath);
+
+                    if (track == null)
+                    {
+                        if (tryGetExternalTrack(Metadata.AudioFile, out externalTrack))
+                            track = externalTrack;
+                    }
 
                     if (track == null)
                     {
@@ -250,6 +271,69 @@ namespace osu.Game.Beatmaps
                 }
             }
 
+            private bool tryGetAbsoluteTrack(string audioReference, out Track track)
+            {
+                track = null;
+
+                if (!Path.IsPathRooted(audioReference) || !File.Exists(audioReference))
+                    return false;
+
+                string folder = Path.GetDirectoryName(audioReference);
+                string fileName = Path.GetFileName(audioReference);
+
+                if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(fileName))
+                    return false;
+
+                var fileStore = new StorageBackedResourceStore(new NativeStorage(folder));
+
+                if (resources.AudioManager != null)
+                {
+                    var trackStore = resources.AudioManager.GetTrackStore(fileStore);
+                    track = trackStore.Get(fileName.Replace('\\', '/'));
+                }
+
+                return track != null;
+            }
+
+            private bool tryGetExternalTrack(string audioReference, out Track track)
+            {
+                track = null;
+
+                if (!isBmsExternalBeatmap() || !tryGetExternalFolderPath(out string folderPath))
+                    return false;
+
+                string normalisedReference = audioReference.Replace('/', Path.DirectorySeparatorChar);
+
+                if (Path.IsPathRooted(normalisedReference))
+                {
+                    try
+                    {
+                        string fullBase = Path.GetFullPath(folderPath);
+                        string fullPath = Path.GetFullPath(normalisedReference);
+                        string relative = Path.GetRelativePath(fullBase, fullPath);
+
+                        if (!relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative))
+                            normalisedReference = relative;
+                        else
+                            return false;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+
+                var fileStore = new StorageBackedResourceStore(new NativeStorage(folderPath));
+
+                if (resources.AudioManager != null)
+                {
+                    var trackStore = resources.AudioManager.GetTrackStore(fileStore);
+                    track = trackStore.Get(normalisedReference.Replace('\\', '/'));
+                }
+
+                return track != null;
+            }
+
             protected override Waveform GetWaveform()
             {
                 if (string.IsNullOrEmpty(Metadata?.AudioFile))
@@ -260,9 +344,15 @@ namespace osu.Game.Beatmaps
 
                 try
                 {
+                    if (Path.IsPathRooted(Metadata.AudioFile) && File.Exists(Metadata.AudioFile))
+                        return new Waveform(File.OpenRead(Metadata.AudioFile));
+
                     string fileStorePath = BeatmapSetInfo.GetPathForFile(Metadata.AudioFile);
 
-                    var trackData = GetStream(fileStorePath);
+                    Stream trackData = !string.IsNullOrEmpty(fileStorePath) ? GetStream(fileStorePath) : null;
+
+                    if (trackData == null && tryResolveExternalPath(Metadata.AudioFile, out string externalAudioPath))
+                        trackData = File.OpenRead(externalAudioPath);
 
                     if (trackData == null)
                     {
@@ -309,10 +399,17 @@ namespace osu.Game.Beatmaps
                             storyboardFilename)
                         {
                             string storyboardFileStorePath = BeatmapSetInfo?.GetPathForFile(storyboardFilename);
-                            storyboardFileStream = GetStream(storyboardFileStorePath);
+                            storyboardFileStream = !string.IsNullOrEmpty(storyboardFileStorePath) ? GetStream(storyboardFileStorePath) : null;
+
+                            if (storyboardFileStream == null && tryResolveExternalPath(storyboardFilename, out string externalStoryboardPath))
+                                storyboardFileStream = File.OpenRead(externalStoryboardPath);
 
                             if (storyboardFileStream == null)
                                 Logger.Log($"Storyboard failed to load (file {storyboardFilename} not found on disk at expected location {storyboardFileStorePath})", level: LogLevel.Error);
+                        }
+                        else if (tryResolveExternalPath(mainStoryboardFilename, out string externalStoryboardPath))
+                        {
+                            storyboardFileStream = File.OpenRead(externalStoryboardPath);
                         }
 
                         if (storyboardFileStream != null)
@@ -349,7 +446,72 @@ namespace osu.Game.Beatmaps
                 }
             }
 
-            public override Stream GetStream(string storagePath) => resources.Files.GetStream(storagePath);
+            public override Stream GetStream(string storagePath)
+            {
+                Stream stream = resources.Files.GetStream(storagePath);
+
+                if (stream != null)
+                    return stream;
+
+                if (tryResolveExternalPathByStoragePath(storagePath, out string externalPath))
+                    return File.OpenRead(externalPath);
+
+                return null;
+            }
+
+            private bool tryResolveExternalPathByStoragePath(string storagePath, out string fullPath)
+            {
+                fullPath = string.Empty;
+
+                if (!isBmsExternalBeatmap())
+                    return false;
+
+                RealmNamedFileUsage usage = BeatmapSetInfo?.Files.FirstOrDefault(f => string.Equals(f.File.GetStoragePath(), storagePath, StringComparison.OrdinalIgnoreCase));
+
+                if (usage == null)
+                    return false;
+
+                return tryResolveExternalPath(usage.Filename, out fullPath);
+            }
+
+            private bool tryResolveExternalPath(string relativeFilename, out string fullPath)
+            {
+                fullPath = string.Empty;
+
+                if (!isBmsExternalBeatmap() || !tryGetExternalFolderPath(out string folderPath))
+                    return false;
+
+                string normalised = relativeFilename.Replace('/', Path.DirectorySeparatorChar);
+                fullPath = Path.Combine(folderPath, normalised);
+
+                return File.Exists(fullPath);
+            }
+
+            private bool isBmsExternalBeatmap()
+                => string.Equals(BeatmapInfo?.Ruleset.ShortName, "bms", StringComparison.OrdinalIgnoreCase)
+                   && BeatmapSetInfo?.Hash.StartsWith(bms_external_hash_prefix, StringComparison.Ordinal) == true;
+
+            private bool tryGetExternalFolderPath(out string folderPath)
+            {
+                folderPath = string.Empty;
+
+                string hash = BeatmapSetInfo?.Hash ?? string.Empty;
+
+                if (!hash.StartsWith(bms_external_hash_prefix, StringComparison.Ordinal))
+                    return false;
+
+                string encoded = hash.Substring(bms_external_hash_prefix.Length);
+
+                try
+                {
+                    folderPath = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+                    return !string.IsNullOrWhiteSpace(folderPath);
+                }
+                catch
+                {
+                    return false;
+                }
+            }
 
             private string getMainStoryboardFilename(IBeatmapMetadataInfo metadata)
             {
