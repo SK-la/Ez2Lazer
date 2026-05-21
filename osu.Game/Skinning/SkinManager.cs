@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
@@ -14,15 +15,20 @@ using JetBrains.Annotations;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Database;
+using osu.Game.Extensions;
+using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.IO;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Utils;
@@ -61,6 +67,8 @@ namespace osu.Game.Skinning
 
         private readonly IResourceStore<byte[]> userFiles;
 
+        private readonly SandboxedScriptRunner scriptRunner;
+
         private Skin ezProSkin { get; }
         private Skin sbiSkin { get; }
         private Skin argonSkin { get; }
@@ -94,6 +102,8 @@ namespace osu.Game.Skinning
             this.resources = resources;
 
             userFiles = new StorageBackedResourceStore(storage.GetStorageForDirectory("files"));
+
+            scriptRunner = new SandboxedScriptRunner();
 
             skinImporter = new SkinImporter(storage, realm, this)
             {
@@ -263,7 +273,92 @@ namespace osu.Game.Skinning
         /// </summary>
         /// <param name="skinInfo">The skin to lookup.</param>
         /// <returns>A <see cref="Skin"/> instance correlating to the provided <see cref="SkinInfo"/>.</returns>
-        public Skin GetSkin(SkinInfo skinInfo) => skinInfo.CreateInstance(this);
+        public Skin GetSkin(SkinInfo skinInfo)
+        {
+            // 检查是否为脚本皮肤（通过查找 .csx 文件）
+            if (isScriptedSkin(skinInfo))
+            {
+                try
+                {
+                    string scriptPath = getScriptPath(skinInfo);
+                    IScriptedSkin scriptedSkin = scriptRunner.LoadScriptAsync(scriptPath).GetResultSafely();
+                    return new ScriptedSkinWrapper(this, this, scriptedSkin, scriptRunner);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Failed to load scripted skin '{skinInfo.Name}': {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
+                    // 回退到默认皮肤
+                    return trianglesSkin;
+                }
+            }
+
+            // 传统皮肤加载逻辑
+            return skinInfo.CreateInstance(this);
+        }
+
+        /// <summary>
+        /// 检查皮肤是否为脚本皮肤（包含 .csx 文件）。
+        /// </summary>
+        private bool isScriptedSkin(SkinInfo skinInfo)
+        {
+            if (!skinInfo.IsManaged)
+                return false;
+
+            try
+            {
+                string scriptPath = getScriptPath(skinInfo);
+                return !string.IsNullOrEmpty(scriptPath) && File.Exists(scriptPath);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 获取脚本文件的路径。
+        /// </summary>
+        private string getScriptPath(SkinInfo skinInfo)
+        {
+            // 脚本皮肤统一放在 EzResources/ScriptedSkin/ 目录下
+            // 使用皮肤名称作为子目录名
+            string scriptDirectory = Path.Combine(EzModifyPath.RESOURCES_PATH, "ScriptedSkin", skinInfo.Name);
+
+            // 查找第一个 .csx 文件
+            if (Directory.Exists(scriptDirectory))
+            {
+                string[] csxFiles = Directory.GetFiles(scriptDirectory, "*.csx", SearchOption.TopDirectoryOnly);
+                return csxFiles.FirstOrDefault();
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 获取皮肤目录路径。
+        /// </summary>
+        private string getSkinDirectory(SkinInfo skinInfo)
+        {
+            // 尝试从 Realm 中获取皮肤的文件存储路径
+            return Realm.Run(r =>
+            {
+                var managedSkin = r.Find<SkinInfo>(skinInfo.ID);
+                if (managedSkin == null)
+                    return null;
+
+                // 获取皮肤的根目录
+                var files = managedSkin.Files.ToArray();
+                if (files.Length == 0)
+                    return null;
+
+                // 假设第一个文件在皮肤根目录下
+                var firstFile = files[0].File;
+                string storagePath = firstFile.GetStoragePath();
+
+                // 返回父目录（皮肤根目录）
+                return Path.GetDirectoryName(storagePath);
+            });
+        }
 
         /// <summary>
         /// Ensure that the current skin is in a state it can accept user modifications.
@@ -419,8 +514,7 @@ namespace osu.Game.Skinning
         public Task<IEnumerable<Live<SkinInfo>>> Import(ProgressNotification notification, ImportTask[] tasks, ImportParameters parameters = default) =>
             skinImporter.Import(notification, tasks, parameters);
 
-        public Task<Live<SkinInfo>> ImportAsUpdate(ProgressNotification notification, ImportTask task, SkinInfo original) =>
-            skinImporter.ImportAsUpdate(notification, task, original);
+        public Task<Live<SkinInfo>> ImportAsUpdate(ProgressNotification notification, ImportTask task, SkinInfo original) => skinImporter.ImportAsUpdate(notification, task, original);
 
         public Task<ExternalEditOperation<SkinInfo>> BeginExternalEditing(SkinInfo model) => skinImporter.BeginExternalEditing(model);
 
