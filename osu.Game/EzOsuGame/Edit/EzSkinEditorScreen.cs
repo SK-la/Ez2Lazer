@@ -2,9 +2,11 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -333,6 +335,45 @@ namespace osu.Game.EzOsuGame.Edit
                 var configEditor = new ScriptedSkinConfigEditor();
                 configEditor.SetSkin(scriptedSkin);
 
+                // 创建重载按钮
+                var reloadButton = new ReloadScriptButton
+                {
+                    Text = "重载脚本",
+                    RelativeSizeAxes = Axes.X,
+                    Height = 40,
+                    Action = () =>
+                    {
+                        // 使用 Task.Run 在后台线程执行异步操作，避免 async void
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                // 获取当前脚本路径
+                                string scriptPath = skinManager.GetScriptPath(scriptedWrapper.SkinInfo.Value);
+
+                                if (!string.IsNullOrEmpty(scriptPath))
+                                {
+                                    bool success = await skinManager.TriggerScriptReload(scriptPath).ConfigureAwait(false);
+
+                                    if (success)
+                                    {
+                                        // 在主线程刷新配置编辑器
+                                        Schedule(() =>
+                                        {
+                                            configEditor.SetSkin(scriptedWrapper.GetScriptedSkin());
+                                        });
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                // 记录错误但不崩溃
+                                Logger.Log($"重载脚本失败: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
+                            }
+                        });
+                    }
+                };
+
                 settingsScrollContainer!.Child = new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,
@@ -348,6 +389,7 @@ namespace osu.Game.EzOsuGame.Edit
                             Colour = Color4.White,
                             Font = OsuFont.Default.With(size: 18, weight: FontWeight.Bold),
                         },
+                        reloadButton,
                         configEditor,
                     }
                 };
@@ -437,6 +479,16 @@ namespace osu.Game.EzOsuGame.Edit
             private void load(OverlayColourProvider? overlayColourProvider, OsuColour colours)
             {
                 BackgroundColour = overlayColourProvider?.Background3 ?? colours.Blue3;
+                Content.CornerRadius = 5;
+            }
+        }
+
+        private partial class ReloadScriptButton : OsuButton
+        {
+            [BackgroundDependencyLoader]
+            private void load(OsuColour colours)
+            {
+                BackgroundColour = colours.Green3;
                 Content.CornerRadius = 5;
             }
         }

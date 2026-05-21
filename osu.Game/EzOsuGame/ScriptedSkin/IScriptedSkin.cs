@@ -77,4 +77,19 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         /// </summary>
         Version Version { get; }
     }
+
+    /// <summary>
+    /// 可选的脚本皮肤元数据接口。
+    /// </summary>
+    /// <remarks>
+    /// 仅当脚本需要参与受保护皮肤、导入/编辑策略时实现。
+    /// 不实现时默认视为未保护，保持旧脚本兼容。
+    /// </remarks>
+    public interface IScriptedSkinMetadata
+    {
+        /// <summary>
+        /// 脚本皮肤是否受保护。
+        /// </summary>
+        bool Protected { get; }
+    }
 }

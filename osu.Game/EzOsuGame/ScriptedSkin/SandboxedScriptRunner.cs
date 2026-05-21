@@ -6,13 +6,20 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
+using osu.Framework.Audio.Sample;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
-using osuTK;
+using osu.Game.Audio;
+using osu.Game.Extensions;
+using osu.Game.IO;
+using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.ScriptedSkin
 {
@@ -27,8 +34,6 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
     {
         internal static readonly string LOGGER_PREFIX = "ScriptedSkin";
 
-        private static readonly ScriptOptions safe_script_options;
-
         private readonly ScriptCompilationCache cache;
 
         /// <summary>
@@ -37,39 +42,6 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         public SandboxedScriptRunner()
         {
             cache = new ScriptCompilationCache();
-        }
-
-        static SandboxedScriptRunner()
-        {
-            // 定义允许引用的程序集白名单
-            var allowedAssemblies = new[]
-            {
-                typeof(IScriptedSkin).Assembly, // osu.Game
-                typeof(Drawable).Assembly, // osu.Framework
-                typeof(Vector2).Assembly, // osuTK
-                typeof(Console).Assembly, // System.Runtime
-                typeof(List<>).Assembly, // System.Collections
-                typeof(Enumerable).Assembly, // System.Linq
-            };
-
-            // 构建安全的脚本选项
-            safe_script_options = ScriptOptions.Default
-                                               .WithReferences(allowedAssemblies)
-                                               .WithImports(
-                                                   "System",
-                                                   "System.Collections.Generic",
-                                                   "System.Linq",
-                                                   "osu.Framework.Graphics",
-                                                   "osu.Framework.Graphics.Containers",
-                                                   "osu.Framework.Graphics.Shapes",
-                                                   "osu.Framework.Bindables",
-                                                   "osuTK",
-                                                   "osuTK.Graphics",
-                                                   "osu.Game.Skinning",
-                                                   "osu.Game.Skinning.ScriptedSkin"
-                                               )
-                                               .WithMetadataResolver(new SafeMetadataResolver());
-
             Logger.Log("SandboxedScriptRunner initialized with security restrictions.", LoggingTarget.Information);
         }
 
@@ -82,17 +54,30 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         /// <exception cref="ScriptSecurityException">安全验证失败时抛出。</exception>
         /// <exception cref="ScriptExecutionException">执行失败时抛出。</exception>
         public async Task<IScriptedSkin> LoadScriptAsync(string scriptPath)
+            => await LoadScriptAsync<IScriptedSkin>(scriptPath).ConfigureAwait(false);
+
+        /// <summary>
+        /// 异步加载并编译脚本文件，返回指定目标类型的实例。
+        /// </summary>
+        /// <typeparam name="T">目标类型。</typeparam>
+        /// <param name="scriptPath">脚本文件的完整路径。</param>
+        /// <param name="ctorArgs">构造函数参数。</param>
+        /// <returns>编译后的实例。</returns>
+        /// <exception cref="ScriptCompilationException">编译失败时抛出。</exception>
+        /// <exception cref="ScriptSecurityException">安全验证失败时抛出。</exception>
+        /// <exception cref="ScriptExecutionException">执行失败时抛出。</exception>
+        public async Task<T> LoadScriptAsync<T>(string scriptPath, params object?[] ctorArgs)
+            where T : class
         {
             if (!File.Exists(scriptPath))
                 throw new FileNotFoundException($"Script file not found: {scriptPath}");
 
-            // 尝试从缓存中获取
-            if (cache.TryGet(scriptPath, out var cachedSkin))
+            if (typeof(T) == typeof(IScriptedSkin) && cache.TryGet(scriptPath, out var cachedSkin))
             {
                 if (cachedSkin != null)
                 {
                     Logger.Log($"{LOGGER_PREFIX} Using cached skin: {cachedSkin.Name}", LoggingTarget.Information);
-                    return cachedSkin;
+                    return (T)cachedSkin;
                 }
             }
 
@@ -107,7 +92,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
             try
             {
                 // 创建脚本对象
-                var script = CSharpScript.Create<IScriptedSkin>(scriptCode, safe_script_options);
+                var script = CSharpScript.Create(scriptCode, ScriptedSkinCompilation.Options);
 
                 // 获取编译结果并检查错误
                 var compilation = script.GetCompilation();
@@ -133,20 +118,18 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
                     }
                 }
 
-                // 执行脚本（创建实例）
-                Logger.Log($"{LOGGER_PREFIX} Executing script...", LoggingTarget.Information);
                 var state = await script.RunAsync().ConfigureAwait(false);
-                var skin = state.ReturnValue;
+                var instance = instantiateFromReturnValue<T>(state.ReturnValue, scriptPath, ctorArgs);
+                if (instance != null)
+                    return cacheAndReturn(scriptPath, instance);
 
-                if (skin == null)
-                    throw new ScriptExecutionException("Script did not return an IScriptedSkin instance.");
+                var loadedAssembly = emitAssembly(compilation, scriptPath);
+                var reflected = instantiateFromAssembly<T>(loadedAssembly, scriptPath, ctorArgs);
 
-                // 添加到缓存
-                cache.Add(scriptPath, skin);
+                if (reflected != null)
+                    return cacheAndReturn(scriptPath, reflected);
 
-                Logger.Log($"{LOGGER_PREFIX} Successfully loaded skin: {skin.Name} v{skin.Version} by {skin.Author}", LoggingTarget.Information);
-
-                return skin;
+                throw new ScriptExecutionException($"Script did not expose a usable {typeof(T).Name} implementation.");
             }
             catch (CompilationErrorException ex)
             {
@@ -161,6 +144,247 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
             {
                 Logger.Log($"{LOGGER_PREFIX} Unexpected error during script execution: {ex}", LoggingTarget.Runtime);
                 throw new ScriptExecutionException($"Failed to execute script: {ex.Message}", ex);
+            }
+        }
+
+        private static Assembly emitAssembly(Compilation compilation, string scriptPath)
+        {
+            using var peStream = new MemoryStream();
+
+            var emitResult = compilation.Emit(peStream);
+
+            if (!emitResult.Success)
+                throw new ScriptCompilationException(emitResult.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToList());
+
+            return Assembly.Load(peStream.ToArray());
+        }
+
+        private T? instantiateFromReturnValue<T>(object? returnValue, string scriptPath, object?[] ctorArgs)
+            where T : class
+        {
+            if (returnValue == null)
+                return null;
+
+            if (returnValue is T typed)
+                return typed;
+
+            if (typeof(T) == typeof(IScriptedSkin) && returnValue is Skin skin)
+                return (T)(object)new SkinScriptedSkinAdapter(skin);
+
+            Logger.Log($"{LOGGER_PREFIX} Script returned {returnValue.GetType().Name}, which cannot be used as {typeof(T).Name} for {Path.GetFileName(scriptPath)}.", LoggingTarget.Information);
+            return null;
+        }
+
+        private T? instantiateFromAssembly<T>(Assembly assembly, string scriptPath, object?[] ctorArgs)
+            where T : class
+        {
+            string expectedTypeName = Path.GetFileNameWithoutExtension(scriptPath);
+            var candidateTypes = assembly.GetTypes()
+                                         .Where(type => !type.IsAbstract && !type.IsInterface)
+                                         .Where(matchesTargetType<T>)
+                                         .OrderByDescending(type => string.Equals(type.Name, expectedTypeName, StringComparison.Ordinal))
+                                         .ThenBy(type => type.FullName, StringComparer.Ordinal)
+                                         .ToArray();
+
+            foreach (var type in candidateTypes)
+            {
+                foreach (object?[] args in expandCtorArgs(scriptPath, ctorArgs))
+                {
+                    var instance = adaptInstance<T>(tryCreateInstance(type, args));
+                    if (instance != null)
+                        return instance;
+                }
+            }
+
+            return null;
+        }
+
+        private static IEnumerable<object?[]> expandCtorArgs(string scriptPath, object?[] ctorArgs)
+        {
+            yield return ctorArgs;
+
+            var fallbackStore = ScriptedSkinCompilation.CreateDirectoryResourceStore(scriptPath);
+
+            if (fallbackStore == null)
+                yield break;
+
+            switch (ctorArgs.Length)
+            {
+                case 0:
+                    yield return new object?[] { fallbackStore };
+
+                    break;
+
+                case 1:
+                    yield return new[] { ctorArgs[0], fallbackStore };
+
+                    break;
+
+                case 2:
+                    yield return new[] { ctorArgs[0], ctorArgs[1], fallbackStore };
+
+                    break;
+            }
+        }
+
+        private static bool matchesTargetType<T>(Type type)
+            where T : class
+        {
+            if (typeof(T).IsAssignableFrom(type))
+                return true;
+
+            return typeof(T) == typeof(IScriptedSkin) && typeof(Skin).IsAssignableFrom(type);
+        }
+
+        private static object? tryCreateInstance(Type type, object?[] ctorArgs)
+        {
+            if (ctorArgs.Length == 0)
+            {
+                if (Activator.CreateInstance(type) is object direct)
+                    return direct;
+            }
+
+            foreach (var ctor in type.GetConstructors())
+            {
+                var parameters = ctor.GetParameters();
+                if (parameters.Length != ctorArgs.Length)
+                    continue;
+
+                bool compatible = true;
+
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    object? arg = ctorArgs[i];
+
+                    if (arg == null)
+                    {
+                        if (parameters[i].ParameterType.IsValueType && Nullable.GetUnderlyingType(parameters[i].ParameterType) == null)
+                        {
+                            compatible = false;
+                            break;
+                        }
+
+                        continue;
+                    }
+
+                    if (!parameters[i].ParameterType.IsInstanceOfType(arg))
+                    {
+                        compatible = false;
+                        break;
+                    }
+                }
+
+                if (!compatible)
+                    continue;
+
+                return ctor.Invoke(ctorArgs);
+            }
+
+            return null;
+        }
+
+        private static T? adaptInstance<T>(object? instance)
+            where T : class
+        {
+            if (instance == null)
+                return null;
+
+            if (instance is T typed)
+                return typed;
+
+            if (typeof(T) == typeof(IScriptedSkin) && instance is Skin skin)
+                return (T)(object)new SkinScriptedSkinAdapter(skin);
+
+            return null;
+        }
+
+        private T cacheAndReturn<T>(string scriptPath, T instance)
+            where T : class
+        {
+            if (typeof(T) == typeof(IScriptedSkin) && instance is IScriptedSkin scriptedSkin)
+                cache.Add(scriptPath, scriptedSkin);
+
+            return instance;
+        }
+
+        /// <summary>
+        /// 尝试提取脚本中声明的 <see cref="SkinInfo"/> 元数据。
+        /// </summary>
+        public async Task<SkinInfo?> LoadScriptInfoAsync(string scriptPath)
+        {
+            if (!File.Exists(scriptPath))
+                throw new FileNotFoundException($"Script file not found: {scriptPath}");
+
+            string scriptCode = await File.ReadAllTextAsync(scriptPath).ConfigureAwait(false);
+            validateScriptSafety(scriptCode, scriptPath);
+
+            try
+            {
+                var script = CSharpScript.Create(scriptCode, ScriptedSkinCompilation.Options);
+                var compilation = script.GetCompilation();
+                var diagnostics = compilation.GetDiagnostics();
+
+                var errors = diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+                if (errors.Any())
+                    throw new ScriptCompilationException(errors);
+
+                var assembly = emitAssembly(compilation, scriptPath);
+                string expectedTypeName = Path.GetFileNameWithoutExtension(scriptPath);
+
+                var candidateTypes = assembly.GetTypes()
+                                             .Where(type => !type.IsAbstract && !type.IsInterface)
+                                             .OrderByDescending(type => string.Equals(type.Name, expectedTypeName, StringComparison.Ordinal))
+                                             .ThenBy(type => type.FullName, StringComparer.Ordinal)
+                                             .ToArray();
+
+                foreach (var type in candidateTypes)
+                {
+                    var createInfo = type.GetMethod("CreateInfo", BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+
+                    if (createInfo?.ReturnType == typeof(SkinInfo) && createInfo.GetParameters().Length == 0)
+                    {
+                        if (createInfo.Invoke(null, null) is SkinInfo skinInfo)
+                            return skinInfo;
+                    }
+
+                    if (typeof(Skin).IsAssignableFrom(type) && type.GetConstructor(Type.EmptyTypes) != null)
+                    {
+                        if (Activator.CreateInstance(type) is Skin skin)
+                            return skin.SkinInfo.Value;
+                    }
+
+                    if (typeof(IScriptedSkin).IsAssignableFrom(type) && type.GetConstructor(Type.EmptyTypes) != null)
+                    {
+                        if (Activator.CreateInstance(type) is IScriptedSkin scriptedSkin)
+                        {
+                            var protectedProperty = scriptedSkin.GetType().GetProperty("Protected", BindingFlags.Public | BindingFlags.Instance);
+
+                            if (protectedProperty?.PropertyType == typeof(bool) && protectedProperty.GetValue(scriptedSkin) is bool isProtected)
+                            {
+                                return new SkinInfo(scriptedSkin.Name, scriptedSkin.Author, typeof(ScriptedSkinWrapper).GetInvariantInstantiationInfo())
+                                {
+                                    Protected = isProtected,
+                                };
+                            }
+
+                            return new SkinInfo(scriptedSkin.Name, scriptedSkin.Author, typeof(ScriptedSkinWrapper).GetInvariantInstantiationInfo());
+                        }
+                    }
+                }
+
+                return null;
+            }
+            catch (CompilationErrorException ex)
+            {
+                throw new ScriptCompilationException(ex.Diagnostics);
+            }
+            catch (ScriptCompilationException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new ScriptExecutionException($"Failed to read script metadata: {ex.Message}", ex);
             }
         }
 
@@ -220,18 +444,12 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
     /// </summary>
     internal class SafeMetadataResolver : MetadataReferenceResolver
     {
-        private static readonly HashSet<string> allowed_assemblies = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        private readonly HashSet<string> allowedAssemblies;
+
+        public SafeMetadataResolver(IEnumerable<string> allowedAssemblyNames)
         {
-            "osu.Game",
-            "osu.Framework",
-            "osuTK",
-            "System.Runtime",
-            "System.Collections",
-            "System.Linq",
-            "System.Core",
-            "mscorlib",
-            "netstandard",
-        };
+            allowedAssemblies = new HashSet<string>(allowedAssemblyNames, StringComparer.OrdinalIgnoreCase);
+        }
 
         public override bool ResolveMissingAssemblies => false;
 
@@ -242,10 +460,10 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         {
             string assemblyName = Path.GetFileNameWithoutExtension(reference);
 
-            if (!allowed_assemblies.Contains(assemblyName))
+            if (!allowedAssemblies.Contains(assemblyName))
             {
                 string message = $"Assembly '{assemblyName}' is not allowed in scripted skins. " +
-                                 $"Allowed assemblies: {string.Join(", ", allowed_assemblies)}";
+                                 $"Allowed assemblies: {string.Join(", ", allowedAssemblies)}";
                 Logger.Log(message, LoggingTarget.Runtime, LogLevel.Important);
                 throw new ScriptSecurityException(message);
             }
@@ -256,6 +474,42 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         public override bool Equals(object? other) => other is SafeMetadataResolver;
 
         public override int GetHashCode() => nameof(SafeMetadataResolver).GetHashCode();
+    }
+
+    /// <summary>
+    /// 将 <see cref="Skin"/> 适配为 <see cref="IScriptedSkin"/>。
+    /// </summary>
+    internal sealed class SkinScriptedSkinAdapter : IScriptedSkin
+    {
+        private readonly Skin skin;
+
+        public SkinScriptedSkinAdapter(Skin skin)
+        {
+            this.skin = skin;
+        }
+
+        public void Initialize(ISkinSource baseSkin, IStorageResourceProvider resources)
+        {
+        }
+
+        public Drawable? GetDrawableComponent(ISkinComponentLookup lookup) => skin.GetDrawableComponent(lookup);
+
+        public Texture? GetTexture(string componentName, WrapMode wrapModeS = default, WrapMode wrapModeT = default) => skin.GetTexture(componentName, wrapModeS, wrapModeT);
+
+        public ISample? GetSample(ISampleInfo sampleInfo) => skin.GetSample(sampleInfo);
+
+        public IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
+            where TLookup : notnull
+            where TValue : notnull
+            => skin.GetConfig<TLookup, TValue>(lookup);
+
+        public string Name => skin.Name;
+
+        public string Author => skin.SkinInfo.Value.Creator;
+
+        public Version Version => skin.GetType().GetProperty("Version", BindingFlags.Public | BindingFlags.Instance)?.GetValue(skin) as Version ?? new Version(1, 0, 0);
+
+        public void Dispose() => skin.Dispose();
     }
 
     /// <summary>

@@ -41,6 +41,7 @@ using osu.Game.Rulesets.Mania.Skinning.Ez2;
 using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
 using osu.Game.Rulesets.Mania.Skinning.SbI;
+using osu.Game.Rulesets.Mania.Skinning.Scripted;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays.Types;
@@ -106,6 +107,10 @@ namespace osu.Game.Rulesets.Mania
 
                 case LegacySkin:
                     return new ManiaLegacySkinTransformer(skin, beatmap);
+
+                // ✨ 脚本皮肤支持：使用通用的 ScriptedSkinTransformer
+                case ScriptedSkinWrapper:
+                    return new ManiaScriptedSkinTransformer(skin, beatmap);
             }
 
             return null;

@@ -598,6 +598,10 @@ namespace osu.Game
             }).Where(m => m != null);
 
             Localisation.AddLocaleMappings(localeMappings);
+
+            // 启动脚本皮肤文件监控
+            var skinManager = Dependencies.Get<SkinManager>();
+            skinManager.StartScriptWatching();
         }
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent) =>

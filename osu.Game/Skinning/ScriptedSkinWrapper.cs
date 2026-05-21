@@ -24,25 +24,25 @@ namespace osu.Game.Skinning
     /// </remarks>
     public class ScriptedSkinWrapper : Skin
     {
-        private readonly ISkinSource skinSource;
-        private readonly IStorageResourceProvider resources;
         private readonly IScriptedSkin scriptedSkin;
-        private readonly SandboxedScriptRunner scriptRunner;
 
-        /// <summary>
-        /// 创建脚本皮肤包装器。
-        /// </summary>
         /// <param name="skinSource">皮肤源（用于回退）。</param>
         /// <param name="resources">资源提供者。</param>
         /// <param name="scriptedSkin">底层脚本皮肤实例。</param>
         /// <param name="scriptRunner">脚本执行器（用于热重载）。</param>
-        public ScriptedSkinWrapper(ISkinSource skinSource, IStorageResourceProvider resources, IScriptedSkin scriptedSkin, SandboxedScriptRunner? scriptRunner = null)
-            : base(createInfoForScriptedSkin(scriptedSkin), resources)
+        /// <param name="skinInfo">可选的原始皮肤信息，用于保留脚本皮肤的 Protected 等元数据。</param>
+        /// <param name="scriptPath">脚本文件路径。</param>
+        public ScriptedSkinWrapper(ISkinSource skinSource,
+                                   IStorageResourceProvider resources,
+                                   IScriptedSkin scriptedSkin,
+                                   SandboxedScriptRunner? scriptRunner = null,
+                                   SkinInfo? skinInfo = null,
+                                   string? scriptPath = null)
+            : base(createInfoForScriptedSkin(scriptedSkin, skinInfo), resources)
         {
-            this.skinSource = skinSource;
-            this.resources = resources;
             this.scriptedSkin = scriptedSkin;
-            this.scriptRunner = scriptRunner ?? new SandboxedScriptRunner();
+            ScriptRunner = scriptRunner ?? new SandboxedScriptRunner();
+            ScriptPath = scriptPath;
 
             // 初始化脚本皮肤
             try
@@ -58,17 +58,36 @@ namespace osu.Game.Skinning
         /// <summary>
         /// 为脚本皮肤创建 SkinInfo。
         /// </summary>
-        private static SkinInfo createInfoForScriptedSkin(IScriptedSkin skin)
+        private static SkinInfo createInfoForScriptedSkin(IScriptedSkin skin, SkinInfo? skinInfo)
         {
+            if (skinInfo != null)
+                return skinInfo;
+
+            bool isProtected = false;
+
+            var protectedProperty = skin.GetType().GetProperty("Protected");
+            if (protectedProperty?.PropertyType == typeof(bool) && protectedProperty.GetValue(skin) is bool protectedValue)
+                isProtected = protectedValue;
+
             return new SkinInfo
             {
                 ID = Guid.NewGuid(), // 脚本皮肤使用动态生成的 ID
                 Name = $"{skin.Name} [Scripted]",
                 Creator = skin.Author,
-                Protected = false, // 脚本皮肤不是受保护的
+                Protected = isProtected,
                 InstantiationInfo = typeof(ScriptedSkinWrapper).GetInvariantInstantiationInfo(),
             };
         }
+
+        /// <summary>
+        /// 获取用于加载后续脚本文件的脚本执行器。
+        /// </summary>
+        public SandboxedScriptRunner ScriptRunner { get; }
+
+        /// <summary>
+        /// 获取脚本皮肤的脚本路径（如果可用）。
+        /// </summary>
+        public string? ScriptPath { get; }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
         {
@@ -83,7 +102,7 @@ namespace osu.Game.Skinning
             }
         }
 
-        public override Texture? GetTexture(string componentName, WrapMode wrapModeS = default, WrapMode wrapModeT = default)
+        public override Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT)
         {
             try
             {
@@ -153,7 +172,7 @@ namespace osu.Game.Skinning
         {
             try
             {
-                var newSkin = await scriptRunner.LoadScriptAsync(scriptPath).ConfigureAwait(false);
+                var newSkin = await ScriptRunner.LoadScriptAsync(scriptPath).ConfigureAwait(false);
 
                 // 清理旧实例
                 scriptedSkin.Dispose();

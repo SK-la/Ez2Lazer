@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
+using osu.Game.Extensions;
 using osu.Game.Database;
 using osu.Game.IO;
 using osu.Game.Models;
@@ -89,6 +90,9 @@ namespace osu.Game.Skinning
 
         public override string ToString()
         {
+            if (InstantiationInfo == typeof(ScriptedSkinWrapper).GetInvariantInstantiationInfo())
+                return $"[Script] {Name} {Creator}".TrimEnd();
+
             string author = string.IsNullOrEmpty(Creator) ? string.Empty : $"({Creator})";
             return $"{Name} {author}".Trim();
         }
