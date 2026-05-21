@@ -16,6 +16,8 @@
     <StartupObject>osu.Desktop.Program</StartupObject>
   </PropertyGroup>
   <PropertyGroup Condition="'$(OfficialEz2Build)' == 'true'">
+    <!-- MinVer must not override official release versioning (tag format contains dots). -->
+    <MinVerSkip>true</MinVerSkip>
     <Version>$(ReleaseVersion)</Version>
     <FileVersion>$(ReleaseVersion).0</FileVersion>
     <AssemblyVersion>$(ReleaseVersion).0</AssemblyVersion>

@@ -56,7 +56,8 @@ def run_publish(
         cmd.extend(["-r", rid])
     if msbuild_properties:
         for key, value in msbuild_properties.items():
-            cmd.append(f'-p:{key}={value}')
+            # Quote values so dotted release tags (e.g. 2026.5.18) are not split by MSBuild.
+            cmd.append(f'-p:{key}="{value}"')
     print("Running:", " ".join(cmd))
     # Capture output for diagnostics in CI, but only print on failure to avoid excessive logs
     res = subprocess.run(cmd, cwd=working_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

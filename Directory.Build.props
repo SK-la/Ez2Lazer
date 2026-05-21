@@ -44,7 +44,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <PropertyGroup Label="Versioning">
-    <MinVerDefaultPreReleaseIdentifiers>preview</MinVerDefaultPreReleaseIdentifiers>
+    <MinVerDefaultPreReleaseIdentifiers>ez2lazer</MinVerDefaultPreReleaseIdentifiers>
     <MinVerMinimumMajorMinor>0.0</MinVerMinimumMajorMinor>
   </PropertyGroup>
   <PropertyGroup Label="Nuget">
