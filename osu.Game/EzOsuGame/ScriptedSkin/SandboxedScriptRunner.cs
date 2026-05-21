@@ -399,6 +399,15 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         }
 
         /// <summary>
+        /// 清除所有脚本的编译缓存。
+        /// </summary>
+        public void ClearAllCache()
+        {
+            cache.Clear();
+            Logger.Log($"{LOGGER_PREFIX} All script caches cleared.", LoggingTarget.Information);
+        }
+
+        /// <summary>
         /// 验证脚本的安全性，阻止危险操作。
         /// </summary>
         /// <param name="scriptCode">脚本源代码。</param>

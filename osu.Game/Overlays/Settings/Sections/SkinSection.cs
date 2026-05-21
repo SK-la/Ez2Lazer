@@ -123,6 +123,8 @@ namespace osu.Game.Overlays.Settings.Sections
                     skins.SelectRandomSkin();
                 }
             });
+
+            skins.ScriptedSkinsCatalogUpdated += refreshSkinsList;
         }
 
         private void skinsChanged(IRealmCollection<SkinInfo> sender, ChangeSet changes)
@@ -149,12 +151,14 @@ namespace osu.Game.Overlays.Settings.Sections
             {
                 int reloaded = await skins.ReloadAllScriptedSkins().ConfigureAwait(false);
                 Logger.Log($"Scripted skins reloaded: {reloaded}", LoggingTarget.Information);
-                Schedule(refreshSkinsList);
             });
         }
 
         protected override void Dispose(bool isDisposing)
         {
+            if (isDisposing)
+                skins.ScriptedSkinsCatalogUpdated -= refreshSkinsList;
+
             base.Dispose(isDisposing);
 
             realmSubscription?.Dispose();
