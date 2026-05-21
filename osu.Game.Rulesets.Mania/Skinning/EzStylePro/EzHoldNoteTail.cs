@@ -14,8 +14,13 @@ using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    internal partial class EzHoldNoteTail : EzNoteBase
+    /// <summary>
+    /// 优先 <see cref="EzNoteBase.TailName"/>；缺失时复用 <see cref="EzHoldNoteHead"/> 的加载与裁切逻辑，并整体旋转 180°。
+    /// </summary>
+    internal partial class EzHoldNoteTail : EzNote
     {
+        protected override bool UseColorization => true;
+
         protected override bool ShowSeparators => false;
 
         private readonly EzHoldNoteHittingLayer hittingLayer = new EzHoldNoteHittingLayer();
@@ -23,9 +28,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private TextureAnimation? animation;
 
         private IBindable<double> tailAlpha = null!;
-        private IBindable<double> tailMaskHeight = null!;
 
         private bool gradient;
+        private bool useNoteTopHalfLayout;
 
         [Resolved]
         private DrawableHitObject? drawableObject { get; set; }
@@ -33,26 +38,29 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [BackgroundDependencyLoader(true)]
         private void load(DrawableHitObject? drawableObject, IEzSkinInfo ezSkinInfo, Ez2ConfigManager ezConfig)
         {
+            RelativeSizeAxes = Axes.X;
+            FillMode = FillMode.Fill;
+
             gradient = ezConfig.Get<bool>(Ez2Setting.ManiaLNGradientEnable);
 
             if (gradient)
-            {
                 Alpha = 0;
-                return;
-            }
 
-            Alpha = 1f;
-
-            if (drawableObject != null)
+            ezSkinInfo.ManiaLNGradientEnable.BindValueChanged(e =>
             {
-                drawableObject.HitObjectApplied += hitObjectApplied;
-            }
+                if (gradient == e.NewValue)
+                    return;
+
+                gradient = e.NewValue;
+                Alpha = gradient ? 0 : 1f;
+                OnLoadChanged();
+            });
 
             tailAlpha = ezSkinInfo.HoldTailAlpha;
-            tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
-
-            tailMaskHeight.BindValueChanged(_ => OnDrawableChanged(), true);
             tailAlpha.BindValueChanged(_ => OnColourChanged(), true);
+
+            if (drawableObject != null)
+                drawableObject.HitObjectApplied += hitObjectApplied;
         }
 
         protected override void UpdateTexture()
@@ -60,40 +68,67 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (gradient)
                 return;
 
+            useNoteTopHalfLayout = false;
+
             animation = Factory.CreateAnimation(TailName);
+
+            if (animation.FrameCount > 0)
+            {
+                MainContainer.Rotation = 0;
+                MainContainer.Child = animation;
+                return;
+            }
+
+            animation.Dispose();
+
+            // 与 EzHoldNoteHead 相同：HeadName -> NoteName
+            animation = Factory.CreateAnimation(HeadName);
+
+            if (animation.FrameCount > 0)
+            {
+                MainContainer.Rotation = 180;
+                MainContainer.Child = animation;
+                return;
+            }
+
+            animation.Dispose();
+            animation = Factory.CreateAnimation(NoteName);
 
             if (animation.FrameCount == 0)
             {
-                animation.Dispose();
-                animation = Factory.CreateAnimation(HeadName);
-
-                if (animation.FrameCount == 0)
-                {
-                    animation.Dispose();
-                    animation = Factory.CreateAnimation(NoteName);
-
-                    if (animation.FrameCount == 0)
-                    {
-                        animation.Dispose();
-                        return;
-                    }
-                }
+                animation = null;
+                return;
             }
 
-            MainContainer.Child = new Container
+            useNoteTopHalfLayout = true;
+            applyNoteTopHalfLayout();
+        }
+
+        private void applyNoteTopHalfLayout()
+        {
+            if (animation == null)
+                return;
+
+            if (useNoteTopHalfLayout)
             {
-                RelativeSizeAxes = Axes.X,
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
-                Masking = true,
-                Child = new Container
+                MainContainer.Anchor = Anchor.TopCentre;
+                MainContainer.Origin = Anchor.TopCentre;
+                MainContainer.RelativeSizeAxes = Axes.X;
+                MainContainer.Masking = true;
+                MainContainer.Child = new Container
                 {
+                    Anchor = Anchor.TopCentre,
+                    Origin = Anchor.TopCentre,
                     RelativeSizeAxes = Axes.X,
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
+                    Masking = true,
                     Child = animation,
-                }
-            };
+                };
+            }
+            else
+            {
+                // 与 EzHoldNoteHead 有 head 资源时一致，仅附加旋转
+                MainContainer.Child = animation;
+            }
         }
 
         protected override void UpdateDrawable()
@@ -101,8 +136,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (gradient)
                 return;
 
-            float visibleHeight = NoteHeight - (float)tailMaskHeight.Value;
-            Height = visibleHeight;
+            Height = NoteHeight;
+
+            if (useNoteTopHalfLayout && MainContainer.Child is Container c)
+            {
+                MainContainer.Height = NoteHeight / 2;
+                c.Height = NoteHeight;
+                // c.Y = -NoteHeight / 2;
+            }
         }
 
         protected override void UpdateColor()
@@ -119,18 +160,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             var holdNoteTail = (DrawableHoldNoteTail)drawableHitObject;
 
-            // 先解绑再绑定，避免重复绑定异常
             ((IBindable<bool>)hittingLayer.IsHitting).UnbindBindings();
             ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNoteTail.HoldNote.IsHolding);
         }
 
         protected override void Dispose(bool isDisposing)
         {
-            base.Dispose(isDisposing);
             if (drawableObject.IsNotNull())
                 drawableObject.HitObjectApplied -= hitObjectApplied;
 
             animation = null;
+            base.Dispose(isDisposing);
         }
     }
 }
