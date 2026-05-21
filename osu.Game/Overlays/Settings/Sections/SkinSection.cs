@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -94,6 +95,12 @@ namespace osu.Game.Overlays.Settings.Sections
                                   + "\n3.游戏内PS、图片导出(包括渐变动画)",
                     Action = () => skinEditor?.ToggleEzSkinEditor(),
                 },
+                new SettingsButtonV2
+                {
+                    Text = "重载脚本皮肤",
+                    TooltipText = "手动重载 ScriptedSkin 目录下的脚本并刷新列表",
+                    Action = reloadScriptedSkins,
+                },
             };
         }
 
@@ -125,10 +132,25 @@ namespace osu.Game.Overlays.Settings.Sections
             if (!sender.Any())
                 return;
             // For simplicity repopulate the full list.
+            refreshSkinsList();
+        }
+
+        private void refreshSkinsList()
+        {
             dropdownItems.Clear();
             dropdownItems.AddRange(skins.GetAllUsableSkins());
 
             Schedule(() => skinDropdown.Items = dropdownItems);
+        }
+
+        private void reloadScriptedSkins()
+        {
+            _ = Task.Run(async () =>
+            {
+                int reloaded = await skins.ReloadAllScriptedSkins().ConfigureAwait(false);
+                Logger.Log($"Scripted skins reloaded: {reloaded}", LoggingTarget.Information);
+                Schedule(refreshSkinsList);
+            });
         }
 
         protected override void Dispose(bool isDisposing)
