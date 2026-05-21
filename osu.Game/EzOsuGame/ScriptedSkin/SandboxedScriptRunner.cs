@@ -25,8 +25,19 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
     /// </remarks>
     public class SandboxedScriptRunner
     {
+        internal static readonly string LOGGER_PREFIX = "ScriptedSkin";
+
         private static readonly ScriptOptions safe_script_options;
-        internal static readonly Logger LOGGER = Logger.GetLogger("ScriptedSkin");
+
+        private readonly ScriptCompilationCache cache;
+
+        /// <summary>
+        /// 创建沙箱脚本执行器实例。
+        /// </summary>
+        public SandboxedScriptRunner()
+        {
+            cache = new ScriptCompilationCache();
+        }
 
         static SandboxedScriptRunner()
         {
@@ -75,7 +86,17 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
             if (!File.Exists(scriptPath))
                 throw new FileNotFoundException($"Script file not found: {scriptPath}");
 
-            Logger.Log($"Loading script: {Path.GetFileName(scriptPath)}", LoggingTarget.Information);
+            // 尝试从缓存中获取
+            if (cache.TryGet(scriptPath, out var cachedSkin))
+            {
+                if (cachedSkin != null)
+                {
+                    Logger.Log($"{LOGGER_PREFIX} Using cached skin: {cachedSkin.Name}", LoggingTarget.Information);
+                    return cachedSkin;
+                }
+            }
+
+            Logger.Log($"{LOGGER_PREFIX} Loading script: {Path.GetFileName(scriptPath)}", LoggingTarget.Information);
 
             // 读取脚本内容
             string scriptCode = await File.ReadAllTextAsync(scriptPath).ConfigureAwait(false);
@@ -97,7 +118,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
                 if (errors.Any())
                 {
                     var exception = new ScriptCompilationException(errors);
-                    Logger.Log($"Compilation failed: {exception.GetFormattedErrors()}", LoggingTarget.Runtime);
+                    Logger.Log($"{LOGGER_PREFIX} Compilation failed: {exception.GetFormattedErrors()}", LoggingTarget.Runtime);
                     throw exception;
                 }
 
@@ -108,25 +129,28 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
                 {
                     foreach (var warning in warnings)
                     {
-                        Logger.Log($"Warning: {warning.GetMessage()} (Line {warning.Location.GetLineSpan().StartLinePosition.Line + 1})", LoggingTarget.Information);
+                        Logger.Log($"{LOGGER_PREFIX} Warning: {warning.GetMessage()} (Line {warning.Location.GetLineSpan().StartLinePosition.Line + 1})", LoggingTarget.Information);
                     }
                 }
 
                 // 执行脚本（创建实例）
-                Logger.Log("Executing script...", LoggingTarget.Information);
+                Logger.Log($"{LOGGER_PREFIX} Executing script...", LoggingTarget.Information);
                 var state = await script.RunAsync().ConfigureAwait(false);
                 var skin = state.ReturnValue;
 
                 if (skin == null)
                     throw new ScriptExecutionException("Script did not return an IScriptedSkin instance.");
 
-                Logger.Log($"Successfully loaded skin: {skin.Name} v{skin.Version} by {skin.Author}", LoggingTarget.Information);
+                // 添加到缓存
+                cache.Add(scriptPath, skin);
+
+                Logger.Log($"{LOGGER_PREFIX} Successfully loaded skin: {skin.Name} v{skin.Version} by {skin.Author}", LoggingTarget.Information);
 
                 return skin;
             }
             catch (CompilationErrorException ex)
             {
-                Logger.Log($"Compilation error: {ex.Message}", LoggingTarget.Runtime);
+                Logger.Log($"{LOGGER_PREFIX} Compilation error: {ex.Message}", LoggingTarget.Runtime);
                 throw new ScriptCompilationException(ex.Diagnostics);
             }
             catch (ScriptExecutionException)
@@ -135,7 +159,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
             }
             catch (Exception ex)
             {
-                Logger.Log($"Unexpected error during script execution: {ex}", LoggingTarget.Runtime);
+                Logger.Log($"{LOGGER_PREFIX} Unexpected error during script execution: {ex}", LoggingTarget.Runtime);
                 throw new ScriptExecutionException($"Failed to execute script: {ex.Message}", ex);
             }
         }
@@ -175,7 +199,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
             // 检查是否使用了命名空间声明（应该使用全局命名空间）
             if (scriptCode.Contains("namespace "))
             {
-                Logger.Log($"Warning: Script {Path.GetFileName(scriptPath)} contains namespace declaration. " +
+                Logger.Log($"{LOGGER_PREFIX} Warning: Script {Path.GetFileName(scriptPath)} contains namespace declaration. " +
                            "Scripts should use global namespace for simplicity.", LoggingTarget.Information);
             }
         }
@@ -212,7 +236,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
             {
                 string message = $"Assembly '{assemblyName}' is not allowed in scripted skins. " +
                                  $"Allowed assemblies: {string.Join(", ", allowed_assemblies)}";
-                Logger.Log(message, LoggingTarget.Runtime);
+                Logger.Log(message, LoggingTarget.Runtime, LogLevel.Important);
                 throw new ScriptSecurityException(message);
             }
 
