@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -324,7 +325,34 @@ namespace osu.Game.EzOsuGame.Edit
         {
             var currentSkin = getEditorSkin();
 
-            if (provider != null)
+            // 检查是否为脚本皮肤
+            if (currentSkin is ScriptedSkinWrapper scriptedWrapper)
+            {
+                var scriptedSkin = scriptedWrapper.GetScriptedSkin();
+
+                var configEditor = new ScriptedSkinConfigEditor();
+                configEditor.SetSkin(scriptedSkin);
+
+                settingsScrollContainer!.Child = new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(0, 15),
+                    Padding = new MarginPadding(10),
+                    Children = new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "脚本皮肤配置",
+                            Colour = Color4.White,
+                            Font = OsuFont.Default.With(size: 18, weight: FontWeight.Bold),
+                        },
+                        configEditor,
+                    }
+                };
+            }
+            else if (provider != null)
             {
                 // Provider may provide a full parameters UI; prefer that when available.
                 settingsScrollContainer!.Child = provider.CreateParametersPart(currentSkin);
