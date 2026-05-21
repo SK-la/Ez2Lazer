@@ -165,6 +165,16 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         }
 
         /// <summary>
+        /// 清除指定脚本的编译缓存，强制下次加载时重新编译。
+        /// </summary>
+        /// <param name="scriptPath">脚本文件的完整路径。</param>
+        public void ClearCache(string scriptPath)
+        {
+            cache.RemoveByPath(scriptPath);
+            Logger.Log($"{LOGGER_PREFIX} Cache cleared for: {Path.GetFileName(scriptPath)}", LoggingTarget.Information);
+        }
+
+        /// <summary>
         /// 验证脚本的安全性，阻止危险操作。
         /// </summary>
         /// <param name="scriptCode">脚本源代码。</param>

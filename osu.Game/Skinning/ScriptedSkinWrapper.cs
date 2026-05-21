@@ -153,7 +153,7 @@ namespace osu.Game.Skinning
         {
             try
             {
-                var newSkin = await scriptRunner.LoadScriptAsync(scriptPath);
+                var newSkin = await scriptRunner.LoadScriptAsync(scriptPath).ConfigureAwait(false);
 
                 // 清理旧实例
                 scriptedSkin.Dispose();
