@@ -10,22 +10,33 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Skinning.Default;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
+    /// <summary>
+    /// head：固定半颗 note 下半圆角；top：固定整颗 note 裁切上半 + 外层区域高度；body 按 top 区域半高与 head 计算。
+    /// </summary>
     internal partial class SbIHoldBodyPiece : FastNoteBase, IHoldNoteBody
     {
+        private const float top_height_const = 50f;
+        private const float top_height_ratio_min = 0.05f;
+        private const float top_height_ratio_max = 0.15f;
+
         private IBindable<double> tailAlpha = null!;
         private IBindable<double> tailMaskHeight = null!;
 
-        private Container? topContainer;
-        private Container? bodyContainer;
+        private Container? topClipContainer;
+        private Container topNoteClipContainer = null!;
+        private Container topInnerContainer = null!;
+        private Container bodyContainer = null!;
+        private Container headClipContainer = null!;
+        private Container headInnerContainer = null!;
 
-        private float tailHeight;
-        private float cachedTailMaskHeight = float.NaN;
+        private float noteHeight;
+        private float halfNoteHeight;
         private float lastBodyContainerHeight = float.NaN;
         private float lastTopContainerY = float.NaN;
+        private float cachedTailMaskHeight = float.NaN;
         private bool lnGradient;
 
         public SbIHoldBodyPiece()
@@ -37,49 +48,78 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         private void load(IEzSkinInfo ezSkinInfo, Ez2ConfigManager ezConfig)
         {
             lnGradient = ezConfig.Get<bool>(Ez2Setting.ManiaLNGradientEnable);
+            tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
+            tailAlpha = ezSkinInfo.HoldTailAlpha;
 
-            if (lnGradient)
+            tailMaskHeight.BindValueChanged(onTailMaskHeightChanged, true);
+            tailAlpha.BindValueChanged(_ =>
             {
-                tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
-                tailAlpha = ezSkinInfo.HoldTailAlpha;
-                tailMaskHeight.BindValueChanged(e =>
-                {
-                    cachedTailMaskHeight = (float)e.NewValue;
-                    UpdateDrawable();
-                }, true);
-                tailAlpha.BindValueChanged(_ => UpdateColor(), true);
-            }
+                if (!lnGradient)
+                    return;
+
+                UpdateColor();
+                resetLayoutCache();
+                UpdateDrawable();
+            });
+
+            ezSkinInfo.ManiaLNGradientEnable.BindValueChanged(e =>
+            {
+                if (lnGradient == e.NewValue)
+                    return;
+
+                lnGradient = e.NewValue;
+                UpdateLoad();
+            });
         }
 
         protected override void UpdateLoad()
         {
-            if (!lnGradient)
-            {
-                MainContainer.Clear();
-                MainContainer.RelativeSizeAxes = Axes.X;
-                MainContainer.Anchor = Anchor.TopCentre;
-                MainContainer.Origin = Anchor.TopCentre;
-                MainContainer.Child = new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = Color4.White,
-                };
+            MainContainer.Clear();
+            MainContainer.RelativeSizeAxes = Axes.Both;
+            MainContainer.Anchor = Anchor.BottomCentre;
+            MainContainer.Origin = Anchor.BottomCentre;
 
-                topContainer = null;
-                bodyContainer = null;
-                resetLayoutCache();
-                return;
+            topClipContainer = null;
+
+            if (lnGradient)
+            {
+                topClipContainer = new Container
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Anchor = Anchor.TopCentre,
+                    Origin = Anchor.TopCentre,
+                    Masking = false,
+                    Child = topNoteClipContainer = new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Anchor = Anchor.TopCentre,
+                        Origin = Anchor.TopCentre,
+                        Masking = true,
+                        Child = topInnerContainer = new Container
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Anchor = Anchor.TopCentre,
+                            Origin = Anchor.TopCentre,
+                            Masking = true,
+                            Child = new Box { RelativeSizeAxes = Axes.Both },
+                        }
+                    }
+                };
             }
 
-            topContainer = new Container
+            headClipContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-                Child = new Box
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
+                Masking = true,
+                Child = headInnerContainer = new Container
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = Color4.White,
+                    RelativeSizeAxes = Axes.X,
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    Masking = true,
+                    Child = new Box { RelativeSizeAxes = Axes.Both },
                 }
             };
 
@@ -88,104 +128,192 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 RelativeSizeAxes = Axes.X,
                 Anchor = Anchor.BottomCentre,
                 Origin = Anchor.BottomCentre,
-                Child = new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = Color4.White,
-                }
+                Masking = true,
+                Child = new Box { RelativeSizeAxes = Axes.Both },
             };
 
-            MainContainer.Clear();
-            MainContainer.Children = [bodyContainer, topContainer];
+            MainContainer.Children = lnGradient
+                ? [topClipContainer!, bodyContainer, headClipContainer]
+                : [bodyContainer, headClipContainer];
 
             resetLayoutCache();
-            Schedule(UpdateDrawable);
+            Schedule(() =>
+            {
+                UpdateDrawable();
+                UpdateColor();
+            });
         }
 
         protected override void UpdateDrawable()
         {
+            if (headInnerContainer == null)
+                return;
+
             if (DrawWidth <= 1)
             {
                 Schedule(UpdateDrawable);
                 return;
             }
 
-            float radius = (float)CornerRadiusBindable.Value;
+            noteHeight = UnitHeight;
+            halfNoteHeight = noteHeight * 0.5f;
 
-            Masking = true;
-            CornerRadius = radius;
+            updateHeadLayout();
 
-            Y = UnitHeight;
+            float moveDown = lnGradient ? getTailMaskHeight() : 0;
 
-            if (!lnGradient)
+            if (lnGradient)
             {
-                MainContainer.Height = DrawHeight + UnitHeight;
-                return;
+                float topRegionHeight = getTopRegionHeight();
+                updateTopNoteLayout(topRegionHeight);
+                updateTopContainerLayout(moveDown, topRegionHeight);
             }
 
-            tailHeight = UnitHeight;
-            float topHeight = Math.Max(tailHeight - cachedTailMaskHeight, 0);
-            float topY = tailHeight - topHeight;
-
-            if (topContainer != null)
-            {
-                topContainer.Alpha = cachedTailMaskHeight >= 0 ? 1 : 0;
-                topContainer.Height = topHeight;
-                topContainer.Y = topY;
-            }
-
-            if (bodyContainer != null)
-                bodyContainer.Height = Math.Max(DrawHeight - tailHeight, 0);
+            updateBodyLayout(moveDown);
         }
 
         protected override void UpdateColor()
         {
-            if (!lnGradient)
-            {
-                MainContainer.Colour = NoteColor;
+            if (headInnerContainer == null)
                 return;
-            }
 
-            if (topContainer != null)
-            {
-                topContainer.Colour = ColourInfo.GradientVertical(
-                    NoteColor.Opacity((float)tailAlpha.Value),
-                    NoteColor);
-            }
+            headInnerContainer.Colour = NoteColor;
+            bodyContainer.Colour = NoteColor;
 
-            if (bodyContainer != null)
-                bodyContainer.Colour = NoteColor;
+            if (!lnGradient || topClipContainer == null)
+                return;
+
+            topInnerContainer.Colour = ColourInfo.GradientVertical(
+                NoteColor.Opacity((float)tailAlpha.Value),
+                NoteColor);
         }
 
         protected override void Update()
         {
             base.Update();
 
-            if (!lnGradient || MainContainer.Children.Count == 0 || tailHeight <= 0)
+            if (headInnerContainer == null || DrawWidth <= 1)
                 return;
 
-            float maskHeight = float.IsNaN(cachedTailMaskHeight) ? 0 : cachedTailMaskHeight;
-            float targetTopHeight = Math.Max(tailHeight - maskHeight, 0);
-            float targetTopY = tailHeight - targetTopHeight;
+            noteHeight = UnitHeight;
+            halfNoteHeight = noteHeight * 0.5f;
 
-            if (topContainer != null && layoutChanged(lastTopContainerY, targetTopY))
+            if (halfNoteHeight <= 0)
+                return;
+
+            updateHeadLayout();
+
+            float moveDown = lnGradient ? getTailMaskHeight() : 0;
+
+            if (lnGradient)
             {
-                topContainer.Y = targetTopY;
-                lastTopContainerY = targetTopY;
+                float topRegionHeight = getTopRegionHeight();
+                updateTopNoteLayout(topRegionHeight);
+                updateTopContainerLayout(moveDown, topRegionHeight);
             }
 
-            float drawHeightMinusHalf = DrawHeight - tailHeight;
-            float middleHeight = Math.Max(drawHeightMinusHalf, tailHeight);
-            float targetBodyHeight = maskHeight >= 0
-                ? middleHeight - maskHeight + 1
-                : middleHeight + MathF.Abs(maskHeight) + 2;
-            targetBodyHeight = Math.Max(targetBodyHeight, 0);
+            updateBodyLayout(moveDown);
+        }
 
-            if (bodyContainer != null && layoutChanged(lastBodyContainerHeight, targetBodyHeight))
+        /// <summary>
+        /// 与 <see cref="SbIHoldNoteHeadPiece"/> 一致：半高裁切，内层整颗 note 底对齐。
+        /// </summary>
+        private void updateHeadLayout()
+        {
+            headClipContainer.Height = halfNoteHeight;
+            headInnerContainer.Height = noteHeight;
+            headInnerContainer.Y = 0;
+            headInnerContainer.CornerRadius = (float)CornerRadiusBindable.Value;
+        }
+
+        /// <summary>
+        /// 使用 top 区域固定高度（非 note 高度）：内层为区域高，裁切半高露出顶部圆角。
+        /// </summary>
+        private void updateTopNoteLayout(float topRegionHeight)
+        {
+            float topHalfHeight = topRegionHeight * 0.5f;
+            topNoteClipContainer.Height = topHalfHeight;
+            topInnerContainer.Height = topRegionHeight;
+            topInnerContainer.Y = 0;
+            topInnerContainer.CornerRadius = (float)CornerRadiusBindable.Value;
+        }
+
+        /// <summary>
+        /// top 外层区域高度：max(总高 × [5%,15%](tailAlpha), 50)。body 按此高度的半高参与计算。
+        /// </summary>
+        private float getTopRegionHeight()
+        {
+            float t = (float)Math.Clamp(tailAlpha.Value, 0, 1);
+            float ratio = top_height_ratio_min + (top_height_ratio_max - top_height_ratio_min) * t;
+            float percentHeight = DrawHeight * ratio;
+            return Math.Max(percentHeight, top_height_const);
+        }
+
+        private float getTopLayoutReserveHeight() => getTopRegionHeight() * 0.5f;
+
+        /// <summary>
+        /// 与 <see cref="EzStylePro.EzHoldNoteMiddle.updateTopContainerLayout"/> 一致，作用于外层区域。
+        /// </summary>
+        private void updateTopContainerLayout(float maskHeight, float topRegionHeight)
+        {
+            if (topClipContainer == null)
+                return;
+
+            topClipContainer.Alpha = maskHeight >= 0 ? 1 : 0;
+
+            if (maskHeight >= 0)
+            {
+                topClipContainer.Height = topRegionHeight;
+
+                if (layoutChanged(lastTopContainerY, maskHeight))
+                {
+                    topClipContainer.Y = maskHeight;
+                    lastTopContainerY = maskHeight;
+                }
+
+                topNoteClipContainer.Y = 0;
+            }
+            else
+            {
+                float extendedHeight = topRegionHeight - maskHeight;
+                topClipContainer.Height = extendedHeight;
+                topClipContainer.Y = topRegionHeight - extendedHeight;
+                lastTopContainerY = topClipContainer.Y;
+                topNoteClipContainer.Y = 0;
+            }
+        }
+
+        private void updateBodyLayout(float moveDown)
+        {
+            float targetBodyHeight;
+
+            if (!lnGradient)
+            {
+                targetBodyHeight = DrawHeight - halfNoteHeight;
+            }
+            else
+            {
+                float topHalfReserve = getTopLayoutReserveHeight();
+                float middleHeight = Math.Max(DrawHeight - topHalfReserve - halfNoteHeight, halfNoteHeight);
+
+                targetBodyHeight = middleHeight - moveDown;
+            }
+
+            if (layoutChanged(lastBodyContainerHeight, targetBodyHeight))
             {
                 bodyContainer.Height = targetBodyHeight;
                 lastBodyContainerHeight = targetBodyHeight;
             }
+
+            if (layoutChanged(bodyContainer.Y, halfNoteHeight))
+                bodyContainer.Y = -halfNoteHeight;
+        }
+
+        private void onTailMaskHeightChanged(ValueChangedEvent<double> height)
+        {
+            cachedTailMaskHeight = (float)height.NewValue;
+            resetLayoutCache();
+            UpdateDrawable();
         }
 
         private void resetLayoutCache()
@@ -194,11 +322,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             lastTopContainerY = float.NaN;
         }
 
-        public void Recycle()
-        {
-            ClearTransforms();
-        }
+        private float getTailMaskHeight() => float.IsNaN(cachedTailMaskHeight) ? 0 : cachedTailMaskHeight;
 
-        private static bool layoutChanged(float oldValue, float newValue) => float.IsNaN(oldValue) || MathF.Abs(oldValue - newValue) > 0.001f;
+        private static bool layoutChanged(float oldValue, float newValue) =>
+            float.IsNaN(oldValue) || MathF.Abs(oldValue - newValue) > 0.001f;
+
+        public void Recycle() => ClearTransforms();
     }
 }

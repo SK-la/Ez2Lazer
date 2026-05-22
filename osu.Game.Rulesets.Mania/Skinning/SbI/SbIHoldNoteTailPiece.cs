@@ -3,52 +3,89 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
     /// <summary>
-    /// <see cref="Ez2Setting.ManiaLNGradientEnable"/> 开启时：尾部隐藏，由 <see cref="SbIHoldBodyPiece"/> 的 top 段代替。
-    /// 关闭时：常规 body + 独立 tail；tail 使用与 body 顶部段相同的 <see cref="IEzSkinInfo.HoldTailMaskHeight"/> / <see cref="IEzSkinInfo.HoldTailAlpha"/>（高度修正与纵向渐变）。
-    /// LN 渐变开关仅在加载时读取；tail 的高度修正与透明度在常规模式下仍随皮肤绑定更新。
+    /// <see cref="Ez2Setting.ManiaLNGradientEnable"/> 开启时隐藏，由 <see cref="SbIHoldBodyPiece"/> 代替。
+    /// 关闭时：完整 note 高度绘制，裁切容器仅显示上半区，露出顶部两个圆角。
     /// </summary>
-    internal partial class SbIHoldNoteTailPiece : SbINotePiece
+    internal partial class SbIHoldNoteTailPiece : FastNoteBase
     {
+        private Container innerContainer = null!;
+        private Box note = null!;
+
         private readonly IBindable<double> tailAlphaBindable = new Bindable<double>();
-        private readonly IBindable<double> tailMaskHeightBindable = new Bindable<double>();
 
         private bool gradient;
+
+        public SbIHoldNoteTailPiece()
+        {
+            RelativeSizeAxes = Axes.X;
+        }
 
         [BackgroundDependencyLoader(true)]
         private void load(IEzSkinInfo ezSkinInfo, Ez2ConfigManager ezConfig)
         {
+            MainContainer.RelativeSizeAxes = Axes.X;
+            MainContainer.Anchor = Anchor.TopCentre;
+            MainContainer.Origin = Anchor.TopCentre;
+            MainContainer.Masking = true;
+            MainContainer.Child = innerContainer = new Container
+            {
+                RelativeSizeAxes = Axes.X,
+                Anchor = Anchor.TopCentre,
+                Origin = Anchor.TopCentre,
+                Masking = true,
+                Child = note = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                }
+            };
+
             gradient = ezConfig.Get<bool>(Ez2Setting.ManiaLNGradientEnable);
 
-            if (gradient)
-            {
-                Alpha = 0;
-                return;
-            }
-
-            Alpha = 1;
-
-            tailMaskHeightBindable.BindTo(ezSkinInfo.HoldTailMaskHeight);
             tailAlphaBindable.BindTo(ezSkinInfo.HoldTailAlpha);
-
-            tailMaskHeightBindable.BindValueChanged(_ => UpdateDrawable(), true);
             tailAlphaBindable.BindValueChanged(_ => UpdateColor(), true);
+
+            ezSkinInfo.ManiaLNGradientEnable.BindValueChanged(e =>
+            {
+                if (gradient == e.NewValue)
+                    return;
+
+                gradient = e.NewValue;
+                Alpha = gradient ? 0 : 1;
+                UpdateDrawable();
+                UpdateColor();
+            });
+
+            Alpha = gradient ? 0 : 1;
         }
 
         protected override void UpdateDrawable()
         {
-            base.UpdateDrawable();
-
             if (gradient)
                 return;
 
-            float visibleHeight = UnitHeight - (float)tailMaskHeightBindable.Value;
-            Height = visibleHeight;
+            if (DrawWidth <= 1)
+            {
+                Schedule(UpdateDrawable);
+                return;
+            }
+
+            float radius = (float)CornerRadiusBindable.Value;
+            float height = UnitHeight;
+            float halfHeight = height / 2;
+
+            Height = halfHeight;
+            MainContainer.Height = halfHeight;
+            innerContainer.Height = height;
+            innerContainer.CornerRadius = radius;
         }
 
         protected override void UpdateColor()
@@ -56,7 +93,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             if (gradient)
                 return;
 
-            MainContainer.Colour = ColourInfo.GradientVertical(
+            note.Colour = ColourInfo.GradientVertical(
                 NoteColor.Opacity((float)tailAlphaBindable.Value),
                 NoteColor);
         }

@@ -100,18 +100,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             }
         }
 
-        void IColumnNote.ForwardOnNoteSetChanged() => OnLoadChanged();
-        void IColumnNote.ForwardOnNoteSizeChanged() => OnDrawableChanged();
-        void IColumnNote.ForwardOnColourChanged() => OnColourChanged();
-
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing)
-            {
                 ColumnWatcher.Remove(Column, this);
-            }
-
             base.Dispose(isDisposing);
         }
+
+        void IColumnNote.ForwardOnNoteSetChanged() => OnLoadChanged();
+        void IColumnNote.ForwardOnNoteSizeChanged() => OnDrawableChanged();
+        void IColumnNote.ForwardOnColourChanged() => OnColourChanged();
     }
 }

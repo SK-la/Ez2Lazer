@@ -1,24 +1,36 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
     internal partial class SbINotePiece : FastNoteBase
     {
+        protected Container Container = null!;
+        protected Box Note = null!;
+
         public SbINotePiece()
         {
             RelativeSizeAxes = Axes.X;
         }
 
-        protected override void UpdateLoad()
+        [BackgroundDependencyLoader]
+        private void load()
         {
-            MainContainer.Clear();
-            MainContainer.Child = new Box
+            MainContainer.RelativeSizeAxes = Axes.X;
+            MainContainer.Masking = true;
+            MainContainer.Child = Container = new Container
             {
-                RelativeSizeAxes = Axes.Both,
+                RelativeSizeAxes = Axes.X,
+                Masking = true,
+                Child = Note = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                }
             };
         }
 
@@ -31,15 +43,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             }
 
             float radius = (float)CornerRadiusBindable.Value;
+            float height = UnitHeight;
 
-            Height = UnitHeight;
-            Masking = true;
-            CornerRadius = radius;
+            Height = height;
+            MainContainer.Height = height;
+            Container.Height = height;
+            Container.CornerRadius = radius;
         }
 
         protected override void UpdateColor()
         {
-            MainContainer.Colour = NoteColor;
+            Note.Colour = NoteColor;
         }
     }
 }
