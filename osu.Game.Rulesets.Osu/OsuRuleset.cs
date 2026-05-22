@@ -244,6 +244,8 @@ namespace osu.Game.Rulesets.Osu
             }
         }
 
+        public override ScoreMultiplierCalculator CreateScoreMultiplierCalculator() => new OsuScoreMultiplierCalculator();
+
         public override Drawable CreateIcon() => new SpriteIcon { Icon = OsuIcon.RulesetOsu };
 
         public override DifficultyCalculator CreateDifficultyCalculator(IWorkingBeatmap beatmap) => new OsuDifficultyCalculator(RulesetInfo, beatmap);

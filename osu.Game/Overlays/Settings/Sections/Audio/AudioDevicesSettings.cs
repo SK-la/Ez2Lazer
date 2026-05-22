@@ -35,9 +35,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         private AudioDeviceDropdown dropdown = null!;
 
-        private FormCheckBox? wasapiExperimental;
-
-        private readonly Bindable<SettingsNote.Data?> wasapiExperimentalNote = new Bindable<SettingsNote.Data?>();
+        private FormCheckBox? legacyAudio;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -50,7 +48,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     HintText = EzSettingsStrings.AUDIO_DEVICE_OUTPUT_HINT,
                 })
                 {
-                    Keywords = new[] { "speaker", "headphone", "output" },
+                    Keywords = new[] { "speaker", "headphone", "output" }
                 },
             };
 
@@ -76,15 +74,9 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 {
                     Keywords = new[] { "asio", "buffer", "latency" },
                 });
-                Add(new SettingsItemV2(wasapiExperimental = new FormCheckBox
+                Add(new SettingsItemV2(legacyAudio = new LegacyAudioCheckbox())
                 {
-                    Caption = AudioSettingsStrings.WasapiLabel,
-                    HintText = AudioSettingsStrings.WasapiTooltip,
-                    Current = audio.UseExperimentalWasapi,
-                })
-                {
-                    Keywords = new[] { "wasapi", "latency", "exclusive" },
-                    Note = { BindTarget = wasapiExperimentalNote },
+                    Keywords = new[] { "wasapi", "latency", "exclusive", "legacy", "experimental" },
                 });
 
                 // Setup ASIO configuration synchronization.
@@ -104,7 +96,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     });
                 });
 
-                wasapiExperimental.Current.ValueChanged += _ => onDeviceChanged(string.Empty);
+                legacyAudio.Current.ValueChanged += _ => onDeviceChanged(string.Empty);
+
                 dropdown.Current.ValueChanged += e => onDeviceChanged(e.NewValue);
                 sampleRateDropdown.Current.ValueChanged += e =>
                 {
@@ -124,20 +117,19 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             audio.OnNewDevice += onDeviceChanged;
             audio.OnLostDevice += onDeviceChanged;
             dropdown.Current = audio.AudioDevice;
+
+            // onDeviceChanged(string.Empty);
         }
 
-        private void onDeviceChanged(string name)
+        private void onDeviceChanged(string _)
         {
-            updateItems();
+            Scheduler.AddOnce(updateItems);
 
-            if (wasapiExperimental != null)
-            {
-                if (wasapiExperimental.Current.Value)
-                    wasapiExperimentalNote.Value = new SettingsNote.Data(AudioSettingsStrings.WasapiNotice, SettingsNote.Type.Warning);
-                else
-                    wasapiExperimentalNote.Value = null;
-            }
+            updateASIOSettingsDisplay();
+        }
 
+        private void updateASIOSettingsDisplay();
+        {
             bool isAsio = name.Contains("ASIO");
 
             if (sampleRateDropdown != null)
@@ -205,6 +197,39 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         {
             protected override LocalisableString GenerateItemText(string item)
                 => string.IsNullOrEmpty(item) ? CommonStrings.Default : base.GenerateItemText(item);
+        }
+    }
+
+    public partial class LegacyAudioCheckbox : FormCheckBox
+    {
+        private Bindable<bool> configExperimentalAudio = null!;
+
+        public LegacyAudioCheckbox()
+        {
+            Caption = AudioSettingsStrings.LegacyAudioLabel;
+            HintText = AudioSettingsStrings.LegacyAudioTooltip;
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(AudioManager audio)
+        {
+            configExperimentalAudio = audio.UseExperimentalWasapi.GetBoundCopy();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            // Manual two-way binding because we're inverting what the framework exposes.
+            Current.ValueChanged += legacy =>
+            {
+                configExperimentalAudio.Value = !legacy.NewValue;
+            };
+
+            configExperimentalAudio.BindValueChanged(experimental =>
+            {
+                Current.Value = !experimental.NewValue;
+            }, true);
         }
     }
 }
