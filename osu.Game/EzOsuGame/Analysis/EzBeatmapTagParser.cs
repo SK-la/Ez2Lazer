@@ -27,10 +27,14 @@ namespace osu.Game.EzOsuGame.Analysis
             bool hasVideo = false;
             bool hasStoryboard = false;
 
-            scanEventLines(workingBeatmap.Beatmap?.UnhandledEventLines, ref hasVideo, ref hasStoryboard);
+            // The IBeatmap.UnhandledEventLines property was removed upstream. Fall back to scanning the main
+            // storyboard file first (cheap and reliable) and avoid relying on an in-memory event lines cache.
+            scanMainStoryboardFile(workingBeatmap, ref hasVideo, ref hasStoryboard);
 
-            if (!hasVideo || !hasStoryboard)
-                scanMainStoryboardFile(workingBeatmap, ref hasVideo, ref hasStoryboard);
+            // If we still haven't found both tags, attempt to decode any available event lines from the in-memory beatmap
+            // (if the implementation later adds a raw-event-lines surface again). This keeps behaviour resilient.
+            // Note: currently IBeatmap does not expose UnhandledEventLines, so this call is a no-op until such API exists.
+            // scanEventLines(workingBeatmap.Beatmap?.UnhandledEventLines, ref hasVideo, ref hasStoryboard);
 
             return new EzBeatmapTagSummary(hasVideo, hasStoryboard);
         }

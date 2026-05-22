@@ -155,7 +155,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
                     using (var outStream = exportStorage.CreateFileSafely(filename))
                     using (var writer = new StreamWriter(outStream, Encoding.UTF8, 1024, true))
-                        new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin).Encode(writer);
+                        new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin, workingBeatmap.Storyboard).Encode(writer);
                 }
                 catch
                 {
@@ -251,7 +251,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
                 var stream = new MemoryStream();
                 using (var sw = new StreamWriter(stream, Encoding.UTF8, 1024, true))
-                    new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin).Encode(sw);
+                    new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin, workingBeatmap.Storyboard).Encode(sw);
 
                 stream.Seek(0, SeekOrigin.Begin);
                 return stream;

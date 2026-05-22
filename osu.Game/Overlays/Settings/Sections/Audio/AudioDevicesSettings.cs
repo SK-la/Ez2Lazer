@@ -121,15 +121,10 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             // onDeviceChanged(string.Empty);
         }
 
-        private void onDeviceChanged(string _)
+        private void onDeviceChanged(string name)
         {
             Scheduler.AddOnce(updateItems);
 
-            updateASIOSettingsDisplay();
-        }
-
-        private void updateASIOSettingsDisplay();
-        {
             bool isAsio = name.Contains("ASIO");
 
             if (sampleRateDropdown != null)
