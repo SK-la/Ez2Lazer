@@ -36,6 +36,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         private float halfNoteHeight;
         private float lastBodyContainerHeight = float.NaN;
         private float lastTopContainerY = float.NaN;
+        private float lastTopRegionHeight = float.NaN;
         private float cachedTailMaskHeight = float.NaN;
         private bool lnGradient;
 
@@ -52,15 +53,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             tailAlpha = ezSkinInfo.HoldTailAlpha;
 
             tailMaskHeight.BindValueChanged(onTailMaskHeightChanged, true);
-            tailAlpha.BindValueChanged(_ =>
-            {
-                if (!lnGradient)
-                    return;
-
-                UpdateColor();
-                resetLayoutCache();
-                UpdateDrawable();
-            });
+            tailAlpha.BindValueChanged(onTailAlphaChanged, true);
 
             ezSkinInfo.ManiaLNGradientEnable.BindValueChanged(e =>
             {
@@ -162,14 +155,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
             float moveDown = lnGradient ? getTailMaskHeight() : 0;
 
-            if (lnGradient)
-            {
-                float topRegionHeight = getTopRegionHeight();
-                updateTopNoteLayout(topRegionHeight);
-                updateTopContainerLayout(moveDown, topRegionHeight);
-            }
-
-            updateBodyLayout(moveDown);
+            refreshTopAndBodyLayout(moveDown);
         }
 
         protected override void UpdateColor()
@@ -205,9 +191,46 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
             float moveDown = lnGradient ? getTailMaskHeight() : 0;
 
-            if (lnGradient)
+            refreshTopAndBodyLayout(moveDown);
+        }
+
+        private void onTailAlphaChanged(ValueChangedEvent<double> _)
+        {
+            if (!lnGradient)
+                return;
+
+            lastTopRegionHeight = float.NaN;
+            resetLayoutCache();
+            UpdateColor();
+            Schedule(refreshTopLayout);
+        }
+
+        private void refreshTopLayout()
+        {
+            if (headInnerContainer == null)
+                return;
+
+            if (DrawWidth <= 1)
+            {
+                Schedule(refreshTopLayout);
+                return;
+            }
+
+            noteHeight = UnitHeight;
+            halfNoteHeight = noteHeight * 0.5f;
+            updateHeadLayout();
+            refreshTopAndBodyLayout(lnGradient ? getTailMaskHeight() : 0);
+        }
+
+        private void refreshTopAndBodyLayout(float moveDown)
+        {
+            if (lnGradient && topClipContainer != null)
             {
                 float topRegionHeight = getTopRegionHeight();
+
+                if (layoutChanged(lastTopRegionHeight, topRegionHeight))
+                    lastTopRegionHeight = topRegionHeight;
+
                 updateTopNoteLayout(topRegionHeight);
                 updateTopContainerLayout(moveDown, topRegionHeight);
             }
@@ -320,6 +343,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         {
             lastBodyContainerHeight = float.NaN;
             lastTopContainerY = float.NaN;
+            lastTopRegionHeight = float.NaN;
         }
 
         private float getTailMaskHeight() => float.IsNaN(cachedTailMaskHeight) ? 0 : cachedTailMaskHeight;
