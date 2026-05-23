@@ -9,7 +9,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
     /// <summary>
     /// 完整 note 尺寸绘制，由裁切容器仅显示下半区，露出底部两个圆角。
     /// </summary>
-    internal partial class SbIHoldNoteHeadPiece : SbINotePiece
+    public partial class SbIHoldNoteHeadPiece : SbINotePiece
     {
         [BackgroundDependencyLoader]
         private void load()

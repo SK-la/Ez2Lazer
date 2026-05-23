@@ -13,7 +13,7 @@ using osu.Framework.Timing;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    internal partial class EzHitTarget : EzNote
+    public partial class EzHitTarget : EzNote
     {
         protected override bool UseColorization => false;
         protected override bool ShowSeparators => false;

@@ -8,7 +8,7 @@ using osu.Framework.Graphics.Containers;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    internal partial class EzHoldNoteHead : EzNoteBase
+    public partial class EzHoldNoteHead : EzNoteBase
     {
         protected override bool UseColorization => true;
         protected override bool ShowSeparators => true;

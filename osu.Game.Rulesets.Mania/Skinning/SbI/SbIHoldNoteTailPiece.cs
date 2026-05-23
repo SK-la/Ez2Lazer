@@ -15,7 +15,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
     /// <see cref="Ez2Setting.ManiaLNGradientEnable"/> 开启时隐藏，由 <see cref="SbIHoldBodyPiece"/> 代替。
     /// 关闭时：完整 note 高度绘制，裁切容器仅显示上半区，露出顶部两个圆角。
     /// </summary>
-    internal partial class SbIHoldNoteTailPiece : FastNoteBase
+    public partial class SbIHoldNoteTailPiece : FastNoteBase
     {
         private Container innerContainer = null!;
         private Box note = null!;

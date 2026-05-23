@@ -12,7 +12,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    internal abstract partial class EzNoteBase : CompositeDrawable, IColumnNote
+    public abstract partial class EzNoteBase : CompositeDrawable, IColumnNote
     {
         protected virtual bool UseColorization => false;
         protected virtual bool ShowSeparators => false;

@@ -16,7 +16,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    internal partial class EzHoldNoteMiddle : EzNoteBase, IHoldNoteBody
+    public partial class EzHoldNoteMiddle : EzNoteBase, IHoldNoteBody
     {
         protected override bool UseColorization => true;
         protected override bool ShowSeparators => true;

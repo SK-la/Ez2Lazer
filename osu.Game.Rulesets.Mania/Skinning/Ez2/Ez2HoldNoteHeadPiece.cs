@@ -7,7 +7,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    internal partial class Ez2HoldNoteHeadPiece : Ez2NotePiece
+    public partial class Ez2HoldNoteHeadPiece : Ez2NotePiece
     {
         protected override Drawable CreateIcon() => new Box
         {

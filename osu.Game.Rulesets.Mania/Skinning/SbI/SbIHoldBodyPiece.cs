@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
     /// <summary>
     /// head：固定半颗 note 下半圆角；top：固定整颗 note 裁切上半 + 外层区域高度；body 按 top 区域半高与 head 计算。
     /// </summary>
-    internal partial class SbIHoldBodyPiece : FastNoteBase, IHoldNoteBody
+    public partial class SbIHoldBodyPiece : FastNoteBase, IHoldNoteBody
     {
         private const float top_height_const = 50f;
         private const float top_height_ratio_min = 0.05f;

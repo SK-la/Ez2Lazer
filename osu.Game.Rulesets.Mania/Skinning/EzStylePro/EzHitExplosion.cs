@@ -10,7 +10,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    internal partial class EzHitExplosion : EzNoteBase, IHitExplosion
+    public partial class EzHitExplosion : EzNoteBase, IHitExplosion
     {
         private static readonly BlendingParameters additive_preserve_alpha = new BlendingParameters
         {

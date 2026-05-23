@@ -17,7 +17,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     /// <summary>
     /// 优先 <see cref="EzNoteBase.TailName"/>；缺失时复用 <see cref="EzHoldNoteHead"/> 的加载与裁切逻辑，并整体旋转 180°。
     /// </summary>
-    internal partial class EzHoldNoteTail : EzNote
+    public partial class EzHoldNoteTail : EzNote
     {
         protected override bool UseColorization => true;
 

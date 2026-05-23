@@ -12,7 +12,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    internal partial class Ez2HitTarget : Ez2NotePiece
+    public partial class Ez2HitTarget : Ez2NotePiece
     {
         private IBindable<ScrollingDirection> direction = null!;
 

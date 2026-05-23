@@ -16,7 +16,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    internal partial class Ez2HoldNoteTailPiece : CompositeDrawable
+    public partial class Ez2HoldNoteTailPiece : CompositeDrawable
     {
         [Resolved]
         private DrawableHitObject? drawableObject { get; set; }

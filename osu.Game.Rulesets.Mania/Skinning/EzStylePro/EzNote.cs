@@ -7,7 +7,7 @@ using osu.Framework.Graphics.Animations;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    internal partial class EzNote : EzNoteBase
+    public partial class EzNote : EzNoteBase
     {
         protected override bool UseColorization => true;
         protected override bool ShowSeparators => true;

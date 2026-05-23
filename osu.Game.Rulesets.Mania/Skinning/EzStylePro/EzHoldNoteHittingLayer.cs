@@ -9,7 +9,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    internal partial class EzHoldNoteHittingLayer : EzNoteBase
+    public partial class EzHoldNoteHittingLayer : EzNoteBase
     {
         private static readonly BlendingParameters additive_preserve_alpha = new BlendingParameters
         {

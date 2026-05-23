@@ -17,7 +17,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    internal partial class Ez2NotePiece : CompositeDrawable
+    public partial class Ez2NotePiece : CompositeDrawable
     {
         public static float NoteHeight = 45;
         public const float NOTE_ACCENT_RATIO = 1f;

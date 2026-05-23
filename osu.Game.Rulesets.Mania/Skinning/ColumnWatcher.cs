@@ -11,7 +11,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
     /// <summary>
     /// 列级更新广播接口，使用<see cref="ColumnWatcher"/>
     /// </summary>
-    internal interface IColumnNote
+    public interface IColumnNote
     {
         void ForwardOnNoteSetChanged();
         void ForwardOnNoteSizeChanged();
@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
     /// ColumnWatcher.Remove(Column, this); // 释放
     /// </code>
     /// </summary>
-    internal class ColumnWatcher
+    public class ColumnWatcher
     {
         private readonly Column column;
         private readonly List<WeakReference<IColumnNote>> notes = new List<WeakReference<IColumnNote>>();

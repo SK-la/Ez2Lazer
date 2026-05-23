@@ -8,7 +8,7 @@ using osu.Framework.Graphics.Shapes;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    internal partial class SbINotePiece : FastNoteBase
+    public partial class SbINotePiece : FastNoteBase
     {
         protected Container Container = null!;
         protected Box Note = null!;

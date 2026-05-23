@@ -16,7 +16,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    internal partial class Ez2HitExplosion : Ez2HitTarget, IHitExplosion
+    public partial class Ez2HitExplosion : Ez2HitTarget, IHitExplosion
     {
         public override bool RemoveWhenNotAlive => true;
 
