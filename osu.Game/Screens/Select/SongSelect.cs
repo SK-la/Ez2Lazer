@@ -434,7 +434,7 @@ namespace osu.Game.Screens.Select
                 ezPreviewManager.EnabledBindable.Value = e.NewValue != 0;
                 ensureTrackLooping(Beatmap.Value, TrackChangeDirection.None);
                 ensurePlayingSelected();
-            });
+            }, true);
         }
 
         protected override void Update()
