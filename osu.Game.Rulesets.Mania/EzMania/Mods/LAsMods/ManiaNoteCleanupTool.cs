@@ -44,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         /// 清理重叠note，重叠LN
         /// </summary>
         /// <param name="beatmap"></param>
-        internal static void CleanOverlapNotes(ManiaBeatmap beatmap)
+        public static void CleanOverlapNotes(ManiaBeatmap beatmap)
         {
             if (beatmap.HitObjects.Count == 0)
                 return;
@@ -78,7 +78,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 beatmap.HitObjects.Remove(obj);
         }
 
-        internal static double GetMinimumGapMs(ManiaBeatmap beatmap, int beat = 8)
+        public static double GetMinimumGapMs(ManiaBeatmap beatmap, int beat = 8)
         {
             if (beatmap.HitObjects.Count == 0)
                 return 0;
@@ -105,7 +105,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         /// 中位去除高速note，长按
         /// </summary>
         /// <param name="beatmap"></param>
-        internal static void EnforceMinimumGaps(ManiaBeatmap beatmap)
+        public static void EnforceMinimumGaps(ManiaBeatmap beatmap)
         {
             if (beatmap.HitObjects.Count == 0)
                 return;
@@ -152,7 +152,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         /// </summary>
         /// <param name="beatmap"></param>
         /// <param name="beat"></param>
-        internal static void EnforceHoldReleaseGap(ManiaBeatmap beatmap, int beat = 8)
+        public static void EnforceHoldReleaseGap(ManiaBeatmap beatmap, int beat = 8)
         {
             if (beatmap.HitObjects.Count == 0)
                 return;

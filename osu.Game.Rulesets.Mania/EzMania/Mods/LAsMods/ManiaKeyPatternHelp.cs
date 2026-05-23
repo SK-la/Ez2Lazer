@@ -40,7 +40,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         private const double add_note_alignment_tolerance = 6.0;
         private const double add_note_min_column_gap = 8.0;
 
-        internal readonly struct WindowContext
+        public readonly struct WindowContext
         {
             public readonly double BeatLength;
             public readonly double WindowStart;
@@ -208,7 +208,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             }
         }
 
-        internal static double GetDelayBeatFraction(int level)
+        public static double GetDelayBeatFraction(int level)
         {
             double t;
 
@@ -222,7 +222,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return 1.0 / 16.0 * (1 + t);
         }
 
-        internal static int GetDelayMaxShiftCount(int level, int noteCount)
+        public static int GetDelayMaxShiftCount(int level, int noteCount)
         {
             if (noteCount <= 0)
                 return 0;
@@ -236,7 +236,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return Math.Min(level, noteCount);
         }
 
-        internal static bool HasDenseBurstBetweenQuarterNotes(List<ManiaHitObject> windowObjects,
+        public static bool HasDenseBurstBetweenQuarterNotes(List<ManiaHitObject> windowObjects,
                                                               double beatLength,
                                                               int totalColumns,
                                                               KeyPatternSettings psSettings)
@@ -323,7 +323,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return false;
         }
 
-        internal static bool HasObjectsInColumnRange(List<ManiaHitObject> objects,
+        public static bool HasObjectsInColumnRange(List<ManiaHitObject> objects,
                                                      int minColumn,
                                                      int maxColumn,
                                                      double startTime,
@@ -349,7 +349,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return false;
         }
 
-        internal static HashSet<int> GetColumnsAtTime(List<ManiaHitObject> objects, double time, double tolerance)
+        public static HashSet<int> GetColumnsAtTime(List<ManiaHitObject> objects, double time, double tolerance)
         {
             var cols = new HashSet<int>();
 
@@ -373,7 +373,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return cols;
         }
 
-        internal static List<Note> GetNotesAtTime(List<ManiaHitObject> objects, double time, double tolerance)
+        public static List<Note> GetNotesAtTime(List<ManiaHitObject> objects, double time, double tolerance)
         {
             var notes = new List<Note>();
 
@@ -386,7 +386,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return notes;
         }
 
-        internal static double GetActiveBeatFraction(List<ManiaHitObject> windowObjects, ManiaBeatmap beatmap, double defaultFraction)
+        public static double GetActiveBeatFraction(List<ManiaHitObject> windowObjects, ManiaBeatmap beatmap, double defaultFraction)
         {
             if (windowObjects.Count < 2)
                 return defaultFraction;
@@ -435,7 +435,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return bestFraction;
         }
 
-        internal static bool TryGetCutJackBaseFraction(double activeFraction, out double baseFraction)
+        public static bool TryGetCutJackBaseFraction(double activeFraction, out double baseFraction)
         {
             const double eps = 1e-6;
 
@@ -457,7 +457,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return false;
         }
 
-        internal static List<int> BuildNearestCandidates(IReadOnlyList<int> columns, int index)
+        public static List<int> BuildNearestCandidates(IReadOnlyList<int> columns, int index)
         {
             int count = columns.Count;
             var ordered = new List<int>(count);
@@ -476,7 +476,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return ordered;
         }
 
-        internal static bool TryAddNoteFromOrderedCandidates(ManiaBeatmap beatmap, IReadOnlyList<int> candidates, double time)
+        public static bool TryAddNoteFromOrderedCandidates(ManiaBeatmap beatmap, IReadOnlyList<int> candidates, double time)
         {
             double alignedTime = AlignTimeToNearbyRow(beatmap, time, add_note_alignment_tolerance);
 
@@ -500,7 +500,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return false;
         }
 
-        internal static bool TryAddNoteFromCandidates(ManiaBeatmap beatmap,
+        public static bool TryAddNoteFromCandidates(ManiaBeatmap beatmap,
                                                       List<int> candidates,
                                                       List<double>? weights,
                                                       Random rng,
@@ -526,7 +526,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return true;
         }
 
-        internal static double AlignTimeToNearbyRow(ManiaBeatmap beatmap, double time, double tolerance = 3.0)
+        public static double AlignTimeToNearbyRow(ManiaBeatmap beatmap, double time, double tolerance = 3.0)
         {
             double bestTime = time;
             double bestDelta = tolerance;
@@ -567,7 +567,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         // Placement helpers (shared rule: hold occupied -> reselect, note exists -> skip).
 
-        internal static bool HasNoteAtTime(ManiaBeatmap beatmap, int column, double time, ManiaHitObject? ignore = null, double tolerance = 0.5)
+        public static bool HasNoteAtTime(ManiaBeatmap beatmap, int column, double time, ManiaHitObject? ignore = null, double tolerance = 0.5)
         {
             foreach (var obj in beatmap.HitObjects)
             {
@@ -584,7 +584,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return false;
         }
 
-        internal static bool TryApplyDelayOffset(ManiaBeatmap beatmap, ManiaHitObject obj, double offset, out bool holdConflict)
+        public static bool TryApplyDelayOffset(ManiaBeatmap beatmap, ManiaHitObject obj, double offset, out bool holdConflict)
         {
             holdConflict = false;
 
@@ -627,7 +627,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         ///     在给定的 quarter 时间点及其前后 quarter 时间范围内，寻找最接近原列且在这三个时间点上均无冲突的列。
         ///     返回找到的列索引，找不到则返回 null。
         /// </summary>
-        internal static int? FindNearestAvailableColumnForQuarter(ManiaBeatmap beatmap,
+        public static int? FindNearestAvailableColumnForQuarter(ManiaBeatmap beatmap,
                                                                   int originalCol,
                                                                   double qTime,
                                                                   double prevTime,
@@ -667,7 +667,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return chosen >= 0 ? chosen : null;
         }
 
-        internal static bool IsHoldOccupyingColumn(ManiaBeatmap beatmap, int column, double time, ManiaHitObject? ignore = null, double tolerance = 0.5)
+        public static bool IsHoldOccupyingColumn(ManiaBeatmap beatmap, int column, double time, ManiaHitObject? ignore = null, double tolerance = 0.5)
         {
             foreach (var obj in beatmap.HitObjects)
             {
@@ -684,7 +684,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return false;
         }
 
-        internal static bool IsWithinBeatFraction(double deltaTime, ManiaBeatmap beatmap, double referenceTime, double beatFraction, double tolerance = 0.5)
+        public static bool IsWithinBeatFraction(double deltaTime, ManiaBeatmap beatmap, double referenceTime, double beatFraction, double tolerance = 0.5)
         {
             double beatLength = beatmap.ControlPointInfo.TimingPointAt(referenceTime).BeatLength;
 
@@ -695,7 +695,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return deltaTime <= threshold + tolerance;
         }
 
-        internal static void RemoveSameColumnRunsWithinBeatFraction(ManiaBeatmap beatmap, double windowStart, double windowEnd, double beatFraction, double tolerance = 0.5)
+        public static void RemoveSameColumnRunsWithinBeatFraction(ManiaBeatmap beatmap, double windowStart, double windowEnd, double beatFraction, double tolerance = 0.5)
         {
             var toRemove = new HashSet<ManiaHitObject>();
 
@@ -730,7 +730,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 beatmap.HitObjects.Remove(obj);
         }
 
-        internal static void Shuffle<T>(IList<T> list, Random rng)
+        public static void Shuffle<T>(IList<T> list, Random rng)
         {
             for (int i = list.Count - 1; i > 0; i--)
             {
@@ -739,7 +739,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             }
         }
 
-        internal static double DistanceToNearest(HashSet<int> occupied, int col)
+        public static double DistanceToNearest(HashSet<int> occupied, int col)
         {
             double best = double.MaxValue;
             foreach (int o in occupied)
@@ -747,7 +747,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return best == double.MaxValue ? 0 : best;
         }
 
-        internal static double GetMedian(HashSet<int> values)
+        public static double GetMedian(HashSet<int> values)
         {
             var ordered = values.OrderBy(v => v).ToList();
             int count = ordered.Count;
@@ -761,7 +761,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return (ordered[count / 2 - 1] + ordered[count / 2]) / 2.0;
         }
 
-        internal static double GetMedianFromList(IReadOnlyList<int> values)
+        public static double GetMedianFromList(IReadOnlyList<int> values)
         {
             if (values.Count == 0)
                 return 0;
@@ -775,7 +775,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return (ordered[count / 2 - 1] + ordered[count / 2]) / 2.0;
         }
 
-        internal static int PickWeightedIndex(IReadOnlyList<double> weights, Random rng)
+        public static int PickWeightedIndex(IReadOnlyList<double> weights, Random rng)
         {
             double total = 0;
             for (int i = 0; i < weights.Count; i++)

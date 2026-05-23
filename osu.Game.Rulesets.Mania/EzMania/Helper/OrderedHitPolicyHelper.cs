@@ -87,21 +87,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         /// <see cref="EzEnumJudgePrecedence.Combo"/> 的固定比较定义。
         /// 当前候选在连击最低可保持窗口晚界内，且上一候选已经越过该窗口早界时返回 true。
         /// </summary>
-        internal static bool CompareComboByPrecedence(double t1NoteTime, double t2NoteTime, double pressTime, ManiaHitWindows windows)
+        public static bool CompareComboByPrecedence(double t1NoteTime, double t2NoteTime, double pressTime, ManiaHitWindows windows)
         {
             double comboEarly = windows.WindowFor(HitResult.Good, true);
             double comboLate = windows.WindowFor(HitResult.Good, false);
             return CompareComboByPrecedence(t1NoteTime, t2NoteTime, pressTime, comboEarly, comboLate);
         }
 
-        internal static bool CompareComboByPrecedence(double t1NoteTime, double t2NoteTime, double pressTime, double comboEarly, double comboLate)
+        public static bool CompareComboByPrecedence(double t1NoteTime, double t2NoteTime, double pressTime, double comboEarly, double comboLate)
             => t1NoteTime < pressTime - comboEarly && t2NoteTime <= pressTime + comboLate;
 
         /// <summary>
         /// <see cref="EzEnumJudgePrecedence.Duration"/> 的固定比较定义。
         /// 当前候选更接近输入时间时返回 true。
         /// </summary>
-        internal static bool CompareDurationByPrecedence(double t1NoteTime, double t2NoteTime, double pressTime)
+        public static bool CompareDurationByPrecedence(double t1NoteTime, double t2NoteTime, double pressTime)
             => Math.Abs(t1NoteTime - pressTime) > Math.Abs(t2NoteTime - pressTime);
 
         /// <summary>
@@ -284,7 +284,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             return HitModeHelper.IsBMSHitMode(mode);
         }
 
-        internal static DrawableHitObject? SelectFoldDrawable(IReadOnlyList<DrawableHitObject> sortedByStartTime, double pressTime, bool comboAlgorithm)
+        public static DrawableHitObject? SelectFoldDrawable(IReadOnlyList<DrawableHitObject> sortedByStartTime, double pressTime, bool comboAlgorithm)
         {
             return SelectFold(
                 sortedByStartTime,
@@ -306,7 +306,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 comboAlgorithm);
         }
 
-        internal static T? SelectFold<T>(
+        public static T? SelectFold<T>(
             IReadOnlyList<T> sortedCandidates,
             Func<T, bool> isJudged,
             Func<T, double> noteTime,
@@ -374,7 +374,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             return tNote;
         }
 
-        internal static int JudgementRankForRouting(HitResult result)
+        public static int JudgementRankForRouting(HitResult result)
         {
             if (result == HitResult.None)
                 return int.MaxValue;
@@ -406,7 +406,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 comboLate);
         }
 
-        internal static bool IsUserTriggerJudgeableNow(DrawableHitObject obj, double time)
+        public static bool IsUserTriggerJudgeableNow(DrawableHitObject obj, double time)
         {
             if (obj.HitObject.HitWindows == null)
                 return false;

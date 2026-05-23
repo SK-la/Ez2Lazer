@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
 {
-    internal class NoteMatrix
+    public class NoteMatrix
     {
         private readonly int[,] data;
 
@@ -76,7 +76,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
         }
     }
 
-    internal class BoolMatrix
+    public class BoolMatrix
     {
         private readonly bool[,] data;
 
@@ -109,7 +109,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
         public Span<bool> AsSpan() => MemoryMarshal.CreateSpan(ref data[0, 0], data.Length);
     }
 
-    internal class DoubleMatrix
+    public class DoubleMatrix
     {
         private readonly double[,] data;
 

@@ -10,9 +10,9 @@ using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
 {
-    internal readonly record struct EzManiaKeyPatternColumnHitObject(double StartTime, int Column);
+    public readonly record struct EzManiaKeyPatternColumnHitObject(double StartTime, int Column);
 
-    internal readonly record struct EzManiaKeyPatternRow(double Time, double BeatLength, int[] Columns)
+    public readonly record struct EzManiaKeyPatternRow(double Time, double BeatLength, int[] Columns)
     {
         public int NoteCount => Columns.Length;
 
@@ -84,7 +84,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
         }
     }
 
-    internal readonly record struct EzManiaAdjacentRowPatternMetrics(
+    public readonly record struct EzManiaAdjacentRowPatternMetrics(
         double Delta,
         double DumpDensity,
         double DelayDensity,
@@ -93,7 +93,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern
         double StructureSimilarity,
         int Direction);
 
-    internal static class EzManiaKeyPatternHelper
+    public static class EzManiaKeyPatternHelper
     {
         public const double TIME_TOLERANCE = 3.0;
 
