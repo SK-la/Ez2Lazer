@@ -6,6 +6,7 @@ import shutil
 import zipfile
 import hashlib
 import platform
+import re
 from datetime import datetime
 
 VELOPACK_TOOL_VERSION = '0.0.1298'
@@ -15,8 +16,13 @@ MACOS_BUNDLE_ID = 'com.sk-la.ez2lazer'
 
 
 def format_date_tag(dt: datetime | None = None) -> str:
+    """Return a default date-based tag in the numeric dotted form used by this project.
+
+    Format: YYYY.MDD.0 where M is month (no leading zero) and DD is day (two digits, zero-padded).
+    Example: 2026.518.0 for 2026 May 18.
+    """
     dt = dt or datetime.utcnow()
-    return f'{dt.year}.{dt.month}.{dt.day:02d}'
+    return f'{dt.year}.{dt.month}{dt.day:02d}.0'
 
 
 def resolve_arch(arch: str | None = None) -> str:
@@ -398,6 +404,8 @@ def velopack_pack(
     github_token = os.environ.get('GITHUB_TOKEN')
     if github_token:
         download_cmd.extend(['--token', github_token])
+    else:
+        print('Velopack: GITHUB_TOKEN is not set; previous release download may be rate-limited and delta generation may be skipped')
 
     print('Running:', ' '.join(download_cmd))
     download_res = subprocess.run(download_cmd, cwd=workdir)
@@ -446,11 +454,23 @@ def velopack_pack(
     # Flatten Velopack outputs into artifacts_dir for CI collection.
     import glob
     output_patterns = ('*.nupkg', 'RELEASES', 'releases*.json', 'assets*.json', '*-Setup.exe', '*.AppImage')
+    copied_full = []
+    copied_delta = []
     for pattern in output_patterns:
         for src in glob.glob(os.path.join(vpk_out, '**', pattern), recursive=True):
             dest = os.path.join(artifacts_dir, os.path.basename(src))
             shutil.copy2(src, dest)
             print('Velopack: copied', dest)
+            lower = os.path.basename(dest).lower()
+            if lower.endswith('.nupkg'):
+                if '-delta.' in lower or '-delta-' in lower:
+                    copied_delta.append(dest)
+                elif '-full.' in lower or '-full-' in lower:
+                    copied_full.append(dest)
+
+    print(f'Velopack: copied {len(copied_full)} full package(s), {len(copied_delta)} delta package(s)')
+    if copied_full and not copied_delta:
+        print('Velopack: warning: no delta package generated. This is expected for a first release, or when previous assets cannot be downloaded for the same pack id/channel/runtime.')
 
     print('Velopack: pack succeeded')
     return 0
@@ -473,10 +493,10 @@ def main():
     parser.add_argument('--appimage', action='store_true', help='Build AppImage for linux from release output')
     parser.add_argument('--os', default=None, help='OS identifier forwarded to dotnet publish')
     parser.add_argument('--platform', default=None, help='Platform to include in package name')
-    parser.add_argument('--tag', default=None, help='Release tag (YYYY.M.DD) for asset names and versioning')
+    parser.add_argument('--tag', default=None, help='Release tag for asset names and versioning (for example: YYYY.MDD.0)')
     parser.add_argument('--arch', default=None, choices=['x64', 'arm64'], help='Target CPU architecture for publish and Velopack')
     parser.add_argument('--official-build', action='store_true', help='Mark build as official Ez2Lazer release (enables versioning + Velopack)')
-    parser.add_argument('--release-version', default=None, help='MSBuild ReleaseVersion (YYYY.M.DD); defaults to --tag')
+    parser.add_argument('--release-version', default=None, help='MSBuild ReleaseVersion (numeric dotted version only, for example: YYYY.MDD.0); defaults to --tag')
     parser.add_argument('--pack-version', default=None, help='Velopack pack version; defaults to {tag}-ez2lazer')
     parser.add_argument('--no-velopack', action='store_true', help='Skip Velopack packaging even for official builds')
     parser.add_argument('--deps-path', default=None, help='Path to folder containing dependency DLLs to include')
@@ -505,10 +525,104 @@ def main():
         # interactive invocation should default to release-only
         args.release_only = True
 
-    # Enforce that a tag is provided to avoid any implicit fallback tag generation
-    if not args.tag:
-        args.tag = format_date_tag()
-        print(f"No --tag provided; defaulting to {args.tag}")
+    def _parse_owner_repo_from_url(url: str) -> tuple[str, str] | None:
+        # expect forms like https://github.com/owner/repo or git@github.com:owner/repo.git
+        try:
+            if url.startswith('https://') or url.startswith('http://'):
+                parts = url.rstrip('/').split('/')
+                owner = parts[-2]
+                repo = parts[-1]
+                if repo.endswith('.git'):
+                    repo = repo[:-4]
+                return owner, repo
+            if url.startswith('git@'):
+                # git@github.com:owner/repo.git
+                path = url.split(':', 1)[1]
+                owner, repo = path.split('/')
+                if repo.endswith('.git'):
+                    repo = repo[:-4]
+                return owner, repo
+        except Exception:
+            pass
+        return None
+
+    def _github_tag_exists(owner: str, repo: str, tag: str) -> bool:
+        # Query GitHub Releases API for an exact tag. Requires GITHUB_TOKEN for higher rate limits
+        import urllib.request, urllib.error, json
+        api = f'https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}'
+        req = urllib.request.Request(api, headers={
+            'Accept': 'application/vnd.github.v3+json'
+        })
+        token = os.environ.get('GITHUB_TOKEN')
+        if token:
+            req.add_header('Authorization', f'token {token}')
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                # 200 means tag exists as a release
+                return resp.getcode() == 200
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return False
+            # on other errors, conservatively assume not found so we can continue with local checks
+            return False
+        except Exception:
+            return False
+
+    # def _git_tag_exists_local(tag: str) -> bool:
+    #     try:
+    #         res = subprocess.run(['git', 'tag', '--list', tag], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+    #         out = res.stdout.decode('utf-8', errors='replace').strip()
+    #         return out == tag
+    #     except Exception:
+    #         return False
+
+    def resolve_tag(proposed: str | None) -> str:
+        # If user provided a tag, use it verbatim.
+        if proposed:
+            return proposed
+
+        # Start with date based tag
+        now = datetime.utcnow()
+        year = now.year
+        month = now.month
+        day = now.day
+        patch = 0
+        base_inner = f"{year}.{month}{day:02d}"
+
+        # determine owner/repo for remote checks
+        owner_repo = None
+        # prefer GITHUB_REPOSITORY env if present
+        gh_repo_env = os.environ.get('GITHUB_REPOSITORY')
+        if gh_repo_env and '/' in gh_repo_env:
+            owner_repo = tuple(gh_repo_env.split('/', 1))
+        else:
+            owner_repo = _parse_owner_repo_from_url(VELOPACK_GITHUB_REPO_URL)
+
+        while True:
+            candidate = f"{base_inner}.{patch}"
+            exists = False
+            # 1) check GitHub releases when we know owner/repo and token may be available
+            if owner_repo:
+                try:
+                    exists = _github_tag_exists(owner_repo[0], owner_repo[1], candidate)
+                except Exception:
+                    exists = False
+            # # 2) fallback to local git tags
+            # if not exists:
+            #     try:
+            #         exists = _git_tag_exists_local(candidate)
+            #     except Exception:
+            #         exists = False
+
+            if not exists:
+                print(f"No --tag provided; selected tag {candidate}")
+                return candidate
+
+            # tag exists, increment patch and try again
+            patch += 1
+
+    # Resolve tag (use provided tag or generate from UTC date and bump patch if necessary)
+    args.tag = resolve_tag(args.tag)
 
     tag_suffix = f"_{args.tag}"
     arch_name = resolve_arch(args.arch)
@@ -516,13 +630,35 @@ def main():
     msbuild_properties = None
     if args.official_build:
         release_version = args.release_version or args.tag
+        # Require strict 3-part numeric version for ReleaseVersion (e.g. 2026.522.0)
+        if not re.fullmatch(r'\d+\.\d+\.\d+', release_version):
+            print(f"Invalid release version '{release_version}'.")
+            print('For --official-build, --release-version (or --tag when --release-version is omitted) must be a 3-part numeric version, e.g. 2026.518.0')
+            sys.exit(2)
+
         msbuild_properties = {
             'OfficialEz2Build': 'true',
             'ReleaseVersion': release_version,
         }
         print(f'Official build: ReleaseVersion={release_version}')
+        print(f'  AssemblyVersion will be: {release_version}')
+        print(f'  InformationalVersion will be: {release_version}-ez2lazer')
 
     pack_version = args.pack_version or f'{args.tag}-ez2lazer'
+
+    # Velopack expects a 3-part SemVer core (major.minor.patch) with optional prerelease.
+    def _is_semver3_with_prerelease(v: str) -> bool:
+        return re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z-.]+)?", v) is not None
+
+    # Enforce strict 3-part tag core (e.g. 2026.522.0). Do not auto-normalize: fail fast so user provides correct tag.
+    if not re.fullmatch(r"\d+\.\d+\.\d+", args.tag or ""):
+        print(f"Invalid tag '{args.tag}'. Tags must be a 3-part numeric version like '2026.522.0'.")
+        print("If you need a different pack version, pass --pack-version explicitly (e.g. '2026.522.0-ez2lazer').")
+        sys.exit(2)
+
+    if not _is_semver3_with_prerelease(pack_version):
+        print(f"--packVersion contains an invalid package version '{pack_version}', it must be a 3-part SemVer2 compliant version string (e.g. 2026.522.0-ez2lazer).")
+        sys.exit(2)
 
     # determine host platform canonical name
     host_raw = platform.system().lower()

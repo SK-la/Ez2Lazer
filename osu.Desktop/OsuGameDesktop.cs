@@ -112,12 +112,6 @@ namespace osu.Desktop
 
         protected override UpdateManager CreateUpdateManager()
         {
-            if (IsPackageManaged)
-                return new NoActionUpdateManager();
-
-            if (!IsOfficialEz2Build)
-                return new UpdateManager();
-
             // If this is the first time we've run the game, ie it is being installed,
             // reset the user's release stream to the Ez2Lazer update channel.
             //
@@ -125,6 +119,12 @@ namespace osu.Desktop
             // the game doesn't immediately try and update them back to the release stream after starting up.
             if (IsFirstRun)
                 LocalConfig.SetValue(OsuSetting.ReleaseStream, ReleaseStream.Ez2Lazer);
+
+            if (IsPackageManaged)
+                return new NoActionUpdateManager();
+
+            if (!IsOfficialEz2Build)
+                return new UpdateManager();
 
             return new VelopackUpdateManager();
         }

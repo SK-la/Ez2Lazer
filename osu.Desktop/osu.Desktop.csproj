@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Project">
     <TargetFramework>net8.0</TargetFramework>
     <OutputType>WinExe</OutputType>
@@ -16,11 +16,9 @@
     <StartupObject>osu.Desktop.Program</StartupObject>
   </PropertyGroup>
   <PropertyGroup Condition="'$(OfficialEz2Build)' == 'true'">
-    <!-- MinVer must not override official release versioning (tag format contains dots). -->
-    <MinVerSkip>true</MinVerSkip>
     <Version>$(ReleaseVersion)</Version>
-    <FileVersion>$(ReleaseVersion).0</FileVersion>
-    <AssemblyVersion>$(ReleaseVersion).0</AssemblyVersion>
+    <FileVersion>$(ReleaseVersion)</FileVersion>
+    <AssemblyVersion>$(ReleaseVersion)</AssemblyVersion>
     <InformationalVersion>$(ReleaseVersion)-ez2lazer</InformationalVersion>
   </PropertyGroup>
   <ItemGroup Condition="'$(OfficialEz2Build)' == 'true'">

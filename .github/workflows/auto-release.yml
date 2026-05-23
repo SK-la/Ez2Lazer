@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '发布使用的 tag，留空则自动使用当前 UTC 日期（YYYY.M.DD）'
+        description: '发布使用的 tag，建议使用纯数字版本（如 2026.518.0）'
         required: false
         default: ''
       branch:
@@ -44,14 +44,68 @@ jobs:
       - name: Resolve tag and branches
         id: export
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $inputTag = '${{ github.event.inputs.tag }}'
+          if (-not [string]::IsNullOrWhiteSpace($inputTag) -and $inputTag -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
+            Write-Error 'Tag must be a 3-part numeric version (e.g., 2026.518.0)'
+            exit 1
+          }
+
+          function Test-GitHubReleaseTagExists {
+            param(
+              [Parameter(Mandatory = $true)][string]$Tag
+            )
+
+            $repo = '${{ github.repository }}'
+            $uri = "https://api.github.com/repos/$repo/releases/tags/$Tag"
+            $headers = @{
+              'Accept' = 'application/vnd.github+json'
+              'X-GitHub-Api-Version' = '2022-11-28'
+            }
+            if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
+              $headers['Authorization'] = "Bearer $env:GITHUB_TOKEN"
+            }
+
+            try {
+              Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -TimeoutSec 15 | Out-Null
+              return $true
+            } catch {
+              if ($_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 404) {
+                return $false
+              }
+
+              Write-Warning "Could not verify GitHub Release tag '$Tag' via API: $($_.Exception.Message)"
+              return $false
+            }
+          }
+
+          function Resolve-NextReleaseTag {
+            param(
+              [Parameter(Mandatory = $true)][string]$BaseTag
+            )
+
+            $candidate = $BaseTag
+            while ($true) {
+              if (-not (Test-GitHubReleaseTagExists -Tag $candidate)) {
+                return $candidate
+              }
+
+              $parts = $candidate.Split('.')
+              if ($parts.Count -lt 1 -or $parts[-1] -notmatch '^\d+$') {
+                return $candidate
+              }
+
+              $prefix = if ($parts.Count -gt 1) { ($parts[0..($parts.Count - 2)] -join '.') } else { $candidate }
+              $candidate = "$prefix.$([int]$parts[-1] + 1)"
+            }
+          }
+
           if ([string]::IsNullOrWhiteSpace($inputTag)) {
             $now = [DateTime]::UtcNow
-            $inputTag = "$($now.Year).$($now.Month).$($now.Day.ToString('D2'))"
-          } elseif ($inputTag -notmatch '^[0-9]{4}\.(?:[1-9]|1[0-2])\.(?:[0-2][0-9]|3[01])$') {
-            Write-Error 'Tag must match YYYY.M.DD format (e.g., 2026.5.18)'
-            exit 1
+              $inputTag = "$($now.Year).$($now.Month)$($now.Day.ToString('D2')).0"
+            $inputTag = Resolve-NextReleaseTag -BaseTag $inputTag
           }
 
           $mainBranch = '${{ github.event.inputs.branch }}'
@@ -180,6 +234,12 @@ jobs:
           if ($platform -eq 'linux') {
             $publishArgs += @('--os', 'linux')
           }
+
+          # Keep release channels stable for in-game differential updates.
+          # win and linux channels are intentionally x64-only to avoid mixed-arch channel collisions.
+          if (($platform -eq 'windows' -and $arch -eq 'arm64') -or ($platform -eq 'linux' -and $arch -eq 'arm64')) {
+            $publishArgs += @('--no-velopack')
+          }
           python @publishArgs
 
       - name: Collect release artifacts
@@ -194,6 +254,7 @@ jobs:
 
           $platform = '${{ matrix.platform }}'
           $arch = '${{ matrix.arch }}'
+          $expectVelopack = -not (($platform -eq 'windows' -and $arch -eq 'arm64') -or ($platform -eq 'linux' -and $arch -eq 'arm64'))
 
           if ($platform -eq 'linux') {
             if ($arch -eq 'arm64') {
@@ -238,7 +299,30 @@ jobs:
 
           $velopackCount = (Get-ChildItem -Path $uploadDir -Filter 'ez2lazer-*.nupkg' -ErrorAction SilentlyContinue).Count
           if ($velopackCount -eq 0) {
-            Write-Warning 'No Velopack nupkg assets found; zip-only release artifact will be uploaded'
+            if ($expectVelopack) {
+              Write-Warning 'No Velopack nupkg assets found; in-game differential updates may be unavailable for this job'
+            } else {
+              Write-Output 'Velopack intentionally disabled for this architecture; zip-only artifacts are expected'
+            }
+          } elseif ($expectVelopack) {
+            $deltaCount = (Get-ChildItem -Path $uploadDir -Filter '*-delta.nupkg' -ErrorAction SilentlyContinue).Count
+            if ($deltaCount -eq 0) {
+              Write-Warning 'No delta nupkg found for this job. This can happen on first release or when previous channel assets are unavailable.'
+            }
+          }
+
+          # Diagnostic: list collected artifacts and compute SHA256 for nupkg files for verification
+          Write-Output 'Collected artifacts:'
+          Get-ChildItem -Path $uploadDir -Recurse | ForEach-Object {
+            Write-Output "- $($_.FullName) ($($_.Length) bytes)"
+            if ($_.Name -like '*.nupkg') {
+              try {
+                $hash = Get-FileHash -Path $_.FullName -Algorithm SHA256
+                Write-Output "  SHA256: $($hash.Hash)"
+              } catch {
+                Write-Warning "Failed to compute SHA256 for $($_.FullName): $_"
+              }
+            }
           }
 
           Write-Output "asset_dir=$uploadDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
