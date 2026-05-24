@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Configuration;
 using osu.Framework.Localisation;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -20,6 +21,15 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             AddRange(new Drawable[]
             {
+                new SettingsItemV2(new FormEnumDropdown<FrameSync>
+                {
+                    Caption = EzSettingsStrings.UPDATE_FRAME_LIMITER,
+                    HintText = EzSettingsStrings.UPDATE_FRAME_LIMITER_TOOLTIP,
+                    Current = ezConfig.GetBindable<FrameSync>(Ez2Setting.UpdateFrameLimiter),
+                })
+                {
+                    Keywords = new[] { "fps", "framerate", "update", "frame", "limiter", "ez" }
+                },
                 new SettingsItemV2(new FormCheckBox
                 {
                     Caption = EzSettingsStrings.EZ_ANALYSIS_REC_ENABLED,
