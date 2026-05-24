@@ -27,6 +27,7 @@ using osuTK;
 using osuTK.Graphics;
 using osu.Game.Localisation;
 using osu.Game.Resources.Localisation.Web;
+using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
 using osu.Game.Utils;
 
@@ -41,7 +42,19 @@ namespace osu.Game.Screens.Play
 
         protected override bool BlockScrollInput => false;
 
-        public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) => true;
+        public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
+        {
+            // 暂停时允许右侧边栏显示
+            if (State.Value == Visibility.Visible)
+            {
+                float rightEdge = ToScreenSpace(new Vector2(DrawWidth, 0)).X;
+
+                if (screenSpacePos.X >= rightEdge - ReplaySettingsOverlay.EXPANDED_WIDTH)
+                    return false;
+            }
+
+            return true;
+        }
 
         public Action? OnResume { get; init; }
         public Action? OnRetry { get; init; }
