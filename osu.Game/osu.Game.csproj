@@ -40,8 +40,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Realm" Version="20.1.0" />
-    <PackageReference Include="ez2lazer.Framework" Version="$(Ez2LazerFrameworkVersion)" Condition="'$(UseEz2LazerNuGetPackages)' == 'true'" />
-    <PackageReference Include="ez2lazer.Game.Resources" Version="$(Ez2LazerGameResourcesVersion)" Condition="'$(UseEz2LazerNuGetPackages)' == 'true'" />
+    <PackageReference Include="ez2lazer.Framework" Version="[$(Ez2LazerFrameworkVersion)]" Condition="'$(UseEz2LazerNuGetPackages)' == 'true'" />
+    <PackageReference Include="ez2lazer.Game.Resources" Version="[$(Ez2LazerGameResourcesVersion)]" Condition="'$(UseEz2LazerNuGetPackages)' == 'true'" />
     <PackageReference Include="Sentry" Version="6.2.0" />
     <!-- Held back due to 0.34.0 failing AOT compilation on ZstdSharp.dll dependency. -->
     <PackageReference Include="SharpCompress" Version="0.48.0" />

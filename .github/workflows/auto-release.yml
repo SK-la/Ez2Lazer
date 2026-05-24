@@ -170,21 +170,13 @@ jobs:
         shell: pwsh
         run: |
           dotnet --info
-          $tag = '${{ needs.prepare.outputs.release_tag }}'
-          dotnet restore ./osu.Desktop/osu.Desktop.csproj `
-            /p:UseEz2LazerNuGetPackages=true `
-            /p:Ez2LazerFrameworkVersion=$tag `
-            /p:Ez2LazerGameResourcesVersion=$tag
+          dotnet restore ./osu.Desktop/osu.Desktop.csproj /p:Configuration=Release
 
       - name: Dotnet build (desktop project)
         working-directory: osu
         shell: pwsh
         run: |
-          $tag = '${{ needs.prepare.outputs.release_tag }}'
-          dotnet build ./osu.Desktop/osu.Desktop.csproj -c Release -p:GenerateFullPaths=true --no-restore --verbosity minimal `
-            /p:UseEz2LazerNuGetPackages=true `
-            /p:Ez2LazerFrameworkVersion=$tag `
-            /p:Ez2LazerGameResourcesVersion=$tag
+          dotnet build ./osu.Desktop/osu.Desktop.csproj -c Release -p:GenerateFullPaths=true --no-restore --verbosity minimal
 
       - name: Run publish script (release only)
         working-directory: osu
