@@ -9,6 +9,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Dialog;
@@ -22,7 +24,7 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
         private bool automaticRendererInUse;
 
         [BackgroundDependencyLoader]
-        private void load(FrameworkConfigManager config, OsuConfigManager osuConfig, IDialogOverlay? dialogOverlay, OsuGame? game, GameHost host)
+        private void load(FrameworkConfigManager config, OsuConfigManager osuConfig, IDialogOverlay? dialogOverlay, OsuGame? game, GameHost host, Ez2ConfigManager ezConfig)
         {
             var renderer = config.GetBindable<RendererType>(FrameworkSetting.Renderer);
             automaticRendererInUse = renderer.Value == RendererType.Automatic;
@@ -38,6 +40,15 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 })
                 {
                     Keywords = new[] { @"compatibility", @"directx" },
+                },
+                new SettingsItemV2(new FormEnumDropdown<FrameSync>
+                {
+                    Caption = EzSettingsStrings.UPDATE_FRAME_LIMITER,
+                    HintText = EzSettingsStrings.UPDATE_FRAME_LIMITER_TOOLTIP,
+                    Current = ezConfig.GetBindable<FrameSync>(Ez2Setting.UpdateFrameLimiter),
+                })
+                {
+                    Keywords = new[] { "fps", "framerate", "update", "frame", "limiter", "ez" }
                 },
                 // TODO: this needs to be a custom dropdown at some point
                 new SettingsItemV2(new FormEnumDropdown<FrameSync>
