@@ -322,6 +322,8 @@ namespace osu.Game
             GlobalConfigStore.Config = LocalConfig;
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);
+
+            bindUpdateFrameLimiter(Ez2ConfigManager);
             EzSkinInfo = new EzSkinInfo(Ez2ConfigManager);
             dependencies.CacheAs<IEzSkinInfo>(EzSkinInfo);
             dependencies.CacheAs(EzResourceStore = new EzResourceStore(Ez2ConfigManager, Host.Renderer, Audio, Storage, realm));
@@ -619,6 +621,30 @@ namespace osu.Game
                 : new OsuConfigManager(Storage);
 
             host.ExceptionThrown += onExceptionThrown;
+        }
+
+        private void bindUpdateFrameLimiter(Ez2ConfigManager ezConfig)
+        {
+            var updateFrameLimiter = ezConfig.GetBindable<FrameSync>(Ez2Setting.UpdateFrameLimiter);
+
+            void apply()
+            {
+                int refreshRate = 60;
+
+                if (Host.Window != null)
+                {
+                    refreshRate = (int)MathF.Round(Host.Window.CurrentDisplayMode.Value.RefreshRate);
+
+                    if (refreshRate <= 0)
+                        refreshRate = 60;
+                }
+
+                Host.MaximumUpdateHz = updateFrameLimiter.Value.ToUpdateHz(refreshRate, Host.AllowBenchmarkUnlimitedFrames);
+            }
+
+            updateFrameLimiter.BindValueChanged(_ => apply(), true);
+
+            Host.Window?.CurrentDisplayMode.BindValueChanged(_ => apply());
         }
 
         #region Exit handling
