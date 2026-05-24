@@ -70,8 +70,12 @@ git clone https://github.com/SK-la/osu-framework
 git clone https://github.com/SK-la/osu-resources
 ```
 
-建议把三个仓库放在同一级目录后再构建。  
-It is recommended to place all three repositories side by side before building.
+建议把三个仓库放在同一级目录后再构建（详见 [LA_OSU_PACKAGES.md](LA_OSU_PACKAGES.md)）：
+
+- **Debug**：项目引用 `osu-framework` / `osu-resources`
+- **Release / CI**：NuGet `ez2lazer.Framework`、`ez2lazer.Game.Resources`
+
+Place all three repos side by side for **Debug** builds; **Release** uses NuGet (see [LA_OSU_PACKAGES.md](LA_OSU_PACKAGES.md)).
 
 自编译版本不会显示游戏内更新选项，也不会从 SK-la/Ez2Lazer Releases 拉取更新。  
 Self-built copies hide in-game update settings and do not check SK-la/Ez2Lazer Releases for updates.

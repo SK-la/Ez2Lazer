@@ -1,0 +1,12 @@
+﻿<!-- Ez2Lazer: Debug = 同级工程引用；Release / CI = ez2lazer.* NuGet -->
+<Project>
+  <PropertyGroup Label="Ez2Lazer">
+    <Ez2LazerFrameworkVersion Condition="'$(Ez2LazerFrameworkVersion)' == ''">2026.524.0-ez2lazer</Ez2LazerFrameworkVersion>
+    <Ez2LazerGameResourcesVersion Condition="'$(Ez2LazerGameResourcesVersion)' == ''">2026.524.4-ez2lazer</Ez2LazerGameResourcesVersion>
+    <!-- 仅本机 Debug 走 ../osu-framework、../osu-resources；Release 与 GitHub Actions 走 NuGet -->
+    <UseEz2LazerNuGetPackages Condition="'$(UseEz2LazerNuGetPackages)' == '' and '$(Configuration)' == 'Debug'">false</UseEz2LazerNuGetPackages>
+    <UseEz2LazerNuGetPackages Condition="'$(UseEz2LazerNuGetPackages)' == ''">true</UseEz2LazerNuGetPackages>
+    <Ez2LazerFrameworkProjectPath>$(MSBuildThisFileDirectory)..\osu-framework\osu.Framework\osu.Framework.csproj</Ez2LazerFrameworkProjectPath>
+    <Ez2LazerResourcesProjectPath>$(MSBuildThisFileDirectory)..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj</Ez2LazerResourcesProjectPath>
+  </PropertyGroup>
+</Project>
