@@ -132,7 +132,8 @@ namespace osu.Game.Screens.Menu
 
                     if (setCount > 0)
                     {
-                        var found = usableBeatmapSets[RNG.Next(0, setCount - 1)].Beatmaps.FirstOrDefault();
+                        // 要选择活动规则集谱面，防止随机到第三方规则集谱面而发生报错。
+                        var found = usableBeatmapSets[RNG.Next(0, setCount - 1)].Beatmaps.FirstOrDefault(b => b.Ruleset.Available);
 
                         if (found != null)
                             initialBeatmap = beatmaps.GetWorkingBeatmap(found);
