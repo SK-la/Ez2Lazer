@@ -3,7 +3,6 @@
 
 using System;
 using osu.Framework.Configuration;
-using osu.Framework.Threading;
 
 namespace osu.Game.EzOsuGame.Configuration
 {
@@ -25,7 +24,7 @@ namespace osu.Game.EzOsuGame.Configuration
             };
 
             if (!allowBenchmarkUnlimited)
-                updateLimiter = Math.Min(GameThread.DEFAULT_ACTIVE_HZ, updateLimiter);
+                updateLimiter = Math.Min(8000, updateLimiter);
 
             return updateLimiter;
         }
