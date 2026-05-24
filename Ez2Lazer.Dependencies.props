@@ -1,1 +1,14 @@
-﻿<!-- Ez2Lazer: Debug = 同级工程引用；Release / CI = ez2lazer.* NuGet。版本仅在此文件维护。 --><Project>  <PropertyGroup Label="Ez2Lazer">    <Ez2LazerFrameworkVersion>2026.524.0-ez2lazer</Ez2LazerFrameworkVersion>    <Ez2LazerGameResourcesVersion>2026.524.4-ez2lazer</Ez2LazerGameResourcesVersion>    <!-- 仅本机 Debug 走 ../osu-framework、../osu-resources；Release 与 GitHub Actions 走 NuGet -->    <UseEz2LazerNuGetPackages Condition="'$(UseEz2LazerNuGetPackages)' == '' and '$(Configuration)' == 'Debug'">false</UseEz2LazerNuGetPackages>    <UseEz2LazerNuGetPackages Condition="'$(UseEz2LazerNuGetPackages)' == ''">true</UseEz2LazerNuGetPackages>    <Ez2LazerFrameworkProjectPath>$(MSBuildThisFileDirectory)..\osu-framework\osu.Framework\osu.Framework.csproj</Ez2LazerFrameworkProjectPath>    <Ez2LazerResourcesProjectPath>$(MSBuildThisFileDirectory)..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj</Ez2LazerResourcesProjectPath>  </PropertyGroup></Project>
+﻿<!-- Ez2Lazer：Framework / Resources 依赖。版本仅在此文件维护。 -->
+<Project>
+  <PropertyGroup Label="Ez2Lazer">
+    <Ez2LazerFrameworkVersion>2026.524.0-ez2lazer</Ez2LazerFrameworkVersion>
+    <Ez2LazerGameResourcesVersion>2026.524.4-ez2lazer</Ez2LazerGameResourcesVersion>
+    <Ez2LazerFrameworkProjectPath>$(MSBuildThisFileDirectory)..\osu-framework\osu.Framework\osu.Framework.csproj</Ez2LazerFrameworkProjectPath>
+    <Ez2LazerResourcesProjectPath>$(MSBuildThisFileDirectory)..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj</Ez2LazerResourcesProjectPath>
+
+    <!-- 依赖来源：true = NuGet（默认）；false = 同级 ../osu-framework、../osu-resources -->
+    <UseEz2LazerNuGetPackages>true</UseEz2LazerNuGetPackages>
+    <!-- 本地联调：注释上一行，取消下一行注释 -->
+    <!-- <UseEz2LazerNuGetPackages>false</UseEz2LazerNuGetPackages> -->
+  </PropertyGroup>
+</Project>

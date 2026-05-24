@@ -70,12 +70,11 @@ git clone https://github.com/SK-la/osu-framework
 git clone https://github.com/SK-la/osu-resources
 ```
 
-建议把三个仓库放在同一级目录后再构建：
+默认使用 NuGet：`ez2lazer.Framework`、`ez2lazer.Game.Resources`（版本在 [Ez2Lazer.Dependencies.props](Ez2Lazer.Dependencies.props) 中维护）。
 
-- **Debug**：项目引用 `osu-framework` / `osu-resources`
-- **Release / CI**：NuGet `ez2lazer.Framework`、`ez2lazer.Game.Resources`（版本在 [Ez2Lazer.Dependencies.props](Ez2Lazer.Dependencies.props) 中维护，CI 不覆盖）
+本地联调 framework / resources：编辑该文件，按注释切换 `UseEz2LazerNuGetPackages`（`true` = NuGet，`false` = 同级工程引用）。
 
-Place all three repos side by side for **Debug** builds; **Release** / CI use NuGet versions from `Ez2Lazer.Dependencies.props`.
+Default: NuGet. Toggle `UseEz2LazerNuGetPackages` in `Ez2Lazer.Dependencies.props` for local sibling projects.
 
 自编译版本不会显示游戏内更新选项，也不会从 SK-la/Ez2Lazer Releases 拉取更新。  
 Self-built copies hide in-game update settings and do not check SK-la/Ez2Lazer Releases for updates.
