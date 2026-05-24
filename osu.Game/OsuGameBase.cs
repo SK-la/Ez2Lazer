@@ -644,8 +644,7 @@ namespace osu.Game
 
             updateFrameLimiter.BindValueChanged(_ => apply(), true);
 
-            if (Host.Window != null)
-                Host.Window.CurrentDisplayMode.BindValueChanged(_ => apply());
+            Host.Window?.CurrentDisplayMode.BindValueChanged(_ => apply());
         }
 
         #region Exit handling
