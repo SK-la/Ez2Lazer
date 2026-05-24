@@ -1,0 +1,12 @@
+<Project>
+  <!--
+    Ensure official release versioning applies to all game assemblies
+    (osu.Game + rulesets + tournament), not only osu.Desktop.
+  -->
+  <PropertyGroup Condition="'$(OfficialEz2Build)' == 'true' and '$(ReleaseVersion)' != ''">
+    <Version>$(ReleaseVersion)</Version>
+    <FileVersion>$(ReleaseVersion)</FileVersion>
+    <AssemblyVersion>$(ReleaseVersion)</AssemblyVersion>
+    <InformationalVersion>$(ReleaseVersion)-ez2lazer</InformationalVersion>
+  </PropertyGroup>
+</Project>
