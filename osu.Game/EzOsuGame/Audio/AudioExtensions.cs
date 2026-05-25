@@ -11,8 +11,6 @@ namespace osu.Game.EzOsuGame.Audio
 {
     public static class AudioExtensions
     {
-        public static readonly int[] COMMON_BUFFER_SIZES = { 64, 128, 256, 512, 1024, 2048 };
-
         public static void SetupAsioConfigurationSync(this AudioManager audioManager, Action<int, int> onFormatChanged, Action<int> onBufferSizeChanged)
         {
             audioManager.OnAsioDeviceConfigurationChanged += (sampleRate, bufferSize, bitDepth) =>

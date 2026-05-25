@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework;
@@ -12,10 +13,10 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
-using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 
 namespace osu.Game.Overlays.Settings.Sections.Audio
@@ -31,8 +32,10 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         private AsioFormatDropdown? sampleRateDropdown;
+        private SettingsItemV2? sampleRateSettingsItem;
 
         private FormDropdown<int>? bufferSizeDropdown;
+        private SettingsItemV2? bufferSizeSettingsItem;
 
         private AudioDeviceDropdown dropdown = null!;
 
@@ -40,6 +43,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         private Bindable<int> configSampleRate = null!;
         private Bindable<int> configBitDepth = null!;
+        private Bindable<int> configBufferSize = null!;
 
         private bool suppressAsioFormatChanges;
 
@@ -48,6 +52,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         {
             configSampleRate = ezConfig.GetBindable<int>(Ez2Setting.AsioSampleRate);
             configBitDepth = ezConfig.GetBindable<int>(Ez2Setting.AsioBitDepth);
+            configBufferSize = ezConfig.GetBindable<int>(Ez2Setting.AsioBufferSize);
 
             Children = new Drawable[]
             {
@@ -68,24 +73,29 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             if (RuntimeInfo.OS == RuntimeInfo.Platform.Windows)
             {
                 var initialFormat = AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value);
+                int initialBuffer = configBufferSize.Value > 0 ? configBufferSize.Value : AudioOutputDefaults.DEFAULT_ASIO_BUFFER_SIZE;
 
-                Add(new SettingsItemV2(sampleRateDropdown = new AsioFormatDropdown
+                sampleRateDropdown = new AsioFormatDropdown
                 {
                     Caption = EzSettingsStrings.ASIO_SAMPLE_RATE_LABEL,
                     HintText = EzSettingsStrings.ASIO_SAMPLE_RATE_HINT,
-                    Items = getDefaultFormatItems(),
+                    Items = new[] { initialFormat },
                     Current = new Bindable<EzAsioFormatOption>(initialFormat),
-                })
-                {
-                    Keywords = new[] { "sample", "rate", "frequency", "bit", "depth", "format" },
-                });
-                Add(new SettingsItemV2(bufferSizeDropdown = new FormDropdown<int>
+                };
+
+                bufferSizeDropdown = new FormDropdown<int>
                 {
                     Caption = EzSettingsStrings.ASIO_BUFFER_SIZE_LABEL,
                     HintText = EzSettingsStrings.ASIO_BUFFER_SIZE_HINT,
-                    Current = ezConfig.GetBindable<int>(Ez2Setting.AsioBufferSize),
-                    Items = AudioExtensions.COMMON_BUFFER_SIZES,
-                })
+                    Current = configBufferSize,
+                    Items = new[] { initialBuffer },
+                };
+
+                Add(sampleRateSettingsItem = new SettingsItemV2(sampleRateDropdown)
+                {
+                    Keywords = new[] { "sample", "rate", "frequency", "bit", "depth", "format" },
+                });
+                Add(bufferSizeSettingsItem = new SettingsItemV2(bufferSizeDropdown)
                 {
                     Keywords = new[] { "asio", "buffer", "latency" },
                 });
@@ -120,8 +130,18 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 {
                     Schedule(() =>
                     {
-                        ensureDropdownContainsValue(bufferSizeDropdown, actualBufferSize);
-                        bufferSizeDropdown.Current.Value = actualBufferSize;
+                        suppressAsioFormatChanges = true;
+
+                        try
+                        {
+                            ensureDropdownContainsValue(bufferSizeDropdown, actualBufferSize);
+                            if (bufferSizeDropdown?.Current != null)
+                                bufferSizeDropdown.Current.Value = actualBufferSize;
+                        }
+                        finally
+                        {
+                            suppressAsioFormatChanges = false;
+                        }
                     });
                 });
 
@@ -154,6 +174,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     Logger.Log($"User set ASIO buffer size to {e.NewValue}", LoggingTarget.Runtime, LogLevel.Debug);
                     audio.SetAsioBufferSize(e.NewValue);
                 });
+
+                setAsioSettingsVisible(false);
             }
         }
 
@@ -176,14 +198,16 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             try
             {
                 string deviceSelection = getCurrentDeviceSelection();
-                refreshAsioFormatItems(deviceSelection);
-                refreshAsioFormatVisibility(deviceSelection);
+                refreshAsioControls(deviceSelection);
+
+                if (!isAsioSelection(deviceSelection))
+                    return;
 
                 var format = AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value);
                 ensureDropdownContainsValue(sampleRateDropdown, format);
 
-                if (sampleRateDropdown.Current != null)
-                    sampleRateDropdown.Current.Value = format;
+                if (sampleRateDropdown?.Current != null)
+                    sampleRateDropdown.Current.Value = pickSupportedFormat(format);
 
                 audio.SetAsioFormat(configSampleRate.Value, configBitDepth.Value);
 
@@ -198,53 +222,53 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         private string getCurrentDeviceSelection() => dropdown.Current?.Value ?? audio.AudioDevice.Value ?? string.Empty;
 
-        private void onDeviceChanged(string? name)
+        private static bool isAsioSelection(string? selection) => selection?.Contains("ASIO", StringComparison.Ordinal) == true;
+
+        private void onDeviceChanged(string? _)
         {
             Scheduler.AddOnce(() =>
             {
                 updateItems();
-                refreshAsioFormatVisibility(name);
-                refreshAsioFormatItems(name);
+                refreshAsioControls(getCurrentDeviceSelection());
             });
         }
 
-        private void refreshAsioFormatVisibility(string? name)
+        private void refreshAsioControls(string? deviceSelection)
         {
-            bool isAsio = name?.Contains("ASIO") == true;
+            deviceSelection ??= getCurrentDeviceSelection();
+            bool isAsio = isAsioSelection(deviceSelection);
 
-            if (sampleRateDropdown != null)
+            setAsioSettingsVisible(isAsio);
+
+            if (!isAsio)
+                return;
+
+            refreshAsioFormatItems(deviceSelection);
+            refreshAsioBufferItems(deviceSelection);
+        }
+
+        private void setAsioSettingsVisible(bool visible)
+        {
+            if (visible)
             {
-                if (isAsio)
-                    sampleRateDropdown.Show();
-                else
-                    sampleRateDropdown.Hide();
+                sampleRateSettingsItem?.Show();
+                bufferSizeSettingsItem?.Show();
             }
-
-            if (bufferSizeDropdown != null)
+            else
             {
-                if (isAsio)
-                    bufferSizeDropdown.Show();
-                else
-                    bufferSizeDropdown.Hide();
+                sampleRateSettingsItem?.Hide();
+                bufferSizeSettingsItem?.Hide();
             }
         }
 
-        private void refreshAsioFormatItems(string? deviceSelection)
+        private void refreshAsioFormatItems(string deviceSelection)
         {
             if (sampleRateDropdown == null)
                 return;
 
-            deviceSelection ??= getCurrentDeviceSelection();
-
-            if (!deviceSelection.Contains("ASIO", System.StringComparison.Ordinal))
-            {
-                sampleRateDropdown.Items = getDefaultFormatItems();
-                return;
-            }
-
             if (!EzAsioDeviceManager.TryParseDeviceSelection(deviceSelection, out string asioName))
             {
-                sampleRateDropdown.Items = getDefaultFormatItems();
+                sampleRateDropdown.Items = new[] { AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value) };
                 return;
             }
 
@@ -254,37 +278,91 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             {
                 supported = audio.GetAsioSupportedFormats(asioName);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 Logger.Log($"Failed to query ASIO formats for '{asioName}': {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
-                supported = getDefaultFormatItems();
+                supported = new[] { AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value) };
             }
 
-            sampleRateDropdown.Items = supported.Count > 0
-                ? supported
-                : getDefaultFormatItems();
+            if (supported.Count == 0)
+                supported = new[] { AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value) };
+
+            sampleRateDropdown.Items = supported;
 
             if (sampleRateDropdown.Current == null)
                 return;
 
-            var current = AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value);
-            ensureDropdownContainsValue(sampleRateDropdown, current);
+            var desired = AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value);
+            var picked = pickSupportedFormat(desired);
+            ensureDropdownContainsValue(sampleRateDropdown, picked);
 
-            if (!suppressAsioFormatChanges)
-                sampleRateDropdown.Current.Value = current;
+            if (!suppressAsioFormatChanges && sampleRateDropdown.Current != null)
+            {
+                sampleRateDropdown.Current.Value = picked;
+                configSampleRate.Value = picked.SampleRate;
+                configBitDepth.Value = picked.BitDepth;
+            }
         }
 
-        private static IReadOnlyList<EzAsioFormatOption> getDefaultFormatItems()
+        private EzAsioFormatOption pickSupportedFormat(EzAsioFormatOption desired)
         {
-            var items = new List<EzAsioFormatOption>();
+            if (sampleRateDropdown?.Items == null)
+                return desired;
 
-            foreach (int rate in EzAsioFormatOption.COMMON_SAMPLE_RATES)
+            if (sampleRateDropdown.Items.Any(i => i == desired))
+                return desired;
+
+            return sampleRateDropdown.Items.First();
+        }
+
+        private void refreshAsioBufferItems(string deviceSelection)
+        {
+            if (bufferSizeDropdown == null)
+                return;
+
+            if (!EzAsioDeviceManager.TryParseDeviceSelection(deviceSelection, out string asioName))
             {
-                foreach (int bits in EzAsioFormatOption.SUPPORTED_BIT_DEPTHS)
-                    items.Add(new EzAsioFormatOption(rate, bits));
+                bufferSizeDropdown.Items = new[] { configBufferSize.Value };
+                return;
             }
 
-            return items;
+            IReadOnlyList<int> supported;
+
+            try
+            {
+                supported = audio.GetAsioSupportedBufferSizes(asioName);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to query ASIO buffer sizes for '{asioName}': {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
+                supported = new[] { configBufferSize.Value };
+            }
+
+            if (supported.Count == 0)
+                supported = new[] { configBufferSize.Value > 0 ? configBufferSize.Value : AudioOutputDefaults.DEFAULT_ASIO_BUFFER_SIZE };
+
+            bufferSizeDropdown.Items = supported;
+
+            if (bufferSizeDropdown.Current == null)
+                return;
+
+            int desired = configBufferSize.Value > 0 ? configBufferSize.Value : supported[0];
+            int picked = pickSupportedBufferSize(desired, supported);
+            ensureDropdownContainsValue(bufferSizeDropdown, picked);
+
+            if (!suppressAsioFormatChanges && bufferSizeDropdown.Current != null)
+            {
+                bufferSizeDropdown.Current.Value = picked;
+                configBufferSize.Value = picked;
+            }
+        }
+
+        private static int pickSupportedBufferSize(int desired, IReadOnlyList<int> supported)
+        {
+            if (supported.Contains(desired))
+                return desired;
+
+            return supported.OrderBy(v => Math.Abs(v - desired)).First();
         }
 
         private static void ensureDropdownContainsValue(AsioFormatDropdown? dropdown, EzAsioFormatOption value)
@@ -340,14 +418,12 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         private partial class AudioDeviceDropdown : FormDropdown<string>
         {
-            protected override LocalisableString GenerateItemText(string item)
-                => string.IsNullOrEmpty(item) ? CommonStrings.Default : base.GenerateItemText(item);
+            protected override LocalisableString GenerateItemText(string item) => string.IsNullOrEmpty(item) ? CommonStrings.Default : base.GenerateItemText(item);
         }
 
         private partial class AsioFormatDropdown : FormDropdown<EzAsioFormatOption>
         {
-            protected override LocalisableString GenerateItemText(EzAsioFormatOption item)
-                => item.DisplayName;
+            protected override LocalisableString GenerateItemText(EzAsioFormatOption item) => item.DisplayName;
         }
     }
 

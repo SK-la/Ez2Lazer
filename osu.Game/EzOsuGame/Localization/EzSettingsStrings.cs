@@ -209,8 +209,8 @@ namespace osu.Game.EzOsuGame.Localization
             "ASIO Output Format (Testing)");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "包含采样率与位深（16/24-bit）。48 kHz 通常更稳定；过高可能导致延迟或时钟不同步。",
-            "Sample rate and bit depth (16/24-bit). 48 kHz is usually most stable; higher rates may increase latency or clock drift.");
+            "列表来自系统音频端点或当前 ASIO 驱动报告（与系统声音设置一致），不枚举试探；不支持的组合不会显示。",
+            "Listed formats come from the OS audio endpoint or active ASIO driver report (matching system sound settings), without rate probing; unsupported combinations are omitted.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_LABEL = new EzLocalizationManager.EzLocalisableString(
             "ASIO 缓冲区大小（测试）",
