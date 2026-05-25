@@ -112,6 +112,7 @@ namespace osu.Game.EzOsuGame.Configuration
             #region 音频与输入
 
             SetDefault(Ez2Setting.AsioSampleRate, 48000);
+            SetDefault(Ez2Setting.AsioBitDepth, 24);
             SetDefault(Ez2Setting.AsioBufferSize, 128);
 
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
@@ -773,6 +774,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         // 音频与输入
         AsioSampleRate,
+        AsioBitDepth,
         AsioBufferSize,
         OffsetPlusMania,
         OffsetPlusNonMania,

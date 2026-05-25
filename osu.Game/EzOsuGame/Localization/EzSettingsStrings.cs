@@ -205,12 +205,12 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nHardware ASIO under wasapi/VM, low latency is still better.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 采样率（测试）",
-            "ASIO Sample Rate (Testing)");
+            "ASIO 输出格式（测试）",
+            "ASIO Output Format (Testing)");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "48k 更佳，过高的值会导致延迟和时钟同步错误。",
-            "48k is better, too high a value will cause delays and clock synchronization errors.");
+            "包含采样率与位深（16/24-bit）。48 kHz 通常更稳定；过高可能导致延迟或时钟不同步。",
+            "Sample rate and bit depth (16/24-bit). 48 kHz is usually most stable; higher rates may increase latency or clock drift.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_LABEL = new EzLocalizationManager.EzLocalisableString(
             "ASIO 缓冲区大小（测试）",
