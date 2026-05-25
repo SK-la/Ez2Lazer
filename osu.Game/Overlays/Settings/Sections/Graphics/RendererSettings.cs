@@ -41,6 +41,13 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 {
                     Keywords = new[] { @"compatibility", @"directx" },
                 },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.FRAME_LIMITER_BASE,
+                    HintText = EzSettingsStrings.FRAME_LIMITER_BASE_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.FrameLimiterBase),
+                    KeyboardStep = 1,
+                }),
                 new SettingsItemV2(new FormEnumDropdown<FrameSync>
                 {
                     Caption = EzSettingsStrings.UPDATE_FRAME_LIMITER,

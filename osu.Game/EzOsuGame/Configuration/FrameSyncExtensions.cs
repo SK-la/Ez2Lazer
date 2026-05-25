@@ -8,25 +8,44 @@ namespace osu.Game.EzOsuGame.Configuration
 {
     public static class FrameSyncExtensions
     {
-        public static double ToUpdateHz(this FrameSync frameSync, int refreshRate, bool allowBenchmarkUnlimited)
-        {
-            if (refreshRate <= 0)
-                refreshRate = 60;
+        public static double ToUpdateHz(this FrameSync frameSync, double baseHz, bool allowBenchmarkUnlimited)
+            => applyLimit(frameSync, baseHz, allowBenchmarkUnlimited, forDraw: false);
 
-            int updateLimiter = frameSync switch
+        public static double ToDrawHz(this FrameSync frameSync, double baseHz, bool allowBenchmarkUnlimited)
+            => applyLimit(frameSync, baseHz, allowBenchmarkUnlimited, forDraw: true);
+
+        private static double applyLimit(FrameSync frameSync, double baseHz, bool allowBenchmarkUnlimited, bool forDraw)
+        {
+            int baseValue = Math.Max(1, (int)Math.Round(baseHz));
+            int limiter = baseValue;
+
+            switch (frameSync)
             {
-                FrameSync.VSync => refreshRate * 2,
-                FrameSync.Limit2x => refreshRate * 2,
-                FrameSync.Limit4x => refreshRate * 4,
-                FrameSync.Limit8x => refreshRate * 8,
-                FrameSync.Unlimited => int.MaxValue,
-                _ => refreshRate * 2,
-            };
+                case FrameSync.VSync:
+                    limiter = forDraw ? int.MaxValue : baseValue;
+                    break;
+
+                case FrameSync.Limit2x:
+                    limiter = baseValue * 2;
+                    break;
+
+                case FrameSync.Limit4x:
+                    limiter = baseValue * 4;
+                    break;
+
+                case FrameSync.Limit8x:
+                    limiter = baseValue * 8;
+                    break;
+
+                case FrameSync.Unlimited:
+                    limiter = int.MaxValue;
+                    break;
+            }
 
             if (!allowBenchmarkUnlimited)
-                updateLimiter = Math.Min(8000, updateLimiter);
+                limiter = Math.Min(8000, limiter);
 
-            return updateLimiter;
+            return limiter;
         }
     }
 }

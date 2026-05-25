@@ -323,7 +323,7 @@ namespace osu.Game
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);
 
-            bindUpdateFrameLimiter(Ez2ConfigManager);
+            bindFrameLimiter(Ez2ConfigManager, frameworkConfig);
             EzSkinInfo = new EzSkinInfo(Ez2ConfigManager);
             dependencies.CacheAs<IEzSkinInfo>(EzSkinInfo);
             dependencies.CacheAs(EzResourceStore = new EzResourceStore(Ez2ConfigManager, Host.Renderer, Audio, Storage, realm));
@@ -623,26 +623,17 @@ namespace osu.Game
             host.ExceptionThrown += onExceptionThrown;
         }
 
-        private void bindUpdateFrameLimiter(Ez2ConfigManager ezConfig)
+        private void bindFrameLimiter(Ez2ConfigManager ezConfig, FrameworkConfigManager frameworkConfig)
         {
             var updateFrameLimiter = ezConfig.GetBindable<FrameSync>(Ez2Setting.UpdateFrameLimiter);
+            var drawFrameLimiter = frameworkConfig.GetBindable<FrameSync>(FrameworkSetting.FrameSync);
+            var baseFrameLimiter = ezConfig.GetBindable<double>(Ez2Setting.FrameLimiterBase);
 
-            void apply()
-            {
-                int refreshRate = 60;
-
-                if (Host.Window != null)
-                {
-                    refreshRate = (int)MathF.Round(Host.Window.CurrentDisplayMode.Value.RefreshRate);
-
-                    if (refreshRate <= 0)
-                        refreshRate = 60;
-                }
-
-                Host.MaximumUpdateHz = updateFrameLimiter.Value.ToUpdateHz(refreshRate, Host.AllowBenchmarkUnlimitedFrames);
-            }
+            void apply() => EzFrameLimiter.Apply(Host, updateFrameLimiter.Value, drawFrameLimiter.Value, baseFrameLimiter);
 
             updateFrameLimiter.BindValueChanged(_ => apply(), true);
+            drawFrameLimiter.BindValueChanged(_ => apply(), true);
+            baseFrameLimiter.BindValueChanged(_ => apply(), true);
 
             Host.Window?.CurrentDisplayMode.BindValueChanged(_ => apply());
         }

@@ -79,6 +79,8 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(Ez2Setting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
+            // 0 = 尚未设置，首次启动时用显示器刷新率写入
+            SetDefault(Ez2Setting.FrameLimiterBase, EzFrameLimiter.UNINITIALISED_BASE, 60.0, 720.0, 1.0);
             SetDefault(Ez2Setting.UpdateFrameLimiter, FrameSync.Unlimited);
             SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
             SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
@@ -741,6 +743,7 @@ namespace osu.Game.EzOsuGame.Configuration
         AccuracyCutoffS,
         AccuracyCutoffA,
 
+        FrameLimiterBase,
         UpdateFrameLimiter,
 
         EzAnalysisRecEnabled,
