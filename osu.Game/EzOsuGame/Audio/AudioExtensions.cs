@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Asio;
 using osu.Framework.Logging;
@@ -11,6 +12,20 @@ namespace osu.Game.EzOsuGame.Audio
 {
     public static class AudioExtensions
     {
+        /// <summary>
+        /// Applies Ez2Lazer ASIO defaults using <see cref="EzAsioAudioDefaults.VirtualHostWarmUpNamePatterns"/>.
+        /// </summary>
+        public static void ApplyEzAsioDefaults(this AudioManager audioManager)
+            => ApplyEzAsioDefaults(audioManager, EzAsioAudioDefaults.VirtualHostWarmUpNamePatterns);
+
+        /// <summary>
+        /// Applies ASIO virtual host warm-up name patterns (case-insensitive substring match on ASIO device names).
+        /// </summary>
+        public static void ApplyEzAsioDefaults(this AudioManager audioManager, IEnumerable<string> virtualHostWarmUpNamePatterns)
+        {
+            audioManager.ConfigureAsioVirtualHostWarmUpNamePatterns(virtualHostWarmUpNamePatterns);
+        }
+
         public static void SetupAsioConfigurationSync(this AudioManager audioManager, Action<int, int> onFormatChanged, Action<int> onBufferSizeChanged)
         {
             audioManager.OnAsioDeviceConfigurationChanged += (sampleRate, bufferSize, bitDepth) =>

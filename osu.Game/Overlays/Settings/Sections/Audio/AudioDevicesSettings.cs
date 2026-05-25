@@ -66,6 +66,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 },
             };
 
+            audio.ApplyEzAsioDefaults();
+
             audio.OnNewDevice += onDeviceChanged;
             audio.OnLostDevice += onDeviceChanged;
             dropdown.Current = audio.AudioDevice;
@@ -120,6 +122,10 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                             sampleRateDropdown.Current.Value = format;
                             configSampleRate.Value = actualSampleRate;
                             configBitDepth.Value = actualBitDepth;
+
+                            // Driver is live on the audio thread — safe to refresh capability lists from cache.
+                            refreshAsioFormatItems(getCurrentDeviceSelection());
+                            refreshAsioBufferItems(getCurrentDeviceSelection());
                         }
                         finally
                         {
@@ -198,10 +204,16 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             try
             {
                 string deviceSelection = getCurrentDeviceSelection();
-                refreshAsioControls(deviceSelection);
+                setAsioSettingsVisible(isAsioSelection(deviceSelection));
 
                 if (!isAsioSelection(deviceSelection))
                     return;
+
+                if (audio.IsAsioOutputActive())
+                {
+                    refreshAsioFormatItems(deviceSelection);
+                    refreshAsioBufferItems(deviceSelection);
+                }
 
                 var format = AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value);
                 ensureDropdownContainsValue(sampleRateDropdown, format);
@@ -220,7 +232,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             }
         }
 
-        private string getCurrentDeviceSelection() => dropdown.Current?.Value ?? audio.AudioDevice.Value ?? string.Empty;
+        private string getCurrentDeviceSelection() => dropdown.Current.Value ?? audio.AudioDevice.Value ?? string.Empty;
 
         private static bool isAsioSelection(string? selection) => selection?.Contains("ASIO", StringComparison.Ordinal) == true;
 
@@ -229,22 +241,18 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             Scheduler.AddOnce(() =>
             {
                 updateItems();
-                refreshAsioControls(getCurrentDeviceSelection());
+
+                string deviceSelection = getCurrentDeviceSelection();
+                setAsioSettingsVisible(isAsioSelection(deviceSelection));
+
+                // Do not query/touch the ASIO driver from the UI thread here — that raced audio-thread init and caused silent output.
+                // Lists refresh after audio-thread initialisation via SetupAsioConfigurationSync, or from cache if already running.
+                if (audio.IsAsioOutputActive())
+                {
+                    refreshAsioFormatItems(deviceSelection);
+                    refreshAsioBufferItems(deviceSelection);
+                }
             });
-        }
-
-        private void refreshAsioControls(string? deviceSelection)
-        {
-            deviceSelection ??= getCurrentDeviceSelection();
-            bool isAsio = isAsioSelection(deviceSelection);
-
-            setAsioSettingsVisible(isAsio);
-
-            if (!isAsio)
-                return;
-
-            refreshAsioFormatItems(deviceSelection);
-            refreshAsioBufferItems(deviceSelection);
         }
 
         private void setAsioSettingsVisible(bool visible)
@@ -289,14 +297,11 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
             sampleRateDropdown.Items = supported;
 
-            if (sampleRateDropdown.Current == null)
-                return;
-
             var desired = AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value);
             var picked = pickSupportedFormat(desired);
             ensureDropdownContainsValue(sampleRateDropdown, picked);
 
-            if (!suppressAsioFormatChanges && sampleRateDropdown.Current != null)
+            if (!suppressAsioFormatChanges)
             {
                 sampleRateDropdown.Current.Value = picked;
                 configSampleRate.Value = picked.SampleRate;
@@ -343,14 +348,11 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
             bufferSizeDropdown.Items = supported;
 
-            if (bufferSizeDropdown.Current == null)
-                return;
-
             int desired = configBufferSize.Value > 0 ? configBufferSize.Value : supported[0];
             int picked = pickSupportedBufferSize(desired, supported);
             ensureDropdownContainsValue(bufferSizeDropdown, picked);
 
-            if (!suppressAsioFormatChanges && bufferSizeDropdown.Current != null)
+            if (!suppressAsioFormatChanges)
             {
                 bufferSizeDropdown.Current.Value = picked;
                 configBufferSize.Value = picked;
