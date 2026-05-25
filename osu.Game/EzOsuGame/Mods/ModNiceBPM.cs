@@ -134,6 +134,9 @@ namespace osu.Game.EzOsuGame.Mods
         private bool hasAppliedFreeBPM;
         private int currentMissCount;
 
+        // 防止 Min/Max AllowableRate 相互调整时的循环触发
+        private bool isUpdatingMinMax;
+
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
             get
@@ -157,24 +160,54 @@ namespace osu.Game.EzOsuGame.Mods
             // 当最小/最大允许速率值更改时更新速度变化范围
             MinAllowableRate.BindValueChanged(val =>
             {
+                if (isUpdatingMinMax) return;
+
+                // 如果新最小值大于当前最大值，需要先调整最大值
+                if (val.NewValue > SpeedChange.MaxValue)
+                {
+                    isUpdatingMinMax = true;
+                    SpeedChange.MaxValue = val.NewValue;
+                    MaxAllowableRate.Value = val.NewValue;
+                    isUpdatingMinMax = false;
+                }
+
                 SpeedChange.MinValue = val.NewValue;
                 if (SpeedChange.Value < val.NewValue)
                     SpeedChange.Value = val.NewValue;
 
                 // 确保最小允许速率不超过最大允许速率
                 if (val.NewValue > MaxAllowableRate.Value)
+                {
+                    isUpdatingMinMax = true;
                     MinAllowableRate.Value = MaxAllowableRate.Value;
+                    isUpdatingMinMax = false;
+                }
             }, true);
 
             MaxAllowableRate.BindValueChanged(val =>
             {
+                if (isUpdatingMinMax) return;
+
+                // 如果新最大值小于当前最小值，需要先调整最小值
+                if (val.NewValue < SpeedChange.MinValue)
+                {
+                    isUpdatingMinMax = true;
+                    SpeedChange.MinValue = val.NewValue;
+                    MinAllowableRate.Value = val.NewValue;
+                    isUpdatingMinMax = false;
+                }
+
                 SpeedChange.MaxValue = val.NewValue;
                 if (SpeedChange.Value > val.NewValue)
                     SpeedChange.Value = val.NewValue;
 
                 // 确保最大允许速率不低于最小允许速率
                 if (val.NewValue < MinAllowableRate.Value)
+                {
+                    isUpdatingMinMax = true;
                     MaxAllowableRate.Value = MinAllowableRate.Value;
+                    isUpdatingMinMax = false;
+                }
             }, true);
 
             InitialRate.BindValueChanged(val =>
