@@ -11,6 +11,7 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -131,7 +132,7 @@ namespace osu.Game.Screens.Ranking.Expanded
                                 Origin = Anchor.TopCentre,
                                 AutoSizeAxes = Axes.Both,
                                 Spacing = new Vector2(5, 0),
-                                Children = new Drawable[]
+                                Children = new[]
                                 {
                                     new StarRatingDisplay(starDifficulty)
                                     {
@@ -152,7 +153,8 @@ namespace osu.Game.Screens.Ranking.Expanded
                                         ExpansionMode = ExpansionMode.AlwaysExpanded,
                                         Scale = new Vector2(0.5f),
                                         Current = { Value = score.Mods }
-                                    }
+                                    },
+                                    EzManiaScoreModeExtensions.CreateDisplayDrawable(score, anchor: Anchor.CentreLeft)
                                 }
                             },
                             new FillFlowContainer

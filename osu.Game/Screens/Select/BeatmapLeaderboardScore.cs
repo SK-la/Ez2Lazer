@@ -31,6 +31,7 @@ using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Users;
 using osu.Game.Users.Drawables;
@@ -109,6 +110,7 @@ namespace osu.Game.Screens.Select
         private Container rightContent = null!;
 
         private FillFlowContainer<Drawable> modsContainer = null!;
+        private Drawable maniaModeDisplay = null!;
 
         private Box totalScoreBackground = null!;
 
@@ -431,7 +433,7 @@ namespace osu.Game.Screens.Select
                                                 Direction = FillDirection.Vertical,
                                                 Padding = new MarginPadding { Horizontal = corner_radius },
                                                 Spacing = new Vector2(0f, -2f),
-                                                Children = new Drawable[]
+                                                Children = new[]
                                                 {
                                                     new OsuSpriteText
                                                     {
@@ -452,6 +454,7 @@ namespace osu.Game.Screens.Select
                                                         Spacing = new Vector2(-10, 0),
                                                         Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                                     },
+                                                    maniaModeDisplay = EzManiaScoreModeExtensions.CreateDisplayDrawable(Score, fontSize: 9, anchor: Anchor.TopRight),
                                                 }
                                             }
                                         }

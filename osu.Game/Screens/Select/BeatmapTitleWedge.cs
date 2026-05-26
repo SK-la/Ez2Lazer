@@ -21,6 +21,8 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
@@ -68,6 +70,13 @@ namespace osu.Game.Screens.Select
         private Statistic lengthStatistic = null!;
         private Statistic bpmStatistic = null!;
 
+        private FillFlowContainer maniaModeFlow = null!;
+        private OsuSpriteText hitModeText = null!;
+        private OsuSpriteText healthModeText = null!;
+
+        private IBindable<EzEnumHitMode> maniaHitModeBindable = null!;
+        private IBindable<EzEnumHealthMode> maniaHealthModeBindable = null!;
+
         [Resolved]
         private ISongSelect? songSelect { get; set; }
 
@@ -91,7 +100,7 @@ namespace osu.Game.Screens.Select
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(Ez2ConfigManager ezConfig)
         {
             Masking = true;
             CornerRadius = corner_radius;
@@ -182,6 +191,32 @@ namespace osu.Game.Screens.Select
                                 },
                             },
                         }),
+                        new ShearAligningWrapper(maniaModeFlow = new FillFlowContainer
+                        {
+                            Shear = -OsuGame.SHEAR,
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Direction = FillDirection.Horizontal,
+                            Spacing = new Vector2(12f, 0f),
+                            Alpha = 0f,
+                            Children = new Drawable[]
+                            {
+                                hitModeText = new OsuSpriteText
+                                {
+                                    Text = string.Empty,
+                                    Font = OsuFont.Style.Caption2.With(weight: FontWeight.SemiBold),
+                                    Colour = OsuColour.Gray(0.75f),
+                                },
+                                healthModeText = new OsuSpriteText
+                                {
+                                    Text = string.Empty,
+                                    Font = OsuFont.Style.Caption2.With(weight: FontWeight.SemiBold),
+                                    Colour = OsuColour.Gray(0.75f),
+                                },
+                            },
+                        }),
                         new ShearAligningWrapper(new Container
                         {
                             Shear = -OsuGame.SHEAR,
@@ -194,6 +229,9 @@ namespace osu.Game.Screens.Select
                     },
                 }
             };
+
+            maniaHitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            maniaHealthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
         }
 
         protected override void LoadComplete()
@@ -213,6 +251,9 @@ namespace osu.Game.Screens.Select
                 settingChangeTracker = new ModSettingChangeTracker(m.NewValue);
                 settingChangeTracker.SettingChanged += _ => updateLengthAndBpmStatistics();
             });
+
+            maniaHitModeBindable.BindValueChanged(_ => updateDisplay(), true);
+            maniaHealthModeBindable.BindValueChanged(_ => updateDisplay(), true);
 
             updateDisplay();
 
@@ -261,6 +302,19 @@ namespace osu.Game.Screens.Select
 
             updateLengthAndBpmStatistics();
             updateOnlineDisplay();
+
+            bool isMania = ruleset.Value.OnlineID == 3;
+
+            if (isMania)
+            {
+                hitModeText.Text = $@"Hit: {EzManiaScoreModeExtensions.GetHitModeDisplayName((int)maniaHitModeBindable.Value)}";
+                healthModeText.Text = $@"HP: {EzManiaScoreModeExtensions.GetHealthModeDisplayName((int)maniaHealthModeBindable.Value)}";
+                maniaModeFlow.Alpha = 1f;
+            }
+            else
+            {
+                maniaModeFlow.Alpha = 0f;
+            }
         }
 
         private CancellationTokenSource? lengthBpmCancellationSource;

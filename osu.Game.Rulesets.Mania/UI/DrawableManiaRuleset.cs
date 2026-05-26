@@ -21,6 +21,8 @@ using osu.Game.Input.Bindings;
 using osu.Game.Input.Handlers;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
@@ -41,7 +43,7 @@ using osuTK.Input;
 
 namespace osu.Game.Rulesets.Mania.UI
 {
-    public partial class DrawableManiaRuleset : DrawableScrollingRuleset<ManiaHitObject>, IPreviewScrollDensityAdjustable
+    public partial class DrawableManiaRuleset : DrawableScrollingRuleset<ManiaHitObject>, IPreviewScrollDensityAdjustable, IManiaGameplayModeSnapshot
     {
         /// <summary>
         /// The minimum time range. This occurs at a <see cref="ManiaRulesetSetting.ScrollSpeed"/> of 40.
@@ -92,6 +94,10 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
         private EzEnumHitMode gameplayHitMode;
         private bool suppressHitModeRevert;
+
+        int IManiaGameplayModeSnapshot.HitMode => (int)gameplayHitMode;
+        int IManiaGameplayModeSnapshot.HealthMode => (int)ManiaHealthProcessor.ActiveHealthMode;
+
         private readonly Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
         private readonly BindableDouble configBaseMs = new BindableDouble();
         private readonly BindableDouble configTimePerSpeed = new BindableDouble();

@@ -13,19 +13,23 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public partial class ManiaHealthProcessor : LegacyDrainingHealthProcessor
     {
-        private static EzEnumHealthMode mode = EzEnumHealthMode.Lazer;
         private static int row;
+
+        /// <summary>
+        /// The health mode locked in for the current play session.
+        /// </summary>
+        public static EzEnumHealthMode ActiveHealthMode { get; private set; } = EzEnumHealthMode.Lazer;
 
         public ManiaHealthProcessor(double drainStartTime)
             : base(drainStartTime)
         {
             try
             {
-                mode = GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
+                ActiveHealthMode = GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             }
             catch { }
 
-            row = switchHealthMode(mode);
+            row = switchHealthMode(ActiveHealthMode);
         }
 
         protected override double ComputeDrainRate()
@@ -33,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             // Base call is run only to compute HP recovery (namely, `HpMultiplierNormal`).
             // This closely mirrors (broken) behaviour of stable and as such is preserved unchanged.
             // 只有Lazer模式下，会调用此方法。从基类中计算HP作用。非Lazer模式禁止使用，否则会出现无限计算。
-            if (mode == EzEnumHealthMode.Lazer)
+            if (ActiveHealthMode == EzEnumHealthMode.Lazer)
                 base.ComputeDrainRate();
 
             return 0;
@@ -48,7 +52,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             double increase = 0;
 
-            if (mode == EzEnumHealthMode.Lazer)
+            if (ActiveHealthMode == EzEnumHealthMode.Lazer)
             {
                 switch (result)
                 {
@@ -85,7 +89,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 return HpMultiplierNormal * increase;
             }
 
-            if (mode == EzEnumHealthMode.O2JamHard || mode == EzEnumHealthMode.O2JamEasy || mode == EzEnumHealthMode.O2JamNormal)
+            if (ActiveHealthMode == EzEnumHealthMode.O2JamHard || ActiveHealthMode == EzEnumHealthMode.O2JamEasy || ActiveHealthMode == EzEnumHealthMode.O2JamNormal)
             {
                 switch (hitObject)
                 {
@@ -128,7 +132,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             // 低血量时的特殊扣血处理
             if (increase < 0 && Health.Value <= 0.5)
             {
-                if (mode == EzEnumHealthMode.IIDX_HD)
+                if (ActiveHealthMode == EzEnumHealthMode.IIDX_HD)
                 {
                     // IIDX模式：血量≤30%时扣血减半
                     if (Health.Value <= 0.3)
@@ -136,7 +140,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                         increase *= 0.5;
                     }
                 }
-                else if (mode == EzEnumHealthMode.LR2_HD)
+                else if (ActiveHealthMode == EzEnumHealthMode.LR2_HD)
                 {
                     // LR2 Hard模式：血量≤30%时扣血×0.6（60%折扣）
                     if (Health.Value <= 0.3)
@@ -144,7 +148,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                         increase *= 0.6;
                     }
                 }
-                else if (mode == EzEnumHealthMode.Raja_HD)
+                else if (ActiveHealthMode == EzEnumHealthMode.Raja_HD)
                 {
                     // raja Hard模式：50%-30%之间线性插值递减
                     if (Health.Value <= 0.3)
