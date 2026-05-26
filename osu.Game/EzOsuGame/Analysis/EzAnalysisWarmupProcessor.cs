@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
@@ -105,6 +106,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private void ensureBackgroundWorkersStarted()
         {
+            if (DebugUtils.IsNUnitRunning)
+                return;
+
             if (backgroundWorkersStarted)
                 return;
 
@@ -303,8 +307,15 @@ namespace osu.Game.EzOsuGame.Analysis
 
                     while (sqliteEnabled && tryBeginAnyPendingBeatmap(out Guid beatmapId))
                     {
-                        using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, pendingBeatmapRecomputeCancellationSource.Token);
-                        recomputePendingBeatmap(beatmapId, includeTagData: true, skipExistingComparison: true, linkedCancellation.Token, "startup warmup");
+                        try
+                        {
+                            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, pendingBeatmapRecomputeCancellationSource.Token);
+                            recomputePendingBeatmap(beatmapId, includeTagData: true, skipExistingComparison: true, linkedCancellation.Token, "startup warmup");
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            return;
+                        }
                     }
                 }
             }
