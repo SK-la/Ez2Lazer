@@ -86,9 +86,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
             return GetBaseScoreForResult(result);
         }
 
-        public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results)
+        public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results, bool useDefaultCutoffs = false)
         {
-            ScoreRank rank = base.RankFromScore(accuracy, results);
+            ScoreRank rank = base.RankFromScore(accuracy, results, useDefaultCutoffs);
 
             if (rank != ScoreRank.S)
                 return rank;
