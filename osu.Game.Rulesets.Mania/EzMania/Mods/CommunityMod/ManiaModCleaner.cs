@@ -16,11 +16,12 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
+    // TODO: 未来添加新的 模块清理Mod，代替这里Mod。修改缩写暂时防止测试报错
     public class ManiaModCleaner : Mod, IApplicableAfterBeatmapConversion
     {
         public override string Name => "Cleaner";
 
-        public override string Acronym => "CL";
+        public override string Acronym => "MC";
 
         public override LocalisableString Description => CleanerStrings.CLEANER_DESCRIPTION;
 

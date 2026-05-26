@@ -9,7 +9,9 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Configuration;
+using System.Linq;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -33,7 +35,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override bool Ranked => false;
 
-        public override Type[] IncompatibleMods => new[] { typeof(ModTimeRamp) };
+        public override Type[] IncompatibleMods => EzManiaModCompatibility.MANIA_RATE_ADJUST_MODS
+                                                                          .Concat(new[] { typeof(ManiaModAdjust), typeof(ManiaModNiceBPM) })
+                                                                          .ToArray();
 
         private readonly BindableDouble accuracy = new BindableDouble();
 
