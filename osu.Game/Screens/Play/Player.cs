@@ -1463,6 +1463,8 @@ namespace osu.Game.Screens.Play
                 score.ScoreInfo.Files.AddRange(s.Files.Detach());
             });
 
+            score.ScoreInfo.StoreManiaModesInSession();
+
             return Task.CompletedTask;
         }
 
