@@ -3,7 +3,6 @@
 
 #nullable disable
 
-using System;
 using System.Globalization;
 using System.Linq;
 using NUnit.Framework;
@@ -38,15 +37,10 @@ namespace osu.Game.Tests.Visual.Fonts
                 // Use StringInfo to split the string into text elements so surrogate-pair emoji are preserved.
                 int[] indices = StringInfo.ParseCombiningCharacters(emojis);
 
-                staticEmojiTexts = indices.Select(i =>
+                staticEmojiTexts = indices.Select((startIndex, index) =>
                 {
-                    int nextIndex = i;
-                    int current = i;
-                    int idxInList = Array.IndexOf(indices, i);
-                    if (idxInList + 1 < indices.Length)
-                        nextIndex = indices[idxInList + 1];
-
-                    string element = emojis.Substring(current, nextIndex - current);
+                    int endIndex = index + 1 < indices.Length ? indices[index + 1] : emojis.Length;
+                    string element = emojis.Substring(startIndex, endIndex - startIndex);
 
                     return new OsuSpriteText
                     {

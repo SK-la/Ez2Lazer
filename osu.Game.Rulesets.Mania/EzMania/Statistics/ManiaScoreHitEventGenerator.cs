@@ -540,6 +540,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
                 double missEarlyWindow = getDirectionalWindow(hitWindowHelper, HitResult.Miss, true) * lenienceFactor;
                 double missLateWindow = getDirectionalWindow(hitWindowHelper, HitResult.Miss, false) * lenienceFactor;
+
+                if (HitModeHelper.IsBMSHitMode(hitMode))
+                {
+                    double badLateWindow = getDirectionalWindow(hitWindowHelper, BMSJudgeMapping.Bad, false) * lenienceFactor;
+                    double kPoorEarlyWindow = getDirectionalWindow(hitWindowHelper, BMSJudgeMapping.KPoor, true) * lenienceFactor;
+                    double kPoorLateWindow = getDirectionalWindow(hitWindowHelper, BMSJudgeMapping.KPoor, false) * lenienceFactor;
+                    missEarlyWindow = Math.Max(missEarlyWindow, kPoorEarlyWindow);
+                    // Late presses beyond the Bad window can still produce BMS Poor (見逃し); align with KPoor early span as upper routing bound.
+                    missLateWindow = Math.Max(missLateWindow, Math.Max(kPoorLateWindow, badLateWindow + kPoorEarlyWindow));
+                }
+
                 double minTime = state.Target.StartTime - missEarlyWindow;
                 double maxTime = state.Target.StartTime + missLateWindow;
 
