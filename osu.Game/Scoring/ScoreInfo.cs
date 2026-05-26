@@ -240,6 +240,9 @@ namespace osu.Game.Scoring
                 CountryCode = RealmUser.CountryCode,
             };
 
+            clone.ManiaHitMode = ManiaHitMode;
+            clone.ManiaHealthMode = ManiaHealthMode;
+
             return clone;
         }
 
@@ -261,6 +264,18 @@ namespace osu.Game.Scoring
         /// Whether this <see cref="ScoreInfo"/> represents a legacy (osu!stable) score.
         /// </summary>
         public bool IsLegacyScore { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: In-memory mania hit mode for the current session. Not persisted (restart will invalidate).
+        /// </summary>
+        [Ignored]
+        public int ManiaHitMode { get; set; } = EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE;
+
+        /// <summary>
+        /// Ez2Lazer: In-memory mania health mode for the current session. Not persisted (restart will invalidate).
+        /// </summary>
+        [Ignored]
+        public int ManiaHealthMode { get; set; } = EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE;
 
         private Dictionary<HitResult, int>? statistics;
 

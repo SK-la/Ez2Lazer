@@ -367,6 +367,8 @@ namespace osu.Game.Screens.Play
                 score.ScoreInfo.OnlineID = s.ID;
                 score.ScoreInfo.Position = s.Position;
 
+                queueEzManiaMetadataSubmission(score, s.ID);
+
                 scoreSubmissionSource.SetResult(true);
                 Logger.Log($"Score submission completed! (token:{token.Value} id:{s.ID})");
             };

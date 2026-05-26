@@ -28,6 +28,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.IO.Archives;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
@@ -1070,6 +1071,9 @@ namespace osu.Game.Screens.Play
 
             if (!canShowResults && !forceImport)
                 return Task.FromResult<ScoreInfo>(null);
+
+            // Persist mania gameplay modes on the score before cloning for import/submission.
+            Score.ScoreInfo.ApplyManiaGameplayModes(DrawableRuleset);
 
             // Clone score before beginning any async processing.
             // - Must be run synchronously as the score may potentially be mutated in the background.

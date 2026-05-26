@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps.Drawables;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Online.Leaderboards;
@@ -90,7 +91,7 @@ namespace osu.Game.Screens.Ranking.Contracted
                                     Padding = new MarginPadding(10),
                                     Direction = FillDirection.Vertical,
                                     Spacing = new Vector2(0, 10),
-                                    Children = new Drawable[]
+                                    Children = new[]
                                     {
                                         new UpdateableAvatar(score.User)
                                         {
@@ -159,9 +160,10 @@ namespace osu.Game.Screens.Ranking.Contracted
                                                     Origin = Anchor.TopCentre,
                                                     Scale = new Vector2(0.3f),
                                                     Margin = new MarginPadding { Top = -6 }
-                                                })
+                                                }),
                                             ]
-                                        }
+                                        },
+                                        EzManiaScoreModeExtensions.CreateDisplayDrawable(score, fontSize: 10, anchor: Anchor.TopLeft)
                                     }
                                 }
                             }
@@ -215,8 +217,7 @@ namespace osu.Game.Screens.Ranking.Contracted
             };
         }
 
-        private Drawable createStatistic(HitResultDisplayStatistic result)
-            => createStatistic(result.DisplayName, result.MaxCount == null ? $"{result.Count}" : $"{result.Count}/{result.MaxCount}");
+        private Drawable createStatistic(HitResultDisplayStatistic result) => createStatistic(result.DisplayName, result.MaxCount == null ? $"{result.Count}" : $"{result.Count}/{result.MaxCount}");
 
         private Drawable createStatistic(LocalisableString key, string value) => new Container
         {
