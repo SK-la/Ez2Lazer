@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
     {
         public override string Name => "Playfield Scale";
 
-        public override string Acronym => "PS";
+        public override string Acronym => "PFT";
 
         public override LocalisableString Description => PlayfieldTransformationStrings.PLAYFIELD_TRANSFORMATION_DESCRIPTION;
 

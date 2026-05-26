@@ -54,7 +54,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.StoryboardAutoVideoSize),
                 })
                 {
-                    Keywords = new[] { "storyboard", "video", "size", "auto", "scaling", "ui" }
+                    Keywords = new[] { "storyboard", "video", "size", "auto", "autosize", "ui" }
                 },
                 new SettingsItemV2(new FormCheckBox
                 {

@@ -24,6 +24,7 @@ using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -572,6 +573,8 @@ namespace osu.Game.Tests.Visual
 
             protected override void LoadAsyncComplete()
             {
+                GlobalConfigStore.EnsureInitialized(Storage);
+
                 // this has to be run here rather than LoadComplete because
                 // TestScene.cs is checking the IsLoaded state (on another thread) and expects
                 // the runner to be loaded at that point.

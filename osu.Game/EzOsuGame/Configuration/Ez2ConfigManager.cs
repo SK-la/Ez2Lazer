@@ -8,6 +8,7 @@ using System.Text;
 using JetBrains.Annotations;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
+using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
@@ -69,6 +70,14 @@ namespace osu.Game.EzOsuGame.Configuration
         {
         }
 
+        protected override void PerformLoad()
+        {
+            if (DebugUtils.IsNUnitRunning)
+                return;
+
+            base.PerformLoad();
+        }
+
         protected override void InitialiseDefaults()
         {
             #region 全局游戏与界面设置
@@ -85,7 +94,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
             SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
-            SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, true);
+            SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
@@ -198,7 +207,7 @@ namespace osu.Game.EzOsuGame.Configuration
         {
             SetDefault(Ez2Setting.ManiaHitMode, EzEnumHitMode.Lazer);
             SetDefault(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
-            SetDefault(Ez2Setting.BmsPoorHitResultEnable, true);
+            SetDefault(Ez2Setting.BmsPoorHitResultEnable, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.JudgePrecedence, EzEnumJudgePrecedence.Earliest);
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);
 

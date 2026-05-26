@@ -38,6 +38,7 @@ using osu.Game.Rulesets;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
@@ -166,7 +167,7 @@ namespace osu.Game.Tests.Visual.Ranking
             AddAssert("lazer mania bridge returned hit events", () => lazerHitEvents is { Count: 1 });
             AddAssert("bms mania bridge returned hit events", () => bmsHitEvents is { Count: 1 });
             AddAssert("lazer late hit is miss", () => lazerHitEvents![0].Result == HitResult.Miss);
-            AddAssert("bms late hit is poor", () => bmsHitEvents![0].Result == HitResult.Poor);
+            AddAssert("bms late hit is poor", () => bmsHitEvents![0].Result == BMSJudgeMapping.Poor);
             AddAssert("bms preserves raw late offset", () => Math.Abs(bmsHitEvents![0].TimeOffset - 300) < 0.01);
         }
 

@@ -210,9 +210,9 @@ namespace osu.Game.Rulesets.Scoring
 
         // 标记后，用于分数算法切换。
         public bool IsLegacyScore = false;
-        private static double accS;
+        private static double accS = accuracy_cutoff_s;
 
-        private static double accA;
+        private static double accA = accuracy_cutoff_a;
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)

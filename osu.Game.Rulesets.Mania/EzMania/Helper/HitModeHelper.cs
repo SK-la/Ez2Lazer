@@ -570,6 +570,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                         HitResult.IgnoreMiss,
                     };
 
+                case EzEnumHitMode.Lazer:
+                case EzEnumHitMode.Classic:
+                    return new[]
+                    {
+                        HitResult.Perfect,
+                        HitResult.Great,
+                        HitResult.Good,
+                        HitResult.Ok,
+                        HitResult.Meh,
+                        HitResult.Miss,
+                        HitResult.IgnoreHit,
+                        HitResult.ComboBreak,
+                        HitResult.IgnoreMiss,
+                    };
+
                 default:
                     return new[]
                     {
@@ -579,7 +594,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                         HitResult.Ok,
                         HitResult.Meh,
                         HitResult.Miss,
-                        HitResult.Poor,
                         HitResult.IgnoreHit,
                         HitResult.ComboBreak,
                         HitResult.IgnoreMiss,

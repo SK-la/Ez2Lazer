@@ -14,6 +14,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -56,7 +57,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override bool ValidForMultiplayer => false;
 
-        public override Type[] IncompatibleMods => new[] { typeof(ModEasy), typeof(ModHardRock), typeof(ModTimeRamp), typeof(ModAdaptiveSpeed), typeof(ModRateAdjust) };
+        public override Type[] IncompatibleMods => new[] { typeof(ModEasy), typeof(ModHardRock), typeof(ModTimeRamp), typeof(ModAdaptiveSpeed), typeof(ModRateAdjust), typeof(ModNiceBPM), typeof(ModLoopPlayClip) };
 
         public override string ExtendedIconInformation => "";
 
