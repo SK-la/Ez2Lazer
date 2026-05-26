@@ -18,6 +18,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
+using osu.Game.Overlays.Notifications;
 
 namespace osu.Game.Overlays.Settings.Sections.Audio
 {
@@ -30,6 +31,9 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
+        private INotificationOverlay? notifications { get; set; }
 
         private AsioFormatDropdown? sampleRateDropdown;
         private SettingsItemV2? sampleRateSettingsItem;
@@ -72,6 +76,13 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             };
 
             audio.ApplyEzAsioDefaults();
+            audio.OnAsioOutputUnavailable = () => Schedule(() =>
+            {
+                notifications?.Post(new SimpleNotification
+                {
+                    Text = EzSettingsStrings.ASIO_OUTPUT_UNAVAILABLE_NOTIFICATION,
+                });
+            });
 
             audio.OnNewDevice += onDeviceChanged;
             audio.OnLostDevice += onDeviceChanged;

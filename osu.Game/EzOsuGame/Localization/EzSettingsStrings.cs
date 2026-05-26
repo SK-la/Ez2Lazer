@@ -196,29 +196,31 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString AUDIO_DEVICE_OUTPUT_HINT = new EzLocalizationManager.EzLocalisableString(
             "ASIO 处于测试阶段！"
-            + "\n对于虚拟声卡，如VoiceMeeter，可能需要先切换到物理输出设备，之后再切换回VM。"
-            + "\n请不要以为ASIO4All这类虚拟ASIO比WASAPI更好，软件桥接并不提供真正的ASIO低延迟。"
-            + "\n硬件ASIO在 wasapi/VM 下，低延迟也依然是更好的。",
+            + "\n对于虚拟音频驱动，如VoiceMeeter，可能需要先切换到物理输出设备，激活驱动后，之后再切换回VM。"
+            + "\n请不要认为虚拟ASIO比WASAPI更好，如果没有声音请尝试重启。",
             "ASIO is testing! "
-            + "\nFor virtual sound cards like VoiceMeeter, you may need to switch to a physical output device first, and then switch back to VM."
-            + "\nPlease don't assume that virtual ASIO like ASIO4All is better than WASAPI, software bridging does not provide true ASIO low latency."
-            + "\nHardware ASIO under wasapi/VM, low latency is still better.");
+            + "\nFor virtual audio drivers like VoiceMeeter, you may need to switch to a physical output device first, activate the driver, and then switch back to VM."
+            + "\nPlease do not assume virtual ASIO is better than WASAPI, and try restarting if there is no sound.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 输出格式（测试）",
-            "ASIO Output Format (Testing)");
+            "ASIO 输出格式（期望值）",
+            "ASIO Output Format (Desired)");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "列表来自系统音频端点或当前 ASIO 驱动报告（与系统声音设置一致），不枚举试探；不支持的组合不会显示。",
-            "Listed formats come from the OS audio endpoint or active ASIO driver report (matching system sound settings), without rate probing; unsupported combinations are omitted.");
+            "选项由系统或 ASIO 驱动提供，显示与系统声音设置一致，但驱动可能不会接受所选值。"
+            + "\n数值越高延迟越高，推荐48000Hz，次选441000Hz。",
+            "Options are provided by the system or the ASIO driver, shown consistent with the system sound settings, but the driver may not accept the selected value."
+            + "\nHigher values mean higher latency, 48000Hz is recommended, followed by 44100Hz.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 缓冲区大小（测试）",
-            "ASIO Buffer Size (Testing)");
+            "ASIO 缓冲区大小（期望值）",
+            "ASIO Buffer Size (Desired)");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "数值越低延迟越低，但过低可能会导致爆音或无法启动。默认为 128。",
-            "Lower is lower latency, but too low may crackle or fail to start. Default is 128.");
+            "选项由系统或 ASIO 驱动提供，显示与系统声音设置一致，但驱动可能不会接受所选值。"
+            + "\n数值越低延迟越低，但过低可能会导致爆音或无法启动。默认为 128。",
+            "Options are provided by the system or the ASIO driver, shown consistent with the system sound settings, but the driver may not accept the selected value."
+            + "\nLower values mean lower latency, but too low may cause crackling or failure to start. Default is 128.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_PASSTHROUGH_LABEL = new EzLocalizationManager.EzLocalisableString(
             "ASIO 直通（原生格式）",
@@ -227,6 +229,10 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_PASSTHROUGH_HINT = new EzLocalizationManager.EzLocalisableString(
             "开启后绕过采样率/位深设置，完全使用驱动当前原生输出格式。关闭后按上方输出格式设置进行播放。",
             "When enabled, bypasses sample-rate/bit-depth output settings and uses the driver's current native output format. When disabled, playback follows the output format settings above.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ASIO_OUTPUT_UNAVAILABLE_NOTIFICATION = new EzLocalizationManager.EzLocalisableString(
+            "ASIO 输出未能启动，当前没有声音。请尝试重启游戏；若仍失败，请关闭占用该 ASIO 驱动的其他程序，或切换到其他音频设备。",
+            "ASIO output failed to start; there is no audio. Try restarting the game. If it still fails, close other apps using this ASIO driver or switch to another audio device.");
 
         #endregion
 
