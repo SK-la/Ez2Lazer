@@ -11,7 +11,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods
 {
     /// <summary>
     /// Centralised mod incompatibility declarations for Ez mania mods.
-    /// Keeps <see cref="TestSceneModValidity"/>'s two-way incompatibility checks satisfied.
     /// </summary>
     internal static class EzManiaModCompatibility
     {
