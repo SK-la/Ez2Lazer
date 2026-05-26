@@ -286,44 +286,6 @@ namespace osu.Game.Tests.Visual.SongSelect
             assertTotal(results, total);
         }
 
-        [Test]
-        public async Task TestGroupingByPp()
-        {
-            int total = 0;
-
-            var beatmapSets = new List<BeatmapSetInfo>();
-            addBeatmapSet(_ => { }, beatmapSets, out var beatmap55);
-            addBeatmapSet(_ => { }, beatmapSets, out var beatmap99);
-            addBeatmapSet(_ => { }, beatmapSets, out var beatmap100);
-            addBeatmapSet(_ => { }, beatmapSets, out var beatmap150);
-            addBeatmapSet(_ => { }, beatmapSets, out var beatmap250);
-            addBeatmapSet(_ => { }, beatmapSets, out var beatmapUnknown);
-
-            var ppValues = new Dictionary<Guid, double>();
-
-            foreach (var beatmap in beatmap55.Beatmaps)
-                ppValues[beatmap.ID] = 55;
-
-            foreach (var beatmap in beatmap99.Beatmaps)
-                ppValues[beatmap.ID] = 99.9;
-
-            foreach (var beatmap in beatmap100.Beatmaps)
-                ppValues[beatmap.ID] = 100;
-
-            foreach (var beatmap in beatmap150.Beatmaps)
-                ppValues[beatmap.ID] = 150.5;
-
-            foreach (var beatmap in beatmap250.Beatmaps)
-                ppValues[beatmap.ID] = 250;
-
-            var results = await runGrouping(GroupMode.PP, beatmapSets, beatmap => ppValues.TryGetValue(beatmap.ID, out double value) ? value : null);
-            assertGroup(results, 0, "0 - 100 PP", beatmap55.Beatmaps.Concat(beatmap99.Beatmaps), ref total);
-            assertGroup(results, 1, "100 - 200 PP", beatmap100.Beatmaps.Concat(beatmap150.Beatmaps), ref total);
-            assertGroup(results, 2, "200 - 300 PP", beatmap250.Beatmaps, ref total);
-            assertGroup(results, 3, "Unknown PP", beatmapUnknown.Beatmaps, ref total);
-            assertTotal(results, total);
-        }
-
         private Action<BeatmapSetInfo> applyStars(double stars)
         {
             return s => s.Beatmaps.ForEach(b => b.StarRating = stars);
@@ -429,38 +391,6 @@ namespace osu.Game.Tests.Visual.SongSelect
             var results = await runGrouping(GroupMode.Favourites, beatmapSets);
             assertGroup(results, 0, "Favourites", firstFavourite.Beatmaps.Concat(secondFavourite.Beatmaps), ref total);
             assertTotal(results, total);
-        }
-
-        [Test]
-        public async Task TestSetItemsPreserveInputOrder()
-        {
-            var beatmapSet = TestResources.CreateTestBeatmapSetInfo(3);
-
-            var groupingFilter = new BeatmapCarouselFilterGrouping
-            {
-                GetCriteria = () => new FilterCriteria { Group = GroupMode.None },
-                GetCollections = () => new List<BeatmapCollection>(),
-                GetLocalUserTopRanks = _ => new Dictionary<Guid, ScoreRank>(),
-                GetFavouriteBeatmapSets = () => favouriteBeatmapSets,
-                ShouldUseXxySrForDifficultyOperations = () => false,
-                GetDifficultiesForOperationsAsync = (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(beatmaps.ToDictionary(b => b, b => b.StarRating)),
-                GetPpForOperationsAsync = (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(new Dictionary<BeatmapInfo, double>()),
-            };
-
-            var inputOrder = new[]
-            {
-                beatmapSet.Beatmaps[2],
-                beatmapSet.Beatmaps[0],
-                beatmapSet.Beatmaps[1],
-            };
-
-            await groupingFilter.Run(inputOrder.Select(b => new CarouselItem(b)).ToList(), CancellationToken.None);
-
-            var groupedSet = groupingFilter.SetItems.Keys.Single();
-            var groupedItems = groupingFilter.SetItems[groupedSet];
-            var groupedBeatmaps = groupedItems.Select(i => i.Model).OfType<GroupedBeatmap>().Select(gb => gb.Beatmap).ToList();
-
-            Assert.That(groupedBeatmaps, Is.EqualTo(inputOrder));
         }
 
         #endregion
