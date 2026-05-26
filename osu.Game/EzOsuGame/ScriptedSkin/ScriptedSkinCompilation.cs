@@ -7,6 +7,9 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Graphics;
@@ -72,6 +75,29 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         private static readonly Lazy<ScriptOptions> script_options = new Lazy<ScriptOptions>(buildScriptOptions);
 
         public static ScriptOptions Options => script_options.Value;
+
+        /// <summary>
+        /// 为脚本源码启用可空引用类型上下文，避免覆盖带 <c>?</c> 签名的 API 时出现 CS8632。
+        /// </summary>
+        public static string PrepareScriptSource(string scriptCode)
+        {
+            if (scriptCode.Contains("#nullable", StringComparison.Ordinal))
+                return scriptCode;
+
+            return "#nullable enable\n" + scriptCode;
+        }
+
+        public static Script CreateScript(string scriptCode) => CSharpScript.Create(PrepareScriptSource(scriptCode), Options);
+
+        public static Compilation ApplyCompilationDefaults(Compilation compilation)
+        {
+            if (compilation is not CSharpCompilation csharpCompilation)
+                return compilation;
+
+            var options = (CSharpCompilationOptions)csharpCompilation.Options;
+
+            return csharpCompilation.WithOptions(options.WithNullableContextOptions(NullableContextOptions.Enable));
+        }
 
         public static IReadOnlyCollection<string> AllowedAssemblyNames { get; } = buildAllowedAssemblyNames();
 

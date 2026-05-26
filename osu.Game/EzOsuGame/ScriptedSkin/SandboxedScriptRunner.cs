@@ -9,7 +9,6 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
@@ -91,11 +90,11 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
 
             try
             {
-                // 创建脚本对象
-                var script = CSharpScript.Create(scriptCode, ScriptedSkinCompilation.Options);
+                // 创建脚本对象（启用 nullable 上下文，与 Skin API 的可空签名一致）
+                var script = ScriptedSkinCompilation.CreateScript(scriptCode);
 
                 // 获取编译结果并检查错误
-                var compilation = script.GetCompilation();
+                var compilation = ScriptedSkinCompilation.ApplyCompilationDefaults(script.GetCompilation());
                 var diagnostics = compilation.GetDiagnostics();
 
                 var errors = diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
@@ -320,8 +319,8 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
 
             try
             {
-                var script = CSharpScript.Create(scriptCode, ScriptedSkinCompilation.Options);
-                var compilation = script.GetCompilation();
+                var script = ScriptedSkinCompilation.CreateScript(scriptCode);
+                var compilation = ScriptedSkinCompilation.ApplyCompilationDefaults(script.GetCompilation());
                 var diagnostics = compilation.GetDiagnostics();
 
                 var errors = diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToList();

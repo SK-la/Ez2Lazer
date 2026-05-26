@@ -4,7 +4,9 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
 using Moq;
 using NUnit.Framework;
 using osu.Framework.Graphics.Rendering.Dummy;
@@ -54,6 +56,22 @@ namespace osu.Game.Tests.Skins
 
             Assert.That(info, Is.Not.Null);
             Assert.That(info!.Name, Is.EqualTo("TestScriptedSkin"));
+        }
+
+        [Test]
+        public void TestMainScriptDoesNotEmitNullableAnnotationWarnings()
+        {
+            string scriptPath = Path.Combine(fixtureDirectory, "TestScriptedSkin.csx");
+            string scriptCode = File.ReadAllText(scriptPath);
+
+            var script = ScriptedSkinCompilation.CreateScript(scriptCode);
+            var compilation = ScriptedSkinCompilation.ApplyCompilationDefaults(script.GetCompilation());
+
+            var nullableWarnings = compilation.GetDiagnostics()
+                                              .Where(d => d.Severity == DiagnosticSeverity.Warning && d.Id == "CS8632")
+                                              .ToList();
+
+            Assert.That(nullableWarnings, Is.Empty, () => string.Join(Environment.NewLine, nullableWarnings.Select(w => w.GetMessage())));
         }
 
         [Test]
