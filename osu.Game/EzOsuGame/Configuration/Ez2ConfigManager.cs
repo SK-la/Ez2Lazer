@@ -114,6 +114,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.AsioSampleRate, 48000);
             SetDefault(Ez2Setting.AsioBitDepth, 24);
             SetDefault(Ez2Setting.AsioBufferSize, 128);
+            SetDefault(Ez2Setting.AsioPassThrough, false);
 
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
             SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
@@ -776,6 +777,7 @@ namespace osu.Game.EzOsuGame.Configuration
         AsioSampleRate,
         AsioBitDepth,
         AsioBufferSize,
+        AsioPassThrough,
         OffsetPlusMania,
         OffsetPlusNonMania,
         HitObjectLifetimeUsesOwnTime,

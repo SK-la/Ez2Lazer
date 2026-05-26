@@ -220,6 +220,14 @@ namespace osu.Game.EzOsuGame.Localization
             "数值越低延迟越低，但过低可能会导致爆音或无法启动。默认为 128。",
             "Lower is lower latency, but too low may crackle or fail to start. Default is 128.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString ASIO_PASSTHROUGH_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "ASIO 直通（原生格式）",
+            "ASIO Pass-through (Native Format)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ASIO_PASSTHROUGH_HINT = new EzLocalizationManager.EzLocalisableString(
+            "开启后绕过采样率/位深设置，完全使用驱动当前原生输出格式。关闭后按上方输出格式设置进行播放。",
+            "When enabled, bypasses sample-rate/bit-depth output settings and uses the driver's current native output format. When disabled, playback follows the output format settings above.");
+
         #endregion
 
         #region 实验性功能

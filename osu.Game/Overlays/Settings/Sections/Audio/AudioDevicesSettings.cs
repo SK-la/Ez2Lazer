@@ -38,12 +38,16 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         private SettingsItemV2? bufferSizeSettingsItem;
 
         private AudioDeviceDropdown dropdown = null!;
+        private SettingsItemV2? outputDeviceSettingsItem;
 
         private FormCheckBox? legacyAudio;
+        private FormCheckBox? asioPassThrough;
+        private SettingsItemV2? asioPassThroughSettingsItem;
 
         private Bindable<int> configSampleRate = null!;
         private Bindable<int> configBitDepth = null!;
         private Bindable<int> configBufferSize = null!;
+        private Bindable<bool> configAsioPassThrough = null!;
 
         private bool suppressAsioFormatChanges;
 
@@ -53,10 +57,11 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             configSampleRate = ezConfig.GetBindable<int>(Ez2Setting.AsioSampleRate);
             configBitDepth = ezConfig.GetBindable<int>(Ez2Setting.AsioBitDepth);
             configBufferSize = ezConfig.GetBindable<int>(Ez2Setting.AsioBufferSize);
+            configAsioPassThrough = ezConfig.GetBindable<bool>(Ez2Setting.AsioPassThrough);
 
             Children = new Drawable[]
             {
-                new SettingsItemV2(dropdown = new AudioDeviceDropdown
+                outputDeviceSettingsItem = new SettingsItemV2(dropdown = new AudioDeviceDropdown
                 {
                     Caption = AudioSettingsStrings.OutputDevice,
                     HintText = EzSettingsStrings.AUDIO_DEVICE_OUTPUT_HINT,
@@ -101,6 +106,15 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 {
                     Keywords = new[] { "asio", "buffer", "latency" },
                 });
+                Add(asioPassThroughSettingsItem = new SettingsItemV2(asioPassThrough = new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.ASIO_PASSTHROUGH_LABEL,
+                    HintText = EzSettingsStrings.ASIO_PASSTHROUGH_HINT,
+                    Current = configAsioPassThrough,
+                })
+                {
+                    Keywords = new[] { "asio", "passthrough", "native", "format" },
+                });
                 Add(new SettingsItemV2(legacyAudio = new LegacyAudioCheckbox())
                 {
                     Keywords = new[] { "wasapi", "latency", "exclusive", "legacy", "experimental" },
@@ -123,9 +137,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                             configSampleRate.Value = actualSampleRate;
                             configBitDepth.Value = actualBitDepth;
 
-                            // Driver is live on the audio thread — safe to refresh capability lists from cache.
-                            refreshAsioFormatItems(getCurrentDeviceSelection());
-                            refreshAsioBufferItems(getCurrentDeviceSelection());
+                            requestAsioSettingsListRefresh(getCurrentDeviceSelection());
                         }
                         finally
                         {
@@ -181,6 +193,14 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     audio.SetAsioBufferSize(e.NewValue);
                 });
 
+                asioPassThrough!.Current.BindValueChanged(e =>
+                {
+                    Logger.Log($"User set ASIO pass-through to {e.NewValue}", LoggingTarget.Runtime, LogLevel.Debug);
+                    audio.SetAsioPassThrough(e.NewValue);
+                    refreshAsioSettingVisibility(getCurrentDeviceSelection());
+                    updateAudioDeviceStatusNote(getCurrentDeviceSelection());
+                }, true);
+
                 setAsioSettingsVisible(false);
             }
         }
@@ -209,11 +229,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 if (!isAsioSelection(deviceSelection))
                     return;
 
-                if (audio.IsAsioOutputActive())
-                {
-                    refreshAsioFormatItems(deviceSelection);
-                    refreshAsioBufferItems(deviceSelection);
-                }
+                requestAsioSettingsListRefresh(deviceSelection);
+                updateAudioDeviceStatusNote(deviceSelection);
 
                 var format = AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value);
                 ensureDropdownContainsValue(sampleRateDropdown, format);
@@ -247,11 +264,21 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
                 // Do not query/touch the ASIO driver from the UI thread here — that raced audio-thread init and caused silent output.
                 // Lists refresh after audio-thread initialisation via SetupAsioConfigurationSync, or from cache if already running.
-                if (audio.IsAsioOutputActive())
-                {
-                    refreshAsioFormatItems(deviceSelection);
-                    refreshAsioBufferItems(deviceSelection);
-                }
+                requestAsioSettingsListRefresh(deviceSelection);
+                updateAudioDeviceStatusNote(deviceSelection);
+            });
+        }
+
+        private void requestAsioSettingsListRefresh(string deviceSelection)
+        {
+            if (!isAsioSelection(deviceSelection))
+                return;
+
+            audio.RequestAsioSettingsListRefresh(deviceSelection, () =>
+            {
+                refreshAsioFormatItems(deviceSelection);
+                refreshAsioBufferItems(deviceSelection);
+                updateAudioDeviceStatusNote(deviceSelection);
             });
         }
 
@@ -259,13 +286,31 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         {
             if (visible)
             {
-                sampleRateSettingsItem?.Show();
-                bufferSizeSettingsItem?.Show();
+                asioPassThroughSettingsItem?.Show();
+                refreshAsioSettingVisibility(getCurrentDeviceSelection());
             }
             else
             {
                 sampleRateSettingsItem?.Hide();
                 bufferSizeSettingsItem?.Hide();
+                asioPassThroughSettingsItem?.Hide();
+            }
+        }
+
+        private void refreshAsioSettingVisibility(string? deviceSelection)
+        {
+            bool isAsio = isAsioSelection(deviceSelection);
+            bool passThroughEnabled = configAsioPassThrough.Value;
+
+            if (!isAsio || passThroughEnabled)
+            {
+                sampleRateSettingsItem?.Hide();
+                bufferSizeSettingsItem?.Hide();
+            }
+            else
+            {
+                sampleRateSettingsItem?.Show();
+                bufferSizeSettingsItem?.Show();
             }
         }
 
@@ -405,6 +450,26 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                              .Where(i => i.IsNotNull())
                              .Distinct()
                              .ToList();
+        }
+
+        private void updateAudioDeviceStatusNote(string? deviceSelection)
+        {
+            if (outputDeviceSettingsItem == null)
+                return;
+
+            if (!isAsioSelection(deviceSelection))
+            {
+                outputDeviceSettingsItem.Note.Value = null;
+                return;
+            }
+
+            if (!EzAsioDeviceManager.TryParseDeviceSelection(deviceSelection ?? string.Empty, out string asioName))
+            {
+                outputDeviceSettingsItem.Note.Value = null;
+                return;
+            }
+
+            outputDeviceSettingsItem.Note.Value = new SettingsNote.Data(audio.GetAsioStatusNote(asioName).ToDisplayText(), SettingsNote.Type.Informational);
         }
 
         protected override void Dispose(bool isDisposing)

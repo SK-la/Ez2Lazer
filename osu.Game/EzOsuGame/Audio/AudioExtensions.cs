@@ -38,5 +38,19 @@ namespace osu.Game.EzOsuGame.Audio
         }
 
         public static EzAsioFormatOption ToFormatOption(int sampleRate, int bitDepth) => new EzAsioFormatOption(sampleRate, bitDepth);
+
+        /// <summary>
+        /// Refreshes ASIO format/buffer dropdowns after capabilities are read on the audio thread.
+        /// </summary>
+        public static void RequestAsioSettingsListRefresh(this AudioManager audioManager, string deviceSelection, Action refreshLists)
+        {
+            if (!EzAsioDeviceManager.TryParseDeviceSelection(deviceSelection, out string asioName))
+            {
+                refreshLists();
+                return;
+            }
+
+            audioManager.RequestAsioCapabilitiesRefresh(asioName, refreshLists);
+        }
     }
 }
