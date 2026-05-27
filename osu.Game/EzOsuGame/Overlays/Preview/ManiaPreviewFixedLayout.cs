@@ -48,8 +48,9 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                     {
                         int endRow = holdEndRows.TryGetValue(note, out int row) ? row : startRow + 1;
                         endRow = Math.Max(startRow + 1, endRow);
-                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, endRow, ManiaPreviewNoteKind.HoldHead));
-                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow + 1, endRow - 1, ManiaPreviewNoteKind.HoldBody));
+                        // startRow = press (bottom), endRow = release (top).
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, ManiaPreviewNoteKind.HoldHead));
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, endRow, ManiaPreviewNoteKind.HoldBody));
                         entries.Add(new ManiaPreviewLayoutEntry(note.Column, endRow, endRow, ManiaPreviewNoteKind.HoldTail));
                         break;
                     }

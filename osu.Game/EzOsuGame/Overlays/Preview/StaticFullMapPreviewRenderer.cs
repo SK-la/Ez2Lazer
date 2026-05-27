@@ -74,8 +74,8 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             float beatLineThickness = Math.Max(0.5f, rowStep * 0.08f);
 
             ManiaPreviewDrawHelper.AddLaneLines(quads, data.TotalColumns, 0, DrawWidth, DrawHeight, laneLineThickness);
-            ManiaPreviewDrawHelper.AddBeatLines(quads, totalRows, rowStep, 0, DrawWidth, beatLineThickness);
-            ManiaPreviewDrawHelper.AddLayoutEntries(quads, layoutEntries, data.TotalColumns, 0, DrawWidth, rowStep, noteHeight, flatNotes: true);
+            ManiaPreviewDrawHelper.AddBeatLines(quads, totalRows, rowStep, 0, DrawWidth, DrawHeight, beatLineThickness);
+            ManiaPreviewDrawHelper.AddLayoutEntries(quads, layoutEntries, data.TotalColumns, 0, DrawWidth, DrawHeight, rowStep, noteHeight, flatNotes: true);
 
             batchDrawable.SetQuads(quads);
         }

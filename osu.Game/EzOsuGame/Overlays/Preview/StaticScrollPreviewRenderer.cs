@@ -130,8 +130,8 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
                 for (int row = rowStart + ManiaPreviewFixedLayout.ROWS_PER_BEAT; row <= rowEnd; row += ManiaPreviewFixedLayout.ROWS_PER_BEAT)
                 {
-                    float localRow = row - rowStart;
-                    float y = localRow * rowStep - beatLineThickness * 0.5f;
+                    int localRow = row - rowStart;
+                    float y = ManiaPreviewDrawHelper.getSlotBottomY(localRow, rowStep, DrawHeight) - beatLineThickness * 0.5f;
                     quads.Add(new PreviewQuad(panelX, y, columnWidth, beatLineThickness, Color4.White.Opacity(0.2f)));
                 }
             }
@@ -161,6 +161,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                     data.TotalColumns,
                     panelX,
                     columnWidth,
+                    DrawHeight,
                     rowStep,
                     noteHeight,
                     flatNotes: false);

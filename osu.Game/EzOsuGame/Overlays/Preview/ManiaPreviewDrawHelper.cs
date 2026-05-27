@@ -8,6 +8,9 @@ using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Overlays.Preview
 {
+    /// <summary>
+    /// Bottom of the drawable is map start; time progresses upward (mania scroll direction).
+    /// </summary>
     public static class ManiaPreviewDrawHelper
     {
         private static readonly Color4 tap_colour = new Color4(80, 150, 255, 230);
@@ -28,11 +31,11 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             }
         }
 
-        public static void AddBeatLines(List<PreviewQuad> quads, int totalRows, float rowStep, float originX, float width, float thickness)
+        public static void AddBeatLines(List<PreviewQuad> quads, int totalRows, float rowStep, float originX, float width, float height, float thickness)
         {
             for (int row = ManiaPreviewFixedLayout.ROWS_PER_BEAT; row < totalRows; row += ManiaPreviewFixedLayout.ROWS_PER_BEAT)
             {
-                float y = row * rowStep - thickness * 0.5f;
+                float y = getSlotBottomY(row, rowStep, height) - thickness * 0.5f;
                 quads.Add(new PreviewQuad(originX, y, width, thickness, Color4.White.Opacity(0.22f)));
             }
         }
@@ -43,12 +46,14 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             int totalColumns,
             float originX,
             float width,
+            float height,
             float rowStep,
             float noteHeight,
             bool flatNotes)
         {
             float laneWidth = width / Math.Max(1, totalColumns);
             float laneInset = laneWidth * 0.1f;
+            float headHeight = flatNotes ? Math.Max(1f, noteHeight * 0.55f) : noteHeight;
 
             foreach (ManiaPreviewLayoutEntry entry in entries)
             {
@@ -58,26 +63,45 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                 switch (entry.Kind)
                 {
                     case ManiaPreviewNoteKind.Tap:
+                    {
+                        float y = getSlotBottomY(entry.Row, rowStep, height) - headHeight;
+                        quads.Add(new PreviewQuad(x, y, laneW, headHeight, getColour(entry.Kind)));
+                        break;
+                    }
+
                     case ManiaPreviewNoteKind.HoldHead:
+                    {
+                        // Head at bottom of LN (press / start time row).
+                        float y = getSlotBottomY(entry.Row, rowStep, height) - headHeight;
+                        quads.Add(new PreviewQuad(x, y, laneW, headHeight, getColour(entry.Kind)));
+                        break;
+                    }
+
                     case ManiaPreviewNoteKind.HoldTail:
                     {
-                        float y = entry.Row * rowStep;
-                        float h = flatNotes ? Math.Max(1f, noteHeight * 0.55f) : noteHeight;
-                        quads.Add(new PreviewQuad(x, y, laneW, h, getColour(entry.Kind)));
+                        // Tail at top of LN (release / end time row).
+                        float y = getSlotTopY(entry.Row, rowStep, height);
+                        quads.Add(new PreviewQuad(x, y, laneW, headHeight, getColour(entry.Kind)));
                         break;
                     }
 
                     case ManiaPreviewNoteKind.HoldBody:
                     {
-                        float y0 = entry.Row * rowStep + noteHeight * 0.55f;
-                        float y1 = (entry.EndRow + 1) * rowStep;
-                        float h = Math.Max(noteHeight, y1 - y0);
-                        quads.Add(new PreviewQuad(x, y0, laneW, h, getColour(entry.Kind)));
+                        float bodyBottom = getSlotBottomY(entry.Row, rowStep, height) - headHeight;
+                        float bodyTop = getSlotTopY(entry.EndRow, rowStep, height) + headHeight;
+                        float h = Math.Max(headHeight, bodyBottom - bodyTop);
+                        quads.Add(new PreviewQuad(x, bodyTop, laneW, h, getColour(entry.Kind)));
                         break;
                     }
                 }
             }
         }
+
+        /// <summary>Bottom edge of the row slot (map start is at drawable bottom).</summary>
+        public static float getSlotBottomY(int row, float rowStep, float height) => height - row * rowStep;
+
+        /// <summary>Top edge of the row slot.</summary>
+        public static float getSlotTopY(int row, float rowStep, float height) => height - (row + 1) * rowStep;
 
         public static (float rowStep, float noteHeight) ComputeRowMetrics(int totalRows, float availableHeight)
         {
