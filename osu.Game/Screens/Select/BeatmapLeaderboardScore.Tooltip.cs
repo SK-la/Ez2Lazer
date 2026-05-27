@@ -83,8 +83,6 @@ namespace osu.Game.Screens.Select
                 if (lastContent != null && lastContent.Equals(content))
                     return;
 
-                content.HydrateManiaModesFromSession();
-
                 dateAndStatistics.Score = content;
                 modsPanel.Score = content;
                 totalScoreRankPanel.Score = content;

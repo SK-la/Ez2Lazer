@@ -40,7 +40,6 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Overlays;
-using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
@@ -910,7 +909,6 @@ namespace osu.Game
                         break;
 
                     case ScorePresentType.Results:
-                        databasedScore.ScoreInfo.HydrateManiaModesFromSession();
                         screen.Push(new SoloResultsScreen(databasedScore.ScoreInfo));
                         break;
                 }

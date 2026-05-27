@@ -29,40 +29,8 @@ namespace osu.Game.EzOsuGame.Scoring
                    && score.ManiaHealthMode >= 0;
         }
 
-        public static void HydrateManiaModesFromSession(this ScoreInfo score)
-        {
-            if (score.Ruleset.OnlineID != 3)
-                return;
-
-            if (score.ManiaHitMode >= 0 && score.ManiaHealthMode >= 0)
-                return;
-
-            if (score.ID != Guid.Empty
-                && EzManiaScoreModeSessionCache.TryGet(score.ID, out int hitMode, out int healthMode))
-            {
-                score.ManiaHitMode = hitMode;
-                score.ManiaHealthMode = healthMode;
-            }
-        }
-
-        public static void StoreManiaModesInSession(this ScoreInfo score)
-        {
-            if (score.Ruleset.OnlineID != 3)
-                return;
-
-            if (score.ManiaHitMode < 0 || score.ManiaHealthMode < 0)
-                return;
-
-            if (score.ID == Guid.Empty)
-                return;
-
-            EzManiaScoreModeSessionCache.Store(score.ID, score.ManiaHitMode, score.ManiaHealthMode);
-        }
-
         public static bool TryGetManiaGameplayModes(this ScoreInfo score, out int hitMode, out int healthMode)
         {
-            score.HydrateManiaModesFromSession();
-
             hitMode = score.ManiaHitMode;
             healthMode = score.ManiaHealthMode;
 
