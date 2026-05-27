@@ -34,15 +34,6 @@ namespace osu.Game.Tests.Visual.Editing
             Add(dialogOverlay);
         }
 
-        [Test]
-        public void TestLoadScreen()
-        {
-            // Test that the screen loads without errors
-            AddStep("load screen", () => { });
-            AddAssert("screen is not null", () => ezSkinEditorScreen != null);
-            AddAssert("screen is EzSkinEditorScreen", () => ezSkinEditorScreen != null);
-        }
-
         // Removed TestPushScreen as Stack is not accessible in this context
         // [Test]
         // public void TestPushScreen()

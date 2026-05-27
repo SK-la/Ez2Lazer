@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
+using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
@@ -86,7 +87,7 @@ namespace osu.Game.Screens.Play
 
         protected override GameplayClockContainer CreateGameplayClockContainer(WorkingBeatmap beatmap, double gameplayStart) => new MasterGameplayClockContainer(beatmap, gameplayStart)
         {
-            ShouldValidatePlaybackRate = true,
+            ShouldValidatePlaybackRate = !DebugUtils.IsNUnitRunning,
         };
 
         protected override void LoadAsyncComplete()

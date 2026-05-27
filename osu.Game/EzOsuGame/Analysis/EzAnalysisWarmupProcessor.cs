@@ -91,6 +91,14 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private void onSqliteEnabledChanged(bool enabled)
         {
+            if (DebugUtils.IsNUnitRunning)
+            {
+                sqliteEnabled = false;
+                pendingScanCompleted = false;
+                cancelPendingBeatmapProcessing();
+                return;
+            }
+
             sqliteEnabled = enabled;
 
             if (enabled)
