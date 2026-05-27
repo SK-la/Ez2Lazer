@@ -32,6 +32,11 @@ namespace osu.Game.Screens.Select.Filter
         [LocalisableDescription(typeof(SongSelectStrings), nameof(SongSelectStrings.Difficulty))]
         Difficulty,
 
+        /// <summary>
+        /// Ez: group by <see cref="Beatmaps.BeatmapInfo.XxyStarRating"/> from Realm (baseline, no mod).
+        /// </summary>
+        XxyStarRating,
+
         PP,
 
         [LocalisableDescription(typeof(SongSelectStrings), nameof(SongSelectStrings.Favourites))]

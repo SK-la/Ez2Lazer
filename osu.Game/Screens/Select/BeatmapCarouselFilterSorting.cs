@@ -18,16 +18,14 @@ namespace osu.Game.Screens.Select
         public int BeatmapItemsCount { get; private set; }
 
         private readonly Func<FilterCriteria> getCriteria;
-        private readonly Func<bool> shouldUseXxySrForDifficultyOperations;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getPpForOperationsAsync;
 
-        public BeatmapCarouselFilterSorting(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations,
+        public BeatmapCarouselFilterSorting(Func<FilterCriteria> getCriteria,
                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync,
                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>>? getPpForOperationsAsync = null)
         {
             this.getCriteria = getCriteria;
-            this.shouldUseXxySrForDifficultyOperations = shouldUseXxySrForDifficultyOperations;
             this.getDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync;
             this.getPpForOperationsAsync = getPpForOperationsAsync ?? ((_, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(new Dictionary<BeatmapInfo, double>()));
         }
@@ -38,11 +36,10 @@ namespace osu.Game.Screens.Select
             var itemList = items.ToList();
 
             bool groupedSets = BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
-            bool useXxyDifficultyValues = shouldUseXxySrForDifficultyOperations()
-                                          && (criteria.Sort == SortMode.Difficulty || groupedSets);
+            bool useXxySort = criteria.Sort == SortMode.XxyStarRating;
             bool usePpValues = criteria.Sort == SortMode.PP;
             bool useSortOperationValues = itemList.Count > 1
-                                          && (useXxyDifficultyValues || usePpValues);
+                                          && (useXxySort || usePpValues);
 
             IReadOnlyDictionary<BeatmapInfo, double>? operationSortValues = null;
 
@@ -59,7 +56,13 @@ namespace osu.Game.Screens.Select
                 if (operationSortValues != null && operationSortValues.TryGetValue(beatmap, out double sortValue))
                     return sortValue;
 
-                return criteria.Sort == SortMode.PP ? 0 : beatmap.StarRating;
+                if (criteria.Sort == SortMode.PP)
+                    return 0;
+
+                if (criteria.Sort == SortMode.XxyStarRating)
+                    return beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : beatmap.StarRating;
+
+                return beatmap.StarRating;
             }
 
             BeatmapItemsCount = itemList.Count;
@@ -107,6 +110,7 @@ namespace osu.Game.Screens.Select
                     break;
 
                 case SortMode.Difficulty:
+                case SortMode.XxyStarRating:
                     comparison = getSortValue(a).CompareTo(getSortValue(b));
                     break;
 

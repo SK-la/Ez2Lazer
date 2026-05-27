@@ -306,12 +306,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 foreach (var beatmap in beatmapList)
                 {
-                    if (pendingWrites.TryGetValue(beatmap.ID, out var pending)
-                        && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
+                    if (beatmap.XxyStarRating >= 0)
                     {
-                        if (pending.Analysis.ManiaSummary?.XxySr is double pendingXxySr)
-                            resolvedValues[beatmap.ID] = pendingXxySr;
-
+                        resolvedValues[beatmap.ID] = beatmap.XxyStarRating;
                         continue;
                     }
 
@@ -657,22 +654,8 @@ LIMIT 1;
             var computedCommonSummary = computed.CommonSummary;
             var storedManiaSummary = stored.ManiaSummary;
             var computedManiaSummary = computed.ManiaSummary;
-            double? storedXxySr = storedManiaSummary?.XxySr;
-            double? computedXxySr = computedManiaSummary?.XxySr;
             double? storedPp = stored.Pp;
             double? computedPp = computed.Pp;
-
-            // 检查 xxysr 差异（最重要）
-            // 如果 stored 是 null 而 computed 有值，必须更新
-            if (!storedXxySr.HasValue && computedXxySr.HasValue)
-                return true;
-
-            // 如果都有值，比较数值是否相同
-            if (storedXxySr.HasValue && computedXxySr.HasValue)
-            {
-                if (!storedXxySr.Value.Equals(computedXxySr.Value))
-                    return true;
-            }
 
             if (!storedPp.HasValue && computedPp.HasValue)
                 return true;
@@ -2321,6 +2304,7 @@ WHERE {col_beatmap_id} = $id;
 
             long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             string kpsListJson = JsonSerializer.Serialize(commonSummary.Value.KpsList);
+
             using (var entry = connection.CreateCommand())
             {
                 entry.Transaction = transaction;
@@ -2418,7 +2402,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
 ";
                 mania.Parameters.AddWithValue("$id", beatmap.ID.ToString());
                 mania.Parameters.AddWithValue("$updated_at", now);
-                mania.Parameters.AddWithValue("$xxy", maniaSummary.Value.XxySr is double xxySr ? xxySr : DBNull.Value);
+                mania.Parameters.AddWithValue("$xxy", DBNull.Value);
                 mania.Parameters.AddWithValue("$column_counts_json", columnCountsJson);
                 mania.Parameters.AddWithValue("$hold_note_counts_json", holdNoteCountsJson);
                 mania.ExecuteNonQuery();

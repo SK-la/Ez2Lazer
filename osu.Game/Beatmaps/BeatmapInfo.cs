@@ -95,6 +95,11 @@ namespace osu.Game.Beatmaps
         public double StarRating { get; set; } = -1;
 
         /// <summary>
+        /// Ez2Lazer: Baseline mania xxy star rating (no mods). Defaults to -1 (not yet calculated). Populated by <see cref="BeatmapUpdater"/>.
+        /// </summary>
+        public double XxyStarRating { get; set; } = -1;
+
+        /// <summary>
         /// Ez2Lazer: Whether the beatmap set's storyboard file contains a video event. Populated by <see cref="BeatmapUpdater"/>.
         /// </summary>
         public bool HasVideo { get; set; }

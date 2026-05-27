@@ -147,7 +147,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (analysisBeatmap.HitObjects.Count == 0)
                 return false;
 
-            if (lookup.Ruleset.OnlineID != 3)
+            if (!EzXxyStarRatingSupport.SupportsBeatmap(analysisBeatmap, lookup.Ruleset))
                 return false;
 
             double rate = getRateAdjustMultiplier(lookup.OrderedMods);
