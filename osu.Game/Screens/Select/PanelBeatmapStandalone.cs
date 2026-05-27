@@ -307,13 +307,7 @@ namespace osu.Game.Screens.Select
 
             var beatmapSet = beatmap.BeatmapSet!;
 
-            scheduledBackgroundRetrieval = Scheduler.AddDelayed(b =>
-            {
-                var workingBeatmap = beatmaps.GetWorkingBeatmap(b);
-                beatmapBackground.Beatmap = workingBeatmap;
-                ezDisplayTag.TagSummary = null;
-                ezDisplayTag.Working = workingBeatmap;
-            }, beatmap, 50);
+            scheduledBackgroundRetrieval = Scheduler.AddDelayed(b => beatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(b), beatmap, 50);
 
             titleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
             artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
@@ -331,6 +325,7 @@ namespace osu.Game.Screens.Select
             spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
 
+            ezDisplayTag.Beatmap = beatmap;
             computeEzAnalysis();
         }
 
@@ -384,8 +379,7 @@ namespace osu.Game.Screens.Select
             if (!resetDisplay)
                 return;
 
-            ezDisplayTag.Working = null;
-            ezDisplayTag.TagSummary = null;
+            ezDisplayTag.Beatmap = null;
             scratchText = null;
 
             displaySR.Current.Value = EzManiaSummary.EMPTY;
@@ -399,9 +393,6 @@ namespace osu.Game.Screens.Select
             IReadOnlyList<double> kpsList = ezAnalysisResult.KpsList;
             ezDisplayKps.SetKps(ezAnalysisResult.Pp, avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
-
-            if (ezAnalysisEnabled && ezAnalysisResult.TagSummary != null)
-                ezDisplayTag.TagSummary = ezAnalysisResult.TagSummary;
 
             if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
             {

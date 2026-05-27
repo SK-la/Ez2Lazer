@@ -94,6 +94,16 @@ namespace osu.Game.Beatmaps
         /// </summary>
         public double StarRating { get; set; } = -1;
 
+        /// <summary>
+        /// Ez2Lazer: Whether the beatmap set's storyboard file contains a video event. Populated by <see cref="BeatmapUpdater"/>.
+        /// </summary>
+        public bool HasVideo { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: Whether the beatmap set's storyboard file contains sprite/animation events. Populated by <see cref="BeatmapUpdater"/>.
+        /// </summary>
+        public bool HasStoryboard { get; set; }
+
         [Indexed]
         public string MD5Hash { get; set; } = string.Empty;
 

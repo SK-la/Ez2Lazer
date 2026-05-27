@@ -530,12 +530,9 @@ WHERE entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID} IN ({string.Join(", ", para
                     return;
                 }
 
-                if (analysis.TagSummary == null && storedAnalysis.TagSummary != null)
-                    analysis = analysis.WithTagSummary(storedAnalysis.TagSummary);
-
                 // 对比两个结果是否有差异
-                MissingDataKind filledMissingData = GetMissingData(storedAnalysis, beatmap.Ruleset.OnlineID, requireTagData: true) &
-                                                    ~GetMissingData(analysis, beatmap.Ruleset.OnlineID, requireTagData: true);
+                MissingDataKind filledMissingData = GetMissingData(storedAnalysis, beatmap.Ruleset.OnlineID, requireTagData: false) &
+                                                    ~GetMissingData(analysis, beatmap.Ruleset.OnlineID, requireTagData: false);
 
                 if (filledMissingData != MissingDataKind.None || hasDifference(storedAnalysis, analysis))
                 {
@@ -719,9 +716,6 @@ LIMIT 1;
                     return true;
             }
 
-            if (stored.TagSummary != computed.TagSummary)
-                return true;
-
             return false;
         }
 
@@ -780,7 +774,7 @@ LIMIT 1;
                 ? existingAnalysis
                 : null;
 
-            return GetMissingData(storedAnalysis, beatmap.Ruleset.OnlineID, requireTagData: true) != MissingDataKind.None;
+            return GetMissingData(storedAnalysis, beatmap.Ruleset.OnlineID, requireTagData: false) != MissingDataKind.None;
         }
 
         public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash, int rulesetOnlineId)> beatmaps) => GetBeatmapsNeedingRecompute(beatmaps, progress: null);
@@ -864,7 +858,7 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
                         continue;
                     }
 
-                    MissingDataKind missingData = getMissingData(row.commonUpdatedAt, row.tagUpdatedAt, row.hasPp, maniaUpdated.Contains(id), rulesetOnlineId, requireTagData: true);
+                    MissingDataKind missingData = getMissingData(row.commonUpdatedAt, row.tagUpdatedAt, row.hasPp, maniaUpdated.Contains(id), rulesetOnlineId, requireTagData: false);
 
                     if (!string.Equals(row.hash, hash, StringComparison.Ordinal)
                         || row.rulesetOnlineId != rulesetOnlineId
@@ -2327,8 +2321,6 @@ WHERE {col_beatmap_id} = $id;
 
             long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             string kpsListJson = JsonSerializer.Serialize(commonSummary.Value.KpsList);
-            string tagPayloadJson = serializeTagSummary(analysis.TagSummary);
-
             using (var entry = connection.CreateCommand())
             {
                 entry.Transaction = transaction;
@@ -2380,8 +2372,8 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
                 entry.Parameters.AddWithValue("$max", analysis.MaxKps);
                 entry.Parameters.AddWithValue("$kps", kpsListJson);
                 entry.Parameters.AddWithValue("$pp", analysis.Pp is double pp ? pp : DBNull.Value);
-                entry.Parameters.AddWithValue("$tag_updated_at", analysis.TagSummary != null ? now : 0);
-                entry.Parameters.AddWithValue("$tag_payload_json", tagPayloadJson);
+                entry.Parameters.AddWithValue("$tag_updated_at", 0);
+                entry.Parameters.AddWithValue("$tag_payload_json", string.Empty);
                 entry.ExecuteNonQuery();
             }
 
@@ -2434,9 +2426,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
         }
 
         private static EzAnalysisResult mergeAnalysisResult(EzAnalysisResult storedAnalysis, EzAnalysisResult computedAnalysis)
-            => computedAnalysis.TagSummary == null
-                ? computedAnalysis.WithTagSummary(storedAnalysis.TagSummary)
-                : computedAnalysis;
+            => computedAnalysis;
 
         internal static MissingDataKind GetMissingData(EzAnalysisResult? storedAnalysis, int rulesetOnlineId, bool requireTagData)
         {

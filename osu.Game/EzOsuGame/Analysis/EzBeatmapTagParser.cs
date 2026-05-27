@@ -14,7 +14,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// 轻量读取谱面中的视频与故事板标记。
     /// 只扫描事件文本，不触发完整 storyboard 对象解码。
     /// </summary>
-    internal static class EzBeatmapTagParser
+    public static class EzBeatmapTagParser
     {
         public static EzBeatmapTagSummary Parse(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo)
             => Parse(beatmapManager.GetWorkingBeatmap(beatmapInfo));

@@ -318,7 +318,7 @@ namespace osu.Game.EzOsuGame.Analysis
                         try
                         {
                             using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, pendingBeatmapRecomputeCancellationSource.Token);
-                            recomputePendingBeatmap(beatmapId, includeTagData: true, skipExistingComparison: true, linkedCancellation.Token, "startup warmup");
+                            recomputePendingBeatmap(beatmapId, includeTagData: false, skipExistingComparison: true, linkedCancellation.Token, "startup warmup");
                         }
                         catch (ObjectDisposedException)
                         {
@@ -358,7 +358,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     if (beatmapId.HasValue)
                     {
                         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, pendingBeatmapRecomputeCancellationSource.Token);
-                        recomputePendingBeatmap(beatmapId.Value, includeTagData: true, skipExistingComparison: false, linkedCancellation.Token, "selected-beatmap warmup");
+                        recomputePendingBeatmap(beatmapId.Value, includeTagData: false, skipExistingComparison: false, linkedCancellation.Token, "selected-beatmap warmup");
                     }
                 }
             }
