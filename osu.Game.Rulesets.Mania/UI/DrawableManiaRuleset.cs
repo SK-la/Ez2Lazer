@@ -91,6 +91,9 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
 
+        [Resolved(canBeNull: true)]
+        private GameplayState? gameplayState { get; set; }
+
         private readonly Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
         private EzEnumHitMode gameplayHitMode;
         private bool suppressHitModeRevert;
@@ -185,8 +188,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
             hitModeBindable.BindValueChanged(h =>
             {
+                // 仅在“本局本地游玩尚未完成”期间锁定 HitMode，避免中途更改破坏一致性。
+                // 结算/回放/分析等非活跃本地游玩场景应允许改动，不要回退全局设置值。
+                bool lockHitModeForThisSession = ReplayScore == null && gameplayState?.HasCompleted == false;
+
                 // 游戏中途修改判定模式将回退到开局时的设置
-                if (h.NewValue != gameplayHitMode)
+                if (lockHitModeForThisSession && h.NewValue != gameplayHitMode)
                 {
                     if (suppressHitModeRevert)
                         return;
