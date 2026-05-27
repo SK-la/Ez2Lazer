@@ -76,8 +76,6 @@ namespace osu.Game.Database
 
         private LocalCachedBeatmapMetadataSource localMetadataSource = null!;
 
-        private const int max_beatmap_backfill_items_per_pass = 300;
-
         protected virtual int TimeToSleepDuringGameplay => 30000;
 
         protected override void LoadComplete()
@@ -91,10 +89,10 @@ namespace osu.Game.Database
                 Logger.Log("Beginning background data store processing..");
 
                 clearOutdatedStarRatings();
-                populateMissingBeatmapTagFlags();
-                populateMissingStarRatings();
                 populateMissingXxyStarRatings();
+                populateMissingStarRatings();
                 populateMissingPerformancePoints();
+                populateMissingBeatmapTagFlags();
                 processOnlineBeatmapSetsWithNoUpdate();
                 // Note that the previous method will also update these on a fresh run.
                 processBeatmapsWithMissingObjectCounts();
@@ -165,12 +163,7 @@ namespace osu.Game.Database
             realmAccess.Run(r =>
             {
                 foreach (var b in r.All<BeatmapInfo>().Where(b => b.StarRating < 0 && b.BeatmapSet != null))
-                {
                     beatmapIds.Add(b.ID);
-
-                    if (beatmapIds.Count >= max_beatmap_backfill_items_per_pass)
-                        break;
-                }
             });
 
             if (beatmapIds.Count == 0)
@@ -251,12 +244,7 @@ namespace osu.Game.Database
             realmAccess.Run(r =>
             {
                 foreach (var b in r.All<BeatmapInfo>().Where(b => b.XxyStarRating < 0 && b.BeatmapSet != null && EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset)))
-                {
                     beatmapIds.Add(b.ID);
-
-                    if (beatmapIds.Count >= max_beatmap_backfill_items_per_pass)
-                        break;
-                }
             });
 
             if (beatmapIds.Count == 0)
@@ -321,12 +309,7 @@ namespace osu.Game.Database
             realmAccess.Run(r =>
             {
                 foreach (var beatmap in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && (b.HasVideo == null || b.HasStoryboard == null)))
-                {
                     beatmapIds.Add(beatmap.ID);
-
-                    if (beatmapIds.Count >= max_beatmap_backfill_items_per_pass)
-                        break;
-                }
             });
 
             if (beatmapIds.Count == 0)
@@ -395,12 +378,7 @@ namespace osu.Game.Database
             realmAccess.Run(r =>
             {
                 foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && b.PerformancePoints < 0))
-                {
                     beatmapIds.Add(b.ID);
-
-                    if (beatmapIds.Count >= max_beatmap_backfill_items_per_pass)
-                        break;
-                }
             });
 
             if (beatmapIds.Count == 0)
@@ -1123,9 +1101,6 @@ namespace osu.Game.Database
         private ProgressNotification? showProgressNotification(int totalCount, string running, string completed)
         {
             if (notificationOverlay == null)
-                return null;
-
-            if (totalCount < 10)
                 return null;
 
             ProgressNotification notification = new ProgressNotification
