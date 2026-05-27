@@ -4,6 +4,8 @@
 using System;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
+using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Framework.Graphics.Sprites;
@@ -29,7 +31,13 @@ namespace osu.Game.Rulesets.Mania.Mods
 
         public override ModType Type => ModType.Conversion;
 
-        public override Type[] IncompatibleMods => new[] { typeof(ManiaModInvert), typeof(ManiaModNoRelease) };
+        public override Type[] IncompatibleMods => new[]
+        {
+            typeof(ManiaModInvert),
+            typeof(ManiaModNoRelease),
+            typeof(ManiaModSpaceBody),
+            typeof(ManiaModReleaseAdjust),
+        };
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {

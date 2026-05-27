@@ -48,12 +48,7 @@ namespace osu.Game.EzOsuGame.Mods
 
         public bool RestartOnFail => false;
 
-        public override Type[] IncompatibleMods => new[]
-        {
-            typeof(ModTimeRamp),
-            typeof(ModAdaptiveSpeed),
-            typeof(ModNoFail),
-        };
+        public override Type[] IncompatibleMods => Array.Empty<Type>();
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {

@@ -13,7 +13,6 @@ using osu.Game.Beatmaps.Timing;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
@@ -66,13 +65,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override Type[] IncompatibleMods => new[]
         {
-            typeof(ManiaModHalfTime),
-            typeof(ManiaModDoubleTime),
-            typeof(ManiaModDaycore),
-            typeof(ManiaModNightcore),
-            typeof(ManiaModAdjust),
-            typeof(ManiaModNiceBPM),
-            typeof(ManiaModAutoplay),
+            typeof(IManiaRateAdjustmentMod),
         };
 
         [SettingSource("Initial rate", "The starting speed of the track.", SettingControlType = typeof(MultiplierSettingsSlider))]
