@@ -75,6 +75,9 @@ namespace osu.Game.Online.API
         {
             request.AttachAPI(this);
 
+            if (IsLocalOnly)
+                return;
+
             Schedule(() =>
             {
                 if (HandleRequest?.Invoke(request) != true)
@@ -96,6 +99,10 @@ namespace osu.Game.Online.API
         public void Perform(APIRequest request)
         {
             request.AttachAPI(this);
+
+            if (IsLocalOnly)
+                return;
+
             HandleRequest?.Invoke(request);
         }
 

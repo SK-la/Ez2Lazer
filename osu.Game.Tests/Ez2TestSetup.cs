@@ -12,8 +12,9 @@ namespace osu.Game.Tests
         [OneTimeSetUp]
         public void GlobalSetup()
         {
-            GlobalConfigStore.EnsureInitialized();
+            var ezConfig = GlobalConfigStore.EnsureInitialized();
             GlobalConfigStore.UseDevelopmentEndpointsForTests = true;
+            ezConfig.SetValue(Ez2Setting.ExperimentalLocalAccount, false);
         }
     }
 }

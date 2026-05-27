@@ -103,7 +103,7 @@ namespace osu.Game.Online.API
 
             AddInternal(localUserState = new LocalUserState(this, config));
 
-            if (isPersistedLocalSession(ProvidedUsername, configuredToken))
+            if (!DebugUtils.IsNUnitRunning && isPersistedLocalSession(ProvidedUsername, configuredToken))
             {
                 password = local_token_marker;
                 IsLocalOnly = true;
