@@ -78,54 +78,18 @@ namespace osu.Game.EzOsuGame.Analysis
         private const string xxy_sr_branch_kind = "xxy_sr_branch";
         private const int xxy_sr_branch_schema_version = 2;
 
-        // 兼容策略：v3 及以前版本不考虑就地兼容。只有 v4（及以后）才考虑就地升级以避免重算。
-        private const int min_inplace_upgrade_version = 4;
+        // 手动维护：算法/序列化格式变更时递增。版本发生变化时会使用新文件名并在可能时从旧库迁移 kps 数据。
+        // v6: 主体主表 + mania 扩展表 + tag 切片。
+        // v6.1: 增加 PP 字段，追加数据，不升版。
+        // v7: 主库 schema 瘦身；移除 tag / 基线 xxy / 基线 PP 列（已迁 Realm）；仅保留 kps 与 mania 列统计。
+        public const int ANALYSIS_VERSION = 7;
 
-        // 手动维护：算法/序列化格式变更时递增。版本发生变化时，会强制重算所有已存条目。
-        // 注意：此版本号与 osu! 官方服务器端的版本号无关，仅用于本地持久化存储的失效控制。
-        // 注意：更新版本号后，务必通过注释保存旧版本的变更记录，方便日后排查问题。
-        // v2: 初始版本，包含 kps_list_json, column_counts_json
-        // v3: 添加 hold_note_counts_json 字段，分离普通note和长按note统计
-        // v4: 添加 beatmap_md5 校验字段；kps_list_json 仅保存用于 UI 的下采样曲线（<=256 点）。
-        // v5: 删除scratchText存储，改为动态计算。数据库可兼容，不升版。
-        // v6: 重建为主体主表 + mania 扩展表 + tag group 的切片结构，修改LN因子数值为5.5。
-        // v6.1: 增加PP字段，追加数据，不升版。
-        public const int ANALYSIS_VERSION = 6;
-
-        // 列定义集中管理：避免在代码中到处硬写列名，便于审计与迁移。
-        private record ColumnInfo(string Name, bool Required = true);
-
+        // 列定义（songs branch 快照库）
         private const string col_beatmap_id = "beatmap_id";
         private const string col_beatmap_hash = "beatmap_hash";
         private const string col_beatmap_md5 = "beatmap_md5";
-        private const string col_analysis_version = "analysis_version";
-        private const string col_average_kps = "kps_avg";
-        private const string col_max_kps = "kps_max";
-        private const string col_kps_list_json = "kps_list_json";
         private const string col_xxy_sr = "xxy_sr";
         private const string col_pp = "pp";
-        private const string col_column_counts_json = "column_counts_json";
-        private const string col_hold_note_counts_json = "hold_note_counts_json";
-        private const string col_last_updated = "last_updated";
-
-        private static readonly ColumnInfo[] allowed_columns_info = new[]
-        {
-            new ColumnInfo(col_beatmap_id),
-            new ColumnInfo(col_beatmap_hash),
-            new ColumnInfo(col_beatmap_md5),
-            new ColumnInfo(col_analysis_version),
-            new ColumnInfo(col_average_kps),
-            new ColumnInfo(col_max_kps),
-            new ColumnInfo(col_kps_list_json),
-            new ColumnInfo(col_xxy_sr),
-            new ColumnInfo(col_pp),
-            new ColumnInfo(col_column_counts_json),
-            new ColumnInfo(col_hold_note_counts_json),
-            new ColumnInfo(col_last_updated)
-        };
-
-        // 为方便快速比较，也保留名字数组供现有逻辑使用。
-        private static readonly string[] allowed_column_names = allowed_columns_info.Select(c => c.Name).ToArray();
 
         private readonly Storage storage;
         private readonly object initLock = new object();
@@ -143,7 +107,6 @@ namespace osu.Game.EzOsuGame.Analysis
         private bool isDisposed;
 
         // 常量化的表名与 meta key，避免在代码中散落硬编码字符串。
-        private const string table_mania_analysis = "mania_analysis";
         private const string meta_key_force_recompute = "force_recompute";
         private const string meta_key_analysis_version = "analysis_version";
         private const string meta_key_kind = "kind";
@@ -197,6 +160,8 @@ namespace osu.Game.EzOsuGame.Analysis
                     Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 
                     Logger.Log($"EzManiaAnalysisPersistentStore path: {dbPath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+
+                    EzAnalysisSchemaManager.TryMigrateFromPreviousMainDatabase(dbPath);
 
                     using var connection = openConnection();
 
@@ -1848,150 +1813,6 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
             return string.IsNullOrEmpty(result) ? "songs_branch" : result;
         }
 
-        /// <summary>
-        /// 就地升级判断：仅在满足版本阈值（v4 及以后）且表结构与期待列一致时允许就地升级。
-        /// </summary>
-        private static bool canUpgradeInPlace(int storedVersion, bool schemaCompatible)
-        {
-            if (storedVersion > ANALYSIS_VERSION)
-                return false;
-
-            if (storedVersion < min_inplace_upgrade_version)
-                return false;
-
-            return schemaCompatible;
-        }
-
-        /// <summary>
-        /// 比对数据库表的列名是否与预期完全一致（忽略大小写与顺序）。
-        /// 如果表不存在或查询失败，返回 false。
-        /// </summary>
-        private static bool isTableSchemaCompatible(SqliteConnection connection, string tableName)
-        {
-            try
-            {
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = $"PRAGMA table_info({tableName});";
-                using var reader = cmd.ExecuteReader();
-
-                var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-                while (reader.Read())
-                {
-                    // PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
-                    existing.Add(reader.GetString(1));
-                }
-
-                var expected = new HashSet<string>(allowed_column_names, StringComparer.OrdinalIgnoreCase);
-                return existing.SetEquals(expected);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private void tryClonePreviousDatabaseIfMissing()
-        {
-            if (string.IsNullOrEmpty(dbPath))
-                return;
-
-            if (File.Exists(dbPath))
-                return;
-
-            string? dir = Path.GetDirectoryName(dbPath);
-            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
-                return;
-
-            // Find the latest previous DB file (by version suffix) which we can potentially upgrade from.
-            // Even if it contains older rows, we will still validate per-row and decide upgrade vs recompute.
-            string? bestCandidate = null;
-            int bestVersion = -1;
-
-            foreach (string file in Directory.EnumerateFiles(dir, "mania-analysis_v*.sqlite", SearchOption.TopDirectoryOnly))
-            {
-                if (string.Equals(file, dbPath, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                if (!tryParseDatabaseVersion(file, out int version))
-                    continue;
-
-                if (version >= ANALYSIS_VERSION)
-                    continue;
-
-                if (version > bestVersion)
-                {
-                    bestVersion = version;
-                    bestCandidate = file;
-                }
-            }
-
-            if (bestCandidate == null)
-                return;
-
-            try
-            {
-                File.Copy(bestCandidate, dbPath);
-                Logger.Log($"[EzManiaAnalysisPersistentStore] Cloned DB from v{bestVersion} to v{ANALYSIS_VERSION}: {Path.GetFileName(bestCandidate)} -> {Path.GetFileName(dbPath)}",
-                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-            }
-            catch (Exception e)
-            {
-                // If cloning fails, we simply fall back to creating a fresh DB and recomputing as needed.
-                Logger.Error(e, "[EzManiaAnalysisPersistentStore] Failed to clone previous DB; falling back to fresh database.", Ez2ConfigManager.LOGGER_NAME);
-            }
-        }
-
-        private static bool tryParseDatabaseVersion(string filePath, out int version)
-        {
-            version = 0;
-
-            string name = Path.GetFileName(filePath);
-            const string prefix = "mania-analysis_v";
-            const string suffix = ".sqlite";
-
-            if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || !name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            string number = name.Substring(prefix.Length, name.Length - prefix.Length - suffix.Length);
-            return int.TryParse(number, NumberStyles.Integer, CultureInfo.InvariantCulture, out version);
-        }
-
-        private static void writeUpgradedRow(SqliteConnection connection,
-                                             BeatmapInfo beatmap,
-                                             double averageKps,
-                                             double maxKps,
-                                             IReadOnlyList<double> kpsList,
-                                             double? xxySr,
-                                             IReadOnlyDictionary<int, int> columnCounts,
-                                             IReadOnlyDictionary<int, int> holdNoteCounts)
-        {
-            string kpsListJson = JsonSerializer.Serialize(kpsList);
-            string columnCountsJson = JsonSerializer.Serialize(columnCounts);
-            string holdNoteCountsJson = JsonSerializer.Serialize(holdNoteCounts);
-
-            using var update = connection.CreateCommand();
-            update.CommandText = $@"
-UPDATE {table_mania_analysis}
-SET {col_beatmap_md5} = $md5,
-    {col_analysis_version} = $version,
-    {col_kps_list_json} = $kps_list_json,
-    {col_xxy_sr} = $xxy_sr,
-    {col_column_counts_json} = $column_counts_json,
-    {col_hold_note_counts_json} = $hold_note_counts_json
-WHERE {col_beatmap_id} = $id;
-";
-            update.Parameters.AddWithValue("$id", beatmap.ID.ToString());
-            update.Parameters.AddWithValue("$md5", beatmap.MD5Hash);
-            update.Parameters.AddWithValue("$version", ANALYSIS_VERSION);
-            update.Parameters.AddWithValue("$kps_list_json", kpsListJson);
-            update.Parameters.AddWithValue("$xxy_sr", xxySr is null ? DBNull.Value : xxySr.Value);
-            update.Parameters.AddWithValue("$column_counts_json", columnCountsJson);
-            update.Parameters.AddWithValue("$hold_note_counts_json", holdNoteCountsJson);
-
-            update.ExecuteNonQuery();
-        }
-
         private void startBackgroundWriter()
         {
             if (backgroundWriterTask != null)
@@ -2168,26 +1989,22 @@ WHERE {EzAnalysisSchemaManager.COL_BEATMAP_ID} = $id;
 INSERT INTO {EzAnalysisSchemaManager.TABLE_MANIA}(
     {EzAnalysisSchemaManager.COL_BEATMAP_ID},
     {EzAnalysisSchemaManager.COL_UPDATED_AT},
-    {EzAnalysisSchemaManager.COL_XXY_SR},
     {EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON},
     {EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON}
 )
 VALUES(
     $id,
     $updated_at,
-    $xxy,
     $column_counts_json,
     $hold_note_counts_json
 )
 ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
     {EzAnalysisSchemaManager.COL_UPDATED_AT} = excluded.{EzAnalysisSchemaManager.COL_UPDATED_AT},
-    {EzAnalysisSchemaManager.COL_XXY_SR} = excluded.{EzAnalysisSchemaManager.COL_XXY_SR},
     {EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON} = excluded.{EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON},
     {EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON} = excluded.{EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON};
 ";
                 mania.Parameters.AddWithValue("$id", beatmap.ID.ToString());
                 mania.Parameters.AddWithValue("$updated_at", now);
-                mania.Parameters.AddWithValue("$xxy", DBNull.Value);
                 mania.Parameters.AddWithValue("$column_counts_json", columnCountsJson);
                 mania.Parameters.AddWithValue("$hold_note_counts_json", holdNoteCountsJson);
                 mania.ExecuteNonQuery();
@@ -2238,103 +2055,6 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
                 requiredData |= MissingDataKind.Mania;
 
             return requiredData;
-        }
-
-        private void cleanupUnrecognizedColumns(SqliteConnection connection)
-        {
-            var existingColumns = getTableColumns(connection, table_mania_analysis);
-            var unrecognizedColumns = existingColumns.Where(c => !allowed_column_names.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
-
-            if (unrecognizedColumns.Count == 0)
-                return;
-
-            // 重建表，删除不识别的列
-            Logger.Log($"[EzManiaAnalysisPersistentStore] Found unrecognized columns: {string.Join(", ", unrecognizedColumns)}; rebuilding table.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
-
-            rebuildTableWithoutUnrecognizedColumns(connection, unrecognizedColumns);
-        }
-
-        private List<string> getTableColumns(SqliteConnection connection, string tableName)
-        {
-            var columns = new List<string>();
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = $"PRAGMA table_info({tableName});";
-
-            using var reader = cmd.ExecuteReader();
-
-            while (reader.Read())
-            {
-                columns.Add(reader.GetString(1)); // name
-            }
-
-            return columns;
-        }
-
-        private void rebuildTableWithoutUnrecognizedColumns(SqliteConnection connection, List<string> unrecognizedColumns)
-        {
-            // 创建临时表，只包含允许的列
-            using var createTempCmd = connection.CreateCommand();
-            createTempCmd.CommandText = $@"
-CREATE TABLE {table_mania_analysis}_temp (
-    {col_beatmap_id} TEXT PRIMARY KEY,
-    {col_beatmap_hash} TEXT NOT NULL,
-    {col_beatmap_md5} TEXT NOT NULL,
-    {col_analysis_version} INTEGER NOT NULL,
-    {col_average_kps} REAL NOT NULL,
-    {col_max_kps} REAL NOT NULL,
-    {col_kps_list_json} TEXT NOT NULL,
-    {col_xxy_sr} REAL NULL,
-    {col_column_counts_json} TEXT NOT NULL,
-    {col_hold_note_counts_json} TEXT NOT NULL
-);
-";
-            createTempCmd.ExecuteNonQuery();
-
-            // 复制数据，只复制允许的列
-            using var insertCmd = connection.CreateCommand();
-            insertCmd.CommandText = $@"
-INSERT INTO {table_mania_analysis}_temp ({col_beatmap_id}, {col_beatmap_hash}, {col_beatmap_md5}, {col_analysis_version}, {col_average_kps}, {col_max_kps}, {col_kps_list_json}, {col_xxy_sr}, {col_column_counts_json}, {col_hold_note_counts_json})
-SELECT {col_beatmap_id}, {col_beatmap_hash}, {col_beatmap_md5}, {col_analysis_version}, {col_average_kps}, {col_max_kps}, {col_kps_list_json}, {col_xxy_sr}, {col_column_counts_json}, {col_hold_note_counts_json}
-FROM {table_mania_analysis};
-";
-            insertCmd.ExecuteNonQuery();
-
-            // 删除旧表
-            using var dropCmd = connection.CreateCommand();
-            dropCmd.CommandText = $"DROP TABLE {table_mania_analysis};";
-            dropCmd.ExecuteNonQuery();
-
-            // 重命名临时表
-            using var renameCmd = connection.CreateCommand();
-            renameCmd.CommandText = $"ALTER TABLE {table_mania_analysis}_temp RENAME TO {table_mania_analysis};";
-            renameCmd.ExecuteNonQuery();
-
-            // 重新创建索引
-            using var indexCmd = connection.CreateCommand();
-            indexCmd.CommandText = $"CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON {table_mania_analysis}({col_analysis_version});";
-            indexCmd.ExecuteNonQuery();
-
-            // 清理数据库文件大小
-            using var vacuumCmd = connection.CreateCommand();
-            vacuumCmd.CommandText = "VACUUM;";
-            vacuumCmd.ExecuteNonQuery();
-        }
-
-        private bool hasColumn(SqliteConnection connection, string tableName, string columnName)
-        {
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = $"PRAGMA table_info({tableName});";
-
-            using var reader = cmd.ExecuteReader();
-
-            while (reader.Read())
-            {
-                string name = reader.GetString(1);
-                if (string.Equals(name, columnName, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-
-            return false;
         }
 
         /// <summary>
