@@ -27,7 +27,7 @@ using osuTK;
 
 namespace osu.Game.EzOsuGame.Mods
 {
-    public partial class ModNiceBPM : Mod, IApplicableToRate, IApplicableToDrawableHitObject, IApplicableToBeatmap, IUpdatableByPlayfield, IApplicableToHUD
+    public partial class ModNiceBPM : ModRateAdjust, IApplicableToDrawableHitObject, IApplicableToBeatmap, IUpdatableByPlayfield, IApplicableToHUD
     {
         public override string Name => "Nice BPM";
 
@@ -41,9 +41,6 @@ namespace osu.Game.EzOsuGame.Mods
 
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
-        public override bool ValidForFreestyleAsRequiredMod => false;
-
-        public override Type[] IncompatibleMods => new[] { typeof(ModRateAdjust), typeof(ModTimeRamp) };
 
         [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.FREE_BPM_LABEL), nameof(NiceBPMStrings.FREE_BPM_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> FreeBPM { get; } = new Bindable<int?>();
@@ -102,7 +99,7 @@ namespace osu.Game.EzOsuGame.Mods
             Precision = 0.01
         };
 
-        public BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
+        public override BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
         {
             MinValue = 0.1,
             MaxValue = 3.0,
@@ -274,7 +271,7 @@ namespace osu.Game.EzOsuGame.Mods
             }, true);
         }
 
-        public void ApplyToTrack(IAdjustableAudioComponent track)
+        public override void ApplyToTrack(IAdjustableAudioComponent track)
         {
             // 检查是否设置了FreeBPM且原始BPM可用
             if (FreeBPM.Value.HasValue && FreeBPM.Value > 0 && originalBPM > 0)
@@ -297,13 +294,11 @@ namespace osu.Game.EzOsuGame.Mods
             }
             else if (FreeBPM.Value.HasValue && FreeBPM.Value > 0 && !hasAppliedFreeBPM && originalBPM <= 0)
             {
-                // 如果设置了FreeBPM但原始BPM尚不可用，则推迟应用
-                // 我们将在BPM可用时在ApplyToBeatmap中应用它
-                // 目前，使用InitialRate作为临时后备
-                SpeedChange.Value = InitialRate.Value;
-                targetRate = InitialRate.Value;
+                // 如果设置了FreeBPM但原始BPM尚不可用，则推迟应用（保持 1.0x，与基类 ApplyToRate 一致）
+                SpeedChange.Value = 1;
+                targetRate = 1;
                 recentRates.Clear();
-                recentRates.AddRange(Enumerable.Repeat(InitialRate.Value, recent_rate_count));
+                recentRates.AddRange(Enumerable.Repeat(1d, recent_rate_count));
             }
             else
             {
@@ -316,11 +311,6 @@ namespace osu.Game.EzOsuGame.Mods
             rateAdjustHelper.ApplyToTrack(track);
         }
 
-        public void ApplyToSample(IAdjustableAudioComponent sample)
-        {
-            sample.AddAdjustment(AdjustableProperty.Frequency, SpeedChange);
-        }
-
         public void ApplyToHUD(HUDOverlay overlay)
         {
             overlay.Add(new NiceBPMRateDisplay(SpeedChange));
@@ -329,31 +319,6 @@ namespace osu.Game.EzOsuGame.Mods
         public void Update(Playfield playfield)
         {
             SpeedChange.Value = Interpolation.DampContinuously(SpeedChange.Value, targetRate, 50, playfield.Clock.ElapsedFrameTime);
-        }
-
-        public double ApplyToRate(double time, double rate = 1)
-        {
-            // 如果设置了FreeBPM且原始BPM可用，使用自由BPM速率而不是初始速率
-            if (FreeBPM.Value.HasValue && FreeBPM.Value > 0 && originalBPM > 0)
-            {
-                double freeRate = FreeBPM.Value.Value / originalBPM;
-                return rate * freeRate;
-            }
-
-            // 如果设置了FreeBPM但原始BPM尚不可用，我们暂时不应应用任何速率调整
-            if (FreeBPM.Value.HasValue && FreeBPM.Value > 0 && originalBPM <= 0)
-            {
-                return rate; // 返回未修改的速率，直到原始BPM可用
-            }
-
-            // 如果启用了动态BPM，我们不乘以初始速率，因为它已经在其他地方考虑过了
-            if (EnableDynamicBPM.Value)
-            {
-                return rate; // 如果动态BPM处于活动状态，则不应用初始速率乘数
-            }
-
-            // 否则，像以前一样使用初始速率
-            return rate * InitialRate.Value;
         }
 
         public void ApplyToDrawableHitObject(DrawableHitObject drawable)
