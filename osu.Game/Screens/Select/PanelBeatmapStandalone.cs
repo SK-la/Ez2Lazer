@@ -396,17 +396,31 @@ namespace osu.Game.Screens.Select
         }
 
         private double? getBaselinePpForDisplay(EzAnalysisResult ezAnalysisResult)
-            => beatmap.PerformancePoints >= 0 ? beatmap.PerformancePoints : ezAnalysisResult.Pp;
+        {
+            if (Item?.Model is not GroupedBeatmap groupedBeatmap)
+                return ezAnalysisResult.Pp;
+
+            var currentBeatmap = groupedBeatmap.Beatmap;
+            return currentBeatmap.PerformancePoints >= 0 ? currentBeatmap.PerformancePoints : ezAnalysisResult.Pp;
+        }
 
         private void updateKPS(EzAnalysisResult ezAnalysisResult)
         {
+            if (Item?.Model is not GroupedBeatmap groupedBeatmap)
+                return;
+
+            var currentBeatmap = groupedBeatmap.Beatmap;
+
             double avgKPS = ezAnalysisResult.AverageKps;
             double maxKps = ezAnalysisResult.MaxKps;
             IReadOnlyList<double> kpsList = ezAnalysisResult.KpsList;
-            ezDisplayKps.SetKps(getBaselinePpForDisplay(ezAnalysisResult), avgKPS, maxKps);
+            double? baselinePp = currentBeatmap.PerformancePoints >= 0
+                ? currentBeatmap.PerformancePoints
+                : ezAnalysisResult.Pp;
+            ezDisplayKps.SetKps(baselinePp, avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
 
-            if (shouldDisplayXxyStarRating && beatmap.SupportsXxyStarRating())
+            if (shouldDisplayXxyStarRating && currentBeatmap.SupportsXxyStarRating())
             {
                 var maniaSummary = ezAnalysisResult.ManiaSummary;
                 var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
@@ -414,16 +428,21 @@ namespace osu.Game.Screens.Select
                 scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 updateKeyCount();
                 ezDisplayKpc.ManiaSummary = maniaSummary;
-                displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay(maniaSummary);
+                displaySR.Current.Value = currentBeatmap.ToEzManiaSummaryForDisplay(maniaSummary);
             }
         }
 
         private void updateManiaDisplayFromBeatmap()
         {
-            if (!shouldDisplayXxyStarRating || !beatmap.SupportsXxyStarRating())
+            if (Item?.Model is not GroupedBeatmap groupedBeatmap)
                 return;
 
-            displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
+            var currentBeatmap = groupedBeatmap.Beatmap;
+
+            if (!shouldDisplayXxyStarRating || !currentBeatmap.SupportsXxyStarRating())
+                return;
+
+            displaySR.Current.Value = currentBeatmap.ToEzManiaSummaryForDisplay();
         }
 
         private void computeEzAnalysis()

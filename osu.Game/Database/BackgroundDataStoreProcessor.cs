@@ -231,31 +231,19 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// Backfill Ez Realm columns on <see cref="BeatmapInfo"/> (tag, baseline xxy, baseline PP) via <see cref="IBeatmapUpdater.Process"/>.
-        /// Runs a one-time full pass when <see cref="RealmAccess.EZ_REALM_SCHEMA_VERSION"/> increases; afterwards only missing xxy/PP.
+        /// Backfill Ez Realm columns on <see cref="BeatmapInfo"/> (baseline xxy / PP, and opportunistic tag refresh) via <see cref="IBeatmapUpdater.Process"/>.
+        /// Always runs incrementally for missing xxy/PP to avoid expensive full-library rewrites on version bumps.
         /// </summary>
         private void populateMissingEzBeatmapRealmFields()
         {
             const int target_version = RealmAccess.EZ_REALM_SCHEMA_VERSION;
             int lastBackfillVersion = ezConfig.Get<int>(Ez2Setting.EzRealmMetadataBackfillVersion);
-            bool runFullBackfill = lastBackfillVersion < target_version;
-
             HashSet<Guid> beatmapSetIds = new HashSet<Guid>();
 
-            Logger.Log(runFullBackfill
-                ? $"Querying for beatmap sets requiring Ez Realm metadata backfill (target ez version {target_version})..."
-                : "Querying for beatmap sets with missing baseline xxy star rating or performance points...");
+            Logger.Log($"Querying for beatmap sets requiring Ez Realm metadata backfill (target ez version {target_version})...");
 
             realmAccess.Run(r =>
             {
-                if (runFullBackfill)
-                {
-                    foreach (var set in r.All<BeatmapSetInfo>())
-                        beatmapSetIds.Add(set.ID);
-
-                    return;
-                }
-
                 foreach (var beatmap in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && (b.PerformancePoints < 0
                                                                                                  || (b.XxyStarRating < 0 && EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset)))))
                     beatmapSetIds.Add(beatmap.BeatmapSet!.ID);
@@ -263,7 +251,7 @@ namespace osu.Game.Database
 
             if (beatmapSetIds.Count == 0)
             {
-                if (runFullBackfill)
+                if (lastBackfillVersion < target_version)
                     ezConfig.SetValue(Ez2Setting.EzRealmMetadataBackfillVersion, target_version);
 
                 return;
@@ -310,7 +298,7 @@ namespace osu.Game.Database
 
             completeNotification(notification, processedCount, beatmapSetIds.Count, failedCount);
 
-            if (runFullBackfill && notification?.State != ProgressNotificationState.Cancelled)
+            if (lastBackfillVersion < target_version && notification?.State != ProgressNotificationState.Cancelled)
                 ezConfig.SetValue(Ez2Setting.EzRealmMetadataBackfillVersion, target_version);
         }
 

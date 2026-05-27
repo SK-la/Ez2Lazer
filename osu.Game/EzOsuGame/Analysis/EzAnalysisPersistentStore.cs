@@ -81,8 +81,8 @@ namespace osu.Game.EzOsuGame.Analysis
         // 手动维护：算法/序列化格式变更时递增。版本发生变化时会使用新文件名并在可能时从旧库迁移 kps 数据。
         // v6: 主体主表 + mania 扩展表 + tag 切片。
         // v6.1: 增加 PP 字段，追加数据，不升版。
-        // v7: 主库 schema 瘦身；移除 tag / 基线 xxy / 基线 PP 列（已迁 Realm）；仅保留 kps 与 mania 列统计。
-        public const int ANALYSIS_VERSION = 7;
+        // v7: 主库 schema 瘦身；移除 tag / 基线 xxy / 基线 PP 列（已迁 Realm）；仅保留 kps 与 mania 列统计。（暂缓）
+        public const int ANALYSIS_VERSION = 6;
 
         // 列定义（songs branch 快照库）
         private const string col_beatmap_id = "beatmap_id";

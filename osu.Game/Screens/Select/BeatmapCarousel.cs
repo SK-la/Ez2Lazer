@@ -211,7 +211,7 @@ namespace osu.Game.Screens.Select
             foreach (var beatmap in beatmapList)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                resolvedValues[beatmap] = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : beatmap.StarRating;
+                resolvedValues[beatmap] = beatmap.XxyStarRating;
             }
 
             return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);

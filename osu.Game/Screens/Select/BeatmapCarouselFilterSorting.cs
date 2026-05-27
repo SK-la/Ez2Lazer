@@ -57,10 +57,10 @@ namespace osu.Game.Screens.Select
                     return sortValue;
 
                 if (criteria.Sort == SortMode.PP)
-                    return 0;
+                    return beatmap.PerformancePoints >= 0 ? beatmap.PerformancePoints : -1;
 
                 if (criteria.Sort == SortMode.XxyStarRating)
-                    return beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : beatmap.StarRating;
+                    return beatmap.XxyStarRating;
 
                 return beatmap.StarRating;
             }

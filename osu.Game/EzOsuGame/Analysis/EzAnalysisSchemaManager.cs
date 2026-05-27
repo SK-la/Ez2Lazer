@@ -16,7 +16,7 @@ namespace osu.Game.EzOsuGame.Analysis
     internal static class EzAnalysisSchemaManager
     {
         public const int ANALYSIS_VERSION = EzAnalysisPersistentStore.ANALYSIS_VERSION;
-        public const int MAIN_SCHEMA_VERSION = 3;
+        public const int MAIN_SCHEMA_VERSION = 2;
         public const string MAIN_DATABASE_KIND = "ez_analysis";
 
         public const string TABLE_ENTRY = "ez_analysis_entry";
@@ -35,11 +35,10 @@ namespace osu.Game.EzOsuGame.Analysis
         public const string COL_COLUMN_COUNTS_JSON = "column_counts_json";
         public const string COL_HOLD_NOTE_COUNTS_JSON = "hold_note_counts_json";
 
-        private const string legacy_col_pp = "pp";
-        private const string legacy_col_tag_updated_at = "tag_updated_at";
-        private const string legacy_col_tag_payload_json = "tag_payload_json";
-        private const string legacy_col_xxy_sr = "xxy_sr";
-        private const string legacy_index_tag_updated = "idx_ez_analysis_entry_tag_updated";
+        public const string COL_TAG_UPDATED_AT = "tag_updated_at";
+        public const string COL_TAG_PAYLOAD_JSON = "tag_payload_json";
+        public const string COL_XXY_SR = "xxy_sr";
+        public const string COL_PP = "pp";
 
         public const string META_KEY_FORCE_RECOMPUTE = "force_recompute";
         public const string META_KEY_ANALYSIS_VERSION = "analysis_version";
@@ -223,12 +222,16 @@ CREATE TABLE IF NOT EXISTS {TABLE_ENTRY} (
     {COL_COMMON_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
     {COL_AVERAGE_KPS} REAL NOT NULL DEFAULT 0,
     {COL_MAX_KPS} REAL NOT NULL DEFAULT 0,
-    {COL_KPS_LIST_JSON} TEXT NOT NULL DEFAULT '[]'
+    {COL_KPS_LIST_JSON} TEXT NOT NULL DEFAULT '[]',
+    {COL_PP} REAL NULL,
+    {COL_TAG_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
+    {COL_TAG_PAYLOAD_JSON} TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS {TABLE_MANIA} (
     {COL_BEATMAP_ID} TEXT PRIMARY KEY,
     {COL_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
+    {COL_XXY_SR} REAL NULL,
     {COL_COLUMN_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     {COL_HOLD_NOTE_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     FOREIGN KEY({COL_BEATMAP_ID}) REFERENCES {TABLE_ENTRY}({COL_BEATMAP_ID}) ON DELETE CASCADE
@@ -236,6 +239,7 @@ CREATE TABLE IF NOT EXISTS {TABLE_MANIA} (
 
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_ruleset ON {TABLE_ENTRY}({COL_RULESET_ONLINE_ID});
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_common_updated ON {TABLE_ENTRY}({COL_COMMON_UPDATED_AT});
+CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_tag_updated ON {TABLE_ENTRY}({COL_TAG_UPDATED_AT});
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_mania_updated ON {TABLE_MANIA}({COL_UPDATED_AT});
 ";
             create.ExecuteNonQuery();
@@ -243,16 +247,8 @@ CREATE INDEX IF NOT EXISTS idx_ez_analysis_mania_updated ON {TABLE_MANIA}({COL_U
 
         private static bool needsMainSchemaRebuild(SqliteConnection connection)
         {
-            if (hasColumn(connection, TABLE_ENTRY, legacy_col_pp)
-                || hasColumn(connection, TABLE_ENTRY, legacy_col_tag_updated_at)
-                || hasColumn(connection, TABLE_ENTRY, legacy_col_tag_payload_json))
-                return true;
-
-            if (tableExists(connection, TABLE_MANIA) && hasColumn(connection, TABLE_MANIA, legacy_col_xxy_sr))
-                return true;
-
             if (!int.TryParse(TryGetMeta(connection, META_KEY_SCHEMA_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out int storedSchemaVersion))
-                return true;
+                return false;
 
             return storedSchemaVersion < MAIN_SCHEMA_VERSION;
         }
@@ -260,13 +256,6 @@ CREATE INDEX IF NOT EXISTS idx_ez_analysis_mania_updated ON {TABLE_MANIA}({COL_U
         private static void rebuildMainDatabaseInPlace(SqliteConnection connection)
         {
             using var transaction = connection.BeginTransaction();
-
-            using (var dropLegacyIndex = connection.CreateCommand())
-            {
-                dropLegacyIndex.Transaction = transaction;
-                dropLegacyIndex.CommandText = $"DROP INDEX IF EXISTS {legacy_index_tag_updated};";
-                dropLegacyIndex.ExecuteNonQuery();
-            }
 
             using (var createEntry = connection.CreateCommand())
             {
@@ -280,7 +269,10 @@ CREATE TABLE {TABLE_ENTRY}_new (
     {COL_COMMON_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
     {COL_AVERAGE_KPS} REAL NOT NULL DEFAULT 0,
     {COL_MAX_KPS} REAL NOT NULL DEFAULT 0,
-    {COL_KPS_LIST_JSON} TEXT NOT NULL DEFAULT '[]'
+    {COL_KPS_LIST_JSON} TEXT NOT NULL DEFAULT '[]',
+    {COL_PP} REAL NULL,
+    {COL_TAG_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
+    {COL_TAG_PAYLOAD_JSON} TEXT NOT NULL DEFAULT ''
 );
 ";
                 createEntry.ExecuteNonQuery();
@@ -298,7 +290,10 @@ INSERT INTO {TABLE_ENTRY}_new (
     {COL_COMMON_UPDATED_AT},
     {COL_AVERAGE_KPS},
     {COL_MAX_KPS},
-    {COL_KPS_LIST_JSON}
+    {COL_KPS_LIST_JSON},
+    {COL_PP},
+    {COL_TAG_UPDATED_AT},
+    {COL_TAG_PAYLOAD_JSON}
 )
 SELECT
     {COL_BEATMAP_ID},
@@ -308,7 +303,10 @@ SELECT
     {COL_COMMON_UPDATED_AT},
     {COL_AVERAGE_KPS},
     {COL_MAX_KPS},
-    {COL_KPS_LIST_JSON}
+    {COL_KPS_LIST_JSON},
+    {COL_PP},
+    {COL_TAG_UPDATED_AT},
+    {COL_TAG_PAYLOAD_JSON}
 FROM {TABLE_ENTRY};
 ";
                 copyEntry.ExecuteNonQuery();
@@ -337,6 +335,7 @@ FROM {TABLE_ENTRY};
 CREATE TABLE {TABLE_MANIA}_new (
     {COL_BEATMAP_ID} TEXT PRIMARY KEY,
     {COL_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
+    {COL_XXY_SR} REAL NULL,
     {COL_COLUMN_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     {COL_HOLD_NOTE_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     FOREIGN KEY({COL_BEATMAP_ID}) REFERENCES {TABLE_ENTRY}({COL_BEATMAP_ID}) ON DELETE CASCADE
@@ -352,12 +351,14 @@ CREATE TABLE {TABLE_MANIA}_new (
 INSERT INTO {TABLE_MANIA}_new (
     {COL_BEATMAP_ID},
     {COL_UPDATED_AT},
+    {COL_XXY_SR},
     {COL_COLUMN_COUNTS_JSON},
     {COL_HOLD_NOTE_COUNTS_JSON}
 )
 SELECT
     {COL_BEATMAP_ID},
     {COL_UPDATED_AT},
+    {COL_XXY_SR},
     {COL_COLUMN_COUNTS_JSON},
     {COL_HOLD_NOTE_COUNTS_JSON}
 FROM {TABLE_MANIA};
@@ -388,6 +389,7 @@ FROM {TABLE_MANIA};
 CREATE TABLE {TABLE_MANIA} (
     {COL_BEATMAP_ID} TEXT PRIMARY KEY,
     {COL_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
+    {COL_XXY_SR} REAL NULL,
     {COL_COLUMN_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     {COL_HOLD_NOTE_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     FOREIGN KEY({COL_BEATMAP_ID}) REFERENCES {TABLE_ENTRY}({COL_BEATMAP_ID}) ON DELETE CASCADE
@@ -403,6 +405,7 @@ CREATE TABLE {TABLE_MANIA} (
                 recreateIndexes.CommandText = $@"
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_ruleset ON {TABLE_ENTRY}({COL_RULESET_ONLINE_ID});
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_common_updated ON {TABLE_ENTRY}({COL_COMMON_UPDATED_AT});
+CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_tag_updated ON {TABLE_ENTRY}({COL_TAG_UPDATED_AT});
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_mania_updated ON {TABLE_MANIA}({COL_UPDATED_AT});
 ";
                 recreateIndexes.ExecuteNonQuery();
@@ -424,20 +427,9 @@ CREATE INDEX IF NOT EXISTS idx_ez_analysis_mania_updated ON {TABLE_MANIA}({COL_U
             if (!tableExists(source, TABLE_ENTRY))
                 return;
 
-            using (var copyEntry = destination.CreateCommand())
+            using (var selectEntry = source.CreateCommand())
             {
-                copyEntry.CommandText = $@"
-ATTACH DATABASE $source AS legacy;
-INSERT INTO main.{TABLE_ENTRY} (
-    {COL_BEATMAP_ID},
-    {COL_BEATMAP_HASH},
-    {COL_BEATMAP_MD5},
-    {COL_RULESET_ONLINE_ID},
-    {COL_COMMON_UPDATED_AT},
-    {COL_AVERAGE_KPS},
-    {COL_MAX_KPS},
-    {COL_KPS_LIST_JSON}
-)
+                selectEntry.CommandText = $@"
 SELECT
     {COL_BEATMAP_ID},
     {COL_BEATMAP_HASH},
@@ -447,38 +439,91 @@ SELECT
     {COL_AVERAGE_KPS},
     {COL_MAX_KPS},
     {COL_KPS_LIST_JSON}
-FROM legacy.{TABLE_ENTRY}
+FROM {TABLE_ENTRY}
 WHERE {COL_COMMON_UPDATED_AT} > 0;
-DETACH DATABASE legacy;
 ";
-                copyEntry.Parameters.AddWithValue("$source", source.DataSource);
-                copyEntry.ExecuteNonQuery();
+
+                using var reader = selectEntry.ExecuteReader();
+                using var insertEntry = destination.CreateCommand();
+                insertEntry.CommandText = $@"
+INSERT OR REPLACE INTO {TABLE_ENTRY} (
+    {COL_BEATMAP_ID},
+    {COL_BEATMAP_HASH},
+    {COL_BEATMAP_MD5},
+    {COL_RULESET_ONLINE_ID},
+    {COL_COMMON_UPDATED_AT},
+    {COL_AVERAGE_KPS},
+    {COL_MAX_KPS},
+    {COL_KPS_LIST_JSON}
+)
+VALUES (
+    $id,
+    $hash,
+    $md5,
+    $ruleset,
+    $common_updated_at,
+    $avg,
+    $max,
+    $kps
+);
+";
+
+                while (reader.Read())
+                {
+                    insertEntry.Parameters.Clear();
+                    insertEntry.Parameters.AddWithValue("$id", reader.GetString(0));
+                    insertEntry.Parameters.AddWithValue("$hash", reader.GetString(1));
+                    insertEntry.Parameters.AddWithValue("$md5", reader.GetString(2));
+                    insertEntry.Parameters.AddWithValue("$ruleset", reader.GetInt32(3));
+                    insertEntry.Parameters.AddWithValue("$common_updated_at", reader.GetInt64(4));
+                    insertEntry.Parameters.AddWithValue("$avg", reader.GetDouble(5));
+                    insertEntry.Parameters.AddWithValue("$max", reader.GetDouble(6));
+                    insertEntry.Parameters.AddWithValue("$kps", reader.GetString(7));
+                    insertEntry.ExecuteNonQuery();
+                }
             }
 
             if (!tableExists(source, TABLE_MANIA))
                 return;
 
-            using (var copyMania = destination.CreateCommand())
+            using (var selectMania = source.CreateCommand())
             {
-                copyMania.CommandText = $@"
-ATTACH DATABASE $source AS legacy;
-INSERT INTO main.{TABLE_MANIA} (
-    {COL_BEATMAP_ID},
-    {COL_UPDATED_AT},
-    {COL_COLUMN_COUNTS_JSON},
-    {COL_HOLD_NOTE_COUNTS_JSON}
-)
+                selectMania.CommandText = $@"
 SELECT
     {COL_BEATMAP_ID},
     {COL_UPDATED_AT},
     {COL_COLUMN_COUNTS_JSON},
     {COL_HOLD_NOTE_COUNTS_JSON}
-FROM legacy.{TABLE_MANIA}
+FROM {TABLE_MANIA}
 WHERE {COL_UPDATED_AT} > 0;
-DETACH DATABASE legacy;
 ";
-                copyMania.Parameters.AddWithValue("$source", source.DataSource);
-                copyMania.ExecuteNonQuery();
+
+                using var reader = selectMania.ExecuteReader();
+                using var insertMania = destination.CreateCommand();
+                insertMania.CommandText = $@"
+INSERT OR REPLACE INTO {TABLE_MANIA} (
+    {COL_BEATMAP_ID},
+    {COL_UPDATED_AT},
+    {COL_COLUMN_COUNTS_JSON},
+    {COL_HOLD_NOTE_COUNTS_JSON}
+)
+VALUES (
+    $id,
+    $updated_at,
+    $column_counts_json,
+    $hold_note_counts_json
+);
+";
+
+                while (reader.Read())
+                {
+                    insertMania.Parameters.Clear();
+                    insertMania.Parameters.AddWithValue("$id", reader.GetString(0));
+                    insertMania.Parameters.AddWithValue("$updated_at", reader.GetInt64(1));
+                    insertMania.Parameters.AddWithValue("$column_counts_json", reader.GetString(2));
+                    insertMania.Parameters.AddWithValue("$hold_note_counts_json", reader.GetString(3));
+                    insertMania.ExecuteNonQuery();
+                }
             }
         }
 
@@ -488,41 +533,53 @@ DETACH DATABASE legacy;
 
             if (tableExists(source, "collection_hidden_state"))
             {
-                using var cmd = destination.CreateCommand();
-                cmd.CommandText = @"
-ATTACH DATABASE $source AS legacy;
-INSERT OR IGNORE INTO main.collection_hidden_state(collection_id, hidden_applied)
-SELECT collection_id, hidden_applied FROM legacy.collection_hidden_state;
-DETACH DATABASE legacy;
-";
-                cmd.Parameters.AddWithValue("$source", source.DataSource);
-                cmd.ExecuteNonQuery();
+                using var select = source.CreateCommand();
+                select.CommandText = "SELECT collection_id, hidden_applied FROM collection_hidden_state;";
+                using var reader = select.ExecuteReader();
+                using var insert = destination.CreateCommand();
+                insert.CommandText = "INSERT OR IGNORE INTO collection_hidden_state(collection_id, hidden_applied) VALUES($collection_id, $hidden_applied);";
+
+                while (reader.Read())
+                {
+                    insert.Parameters.Clear();
+                    insert.Parameters.AddWithValue("$collection_id", reader.GetString(0));
+                    insert.Parameters.AddWithValue("$hidden_applied", reader.GetInt64(1));
+                    insert.ExecuteNonQuery();
+                }
             }
 
             if (tableExists(source, "collection_hidden_preexisting_beatmap"))
             {
-                using var cmd = destination.CreateCommand();
-                cmd.CommandText = @"
-ATTACH DATABASE $source AS legacy;
-INSERT OR IGNORE INTO main.collection_hidden_preexisting_beatmap(collection_id, beatmap_id)
-SELECT collection_id, beatmap_id FROM legacy.collection_hidden_preexisting_beatmap;
-DETACH DATABASE legacy;
-";
-                cmd.Parameters.AddWithValue("$source", source.DataSource);
-                cmd.ExecuteNonQuery();
+                using var select = source.CreateCommand();
+                select.CommandText = "SELECT collection_id, beatmap_id FROM collection_hidden_preexisting_beatmap;";
+                using var reader = select.ExecuteReader();
+                using var insert = destination.CreateCommand();
+                insert.CommandText = "INSERT OR IGNORE INTO collection_hidden_preexisting_beatmap(collection_id, beatmap_id) VALUES($collection_id, $beatmap_id);";
+
+                while (reader.Read())
+                {
+                    insert.Parameters.Clear();
+                    insert.Parameters.AddWithValue("$collection_id", reader.GetString(0));
+                    insert.Parameters.AddWithValue("$beatmap_id", reader.GetString(1));
+                    insert.ExecuteNonQuery();
+                }
             }
 
             if (tableExists(source, "collection_hidden_beatmap_md5"))
             {
-                using var cmd = destination.CreateCommand();
-                cmd.CommandText = @"
-ATTACH DATABASE $source AS legacy;
-INSERT OR IGNORE INTO main.collection_hidden_beatmap_md5(collection_id, beatmap_md5)
-SELECT collection_id, beatmap_md5 FROM legacy.collection_hidden_beatmap_md5;
-DETACH DATABASE legacy;
-";
-                cmd.Parameters.AddWithValue("$source", source.DataSource);
-                cmd.ExecuteNonQuery();
+                using var select = source.CreateCommand();
+                select.CommandText = "SELECT collection_id, beatmap_md5 FROM collection_hidden_beatmap_md5;";
+                using var reader = select.ExecuteReader();
+                using var insert = destination.CreateCommand();
+                insert.CommandText = "INSERT OR IGNORE INTO collection_hidden_beatmap_md5(collection_id, beatmap_md5) VALUES($collection_id, $beatmap_md5);";
+
+                while (reader.Read())
+                {
+                    insert.Parameters.Clear();
+                    insert.Parameters.AddWithValue("$collection_id", reader.GetString(0));
+                    insert.Parameters.AddWithValue("$beatmap_md5", reader.GetString(1));
+                    insert.ExecuteNonQuery();
+                }
             }
         }
 
@@ -530,21 +587,31 @@ DETACH DATABASE legacy;
         {
             EnsureMetaTableExists(destination);
 
-            using var cmd = destination.CreateCommand();
-            cmd.CommandText = @"
-ATTACH DATABASE $source AS legacy;
-INSERT INTO main.meta(key, value)
-SELECT key, value
-FROM legacy.meta
-WHERE key NOT IN ($schema_version, $analysis_version, $kind)
+            if (!tableExists(source, "meta"))
+                return;
+
+            using var select = source.CreateCommand();
+            select.CommandText = "SELECT key, value FROM meta;";
+            using var reader = select.ExecuteReader();
+            using var insert = destination.CreateCommand();
+            insert.CommandText = @"
+INSERT INTO meta(key, value)
+VALUES($key, $value)
 ON CONFLICT(key) DO UPDATE SET value = excluded.value;
-DETACH DATABASE legacy;
 ";
-            cmd.Parameters.AddWithValue("$source", source.DataSource);
-            cmd.Parameters.AddWithValue("$schema_version", META_KEY_SCHEMA_VERSION);
-            cmd.Parameters.AddWithValue("$analysis_version", META_KEY_ANALYSIS_VERSION);
-            cmd.Parameters.AddWithValue("$kind", META_KEY_KIND);
-            cmd.ExecuteNonQuery();
+
+            while (reader.Read())
+            {
+                string key = reader.GetString(0);
+
+                if (key == META_KEY_SCHEMA_VERSION || key == META_KEY_ANALYSIS_VERSION || key == META_KEY_KIND)
+                    continue;
+
+                insert.Parameters.Clear();
+                insert.Parameters.AddWithValue("$key", key);
+                insert.Parameters.AddWithValue("$value", reader.GetString(1));
+                insert.ExecuteNonQuery();
+            }
         }
 
         private static string? findLatestPreviousMainDatabase(string directory, string targetDatabasePath)
