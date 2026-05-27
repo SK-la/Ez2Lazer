@@ -415,12 +415,12 @@ namespace osu.Game.Rulesets.Scoring
 
         public static void ValidateHitResultPair(HitResult maxResult, HitResult minResult)
         {
+            // Poor may be paired with any judgement result (mania BMS).
+            if (minResult == HitResult.Poor || maxResult == HitResult.Poor)
+                return;
+
             if (maxResult == HitResult.None || !IsHit(maxResult))
                 throw new ArgumentOutOfRangeException(nameof(maxResult), $"{maxResult} is not a valid maximum judgement result.");
-
-            // Pool is a special result that can be both max and min
-            if (minResult == HitResult.Poor)
-                return;
 
             if (minResult == HitResult.None || IsHit(minResult))
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum judgement result.");

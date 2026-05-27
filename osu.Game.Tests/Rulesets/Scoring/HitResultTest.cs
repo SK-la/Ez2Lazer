@@ -18,7 +18,8 @@ namespace osu.Game.Tests.Rulesets.Scoring
         [TestCase(new[] { HitResult.IgnoreHit }, new[] { HitResult.IgnoreMiss, HitResult.ComboBreak })]
         public void TestValidResultPairs(HitResult[] maxResults, HitResult[] minResults)
         {
-            HitResult[] unsupportedResults = HitResultExtensions.ALL_TYPES.Where(t => !minResults.Contains(t)).ToArray();
+            // Poor is intentionally excluded from standard min-result sets; it is validated separately in Ez mania.
+            HitResult[] unsupportedResults = HitResultExtensions.ALL_TYPES.Where(t => !minResults.Contains(t) && t != HitResult.Poor).ToArray();
 
             Assert.Multiple(() =>
             {
@@ -29,6 +30,22 @@ namespace osu.Game.Tests.Rulesets.Scoring
 
                     foreach (var unsupported in unsupportedResults)
                         Assert.Throws<ArgumentOutOfRangeException>(() => HitResultExtensions.ValidateHitResultPair(max, unsupported), $"{max} + {unsupported} should not be supported.");
+                }
+            });
+        }
+
+        [Test]
+        public void TestPoorCanPairWithAnyResult()
+        {
+            Assert.Multiple(() =>
+            {
+                foreach (var other in HitResultExtensions.ALL_TYPES)
+                {
+                    if (other == HitResult.None)
+                        continue;
+
+                    Assert.DoesNotThrow(() => HitResultExtensions.ValidateHitResultPair(other, HitResult.Poor), $"{other} + Poor should be supported.");
+                    Assert.DoesNotThrow(() => HitResultExtensions.ValidateHitResultPair(HitResult.Poor, other), $"Poor + {other} should be supported.");
                 }
             });
         }
