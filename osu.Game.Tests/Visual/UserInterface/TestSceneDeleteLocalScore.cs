@@ -174,6 +174,51 @@ namespace osu.Game.Tests.Visual.UserInterface
         }
 
         [Test]
+        public void TestDeleteViaRightClickWithMalformedMods()
+        {
+            ScoreInfo scoreBeingDeleted = null!;
+            AddStep("corrupt top score mods json", () =>
+            {
+                scoreBeingDeleted = importedScores.First();
+                Realm.Write(_ =>
+                {
+                    scoreBeingDeleted.ModsJson = "{ definitely not valid json }";
+                });
+            });
+
+            AddStep("open menu for corrupted score", () =>
+            {
+                var leaderboardScore = leaderboard.ChildrenOfType<BeatmapLeaderboardScore>()
+                                                  .First(s => s.Score.ID == scoreBeingDeleted.ID);
+
+                InputManager.MoveMouseTo(leaderboardScore);
+                InputManager.Click(MouseButton.Right);
+            });
+
+            // Ensure the context menu and delete dialog are shown without crashing.
+            AddStep("finish transforms", () => leaderboard.FinishTransforms(true));
+            AddStep("click delete option", () =>
+            {
+                InputManager.MoveMouseTo(leaderboard.ChildrenOfType<DrawableOsuMenuItem>()
+                                                    .First(i => string.Equals(i.Item.Text.Value.ToString(), "delete", System.StringComparison.OrdinalIgnoreCase)));
+                InputManager.Click(MouseButton.Left);
+            });
+            AddStep("finish transforms", () => dialogOverlay.FinishTransforms(true));
+            AddUntilStep("wait for delete dialog", () => dialogOverlay.ChildrenOfType<DialogButton>().Any());
+            AddStep("click delete button", () =>
+            {
+                InputManager.MoveMouseTo(dialogOverlay.ChildrenOfType<DialogButton>().First());
+                InputManager.PressButton(MouseButton.Left);
+            });
+
+            AddUntilStep("wait for fetch", () => scores.Any());
+            AddUntilStep("score removed from leaderboard", () => scores.All(s => s.ID != scoreBeingDeleted.ID));
+
+            // "Clean up"
+            AddStep("release left mouse button", () => InputManager.ReleaseButton(MouseButton.Left));
+        }
+
+        [Test]
         public void TestDeleteViaDatabase()
         {
             AddStep("delete top score", () => scoreManager.Delete(importedScores[0]));

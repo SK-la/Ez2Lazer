@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
+using osu.Framework.Logging;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
@@ -363,7 +364,22 @@ namespace osu.Game.Scoring
                 if (mods != null)
                     return mods;
 
-                return APIMods.Select(m => m.ToMod(Ruleset.CreateInstance())).ToArray();
+                List<Mod> parsedMods = new List<Mod>();
+                var ruleset = Ruleset.CreateInstance();
+
+                foreach (var apiMod in APIMods)
+                {
+                    try
+                    {
+                        parsedMods.Add(apiMod.ToMod(ruleset));
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Failed to deserialize score mod '{apiMod}': {ex.Message}");
+                    }
+                }
+
+                return parsedMods.ToArray();
             }
             set
             {
@@ -385,7 +401,17 @@ namespace osu.Game.Scoring
 
                 // prioritise reading from realm backing
                 if (!string.IsNullOrEmpty(ModsJson))
-                    apiMods = JsonConvert.DeserializeObject<APIMod[]>(ModsJson);
+                {
+                    try
+                    {
+                        apiMods = JsonConvert.DeserializeObject<APIMod[]>(ModsJson);
+                    }
+                    catch (JsonException ex)
+                    {
+                        Logger.Log($"Failed to deserialize score mods JSON: {ex.Message}");
+                        apiMods = Array.Empty<APIMod>();
+                    }
+                }
 
                 // then check mods set via Mods property.
                 if (mods != null)
