@@ -101,8 +101,19 @@ namespace osu.Game.Database
         /// 49   2025-06-10    Reset the LegacyOnlineID to -1 for all scores that have it set to 0 (which is semantically the same) for consistency of handling with OnlineID.
         /// 50   2025-07-11    Add UserTags to BeatmapMetadata.
         /// 51   2025-07-22    Add ScoreInfo.Pauses.
+        ///
+        /// Ez2Lazer-only revisions are tracked separately via <see cref="EZ_REALM_SCHEMA_VERSION"/>.
+        /// The on-disk Realm schema version is <see cref="file_schema_version"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 51001).
+        /// Ez v1: Add ScoreInfo.ManiaHitMode and ManiaHealthMode.
         /// </summary>
         private const int schema_version = 51;
+
+        /// <summary>
+        /// Ez2Lazer schema revision. Bump when adding Ez-persisted fields; do not change <see cref="schema_version"/> for Ez-only work.
+        /// </summary>
+        public const int EZ_REALM_SCHEMA_VERSION = 1;
+
+        private const int file_schema_version = schema_version * 1000 + EZ_REALM_SCHEMA_VERSION;
 
         /// <summary>
         /// Lock object which is held during <see cref="BlockAllOperations"/> sections, blocking realm retrieval during blocking periods.
@@ -173,7 +184,7 @@ namespace osu.Game.Database
                 updateRealm = getRealmInstance();
                 hasInitialisedOnce = true;
 
-                Logger.Log(@$"Opened realm ""{updateRealm.Config.DatabasePath}"" at version {updateRealm.Config.SchemaVersion}");
+                Logger.Log(@$"Opened realm ""{updateRealm.Config.DatabasePath}"" at version {updateRealm.Config.SchemaVersion} (schema_version {schema_version}, ez {EZ_REALM_SCHEMA_VERSION})");
 
                 // Resubscribe any subscriptions
                 foreach (var action in customSubscriptionsResetMap.Keys.ToArray())
@@ -806,7 +817,7 @@ namespace osu.Game.Database
 
             return new RealmConfiguration(storage.GetFullPath(filename ?? Filename, true))
             {
-                SchemaVersion = schema_version,
+                SchemaVersion = file_schema_version,
                 MigrationCallback = onMigration,
                 FallbackPipePath = tempPathLocation,
             };
@@ -814,8 +825,18 @@ namespace osu.Game.Database
 
         private void onMigration(Migration migration, ulong lastSchemaVersion)
         {
-            for (ulong i = lastSchemaVersion + 1; i <= schema_version; i++)
-                applyMigrationsForVersion(migration, i);
+            if (lastSchemaVersion < schema_version)
+            {
+                for (ulong i = lastSchemaVersion + 1; i <= schema_version; i++)
+                    applyMigrationsForVersion(migration, i);
+            }
+
+            int startingEzVersion = lastSchemaVersion >= (ulong)file_schema_version - EZ_REALM_SCHEMA_VERSION
+                ? (int)(lastSchemaVersion - schema_version * 1000)
+                : 0;
+
+            for (int ez = startingEzVersion + 1; ez <= EZ_REALM_SCHEMA_VERSION; ez++)
+                applyEzMigrationsForVersion(migration, ez);
         }
 
         private void applyMigrationsForVersion(Migration migration, ulong targetVersion)
@@ -1329,6 +1350,27 @@ namespace osu.Game.Database
             }
 
             Logger.Log($"Migration completed in {stopwatch.ElapsedMilliseconds}ms");
+        }
+
+        private void applyEzMigrationsForVersion(Migration migration, int targetEzVersion)
+        {
+            Logger.Log($"Running Ez realm migration to ez version {targetEzVersion} (file schema {schema_version * 1000 + targetEzVersion})...");
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
+            switch (targetEzVersion)
+            {
+                case 1:
+                    // Realm defaults new int columns to 0 (valid Lazer hit mode). Mark all existing scores as unset.
+                    foreach (var score in migration.NewRealm.All<ScoreInfo>())
+                    {
+                        score.ManiaHitMode = -1;
+                        score.ManiaHealthMode = -1;
+                    }
+
+                    break;
+            }
+
+            Logger.Log($"Ez migration completed in {stopwatch.ElapsedMilliseconds}ms");
         }
 
         private string? getRulesetShortNameFromLegacyID(long rulesetId)

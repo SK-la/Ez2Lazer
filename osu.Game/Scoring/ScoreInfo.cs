@@ -266,15 +266,13 @@ namespace osu.Game.Scoring
         public bool IsLegacyScore { get; set; }
 
         /// <summary>
-        /// Ez2Lazer: In-memory mania hit mode for the current session. Not persisted (restart will invalidate).
+        /// Ez2Lazer: Mania hit mode used when this score was set. <see cref="EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE"/> when unknown or not mania.
         /// </summary>
-        [Ignored]
         public int ManiaHitMode { get; set; } = EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE;
 
         /// <summary>
-        /// Ez2Lazer: In-memory mania health mode for the current session. Not persisted (restart will invalidate).
+        /// Ez2Lazer: Mania health mode used when this score was set. <see cref="EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE"/> when unknown or not mania.
         /// </summary>
-        [Ignored]
         public int ManiaHealthMode { get; set; } = EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE;
 
         private Dictionary<HitResult, int>? statistics;

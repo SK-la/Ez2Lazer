@@ -26,7 +26,6 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
@@ -102,8 +101,6 @@ namespace osu.Game.Screens.Ranking
 
         protected ResultsScreen(ScoreInfo? score)
         {
-            score?.HydrateManiaModesFromSession();
-
             Score = score;
 
             SelectedScore.Value = score;
