@@ -143,6 +143,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private bool expanded;
         private bool fullMapFocusActive;
+        private float focusSavedPanelWidth;
+        private float focusSavedPanelHeight;
 
         public readonly Bindable<bool> ExpandedState = new Bindable<bool>();
 
@@ -620,6 +622,8 @@ namespace osu.Game.EzOsuGame.Overlays
             }
 
             float targetPanelY = expanded ? 0 : 14;
+            float displayPanelWidth;
+            float displayPanelHeight;
 
             if (!fullMapFocusActive)
             {
@@ -628,24 +632,26 @@ namespace osu.Game.EzOsuGame.Overlays
                     : getDefaultPanelWidth();
 
                 panelHeight = clampPanelHeight(panelHeight);
+                displayPanelWidth = panelWidth;
+                displayPanelHeight = panelHeight;
             }
             else
             {
-                panelWidth = DrawWidth;
-                panelHeight = DrawHeight;
+                displayPanelWidth = DrawWidth;
+                displayPanelHeight = DrawHeight;
                 targetPanelY = 0;
             }
 
-            if (panelWidth != lastAppliedPanelWidth)
+            if (displayPanelWidth != lastAppliedPanelWidth)
             {
-                panelContainer.Width = panelWidth;
-                lastAppliedPanelWidth = panelWidth;
+                panelContainer.Width = displayPanelWidth;
+                lastAppliedPanelWidth = displayPanelWidth;
             }
 
-            if (panelHeight != lastAppliedPanelHeight)
+            if (displayPanelHeight != lastAppliedPanelHeight)
             {
-                panelContainer.Height = panelHeight;
-                lastAppliedPanelHeight = panelHeight;
+                panelContainer.Height = displayPanelHeight;
+                lastAppliedPanelHeight = displayPanelHeight;
             }
 
             panelContainer.X = fullMapFocusActive ? 0 : panel_left_margin;
@@ -679,7 +685,6 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (customManiaStaticMode && maniaStaticRenderer != null)
             {
-                maniaStaticRenderer.SetCurrentTime(previewClock.CurrentTime);
                 maniaStaticRenderer.SetDensity((float)previewDensity.Value);
                 updateProgressDisplay(previewClock.CurrentTime);
                 return;
@@ -797,6 +802,16 @@ namespace osu.Game.EzOsuGame.Overlays
                     return true;
                 }
             }
+
+            if (previewMode.Value == EzBeatmapPreviewMode.StaticScroll
+                && maniaStaticRenderer is StaticScrollPreviewRenderer scrollRenderer)
+            {
+                scrollRenderer.AdjustScroll(-e.ScrollDelta.Y * 48f);
+                return true;
+            }
+
+            if (drawableRuleset == null)
+                return base.OnScroll(e);
 
             if (e.CurrentState.Keyboard.AltPressed
                 && drawableRuleset is IDrawableScrollingRuleset scrolling
@@ -1024,7 +1039,11 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             setFullMapFocusState(false);
 
-            // First, clear the visual container (this disposes children on the update thread).
+            drawableRuleset = null;
+            maniaStaticRenderer = null;
+            densityController.DisposeSession();
+
+            // Clear disposes children; do not Dispose maniaStaticRenderer separately (avoids double-dispose).
             if (stageScaleContainer.Count > 0)
             {
                 if (!IsLoaded)
@@ -1032,11 +1051,6 @@ namespace osu.Game.EzOsuGame.Overlays
                 else
                     Schedule(() => stageScaleContainer.Clear(true));
             }
-
-            drawableRuleset = null;
-            maniaStaticRenderer?.Dispose();
-            maniaStaticRenderer = null;
-            densityController.DisposeSession();
         }
 
         private float clampPanelWidth(float width)
@@ -1226,7 +1240,6 @@ namespace osu.Game.EzOsuGame.Overlays
             stageScaleContainer.Size = Vector2.One;
             stageScaleContainer.Child = (Drawable)renderer;
 
-            maniaStaticRenderer?.Dispose();
             maniaStaticRenderer = renderer;
             drawableRuleset = null;
         }
@@ -1235,6 +1248,12 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             if (fullMapFocusActive == focused)
                 return;
+
+            if (focused)
+            {
+                focusSavedPanelWidth = lastAppliedPanelWidth > 0 ? lastAppliedPanelWidth : panelWidth;
+                focusSavedPanelHeight = lastAppliedPanelHeight > 0 ? lastAppliedPanelHeight : panelHeight;
+            }
 
             fullMapFocusActive = focused;
 
@@ -1245,6 +1264,14 @@ namespace osu.Game.EzOsuGame.Overlays
             topResizeHandle.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             rightResizeHandle.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             stateText.FadeTo(focused ? 0 : stateText.Alpha, 100, Easing.OutQuint);
+
+            if (!focused)
+            {
+                panelWidth = focusSavedPanelWidth;
+                panelHeight = focusSavedPanelHeight;
+                lastAppliedPanelWidth = -1;
+                lastAppliedPanelHeight = -1;
+            }
 
             if (maniaStaticRenderer is StaticFullMapPreviewRenderer fullMapRenderer)
                 fullMapRenderer.SetZoom(focused);

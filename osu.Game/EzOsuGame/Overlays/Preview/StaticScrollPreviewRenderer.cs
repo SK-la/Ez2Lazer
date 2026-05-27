@@ -13,24 +13,33 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 {
     public partial class StaticScrollPreviewRenderer : CompositeDrawable, IManiaStaticPreviewRenderer
     {
-        private float columnSpacing { get; } = 16f;
-        private float laneInsetRatio { get; } = 0.12f;
+        private const float column_spacing = 16f;
 
         private readonly Container content;
         private readonly ManiaPreviewBatchDrawable batchDrawable;
 
         private ManiaPreviewData data;
+        private List<ManiaPreviewLayoutEntry> layoutEntries = new List<ManiaPreviewLayoutEntry>();
+        private int totalRows = 1;
         private bool hasData;
-        private double currentTime;
-        private float density = 1;
+        private float density = 1f;
+        private float scrollOffset;
+        private float lastViewportWidth;
+        private int lastMeasuresPerColumn = -1;
 
         public StaticScrollPreviewRenderer()
         {
             RelativeSizeAxes = Axes.Both;
+            Masking = true;
+
             InternalChild = content = new Container
             {
-                RelativeSizeAxes = Axes.Both,
-                Child = batchDrawable = new ManiaPreviewBatchDrawable()
+                RelativeSizeAxes = Axes.Y,
+                AutoSizeAxes = Axes.X,
+                Child = batchDrawable = new ManiaPreviewBatchDrawable
+                {
+                    RelativeSizeAxes = Axes.None,
+                }
             };
         }
 
@@ -38,25 +47,30 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         {
             base.UpdateAfterChildren();
 
-            if (hasData)
-            {
+            if (!hasData)
+                return;
+
+            int measuresPerColumn = getMeasuresPerColumn();
+
+            if (DrawWidth != lastViewportWidth || measuresPerColumn != lastMeasuresPerColumn)
                 rebuild();
-                updateScrollOffset();
-            }
+
+            updateScrollOffset();
         }
 
         public void SetData(ManiaPreviewData data)
         {
             this.data = data;
+            layoutEntries = ManiaPreviewFixedLayout.Build(data);
+            totalRows = ManiaPreviewFixedLayout.GetTotalRows(layoutEntries);
             hasData = true;
+            lastMeasuresPerColumn = -1;
             rebuild();
             updateScrollOffset();
         }
 
         public void SetCurrentTime(double time)
         {
-            currentTime = time;
-            updateScrollOffset();
         }
 
         public void SetDensity(float density)
@@ -67,8 +81,16 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                 return;
 
             this.density = clamped;
+            lastMeasuresPerColumn = -1;
             rebuild();
             updateScrollOffset();
+        }
+
+        public void AdjustScroll(float delta)
+        {
+            float maxOffset = Math.Max(0, content.DrawWidth - DrawWidth);
+            scrollOffset = Math.Clamp(scrollOffset + delta, 0, maxOffset);
+            content.X = -scrollOffset;
         }
 
         private void rebuild()
@@ -76,118 +98,86 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             if (DrawWidth <= 1 || DrawHeight <= 1)
                 return;
 
+            lastViewportWidth = DrawWidth;
             int measuresPerColumn = getMeasuresPerColumn();
-            var quads = new List<PreviewQuad>(data.Notes.Count + data.BarLines.Count + data.TotalColumns * 4);
+            lastMeasuresPerColumn = measuresPerColumn;
 
-            IReadOnlyList<double> boundaries = buildMeasureBoundaries();
-            int segmentCount = Math.Max(1, boundaries.Count - 1);
-            int columnCount = Math.Max(1, (segmentCount + measuresPerColumn - 1) / measuresPerColumn);
+            int rowsPerColumn = measuresPerColumn * ManiaPreviewFixedLayout.ROWS_PER_MEASURE;
+            int columnCount = Math.Max(1, (totalRows + rowsPerColumn - 1) / rowsPerColumn);
 
-            float columnWidth = Math.Max(80, DrawWidth * 0.18f);
-            float laneWidth = columnWidth / Math.Max(1, data.TotalColumns);
-            float contentWidth = columnCount * columnWidth + Math.Max(0, columnCount - 1) * columnSpacing;
-            float laneLineThickness = Math.Max(1, DrawWidth * 0.0014f);
-            float barThickness = Math.Max(1, DrawHeight * 0.0016f);
-            float minNoteHeight = Math.Max(1.2f, DrawHeight * 0.004f);
+            float columnWidth = Math.Max(96f, DrawWidth * 0.22f);
+            float contentWidth = columnCount * columnWidth + Math.Max(0, columnCount - 1) * column_spacing;
+            (float rowStep, float noteHeight) = ManiaPreviewDrawHelper.ComputeRowMetrics(rowsPerColumn, DrawHeight);
 
-            content.Size = new Vector2(contentWidth, DrawHeight);
+            content.Height = DrawHeight;
             batchDrawable.Size = new Vector2(contentWidth, DrawHeight);
+
+            var quads = new List<PreviewQuad>(layoutEntries.Count + columnCount * (data.TotalColumns + rowsPerColumn));
+
+            float laneLineThickness = Math.Max(0.5f, columnWidth * 0.004f);
+            float beatLineThickness = Math.Max(0.5f, rowStep * 0.08f);
 
             for (int col = 0; col < columnCount; col++)
             {
-                float panelX = col * (columnWidth + columnSpacing);
-                int startSegment = col * measuresPerColumn;
-                int endSegment = Math.Min(segmentCount, startSegment + measuresPerColumn);
-                double startTime = boundaries[startSegment];
-                double endTime = boundaries[endSegment];
-                float span = (float)Math.Max(1, endTime - startTime);
+                float panelX = col * (columnWidth + column_spacing);
+                int rowStart = col * rowsPerColumn;
+                int rowEnd = Math.Min(totalRows, rowStart + rowsPerColumn);
 
-                quads.Add(new PreviewQuad(panelX, 0, 1.2f, DrawHeight, Color4.White.Opacity(0.2f)));
-                quads.Add(new PreviewQuad(panelX + columnWidth, 0, 1.2f, DrawHeight, Color4.White.Opacity(0.2f)));
+                quads.Add(new PreviewQuad(panelX, 0, 1f, DrawHeight, Color4.White.Opacity(0.18f)));
+                quads.Add(new PreviewQuad(panelX + columnWidth - 1f, 0, 1f, DrawHeight, Color4.White.Opacity(0.18f)));
 
-                for (int lane = 1; lane < data.TotalColumns; lane++)
+                ManiaPreviewDrawHelper.AddLaneLines(quads, data.TotalColumns, panelX, columnWidth, DrawHeight, laneLineThickness);
+
+                for (int row = rowStart + ManiaPreviewFixedLayout.ROWS_PER_BEAT; row <= rowEnd; row += ManiaPreviewFixedLayout.ROWS_PER_BEAT)
                 {
-                    float x = panelX + lane * laneWidth - laneLineThickness * 0.5f;
-                    quads.Add(new PreviewQuad(x, 0, laneLineThickness, DrawHeight, Color4.White.Opacity(0.12f)));
-                }
-
-                for (int seg = startSegment; seg <= endSegment; seg++)
-                {
-                    float y = (float)((boundaries[seg] - startTime) / span * DrawHeight);
-                    quads.Add(new PreviewQuad(panelX, y, columnWidth, barThickness, Color4.White.Opacity(0.23f)));
+                    float localRow = row - rowStart;
+                    float y = localRow * rowStep - beatLineThickness * 0.5f;
+                    quads.Add(new PreviewQuad(panelX, y, columnWidth, beatLineThickness, Color4.White.Opacity(0.2f)));
                 }
             }
 
-            foreach (ManiaPreviewNote note in data.Notes)
+            foreach (ManiaPreviewLayoutEntry entry in layoutEntries)
             {
-                int segIndex = locateSegment(boundaries, note.StartTime);
-                int col = segIndex / measuresPerColumn;
-                int colFirstSegment = col * measuresPerColumn;
-                int colLastSegment = Math.Min(segmentCount, colFirstSegment + measuresPerColumn);
-                double colStartTime = boundaries[colFirstSegment];
-                double colEndTime = boundaries[colLastSegment];
+                int col = entry.Row / rowsPerColumn;
+                if (col >= columnCount)
+                    continue;
 
-                float panelX = col * (columnWidth + columnSpacing);
-                float span = (float)Math.Max(1, colEndTime - colStartTime);
-                float laneX = panelX + note.Column * laneWidth + laneWidth * laneInsetRatio;
-                float laneW = laneWidth * (1 - laneInsetRatio * 2);
+                int rowStart = col * rowsPerColumn;
+                int rowEnd = Math.Min(totalRows, rowStart + rowsPerColumn);
 
-                float y0 = (float)((note.StartTime - colStartTime) / span * DrawHeight);
-                float y1 = (float)((Math.Min(note.EndTime, colEndTime) - colStartTime) / span * DrawHeight);
-                float h = Math.Max(minNoteHeight, y1 - y0);
+                if (entry.Row >= rowEnd)
+                    continue;
 
-                var colour = note.EndTime - note.StartTime > 1 ? new Color4(121, 201, 255, 220) : new Color4(255, 214, 124, 230);
-                quads.Add(new PreviewQuad(laneX, y0, laneW, h, colour));
+                float panelX = col * (columnWidth + column_spacing);
+                var localEntry = new ManiaPreviewLayoutEntry(
+                    entry.Column,
+                    entry.Row - rowStart,
+                    Math.Min(entry.EndRow, rowEnd - 1) - rowStart,
+                    entry.Kind);
+
+                ManiaPreviewDrawHelper.AddLayoutEntries(
+                    quads,
+                    new[] { localEntry },
+                    data.TotalColumns,
+                    panelX,
+                    columnWidth,
+                    rowStep,
+                    noteHeight,
+                    flatNotes: false);
             }
 
             batchDrawable.SetQuads(quads);
+            scrollOffset = Math.Clamp(scrollOffset, 0, Math.Max(0, contentWidth - DrawWidth));
+            content.X = -scrollOffset;
         }
 
         private void updateScrollOffset()
         {
-            if (!hasData || content.DrawWidth <= DrawWidth)
-            {
-                content.X = 0;
-                return;
-            }
-
-            double ratio = (currentTime - data.MinTime) / Math.Max(1, data.MaxTime - data.MinTime);
-            ratio = Math.Clamp(ratio, 0, 1);
-            float maxOffset = content.DrawWidth - DrawWidth;
-            content.X = (float)(maxOffset * ratio);
-        }
-
-        private IReadOnlyList<double> buildMeasureBoundaries()
-        {
-            if (data.BarLines.Count < 2)
-                return new[] { data.MinTime, data.MaxTime };
-
-            var boundaries = new List<double>(data.BarLines.Count + 2);
-
-            if (data.BarLines[0] > data.MinTime)
-                boundaries.Add(data.MinTime);
-
-            boundaries.AddRange(data.BarLines);
-
-            if (boundaries[^1] < data.MaxTime)
-                boundaries.Add(data.MaxTime);
-
-            return boundaries;
+            float maxOffset = Math.Max(0, content.DrawWidth - DrawWidth);
+            scrollOffset = Math.Clamp(scrollOffset, 0, maxOffset);
+            content.X = -scrollOffset;
         }
 
         private int getMeasuresPerColumn() => Math.Clamp((int)Math.Round(2f / density), 1, 8);
-
-        private static int locateSegment(IReadOnlyList<double> boundaries, double time)
-        {
-            int last = boundaries.Count - 2;
-
-            for (int i = 0; i <= last; i++)
-            {
-                if (time < boundaries[i + 1])
-                    return i;
-            }
-
-            return Math.Max(0, last);
-        }
     }
 }

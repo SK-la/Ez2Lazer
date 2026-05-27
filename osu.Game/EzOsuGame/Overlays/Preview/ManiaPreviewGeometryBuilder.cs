@@ -3,9 +3,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -13,36 +11,41 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 {
     public static class ManiaPreviewGeometryBuilder
     {
+        private const double hold_threshold_ms = 1;
+
         public static ManiaPreviewData Build(IBeatmap beatmap)
         {
             var hitObjects = beatmap.HitObjects;
             if (hitObjects.Count == 0)
-                return new ManiaPreviewData(4, 0, 1, Array.Empty<double>(), Array.Empty<ManiaPreviewNote>());
+                return new ManiaPreviewData(4, Array.Empty<ManiaPreviewNote>());
 
             int totalColumns = getTotalColumns(beatmap, hitObjects);
-            double minTime = hitObjects.Min(h => h.StartTime);
-            double maxTime = hitObjects.Max(h => h.GetEndTime());
-            maxTime = Math.Max(maxTime, minTime + 1);
-
-            var notes = new List<ManiaPreviewNote>(hitObjects.Count);
+            var notes = new List<ManiaPreviewNote>();
 
             foreach (HitObject obj in hitObjects)
             {
-                if (obj is not IHasColumn hasColumn)
+                if (!tryGetColumn(obj, totalColumns, out int column))
                     continue;
 
                 double endTime = obj is IHasDuration hasDuration ? obj.StartTime + Math.Max(0, hasDuration.Duration) : obj.StartTime;
-                notes.Add(new ManiaPreviewNote(obj.StartTime, Math.Max(endTime, obj.StartTime), Math.Clamp(hasColumn.Column, 0, totalColumns - 1)));
+                bool isHold = endTime - obj.StartTime > hold_threshold_ms;
+
+                if (!isHold)
+                {
+                    notes.Add(new ManiaPreviewNote(obj.StartTime, endTime, column, ManiaPreviewNoteKind.Tap));
+                    continue;
+                }
+
+                notes.Add(new ManiaPreviewNote(obj.StartTime, endTime, column, ManiaPreviewNoteKind.HoldHead));
             }
 
-            notes.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
+            notes.Sort((a, b) =>
+            {
+                int cmp = a.StartTime.CompareTo(b.StartTime);
+                return cmp != 0 ? cmp : a.Kind.CompareTo(b.Kind);
+            });
 
-            return new ManiaPreviewData(
-                totalColumns,
-                minTime,
-                maxTime,
-                generateBarLines(beatmap.ControlPointInfo, minTime, maxTime),
-                notes);
+            return new ManiaPreviewData(totalColumns, notes);
         }
 
         private static int getTotalColumns(IBeatmap beatmap, IReadOnlyList<HitObject> objects)
@@ -59,53 +62,22 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             return Math.Max(1, Math.Max(byDifficulty, maxColumn));
         }
 
-        private static List<double> generateBarLines(ControlPointInfo controlPoints, double minTime, double maxTime)
+        private static bool tryGetColumn(HitObject obj, int totalColumns, out int column)
         {
-            var barLines = new List<double>();
-            var timingPoints = controlPoints.TimingPoints;
-
-            if (timingPoints.Count == 0)
+            if (obj is IHasColumn hasColumn)
             {
-                fillDefaultBarLines(barLines, minTime, maxTime);
-                return barLines;
+                column = Math.Clamp(hasColumn.Column, 0, totalColumns - 1);
+                return true;
             }
 
-            for (int i = 0; i < timingPoints.Count; i++)
+            if (obj is IHasXPosition hasX)
             {
-                TimingControlPoint current = timingPoints[i];
-                double segmentStart = Math.Max(current.Time, minTime);
-                double segmentEnd = i + 1 < timingPoints.Count ? Math.Min(timingPoints[i + 1].Time, maxTime) : maxTime;
-
-                if (segmentEnd <= segmentStart)
-                    continue;
-
-                double barLength = Math.Max(1, current.BeatLength * Math.Max(1, current.TimeSignature.Numerator));
-                double first = current.OmitFirstBarLine ? current.Time + barLength : current.Time;
-
-                if (first > segmentEnd)
-                    continue;
-
-                double line = first + Math.Ceiling((segmentStart - first) / barLength) * barLength;
-
-                for (; line <= segmentEnd; line += barLength)
-                {
-                    if (line >= minTime && line <= maxTime)
-                        barLines.Add(line);
-                }
+                column = Math.Clamp((int)Math.Round(hasX.X), 0, totalColumns - 1);
+                return true;
             }
 
-            if (barLines.Count == 0)
-                fillDefaultBarLines(barLines, minTime, maxTime);
-
-            barLines.Sort();
-            return barLines;
-        }
-
-        private static void fillDefaultBarLines(List<double> barLines, double minTime, double maxTime)
-        {
-            const double default_bar_length = 2000;
-            for (double t = minTime; t <= maxTime; t += default_bar_length)
-                barLines.Add(t);
+            column = 0;
+            return false;
         }
     }
 }
