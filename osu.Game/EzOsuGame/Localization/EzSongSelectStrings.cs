@@ -35,11 +35,19 @@ namespace osu.Game.EzOsuGame.Localization
             "移除交集",
             "Remove intersection");
 
-        public static readonly LocalisableString SQLITE_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "使用 sqlite 库进行过滤、排序、分组；"
-            + "\n启用xxySR、PP的支持，搭配分支库时可以获得mod处理结果的支持；",
-            "Use sqlite library for filtering, sorting and grouping;"
-            + "\nEnable xxySR and PP support, with branch library can get mod processing results support;");
+        public static readonly LocalisableString EZ_ANALYSIS_FILTER = new EzLocalizationManager.EzLocalisableString(
+            "Ez分析过滤",
+            "Ez analysis filter");
+
+        public static readonly LocalisableString XXY_STAR_RATING = new EzLocalizationManager.EzLocalisableString(
+            "xxy SR",
+            "xxy SR");
+
+        public static readonly LocalisableString EZ_ANALYSIS_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "分支曲库激活时：开启后，**xxy SR** 排序/分组/筛选改用分支库 sqlite 中的 xxy（含 mod 变体），替代 Realm 基线。"
+            + "\n**官方难度**排序/分组始终使用 StarRating，不受此开关影响。",
+            "When a songs branch is active: **xxy SR** sort/group/star filter use branch sqlite xxy (incl. mod variants) instead of Realm baseline."
+            + "\nSort/group by official **Difficulty** always uses StarRating.");
 
         public static readonly LocalisableString KEY_SOUND_PREVIEW_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "按键音预览：\n0 关闭; \n1 蓝灯开启 (全量音效预览); \n2 黄灯开启 (全量音效预览, 游戏中自动播放 note 音效, 按键不再触发样本播放) ",

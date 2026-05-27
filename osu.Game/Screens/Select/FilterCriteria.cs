@@ -317,6 +317,7 @@ namespace osu.Game.Screens.Select
                 case SortMode.BPM:
                 case SortMode.Length:
                 case SortMode.Difficulty:
+                case SortMode.XxyStarRating:
                     return true;
 
                 default:

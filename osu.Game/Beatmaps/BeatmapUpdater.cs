@@ -19,6 +19,8 @@ namespace osu.Game.Beatmaps
     {
         private readonly IWorkingBeatmapCache workingBeatmapCache;
 
+        private readonly BeatmapManager? beatmapManager;
+
         private readonly BeatmapDifficultyCache difficultyCache;
 
         private readonly EzAnalysisCache ezAnalysisCache;
@@ -32,6 +34,7 @@ namespace osu.Game.Beatmaps
         public BeatmapUpdater(IWorkingBeatmapCache workingBeatmapCache, BeatmapDifficultyCache difficultyCache, EzAnalysisCache ezAnalysisCache, IAPIProvider api, Storage storage)
         {
             this.workingBeatmapCache = workingBeatmapCache;
+            beatmapManager = workingBeatmapCache as BeatmapManager;
             this.difficultyCache = difficultyCache;
             this.ezAnalysisCache = ezAnalysisCache;
 
@@ -71,6 +74,8 @@ namespace osu.Game.Beatmaps
                     var tagSummary = EzBeatmapTagParser.Parse(working);
                     beatmap.HasVideo = tagSummary.HasVideo;
                     beatmap.HasStoryboard = tagSummary.HasStoryboard;
+
+                    updateXxyStarRating(beatmap, working);
                 }
 
                 // And invalidate again afterwards as re-fetching the most up-to-date database metadata will be required.
@@ -94,6 +99,24 @@ namespace osu.Game.Beatmaps
                 // And invalidate again afterwards as re-fetching the most up-to-date database metadata will be required.
                 workingBeatmapCache.Invalidate(beatmapInfo);
             });
+        }
+
+        private void updateXxyStarRating(BeatmapInfo beatmap, WorkingBeatmap working)
+        {
+            if (!EzXxyStarRatingSupport.SupportsBeatmap(working.Beatmap, beatmap.Ruleset))
+            {
+                beatmap.XxyStarRating = -1;
+                return;
+            }
+
+            if (beatmapManager == null)
+                return;
+
+            var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
+
+            beatmap.XxyStarRating = EzAnalysisComputation.TryComputeXxySr(beatmapManager, lookup, CancellationToken.None, out double xxySr)
+                ? xxySr
+                : -1;
         }
 
         #region Implementation of IDisposable

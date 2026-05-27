@@ -24,8 +24,11 @@ using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Screens.Select.Filter;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
@@ -67,11 +70,15 @@ namespace osu.Game.Screens.Select
         private ScheduledDelegate? scheduledEzAnalysisUpdate;
 
         private bool ezAnalysisEnabled;
+        private bool shouldDisplayXxyStarRating;
         private string? scratchText;
         private const int mania_ui_update_throttle_ms = 15;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
+        private OsuConfigManager config { get; set; } = null!;
 
         [Resolved]
         private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
@@ -268,6 +275,7 @@ namespace osu.Game.Screens.Select
             ruleset.BindValueChanged(_ =>
             {
                 ezAnalysisEnabled = ezAnalysisCacheEnabled || ezAnalysisSqliteEnabled;
+                shouldDisplayXxyStarRating = EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value);
 
                 resetEzDisplay();
                 updateKeyCount();
@@ -278,13 +286,24 @@ namespace osu.Game.Screens.Select
                 updateKeyCount();
             }, true);
 
-            var sqliteFilter = ezConfig.GetBindable<bool>(Ez2Setting.SqliteFilter);
-            sqliteFilter.BindValueChanged(value =>
+            var ezAnalysisFilter = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisFilter);
+            var sortMode = config.GetBindable<SortMode>(OsuSetting.SongSelectSortingMode);
+            var groupMode = config.GetBindable<GroupMode>(OsuSetting.SongSelectGroupMode);
+
+            void updateStarFilterIcon()
             {
-                starCounter.Icon = value.NewValue
+                bool useXxyMetric = EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value)
+                                    && (sortMode.Value == SortMode.XxyStarRating || groupMode.Value == GroupMode.XxyStarRating);
+
+                starCounter.Icon = useXxyMetric
                     ? FontAwesome.Solid.Moon
                     : FontAwesome.Solid.Star;
-            }, true);
+            }
+
+            ruleset.BindValueChanged(_ => updateStarFilterIcon(), true);
+            sortMode.BindValueChanged(_ => updateStarFilterIcon());
+            groupMode.BindValueChanged(_ => updateStarFilterIcon());
+            ezAnalysisFilter.BindValueChanged(_ => updateStarFilterIcon(), true);
         }
 
         protected override void PrepareForUse()
@@ -302,22 +321,28 @@ namespace osu.Game.Screens.Select
 
             resetEzDisplay();
             ezDisplayTag.Beatmap = beatmap;
+            updateManiaDisplayFromBeatmap();
             computeEzAnalysis();
         }
 
         private void resetEzDisplay()
         {
-            if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
-            {
+            bool showXxy = shouldDisplayXxyStarRating && beatmap.SupportsXxyStarRating();
+
+            if (showXxy)
                 displaySR.Show();
-                ezDisplayKpc.Show();
+            else
+            {
+                displaySR.Current.Value = EzManiaSummary.EMPTY;
+                displaySR.Hide();
             }
+
+            if (ezAnalysisEnabled && showXxy)
+                ezDisplayKpc.Show();
             else
             {
                 ezDisplayKpc.ManiaSummary = null;
                 ezDisplayKpc.Hide();
-                displaySR.Current.Value = EzManiaSummary.EMPTY;
-                displaySR.Hide();
             }
         }
 
@@ -375,7 +400,7 @@ namespace osu.Game.Screens.Select
             ezDisplayKps.SetKps(ezAnalysisResult.Pp, avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
 
-            if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
+            if (shouldDisplayXxyStarRating && beatmap.SupportsXxyStarRating())
             {
                 var maniaSummary = ezAnalysisResult.ManiaSummary;
                 var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
@@ -383,8 +408,16 @@ namespace osu.Game.Screens.Select
                 scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 updateKeyCount();
                 ezDisplayKpc.ManiaSummary = maniaSummary;
-                displaySR.Current.Value = maniaSummary ?? EzManiaSummary.EMPTY;
+                displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay(maniaSummary);
             }
+        }
+
+        private void updateManiaDisplayFromBeatmap()
+        {
+            if (!shouldDisplayXxyStarRating || !beatmap.SupportsXxyStarRating())
+                return;
+
+            displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
         }
 
         private void computeEzAnalysis()

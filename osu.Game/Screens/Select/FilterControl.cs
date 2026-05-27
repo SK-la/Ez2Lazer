@@ -20,6 +20,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.UserInterface;
@@ -52,12 +53,12 @@ namespace osu.Game.Screens.Select
         private SongSelectSearchTextBox searchTextBox = null!;
         private ShearedToggleButton showConvertedBeatmapsButton = null!;
         private DifficultyRangeSlider difficultyRangeSlider = null!;
-        private ShearedDropdown<SortMode> sortDropdown = null!;
+        private SortModeDropdown sortDropdown = null!;
         private ShearedDropdown<GroupModeDropdownItem> groupDropdown = null!;
         private CollectionDropdown collectionDropdown = null!;
         private EzKeyModeSelector csSelector = null!;
         private ShearedKSPreviewButton ksPreviewButton = null!;
-        private ShearedToggleButton sqliteFilterButton = null!;
+        private ShearedToggleButton ezAnalysisFilterButton = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -213,10 +214,9 @@ namespace osu.Game.Screens.Select
                                     {
                                         new[]
                                         {
-                                            sortDropdown = new ShearedDropdown<SortMode>(SongSelectStrings.Sort)
+                                            sortDropdown = new SortModeDropdown(SongSelectStrings.Sort)
                                             {
                                                 RelativeSizeAxes = Axes.X,
-                                                Items = Enum.GetValues<SortMode>(),
                                             },
                                             Empty(),
                                             groupDropdown = new GroupModeDropdown(SongSelectStrings.Group)
@@ -252,13 +252,13 @@ namespace osu.Game.Screens.Select
                                                 RelativeSizeAxes = Axes.X,
                                             },
                                             Empty(),
-                                            sqliteFilterButton = new ShearedToggleButton
+                                            ezAnalysisFilterButton = new ShearedToggleButton
                                             {
                                                 Anchor = Anchor.Centre,
                                                 Origin = Anchor.Centre,
                                                 AutoSizeAxes = Axes.X,
-                                                Text = "sqlite",
-                                                TooltipText = EzSongSelectStrings.SQLITE_FILTER_TOOLTIP,
+                                                Text = EzSongSelectStrings.EZ_ANALYSIS_FILTER,
+                                                TooltipText = EzSongSelectStrings.EZ_ANALYSIS_FILTER_TOOLTIP,
                                                 Height = 30f,
                                             },
                                         },
@@ -287,7 +287,7 @@ namespace osu.Game.Screens.Select
             config.BindWith(OsuSetting.ShowConvertedBeatmaps, showConvertedBeatmapsButton.Active);
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
 
-            ezConfig.BindWith(Ez2Setting.SqliteFilter, sqliteFilterButton.Active);
+            ezConfig.BindWith(Ez2Setting.EzAnalysisFilter, ezAnalysisFilterButton.Active);
             ezConfig.BindWith(Ez2Setting.KeySoundPreviewMode, ksPreviewButton.State);
 
             ruleset.BindValueChanged(_ =>
@@ -307,7 +307,7 @@ namespace osu.Game.Screens.Select
                     return;
 
                 var rulesetCriteria = currentCriteria.RulesetCriteria;
-                if (sortDropdown.Current.Value == SortMode.PP || rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
+                if (sortDropdown.Current.Value is SortMode.PP or SortMode.XxyStarRating || rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
                     updateCriteria();
             });
 
@@ -361,7 +361,7 @@ namespace osu.Game.Screens.Select
             ScopedBeatmapSet.BindValueChanged(_ => updateCriteria(clearScopedSet: false));
 
             csSelector.Current.BindValueChanged(_ => updateCriteria());
-            sqliteFilterButton.Active.BindValueChanged(_ => updateCriteria());
+            ezAnalysisFilterButton.Active.BindValueChanged(_ => updateCriteria());
 
             updateEzControlVisibility();
             updateVisibleResultsActionAvailability();
@@ -627,6 +627,84 @@ namespace osu.Game.Screens.Select
             }
         }
 
+        private partial class SortModeDropdown : ShearedDropdown<SortMode>
+        {
+            [Resolved]
+            private IBindable<RulesetInfo> ruleset { get; set; } = null!;
+
+            private Bindable<SortMode> configSortMode { get; } = new Bindable<SortMode>();
+
+            public SortModeDropdown(LocalisableString label)
+                : base(label)
+            {
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OsuConfigManager config)
+            {
+                config.BindWith(OsuSetting.SongSelectSortingMode, configSortMode);
+            }
+
+            protected override void LoadAsyncComplete()
+            {
+                ruleset.BindValueChanged(_ =>
+                {
+                    updateAvailableItems();
+                    updateCurrentFromConfig();
+                }, true);
+                configSortMode.BindValueChanged(_ => updateCurrentFromConfig());
+                Current.BindValueChanged(currentChanged);
+
+                base.LoadAsyncComplete();
+            }
+
+            private void updateAvailableItems()
+            {
+                var items = new List<SortMode>();
+
+                foreach (var item in Enum.GetValues<SortMode>())
+                {
+                    if (item == SortMode.XxyStarRating && !EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value))
+                        continue;
+
+                    items.Add(item);
+                }
+
+                Items = items.ToArray();
+            }
+
+            private bool synchronisingBindables;
+
+            private void updateCurrentFromConfig()
+            {
+                if (synchronisingBindables)
+                    return;
+
+                synchronisingBindables = true;
+                Current.Value = Items.Contains(configSortMode.Value) ? configSortMode.Value : SortMode.Title;
+                synchronisingBindables = false;
+            }
+
+            private void currentChanged(ValueChangedEvent<SortMode> current)
+            {
+                if (synchronisingBindables)
+                    return;
+
+                if (current.NewValue == SortMode.XxyStarRating && !Items.Contains(SortMode.XxyStarRating))
+                    return;
+
+                configSortMode.Value = current.NewValue;
+            }
+
+            protected override LocalisableString GenerateItemText(SortMode item)
+            {
+                if (item == SortMode.XxyStarRating)
+                    return EzSongSelectStrings.XXY_STAR_RATING;
+
+                return item.GetLocalisableDescription();
+            }
+        }
+
         private partial class GroupModeDropdown : ShearedDropdown<GroupModeDropdownItem>
         {
             [Resolved]
@@ -673,6 +751,13 @@ namespace osu.Game.Screens.Select
                     {
                         case GroupMode.PP:
                             items.Add(new GroupModeDropdownItem(GroupMode.PP, "PP"));
+                            break;
+
+                        case GroupMode.XxyStarRating:
+                            if (!EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value))
+                                break;
+
+                            items.Add(new GroupModeDropdownItem(GroupMode.XxyStarRating, EzSongSelectStrings.XXY_STAR_RATING));
                             break;
 
                         default:

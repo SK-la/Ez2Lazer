@@ -81,6 +81,12 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             xxySr = 0;
 
+            if (beatmapInfo is BeatmapInfo beatmap && beatmap.XxyStarRating >= 0)
+            {
+                xxySr = beatmap.XxyStarRating;
+                return true;
+            }
+
             if (!TryGetStoredAnalysis(beatmapInfo, rulesetInfo, out var result))
                 return false;
 

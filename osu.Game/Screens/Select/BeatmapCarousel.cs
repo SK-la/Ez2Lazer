@@ -33,6 +33,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
+using osu.Game.Screens.Select.Filter;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using Realms;
@@ -57,8 +58,8 @@ namespace osu.Game.Screens.Select
         public const float SPACING = 3f;
 
         private IBindableList<BeatmapSetInfo> detachedBeatmaps = null!;
-        private Bindable<bool> sqliteFilter = null!;
-        private Bindable<bool> ezAnalysisSqliteEnabled = null!;
+        private Bindable<bool> ezAnalysisFilter = null!;
+        private Bindable<bool> ezAnalysisSqliteEnabled = null!; // PP 等 sqlite 消费端；不 gate xxy SR
         private IBindable<int> activeSongsBranchVersion = null!;
         private readonly AsyncLocal<Dictionary<Guid, double>?> operationDifficultyCache = new AsyncLocal<Dictionary<Guid, double>?>();
         private readonly AsyncLocal<Dictionary<Guid, double>?> operationPpCache = new AsyncLocal<Dictionary<Guid, double>?>();
@@ -132,15 +133,14 @@ namespace osu.Game.Screens.Select
 
             Filters = new ICarouselFilter[]
             {
-                new BeatmapCarouselFilterMatching(() => Criteria!, () => preferXxySrForDifficultyOperations, () => useActiveSongsBranchAsBeatmapSource, getDifficultiesForOperationsAsync, getActiveBranchDifficultiesAsync, getPpValuesForOperationsAsync),
-                new BeatmapCarouselFilterSorting(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultiesForOperationsAsync, getPpValuesForOperationsAsync),
+                new BeatmapCarouselFilterMatching(() => Criteria!, getDifficultiesForOperationsAsync, getPpValuesForOperationsAsync),
+                new BeatmapCarouselFilterSorting(() => Criteria!, getDifficultiesForOperationsAsync, getPpValuesForOperationsAsync),
                 grouping = new BeatmapCarouselFilterGrouping
                 {
                     GetCriteria = () => Criteria!,
                     GetCollections = GetAllCollections,
                     GetLocalUserTopRanks = GetBeatmapInfoGuidToTopRankMapping,
                     GetFavouriteBeatmapSets = GetFavouriteBeatmapSets,
-                    ShouldUseXxySrForDifficultyOperations = () => preferXxySrForDifficultyOperations,
                     GetDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync,
                     GetPpForOperationsAsync = getPpValuesForOperationsAsync,
                 }
@@ -170,86 +170,48 @@ namespace osu.Game.Screens.Select
             setupPools();
             detachedBeatmaps = beatmapStore.GetBeatmapSets(cancellationToken);
             loadSamples(audio);
-            sqliteFilter = ezConfig.GetBindable<bool>(Ez2Setting.SqliteFilter);
+            ezAnalysisFilter = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisFilter);
             ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
             config.BindWith(OsuSetting.RandomSelectAlgorithm, randomAlgorithm);
         }
 
         private bool useActiveSongsBranchAsBeatmapSource => ezAnalysisCache.IsActiveSongsBranchFor(ruleset.Value, Criteria?.Mods);
 
-        private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && ruleset.Value.OnlineID == 3 && sqliteFilter.Value;
+        private bool useEzAnalysisBranchForXxyOperations => useActiveSongsBranchAsBeatmapSource && ezAnalysisFilter.Value;
 
-        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getActiveBranchDifficultiesAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
-        {
-            if (!useActiveSongsBranchAsBeatmapSource)
-                return Task.FromResult(empty_operation_difficulties);
-
-            var beatmapList = beatmaps.Distinct().ToList();
-
-            if (beatmapList.Count == 0)
-                return Task.FromResult(empty_operation_difficulties);
-
-            var activeSongsBranchValues = ezAnalysisCache.GetActiveSongsBranchValues(beatmapList, ruleset.Value, Criteria?.Mods);
-
-            if (activeSongsBranchValues.Count == 0)
-                return Task.FromResult(empty_operation_difficulties);
-
-            var resolvedValues = new Dictionary<BeatmapInfo, double>(activeSongsBranchValues.Count);
-
-            foreach (var beatmap in beatmapList)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (activeSongsBranchValues.TryGetValue(beatmap.ID, out double xxySr))
-                    resolvedValues[beatmap] = xxySr;
-            }
-
-            return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
-        }
+        private static bool usesXxyStarRatingOperations(FilterCriteria criteria)
+            => criteria.Sort == SortMode.XxyStarRating || criteria.Group == GroupMode.XxyStarRating;
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getDifficultiesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
-            if (!preferXxySrForDifficultyOperations)
+            if (Criteria == null)
+                return Task.FromResult(empty_operation_difficulties);
+
+            if (!usesXxyStarRatingOperations(Criteria))
+                return Task.FromResult(empty_operation_difficulties);
+
+            if (useEzAnalysisBranchForXxyOperations)
+                return getStrictActiveBranchDifficultiesAsync(beatmaps.Distinct().ToList(), Criteria.Mods, cancellationToken);
+
+            return getRealmXxyStarRatingsAsync(beatmaps, cancellationToken);
+        }
+
+        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getRealmXxyStarRatingsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
+        {
+            if (!EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value))
                 return Task.FromResult(empty_operation_difficulties);
 
             var beatmapList = beatmaps.Distinct().ToList();
 
             if (beatmapList.Count == 0)
                 return Task.FromResult(empty_operation_difficulties);
-
-            var currentMods = Criteria?.Mods;
-            bool useCurrentBranch = ezAnalysisCache.IsActiveSongsBranchFor(ruleset.Value, currentMods);
-
-            if (useCurrentBranch)
-                return getStrictActiveBranchDifficultiesAsync(beatmapList, currentMods, cancellationToken);
-
-            if ((currentMods?.Count ?? 0) > 0)
-            {
-                return Task.FromResult(empty_operation_difficulties);
-            }
-
-            var cachedDifficulties = operationDifficultyCache.Value ??= new Dictionary<Guid, double>();
-            var uncachedBeatmaps = beatmapList.Where(b => !cachedDifficulties.ContainsKey(b.ID)).ToList();
-
-            if (uncachedBeatmaps.Count > 0)
-            {
-                var storedXxySrValues = ezAnalysisCache.GetStoredXxySrValues(uncachedBeatmaps, ruleset.Value, mods: null);
-
-                foreach (var beatmap in uncachedBeatmaps)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    cachedDifficulties[beatmap.ID] = storedXxySrValues.TryGetValue(beatmap.ID, out double xxySr) ? xxySr : beatmap.StarRating;
-                }
-            }
 
             var resolvedValues = new Dictionary<BeatmapInfo, double>(beatmapList.Count);
 
             foreach (var beatmap in beatmapList)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-
-                if (cachedDifficulties.TryGetValue(beatmap.ID, out double xxySr))
-                    resolvedValues[beatmap] = xxySr;
+                resolvedValues[beatmap] = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : beatmap.StarRating;
             }
 
             return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);

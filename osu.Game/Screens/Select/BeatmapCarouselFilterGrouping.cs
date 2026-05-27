@@ -47,7 +47,6 @@ namespace osu.Game.Screens.Select
         public required Func<List<BeatmapCollection>> GetCollections { get; init; }
         public required Func<FilterCriteria, IReadOnlyDictionary<Guid, ScoreRank>> GetLocalUserTopRanks { get; init; }
         public required Func<HashSet<int>> GetFavouriteBeatmapSets { get; init; }
-        public required Func<bool> ShouldUseXxySrForDifficultyOperations { get; init; }
         public required Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> GetDifficultiesForOperationsAsync { get; init; }
         public required Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> GetPpForOperationsAsync { get; init; }
 
@@ -69,12 +68,11 @@ namespace osu.Game.Screens.Select
 
                 // xxy_SR is only required when difficulty is the active grouping key.
                 // For 0/1 item, grouping key does not affect output.
-                bool useXxyDifficulty = criteria.Group == GroupMode.Difficulty
-                                        && ShouldUseXxySrForDifficultyOperations()
-                                        && itemList.Count > 1;
+                bool useXxyStarRatingGrouping = itemList.Count > 1
+                                                && criteria.Group == GroupMode.XxyStarRating;
                 bool usePpGrouping = criteria.Group == GroupMode.PP && itemList.Count > 0;
 
-                if (useXxyDifficulty)
+                if (useXxyStarRatingGrouping)
                 {
                     var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model).Distinct().ToList();
                     operationDifficulties = GetDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken)
@@ -200,7 +198,8 @@ namespace osu.Game.Screens.Select
         {
             // In certain cases, we intentionally split out difficulties
             // where it's more relevant or convenient to view them as individual items.
-            if (criteria.Sort == SortMode.Difficulty || criteria.Group == GroupMode.Difficulty || criteria.Group == GroupMode.PP)
+            if (criteria.Sort is SortMode.Difficulty or SortMode.XxyStarRating
+                || criteria.Group is GroupMode.Difficulty or GroupMode.XxyStarRating or GroupMode.PP)
                 return false;
             if (criteria.Sort == SortMode.LastPlayed && criteria.Group == GroupMode.LastPlayed)
                 return false;
@@ -251,6 +250,7 @@ namespace osu.Game.Screens.Select
                     return getGroupsBy(b => defineGroupByBPM(FormatUtils.RoundBPM(b.BPM)), items);
 
                 case GroupMode.Difficulty:
+                case GroupMode.XxyStarRating:
                     return getGroupsBy(b => defineGroupByStars(getDifficulty(b)), items);
 
                 case GroupMode.PP:

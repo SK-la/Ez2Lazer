@@ -103,7 +103,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.BeatmapPreviewDensity, 1.0, 0.1, 5.0, 0.05);
             SetDefault(Ez2Setting.EditorSyncTimelineSpacing, true);
 
-            SetDefault(Ez2Setting.SqliteFilter, false);
+            SetDefault(Ez2Setting.EzAnalysisFilter, false);
             SetDefault(Ez2Setting.EzSelectCsMode, string.Empty);
             SetDefault(Ez2Setting.ColumnTypeListSelect, 4);
 
@@ -769,7 +769,7 @@ namespace osu.Game.EzOsuGame.Configuration
         BeatmapPreviewDensity,
         EditorSyncTimelineSpacing,
 
-        SqliteFilter,
+        EzAnalysisFilter,
         EzSelectCsMode,
         ColumnTypeListSelect,
 
