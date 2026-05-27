@@ -65,7 +65,7 @@ namespace osu.Game.Screens.Select
                 if (beatmap.Hidden)
                     continue;
 
-                double starDifficultyForFilter = beatmap.StarRating;
+                double starDifficultyForFilter = useXxyForStarFilter ? beatmap.XxyStarRating : beatmap.StarRating;
 
                 if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double operationDifficulty))
                     starDifficultyForFilter = operationDifficulty;

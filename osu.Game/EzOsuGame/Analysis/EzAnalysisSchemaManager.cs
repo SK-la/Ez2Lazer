@@ -15,6 +15,8 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     internal static class EzAnalysisSchemaManager
     {
+        // Note: main sqlite remains v6-compatible for now. Legacy columns (pp/tag/xxy_sr) are schema-only
+        // compatibility baggage and must not be used as primary runtime data sources.
         public const int ANALYSIS_VERSION = EzAnalysisPersistentStore.ANALYSIS_VERSION;
         public const int MAIN_SCHEMA_VERSION = 2;
         public const string MAIN_DATABASE_KIND = "ez_analysis";
