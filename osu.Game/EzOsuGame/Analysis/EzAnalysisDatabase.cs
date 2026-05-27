@@ -87,14 +87,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 return true;
             }
 
-            if (!TryGetStoredAnalysis(beatmapInfo, rulesetInfo, out var result))
-                return false;
-
-            if (result.ManiaSummary?.XxySr is not double storedXxySr)
-                return false;
-
-            xxySr = storedXxySr;
-            return true;
+            return false;
         }
 
         public IBindable<string?> ActiveSongsBranchDisplayName => activeSongsBranchDisplayName;
@@ -472,8 +465,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return beatmapInfo is BeatmapInfo localBeatmapInfo && persistentStore.NeedsOnDemandBackfill(localBeatmapInfo);
         }
 
-        public Task<EzAnalysisResult?> BackfillStoredDataAsync(BeatmapInfo beatmapInfo, bool includeTagData = false, bool skipExistingComparison = false,
-                                                               CancellationToken cancellationToken = default)
+        public Task<EzAnalysisResult?> BackfillStoredDataAsync(BeatmapInfo beatmapInfo, bool skipExistingComparison = false, CancellationToken cancellationToken = default)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
                 return Task.FromResult<EzAnalysisResult?>(null);
@@ -481,11 +473,11 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!tryCreateStoredLookup(beatmapInfo, beatmapInfo.Ruleset, mods: null, out var lookup))
                 return Task.FromResult<EzAnalysisResult?>(null);
 
-            return Task.Run(() => backfillStoredData(beatmapInfo, lookup, includeTagData, skipExistingComparison, cancellationToken), cancellationToken);
+            return Task.Run(() => backfillStoredData(beatmapInfo, lookup, skipExistingComparison, cancellationToken), cancellationToken);
         }
 
         public Task<EzAnalysisResult?> RecomputeStoredAnalysisAsync(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
-            => BackfillStoredDataAsync(beatmapInfo, includeTagData: false, skipExistingComparison: false, cancellationToken);
+            => BackfillStoredDataAsync(beatmapInfo, skipExistingComparison: false, cancellationToken);
 
         internal static bool CanUseStoredAnalysis(BeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, IEnumerable<Mod>? mods)
         {
@@ -500,8 +492,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return mods == null || !mods.Any();
         }
 
-        private EzAnalysisResult? backfillStoredData(BeatmapInfo beatmapInfo, EzAnalysisLookupCache lookup, bool includeTagData, bool skipExistingComparison,
-                                                     CancellationToken cancellationToken)
+        private EzAnalysisResult? backfillStoredData(BeatmapInfo beatmapInfo, EzAnalysisLookupCache lookup, bool skipExistingComparison, CancellationToken cancellationToken)
         {
             try
             {
@@ -509,7 +500,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     ? existingAnalysis
                     : null;
 
-                var missingData = EzAnalysisPersistentStore.GetMissingData(storedAnalysis, beatmapInfo.Ruleset.OnlineID, requireTagData: false);
+                var missingData = EzAnalysisPersistentStore.GetMissingData(storedAnalysis, beatmapInfo.Ruleset.OnlineID);
                 bool needsAnalysis = EzAnalysisPersistentStore.RequiresAnalysisComputation(missingData);
 
                 if (!needsAnalysis)

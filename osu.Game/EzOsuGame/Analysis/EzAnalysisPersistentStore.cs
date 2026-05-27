@@ -40,8 +40,7 @@ namespace osu.Game.EzOsuGame.Analysis
             None = 0,
             Common = 1 << 0,
             Pp = 1 << 1,
-            Tag = 1 << 2,
-            Mania = 1 << 3,
+            Mania = 1 << 2,
         }
 
         public readonly record struct SongsBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double XxySr, double? Pp);
@@ -403,13 +402,7 @@ WHERE entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID} IN ({string.Join(", ", para
 
         /// <summary>
         /// 对比新计算结果和 SQLite 中的旧数据，如果有差异则更新。
-        /// 主要场景：
-        /// - xxysr 从 null 补算成有值（mania 模式的谱面被重新计算）
-        /// - KPS 数据有显著变化（算法修复等）
-        /// 工作机制：
-        /// - 如果 stored 数据不存在，直接存储新数据
-        /// - 如果 stored xxysr == null 而 computed 有值，说明需要补充 xxysr，更新
-        /// - 如果都是 xxysr == null，说明是非 mania 模式数据，比较 KPS 数据是否相同
+        /// 主要场景：KPS / PP / mania 列统计变化（算法修复等）。基线 xxy 已迁到 Realm，不在此比较。
         /// </summary>
         public void StoreIfDifferent(BeatmapInfo beatmap, EzAnalysisResult analysis)
         {
@@ -450,8 +443,8 @@ WHERE entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID} IN ({string.Join(", ", para
                 }
 
                 // 对比两个结果是否有差异
-                MissingDataKind filledMissingData = GetMissingData(storedAnalysis, beatmap.Ruleset.OnlineID, requireTagData: false) &
-                                                    ~GetMissingData(analysis, beatmap.Ruleset.OnlineID, requireTagData: false);
+                MissingDataKind filledMissingData = GetMissingData(storedAnalysis, beatmap.Ruleset.OnlineID) &
+                                                    ~GetMissingData(analysis, beatmap.Ruleset.OnlineID);
 
                 if (filledMissingData != MissingDataKind.None || hasDifference(storedAnalysis, analysis))
                 {
@@ -487,10 +480,7 @@ SELECT entry.{EzAnalysisSchemaManager.COL_BEATMAP_HASH},
        entry.{EzAnalysisSchemaManager.COL_MAX_KPS},
        entry.{EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
     entry.{EzAnalysisSchemaManager.COL_PP},
-       entry.{EzAnalysisSchemaManager.COL_TAG_UPDATED_AT},
-       entry.{EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON},
        mania.{EzAnalysisSchemaManager.COL_UPDATED_AT},
-       mania.{EzAnalysisSchemaManager.COL_XXY_SR},
        mania.{EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON},
        mania.{EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON}
 FROM {EzAnalysisSchemaManager.TABLE_ENTRY} entry
@@ -535,15 +525,11 @@ LIMIT 1;
                     double maxKps = reader.GetDouble(5);
                     string kpsListJson = reader.GetString(6);
                     double? pp = reader.IsDBNull(7) ? null : reader.GetDouble(7);
-                    long tagUpdatedAt = reader.GetInt64(8);
-                    string tagPayloadJson = reader.GetString(9);
-                    long maniaUpdatedAt = reader.IsDBNull(10) ? 0 : reader.GetInt64(10);
-                    double? xxySr = reader.IsDBNull(11) ? null : reader.GetDouble(11);
-                    if (beatmap.XxyStarRating >= 0)
-                        xxySr = beatmap.XxyStarRating;
+                    long maniaUpdatedAt = reader.IsDBNull(8) ? 0 : reader.GetInt64(8);
+                    double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
 
-                    string columnCountsJson = reader.IsDBNull(12) ? "{}" : reader.GetString(12);
-                    string holdNoteCountsJson = reader.IsDBNull(13) ? "{}" : reader.GetString(13);
+                    string columnCountsJson = reader.IsDBNull(9) ? "{}" : reader.GetString(9);
+                    string holdNoteCountsJson = reader.IsDBNull(10) ? "{}" : reader.GetString(10);
 
                     var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
                     var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
@@ -553,9 +539,7 @@ LIMIT 1;
                         ? new EzManiaSummary(columnCounts, holdNoteCounts, xxySr)
                         : null;
 
-                    EzBeatmapTagSummary? tagSummary = deserializeTagSummary(tagPayloadJson, tagUpdatedAt);
-
-                    result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), pp, maniaSummary, tagSummary);
+                    result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), pp, maniaSummary);
 
                     if (pending is not null && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
                         result = mergeAnalysisResult(result, pending.Analysis);
@@ -682,7 +666,7 @@ LIMIT 1;
                 ? existingAnalysis
                 : null;
 
-            return GetMissingData(storedAnalysis, beatmap.Ruleset.OnlineID, requireTagData: false) != MissingDataKind.None;
+            return GetMissingData(storedAnalysis, beatmap.Ruleset.OnlineID) != MissingDataKind.None;
         }
 
         public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash, int rulesetOnlineId)> beatmaps) => GetBeatmapsNeedingRecompute(beatmaps, progress: null);
@@ -698,7 +682,7 @@ LIMIT 1;
 
                 var beatmapList = beatmaps as IList<(Guid id, string hash, int rulesetOnlineId)> ?? beatmaps.ToList();
 
-                var existing = new Dictionary<Guid, (string hash, int rulesetOnlineId, long commonUpdatedAt, long tagUpdatedAt, bool hasPp)>();
+                var existing = new Dictionary<Guid, (string hash, int rulesetOnlineId, long commonUpdatedAt, bool hasPp)>();
                 var maniaUpdated = new HashSet<Guid>();
 
                 bool forceRecompute;
@@ -712,7 +696,6 @@ SELECT {EzAnalysisSchemaManager.COL_BEATMAP_ID},
        {EzAnalysisSchemaManager.COL_BEATMAP_HASH},
        {EzAnalysisSchemaManager.COL_RULESET_ONLINE_ID},
        {EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT},
-       {EzAnalysisSchemaManager.COL_TAG_UPDATED_AT},
        {EzAnalysisSchemaManager.COL_PP}
 FROM {EzAnalysisSchemaManager.TABLE_ENTRY};
 ";
@@ -724,7 +707,7 @@ FROM {EzAnalysisSchemaManager.TABLE_ENTRY};
                             if (!Guid.TryParse(reader.GetString(0), out var id))
                                 continue;
 
-                            existing[id] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt64(3), reader.GetInt64(4), !reader.IsDBNull(5));
+                            existing[id] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt64(3), !reader.IsDBNull(4));
                         }
                     }
 
@@ -766,7 +749,7 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
                         continue;
                     }
 
-                    MissingDataKind missingData = getMissingData(row.commonUpdatedAt, row.tagUpdatedAt, row.hasPp, maniaUpdated.Contains(id), rulesetOnlineId, requireTagData: false);
+                    MissingDataKind missingData = getMissingData(row.commonUpdatedAt, row.hasPp, maniaUpdated.Contains(id), rulesetOnlineId);
 
                     if (!string.Equals(row.hash, hash, StringComparison.Ordinal)
                         || row.rulesetOnlineId != rulesetOnlineId
@@ -2243,9 +2226,7 @@ INSERT INTO {EzAnalysisSchemaManager.TABLE_ENTRY}(
     {EzAnalysisSchemaManager.COL_AVERAGE_KPS},
     {EzAnalysisSchemaManager.COL_MAX_KPS},
     {EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
-    {EzAnalysisSchemaManager.COL_PP},
-    {EzAnalysisSchemaManager.COL_TAG_UPDATED_AT},
-    {EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON}
+    {EzAnalysisSchemaManager.COL_PP}
 )
 VALUES(
     $id,
@@ -2256,9 +2237,7 @@ VALUES(
     $avg,
     $max,
     $kps,
-    $pp,
-    $tag_updated_at,
-    $tag_payload_json
+    $pp
 )
 ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
     {EzAnalysisSchemaManager.COL_BEATMAP_HASH} = excluded.{EzAnalysisSchemaManager.COL_BEATMAP_HASH},
@@ -2268,9 +2247,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
     {EzAnalysisSchemaManager.COL_AVERAGE_KPS} = excluded.{EzAnalysisSchemaManager.COL_AVERAGE_KPS},
     {EzAnalysisSchemaManager.COL_MAX_KPS} = excluded.{EzAnalysisSchemaManager.COL_MAX_KPS},
     {EzAnalysisSchemaManager.COL_KPS_LIST_JSON} = excluded.{EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
-    {EzAnalysisSchemaManager.COL_PP} = excluded.{EzAnalysisSchemaManager.COL_PP},
-    {EzAnalysisSchemaManager.COL_TAG_UPDATED_AT} = excluded.{EzAnalysisSchemaManager.COL_TAG_UPDATED_AT},
-    {EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON} = excluded.{EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON};
+    {EzAnalysisSchemaManager.COL_PP} = excluded.{EzAnalysisSchemaManager.COL_PP};
 ";
                 entry.Parameters.AddWithValue("$id", beatmap.ID.ToString());
                 entry.Parameters.AddWithValue("$hash", beatmap.Hash);
@@ -2281,8 +2258,6 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
                 entry.Parameters.AddWithValue("$max", analysis.MaxKps);
                 entry.Parameters.AddWithValue("$kps", kpsListJson);
                 entry.Parameters.AddWithValue("$pp", analysis.Pp is double pp ? pp : DBNull.Value);
-                entry.Parameters.AddWithValue("$tag_updated_at", 0);
-                entry.Parameters.AddWithValue("$tag_payload_json", string.Empty);
                 entry.ExecuteNonQuery();
             }
 
@@ -2337,10 +2312,10 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
         private static EzAnalysisResult mergeAnalysisResult(EzAnalysisResult storedAnalysis, EzAnalysisResult computedAnalysis)
             => computedAnalysis;
 
-        internal static MissingDataKind GetMissingData(EzAnalysisResult? storedAnalysis, int rulesetOnlineId, bool requireTagData)
+        internal static MissingDataKind GetMissingData(EzAnalysisResult? storedAnalysis, int rulesetOnlineId)
         {
             if (!storedAnalysis.HasValue)
-                return getRequiredDataMask(rulesetOnlineId, requireTagData);
+                return getRequiredDataMask(rulesetOnlineId);
 
             MissingDataKind missingData = MissingDataKind.None;
             EzAnalysisResult analysis = storedAnalysis.Value;
@@ -2351,9 +2326,6 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
             if (analysis.Pp == null)
                 missingData |= MissingDataKind.Pp;
 
-            if (requireTagData && analysis.TagSummary == null)
-                missingData |= MissingDataKind.Tag;
-
             if (rulesetOnlineId == 3 && analysis.ManiaSummary == null)
                 missingData |= MissingDataKind.Mania;
 
@@ -2363,7 +2335,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
         internal static bool RequiresAnalysisComputation(MissingDataKind missingData)
             => (missingData & (MissingDataKind.Common | MissingDataKind.Pp | MissingDataKind.Mania)) != MissingDataKind.None;
 
-        private static MissingDataKind getMissingData(long commonUpdatedAt, long tagUpdatedAt, bool hasPp, bool hasManiaData, int rulesetOnlineId, bool requireTagData)
+        private static MissingDataKind getMissingData(long commonUpdatedAt, bool hasPp, bool hasManiaData, int rulesetOnlineId)
         {
             MissingDataKind missingData = MissingDataKind.None;
 
@@ -2373,42 +2345,20 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
             if (!hasPp)
                 missingData |= MissingDataKind.Pp;
 
-            if (requireTagData && tagUpdatedAt <= 0)
-                missingData |= MissingDataKind.Tag;
-
             if (rulesetOnlineId == 3 && !hasManiaData)
                 missingData |= MissingDataKind.Mania;
 
             return missingData;
         }
 
-        private static MissingDataKind getRequiredDataMask(int rulesetOnlineId, bool requireTagData)
+        private static MissingDataKind getRequiredDataMask(int rulesetOnlineId)
         {
             MissingDataKind requiredData = MissingDataKind.Common | MissingDataKind.Pp;
-
-            if (requireTagData)
-                requiredData |= MissingDataKind.Tag;
 
             if (rulesetOnlineId == 3)
                 requiredData |= MissingDataKind.Mania;
 
             return requiredData;
-        }
-
-        private static string serializeTagSummary(EzBeatmapTagSummary? tagSummary)
-            => tagSummary is EzBeatmapTagSummary value
-                ? JsonSerializer.Serialize(value)
-                : string.Empty;
-
-        private static EzBeatmapTagSummary? deserializeTagSummary(string tagPayloadJson, long tagUpdatedAt)
-        {
-            if (tagUpdatedAt <= 0)
-                return null;
-
-            if (string.IsNullOrWhiteSpace(tagPayloadJson))
-                return EzBeatmapTagSummary.EMPTY;
-
-            return JsonSerializer.Deserialize<EzBeatmapTagSummary>(tagPayloadJson);
         }
 
         private void cleanupUnrecognizedColumns(SqliteConnection connection)
