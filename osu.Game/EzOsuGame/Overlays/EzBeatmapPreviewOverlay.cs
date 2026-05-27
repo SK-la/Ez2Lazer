@@ -1304,10 +1304,6 @@ namespace osu.Game.EzOsuGame.Overlays
             stageScaleContainer.RelativeSizeAxes = Axes.Both;
             stageScaleContainer.Scale = Vector2.One;
             stageScaleContainer.Size = Vector2.One;
-
-            if (stageScaleContainer.Count > 0)
-                stageScaleContainer.Clear(false);
-
             stageScaleContainer.Child = (Drawable)renderer;
 
             maniaStaticRenderer = renderer;
