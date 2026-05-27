@@ -24,6 +24,13 @@ namespace osu.Game.EzOsuGame.Configuration
         }
 
         /// <summary>
+        /// When set, <see cref="OsuGameBase.CreateEndpoints"/> uses development API endpoints (dev.ppy.sh)
+        /// so official tests that assume dev.ppy.sh URLs keep working despite Ez server presets.
+        /// Enabled by <c>Ez2TestSetup</c> during DEBUG test runs.
+        /// </summary>
+        public static bool UseDevelopmentEndpointsForTests { get; set; }
+
+        /// <summary>
         /// Ensures <see cref="EzConfig"/> exists. Used by unit tests and early gameplay code paths before <see cref="OsuGameBase"/> finishes loading.
         /// </summary>
         public static Ez2ConfigManager EnsureInitialized(Storage? storage = null)

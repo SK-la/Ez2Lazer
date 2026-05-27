@@ -10,6 +10,10 @@ namespace osu.Game.Tests
     public class Ez2TestSetup
     {
         [OneTimeSetUp]
-        public void GlobalSetup() => GlobalConfigStore.EnsureInitialized();
+        public void GlobalSetup()
+        {
+            GlobalConfigStore.EnsureInitialized();
+            GlobalConfigStore.UseDevelopmentEndpointsForTests = true;
+        }
     }
 }

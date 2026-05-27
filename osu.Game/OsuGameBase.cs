@@ -113,6 +113,9 @@ namespace osu.Game
 
         public virtual EndpointConfiguration CreateEndpoints()
         {
+            if (UseDevelopmentServer && GlobalConfigStore.UseDevelopmentEndpointsForTests)
+                return new DevelopmentEndpointConfiguration();
+
             // 如果Ez2ConfigManager已初始化，根据服务器预设选择对应的配置
             if (Ez2ConfigManager != null)
             {
