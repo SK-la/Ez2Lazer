@@ -4,6 +4,7 @@
 using osu.Framework.Localisation;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -16,7 +17,7 @@ namespace osu.Game.EzOsuGame.Overlays
         protected override LocalisableString Header => EzSettingsStrings.EZ_UI_SETTINGS_HEADER;
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezConfig)
+        private void load(Ez2ConfigManager ezConfig, BackgroundDataStoreProcessor backgroundDataStoreProcessor)
         {
             AddRange(new Drawable[]
             {
@@ -37,6 +38,20 @@ namespace osu.Game.EzOsuGame.Overlays
                 })
                 {
                     Keywords = new[] { "analysis", "sqlite", "cache", "warmup", "persistent" }
+                },
+                new SettingsButtonV2
+                {
+                    Text = EzSettingsStrings.EZ_REALM_METADATA_BACKFILL_BUTTON,
+                    TooltipText = EzSettingsStrings.EZ_REALM_METADATA_BACKFILL_TOOLTIP,
+                    Action = () => backgroundDataStoreProcessor.QueueEzRealmMetadataBackfill(),
+                    Keywords = new[] { "realm", "tag", "xxy", "pp", "metadata", "backfill" },
+                },
+                new SettingsButtonV2
+                {
+                    Text = EzSettingsStrings.EZ_REALM_METADATA_BACKFILL_FORCE_BUTTON,
+                    TooltipText = EzSettingsStrings.EZ_REALM_METADATA_BACKFILL_FORCE_TOOLTIP,
+                    Action = () => backgroundDataStoreProcessor.QueueEzRealmMetadataBackfill(forceAll: true),
+                    Keywords = new[] { "realm", "tag", "xxy", "pp", "metadata", "force", "recalculate" },
                 },
                 new SettingsItemV2(new FormCheckBox
                 {

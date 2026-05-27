@@ -85,6 +85,30 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nWhen enabled: Panels read local data directly, and perform warmup queue analysis loading on exe startup (progress will pause when entering gameplay), but Mod conversion results will not be considered."
             + "\nWhen disabled: Do not read SQLite local data, and do not perform warmup.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL =
+            new EzLocalizationManager.EzLocalisableString("补算 Realm 元数据（Tag / XxySR / PP）", "Backfill Realm metadata (Tag / XxySR / PP)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_BUTTON =
+            new EzLocalizationManager.EzLocalisableString("立即补算", "Backfill now");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "在后台补算选歌面板所需的 Realm 字段：谱面 Tag（视频/Storyboard）、Xxy 星级、PP。"
+            + "\n启动时也会自动执行；若看不到进度通知，可点此手动触发。",
+            "Backfill Realm fields used by song select: beatmap tags (video/storyboard), Xxy star rating, and PP."
+            + "\nAlso runs automatically at startup; use this if progress notifications did not appear.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_FORCE =
+            new EzLocalizationManager.EzLocalisableString("强制全部重算 Realm 元数据", "Force full Realm metadata recalculation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_FORCE_BUTTON =
+            new EzLocalizationManager.EzLocalisableString("强制重算", "Force recalculate");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_FORCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "先将所有谱面的 Tag / XxySR / PP 标记为未计算，再执行完整补算。"
+            + "\n谱面较多时耗时较长，请留意右下角进度通知。",
+            "Marks all beatmaps' Tag / XxySR / PP as uncomputed, then runs a full backfill."
+            + "\nMay take a long time for large libraries; watch the progress notification.");
+
         #region 机制类
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez Mania 设置", "Ez Mania Settings");
