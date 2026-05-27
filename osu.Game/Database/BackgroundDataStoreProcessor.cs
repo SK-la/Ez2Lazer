@@ -17,6 +17,8 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Extensions;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
@@ -73,6 +75,9 @@ namespace osu.Game.Database
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
         private LocalCachedBeatmapMetadataSource localMetadataSource = null!;
 
         protected virtual int TimeToSleepDuringGameplay => 30000;
@@ -89,6 +94,7 @@ namespace osu.Game.Database
 
                 clearOutdatedStarRatings();
                 populateMissingStarRatings();
+                populateMissingEzBeatmapRealmFields();
                 processOnlineBeatmapSetsWithNoUpdate();
                 // Note that the previous method will also update these on a fresh run.
                 processBeatmapsWithMissingObjectCounts();
@@ -222,6 +228,89 @@ namespace osu.Game.Database
             }
 
             completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
+        }
+
+        /// <summary>
+        /// Backfill Ez Realm columns on <see cref="BeatmapInfo"/> (tag, baseline xxy) via <see cref="IBeatmapUpdater.Process"/>.
+        /// Runs a one-time full pass when <see cref="RealmAccess.EZ_REALM_SCHEMA_VERSION"/> increases; afterwards only missing xxy.
+        /// </summary>
+        private void populateMissingEzBeatmapRealmFields()
+        {
+            const int target_version = RealmAccess.EZ_REALM_SCHEMA_VERSION;
+            int lastBackfillVersion = ezConfig.Get<int>(Ez2Setting.EzRealmMetadataBackfillVersion);
+            bool runFullBackfill = lastBackfillVersion < target_version;
+
+            HashSet<Guid> beatmapSetIds = new HashSet<Guid>();
+
+            Logger.Log(runFullBackfill
+                ? $"Querying for beatmap sets requiring Ez Realm metadata backfill (target ez version {target_version})..."
+                : "Querying for beatmap sets with missing baseline xxy star rating...");
+
+            realmAccess.Run(r =>
+            {
+                if (runFullBackfill)
+                {
+                    foreach (var set in r.All<BeatmapSetInfo>())
+                        beatmapSetIds.Add(set.ID);
+
+                    return;
+                }
+
+                foreach (var beatmap in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && b.XxyStarRating < 0 && EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset)))
+                    beatmapSetIds.Add(beatmap.BeatmapSet!.ID);
+            });
+
+            if (beatmapSetIds.Count == 0)
+            {
+                if (runFullBackfill)
+                    ezConfig.SetValue(Ez2Setting.EzRealmMetadataBackfillVersion, target_version);
+
+                return;
+            }
+
+            Logger.Log($"Found {beatmapSetIds.Count} beatmap sets which require Ez Realm metadata population.");
+
+            var notification = showProgressNotification(
+                beatmapSetIds.Count,
+                "Populating Ez beatmap metadata in Realm",
+                "beatmap sets have been updated with Ez tag/xxy metadata");
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            foreach (var id in beatmapSetIds)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                updateNotificationProgress(notification, processedCount, beatmapSetIds.Count);
+
+                sleepIfRequired();
+
+                realmAccess.Run(r =>
+                {
+                    var set = r.Find<BeatmapSetInfo>(id);
+
+                    if (set == null)
+                        return;
+
+                    try
+                    {
+                        beatmapUpdater.Process(set, MetadataLookupScope.None);
+                        ++processedCount;
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log($"Ez Realm metadata backfill failed on {set}: {e}");
+                        ++failedCount;
+                    }
+                });
+            }
+
+            completeNotification(notification, processedCount, beatmapSetIds.Count, failedCount);
+
+            if (runFullBackfill && notification?.State != ProgressNotificationState.Cancelled)
+                ezConfig.SetValue(Ez2Setting.EzRealmMetadataBackfillVersion, target_version);
         }
 
         private void processOnlineBeatmapSetsWithNoUpdate()
