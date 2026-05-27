@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
@@ -29,7 +28,6 @@ namespace osu.Game.EzOsuGame.Mods
                                    IApplicableToPlayer,
                                    IApplicableToHUD,
                                    IApplicableFailOverride,
-                                   IApplicableToRate,
                                    IEzApplyOrder
     {
         public override string Name => "Loop Play Clip (No Fail)";
@@ -52,7 +50,6 @@ namespace osu.Game.EzOsuGame.Mods
 
         public override Type[] IncompatibleMods => new[]
         {
-            typeof(ModRateAdjust),
             typeof(ModTimeRamp),
             typeof(ModAdaptiveSpeed),
             typeof(ModNoFail),
@@ -62,7 +59,9 @@ namespace osu.Game.EzOsuGame.Mods
         {
             get
             {
-                yield return ($"Speed x{SpeedChange.Value:N2}", AdjustPitch.Value ? "Pitch Adjusted" : "Pitch Unchanged");
+                if (ConstantSpeed.Value)
+                    yield return (LoopPlayClipStrings.CONSTANT_SPEED_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
+
                 yield return ($"{LoopCount.Value}", "Loop Count");
                 yield return ("Break", $"{BreakQuarter.Value} × 1/2 beat");
                 yield return ("Start", $"{(CutTimeStart.Value is null ? "Original Start Time" : Millisecond.Value ? $"{CutTimeStart.Value} ms" : GetStringTime((int)CutTimeStart.Value))}");
@@ -87,18 +86,6 @@ namespace osu.Game.EzOsuGame.Mods
             MaxValue = 100,
             Precision = 1
         };
-
-        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SPEED_CHANGE_LABEL), nameof(EzCommonModStrings.SPEED_CHANGE_DESCRIPTION),
-            SettingControlType = typeof(MultiplierSettingsSlider))]
-        public BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
-        {
-            MinValue = 0.5,
-            MaxValue = 2.0,
-            Precision = 0.01,
-        };
-
-        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.ADJUST_PITCH_LABEL), nameof(EzCommonModStrings.ADJUST_PITCH_DESCRIPTION))]
-        public BindableBool AdjustPitch { get; } = new BindableBool();
 
         [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.CONSTANT_SPEED_LABEL), nameof(LoopPlayClipStrings.CONSTANT_SPEED_DESCRIPTION))]
         public BindableBool ConstantSpeed { get; } = new BindableBool(true);
@@ -184,9 +171,6 @@ namespace osu.Game.EzOsuGame.Mods
         private readonly DuplicateVirtualTrack duplicateTrack;
         private IWorkingBeatmap? pendingWorkingBeatmap;
 
-        // 时间设置统一管理
-        private readonly RateAdjustModHelper rateAdjustHelper;
-
         protected double ResolvedCutTimeStart
         {
             get
@@ -259,9 +243,6 @@ namespace osu.Game.EzOsuGame.Mods
 
         public ModLoopPlayClip()
         {
-            rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
-            rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
-
             UseGlobalAbRange.BindValueChanged(_ => applyRangeFromStore(), true);
 
             // 当全局A/B范围改变时，更新设置
@@ -284,15 +265,6 @@ namespace osu.Game.EzOsuGame.Mods
             CutTimeStart.Value = Millisecond.Value ? (int)startMs : (int)(startMs / 1000d);
             CutTimeEnd.Value = Millisecond.Value ? (int)endMs : (int)(endMs / 1000d);
         }
-
-        public void ApplyToTrack(IAdjustableAudioComponent track) => rateAdjustHelper.ApplyToTrack(track);
-
-        public void ApplyToSample(IAdjustableAudioComponent sample)
-        {
-            sample.AddAdjustment(AdjustableProperty.Frequency, SpeedChange);
-        }
-
-        public double ApplyToRate(double time, double rate = 1) => rate * SpeedChange.Value;
 
         public void ApplyToPlayer(Player player)
         {

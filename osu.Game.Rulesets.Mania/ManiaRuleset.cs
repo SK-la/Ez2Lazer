@@ -15,7 +15,6 @@ using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
-using osu.Game.EzOsuGame.Mods;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Configuration;
@@ -283,7 +282,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModKrrDP(),
                         new ManiaModKrrDPRefiner(),
                         new ManiaModReconcile(),
-                        new UniversalLoopPlayClip(),
+                        new ManiaUniversalLoopPlayClip(),
                         new ManiaModSRAdjust(),
                     };
 
