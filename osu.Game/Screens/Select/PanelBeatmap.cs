@@ -301,7 +301,6 @@ namespace osu.Game.Screens.Select
             updateKeyCount();
 
             resetEzDisplay();
-            ezDisplayTag.TagSummary = null;
             ezDisplayTag.Beatmap = beatmap;
             computeEzAnalysis();
         }
@@ -362,7 +361,6 @@ namespace osu.Game.Screens.Select
                 return;
 
             ezDisplayTag.Beatmap = null;
-            ezDisplayTag.TagSummary = null;
             scratchText = null;
 
             displaySR.Current.Value = EzManiaSummary.EMPTY;
@@ -376,9 +374,6 @@ namespace osu.Game.Screens.Select
             var kpsList = ezAnalysisResult.KpsList;
             ezDisplayKps.SetKps(ezAnalysisResult.Pp, avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
-
-            if (ezAnalysisEnabled && ezAnalysisResult.TagSummary != null)
-                ezDisplayTag.TagSummary = ezAnalysisResult.TagSummary;
 
             if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
             {

@@ -11,7 +11,6 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -23,7 +22,8 @@ using osuTK;
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
-    /// 用于在难度卡底部显示标签的组件，包括用户标签、视频标签、故事版标签
+    /// 用于在难度卡底部显示标签的组件，包括用户标签、视频标签、故事版标签。
+    /// Video/Storyboard 标记由 <see cref="BeatmapUpdater"/> 写入 <see cref="BeatmapInfo"/>，此处只读 Realm 字段。
     /// </summary>
     public partial class EzDisplayTag : CompositeDrawable
     {
@@ -33,53 +33,6 @@ namespace osu.Game.EzOsuGame.UserInterface
         private readonly FillFlowContainer tagFlow;
 
         private ScheduledDelegate? scheduledTagUpdate;
-        private EzBeatmapTagSummary? tagSummary;
-
-        public EzBeatmapTagSummary? TagSummary
-        {
-            get => tagSummary;
-            set
-            {
-                if (tagSummary == value)
-                    return;
-
-                tagSummary = value;
-
-                scheduledTagUpdate?.Cancel();
-                scheduledTagUpdate = Scheduler.AddDelayed(() =>
-                {
-                    if (!IsAlive)
-                        return;
-
-                    updateSubscription();
-                    scheduledTagUpdate = null;
-                }, 0);
-            }
-        }
-
-        private WorkingBeatmap? working;
-
-        public WorkingBeatmap? Working
-        {
-            get => working;
-            set
-            {
-                if (working == value)
-                    return;
-
-                working = value;
-
-                // 当外部传入 WorkingBeatmap 时触发订阅更新（尽量快速生效）
-                scheduledTagUpdate?.Cancel();
-                scheduledTagUpdate = Scheduler.AddDelayed(() =>
-                {
-                    if (!IsAlive) return;
-
-                    updateSubscription();
-                    scheduledTagUpdate = null;
-                }, 0);
-            }
-        }
 
         private BeatmapInfo? beatmap;
 
@@ -88,31 +41,13 @@ namespace osu.Game.EzOsuGame.UserInterface
             get => beatmap;
             set
             {
-                if (beatmap == null && value == null)
+                if (beatmap != null && beatmap.Equals(value))
                     return;
 
                 beatmap = value;
-
-                // 取消上一次的防抖计划（若有），并在短延迟后执行订阅更新以减少滚动时的开销
-                scheduledTagUpdate?.Cancel();
-                scheduledTagUpdate = null;
-
-                if (IsLoaded)
-                {
-                    scheduledTagUpdate = Scheduler.AddDelayed(() =>
-                    {
-                        updateSubscription();
-                        scheduledTagUpdate = null;
-                    }, 50);
-                }
+                scheduleTagUpdate();
             }
         }
-
-        // 直读故事版基本也不会有显著的内存问题。尽管AI在内存分析问题中，总是乱猜测说这样可能存在问题。
-        private bool useSbFallBack => true;
-
-        [Resolved]
-        private BeatmapManager beatmaps { get; set; } = null!;
 
         [Resolved]
         private ISongSelect? songSelect { get; set; }
@@ -131,31 +66,40 @@ namespace osu.Game.EzOsuGame.UserInterface
             };
         }
 
-        private void updateSubscription()
+        private void scheduleTagUpdate()
         {
-            if (beatmap == null && working == null)
+            scheduledTagUpdate?.Cancel();
+            scheduledTagUpdate = null;
+
+            if (!IsLoaded)
                 return;
 
-            updateTags();
+            scheduledTagUpdate = Scheduler.AddDelayed(() =>
+            {
+                updateTags();
+                scheduledTagUpdate = null;
+            }, beatmap != null ? 50 : 0);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            scheduleTagUpdate();
         }
 
         private void updateTags()
         {
             tagFlow.Clear();
 
-            beatmap ??= working?.BeatmapInfo;
-
             if (beatmap == null)
                 return;
 
-            // 先准备数据，统一全部释放，之后更新UI.
             var userTags = beatmap.Metadata.UserTags.Take(max_visible_tags);
-            EzBeatmapTagSummary resolvedTagSummary = tagSummary ?? getFallbackTagSummary(beatmap);
 
-            if (resolvedTagSummary.HasVideo)
+            if (beatmap.HasVideo)
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Film, BeatmapsetsStrings.ShowInfoVideo));
 
-            if (resolvedTagSummary.HasStoryboard)
+            if (beatmap.HasStoryboard)
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard));
 
             foreach (string tag in userTags)
@@ -173,20 +117,10 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             if (isDisposing)
             {
-                // 取消防抖计划，避免延迟任务在组件已卸载时执行
                 scheduledTagUpdate?.Cancel();
                 scheduledTagUpdate = null;
-
                 beatmap = null;
-                working = null;
-                tagSummary = null;
             }
-        }
-
-        private EzBeatmapTagSummary getFallbackTagSummary(BeatmapInfo beatmapInfo)
-        {
-            WorkingBeatmap fallbackWorking = working ?? beatmaps.GetWorkingBeatmap(beatmapInfo);
-            return EzBeatmapTagParser.Parse(fallbackWorking);
         }
 
         private partial class IconTag : CompositeDrawable, IHasTooltip

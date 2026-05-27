@@ -503,24 +503,15 @@ namespace osu.Game.EzOsuGame.Analysis
                     ? existingAnalysis
                     : null;
 
-                var missingData = EzAnalysisPersistentStore.GetMissingData(storedAnalysis, beatmapInfo.Ruleset.OnlineID, includeTagData);
+                var missingData = EzAnalysisPersistentStore.GetMissingData(storedAnalysis, beatmapInfo.Ruleset.OnlineID, requireTagData: false);
                 bool needsAnalysis = EzAnalysisPersistentStore.RequiresAnalysisComputation(missingData);
-                bool needsTag = includeTagData && (missingData & EzAnalysisPersistentStore.MissingDataKind.Tag) != 0;
 
-                if (!needsAnalysis && !needsTag)
+                if (!needsAnalysis)
                     return storedAnalysis;
 
                 var workingBeatmap = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo);
 
-                EzAnalysisResult result = needsAnalysis
-                    ? EzAnalysisComputation.Compute(workingBeatmap, lookup, cancellationToken)
-                    : storedAnalysis!.Value;
-
-                if (includeTagData && (needsAnalysis || needsTag))
-                    result = result.WithTagSummary(EzBeatmapTagParser.Parse(workingBeatmap));
-
-                if (!includeTagData && storedAnalysis?.TagSummary != null && result.TagSummary == null)
-                    result = result.WithTagSummary(storedAnalysis.Value.TagSummary);
+                EzAnalysisResult result = EzAnalysisComputation.Compute(workingBeatmap, lookup, cancellationToken);
 
                 if (skipExistingComparison)
                     persistentStore.Store(beatmapInfo, result);

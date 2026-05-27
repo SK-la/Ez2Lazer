@@ -67,6 +67,10 @@ namespace osu.Game.Beatmaps
 
                     beatmap.StarRating = calculator.Calculate().StarRating;
                     beatmap.UpdateStatisticsFromBeatmap(working.Beatmap);
+
+                    var tagSummary = EzBeatmapTagParser.Parse(working);
+                    beatmap.HasVideo = tagSummary.HasVideo;
+                    beatmap.HasStoryboard = tagSummary.HasStoryboard;
                 }
 
                 // And invalidate again afterwards as re-fetching the most up-to-date database metadata will be required.
