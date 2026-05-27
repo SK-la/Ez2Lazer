@@ -20,6 +20,22 @@ namespace osu.Game.EzOsuGame.Analysis
     // 不主动释放 workingCache，让框架自行决定。主动释放会频繁触发大量 Invalidating 日志。
     internal static class EzAnalysisComputation
     {
+        public static bool TryComputePerformancePoints(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double performancePoints)
+        {
+            performancePoints = 0;
+
+            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+            IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (tryComputePerfectPp(workingBeatmap, analysisBeatmap, lookup, cancellationToken) is not double resolvedPp)
+                return false;
+
+            performancePoints = resolvedPp;
+            return true;
+        }
+
         public static bool TryComputeXxySr(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double xxySr)
         {
             xxySr = 0;

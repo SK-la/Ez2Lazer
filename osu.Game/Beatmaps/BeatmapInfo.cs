@@ -100,6 +100,11 @@ namespace osu.Game.Beatmaps
         public double XxyStarRating { get; set; } = -1;
 
         /// <summary>
+        /// Ez2Lazer: Baseline perfect-play performance points (no mods). Defaults to -1 (not yet calculated). Populated by <see cref="BeatmapUpdater"/>.
+        /// </summary>
+        public double PerformancePoints { get; set; } = -1;
+
+        /// <summary>
         /// Ez2Lazer: Whether the beatmap set's storyboard file contains a video event. Populated by <see cref="BeatmapUpdater"/>.
         /// </summary>
         public bool HasVideo { get; set; }

@@ -219,44 +219,34 @@ namespace osu.Game.Screens.Select
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getPpValuesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
-            if (!ezAnalysisSqliteEnabled.Value)
-                return Task.FromResult(empty_operation_difficulties);
-
             var beatmapList = beatmaps.Distinct().ToList();
 
             if (beatmapList.Count == 0)
                 return Task.FromResult(empty_operation_difficulties);
 
-            var cachedPpValues = operationPpCache.Value ??= new Dictionary<Guid, double>();
-            var uncachedBeatmaps = beatmapList.Where(b => !cachedPpValues.ContainsKey(b.ID)).ToList();
+            var currentMods = Criteria?.Mods;
 
-            if (uncachedBeatmaps.Count > 0)
+            if (ezAnalysisCache.IsActiveSongsBranchFor(ruleset.Value, currentMods))
             {
-                var currentMods = Criteria?.Mods;
-                bool useCurrentBranch = ezAnalysisCache.IsActiveSongsBranchFor(ruleset.Value, currentMods);
-                IReadOnlyDictionary<Guid, double> sourceValues;
+                if (!ezAnalysisSqliteEnabled.Value)
+                    return Task.FromResult(empty_operation_difficulties);
 
-                if (useCurrentBranch)
-                {
-                    sourceValues = ezAnalysisCache.GetActiveSongsBranchPpValues(uncachedBeatmaps, ruleset.Value, currentMods);
-                }
-                else if ((currentMods?.Count ?? 0) > 0)
-                {
-                    sourceValues = empty_operation_values;
-                }
-                else
-                {
-                    sourceValues = ezAnalysisCache.GetStoredPpValues(uncachedBeatmaps, ruleset.Value, mods: null);
-                }
+                var branchValues = ezAnalysisCache.GetActiveSongsBranchPpValues(beatmapList, ruleset.Value, currentMods);
+                var branchResolved = new Dictionary<BeatmapInfo, double>(beatmapList.Count);
 
-                foreach (var beatmap in uncachedBeatmaps)
+                foreach (var beatmap in beatmapList)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (sourceValues.TryGetValue(beatmap.ID, out double pp))
-                        cachedPpValues[beatmap.ID] = pp;
+                    if (branchValues.TryGetValue(beatmap.ID, out double pp))
+                        branchResolved[beatmap] = pp;
                 }
+
+                return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(branchResolved);
             }
+
+            if ((currentMods?.Count ?? 0) > 0)
+                return Task.FromResult(empty_operation_difficulties);
 
             var resolvedValues = new Dictionary<BeatmapInfo, double>(beatmapList.Count);
 
@@ -264,8 +254,8 @@ namespace osu.Game.Screens.Select
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (cachedPpValues.TryGetValue(beatmap.ID, out double pp))
-                    resolvedValues[beatmap] = pp;
+                if (beatmap.PerformancePoints >= 0)
+                    resolvedValues[beatmap] = beatmap.PerformancePoints;
             }
 
             return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);

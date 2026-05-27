@@ -22,7 +22,7 @@ using osu.Game.Screens.Play;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 启动阶段做一次全量扫描，补齐 analysis 主体与轻量 tag 结果。
+    /// 启动阶段做一次全量扫描，补齐 analysis 主体（kps / mania 列统计）。基线 PP 由 Realm / BeatmapUpdater 负责。
     /// 运行阶段通过单后台 worker 仅处理最新选中谱面的低优先级重算。
     /// </summary>
     public partial class EzAnalysisWarmupProcessor : Component
@@ -318,7 +318,7 @@ namespace osu.Game.EzOsuGame.Analysis
                         try
                         {
                             using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, pendingBeatmapRecomputeCancellationSource.Token);
-                            recomputePendingBeatmap(beatmapId, includeTagData: false, skipExistingComparison: true, linkedCancellation.Token, "startup warmup");
+                            recomputePendingBeatmap(beatmapId, skipExistingComparison: true, linkedCancellation.Token, source: "startup warmup");
                         }
                         catch (ObjectDisposedException)
                         {
@@ -358,7 +358,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     if (beatmapId.HasValue)
                     {
                         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, pendingBeatmapRecomputeCancellationSource.Token);
-                        recomputePendingBeatmap(beatmapId.Value, includeTagData: false, skipExistingComparison: false, linkedCancellation.Token, "selected-beatmap warmup");
+                        recomputePendingBeatmap(beatmapId.Value, skipExistingComparison: false, linkedCancellation.Token, source: "selected-beatmap warmup");
                     }
                 }
             }
@@ -367,7 +367,7 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        private void recomputePendingBeatmap(Guid beatmapId, bool includeTagData, bool skipExistingComparison, CancellationToken cancellationToken, string source)
+        private void recomputePendingBeatmap(Guid beatmapId, bool skipExistingComparison, CancellationToken cancellationToken, string source)
         {
             BeatmapInfo? beatmap = null;
 
@@ -388,7 +388,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     return;
                 }
 
-                analysisDatabase.BackfillStoredDataAsync(beatmap, includeTagData, skipExistingComparison, cancellationToken)
+                analysisDatabase.BackfillStoredDataAsync(beatmap, skipExistingComparison, cancellationToken)
                                 .GetAwaiter()
                                 .GetResult();
 
