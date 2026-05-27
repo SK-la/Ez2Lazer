@@ -231,8 +231,8 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// Backfill Ez Realm columns on <see cref="BeatmapInfo"/> (tag, baseline xxy) via <see cref="IBeatmapUpdater.Process"/>.
-        /// Runs a one-time full pass when <see cref="RealmAccess.EZ_REALM_SCHEMA_VERSION"/> increases; afterwards only missing xxy.
+        /// Backfill Ez Realm columns on <see cref="BeatmapInfo"/> (tag, baseline xxy, baseline PP) via <see cref="IBeatmapUpdater.Process"/>.
+        /// Runs a one-time full pass when <see cref="RealmAccess.EZ_REALM_SCHEMA_VERSION"/> increases; afterwards only missing xxy/PP.
         /// </summary>
         private void populateMissingEzBeatmapRealmFields()
         {
@@ -244,7 +244,7 @@ namespace osu.Game.Database
 
             Logger.Log(runFullBackfill
                 ? $"Querying for beatmap sets requiring Ez Realm metadata backfill (target ez version {target_version})..."
-                : "Querying for beatmap sets with missing baseline xxy star rating...");
+                : "Querying for beatmap sets with missing baseline xxy star rating or performance points...");
 
             realmAccess.Run(r =>
             {
@@ -256,7 +256,8 @@ namespace osu.Game.Database
                     return;
                 }
 
-                foreach (var beatmap in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && b.XxyStarRating < 0 && EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset)))
+                foreach (var beatmap in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && (b.PerformancePoints < 0
+                                                                                                 || (b.XxyStarRating < 0 && EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset)))))
                     beatmapSetIds.Add(beatmap.BeatmapSet!.ID);
             });
 
@@ -273,7 +274,7 @@ namespace osu.Game.Database
             var notification = showProgressNotification(
                 beatmapSetIds.Count,
                 "Populating Ez beatmap metadata in Realm",
-                "beatmap sets have been updated with Ez tag/xxy metadata");
+                "beatmap sets have been updated with Ez tag/xxy/PP metadata");
 
             int processedCount = 0;
             int failedCount = 0;

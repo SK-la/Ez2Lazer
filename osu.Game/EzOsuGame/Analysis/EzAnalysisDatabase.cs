@@ -159,26 +159,29 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
         {
-            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
-                return empty_pp_values;
-
             var beatmapList = beatmaps.Distinct().ToList();
 
             if (beatmapList.Count == 0)
                 return empty_pp_values;
 
-            if (IsActiveSongsBranchFor(rulesetInfo, mods))
+            if (IsActiveSongsBranchFor(rulesetInfo, mods)
+                && sqliteAnalysisEnabled.Value
+                && EzAnalysisPersistentStore.Enabled)
+            {
                 return getResolvedActiveBranchValues(beatmapList, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchPpValues, empty_pp_values);
+            }
 
             if (mods?.Any() == true)
                 return empty_pp_values;
 
-            var eligibleBeatmaps = beatmapList.Where(b => CanUseStoredAnalysis(b, rulesetInfo, mods)).ToList();
+            var resolvedValues = new Dictionary<Guid, double>();
 
-            if (eligibleBeatmaps.Count == 0)
-                return empty_pp_values;
+            foreach (var beatmap in beatmapList)
+            {
+                if (beatmap.PerformancePoints >= 0)
+                    resolvedValues[beatmap.ID] = beatmap.PerformancePoints;
+            }
 
-            var resolvedValues = persistentStore.GetStoredPpValues(eligibleBeatmaps);
             return resolvedValues.Count == 0 ? empty_pp_values : resolvedValues;
         }
 

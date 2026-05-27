@@ -76,6 +76,7 @@ namespace osu.Game.Beatmaps
                     beatmap.HasStoryboard = tagSummary.HasStoryboard;
 
                     updateXxyStarRating(beatmap, working);
+                    updatePerformancePoints(beatmap, working);
                 }
 
                 // And invalidate again afterwards as re-fetching the most up-to-date database metadata will be required.
@@ -116,6 +117,18 @@ namespace osu.Game.Beatmaps
 
             beatmap.XxyStarRating = EzAnalysisComputation.TryComputeXxySr(beatmapManager, lookup, CancellationToken.None, out double xxySr)
                 ? xxySr
+                : -1;
+        }
+
+        private void updatePerformancePoints(BeatmapInfo beatmap, WorkingBeatmap working)
+        {
+            if (beatmapManager == null)
+                return;
+
+            var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
+
+            beatmap.PerformancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double performancePoints)
+                ? performancePoints
                 : -1;
         }
 

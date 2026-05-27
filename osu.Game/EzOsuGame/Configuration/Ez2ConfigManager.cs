@@ -773,7 +773,7 @@ namespace osu.Game.EzOsuGame.Configuration
         EzAnalysisFilter,
 
         /// <summary>
-        /// Last Ez Realm metadata schema version for which tag/xxy backfill completed (see RealmAccess.EZ_REALM_SCHEMA_VERSION).
+        /// Last Ez Realm metadata schema version for which tag/xxy/PP backfill completed (see RealmAccess.EZ_REALM_SCHEMA_VERSION).
         /// </summary>
         EzRealmMetadataBackfillVersion,
         EzSelectCsMode,

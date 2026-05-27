@@ -39,8 +39,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             None = 0,
             Common = 1 << 0,
-            Pp = 1 << 1,
-            Mania = 1 << 2,
+            Mania = 1 << 1,
         }
 
         public readonly record struct SongsBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double XxySr, double? Pp);
@@ -303,106 +302,9 @@ namespace osu.Game.EzOsuGame.Analysis
             return resolvedValues;
         }
 
-        public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps)
-        {
-            if (!Enabled)
-                return empty_pp_values;
-
-            try
-            {
-                Initialise();
-
-                var beatmapList = beatmaps.Distinct().ToList();
-
-                if (beatmapList.Count == 0)
-                    return empty_pp_values;
-
-                var beatmapsById = beatmapList.ToDictionary(b => b.ID);
-                var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
-                var idsNeedingDatabaseLookup = new List<Guid>(beatmapList.Count);
-
-                foreach (var beatmap in beatmapList)
-                {
-                    if (pendingWrites.TryGetValue(beatmap.ID, out var pending)
-                        && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
-                    {
-                        if (pending.Analysis.Pp is double pendingPp)
-                            resolvedValues[beatmap.ID] = pendingPp;
-
-                        continue;
-                    }
-
-                    idsNeedingDatabaseLookup.Add(beatmap.ID);
-                }
-
-                if (idsNeedingDatabaseLookup.Count == 0)
-                    return resolvedValues;
-
-                using var connection = openConnection();
-
-                if (EzAnalysisSchemaManager.GetMetaBool(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE))
-                    return resolvedValues.Count == 0 ? empty_pp_values : resolvedValues;
-
-                for (int offset = 0; offset < idsNeedingDatabaseLookup.Count; offset += 800)
-                {
-                    using var cmd = connection.CreateCommand();
-
-                    int batchCount = Math.Min(800, idsNeedingDatabaseLookup.Count - offset);
-                    var parameterNames = new List<string>(batchCount);
-
-                    for (int i = 0; i < batchCount; i++)
-                    {
-                        string parameterName = $"$id{i}";
-                        parameterNames.Add(parameterName);
-                        cmd.Parameters.AddWithValue(parameterName, idsNeedingDatabaseLookup[offset + i].ToString());
-                    }
-
-                    cmd.CommandText = $@"
-SELECT entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID},
-       entry.{EzAnalysisSchemaManager.COL_BEATMAP_HASH},
-       entry.{EzAnalysisSchemaManager.COL_BEATMAP_MD5},
-       entry.{EzAnalysisSchemaManager.COL_PP}
-FROM {EzAnalysisSchemaManager.TABLE_ENTRY} entry
-WHERE entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID} IN ({string.Join(", ", parameterNames)})
-    AND entry.{EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT} > 0
-    AND entry.{EzAnalysisSchemaManager.COL_PP} IS NOT NULL;
-";
-
-                    using var reader = cmd.ExecuteReader();
-
-                    while (reader.Read())
-                    {
-                        if (!Guid.TryParse(reader.GetString(0), out var beatmapId))
-                            continue;
-
-                        if (!beatmapsById.TryGetValue(beatmapId, out var beatmap))
-                            continue;
-
-                        string storedHash = reader.GetString(1);
-                        string storedMd5 = reader.GetString(2);
-
-                        if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
-                            continue;
-
-                        if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
-                            continue;
-
-                        resolvedValues[beatmapId] = reader.GetDouble(3);
-                    }
-                }
-
-                return resolvedValues;
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore GetStoredPpValues failed.", Ez2ConfigManager.LOGGER_NAME);
-                return empty_pp_values;
-            }
-        }
-
         /// <summary>
         /// 对比新计算结果和 SQLite 中的旧数据，如果有差异则更新。
-        /// 主要场景：KPS / PP / mania 列统计变化（算法修复等）。基线 xxy 已迁到 Realm，不在此比较。
+        /// 主要场景：KPS / mania 列统计变化（算法修复等）。基线 xxy / PP 已迁到 Realm，不在此比较。
         /// </summary>
         public void StoreIfDifferent(BeatmapInfo beatmap, EzAnalysisResult analysis)
         {
@@ -479,7 +381,6 @@ SELECT entry.{EzAnalysisSchemaManager.COL_BEATMAP_HASH},
        entry.{EzAnalysisSchemaManager.COL_AVERAGE_KPS},
        entry.{EzAnalysisSchemaManager.COL_MAX_KPS},
        entry.{EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
-    entry.{EzAnalysisSchemaManager.COL_PP},
        mania.{EzAnalysisSchemaManager.COL_UPDATED_AT},
        mania.{EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON},
        mania.{EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON}
@@ -524,12 +425,12 @@ LIMIT 1;
                     double averageKps = reader.GetDouble(4);
                     double maxKps = reader.GetDouble(5);
                     string kpsListJson = reader.GetString(6);
-                    double? pp = reader.IsDBNull(7) ? null : reader.GetDouble(7);
-                    long maniaUpdatedAt = reader.IsDBNull(8) ? 0 : reader.GetInt64(8);
+                    double? pp = beatmap.PerformancePoints >= 0 ? beatmap.PerformancePoints : null;
+                    long maniaUpdatedAt = reader.IsDBNull(7) ? 0 : reader.GetInt64(7);
                     double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
 
-                    string columnCountsJson = reader.IsDBNull(9) ? "{}" : reader.GetString(9);
-                    string holdNoteCountsJson = reader.IsDBNull(10) ? "{}" : reader.GetString(10);
+                    string columnCountsJson = reader.IsDBNull(8) ? "{}" : reader.GetString(8);
+                    string holdNoteCountsJson = reader.IsDBNull(9) ? "{}" : reader.GetString(9);
 
                     var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
                     var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
@@ -563,17 +464,6 @@ LIMIT 1;
             var computedCommonSummary = computed.CommonSummary;
             var storedManiaSummary = stored.ManiaSummary;
             var computedManiaSummary = computed.ManiaSummary;
-            double? storedPp = stored.Pp;
-            double? computedPp = computed.Pp;
-
-            if (!storedPp.HasValue && computedPp.HasValue)
-                return true;
-
-            if (storedPp.HasValue && computedPp.HasValue)
-            {
-                if (!storedPp.Value.Equals(computedPp.Value))
-                    return true;
-            }
 
             // 检查 KPS 相关数据
             if (!stored.AverageKps.Equals(computed.AverageKps) || !stored.MaxKps.Equals(computed.MaxKps))
@@ -682,7 +572,7 @@ LIMIT 1;
 
                 var beatmapList = beatmaps as IList<(Guid id, string hash, int rulesetOnlineId)> ?? beatmaps.ToList();
 
-                var existing = new Dictionary<Guid, (string hash, int rulesetOnlineId, long commonUpdatedAt, bool hasPp)>();
+                var existing = new Dictionary<Guid, (string hash, int rulesetOnlineId, long commonUpdatedAt)>();
                 var maniaUpdated = new HashSet<Guid>();
 
                 bool forceRecompute;
@@ -695,8 +585,7 @@ LIMIT 1;
 SELECT {EzAnalysisSchemaManager.COL_BEATMAP_ID},
        {EzAnalysisSchemaManager.COL_BEATMAP_HASH},
        {EzAnalysisSchemaManager.COL_RULESET_ONLINE_ID},
-       {EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT},
-       {EzAnalysisSchemaManager.COL_PP}
+       {EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT}
 FROM {EzAnalysisSchemaManager.TABLE_ENTRY};
 ";
 
@@ -707,7 +596,7 @@ FROM {EzAnalysisSchemaManager.TABLE_ENTRY};
                             if (!Guid.TryParse(reader.GetString(0), out var id))
                                 continue;
 
-                            existing[id] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt64(3), !reader.IsDBNull(4));
+                            existing[id] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt64(3));
                         }
                     }
 
@@ -749,7 +638,7 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
                         continue;
                     }
 
-                    MissingDataKind missingData = getMissingData(row.commonUpdatedAt, row.hasPp, maniaUpdated.Contains(id), rulesetOnlineId);
+                    MissingDataKind missingData = getMissingData(row.commonUpdatedAt, maniaUpdated.Contains(id), rulesetOnlineId);
 
                     if (!string.Equals(row.hash, hash, StringComparison.Ordinal)
                         || row.rulesetOnlineId != rulesetOnlineId
@@ -2225,8 +2114,7 @@ INSERT INTO {EzAnalysisSchemaManager.TABLE_ENTRY}(
     {EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT},
     {EzAnalysisSchemaManager.COL_AVERAGE_KPS},
     {EzAnalysisSchemaManager.COL_MAX_KPS},
-    {EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
-    {EzAnalysisSchemaManager.COL_PP}
+    {EzAnalysisSchemaManager.COL_KPS_LIST_JSON}
 )
 VALUES(
     $id,
@@ -2236,8 +2124,7 @@ VALUES(
     $common_updated_at,
     $avg,
     $max,
-    $kps,
-    $pp
+    $kps
 )
 ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
     {EzAnalysisSchemaManager.COL_BEATMAP_HASH} = excluded.{EzAnalysisSchemaManager.COL_BEATMAP_HASH},
@@ -2246,8 +2133,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
     {EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT} = excluded.{EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT},
     {EzAnalysisSchemaManager.COL_AVERAGE_KPS} = excluded.{EzAnalysisSchemaManager.COL_AVERAGE_KPS},
     {EzAnalysisSchemaManager.COL_MAX_KPS} = excluded.{EzAnalysisSchemaManager.COL_MAX_KPS},
-    {EzAnalysisSchemaManager.COL_KPS_LIST_JSON} = excluded.{EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
-    {EzAnalysisSchemaManager.COL_PP} = excluded.{EzAnalysisSchemaManager.COL_PP};
+    {EzAnalysisSchemaManager.COL_KPS_LIST_JSON} = excluded.{EzAnalysisSchemaManager.COL_KPS_LIST_JSON};
 ";
                 entry.Parameters.AddWithValue("$id", beatmap.ID.ToString());
                 entry.Parameters.AddWithValue("$hash", beatmap.Hash);
@@ -2257,7 +2143,6 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
                 entry.Parameters.AddWithValue("$avg", analysis.AverageKps);
                 entry.Parameters.AddWithValue("$max", analysis.MaxKps);
                 entry.Parameters.AddWithValue("$kps", kpsListJson);
-                entry.Parameters.AddWithValue("$pp", analysis.Pp is double pp ? pp : DBNull.Value);
                 entry.ExecuteNonQuery();
             }
 
@@ -2323,9 +2208,6 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
             if (analysis.CommonSummary == null)
                 missingData |= MissingDataKind.Common;
 
-            if (analysis.Pp == null)
-                missingData |= MissingDataKind.Pp;
-
             if (rulesetOnlineId == 3 && analysis.ManiaSummary == null)
                 missingData |= MissingDataKind.Mania;
 
@@ -2333,17 +2215,14 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
         }
 
         internal static bool RequiresAnalysisComputation(MissingDataKind missingData)
-            => (missingData & (MissingDataKind.Common | MissingDataKind.Pp | MissingDataKind.Mania)) != MissingDataKind.None;
+            => (missingData & (MissingDataKind.Common | MissingDataKind.Mania)) != MissingDataKind.None;
 
-        private static MissingDataKind getMissingData(long commonUpdatedAt, bool hasPp, bool hasManiaData, int rulesetOnlineId)
+        private static MissingDataKind getMissingData(long commonUpdatedAt, bool hasManiaData, int rulesetOnlineId)
         {
             MissingDataKind missingData = MissingDataKind.None;
 
             if (commonUpdatedAt <= 0)
                 missingData |= MissingDataKind.Common;
-
-            if (!hasPp)
-                missingData |= MissingDataKind.Pp;
 
             if (rulesetOnlineId == 3 && !hasManiaData)
                 missingData |= MissingDataKind.Mania;
@@ -2353,7 +2232,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
 
         private static MissingDataKind getRequiredDataMask(int rulesetOnlineId)
         {
-            MissingDataKind requiredData = MissingDataKind.Common | MissingDataKind.Pp;
+            MissingDataKind requiredData = MissingDataKind.Common;
 
             if (rulesetOnlineId == 3)
                 requiredData |= MissingDataKind.Mania;

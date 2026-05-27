@@ -392,12 +392,15 @@ namespace osu.Game.Screens.Select
             ezDisplayKpc.ManiaSummary = null;
         }
 
+        private double? getBaselinePpForDisplay(EzAnalysisResult ezAnalysisResult)
+            => beatmap.PerformancePoints >= 0 ? beatmap.PerformancePoints : ezAnalysisResult.Pp;
+
         private void updateKPS(EzAnalysisResult ezAnalysisResult)
         {
             double avgKPS = ezAnalysisResult.AverageKps;
             double maxKps = ezAnalysisResult.MaxKps;
             var kpsList = ezAnalysisResult.KpsList;
-            ezDisplayKps.SetKps(ezAnalysisResult.Pp, avgKPS, maxKps);
+            ezDisplayKps.SetKps(getBaselinePpForDisplay(ezAnalysisResult), avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
 
             if (shouldDisplayXxyStarRating && beatmap.SupportsXxyStarRating())

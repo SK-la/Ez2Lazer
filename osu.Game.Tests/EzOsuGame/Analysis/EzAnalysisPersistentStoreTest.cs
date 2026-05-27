@@ -16,27 +16,14 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var missing = EzAnalysisPersistentStore.GetMissingData(null, 3);
 
             Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Common, Is.Not.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
-            Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Pp, Is.Not.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
             Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Mania, Is.Not.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
             Assert.That(EzAnalysisPersistentStore.RequiresAnalysisComputation(missing), Is.True);
         }
 
         [Test]
-        public void TestMissingDataTracksPpIndependently()
+        public void TestMissingDataCompleteWhenCommonPresent()
         {
             var stored = new EzAnalysisResult(new KpsSummary(1, 2, Array.Empty<double>()));
-
-            var missing = EzAnalysisPersistentStore.GetMissingData(stored, 0);
-
-            Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Pp, Is.Not.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
-            Assert.That(missing & EzAnalysisPersistentStore.MissingDataKind.Mania, Is.EqualTo(EzAnalysisPersistentStore.MissingDataKind.None));
-            Assert.That(EzAnalysisPersistentStore.RequiresAnalysisComputation(missing), Is.True);
-        }
-
-        [Test]
-        public void TestMissingDataCompleteWhenCommonAndPpPresent()
-        {
-            var stored = new EzAnalysisResult(new KpsSummary(1, 2, Array.Empty<double>()), 123.45);
 
             var missing = EzAnalysisPersistentStore.GetMissingData(stored, 0);
 
