@@ -26,6 +26,11 @@ namespace osu.Game.Rulesets
         /// </summary>
         public int LastAppliedDifficultyVersion { get; set; }
 
+        /// <summary>
+        /// Stores the last applied XxySR version used to invalidate persisted <see cref="Beatmaps.BeatmapInfo.XxyStarRating"/>.
+        /// </summary>
+        public int LastAppliedXxySrVersion { get; set; }
+
         public RulesetInfo(string shortName, string name, string instantiationInfo, int onlineID)
         {
             ShortName = shortName;
@@ -92,6 +97,7 @@ namespace osu.Game.Rulesets
             InstantiationInfo = InstantiationInfo,
             Available = Available,
             LastAppliedDifficultyVersion = LastAppliedDifficultyVersion,
+            LastAppliedXxySrVersion = LastAppliedXxySrVersion,
         };
 
         public Ruleset CreateInstance()

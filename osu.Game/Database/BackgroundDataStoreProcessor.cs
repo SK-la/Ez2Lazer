@@ -89,8 +89,11 @@ namespace osu.Game.Database
                 Logger.Log("Beginning background data store processing..");
 
                 clearOutdatedStarRatings();
-                populateMissingXxyStarRatings();
                 populateMissingStarRatings();
+
+                clearOutdatedXxyStarRatings();
+                populateMissingXxyStarRatings();
+
                 populateMissingPerformancePoints();
                 populateMissingBeatmapTagFlags();
                 processOnlineBeatmapSetsWithNoUpdate();
@@ -145,6 +148,44 @@ namespace osu.Game.Database
                     });
 
                     Logger.Log($"Finished resetting {countReset} beatmap sets for {ruleset.Name}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Check whether the databased xxy calculation version matches the latest ruleset provided version.
+        /// If it doesn't, clear out existing xxy values so they can be incrementally recalculated.
+        /// </summary>
+        private void clearOutdatedXxyStarRatings()
+        {
+            foreach (var ruleset in rulesetStore.AvailableRulesets)
+            {
+                if (!EzXxyStarRatingSupport.SupportsRuleset(ruleset))
+                    continue;
+
+                int currentVersion = ruleset.CreateInstance().CreateDifficultyCalculator(gameBeatmap.Value).Version;
+
+                if (ruleset.LastAppliedXxySrVersion < currentVersion)
+                {
+                    Logger.Log($"Resetting XxyStarRatings for {ruleset.Name} (XxySR version updated from {ruleset.LastAppliedXxySrVersion} to {currentVersion})");
+
+                    int countReset = 0;
+
+                    realmAccess.Write(r =>
+                    {
+                        foreach (var b in r.All<BeatmapInfo>())
+                        {
+                            if (b.Ruleset.ShortName == ruleset.ShortName)
+                            {
+                                b.XxyStarRating = -1;
+                                countReset++;
+                            }
+                        }
+
+                        r.Find<RulesetInfo>(ruleset.ShortName)!.LastAppliedXxySrVersion = currentVersion;
+                    });
+
+                    Logger.Log($"Finished resetting {countReset} beatmaps for xxy {ruleset.Name}");
                 }
             }
         }
