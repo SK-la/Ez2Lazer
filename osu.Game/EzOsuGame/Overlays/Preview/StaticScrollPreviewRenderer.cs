@@ -3,28 +3,26 @@
 
 using System;
 using System.Collections.Generic;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Overlays.Preview
 {
     public partial class StaticScrollPreviewRenderer : CompositeDrawable, IManiaStaticPreviewRenderer
     {
-        private const float column_spacing = 16f;
-
         private readonly Container content;
         private readonly ManiaPreviewBatchDrawable batchDrawable;
 
         private ManiaPreviewData data;
         private List<ManiaPreviewLayoutEntry> layoutEntries = new List<ManiaPreviewLayoutEntry>();
+        private ManiaPreviewColumnLayout layout;
         private int totalRows = 1;
         private bool hasData;
         private float density = 1f;
         private float scrollOffset;
         private float lastViewportWidth;
+        private float lastViewportHeight;
         private int lastMeasuresPerColumn = -1;
 
         public StaticScrollPreviewRenderer()
@@ -50,12 +48,10 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             if (!hasData)
                 return;
 
-            int measuresPerColumn = getMeasuresPerColumn();
-
-            if (DrawWidth != lastViewportWidth || measuresPerColumn != lastMeasuresPerColumn)
+            if (DrawWidth != lastViewportWidth || DrawHeight != lastViewportHeight || getMeasuresPerColumn() != lastMeasuresPerColumn)
                 rebuild();
 
-            updateScrollOffset();
+            applyScrollOffset();
         }
 
         public void SetData(ManiaPreviewData data)
@@ -66,7 +62,6 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             hasData = true;
             lastMeasuresPerColumn = -1;
             rebuild();
-            updateScrollOffset();
         }
 
         public void SetCurrentTime(double time)
@@ -83,13 +78,33 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             this.density = clamped;
             lastMeasuresPerColumn = -1;
             rebuild();
-            updateScrollOffset();
         }
 
         public void AdjustScroll(float delta)
         {
-            float maxOffset = Math.Max(0, content.DrawWidth - DrawWidth);
+            float maxOffset = getMaxScrollOffset();
             scrollOffset = Math.Clamp(scrollOffset + delta, 0, maxOffset);
+            applyScrollOffset();
+        }
+
+        public void SetScrollProgress(float progress)
+        {
+            float maxOffset = getMaxScrollOffset();
+            scrollOffset = Math.Clamp(progress, 0, 1) * maxOffset;
+            applyScrollOffset();
+        }
+
+        public float GetScrollProgress()
+        {
+            float maxOffset = getMaxScrollOffset();
+            return maxOffset > 0 ? scrollOffset / maxOffset : 0;
+        }
+
+        private float getMaxScrollOffset() => Math.Max(0, content.DrawWidth - DrawWidth);
+
+        private void applyScrollOffset()
+        {
+            scrollOffset = Math.Clamp(scrollOffset, 0, getMaxScrollOffset());
             content.X = -scrollOffset;
         }
 
@@ -99,84 +114,20 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                 return;
 
             lastViewportWidth = DrawWidth;
-            int measuresPerColumn = getMeasuresPerColumn();
-            lastMeasuresPerColumn = measuresPerColumn;
+            lastViewportHeight = DrawHeight;
+            lastMeasuresPerColumn = getMeasuresPerColumn();
 
-            int rowsPerColumn = measuresPerColumn * ManiaPreviewFixedLayout.ROWS_PER_MEASURE;
-            int columnCount = Math.Max(1, (totalRows + rowsPerColumn - 1) / rowsPerColumn);
-
-            float columnWidth = Math.Max(96f, DrawWidth * 0.22f);
-            float contentWidth = columnCount * columnWidth + Math.Max(0, columnCount - 1) * column_spacing;
-            (float rowStep, float noteHeight) = ManiaPreviewDrawHelper.ComputeRowMetrics(rowsPerColumn, DrawHeight);
+            layout = ManiaPreviewColumnLayout.ForScroll(totalRows, DrawWidth, DrawHeight, density);
 
             content.Height = DrawHeight;
-            batchDrawable.Size = new Vector2(contentWidth, DrawHeight);
+            batchDrawable.Size = new Vector2(layout.ContentWidth, DrawHeight);
 
-            var quads = new List<PreviewQuad>(layoutEntries.Count + columnCount * (data.TotalColumns + rowsPerColumn));
-
-            float laneLineThickness = Math.Max(0.5f, columnWidth * 0.004f);
-            float beatLineThickness = Math.Max(0.5f, rowStep * 0.08f);
-
-            for (int col = 0; col < columnCount; col++)
-            {
-                float panelX = col * (columnWidth + column_spacing);
-                int rowStart = col * rowsPerColumn;
-                int rowEnd = Math.Min(totalRows, rowStart + rowsPerColumn);
-
-                quads.Add(new PreviewQuad(panelX, 0, 1f, DrawHeight, Color4.White.Opacity(0.18f)));
-                quads.Add(new PreviewQuad(panelX + columnWidth - 1f, 0, 1f, DrawHeight, Color4.White.Opacity(0.18f)));
-
-                ManiaPreviewDrawHelper.AddLaneLines(quads, data.TotalColumns, panelX, columnWidth, DrawHeight, laneLineThickness);
-
-                for (int row = rowStart + ManiaPreviewFixedLayout.ROWS_PER_BEAT; row <= rowEnd; row += ManiaPreviewFixedLayout.ROWS_PER_BEAT)
-                {
-                    int localRow = row - rowStart;
-                    float y = ManiaPreviewDrawHelper.getSlotBottomY(localRow, rowStep, DrawHeight) - beatLineThickness * 0.5f;
-                    quads.Add(new PreviewQuad(panelX, y, columnWidth, beatLineThickness, Color4.White.Opacity(0.2f)));
-                }
-            }
-
-            foreach (ManiaPreviewLayoutEntry entry in layoutEntries)
-            {
-                int col = entry.Row / rowsPerColumn;
-                if (col >= columnCount)
-                    continue;
-
-                int rowStart = col * rowsPerColumn;
-                int rowEnd = Math.Min(totalRows, rowStart + rowsPerColumn);
-
-                if (entry.Row >= rowEnd)
-                    continue;
-
-                float panelX = col * (columnWidth + column_spacing);
-                var localEntry = new ManiaPreviewLayoutEntry(
-                    entry.Column,
-                    entry.Row - rowStart,
-                    Math.Min(entry.EndRow, rowEnd - 1) - rowStart,
-                    entry.Kind);
-
-                ManiaPreviewDrawHelper.AddLayoutEntries(
-                    quads,
-                    new[] { localEntry },
-                    data.TotalColumns,
-                    panelX,
-                    columnWidth,
-                    DrawHeight,
-                    rowStep,
-                    noteHeight,
-                    flatNotes: false);
-            }
+            var quads = new List<PreviewQuad>(layoutEntries.Count + layout.ColumnCount * (data.TotalColumns + layout.RowsPerColumn));
+            ManiaPreviewColumnRenderer.BuildColumnPanels(quads, layoutEntries, layout, data, totalRows, DrawHeight);
 
             batchDrawable.SetQuads(quads);
-            scrollOffset = Math.Clamp(scrollOffset, 0, Math.Max(0, contentWidth - DrawWidth));
-            content.X = -scrollOffset;
-        }
-
-        private void updateScrollOffset()
-        {
-            float maxOffset = Math.Max(0, content.DrawWidth - DrawWidth);
-            scrollOffset = Math.Clamp(scrollOffset, 0, maxOffset);
-            content.X = -scrollOffset;
+            scrollOffset = Math.Clamp(scrollOffset, 0, getMaxScrollOffset());
+            applyScrollOffset();
         }
 
         private int getMeasuresPerColumn() => Math.Clamp((int)Math.Round(2f / density), 1, 8);

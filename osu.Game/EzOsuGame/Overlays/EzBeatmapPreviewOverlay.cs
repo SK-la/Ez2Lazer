@@ -77,6 +77,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Container panelContainer;
         private readonly Container stageViewport;
         private readonly Container stageScaleContainer;
+        private readonly Container stageAreaContainer;
+        private readonly Container bottomControlsContainer;
         private readonly ProgressBar timeline;
         private readonly OsuSpriteText progressText;
         private readonly OsuSpriteText stateText;
@@ -140,6 +142,7 @@ namespace osu.Game.EzOsuGame.Overlays
                                               && (previewMode.Value == EzBeatmapPreviewMode.StaticFullMap || previewMode.Value == EzBeatmapPreviewMode.StaticScroll);
 
         private bool fullMapMode => previewMode.Value == EzBeatmapPreviewMode.StaticFullMap;
+        private bool scrollMode => previewMode.Value == EzBeatmapPreviewMode.StaticScroll;
 
         private bool expanded;
         private bool fullMapFocusActive;
@@ -198,7 +201,7 @@ namespace osu.Game.EzOsuGame.Overlays
                                 Direction = FillDirection.Vertical,
                                 Spacing = new Vector2(0, preview_mode_button_spacing),
                             },
-                            new Container
+                            stageAreaContainer = new Container
                             {
                                 RelativeSizeAxes = Axes.Both,
                                 Padding = new MarginPadding
@@ -243,7 +246,7 @@ namespace osu.Game.EzOsuGame.Overlays
                                     }
                                 }
                             },
-                            new Container
+                            bottomControlsContainer = new Container
                             {
                                 RelativeSizeAxes = Axes.X,
                                 Height = bottom_controls_height,
@@ -304,8 +307,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 }
             };
 
-            timeline.OnSeek = time => seekTo(time, dynamicMode);
-            timeline.OnCommit = time => seekTo(time, dynamicMode);
+            timeline.OnSeek = onTimelineSeek;
+            timeline.OnCommit = onTimelineCommit;
 
             createPreviewModeButtons();
             // 初始化对外可观察的展开状态
@@ -350,6 +353,8 @@ namespace osu.Game.EzOsuGame.Overlays
             panelContainer.MoveTo(new Vector2(panel_left_margin, 14));
             panelContainer.FadeIn(160, Easing.OutQuint);
             panelContainer.MoveToY(0, 160, Easing.OutQuint);
+
+            updatePreviewControlsLayout();
 
             if (selectionDirty)
                 scheduleSelectionLoad();
@@ -685,8 +690,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (customManiaStaticMode && maniaStaticRenderer != null)
             {
-                maniaStaticRenderer.SetDensity((float)previewDensity.Value);
-                updateProgressDisplay(previewClock.CurrentTime);
+                if (scrollMode)
+                    maniaStaticRenderer.SetDensity((float)previewDensity.Value);
+
                 return;
             }
 
@@ -807,6 +813,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 && maniaStaticRenderer is StaticScrollPreviewRenderer scrollRenderer)
             {
                 scrollRenderer.AdjustScroll(-e.ScrollDelta.Y * 48f);
+                syncTimelineFromScroll(scrollRenderer.GetScrollProgress());
                 return true;
             }
 
@@ -1014,11 +1021,69 @@ namespace osu.Game.EzOsuGame.Overlays
                 previewClock.Seek(clamped);
             }
 
+            if (scrollMode)
+                syncScrollRendererFromTime(clamped);
+
             updateProgressDisplay(clamped);
+        }
+
+        private void onTimelineSeek(double time)
+        {
+            if (scrollMode)
+            {
+                seekTo(time);
+                return;
+            }
+
+            seekTo(time, dynamicMode);
+        }
+
+        private void onTimelineCommit(double time) => onTimelineSeek(time);
+
+        private void syncScrollRendererFromTime(double time)
+        {
+            if (maniaStaticRenderer is not StaticScrollPreviewRenderer scroll)
+                return;
+
+            float progress = beatmapMaxTime > beatmapMinTime
+                ? (float)((time - beatmapMinTime) / (beatmapMaxTime - beatmapMinTime))
+                : 0;
+
+            scroll.SetScrollProgress(progress);
+        }
+
+        private void syncTimelineFromScroll(float progress)
+        {
+            double time = beatmapMaxTime <= beatmapMinTime
+                ? 0
+                : beatmapMinTime + progress * (beatmapMaxTime - beatmapMinTime);
+
+            previewClock.Stop();
+            previewClock.Seek(time);
+            updateProgressDisplay(time);
+        }
+
+        private void updatePreviewControlsLayout()
+        {
+            bool showTimeline = expanded && !fullMapFocusActive && !fullMapMode;
+
+            bottomControlsContainer.Height = showTimeline ? bottom_controls_height : 0;
+            bottomControlsContainer.Alpha = showTimeline ? 1 : 0;
+
+            stageAreaContainer.Padding = new MarginPadding
+            {
+                Top = resize_handle_height,
+                Bottom = showTimeline ? bottom_controls_height : 8,
+                Left = preview_mode_list_width + 16,
+                Right = 8
+            };
         }
 
         private void updateProgressDisplay(double time)
         {
+            if (fullMapMode)
+                return;
+
             if (beatmapMaxTime <= beatmapMinTime)
             {
                 timeline.EndTime = 1;
@@ -1043,14 +1108,9 @@ namespace osu.Game.EzOsuGame.Overlays
             maniaStaticRenderer = null;
             densityController.DisposeSession();
 
-            // Clear disposes children; do not Dispose maniaStaticRenderer separately (avoids double-dispose).
+            // Clear synchronously: a scheduled Clear can run after a newer preview is mounted (e.g. switching key count).
             if (stageScaleContainer.Count > 0)
-            {
-                if (!IsLoaded)
-                    stageScaleContainer.Clear(true);
-                else
-                    Schedule(() => stageScaleContainer.Clear(true));
-            }
+                stageScaleContainer.Clear(true);
         }
 
         private float clampPanelWidth(float width)
@@ -1166,6 +1226,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             updatePreviewModeButtons();
             setFullMapFocusState(false);
+            updatePreviewControlsLayout();
 
             nextDynamicLoopStartTime = 0;
             previewClock.Stop();
@@ -1174,7 +1235,12 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 setupManiaStaticPreview(playableBeatmap);
                 previewClock.Seek(Math.Clamp(previewClock.CurrentTime, beatmapMinTime, beatmapMaxTime));
-                updateProgressDisplay(previewClock.CurrentTime);
+
+                if (scrollMode)
+                    syncScrollRendererFromTime(previewClock.CurrentTime);
+                else
+                    updateProgressDisplay(previewClock.CurrentTime);
+
                 return;
             }
 
@@ -1238,10 +1304,19 @@ namespace osu.Game.EzOsuGame.Overlays
             stageScaleContainer.RelativeSizeAxes = Axes.Both;
             stageScaleContainer.Scale = Vector2.One;
             stageScaleContainer.Size = Vector2.One;
+
+            if (stageScaleContainer.Count > 0)
+                stageScaleContainer.Clear(false);
+
             stageScaleContainer.Child = (Drawable)renderer;
 
             maniaStaticRenderer = renderer;
             drawableRuleset = null;
+
+            if (scrollMode)
+                syncScrollRendererFromTime(previewClock.CurrentTime);
+
+            updatePreviewControlsLayout();
         }
 
         private void setFullMapFocusState(bool focused)
@@ -1258,12 +1333,12 @@ namespace osu.Game.EzOsuGame.Overlays
             fullMapFocusActive = focused;
 
             previewModeButtonList.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
-            timeline.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
-            progressText.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             loadTimeText.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             topResizeHandle.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             rightResizeHandle.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             stateText.FadeTo(focused ? 0 : stateText.Alpha, 100, Easing.OutQuint);
+
+            updatePreviewControlsLayout();
 
             if (!focused)
             {
