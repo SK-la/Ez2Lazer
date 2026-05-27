@@ -91,7 +91,7 @@ namespace osu.Game.Database
                 Logger.Log("Beginning background data store processing..");
 
                 clearOutdatedStarRatings();
-                populateMissingEzBeatmapRealmFields();
+                populateMissingBeatmapTagFlags();
                 populateMissingStarRatings();
                 populateMissingXxyStarRatings();
                 populateMissingPerformancePoints();
@@ -313,7 +313,7 @@ namespace osu.Game.Database
         /// This method is intentionally separated from <see cref="BeatmapUpdater.Process"/> so we don't accidentally
         /// recompute unrelated fields (star / xxy / pp) during PP/xxy backfills.
         /// </summary>
-        private void populateMissingEzBeatmapRealmFields()
+        private void populateMissingBeatmapTagFlags()
         {
             HashSet<Guid> beatmapIds = new HashSet<Guid>();
             Logger.Log("Querying for beatmaps requiring Ez Realm tag backfill...");
