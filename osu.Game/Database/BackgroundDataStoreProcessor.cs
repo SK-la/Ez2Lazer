@@ -259,6 +259,14 @@ namespace osu.Game.Database
 
                     beatmap.HasVideo = null;
                     beatmap.HasStoryboard = null;
+
+                    // Third-party / unavailable rulesets: keep persisted xxy/pp until the assembly is loadable again.
+                    if (!EzXxyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
+                    {
+                        beatmapCount++;
+                        continue;
+                    }
+
                     beatmap.PerformancePoints = -1;
 
                     if (EzXxyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
@@ -365,7 +373,8 @@ namespace osu.Game.Database
 
             realmAccess.Run(r =>
             {
-                foreach (var b in r.All<BeatmapInfo>().Where(b => b.XxyStarRating < 0 && b.BeatmapSet != null && EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset)))
+                foreach (var b in r.All<BeatmapInfo>().Where(b => b.XxyStarRating < 0 && b.BeatmapSet != null).AsEnumerable()
+                                   .Where(b => EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset)))
                     beatmapIds.Add(b.ID);
             });
 
@@ -500,7 +509,8 @@ namespace osu.Game.Database
 
             realmAccess.Run(r =>
             {
-                foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && b.PerformancePoints < 0))
+                foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && b.PerformancePoints < 0).AsEnumerable()
+                                   .Where(b => EzXxyStarRatingSupport.IsRulesetAvailable(b.Ruleset)))
                     beatmapIds.Add(b.ID);
             });
 

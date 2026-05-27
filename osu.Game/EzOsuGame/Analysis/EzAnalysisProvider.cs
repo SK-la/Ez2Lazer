@@ -90,6 +90,9 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             provider = null!;
 
+            if (!EzXxyStarRatingSupport.IsRulesetAvailable(rulesetInfo))
+                return false;
+
             try
             {
                 if (rulesetInfo.CreateInstance().CreateEzAnalysisProvider() is not IEzAnalysisProvider createdProvider)
