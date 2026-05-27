@@ -279,6 +279,8 @@ namespace osu.Game.Tests.Visual.SongSelect
                 {
                 }
 
+                public double ComputeXxyStarRating(BeatmapInfo beatmapInfo) => -1;
+
                 public void Dispose()
                 {
                 }

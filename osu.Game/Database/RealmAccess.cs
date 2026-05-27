@@ -103,18 +103,19 @@ namespace osu.Game.Database
         /// 51   2025-07-22    Add ScoreInfo.Pauses.
         ///
         /// Ez2Lazer-only revisions are tracked separately via <see cref="EZ_REALM_SCHEMA_VERSION"/>.
-        /// The on-disk Realm schema version is <see cref="file_schema_version"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 51004).
+        /// The on-disk Realm schema version is <see cref="file_schema_version"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 51005).
         /// Ez v1: Add ScoreInfo.ManiaHitMode and ManiaHealthMode.
         /// Ez v2: Add BeatmapInfo.HasVideo and HasStoryboard.
         /// Ez v3: Add BeatmapInfo.XxyStarRating.
         /// Ez v4: Add BeatmapInfo.PerformancePoints.
+        /// Ez v5: Change BeatmapInfo.HasVideo/HasStoryboard to nullable (null = unknown).
         /// </summary>
         private const int schema_version = 51;
 
         /// <summary>
         /// Ez2Lazer schema revision. Bump when adding Ez-persisted fields; do not change <see cref="schema_version"/> for Ez-only work.
         /// </summary>
-        public const int EZ_REALM_SCHEMA_VERSION = 4;
+        public const int EZ_REALM_SCHEMA_VERSION = 5;
 
         private const int file_schema_version = schema_version * 1000 + EZ_REALM_SCHEMA_VERSION;
 
@@ -1385,6 +1386,15 @@ namespace osu.Game.Database
                 case 4:
                     foreach (var beatmap in migration.NewRealm.All<BeatmapInfo>())
                         beatmap.PerformancePoints = -1;
+
+                    break;
+
+                case 5:
+                    foreach (var beatmap in migration.NewRealm.All<BeatmapInfo>())
+                    {
+                        beatmap.HasVideo = null;
+                        beatmap.HasStoryboard = null;
+                    }
 
                     break;
             }

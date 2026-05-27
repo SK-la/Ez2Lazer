@@ -96,10 +96,10 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             var userTags = beatmap.Metadata.UserTags.Take(max_visible_tags);
 
-            if (beatmap.HasVideo)
+            if (beatmap.HasVideo == true)
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Film, BeatmapsetsStrings.ShowInfoVideo));
 
-            if (beatmap.HasStoryboard)
+            if (beatmap.HasStoryboard == true)
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard));
 
             foreach (string tag in userTags)

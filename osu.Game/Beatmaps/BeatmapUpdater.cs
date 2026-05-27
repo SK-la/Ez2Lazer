@@ -75,7 +75,7 @@ namespace osu.Game.Beatmaps
                     beatmap.HasVideo = tagSummary.HasVideo;
                     beatmap.HasStoryboard = tagSummary.HasStoryboard;
 
-                    updateXxyStarRating(beatmap, working);
+                    updateXxyStarRating(beatmap);
                     updatePerformancePoints(beatmap, working);
                 }
 
@@ -102,22 +102,26 @@ namespace osu.Game.Beatmaps
             });
         }
 
-        private void updateXxyStarRating(BeatmapInfo beatmap, WorkingBeatmap working)
+        public double ComputeXxyStarRating(BeatmapInfo beatmapInfo)
         {
-            if (!EzXxyStarRatingSupport.SupportsBeatmap(working.Beatmap, beatmap.Ruleset))
-            {
-                beatmap.XxyStarRating = -1;
-                return;
-            }
+            var working = workingBeatmapCache.GetWorkingBeatmap(beatmapInfo);
+
+            if (!EzXxyStarRatingSupport.SupportsBeatmap(working.Beatmap, beatmapInfo.Ruleset))
+                return -1;
 
             if (beatmapManager == null)
-                return;
+                return -1;
 
-            var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
+            var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
 
-            beatmap.XxyStarRating = EzAnalysisComputation.TryComputeXxySr(beatmapManager, lookup, CancellationToken.None, out double xxySr)
+            return EzAnalysisComputation.TryComputeXxySr(beatmapManager, lookup, CancellationToken.None, out double xxySr)
                 ? xxySr
                 : -1;
+        }
+
+        private void updateXxyStarRating(BeatmapInfo beatmap)
+        {
+            beatmap.XxyStarRating = ComputeXxyStarRating(beatmap);
         }
 
         private void updatePerformancePoints(BeatmapInfo beatmap, WorkingBeatmap working)
