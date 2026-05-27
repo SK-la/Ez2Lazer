@@ -318,6 +318,7 @@ namespace osu.Game.Screens.Select
                 case SortMode.Length:
                 case SortMode.Difficulty:
                 case SortMode.XxyStarRating:
+                case SortMode.PP:
                     return true;
 
                 default:

@@ -18,7 +18,6 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Extensions;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
@@ -75,10 +74,9 @@ namespace osu.Game.Database
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
 
-        [Resolved]
-        private Ez2ConfigManager ezConfig { get; set; } = null!;
-
         private LocalCachedBeatmapMetadataSource localMetadataSource = null!;
+
+        private const int max_beatmap_backfill_items_per_pass = 300;
 
         protected virtual int TimeToSleepDuringGameplay => 30000;
 
@@ -93,8 +91,10 @@ namespace osu.Game.Database
                 Logger.Log("Beginning background data store processing..");
 
                 clearOutdatedStarRatings();
-                populateMissingStarRatings();
                 populateMissingEzBeatmapRealmFields();
+                populateMissingStarRatings();
+                populateMissingXxyStarRatings();
+                populateMissingPerformancePoints();
                 processOnlineBeatmapSetsWithNoUpdate();
                 // Note that the previous method will also update these on a fresh run.
                 processBeatmapsWithMissingObjectCounts();
@@ -165,7 +165,12 @@ namespace osu.Game.Database
             realmAccess.Run(r =>
             {
                 foreach (var b in r.All<BeatmapInfo>().Where(b => b.StarRating < 0 && b.BeatmapSet != null))
+                {
                     beatmapIds.Add(b.ID);
+
+                    if (beatmapIds.Count >= max_beatmap_backfill_items_per_pass)
+                        break;
+                }
             });
 
             if (beatmapIds.Count == 0)
@@ -200,7 +205,10 @@ namespace osu.Game.Database
                 var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
 
                 if (beatmap == null)
-                    return;
+                {
+                    ++failedCount;
+                    continue;
+                }
 
                 try
                 {
@@ -231,75 +239,222 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// Backfill Ez Realm columns on <see cref="BeatmapInfo"/> (baseline xxy / PP, and opportunistic tag refresh) via <see cref="IBeatmapUpdater.Process"/>.
-        /// Always runs incrementally for missing xxy/PP to avoid expensive full-library rewrites on version bumps.
+        /// Incrementally backfill missing baseline xxy star ratings on <see cref="BeatmapInfo"/>.
+        /// Behaviour intentionally mirrors <see cref="populateMissingStarRatings"/>: beatmap-level query, beatmap-level compute and write.
         /// </summary>
-        private void populateMissingEzBeatmapRealmFields()
+        private void populateMissingXxyStarRatings()
         {
-            const int target_version = RealmAccess.EZ_REALM_SCHEMA_VERSION;
-            int lastBackfillVersion = ezConfig.Get<int>(Ez2Setting.EzRealmMetadataBackfillVersion);
-            HashSet<Guid> beatmapSetIds = new HashSet<Guid>();
+            HashSet<Guid> beatmapIds = new HashSet<Guid>();
 
-            Logger.Log($"Querying for beatmap sets requiring Ez Realm metadata backfill (target ez version {target_version})...");
+            Logger.Log("Querying for beatmaps with missing xxy star ratings...");
 
             realmAccess.Run(r =>
             {
-                foreach (var beatmap in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && (b.PerformancePoints < 0
-                                                                                                 || (b.XxyStarRating < 0 && EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset)))))
-                    beatmapSetIds.Add(beatmap.BeatmapSet!.ID);
+                foreach (var b in r.All<BeatmapInfo>().Where(b => b.XxyStarRating < 0 && b.BeatmapSet != null && EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset)))
+                {
+                    beatmapIds.Add(b.ID);
+
+                    if (beatmapIds.Count >= max_beatmap_backfill_items_per_pass)
+                        break;
+                }
             });
 
-            if (beatmapSetIds.Count == 0)
-            {
-                if (lastBackfillVersion < target_version)
-                    ezConfig.SetValue(Ez2Setting.EzRealmMetadataBackfillVersion, target_version);
-
+            if (beatmapIds.Count == 0)
                 return;
-            }
 
-            Logger.Log($"Found {beatmapSetIds.Count} beatmap sets which require Ez Realm metadata population.");
+            Logger.Log($"Found {beatmapIds.Count} beatmaps which require xxy star rating reprocessing.");
 
-            var notification = showProgressNotification(
-                beatmapSetIds.Count,
-                "Populating Ez beatmap metadata in Realm",
-                "beatmap sets have been updated with Ez tag/xxy/PP metadata");
+            var notification = showProgressNotification(beatmapIds.Count, "Reprocessing xxy star rating for beatmaps", "beatmaps' xxy star ratings have been updated");
 
             int processedCount = 0;
             int failedCount = 0;
 
-            foreach (var id in beatmapSetIds)
+            foreach (Guid id in beatmapIds)
             {
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
 
-                updateNotificationProgress(notification, processedCount, beatmapSetIds.Count);
+                updateNotificationProgress(notification, processedCount, beatmapIds.Count);
 
                 sleepIfRequired();
 
-                realmAccess.Run(r =>
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
                 {
-                    var set = r.Find<BeatmapSetInfo>(id);
+                    ++failedCount;
+                    continue;
+                }
 
-                    if (set == null)
-                        return;
+                try
+                {
+                    double xxyStarRating = beatmapUpdater.ComputeXxyStarRating(beatmap);
 
-                    try
+                    realmAccess.Write(r =>
                     {
-                        beatmapUpdater.Process(set, MetadataLookupScope.None);
-                        ++processedCount;
-                    }
-                    catch (Exception e)
-                    {
-                        Logger.Log($"Ez Realm metadata backfill failed on {set}: {e}");
-                        ++failedCount;
-                    }
-                });
+                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
+                            liveBeatmapInfo.XxyStarRating = xxyStarRating;
+                    });
+                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                    ++processedCount;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background xxy processing failed on {beatmap}: {e}");
+                    ++failedCount;
+                }
             }
 
-            completeNotification(notification, processedCount, beatmapSetIds.Count, failedCount);
+            completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
+        }
 
-            if (lastBackfillVersion < target_version && notification?.State != ProgressNotificationState.Cancelled)
-                ezConfig.SetValue(Ez2Setting.EzRealmMetadataBackfillVersion, target_version);
+        /// <summary>
+        /// Backfill Ez Realm tag columns on <see cref="BeatmapInfo"/> (baseline HasVideo/HasStoryboard).
+        /// This method is intentionally separated from <see cref="BeatmapUpdater.Process"/> so we don't accidentally
+        /// recompute unrelated fields (star / xxy / pp) during PP/xxy backfills.
+        /// </summary>
+        private void populateMissingEzBeatmapRealmFields()
+        {
+            HashSet<Guid> beatmapIds = new HashSet<Guid>();
+            Logger.Log("Querying for beatmaps requiring Ez Realm tag backfill...");
+
+            realmAccess.Run(r =>
+            {
+                foreach (var beatmap in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && (b.HasVideo == null || b.HasStoryboard == null)))
+                {
+                    beatmapIds.Add(beatmap.ID);
+
+                    if (beatmapIds.Count >= max_beatmap_backfill_items_per_pass)
+                        break;
+                }
+            });
+
+            if (beatmapIds.Count == 0)
+                return;
+
+            Logger.Log($"Found {beatmapIds.Count} beatmaps which require Ez Realm tag population.");
+
+            var notification = showProgressNotification(
+                beatmapIds.Count,
+                "Populating Ez beatmap tags in Realm",
+                "beatmaps have been updated with Ez tags");
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            foreach (var id in beatmapIds)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                updateNotificationProgress(notification, processedCount, beatmapIds.Count);
+
+                sleepIfRequired();
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                {
+                    ++failedCount;
+                    continue;
+                }
+
+                try
+                {
+                    var working = beatmapManager.GetWorkingBeatmap(beatmap);
+                    var tagSummary = EzBeatmapTagParser.Parse(working);
+
+                    realmAccess.Write(r =>
+                    {
+                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
+                        {
+                            liveBeatmapInfo.HasVideo = tagSummary.HasVideo;
+                            liveBeatmapInfo.HasStoryboard = tagSummary.HasStoryboard;
+                        }
+                    });
+
+                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                    ++processedCount;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background tag processing failed on {beatmap}: {e}");
+                    ++failedCount;
+                }
+            }
+
+            completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
+        }
+
+        private void populateMissingPerformancePoints()
+        {
+            HashSet<Guid> beatmapIds = new HashSet<Guid>();
+
+            Logger.Log("Querying for beatmaps with missing baseline PP...");
+
+            realmAccess.Run(r =>
+            {
+                foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && b.PerformancePoints < 0))
+                {
+                    beatmapIds.Add(b.ID);
+
+                    if (beatmapIds.Count >= max_beatmap_backfill_items_per_pass)
+                        break;
+                }
+            });
+
+            if (beatmapIds.Count == 0)
+                return;
+
+            Logger.Log($"Found {beatmapIds.Count} beatmaps which require PP reprocessing.");
+
+            var notification = showProgressNotification(beatmapIds.Count, "Reprocessing baseline PP for beatmaps", "beatmaps' baseline PP has been updated");
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            foreach (Guid id in beatmapIds)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                updateNotificationProgress(notification, processedCount, beatmapIds.Count);
+
+                sleepIfRequired();
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                {
+                    ++failedCount;
+                    continue;
+                }
+
+                try
+                {
+                    var lookup = new EzAnalysisLookupCache(beatmap, beatmap.Ruleset, mods: null);
+
+                    double performancePoints = EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, CancellationToken.None, out double computedPp)
+                        ? computedPp
+                        : -1;
+
+                    realmAccess.Write(r =>
+                    {
+                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
+                            liveBeatmapInfo.PerformancePoints = performancePoints;
+                    });
+
+                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                    ++processedCount;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background PP processing failed on {beatmap}: {e}");
+                    ++failedCount;
+                }
+            }
+
+            completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
         }
 
         private void processOnlineBeatmapSetsWithNoUpdate()

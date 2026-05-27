@@ -1250,35 +1250,66 @@ namespace osu.Game.Screens.Select
 
         private CancellationTokenSource? onlineLookupCancellation;
         private Task<APIBeatmapSet?>? currentOnlineLookup;
+        private readonly HashSet<int> requestedOnlineLookupSetIds = new HashSet<int>();
+        private readonly Dictionary<int, APIBeatmapSet?> onlineLookupCache = new Dictionary<int, APIBeatmapSet?>();
+        private const int max_online_lookup_sets_per_session = 120;
 
         private void fetchOnlineInfo(bool force = false)
         {
             var beatmapSetInfo = Beatmap.Value.BeatmapSetInfo;
+            int onlineSetId = beatmapSetInfo.OnlineID;
 
-            if (lastLookupResult.Value?.Result?.OnlineID == beatmapSetInfo.OnlineID && !force)
+            if (lastLookupResult.Value?.Result?.OnlineID == onlineSetId && !force)
                 return;
 
             onlineLookupCancellation?.Cancel();
             onlineLookupCancellation = null;
 
-            if (beatmapSetInfo.OnlineID < 0)
+            if (onlineSetId < 0)
             {
+                lastLookupResult.Value = BeatmapSetLookupResult.Completed(null);
+                return;
+            }
+
+            if (!force && onlineLookupCache.TryGetValue(onlineSetId, out var cached))
+            {
+                lastLookupResult.Value = BeatmapSetLookupResult.Completed(cached);
+                return;
+            }
+
+            bool isNewLookupSet = requestedOnlineLookupSetIds.Add(onlineSetId);
+
+            if (isNewLookupSet && requestedOnlineLookupSetIds.Count > max_online_lookup_sets_per_session)
+            {
+                requestedOnlineLookupSetIds.Remove(onlineSetId);
+                Logger.Log($"Skipping online beatmap set lookup for {onlineSetId}: per-session lookup cap ({max_online_lookup_sets_per_session}) reached.", LoggingTarget.Network);
                 lastLookupResult.Value = BeatmapSetLookupResult.Completed(null);
                 return;
             }
 
             lastLookupResult.Value = BeatmapSetLookupResult.InProgress();
             onlineLookupCancellation = new CancellationTokenSource();
-            currentOnlineLookup = onlineLookupSource.GetBeatmapSetAsync(beatmapSetInfo.OnlineID, onlineLookupCancellation.Token);
+            currentOnlineLookup = onlineLookupSource.GetBeatmapSetAsync(onlineSetId, onlineLookupCancellation.Token);
             currentOnlineLookup.ContinueWith(t =>
             {
                 if (t.IsCompletedSuccessfully)
-                    Schedule(() => lastLookupResult.Value = BeatmapSetLookupResult.Completed(t.GetResultSafely()));
+                {
+                    APIBeatmapSet? result = t.GetResultSafely();
+                    Schedule(() =>
+                    {
+                        onlineLookupCache[onlineSetId] = result;
+                        lastLookupResult.Value = BeatmapSetLookupResult.Completed(result);
+                    });
+                }
 
                 if (t.Exception != null)
                 {
                     Logger.Log($"Error when fetching online beatmap set: {t.Exception}", LoggingTarget.Network);
-                    Schedule(() => lastLookupResult.Value = BeatmapSetLookupResult.Completed(null));
+                    Schedule(() =>
+                    {
+                        onlineLookupCache[onlineSetId] = null;
+                        lastLookupResult.Value = BeatmapSetLookupResult.Completed(null);
+                    });
                 }
             });
         }

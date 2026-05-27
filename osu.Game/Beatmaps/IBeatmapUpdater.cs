@@ -31,5 +31,12 @@ namespace osu.Game.Beatmaps
         /// <param name="beatmapInfo">The managed beatmap to update. A transaction will be opened to apply changes.</param>
         /// <param name="lookupScope">The preferred scope to use for metadata lookup.</param>
         void ProcessObjectCounts(BeatmapInfo beatmapInfo, MetadataLookupScope lookupScope = MetadataLookupScope.LocalCacheFirst);
+
+        /// <summary>
+        /// Computes baseline xxy star rating for a beatmap without running full-set processing.
+        /// </summary>
+        /// <param name="beatmapInfo">Beatmap to compute for.</param>
+        /// <returns>The computed value, or -1 when unsupported / failed.</returns>
+        double ComputeXxyStarRating(BeatmapInfo beatmapInfo);
     }
 }

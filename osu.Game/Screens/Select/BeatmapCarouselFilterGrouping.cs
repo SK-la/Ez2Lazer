@@ -95,6 +95,9 @@ namespace osu.Game.Screens.Select
                     if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double difficulty))
                         return difficulty;
 
+                    if (criteria.Group == GroupMode.XxyStarRating)
+                        return beatmap.XxyStarRating;
+
                     return beatmap.StarRating;
                 }
 

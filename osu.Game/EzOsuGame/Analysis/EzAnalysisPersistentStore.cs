@@ -390,6 +390,7 @@ LIMIT 1;
                     double averageKps = reader.GetDouble(4);
                     double maxKps = reader.GetDouble(5);
                     string kpsListJson = reader.GetString(6);
+                    // Baseline PP/Xxy are sourced from Realm fields; main sqlite legacy columns are ignored.
                     double? pp = beatmap.PerformancePoints >= 0 ? beatmap.PerformancePoints : null;
                     long maniaUpdatedAt = reader.IsDBNull(7) ? 0 : reader.GetInt64(7);
                     double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
