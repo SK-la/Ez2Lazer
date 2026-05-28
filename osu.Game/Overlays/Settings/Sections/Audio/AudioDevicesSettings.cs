@@ -111,14 +111,6 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     Items = new[] { initialBuffer },
                 };
 
-                Add(sampleRateSettingsItem = new SettingsItemV2(sampleRateDropdown)
-                {
-                    Keywords = new[] { "sample", "rate", "frequency", "bit", "depth", "format" },
-                });
-                Add(bufferSizeSettingsItem = new SettingsItemV2(bufferSizeDropdown)
-                {
-                    Keywords = new[] { "asio", "buffer", "latency" },
-                });
                 Add(asioPassThroughSettingsItem = new SettingsItemV2(asioPassThrough = new FormCheckBox
                 {
                     Caption = EzSettingsStrings.ASIO_PASSTHROUGH_LABEL,
@@ -127,6 +119,14 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 })
                 {
                     Keywords = new[] { "asio", "pcm", "external", "internal", "passthrough", "driver", "panel" },
+                });
+                Add(sampleRateSettingsItem = new SettingsItemV2(sampleRateDropdown)
+                {
+                    Keywords = new[] { "sample", "rate", "frequency", "bit", "depth", "format" },
+                });
+                Add(bufferSizeSettingsItem = new SettingsItemV2(bufferSizeDropdown)
+                {
+                    Keywords = new[] { "asio", "buffer", "latency" },
                 });
                 Add(reloadAsioDriverButton = new SettingsButtonV2
                 {
