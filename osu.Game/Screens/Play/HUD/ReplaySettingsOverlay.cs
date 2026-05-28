@@ -41,6 +41,16 @@ namespace osu.Game.Screens.Play.HUD
         [Resolved]
         private HUDOverlay? hudOverlay { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private GameplayClockContainer? gameplayClock { get; set; }
+
+        /// <summary>
+        /// When true, the overlay only receives input and can expand while gameplay is paused.
+        /// </summary>
+        public bool RequirePauseToInteract { get; init; }
+
+        private bool canInteract => !RequirePauseToInteract || gameplayClock?.IsPaused.Value == true;
+
         // Player settings are kept off the edge of the screen.
         //
         // In edge cases, floating point error could result in the whole control getting masked away
@@ -92,10 +102,19 @@ namespace osu.Game.Screens.Play.HUD
             base.LoadComplete();
 
             inputManager = GetContainingInputManager()!;
+
+            if (RequirePauseToInteract && gameplayClock != null)
+            {
+                gameplayClock.IsPaused.BindValueChanged(_ =>
+                {
+                    if (!canInteract)
+                        Expanded.Value = false;
+                });
+            }
         }
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) =>
-            screenSpacePos.X > button.ScreenSpaceDrawQuad.TopLeft.X;
+            canInteract && screenSpacePos.X > button.ScreenSpaceDrawQuad.TopLeft.X;
 
         protected override bool OnMouseMove(MouseMoveEvent e)
         {
@@ -106,6 +125,9 @@ namespace osu.Game.Screens.Play.HUD
         protected override void Update()
         {
             base.Update();
+
+            if (RequirePauseToInteract)
+                Alpha = canInteract ? 1 : 0;
 
             if (hudOverlay != null)
                 button.Y = ToLocalSpace(hudOverlay.TopRightElements.ScreenSpaceDrawQuad.BottomRight).Y;
@@ -119,6 +141,12 @@ namespace osu.Game.Screens.Play.HUD
 
         private void checkExpanded()
         {
+            if (!canInteract)
+            {
+                Expanded.Value = false;
+                return;
+            }
+
             float screenMouseX = inputManager.CurrentState.Mouse.Position.X;
 
             Expanded.Value =
