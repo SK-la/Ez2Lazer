@@ -17,8 +17,9 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         private static readonly Color4 hold_head_colour = new Color4(255, 80, 80, 235);
         private static readonly Color4 hold_body_tail_colour = new Color4(255, 220, 70, 230);
 
-        public static void AddLaneLines(List<PreviewQuad> quads, int totalColumns, float originX, float width, float height, float thickness)
+        public static void AddLaneLines(List<PreviewQuad> quads, ManiaPreviewData data, float originX, float width, float height, float thickness)
         {
+            int totalColumns = data.TotalColumns;
             if (totalColumns <= 1)
                 return;
 
@@ -26,8 +27,12 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
             for (int lane = 1; lane < totalColumns; lane++)
             {
+                bool hasSeparator = lane - 1 < data.SeparatorAfterColumns.Count && data.SeparatorAfterColumns[lane - 1];
+                if (!hasSeparator)
+                    continue;
+
                 float x = originX + lane * laneWidth - thickness * 0.5f;
-                quads.Add(new PreviewQuad(x, 0, thickness, height, Color4.White.Opacity(0.12f)));
+                quads.Add(new PreviewQuad(x, 0, thickness * 1.8f, height, Color4.White.Opacity(0.30f)));
             }
         }
 
@@ -35,7 +40,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         {
             for (int row = ManiaPreviewFixedLayout.ROWS_PER_BEAT; row < totalRows; row += ManiaPreviewFixedLayout.ROWS_PER_BEAT)
             {
-                float y = getSlotBottomY(row, rowStep, height) - thickness * 0.5f;
+                float y = GetSlotBottomY(row, rowStep, height) - thickness * 0.5f;
                 quads.Add(new PreviewQuad(originX, y, width, thickness, Color4.White.Opacity(0.22f)));
             }
         }
@@ -64,7 +69,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                 {
                     case ManiaPreviewNoteKind.Tap:
                     {
-                        float y = getSlotBottomY(entry.Row, rowStep, height) - headHeight;
+                        float y = GetSlotBottomY(entry.Row, rowStep, height) - headHeight;
                         quads.Add(new PreviewQuad(x, y, laneW, headHeight, getColour(entry.Kind)));
                         break;
                     }
@@ -72,7 +77,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                     case ManiaPreviewNoteKind.HoldHead:
                     {
                         // Head at bottom of LN (press / start time row).
-                        float y = getSlotBottomY(entry.Row, rowStep, height) - headHeight;
+                        float y = GetSlotBottomY(entry.Row, rowStep, height) - headHeight;
                         quads.Add(new PreviewQuad(x, y, laneW, headHeight, getColour(entry.Kind)));
                         break;
                     }
@@ -80,15 +85,15 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                     case ManiaPreviewNoteKind.HoldTail:
                     {
                         // Tail at top of LN (release / end time row).
-                        float y = getSlotTopY(entry.Row, rowStep, height);
+                        float y = GetSlotTopY(entry.Row, rowStep, height);
                         quads.Add(new PreviewQuad(x, y, laneW, headHeight, getColour(entry.Kind)));
                         break;
                     }
 
                     case ManiaPreviewNoteKind.HoldBody:
                     {
-                        float bodyBottom = getSlotBottomY(entry.Row, rowStep, height) - headHeight;
-                        float bodyTop = getSlotTopY(entry.EndRow, rowStep, height) + headHeight;
+                        float bodyBottom = GetSlotBottomY(entry.Row, rowStep, height) - headHeight;
+                        float bodyTop = GetSlotTopY(entry.EndRow, rowStep, height) + headHeight;
                         float h = Math.Max(headHeight, bodyBottom - bodyTop);
                         quads.Add(new PreviewQuad(x, bodyTop, laneW, h, getColour(entry.Kind)));
                         break;
@@ -98,10 +103,10 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         }
 
         /// <summary>Bottom edge of the row slot (map start is at drawable bottom).</summary>
-        public static float getSlotBottomY(int row, float rowStep, float height) => height - row * rowStep;
+        public static float GetSlotBottomY(int row, float rowStep, float height) => height - row * rowStep;
 
         /// <summary>Top edge of the row slot.</summary>
-        public static float getSlotTopY(int row, float rowStep, float height) => height - (row + 1) * rowStep;
+        public static float GetSlotTopY(int row, float rowStep, float height) => height - (row + 1) * rowStep;
 
         public static (float rowStep, float noteHeight) ComputeRowMetrics(int totalRows, float availableHeight)
         {

@@ -25,17 +25,17 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             {
                 float panelX = col * (layout.ColumnWidth + ManiaPreviewColumnLayout.COLUMN_SPACING);
                 int rowStart = col * layout.RowsPerColumn;
-                int rowEnd = System.Math.Min(totalRows, rowStart + layout.RowsPerColumn);
+                int rowEnd = Math.Min(totalRows, rowStart + layout.RowsPerColumn);
 
                 quads.Add(new PreviewQuad(panelX, 0, 1f, panelHeight, Color4.White.Opacity(0.18f)));
                 quads.Add(new PreviewQuad(panelX + layout.ColumnWidth - 1f, 0, 1f, panelHeight, Color4.White.Opacity(0.18f)));
 
-                ManiaPreviewDrawHelper.AddLaneLines(quads, data.TotalColumns, panelX, layout.ColumnWidth, panelHeight, laneLineThickness);
+                ManiaPreviewDrawHelper.AddLaneLines(quads, data, panelX, layout.ColumnWidth, panelHeight, laneLineThickness);
 
                 for (int row = rowStart + ManiaPreviewFixedLayout.ROWS_PER_BEAT; row <= rowEnd; row += ManiaPreviewFixedLayout.ROWS_PER_BEAT)
                 {
                     int localRow = row - rowStart;
-                    float y = ManiaPreviewDrawHelper.getSlotBottomY(localRow, layout.RowStep, panelHeight) - beatLineThickness * 0.5f;
+                    float y = ManiaPreviewDrawHelper.GetSlotBottomY(localRow, layout.RowStep, panelHeight) - beatLineThickness * 0.5f;
                     quads.Add(new PreviewQuad(panelX, y, layout.ColumnWidth, beatLineThickness, Color4.White.Opacity(0.2f)));
                 }
             }
@@ -47,7 +47,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                     continue;
 
                 int rowStart = col * layout.RowsPerColumn;
-                int rowEnd = System.Math.Min(totalRows, rowStart + layout.RowsPerColumn);
+                int rowEnd = Math.Min(totalRows, rowStart + layout.RowsPerColumn);
 
                 if (entry.Row >= rowEnd)
                     continue;

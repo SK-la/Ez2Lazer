@@ -19,6 +19,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
     public readonly record struct ManiaPreviewData(
         int TotalColumns,
+        IReadOnlyList<bool> SeparatorAfterColumns,
         IReadOnlyList<ManiaPreviewNote> Notes);
 
     public readonly record struct ManiaPreviewLayoutEntry(

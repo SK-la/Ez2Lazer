@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -17,7 +18,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
         {
             var hitObjects = beatmap.HitObjects;
             if (hitObjects.Count == 0)
-                return new ManiaPreviewData(4, Array.Empty<ManiaPreviewNote>());
+                return new ManiaPreviewData(4, Array.Empty<bool>(), Array.Empty<ManiaPreviewNote>());
 
             int totalColumns = getTotalColumns(beatmap, hitObjects);
             var notes = new List<ManiaPreviewNote>();
@@ -45,7 +46,7 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                 return cmp != 0 ? cmp : a.Kind.CompareTo(b.Kind);
             });
 
-            return new ManiaPreviewData(totalColumns, notes);
+            return new ManiaPreviewData(totalColumns, buildSeparatorMap(totalColumns), notes);
         }
 
         private static int getTotalColumns(IBeatmap beatmap, IReadOnlyList<HitObject> objects)
@@ -78,6 +79,38 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
             column = 0;
             return false;
+        }
+
+        private static bool[] buildSeparatorMap(int totalColumns)
+        {
+            bool[] separators = new bool[Math.Max(0, totalColumns)];
+
+            try
+            {
+                Type? stageType = Type.GetType("osu.Game.Rulesets.Mania.Beatmaps.StageDefinition, osu.Game.Rulesets.Mania");
+                Type? extType = Type.GetType("osu.Game.Rulesets.Mania.EzMania.EzStageDefinitionExtensions, osu.Game.Rulesets.Mania");
+                if (stageType == null || extType == null)
+                    return separators;
+
+                ConstructorInfo? ctor = stageType.GetConstructor(new[] { typeof(int) });
+                MethodInfo? hasSeparator = extType.GetMethod("HasSeparator", BindingFlags.Public | BindingFlags.Static);
+                if (ctor == null || hasSeparator == null)
+                    return separators;
+
+                object stage = ctor.Invoke(new object[] { totalColumns });
+
+                for (int column = 0; column < totalColumns - 1; column++)
+                {
+                    object? result = hasSeparator.Invoke(null, new[] { stage, column });
+                    separators[column] = result is bool value && value;
+                }
+            }
+            catch
+            {
+                // Keep defaults if mania ruleset assembly is unavailable.
+            }
+
+            return separators;
         }
     }
 }
