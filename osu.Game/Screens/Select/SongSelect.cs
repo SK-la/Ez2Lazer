@@ -308,12 +308,6 @@ namespace osu.Game.Screens.Select
                                         },
                                     }
                                 },
-                                ezBeatmapPreviewOverlay = new EzBeatmapPreviewOverlay
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                    Depth = float.MinValue,
-                                    DefaultPanelRightEdgeInScreenSpace = () => titleWedge.ScreenSpaceDrawQuad.AABBFloat.Right,
-                                },
                                 ezPreviewManager = new EzPreviewTrackManager()
                             }
                         },
@@ -324,6 +318,12 @@ namespace osu.Game.Screens.Select
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both,
+                },
+                ezBeatmapPreviewOverlay = new EzBeatmapPreviewOverlay
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Depth = float.MinValue,
+                    DefaultPanelRightEdgeInScreenSpace = () => titleWedge.ScreenSpaceDrawQuad.AABBFloat.Right,
                 },
                 modSpeedHotkeyHandler = new ModSpeedHotkeyHandler()
             });

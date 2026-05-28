@@ -150,6 +150,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private float focusSavedPanelHeight;
 
         public readonly Bindable<bool> ExpandedState = new Bindable<bool>();
+        public readonly Bindable<bool> FullMapFocusState = new Bindable<bool>();
 
         public Func<float>? DefaultPanelRightEdgeInScreenSpace { get; set; }
 
@@ -311,8 +312,9 @@ namespace osu.Game.EzOsuGame.Overlays
             timeline.OnCommit = onTimelineCommit;
 
             createPreviewModeButtons();
-            // 初始化对外可观察的展开状态
+            // 初始化对外可观察的状态
             ExpandedState.Value = expanded;
+            FullMapFocusState.Value = fullMapFocusActive;
             updatePreviewModeButtons();
         }
 
@@ -1327,6 +1329,7 @@ namespace osu.Game.EzOsuGame.Overlays
             }
 
             fullMapFocusActive = focused;
+            FullMapFocusState.Value = focused;
 
             previewModeButtonList.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             loadTimeText.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
