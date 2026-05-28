@@ -110,7 +110,6 @@ namespace osu.Game.Screens.Select
         private Container rightContent = null!;
 
         private FillFlowContainer<Drawable> modsContainer = null!;
-        private Drawable maniaModeDisplay = null!;
 
         private Box totalScoreBackground = null!;
 
@@ -318,18 +317,19 @@ namespace osu.Game.Screens.Select
                                                 {
                                                     Name = @"Statistics container",
                                                     Padding = new MarginPadding { Right = 10 },
-                                                    Spacing = new Vector2(20, 0),
+                                                    Spacing = new Vector2(10, 0),
                                                     Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                                     Anchor = Anchor.CentreRight,
                                                     Origin = Anchor.CentreRight,
                                                     AutoSizeAxes = Axes.Both,
                                                     Direction = FillDirection.Horizontal,
-                                                    Children = new Drawable[]
+                                                    Children = new[]
                                                     {
+                                                        EzManiaScoreModeExtensions.CreateDisplayDrawable(Score, fontSize: 12, anchor: Anchor.CentreLeft),
                                                         new ScoreComponentLabel(BeatmapsetsStrings.ShowScoreboardHeadersCombo.ToUpper(), $"{Score.MaxCombo.ToString()}x",
                                                             Score.MaxCombo == Score.GetMaximumAchievableCombo(), 60),
                                                         new ScoreComponentLabel(BeatmapsetsStrings.ShowScoreboardHeadersAccuracy.ToUpper(), Score.DisplayAccuracy, Score.Accuracy == 1,
-                                                            55),
+                                                            45),
                                                     },
                                                     Alpha = 0,
                                                 }
@@ -433,7 +433,7 @@ namespace osu.Game.Screens.Select
                                                 Direction = FillDirection.Vertical,
                                                 Padding = new MarginPadding { Horizontal = corner_radius },
                                                 Spacing = new Vector2(0f, -2f),
-                                                Children = new[]
+                                                Children = new Drawable[]
                                                 {
                                                     new OsuSpriteText
                                                     {
@@ -454,7 +454,6 @@ namespace osu.Game.Screens.Select
                                                         Spacing = new Vector2(-10, 0),
                                                         Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                                     },
-                                                    maniaModeDisplay = EzManiaScoreModeExtensions.CreateDisplayDrawable(Score, fontSize: 9, anchor: Anchor.TopRight),
                                                 }
                                             }
                                         }
