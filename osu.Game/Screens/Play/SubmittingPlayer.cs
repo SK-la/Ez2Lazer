@@ -10,6 +10,7 @@ using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Development;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
@@ -33,6 +34,8 @@ namespace osu.Game.Screens.Play
     /// </summary>
     public abstract partial class SubmittingPlayer : Player
     {
+        private ReplaySettingsOverlay pauseReplaySettingsOverlay;
+
         /// <summary>
         /// The token to be used for the current submission. This is fetched via a request created by <see cref="CreateTokenRequest"/>.
         /// </summary>
@@ -73,7 +76,10 @@ namespace osu.Game.Screens.Play
 
             AddInternal(new PlayerTouchInputDetector());
 
-            GameplayClockContainer.Add(new ReplaySettingsOverlay { RequirePauseToInteract = true });
+            GameplayClockContainer.Add(pauseReplaySettingsOverlay = new ReplaySettingsOverlay
+            {
+                Alpha = 0
+            });
 
             // We probably want to move this display to something more global.
             // Probably using the OSD somehow.
@@ -83,6 +89,24 @@ namespace osu.Game.Screens.Play
                 Anchor = Anchor.CentreRight,
                 Origin = Anchor.CentreRight,
             });
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (DrawableRuleset == null)
+                return;
+
+            PauseOverlay.State.ValueChanged += state =>
+            {
+                bool visible = state.NewValue == Visibility.Visible;
+                pauseReplaySettingsOverlay.Alpha = visible ? 1 : 0;
+
+                if (!visible)
+                    pauseReplaySettingsOverlay.Expanded.Value = false;
+            };
+            pauseReplaySettingsOverlay.Alpha = PauseOverlay.State.Value == Visibility.Visible ? 1 : 0;
         }
 
         protected override GameplayClockContainer CreateGameplayClockContainer(WorkingBeatmap beatmap, double gameplayStart) => new MasterGameplayClockContainer(beatmap, gameplayStart)

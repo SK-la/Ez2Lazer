@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
@@ -49,7 +50,14 @@ namespace osu.Game.Screens.Play.HUD
         /// </summary>
         public bool RequirePauseToInteract { get; init; }
 
-        private bool canInteract => !RequirePauseToInteract || gameplayClock?.IsPaused.Value == true;
+        /// <summary>
+        /// Optional explicit pause-state source for contexts where automatic DI lookup is unavailable.
+        /// </summary>
+        public IBindable<bool>? PausedState { get; init; }
+
+        private IBindable<bool>? pauseState => PausedState ?? gameplayClock?.IsPaused;
+
+        private bool canInteract => !RequirePauseToInteract || pauseState?.Value == true;
 
         // Player settings are kept off the edge of the screen.
         //
@@ -103,9 +111,12 @@ namespace osu.Game.Screens.Play.HUD
 
             inputManager = GetContainingInputManager()!;
 
-            if (RequirePauseToInteract && gameplayClock != null)
+            // Fallback for contexts where DI resolution of GameplayClockContainer is unavailable.
+            gameplayClock ??= this.FindClosestParent<GameplayClockContainer>();
+
+            if (RequirePauseToInteract && pauseState != null)
             {
-                gameplayClock.IsPaused.BindValueChanged(_ =>
+                pauseState.BindValueChanged(_ =>
                 {
                     if (!canInteract)
                         Expanded.Value = false;
@@ -132,10 +143,12 @@ namespace osu.Game.Screens.Play.HUD
             if (hudOverlay != null)
                 button.Y = ToLocalSpace(hudOverlay.TopRightElements.ScreenSpaceDrawQuad.BottomRight).Y;
 
-            // Only check expanded if already expanded.
-            // This is because if we are always checking, it would bypass blocking overlays.
-            // Case in point: the skin editor overlay blocks input from reaching the player, but checking raw coordinates would make settings pop out.
-            if (Expanded.Value)
+            // In pause-only interaction mode, this overlay may not consistently receive mouse move events
+            // due to pause menu input layering. Polling mouse position keeps expansion responsive while paused.
+            if (RequirePauseToInteract && canInteract)
+                checkExpanded();
+            // Outside pause-only mode, preserve old behaviour to respect blocking overlays.
+            else if (Expanded.Value)
                 checkExpanded();
         }
 
