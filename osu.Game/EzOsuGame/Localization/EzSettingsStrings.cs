@@ -227,32 +227,46 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nPlease do not assume virtual ASIO is better than WASAPI, and try restarting if there is no sound.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 输出格式（期望值）",
-            "ASIO Output Format (Desired)");
+            "ASIO 输出格式（内部 PCM）",
+            "ASIO Output Format (Internal PCM)");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "选项由系统或 ASIO 驱动提供，显示与系统声音设置一致，但驱动可能不会接受所选值。"
-            + "\n数值越高延迟越高，推荐48000Hz，次选441000Hz。",
-            "Options are provided by the system or the ASIO driver, shown consistent with the system sound settings, but the driver may not accept the selected value."
-            + "\nHigher values mean higher latency, 48000Hz is recommended, followed by 44100Hz.");
+            "仅在关闭「外部 PCM」时生效。所有音频仍会混音到统一的输出采样率。"
+            + "\n推荐 48000 Hz，次选 44100 Hz。",
+            "Only applies when External PCM is off. All audio is still mixed to a single output sample rate."
+            + "\n48000 Hz is recommended; 44100 Hz is the alternative.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 缓冲区大小（期望值）",
-            "ASIO Buffer Size (Desired)");
+            "ASIO 缓冲区大小（内部 PCM）",
+            "ASIO Buffer Size (Internal PCM)");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "选项由系统或 ASIO 驱动提供，显示与系统声音设置一致，但驱动可能不会接受所选值。"
-            + "\n数值越低延迟越低，但过低可能会导致爆音或无法启动。默认为 128。",
-            "Options are provided by the system or the ASIO driver, shown consistent with the system sound settings, but the driver may not accept the selected value."
-            + "\nLower values mean lower latency, but too low may cause crackling or failure to start. Default is 128.");
+            "仅在关闭「外部 PCM」时生效。数值越低延迟越低，过低可能爆音或无法启动。",
+            "Only applies when External PCM is off. Lower values reduce latency but may crackle or fail to start.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_PASSTHROUGH_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 直通（原生格式）",
-            "ASIO Pass-through (Native Format)");
+            "ASIO 外部 PCM（推荐）",
+            "ASIO External PCM (Recommended)");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_PASSTHROUGH_HINT = new EzLocalizationManager.EzLocalisableString(
-            "开启后绕过采样率/位深设置，完全使用驱动当前原生输出格式。关闭后按上方输出格式设置进行播放。",
-            "When enabled, bypasses sample-rate/bit-depth output settings and uses the driver's current native output format. When disabled, playback follows the output format settings above.");
+            "开启：输出采样率、位深与缓冲区由 ASIO 驱动控制面板决定，游戏不覆盖（外部 PCM）。"
+            + "\n关闭：使用下方游戏内设置指定输出格式（内部 PCM，适用于无驱动面板的设备）。"
+            + "\n无论哪种模式，多路音效都会在混音后以统一格式输出。",
+            "On: sample rate, bit depth, and buffer follow the ASIO driver control panel; the game does not override (external PCM)."
+            + "\nOff: use the in-game settings below (internal PCM; for devices without a driver panel)."
+            + "\nIn both modes, multiple sounds are mixed to one output format.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ASIO_RELOAD_DRIVER_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "重新加载 ASIO 驱动",
+            "Reload ASIO Driver");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ASIO_RELOAD_DRIVER_HINT = new EzLocalizationManager.EzLocalisableString(
+            "释放本程序占用的音频设备后，按当前输出设备选择重新初始化，并重新读取驱动当前生效的格式与缓冲区。",
+            "Releases audio resources held by the game, re-initialises the current output device, and re-reads the driver's active format and buffer settings.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ASIO_RELOAD_DRIVER_FAILED_NOTIFICATION = new EzLocalizationManager.EzLocalisableString(
+            "ASIO 驱动重新加载失败。请确认驱动控制面板中的设置，或尝试重启游戏。",
+            "ASIO driver reload failed. Check the driver control panel settings, or try restarting the game.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_OUTPUT_UNAVAILABLE_NOTIFICATION = new EzLocalizationManager.EzLocalisableString(
             "ASIO 输出未能启动，当前没有声音。请尝试重启游戏；若仍失败，请关闭占用该 ASIO 驱动的其他程序，或切换到其他音频设备。",
