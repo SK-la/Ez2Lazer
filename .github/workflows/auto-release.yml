@@ -1,22 +1,14 @@
 name: Auto Release CL (x64 + arm64, 3 platform manual build + package + release)
 
 on:
+  push:
+    tags:
+      - '*.*.*'
+      - '*.*.*-ez2lazer'
   workflow_dispatch:
     inputs:
       tag:
         description: '发布使用的 tag，建议使用纯数字版本（如 2026.518.0）'
-        required: false
-        default: ''
-      branch:
-        description: '主仓分支名，留空默认 master'
-        required: false
-        default: ''
-      framework_branch:
-        description: 'osu-framework 分支名，留空默认 master'
-        required: false
-        default: ''
-      resources_branch:
-        description: 'osu-resources 分支名，留空默认 master'
         required: false
         default: ''
       no_publish:
@@ -37,20 +29,37 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_tag: ${{ steps.export.outputs.release_tag }}
-      main_branch: ${{ steps.export.outputs.main_branch }}
-      framework_branch: ${{ steps.export.outputs.framework_branch }}
-      resources_branch: ${{ steps.export.outputs.resources_branch }}
+      publish_version_tag: ${{ steps.export.outputs.publish_version_tag }}
+      skip_release: ${{ steps.export.outputs.skip_release }}
     steps:
       - name: Resolve tag and branches
         id: export
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALLOWED_TAG_PUSHER: SK-la
         run: |
+          $eventName = '${{ github.event_name }}'
+          $refType = '${{ github.ref_type }}'
+          $refName = '${{ github.ref_name }}'
+          $actor = '${{ github.actor }}'
+          $allowedTagPusher = $env:ALLOWED_TAG_PUSHER
+          $skipRelease = 'false'
+
           $inputTag = '${{ github.event.inputs.tag }}'
-          if (-not [string]::IsNullOrWhiteSpace($inputTag) -and $inputTag -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
-            Write-Error 'Tag must be a 3-part numeric version (e.g., 2026.518.0)'
-            exit 1
+          if ($eventName -eq 'push' -and $refType -eq 'tag') {
+            $inputTag = $refName
+
+            # 仅允许指定账号推送的 tag 触发发布，避免上游同步来的 tag 误触发。
+            if (-not [string]::IsNullOrWhiteSpace($allowedTagPusher) -and $actor -ne $allowedTagPusher) {
+              Write-Warning "Skip release: pushed tag '$inputTag' by actor '$actor' is not allowed (expected '$allowedTagPusher')."
+              $skipRelease = 'true'
+            }
+          }
+
+          if (-not [string]::IsNullOrWhiteSpace($inputTag) -and $inputTag -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-ez2lazer)?$') {
+            Write-Warning "Skip release: tag '$inputTag' must be 'x.y.z' or 'x.y.z-ez2lazer'."
+            $skipRelease = 'true'
           }
 
           function Test-GitHubReleaseTagExists {
@@ -102,28 +111,33 @@ jobs:
             }
           }
 
-          if ([string]::IsNullOrWhiteSpace($inputTag)) {
+          if ([string]::IsNullOrWhiteSpace($inputTag) -and $eventName -eq 'workflow_dispatch') {
             $now = [DateTime]::UtcNow
               $inputTag = "$($now.Year).$($now.Month)$($now.Day.ToString('D2')).0"
             $inputTag = Resolve-NextReleaseTag -BaseTag $inputTag
           }
 
-          $mainBranch = '${{ github.event.inputs.branch }}'
-          if ([string]::IsNullOrWhiteSpace($mainBranch)) { $mainBranch = '${{ github.ref_name }}' }
+          if ([string]::IsNullOrWhiteSpace($inputTag)) {
+            Write-Warning "Skip release: no valid tag provided/resolved for event '$eventName'."
+            $skipRelease = 'true'
+          }
 
-          $frameworkBranch = '${{ github.event.inputs.framework_branch }}'
-          if ([string]::IsNullOrWhiteSpace($frameworkBranch)) { $frameworkBranch = 'master' }
+          $publishVersionTag = $inputTag
+          if (-not [string]::IsNullOrWhiteSpace($publishVersionTag)) {
+            $publishVersionTag = $publishVersionTag -replace '-ez2lazer$', ''
+          }
 
-          $resourcesBranch = '${{ github.event.inputs.resources_branch }}'
-          if ([string]::IsNullOrWhiteSpace($resourcesBranch)) { $resourcesBranch = 'master' }
+          Write-Output "Resolved release tag: $inputTag"
+          Write-Output "Resolved publish version tag: $publishVersionTag"
+          Write-Output "Skip release: $skipRelease"
 
           Write-Output "release_tag=$inputTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          Write-Output "main_branch=$mainBranch" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          Write-Output "framework_branch=$frameworkBranch" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          Write-Output "resources_branch=$resourcesBranch" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Output "publish_version_tag=$publishVersionTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Output "skip_release=$skipRelease" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
   build:
     needs: prepare
+    if: ${{ needs.prepare.outputs.skip_release != 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -136,14 +150,12 @@ jobs:
         with:
           fetch-depth: 0
           path: osu
-          ref: refs/heads/${{ needs.prepare.outputs.main_branch }}
 
       - name: Checkout osu-resources (resources) as sibling
         uses: actions/checkout@v4
         with:
           repository: SK-la/osu-resources
           path: osu-resources
-          ref: refs/heads/${{ needs.prepare.outputs.resources_branch }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -160,10 +172,25 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('osu/**/packages.lock.json', 'osu/**/*.csproj', 'osu/**/*.props', 'osu/**/*.targets', 'osu/global.json', 'osu/NuGet.config') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-${{ matrix.platform }}-${{ matrix.arch }}-
+            nuget-${{ runner.os }}-
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+
+      - name: Cache vpk tool
+        uses: actions/cache@v4
+        with:
+          path: osu/.vpk-tools
+          key: vpk-${{ runner.os }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('osu/publish.py') }}
 
       - name: Dotnet restore (desktop project)
         working-directory: osu
@@ -187,11 +214,12 @@ jobs:
           PYTHONIOENCODING: 'utf-8'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $tag = '${{ needs.prepare.outputs.release_tag }}'
+          $tag = '${{ needs.prepare.outputs.publish_version_tag }}'
           if ([string]::IsNullOrWhiteSpace($tag)) {
-            Write-Error 'release tag is missing'
+            Write-Error 'publish version tag is missing'
             exit 1
           }
+          Write-Output "Packaging with release tag '${{ needs.prepare.outputs.release_tag }}' and publish version '$tag'."
 
           $workspace = '${{ github.workspace }}'
           $project = Join-Path (Get-Location) 'osu.Desktop\osu.Desktop.csproj'
@@ -216,6 +244,10 @@ jobs:
           )
           if ($platform -eq 'linux') {
             $publishArgs += @('--os', 'linux')
+            if ($arch -eq 'x64') {
+              # Linux x64 additionally produces standalone AppImage for direct distribution.
+              $publishArgs += @('--appimage')
+            }
           }
 
           # Keep release channels stable for in-game differential updates.
@@ -318,7 +350,7 @@ jobs:
 
   release:
     needs: [prepare, build]
-    if: ${{ github.event.inputs.no_publish != '1' }}
+    if: ${{ needs.prepare.outputs.skip_release != 'true' && github.event.inputs.no_publish != '1' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -328,7 +360,6 @@ jobs:
         with:
           fetch-depth: 0
           path: osu
-          ref: refs/heads/${{ needs.prepare.outputs.main_branch }}
 
       - name: Check remote tag existence and create if missing
         shell: pwsh

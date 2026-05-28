@@ -175,6 +175,24 @@ def _compute_sha256(path: str) -> str:
     return h.hexdigest()
 
 
+def _snapshot_files_by_pattern(root_dir: str, patterns: tuple[str, ...]) -> dict[str, tuple[int, str]]:
+    """Return a snapshot map: basename -> (size, sha256) for matched files."""
+    import glob
+
+    snapshot: dict[str, tuple[int, str]] = {}
+    for pattern in patterns:
+        for src in glob.glob(os.path.join(root_dir, '**', pattern), recursive=True):
+            if not os.path.isfile(src):
+                continue
+            name = os.path.basename(src)
+            try:
+                snapshot[name] = (os.path.getsize(src), _compute_sha256(src))
+            except Exception:
+                # Best-effort snapshot; skip unreadable files.
+                continue
+    return snapshot
+
+
 def zip_folder(src_dir: str, zip_path: str):
     """Create a deterministic zip of src_dir at zip_path.
 
@@ -438,6 +456,9 @@ def velopack_pack(
     if target_platform == 'windows' and os.path.isfile(icon_path):
         pack_cmd.extend(['--icon', icon_path])
 
+    output_patterns = ('*.nupkg', 'RELEASES', 'releases*.json', 'assets*.json', '*-Setup.exe', '*.AppImage')
+    before_pack_snapshot = _snapshot_files_by_pattern(vpk_out, output_patterns)
+
     print('Running:', ' '.join(pack_cmd))
     pack_res = subprocess.run(pack_cmd, cwd=workdir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if pack_res.returncode != 0:
@@ -451,13 +472,28 @@ def velopack_pack(
         print('Velopack: pack failed with code', pack_res.returncode)
         return pack_res.returncode
 
-    # Flatten Velopack outputs into artifacts_dir for CI collection.
+    # Flatten only files generated/updated by this pack invocation.
+    # This prevents previously downloaded release assets from polluting a new GitHub release.
     import glob
-    output_patterns = ('*.nupkg', 'RELEASES', 'releases*.json', 'assets*.json', '*-Setup.exe', '*.AppImage')
     copied_full = []
     copied_delta = []
+    copied_manifest = []
     for pattern in output_patterns:
         for src in glob.glob(os.path.join(vpk_out, '**', pattern), recursive=True):
+            if not os.path.isfile(src):
+                continue
+
+            name = os.path.basename(src)
+            try:
+                current_signature = (os.path.getsize(src), _compute_sha256(src))
+            except Exception:
+                print('Velopack: skipped unreadable file', src)
+                continue
+
+            # Keep only files that are new or changed after packing.
+            if before_pack_snapshot.get(name) == current_signature:
+                continue
+
             dest = os.path.join(artifacts_dir, os.path.basename(src))
             shutil.copy2(src, dest)
             print('Velopack: copied', dest)
@@ -467,8 +503,10 @@ def velopack_pack(
                     copied_delta.append(dest)
                 elif '-full.' in lower or '-full-' in lower:
                     copied_full.append(dest)
+            elif lower == 'releases' or lower.endswith('.json'):
+                copied_manifest.append(dest)
 
-    print(f'Velopack: copied {len(copied_full)} full package(s), {len(copied_delta)} delta package(s)')
+    print(f'Velopack: copied {len(copied_full)} full package(s), {len(copied_delta)} delta package(s), {len(copied_manifest)} manifest file(s)')
     if copied_full and not copied_delta:
         print('Velopack: warning: no delta package generated. This is expected for a first release, or when previous assets cannot be downloaded for the same pack id/channel/runtime.')
 
@@ -748,7 +786,6 @@ def main():
         if os.path.exists(release_dir):
             # handle deps source
             temp_dirs = []
-            deps_to_cleanup = []
             try:
                 if args.deps_source == 'local':
                     deps_src_path = args.deps_path
@@ -1042,11 +1079,12 @@ def main():
                             shutil.copy2(s, d)
 
                     # AppRun
+                    linux_main_exe = resolve_main_exe(release_dir, 'linux')
                     apprun_path = os.path.join(appdir, 'AppRun')
                     with open(apprun_path, 'w', encoding='utf-8') as f:
                         f.write('#!/bin/sh\n')
                         f.write('HERE="$(dirname "$(readlink -f "$0")")"\n')
-                        f.write('exec "$HERE"/usr/bin/osu.Desktop "$@"\n')
+                        f.write(f'exec "$HERE"/usr/bin/{linux_main_exe} "$@"\n')
                     try:
                         os.chmod(apprun_path, 0o755)
                     except Exception:
@@ -1058,7 +1096,7 @@ def main():
                         f.write('[Desktop Entry]\n')
                         f.write('Type=Application\n')
                         f.write('Name=Ez2Lazer\n')
-                        f.write('Exec=osu.Desktop %u\n')
+                        f.write(f'Exec={linux_main_exe} %u\n')
                         f.write('Icon=ez2lazer\n')
                         f.write('Categories=Game;\n')
                         f.write('Terminal=false\n')
@@ -1094,7 +1132,10 @@ def main():
 
                     # run appimagetool
                     # Run appimagetool and capture output for diagnostics
-                    rc_tool = subprocess.run([tool, appdir], cwd=base_out, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    appimage_env = os.environ.copy()
+                    appimage_env.setdefault('ARCH', 'aarch64' if arch_name == 'arm64' else 'x86_64')
+                    appimage_env.setdefault('APPIMAGE_EXTRACT_AND_RUN', '1')
+                    rc_tool = subprocess.run([tool, appdir], cwd=base_out, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=appimage_env)
                     if rc_tool.returncode != 0:
                         try:
                             out = rc_tool.stdout.decode('utf-8', errors='replace')
