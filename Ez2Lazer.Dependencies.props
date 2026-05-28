@@ -1,7 +1,7 @@
 ﻿<!-- Ez2Lazer：Framework / Resources 依赖。版本仅在此文件维护。 -->
 <Project>
   <PropertyGroup Label="Ez2Lazer">
-    <Ez2LazerFrameworkVersion>2026.528.0-ez2lazer</Ez2LazerFrameworkVersion>
+    <Ez2LazerFrameworkVersion>2026.528.1-ez2lazer</Ez2LazerFrameworkVersion>
     <Ez2LazerGameResourcesVersion>2026.524.4-ez2lazer</Ez2LazerGameResourcesVersion>
     <Ez2LazerFrameworkProjectPath>$(MSBuildThisFileDirectory)..\osu-framework\osu.Framework\osu.Framework.csproj</Ez2LazerFrameworkProjectPath>
     <Ez2LazerResourcesProjectPath>$(MSBuildThisFileDirectory)..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj</Ez2LazerResourcesProjectPath>
