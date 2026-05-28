@@ -48,10 +48,12 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         private FormCheckBox? asioPassThrough;
         private SettingsItemV2? asioPassThroughSettingsItem;
 
+        private SettingsButtonV2? reloadAsioDriverButton;
+
         private Bindable<int> configSampleRate = null!;
         private Bindable<int> configBitDepth = null!;
         private Bindable<int> configBufferSize = null!;
-        private Bindable<bool> configAsioPassThrough = null!;
+        private Bindable<bool> configAsioUseExternalPCM = null!;
 
         private bool suppressAsioFormatChanges;
 
@@ -61,7 +63,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             configSampleRate = ezConfig.GetBindable<int>(Ez2Setting.AsioSampleRate);
             configBitDepth = ezConfig.GetBindable<int>(Ez2Setting.AsioBitDepth);
             configBufferSize = ezConfig.GetBindable<int>(Ez2Setting.AsioBufferSize);
-            configAsioPassThrough = ezConfig.GetBindable<bool>(Ez2Setting.AsioPassThrough);
+            configAsioUseExternalPCM = ezConfig.GetBindable<bool>(Ez2Setting.AsioUseExternalPCM);
 
             Children = new Drawable[]
             {
@@ -121,10 +123,17 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 {
                     Caption = EzSettingsStrings.ASIO_PASSTHROUGH_LABEL,
                     HintText = EzSettingsStrings.ASIO_PASSTHROUGH_HINT,
-                    Current = configAsioPassThrough,
+                    Current = configAsioUseExternalPCM,
                 })
                 {
-                    Keywords = new[] { "asio", "passthrough", "native", "format" },
+                    Keywords = new[] { "asio", "pcm", "external", "internal", "passthrough", "driver", "panel" },
+                });
+                Add(reloadAsioDriverButton = new SettingsButtonV2
+                {
+                    Text = EzSettingsStrings.ASIO_RELOAD_DRIVER_LABEL,
+                    TooltipText = EzSettingsStrings.ASIO_RELOAD_DRIVER_HINT,
+                    Keywords = new[] { "asio", "reload", "driver", "refresh", "restart" },
+                    Action = reloadAsioDriver,
                 });
                 Add(new SettingsItemV2(legacyAudio = new LegacyAudioCheckbox())
                 {
@@ -206,8 +215,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
                 asioPassThrough!.Current.BindValueChanged(e =>
                 {
-                    Logger.Log($"User set ASIO pass-through to {e.NewValue}", LoggingTarget.Runtime, LogLevel.Debug);
-                    audio.SetAsioPassThrough(e.NewValue);
+                    Logger.Log($"User set ASIO PCM mode to {(e.NewValue ? "external" : "internal")}", LoggingTarget.Runtime, LogLevel.Debug);
+                    audio.SetAsioUseExternalPCM(e.NewValue);
                     refreshAsioSettingVisibility(getCurrentDeviceSelection());
                     updateAudioDeviceStatusNote(getCurrentDeviceSelection());
                 }, true);
@@ -240,19 +249,23 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 if (!isAsioSelection(deviceSelection))
                     return;
 
+                audio.SetAsioUseExternalPCM(configAsioUseExternalPCM.Value);
+
                 requestAsioSettingsListRefresh(deviceSelection);
                 updateAudioDeviceStatusNote(deviceSelection);
 
                 var format = AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value);
                 ensureDropdownContainsValue(sampleRateDropdown, format);
 
-                if (sampleRateDropdown?.Current != null)
+                if (sampleRateDropdown?.Current != null && !configAsioUseExternalPCM.Value)
                     sampleRateDropdown.Current.Value = pickSupportedFormat(format);
 
-                audio.SetAsioFormat(configSampleRate.Value, configBitDepth.Value);
-
-                if (bufferSizeDropdown?.Current != null)
-                    audio.SetAsioBufferSize(bufferSizeDropdown.Current.Value);
+                // Driver-panel mode: do not push saved fallback values onto the ASIO driver on open.
+                if (!configAsioUseExternalPCM.Value)
+                {
+                    audio.SetAsioFormat(configSampleRate.Value, configBitDepth.Value);
+                    audio.SetAsioBufferSize(bufferSizeDropdown?.Current.Value ?? configBufferSize.Value);
+                }
             }
             finally
             {
@@ -298,6 +311,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             if (visible)
             {
                 asioPassThroughSettingsItem?.Show();
+                reloadAsioDriverButton?.Show();
                 refreshAsioSettingVisibility(getCurrentDeviceSelection());
             }
             else
@@ -305,15 +319,44 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 sampleRateSettingsItem?.Hide();
                 bufferSizeSettingsItem?.Hide();
                 asioPassThroughSettingsItem?.Hide();
+                reloadAsioDriverButton?.Hide();
             }
+        }
+
+        private void reloadAsioDriver()
+        {
+            if (reloadAsioDriverButton == null)
+                return;
+
+            reloadAsioDriverButton.Enabled.Value = false;
+
+            audio.ReloadCurrentAudioDevice(success =>
+            {
+                Schedule(() =>
+                {
+                    reloadAsioDriverButton.Enabled.Value = true;
+
+                    string deviceSelection = getCurrentDeviceSelection();
+                    requestAsioSettingsListRefresh(deviceSelection);
+                    updateAudioDeviceStatusNote(deviceSelection);
+
+                    if (!success)
+                    {
+                        notifications?.Post(new SimpleNotification
+                        {
+                            Text = EzSettingsStrings.ASIO_RELOAD_DRIVER_FAILED_NOTIFICATION,
+                        });
+                    }
+                });
+            });
         }
 
         private void refreshAsioSettingVisibility(string? deviceSelection)
         {
             bool isAsio = isAsioSelection(deviceSelection);
-            bool passThroughEnabled = configAsioPassThrough.Value;
+            bool useExternalPCM = configAsioUseExternalPCM.Value;
 
-            if (!isAsio || passThroughEnabled)
+            if (!isAsio || useExternalPCM)
             {
                 sampleRateSettingsItem?.Hide();
                 bufferSizeSettingsItem?.Hide();
@@ -357,7 +400,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             var picked = pickSupportedFormat(desired);
             ensureDropdownContainsValue(sampleRateDropdown, picked);
 
-            if (!suppressAsioFormatChanges)
+            if (!suppressAsioFormatChanges && !configAsioUseExternalPCM.Value)
             {
                 sampleRateDropdown.Current.Value = picked;
                 configSampleRate.Value = picked.SampleRate;
@@ -408,7 +451,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             int picked = pickSupportedBufferSize(desired, supported);
             ensureDropdownContainsValue(bufferSizeDropdown, picked);
 
-            if (!suppressAsioFormatChanges)
+            if (!suppressAsioFormatChanges && !configAsioUseExternalPCM.Value)
             {
                 bufferSizeDropdown.Current.Value = picked;
                 configBufferSize.Value = picked;
