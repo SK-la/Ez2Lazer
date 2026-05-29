@@ -33,5 +33,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NORMAL = new EzLocalizationManager.EzLocalisableString("正常", "Normal");
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_IN_GAME_FOCUS = new EzLocalizationManager.EzLocalisableString("游戏内聚焦", "In-game focus");
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NEVER = new EzLocalizationManager.EzLocalisableString("永不通知", "Never notify");
+
+        public static readonly LocalisableString SCREENSHOT_ACTION_SAVE_ONLY = new EzLocalizationManager.EzLocalisableString("仅保存图片", "Save image only");
+        public static readonly LocalisableString SCREENSHOT_ACTION_SAVE_AND_COPY = new EzLocalizationManager.EzLocalisableString("保存图片并复制到剪贴板", "Save image and copy to clipboard");
+        public static readonly LocalisableString SCREENSHOT_ACTION_COPY_ONLY = new EzLocalizationManager.EzLocalisableString("仅将图片复制到剪贴板", "Copy image to clipboard only");
     }
 }

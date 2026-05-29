@@ -70,6 +70,15 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nIn-game focus: suppress all notification toasts and sounds while playing a beatmap (including load and pause)."
             + "\nNever notify: suppress notification toasts and sounds at all times.");
 
+        public static readonly LocalisableString SCREENSHOT_ACTION =
+            new EzLocalizationManager.EzLocalisableString("截图行为", "Screenshot action");
+
+        public static readonly LocalisableString SCREENSHOT_COPIED_TO_CLIPBOARD =
+            new EzLocalizationManager.EzLocalisableString("截图已复制到剪贴板！", "Screenshot copied to clipboard!");
+
+        public static LocalisableString ScreenshotSaved(string filename) =>
+            new EzLocalizationManager.EzLocalisableString($"截图已保存！点此处查看：\n{filename}", $"Screenshot saved! Click to view.\n{filename}");
+
         public static readonly EzLocalizationManager.EzLocalisableString STORYBOARD_VIDEO_AUTO_SIZE =
             new EzLocalizationManager.EzLocalisableString("故事板视频自适应填满", "Storyboard video auto-size to fill");
 

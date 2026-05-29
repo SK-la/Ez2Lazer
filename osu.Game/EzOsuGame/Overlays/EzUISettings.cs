@@ -85,6 +85,14 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "notification", "toast", "alert", "sound", "ui", "gameplay" }
                 },
+                new SettingsItemV2(new FormEnumDropdown<EzScreenshotAction>
+                {
+                    Caption = EzSettingsStrings.SCREENSHOT_ACTION,
+                    Current = ezConfig.GetBindable<EzScreenshotAction>(Ez2Setting.ScreenshotAction),
+                })
+                {
+                    Keywords = new[] { "screenshot", "clipboard", "capture", "image", "ui" }
+                },
                 new SettingsItemV2(new FormCheckBox
                 {
                     Caption = EzSettingsStrings.STORYBOARD_VIDEO_AUTO_SIZE,

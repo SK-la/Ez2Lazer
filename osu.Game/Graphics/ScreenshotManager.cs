@@ -16,8 +16,9 @@ using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Input.Bindings;
-using osu.Game.Localisation;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
@@ -49,6 +50,9 @@ namespace osu.Game.Graphics
 
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         private Storage storage = null!;
 
@@ -88,7 +92,10 @@ namespace osu.Game.Graphics
             Interlocked.Increment(ref screenShotTasks);
 
             ScreenshotFormat screenshotFormat = config.Get<ScreenshotFormat>(OsuSetting.ScreenshotFormat);
+            EzScreenshotAction screenshotAction = ezConfig.Get<EzScreenshotAction>(Ez2Setting.ScreenshotAction);
             bool captureMenuCursor = config.Get<bool>(OsuSetting.ScreenshotCaptureMenuCursor);
+            bool shouldSave = screenshotAction != EzScreenshotAction.CopyOnly;
+            bool shouldCopy = screenshotAction != EzScreenshotAction.SaveOnly;
 
             try
             {
@@ -143,40 +150,51 @@ namespace osu.Game.Graphics
                         });
                     }
 
-                    clipboard.SetImage(image);
+                    if (shouldCopy)
+                        clipboard.SetImage(image);
 
-                    (string? filename, Stream? stream) = getWritableStream(screenshotFormat);
-
-                    if (filename == null) return;
-
-                    using (stream)
+                    if (shouldSave)
                     {
-                        switch (screenshotFormat)
+                        (string? filename, Stream? stream) = getWritableStream(screenshotFormat);
+
+                        if (filename == null) return;
+
+                        using (stream)
                         {
-                            case ScreenshotFormat.Png:
-                                await image.SaveAsPngAsync(stream).ConfigureAwait(false);
-                                break;
+                            switch (screenshotFormat)
+                            {
+                                case ScreenshotFormat.Png:
+                                    await image.SaveAsPngAsync(stream).ConfigureAwait(false);
+                                    break;
 
-                            case ScreenshotFormat.Jpg:
-                                const int jpeg_quality = 92;
+                                case ScreenshotFormat.Jpg:
+                                    const int jpeg_quality = 92;
 
-                                await image.SaveAsJpegAsync(stream, new JpegEncoder { Quality = jpeg_quality }).ConfigureAwait(false);
-                                break;
+                                    await image.SaveAsJpegAsync(stream, new JpegEncoder { Quality = jpeg_quality }).ConfigureAwait(false);
+                                    break;
 
-                            default:
-                                throw new InvalidOperationException($"Unknown enum member {nameof(ScreenshotFormat)} {screenshotFormat}.");
+                                default:
+                                    throw new InvalidOperationException($"Unknown enum member {nameof(ScreenshotFormat)} {screenshotFormat}.");
+                            }
                         }
+
+                        notificationOverlay.Post(new SimpleNotification
+                        {
+                            Text = EzSettingsStrings.ScreenshotSaved(filename),
+                            Activated = () =>
+                            {
+                                storage.PresentFileExternally(filename);
+                                return true;
+                            }
+                        });
                     }
-
-                    notificationOverlay.Post(new SimpleNotification
+                    else
                     {
-                        Text = NotificationsStrings.ScreenshotSaved(filename),
-                        Activated = () =>
+                        notificationOverlay.Post(new SimpleNotification
                         {
-                            storage.PresentFileExternally(filename);
-                            return true;
-                        }
-                    });
+                            Text = EzSettingsStrings.SCREENSHOT_COPIED_TO_CLIPBOARD
+                        });
+                    }
                 }
             }
             finally
