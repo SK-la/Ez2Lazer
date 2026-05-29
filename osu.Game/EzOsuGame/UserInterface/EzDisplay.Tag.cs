@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
@@ -18,6 +19,7 @@ using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Screens.Select;
 using osuTK;
+using osuTK.Input;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
@@ -167,15 +169,46 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             private readonly string tagText;
 
+            private OverlayColourProvider colourProvider = null!;
+            private Box background = null!;
+            private OsuSpriteText label = null!;
+
             public SimpleTag(string text)
             {
                 tagText = text;
                 AutoSizeAxes = Axes.Both;
             }
 
+            protected override bool OnClick(ClickEvent e)
+            {
+                if (!e.CurrentState.Keyboard.Keys.IsPressed(Key.LAlt))
+                    return false;
+
+                return base.OnClick(e);
+            }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                if (!e.CurrentState.Keyboard.Keys.IsPressed(Key.LAlt))
+                    return false;
+
+                background.FadeColour(colourProvider.Highlight1, 200, Easing.OutQuint);
+                label.FadeColour(colourProvider.Content1, 200, Easing.OutQuint);
+                return base.OnHover(e);
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                background.FadeColour(colourProvider.Background3, 200, Easing.OutQuint);
+                label.FadeColour(colourProvider.Content2, 200, Easing.OutQuint);
+                base.OnHoverLost(e);
+            }
+
             [BackgroundDependencyLoader]
             private void load(OverlayColourProvider colourProvider)
             {
+                this.colourProvider = colourProvider;
+
                 CornerRadius = tag_corner_radius;
                 Masking = true;
 
@@ -184,12 +217,12 @@ namespace osu.Game.EzOsuGame.UserInterface
                     AutoSizeAxes = Axes.Both,
                     Children = new Drawable[]
                     {
-                        new Box
+                        background = new Box
                         {
                             RelativeSizeAxes = Axes.Both,
                             Colour = colourProvider.Background3,
                         },
-                        new OsuSpriteText
+                        label = new OsuSpriteText
                         {
                             Text = tagText,
                             Font = OsuFont.GetFont(size: 10, weight: FontWeight.SemiBold),
