@@ -93,6 +93,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
             SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
+            SetDefault(Ez2Setting.NotificationBehaviour, EzNotificationBehaviour.Normal);
             SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
 
@@ -760,6 +761,7 @@ namespace osu.Game.EzOsuGame.Configuration
         EzAnalysisRecEnabled,
         EzAnalysisSqliteEnabled,
         HideMainMenuOnlineBanner,
+        NotificationBehaviour,
         ManiaSkipEmptyEdgeColumns,
         StoryboardAutoVideoSize,
 

@@ -57,6 +57,19 @@ namespace osu.Game.EzOsuGame.Localization
             "开启后将隐藏主界面底部的在线新闻/广告轮播图。",
             "When enabled, the online news/advertisement banner at the bottom of the main menu will be hidden.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString NOTIFICATION_BEHAVIOUR =
+            new EzLocalizationManager.EzLocalisableString("通知行为", "Notification behaviour");
+
+        public static readonly EzLocalizationManager.EzLocalisableString NOTIFICATION_BEHAVIOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "控制游戏内通知弹窗与提示音。"
+            + "\n正常：与 osu! lazer 默认行为一致。"
+            + "\n游戏内聚焦：进入谱面游玩（含加载与暂停）后屏蔽一切通知弹窗与提示音。"
+            + "\n永不通知：在任何时候均不显示通知弹窗或播放提示音。",
+            "Controls in-game notification toasts and sounds."
+            + "\nNormal: same as default osu! lazer behaviour."
+            + "\nIn-game focus: suppress all notification toasts and sounds while playing a beatmap (including load and pause)."
+            + "\nNever notify: suppress notification toasts and sounds at all times.");
+
         public static readonly EzLocalizationManager.EzLocalisableString STORYBOARD_VIDEO_AUTO_SIZE =
             new EzLocalizationManager.EzLocalisableString("故事板视频自适应填满", "Storyboard video auto-size to fill");
 

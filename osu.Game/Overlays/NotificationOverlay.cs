@@ -17,6 +17,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Overlays.Notifications;
@@ -172,35 +173,41 @@ namespace osu.Game.Overlays
 
         private double? lastSamplePlayback;
 
-        public void Post(Notification notification) => (notification.IsCritical ? criticalPostScheduler : postScheduler).Add(() =>
+        public void Post(Notification notification)
         {
-            ++runningDepth;
+            if (EzNotificationFilter.ShouldSuppress(game))
+                return;
 
-            Logger.Log($"⚠️ {notification.Text}");
-
-            notification.Closed += () => notificationClosed(notification);
-
-            if (notification is IHasCompletionTarget hasCompletionTarget)
-                hasCompletionTarget.CompletionTarget ??= Post;
-
-            playDebouncedSample(notification.PopInSampleName);
-
-            if (notification.IsImportant)
+            (notification.IsCritical ? criticalPostScheduler : postScheduler).Add(() =>
             {
-                game?.Window?.Flash();
-                notification.Closed += () => game?.Window?.CancelFlash();
-            }
+                ++runningDepth;
 
-            if (State.Value == Visibility.Hidden)
-            {
-                notification.IsInToastTray = true;
-                toastTray.Post(notification);
-            }
-            else
-                addPermanently(notification);
+                Logger.Log($"⚠️ {notification.Text}");
 
-            updateCounts();
-        });
+                notification.Closed += () => notificationClosed(notification);
+
+                if (notification is IHasCompletionTarget hasCompletionTarget)
+                    hasCompletionTarget.CompletionTarget ??= Post;
+
+                playDebouncedSample(notification.PopInSampleName);
+
+                if (notification.IsImportant)
+                {
+                    game?.Window?.Flash();
+                    notification.Closed += () => game?.Window?.CancelFlash();
+                }
+
+                if (State.Value == Visibility.Hidden)
+                {
+                    notification.IsInToastTray = true;
+                    toastTray.Post(notification);
+                }
+                else
+                    addPermanently(notification);
+
+                updateCounts();
+            });
+        }
 
         private void addPermanently(Notification notification)
         {

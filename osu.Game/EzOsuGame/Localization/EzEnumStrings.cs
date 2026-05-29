@@ -29,5 +29,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString JUDGE_PRECEDENCE_DURATION = new EzLocalizationManager.EzLocalisableString("时差优先(raja风格)", "By Duration");
         public static readonly LocalisableString JUDGE_PRECEDENCE_EARLIEST = new EzLocalizationManager.EzLocalisableString("最早note优先(osu风格)", "By Earliest Note");
         public static readonly LocalisableString JUDGE_PRECEDENCE_SCORE = new EzLocalizationManager.EzLocalisableString("分数优先(势利)", "By Score");
+
+        public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NORMAL = new EzLocalizationManager.EzLocalisableString("正常", "Normal");
+        public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_IN_GAME_FOCUS = new EzLocalizationManager.EzLocalisableString("游戏内聚焦", "In-game focus");
+        public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NEVER = new EzLocalizationManager.EzLocalisableString("永不通知", "Never notify");
     }
 }
