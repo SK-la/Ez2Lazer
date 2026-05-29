@@ -51,6 +51,9 @@ namespace osu.Game.Screens.Play
 
                 if (screenSpacePos.X >= rightEdge - ReplaySettingsOverlay.EXPANDED_WIDTH)
                     return false;
+
+                if (settingsPreviewMode)
+                    return false;
             }
 
             return true;
@@ -85,6 +88,10 @@ namespace osu.Game.Screens.Play
 
         private TextFlowContainer playInfoText = null!;
 
+        private Box dimBackground = null!;
+        private FillFlowContainer menuContent = null!;
+        private bool settingsPreviewMode;
+
         [Resolved]
         private GlobalActionContainer globalAction { get; set; } = null!;
 
@@ -103,13 +110,13 @@ namespace osu.Game.Screens.Play
                     Looping = true,
                     Volume = { Value = 0 }
                 },
-                new Box
+                dimBackground = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
                     Colour = Color4.Black,
                     Alpha = background_alpha,
                 },
-                new FillFlowContainer
+                menuContent = new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
@@ -186,16 +193,53 @@ namespace osu.Game.Screens.Play
             }
         }
 
+        /// <summary>
+        /// Temporarily hides the pause menu visuals so visual settings can be previewed from the sidebar.
+        /// </summary>
+        public void SetSettingsPreviewMode(bool previewing)
+        {
+            settingsPreviewMode = previewing;
+
+            if (IsLoaded)
+                updateSettingsPreviewVisuals(true);
+        }
+
+        private void updateSettingsPreviewVisuals(bool transform)
+        {
+            float dimTarget = settingsPreviewMode ? 0 : background_alpha;
+            float contentTarget = settingsPreviewMode ? 0 : 1;
+
+            if (transform)
+            {
+                dimBackground.FadeTo(dimTarget, TRANSITION_DURATION, Easing.OutQuint);
+                menuContent.FadeTo(contentTarget, TRANSITION_DURATION, Easing.OutQuint);
+            }
+            else
+            {
+                dimBackground.Alpha = dimTarget;
+                menuContent.Alpha = contentTarget;
+            }
+        }
+
         protected override void PopIn()
         {
             this.FadeIn(TRANSITION_DURATION, Easing.In);
             updateInfoText();
+            updateSettingsPreviewVisuals(false);
 
             startPauseLoop();
         }
 
         protected override void PopOut()
         {
+            settingsPreviewMode = false;
+
+            if (IsLoaded)
+            {
+                dimBackground.Alpha = background_alpha;
+                menuContent.Alpha = 1;
+            }
+
             this.FadeOut(TRANSITION_DURATION, Easing.In);
             stopPauseLoop();
         }

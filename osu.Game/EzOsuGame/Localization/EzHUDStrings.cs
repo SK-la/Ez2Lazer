@@ -138,5 +138,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SPRITE_PLUS_FRAME_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString("动画帧模板", "Frame Template");
         public static readonly LocalisableString SPRITE_PLUS_FRAME_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("默认 {0}。示例：{0}、{000}、{1}。不使用 {} 时按普通后缀处理。", "Default is {0}. Examples: {0}, {000}, {1}. Without {}, it is treated as a normal suffix.");
+
+        public static readonly LocalisableString PAUSE_SETTINGS_PREVIEW_PAUSED = new EzLocalizationManager.EzLocalisableString("暂停中", "Paused");
+        public static readonly LocalisableString PAUSE_SETTINGS_PREVIEW_LABEL = new EzLocalizationManager.EzLocalisableString("预览", "Preview");
     }
 }
