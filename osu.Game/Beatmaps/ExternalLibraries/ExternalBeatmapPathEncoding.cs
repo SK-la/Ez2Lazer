@@ -54,6 +54,34 @@ namespace osu.Game.Beatmaps.ExternalLibraries
             => !string.IsNullOrEmpty(hash) && hash.StartsWith(HASH_PREFIX, StringComparison.Ordinal);
 
         /// <summary>
+        /// Resolves the on-disk folder for a unified <see cref="HASH_PREFIX"/> external set.
+        /// Prefers persisted <see cref="BeatmapSetInfo.ExternalContentRoot"/>; does not require the directory to exist for the first lookup pass.
+        /// </summary>
+        public static bool TryResolveContentRoot(BeatmapSetInfo set, out string contentRoot)
+        {
+            contentRoot = string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(set.ExternalContentRoot))
+            {
+                contentRoot = Path.GetFullPath(set.ExternalContentRoot);
+                return true;
+            }
+
+            if (TryDecode(set.Hash, out contentRoot))
+                return true;
+
+            string? effective = set.GetEffectiveExternalContentRoot();
+
+            if (!string.IsNullOrEmpty(effective))
+            {
+                contentRoot = effective;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Populates <see cref="BeatmapSetInfo.ExternalContentRoot"/> and <see cref="BeatmapSetInfo.HostingKind"/> from a standard <see cref="HASH_PREFIX"/> hash.
         /// </summary>
         public static bool TryPopulateExternalHosting(BeatmapSetInfo set)

@@ -16,6 +16,7 @@ using osu.Framework.Extensions;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.Beatmaps.ExternalLibraries;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Database;
 using osu.Game.Extensions;
@@ -633,12 +634,18 @@ namespace osu.Game.Beatmaps
                 // Detached beatmapsets don't come with files as an optimisation (see `RealmObjectExtensions.beatmap_set_mapper`).
                 // If we seem to be missing files, now is a good time to re-fetch.
                 bool missingFiles = beatmapInfo.BeatmapSet?.Files.Count == 0;
+                bool missingExternalHosting = beatmapInfo.BeatmapSet != null
+                                              && (beatmapInfo.BeatmapSet.IsExternallyHosted
+                                                  || ExternalBeatmapPathEncoding.IsExternalSetHash(beatmapInfo.BeatmapSet.Hash))
+                                              && (string.IsNullOrWhiteSpace(beatmapInfo.BeatmapSet.ExternalContentRoot)
+                                                  || missingFiles
+                                                  || !ExternalBeatmapPathEncoding.TryResolveContentRoot(beatmapInfo.BeatmapSet, out _));
 
                 if (beatmapInfo.IsManaged)
                 {
                     beatmapInfo = beatmapInfo.Detach();
                 }
-                else if (refetch || missingFiles)
+                else if (refetch || missingFiles || missingExternalHosting)
                 {
                     Guid id = beatmapInfo.ID;
                     beatmapInfo = Realm.Run(r => r.Find<BeatmapInfo>(id)?.Detach()) ?? beatmapInfo;

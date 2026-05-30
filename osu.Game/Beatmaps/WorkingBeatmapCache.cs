@@ -164,13 +164,14 @@ namespace osu.Game.Beatmaps
 
                 refreshExternalHostingFromRealm(beatmapSet, resources.RealmAccess);
 
-                if (beatmapSet.HostingKind != BeatmapSetHostingKind.External && ExternalBeatmapPathEncoding.IsExternalSetHash(beatmapSet.Hash))
-                    ExternalBeatmapPathEncoding.TryPopulateExternalHosting(beatmapSet);
+                if (!ExternalBeatmapPathEncoding.TryResolveContentRoot(beatmapSet, out string contentRoot))
+                {
+                    if (ExternalBeatmapPathEncoding.IsExternalSetHash(beatmapSet.Hash))
+                        ExternalBeatmapPathEncoding.TryPopulateExternalHosting(beatmapSet);
 
-                string contentRoot = beatmapSet.GetEffectiveExternalContentRoot();
-
-                if (string.IsNullOrEmpty(contentRoot))
-                    return resources.Files;
+                    if (!ExternalBeatmapPathEncoding.TryResolveContentRoot(beatmapSet, out contentRoot))
+                        return resources.Files;
+                }
 
                 return new ExternalBeatmapCompositeFileStore(resources.Files, contentRoot, buildExternalFileMappings(beatmapInfo, resources.RealmAccess));
             }
@@ -187,6 +188,13 @@ namespace osu.Game.Beatmaps
                     beatmapSet.HostingKind = freshSet.HostingKind;
                     beatmapSet.ExternalContentRoot = freshSet.ExternalContentRoot;
                     beatmapSet.Hash = freshSet.Hash;
+
+                    // Carousel detach omits Files (see RealmObjectExtensions.beatmap_set_mapper); copy for external lookups.
+                    if (beatmapSet.Files.Count == 0 && freshSet.Files.Count > 0)
+                    {
+                        foreach (var file in freshSet.Files)
+                            beatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = file.File.Hash }, file.Filename));
+                    }
                 });
             }
 
@@ -227,6 +235,16 @@ namespace osu.Game.Beatmaps
                     }
                 });
 
+                string chartPath = beatmapInfo.Path;
+
+                if (!string.IsNullOrEmpty(chartPath) && beatmapInfo.BeatmapSet != null)
+                {
+                    string storagePath = beatmapInfo.BeatmapSet.GetPathForFile(chartPath);
+
+                    if (!string.IsNullOrEmpty(storagePath))
+                        add(storagePath, chartPath);
+                }
+
                 return mappings;
             }
 
@@ -237,16 +255,19 @@ namespace osu.Game.Beatmaps
 
                 try
                 {
-                    string fileStorePath = BeatmapSetInfo.GetPathForFile(BeatmapInfo.Path);
-                    var stream = !string.IsNullOrEmpty(fileStorePath) ? GetStream(fileStorePath) : null;
+                    string chartPath = BeatmapInfo.Path;
+                    string fileStorePath = BeatmapSetInfo.GetPathForFile(chartPath);
+                    var stream = openChartStream(chartPath, fileStorePath);
 
                     if (stream == null)
                     {
-                        Logger.Log($"Beatmap failed to load (file {BeatmapInfo.Path} not found on disk at expected location {fileStorePath}).", level: LogLevel.Error);
+                        // Carousel prefetches many panels; external sets log at Debug to avoid spamming errors during scroll.
+                        var logLevel = isExternalChartSet() ? LogLevel.Debug : LogLevel.Error;
+                        Logger.Log($"Beatmap failed to load (file {chartPath} not found on disk at expected location {fileStorePath}).", level: logLevel);
                         return new Beatmap { BeatmapInfo = BeatmapInfo };
                     }
 
-                    if (BeatmapSetInfo.IsExternallyHosted)
+                    if (isExternalChartSet())
                         return decodeExternalBeatmap(stream);
 
                     string streamMD5 = stream.ComputeMD5Hash();
@@ -275,6 +296,40 @@ namespace osu.Game.Beatmaps
                     return null;
                 }
             }
+
+            private Stream openChartStream(string chartPath, string fileStorePath)
+            {
+                if (!string.IsNullOrEmpty(fileStorePath))
+                {
+                    var stream = GetStream(fileStorePath);
+
+                    if (stream != null)
+                        return stream;
+                }
+
+                var streamByName = GetStream(chartPath);
+
+                if (streamByName != null)
+                    return streamByName;
+
+                return tryOpenExternalChartOnDisk(chartPath);
+            }
+
+            private Stream tryOpenExternalChartOnDisk(string chartPath)
+            {
+                if (!isExternalChartSet())
+                    return null;
+
+                if (!ExternalBeatmapPathEncoding.TryResolveContentRoot(BeatmapSetInfo, out string contentRoot))
+                    return null;
+
+                string fullPath = Path.Combine(contentRoot, chartPath.Replace('/', Path.DirectorySeparatorChar));
+
+                return File.Exists(fullPath) ? File.OpenRead(fullPath) : null;
+            }
+
+            private bool isExternalChartSet()
+                => BeatmapSetInfo.IsExternallyHosted || ExternalBeatmapPathEncoding.IsExternalSetHash(BeatmapSetInfo.Hash);
 
             private IBeatmap decodeExternalBeatmap(Stream stream)
             {
