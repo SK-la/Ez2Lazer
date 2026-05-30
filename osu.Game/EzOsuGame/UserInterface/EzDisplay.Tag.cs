@@ -36,6 +36,8 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         private ScheduledDelegate? scheduledTagUpdate;
 
+        private bool altHighlightActive;
+
         private BeatmapInfo? beatmap;
 
         public BeatmapInfo? Beatmap
@@ -87,6 +89,19 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             base.LoadComplete();
             scheduleTagUpdate();
+            EzDisplayTagAltHighlight.ActiveChanged += onAltHighlightChanged;
+            onAltHighlightChanged(EzDisplayTagAltHighlight.Active);
+        }
+
+        private void onAltHighlightChanged(bool active)
+        {
+            if (altHighlightActive == active)
+                return;
+
+            altHighlightActive = active;
+
+            foreach (var tag in tagFlow.Children.OfType<SimpleTag>())
+                tag.SetAltHighlight(altHighlightActive);
         }
 
         private void updateTags()
@@ -106,10 +121,12 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             foreach (string tag in userTags)
             {
-                tagFlow.Add(new SimpleTag(tag)
+                var simpleTag = new SimpleTag(tag)
                 {
                     Action = () => songSelect?.Search($@"tag=""{tag}""!"),
-                });
+                };
+                tagFlow.Add(simpleTag);
+                simpleTag.SetAltHighlight(altHighlightActive);
             }
         }
 
@@ -119,6 +136,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             if (isDisposing)
             {
+                EzDisplayTagAltHighlight.ActiveChanged -= onAltHighlightChanged;
                 scheduledTagUpdate?.Cancel();
                 scheduledTagUpdate = null;
                 beatmap = null;
@@ -172,11 +190,21 @@ namespace osu.Game.EzOsuGame.UserInterface
             private OverlayColourProvider colourProvider = null!;
             private Box background = null!;
             private OsuSpriteText label = null!;
+            private bool altHighlightActive;
 
             public SimpleTag(string text)
             {
                 tagText = text;
                 AutoSizeAxes = Axes.Both;
+            }
+
+            public void SetAltHighlight(bool active)
+            {
+                if (altHighlightActive == active)
+                    return;
+
+                altHighlightActive = active;
+                refreshColours();
             }
 
             protected override bool OnClick(ClickEvent e)
@@ -187,21 +215,29 @@ namespace osu.Game.EzOsuGame.UserInterface
                 return base.OnClick(e);
             }
 
-            protected override bool OnHover(HoverEvent e)
-            {
-                if (!e.CurrentState.Keyboard.Keys.IsPressed(Key.LAlt))
-                    return false;
-
-                background.FadeColour(colourProvider.Highlight1, 200, Easing.OutQuint);
-                label.FadeColour(colourProvider.Content1, 200, Easing.OutQuint);
-                return base.OnHover(e);
-            }
+            protected override bool OnHover(HoverEvent e) => altHighlightActive && base.OnHover(e);
 
             protected override void OnHoverLost(HoverLostEvent e)
             {
-                background.FadeColour(colourProvider.Background3, 200, Easing.OutQuint);
-                label.FadeColour(colourProvider.Content2, 200, Easing.OutQuint);
+                if (!altHighlightActive)
+                    refreshColours();
+
                 base.OnHoverLost(e);
+            }
+
+            private void refreshColours()
+            {
+                if (!IsLoaded)
+                    return;
+
+                background.FadeColour(altHighlightActive ? colourProvider.Highlight1 : colourProvider.Background3, 200, Easing.OutQuint);
+                label.FadeColour(altHighlightActive ? colourProvider.Content1 : colourProvider.Content2, 200, Easing.OutQuint);
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+                refreshColours();
             }
 
             [BackgroundDependencyLoader]

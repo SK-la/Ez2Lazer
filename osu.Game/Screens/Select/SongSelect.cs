@@ -40,6 +40,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -325,7 +326,8 @@ namespace osu.Game.Screens.Select
                     Depth = float.MinValue,
                     DefaultPanelRightEdgeInScreenSpace = () => titleWedge.ScreenSpaceDrawQuad.AABBFloat.Right,
                 },
-                modSpeedHotkeyHandler = new ModSpeedHotkeyHandler()
+                modSpeedHotkeyHandler = new ModSpeedHotkeyHandler(),
+                new EzDisplayTagKeyboardHandler(),
             });
 
             LoadComponent(modSelectOverlay = CreateModSelectOverlay());
@@ -870,6 +872,8 @@ namespace osu.Game.Screens.Select
 
         private void onLeavingScreen()
         {
+            EzDisplayTagAltHighlight.Reset();
+
             restoreBackground();
 
             if (manageCollectionsDialog != null)
