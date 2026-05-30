@@ -34,9 +34,7 @@ namespace osu.Game.Beatmaps.ExternalLibraries
                     return new ExternalLibrarySettings();
 
                 using var reader = new StreamReader(stream);
-                var settings = JsonConvert.DeserializeObject<ExternalLibrarySettings>(reader.ReadToEnd()) ?? new ExternalLibrarySettings();
-                settings.Normalise();
-                return settings;
+                return JsonConvert.DeserializeObject<ExternalLibrarySettings>(reader.ReadToEnd()) ?? new ExternalLibrarySettings();
             }
             catch (Exception)
             {

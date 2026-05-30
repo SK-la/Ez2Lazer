@@ -19,10 +19,11 @@ using osu.Game.Rulesets;
 
 namespace osu.Game.Beatmaps.ExternalLibraries
 {
+    /// <summary>
+    /// Indexes external on-disk libraries via <see cref="IRulesetExternalBeatmapLibraryContributor"/> (e.g. BMS).
+    /// </summary>
     public partial class ExternalBeatmapLibraryIndexer : Component
     {
-        private static readonly string[] standard_ruleset_short_names = { "osu", "mania", "taiko", "catch" };
-
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
 
@@ -96,18 +97,9 @@ namespace osu.Game.Beatmaps.ExternalLibraries
         private void scanAll(ExternalLibrarySettings settings, ProgressNotification progress)
         {
             var writer = new ExternalBeatmapLibraryRealmWriter(realm, storage);
-            var standardRulesets = rulesets.AvailableRulesets
-                                            .OfType<RulesetInfo>()
-                                            .Where(r => standard_ruleset_short_names.Contains(r.ShortName, StringComparer.Ordinal))
-                                            .ToDictionary(r => r.ShortName, StringComparer.Ordinal);
-
-            int totalSteps = 0;
+            var enabledRulesets = settings.Rulesets.Where(kvp => kvp.Value.Enabled).ToList();
+            int totalSteps = enabledRulesets.Sum(kvp => kvp.Value.Paths.Count(p => !string.IsNullOrWhiteSpace(p)));
             int completedSteps = 0;
-
-            if (settings.Enabled)
-                totalSteps += settings.Paths.Count(p => !string.IsNullOrWhiteSpace(p));
-
-            totalSteps += settings.Rulesets.Count(kvp => kvp.Value.Enabled && kvp.Value.Paths.Any(p => !string.IsNullOrWhiteSpace(p)));
 
             void reportProgress()
             {
@@ -121,42 +113,8 @@ namespace osu.Game.Beatmaps.ExternalLibraries
                 Schedule(() => progress.Progress = (float)completedSteps / totalSteps);
             }
 
-            if (settings.Enabled && standardRulesets.Count > 0)
+            foreach (var (shortName, config) in enabledRulesets)
             {
-                var setsByRuleset = new Dictionary<string, List<ExternalBeatmapSetImportModel>>(StringComparer.Ordinal);
-
-                foreach (string path in settings.Paths)
-                {
-                    if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
-                        continue;
-
-                    string fullPath = Path.GetFullPath(path);
-
-                    foreach (var set in OsuFolderExternalLibraryScanner.Scan(fullPath, standardRulesets, CancellationToken.None))
-                    {
-                        string shortName = set.Ruleset.ShortName;
-
-                        if (!setsByRuleset.TryGetValue(shortName, out var list))
-                        {
-                            list = new List<ExternalBeatmapSetImportModel>();
-                            setsByRuleset[shortName] = list;
-                        }
-
-                        list.Add(set);
-                    }
-
-                    reportProgress();
-                }
-
-                foreach (var (shortName, sets) in setsByRuleset)
-                    writer.UpsertSets(sets, shortName);
-            }
-
-            foreach (var (shortName, config) in settings.Rulesets.Where(kvp => kvp.Value.Enabled))
-            {
-                if (standard_ruleset_short_names.Contains(shortName, StringComparer.Ordinal))
-                    continue;
-
                 var rulesetInfo = rulesets.AvailableRulesets.FirstOrDefault(r => string.Equals(r.ShortName, shortName, StringComparison.OrdinalIgnoreCase));
 
                 if (rulesetInfo == null)
@@ -174,9 +132,7 @@ namespace osu.Game.Beatmaps.ExternalLibraries
                     if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
                         continue;
 
-                    string fullPath = Path.GetFullPath(path);
-
-                    foreach (var set in contributor.ScanPath(fullPath, CancellationToken.None))
+                    foreach (var set in contributor.ScanPath(Path.GetFullPath(path), CancellationToken.None))
                         allSets.Add(set);
 
                     reportProgress();
