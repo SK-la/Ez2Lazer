@@ -35,16 +35,16 @@ namespace osu.Game.Beatmaps.ExternalLibraries
                 chain.AddStore(new StorageBackedResourceStore(new NativeStorage(this.contentRoot)));
         }
 
-        public byte[]? Get(string name)
+        public byte[] Get(string name)
         {
             byte[]? result = chain.Get(name);
-            return result ?? readBytes(openFromContentRoot(name));
+            return result ?? readBytes(openFromContentRoot(name)) ?? null!;
         }
 
-        public async Task<byte[]> GetAsync(string name, CancellationToken cancellationToken = default)
+        public Task<byte[]> GetAsync(string name, CancellationToken cancellationToken = default)
         {
-            byte[]? result = await chain.GetAsync(name, cancellationToken).ConfigureAwait(false);
-            return result ?? readBytes(openFromContentRoot(name));
+            byte[]? result = chain.GetAsync(name, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
+            return Task.FromResult(result ?? readBytes(openFromContentRoot(name)) ?? null!);
         }
 
         public Stream? GetStream(string name)
@@ -88,7 +88,7 @@ namespace osu.Game.Beatmaps.ExternalLibraries
 
         private IEnumerable<string> getCandidateRelativePaths(string name)
         {
-            if (storagePathToRelativeFilename.TryGetValue(name, out string mapped))
+            if (storagePathToRelativeFilename.TryGetValue(name, out string? mapped))
                 yield return mapped;
 
             yield return name;
