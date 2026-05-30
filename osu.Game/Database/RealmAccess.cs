@@ -566,15 +566,18 @@ namespace osu.Game.Database
             if (!ThreadSafety.IsUpdateThread)
                 throw new InvalidOperationException($@"{nameof(RunAsync)} must be called from the update thread.");
 
-            // CountdownEvent will fail if already at zero.
-            if (!pendingAsyncOperations.TryAddCount())
-                pendingAsyncOperations.Reset(1);
+            beginPendingAsyncOperation();
 
             return Task.Run(() =>
             {
-                var result = Run(action);
-                pendingAsyncOperations.Signal();
-                return result;
+                try
+                {
+                    return Run(action);
+                }
+                finally
+                {
+                    endPendingAsyncOperation();
+                }
             }, token);
         }
 
@@ -631,27 +634,28 @@ namespace osu.Game.Database
             if (!ThreadSafety.IsUpdateThread)
                 throw new InvalidOperationException(@$"{nameof(WriteAsync)} must be called from the update thread.");
 
-            // CountdownEvent will fail if already at zero.
-            if (!pendingAsyncOperations.TryAddCount())
-                pendingAsyncOperations.Reset(1);
+            beginPendingAsyncOperation();
 
             // Regardless of calling Realm.GetInstance or Realm.GetInstanceAsync, there is a blocking overhead on retrieval.
             // Adding a forced Task.Run resolves this.
-            var writeTask = Task.Run(async () =>
+            return Task.Run(async () =>
             {
-                total_writes_async.Value++;
+                try
+                {
+                    total_writes_async.Value++;
 
-                // Not attempting to use Realm.GetInstanceAsync as there's seemingly no benefit to us (for now) and it adds complexity due to locking
-                // concerns in getRealmInstance(). On a quick check, it looks to be more suited to cases where realm is connecting to an online sync
-                // server, which we don't use. May want to report upstream or revisit in the future.
-                using (var realm = getRealmInstance())
-                    // ReSharper disable once AccessToDisposedClosure (WriteAsync should be marked as [InstantHandle]).
-                    await realm.WriteAsync(() => action(realm)).ConfigureAwait(false);
-
-                pendingAsyncOperations.Signal();
+                    // Not attempting to use Realm.GetInstanceAsync as there's seemingly no benefit to us (for now) and it adds complexity due to locking
+                    // concerns in getRealmInstance(). On a quick check, it looks to be more suited to cases where realm is connecting to an online sync
+                    // server, which we don't use. May want to report upstream or revisit in the future.
+                    using (var realm = getRealmInstance())
+                        // ReSharper disable once AccessToDisposedClosure (WriteAsync should be marked as [InstantHandle]).
+                        await realm.WriteAsync(() => action(realm)).ConfigureAwait(false);
+                }
+                finally
+                {
+                    endPendingAsyncOperation();
+                }
             });
-
-            return writeTask;
         }
 
         /// <summary>
@@ -667,29 +671,28 @@ namespace osu.Game.Database
             if (!ThreadSafety.IsUpdateThread)
                 throw new InvalidOperationException(@$"{nameof(WriteAsync)} must be called from the update thread.");
 
-            // CountdownEvent will fail if already at zero.
-            if (!pendingAsyncOperations.TryAddCount())
-                pendingAsyncOperations.Reset(1);
+            beginPendingAsyncOperation();
 
             // Regardless of calling Realm.GetInstance or Realm.GetInstanceAsync, there is a blocking overhead on retrieval.
             // Adding a forced Task.Run resolves this.
-            var writeTask = Task.Run(async () =>
+            return Task.Run(async () =>
             {
-                T result;
-                total_writes_async.Value++;
+                try
+                {
+                    total_writes_async.Value++;
 
-                // Not attempting to use Realm.GetInstanceAsync as there's seemingly no benefit to us (for now) and it adds complexity due to locking
-                // concerns in getRealmInstance(). On a quick check, it looks to be more suited to cases where realm is connecting to an online sync
-                // server, which we don't use. May want to report upstream or revisit in the future.
-                using (var realm = getRealmInstance())
-                    // ReSharper disable once AccessToDisposedClosure (WriteAsync should be marked as [InstantHandle]).
-                    result = await realm.WriteAsync(() => action(realm)).ConfigureAwait(false);
-
-                pendingAsyncOperations.Signal();
-                return result;
+                    // Not attempting to use Realm.GetInstanceAsync as there's seemingly no benefit to us (for now) and it adds complexity due to locking
+                    // concerns in getRealmInstance(). On a quick check, it looks to be more suited to cases where realm is connecting to an online sync
+                    // server, which we don't use. May want to report upstream or revisit in the future.
+                    using (var realm = getRealmInstance())
+                        // ReSharper disable once AccessToDisposedClosure (WriteAsync should be marked as [InstantHandle]).
+                        return await realm.WriteAsync(() => action(realm)).ConfigureAwait(false);
+                }
+                finally
+                {
+                    endPendingAsyncOperation();
+                }
             });
-
-            return writeTask;
         }
 
         /// <summary>
@@ -1682,21 +1685,60 @@ namespace osu.Game.Database
 
         private bool isDisposed;
 
+        private void beginPendingAsyncOperation()
+        {
+            // CountdownEvent will fail if already at zero.
+            if (!pendingAsyncOperations.TryAddCount())
+                pendingAsyncOperations.Reset(1);
+        }
+
+        private void endPendingAsyncOperation() => pendingAsyncOperations.Signal();
+
+        /// <summary>
+        /// Release the realm retrieval lock if it is currently held, allowing in-flight async operations to complete or fail during disposal.
+        /// </summary>
+        private void unblockRealmRetrievalForDisposal()
+        {
+            while (realmRetrievalLock.CurrentCount == 0)
+            {
+                try
+                {
+                    realmRetrievalLock.Release();
+                }
+                catch (SemaphoreFullException)
+                {
+                    break;
+                }
+            }
+        }
+
+        private void drainPendingAsyncOperations()
+        {
+            while (pendingAsyncOperations.CurrentCount > 0)
+                pendingAsyncOperations.Signal();
+        }
+
         public void Dispose()
         {
+            if (isDisposed)
+                return;
+
+            // Unblock async writes which may be waiting on realm retrieval during host shutdown (e.g. if BlockAllOperations was interrupted).
+            unblockRealmRetrievalForDisposal();
+
             if (!pendingAsyncOperations.Wait(10000))
+            {
                 Logger.Log("Realm took too long waiting on pending async writes", level: LogLevel.Error);
+                drainPendingAsyncOperations();
+            }
 
             updateRealm?.Dispose();
 
-            if (!isDisposed)
-            {
-                // intentionally block realm retrieval indefinitely. this ensures that nothing can start consuming a new instance after disposal.
-                realmRetrievalLock.Wait();
-                realmRetrievalLock.Dispose();
+            // Intentionally block realm retrieval indefinitely. This ensures that nothing can start consuming a new instance after disposal.
+            realmRetrievalLock.Wait();
+            realmRetrievalLock.Dispose();
 
-                isDisposed = true;
-            }
+            isDisposed = true;
         }
     }
 }
