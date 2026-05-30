@@ -297,7 +297,7 @@ namespace osu.Game.Screens.Select
 
                     if (!hasMods
                         && selectedRuleset != null
-                        && selectedRuleset.OnlineID == 3
+                        && EzAnalysisProviderBridge.HasAnalysisProvider(selectedRuleset)
                         && analysisDatabase.TryGetStoredAnalysis(selectedBeatmap.BeatmapInfo, selectedRuleset, out var storedAnalysis))
                     {
                         maniaSummary = storedAnalysis.ManiaSummary;
@@ -315,8 +315,10 @@ namespace osu.Game.Screens.Select
 
                     maniaSummary ??= OptimizedBeatmapCalculator.GetEzManiaSummary(playableBeatmap);
 
-                    // 如果是 mania，则计算列计数并更新中间的 KPC 药丸组件
-                    if (selectedRuleset != null && selectedRuleset.OnlineID == 3)
+                    bool showKpc = selectedRuleset != null
+                                   && EzAnalysisProviderBridge.HasAnalysisProvider(selectedRuleset);
+
+                    if (showKpc)
                     {
                         Schedule(() =>
                         {
@@ -329,7 +331,6 @@ namespace osu.Game.Screens.Select
                     }
                     else
                     {
-                        // 非 Mania 情况隐藏组件
                         Schedule(() =>
                         {
                             ezDisplayKpc.ManiaSummary = null;

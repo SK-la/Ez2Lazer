@@ -71,7 +71,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             PlayableCachedWorkingBeatmap playableWorkingBeatmap = new PlayableCachedWorkingBeatmap(workingBeatmap);
 
-            bool onlyKps = lookup.Ruleset.OnlineID != 3;
+            bool onlyKps = !EzAnalysisProviderBridge.HasAnalysisProvider(lookup.Ruleset);
             IBeatmap analysisBeatmap = playableWorkingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();

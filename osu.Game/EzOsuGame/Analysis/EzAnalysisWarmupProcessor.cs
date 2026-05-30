@@ -187,13 +187,9 @@ namespace osu.Game.EzOsuGame.Analysis
                 {
                     totalBeatmaps++;
 
-                    bool isMania = b.Ruleset.OnlineID == 3;
-                    bool isOther = b.Ruleset.OnlineID >= 4 || string.Equals(b.Ruleset.ShortName, "bms", StringComparison.OrdinalIgnoreCase);
-                    bool isExternalBms = isOther
-                                         && b.BeatmapSet != null
-                                         && b.BeatmapSet.Hash.StartsWith("bms-ext:set:", StringComparison.Ordinal);
+                    bool hasEzAnalysisProvider = EzAnalysisProviderBridge.HasAnalysisProvider(b.Ruleset);
 
-                    if (isMania)
+                    if (hasEzAnalysisProvider)
                     {
                         maniaTotal++;
                         if (b.Hidden)
@@ -210,14 +206,9 @@ namespace osu.Game.EzOsuGame.Analysis
                     if (b.BeatmapSet == null)
                         continue;
 
-                    // External BMS libraries are volatile by nature (sync/relink), and forcing sqlite backfill
-                    // every startup is noisy and expensive. BMS keeps runtime analysis on-demand.
-                    if (isExternalBms)
-                        continue;
-
                     totalWithSet++;
 
-                    if (isMania)
+                    if (hasEzAnalysisProvider)
                         maniaWithSet++;
 
                     beatmaps.Add((b.ID, b.Hash, b.Ruleset.OnlineID));

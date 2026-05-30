@@ -69,8 +69,6 @@ namespace osu.Game.Screens.Select
         private CancellationTokenSource? ezAnalysisCancellationSource;
         private ScheduledDelegate? scheduledEzAnalysisUpdate;
 
-        private bool ezAnalysisEnabled;
-        private bool shouldDisplayXxyStarRating;
         private string? scratchText;
         private const int mania_ui_update_throttle_ms = 15;
 
@@ -102,6 +100,8 @@ namespace osu.Game.Screens.Select
         private IPanelAccentColourProvider? accentColourProvider { get; set; }
 
         private BeatmapInfo beatmap => ((GroupedBeatmap)Item!.Model).Beatmap;
+
+        private bool supportsEzAnalysis => EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value);
 
         public PanelBeatmap()
         {
@@ -269,14 +269,8 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
-            bool ezAnalysisCacheEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled);
-            bool ezAnalysisSqliteEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
-
             ruleset.BindValueChanged(_ =>
             {
-                ezAnalysisEnabled = ezAnalysisCacheEnabled || ezAnalysisSqliteEnabled;
-                shouldDisplayXxyStarRating = EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value);
-
                 resetEzDisplay();
                 updateKeyCount();
             }, true);
@@ -330,7 +324,7 @@ namespace osu.Game.Screens.Select
             if (Item?.IsVisible != true)
                 return;
 
-            bool showXxy = shouldDisplayXxyStarRating && beatmap.SupportsXxyStarRating();
+            bool showXxy = supportsEzAnalysis && beatmap.SupportsXxyStarRating();
 
             if (showXxy)
                 displaySR.Show();
@@ -340,7 +334,7 @@ namespace osu.Game.Screens.Select
                 displaySR.Hide();
             }
 
-            if (ezAnalysisEnabled && showXxy)
+            if (supportsEzAnalysis && showXxy)
                 ezDisplayKpc.Show();
             else
             {
@@ -409,7 +403,7 @@ namespace osu.Game.Screens.Select
             ezDisplayKps.SetKps(baselinePp, avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
 
-            if (shouldDisplayXxyStarRating && beatmap.SupportsXxyStarRating())
+            if (supportsEzAnalysis && beatmap.SupportsXxyStarRating())
             {
                 var maniaSummary = ezAnalysisResult.ManiaSummary;
                 var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
@@ -423,7 +417,7 @@ namespace osu.Game.Screens.Select
 
         private void updateManiaDisplayFromBeatmap()
         {
-            if (!shouldDisplayXxyStarRating || !beatmap.SupportsXxyStarRating())
+            if (!supportsEzAnalysis || !beatmap.SupportsXxyStarRating())
                 return;
 
             displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
@@ -431,7 +425,7 @@ namespace osu.Game.Screens.Select
 
         private void computeEzAnalysis()
         {
-            if (!ezAnalysisEnabled)
+            if (!supportsEzAnalysis)
                 return;
 
             ezAnalysisCancellationSource?.Cancel();

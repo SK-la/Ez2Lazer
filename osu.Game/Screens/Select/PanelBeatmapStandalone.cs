@@ -22,7 +22,6 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
@@ -63,9 +62,6 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
-        [Resolved]
-        private Ez2ConfigManager ezConfig { get; set; } = null!;
-
         private EzDisplayKpsGraph ezDisplayKpsGraph = null!;
         private EzDisplayKps ezDisplayKps = null!;
         private EzDisplayKpc ezDisplayKpc = null!;
@@ -76,11 +72,11 @@ namespace osu.Game.Screens.Select
         private CancellationTokenSource? ezAnalysisCancellationSource;
         private ScheduledDelegate? scheduledEzAnalysisUpdate;
 
-        private bool ezAnalysisEnabled;
-        private bool shouldDisplayXxyStarRating;
         private string? scratchText;
 
         private const int mania_ui_update_throttle_ms = 15;
+
+        private bool supportsEzAnalysis => EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value);
 
         #endregion
 
@@ -281,16 +277,8 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
-            // 不订阅 ez 分析开关变更；统一依赖 panel 生命周期（PrepareForUse/FreeAfterUse）进行刷新。
-            // 这样可减少滚动场景下的回调抖动与绑定链复杂度。
-            bool ezAnalysisCacheEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled);
-            bool ezAnalysisSqliteEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
-
             ruleset.BindValueChanged(_ =>
             {
-                ezAnalysisEnabled = ezAnalysisCacheEnabled || ezAnalysisSqliteEnabled;
-                shouldDisplayXxyStarRating = EzXxyStarRatingSupport.SupportsRuleset(ruleset.Value);
-
                 resetEzDisplay();
                 updateKeyCount();
             }, true);
@@ -336,11 +324,10 @@ namespace osu.Game.Screens.Select
 
         private void resetEzDisplay()
         {
-            // ruleset 变更会广播到所有 panel；仅更新当前在用的可见实例（与 Update 中取消计算的条件一致）。
             if (Item?.IsVisible != true)
                 return;
 
-            bool showXxy = shouldDisplayXxyStarRating && beatmap.SupportsXxyStarRating();
+            bool showXxy = supportsEzAnalysis && beatmap.SupportsXxyStarRating();
 
             if (showXxy)
                 displaySR.Show();
@@ -350,7 +337,7 @@ namespace osu.Game.Screens.Select
                 displaySR.Hide();
             }
 
-            if (ezAnalysisEnabled && showXxy)
+            if (supportsEzAnalysis && showXxy)
                 ezDisplayKpc.Show();
             else
             {
@@ -414,7 +401,7 @@ namespace osu.Game.Screens.Select
             ezDisplayKps.SetKps(baselinePp, avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
 
-            if (shouldDisplayXxyStarRating && beatmap.SupportsXxyStarRating())
+            if (supportsEzAnalysis && beatmap.SupportsXxyStarRating())
             {
                 var maniaSummary = ezAnalysisResult.ManiaSummary;
                 var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
@@ -428,7 +415,7 @@ namespace osu.Game.Screens.Select
 
         private void updateManiaDisplayFromBeatmap()
         {
-            if (!shouldDisplayXxyStarRating || !beatmap.SupportsXxyStarRating())
+            if (!supportsEzAnalysis || !beatmap.SupportsXxyStarRating())
                 return;
 
             displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
@@ -436,7 +423,7 @@ namespace osu.Game.Screens.Select
 
         private void computeEzAnalysis()
         {
-            if (!ezAnalysisEnabled)
+            if (!supportsEzAnalysis)
                 return;
 
             ezAnalysisCancellationSource?.Cancel();
@@ -447,6 +434,7 @@ namespace osu.Game.Screens.Select
                 return;
 
             resetEzDisplay();
+
             ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             ezAnalysisBindable.BindValueChanged(result =>
             {
