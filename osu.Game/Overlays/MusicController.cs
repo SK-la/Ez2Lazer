@@ -460,7 +460,8 @@ namespace osu.Game.Overlays
             realm.Realm.All<BeatmapSetInfo>().Where(s => !s.DeletePending)
                  .AsEnumerable()
                  .Select(s => new RealmLive<BeatmapSetInfo>(s, realm))
-                 .Where(i => (allowProtectedTracks || !i.Value.Protected)
+                 .Where(i => i.Value.HostingKind != BeatmapSetHostingKind.External
+                             && (allowProtectedTracks || !i.Value.Protected)
                              && (SeasonalUIConfig.ENABLED || i.Value.Hash != IntroChristmas.CHRISTMAS_BEATMAP_SET_HASH));
 
         private void changeBeatmap(WorkingBeatmap newWorking)

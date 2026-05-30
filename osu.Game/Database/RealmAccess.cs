@@ -20,6 +20,7 @@ using osu.Framework.Platform;
 using osu.Framework.Statistics;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.ExternalLibraries;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
@@ -116,7 +117,7 @@ namespace osu.Game.Database
         /// <summary>
         /// Ez2Lazer schema revision. Bump when adding Ez-persisted fields; do not change <see cref="schema_version"/> for Ez-only work.
         /// </summary>
-        public const int EZ_REALM_SCHEMA_VERSION = 6;
+        public const int EZ_REALM_SCHEMA_VERSION = 7;
 
         private const int file_schema_version = schema_version * 1000 + EZ_REALM_SCHEMA_VERSION;
 
@@ -1477,7 +1478,21 @@ namespace osu.Game.Database
                         ruleset.LastAppliedXxySrVersion = 0;
 
                     break;
+
+                case 7:
+                    foreach (var set in migration.NewRealm.All<BeatmapSetInfo>())
+                    {
+                        if (ExternalBeatmapPathEncoding.TryPopulateExternalHosting(set))
+                            continue;
+
+                        if (set.HostingKind == BeatmapSetHostingKind.External && !string.IsNullOrWhiteSpace(set.ExternalContentRoot))
+                            set.ExternalContentRoot = Path.GetFullPath(set.ExternalContentRoot);
+                    }
+
+                    break;
             }
+
+            EzRealmMigrationContributorRegistry.ApplyContributors(migration, targetEzVersion);
 
             Logger.Log($"Ez migration completed in {stopwatch.ElapsedMilliseconds}ms");
         }

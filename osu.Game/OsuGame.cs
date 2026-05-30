@@ -1247,6 +1247,7 @@ namespace osu.Game
 
             loadComponentSingleFile(new BackgroundDataStoreProcessor(), Add, true);
             loadComponentSingleFile(new EzAnalysisWarmupProcessor(), Add);
+            loadComponentSingleFile(new Beatmaps.ExternalLibraries.ExternalBeatmapLibraryIndexer(), Add);
             loadComponentSingleFile<BeatmapStore>(detachedBeatmapStore = new RealmDetachedBeatmapStore(), Add, true);
             loadComponentSingleFile(new QueueController(), Add, true);
 
