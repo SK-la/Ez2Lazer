@@ -206,6 +206,10 @@ namespace osu.Game.EzOsuGame.Analysis
                     if (b.BeatmapSet == null)
                         continue;
 
+                    // Externally hosted libraries are volatile; skip startup sqlite backfill.
+                    if (b.BeatmapSet is BeatmapSetInfo { IsExternallyHosted: true })
+                        continue;
+
                     totalWithSet++;
 
                     if (hasEzAnalysisProvider)

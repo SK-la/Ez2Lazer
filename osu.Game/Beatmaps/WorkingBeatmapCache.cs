@@ -19,6 +19,7 @@ using osu.Framework.Lists;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Statistics;
+using osu.Game.Beatmaps.ExternalLibraries;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Database;
 using osu.Game.Extensions;
@@ -143,10 +144,27 @@ namespace osu.Game.Beatmaps
             [NotNull]
             private readonly IBeatmapResourceProvider resources;
 
+            private readonly IResourceStore<byte[]> beatmapFileStore;
+
             public BeatmapManagerWorkingBeatmap(BeatmapInfo beatmapInfo, [NotNull] IBeatmapResourceProvider resources)
                 : base(beatmapInfo, resources.AudioManager)
             {
                 this.resources = resources;
+                beatmapFileStore = createBeatmapFileStore(beatmapInfo, resources);
+            }
+
+            private static IResourceStore<byte[]> createBeatmapFileStore(BeatmapInfo beatmapInfo, IBeatmapResourceProvider resources)
+            {
+                string? contentRoot = beatmapInfo.BeatmapSet?.GetEffectiveExternalContentRoot();
+
+                if (contentRoot == null)
+                    return resources.Files;
+
+                var mappings = beatmapInfo.BeatmapSet!.Files
+                                          .Select(f => (f.File.GetStoragePath(), f.Filename))
+                                          .Where(m => !string.IsNullOrEmpty(m.Item1));
+
+                return new ExternalBeatmapCompositeFileStore(resources.Files, contentRoot, mappings);
             }
 
             protected override IBeatmap GetBeatmap()
@@ -349,7 +367,7 @@ namespace osu.Game.Beatmaps
                 }
             }
 
-            public override Stream GetStream(string storagePath) => resources.Files.GetStream(storagePath);
+            public override Stream GetStream(string storagePath) => beatmapFileStore.GetStream(storagePath);
 
             private string getMainStoryboardFilename(IBeatmapMetadataInfo metadata)
             {
