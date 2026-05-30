@@ -3,7 +3,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using osu.Game.Beatmaps.ExternalLibraries;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 using osu.Game.Database;
@@ -17,7 +19,7 @@ namespace osu.Game.Beatmaps
     /// A realm model containing metadata for a beatmap set (containing multiple <see cref="BeatmapInfo"/>s).
     /// </summary>
     [MapTo("BeatmapSet")]
-    public partial class BeatmapSetInfo : RealmObject, IHasGuidPrimaryKey, IHasRealmFiles, ISoftDelete, IEquatable<BeatmapSetInfo>, IBeatmapSetInfo
+    public class BeatmapSetInfo : RealmObject, IHasGuidPrimaryKey, IHasRealmFiles, ISoftDelete, IEquatable<BeatmapSetInfo>, IBeatmapSetInfo
     {
         [PrimaryKey]
         public Guid ID { get; set; }
@@ -62,6 +64,36 @@ namespace osu.Game.Beatmaps
         /// Whether deleting this beatmap set should be prohibited (due to it being a system requirement to be present).
         /// </summary>
         public bool Protected { get; set; }
+
+        /// <summary>
+        /// Absolute path to on-disk content for <see cref="BeatmapSetHostingKind.External"/> sets.
+        /// </summary>
+        public string ExternalContentRoot { get; set; } = string.Empty;
+
+        [MapTo(nameof(HostingKind))]
+        public int HostingKindInt { get; set; } = (int)BeatmapSetHostingKind.Internal;
+
+        public BeatmapSetHostingKind HostingKind
+        {
+            get => (BeatmapSetHostingKind)HostingKindInt;
+            set => HostingKindInt = (int)value;
+        }
+
+        public bool IsExternallyHosted => HostingKind == BeatmapSetHostingKind.External;
+
+        /// <summary>
+        /// Resolves the content root used for resource loading, preferring the persisted field.
+        /// </summary>
+        public string? GetEffectiveExternalContentRoot()
+        {
+            if (!string.IsNullOrWhiteSpace(ExternalContentRoot) && Directory.Exists(ExternalContentRoot))
+                return Path.GetFullPath(ExternalContentRoot);
+
+            if (ExternalBeatmapPathEncoding.TryDecode(Hash, out string decoded) && Directory.Exists(decoded))
+                return decoded;
+
+            return null;
+        }
 
         public double MaxStarDifficulty => Beatmaps.Count == 0 ? 0 : Beatmaps.Max(b => b.StarRating);
 
