@@ -30,13 +30,15 @@ using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Screens.Select.Filter;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using Realms;
+
+// ReSharper disable RedundantUsingDirective
+using osu.Game.Graphics.Sprites;
 
 namespace osu.Game.Screens.Select
 {

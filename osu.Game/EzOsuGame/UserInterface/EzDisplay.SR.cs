@@ -4,7 +4,6 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -16,6 +15,9 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Utils;
 using osuTK;
 using osu.Game.EzOsuGame.Analysis;
+
+// ReSharper disable RedundantUsingDirective
+using osu.Framework.Extensions.LocalisationExtensions;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
