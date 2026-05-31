@@ -1,0 +1,178 @@
+# auto-release 已在 linux x64 任务中生成 ez2lazer.Game.{tag}.nupkg（与安装包内 osu.Game.dll 字节一致）。
+# 本工作流：手动触发 → 确认 GitHub Release 已发布且资产齐全 → 校验哈希 → 推送到 nuget.org。
+# 注意：不会因推送 git tag 自动运行；必须等 Auto Release 创建发布页后再手动执行。
+
+name: Pack and publish ez2lazer.Game (NuGet)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'GitHub Release tag（如 2026.524.0-ez2lazer；可省略重复后缀，CI 会归一化）'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  gate:
+    name: Verify GitHub Release is ready
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.gate.outputs.tag }}
+    steps:
+      - name: Require published Release (not tag push alone)
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          RAW_TAG='${{ inputs.tag }}'
+          REPO='${{ github.repository }}'
+
+          CORE=$(echo "$RAW_TAG" | sed -E 's/(-ez2lazer)+$//')
+          if [[ ! "$CORE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag 须为 x.y.z 或 x.y.z-ez2lazer（可含重复后缀，会自动去重），例如 2026.524.0-ez2lazer"
+            exit 1
+          fi
+          TAG="${CORE}-ez2lazer"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Normalized release tag: $TAG (AssemblyVersion core: $CORE)"
+
+          if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::未找到 GitHub Release 发布页: $TAG"
+            echo "::error::推送 tag 不会触发本工作流；请先完成 Auto Release，待发布页与安装包/nupkg 资产上传后再运行。"
+            exit 1
+          fi
+
+          RELEASE_JSON=$(gh release view "$TAG" --repo "$REPO" --json isDraft,createdAt,publishedAt,assets)
+          IS_DRAFT=$(echo "$RELEASE_JSON" | jq -r '.isDraft')
+          if [[ "$IS_DRAFT" == "true" ]]; then
+            echo "::error::Release $TAG 仍为草稿，尚未正式发布。请完成 Auto Release 或手动发布后再推 NuGet。"
+            exit 1
+          fi
+
+          CREATED_AT=$(echo "$RELEASE_JSON" | jq -r '.createdAt')
+          echo "GitHub Release $TAG is published (created: $CREATED_AT)."
+
+          mapfile -t ASSET_NAMES < <(echo "$RELEASE_JSON" | jq -r '.assets[].name')
+          if [[ ${#ASSET_NAMES[@]} -eq 0 ]]; then
+            echo "::error::Release $TAG 已存在但没有任何资产。请等待 Auto Release 完成或重新发布。"
+            exit 1
+          fi
+
+          echo "Release assets:"
+          printf '  - %s\n' "${ASSET_NAMES[@]}"
+
+          has_nupkg=false
+          has_linux_zip=false
+          for name in "${ASSET_NAMES[@]}"; do
+            case "$name" in
+              ez2lazer.Game.${TAG}.nupkg) has_nupkg=true ;;
+              Ez2Lazer_release_linux_x64*.zip) has_linux_zip=true ;;
+            esac
+          done
+
+          missing=()
+          $has_nupkg || missing+=("ez2lazer.Game.${TAG}.nupkg")
+          $has_linux_zip || missing+=("Ez2Lazer_release_linux_x64*.zip")
+
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::Release $TAG 缺少 Auto Release 必需资产："
+            printf '  - %s\n' "${missing[@]}"
+            echo "::error::请确认 Auto Release（含 linux x64 PackEz2GameNuGet）已成功完成后再推 NuGet。"
+            exit 1
+          fi
+
+          echo "Release gate passed: published page and required assets are present."
+
+  publish:
+    name: Push ez2lazer.Game to nuget.org
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Download ez2lazer.Game nupkg from Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG='${{ needs.gate.outputs.tag }}'
+          mkdir -p artifacts
+          gh release download "$TAG" --repo '${{ github.repository }}' \
+            --pattern "ez2lazer.Game.${TAG}.nupkg" \
+            --dir artifacts
+          ls -la artifacts/
+
+      - name: Verify osu.Game.dll hash matches linux x64 release zip
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG='${{ needs.gate.outputs.tag }}'
+          WORK="${RUNNER_TEMP}/hash-verify"
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+
+          gh release download "$TAG" --repo '${{ github.repository }}' \
+            --pattern 'Ez2Lazer_release_linux_x64*.zip' \
+            --dir "$WORK/zip"
+
+          ZIP=$(ls "$WORK/zip"/*.zip | head -1)
+          unzip -q "$ZIP" -d "$WORK/zip-extract"
+          RELEASE_DLL=$(find "$WORK/zip-extract" -name 'osu.Game.dll' | head -1)
+          if [[ -z "$RELEASE_DLL" || ! -f "$RELEASE_DLL" ]]; then
+            echo "::error::linux x64 zip 中未找到 osu.Game.dll"
+            exit 1
+          fi
+
+          unzip -q "artifacts/ez2lazer.Game.${TAG}.nupkg" -d "$WORK/nupkg-extract"
+          NUGET_DLL="$WORK/nupkg-extract/lib/net8.0/osu.Game.dll"
+          if [[ ! -f "$NUGET_DLL" ]]; then
+            echo "::error::nupkg 中未找到 lib/net8.0/osu.Game.dll"
+            exit 1
+          fi
+
+          RELEASE_HASH=$(sha256sum "$RELEASE_DLL" | awk '{print $1}')
+          NUGET_HASH=$(sha256sum "$NUGET_DLL" | awk '{print $1}')
+
+          echo "Release zip osu.Game.dll SHA256: $RELEASE_HASH"
+          echo "NuGet package osu.Game.dll SHA256: $NUGET_HASH"
+
+          if [[ "$RELEASE_HASH" != "$NUGET_HASH" ]]; then
+            echo "::error::哈希不一致，无法通过平台校验。请重新跑 Auto Release（linux x64 会生成匹配的 nupkg）。"
+            exit 1
+          fi
+          echo "Hash verification passed."
+
+      - name: NuGet login (Trusted Publishing / OIDC)
+        uses: NuGet/login@v1
+        id: nuget_login
+        with:
+          user: SK_LA
+
+      - name: Publish to nuget.org
+        run: |
+          set -euo pipefail
+          TAG='${{ needs.gate.outputs.tag }}'
+          LOG="${RUNNER_TEMP}/nuget-push.log"
+          set +e
+          dotnet nuget push "artifacts/ez2lazer.Game.${TAG}.nupkg" \
+            --api-key "${{ steps.nuget_login.outputs.NUGET_API_KEY }}" \
+            --source "https://api.nuget.org/v3/index.json" \
+            2>&1 | tee "$LOG"
+          STATUS=$?
+          set -e
+          if [[ $STATUS -ne 0 ]]; then
+            if grep -qiE 'already exists|409' "$LOG"; then
+              echo "::error::版本 ${TAG} 已在 nuget.org 存在，无法重复推送。"
+              echo "https://www.nuget.org/packages/ez2lazer.Game/${TAG}"
+            fi
+            exit 1
+          fi
+          echo "Published: https://www.nuget.org/packages/ez2lazer.Game/${TAG}"

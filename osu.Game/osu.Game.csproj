@@ -5,8 +5,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Label="Nuget">
-    <Title>osu!</Title>
-    <PackageId>ppy.osu.Game</PackageId>
+    <Title>osu! (Ez2Lazer)</Title>
+    <PackageId>ez2lazer.Game</PackageId>
+    <AssemblyName>osu.Game</AssemblyName>
     <Version>0.0.0</Version>
     <PackageIcon>icon.png</PackageIcon>
     <IsPackable>true</IsPackable>

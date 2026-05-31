@@ -3,12 +3,11 @@ name: Auto Release CL (x64 + arm64, 3 platform manual build + package + release)
 on:
   push:
     tags:
-      - '*.*.*'
       - '*.*.*-ez2lazer'
   workflow_dispatch:
     inputs:
       tag:
-        description: '发布使用的 tag，建议使用纯数字版本（如 2026.518.0）'
+        description: '留空=取最新提交上已有 -ez2lazer tag，否则按 UTC 日期自动生成；填写则校验并使用该版本'
         required: false
         default: ''
       no_publish:
@@ -32,6 +31,12 @@ jobs:
       publish_version_tag: ${{ steps.export.outputs.publish_version_tag }}
       skip_release: ${{ steps.export.outputs.skip_release }}
     steps:
+      - name: Checkout for tag resolution
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Resolve tag and branches
         id: export
         shell: pwsh
@@ -45,8 +50,9 @@ jobs:
           $actor = '${{ github.actor }}'
           $allowedTagPusher = $env:ALLOWED_TAG_PUSHER
           $skipRelease = 'false'
+          $manualTagInput = '${{ github.event.inputs.tag }}'.Trim()
+          $inputTag = $manualTagInput
 
-          $inputTag = '${{ github.event.inputs.tag }}'
           if ($eventName -eq 'push' -and $refType -eq 'tag') {
             $inputTag = $refName
 
@@ -57,9 +63,34 @@ jobs:
             }
           }
 
-          if (-not [string]::IsNullOrWhiteSpace($inputTag) -and $inputTag -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-ez2lazer)?$') {
-            Write-Warning "Skip release: tag '$inputTag' must be 'x.y.z' or 'x.y.z-ez2lazer'."
-            $skipRelease = 'true'
+          function Get-Ez2VersionCore {
+            param([Parameter(Mandatory = $true)][string]$Tag)
+            return ($Tag -replace '(-ez2lazer)+$', '')
+          }
+
+          function Normalize-Ez2ReleaseTag {
+            param([Parameter(Mandatory = $true)][string]$Tag)
+            $core = Get-Ez2VersionCore $Tag
+            if ($core -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
+              return $Tag
+            }
+            return "$core-ez2lazer"
+          }
+
+          function Test-IsEz2ReleaseTagCandidate {
+            param([Parameter(Mandatory = $true)][string]$Tag)
+            return ($Tag -match '^[0-9]+\.[0-9]+\.[0-9]+(-ez2lazer)*$')
+          }
+
+          function Get-Ez2TagsOnCommit {
+            param([Parameter(Mandatory = $true)][string]$Commit)
+            $tags = @(git tag --points-at $Commit 2>$null)
+            return @(
+              $tags |
+                Where-Object { Test-IsEz2ReleaseTagCandidate $_ } |
+                ForEach-Object { Normalize-Ez2ReleaseTag $_ } |
+                Select-Object -Unique
+            )
           }
 
           function Test-GitHubReleaseTagExists {
@@ -95,9 +126,10 @@ jobs:
               [Parameter(Mandatory = $true)][string]$BaseTag
             )
 
-            $candidate = $BaseTag
+            $candidate = Get-Ez2VersionCore $BaseTag
             while ($true) {
-              if (-not (Test-GitHubReleaseTagExists -Tag $candidate)) {
+              $releaseCandidate = Normalize-Ez2ReleaseTag $candidate
+              if (-not (Test-GitHubReleaseTagExists -Tag $releaseCandidate)) {
                 return $candidate
               }
 
@@ -111,10 +143,37 @@ jobs:
             }
           }
 
-          if ([string]::IsNullOrWhiteSpace($inputTag) -and $eventName -eq 'workflow_dispatch') {
-            $now = [DateTime]::UtcNow
-              $inputTag = "$($now.Year).$($now.Month)$($now.Day.ToString('D2')).0"
-            $inputTag = Resolve-NextReleaseTag -BaseTag $inputTag
+          if ($eventName -eq 'workflow_dispatch') {
+            if ([string]::IsNullOrWhiteSpace($manualTagInput)) {
+              $headCommit = (git rev-parse HEAD).Trim()
+              if ([string]::IsNullOrWhiteSpace($headCommit)) {
+                Write-Warning 'Skip release: could not resolve HEAD commit for tag lookup.'
+                $skipRelease = 'true'
+              } else {
+                Write-Output "Resolving tag from HEAD commit: $headCommit"
+                $existingTags = Get-Ez2TagsOnCommit -Commit $headCommit
+                if ($existingTags.Count -gt 0) {
+                  $inputTag = $existingTags | Sort-Object -Descending | Select-Object -First 1
+                  Write-Output "Found existing -ez2lazer tag on HEAD: $inputTag"
+                } else {
+                  $now = [DateTime]::UtcNow
+                  $dateTag = "$($now.Year).$($now.Month)$($now.Day.ToString('D2')).0"
+                  $inputTag = Resolve-NextReleaseTag -BaseTag $dateTag
+                  Write-Output "No -ez2lazer tag on HEAD; generated candidate: $inputTag"
+                }
+              }
+            } else {
+              if (-not (Test-IsEz2ReleaseTagCandidate $manualTagInput)) {
+                Write-Warning "Skip release: manual tag '$manualTagInput' must be 'x.y.z' with optional '-ez2lazer' suffix."
+                $skipRelease = 'true'
+              } else {
+                $inputTag = $manualTagInput
+                Write-Output "Using manually specified tag: $inputTag"
+              }
+            }
+          } elseif (-not [string]::IsNullOrWhiteSpace($inputTag) -and -not (Test-IsEz2ReleaseTagCandidate $inputTag)) {
+            Write-Warning "Skip release: tag '$inputTag' must be 'x.y.z' with optional '-ez2lazer' suffix."
+            $skipRelease = 'true'
           }
 
           if ([string]::IsNullOrWhiteSpace($inputTag)) {
@@ -122,16 +181,25 @@ jobs:
             $skipRelease = 'true'
           }
 
-          $publishVersionTag = $inputTag
-          if (-not [string]::IsNullOrWhiteSpace($publishVersionTag)) {
-            $publishVersionTag = $publishVersionTag -replace '-ez2lazer$', ''
+          $releaseTag = Normalize-Ez2ReleaseTag $inputTag
+          $publishVersionTag = Get-Ez2VersionCore $releaseTag
+
+          if ($releaseTag -notmatch '^[0-9]+\.[0-9]+\.[0-9]+-ez2lazer$') {
+            Write-Warning "Skip release: normalized tag '$releaseTag' is invalid."
+            $skipRelease = 'true'
           }
 
-          Write-Output "Resolved release tag: $inputTag"
+          if ($skipRelease -ne 'true' -and (Test-GitHubReleaseTagExists -Tag $releaseTag)) {
+            Write-Warning "Skip release: GitHub Release '$releaseTag' already exists. Bump version or delete the existing release before re-running."
+            $skipRelease = 'true'
+          }
+
+          Write-Output "Resolved input tag: $inputTag"
+          Write-Output "Resolved release tag: $releaseTag"
           Write-Output "Resolved publish version tag: $publishVersionTag"
           Write-Output "Skip release: $skipRelease"
 
-          Write-Output "release_tag=$inputTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Output "release_tag=$releaseTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           Write-Output "publish_version_tag=$publishVersionTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           Write-Output "skip_release=$skipRelease" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
@@ -257,6 +325,20 @@ jobs:
           }
           python @publishArgs
 
+      # 与安装包共用同一份 osu.Game.dll，保证 NuGet 哈希可与 Release zip 校验一致
+      - name: Pack ez2lazer.Game NuGet (linux x64 only)
+        if: matrix.platform == 'linux' && matrix.arch == 'x64'
+        working-directory: osu
+        shell: pwsh
+        run: |
+          $tag = '${{ needs.prepare.outputs.release_tag }}'
+          $releaseDir = Join-Path (Get-Location) 'artifacts/Ez2Lazer_release_linux_x64'
+          if (-not (Test-Path $releaseDir)) {
+            Write-Error "Release directory not found: $releaseDir"
+            exit 1
+          }
+          ./PackEz2GameNuGet.ps1 -Tag $tag -ReleaseDir $releaseDir
+
       - name: Collect release artifacts
         id: prepare_asset
         shell: pwsh
@@ -304,6 +386,14 @@ jobs:
           }
           if (-not $zipFound) { Write-Error "zip asset not found in $osuArtifacts"; exit 1 }
           Copy-Item -Path $zipFound.FullName -Destination (Join-Path $uploadDir $zipDest) -Force
+
+          $tag = '${{ needs.prepare.outputs.release_tag }}'
+          $gameNuget = Join-Path $osuArtifacts "nuget-pack/ez2lazer.Game.$tag.nupkg"
+          if (Test-Path $gameNuget) {
+            Copy-Item -Path $gameNuget -Destination (Join-Path $uploadDir "ez2lazer.Game.$tag.nupkg") -Force
+            $gameHash = Get-FileHash -Path $gameNuget -Algorithm SHA256
+            Write-Output "ez2lazer.Game NuGet package SHA256: $($gameHash.Hash)"
+          }
 
           $velopackPatterns = @('ez2lazer-*.nupkg', 'RELEASES', 'releases*.json', 'assets*.json', 'ez2lazer-*-Setup.exe', 'ez2lazer*.AppImage', '*.AppImage')
           foreach ($pattern in $velopackPatterns) {
