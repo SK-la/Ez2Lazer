@@ -16,6 +16,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Extensions;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
@@ -40,6 +41,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private readonly EzAnalysisPersistentStore persistentStore;
         private readonly BeatmapManager beatmapManager;
+        private readonly RulesetStore rulesetStore;
         private readonly IBindable<bool> sqliteAnalysisEnabled;
         private readonly Bindable<string?> activeSongsBranchDisplayName = new Bindable<string?>();
         private readonly Bindable<int> activeSongsBranchVersion = new Bindable<int>();
@@ -47,6 +49,13 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly List<ActiveSongsBranchState> activeSongsBranches = new List<ActiveSongsBranchState>();
 
         private readonly record struct ActiveSongsBranchState(string DatabasePath, string DisplayName, int RulesetOnlineId, string ModsFingerprint);
+
+        public readonly record struct SongsBranchRefreshPlan(
+            EzAnalysisPersistentStore.SongsBranchDescriptor Branch,
+            bool RefreshXxy,
+            bool RefreshPp,
+            int CurrentXxyVersion,
+            int CurrentPpVersion);
 
         public readonly record struct SongsBranchBuildResult(
             bool Success,
@@ -56,10 +65,11 @@ namespace osu.Game.EzOsuGame.Analysis
             int RequestedBeatmapCount,
             int StoredBeatmapCount);
 
-        public EzAnalysisDatabase(EzAnalysisPersistentStore persistentStore, BeatmapManager beatmapManager, Ez2ConfigManager ezConfig)
+        public EzAnalysisDatabase(EzAnalysisPersistentStore persistentStore, BeatmapManager beatmapManager, RulesetStore rulesetStore, Ez2ConfigManager ezConfig)
         {
             this.persistentStore = persistentStore;
             this.beatmapManager = beatmapManager;
+            this.rulesetStore = rulesetStore;
 
             sqliteAnalysisEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
         }
@@ -327,7 +337,17 @@ namespace osu.Game.EzOsuGame.Analysis
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    persistentStore.StoreSongsBranch(databasePath, metadata, rows, sourceCollection, cancellationToken);
+
+                    int xxySrAlgorithmVersion = 0;
+                    int ppAlgorithmVersion = 0;
+
+                    if (EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(localRulesetInfo, out int resolvedXxyVersion))
+                        xxySrAlgorithmVersion = resolvedXxyVersion;
+
+                    if (tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int resolvedPpVersion))
+                        ppAlgorithmVersion = resolvedPpVersion;
+
+                    persistentStore.StoreSongsBranch(databasePath, metadata, rows, sourceCollection, xxySrAlgorithmVersion, ppAlgorithmVersion, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
 
                     deleteBranchesForSourceCollection(resolvedSourceCollectionId, databasePath);
@@ -458,6 +478,155 @@ namespace osu.Game.EzOsuGame.Analysis
                 return Array.Empty<Guid>();
 
             return persistentStore.GetBeatmapsNeedingRecompute(beatmaps);
+        }
+
+        /// <summary>
+        /// 扫描所有分支库：legacy 库补写版本 meta；返回 xxy 或 PP 算法落后、需要重算的分支计划。
+        /// </summary>
+        public IReadOnlyList<SongsBranchRefreshPlan> GetSongsBranchesNeedingRefresh()
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return Array.Empty<SongsBranchRefreshPlan>();
+
+            var plans = new List<SongsBranchRefreshPlan>();
+
+            foreach (var branch in persistentStore.GetAvailableSongsBranches())
+            {
+                var rulesetInfo = rulesetStore.GetRuleset(branch.Metadata.RulesetOnlineId);
+
+                if (rulesetInfo is not RulesetInfo localRulesetInfo)
+                    continue;
+
+                bool supportsXxy = EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(localRulesetInfo, out int currentXxyVersion);
+                bool supportsPp = tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int currentPpVersion);
+
+                if (!supportsXxy && !supportsPp)
+                    continue;
+
+                persistentStore.TryGetSongsBranchStoredXxyVersion(branch.DatabasePath, out int storedXxyVersion);
+                persistentStore.TryGetSongsBranchStoredPpVersion(branch.DatabasePath, out int storedPpVersion);
+
+                if (supportsXxy && storedXxyVersion <= 0)
+                    persistentStore.EnsureSongsBranchXxyVersionMeta(branch.DatabasePath, currentXxyVersion);
+
+                if (supportsPp && storedPpVersion <= 0)
+                    persistentStore.EnsureSongsBranchPpVersionMeta(branch.DatabasePath, currentPpVersion);
+
+                bool refreshXxy = supportsXxy && persistentStore.SongsBranchNeedsXxyRefresh(storedXxyVersion, currentXxyVersion);
+                bool refreshPp = supportsPp && persistentStore.SongsBranchNeedsPpRefresh(storedPpVersion, currentPpVersion);
+
+                if (refreshXxy || refreshPp)
+                {
+                    plans.Add(new SongsBranchRefreshPlan(
+                        branch,
+                        refreshXxy,
+                        refreshPp,
+                        supportsXxy ? currentXxyVersion : 0,
+                        supportsPp ? currentPpVersion : 0));
+                }
+            }
+
+            return plans;
+        }
+
+        public Task RefreshSongsBranchAsync(SongsBranchRefreshPlan plan, Action<int, int>? progress = null, CancellationToken cancellationToken = default)
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return Task.CompletedTask;
+
+            if (!plan.RefreshXxy && !plan.RefreshPp)
+                return Task.CompletedTask;
+
+            return Task.Run(() =>
+            {
+                var rulesetInfo = rulesetStore.GetRuleset(plan.Branch.Metadata.RulesetOnlineId);
+
+                if (rulesetInfo is not RulesetInfo localRulesetInfo)
+                    return;
+
+                var storedRows = persistentStore.ReadAllSongsBranchRows(plan.Branch.DatabasePath);
+
+                if (storedRows.Count == 0)
+                {
+                    persistentStore.EnsureSongsBranchVersionMeta(plan.Branch.DatabasePath, plan.CurrentXxyVersion, plan.CurrentPpVersion);
+                    return;
+                }
+
+                var beatmapLookup = buildLocalBeatmapLookup();
+                var mods = restoreModsFromJson(localRulesetInfo, plan.Branch.Metadata.ModsJson);
+                var updatedRows = new List<EzAnalysisPersistentStore.SongsBranchRow>(storedRows.Count);
+                long lastProgressReportAt = Environment.TickCount64;
+
+                for (int i = 0; i < storedRows.Count; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var storedRow = storedRows[i];
+                    double xxySr = storedRow.XxySr;
+                    double? pp = storedRow.Pp;
+
+                    if (beatmapLookup.TryGetValue(storedRow.BeatmapId, out var beatmap)
+                        && string.Equals(beatmap.Hash, storedRow.BeatmapHash, StringComparison.Ordinal))
+                    {
+                        try
+                        {
+                            var lookup = new EzAnalysisLookupCache(beatmap, localRulesetInfo, mods);
+
+                            if (plan.RefreshXxy
+                                && EzAnalysisComputation.TryComputeXxySr(beatmapManager, lookup, cancellationToken, out double computedXxySr))
+                            {
+                                xxySr = computedXxySr;
+                            }
+
+                            if (plan.RefreshPp
+                                && EzAnalysisComputation.TryComputePerformancePoints(beatmapManager, lookup, cancellationToken, out double computedPp))
+                            {
+                                pp = computedPp;
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (BeatmapInvalidForRulesetException)
+                        {
+                        }
+                        catch (Exception ex)
+                        {
+                            if (Interlocked.Increment(ref songsBranchComputeFailCount) <= 10)
+                            {
+                                Logger.Error(ex,
+                                    $"[EzAnalysisDatabase] RefreshSongsBranchAsync failed. beatmapId={beatmap.ID} branch=\"{plan.Branch.Metadata.DisplayName}\"",
+                                    Ez2ConfigManager.LOGGER_NAME);
+                            }
+                        }
+                    }
+
+                    updatedRows.Add(new EzAnalysisPersistentStore.SongsBranchRow(storedRow.BeatmapId, storedRow.BeatmapHash, storedRow.BeatmapMd5, xxySr, pp));
+
+                    long now = Environment.TickCount64;
+
+                    if (i == 0 || i + 1 == storedRows.Count || now - lastProgressReportAt >= 100)
+                    {
+                        lastProgressReportAt = now;
+                        progress?.Invoke(i + 1, storedRows.Count);
+                    }
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                persistentStore.UpdateSongsBranchRows(
+                    plan.Branch.DatabasePath,
+                    updatedRows,
+                    plan.RefreshXxy ? plan.CurrentXxyVersion : null,
+                    plan.RefreshPp ? plan.CurrentPpVersion : null);
+
+                lock (activeSongsBranchStateLock)
+                {
+                    if (activeSongsBranches.Any(state => string.Equals(state.DatabasePath, plan.Branch.DatabasePath, StringComparison.OrdinalIgnoreCase)))
+                        activeSongsBranchVersion.Value++;
+                }
+            }, cancellationToken);
         }
 
         public bool NeedsOnDemandBackfill(IBeatmapInfo beatmapInfo)
@@ -1013,6 +1182,80 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 if (wasActive)
                     activateSongsBranch(existingBranch.DatabasePath, existingBranch.Metadata);
+            }
+        }
+
+        private Dictionary<Guid, BeatmapInfo> buildLocalBeatmapLookup()
+        {
+            return beatmapManager.GetAllUsableBeatmapSets()
+                                 .SelectMany(set => set.Beatmaps)
+                                 .GroupBy(beatmap => beatmap.ID)
+                                 .ToDictionary(group => group.Key, group => group.First());
+        }
+
+        private bool tryGetOfficialPerformancePointsVersion(RulesetInfo rulesetInfo, out int version)
+        {
+            version = 0;
+
+            var workingBeatmap = tryGetDifficultyCalculatorWorkingBeatmap();
+            return workingBeatmap != null && EzPerformancePointsSupport.TryGetPerformancePointsVersion(rulesetInfo, workingBeatmap, out version);
+        }
+
+        private IWorkingBeatmap? tryGetDifficultyCalculatorWorkingBeatmap()
+        {
+            var beatmapInfo = beatmapManager.GetAllUsableBeatmapSets()
+                                            .SelectMany(set => set.Beatmaps)
+                                            .FirstOrDefault();
+
+            return beatmapInfo != null ? beatmapManager.GetWorkingBeatmap(beatmapInfo) : null;
+        }
+
+        private static IReadOnlyList<Mod> restoreModsFromJson(RulesetInfo rulesetInfo, string modsJson)
+        {
+            if (string.IsNullOrWhiteSpace(modsJson))
+                return Array.Empty<Mod>();
+
+            try
+            {
+                var apiMods = JsonConvert.DeserializeObject<IEnumerable<APIMod>>(modsJson)?.ToArray();
+
+                if (apiMods == null || apiMods.Length == 0)
+                    return Array.Empty<Mod>();
+
+                var rulesetInstance = rulesetInfo.CreateInstance();
+                var restoredMods = new List<Mod>();
+
+                foreach (var apiMod in apiMods)
+                {
+                    Mod? restoredMod = rulesetInstance.CreateModFromAcronym(apiMod.Acronym);
+
+                    if (restoredMod == null)
+                        continue;
+
+                    foreach (var (_, property) in restoredMod.GetSettingsSourceProperties())
+                    {
+                        string settingKey = property.Name.ToSnakeCase();
+
+                        if (!apiMod.Settings.TryGetValue(settingKey, out object? settingValue))
+                            continue;
+
+                        try
+                        {
+                            restoredMod.CopyAdjustedSetting((IBindable)property.GetValue(restoredMod)!, settingValue);
+                        }
+                        catch
+                        {
+                        }
+                    }
+
+                    restoredMods.Add(restoredMod);
+                }
+
+                return restoredMods;
+            }
+            catch
+            {
+                return Array.Empty<Mod>();
             }
         }
 

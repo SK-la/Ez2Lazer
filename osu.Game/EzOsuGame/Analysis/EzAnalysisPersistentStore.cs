@@ -72,17 +72,24 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public static bool Enabled = true;
 
-        public static readonly string DATABASE_FILENAME = $@"ez-analysis_v{ANALYSIS_VERSION}.sqlite";
+        public const string LEGACY_DATABASE_FILENAME_PREFIX = "ez-analysis_v";
 
         public const string SONGS_BRANCH_DATABASE_DIRECTORY = "EzData";
         private const string xxy_sr_branch_kind = "xxy_sr_branch";
         private const int xxy_sr_branch_schema_version = 2;
 
-        // 手动维护：算法/序列化格式变更时递增。版本发生变化时会使用新文件名并在可能时从旧库迁移 kps 数据。
-        // v6: 主体主表 + mania 扩展表 + tag 切片。
-        // v6.1: 增加 PP 字段，追加数据，不升版。
-        // v7: 主库 schema 瘦身；移除 tag / 基线 xxy / 基线 PP 列（已迁 Realm）；仅保留 kps 与 mania 列统计。（暂缓）
-        public const int ANALYSIS_VERSION = 6;
+        /// <summary>
+        /// 主分析库文件版本。仅 kps / KPC 表结构或 kps 算法变更时递增；v7 自 v6 继承 kps 数据并移除 legacy 列。
+        /// 分支库：xxy 用 <c>xxy_sr_version</c>；PP 用官方 <c>pp_version</c>（<see cref="Rulesets.Difficulty.DifficultyCalculator.Version"/>，全模式）。
+        /// </summary>
+        public const int ANALYSIS_VERSION = 7;
+
+        public static string DatabaseFilename => $"{LEGACY_DATABASE_FILENAME_PREFIX}{ANALYSIS_VERSION}.sqlite";
+
+        /// <summary>
+        /// 旧版稳定文件名（中间分支）；v7 启动时会从此文件迁移一次。
+        /// </summary>
+        public const string LEGACY_STABLE_DATABASE_FILENAME = "ez-analysis.sqlite";
 
         // 列定义（songs branch 快照库）
         private const string col_beatmap_id = "beatmap_id";
@@ -108,6 +115,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
         // 常量化的表名与 meta key，避免在代码中散落硬编码字符串。
         private const string meta_key_force_recompute = "force_recompute";
+        private const string meta_key_xxy_sr_version = "xxy_sr_version";
+        private const string meta_key_pp_version = "pp_version";
         private const string meta_key_analysis_version = "analysis_version";
         private const string meta_key_kind = "kind";
         private const string meta_key_schema_version = "schema_version";
@@ -153,7 +162,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (initialised)
                     return;
 
-                dbPath = storage.GetFullPath(DATABASE_FILENAME, true);
+                dbPath = storage.GetFullPath(DatabaseFilename, true);
 
                 try
                 {
@@ -212,9 +221,6 @@ namespace osu.Game.EzOsuGame.Analysis
                 pendingWrites.TryGetValue(beatmap.ID, out var pending);
 
                 using var connection = openConnection();
-
-                if (EzAnalysisSchemaManager.GetMetaBool(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE))
-                    return false;
 
                 if (!tryGetRawData(connection, beatmap, out var storedAnalysis))
                 {
@@ -294,12 +300,6 @@ namespace osu.Game.EzOsuGame.Analysis
                 Initialise();
 
                 using var connection = openConnection();
-
-                if (EzAnalysisSchemaManager.GetMetaBool(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE))
-                {
-                    Store(beatmap, analysis);
-                    return;
-                }
 
                 // 尝试从 SQLite 读取旧数据
                 if (!tryGetRawData(connection, beatmap, out var storedAnalysis))
@@ -421,8 +421,7 @@ LIMIT 1;
         }
 
         /// <summary>
-        /// 比较两个分析结果是否有差异。
-        /// 关键字段：xxysr, averageKps, maxKps, ColumnCounts, HoldNoteCounts
+        /// 比较两个分析结果是否有差异（仅 kps / KPC；xxy / PP 来自 Realm，不在此比较）。
         /// </summary>
         private bool hasDifference(EzAnalysisResult stored, EzAnalysisResult computed)
         {
@@ -541,8 +540,6 @@ LIMIT 1;
                 var existing = new Dictionary<Guid, (string hash, int rulesetOnlineId, long commonUpdatedAt)>();
                 var maniaUpdated = new HashSet<Guid>();
 
-                bool forceRecompute;
-
                 using (var connection = openConnection())
                 {
                     using (var entryCommand = connection.CreateCommand())
@@ -582,8 +579,6 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
                                 maniaUpdated.Add(id);
                         }
                     }
-
-                    forceRecompute = EzAnalysisSchemaManager.GetMetaBool(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE);
                 }
 
                 List<Guid> needing = new List<Guid>();
@@ -608,8 +603,7 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
 
                     if (!string.Equals(row.hash, hash, StringComparison.Ordinal)
                         || row.rulesetOnlineId != rulesetOnlineId
-                        || missingData != MissingDataKind.None
-                        || forceRecompute)
+                        || missingData != MissingDataKind.None)
                         needing.Add(id);
                 }
 
@@ -680,7 +674,7 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
         }
 
         public void StoreSongsBranch(string databasePath, SongsBranchMetadata metadata, IEnumerable<SongsBranchRow> rows, SourceCollectionSnapshot? sourceCollection = null,
-                                     CancellationToken cancellationToken = default)
+                                     int xxySrAlgorithmVersion = 0, int ppAlgorithmVersion = 0, CancellationToken cancellationToken = default)
         {
             if (!Enabled)
                 return;
@@ -740,6 +734,12 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
                 setMeta(connection, meta_key_kind, xxy_sr_branch_kind);
                 setMeta(connection, meta_key_schema_version, xxy_sr_branch_schema_version.ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, meta_key_analysis_version, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
+
+                if (xxySrAlgorithmVersion > 0)
+                    setMeta(connection, meta_key_xxy_sr_version, xxySrAlgorithmVersion.ToString(CultureInfo.InvariantCulture));
+
+                if (ppAlgorithmVersion > 0)
+                    setMeta(connection, meta_key_pp_version, ppAlgorithmVersion.ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, meta_key_ruleset_online_id, metadata.RulesetOnlineId.ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, meta_key_ruleset_short_name, metadata.RulesetShortName);
                 setMeta(connection, meta_key_mods_fingerprint, metadata.ModsFingerprint);
@@ -1172,6 +1172,229 @@ WHERE {col_beatmap_md5} IN ({string.Join(", ", parameterNames)});
                    .ToList();
         }
 
+        /// <summary>
+        /// 读取分支库 meta 中的 xxy 算法版本；缺失时返回 0（表示 legacy，默认视为当前算法）。
+        /// </summary>
+        public bool TryGetSongsBranchStoredXxyVersion(string databasePath, out int storedVersion)
+        {
+            storedVersion = 0;
+
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return false;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!isValidSongsBranchConnection(connection))
+                    return false;
+
+                if (!int.TryParse(tryGetMeta(connection, meta_key_xxy_sr_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out storedVersion))
+                    storedVersion = 0;
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGetSongsBranchStoredXxyVersion failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 为 legacy 分支库补写 xxy / PP 算法版本 meta（不触发重算）。已有版本且落后时不修改。
+        /// </summary>
+        public void EnsureSongsBranchVersionMeta(string databasePath, int currentXxyVersion, int currentPpVersion)
+        {
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return;
+
+            if (currentXxyVersion <= 0 && currentPpVersion <= 0)
+                return;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!isValidSongsBranchConnection(connection))
+                    return;
+
+                if (currentXxyVersion > 0 && string.IsNullOrEmpty(tryGetMeta(connection, meta_key_xxy_sr_version)))
+                    setMeta(connection, meta_key_xxy_sr_version, currentXxyVersion.ToString(CultureInfo.InvariantCulture));
+
+                if (currentPpVersion > 0 && string.IsNullOrEmpty(tryGetMeta(connection, meta_key_pp_version)))
+                    setMeta(connection, meta_key_pp_version, currentPpVersion.ToString(CultureInfo.InvariantCulture));
+
+                setMeta(connection, meta_key_analysis_version, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore EnsureSongsBranchVersionMeta failed.", Ez2ConfigManager.LOGGER_NAME);
+            }
+        }
+
+        public void EnsureSongsBranchXxyVersionMeta(string databasePath, int currentXxyVersion)
+            => EnsureSongsBranchVersionMeta(databasePath, currentXxyVersion, 0);
+
+        public void EnsureSongsBranchPpVersionMeta(string databasePath, int currentPpVersion)
+            => EnsureSongsBranchVersionMeta(databasePath, 0, currentPpVersion);
+
+        public bool SongsBranchNeedsXxyRefresh(int storedXxyVersion, int currentXxyVersion)
+        {
+            if (currentXxyVersion <= 0)
+                return false;
+
+            // legacy 分支库（无 meta）默认按当前算法生成，首次打开会 stamp 而不重算
+            if (storedXxyVersion <= 0)
+                return false;
+
+            return storedXxyVersion < currentXxyVersion;
+        }
+
+        public IReadOnlyList<SongsBranchRow> ReadAllSongsBranchRows(string databasePath)
+        {
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return Array.Empty<SongsBranchRow>();
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!isValidSongsBranchConnection(connection))
+                    return Array.Empty<SongsBranchRow>();
+
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $@"
+SELECT {col_beatmap_id}, {col_beatmap_hash}, {col_beatmap_md5}, {col_xxy_sr}, {col_pp}
+FROM {table_xxy_sr_branch};";
+
+                var rows = new List<SongsBranchRow>();
+
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    if (!Guid.TryParse(reader.GetString(0), out Guid beatmapId))
+                        continue;
+
+                    rows.Add(new SongsBranchRow(
+                        beatmapId,
+                        reader.GetString(1),
+                        reader.GetString(2),
+                        reader.IsDBNull(3) ? 0 : reader.GetDouble(3),
+                        reader.IsDBNull(4) ? null : reader.GetDouble(4)));
+                }
+
+                return rows;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore ReadAllSongsBranchRows failed.", Ez2ConfigManager.LOGGER_NAME);
+                return Array.Empty<SongsBranchRow>();
+            }
+        }
+
+        public bool SongsBranchNeedsPpRefresh(int storedPpVersion, int currentPpVersion)
+        {
+            if (currentPpVersion <= 0)
+                return false;
+
+            if (storedPpVersion <= 0)
+                return false;
+
+            return storedPpVersion < currentPpVersion;
+        }
+
+        public bool TryGetSongsBranchStoredPpVersion(string databasePath, out int storedVersion)
+        {
+            storedVersion = 0;
+
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return false;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!isValidSongsBranchConnection(connection))
+                    return false;
+
+                if (!int.TryParse(tryGetMeta(connection, meta_key_pp_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out storedVersion))
+                    storedVersion = 0;
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGetSongsBranchStoredPpVersion failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
+        public bool UpdateSongsBranchRows(string databasePath, IEnumerable<SongsBranchRow> rows, int? newXxySrAlgorithmVersion, int? newPpAlgorithmVersion)
+        {
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return false;
+
+            if (newXxySrAlgorithmVersion is not int xxyVersion && newPpAlgorithmVersion is not int ppVersion)
+                return false;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!isValidSongsBranchConnection(connection))
+                    return false;
+
+                using var transaction = connection.BeginTransaction();
+
+                using var update = connection.CreateCommand();
+                update.Transaction = transaction;
+                update.CommandText = $@"
+UPDATE {table_xxy_sr_branch}
+SET {col_xxy_sr} = $xxy,
+    {col_pp} = $pp
+WHERE {col_beatmap_id} = $id;
+";
+
+                var idParam = update.CreateParameter();
+                idParam.ParameterName = "$id";
+                update.Parameters.Add(idParam);
+
+                var xxyParam = update.CreateParameter();
+                xxyParam.ParameterName = "$xxy";
+                update.Parameters.Add(xxyParam);
+
+                var ppParam = update.CreateParameter();
+                ppParam.ParameterName = "$pp";
+                update.Parameters.Add(ppParam);
+
+                foreach (var row in rows)
+                {
+                    idParam.Value = row.BeatmapId.ToString();
+                    xxyParam.Value = row.XxySr;
+                    ppParam.Value = row.Pp.HasValue ? row.Pp.Value : DBNull.Value;
+                    update.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+
+                if (newXxySrAlgorithmVersion is int resolvedXxyVersion && resolvedXxyVersion > 0)
+                    setMeta(connection, meta_key_xxy_sr_version, resolvedXxyVersion.ToString(CultureInfo.InvariantCulture));
+
+                if (newPpAlgorithmVersion is int resolvedPpVersion && resolvedPpVersion > 0)
+                    setMeta(connection, meta_key_pp_version, resolvedPpVersion.ToString(CultureInfo.InvariantCulture));
+
+                setMeta(connection, meta_key_analysis_version, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore UpdateSongsBranchRows failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
         // 备份分支库隐藏用法
 //         public bool TrySetSongsBranchHideState(string databasePath, bool hiddenApplied, IEnumerable<Guid> preexistingHiddenBeatmapIds)
 //         {
@@ -1323,8 +1546,7 @@ ON CONFLICT(collection_id, beatmap_md5) DO NOTHING;
         }
 
         /// <summary>
-        /// 在当前（主）数据库中设置或清除强制重建开关（meta.force_recompute = "1" / "0"）。
-        /// 用途：当某个版本需要强制重建全部数据时，可手动开启，下一次确认兼容后再关闭。
+        /// 强制使全部已缓存 kps / KPC 失效（开发/维护用）。
         /// </summary>
         public bool TrySetForceRecompute(bool force)
         {
@@ -1336,7 +1558,11 @@ ON CONFLICT(collection_id, beatmap_md5) DO NOTHING;
                 Initialise();
 
                 using var connection = openConnection();
-                EzAnalysisSchemaManager.SetMeta(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE, force ? "1" : "0");
+
+                if (force)
+                    EzAnalysisSchemaManager.InvalidateAllCachedAnalysisTimestamps(connection);
+
+                EzAnalysisSchemaManager.SetMeta(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE, "0");
                 return true;
             }
             catch (Exception e)
@@ -1633,7 +1859,6 @@ LIMIT 1;
         {
             string? kind = tryGetMeta(connection, meta_key_kind);
             string? schemaVersionText = tryGetMeta(connection, meta_key_schema_version);
-            string? analysisVersionText = tryGetMeta(connection, meta_key_analysis_version);
 
             if (!string.Equals(kind, xxy_sr_branch_kind, StringComparison.Ordinal))
                 return false;
@@ -1641,10 +1866,10 @@ LIMIT 1;
             if (!int.TryParse(schemaVersionText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int schemaVersion) || schemaVersion != xxy_sr_branch_schema_version)
                 return false;
 
-            if (!int.TryParse(analysisVersionText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int analysisVersion) || analysisVersion != ANALYSIS_VERSION)
-                return false;
-
-            return true;
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $name LIMIT 1;";
+            cmd.Parameters.AddWithValue("$name", table_xxy_sr_branch);
+            return cmd.ExecuteScalar() != null;
         }
 
         private static bool tryReadSongsBranchMetadata(SqliteConnection connection, out SongsBranchMetadata metadata)

@@ -15,10 +15,9 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     internal static class EzAnalysisSchemaManager
     {
-        // Note: main sqlite remains v6-compatible for now. Legacy columns (pp/tag/xxy_sr) are schema-only
-        // compatibility baggage and must not be used as primary runtime data sources.
+        // Note: main sqlite v7 stores kps/KPC only (slim schema). Legacy pp/tag/xxy_sr columns removed at schema v3.
         public const int ANALYSIS_VERSION = EzAnalysisPersistentStore.ANALYSIS_VERSION;
-        public const int MAIN_SCHEMA_VERSION = 2;
+        public const int MAIN_SCHEMA_VERSION = 3;
         public const string MAIN_DATABASE_KIND = "ez_analysis";
 
         public const string TABLE_ENTRY = "ez_analysis_entry";
@@ -73,10 +72,32 @@ PRAGMA temp_store=MEMORY;
             SetMeta(connection, META_KEY_KIND, MAIN_DATABASE_KIND);
             SetMeta(connection, META_KEY_SCHEMA_VERSION, MAIN_SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
             SetMeta(connection, META_KEY_ANALYSIS_VERSION, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
+            SetMeta(connection, META_KEY_FORCE_RECOMPUTE, "0");
         }
 
         /// <summary>
-        /// 从旧版 <c>ez-analysis_v*.sqlite</c> 复制仍需要的 kps / mania 列统计到新的 v7 主库。
+        /// Clears kps / mania column timestamps so startup warmup recomputes only those slices (维护/强制重算用).
+        /// </summary>
+        public static void InvalidateAllCachedAnalysisTimestamps(SqliteConnection connection)
+        {
+            if (!tableExists(connection, TABLE_ENTRY))
+                return;
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+UPDATE {TABLE_ENTRY}
+SET {COL_COMMON_UPDATED_AT} = 0
+WHERE {COL_COMMON_UPDATED_AT} <> 0;
+
+UPDATE {TABLE_MANIA}
+SET {COL_UPDATED_AT} = 0
+WHERE {COL_UPDATED_AT} <> 0;
+";
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// 从旧版 <c>ez-analysis_v*.sqlite</c>（或中间版 <c>ez-analysis.sqlite</c>）复制 kps / mania 列统计到当前版本文件。
         /// </summary>
         public static bool TryMigrateFromPreviousMainDatabase(string targetDatabasePath)
         {
@@ -110,6 +131,7 @@ PRAGMA temp_store=MEMORY;
                 SetMeta(destination, META_KEY_KIND, MAIN_DATABASE_KIND);
                 SetMeta(destination, META_KEY_SCHEMA_VERSION, MAIN_SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
                 SetMeta(destination, META_KEY_ANALYSIS_VERSION, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
+                SetMeta(destination, META_KEY_FORCE_RECOMPUTE, "0");
 
                 using var vacuum = destination.CreateCommand();
                 vacuum.CommandText = "VACUUM;";
@@ -224,16 +246,12 @@ CREATE TABLE IF NOT EXISTS {TABLE_ENTRY} (
     {COL_COMMON_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
     {COL_AVERAGE_KPS} REAL NOT NULL DEFAULT 0,
     {COL_MAX_KPS} REAL NOT NULL DEFAULT 0,
-    {COL_KPS_LIST_JSON} TEXT NOT NULL DEFAULT '[]',
-    {COL_PP} REAL NULL,
-    {COL_TAG_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
-    {COL_TAG_PAYLOAD_JSON} TEXT NOT NULL DEFAULT ''
+    {COL_KPS_LIST_JSON} TEXT NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS {TABLE_MANIA} (
     {COL_BEATMAP_ID} TEXT PRIMARY KEY,
     {COL_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
-    {COL_XXY_SR} REAL NULL,
     {COL_COLUMN_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     {COL_HOLD_NOTE_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     FOREIGN KEY({COL_BEATMAP_ID}) REFERENCES {TABLE_ENTRY}({COL_BEATMAP_ID}) ON DELETE CASCADE
@@ -241,7 +259,6 @@ CREATE TABLE IF NOT EXISTS {TABLE_MANIA} (
 
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_ruleset ON {TABLE_ENTRY}({COL_RULESET_ONLINE_ID});
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_common_updated ON {TABLE_ENTRY}({COL_COMMON_UPDATED_AT});
-CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_tag_updated ON {TABLE_ENTRY}({COL_TAG_UPDATED_AT});
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_mania_updated ON {TABLE_MANIA}({COL_UPDATED_AT});
 ";
             create.ExecuteNonQuery();
@@ -271,10 +288,7 @@ CREATE TABLE {TABLE_ENTRY}_new (
     {COL_COMMON_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
     {COL_AVERAGE_KPS} REAL NOT NULL DEFAULT 0,
     {COL_MAX_KPS} REAL NOT NULL DEFAULT 0,
-    {COL_KPS_LIST_JSON} TEXT NOT NULL DEFAULT '[]',
-    {COL_PP} REAL NULL,
-    {COL_TAG_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
-    {COL_TAG_PAYLOAD_JSON} TEXT NOT NULL DEFAULT ''
+    {COL_KPS_LIST_JSON} TEXT NOT NULL DEFAULT '[]'
 );
 ";
                 createEntry.ExecuteNonQuery();
@@ -292,10 +306,7 @@ INSERT INTO {TABLE_ENTRY}_new (
     {COL_COMMON_UPDATED_AT},
     {COL_AVERAGE_KPS},
     {COL_MAX_KPS},
-    {COL_KPS_LIST_JSON},
-    {COL_PP},
-    {COL_TAG_UPDATED_AT},
-    {COL_TAG_PAYLOAD_JSON}
+    {COL_KPS_LIST_JSON}
 )
 SELECT
     {COL_BEATMAP_ID},
@@ -305,10 +316,7 @@ SELECT
     {COL_COMMON_UPDATED_AT},
     {COL_AVERAGE_KPS},
     {COL_MAX_KPS},
-    {COL_KPS_LIST_JSON},
-    {COL_PP},
-    {COL_TAG_UPDATED_AT},
-    {COL_TAG_PAYLOAD_JSON}
+    {COL_KPS_LIST_JSON}
 FROM {TABLE_ENTRY};
 ";
                 copyEntry.ExecuteNonQuery();
@@ -337,7 +345,6 @@ FROM {TABLE_ENTRY};
 CREATE TABLE {TABLE_MANIA}_new (
     {COL_BEATMAP_ID} TEXT PRIMARY KEY,
     {COL_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
-    {COL_XXY_SR} REAL NULL,
     {COL_COLUMN_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     {COL_HOLD_NOTE_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     FOREIGN KEY({COL_BEATMAP_ID}) REFERENCES {TABLE_ENTRY}({COL_BEATMAP_ID}) ON DELETE CASCADE
@@ -353,14 +360,12 @@ CREATE TABLE {TABLE_MANIA}_new (
 INSERT INTO {TABLE_MANIA}_new (
     {COL_BEATMAP_ID},
     {COL_UPDATED_AT},
-    {COL_XXY_SR},
     {COL_COLUMN_COUNTS_JSON},
     {COL_HOLD_NOTE_COUNTS_JSON}
 )
 SELECT
     {COL_BEATMAP_ID},
     {COL_UPDATED_AT},
-    {COL_XXY_SR},
     {COL_COLUMN_COUNTS_JSON},
     {COL_HOLD_NOTE_COUNTS_JSON}
 FROM {TABLE_MANIA};
@@ -391,7 +396,6 @@ FROM {TABLE_MANIA};
 CREATE TABLE {TABLE_MANIA} (
     {COL_BEATMAP_ID} TEXT PRIMARY KEY,
     {COL_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
-    {COL_XXY_SR} REAL NULL,
     {COL_COLUMN_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     {COL_HOLD_NOTE_COUNTS_JSON} TEXT NOT NULL DEFAULT '{{}}',
     FOREIGN KEY({COL_BEATMAP_ID}) REFERENCES {TABLE_ENTRY}({COL_BEATMAP_ID}) ON DELETE CASCADE
@@ -407,7 +411,6 @@ CREATE TABLE {TABLE_MANIA} (
                 recreateIndexes.CommandText = $@"
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_ruleset ON {TABLE_ENTRY}({COL_RULESET_ONLINE_ID});
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_common_updated ON {TABLE_ENTRY}({COL_COMMON_UPDATED_AT});
-CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_tag_updated ON {TABLE_ENTRY}({COL_TAG_UPDATED_AT});
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_mania_updated ON {TABLE_MANIA}({COL_UPDATED_AT});
 ";
                 recreateIndexes.ExecuteNonQuery();
@@ -606,7 +609,14 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
             {
                 string key = reader.GetString(0);
 
-                if (key == META_KEY_SCHEMA_VERSION || key == META_KEY_ANALYSIS_VERSION || key == META_KEY_KIND)
+                if (key == META_KEY_SCHEMA_VERSION
+                    || key == META_KEY_ANALYSIS_VERSION
+                    || key == "kps_kpc_version"
+                    || key == "computation_version"
+                    || key == "pp_version"
+                    || key == "xxy_sr_version"
+                    || key == META_KEY_FORCE_RECOMPUTE
+                    || key == META_KEY_KIND)
                     continue;
 
                 insert.Parameters.Clear();
@@ -621,7 +631,7 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
             string? bestCandidate = null;
             int bestVersion = -1;
 
-            foreach (string file in Directory.EnumerateFiles(directory, "ez-analysis_v*.sqlite", SearchOption.TopDirectoryOnly))
+            foreach (string file in Directory.EnumerateFiles(directory, $"{EzAnalysisPersistentStore.LEGACY_DATABASE_FILENAME_PREFIX}*.sqlite", SearchOption.TopDirectoryOnly))
             {
                 if (string.Equals(Path.GetFullPath(file), Path.GetFullPath(targetDatabasePath), StringComparison.OrdinalIgnoreCase))
                     continue;
@@ -637,6 +647,15 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
                     bestVersion = version;
                     bestCandidate = file;
                 }
+            }
+
+            string stableLegacyPath = Path.Combine(directory, EzAnalysisPersistentStore.LEGACY_STABLE_DATABASE_FILENAME);
+
+            if (File.Exists(stableLegacyPath)
+                && !string.Equals(Path.GetFullPath(stableLegacyPath), Path.GetFullPath(targetDatabasePath), StringComparison.OrdinalIgnoreCase)
+                && 6 > bestVersion)
+            {
+                bestCandidate = stableLegacyPath;
             }
 
             return bestCandidate;

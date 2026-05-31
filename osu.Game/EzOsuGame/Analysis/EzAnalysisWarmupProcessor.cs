@@ -145,7 +145,11 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 pendingScanCompleted = false;
 
-                ProcessingTask = Task.Factory.StartNew(scanBeatmapsNeedingWarmup, TaskCreationOptions.LongRunning).ContinueWith(t =>
+                ProcessingTask = Task.Factory.StartNew(() =>
+                {
+                    scanBeatmapsNeedingWarmup();
+                    scanSongsBranchesNeedingRefresh();
+                }, TaskCreationOptions.LongRunning).ContinueWith(t =>
                 {
                     if (t.Exception?.InnerException is ObjectDisposedException)
                     {
@@ -207,7 +211,7 @@ namespace osu.Game.EzOsuGame.Analysis
                         continue;
 
                     // Externally hosted libraries are volatile; skip startup sqlite backfill.
-                    if (b.BeatmapSet is BeatmapSetInfo { IsExternallyHosted: true })
+                    if (b.BeatmapSet is { IsExternallyHosted: true })
                         continue;
 
                     totalWithSet++;
@@ -265,6 +269,124 @@ namespace osu.Game.EzOsuGame.Analysis
                 startupWarmupSignal.Release();
 
             postWarmupSummaryNotification(needingRecompute.Count);
+        }
+
+        private void scanSongsBranchesNeedingRefresh()
+        {
+            if (!sqliteEnabled)
+                return;
+
+            var refreshPlans = analysisDatabase.GetSongsBranchesNeedingRefresh();
+
+            if (refreshPlans.Count == 0)
+            {
+                Logger.Log("No songs branches require xxy/PP refresh.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return;
+            }
+
+            int totalBeatmaps = refreshPlans.Sum(plan => plan.Branch.Metadata.BeatmapCount);
+            Logger.Log($"Songs branch refresh queued for {refreshPlans.Count} branch(es), ~{totalBeatmaps} beatmap(s).",
+                Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+
+            postSongsBranchRefreshNotification(refreshPlans.Count, totalBeatmaps);
+
+            int totalBranches = refreshPlans.Count;
+
+            for (int branchIndex = 0; branchIndex < totalBranches; branchIndex++)
+            {
+                if (!sqliteEnabled)
+                    return;
+
+                var plan = refreshPlans[branchIndex];
+
+                try
+                {
+                    using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(startupWarmupCancellationSource.Token);
+                    int index = branchIndex;
+                    analysisDatabase.RefreshSongsBranchAsync(plan,
+                        (processed, total) => updateSongsBranchRefreshProgress(index + 1, totalBranches, plan.Branch.Metadata.DisplayName, processed, total),
+                        linkedCancellation.Token).Wait(linkedCancellation.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, $"Songs branch refresh failed for \"{plan.Branch.Metadata.DisplayName}\".", Ez2ConfigManager.LOGGER_NAME);
+                }
+
+                updateSongsBranchRefreshProgress(branchIndex + 1, totalBranches, plan.Branch.Metadata.DisplayName, 0, 0);
+            }
+        }
+
+        private ProgressNotification? songsBranchRefreshProgressNotification;
+        private int songsBranchRefreshTotalBeatmaps;
+
+        private void postSongsBranchRefreshNotification(int branchCount, int totalBeatmaps)
+        {
+            if (notificationOverlay == null || branchCount <= 0)
+                return;
+
+            Schedule(() =>
+            {
+                try
+                {
+                    if (totalBeatmaps < 10)
+                    {
+                        notificationOverlay.Post(new SimpleNotification
+                        {
+                            Text = $"Ez songs branch refresh queued for {branchCount} branch(es)."
+                        });
+                        return;
+                    }
+
+                    var notification = new ProgressNotification
+                    {
+                        Text = $"Ez songs branch refresh queued for {branchCount} branch(es) (~{totalBeatmaps} beatmaps)",
+                        CompletionText = "Songs branch refresh complete",
+                        CancelRequested = () => true,
+                        State = ProgressNotificationState.Active
+                    };
+
+                    songsBranchRefreshProgressNotification = notification;
+                    songsBranchRefreshTotalBeatmaps = totalBeatmaps;
+                    notificationOverlay.Post(notification);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to post songs branch refresh notification.");
+                }
+            });
+        }
+
+        private void updateSongsBranchRefreshProgress(int processedBranches, int totalBranches, string branchDisplayName, int processedBeatmaps, int branchBeatmapTotal)
+        {
+            if (songsBranchRefreshProgressNotification == null)
+                return;
+
+            Schedule(() =>
+            {
+                try
+                {
+                    if (processedBeatmaps > 0 && branchBeatmapTotal > 0)
+                    {
+                        songsBranchRefreshProgressNotification.Text =
+                            $"Refreshing songs branch \"{branchDisplayName}\" ({processedBeatmaps} of {branchBeatmapTotal}) — branch {processedBranches} of {totalBranches}";
+                        songsBranchRefreshProgressNotification.Progress = (float)processedBeatmaps / branchBeatmapTotal;
+                    }
+                    else if (processedBranches >= totalBranches)
+                    {
+                        songsBranchRefreshProgressNotification.CompletionText = "Songs branch refresh complete";
+                        songsBranchRefreshProgressNotification.State = ProgressNotificationState.Completed;
+                        songsBranchRefreshProgressNotification = null;
+                        songsBranchRefreshTotalBeatmaps = 0;
+                    }
+                }
+                catch
+                {
+                }
+            });
         }
 
         private void queueSelectedBeatmapRecomputeIfRequired(WorkingBeatmap? workingBeatmap)

@@ -2,8 +2,10 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using NUnit.Framework;
+using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.EzMania.Analysis;
 
 namespace osu.Game.Tests.EzOsuGame.Analysis
@@ -27,6 +29,22 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
             Assert.That(EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(rulesetInfo, out int xxyVersion), Is.True);
             Assert.That(xxyVersion, Is.EqualTo(EzManiaXxyStarRating.VERSION));
+        }
+    }
+
+    [TestFixture]
+    public class TestPerformancePointsVersion
+    {
+        [Test]
+        public void TryGetPerformancePointsVersion_uses_official_difficulty_calculator_version()
+        {
+            var rulesetInfo = new ManiaRuleset().RulesetInfo;
+            rulesetInfo.Available = true;
+            var workingBeatmap = new FlatWorkingBeatmap(new Beatmap());
+
+            Assert.That(EzPerformancePointsSupport.TryGetPerformancePointsVersion(rulesetInfo, workingBeatmap, out int ppVersion), Is.True);
+            Assert.That(ppVersion, Is.EqualTo(new ManiaDifficultyCalculator(rulesetInfo, workingBeatmap).Version));
+            Assert.That(ppVersion, Is.Not.EqualTo(EzManiaXxyStarRating.VERSION));
         }
     }
 }

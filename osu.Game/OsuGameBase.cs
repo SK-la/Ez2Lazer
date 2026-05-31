@@ -396,7 +396,7 @@ namespace osu.Game
             dependencies.CacheAs<IWorkingBeatmapCache>(BeatmapManager);
 
             ezAnalysisPersistentStore = new EzAnalysisPersistentStore(Storage);
-            var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, Ez2ConfigManager);
+            var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, RulesetStore, Ez2ConfigManager);
             ezAnalysisCache = new EzAnalysisCache(ezAnalysisDatabase, Ez2ConfigManager);
             dependencies.Cache(ezAnalysisPersistentStore);
             dependencies.Cache(ezAnalysisDatabase);
