@@ -50,6 +50,9 @@ namespace osu.Game.Utils
             if (Environment.GetEnvironmentVariable("OSU_DISABLE_ERROR_REPORTING") == "1")
                 return;
 
+            if (!game.SubmitErrorsToSentry)
+                return;
+
             if (DebugUtils.IsNUnitRunning)
                 return;
 

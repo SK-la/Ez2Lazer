@@ -147,6 +147,11 @@ namespace osu.Game
 
         public bool IsDeployedBuild => AssemblyVersion.Major > 0;
 
+        /// <summary>
+        /// When true, unhandled errors may be submitted to ppy Sentry. Disabled for Ez2Lazer.
+        /// </summary>
+        public virtual bool SubmitErrorsToSentry => false;
+
         public virtual string Version
         {
             get
