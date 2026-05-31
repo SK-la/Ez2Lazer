@@ -104,7 +104,7 @@ namespace osu.Game.Database
         /// 51   2025-07-22    Add ScoreInfo.Pauses.
         ///
         /// Ez2Lazer-only revisions are tracked separately via <see cref="EZ_REALM_SCHEMA_VERSION"/>.
-        /// The on-disk Realm schema version is <see cref="file_schema_version"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 51006).
+        /// The on-disk Realm schema version is <see cref="file_schema_version"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 51007).
         /// Ez v1: Add ScoreInfo.ManiaHitMode and ManiaHealthMode.
         /// Ez v2: Add BeatmapInfo.HasVideo and HasStoryboard.
         /// Ez v3: Add BeatmapInfo.XxyStarRating.
@@ -223,7 +223,7 @@ namespace osu.Game.Database
         /// <param name="storage">The game storage which will be used to create the realm backing file.</param>
         /// <param name="filename">The filename to use for the realm backing file. A ".realm" extension will be added automatically if not specified.</param>
         /// <param name="updateThread">The game update thread, used to post realm operations into a thread-safe context.</param>
-        /// <param name="useDevelopmentVersionedFilenames">When <c>true</c>, use <c>client_{schema}.realm</c> sidecar copies for migration (game dev default). External tools should pass <c>false</c>.</param>
+        /// <param name="useDevelopmentVersionedFilenames">When <c>true</c>, use <c>client_{FileSchemaVersion}.realm</c> sidecar copies (e.g. <c>client_51007.realm</c>). External tools should pass <c>false</c>.</param>
         /// <param name="allowDestructiveRecoveryOnSchemaMismatch">When <c>false</c>, schema downgrade errors are thrown instead of backing up and recreating the database (for external tools).</param>
         /// <param name="performSchemaMigration">When <c>false</c>, opens at <paramref name="pinnedDiskSchemaVersion"/> without running migrations (EzRealmSync 等工具).</param>
         /// <param name="pinnedDiskSchemaVersion">磁盘上已有的 schema 版本；<paramref name="performSchemaMigration"/> 为 false 时必填。</param>
@@ -247,7 +247,7 @@ namespace osu.Game.Database
         /// <param name="filename">The filename to use for the realm backing file.</param>
         /// <param name="schemaProfile">Schema encoding and migration set (Ez vs official).</param>
         /// <param name="updateThread">The game update thread, used to post realm operations into a thread-safe context.</param>
-        /// <param name="useDevelopmentVersionedFilenames">When <c>true</c>, DEBUG builds use <c>client_{version}.realm</c> filenames.</param>
+        /// <param name="useDevelopmentVersionedFilenames">When <c>true</c>, use <c>client_{FileSchemaVersion}.realm</c> filenames.</param>
         /// <param name="allowDestructiveRecoveryOnSchemaMismatch">When <c>false</c>, do not delete/recreate the realm file on schema downgrade.</param>
         /// <param name="performSchemaMigration">When <c>false</c>, do not migrate — open exactly at <paramref name="pinnedDiskSchemaVersion"/>.</param>
         /// <param name="pinnedDiskSchemaVersion">Required when <paramref name="performSchemaMigration"/> is <c>false</c>.</param>
@@ -300,18 +300,18 @@ namespace osu.Game.Database
         private void applyFilenameSchemaSuffix(ref string filename)
         {
             string originalFilename = filename;
+            int targetVersion = schemaProfile.EzRealmSchemaVersion > 0
+                ? schemaProfile.FileSchemaVersion
+                : schemaProfile.UpstreamSchemaVersion;
 
-            filename = getVersionedFilename(schemaProfile.UpstreamSchemaVersion);
+            filename = GetVersionedRealmFilename(originalFilename, targetVersion);
 
             // First check if the current realm version already exists...
             if (storage.Exists(filename))
                 return;
 
-            // Check for a previous version we can use as a base database to migrate from...
-            for (int i = schemaProfile.UpstreamSchemaVersion - 1; i >= 0; i--)
+            foreach (string previousFilename in EnumerateSidecarPredecessorFilenames(originalFilename, schemaProfile))
             {
-                string previousFilename = getVersionedFilename(i);
-
                 if (storage.Exists(previousFilename))
                 {
                     copyPreviousVersion(previousFilename, filename);
@@ -319,21 +319,45 @@ namespace osu.Game.Database
                 }
             }
 
-            // Finally, check for  a non-versioned file exists (aka before this method was added)...
-            if (storage.Exists(originalFilename))
-                copyPreviousVersion(originalFilename, filename);
-
             void copyPreviousVersion(string previousFilename, string newFilename)
             {
                 using (var previous = storage.GetStream(previousFilename))
                 using (var current = storage.CreateFileSafely(newFilename))
                 {
-                    Logger.Log(@$"Copying previous realm database {previousFilename} to {newFilename} for migration to schema version {schemaProfile.UpstreamSchemaVersion}");
+                    Logger.Log(@$"Copying previous realm database {previousFilename} to {newFilename} for migration to schema version {targetVersion}");
                     previous.CopyTo(current);
                 }
             }
+        }
 
-            string getVersionedFilename(int version) => originalFilename.Replace(realm_extension, $"_{version}{realm_extension}");
+        internal static string GetVersionedRealmFilename(string originalFilename, int version)
+        {
+            if (!originalFilename.EndsWith(realm_extension, StringComparison.Ordinal))
+                originalFilename += realm_extension;
+
+            return originalFilename.Replace(realm_extension, $"_{version}{realm_extension}");
+        }
+
+        internal static IEnumerable<string> EnumerateSidecarPredecessorFilenames(string originalFilename, IRealmSchemaProfile schemaProfile)
+        {
+            if (schemaProfile.EzRealmSchemaVersion > 0)
+            {
+                int baseVersion = schemaProfile.UpstreamSchemaVersion * 1000;
+
+                for (int ez = schemaProfile.EzRealmSchemaVersion - 1; ez >= 1; ez--)
+                    yield return GetVersionedRealmFilename(originalFilename, baseVersion + ez);
+
+                yield return GetVersionedRealmFilename(originalFilename, schemaProfile.UpstreamSchemaVersion);
+            }
+            else
+            {
+                for (int version = schemaProfile.UpstreamSchemaVersion - 1; version >= 0; version--)
+                    yield return GetVersionedRealmFilename(originalFilename, version);
+            }
+
+            yield return originalFilename.EndsWith(realm_extension, StringComparison.Ordinal)
+                ? originalFilename
+                : originalFilename + realm_extension;
         }
 
         private void attemptRecoverFromFile(string recoveryFilename)
