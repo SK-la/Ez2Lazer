@@ -30,6 +30,20 @@ namespace osu.Game.EzOsuGame.Analysis
         public static bool SupportsBeatmapInfo(BeatmapInfo beatmapInfo)
             => SupportsRuleset(beatmapInfo.Ruleset);
 
+        /// <summary>
+        /// yyyyMMdd xxy SR algorithm version for the ruleset, if it implements <see cref="IEzXxyStarRatingSupport"/>.
+        /// </summary>
+        public static bool TryGetXxyStarRatingVersion(IRulesetInfo rulesetInfo, out int version)
+        {
+            version = 0;
+
+            if (!tryGetSupport(rulesetInfo, out IEzXxyStarRatingSupport support))
+                return false;
+
+            version = support.XxyStarRatingVersion;
+            return version > 0;
+        }
+
         private static bool tryGetSupport(IRulesetInfo rulesetInfo, out IEzXxyStarRatingSupport support)
         {
             support = null!;

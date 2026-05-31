@@ -27,7 +27,8 @@ namespace osu.Game.Rulesets
         public int LastAppliedDifficultyVersion { get; set; }
 
         /// <summary>
-        /// Stores the last applied XxySR version used to invalidate persisted <see cref="Beatmaps.BeatmapInfo.XxyStarRating"/>.
+        /// Stores the last applied xxy SR calculation version (yyyyMMdd, from <see cref="EzOsuGame.Analysis.IEzXxyStarRatingSupport.XxyStarRatingVersion"/>).
+        /// Used to invalidate persisted <see cref="Beatmaps.BeatmapInfo.XxyStarRating"/>.
         /// </summary>
         public int LastAppliedXxySrVersion { get; set; }
 

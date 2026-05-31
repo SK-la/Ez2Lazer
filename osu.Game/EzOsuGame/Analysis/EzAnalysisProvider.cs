@@ -43,6 +43,11 @@ namespace osu.Game.EzOsuGame.Analysis
     public interface IEzXxyStarRatingSupport
     {
         /// <summary>
+        /// yyyyMMdd revision of this ruleset's xxy SR algorithm. Bump when calculation logic changes.
+        /// </summary>
+        int XxyStarRatingVersion { get; }
+
+        /// <summary>
         /// Whether xxy SR can be calculated for this beatmap (layout, key count, etc.).
         /// </summary>
         bool SupportsXxyStarRating(IBeatmap beatmap);

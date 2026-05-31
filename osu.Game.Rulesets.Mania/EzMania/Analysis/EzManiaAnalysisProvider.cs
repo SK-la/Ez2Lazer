@@ -13,6 +13,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 {
     public class EzManiaAnalysisProvider : IEzAnalysisProvider, IEzXxyStarRatingSupport
     {
+        public int XxyStarRatingVersion => EzManiaXxyStarRating.VERSION;
+
         public bool SupportsXxyStarRating(IBeatmap beatmap) => EzManiaXxyStarRating.IsPatternSupported(beatmap);
 
         public bool TryCompute(in EzAnalysisRequest request, CancellationToken cancellationToken, out IEzAnalysis analysis)

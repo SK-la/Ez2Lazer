@@ -207,14 +207,12 @@ namespace osu.Game.Database
         {
             foreach (var ruleset in rulesetStore.AvailableRulesets)
             {
-                if (!EzXxyStarRatingSupport.SupportsRuleset(ruleset))
+                if (!EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(ruleset, out int currentVersion))
                     continue;
-
-                int currentVersion = ruleset.CreateInstance().CreateDifficultyCalculator(gameBeatmap.Value).Version;
 
                 if (ruleset.LastAppliedXxySrVersion < currentVersion)
                 {
-                    Logger.Log($"Resetting XxyStarRatings for {ruleset.Name} (XxySR version updated from {ruleset.LastAppliedXxySrVersion} to {currentVersion})");
+                    Logger.Log($"Resetting XxyStarRatings for {ruleset.Name} (xxy SR version updated from {ruleset.LastAppliedXxySrVersion} to {currentVersion})");
 
                     int countReset = 0;
 

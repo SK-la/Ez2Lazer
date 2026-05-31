@@ -12,6 +12,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
     /// </summary>
     public static class EzManiaXxyStarRating
     {
+        /// <summary>
+        /// yyyyMMdd revision of the Mania xxy SR algorithm. Bump when calculation logic changes (independent of official <see cref="Difficulty.ManiaDifficultyCalculator.Version"/>).
+        /// </summary>
+        public const int VERSION = 20250415;
+
         public static bool IsPatternSupported(IBeatmap beatmap)
         {
             int keyCount = beatmap is ManiaBeatmap maniaBeatmap && maniaBeatmap.TotalColumns > 0
