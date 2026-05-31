@@ -481,7 +481,7 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// 扫描所有分支库：legacy 库补写版本 meta；返回 xxy 或 PP 算法落后、需要重算的分支计划。
+        /// 扫描所有分支库：v2+ legacy 库补写版本 meta；v1 迁移后标记全量 refresh；返回 xxy 或 PP 算法落后、需要重算的分支计划。
         /// </summary>
         public IReadOnlyList<SongsBranchRefreshPlan> GetSongsBranchesNeedingRefresh()
         {
@@ -502,6 +502,18 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 if (!supportsXxy && !supportsPp)
                     continue;
+
+                if (persistentStore.TryGetSongsBranchRequiresPostMigrationRefresh(branch.DatabasePath, out bool requiresPostMigrationRefresh)
+                    && requiresPostMigrationRefresh)
+                {
+                    plans.Add(new SongsBranchRefreshPlan(
+                        branch,
+                        RefreshXxy: supportsXxy,
+                        RefreshPp: supportsPp,
+                        CurrentXxyVersion: supportsXxy ? currentXxyVersion : 0,
+                        CurrentPpVersion: supportsPp ? currentPpVersion : 0));
+                    continue;
+                }
 
                 persistentStore.TryGetSongsBranchStoredXxyVersion(branch.DatabasePath, out int storedXxyVersion);
                 persistentStore.TryGetSongsBranchStoredPpVersion(branch.DatabasePath, out int storedPpVersion);
@@ -549,6 +561,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 if (storedRows.Count == 0)
                 {
                     persistentStore.EnsureSongsBranchVersionMeta(plan.Branch.DatabasePath, plan.CurrentXxyVersion, plan.CurrentPpVersion);
+                    persistentStore.ClearSongsBranchPostMigrationRefresh(plan.Branch.DatabasePath);
                     return;
                 }
 
@@ -620,6 +633,8 @@ namespace osu.Game.EzOsuGame.Analysis
                     updatedRows,
                     plan.RefreshXxy ? plan.CurrentXxyVersion : null,
                     plan.RefreshPp ? plan.CurrentPpVersion : null);
+
+                persistentStore.ClearSongsBranchPostMigrationRefresh(plan.Branch.DatabasePath);
 
                 lock (activeSongsBranchStateLock)
                 {
