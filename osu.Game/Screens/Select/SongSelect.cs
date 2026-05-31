@@ -111,6 +111,8 @@ namespace osu.Game.Screens.Select
 
         private ModSelectOverlay modSelectOverlay = null!;
         private ModSpeedHotkeyHandler modSpeedHotkeyHandler = null!;
+        private readonly EzModSelectionRestoreController modRestoreController = new();
+        private FooterButtonMods footerButtonMods = null!;
 
         // Blue is the most neutral choice, so I'm using that for now.
         // Purple makes the most sense to match the "gameplay" flow, but it's a bit too strong for the current design.
@@ -327,7 +329,6 @@ namespace osu.Game.Screens.Select
                     DefaultPanelRightEdgeInScreenSpace = () => titleWedge.ScreenSpaceDrawQuad.AABBFloat.Right,
                 },
                 modSpeedHotkeyHandler = new ModSpeedHotkeyHandler(),
-                new EzDisplayTagKeyboardHandler(),
             });
 
             LoadComponent(modSelectOverlay = CreateModSelectOverlay());
@@ -347,9 +348,10 @@ namespace osu.Game.Screens.Select
 
         // Colour scheme for mod overlay is left as default (green) to match mods button.
         // Not sure about this, but we'll iterate based on feedback.
-        protected virtual ModSelectOverlay CreateModSelectOverlay() => new UserModSelectOverlay
+        protected virtual ModSelectOverlay CreateModSelectOverlay() => new EzUserModSelectOverlay
         {
             ShowPresets = true,
+            RestoreController = modRestoreController,
         };
 
         private void requestRecommendedSelection(IEnumerable<GroupedBeatmap> groupedBeatmaps)
@@ -367,18 +369,12 @@ namespace osu.Game.Screens.Select
 
         public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons() => new ScreenFooterButton[]
         {
-            new FooterButtonMods(modSelectOverlay)
+            footerButtonMods = new FooterButtonMods(modSelectOverlay)
             {
                 Hotkey = GlobalAction.ToggleModSelection,
                 Mods = Mods,
                 Ruleset = Ruleset,
-                RequestDeselectAllMods = () =>
-                {
-                    if (modSelectOverlay.State.Value == Visibility.Visible)
-                        modSelectOverlay.DeselectAll();
-                    else
-                        Mods.Value = Array.Empty<Mod>();
-                }
+                RequestDeselectAllMods = () => modRestoreController.ClearOrRestore(Mods, modSelectOverlay),
             },
             new FooterButtonRandom
             {
@@ -438,6 +434,17 @@ namespace osu.Game.Screens.Select
                 ensureTrackLooping(Beatmap.Value, TrackChangeDirection.None);
                 ensurePlayingSelected();
             }, true);
+
+            OnLoadComplete += _ => addEzModFooterHelpers();
+        }
+
+        private void addEzModFooterHelpers()
+        {
+            footerButtonMods.Add(new EzModFooterAltHint());
+
+            var keyboardHandler = EzSongSelectKeyboardHandler.ForSongSelect(modRestoreController, Mods, modSelectOverlay);
+            keyboardHandler.Depth = float.MinValue;
+            AddInternal(keyboardHandler);
         }
 
         protected override void Update()
@@ -873,6 +880,7 @@ namespace osu.Game.Screens.Select
         private void onLeavingScreen()
         {
             EzDisplayTagAltHighlight.Reset();
+            modRestoreController.Reset();
 
             restoreBackground();
 

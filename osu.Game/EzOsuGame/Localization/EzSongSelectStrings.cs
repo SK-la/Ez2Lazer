@@ -65,5 +65,17 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SELECTION_EZ_ANALYSIS = new EzLocalizationManager.EzLocalisableString(
             "Ez分析",
             "EzAnalysis");
+
+        public static readonly LocalisableString RESTORE_MOD_SELECTION = new EzLocalizationManager.EzLocalisableString(
+            "恢复上一次选择",
+            "Restore previous selection");
+
+        public static readonly LocalisableString MOD_CLEAR_RESTORE_HINT = new EzLocalizationManager.EzLocalisableString(
+            "清空 / 恢复 Mod",
+            "Clear / restore mods");
+
+        public static readonly LocalisableString MOD_CLEAR_RESTORE_HINT_SUB = new EzLocalizationManager.EzLocalisableString(
+            "切换",
+            "Toggle");
     }
 }

@@ -6,7 +6,7 @@ using System;
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
-    /// 选歌界面 LAlt 按住时，由 <see cref="EzDisplayTagKeyboardHandler"/> 更新；各 <see cref="EzDisplayTag"/> 订阅以切换高亮。
+    /// 选歌界面 LAlt 按住时，由 <see cref="EzSongSelectKeyboardHandler"/> 更新；各 <see cref="EzDisplayTag"/> 订阅以切换高亮。
     /// </summary>
     internal static class EzDisplayTagAltHighlight
     {
