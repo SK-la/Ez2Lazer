@@ -17,6 +17,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Screens.Play;
 using osu.Game.Online;
 using osu.Game.Online.API;
@@ -259,6 +260,8 @@ namespace osu.Game.Screens.Play
 
         protected override void StartGameplay()
         {
+            EzOnlineScoreSubmissionPolicy.ApplySessionSettingsSnapshot(Score.ScoreInfo, ezConfig);
+
             base.StartGameplay();
 
             // User expectation is that last played should be updated when entering the gameplay loop
@@ -294,7 +297,11 @@ namespace osu.Game.Screens.Play
         public override bool OnExiting(ScreenExitEvent e)
         {
             bool exiting = base.OnExiting(e);
-            submitFromFailOrQuit(Score);
+
+            // Passed plays already submit in PrepareScoreForResultsAsync; avoid a second submitScore that reads post-results settings.
+            if (GameplayState.HasFailed || GameplayState.HasQuit)
+                submitFromFailOrQuit(Score);
+
             statics.SetValue(Static.LastLocalUserScore, Score?.ScoreInfo.DeepClone());
 
             // 生成延迟报告
@@ -343,32 +350,9 @@ namespace osu.Game.Screens.Play
                 return Task.CompletedTask;
             }
 
-            var accCutoffABindable = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA);
-            var accCutoffSBindable = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS);
-            bool hasDefaultCutoffValues = accCutoffABindable.IsDefault || accCutoffSBindable.IsDefault;
-            // 如果当前所选的 HitMode 不是 Lazer，则强制跳过上传成绩
-            var hitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-
-            if (Ruleset.Value.OnlineID == 3 && (hitMode != EzEnumHitMode.Lazer || !hasDefaultCutoffValues))
+            if (!EzOnlineScoreSubmissionPolicy.AllowsOfficialSubmission(score.ScoreInfo, out string blockReason))
             {
-                Logger.Log($"[EzMania]Score submission blocked by custom rating settings (HitMode={hitMode}, CutoffA={accCutoffABindable.Value:0.####}, CutoffS={accCutoffSBindable.Value:0.####})."
-                  , Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                return Task.CompletedTask;
-            }
-
-            // 如果任一 offsetPlus 设置非0，则禁止上传成绩以防止不公平的分数提交
-            var offsetManiaBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
-            var offsetNonStdBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
-
-            if (Ruleset.Value.OnlineID == 3 && !offsetManiaBindable.IsDefault)
-            {
-                Logger.Log("[EzMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                return Task.CompletedTask;
-            }
-
-            if (Ruleset.Value.OnlineID != 3 && !offsetNonStdBindable.IsDefault)
-            {
-                Logger.Log("[EzNoMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log($"[Ez] Score submission blocked by session snapshot ({blockReason}).", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return Task.CompletedTask;
             }
 

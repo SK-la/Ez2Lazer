@@ -243,6 +243,11 @@ namespace osu.Game.Scoring
 
             clone.ManiaHitMode = ManiaHitMode;
             clone.ManiaHealthMode = ManiaHealthMode;
+            clone.SessionOffsetPlusMania = SessionOffsetPlusMania;
+            clone.SessionOffsetPlusNonMania = SessionOffsetPlusNonMania;
+            clone.SessionAccuracyCutoffA = SessionAccuracyCutoffA;
+            clone.SessionAccuracyCutoffS = SessionAccuracyCutoffS;
+            clone.SessionSettingsCaptured = SessionSettingsCaptured;
 
             return clone;
         }
@@ -275,6 +280,36 @@ namespace osu.Game.Scoring
         /// Ez2Lazer: Mania health mode used when this score was set. <see cref="EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE"/> when unknown or not mania.
         /// </summary>
         public int ManiaHealthMode { get; set; } = EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE;
+
+        /// <summary>
+        /// Ez2Lazer: Mania offset-plus setting at gameplay start (submission eligibility snapshot).
+        /// </summary>
+        [Ignored]
+        public double SessionOffsetPlusMania { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: Non-mania offset-plus setting at gameplay start (submission eligibility snapshot).
+        /// </summary>
+        [Ignored]
+        public double SessionOffsetPlusNonMania { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: Accuracy cutoff A at gameplay start (submission eligibility snapshot).
+        /// </summary>
+        [Ignored]
+        public double SessionAccuracyCutoffA { get; set; } = EzOsuGame.Scoring.EzOnlineScoreSubmissionPolicy.DEFAULT_ACCURACY_CUTOFF_A;
+
+        /// <summary>
+        /// Ez2Lazer: Accuracy cutoff S at gameplay start (submission eligibility snapshot).
+        /// </summary>
+        [Ignored]
+        public double SessionAccuracyCutoffS { get; set; } = EzOsuGame.Scoring.EzOnlineScoreSubmissionPolicy.DEFAULT_ACCURACY_CUTOFF_S;
+
+        /// <summary>
+        /// Whether session offset/cutoff snapshots were captured at gameplay start.
+        /// </summary>
+        [Ignored]
+        public bool SessionSettingsCaptured { get; set; }
 
         private Dictionary<HitResult, int>? statistics;
 
