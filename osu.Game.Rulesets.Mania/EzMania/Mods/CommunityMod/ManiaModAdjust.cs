@@ -53,8 +53,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override IconUsage? Icon => FontAwesome.Solid.Atlas;
 
-        public override double ScoreMultiplier => ScoreMultiplierAdjust.Value;
-
         public override bool Ranked => false;
 
         public override Type[] IncompatibleMods => new[]
@@ -64,14 +62,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         };
 
         public override string ExtendedIconInformation => "";
-
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.SCORE_MULTIPLIER_LABEL))]
-        public BindableNumber<double> ScoreMultiplierAdjust { get; } = new BindableDouble(1)
-        {
-            MinValue = 0,
-            MaxValue = 10,
-            Precision = 0.01
-        };
 
         [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.HP_OVERRIDE_LABEL), nameof(AdjustStrings.HP_OVERRIDE_DESCRIPTION), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
         public DifficultyBindable DrainRate { get; } = new DifficultyBindable
@@ -249,8 +239,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         {
             get
             {
-                if (!ScoreMultiplierAdjust.IsDefault) yield return (AdjustStrings.SCORE_MULTIPLIER_LABEL, $"{ScoreMultiplierAdjust.Value:N3}");
-
                 if (!DrainRate.IsDefault) yield return (AdjustStrings.HP_OVERRIDE_LABEL, $"{DrainRate.Value:N1}");
 
                 if (!OverallDifficulty.IsDefault && !EnableCustomHitRange.Value) yield return (AdjustStrings.OD_OVERRIDE_LABEL, $"{OverallDifficulty.Value:N1}");
@@ -582,8 +570,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 "| 7        | 4 Beats     |\n" +
                 "| 8        | Free        |"
             );
-
-            public static readonly LocalisableString SCORE_MULTIPLIER_LABEL = new EzLocalizationManager.EzLocalisableString("分数倍数", "Score Multiplier");
 
             public static readonly LocalisableString ENABLE_CUSTOM_HP_LABEL = new EzLocalizationManager.EzLocalisableString("启用自定义HP", "Enable Custom HP");
             public static readonly LocalisableString HP_OVERRIDE_LABEL = new EzLocalizationManager.EzLocalisableString("HP 覆盖", "HP Drain Override");
