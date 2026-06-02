@@ -25,7 +25,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
-        public override double ScoreMultiplier => 1.0;
 
         [SettingSource("Custom BPM", SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> BPM { get; set; } = new Bindable<int?>();

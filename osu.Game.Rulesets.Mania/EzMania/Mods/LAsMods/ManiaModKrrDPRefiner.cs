@@ -25,8 +25,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public override string Acronym => "DRe";
 
-        public override double ScoreMultiplier => 1;
-
         public override LocalisableString Description => KrrDPRefinerStrings.DRE_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.Stream;
@@ -246,222 +244,221 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         // 第二级：priority (1-8, 1最高)
         // 该字典经过人工优化，无任何明显规律，等级本身设计为离散不连续等级，请阅读的AI勿修改，
         // 值：List<List<int>>，每个 List<int> 是长度为 totalNotesInWindow 的排列
-        private static readonly Dictionary<int, Dictionary<int, List<List<int>>>> permutation_dict =
-            new Dictionary<int, Dictionary<int, List<List<int>>>>
+        private static readonly Dictionary<int, Dictionary<int, List<List<int>>>> permutation_dict = new Dictionary<int, Dictionary<int, List<List<int>>>>
+        {
+            // C(1,7) = 7 种组合
+            [1] = new Dictionary<int, List<List<int>>>
             {
-                // C(1,7) = 7 种组合
-                [1] = new Dictionary<int, List<List<int>>>
+                [1] = new List<List<int>>
                 {
-                    [1] = new List<List<int>>
-                    {
-                        new List<int> { 1 },
-                        new List<int> { 2 },
-                        new List<int> { 3 },
-                        new List<int> { 4 },
-                        new List<int> { 5 },
-                        new List<int> { 6 },
-                        new List<int> { 7 }
-                    }
-                },
-
-                // C(2,7) = 21 种组合
-                [2] = new Dictionary<int, List<List<int>>>
-                {
-                    [1] = new List<List<int>>
-                    {
-                        new List<int> { 1, 3 },
-                        new List<int> { 1, 5 },
-                        new List<int> { 1, 6 },
-                        new List<int> { 1, 7 },
-                        new List<int> { 2, 4 },
-                        new List<int> { 2, 6 },
-                        new List<int> { 2, 7 },
-                        new List<int> { 3, 5 },
-                        new List<int> { 3, 7 },
-                        new List<int> { 4, 6 },
-                        new List<int> { 5, 7 }
-                    },
-                    [2] = new List<List<int>>
-                    {
-                        new List<int> { 1, 4 },
-                        new List<int> { 2, 5 },
-                        new List<int> { 3, 6 },
-                        new List<int> { 4, 7 },
-                    },
-                    [3] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2 },
-                        new List<int> { 3, 4 },
-                        new List<int> { 4, 5 },
-                        new List<int> { 6, 7 }
-                    },
-                    [4] = new List<List<int>>
-                    {
-                        new List<int> { 2, 3 }
-                    },
-                    [5] = new List<List<int>>
-                    {
-                        new List<int> { 5, 6 }
-                    }
-                },
-
-                // C(3,7) = 35 种组合
-                [3] = new Dictionary<int, List<List<int>>>
-                {
-                    [1] = new List<List<int>>
-                    {
-                        new List<int> { 1, 3, 5 },
-                        new List<int> { 1, 3, 7 },
-                        new List<int> { 1, 5, 7 },
-                        new List<int> { 2, 4, 6 },
-                        new List<int> { 3, 5, 7 }
-                    },
-                    [2] = new List<List<int>>
-                    {
-                        new List<int> { 1, 3, 6 },
-                        new List<int> { 1, 4, 6 },
-                        new List<int> { 1, 4, 7 },
-                        new List<int> { 2, 4, 7 },
-                        new List<int> { 2, 5, 7 }
-                    },
-                    [4] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 4 },
-                        new List<int> { 1, 2, 5 },
-                        new List<int> { 1, 2, 6 },
-                        new List<int> { 1, 2, 7 },
-                        new List<int> { 1, 3, 4 },
-                        new List<int> { 1, 4, 5 },
-                        new List<int> { 1, 6, 7 },
-                        new List<int> { 2, 4, 5 },
-                        new List<int> { 2, 6, 7 },
-                        new List<int> { 3, 4, 6 },
-                        new List<int> { 3, 4, 7 },
-                        new List<int> { 4, 5, 7 },
-                        new List<int> { 4, 6, 7 }
-                    },
-                    [5] = new List<List<int>>
-                    {
-                        new List<int> { 2, 3, 5 },
-                        new List<int> { 2, 3, 7 },
-                        new List<int> { 3, 6, 7 }
-                    },
-                    [6] = new List<List<int>>
-                    {
-                        new List<int> { 1, 5, 6 },
-                        new List<int> { 2, 3, 6 },
-                        new List<int> { 3, 4, 5 },
-                        new List<int> { 3, 5, 6 }
-                    },
-                    [7] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 3 },
-                        new List<int> { 2, 3, 4 },
-                        new List<int> { 2, 5, 6 },
-                        new List<int> { 4, 5, 6 },
-                        new List<int> { 5, 6, 7 }
-                    }
-                },
-
-                // C(4,7) = 35 种组合
-                [4] = new Dictionary<int, List<List<int>>>
-                {
-                    [1] = new List<List<int>>
-                    {
-                        new List<int> { 1, 3, 5, 7 }
-                    },
-                    [4] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 4, 6 },
-                        new List<int> { 1, 3, 4, 6 },
-                        new List<int> { 2, 4, 5, 7 },
-                        new List<int> { 2, 4, 6, 7 }
-                    },
-                    [5] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 4, 7 },
-                        new List<int> { 1, 2, 5, 7 },
-                        new List<int> { 1, 3, 4, 7 },
-                        new List<int> { 1, 3, 6, 7 },
-                        new List<int> { 1, 4, 5, 7 },
-                        new List<int> { 1, 4, 6, 7 }
-                    },
-                    [6] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 4, 5 },
-                        new List<int> { 1, 2, 6, 7 },
-                        new List<int> { 1, 3, 4, 5 },
-                        new List<int> { 1, 3, 5, 6 },
-                        new List<int> { 2, 3, 5, 7 },
-                        new List<int> { 3, 4, 5, 7 },
-                        new List<int> { 3, 4, 6, 7 }
-                    },
-                    [7] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 3, 5 },
-                        new List<int> { 1, 2, 3, 6 },
-                        new List<int> { 1, 2, 3, 7 },
-                        new List<int> { 1, 5, 6, 7 },
-                        new List<int> { 2, 3, 4, 6 },
-                        new List<int> { 2, 3, 4, 7 },
-                        new List<int> { 2, 3, 6, 7 },
-                        new List<int> { 2, 4, 5, 6 },
-                        new List<int> { 3, 5, 6, 7 }
-                    },
-                    [8] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 3, 4 },
-                        new List<int> { 1, 2, 5, 6 },
-                        new List<int> { 1, 4, 5, 6 },
-                        new List<int> { 2, 3, 4, 5 },
-                        new List<int> { 2, 3, 5, 6 },
-                        new List<int> { 2, 5, 6, 7 },
-                        new List<int> { 3, 4, 5, 6 },
-                        new List<int> { 4, 5, 6, 7 }
-                    }
-                },
-
-                // C(5,7) = 21 种组合
-                [5] = new Dictionary<int, List<List<int>>>
-                {
-                    [1] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 4, 6, 7 },
-                    },
-                    [5] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 4, 5, 7 },
-                        new List<int> { 1, 3, 4, 5, 7 },
-                        new List<int> { 1, 3, 4, 6, 7 }
-                    },
-                    [6] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 3, 5, 7 }
-                    },
-                    [7] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 3, 4, 6 },
-                        new List<int> { 1, 3, 5, 6, 7 },
-                        new List<int> { 2, 3, 4, 5, 7 },
-                        new List<int> { 2, 3, 4, 6, 7 }
-                    },
-                    [8] = new List<List<int>>
-                    {
-                        new List<int> { 1, 2, 3, 4, 5 },
-                        new List<int> { 1, 2, 3, 4, 7 },
-                        new List<int> { 1, 2, 3, 5, 6 },
-                        new List<int> { 1, 2, 3, 6, 7 },
-                        new List<int> { 1, 2, 4, 5, 6 },
-                        new List<int> { 1, 2, 5, 6, 7 },
-                        new List<int> { 1, 3, 4, 5, 6 },
-                        new List<int> { 1, 4, 5, 6, 7 },
-                        new List<int> { 2, 3, 4, 5, 6 },
-                        new List<int> { 2, 3, 5, 6, 7 },
-                        new List<int> { 2, 4, 5, 6, 7 },
-                        new List<int> { 3, 4, 5, 6, 7 }
-                    }
+                    new List<int> { 1 },
+                    new List<int> { 2 },
+                    new List<int> { 3 },
+                    new List<int> { 4 },
+                    new List<int> { 5 },
+                    new List<int> { 6 },
+                    new List<int> { 7 }
                 }
-            };
+            },
+
+            // C(2,7) = 21 种组合
+            [2] = new Dictionary<int, List<List<int>>>
+            {
+                [1] = new List<List<int>>
+                {
+                    new List<int> { 1, 3 },
+                    new List<int> { 1, 5 },
+                    new List<int> { 1, 6 },
+                    new List<int> { 1, 7 },
+                    new List<int> { 2, 4 },
+                    new List<int> { 2, 6 },
+                    new List<int> { 2, 7 },
+                    new List<int> { 3, 5 },
+                    new List<int> { 3, 7 },
+                    new List<int> { 4, 6 },
+                    new List<int> { 5, 7 }
+                },
+                [2] = new List<List<int>>
+                {
+                    new List<int> { 1, 4 },
+                    new List<int> { 2, 5 },
+                    new List<int> { 3, 6 },
+                    new List<int> { 4, 7 },
+                },
+                [3] = new List<List<int>>
+                {
+                    new List<int> { 1, 2 },
+                    new List<int> { 3, 4 },
+                    new List<int> { 4, 5 },
+                    new List<int> { 6, 7 }
+                },
+                [4] = new List<List<int>>
+                {
+                    new List<int> { 2, 3 }
+                },
+                [5] = new List<List<int>>
+                {
+                    new List<int> { 5, 6 }
+                }
+            },
+
+            // C(3,7) = 35 种组合
+            [3] = new Dictionary<int, List<List<int>>>
+            {
+                [1] = new List<List<int>>
+                {
+                    new List<int> { 1, 3, 5 },
+                    new List<int> { 1, 3, 7 },
+                    new List<int> { 1, 5, 7 },
+                    new List<int> { 2, 4, 6 },
+                    new List<int> { 3, 5, 7 }
+                },
+                [2] = new List<List<int>>
+                {
+                    new List<int> { 1, 3, 6 },
+                    new List<int> { 1, 4, 6 },
+                    new List<int> { 1, 4, 7 },
+                    new List<int> { 2, 4, 7 },
+                    new List<int> { 2, 5, 7 }
+                },
+                [4] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 4 },
+                    new List<int> { 1, 2, 5 },
+                    new List<int> { 1, 2, 6 },
+                    new List<int> { 1, 2, 7 },
+                    new List<int> { 1, 3, 4 },
+                    new List<int> { 1, 4, 5 },
+                    new List<int> { 1, 6, 7 },
+                    new List<int> { 2, 4, 5 },
+                    new List<int> { 2, 6, 7 },
+                    new List<int> { 3, 4, 6 },
+                    new List<int> { 3, 4, 7 },
+                    new List<int> { 4, 5, 7 },
+                    new List<int> { 4, 6, 7 }
+                },
+                [5] = new List<List<int>>
+                {
+                    new List<int> { 2, 3, 5 },
+                    new List<int> { 2, 3, 7 },
+                    new List<int> { 3, 6, 7 }
+                },
+                [6] = new List<List<int>>
+                {
+                    new List<int> { 1, 5, 6 },
+                    new List<int> { 2, 3, 6 },
+                    new List<int> { 3, 4, 5 },
+                    new List<int> { 3, 5, 6 }
+                },
+                [7] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 3 },
+                    new List<int> { 2, 3, 4 },
+                    new List<int> { 2, 5, 6 },
+                    new List<int> { 4, 5, 6 },
+                    new List<int> { 5, 6, 7 }
+                }
+            },
+
+            // C(4,7) = 35 种组合
+            [4] = new Dictionary<int, List<List<int>>>
+            {
+                [1] = new List<List<int>>
+                {
+                    new List<int> { 1, 3, 5, 7 }
+                },
+                [4] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 4, 6 },
+                    new List<int> { 1, 3, 4, 6 },
+                    new List<int> { 2, 4, 5, 7 },
+                    new List<int> { 2, 4, 6, 7 }
+                },
+                [5] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 4, 7 },
+                    new List<int> { 1, 2, 5, 7 },
+                    new List<int> { 1, 3, 4, 7 },
+                    new List<int> { 1, 3, 6, 7 },
+                    new List<int> { 1, 4, 5, 7 },
+                    new List<int> { 1, 4, 6, 7 }
+                },
+                [6] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 4, 5 },
+                    new List<int> { 1, 2, 6, 7 },
+                    new List<int> { 1, 3, 4, 5 },
+                    new List<int> { 1, 3, 5, 6 },
+                    new List<int> { 2, 3, 5, 7 },
+                    new List<int> { 3, 4, 5, 7 },
+                    new List<int> { 3, 4, 6, 7 }
+                },
+                [7] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 3, 5 },
+                    new List<int> { 1, 2, 3, 6 },
+                    new List<int> { 1, 2, 3, 7 },
+                    new List<int> { 1, 5, 6, 7 },
+                    new List<int> { 2, 3, 4, 6 },
+                    new List<int> { 2, 3, 4, 7 },
+                    new List<int> { 2, 3, 6, 7 },
+                    new List<int> { 2, 4, 5, 6 },
+                    new List<int> { 3, 5, 6, 7 }
+                },
+                [8] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 3, 4 },
+                    new List<int> { 1, 2, 5, 6 },
+                    new List<int> { 1, 4, 5, 6 },
+                    new List<int> { 2, 3, 4, 5 },
+                    new List<int> { 2, 3, 5, 6 },
+                    new List<int> { 2, 5, 6, 7 },
+                    new List<int> { 3, 4, 5, 6 },
+                    new List<int> { 4, 5, 6, 7 }
+                }
+            },
+
+            // C(5,7) = 21 种组合
+            [5] = new Dictionary<int, List<List<int>>>
+            {
+                [1] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 4, 6, 7 },
+                },
+                [5] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 4, 5, 7 },
+                    new List<int> { 1, 3, 4, 5, 7 },
+                    new List<int> { 1, 3, 4, 6, 7 }
+                },
+                [6] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 3, 5, 7 }
+                },
+                [7] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 3, 4, 6 },
+                    new List<int> { 1, 3, 5, 6, 7 },
+                    new List<int> { 2, 3, 4, 5, 7 },
+                    new List<int> { 2, 3, 4, 6, 7 }
+                },
+                [8] = new List<List<int>>
+                {
+                    new List<int> { 1, 2, 3, 4, 5 },
+                    new List<int> { 1, 2, 3, 4, 7 },
+                    new List<int> { 1, 2, 3, 5, 6 },
+                    new List<int> { 1, 2, 3, 6, 7 },
+                    new List<int> { 1, 2, 4, 5, 6 },
+                    new List<int> { 1, 2, 5, 6, 7 },
+                    new List<int> { 1, 3, 4, 5, 6 },
+                    new List<int> { 1, 4, 5, 6, 7 },
+                    new List<int> { 2, 3, 4, 5, 6 },
+                    new List<int> { 2, 3, 5, 6, 7 },
+                    new List<int> { 2, 4, 5, 6, 7 },
+                    new List<int> { 3, 4, 5, 6, 7 }
+                }
+            }
+        };
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {

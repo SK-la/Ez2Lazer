@@ -25,8 +25,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public override LocalisableString Description => KrrN2NcStrings.KRR_N2N_DESCRIPTION;
 
-        public override double ScoreMultiplier => 1;
-
         public override ModType Type => ModType.LA_Mod;
 
         public override bool Ranked => false;

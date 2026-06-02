@@ -29,8 +29,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override LocalisableString Description => "Convert 4k to 8k (Double 4k).";
 
-        public override double ScoreMultiplier => 1;
-
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;

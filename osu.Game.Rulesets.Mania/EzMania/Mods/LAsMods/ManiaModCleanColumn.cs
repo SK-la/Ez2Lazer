@@ -28,8 +28,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public override string Acronym => "CC";
 
-        public override double ScoreMultiplier => 1;
-
         public override LocalisableString Description => CleanColumnStrings.CLEAN_COLUMN_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.Backspace;
@@ -94,7 +92,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 if (DeletePColumn.Value) yield return (CleanColumnStrings.DELETE_P_COLUMN_LABEL, "On");
                 if (DeleteEColumn.Value) yield return (CleanColumnStrings.DELETE_E_COLUMN_LABEL, "On");
                 if (EnableCustomDelete.Value) yield return (CleanColumnStrings.ENABLE_CUSTOM_DELETE_LABEL, string.IsNullOrWhiteSpace(CustomDeleteColumn.Value) ? "Enabled" : CustomDeleteColumn.Value);
-                if (EnableCustomReorder.Value) yield return (CleanColumnStrings.ENABLE_CUSTOM_REORDER_LABEL, string.IsNullOrWhiteSpace(CustomReorderColumn.Value) ? "Enabled" : CustomReorderColumn.Value);
+                if (EnableCustomReorder.Value)
+                    yield return (CleanColumnStrings.ENABLE_CUSTOM_REORDER_LABEL, string.IsNullOrWhiteSpace(CustomReorderColumn.Value) ? "Enabled" : CustomReorderColumn.Value);
                 if (UseHealthCapReduction.Value) yield return (CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_LABEL, "On");
 
                 yield return (EzCommonModStrings.SEED_LABEL, Seed.Value?.ToString() ?? "Random");

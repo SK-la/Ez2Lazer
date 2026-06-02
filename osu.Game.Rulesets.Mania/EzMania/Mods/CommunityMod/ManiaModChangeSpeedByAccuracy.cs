@@ -3,13 +3,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Configuration;
-using System.Linq;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mods;
@@ -30,8 +30,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public override ModType Type => ModType.CommunityMod;
 
         public override IconUsage? Icon => FontAwesome.Solid.ChartLine;
-
-        public override double ScoreMultiplier => 1;
 
         public override bool Ranked => false;
 

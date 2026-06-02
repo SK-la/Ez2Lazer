@@ -23,8 +23,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override string Acronym => "SP";
 
-        public override double ScoreMultiplier => 1;
-
         public override LocalisableString Description => LNSimplifyStrings.LN_SIMPLIFY_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.YinYang;

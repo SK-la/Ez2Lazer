@@ -28,8 +28,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override LocalisableString Description => MalodyStyleLNStrings.MALODY_STYLE_LN_DESCRIPTION;
 
-        public override double ScoreMultiplier => 1;
-
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;

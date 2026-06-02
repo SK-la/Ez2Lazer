@@ -31,8 +31,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override string Acronym => "NtMA";
 
-        public override double ScoreMultiplier => 1;
-
         public override LocalisableString Description => NtoMAnotherStrings.NTOM_ANOTHER_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.CloudRain;

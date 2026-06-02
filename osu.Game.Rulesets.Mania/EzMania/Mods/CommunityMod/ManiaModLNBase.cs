@@ -20,8 +20,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override LocalisableString Description => LNStrings.LN_DESCRIPTION;
 
-        public override double ScoreMultiplier => 1;
-
         public override IconUsage? Icon => FontAwesome.Solid.YinYang;
 
         public override ModType Type => ModType.CommunityMod;

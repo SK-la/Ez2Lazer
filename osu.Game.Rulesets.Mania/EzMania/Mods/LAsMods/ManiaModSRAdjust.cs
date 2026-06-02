@@ -24,8 +24,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public override ModType Type => ModType.LA_Mod;
 
-        public override double ScoreMultiplier => 1;
-
         public override bool Ranked => false;
 
         [SettingSource(typeof(SRAdjustStrings), nameof(SRAdjustStrings.SR_ADJUST_RESCALE_THRESHOLD_LABEL), nameof(SRAdjustStrings.SR_ADJUST_RESCALE_THRESHOLD_DESCRIPTION),

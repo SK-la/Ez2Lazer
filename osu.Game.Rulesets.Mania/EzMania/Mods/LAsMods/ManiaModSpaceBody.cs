@@ -27,7 +27,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override string Name => "Space Body";
 
         public override string Acronym => "SB";
-        public override double ScoreMultiplier => 1;
 
         public override LocalisableString Description => SpaceBodyStrings.SPACE_BODY_DESCRIPTION;
 

@@ -29,8 +29,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override LocalisableString Description => ReleaseAdjustStrings.RELEASE_ADJUST_DESCRIPTION;
 
-        public override double ScoreMultiplier => 1;
-
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;

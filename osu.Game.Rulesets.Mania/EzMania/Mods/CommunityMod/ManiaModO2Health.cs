@@ -34,8 +34,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override LocalisableString Description => O2HealthStrings.O2_HEALTH_DESCRIPTION;
 
-        public override double ScoreMultiplier => 1.0;
-
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
             get

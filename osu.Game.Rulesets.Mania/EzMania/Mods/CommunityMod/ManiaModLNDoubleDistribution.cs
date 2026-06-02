@@ -24,8 +24,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override string Acronym => "DD";
 
-        public override double ScoreMultiplier => 1;
-
         public override LocalisableString Description => LNDoubleDistributionStrings.LN_DOUBLE_DISTRIBUTION_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.YinYang;

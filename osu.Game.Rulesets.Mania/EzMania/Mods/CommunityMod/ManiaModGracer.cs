@@ -29,8 +29,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override string Acronym => "GR";
 
-        public override double ScoreMultiplier => 1;
-
         public override IconUsage? Icon => FontAwesome.Solid.Star;
 
         public override bool Ranked => false;

@@ -23,7 +23,6 @@ namespace osu.Game.EzOsuGame.Mods
         public override string Acronym => "RC";
         public override LocalisableString Description => ReconcileStrings.RECONCILE_DESCRIPTION;
         public override ModType Type => ModType.LA_Mod;
-        public override double ScoreMultiplier => 1;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;

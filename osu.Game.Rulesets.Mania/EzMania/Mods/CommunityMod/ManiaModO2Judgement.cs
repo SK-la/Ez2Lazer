@@ -29,8 +29,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override LocalisableString Description => O2JudgementStrings.O2_JUDGEMENT_DESCRIPTION;
 
-        public override double ScoreMultiplier => 1.0;
-
         public override ModType Type => ModType.CommunityMod;
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription

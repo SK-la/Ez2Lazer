@@ -27,8 +27,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override LocalisableString Description => PlayfieldTransformationStrings.PLAYFIELD_TRANSFORMATION_DESCRIPTION;
 
-        public override double ScoreMultiplier => 1.0;
-
         public override ModType Type => ModType.CommunityMod;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;

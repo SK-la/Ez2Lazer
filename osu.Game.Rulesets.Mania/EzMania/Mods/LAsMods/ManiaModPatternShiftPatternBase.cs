@@ -47,8 +47,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public override string Acronym => PatternAcronym;
 
-        public override double ScoreMultiplier => 1;
-
         public override LocalisableString Description => PatternShiftStrings.PATTERN_SHIFT_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.Magic;

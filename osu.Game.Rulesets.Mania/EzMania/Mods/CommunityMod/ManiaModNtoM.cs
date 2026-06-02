@@ -26,8 +26,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override string Acronym => "NTM"; //Nk to Mk Letter
 
-        public override double ScoreMultiplier => 1;
-
         public override LocalisableString Description => NtoMStrings.NTOM_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.Moon;

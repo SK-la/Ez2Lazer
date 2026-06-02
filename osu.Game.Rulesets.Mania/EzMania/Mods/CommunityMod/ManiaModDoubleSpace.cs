@@ -23,8 +23,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override string Acronym => "DSp";
 
-        public override double ScoreMultiplier => 1.0;
-
         public override LocalisableString Description => DoubleSpaceStrings.DOUBLE_SPACE_DESCRIPTION;
 
         public override ModType Type => ModType.CommunityMod;
@@ -202,9 +200,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
     public static class DoubleSpaceStrings
     {
-        public static readonly LocalisableString DOUBLE_SPACE_DESCRIPTION =
-            new EzLocalizationManager.EzLocalisableString(
-                "将5K/7K/9K的特殊列一分为二，变成6K/8K/10K，用双拇指分担单拇指压力",
-                "Split the Special column of 5K/7K/9K into two, converting to 6K/8K/10K. Share the single-thumb pressure with both thumbs.");
+        public static readonly LocalisableString DOUBLE_SPACE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "将5K/7K/9K的特殊列一分为二，变成6K/8K/10K，用双拇指分担单拇指压力",
+            "Split the Special column of 5K/7K/9K into two, converting to 6K/8K/10K. Share the single-thumb pressure with both thumbs.");
     }
 }

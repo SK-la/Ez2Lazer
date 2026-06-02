@@ -57,7 +57,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public override string Name => "Krr Random Plus";
         public override string Acronym => "RP";
-        public override double ScoreMultiplier => 1.0;
         public override LocalisableString Description => KrrRandomPlusStrings.MOD_DESCRIPTION;
         public override IconUsage? Icon => FontAwesome.Solid.Random;
         public override ModType Type => ModType.LA_Mod;

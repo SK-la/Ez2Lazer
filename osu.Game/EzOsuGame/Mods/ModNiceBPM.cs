@@ -12,9 +12,9 @@ using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
@@ -36,8 +36,6 @@ namespace osu.Game.EzOsuGame.Mods
         public override LocalisableString Description => NiceBPMStrings.NICE_BPM_DESCRIPTION;
 
         public override ModType Type => ModType.LA_Mod;
-
-        public override double ScoreMultiplier => 1;
 
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;

@@ -31,8 +31,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override IconUsage? Icon => FontAwesome.Solid.Brain;
 
-        public override double ScoreMultiplier => 1;
-
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
@@ -383,7 +381,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
                         if (compare == 1)
                         {
-                            if (probability > 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
+                            if (probability > 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
                             {
                                 foreach (int column in columnWithNoNote)
                                 {
@@ -415,7 +413,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                         }
                         else if (compare == 2)
                         {
-                            if (probability > 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
+                            if (probability > 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
                             {
                                 foreach (int column in columnWithNoNote)
                                 {
@@ -431,7 +429,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                                     }
                                 }
                             }
-                            else if (probability < 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
+                            else if (probability < 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
                             {
                                 foreach (int column in columnWithNote)
                                 {
@@ -515,7 +513,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
                 if (compare == 1)
                 {
-                    if (probability > 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
+                    if (probability > 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNoNote)
                         {
@@ -531,7 +529,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                             }
                         }
                     }
-                    else if (probability < 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
+                    else if (probability < 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {
@@ -563,7 +561,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                             }
                         }
                     }
-                    else if (probability < 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
+                    else if (probability < 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {
@@ -656,7 +654,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                             }
                         }
                     }
-                    else if (probability < 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
+                    else if (probability < 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {
@@ -671,7 +669,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 }
                 else if (compare == 2)
                 {
-                    if (probability > 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
+                    if (probability > 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNoNote)
                         {
@@ -686,7 +684,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                             }
                         }
                     }
-                    else if (probability < 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
+                    else if (probability < 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {

@@ -33,7 +33,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override IconUsage? Icon => FontAwesome.Solid.Tools;
 
         public override bool Ranked => false;
-        public override double ScoreMultiplier => 1;
 
         [SettingSource(typeof(Ez2SettingsStrings), nameof(Ez2SettingsStrings.NO_SCRATCH_LABEL), nameof(Ez2SettingsStrings.NO_SCRATCH_DESCRIPTION))]
         public BindableBool NoScratch { get; } = new BindableBool();

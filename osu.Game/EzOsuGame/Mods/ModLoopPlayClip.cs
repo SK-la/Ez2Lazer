@@ -35,8 +35,6 @@ namespace osu.Game.EzOsuGame.Mods
         public override string Acronym => "LP";
         public override LocalisableString Description => LoopPlayClipStrings.LOOP_PLAY_CLIP_DESCRIPTION;
 
-        public override double ScoreMultiplier => 1;
-
         public override IconUsage? Icon => FontAwesome.Solid.ArrowCircleDown;
 
         public override ModType Type => ModType.LA_Mod;
@@ -407,8 +405,8 @@ namespace osu.Game.EzOsuGame.Mods
             }
             else
             {
-                cutTimeStart = CutTimeStart.Value.HasValue ? (Millisecond.Value ? CutTimeStart.Value.Value : CutTimeStart.Value.Value * 1000d) : double.NaN;
-                cutTimeEnd = CutTimeEnd.Value.HasValue ? (Millisecond.Value ? CutTimeEnd.Value.Value : CutTimeEnd.Value.Value * 1000d) : double.NaN;
+                cutTimeStart = CutTimeStart.Value.HasValue ? Millisecond.Value ? CutTimeStart.Value.Value : CutTimeStart.Value.Value * 1000d : double.NaN;
+                cutTimeEnd = CutTimeEnd.Value.HasValue ? Millisecond.Value ? CutTimeEnd.Value.Value : CutTimeEnd.Value.Value * 1000d : double.NaN;
             }
 
             var (minTime, maxTime) = beatmap.CalculatePlayableBounds();

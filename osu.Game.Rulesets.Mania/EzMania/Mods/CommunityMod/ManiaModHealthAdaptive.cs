@@ -36,8 +36,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override ModType Type => ModType.CommunityMod;
 
-        public override double ScoreMultiplier => 1;
-
         public override bool Ranked => false;
 
         public override bool ValidForMultiplayer => true;

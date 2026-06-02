@@ -19,7 +19,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override string Name => "Krr LN Converter";
         public override string Acronym => "KLN";
         public override LocalisableString Description => KrrLNStrings.KRR_LN_DESCRIPTION;
-        public override double ScoreMultiplier => 1;
         public override ModType Type => ModType.LA_Mod;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
