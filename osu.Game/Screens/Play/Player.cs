@@ -19,12 +19,14 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Framework.Threading;
+using osu.Framework.Input.Bindings;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.Graphics.Containers;
+using osu.Game.Input.Bindings;
 using osu.Game.IO.Archives;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
@@ -200,6 +202,9 @@ namespace osu.Game.Screens.Play
 
         [Resolved]
         private OsuGameBase game { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private RealmAccess realm { get; set; }
 
         public GameplayState GameplayState { get; private set; }
 
@@ -567,6 +572,9 @@ namespace osu.Game.Screens.Play
 
         private Drawable createOverlayComponents()
         {
+            bool allowGameplayKeySkip = GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.SkipWithGameplayKeys);
+            var gameplaySkipKeys = allowGameplayKeySkip ? buildGameplaySkipKeySet() : null;
+
             var container = new Container
             {
                 RelativeSizeAxes = Axes.Both,
@@ -602,10 +610,14 @@ namespace osu.Game.Screens.Play
                     SkipIntroOverlay = CreateSkipOverlay(DrawableRuleset.GameplayStartTime).With(o =>
                     {
                         o.RequestSkip = RequestIntroSkip;
+                        o.AllowGameplayKeySkip = allowGameplayKeySkip;
+                        o.AdditionalSkipKeys = gameplaySkipKeys;
                     }),
                     skipOutroOverlay = new SkipOverlay(GameplayState.Storyboard.LatestEventTime ?? 0)
                     {
                         RequestSkip = () => progressToResults(false),
+                        AllowGameplayKeySkip = allowGameplayKeySkip,
+                        AdditionalSkipKeys = gameplaySkipKeys,
                         Alpha = 0
                     },
                     DrawableRuleset.ResumeOverlay?.CreateProxy() ?? new Container(),
@@ -629,6 +641,39 @@ namespace osu.Game.Screens.Play
         }
 
         protected virtual SkipOverlay CreateSkipOverlay(double startTime) => new SkipOverlay(startTime);
+
+        private HashSet<InputKey> buildGameplaySkipKeySet()
+        {
+            var keys = new HashSet<InputKey>();
+
+            int variant = ruleset.GetVariantForBeatmap(Beatmap.Value.BeatmapInfo, GameplayState.Mods);
+            var defaultBindings = ruleset.GetDefaultKeyBindings(variant).ToList();
+            List<RealmKeyBinding> customBindings = null;
+
+            realm?.Run(r =>
+            {
+                customBindings = r.All<RealmKeyBinding>()
+                                  .Where(b => b.RulesetName == ruleset.ShortName && b.Variant == variant)
+                                  .ToList();
+            });
+
+            IEnumerable<IKeyBinding> effectiveBindings = customBindings?.Count > 0
+                ? customBindings
+                : defaultBindings;
+
+            foreach (var binding in effectiveBindings)
+            {
+                foreach (InputKey key in binding.KeyCombination.Keys)
+                {
+                    if (key == InputKey.None || !key.IsPhysical() || KeyCombination.IsModifierKey(key))
+                        continue;
+
+                    keys.Add(key);
+                }
+            }
+
+            return keys;
+        }
 
         private void onBreakTimeChanged(ValueChangedEvent<bool> isBreakTime)
         {

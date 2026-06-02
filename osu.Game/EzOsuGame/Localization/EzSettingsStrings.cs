@@ -172,6 +172,16 @@ namespace osu.Game.EzOsuGame.Localization
             "When enabled, 14k skins will skip the last column and load as 13k, for playing Ez2Ac arcade beatmaps."
             + "Note: This option must be enabled when there are note in the 14k last column, otherwise it will cause a crash when entering the beatmap!");
 
+        public static readonly LocalisableString SKIP_WITH_GAMEPLAY_KEYS = new EzLocalizationManager.EzLocalisableString(
+            "跳过可由游戏按键触发",
+            "Allow gameplay keys to trigger skip");
+
+        public static readonly LocalisableString SKIP_WITH_GAMEPLAY_KEYS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后，在可跳过阶段按下当前模式的游玩按键也会触发跳过。"
+            + "\n会读取你当前规则集与变体（如 mania 几 K）的实际键位设置。",
+            "When enabled, pressing gameplay keys for the current mode also triggers skip during skippable periods."
+            + "\nUses your current ruleset/variant key bindings (for example, mania key count bindings).");
+
         // public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS = new EzLocalizationManager.EzLocalisableString("跳过空边缘列", "Skip Empty Edge Columns");
         //
         // public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(

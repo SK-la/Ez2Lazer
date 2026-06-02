@@ -4,6 +4,7 @@
 #nullable disable
 
 using System;
+using System.Collections.Generic;
 using JetBrains.Annotations;
 using osu.Framework;
 using osu.Framework.Allocation;
@@ -18,6 +19,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Framework.Extensions;
 using osu.Framework.Utils;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
@@ -40,6 +42,16 @@ namespace osu.Game.Screens.Play
         private readonly double startTime;
 
         public Action RequestSkip;
+
+        /// <summary>
+        /// Whether additional gameplay keys may trigger skip.
+        /// </summary>
+        public bool AllowGameplayKeySkip { get; set; }
+
+        /// <summary>
+        /// Additional physical input keys that may trigger skip.
+        /// </summary>
+        public ISet<InputKey> AdditionalSkipKeys { get; set; }
 
         protected FadeContainer FadingContent { get; private set; }
 
@@ -223,6 +235,23 @@ namespace osu.Game.Screens.Play
 
         public void OnReleased(KeyBindingReleaseEvent<GlobalAction> e)
         {
+        }
+
+        protected override bool OnKeyDown(KeyDownEvent e)
+        {
+            if (AllowGameplayKeySkip && button.Enabled.Value && AdditionalSkipKeys != null)
+            {
+                InputKey pressed = KeyCombination.FromKey(e.Key);
+                InputKey? virtualKey = pressed.GetVirtualKey();
+
+                if (AdditionalSkipKeys.Contains(pressed) || (virtualKey.HasValue && AdditionalSkipKeys.Contains(virtualKey.Value)))
+                {
+                    button.TriggerClick();
+                    return true;
+                }
+            }
+
+            return base.OnKeyDown(e);
         }
 
         public partial class FadeContainer : Container, IStateful<Visibility>

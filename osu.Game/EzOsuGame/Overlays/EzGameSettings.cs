@@ -33,6 +33,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private Bindable<EzEnumJudgePrecedence> judgePrecedenceBindable = null!;
         private Bindable<double> offsetManiaBindable = null!;
         private Bindable<double> offsetNonManiaBindable = null!;
+        private Bindable<bool> skipWithGameplayKeysBindable = null!;
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
@@ -45,6 +46,7 @@ namespace osu.Game.EzOsuGame.Overlays
             judgePrecedenceBindable = ezConfig.GetBindable<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
             offsetManiaBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             offsetNonManiaBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
+            skipWithGameplayKeysBindable = ezConfig.GetBindable<bool>(Ez2Setting.SkipWithGameplayKeys);
 
             Children = new Drawable[]
             {
@@ -135,6 +137,15 @@ namespace osu.Game.EzOsuGame.Overlays
                     LabelFormat = v => $"{v:N0} ms",
                     TooltipFormat = BeatmapOffsetControl.GetOffsetExplanatoryText,
                 }),
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.SKIP_WITH_GAMEPLAY_KEYS,
+                    HintText = EzSettingsStrings.SKIP_WITH_GAMEPLAY_KEYS_TOOLTIP,
+                    Current = skipWithGameplayKeysBindable,
+                })
+                {
+                    Keywords = new[] { "skip", "gameplay", "key", "mania", "std" }
+                },
             };
 
             maniaHealthModeBindable.BindValueChanged(e =>
