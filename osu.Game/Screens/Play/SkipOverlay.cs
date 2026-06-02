@@ -239,7 +239,7 @@ namespace osu.Game.Screens.Play
 
         protected override bool OnKeyDown(KeyDownEvent e)
         {
-            if (AllowGameplayKeySkip && button.Enabled.Value && AdditionalSkipKeys != null)
+            if (AllowGameplayKeySkip && button.Enabled.Value && AdditionalSkipKeys != null && AdditionalSkipKeys.Count > 0)
             {
                 InputKey pressed = KeyCombination.FromKey(e.Key);
                 InputKey? virtualKey = pressed.GetVirtualKey();

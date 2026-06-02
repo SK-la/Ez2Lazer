@@ -26,7 +26,6 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.Graphics.Containers;
-using osu.Game.Input.Bindings;
 using osu.Game.IO.Archives;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
@@ -202,9 +201,6 @@ namespace osu.Game.Screens.Play
 
         [Resolved]
         private OsuGameBase game { get; set; }
-
-        [Resolved(CanBeNull = true)]
-        private RealmAccess realm { get; set; }
 
         public GameplayState GameplayState { get; private set; }
 
@@ -646,33 +642,29 @@ namespace osu.Game.Screens.Play
         {
             var keys = new HashSet<InputKey>();
 
-            int variant = ruleset.GetVariantForBeatmap(Beatmap.Value.BeatmapInfo, GameplayState.Mods);
-            var defaultBindings = ruleset.GetDefaultKeyBindings(variant).ToList();
-            List<RealmKeyBinding> customBindings = null;
-
-            realm?.Run(r =>
+            try
             {
-                customBindings = r.All<RealmKeyBinding>()
-                                  .Where(b => b.RulesetName == ruleset.ShortName && b.Variant == variant)
-                                  .ToList();
-            });
-
-            IEnumerable<IKeyBinding> effectiveBindings = customBindings?.Count > 0
-                ? customBindings
-                : defaultBindings;
-
-            foreach (var binding in effectiveBindings)
+                int variant = ruleset.GetVariantForBeatmap(Beatmap.Value.BeatmapInfo, GameplayState.Mods);
+                foreach (var binding in ruleset.GetDefaultKeyBindings(variant))
+                    appendBindingKeys(keys, binding);
+            }
+            catch (Exception ex)
             {
-                foreach (InputKey key in binding.KeyCombination.Keys)
-                {
-                    if (key == InputKey.None || !key.IsPhysical() || KeyCombination.IsModifierKey(key))
-                        continue;
-
-                    keys.Add(key);
-                }
+                Logger.Log($"[SkipOverlay] Failed to build gameplay skip key set, falling back to default skip hotkey only. {ex.Message}", level: LogLevel.Debug);
             }
 
             return keys;
+        }
+
+        private static void appendBindingKeys(HashSet<InputKey> keys, IKeyBinding binding)
+        {
+            foreach (InputKey key in binding.KeyCombination.Keys)
+            {
+                if (key == InputKey.None || !key.IsPhysical() || KeyCombination.IsModifierKey(key))
+                    continue;
+
+                keys.Add(key);
+            }
         }
 
         private void onBreakTimeChanged(ValueChangedEvent<bool> isBreakTime)
@@ -1503,23 +1495,26 @@ namespace osu.Game.Screens.Play
             var imported = scoreManager.Import(importableScore, replayReader);
             Debug.Assert(imported != null);
 
-            imported.PerformRead(s =>
+            if (imported != null)
             {
-                // because of the clone above, it's required that we copy back the post-import hash/ID to use for availability matching.
-                score.ScoreInfo.Hash = s.Hash;
-                score.ScoreInfo.ID = s.ID;
-                score.ScoreInfo.Files.AddRange(s.Files.Detach());
-                score.ScoreInfo.ManiaHitMode = s.ManiaHitMode;
-                score.ScoreInfo.ManiaHealthMode = s.ManiaHealthMode;
-            });
-
-            if (maniaHitMode >= 0 && maniaHealthMode >= 0)
-            {
-                imported.PerformWrite(s =>
+                imported.PerformRead(s =>
                 {
-                    s.ManiaHitMode = maniaHitMode;
-                    s.ManiaHealthMode = maniaHealthMode;
+                    // because of the clone above, it's required that we copy back the post-import hash/ID to use for availability matching.
+                    score.ScoreInfo.Hash = s.Hash;
+                    score.ScoreInfo.ID = s.ID;
+                    score.ScoreInfo.Files.AddRange(s.Files.Detach());
+                    score.ScoreInfo.ManiaHitMode = s.ManiaHitMode;
+                    score.ScoreInfo.ManiaHealthMode = s.ManiaHealthMode;
                 });
+
+                if (maniaHitMode >= 0 && maniaHealthMode >= 0)
+                {
+                    imported.PerformWrite(s =>
+                    {
+                        s.ManiaHitMode = maniaHitMode;
+                        s.ManiaHealthMode = maniaHealthMode;
+                    });
+                }
             }
 
             return Task.CompletedTask;
