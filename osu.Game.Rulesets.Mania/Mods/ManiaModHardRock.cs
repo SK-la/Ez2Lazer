@@ -3,10 +3,10 @@
 
 using System;
 using System.Linq;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.Mods
@@ -15,7 +15,6 @@ namespace osu.Game.Rulesets.Mania.Mods
     {
         public override Type[] IncompatibleMods => base.IncompatibleMods.Concat(new[] { typeof(ManiaModAdjust) }).ToArray();
 
-        public override double ScoreMultiplier => 1;
         public override bool Ranked => false;
 
         public const double HIT_WINDOW_DIFFICULTY_MULTIPLIER = 1.4;
