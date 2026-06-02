@@ -3,6 +3,7 @@
 
 using osu.Framework.Platform;
 using osu.Game.Database;
+using osu.Game.Rulesets.BMS.Localization;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
 {
@@ -50,11 +51,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             Action<ImportProgress>? reportProgress = null,
             CancellationToken cancellationToken = default)
         {
-            reportProgress?.Invoke(new ImportProgress(0, "正在索引 BMS 曲库..."));
+            reportProgress?.Invoke(new ImportProgress(0, BmsStrings.IMPORT_INDEXING.ToString()));
 
             await manager.ScanLibraryAsync(paths, cancellationToken).ConfigureAwait(false);
 
-            reportProgress?.Invoke(new ImportProgress(SCAN_PROGRESS_PORTION, "正在写入 osu 曲库..."));
+            reportProgress?.Invoke(new ImportProgress(SCAN_PROGRESS_PORTION, BmsStrings.IMPORT_WRITING_CATALOG.ToString()));
 
             await Task.Run(
                 () => BMSOsuLibrarySynchronizer.Synchronize(manager, storage, realm, bmsRulesetInfo),
@@ -63,7 +64,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             int songs = manager.LibraryCache?.Songs.Count ?? 0;
             int charts = manager.LibraryCache?.TotalCharts ?? 0;
 
-            reportProgress?.Invoke(new ImportProgress(1, $"完成: {songs} 首歌曲, {charts} 张谱面"));
+            reportProgress?.Invoke(new ImportProgress(1, BmsStrings.Import_Complete(songs, charts)));
 
             return new ImportResult(songs, charts);
         }

@@ -19,6 +19,7 @@ using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
+using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 using osu.Game.Rulesets.Mania;
@@ -92,22 +93,22 @@ namespace osu.Game.Rulesets.BMS.UI
             {
                 new SettingsButtonV2
                 {
-                    Text = "标准 BMS 选歌（Carousel）",
+                    Text = BmsStrings.SETTINGS_OPEN_CAROUSEL_SONG_SELECT,
                     Action = openStandardBmsSongSelect,
                 },
                 new SettingsButtonV2
                 {
-                    Text = "Raja 风格 BMS 选歌",
+                    Text = BmsStrings.SETTINGS_OPEN_RAJA_SONG_SELECT,
                     Action = openRajaBmsSongSelect,
                 },
                 new SettingsButtonV2
                 {
-                    Text = "构建 BMS 分析库",
+                    Text = BmsStrings.SETTINGS_BUILD_ANALYTICS_DATABASE,
                     Action = buildAnalyticsDatabase,
                 },
                 new SettingsButtonV2
                 {
-                    Text = "打开 BMS 曲库设置向导",
+                    Text = BmsStrings.SETTINGS_OPEN_PATH_WIZARD,
                     Action = selectPath,
                 },
                 new Container
@@ -160,28 +161,28 @@ namespace osu.Game.Rulesets.BMS.UI
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = "自动预加载 Key-sound",
+                    Caption = BmsStrings.SETTINGS_AUTO_PRELOAD_KEYSOUNDS,
                     Current = bmsConfig.GetBindable<bool>(BMSRulesetSetting.AutoPreloadKeysounds),
                 }),
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = "Key-sound 音量",
+                    Caption = BmsStrings.SETTINGS_KEY_SOUND_VOLUME,
                     Current = bmsConfig.GetBindable<double>(BMSRulesetSetting.KeysoundVolume),
                     KeyboardStep = 0.01f,
                     LabelFormat = v => $"{v:P0}",
                 }),
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = "DP-Stage 间距",
-                    HintText = "DP模式(10k+)，控制左右面板之间的间距。",
+                    Caption = BmsStrings.SETTINGS_DP_STAGE_SPACING,
+                    HintText = BmsStrings.SETTINGS_DP_STAGE_SPACING_HINT,
                     Current = bmsConfig.GetBindable<double>(BMSRulesetSetting.DpStageSpacing),
                     KeyboardStep = 1,
                     LabelFormat = v => $"{v:0}",
                 }),
                 new SettingsItemV2(new FormEnumDropdown<BMSGameplayRoute>
                 {
-                    Caption = "Gameplay 路由",
-                    HintText = "ManiaCompatibility：复用 Mania 渲染与判定（推荐）。BmsNative：使用 BMS 原生流水线（实验性）。",
+                    Caption = BmsStrings.SETTINGS_GAMEPLAY_ROUTE,
+                    HintText = BmsStrings.SETTINGS_GAMEPLAY_ROUTE_HINT,
                     Current = bmsConfig.GetBindable<BMSGameplayRoute>(BMSRulesetSetting.GameplayRoute),
                 }),
             };
@@ -206,12 +207,13 @@ namespace osu.Game.Rulesets.BMS.UI
             libraryPathsBindable.BindValueChanged(_ => updatePathDisplay(), true);
             legacyRootPathBindable.BindValueChanged(_ => updatePathDisplay());
 
-            speedNote.Current.Value = new SettingsNote.Data("BMS 复用 mania 设置及快捷键（含 LAlt 加速步进）。", SettingsNote.Type.Informational);
+            speedNote.Current.Value = new SettingsNote.Data(BmsStrings.SETTINGS_MANIA_SCROLL_NOTE, SettingsNote.Type.Informational);
 
             // Show initial cache status
             if (beatmapManager?.LibraryCache != null)
             {
-                cacheStatusNote.Current.Value = new SettingsNote.Data($"已缓存 {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面",
+                cacheStatusNote.Current.Value = new SettingsNote.Data(
+                    BmsStrings.Settings_CachedStatus(beatmapManager.LibraryCache.Songs.Count, beatmapManager.LibraryCache.TotalCharts),
                     SettingsNote.Type.Informational);
             }
         }
@@ -238,7 +240,7 @@ namespace osu.Game.Rulesets.BMS.UI
 
             if (runner == null)
             {
-                notificationOverlay?.Post(new SimpleErrorNotification { Text = "无法打开 BMS 选歌界面（未找到屏幕导航器）。" });
+                notificationOverlay?.Post(new SimpleErrorNotification { Text = BmsStrings.SETTINGS_CANNOT_OPEN_SONG_SELECT });
                 return;
             }
 
@@ -267,7 +269,7 @@ namespace osu.Game.Rulesets.BMS.UI
 
             if (runner == null)
             {
-                notificationOverlay?.Post(new SimpleErrorNotification { Text = "无法打开向导（未找到屏幕导航器）。" });
+                notificationOverlay?.Post(new SimpleErrorNotification { Text = BmsStrings.SETTINGS_CANNOT_OPEN_WIZARD });
                 return;
             }
 
@@ -295,17 +297,17 @@ namespace osu.Game.Rulesets.BMS.UI
             {
                 notificationOverlay?.Post(new SimpleErrorNotification
                 {
-                    Text = "请先在向导中添加至少一个有效的 BMS 文件夹路径"
+                    Text = BmsStrings.SETTINGS_ADD_VALID_PATH_FIRST,
                 });
                 return;
             }
 
-            cacheStatusNote.Current.Value = new SettingsNote.Data("正在扫描...", SettingsNote.Type.Informational);
+            cacheStatusNote.Current.Value = new SettingsNote.Data(BmsStrings.SETTINGS_SCANNING_NOTE, SettingsNote.Type.Informational);
 
             var notification = new ProgressNotification
             {
-                Text = "正在扫描 BMS 歌曲库...",
-                CompletionText = "BMS 歌曲库扫描完成!",
+                Text = BmsStrings.SETTINGS_SCANNING_LIBRARY,
+                CompletionText = BmsStrings.SETTINGS_SCAN_COMPLETE,
                 State = ProgressNotificationState.Active,
                 Progress = 0 // 初始化进度为 0,显示进度条而不是转圈
             };
@@ -340,7 +342,7 @@ namespace osu.Game.Rulesets.BMS.UI
                         notification.Progress = 1f;
                         notification.State = ProgressNotificationState.Completed;
                         cacheStatusNote.Current.Value = new SettingsNote.Data(
-                            $"扫描完成! {result.SongCount} 首歌曲, {result.ChartCount} 张谱面",
+                            BmsStrings.Settings_ScanCompleteStatus(result.SongCount, result.ChartCount),
                             SettingsNote.Type.Informational);
 
                         // 扫描完成后，为每个路径创建独立的收藏夹
@@ -352,7 +354,7 @@ namespace osu.Game.Rulesets.BMS.UI
                     Schedule(() =>
                     {
                         notification.State = ProgressNotificationState.Cancelled;
-                        cacheStatusNote.Current.Value = new SettingsNote.Data($"扫描失败: {ex.Message}", SettingsNote.Type.Critical);
+                        cacheStatusNote.Current.Value = new SettingsNote.Data(BmsStrings.Settings_ScanFailedStatus(ex.Message), SettingsNote.Type.Critical);
                     });
                 }
                 finally
@@ -406,7 +408,7 @@ namespace osu.Game.Rulesets.BMS.UI
                 if (string.IsNullOrEmpty(collectionName))
                     collectionName = Path.GetFileName(path); // 尝试再次获取
                 if (string.IsNullOrEmpty(collectionName))
-                    collectionName = "BMS Collection"; // 最后的默认值
+                    collectionName = BmsStrings.SETTINGS_DEFAULT_COLLECTION_NAME.ToString(); // 最后的默认值
 
                 // 检查名称是否已使用，如果已使用则追加序号
                 if (usedCollectionNames.TryGetValue(collectionName, out int value))
@@ -436,7 +438,7 @@ namespace osu.Game.Rulesets.BMS.UI
             {
                 notificationOverlay?.Post(new SimpleNotification
                 {
-                    Text = $"已为 {createdCount} 个路径创建收藏夹，共收藏 {totalCharts} 张谱面"
+                    Text = BmsStrings.Settings_CollectionsCreated(createdCount, totalCharts),
                 });
             }
         }

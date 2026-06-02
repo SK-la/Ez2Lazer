@@ -18,6 +18,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
+using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.BMS.Scoring.Lamp;
 using osu.Game.Rulesets.BMS.Scoring.Lamp.Persistence;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
@@ -130,7 +131,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                         Margin = new MarginPadding { Top = 78, Right = 20 },
                         Child = searchTextBox = new OsuTextBox
                         {
-                            PlaceholderText = "搜索曲目 (Enter)",
+                            PlaceholderText = BmsStrings.RAJA_SEARCH_PLACEHOLDER,
                             RelativeSizeAxes = Axes.Both,
                         },
                     },
@@ -218,9 +219,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         {
             return new[]
             {
-                new ScreenFooterButton { Text = "返回", Action = this.Exit },
-                new ScreenFooterButton { Text = "刷新曲库", Action = refreshLibrary },
-                new ScreenFooterButton { Text = "构建分析库", Action = buildAnalytics },
+                new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_BACK, Action = this.Exit },
+                new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_REFRESH_LIBRARY, Action = refreshLibrary },
+                new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_BUILD_ANALYTICS_SHORT, Action = buildAnalytics },
             };
         }
 
@@ -250,7 +251,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
             if (song == null)
             {
-                notifications?.Post(new SimpleNotification { Text = "请选择一个 BMS 谱面" });
+                notifications?.Post(new SimpleNotification { Text = BmsStrings.SONG_SELECT_SELECT_CHART_TO_PLAY });
                 return;
             }
 

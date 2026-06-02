@@ -8,6 +8,7 @@ using osu.Game.Database;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
@@ -26,13 +27,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             if (!beatmapManager.HasIndexedCharts)
             {
-                notifications?.Post(new SimpleNotification { Text = "BMS 曲库为空，请先扫描曲库" });
+                notifications?.Post(new SimpleNotification { Text = BmsStrings.ANALYTICS_LIBRARY_EMPTY });
                 return;
             }
 
             var notification = new ProgressNotification
             {
-                Text = "正在构建 BMS 分析库...",
+                Text = BmsStrings.ANALYTICS_BUILDING,
                 Progress = 0,
             };
 
@@ -64,9 +65,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                     scheduler.Add(() =>
                     {
                         notification.Progress = 1f;
-                        notification.Text = "BMS 分析库构建完成";
+                        notification.Text = BmsStrings.ANALYTICS_BUILD_COMPLETE;
                         notification.State = ProgressNotificationState.Completed;
-                        notification.CompletionText = "BMS 分析库构建完成";
+                        notification.CompletionText = BmsStrings.ANALYTICS_BUILD_COMPLETE;
                         onComplete?.Invoke();
                     });
                 }
@@ -80,7 +81,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                     {
                         Logger.Error(ex, "[BMS] analytics build failed");
                         notification.State = ProgressNotificationState.Cancelled;
-                        notifications?.Post(new SimpleNotification { Text = $"分析库构建失败：{ex.Message}" });
+                        notifications?.Post(new SimpleNotification { Text = BmsStrings.Analytics_BuildFailed(ex.Message) });
                     });
                 }
             }, cancellationToken);
@@ -102,7 +103,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 return;
 
             notification.State = ProgressNotificationState.Cancelled;
-            notification.Text = "BMS 分析已取消";
+            notification.Text = BmsStrings.ANALYTICS_CANCELLED;
         }
     }
 }

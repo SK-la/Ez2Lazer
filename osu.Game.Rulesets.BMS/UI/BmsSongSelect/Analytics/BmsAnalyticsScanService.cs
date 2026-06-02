@@ -5,6 +5,7 @@ using osu.Framework.Audio;
 using osu.Framework.Logging;
 using osu.Game.Database;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.BMS.Localization;
 
 namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
 {
@@ -45,7 +46,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
 
             int total = charts.Count;
 
-            report(progress, 0, total, "准备分析…");
+            report(progress, 0, total, BmsStrings.ANALYTICS_PREPARING.ToString());
 
             try
             {
@@ -56,7 +57,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                     var chart = charts[index];
                     int displayIndex = index + 1;
 
-                    report(progress, index, total, $"[{displayIndex}/{total}] 开始: {chart.Title}");
+                    report(progress, index, total, BmsStrings.Analytics_ChartStarted(displayIndex, total, chart.Title));
 
                     string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
                         ? BmsPathKeys.ComputeChartPathKey(chart.FullPath)
@@ -96,14 +97,14 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                         Logger.Log($"[BMS] Analytics scan failed for {chart.FullPath}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
                     }
 
-                    report(progress, displayIndex, total, $"[{displayIndex}/{total}] 完成: {chart.Title}");
+                    report(progress, displayIndex, total, BmsStrings.Analytics_ChartFinished(displayIndex, total, chart.Title));
                 }
 
-                report(progress, total, total, "分析完成");
+                report(progress, total, total, BmsStrings.ANALYTICS_COMPLETE.ToString());
             }
             catch (OperationCanceledException)
             {
-                report(progress, 0, total, "分析已取消");
+                report(progress, 0, total, BmsStrings.ANALYTICS_CANCELLED_SHORT.ToString());
                 throw;
             }
         }
@@ -118,7 +119,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                 if (cancellationToken.IsCancellationRequested)
                     return;
 
-                report(progress, completed, total, $"[{completed + 1}/{total}] 解析中: {title}");
+                report(progress, completed, total, BmsStrings.Analytics_ChartParsing(completed + 1, total, title));
             }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         }
 

@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Text.Json;
+using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering;
 
 namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
@@ -75,7 +76,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
         public BmsSameFolderBar(string folderPath)
         {
             folderCrc = BmsPathCrc.Compute(folderPath);
-            Title = "SAME FOLDER";
+            Title = BmsStrings.RAJA_SAME_FOLDER_FILTER_TITLE.ToString();
         }
 
         public override string Title { get; }

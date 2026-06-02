@@ -15,6 +15,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
+using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
@@ -88,14 +89,14 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                         {
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
-                            Text = "加载中...",
+                            Text = BmsStrings.LOADER_LOADING,
                             Font = OsuFont.GetFont(size: 32, weight: FontWeight.Bold),
                         },
                         statusText = new OsuSpriteText
                         {
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
-                            Text = "正在解析 BMS 文件...",
+                            Text = BmsStrings.LOADER_PARSING_BMS_FILE,
                             Font = OsuFont.GetFont(size: 18),
                             Colour = colours.Yellow,
                         },
@@ -127,14 +128,14 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             try
             {
-                statusText.Text = "正在解析谱面...";
+                statusText.Text = BmsStrings.LOADER_PARSING_BEATMAP;
 
                 // Force load the beatmap
                 var beatmap = workingBeatmap.Beatmap;
 
                 if (beatmap == null || beatmap.HitObjects.Count == 0)
                 {
-                    statusText.Text = "错误: 谱面加载失败或没有音符";
+                    statusText.Text = BmsStrings.LOADER_LOAD_FAILED;
                     loadingSpinner.Hide();
                     scheduleExit(2000);
                     return;
@@ -143,7 +144,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 // Update title display
                 var metadata = workingBeatmap.BeatmapInfo.Metadata;
                 titleText.Text = string.IsNullOrEmpty(metadata.Title) ? "BMS" : metadata.Title;
-                statusText.Text = $"加载完成! {beatmap.HitObjects.Count} 个音符";
+                statusText.Text = BmsStrings.Loader_LoadComplete(beatmap.HitObjects.Count);
 
                 // Small delay then push to player
                 scheduledPushPlayer = Scheduler.AddDelayed(() =>
@@ -158,7 +159,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             catch (Exception ex)
             {
                 Logger.Error(ex, "Failed to load BMS beatmap for play");
-                statusText.Text = $"加载失败: {ex.Message}";
+                statusText.Text = BmsStrings.Loader_LoadError(ex.Message);
                 loadingSpinner.Hide();
                 scheduleExit(3000);
             }
@@ -191,7 +192,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             catch (Exception ex)
             {
                 Logger.Error(ex, "Failed to push BMS player");
-                statusText.Text = $"启动游戏失败: {ex.Message}";
+                statusText.Text = BmsStrings.Loader_LaunchFailed(ex.Message);
                 scheduleExit(3000);
             }
         }

@@ -16,6 +16,7 @@ using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Rulesets.BMS.Configuration;
+using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Screens;
 using osuTK;
 
@@ -91,18 +92,18 @@ namespace osu.Game.Rulesets.BMS.UI
                                     {
                                         new TooltipTextFlowContainer
                                         {
-                                            Text = "BMS 曲库设置向导",
+                                            Text = BmsStrings.PATH_WIZARD_TITLE,
                                             TextAnchor = Anchor.TopCentre,
                                             RelativeSizeAxes = Axes.X,
                                             AutoSizeAxes = Axes.Y,
-                                            TooltipText = "BMS 曲库路径设置向导 - 用于配置 BMS 文件的扫描目录",
+                                            TooltipText = BmsStrings.PATH_WIZARD_TOOLTIP,
                                         },
                                         new TooltipTextFlowContainer
                                         {
-                                            Text = "先添加任意数量的文件夹路径。应用会立即保存并重建扫描，确定只关闭当前向导。",
+                                            Text = BmsStrings.PATH_WIZARD_INTRO,
                                             RelativeSizeAxes = Axes.X,
                                             AutoSizeAxes = Axes.Y,
-                                            TooltipText = "在此处选择包含 BMS 文件的文件夹，然后点击'添加当前路径'按钮将其添加到曲库列表中。您可以添加多个文件夹，每个文件夹都会被扫描以查找 BMS 文件。",
+                                            TooltipText = BmsStrings.PATH_WIZARD_INTRO_TOOLTIP,
                                         }
                                     }
                                 }
@@ -146,13 +147,13 @@ namespace osu.Game.Rulesets.BMS.UI
                                                             new RoundedButton
                                                             {
                                                                 Width = 180,
-                                                                Text = "添加当前路径",
+                                                                Text = BmsStrings.PATH_WIZARD_ADD_CURRENT_PATH,
                                                                 Action = addSelectedPath,
                                                             },
                                                             new RoundedButton
                                                             {
                                                                 Width = 140,
-                                                                Text = "清空列表",
+                                                                Text = BmsStrings.PATH_WIZARD_CLEAR_LIST,
                                                                 Action = () =>
                                                                 {
                                                                     stagedPaths.Clear();
@@ -163,7 +164,7 @@ namespace osu.Game.Rulesets.BMS.UI
                                                     },
                                                     new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 16))
                                                     {
-                                                        Text = "已添加的路径",
+                                                        Text = BmsStrings.PATH_WIZARD_ADDED_PATHS_HEADER,
                                                         RelativeSizeAxes = Axes.X,
                                                         AutoSizeAxes = Axes.Y,
                                                     },
@@ -198,13 +199,13 @@ namespace osu.Game.Rulesets.BMS.UI
                                         new RoundedButton
                                         {
                                             Width = 200,
-                                            Text = "确定",
+                                            Text = BmsStrings.PATH_WIZARD_CONFIRM,
                                             Action = this.Exit,
                                         },
                                         new RoundedButton
                                         {
                                             Width = 200,
-                                            Text = "应用",
+                                            Text = BmsStrings.PATH_WIZARD_APPLY,
                                             Action = applyPaths,
                                         },
                                     }
@@ -247,7 +248,7 @@ namespace osu.Game.Rulesets.BMS.UI
             {
                 pathList.Add(new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 14))
                 {
-                    Text = "暂未添加路径。",
+                    Text = BmsStrings.PATH_WIZARD_NO_PATHS_YET,
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
                 });
@@ -296,7 +297,7 @@ namespace osu.Game.Rulesets.BMS.UI
                                         Height = 24,
                                         Anchor = Anchor.CentreRight,
                                         Origin = Anchor.CentreRight,
-                                        Text = "移除",
+                                        Text = BmsStrings.PATH_WIZARD_REMOVE,
                                         Action = () => requestRemovePath(path),
                                     },
                                 },
@@ -320,8 +321,8 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             public RemovePathDialog(string path, Action onConfirm)
             {
-                HeaderText = "移除曲库路径";
-                BodyText = $"该操作将从列表移除以下路径：{Environment.NewLine}{path}";
+                HeaderText = BmsStrings.PATH_WIZARD_REMOVE_DIALOG_HEADER;
+                BodyText = BmsStrings.PathWizard_RemoveDialogBody(path);
                 DangerousAction = onConfirm;
             }
         }

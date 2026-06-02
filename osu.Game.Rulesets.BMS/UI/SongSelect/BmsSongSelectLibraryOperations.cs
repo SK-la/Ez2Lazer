@@ -8,6 +8,7 @@ using osu.Game.Database;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.BMS.Localization;
 
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
 {
@@ -24,13 +25,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             if (beatmapManager.RootPaths.Count == 0)
             {
-                notifications?.Post(new SimpleNotification { Text = "请先在 BMS 设置中添加曲库路径" });
+                notifications?.Post(new SimpleNotification { Text = BmsStrings.SONG_SELECT_ADD_LIBRARY_PATH_FIRST });
                 return;
             }
 
             var notification = new ProgressNotification
             {
-                Text = "正在扫描 BMS 曲库...",
+                Text = BmsStrings.SONG_SELECT_SCANNING_LIBRARY,
                 Progress = 0,
             };
 
@@ -65,7 +66,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                     {
                         Logger.Error(ex, "[BMS] library import failed");
                         notification.State = ProgressNotificationState.Cancelled;
-                        notifications?.Post(new SimpleNotification { Text = $"刷新失败：{ex.Message}" });
+                        notifications?.Post(new SimpleNotification { Text = BmsStrings.SongSelect_RefreshFailed(ex.Message) });
                     });
                 }
             });

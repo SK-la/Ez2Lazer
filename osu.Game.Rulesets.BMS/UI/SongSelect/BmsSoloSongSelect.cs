@@ -16,6 +16,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
+using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.BMS.Scoring.Lamp;
 using osu.Game.Rulesets.BMS.Scoring.Lamp.Persistence;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
@@ -216,7 +217,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             {
                 notifications?.Post(new SimpleNotification
                 {
-                    Text = "BMS 曲库索引为空，请在设置中添加路径或点「刷新曲库」扫描",
+                    Text = BmsStrings.SONG_SELECT_EMPTY_INDEX,
                     Icon = FontAwesome.Solid.InfoCircle,
                 });
             }
@@ -274,7 +275,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             {
                 notifications?.Post(new SimpleNotification
                 {
-                    Text = "请先选择一个 BMS 谱面",
+                    Text = BmsStrings.SONG_SELECT_SELECT_CHART_FIRST,
                     Icon = FontAwesome.Solid.ExclamationTriangle,
                 });
                 return;
@@ -295,7 +296,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             buttons.Add(new ScreenFooterButton
             {
-                Text = "刷新曲库",
+                Text = BmsStrings.SONG_SELECT_REFRESH_LIBRARY,
                 Icon = FontAwesome.Solid.SyncAlt,
                 Action = refreshLibrary,
             });
@@ -370,7 +371,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             {
                 notifications?.Post(new SimpleNotification
                 {
-                    Text = "请先在 BMS 设置中添加曲库路径",
+                    Text = BmsStrings.SONG_SELECT_ADD_LIBRARY_PATH_FIRST,
                     Icon = FontAwesome.Solid.ExclamationTriangle,
                 });
                 return;
@@ -378,7 +379,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             var notification = new ProgressNotification
             {
-                Text = "正在扫描 BMS 曲库...",
+                Text = BmsStrings.SONG_SELECT_SCANNING_LIBRARY,
                 Progress = 0,
             };
 
@@ -423,7 +424,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                         notification.State = ProgressNotificationState.Cancelled;
                         notifications?.Post(new SimpleNotification
                         {
-                            Text = $"刷新失败：{ex.Message}",
+                            Text = BmsStrings.SongSelect_RefreshFailed(ex.Message),
                             Icon = FontAwesome.Solid.ExclamationTriangle,
                         });
                     });
