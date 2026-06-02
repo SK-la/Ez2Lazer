@@ -202,7 +202,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ExperimentalLocalAccount, false);
 
             SetDefault(Ez2Setting.EzJudgmentDiagEnabled, false);
-            SetDefault(Ez2Setting.EzSubFrameCorrectionEnabled, true);
+            SetDefault(Ez2Setting.EzSubFrameCorrectionEnabled, false);
             SetDefault(Ez2Setting.EzTimingTraceEnabled, false);
 
             #endregion
