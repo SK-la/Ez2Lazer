@@ -10,6 +10,7 @@ using osu.Game.Database;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Screens;
 
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
@@ -33,7 +34,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             {
                 notifications?.Post(new SimpleNotification
                 {
-                    Text = "未能定位 BMS 源文件，请刷新曲库",
+                    Text = BmsStrings.SONG_SELECT_SOURCE_FILE_NOT_FOUND,
                 });
                 return false;
             }
@@ -55,7 +56,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             catch (Exception ex)
             {
                 Logger.Error(ex, "Failed to launch BMS gameplay");
-                notifications?.Post(new SimpleNotification { Text = $"加载谱面失败：{ex.Message}" });
+                notifications?.Post(new SimpleNotification { Text = BmsStrings.SongSelect_LoadBeatmapFailed(ex.Message) });
                 return false;
             }
         }
@@ -71,7 +72,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             if (!TryResolveSource(beatmapManager, beatmapInfo, out string chartPath, out BMSChartCache? chartCache))
             {
-                notifications?.Post(new SimpleNotification { Text = "未能定位 BMS 源文件，请刷新曲库" });
+                notifications?.Post(new SimpleNotification { Text = BmsStrings.SONG_SELECT_SOURCE_FILE_NOT_FOUND });
                 return false;
             }
 

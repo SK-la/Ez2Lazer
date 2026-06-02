@@ -9,6 +9,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BMS.Beatmaps.Persistence;
+using osu.Game.Rulesets.BMS.Localization;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
 {
@@ -99,7 +100,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 else if (!string.IsNullOrEmpty(LibraryCache.RootPath))
                     SetRootPaths(new[] { LibraryCache.RootPath });
 
-                StatusMessage.Value = $"已加载 {LibraryCache.Songs.Count} 首歌曲, {LibraryCache.TotalCharts} 张谱面";
+                StatusMessage.Value = BmsStrings.Scan_LoadedFromIndex(LibraryCache.Songs.Count, LibraryCache.TotalCharts);
 
                 if (LibraryCache.TotalCharts > 0)
                     realmSyncRequired = true;
@@ -145,7 +146,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             IsScanning.Value = true;
             ScanProgress.Value = 0;
-            StatusMessage.Value = "正在扫描文件夹...";
+            StatusMessage.Value = BmsStrings.SCAN_SCANNING_FOLDERS.ToString();
 
             try
             {
@@ -154,7 +155,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                 if (existingPaths.Count == 0)
                 {
-                    StatusMessage.Value = "错误: 没有可用的路径";
+                    StatusMessage.Value = BmsStrings.SCAN_NO_VALID_PATHS.ToString();
                     return;
                 }
 
@@ -162,11 +163,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                 if (bmsFiles.Count == 0)
                 {
-                    StatusMessage.Value = "未找到 BMS 文件";
+                    StatusMessage.Value = BmsStrings.SCAN_NO_BMS_FILES.ToString();
                     return;
                 }
 
-                StatusMessage.Value = $"找到 {bmsFiles.Count} 个 BMS 文件，正在解析...";
+                StatusMessage.Value = BmsStrings.Scan_FoundFiles(bmsFiles.Count);
 
                 var folderGroups = bmsFiles
                                    .GroupBy(f => Path.GetDirectoryName(f) ?? string.Empty)
@@ -227,7 +228,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                             lock (progressLock)
                             {
                                 ScanProgress.Value = (double)done / totalFolders;
-                                StatusMessage.Value = $"正在解析... {done}/{totalFolders} 文件夹";
+                                StatusMessage.Value = BmsStrings.Scan_ParsingFolders(done, totalFolders);
                             }
                         });
                 }, token).ConfigureAwait(false);
@@ -239,16 +240,16 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 rebuildSourceMapFromIndex();
                 realmSyncRequired = true;
 
-                StatusMessage.Value = $"扫描完成: {LibraryCache.Songs.Count} 首歌曲, {LibraryCache.TotalCharts} 张谱面";
+                StatusMessage.Value = BmsStrings.Scan_Complete(LibraryCache.Songs.Count, LibraryCache.TotalCharts);
             }
             catch (OperationCanceledException)
             {
-                StatusMessage.Value = "扫描已取消";
+                StatusMessage.Value = BmsStrings.SCAN_CANCELLED.ToString();
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "BMS library scan failed");
-                StatusMessage.Value = $"扫描错误: {ex.Message}";
+                StatusMessage.Value = BmsStrings.Scan_Error(ex.Message);
             }
             finally
             {

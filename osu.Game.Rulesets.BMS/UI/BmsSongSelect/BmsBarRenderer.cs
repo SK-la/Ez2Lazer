@@ -8,6 +8,7 @@ using osu.Framework.Input.Events;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars;
 using osuTK;
@@ -56,7 +57,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                             breadcrumbText = new OsuSpriteText
                             {
                                 Font = OsuFont.GetFont(size: 18, weight: FontWeight.Bold),
-                                Text = "ROOT",
+                                Text = BmsStrings.RAJA_ROOT_LABEL,
                             },
                             statusText = new OsuSpriteText
                             {
@@ -72,7 +73,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                                 Y = -4,
                                 Font = OsuFont.Default.With(size: 12),
                                 Colour = Colour4.Gray,
-                                Text = "↑↓ 移动 | Enter 进入/开始 | Esc/← 返回 | 1=KEY 2=排序 8=同文件夹",
+                                Text = BmsStrings.RAJA_KEY_HINTS,
                             },
                         },
                     },
@@ -131,18 +132,18 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                                             new OsuSpriteText
                                             {
                                                 Font = OsuFont.GetFont(size: 14, weight: FontWeight.Bold),
-                                                Text = "选中项详情",
+                                                Text = BmsStrings.RAJA_SELECTION_DETAIL,
                                             },
                                             detailTitle = new OsuSpriteText
                                             {
                                                 Font = OsuFont.GetFont(size: 16, weight: FontWeight.Bold),
-                                                Text = "—",
+                                                Text = BmsStrings.RAJA_PLACEHOLDER_DASH,
                                             },
                                             detailBody = new OsuSpriteText
                                             {
                                                 Font = OsuFont.Default.With(size: 13),
                                                 Colour = Colour4.LightGray,
-                                                Text = "选择曲目以预览分析数据",
+                                                Text = BmsStrings.RAJA_SELECT_CHART_FOR_ANALYTICS,
                                             },
                                         },
                                     },
@@ -164,7 +165,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
             if (manager.CurrentBars.Count == 0)
             {
-                listFlow.Add(new OsuSpriteText { Text = "(空)", Font = OsuFont.Default });
+                listFlow.Add(new OsuSpriteText { Text = BmsStrings.RAJA_EMPTY_LIST, Font = OsuFont.Default });
                 updateDetail(null);
                 return;
             }
@@ -192,7 +193,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         {
             if (bar == null)
             {
-                detailTitle.Text = "—";
+                detailTitle.Text = BmsStrings.RAJA_PLACEHOLDER_DASH;
                 detailBody.Text = string.Empty;
                 return;
             }
@@ -202,20 +203,28 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             if (bar is BmsSongBar song)
             {
                 var c = song.Chart;
-                string analyticsLine = "分析: —";
+                string analyticsLine = BmsStrings.RAJA_ANALYTICS_NONE.ToString();
+
                 if (context.Analytics.TryGet(song.PathKey, out BmsAnalyticsRecord record))
-                    analyticsLine = $"PP {record.Pp:0.#} | xxySR {record.XxySr:0.##} | KPS {record.AvgKps:0.#}/{record.MaxKps:0.#} | ★ {record.StarRating:0.##}";
+                {
+                    analyticsLine = BmsStrings.Raja_DetailAnalytics(
+                        record.Pp ?? 0,
+                        record.XxySr ?? 0,
+                        record.AvgKps ?? 0,
+                        record.MaxKps ?? 0,
+                        record.StarRating ?? 0);
+                }
 
                 detailBody.Text = string.Join("\n",
-                    $"艺术家: {c.Artist}",
-                    $"等级: Lv.{c.PlayLevel} | {c.KeyCount}K | {c.FileName}",
-                    $"BPM: {c.Bpm:0.#} | 音符: {c.TotalNotes}",
-                    $"路径: {c.FolderPath}",
+                    BmsStrings.Raja_DetailArtist(c.Artist),
+                    BmsStrings.Raja_DetailLevel(c.PlayLevel, c.KeyCount, c.FileName),
+                    BmsStrings.Raja_DetailBpm(c.Bpm, c.TotalNotes),
+                    BmsStrings.Raja_DetailPath(c.FolderPath),
                     analyticsLine);
             }
             else if (bar is BmsDirectoryBar)
             {
-                detailBody.Text = "目录 — 按 Enter 进入";
+                detailBody.Text = BmsStrings.RAJA_DIRECTORY_ENTER_HINT;
             }
             else
             {
@@ -254,9 +263,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         private string formatAnalytics(BmsSongBar song)
         {
             if (!context.Analytics.TryGet(song.PathKey, out BmsAnalyticsRecord record))
-                return "—";
+                return BmsStrings.RAJA_PLACEHOLDER_DASH.ToString();
 
-            return $"PP{record.Pp:0.#} SR{record.XxySr:0.##} KPS{record.AvgKps:0.#}";
+            return BmsStrings.Raja_RowAnalyticsSuffix(record.Pp ?? 0, record.XxySr ?? 0, record.AvgKps ?? 0);
         }
 
         protected override bool OnKeyDown(KeyDownEvent e)
