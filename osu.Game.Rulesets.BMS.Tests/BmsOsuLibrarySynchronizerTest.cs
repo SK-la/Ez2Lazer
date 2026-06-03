@@ -72,6 +72,34 @@ namespace osu.Game.Rulesets.BMS.Tests
         }
 
         [Test]
+        public void TestPersistedSongSelectBaseline_roundtrip_preserves_analytics_fields()
+        {
+            var ruleset = new RulesetInfo { ShortName = "bms", Name = "BMS" };
+            Guid beatmapId = Guid.NewGuid();
+            string chartPath = Path.Combine(content_root, "chart.bms");
+
+            var existingSet = buildSyncedSet(ruleset, beatmapId, chartPath, relativeFilename: "chart.bms");
+            var beatmap = existingSet.Beatmaps[0];
+            beatmap.StarRating = 4.56;
+            beatmap.XxyStarRating = 6.21;
+            beatmap.PerformancePoints = 123.45;
+
+            var preserved = BMSOsuLibrarySynchronizer.CapturePersistedSongSelectBaselineForTesting(existingSet);
+
+            var reimported = new BeatmapInfo(ruleset, new BeatmapDifficulty(), new BeatmapMetadata())
+            {
+                ID = beatmapId,
+                BeatmapSet = existingSet,
+            };
+
+            BMSOsuLibrarySynchronizer.ApplyPersistedSongSelectBaselineForTesting(reimported, preserved);
+
+            Assert.That(reimported.StarRating, Is.EqualTo(4.56).Within(0.001));
+            Assert.That(reimported.XxyStarRating, Is.EqualTo(6.21).Within(0.001));
+            Assert.That(reimported.PerformancePoints, Is.EqualTo(123.45).Within(0.001));
+        }
+
+        [Test]
         public void TestSetMatches_false_when_hash_is_legacy_prefix()
         {
             var ruleset = new RulesetInfo { ShortName = "bms", Name = "BMS" };

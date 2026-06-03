@@ -26,7 +26,13 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                     var beatmap = r.Find<BeatmapInfo>(beatmapId);
 
                     if (beatmap == null)
+                    {
+                        Logger.Log(
+                            $"[BMS] Realm analytics writeback skipped: beatmap {beatmapId} not in catalog (chart={chart.FullPath}). Sync library to Realm before building analytics.",
+                            LoggingTarget.Database,
+                            LogLevel.Debug);
                         return;
+                    }
 
                     if (result.StarRating is double star && star >= 0)
                         beatmap.StarRating = star;

@@ -5,6 +5,7 @@ using osu.Framework.Audio;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BMS.Beatmaps;
@@ -22,6 +23,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             AudioManager audioManager,
             RealmAccess realm,
             INotificationOverlay? notifications,
+            EzAnalysisDatabase? analysisDatabase = null,
             Action? onComplete = null,
             CancellationToken cancellationToken = default)
         {
@@ -54,7 +56,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                         audioManager,
                         progress,
                         token,
-                        realm).ConfigureAwait(false);
+                        realm,
+                        analysisDatabase).ConfigureAwait(false);
 
                     if (token.IsCancellationRequested)
                     {
