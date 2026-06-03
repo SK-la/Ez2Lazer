@@ -9,7 +9,6 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.Overlays
@@ -45,8 +44,9 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
-                    Direction = FillDirection.Horizontal,
-                    Padding = SettingsPanel.CONTENT_PADDING,
+                    Direction = FillDirection.Vertical,
+                    // Padding = SettingsPanel.CONTENT_PADDING,
+                    Margin = new MarginPadding { Top = 10, Bottom = 10, Left = 10 },
                     Children = new Drawable[]
                     {
                         new SettingsButton
