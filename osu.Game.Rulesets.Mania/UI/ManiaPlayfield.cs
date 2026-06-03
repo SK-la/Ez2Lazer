@@ -25,6 +25,8 @@ namespace osu.Game.Rulesets.Mania.UI
         public IReadOnlyList<Stage> Stages => stages;
 
         private readonly List<Stage> stages = new List<Stage>();
+        private readonly GridContainer playfieldGrid;
+        private readonly Container stageSpacingCell = new Container { Name = "Stage spacing" };
 
         public override Quad SkinnableComponentScreenSpaceDrawQuad
         {
@@ -60,7 +62,6 @@ namespace osu.Game.Rulesets.Mania.UI
             if (stageDefinitions.Count <= 0)
                 throw new ArgumentException("Can't have zero or fewer stages.");
 
-            GridContainer playfieldGrid;
             AddInternal(playfieldGrid = new GridContainer
             {
                 RelativeSizeAxes = Axes.Both,
@@ -176,6 +177,30 @@ namespace osu.Game.Rulesets.Mania.UI
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Sets the horizontal gap between dual stages.
+        /// </summary>
+        public void SetStageSpacing(float spacing)
+        {
+            if (stages.Count != 2)
+                return;
+
+            if (spacing <= 0)
+            {
+                playfieldGrid.ColumnDimensions = Array.Empty<Dimension>();
+                playfieldGrid.Content = new[] { new Drawable[] { stages[0], stages[1] } };
+                return;
+            }
+
+            playfieldGrid.ColumnDimensions = new[]
+            {
+                new Dimension(GridSizeMode.Distributed),
+                new Dimension(GridSizeMode.Absolute, spacing, spacing, spacing),
+                new Dimension(GridSizeMode.Distributed),
+            };
+            playfieldGrid.Content = new[] { new Drawable[] { stages[0], stageSpacingCell, stages[1] } };
         }
     }
 }

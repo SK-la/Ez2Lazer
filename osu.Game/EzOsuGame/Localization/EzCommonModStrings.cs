@@ -73,5 +73,11 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString JUDGEMENT_FILTER_DIRECTION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "选择忽略更好或更差的判定",
             "Choose whether to ignore better or worse judgements relative to the filter.");
+
+        public static readonly LocalisableString STAGE_SPACING_LABEL = new EzLocalizationManager.EzLocalisableString("面板间距", "Stage Spacing");
+
+        public static readonly LocalisableString STAGE_SPACING_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "调整双面板之间的间距（像素）",
+            "Adjust the gap between the two stages in pixels.");
     }
 }

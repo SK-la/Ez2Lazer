@@ -41,32 +41,5 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
             AddStep("acquiesce", () => InputManager.Key(Key.Number1));
             AddUntilStep("beatmap became 8K", () => Game.Beatmap.Value.BeatmapInfo.Difficulty.CircleSize, () => Is.EqualTo(8));
         }
-
-        [Test]
-        public void TestDualStagesChange()
-        {
-            FormCheckBox dualStages = null!;
-            FormSliderBar<int> keyCount = null!;
-
-            AddStep("go to setup screen", () => InputManager.Key(Key.F4));
-            AddUntilStep("retrieve dual stages checkbox", () => dualStages = Editor.ChildrenOfType<SetupScreen>().Single().ChildrenOfType<FormCheckBox>().First(), () => Is.Not.Null);
-            AddUntilStep("retrieve key count slider", () => keyCount = Editor.ChildrenOfType<SetupScreen>().Single().ChildrenOfType<FormSliderBar<int>>().First(), () => Is.Not.Null);
-            AddAssert("key count is 5", () => keyCount.Current.Value, () => Is.EqualTo(5));
-            AddStep("set dual stages", () =>
-            {
-                dualStages.Current.Value = true;
-            });
-            AddUntilStep("dialog visible", () => Game.ChildrenOfType<IDialogOverlay>().SingleOrDefault()?.CurrentDialog, Is.InstanceOf<SaveAndReloadEditorDialog>);
-            AddStep("refuse", () => InputManager.Key(Key.Number2));
-            AddUntilStep("key count is 5", () => keyCount.Current.Value, () => Is.EqualTo(5));
-
-            AddStep("set dual stages again", () =>
-            {
-                dualStages.Current.Value = true;
-            });
-            AddUntilStep("dialog visible", () => Game.ChildrenOfType<IDialogOverlay>().Single().CurrentDialog, Is.InstanceOf<SaveAndReloadEditorDialog>);
-            AddStep("acquiesce", () => InputManager.Key(Key.Number1));
-            AddUntilStep("beatmap became 12K", () => Game.Beatmap.Value.BeatmapInfo.Difficulty.CircleSize, () => Is.EqualTo(12));
-        }
     }
 }

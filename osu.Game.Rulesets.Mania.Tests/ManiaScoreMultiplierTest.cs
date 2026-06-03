@@ -5,6 +5,7 @@ using System;
 using NUnit.Framework;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -117,7 +118,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             #region Conversion
 
             [new Mod[] { new ManiaModRandom() }, 1],
-            [new Mod[] { new ManiaModDualStages() }, 1],
+            [new Mod[] { new ManiaModSplitStages() }, 1],
             [new Mod[] { new ManiaModMirror() }, 1],
             [new Mod[] { new ManiaModDifficultyAdjust() }, 0.5],
             [new Mod[] { new ManiaModClassic() }, 1],

@@ -12,6 +12,7 @@ using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Mania.Difficulty.Skills;
+using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.MathUtils;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
@@ -116,15 +117,15 @@ namespace osu.Game.Rulesets.Mania.Difficulty
                     new ManiaModKey3(),
                     new ManiaModKey4(),
                     new ManiaModKey5(),
-                    new MultiMod(new ManiaModKey5(), new ManiaModDualStages()),
+                    new MultiMod(new ManiaModKey5(), new ManiaModSplitStages()),
                     new ManiaModKey6(),
-                    new MultiMod(new ManiaModKey6(), new ManiaModDualStages()),
+                    new MultiMod(new ManiaModKey6(), new ManiaModSplitStages()),
                     new ManiaModKey7(),
-                    new MultiMod(new ManiaModKey7(), new ManiaModDualStages()),
+                    new MultiMod(new ManiaModKey7(), new ManiaModSplitStages()),
                     new ManiaModKey8(),
-                    new MultiMod(new ManiaModKey8(), new ManiaModDualStages()),
+                    new MultiMod(new ManiaModKey8(), new ManiaModSplitStages()),
                     new ManiaModKey9(),
-                    new MultiMod(new ManiaModKey9(), new ManiaModDualStages()),
+                    new MultiMod(new ManiaModKey9(), new ManiaModSplitStages()),
                 }).ToArray();
             }
         }

@@ -178,7 +178,7 @@ namespace osu.Game.Rulesets.Mania
                 yield return new ManiaModKey9();
 
             if (mods.HasFlag(LegacyMods.KeyCoop))
-                yield return new ManiaModDualStages();
+                yield return new ManiaModSplitStages();
 
             if (mods.HasFlag(LegacyMods.NoFail))
                 yield return new ManiaModNoFail();
@@ -237,7 +237,7 @@ namespace osu.Game.Rulesets.Mania
                         value |= LegacyMods.Key9;
                         break;
 
-                    case ManiaModDualStages:
+                    case ManiaModSplitStages:
                         value |= LegacyMods.KeyCoop;
                         break;
 
@@ -339,7 +339,7 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new ManiaModRandom(),
-                        new ManiaModDualStages(),
+                        new ManiaModSplitStages(),
                         new ManiaModMirror(),
                         new ManiaModDifficultyAdjust(),
                         new ManiaModClassic(),
