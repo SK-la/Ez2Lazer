@@ -133,7 +133,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 && analysisDatabase.TryGetStoredSqliteSlice(seedBeatmapInfo, currentRuleset.Value, out var storedSlice))
                 bindable.Value = storedSlice;
 
-            if (beatmapInfo is BeatmapInfo localBeatmapInfo)
+            if (beatmapInfo is BeatmapInfo localBeatmapInfo && shouldScheduleNoModDynamicAnalysis(localBeatmapInfo, currentRuleset.Value, currentMods.Value))
                 updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, cancellationToken, computationDelay);
 
             lock (bindableUpdateLock)
@@ -260,7 +260,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(trackedUpdateCancellationSource.Token, bindable.CancellationToken);
                     linkedCancellationSources.Add(linkedSource);
 
-                    if (bindable.BeatmapInfo is BeatmapInfo localBeatmapInfo)
+                    if (bindable.BeatmapInfo is BeatmapInfo localBeatmapInfo && shouldScheduleNoModDynamicAnalysis(localBeatmapInfo, currentRuleset.Value, currentMods.Value))
                         updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, linkedSource.Token);
                 }
             }
@@ -282,6 +282,15 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 linkedCancellationSources.Clear();
             }
+        }
+
+        private bool shouldScheduleNoModDynamicAnalysis(BeatmapInfo beatmapInfo, IRulesetInfo rulesetInfo, IEnumerable<Mod> mods)
+        {
+            if (mods.Any())
+                return true;
+
+            return !analysisDatabase.TryGetStoredSqliteSlice(beatmapInfo, rulesetInfo, out var storedSlice)
+                   || !EzSongSelectAnalysisDisplay.HasDisplayableKps(storedSlice);
         }
 
         private void updateBindable(BindableBeatmapEzAnalysis bindable, BeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, IEnumerable<Mod>? mods,
