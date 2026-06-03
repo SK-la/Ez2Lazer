@@ -83,6 +83,9 @@ namespace osu.Game.Rulesets.BMS.Audio
                     missing++;
             }
 
+            if (backgroundEvents != null && backgroundEvents.Count > 0)
+                SetBackgroundSoundEvents(backgroundEvents);
+
             IsPrepared = true;
 
             Logger.Log($"{bms_log_prefix} Prepare complete: {loaded} loaded, {missing} missing, folder={bmsFolder}", LoggingTarget.Runtime, LogLevel.Debug);

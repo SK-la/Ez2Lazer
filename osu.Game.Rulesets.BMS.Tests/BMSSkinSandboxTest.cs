@@ -62,6 +62,18 @@ namespace osu.Game.Rulesets.BMS.Tests
             Assert.DoesNotThrow(() => skin.GetSample(new ConvertHitObjectParser.FileHitSampleInfo("   ", 100)));
         }
 
+        [Test]
+        public void TestExternalSampleSkinFallsBackToInnerWhenRuntimeContextMissing()
+        {
+            var manager = TestReflectionHelpers.CreateUninitialisedBmsKeysoundManager();
+            var inner = new BMSSkin(manager);
+            var wrapper = new BMSExternalSampleSkin(inner);
+
+            BmsRuntimeAudioContext.Clear();
+
+            Assert.That(wrapper.GetSample(new ConvertHitObjectParser.FileHitSampleInfo("kick.wav", 100)), Is.Null);
+        }
+
         private static string locateSource(string fileName)
         {
             string assemblyLocation = typeof(BMSSkinSandboxTest).Assembly.Location;

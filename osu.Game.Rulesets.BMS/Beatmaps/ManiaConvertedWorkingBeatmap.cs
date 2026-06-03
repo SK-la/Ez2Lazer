@@ -12,6 +12,7 @@ using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Skinning;
+using osu.Game.Storyboards;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
 {
@@ -55,6 +56,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     else
                         KeysoundManager.Prepare(maniaBeatmap.HitObjects);
                 }
+
+                BmsRuntimeAudioContext.RegisterKeysoundManager(KeysoundManager);
             }
 
             if (maniaBeatmap.HitObjects.Count > 0)
@@ -63,6 +66,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public static ManiaBeatmap ConvertToManiaBeatmap(IBeatmap bmsBeatmap)
         {
+            if (bmsBeatmap is ManiaBeatmap existing)
+                return existing;
+
             var usedColumns = bmsBeatmap.HitObjects
                                         .OfType<BMSHitObject>()
                                         .Select(h => h.Column)
@@ -178,6 +184,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         }
 
         public override Texture? GetBackground() => SourceBeatmap.GetBackground();
+
+        protected override Storyboard GetStoryboard() => SourceBeatmap.Storyboard;
 
         protected override Track GetBeatmapTrack() => audioManager.Tracks.GetVirtual(Math.Max(beatmapLength, 60000));
 

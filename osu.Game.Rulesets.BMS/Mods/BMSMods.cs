@@ -4,8 +4,11 @@
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Objects;
+using osu.Game.Rulesets.BMS.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
@@ -35,6 +38,15 @@ namespace osu.Game.Rulesets.BMS.Mods
     public class BMSModAutoplay : ModAutoplay
     {
         public override LocalisableString Description => "Watch a perfect automated play through the song.";
+
+        public override ModReplayData CreateReplayData(IBeatmap beatmap, IReadOnlyList<Mod> mods)
+        {
+            if (BmsRuntimeAudioContext.PreferNativeAutoplayReplay)
+                return new ModReplayData(new BMSAutoGenerator(beatmap).Generate(), new ModCreatedUser { Username = @"osu!topus" });
+
+            ManiaBeatmap mania = beatmap as ManiaBeatmap ?? ManiaConvertedWorkingBeatmap.ConvertToManiaBeatmap(beatmap);
+            return new ManiaModAutoplay().CreateReplayData(mania, mods);
+        }
     }
 
     public class BMSModRandom : ModRandom, IApplicableAfterBeatmapConversion

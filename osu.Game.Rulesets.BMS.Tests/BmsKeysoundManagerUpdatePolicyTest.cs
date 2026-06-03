@@ -1,9 +1,11 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.BMS.Tests
 {
@@ -61,6 +63,27 @@ namespace osu.Game.Rulesets.BMS.Tests
 
             int nextIndex = TestReflectionHelpers.GetField<int>(manager, "nextBackgroundIndex");
             Assert.That(nextIndex, Is.EqualTo(1), "rewind should reposition index based on current time and then progress");
+        }
+
+        [Test]
+        public void TestPrepareRegistersBackgroundTimeline()
+        {
+            var manager = TestReflectionHelpers.CreateUninitialisedBmsKeysoundManager();
+
+            var events = new List<BmsBackgroundSoundEvent>
+            {
+                new BmsBackgroundSoundEvent(100, string.Empty),
+                new BmsBackgroundSoundEvent(200, string.Empty),
+            };
+
+            manager.Prepare(Array.Empty<HitObject>(), events);
+
+            Assert.That(manager.IsPrepared, Is.True);
+
+            manager.Update(100);
+
+            int nextIndex = TestReflectionHelpers.GetField<int>(manager, "nextBackgroundIndex");
+            Assert.That(nextIndex, Is.EqualTo(1), "Prepare should install background events for Update to consume");
         }
     }
 }

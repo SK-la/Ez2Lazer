@@ -13,10 +13,11 @@ using osu.Framework.Threading;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Framework.Bindables;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.BMS.Localization;
-using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osuTK;
@@ -48,6 +49,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         [Resolved]
         private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
+
+        [Resolved]
+        private Bindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
         /// <summary>
         /// Construct a player loader with an explicit route override (mainly used by tests or special entries).
@@ -187,10 +191,12 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                     bool preload = resolveAutoPreloadFromConfig();
                     var maniaWorkingBeatmap = new ManiaConvertedWorkingBeatmap(workingBeatmap, audioManager, preload);
                     Beatmap.Value = maniaWorkingBeatmap;
-                    Ruleset.Value = new ManiaRuleset().RulesetInfo;
+                    // Keep BMS ruleset so song-select mods (e.g. BMSModAutoplay) pass Player validation.
+                    // Drawable still uses Mania via BMSRuleset.CreateDrawableRulesetWith.
+                    Ruleset.Value = new BMSRuleset().RulesetInfo;
                 }
 
-                var playerLoader = new PlayerLoader(() => new BmsPlayer());
+                var playerLoader = new PlayerLoader(createPlayer);
                 this.Push(playerLoader);
             }
             catch (Exception ex)
@@ -199,6 +205,16 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 statusText.Text = BmsStrings.Loader_LaunchFailed(ex.Message);
                 scheduleExit(3000);
             }
+        }
+
+        private Player createPlayer()
+        {
+            var replayGeneratingMod = mods.Value.OfType<ICreateReplayData>().FirstOrDefault();
+
+            if (replayGeneratingMod != null)
+                return new BmsReplayPlayer(replayGeneratingMod.CreateScoreFromReplayData);
+
+            return new BmsPlayer();
         }
 
         private bool resolveAutoPreloadFromConfig()
