@@ -30,6 +30,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// - L1 Realm 基线 xxy/PP：由 UI 直读 <see cref="BeatmapInfo"/>（见 <see cref="EzSongSelectAnalysisDisplay"/>），不经本 cache。
     /// - L2 主 SQLite：NoMod 时仅提供 kps/KPC 切片（<see cref="EzAnalysisDatabase.TryGetStoredSqliteSlice"/>）。
     /// - L3 本 cache：当前 ruleset/mods 下的动态 <see cref="EzAnalysisResult"/>（含 mod 后 xxy/PP/kps）。
+    /// NoMod 面板语义对齐 <see cref="BeatmapDifficultyCache"/>：先 L2 预填，debounce 后总调度检验；检验走 <see cref="EzAnalysisDatabase.BackfillStoredDataAsync"/>（齐全则只读 SQLite）。
     /// 不承担预热、Realm 回填或分支库写入。
     /// </summary>
     public partial class EzAnalysisCache : MemoryCachingComponent<EzAnalysisLookupCache, EzAnalysisResult?>
@@ -133,7 +134,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 && analysisDatabase.TryGetStoredSqliteSlice(seedBeatmapInfo, currentRuleset.Value, out var storedSlice))
                 bindable.Value = storedSlice;
 
-            if (beatmapInfo is BeatmapInfo localBeatmapInfo && shouldScheduleNoModDynamicAnalysis(localBeatmapInfo, currentRuleset.Value, currentMods.Value))
+            if (beatmapInfo is BeatmapInfo localBeatmapInfo)
                 updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, cancellationToken, computationDelay);
 
             lock (bindableUpdateLock)
@@ -260,7 +261,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(trackedUpdateCancellationSource.Token, bindable.CancellationToken);
                     linkedCancellationSources.Add(linkedSource);
 
-                    if (bindable.BeatmapInfo is BeatmapInfo localBeatmapInfo && shouldScheduleNoModDynamicAnalysis(localBeatmapInfo, currentRuleset.Value, currentMods.Value))
+                    if (bindable.BeatmapInfo is BeatmapInfo localBeatmapInfo)
                         updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, linkedSource.Token);
                 }
             }
@@ -282,15 +283,6 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 linkedCancellationSources.Clear();
             }
-        }
-
-        private bool shouldScheduleNoModDynamicAnalysis(BeatmapInfo beatmapInfo, IRulesetInfo rulesetInfo, IEnumerable<Mod> mods)
-        {
-            if (mods.Any())
-                return true;
-
-            return !analysisDatabase.TryGetStoredSqliteSlice(beatmapInfo, rulesetInfo, out var storedSlice)
-                   || !EzSongSelectAnalysisDisplay.HasDisplayableKps(storedSlice);
         }
 
         private void updateBindable(BindableBeatmapEzAnalysis bindable, BeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, IEnumerable<Mod>? mods,
@@ -316,6 +308,13 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             try
             {
+                if (EzAnalysisDatabase.CanUseStoredAnalysis(lookup.BeatmapInfo, lookup.Ruleset, lookup.OrderedMods))
+                {
+                    return analysisDatabase.BackfillStoredDataAsync(lookup.BeatmapInfo, skipExistingComparison: false, cancellationToken)
+                                           .GetAwaiter()
+                                           .GetResult();
+                }
+
                 return EzAnalysisComputation.Compute(beatmapManager, lookup, cancellationToken);
             }
             catch (OperationCanceledException)
