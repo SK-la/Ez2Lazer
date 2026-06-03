@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
@@ -12,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BMS.Tests
@@ -19,108 +19,67 @@ namespace osu.Game.Rulesets.BMS.Tests
     [TestFixture]
     public class BMSExternalSampleSkinTest
     {
-        [Test]
-        public void TestInnerSkinIsAlwaysAskedFirst()
+        [TearDown]
+        public void TearDown()
         {
-            var inner = new TrackingSkin();
-            string folder = createTempFolder();
-
-            try
-            {
-                var skin = new BMSExternalSampleSkin(inner, folder, () => null);
-                skin.GetSample(new TestSampleInfo(new[] { "kick.wav" }));
-
-                Assert.That(inner.SampleLookups, Has.Count.EqualTo(1));
-            }
-            finally
-            {
-                Directory.Delete(folder, true);
-            }
+            BmsRuntimeAudioContext.Clear();
         }
 
         [Test]
-        public void TestNullAudioProviderDegradesGracefully()
+        public void TestFileHitSampleDoesNotQueryInnerSkin()
         {
             var inner = new TrackingSkin();
-            string folder = createTempFolder();
+            var skin = new BMSExternalSampleSkin(inner);
 
-            try
-            {
-                File.WriteAllText(Path.Combine(folder, "kick.wav"), "x");
+            skin.GetSample(new ConvertHitObjectParser.FileHitSampleInfo("kick.wav", 100));
 
-                var skin = new BMSExternalSampleSkin(inner, folder, () => null);
-                Assert.That(skin.GetSample(new TestSampleInfo(new[] { "kick.wav" })), Is.Null);
-            }
-            finally
-            {
-                Directory.Delete(folder, true);
-            }
+            Assert.That(inner.SampleLookups, Is.Empty);
         }
 
         [Test]
-        public void TestMissingFolderDegradesGracefully()
+        public void TestNonFileSampleUsesInnerSkinOnly()
         {
             var inner = new TrackingSkin();
-            string nonExistent = Path.Combine(Path.GetTempPath(), "bms-skin-missing-" + Guid.NewGuid().ToString("N"));
+            var skin = new BMSExternalSampleSkin(inner);
 
-            var skin = new BMSExternalSampleSkin(inner, nonExistent, () => null);
-            Assert.DoesNotThrow(() => skin.GetSample(new TestSampleInfo(new[] { "missing" })));
+            skin.GetSample(new TestSampleInfo(new[] { "hitnormal" }));
+
+            Assert.That(inner.SampleLookups, Has.Count.EqualTo(1));
         }
 
         [Test]
-        public void TestEmptyLookupNamesReturnsNullWithoutThrowing()
+        public void TestFileHitSampleReadsFromRuntimeManagerCache()
         {
             var inner = new TrackingSkin();
-            string folder = createTempFolder();
+            var skin = new BMSExternalSampleSkin(inner);
+            var manager = TestReflectionHelpers.CreateUninitialisedBmsKeysoundManager();
+            var cache = TestReflectionHelpers.GetField<Dictionary<string, ISample>>(manager, "keysoundCache");
+            cache["kick.wav"] = new SampleVirtual();
 
-            try
-            {
-                var skin = new BMSExternalSampleSkin(inner, folder, () => null);
+            BmsRuntimeAudioContext.RegisterKeysoundManager(manager);
 
-                Assert.DoesNotThrow(() => skin.GetSample(new TestSampleInfo(Array.Empty<string>())));
-                Assert.DoesNotThrow(() => skin.GetSample(new TestSampleInfo(new[] { string.Empty, "  ", null! })));
-            }
-            finally
-            {
-                Directory.Delete(folder, true);
-            }
+            var sample = skin.GetSample(new ConvertHitObjectParser.FileHitSampleInfo("kick.wav", 100));
+
+            Assert.That(inner.SampleLookups, Is.Empty);
+            Assert.That(sample, Is.Not.Null);
         }
 
         [Test]
         public void TestPassThroughTextureAndConfig()
         {
             var inner = new TrackingSkin();
-            string folder = createTempFolder();
+            var skin = new BMSExternalSampleSkin(inner);
 
-            try
-            {
-                var skin = new BMSExternalSampleSkin(inner, folder, () => null);
-
-                Assert.That(skin.GetTexture("anything", default, default), Is.Null);
-                Assert.That(skin.GetConfig<string, string>("any"), Is.Null);
-                Assert.That(inner.TextureLookups, Has.Count.EqualTo(1));
-                Assert.That(inner.ConfigLookups, Has.Count.EqualTo(1));
-            }
-            finally
-            {
-                Directory.Delete(folder, true);
-            }
+            Assert.That(skin.GetTexture("anything", default, default), Is.Null);
+            Assert.That(skin.GetConfig<string, string>("any"), Is.Null);
+            Assert.That(inner.TextureLookups, Has.Count.EqualTo(1));
+            Assert.That(inner.ConfigLookups, Has.Count.EqualTo(1));
         }
 
         [Test]
         public void TestNullInnerThrows()
         {
-            string folder = createTempFolder();
-
-            try
-            {
-                Assert.That(() => new BMSExternalSampleSkin(null!, folder, () => null), Throws.ArgumentNullException);
-                Assert.That(() => new BMSExternalSampleSkin(new TrackingSkin(), folder, null!), Throws.ArgumentNullException);
-            }
-            finally
-            {
-                Directory.Delete(folder, true);
-            }
+            Assert.That(() => new BMSExternalSampleSkin(null!), Throws.ArgumentNullException);
         }
 
         private static string createTempFolder()
@@ -132,14 +91,9 @@ namespace osu.Game.Rulesets.BMS.Tests
 
         private class TestSampleInfo : ISampleInfo
         {
-            private readonly string[] lookupNames;
+            public TestSampleInfo(IEnumerable<string> lookupNames) => LookupNames = lookupNames;
 
-            public TestSampleInfo(IEnumerable<string?> lookupNames)
-            {
-                this.lookupNames = lookupNames.Select(name => name ?? string.Empty).ToArray();
-            }
-
-            public IEnumerable<string> LookupNames => lookupNames;
+            public IEnumerable<string> LookupNames { get; }
             public int Volume => 100;
         }
 

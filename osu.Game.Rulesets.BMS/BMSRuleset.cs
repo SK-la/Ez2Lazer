@@ -6,14 +6,12 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.Graphics;
-using osu.Game.IO;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BMS.Beatmaps;
@@ -71,61 +69,7 @@ namespace osu.Game.Rulesets.BMS
 
         private static void attachBmsRuntimeComponents(DrawableRuleset drawableRuleset, IBeatmap beatmap)
         {
-            // Always register the AudioManager for non-Drawable BMS helpers (e.g. BMSExternalSampleSkin).
             drawableRuleset.Overlays.Add(new BmsRuntimeAudioRegistrar());
-
-            // Only attach the BGM driver when this beatmap is actually backed by an external BMS folder
-            // and we can resolve some background sound events.
-            if (!BMSExternalPath.TryGetContentRoot(beatmap.BeatmapInfo.BeatmapSet, out string folder))
-                return;
-
-            var bgmEvents = tryLoadBackgroundSoundEvents(beatmap, folder);
-
-            if (bgmEvents.Count == 0)
-                return;
-
-            drawableRuleset.Overlays.Add(new BmsBackgroundSoundDriver(folder, bgmEvents));
-        }
-
-        private static IReadOnlyList<BmsBackgroundSoundEvent> tryLoadBackgroundSoundEvents(IBeatmap beatmap, string folder)
-        {
-            if (beatmap is BMSBeatmap directBmsBeatmap && directBmsBeatmap.BackgroundSoundEvents.Count > 0)
-                return directBmsBeatmap.BackgroundSoundEvents;
-
-            // The standard play path runs the chart through the mania converter, which strips top-level
-            // BMS metadata. As a last-resort fallback, locate the original .bms file in the folder and
-            // re-decode it just to fish out the BGM event list.
-            try
-            {
-                if (!Directory.Exists(folder))
-                    return Array.Empty<BmsBackgroundSoundEvent>();
-
-                string? chartFile = Directory.EnumerateFiles(folder)
-                                             .FirstOrDefault(path =>
-                                             {
-                                                 string ext = Path.GetExtension(path);
-                                                 return string.Equals(ext, ".bms", StringComparison.OrdinalIgnoreCase)
-                                                        || string.Equals(ext, ".bme", StringComparison.OrdinalIgnoreCase)
-                                                        || string.Equals(ext, ".bml", StringComparison.OrdinalIgnoreCase)
-                                                        || string.Equals(ext, ".pms", StringComparison.OrdinalIgnoreCase);
-                                             });
-
-                if (chartFile == null)
-                    return Array.Empty<BmsBackgroundSoundEvent>();
-
-                using var stream = File.OpenRead(chartFile);
-                using var reader = new LineBufferedReader(stream);
-                var decoder = new BMSBeatmapDecoder();
-
-                if (decoder.Decode(reader) is BMSBeatmap decoded)
-                    return decoded.BackgroundSoundEvents;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[BMS] Failed to load background sound events from '{folder}': {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
-            }
-
-            return Array.Empty<BmsBackgroundSoundEvent>();
         }
 
         public override ScoreProcessor CreateScoreProcessor() => new BMSScoreProcessor();
@@ -143,16 +87,14 @@ namespace osu.Game.Rulesets.BMS
 
         public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap)
         {
-            // WorkingBeatmap.Skin may already wrap LegacyBeatmapSkin with BMSExternalSampleSkin (song select preview).
-            // Unwrap so Mania skin transformers see LegacyBeatmapSkin once; then apply a single external wrapper.
             ISkin chain = skin is BMSExternalSampleSkin ext ? ext.Inner : skin;
 
             var inner = createInnerSkinTransformer(chain, beatmap) ?? chain;
 
-            if (!BMSExternalPath.TryGetContentRoot(beatmap.BeatmapInfo.BeatmapSet, out string folder))
+            if (beatmap.BeatmapInfo.BeatmapSet != null && !beatmap.BeatmapInfo.BeatmapSet.IsExternallyHosted)
                 return ReferenceEquals(inner, skin) ? null : inner;
 
-            return new BMSExternalSampleSkin(inner, folder, () => BmsRuntimeAudioContext.Audio);
+            return new BMSExternalSampleSkin(inner);
         }
 
         private ISkin? createInnerSkinTransformer(ISkin skin, IBeatmap beatmap)

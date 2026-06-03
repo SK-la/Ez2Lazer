@@ -17,9 +17,9 @@ namespace osu.Game.Rulesets.BMS.Tests
         {
             var manager = TestReflectionHelpers.CreateUninitialisedBmsKeysoundManager();
 
-            Assert.DoesNotThrow(() => manager.Dispose());
+            Assert.DoesNotThrow(manager.Dispose);
             Assert.That(manager.IsDisposed, Is.True);
-            Assert.DoesNotThrow(() => manager.Dispose());
+            Assert.DoesNotThrow(manager.Dispose);
 
             Assert.DoesNotThrow(() => manager.SetOffset(12));
             Assert.DoesNotThrow(() => manager.SetVolume(0.5));
@@ -29,8 +29,7 @@ namespace osu.Game.Rulesets.BMS.Tests
             }));
             Assert.DoesNotThrow(() => manager.Update(1000));
             Assert.DoesNotThrow(() => manager.TriggerKeysound("a.wav"));
-            Assert.DoesNotThrow(() => manager.LoadKeysound("a.wav"));
-            Assert.DoesNotThrow(() => manager.PreloadKeysounds(Array.Empty<HitObject>()));
+            Assert.DoesNotThrow(() => manager.Prepare(Array.Empty<HitObject>()));
         }
     }
 }

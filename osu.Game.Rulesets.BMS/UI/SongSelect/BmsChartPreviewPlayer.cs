@@ -1,15 +1,13 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Allocation;
-using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
-using osu.Game.Audio;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BMS.Audio;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 using osu.Game.Rulesets.Objects;
@@ -28,9 +26,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
     /// <c>EzPreviewTrackManager</c>'s coarse 16ms / 5ms-tolerance update loop on dense BMS keysound
     /// charts, where most note samples used to fall outside the trigger window.
     ///
-    /// Samples are resolved via the supplied <see cref="BMSWorkingBeatmap"/>'s skin (which already
-    /// owns a folder-mounted <see cref="ISampleStore"/>), so external BMS folders work without
-    /// touching osu.Game's sandboxed storage.
+    /// Samples are resolved from a prepared <see cref="BmsKeysoundManager"/> cache on the
+    /// supplied <see cref="BMSWorkingBeatmap"/> — no runtime disk IO during preview.
     /// </summary>
     public partial class BmsChartPreviewPlayer : CompositeDrawable
     {
@@ -63,11 +60,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         /// </summary>
         private const int max_scheduled_samples_per_loop = 200;
 
-        [Resolved]
-        private AudioManager audioManager { get; set; } = null!;
-
-        // currentBeatmap is the beatmap whose skin we use to resolve samples.
         private BMSWorkingBeatmap? currentBeatmap;
+        private BmsKeysoundManager? previewKeysoundManager;
         private double previewStartTime;
         private readonly List<TimedSample> timeline = new List<TimedSample>();
         private readonly List<ScheduledDelegate> scheduledTriggers = new List<ScheduledDelegate>();
@@ -94,7 +88,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             currentBeatmap = beatmap;
 
-            // Build timeline from hit-object samples (keysounds) + BMS background channels.
+            beatmap.PrepareAudio(preloadKeysounds: true);
+            previewKeysoundManager = beatmap.KeysoundManager;
+
             collectTimeline(beatmap);
 
             if (timeline.Count == 0)
@@ -128,6 +124,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             timeline.Clear();
             currentBeatmap = null;
+            previewKeysoundManager = null;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -219,12 +216,12 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         private void triggerSample(TimedSample evt)
         {
-            if (!playing || currentBeatmap == null)
+            if (!playing || previewKeysoundManager == null)
                 return;
 
             try
             {
-                ISample? sample = currentBeatmap.Skin.GetSample(new FilenameSampleInfo(evt.Filename));
+                var sample = previewKeysoundManager.GetPreparedSample(evt.Filename);
 
                 if (sample == null)
                     return;
@@ -319,24 +316,6 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             // Currently informational only — consumers may want to weight or mute one of the streams in future.
             public bool IsBackground { get; }
-        }
-
-        /// <summary>
-        /// Minimal <see cref="ISampleInfo"/> implementation that just exposes a single filename so that
-        /// <see cref="osu.Game.Skinning.ISkin.GetSample(ISampleInfo)"/> can look up a BMS folder asset
-        /// by its declared <c>#WAVxx</c> name.
-        /// </summary>
-        private sealed class FilenameSampleInfo : ISampleInfo
-        {
-            private readonly string filename;
-
-            public FilenameSampleInfo(string filename)
-            {
-                this.filename = filename;
-            }
-
-            public IEnumerable<string> LookupNames => new[] { filename };
-            public int Volume => 100;
         }
     }
 }

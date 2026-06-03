@@ -12,6 +12,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
+using osu.Game.Rulesets.BMS.Audio;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
@@ -42,6 +43,22 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// Gets the folder path containing the BMS file.
         /// </summary>
         public string FolderPath { get; }
+
+        public BmsKeysoundManager? KeysoundManager { get; private set; }
+
+        /// <summary>
+        /// Prepares external folder samples before preview or gameplay (no IO after this).
+        /// </summary>
+        public void PrepareAudio(bool preloadKeysounds = true)
+        {
+            KeysoundManager ??= new BmsKeysoundManager(audioManager, FolderPath);
+
+            if (!preloadKeysounds || KeysoundManager.IsPrepared)
+                return;
+
+            if (Beatmap is BMSBeatmap bmsBeatmap)
+                KeysoundManager.Prepare(bmsBeatmap.HitObjects, bmsBeatmap.BackgroundSoundEvents);
+        }
 
         /// <summary>
         /// Construct a working beatmap directly from a BMS file on disk.
@@ -273,8 +290,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         protected override ISkin GetSkin()
         {
-            // Return a skin that can load keysounds from the BMS folder
-            return new BMSSkin(FolderPath, audioManager);
+            KeysoundManager ??= new BmsKeysoundManager(audioManager, FolderPath);
+            return new BMSSkin(KeysoundManager);
         }
 
         public override Stream? GetStream(string storagePath)
