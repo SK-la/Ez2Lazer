@@ -5,6 +5,8 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Screens.Edit.Compose.Components.Timeline;
 using osu.Game.Tests.Visual;
 using osuTK;
 using osuTK.Input;
@@ -286,17 +288,32 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
                 EditorBeatmap.SelectedHitObjects.Add(EditorBeatmap.HitObjects.Last());
             });
 
-            AddStep("Drag tail", () =>
+            HoldNote column0Hold = null!;
+            DragArea column0DragArea = null!;
+            TimelineHitObjectBlueprint column0Blueprint = null!;
+
+            AddStep("cache column 0 hold", () => column0Hold = EditorBeatmap.HitObjects.OfType<HoldNote>().Single(h => h.Column == 0));
+
+            AddStep("raise column 0 above selection", () =>
             {
-                var blueprintDragArea = this.ChildrenOfType<DragArea>().First();
-                dragBackward(blueprintDragArea);
+                column0Blueprint = this.ChildrenOfType<TimelineHitObjectBlueprint>().Single(b => b.Item == column0Hold);
+                column0Blueprint.Depth = 10;
             });
+
+            AddStep("press tail", () =>
+            {
+                column0DragArea = getDragAreaFor(column0Hold);
+                InputManager.MoveMouseTo(column0DragArea);
+                InputManager.PressButton(MouseButton.Left);
+            });
+
+            AddRepeatStep("drag tail", () => InputManager.MoveMouseTo(new Vector2(700, 110)), 5);
 
             AddStep("Release tail", () => InputManager.ReleaseButton(MouseButton.Left));
 
             AddAssert("Duration is lower, other is unchanged", () =>
-                ((HoldNote)EditorBeatmap.HitObjects[0]).Duration < 937.5f &&
-                ((HoldNote)EditorBeatmap.HitObjects[^1]).Duration == 937.5f
+                column0Hold.Duration < 937.5f &&
+                EditorBeatmap.HitObjects.OfType<HoldNote>().Single(h => h.Column == 1).Duration == 937.5f
             );
         }
 
@@ -333,6 +350,9 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
                 }
             );
         }
+
+        private DragArea getDragAreaFor(HitObject hitObject) =>
+            this.ChildrenOfType<TimelineHitObjectBlueprint>().Single(b => b.Item == hitObject).ChildrenOfType<DragArea>().Single();
 
         private void dragForward(DragArea dragArea)
         {
