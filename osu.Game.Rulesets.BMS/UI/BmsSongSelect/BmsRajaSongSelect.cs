@@ -13,6 +13,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
@@ -68,6 +69,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
+
+        [Resolved]
+        private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
 
         [Resolved(canBeNull: true)]
         private INotificationOverlay? notifications { get; set; }
@@ -291,6 +295,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 audioManager,
                 realm,
                 notifications,
+                analysisDatabase,
                 onComplete: () => Schedule(() => barManager.ResetToRoot()));
         }
 

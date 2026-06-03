@@ -6,12 +6,12 @@ using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Collections;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
@@ -63,10 +63,10 @@ namespace osu.Game.Rulesets.BMS.UI
         private RealmAccess realm { get; set; } = null!;
 
         [Resolved]
-        private AudioManager audioManager { get; set; } = null!;
+        private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
 
         [Resolved]
-        private IRenderer renderer { get; set; } = null!;
+        private AudioManager audioManager { get; set; } = null!;
 
         [Resolved]
         private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
@@ -260,7 +260,8 @@ namespace osu.Game.Rulesets.BMS.UI
                 analyticsRepository,
                 audioManager,
                 realm,
-                notificationOverlay);
+                notificationOverlay,
+                analysisDatabase);
         }
 
         private void selectPath()

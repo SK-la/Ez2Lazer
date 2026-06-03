@@ -4,6 +4,7 @@
 using osu.Framework.Audio;
 using osu.Framework.Logging;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Localization;
 
@@ -25,13 +26,14 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
             AudioManager audioManager,
             IProgress<BmsAnalyticsScanProgress>? progress = null,
             CancellationToken cancellationToken = default,
-            RealmAccess? realm = null)
+            RealmAccess? realm = null,
+            EzAnalysisDatabase? analysisDatabase = null)
         {
             var charts = beatmapManager.GetAllCharts().ToList();
             if (charts.Count == 0)
                 return Task.CompletedTask;
 
-            return Task.Run(() => runOnBackgroundThread(charts, repository, audioManager, realm, progress, cancellationToken), cancellationToken);
+            return Task.Run(() => runOnBackgroundThread(charts, repository, audioManager, realm, analysisDatabase, progress, cancellationToken), cancellationToken);
         }
 
         private static void runOnBackgroundThread(
@@ -39,6 +41,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
             BmsAnalyticsSqliteRepository repository,
             AudioManager audioManager,
             RealmAccess? realm,
+            EzAnalysisDatabase? analysisDatabase,
             IProgress<BmsAnalyticsScanProgress>? progress,
             CancellationToken cancellationToken)
         {
@@ -84,7 +87,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                                 KpsListJson = analyticsResult.KpsListJson,
                             });
 
-                            if (realm != null)
+                            if (realm != null && analysisDatabase != null)
+                                BmsAnalyticsStandardPipeline.TryCommitChart(realm, analysisDatabase, chart, pathKey, analyticsResult);
+                            else if (realm != null)
                                 BmsAnalyticsRealmWriteback.TryApply(realm, chart, analyticsResult);
                         }
                     }
@@ -99,6 +104,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
 
                     report(progress, displayIndex, total, BmsStrings.Analytics_ChartFinished(displayIndex, total, chart.Title));
                 }
+
+                if (realm != null && analysisDatabase != null)
+                    BmsAnalyticsStandardPipeline.BulkCommitFromRepository(realm, analysisDatabase, charts, repository);
 
                 report(progress, total, total, BmsStrings.ANALYTICS_COMPLETE.ToString());
             }
