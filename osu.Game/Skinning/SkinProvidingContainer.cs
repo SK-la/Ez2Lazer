@@ -153,11 +153,16 @@ namespace osu.Game.Skinning
                     return sourceSample;
             }
 
-            if (!AllowFallingBackToParent)
+            if (!AllowFallingBackToParent || !AllowParentSampleFallback(sampleInfo))
                 return null;
 
             return ParentSource?.GetSample(sampleInfo);
         }
+
+        /// <summary>
+        /// Whether a sample lookup that missed on local sources may fall back to the parent <see cref="ISkinSource"/>.
+        /// </summary>
+        protected virtual bool AllowParentSampleFallback(ISampleInfo sampleInfo) => true;
 
         public IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
             where TLookup : notnull

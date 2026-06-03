@@ -4,7 +4,6 @@
 #nullable disable
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -173,7 +172,7 @@ namespace osu.Game.Beatmaps
                         return resources.Files;
                 }
 
-                return new ExternalBeatmapCompositeFileStore(resources.Files, contentRoot, buildExternalFileMappings(beatmapInfo, resources.RealmAccess));
+                return new ExternalBeatmapFileStore(contentRoot, ExternalBeatmapFileMappingsBuilder.Build(beatmapInfo, resources.RealmAccess));
             }
 
             private static void refreshExternalHostingFromRealm(BeatmapSetInfo beatmapSet, RealmAccess realmAccess)
@@ -196,56 +195,6 @@ namespace osu.Game.Beatmaps
                             beatmapSet.Files.Add(new RealmNamedFileUsage(new RealmFile { Hash = file.File.Hash }, file.Filename));
                     }
                 });
-            }
-
-            private static IEnumerable<(string storagePath, string relativeFilename)> buildExternalFileMappings(BeatmapInfo beatmapInfo, RealmAccess realmAccess)
-            {
-                var mappings = new List<(string storagePath, string relativeFilename)>();
-                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-                void add(string storagePath, string relativeFilename)
-                {
-                    if (string.IsNullOrEmpty(storagePath) || string.IsNullOrEmpty(relativeFilename))
-                        return;
-
-                    if (seen.Add(storagePath))
-                        mappings.Add((storagePath, relativeFilename));
-                }
-
-                if (beatmapInfo.BeatmapSet != null)
-                {
-                    foreach (var file in beatmapInfo.BeatmapSet.Files)
-                        add(file.File.GetStoragePath(), file.Filename);
-                }
-
-                if (beatmapInfo.File is RealmNamedFileUsage usage)
-                    add(usage.File.GetStoragePath(), usage.Filename);
-
-                realmAccess?.Run(r =>
-                {
-                    var freshBeatmap = r.Find<BeatmapInfo>(beatmapInfo.ID);
-
-                    if (freshBeatmap?.File is RealmNamedFileUsage freshFile)
-                        add(freshFile.File.GetStoragePath(), freshFile.Filename);
-
-                    if (freshBeatmap?.BeatmapSet is BeatmapSetInfo freshSet)
-                    {
-                        foreach (var file in freshSet.Files)
-                            add(file.File.GetStoragePath(), file.Filename);
-                    }
-                });
-
-                string chartPath = beatmapInfo.Path;
-
-                if (!string.IsNullOrEmpty(chartPath) && beatmapInfo.BeatmapSet != null)
-                {
-                    string storagePath = beatmapInfo.BeatmapSet.GetPathForFile(chartPath);
-
-                    if (!string.IsNullOrEmpty(storagePath))
-                        add(storagePath, chartPath);
-                }
-
-                return mappings;
             }
 
             protected override IBeatmap GetBeatmap()
@@ -299,6 +248,19 @@ namespace osu.Game.Beatmaps
 
             private Stream openChartStream(string chartPath, string fileStorePath)
             {
+                if (isExternalChartSet())
+                {
+                    if (!string.IsNullOrEmpty(fileStorePath))
+                    {
+                        var stream = GetStream(fileStorePath);
+
+                        if (stream != null)
+                            return stream;
+                    }
+
+                    return GetStream(chartPath);
+                }
+
                 if (!string.IsNullOrEmpty(fileStorePath))
                 {
                     var stream = GetStream(fileStorePath);
@@ -307,25 +269,7 @@ namespace osu.Game.Beatmaps
                         return stream;
                 }
 
-                var streamByName = GetStream(chartPath);
-
-                if (streamByName != null)
-                    return streamByName;
-
-                return tryOpenExternalChartOnDisk(chartPath);
-            }
-
-            private Stream tryOpenExternalChartOnDisk(string chartPath)
-            {
-                if (!isExternalChartSet())
-                    return null;
-
-                if (!ExternalBeatmapPathEncoding.TryResolveContentRoot(BeatmapSetInfo, out string contentRoot))
-                    return null;
-
-                string fullPath = Path.Combine(contentRoot, chartPath.Replace('/', Path.DirectorySeparatorChar));
-
-                return File.Exists(fullPath) ? File.OpenRead(fullPath) : null;
+                return GetStream(chartPath);
             }
 
             private bool isExternalChartSet()
@@ -496,7 +440,8 @@ namespace osu.Game.Beatmaps
             {
                 try
                 {
-                    return new LegacyBeatmapSkin(BeatmapInfo, resources);
+                    IResourceStore<byte[]> externalStore = isExternalChartSet() ? beatmapFileStore : null;
+                    return new LegacyBeatmapSkin(BeatmapInfo, resources, externalStore);
                 }
                 catch (Exception e)
                 {

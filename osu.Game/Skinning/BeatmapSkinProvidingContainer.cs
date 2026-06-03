@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Game.Audio;
+using osu.Game.Rulesets.Objects.Legacy;
 
 namespace osu.Game.Skinning
 {
@@ -25,6 +26,30 @@ namespace osu.Game.Skinning
         protected override bool AllowTextureLookup(string componentName) => BeatmapSkins.Value;
 
         protected override bool AllowSampleLookup(ISampleInfo sampleInfo) => BeatmapHitsounds.Value;
+
+        /// <summary>
+        /// When set, beatmap-tied samples that miss on the beatmap skin will not fall back to parent skins.
+        /// Used for externally hosted sets where samples must resolve only from the content root.
+        /// </summary>
+        public bool DisallowBeatmapSampleParentFallback { get; set; }
+
+        protected override bool AllowParentSampleFallback(ISampleInfo sampleInfo)
+            => !DisallowBeatmapSampleParentFallback || !isBeatmapTiedSample(sampleInfo);
+
+        private static bool isBeatmapTiedSample(ISampleInfo sampleInfo)
+        {
+            switch (sampleInfo)
+            {
+                case HitSampleInfo hit when hit.UseBeatmapSamples:
+                    return true;
+
+                case ConvertHitObjectParser.FileHitSampleInfo:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
 
         private readonly ISkin skin;
         private readonly ISkin? classicFallback;
