@@ -16,9 +16,11 @@ namespace osu.Game.EzOsuGame.Beatmaps
         public static double? GetPersistedXxyStarRating(this BeatmapInfo beatmap)
             => beatmap.HasPersistedXxyStarRating() ? beatmap.XxyStarRating : null;
 
-        public static EzManiaSummary ToEzManiaSummaryForDisplay(this BeatmapInfo beatmap, EzManiaSummary? analysisSummary = null)
+        public static EzManiaSummary ToEzManiaSummaryForDisplay(this BeatmapInfo beatmap, EzManiaSummary? analysisSummary = null, bool preferAnalysisValues = false)
         {
-            double? xxy = beatmap.GetPersistedXxyStarRating() ?? analysisSummary?.XxySr;
+            double? xxy = preferAnalysisValues && analysisSummary?.XxySr is double analysisXxy
+                ? analysisXxy
+                : beatmap.GetPersistedXxyStarRating() ?? analysisSummary?.XxySr;
 
             return new EzManiaSummary(
                 analysisSummary?.ColumnCounts,

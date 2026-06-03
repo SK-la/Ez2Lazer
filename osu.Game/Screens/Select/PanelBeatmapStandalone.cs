@@ -392,24 +392,20 @@ namespace osu.Game.Screens.Select
             if (Item?.IsVisible != true)
                 return;
 
-            double avgKPS = ezAnalysisResult.AverageKps;
-            double maxKps = ezAnalysisResult.MaxKps;
-            IReadOnlyList<double> kpsList = ezAnalysisResult.KpsList;
-            double? baselinePp = beatmap.PerformancePoints >= 0
-                ? beatmap.PerformancePoints
-                : ezAnalysisResult.Pp;
-            ezDisplayKps.SetKps(baselinePp, avgKPS, maxKps);
-            ezDisplayKpsGraph.SetPoints(kpsList);
+            var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
+
+            ezDisplayKps.SetKps(metrics.PerformancePoints, metrics.AverageKps, metrics.MaxKps);
+            ezDisplayKpsGraph.SetPoints(metrics.KpsList);
 
             if (supportsEzAnalysis && beatmap.SupportsXxyStarRating())
             {
-                var maniaSummary = ezAnalysisResult.ManiaSummary;
+                var maniaSummary = metrics.ManiaSummary;
                 var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
 
-                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
+                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, metrics.MaxKps, metrics.KpsList);
                 updateKeyCount();
                 ezDisplayKpc.ManiaSummary = maniaSummary;
-                displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay(maniaSummary);
+                displaySR.Current.Value = maniaSummary ?? EzManiaSummary.EMPTY;
             }
         }
 
