@@ -279,6 +279,7 @@ namespace osu.Game.Screens.Select
             mods.BindValueChanged(_ =>
             {
                 updateKeyCount();
+                computeEzAnalysis();
             }, true);
 
             var ezAnalysisFilter = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisFilter);
@@ -423,9 +424,6 @@ namespace osu.Game.Screens.Select
 
         private void computeEzAnalysis()
         {
-            if (!supportsEzAnalysis)
-                return;
-
             ezAnalysisCancellationSource?.Cancel();
             ezAnalysisCancellationSource?.Dispose();
             ezAnalysisCancellationSource = new CancellationTokenSource();
