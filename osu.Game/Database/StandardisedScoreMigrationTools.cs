@@ -645,7 +645,7 @@ namespace osu.Game.Database
 
         public static ScoreRank ComputeRank(double accuracy, IReadOnlyDictionary<HitResult, int> statistics, IList<Mod> mods, ScoreProcessor scoreProcessor)
         {
-            var rank = scoreProcessor.RankFromScore(accuracy, statistics);
+            var rank = scoreProcessor.RankFromScore(accuracy, statistics, useDefaultCutoffs: true);
 
             foreach (var mod in mods.OfType<IApplicableToScoreProcessor>())
                 rank = mod.AdjustRank(rank, accuracy);

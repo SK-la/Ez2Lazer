@@ -16,9 +16,9 @@ namespace osu.Game.Rulesets.Osu.Scoring
         {
         }
 
-        public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results)
+        public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results, bool useDefaultCutoffs = false)
         {
-            ScoreRank rank = base.RankFromScore(accuracy, results);
+            ScoreRank rank = base.RankFromScore(accuracy, results, useDefaultCutoffs);
 
             switch (rank)
             {

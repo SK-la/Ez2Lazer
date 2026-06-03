@@ -595,13 +595,22 @@ namespace osu.Game.Rulesets.Scoring
         /// <summary>
         /// Given an accuracy (0..1), return the correct <see cref="ScoreRank"/>.
         /// </summary>
-        public virtual ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results)
+        /// <param name="accuracy">The accuracy to evaluate.</param>
+        /// <param name="results">Hit result statistics used for ruleset-specific rank adjustments.</param>
+        /// <param name="useDefaultCutoffs">
+        /// When <c>true</c>, uses the original S/A accuracy thresholds instead of user-configured values.
+        /// This must be used when recomputing ranks for imported or migrated scores.
+        /// </param>
+        public virtual ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results, bool useDefaultCutoffs = false)
         {
+            double sCutoff = useDefaultCutoffs ? accuracy_cutoff_s : accS;
+            double aCutoff = useDefaultCutoffs ? accuracy_cutoff_a : accA;
+
             if (accuracy == accuracy_cutoff_x)
                 return ScoreRank.X;
-            if (accuracy >= accS)
+            if (accuracy >= sCutoff)
                 return ScoreRank.S;
-            if (accuracy >= accA)
+            if (accuracy >= aCutoff)
                 return ScoreRank.A;
             if (accuracy >= accuracy_cutoff_b)
                 return ScoreRank.B;
