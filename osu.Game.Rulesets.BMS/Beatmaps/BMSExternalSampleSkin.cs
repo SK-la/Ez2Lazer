@@ -38,7 +38,14 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public ISample? GetSample(ISampleInfo sampleInfo)
         {
             if (sampleInfo is ConvertHitObjectParser.FileHitSampleInfo fileSample)
-                return BmsRuntimeAudioContext.KeysoundManager?.GetPreparedSample(fileSample.Filename);
+            {
+                var prepared = BmsRuntimeAudioContext.KeysoundManager?.GetPreparedSample(fileSample.Filename);
+                if (prepared != null)
+                    return prepared;
+
+                // Fallback to the beatmap skin (BMSSkin) when runtime context is not registered yet.
+                return Inner.GetSample(sampleInfo);
+            }
 
             return Inner.GetSample(sampleInfo);
         }

@@ -55,6 +55,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     else
                         KeysoundManager.Prepare(maniaBeatmap.HitObjects);
                 }
+
+                BmsRuntimeAudioContext.RegisterKeysoundManager(KeysoundManager);
             }
 
             if (maniaBeatmap.HitObjects.Count > 0)
@@ -63,6 +65,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public static ManiaBeatmap ConvertToManiaBeatmap(IBeatmap bmsBeatmap)
         {
+            if (bmsBeatmap is ManiaBeatmap existing)
+                return existing;
+
             var usedColumns = bmsBeatmap.HitObjects
                                         .OfType<BMSHitObject>()
                                         .Select(h => h.Column)

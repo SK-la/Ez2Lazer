@@ -58,6 +58,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             if (Beatmap is BMSBeatmap bmsBeatmap)
                 KeysoundManager.Prepare(bmsBeatmap.HitObjects, bmsBeatmap.BackgroundSoundEvents);
+
+            BmsRuntimeAudioContext.RegisterKeysoundManager(KeysoundManager);
         }
 
         /// <summary>

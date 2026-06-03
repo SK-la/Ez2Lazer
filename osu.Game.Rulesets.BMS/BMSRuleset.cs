@@ -60,7 +60,10 @@ namespace osu.Game.Rulesets.BMS
 
         public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
         {
-            var maniaDrawableRuleset = new ManiaRuleset().CreateDrawableRulesetWith(ManiaConvertedWorkingBeatmap.ConvertToManiaBeatmap(beatmap), mods);
+            BmsRuntimeAudioContext.PreferNativeAutoplayReplay = false;
+
+            ManiaBeatmap maniaBeatmap = beatmap as ManiaBeatmap ?? ManiaConvertedWorkingBeatmap.ConvertToManiaBeatmap(beatmap);
+            var maniaDrawableRuleset = new ManiaRuleset().CreateDrawableRulesetWith(maniaBeatmap, mods);
 
             attachBmsRuntimeComponents(maniaDrawableRuleset, beatmap);
 
@@ -143,16 +146,16 @@ namespace osu.Game.Rulesets.BMS
                 case ModType.DifficultyReduction:
                     return new Mod[]
                     {
-                        new ManiaModEasy(),
-                        new ManiaModNoFail(),
+                        new BMSModEasy(),
+                        new BMSModNoFail(),
                         new ManiaModHalfTime(),
                     };
 
                 case ModType.DifficultyIncrease:
                     return new Mod[]
                     {
-                        new ManiaModHardRock(),
-                        new ManiaModSuddenDeath(),
+                        new BMSModHardRock(),
+                        new BMSModSuddenDeath(),
                         new ManiaModPerfect(),
                         new ManiaModDoubleTime(),
                         new ManiaModNightcore(),
@@ -164,7 +167,7 @@ namespace osu.Game.Rulesets.BMS
                 case ModType.Automation:
                     return new Mod[]
                     {
-                        new ManiaModAutoplay(),
+                        new BMSModAutoplay(),
                     };
 
                 case ModType.Conversion:
@@ -434,9 +437,13 @@ namespace osu.Game.Rulesets.BMS
         }
     }
 
-    internal class BMSNativeRuleset : BMSRuleset
+    public class BMSNativeRuleset : BMSRuleset
     {
-        public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) => new DrawableBMSRuleset(this, beatmap, mods);
+        public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
+        {
+            BmsRuntimeAudioContext.PreferNativeAutoplayReplay = true;
+            return new DrawableBMSRuleset(this, beatmap, mods);
+        }
     }
 
     internal class ManiaDifficultyWorkingBeatmapAdapter : WorkingBeatmap

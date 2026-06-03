@@ -15,6 +15,12 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public static BmsKeysoundManager? KeysoundManager { get; private set; }
 
+        /// <summary>
+        /// When true, autoplay generates native <see cref="Replays.BMSReplayFrame"/>s (see <see cref="BMSNativeRuleset"/>).
+        /// Cleared for Mania-compatible gameplay and skin editor preview.
+        /// </summary>
+        public static bool PreferNativeAutoplayReplay { get; set; }
+
         internal static void Register(AudioManager? audioManager)
         {
             if (audioManager != null)
@@ -29,6 +35,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public static void Clear()
         {
             KeysoundManager = null;
+            PreferNativeAutoplayReplay = false;
         }
     }
 }
