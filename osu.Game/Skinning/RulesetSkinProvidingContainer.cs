@@ -63,6 +63,7 @@ namespace osu.Game.Skinning
                 BeatmapSkins = BeatmapSkins,
                 BeatmapColours = BeatmapColours,
                 BeatmapHitsounds = BeatmapHitsounds,
+                DisallowBeatmapSampleParentFallback = Beatmap.BeatmapInfo.BeatmapSet?.IsExternallyHosted == true,
             };
         }
 

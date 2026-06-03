@@ -8,54 +8,39 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.IO.Stores;
-using osu.Framework.Platform;
 
 namespace osu.Game.Beatmaps.ExternalLibraries
 {
     /// <summary>
-    /// Chains the game file store with an optional external content root, resolving storage paths and relative filenames.
+    /// Resolves beatmap files exclusively from an external content root, using Realm storage paths and relative filenames.
+    /// Does not consult the internal Realm file store.
     /// </summary>
-    public sealed class ExternalBeatmapCompositeFileStore : IResourceStore<byte[]>
+    public sealed class ExternalBeatmapFileStore : IResourceStore<byte[]>
     {
-        private readonly ResourceStore<byte[]> chain;
-        private readonly string? contentRoot;
+        private readonly string contentRoot;
         private readonly Dictionary<string, string> storagePathToRelativeFilename;
 
-        public ExternalBeatmapCompositeFileStore(IResourceStore<byte[]> primaryStore, string? contentRoot, IEnumerable<(string storagePath, string relativeFilename)> fileMappings)
+        public ExternalBeatmapFileStore(string contentRoot, IEnumerable<(string storagePath, string relativeFilename)> fileMappings)
         {
-            this.contentRoot = string.IsNullOrWhiteSpace(contentRoot) ? null : Path.GetFullPath(contentRoot);
+            this.contentRoot = Path.GetFullPath(contentRoot);
             storagePathToRelativeFilename = fileMappings
                                             .Where(m => !string.IsNullOrEmpty(m.storagePath))
                                             .GroupBy(m => m.storagePath, StringComparer.OrdinalIgnoreCase)
                                             .ToDictionary(g => g.Key, g => g.First().relativeFilename, StringComparer.OrdinalIgnoreCase);
-
-            chain = new ResourceStore<byte[]>(primaryStore);
-
-            if (this.contentRoot != null)
-                chain.AddStore(new StorageBackedResourceStore(new NativeStorage(this.contentRoot)));
         }
 
-        public byte[] Get(string name)
-        {
-            byte[]? result = chain.Get(name);
-            return result ?? readBytes(openFromContentRoot(name)) ?? null!;
-        }
+        public byte[] Get(string name) => readBytes(openFromContentRoot(name)) ?? null!;
 
         public Task<byte[]> GetAsync(string name, CancellationToken cancellationToken = default)
+            => Task.FromResult(readBytes(openFromContentRoot(name)) ?? null!);
+
+        public Stream? GetStream(string name) => openFromContentRoot(name);
+
+        public IEnumerable<string> GetAvailableResources() => storagePathToRelativeFilename.Keys;
+
+        public void Dispose()
         {
-            byte[]? result = chain.GetAsync(name, cancellationToken).ConfigureAwait(false).GetAwaiter().GetResult();
-            return Task.FromResult(result ?? readBytes(openFromContentRoot(name)) ?? null!);
         }
-
-        public Stream? GetStream(string name)
-        {
-            Stream? result = chain.GetStream(name);
-            return result ?? openFromContentRoot(name);
-        }
-
-        public IEnumerable<string> GetAvailableResources() => chain.GetAvailableResources();
-
-        public void Dispose() => chain.Dispose();
 
         private static byte[]? readBytes(Stream? stream)
         {
@@ -72,9 +57,6 @@ namespace osu.Game.Beatmaps.ExternalLibraries
 
         private Stream? openFromContentRoot(string name)
         {
-            if (contentRoot == null)
-                return null;
-
             foreach (string candidate in getCandidateRelativePaths(name))
             {
                 string fullPath = Path.Combine(contentRoot, candidate.Replace('/', Path.DirectorySeparatorChar));
