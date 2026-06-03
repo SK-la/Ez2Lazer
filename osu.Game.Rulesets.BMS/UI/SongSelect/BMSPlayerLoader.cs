@@ -146,6 +146,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 titleText.Text = string.IsNullOrEmpty(metadata.Title) ? "BMS" : metadata.Title;
                 statusText.Text = BmsStrings.Loader_LoadComplete(beatmap.HitObjects.Count);
 
+                bool preload = resolveAutoPreloadFromConfig();
+                workingBeatmap.PrepareAudio(preload);
+
                 // Small delay then push to player
                 scheduledPushPlayer = Scheduler.AddDelayed(() =>
                 {
@@ -181,7 +184,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 }
                 else
                 {
-                    var maniaWorkingBeatmap = new ManiaConvertedWorkingBeatmap(workingBeatmap, audioManager);
+                    bool preload = resolveAutoPreloadFromConfig();
+                    var maniaWorkingBeatmap = new ManiaConvertedWorkingBeatmap(workingBeatmap, audioManager, preload);
                     Beatmap.Value = maniaWorkingBeatmap;
                     Ruleset.Value = new ManiaRuleset().RulesetInfo;
                 }
@@ -195,6 +199,21 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 statusText.Text = BmsStrings.Loader_LaunchFailed(ex.Message);
                 scheduleExit(3000);
             }
+        }
+
+        private bool resolveAutoPreloadFromConfig()
+        {
+            try
+            {
+                if (rulesetConfigCache.GetConfigFor(new BMSRuleset()) is BMSRulesetConfigManager bmsConfig)
+                    return bmsConfig.Get<bool>(BMSRulesetSetting.AutoPreloadKeysounds);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"BMSPlayerLoader: failed to read AutoPreloadKeysounds: {ex.Message}", LoggingTarget.Runtime, LogLevel.Important);
+            }
+
+            return true;
         }
 
         private BMSGameplayRoute resolveRouteFromConfig()

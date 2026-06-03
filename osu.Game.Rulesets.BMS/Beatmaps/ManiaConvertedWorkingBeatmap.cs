@@ -46,11 +46,15 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             if (preloadKeysounds)
             {
-                KeysoundManager = new BmsKeysoundManager(audioManager, SourceBeatmap.FolderPath);
-                KeysoundManager.PreloadKeysounds(maniaBeatmap.HitObjects);
+                KeysoundManager = source.KeysoundManager ?? new BmsKeysoundManager(audioManager, SourceBeatmap.FolderPath);
 
-                if (source.Beatmap is BMSBeatmap bmsBeatmap)
-                    KeysoundManager.SetBackgroundSoundEvents(bmsBeatmap.BackgroundSoundEvents);
+                if (!KeysoundManager.IsPrepared)
+                {
+                    if (source.Beatmap is BMSBeatmap bmsBeatmap)
+                        KeysoundManager.Prepare(maniaBeatmap.HitObjects, bmsBeatmap.BackgroundSoundEvents);
+                    else
+                        KeysoundManager.Prepare(maniaBeatmap.HitObjects);
+                }
             }
 
             if (maniaBeatmap.HitObjects.Count > 0)
@@ -86,20 +90,26 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             {
                 int column = columnRemap.GetValueOrDefault(hitObject.Column, 0);
 
+                var samples = hitObject.Samples.ToList();
+
                 ManiaHitObject maniaHitObject = hitObject switch
                 {
-                    BMSHoldNote holdNote => new HoldNote
+                    BMSHoldNote holdNote => new BmsManiaHoldNote
                     {
                         Column = column,
                         StartTime = holdNote.StartTime,
                         Duration = holdNote.Duration,
-                        Samples = holdNote.Samples.ToList(),
+                        Samples = samples,
+                        KeysoundSamples = samples,
+                        IsScratch = holdNote.IsScratch,
                     },
-                    _ => new Note
+                    _ => new BmsManiaNote
                     {
                         Column = column,
                         StartTime = hitObject.StartTime,
-                        Samples = hitObject.Samples.ToList(),
+                        Samples = samples,
+                        KeysoundSamples = samples,
+                        IsScratch = hitObject.IsScratch,
                     }
                 };
 
@@ -171,7 +181,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         protected override Track GetBeatmapTrack() => audioManager.Tracks.GetVirtual(Math.Max(beatmapLength, 60000));
 
-        protected override ISkin GetSkin() => null!;
+        protected override ISkin GetSkin()
+        {
+            if (KeysoundManager == null)
+                return null!;
+
+            return new BMSSkin(KeysoundManager);
+        }
 
         public override Stream? GetStream(string storagePath) => SourceBeatmap.GetStream(storagePath);
 

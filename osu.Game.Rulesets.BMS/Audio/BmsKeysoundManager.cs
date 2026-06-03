@@ -15,8 +15,8 @@ using osu.Game.Rulesets.Objects.Legacy;
 namespace osu.Game.Rulesets.BMS.Audio
 {
     /// <summary>
-    /// Manages keysound playback for BMS beatmaps.
-    /// BMS uses keysounds as the primary audio source with optional BGM.
+    /// Manages BMS chart audio: <see cref="Prepare"/> loads all samples before gameplay;
+    /// runtime only plays from the in-memory cache (no disk IO).
     /// </summary>
     public class BmsKeysoundManager
     {
@@ -27,16 +27,15 @@ namespace osu.Game.Rulesets.BMS.Audio
         private readonly AudioManager audioManager;
         private readonly ISampleStore? sampleStore;
         private readonly string bmsFolder;
-        private readonly Dictionary<string, ISample> keysoundCache = new Dictionary<string, ISample>();
-        private readonly Dictionary<string, double> keysoundPlayTimes = new Dictionary<string, double>(); // filename -> scheduled play time
+        private readonly Dictionary<string, ISample> keysoundCache = new Dictionary<string, ISample>(StringComparer.OrdinalIgnoreCase);
+        private BmsFolderSampleIndex? folderIndex;
         private double currentOffset;
         private double gameplayTime;
         private double sampleVolume = 1;
         private List<BmsBackgroundSoundEvent> backgroundEvents = new List<BmsBackgroundSoundEvent>();
         private int nextBackgroundIndex;
         private double lastBackgroundUpdateTime = double.MinValue;
-        private bool loggedMissingBackgroundEvents;
-        private bool loggedFirstBackgroundUpdate;
+        private int missingSampleLogCount;
         public bool IsDisposed { get; private set; }
 
         public BmsKeysoundManager(AudioManager audioManager, string bmsFolder)
@@ -44,57 +43,55 @@ namespace osu.Game.Rulesets.BMS.Audio
             this.audioManager = audioManager;
             this.bmsFolder = bmsFolder;
 
-            // Create a sample store for the BMS folder
             var storage = new NativeStorage(bmsFolder);
             var resourceStore = new StorageBackedResourceStore(storage);
             sampleStore = audioManager.GetSampleStore(resourceStore);
-
-            Logger.Log($"{bms_log_prefix} Keysound manager created - AudioManager: {true}, Folder: {bmsFolder}", LoggingTarget.Runtime, LogLevel.Important);
-            Logger.Log($"{bms_log_prefix} Created SampleStore for BMS folder: {sampleStore != null}", LoggingTarget.Runtime, LogLevel.Important);
         }
 
+        public bool IsPrepared { get; private set; }
+
         /// <summary>
-        /// Preload all keysounds from the beatmap's hit objects.
+        /// One-time chart entry: build folder index, decode all referenced samples into memory.
         /// </summary>
-        public void PreloadKeysounds(IEnumerable<HitObject> hitObjects)
+        public void Prepare(IEnumerable<HitObject> hitObjects, IReadOnlyList<BmsBackgroundSoundEvent>? backgroundEvents = null)
         {
-            if (IsDisposed)
+            if (IsDisposed || IsPrepared)
                 return;
 
+            folderIndex = BmsFolderSampleIndex.TryBuild(bmsFolder);
+
             var keysoundFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            collectSampleFilenames(hitObjects, keysoundFiles);
 
-            foreach (var hitObject in hitObjects)
+            if (backgroundEvents != null)
             {
-                IEnumerable<HitSampleInfo> samples = hitObject.Samples;
-
-                if (hitObject is IBmsKeysoundProvider provider && provider.KeysoundSamples.Count > 0)
-                    samples = provider.KeysoundSamples;
-                else if (hitObject.AuxiliarySamples.Count > 0)
-                    samples = hitObject.AuxiliarySamples;
-
-                foreach (var sample in samples)
+                foreach (var evt in backgroundEvents)
                 {
-                    if (sample is ConvertHitObjectParser.FileHitSampleInfo fileSample)
-                    {
-                        keysoundFiles.Add(fileSample.Filename);
-                    }
+                    if (!string.IsNullOrEmpty(evt.Filename))
+                        keysoundFiles.Add(evt.Filename);
                 }
             }
 
-            Logger.Log($"{bms_log_prefix} Preloading {keysoundFiles.Count} keysounds", LoggingTarget.Runtime, LogLevel.Debug);
+            int loaded = 0;
+            int missing = 0;
 
             foreach (string filename in keysoundFiles)
             {
-                try
-                {
-                    LoadKeysound(filename);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"{bms_log_prefix} Failed to preload keysound {filename}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
-                }
+                if (loadIntoCache(filename) != null)
+                    loaded++;
+                else
+                    missing++;
             }
+
+            IsPrepared = true;
+
+            Logger.Log($"{bms_log_prefix} Prepare complete: {loaded} loaded, {missing} missing, folder={bmsFolder}", LoggingTarget.Runtime, LogLevel.Debug);
         }
+
+        /// <summary>
+        /// Legacy name; forwards to <see cref="Prepare"/>.
+        /// </summary>
+        public void PreloadKeysounds(IEnumerable<HitObject> hitObjects) => Prepare(hitObjects);
 
         public void SetBackgroundSoundEvents(IReadOnlyList<BmsBackgroundSoundEvent> events)
         {
@@ -106,142 +103,49 @@ namespace osu.Game.Rulesets.BMS.Audio
                                .ToList();
             nextBackgroundIndex = 0;
             lastBackgroundUpdateTime = double.MinValue;
-            loggedMissingBackgroundEvents = false;
-            loggedFirstBackgroundUpdate = false;
-
-            Logger.Log($"{bms_log_prefix} Background sound events set: {backgroundEvents.Count}", LoggingTarget.Runtime, LogLevel.Debug);
         }
 
         /// <summary>
-        /// Load a keysound file into cache.
+        /// Returns a prepared sample for skin / drawable <see cref="osu.Game.Skinning.ISkin.GetSample"/> (no IO).
         /// </summary>
-        public ISample? LoadKeysound(string filename)
+        public ISample? GetPreparedSample(string filename)
         {
-            if (IsDisposed)
+            if (IsDisposed || string.IsNullOrEmpty(filename))
                 return null;
 
-            if (string.IsNullOrEmpty(filename))
-                return null;
-
-            // Normalize filename - use lowercase for cache key to handle case-insensitive filesystems
             string cacheKey = filename.ToLowerInvariant();
+            return keysoundCache.GetValueOrDefault(cacheKey);
+        }
 
-            if (keysoundCache.TryGetValue(cacheKey, out var cached))
-                return cached;
+        /// <summary>
+        /// Play a previously prepared sample. Does not load from disk.
+        /// </summary>
+        public void TriggerKeysound(string filename)
+        {
+            if (IsDisposed || string.IsNullOrEmpty(filename))
+                return;
 
-            // Try to load the sample - sampleStore will handle file extensions automatically
-            string? foundFilename = null;
+            var sample = GetPreparedSample(filename);
 
-            // Try the filename as-is first
-            if (File.Exists(Path.Combine(bmsFolder, filename)))
+            if (sample == null)
             {
-                foundFilename = filename;
-            }
-            else
-            {
-                // Get base name without extension and try different extensions
-                string baseName = Path.GetFileNameWithoutExtension(filename);
-                string[] extensions = new[] { "", ".wav", ".ogg", ".mp3", ".flac" };
-
-                foreach (string ext in extensions)
-                {
-                    // Try different case variations
-                    string[] testNames = new[] { baseName + ext, baseName.ToLowerInvariant() + ext, baseName.ToUpperInvariant() + ext };
-
-                    foreach (string testName in testNames)
-                    {
-                        if (File.Exists(Path.Combine(bmsFolder, testName)))
-                        {
-                            foundFilename = testName;
-                            break;
-                        }
-                    }
-
-                    if (foundFilename != null)
-                        break;
-                }
-            }
-
-            if (foundFilename == null)
-            {
-                // Only log first few failures to avoid spam
-                if (keysoundCache.Count < 100)
-                    Logger.Log($"[BMS] ❌ Not found: {filename}", LoggingTarget.Runtime, LogLevel.Debug);
-                return null;
+                if (missingSampleLogCount++ < 5)
+                    Logger.Log($"{bms_log_prefix} Keysound not prepared: {filename}", LoggingTarget.Runtime, LogLevel.Debug);
+                return;
             }
 
             try
             {
-                if (sampleStore == null)
-                    return null;
-
-                var sample = sampleStore.Get(foundFilename);
-                keysoundCache[cacheKey] = sample;
-
-                // Log first few successful loads with more detail
-                if (keysoundCache.Count <= 5)
-                {
-                    Logger.Log($"{bms_log_prefix} ✓ Loaded #{keysoundCache.Count}: {filename} -> {foundFilename}", LoggingTarget.Runtime, LogLevel.Important);
-                    Logger.Log($"{bms_log_prefix}    Sample info: {sample != null}, Has volume: {sample?.Volume != null}, Volume value: {sample?.Volume?.Value ?? -1:F2}", LoggingTarget.Runtime,
-                        LogLevel.Important);
-                }
-                else if (keysoundCache.Count == 10)
-                {
-                    Logger.Log($"{bms_log_prefix} ✓ Loaded 10 samples, suppressing further load logs...", LoggingTarget.Runtime, LogLevel.Debug);
-                }
-
-                return sample;
+                var channel = sample.Play();
+                if (channel != null)
+                    channel.Volume.Value = sampleVolume;
             }
             catch (Exception ex)
             {
-                Logger.Log($"{bms_log_prefix} ❌ Load exception: {filename}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
-                return null;
+                Logger.Log($"[BMS] Failed to play keysound {filename}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
             }
         }
 
-        /// <summary>
-        /// Trigger a keysound to play immediately with offset applied.
-        /// </summary>
-        public void TriggerKeysound(string filename)
-        {
-            if (IsDisposed)
-                return;
-
-            if (string.IsNullOrEmpty(filename))
-                return;
-
-            var sample = LoadKeysound(filename);
-
-            if (sample != null)
-            {
-                try
-                {
-                    var channel = sample.Play();
-
-                    if (channel != null)
-                        channel.Volume.Value = sampleVolume;
-
-                    // Log detailed playback info for first few triggers
-                    if (nextBackgroundIndex < 5 || gameplayTime < 10000)
-                    {
-                        Logger.Log($"{bms_log_prefix} ▶ Playing: {filename} at {gameplayTime:F0}ms - Channel: {channel != null}, Volume: {sample.Volume?.Value ?? -1}", LoggingTarget.Runtime,
-                            LogLevel.Important);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"[BMS] Failed to play keysound {filename}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
-                }
-            }
-            else
-            {
-                Logger.Log($"{bms_log_prefix} ⚠ Keysound not loaded: {filename}", LoggingTarget.Runtime, LogLevel.Debug);
-            }
-        }
-
-        /// <summary>
-        /// Update the current gameplay time. Call this every frame from the Player.
-        /// </summary>
         public void Update(double currentGameplayTime)
         {
             if (IsDisposed)
@@ -250,23 +154,7 @@ namespace osu.Game.Rulesets.BMS.Audio
             gameplayTime = currentGameplayTime;
 
             if (backgroundEvents.Count == 0)
-            {
-                // Only log this once
-                if (!loggedMissingBackgroundEvents)
-                {
-                    Logger.Log($"{bms_log_prefix} Update called but no background events loaded", LoggingTarget.Runtime, LogLevel.Debug);
-                    loggedMissingBackgroundEvents = true;
-                }
-
                 return;
-            }
-
-            // Log first update with background events
-            if (!loggedFirstBackgroundUpdate)
-            {
-                Logger.Log($"{bms_log_prefix} First Update with {backgroundEvents.Count} background events, currentTime={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
-                loggedFirstBackgroundUpdate = true;
-            }
 
             if (currentGameplayTime < lastBackgroundUpdateTime)
             {
@@ -276,7 +164,6 @@ namespace osu.Game.Rulesets.BMS.Audio
             }
 
             int eventsTriggered = 0;
-            int discardedEvents = 0;
 
             while (nextBackgroundIndex < backgroundEvents.Count)
             {
@@ -288,7 +175,6 @@ namespace osu.Game.Rulesets.BMS.Audio
 
                 if (currentGameplayTime - scheduledTime > stale_background_event_threshold)
                 {
-                    discardedEvents++;
                     nextBackgroundIndex++;
                     continue;
                 }
@@ -301,20 +187,9 @@ namespace osu.Game.Rulesets.BMS.Audio
                     break;
             }
 
-            if (eventsTriggered > 0)
-                Logger.Log($"{bms_log_prefix} Triggered {eventsTriggered} background sound events at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
-            if (discardedEvents > 0)
-                Logger.Log($"{bms_log_prefix} Discarded {discardedEvents} stale background events at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
-            if (eventsTriggered >= max_background_triggers_per_update && nextBackgroundIndex < backgroundEvents.Count)
-                Logger.Log($"{bms_log_prefix} Background trigger cap reached ({max_background_triggers_per_update}) at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
-
             lastBackgroundUpdateTime = currentGameplayTime;
         }
 
-        /// <summary>
-        /// Set the offset to apply to all keysound timings.
-        /// BMS offset works inversely: positive offset delays the audio playback.
-        /// </summary>
         public void SetOffset(double offsetMs)
         {
             if (IsDisposed)
@@ -331,9 +206,6 @@ namespace osu.Game.Rulesets.BMS.Audio
             sampleVolume = Math.Clamp(volume, 0, 1);
         }
 
-        /// <summary>
-        /// Dispose all cached keysounds.
-        /// </summary>
         public void Dispose()
         {
             if (IsDisposed)
@@ -342,13 +214,63 @@ namespace osu.Game.Rulesets.BMS.Audio
             IsDisposed = true;
 
             foreach (var sample in keysoundCache.Values)
-            {
                 (sample as IDisposable)?.Dispose();
-            }
 
             keysoundCache.Clear();
-            keysoundPlayTimes.Clear();
             backgroundEvents.Clear();
+        }
+
+        private ISample? loadIntoCache(string filename)
+        {
+            if (string.IsNullOrEmpty(filename))
+                return null;
+
+            string cacheKey = filename.ToLowerInvariant();
+
+            if (keysoundCache.TryGetValue(cacheKey, out var cached))
+                return cached;
+
+            if (folderIndex == null || sampleStore == null)
+                return null;
+
+            string? relative = folderIndex.TryResolveRelativePath(filename);
+
+            if (relative == null)
+                return null;
+
+            try
+            {
+                var sample = sampleStore.Get(relative);
+                keysoundCache[cacheKey] = sample;
+                return sample;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"{bms_log_prefix} Load failed: {filename}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
+                return null;
+            }
+        }
+
+        private static void collectSampleFilenames(IEnumerable<HitObject> hitObjects, HashSet<string> keysoundFiles)
+        {
+            foreach (var hitObject in hitObjects)
+            {
+                IEnumerable<HitSampleInfo> samples = hitObject.Samples;
+
+                if (hitObject is IBmsKeysoundProvider provider && provider.KeysoundSamples.Count > 0)
+                    samples = provider.KeysoundSamples;
+                else if (hitObject.AuxiliarySamples.Count > 0)
+                    samples = hitObject.AuxiliarySamples;
+
+                foreach (var sample in samples)
+                {
+                    if (sample is ConvertHitObjectParser.FileHitSampleInfo fileSample)
+                        keysoundFiles.Add(fileSample.Filename);
+                }
+
+                if (hitObject.NestedHitObjects.Count > 0)
+                    collectSampleFilenames(hitObject.NestedHitObjects, keysoundFiles);
+            }
         }
     }
 }
