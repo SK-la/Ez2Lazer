@@ -109,6 +109,9 @@ namespace osu.Game.Beatmaps
             if (!EzXxyStarRatingSupport.SupportsBeatmap(working.Beatmap, beatmapInfo.Ruleset))
                 return -1;
 
+            if (working.Beatmap.HitObjects.Count == 0)
+                return 0;
+
             if (beatmapManager == null)
                 return -1;
 

@@ -201,11 +201,14 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             xxySr = null;
 
-            if (analysisBeatmap.HitObjects.Count == 0)
-                return false;
-
             if (!EzXxyStarRatingSupport.SupportsBeatmap(analysisBeatmap, lookup.Ruleset))
                 return false;
+
+            if (analysisBeatmap.HitObjects.Count == 0)
+            {
+                xxySr = 0;
+                return true;
+            }
 
             double rate = getRateAdjustMultiplier(lookup.OrderedMods);
 

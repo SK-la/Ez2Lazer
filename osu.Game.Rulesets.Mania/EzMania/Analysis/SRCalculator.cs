@@ -146,11 +146,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         {
             double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
 
-            if (cross == null || cross[0] == -1)
-            {
-                Console.WriteLine($@"[SR][ERROR] Key mode {keyCount}k is not supported by the SR algorithm.");
+            if (cross == null)
                 throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
-            }
 
             int estimatedNotes = maniaBeatmap.HitObjects.Count;
             if (estimatedNotes == 0) return 0.0;
@@ -287,11 +284,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.BeatmapInfo.Difficulty.CircleSize));
             double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
 
-            if (cross == null || cross[0] == -1)
-            {
-                Console.WriteLine($@"[SR][ERROR] Key mode {keyCount}k is not supported by the SR algorithm.");
+            if (cross == null)
                 throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
-            }
 
             int estimatedNotes = maniaBeatmap.HitObjects.Count;
 

@@ -60,6 +60,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             if (!EzManiaXxyStarRating.IsPatternSupported(beatmap))
                 return false;
 
+            if (beatmap.HitObjects.Count == 0)
+                return true;
+
             sr = SRCalculator.CalculateSR(beatmap, clockRate);
             return !double.IsNaN(sr) && !double.IsInfinity(sr);
         }

@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                 ? maniaBeatmap.TotalColumns
                 : Math.Max(1, (int)Math.Round(beatmap.BeatmapInfo.Difficulty.CircleSize));
 
-            return keyCount < 11 || keyCount % 2 == 0;
+            return keyCount >= 1 && keyCount <= CrossMatrixProvider.MAX_SUPPORTED_KEY_COUNT && CrossMatrixProvider.GetMatrix(keyCount) != null;
         }
     }
 }
