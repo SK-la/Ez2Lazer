@@ -77,8 +77,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         continue;
                     }
 
+                    Dictionary<Guid, PersistedSongSelectBaseline>? preservedBaseline = null;
+
                     if (existingSet != null)
                     {
+                        preservedBaseline = capturePersistedSongSelectBaseline(existingSet);
                         removeSet(r, existingSet);
                         removedSets++;
                     }
@@ -124,6 +127,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         };
 
                         applyVirtualBeatmapToRealm(beatmap, virtualBeatmap);
+                        applyPersistedSongSelectBaseline(beatmap, preservedBaseline);
 
                         newSet.Beatmaps.Add(beatmap);
                         importedBeatmaps++;
@@ -140,6 +144,50 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             manager.MarkRealmSynchronized();
 
             Logger.Log($"[BMS] External library sync finished: imported {importedSets} sets/{importedBeatmaps} beatmaps, removed {removedSets} sets, skipped {skippedSets} unchanged sets.");
+        }
+
+        /// <summary>
+        /// Song-select baseline fields written by <see cref="UI.BmsSongSelect.Analytics.BmsAnalyticsRealmWriteback"/>.
+        /// </summary>
+        public readonly record struct PersistedSongSelectBaseline(double StarRating, double XxyStarRating, double PerformancePoints);
+
+        /// <summary>
+        /// Exposed for unit tests validating Realm re-import retains song-select baseline.
+        /// </summary>
+        public static IReadOnlyDictionary<Guid, PersistedSongSelectBaseline> CapturePersistedSongSelectBaselineForTesting(BeatmapSetInfo existingSet)
+            => capturePersistedSongSelectBaseline(existingSet);
+
+        /// <summary>
+        /// Exposed for unit tests validating Realm re-import retains song-select baseline.
+        /// </summary>
+        public static void ApplyPersistedSongSelectBaselineForTesting(BeatmapInfo beatmap, IReadOnlyDictionary<Guid, PersistedSongSelectBaseline>? preservedBaseline)
+            => applyPersistedSongSelectBaseline(beatmap, preservedBaseline);
+
+        private static Dictionary<Guid, PersistedSongSelectBaseline> capturePersistedSongSelectBaseline(BeatmapSetInfo existingSet)
+        {
+            var result = new Dictionary<Guid, PersistedSongSelectBaseline>();
+
+            foreach (var beatmap in existingSet.Beatmaps)
+            {
+                result[beatmap.ID] = new PersistedSongSelectBaseline(beatmap.StarRating, beatmap.XxyStarRating, beatmap.PerformancePoints);
+            }
+
+            return result;
+        }
+
+        private static void applyPersistedSongSelectBaseline(BeatmapInfo beatmap, IReadOnlyDictionary<Guid, PersistedSongSelectBaseline>? preservedBaseline)
+        {
+            if (preservedBaseline == null || !preservedBaseline.TryGetValue(beatmap.ID, out PersistedSongSelectBaseline persisted))
+                return;
+
+            if (persisted.StarRating >= 0)
+                beatmap.StarRating = persisted.StarRating;
+
+            if (persisted.XxyStarRating >= 0)
+                beatmap.XxyStarRating = persisted.XxyStarRating;
+
+            if (persisted.PerformancePoints >= 0)
+                beatmap.PerformancePoints = persisted.PerformancePoints;
         }
 
         private static void applyVirtualBeatmapToRealm(BeatmapInfo beatmap, BeatmapInfo virtualBeatmap)
