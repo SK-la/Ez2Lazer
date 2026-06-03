@@ -23,29 +23,45 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static bool HasActiveMods(IReadOnlyList<Mod>? mods) => mods != null && mods.Count > 0;
 
+        public static bool HasDisplayableKps(in EzAnalysisResult result)
+            => result.KpsList.Count > 0 || result.AverageKps > 0 || result.MaxKps > 0;
+
+        /// <summary>
+        /// 避免 bindable 在异步重算完成前用空占位结果清空折线（尤其有 Mod 时）。
+        /// </summary>
+        public static bool ShouldApplyPanelUpdate(in EzAnalysisResult result, IReadOnlyList<Mod>? mods)
+            => HasDisplayableKps(result) || !HasActiveMods(mods);
+
         public static PanelMetrics Resolve(BeatmapInfo beatmap, EzAnalysisResult? dynamic, IReadOnlyList<Mod>? mods)
         {
             bool hasMods = HasActiveMods(mods);
-            bool useDynamicMetrics = hasMods && dynamicHasDisplayMetrics(dynamic);
+            bool useDynamicStarMetrics = hasMods && dynamicHasStarMetrics(dynamic);
 
-            double? pp = useDynamicMetrics && dynamic!.Value.Pp is double dynamicPp
+            double? pp = useDynamicStarMetrics && dynamic!.Value.Pp is double dynamicPp
                 ? dynamicPp
                 : beatmap.PerformancePoints >= 0
                     ? beatmap.PerformancePoints
                     : dynamic?.Pp;
 
-            double avgKps = dynamic?.AverageKps ?? 0;
-            double maxKps = dynamic?.MaxKps ?? 0;
-            var kpsList = dynamic?.KpsList ?? System.Array.Empty<double>();
+            double avgKps = 0;
+            double maxKps = 0;
+            IReadOnlyList<double> kpsList = System.Array.Empty<double>();
+
+            if (dynamic is { } analysis && HasDisplayableKps(analysis))
+            {
+                avgKps = analysis.AverageKps;
+                maxKps = analysis.MaxKps;
+                kpsList = analysis.KpsList;
+            }
 
             EzManiaSummary? maniaSummary = beatmap.ToEzManiaSummaryForDisplay(
                 dynamic?.ManiaSummary,
-                preferAnalysisValues: useDynamicMetrics);
+                preferAnalysisValues: useDynamicStarMetrics);
 
             return new PanelMetrics(pp, avgKps, maxKps, kpsList, maniaSummary);
         }
 
-        private static bool dynamicHasDisplayMetrics(EzAnalysisResult? dynamic)
+        private static bool dynamicHasStarMetrics(EzAnalysisResult? dynamic)
         {
             if (!dynamic.HasValue)
                 return false;
@@ -55,10 +71,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (result.Pp != null)
                 return true;
 
-            if (result.ManiaSummary?.XxySr != null)
-                return true;
-
-            return result.AverageKps > 0 || result.MaxKps > 0 || result.KpsList.Count > 0;
+            return result.ManiaSummary?.XxySr != null;
         }
     }
 }

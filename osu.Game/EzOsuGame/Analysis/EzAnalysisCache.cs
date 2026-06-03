@@ -129,7 +129,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
             // NoMod：仅预填主 SQLite 的 kps/KPC 切片；xxy/PP 占位由面板直读 Realm（对齐 StarRating）。
             if (currentMods.Value.Count == 0
-                && analysisDatabase.TryGetStoredSqliteSlice(beatmapInfo, beatmapInfo.Ruleset, out var storedSlice))
+                && beatmapInfo is BeatmapInfo seedBeatmapInfo
+                && analysisDatabase.TryGetStoredSqliteSlice(seedBeatmapInfo, currentRuleset.Value, out var storedSlice))
                 bindable.Value = storedSlice;
 
             if (beatmapInfo is BeatmapInfo localBeatmapInfo)

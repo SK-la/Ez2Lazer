@@ -273,6 +273,7 @@ namespace osu.Game.Screens.Select
             {
                 resetEzDisplay();
                 updateKeyCount();
+                computeEzAnalysis();
             }, true);
 
             mods.BindValueChanged(_ =>
@@ -387,6 +388,7 @@ namespace osu.Game.Screens.Select
 
             displaySR.Current.Value = EzManiaSummary.EMPTY;
             ezDisplayKpc.ManiaSummary = null;
+            ezDisplayKpsGraph.SetPoints(Array.Empty<double>());
         }
 
         private void updateKPS(EzAnalysisResult ezAnalysisResult)
@@ -432,15 +434,22 @@ namespace osu.Game.Screens.Select
                 return;
 
             ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+
+            if (EzSongSelectAnalysisDisplay.ShouldApplyPanelUpdate(ezAnalysisBindable.Value, mods.Value))
+                updateKPS(ezAnalysisBindable.Value);
+
             ezAnalysisBindable.BindValueChanged(result =>
             {
+                if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelUpdate(result.NewValue, mods.Value))
+                    return;
+
                 scheduledEzAnalysisUpdate?.Cancel();
                 scheduledEzAnalysisUpdate = Scheduler.AddDelayed(() =>
                 {
                     updateKPS(result.NewValue);
                     scheduledEzAnalysisUpdate = null;
                 }, mania_ui_update_throttle_ms);
-            }, true);
+            });
         }
 
         private void computeStarRating()
