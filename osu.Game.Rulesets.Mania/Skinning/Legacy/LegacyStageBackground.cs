@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Skinning;
 using osuTK;
@@ -63,8 +64,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                 }
             };
 
-            for (int i = 0; i < stageDefinition.Columns; i++)
-                columnBackgrounds.SetContentForColumn(i, new ColumnBackground(i, i == stageDefinition.Columns - 1));
+            int displayColumns = ManiaEzColumnLayout.GetDisplayColumnCount(stageDefinition);
+
+            for (int i = 0; i < displayColumns; i++)
+                columnBackgrounds.SetContentForColumn(i, new ColumnBackground(i, i == displayColumns - 1));
         }
 
         protected override void Update()

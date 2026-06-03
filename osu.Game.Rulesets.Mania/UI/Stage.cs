@@ -12,7 +12,9 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
+using osu.Framework.Logging;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -95,7 +97,7 @@ namespace osu.Game.Rulesets.Mania.UI
             Container columnBackgrounds;
             Container topLevelContainer;
 
-            InternalChildren = new Drawable[]
+            InternalChildren = new[]
             {
                 (stageBackdropBlur = showBlur
                     ? new BackdropBlurDrawable
@@ -170,13 +172,10 @@ namespace osu.Game.Rulesets.Mania.UI
                 }
             };
 
-            bool skipLastColumn = GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
+            int displayColumns = ManiaEzColumnLayout.GetDisplayColumnCount(definition);
 
-            for (int i = 0; i < definition.Columns; i++)
+            for (int i = 0; i < displayColumns; i++)
             {
-                if (skipLastColumn && definition.Columns == 14 && i == definition.Columns - 1)
-                    continue;
-
                 bool isSpecial = definition.IsSpecialColumn(i);
 
                 var action = columnStartAction;
@@ -291,13 +290,53 @@ namespace osu.Game.Rulesets.Mania.UI
             NewResult += OnNewResult;
         }
 
-        public override void Add(HitObject hitObject) => Columns[((ManiaHitObject)hitObject).Column - firstColumnIndex].Add(hitObject);
+        public override void Add(HitObject hitObject)
+        {
+            if (!tryGetColumnForHitObject((ManiaHitObject)hitObject, out var column))
+                return;
 
-        public override bool Remove(HitObject hitObject) => Columns[((ManiaHitObject)hitObject).Column - firstColumnIndex].Remove(hitObject);
+            column.Add(hitObject);
+        }
 
-        public override void Add(DrawableHitObject h) => Columns[((ManiaHitObject)h.HitObject).Column - firstColumnIndex].Add(h);
+        public override bool Remove(HitObject hitObject)
+        {
+            if (!tryGetColumnForHitObject((ManiaHitObject)hitObject, out var column))
+                return false;
 
-        public override bool Remove(DrawableHitObject h) => Columns[((ManiaHitObject)h.HitObject).Column - firstColumnIndex].Remove(h);
+            return column.Remove(hitObject);
+        }
+
+        public override void Add(DrawableHitObject h)
+        {
+            if (!tryGetColumnForHitObject((ManiaHitObject)h.HitObject, out var column))
+                return;
+
+            column.Add(h);
+        }
+
+        public override bool Remove(DrawableHitObject h)
+        {
+            if (!tryGetColumnForHitObject((ManiaHitObject)h.HitObject, out var column))
+                return false;
+
+            return column.Remove(h);
+        }
+
+        private bool tryGetColumnForHitObject(ManiaHitObject hitObject, out Column column)
+        {
+            column = null!;
+
+            int localColumn = hitObject.Column - firstColumnIndex;
+
+            if (ManiaEzColumnLayout.ShouldSkipBeatmapColumn(Definition, localColumn))
+            {
+                Logger.Log($"Skipping hit object in column {hitObject.Column} because Ez2Ac mode hides the last column of 14K beatmaps.");
+                return false;
+            }
+
+            column = Columns[localColumn];
+            return true;
+        }
 
         public void Add(BarLine barLine) => base.Add(barLine);
 

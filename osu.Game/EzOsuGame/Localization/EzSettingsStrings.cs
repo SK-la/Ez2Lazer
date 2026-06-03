@@ -165,10 +165,10 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS = new EzLocalizationManager.EzLocalisableString("使用Ez2Ac 10k2s1p", "Use Ez2Ac 10k2s1p");
 
         public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启后，14k皮肤跳过最后一列，加载成13k，用于游玩Ez2Ac街机谱面。"
-            + "\n注意：14k最后一列有note时必须开启此选项，否则进入谱面时会导致程序崩溃！",
-            "When enabled, 14k skins will skip the last column and load as 13k, for playing Ez2Ac arcade beatmaps."
-            + "Note: This option must be enabled when there are note in the 14k last column, otherwise it will cause a crash when entering the beatmap!");
+            "开启后，14k谱面按13k显示（跳过最后一列），用于游玩Ez2Ac街机谱面（最后一列为空）。"
+            + "\n若最后一列有音符，请关闭此选项。",
+            "When enabled, 14K beatmaps display as 13K (last column hidden) for Ez2Ac arcade maps with an empty last column."
+            + "\nDisable this if the last column contains notes.");
 
         public static readonly LocalisableString SKIP_WITH_GAMEPLAY_KEYS = new EzLocalizationManager.EzLocalisableString(
             "跳过可由游戏按键触发",

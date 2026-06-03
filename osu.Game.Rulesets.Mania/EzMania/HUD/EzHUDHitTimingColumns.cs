@@ -75,13 +75,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         {
             columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
             specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
-            recreateComponents();
+            floatingAverages = Array.Empty<double>();
+            judgementMarkers = Array.Empty<Box>();
+            columns = Array.Empty<Container>();
         }
 
         private void recreateComponents()
         {
             ClearInternal();
-            keyCount = controller.Triggers.Count;
+            keyCount = ManiaEzColumnLayout.GetDisplayColumnCount(controller.Triggers.Count);
+
+            if (keyCount <= 0)
+            {
+                floatingAverages = Array.Empty<double>();
+                judgementMarkers = Array.Empty<Box>();
+                columns = Array.Empty<Container>();
+                return;
+            }
             floatingAverages = new double[keyCount];
             judgementMarkers = new Box[keyCount];
             InternalChild = new Container
@@ -253,10 +263,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         public override void Clear()
         {
+            if (columns == null)
+                return;
+
             foreach (var column in columns)
-            {
                 column.Clear();
-            }
         }
     }
 }

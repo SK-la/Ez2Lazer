@@ -77,8 +77,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private void triggersChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             KeyFlow.Clear();
-            foreach (var trigger in Controller.Triggers)
-                KeyFlow.Add(CreateCounter(trigger));
+
+            int displayColumns = ManiaEzColumnLayout.GetDisplayColumnCount(StageDefinition.Columns);
+
+            if (displayColumns <= 0)
+                return;
+
+            for (int i = 0; i < displayColumns && i < Controller.Triggers.Count; i++)
+                KeyFlow.Add(CreateCounter(Controller.Triggers[i]));
 
             updateCounterWidths();
         }

@@ -85,7 +85,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         {
             keyFlow.Clear();
 
-            for (int i = 0; i < controller.Triggers.Count; i++)
+            int displayColumns = ManiaEzColumnLayout.GetDisplayColumnCount(controller.Triggers.Count);
+
+            if (displayColumns <= 0)
+                return;
+
+            for (int i = 0; i < displayColumns; i++)
             {
                 float? widthS = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
                                         new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, i))
