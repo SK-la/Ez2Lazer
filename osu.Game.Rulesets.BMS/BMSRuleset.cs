@@ -82,8 +82,6 @@ namespace osu.Game.Rulesets.BMS
         public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap) => new BMSBeatmapConverter(beatmap, this);
         public override PerformanceCalculator CreatePerformanceCalculator() => new ManiaPerformanceCalculator();
 
-        public override HitObjectComposer CreateHitObjectComposer() => new ManiaHitObjectComposer(this);
-
         public override IBeatmapVerifier CreateBeatmapVerifier() => new ManiaBeatmapVerifier();
 
         public override IEzAnalysisProvider CreateEzAnalysisProvider() => new EzBms.BmsEzAnalysisProvider();
