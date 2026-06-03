@@ -347,7 +347,7 @@ namespace osu.Game.Screens.Select
                 IReadOnlyList<double> kpsList;
 
                 if (selectedMods.Count == 0
-                    && analysisDatabase.TryGetStoredAnalysis(beatmapInfo, selectedRuleset, out var storedAnalysis)
+                    && analysisDatabase.TryGetStoredSqliteSlice(beatmapInfo, selectedRuleset, out var storedAnalysis)
                     && storedAnalysis.KpsList is { Count: > 0 } storedKpsList)
                 {
                     kpsList = storedKpsList;

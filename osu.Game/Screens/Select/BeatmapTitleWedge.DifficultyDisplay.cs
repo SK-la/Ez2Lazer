@@ -48,6 +48,9 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
 
+            [Resolved]
+            private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
+
             private EzDisplayKpc ezDisplayKpc = null!;
 
             private ModSettingChangeTracker? settingChangeTracker;
@@ -295,23 +298,39 @@ namespace osu.Game.Screens.Select
                     bool hasMods = selectedMods.Length > 0;
                     EzManiaSummary? maniaSummary = null;
 
-                    if (!hasMods
-                        && selectedRuleset != null
-                        && EzAnalysisProviderBridge.HasAnalysisProvider(selectedRuleset)
-                        && analysisDatabase.TryGetStoredAnalysis(selectedBeatmap.BeatmapInfo, selectedRuleset, out var storedAnalysis))
+                    EzAnalysisResult? dynamicAnalysis = null;
+
+                    if (selectedBeatmap.BeatmapInfo is BeatmapInfo beatmapInfo
+                        && selectedRuleset is RulesetInfo rulesetInfo
+                        && EzAnalysisProviderBridge.HasAnalysisProvider(selectedRuleset))
                     {
-                        maniaSummary = storedAnalysis.ManiaSummary;
+                        if (hasMods)
+                        {
+                            dynamicAnalysis = ezAnalysisCache
+                                              .GetAnalysisAsync(beatmapInfo, rulesetInfo, selectedMods, cancellationToken)
+                                              .GetAwaiter()
+                                              .GetResult();
+                        }
+                        else if (analysisDatabase.TryGetStoredSqliteSlice(beatmapInfo, selectedRuleset, out var storedSlice))
+                        {
+                            dynamicAnalysis = storedSlice;
+                        }
                     }
 
                     // This can take time as it is a synchronous task.
                     // 使用可取消重载，避免快速切歌时后台任务继续持有旧谱面对象。
-                    var playableBeatmap = selectedBeatmap.GetPlayableBeatmap(selectedRuleset, Array.Empty<Mod>(), cancellationToken);
+                    var playableBeatmap = selectedBeatmap.GetPlayableBeatmap(selectedRuleset, selectedMods, cancellationToken);
 
                     cancellationToken.ThrowIfCancellationRequested();
 
                     var statistics = playableBeatmap.GetStatistics()
                                                     .Select(s => new StatisticDifficulty.Data(s.Name, s.BarDisplayLength ?? 0, s.BarDisplayLength ?? 0, 1, s.Content))
                                                     .ToList();
+
+                    if (selectedBeatmap.BeatmapInfo is BeatmapInfo localBeatmapInfo)
+                    {
+                        maniaSummary = EzSongSelectAnalysisDisplay.Resolve(localBeatmapInfo, dynamicAnalysis, selectedMods).ManiaSummary;
+                    }
 
                     maniaSummary ??= OptimizedBeatmapCalculator.GetEzManiaSummary(playableBeatmap);
 

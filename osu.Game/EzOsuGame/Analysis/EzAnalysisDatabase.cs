@@ -25,12 +25,12 @@ using osu.Game.Rulesets.UI;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 选歌分析数据库入口。
+    /// 选歌分析持久化入口（主 SQLite + 分支库）。
     ///
-    /// 职责对齐官方选歌读取链路：
-    /// - SQLite 持久化结果作为选歌基线数据源。
-    /// - 运行时分析缓存仅负责当前 ruleset/mods 的动态修正。
-    /// - 启动预热与运行期补算由外部后台处理器驱动，不再挂在 cache 上。
+    /// 三层数据（见 <see cref="EzSongSelectAnalysisDisplay"/>）：
+    /// - L1 Realm：<see cref="BeatmapInfo.XxyStarRating"/> / <see cref="BeatmapInfo.PerformancePoints"/>，不受 SQLite 开关影响。
+    /// - L2 主 SQLite（<see cref="Ez2Setting.EzAnalysisSqliteEnabled"/>）：仅 kps + mania 列统计；分支库另存 mod 快照 xxy/PP。
+    /// - L3 动态重算：由 <see cref="EzAnalysisCache"/> 负责，非本类职责。
     /// </summary>
     public class EzAnalysisDatabase
     {
@@ -74,7 +74,10 @@ namespace osu.Game.EzOsuGame.Analysis
             sqliteAnalysisEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
         }
 
-        public bool TryGetStoredAnalysis(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out EzAnalysisResult result)
+        /// <summary>
+        /// 读取主 SQLite 中的 kps/KPC 切片（NoMod）。不含 xxy/PP。
+        /// </summary>
+        public bool TryGetStoredSqliteSlice(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out EzAnalysisResult result)
         {
             result = default;
 
@@ -140,11 +143,12 @@ namespace osu.Game.EzOsuGame.Analysis
             return getResolvedActiveBranchValues(beatmaps, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchPpValues, empty_pp_values);
         }
 
-        public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+        /// <summary>
+        /// NoMod 基线 xxy：直读 Realm（对齐 carousel 读 <see cref="BeatmapInfo.StarRating"/>）。
+        /// 有 mod 时仅返回已激活且指纹匹配的分支库值（需 SQLite 开关）。
+        /// </summary>
+        public IReadOnlyDictionary<Guid, double> GetBaselineXxySrFromRealm(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
         {
-            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
-                return empty_xxy_sr_values;
-
             var beatmapList = beatmaps.Distinct().ToList();
 
             if (beatmapList.Count == 0)
@@ -152,20 +156,19 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (IsActiveSongsBranchFor(rulesetInfo, mods))
             {
+                if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                    return empty_xxy_sr_values;
+
                 return getResolvedActiveBranchValues(beatmapList, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchValues, empty_xxy_sr_values);
             }
 
             if (mods?.Any() == true)
                 return empty_xxy_sr_values;
 
-            var eligibleBeatmaps = beatmapList.Where(b => CanUseStoredAnalysis(b, rulesetInfo, mods: null)).ToList();
-
-            if (eligibleBeatmaps.Count == 0)
-                return empty_xxy_sr_values;
-
-            var resolvedValues = persistentStore.GetStoredXxySrValues(eligibleBeatmaps);
+            var resolvedValues = persistentStore.GetBaselineXxySrFromRealm(beatmapList);
             return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
         }
+
 
         public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
         {
@@ -695,7 +698,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 var workingBeatmap = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo);
 
-                EzAnalysisResult result = EzAnalysisComputation.Compute(workingBeatmap, lookup, cancellationToken);
+                EzAnalysisResult result = EzAnalysisComputation.ComputePersistedSqliteSlice(workingBeatmap, lookup, cancellationToken);
 
                 if (skipExistingComparison)
                     persistentStore.Store(beatmapInfo, result);

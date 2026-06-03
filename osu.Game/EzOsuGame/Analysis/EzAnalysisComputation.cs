@@ -67,6 +67,47 @@ namespace osu.Game.EzOsuGame.Analysis
         public static EzAnalysisResult Compute(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
             => Compute(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup, cancellationToken);
 
+        /// <summary>
+        /// 主 SQLite 预热/回填专用：仅计算 kps 与 mania 列统计（NoMod），不写 xxy/PP（由 Realm 维护）。
+        /// </summary>
+        public static EzAnalysisResult ComputePersistedSqliteSlice(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup,
+                                                                   CancellationToken cancellationToken = default)
+            => ComputePersistedSqliteSlice(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup, cancellationToken);
+
+        public static EzAnalysisResult ComputePersistedSqliteSlice(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
+        {
+            PlayableCachedWorkingBeatmap playableWorkingBeatmap = new PlayableCachedWorkingBeatmap(workingBeatmap);
+
+            bool onlyKps = !EzAnalysisProviderBridge.HasAnalysisProvider(lookup.Ruleset);
+            IBeatmap analysisBeatmap = playableWorkingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(analysisBeatmap, onlyKps: onlyKps);
+
+            double rate = getRateAdjustMultiplier(lookup.OrderedMods);
+
+            if (!Precision.AlmostEquals(rate, 1.0))
+            {
+                averageKps *= rate;
+                maxKps *= rate;
+
+                for (int i = 0; i < kpsList.Count; i++)
+                    kpsList[i] *= rate;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
+
+            var commonSummary = new KpsSummary(averageKps, maxKps, kpsList);
+            EzManiaSummary? maniaSummary = onlyKps
+                ? null
+                : new EzManiaSummary(columnCounts, holdNoteCounts, xxySr: null);
+
+            return new EzAnalysisResult(commonSummary, pp: null, maniaSummary);
+        }
+
         public static EzAnalysisResult Compute(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
         {
             PlayableCachedWorkingBeatmap playableWorkingBeatmap = new PlayableCachedWorkingBeatmap(workingBeatmap);

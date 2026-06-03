@@ -258,7 +258,10 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps)
+        /// <summary>
+        /// NoMod 基线 xxy：从 <see cref="BeatmapInfo.XxyStarRating"/> 聚合（非 SQLite）。
+        /// </summary>
+        public IReadOnlyDictionary<Guid, double> GetBaselineXxySrFromRealm(IEnumerable<BeatmapInfo> beatmaps)
         {
             var beatmapList = beatmaps.Distinct().ToList();
 
@@ -393,10 +396,8 @@ LIMIT 1;
                     double averageKps = reader.GetDouble(4);
                     double maxKps = reader.GetDouble(5);
                     string kpsListJson = reader.GetString(6);
-                    // Baseline PP/Xxy are sourced from Realm fields; main sqlite legacy columns are ignored.
-                    double? pp = beatmap.PerformancePoints >= 0 ? beatmap.PerformancePoints : null;
+                    // 主库仅持久化 kps/KPC；xxy/PP 基线由 Realm 字段提供，不在此 DTO 中注入。
                     long maniaUpdatedAt = reader.IsDBNull(7) ? 0 : reader.GetInt64(7);
-                    double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
 
                     string columnCountsJson = reader.IsDBNull(8) ? "{}" : reader.GetString(8);
                     string holdNoteCountsJson = reader.IsDBNull(9) ? "{}" : reader.GetString(9);
@@ -406,10 +407,10 @@ LIMIT 1;
                     var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
 
                     EzManiaSummary? maniaSummary = storedRulesetOnlineId == 3 && maniaUpdatedAt > 0
-                        ? new EzManiaSummary(columnCounts, holdNoteCounts, xxySr)
+                        ? new EzManiaSummary(columnCounts, holdNoteCounts, xxySr: null)
                         : null;
 
-                    result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), pp, maniaSummary);
+                    result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), pp: null, maniaSummary);
 
                     if (pending is not null && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
                         result = mergeAnalysisResult(result, pending.Analysis);
@@ -1383,9 +1384,6 @@ FROM {table_songs_branch_entry};";
             if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
 
-            if (newXxySrAlgorithmVersion is not int xxyVersion && newPpAlgorithmVersion is not int ppVersion)
-                return false;
-
             try
             {
                 using var connection = openConnection(databasePath);
@@ -1426,11 +1424,11 @@ WHERE {col_beatmap_id} = $id;
 
                 transaction.Commit();
 
-                if (newXxySrAlgorithmVersion is int resolvedXxyVersion && resolvedXxyVersion > 0)
-                    setMeta(connection, meta_key_xxy_sr_version, resolvedXxyVersion.ToString(CultureInfo.InvariantCulture));
+                if (newXxySrAlgorithmVersion is > 0)
+                    setMeta(connection, meta_key_xxy_sr_version, newXxySrAlgorithmVersion.Value.ToString(CultureInfo.InvariantCulture));
 
-                if (newPpAlgorithmVersion is int resolvedPpVersion && resolvedPpVersion > 0)
-                    setMeta(connection, meta_key_pp_version, resolvedPpVersion.ToString(CultureInfo.InvariantCulture));
+                if (newPpAlgorithmVersion is > 0)
+                    setMeta(connection, meta_key_pp_version, newPpAlgorithmVersion.Value.ToString(CultureInfo.InvariantCulture));
 
                 setMeta(connection, meta_key_analysis_version, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
                 return true;

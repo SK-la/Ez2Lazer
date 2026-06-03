@@ -91,21 +91,19 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("启用 Ez 分析重算", "Enable Ez analysis recomputation");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启后允许选歌界面进行实时分析并刷新显示，纳入Mod转换结果的分析。"
-            + "\n注意：该开关不控制 SQLite 本地读取与预热（由下方 SQLite 开关单独控制）。",
-            "When enabled, allows real-time analysis and display refresh in the song selection screen, including analysis of Mod conversion results."
-            + "\nNote: This switch does not control SQLite local reading and warmup (which is controlled separately by the SQLite switch below).");
+            "开启后，选歌界面会像官方星级一样按当前 Mod 按需重算 xxy/PP/KPS 并刷新面板。"
+            + "\n关闭时，有 Mod 仍显示 Realm 无 Mod 基线。不控制 SQLite 与 Realm 回填。",
+            "When enabled, song select recomputes xxy/PP/KPS for the current mods on demand (like official star rating) and refreshes panels."
+            + "\nWhen disabled, mods still show the NoMod Realm baseline. Does not control SQLite or Realm backfill.");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED =
             new EzLocalizationManager.EzLocalisableString("启用 Ez 分析本地数据（SQLite）", "Enable Ez analysis local data (SQLite)");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "启用独立控制的 SQLite 本地储存，启动时预热器。（No-Mod）"
-            + "\n开启：面板直读本地数据，在exe启动时执行预热列队分析加载（进入游戏中会暂停进度），但不会考虑Mod转换结果。"
-            + "\n关闭：不读取 SQLite 本地数据，也不执行预热。",
-            "Enable independently controlled SQLite local storage and warmup on startup (No-Mod)"
-            + "\nWhen enabled: Panels read local data directly, and perform warmup queue analysis loading on exe startup (progress will pause when entering gameplay), but Mod conversion results will not be considered."
-            + "\nWhen disabled: Do not read SQLite local data, and do not perform warmup.");
+            "控制主 analysis SQLite（kps/KPC 缓存、启动预热）与分支曲库（预生成 Mod 快照）的读写。"
+            + "\n不影响 Realm 中的 xxy/PP 基线；Mod 下面板动态重算由上方「分析重算」开关控制。",
+            "Controls main analysis SQLite (kps/KPC cache, startup warmup) and songs branch libraries (precomputed mod snapshots)."
+            + "\nDoes not affect Realm xxy/PP baselines; mod-aware panel recompute is controlled by the recompute switch above.");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL =
             new EzLocalizationManager.EzLocalisableString("补算 Realm 元数据（Tag / XxySR / PP）", "Backfill Realm metadata (Tag / XxySR / PP)");

@@ -273,6 +273,7 @@ namespace osu.Game.Screens.Select
             {
                 resetEzDisplay();
                 updateKeyCount();
+                computeEzAnalysis();
             }, true);
 
             mods.BindValueChanged(_ =>
@@ -387,6 +388,7 @@ namespace osu.Game.Screens.Select
 
             displaySR.Current.Value = EzManiaSummary.EMPTY;
             ezDisplayKpc.ManiaSummary = null;
+            ezDisplayKpsGraph.SetPoints(Array.Empty<double>());
         }
 
         private void updateKPS(EzAnalysisResult ezAnalysisResult)
@@ -394,24 +396,20 @@ namespace osu.Game.Screens.Select
             if (Item?.IsVisible != true)
                 return;
 
-            double avgKPS = ezAnalysisResult.AverageKps;
-            double maxKps = ezAnalysisResult.MaxKps;
-            var kpsList = ezAnalysisResult.KpsList;
-            double? baselinePp = beatmap.PerformancePoints >= 0
-                ? beatmap.PerformancePoints
-                : ezAnalysisResult.Pp;
-            ezDisplayKps.SetKps(baselinePp, avgKPS, maxKps);
-            ezDisplayKpsGraph.SetPoints(kpsList);
+            var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
+
+            ezDisplayKps.SetKps(metrics.PerformancePoints, metrics.AverageKps, metrics.MaxKps);
+            ezDisplayKpsGraph.SetPoints(metrics.KpsList);
 
             if (supportsEzAnalysis && beatmap.SupportsXxyStarRating())
             {
-                var maniaSummary = ezAnalysisResult.ManiaSummary;
+                var maniaSummary = metrics.ManiaSummary;
                 var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
 
-                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
+                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, metrics.MaxKps, metrics.KpsList);
                 updateKeyCount();
                 ezDisplayKpc.ManiaSummary = maniaSummary;
-                displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay(maniaSummary);
+                displaySR.Current.Value = maniaSummary ?? EzManiaSummary.EMPTY;
             }
         }
 
@@ -436,15 +434,22 @@ namespace osu.Game.Screens.Select
                 return;
 
             ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+
+            if (EzSongSelectAnalysisDisplay.ShouldApplyPanelUpdate(ezAnalysisBindable.Value, mods.Value))
+                updateKPS(ezAnalysisBindable.Value);
+
             ezAnalysisBindable.BindValueChanged(result =>
             {
+                if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelUpdate(result.NewValue, mods.Value))
+                    return;
+
                 scheduledEzAnalysisUpdate?.Cancel();
                 scheduledEzAnalysisUpdate = Scheduler.AddDelayed(() =>
                 {
                     updateKPS(result.NewValue);
                     scheduledEzAnalysisUpdate = null;
                 }, mania_ui_update_throttle_ms);
-            }, true);
+            });
         }
 
         private void computeStarRating()
