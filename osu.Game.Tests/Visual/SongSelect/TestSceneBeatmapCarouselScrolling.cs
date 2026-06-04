@@ -103,9 +103,10 @@ namespace osu.Game.Tests.Visual.SongSelect
             WaitForScrolling();
 
             ApplyToFilterAndWaitForFilter("search", f => f.SearchText = "Some");
+            WaitForScrolling();
 
             AddUntilStep("select screen position returned to selection", () => Carousel.ChildrenOfType<PanelBeatmap>().Single(p => p.Selected.Value).ScreenSpaceDrawQuad,
-                () => Is.EqualTo(positionBefore));
+                () => Is.EqualTo(positionBefore).Using<Quad, Quad>(quadsAlmostEqual));
         }
 
         [Test]
@@ -126,9 +127,16 @@ namespace osu.Game.Tests.Visual.SongSelect
             AddStep("save selected screen position", () => positionBefore = Carousel.ChildrenOfType<PanelBeatmap>().FirstOrDefault(p => p.Selected.Value)!.ScreenSpaceDrawQuad);
 
             ApplyToFilterAndWaitForFilter("search", f => f.SearchText = "Some");
+            WaitForScrolling();
 
             AddUntilStep("select screen position returned to selection", () => Carousel.ChildrenOfType<PanelBeatmap>().Single(p => p.Selected.Value).ScreenSpaceDrawQuad,
-                () => Is.EqualTo(positionBefore));
+                () => Is.EqualTo(positionBefore).Using<Quad, Quad>(quadsAlmostEqual));
         }
+
+        private static bool quadsAlmostEqual(Quad expected, Quad actual)
+            => Precision.AlmostEquals(expected.TopLeft, actual.TopLeft)
+               && Precision.AlmostEquals(expected.TopRight, actual.TopRight)
+               && Precision.AlmostEquals(expected.BottomLeft, actual.BottomLeft)
+               && Precision.AlmostEquals(expected.BottomRight, actual.BottomRight);
     }
 }

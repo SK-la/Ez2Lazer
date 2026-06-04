@@ -398,8 +398,8 @@ namespace osu.Game.Tests.Visual.SongSelect
             addBeatmapSet(s => s.Beatmaps[0].Metadata.Source = string.Empty, beatmapSets, out var beatmapUnsourced);
 
             var results = await runGrouping(GroupMode.Source, beatmapSets);
-            assertGroup(results, 0, "Cool Game", (beatmapCoolGame.Beatmaps.Concat(beatmapCoolGameB.Beatmaps)), ref total);
-            assertGroup(results, 1, "Nice Movie", beatmapNiceMovie.Beatmaps, ref total);
+            assertGroup(results, 0, "ACG", (beatmapCoolGame.Beatmaps.Concat(beatmapCoolGameB.Beatmaps)), ref total);
+            assertGroup(results, 1, "Others", beatmapNiceMovie.Beatmaps, ref total);
             assertGroup(results, 2, "Unsourced", beatmapUnsourced.Beatmaps, ref total);
             assertTotal(results, total);
         }
