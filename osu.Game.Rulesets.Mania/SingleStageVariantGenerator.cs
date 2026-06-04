@@ -37,16 +37,22 @@ namespace osu.Game.Rulesets.Mania
                 leftKeys = new[] { InputKey.Tab, InputKey.LControl, InputKey.A, InputKey.S, InputKey.D, InputKey.Space, InputKey.Number5, InputKey.Number6 };
                 rightKeys = new[] { InputKey.Number7, InputKey.Number8, InputKey.Slash, InputKey.L, InputKey.Semicolon, InputKey.Quote, InputKey.Enter, InputKey.BackSlash };
             }
-            else // if (variant == 18)
+            else if (variant == 18)
             {
                 leftKeys = new[] { InputKey.Q, InputKey.W, InputKey.E, InputKey.R, InputKey.A, InputKey.S, InputKey.D, InputKey.F, InputKey.Space };
                 rightKeys = new[] { InputKey.Alt, InputKey.L, InputKey.Semicolon, InputKey.Quote, InputKey.Enter, InputKey.O, InputKey.P, InputKey.BracketLeft, InputKey.BracketRight };
             }
-            // else
-            // {
-            //     leftKeys = new[] { InputKey.A, InputKey.S, InputKey.D, InputKey.F };
-            //     rightKeys = new[] { InputKey.J, InputKey.K, InputKey.L, InputKey.Semicolon };
-            // }
+            else if (variant > 10)
+            {
+                // 11/13/15/17K etc. — no dedicated layout; use extended key pool so Realm registration does not index past array bounds.
+                leftKeys = new[] { InputKey.Q, InputKey.W, InputKey.E, InputKey.R, InputKey.A, InputKey.S, InputKey.D, InputKey.F, InputKey.Space };
+                rightKeys = new[] { InputKey.Alt, InputKey.L, InputKey.Semicolon, InputKey.Quote, InputKey.Enter, InputKey.O, InputKey.P, InputKey.BracketLeft, InputKey.BracketRight };
+            }
+            else
+            {
+                leftKeys = new[] { InputKey.A, InputKey.S, InputKey.D, InputKey.F };
+                rightKeys = new[] { InputKey.J, InputKey.K, InputKey.L, InputKey.Semicolon };
+            }
         }
 
         public IEnumerable<KeyBinding> GenerateMappings() => new VariantMappingGenerator
