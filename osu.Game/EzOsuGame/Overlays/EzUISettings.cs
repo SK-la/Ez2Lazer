@@ -18,7 +18,7 @@ namespace osu.Game.EzOsuGame.Overlays
         protected override LocalisableString Header => EzSettingsStrings.EZ_UI_SETTINGS_HEADER;
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezConfig, BackgroundDataStoreProcessor backgroundDataStoreProcessor)
+        private void load(Ez2ConfigManager ezConfig, BackgroundDataStoreProcessor? backgroundDataStoreProcessor)
         {
             AddRange(new Drawable[]
             {
@@ -53,7 +53,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         {
                             Text = EzSettingsStrings.EZ_REALM_METADATA_BACKFILL_BUTTON,
                             TooltipText = EzSettingsStrings.EZ_REALM_METADATA_BACKFILL_TOOLTIP,
-                            Action = () => backgroundDataStoreProcessor.QueueEzRealmMetadataBackfill(),
+                            Action = () => backgroundDataStoreProcessor?.QueueEzRealmMetadataBackfill(),
                             Keywords = new[] { "realm", "tag", "xxy", "pp", "metadata", "backfill" },
                         },
 #if DEBUG
@@ -61,7 +61,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         {
                             Text = EzSettingsStrings.EZ_REALM_METADATA_BACKFILL_FORCE_BUTTON,
                             TooltipText = EzSettingsStrings.EZ_REALM_METADATA_BACKFILL_FORCE_TOOLTIP,
-                            Action = () => backgroundDataStoreProcessor.QueueEzRealmMetadataBackfill(forceAll: true),
+                            Action = () => backgroundDataStoreProcessor?.QueueEzRealmMetadataBackfill(forceAll: true),
                             Keywords = new[] { "realm", "tag", "xxy", "pp", "metadata", "force", "recalculate" },
                         },
 # endif

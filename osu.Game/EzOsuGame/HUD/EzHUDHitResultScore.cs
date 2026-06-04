@@ -101,11 +101,11 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private ScoreProcessor processor { get; set; } = null!;
 
-        [Resolved(canBeNull: true)]
-        private GameplayClockContainer gameplayClockContainer { get; set; } = null!;
-
         [Resolved]
         private JudgementCountController judgementCountController { get; set; } = null!;
+
+        [Resolved(canBeNull: true)]
+        private GameplayClockContainer? gameplayClockContainer { get; set; }
 
         private Bindable<EzEnumGameThemeName> themeName = null!;
         private Bindable<EzEnumHitMode> maniaHitModeConfig = null!;
@@ -185,7 +185,8 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
-            gameplayClockContainer.OnSeek += Clear;
+            if (gameplayClockContainer != null)
+                gameplayClockContainer.OnSeek += Clear;
 
             processor.NewJudgement += processorNewJudgement;
         }
@@ -564,7 +565,10 @@ namespace osu.Game.EzOsuGame.HUD
         protected override void Dispose(bool isDisposing)
         {
             processor.NewJudgement -= processorNewJudgement;
-            gameplayClockContainer.OnSeek -= Clear;
+
+            if (gameplayClockContainer != null)
+                gameplayClockContainer.OnSeek -= Clear;
+
             base.Dispose(isDisposing);
         }
     }

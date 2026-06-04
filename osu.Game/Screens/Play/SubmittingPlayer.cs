@@ -299,7 +299,7 @@ namespace osu.Game.Screens.Play
             bool exiting = base.OnExiting(e);
 
             // Passed plays already submit in PrepareScoreForResultsAsync; avoid a second submitScore that reads post-results settings.
-            if (GameplayState.HasFailed || GameplayState.HasQuit)
+            if (GameplayState != null && (GameplayState.HasFailed || GameplayState.HasQuit))
                 submitFromFailOrQuit(Score);
 
             statics.SetValue(Static.LastLocalUserScore, Score?.ScoreInfo.DeepClone());

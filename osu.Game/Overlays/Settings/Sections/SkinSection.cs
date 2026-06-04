@@ -156,7 +156,7 @@ namespace osu.Game.Overlays.Settings.Sections
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing)
+            if (isDisposing && skins != null)
                 skins.ScriptedSkinsCatalogUpdated -= refreshSkinsList;
 
             base.Dispose(isDisposing);
