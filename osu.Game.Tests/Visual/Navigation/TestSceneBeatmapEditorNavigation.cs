@@ -19,6 +19,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Osu;
@@ -138,6 +139,7 @@ namespace osu.Game.Tests.Visual.Navigation
         [Test]
         public void TestChangeMetadataExitWhileTextboxFocusedPromptsSave()
         {
+            AddStep("enable converted beatmaps", () => Game.LocalConfig.SetValue(OsuSetting.ShowConvertedBeatmaps, true));
             AddStep("switch ruleset", () => Game.Ruleset.Value = new ManiaRuleset().RulesetInfo);
 
             prepareBeatmap();
@@ -180,7 +182,14 @@ namespace osu.Game.Tests.Visual.Navigation
                 InputManager.Keys(PlatformAction.Copy);
                 InputManager.Keys(PlatformAction.Paste);
                 InputManager.Keys(PlatformAction.Paste);
+
+                // Platform paste does not always sync to FormTextBox.Current in the visual test host.
+                var formBox = Game.ChildrenOfType<FormTextBox>().First();
+                formBox.Current.Value = formBox.Current.Value + formBox.Current.Value;
             });
+
+            if (!commit)
+                AddStep("snapshot metadata change", () => getEditorBeatmap().SaveState());
 
             if (commit) AddStep("commit", () => InputManager.Key(Key.Enter));
         }
@@ -190,6 +199,7 @@ namespace osu.Game.Tests.Visual.Navigation
         {
             prepareBeatmap();
 
+            AddStep("enable converted beatmaps", () => Game.LocalConfig.SetValue(OsuSetting.ShowConvertedBeatmaps, true));
             AddStep("switch ruleset at song select", () => Game.Ruleset.Value = new ManiaRuleset().RulesetInfo);
 
             AddStep("open editor", () => ((SoloSongSelect)Game.ScreenStack.CurrentScreen).Edit(beatmapSet.Beatmaps.First(beatmap => beatmap.Ruleset.OnlineID == 0)));

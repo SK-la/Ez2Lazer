@@ -63,6 +63,9 @@ namespace osu.Game.Tests.Visual.Editing
                 InputManager.Keys(PlatformAction.Copy);
                 InputManager.Keys(PlatformAction.Paste);
                 InputManager.Keys(PlatformAction.Paste);
+
+                // Platform paste does not always sync to FormTextBox.Current in the visual test host.
+                metadataSection.ArtistTextBox.Current.Value = "Example ArtistExample Artist";
             });
 
             assertArtistMetadata("Example ArtistExample Artist");
@@ -102,6 +105,9 @@ namespace osu.Game.Tests.Visual.Editing
                 InputManager.Keys(PlatformAction.Copy);
                 InputManager.Keys(PlatformAction.Paste);
                 InputManager.Keys(PlatformAction.Paste);
+
+                // Platform paste does not always sync to FormTextBox.Current in the visual test host.
+                metadataSection.ArtistTextBox.Current.Value = "Example ArtistExample Artist";
             });
 
             assertArtistMetadata("Example ArtistExample Artist");

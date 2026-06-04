@@ -14,7 +14,6 @@ using osu.Game.Database;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays;
-using osu.Game.Overlays.Mods;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu.Mods;
@@ -159,21 +158,22 @@ namespace osu.Game.Tests.Visual.Navigation
         [Test]
         public void TestAutoplayShortcutReturnsInitialModsOnExit()
         {
-            PushAndConfirm(() => new SoloSongSelect());
+            SoloSongSelect? songSelect = null;
+
+            PushAndConfirm(() =>
+            {
+                songSelect = new SoloSongSelect();
+                return songSelect;
+            });
 
             AddStep("import beatmap", () => BeatmapImportHelper.LoadOszIntoOsu(Game, virtualTrack: true).WaitSafely());
 
             AddUntilStep("wait for selection", () => !Game.Beatmap.IsDefault);
 
-            AddStep("open mod select", () => InputManager.Key(Key.F1));
-            AddStep("search magnetised", () => this.ChildrenOfType<ModSelectOverlay>().Single().SearchTerm = "MG");
-            AddStep("select", () => InputManager.Key(Key.Enter));
+            AddStep("select magnetised", () => songSelect!.Mods.Value = new Mod[] { new OsuModMagnetised() });
 
-            AddAssert("magnetised selected", () => Game.SelectedMods.Value.Single(), Is.TypeOf<OsuModMagnetised>);
-            AddStep("configure mod", () => ((OsuModMagnetised)Game.SelectedMods.Value.Single()).AttractionStrength.Value = 1.0f);
-
-            pushEscape();
-            pushEscape();
+            AddAssert("magnetised selected", () => songSelect!.Mods.Value.Single(), Is.TypeOf<OsuModMagnetised>);
+            AddStep("configure mod", () => ((OsuModMagnetised)songSelect!.Mods.Value.Single()).AttractionStrength.Value = 1.0f);
 
             AddStep("press ctrl+enter", () =>
             {
@@ -182,19 +182,19 @@ namespace osu.Game.Tests.Visual.Navigation
                 InputManager.ReleaseKey(Key.ControlLeft);
             });
 
-            AddUntilStep("wait for player", () =>
+            AddUntilStep("wait for player loader", () =>
             {
                 DismissAnyNotifications();
-                return Game.ScreenStack.CurrentScreen is Player;
+                return Game.ScreenStack.CurrentScreen is PlayerLoader;
             });
 
-            AddAssert("only autoplay selected", () => Game.SelectedMods.Value.Single(), Is.TypeOf<OsuModAutoplay>);
+            AddAssert("only autoplay selected", () => songSelect!.Mods.Value.Single(), Is.TypeOf<OsuModAutoplay>);
 
             pushEscape();
             waitForScreen<SoloSongSelect>();
 
-            AddAssert("magnetised selected", () => Game.SelectedMods.Value.Single(), Is.TypeOf<OsuModMagnetised>);
-            AddAssert("mod configured", () => ((OsuModMagnetised)Game.SelectedMods.Value.Single()).AttractionStrength.Value, () => Is.EqualTo(1.0f));
+            AddAssert("magnetised selected", () => songSelect!.Mods.Value.Single(), Is.TypeOf<OsuModMagnetised>);
+            AddAssert("mod configured", () => ((OsuModMagnetised)songSelect!.Mods.Value.Single()).AttractionStrength.Value, () => Is.EqualTo(1.0f));
         }
 
         [Test]

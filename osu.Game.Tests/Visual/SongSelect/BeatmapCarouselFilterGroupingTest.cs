@@ -392,16 +392,58 @@ namespace osu.Game.Tests.Visual.SongSelect
             int total = 0;
 
             var beatmapSets = new List<BeatmapSetInfo>();
-            addBeatmapSet(s => s.Beatmaps[0].Metadata.Source = "Cool Game", beatmapSets, out var beatmapCoolGame);
-            addBeatmapSet(s => s.Beatmaps[0].Metadata.Source = "Cool game", beatmapSets, out var beatmapCoolGameB);
-            addBeatmapSet(s => s.Beatmaps[0].Metadata.Source = "Nice Movie", beatmapSets, out var beatmapNiceMovie);
-            addBeatmapSet(s => s.Beatmaps[0].Metadata.Source = string.Empty, beatmapSets, out var beatmapUnsourced);
+
+            // Ez `defineGroupBySource` matches keywords across source/tags/title/artist/difficulty (priority order), not literal source names.
+            addBeatmapSet(s =>
+            {
+                applyNeutralSourceMetadata(s);
+                s.Beatmaps[0].Metadata.Source = "touhou arrangement";
+            }, beatmapSets, out var beatmapTouhou);
+
+            addBeatmapSet(s =>
+            {
+                applyNeutralSourceMetadata(s);
+                s.Beatmaps[0].Metadata.Source = "TV anime size";
+            }, beatmapSets, out var beatmapAcg);
+
+            addBeatmapSet(s =>
+            {
+                applyNeutralSourceMetadata(s);
+                s.Beatmaps[0].Metadata.Source = "TV ANIME";
+            }, beatmapSets, out var beatmapAcgUpper);
+
+            addBeatmapSet(s =>
+            {
+                applyNeutralSourceMetadata(s);
+                s.Beatmaps[0].Metadata.Source = "Nice Movie";
+            }, beatmapSets, out var beatmapOthers);
+
+            addBeatmapSet(s =>
+            {
+                applyNeutralSourceMetadata(s);
+                s.Beatmaps[0].Metadata.Source = string.Empty;
+            }, beatmapSets, out var beatmapUnsourced);
 
             var results = await runGrouping(GroupMode.Source, beatmapSets);
-            assertGroup(results, 0, "ACG", (beatmapCoolGame.Beatmaps.Concat(beatmapCoolGameB.Beatmaps)), ref total);
-            assertGroup(results, 1, "Others", beatmapNiceMovie.Beatmaps, ref total);
-            assertGroup(results, 2, "Unsourced", beatmapUnsourced.Beatmaps, ref total);
+
+            // Group order follows GroupDefinition.Order: 东方Project(2) → ACG(3) → Others(50) → Unsourced(200).
+            assertGroup(results, 0, "东方Project", beatmapTouhou.Beatmaps, ref total);
+            assertGroup(results, 1, "ACG", beatmapAcg.Beatmaps.Concat(beatmapAcgUpper.Beatmaps), ref total);
+            assertGroup(results, 2, "Others", beatmapOthers.Beatmaps, ref total);
+            assertGroup(results, 3, "Unsourced", beatmapUnsourced.Beatmaps, ref total);
             assertTotal(results, total);
+        }
+
+        /// <summary>
+        /// Clears fields that would accidentally match Ez source heuristics so only the configured <see cref="BeatmapMetadata.Source"/> drives grouping.
+        /// </summary>
+        private static void applyNeutralSourceMetadata(BeatmapSetInfo set)
+        {
+            var metadata = set.Beatmaps[0].Metadata;
+            metadata.Artist = "Neutral Artist";
+            metadata.Title = "Neutral Title";
+            metadata.Tags = string.Empty;
+            metadata.Source = string.Empty;
         }
 
         #endregion

@@ -15,7 +15,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Testing;
 using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
+using osu.Game.Online.Chat;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Online.API;
@@ -43,6 +43,25 @@ namespace osu.Game.Tests.Visual.Online
         private CommentsContainer commentsContainer = null!;
 
         private readonly ManualResetEventSlim requestLock = new ManualResetEventSlim();
+
+        private LinkFlowContainer getActionsContainer(DrawableComment comment) =>
+            comment.ChildrenOfType<LinkFlowContainer>().Single(c => c.Name == @"Actions buttons");
+
+        /// <summary>
+        /// Permalink, reply, and (for own comments) delete are <see cref="SpriteText"/> links in order.
+        /// </summary>
+        private SpriteText[] getActionLinkSprites(DrawableComment comment) =>
+            getActionsContainer(comment).ChildrenOfType<SpriteText>().ToArray();
+
+        private SpriteText getDeleteLinkSprite(DrawableComment comment) =>
+            getActionLinkSprites(comment).Last();
+
+        private SpriteText getReplyLinkSprite(DrawableComment comment) =>
+            getActionLinkSprites(comment)[1];
+
+        private SpriteText getReportLinkSprite(DrawableComment comment) =>
+            comment.ChildrenOfType<CommentReportButton>().Single()
+                   .ChildrenOfType<SpriteText>().First();
 
         [BackgroundDependencyLoader]
         private void load()
@@ -81,14 +100,14 @@ namespace osu.Game.Tests.Visual.Online
             {
                 var comments = this.ChildrenOfType<DrawableComment>();
                 var ourComment = comments.SingleOrDefault(x => x.Comment.Id == 1);
-                return ourComment != null && ourComment.ChildrenOfType<OsuSpriteText>().Any(x => x.Text == "delete");
+                return ourComment != null && getActionLinkSprites(ourComment).Length >= 3;
             });
 
             AddAssert("Second doesn't", () =>
             {
                 var comments = this.ChildrenOfType<DrawableComment>();
                 var ourComment = comments.Single(x => x.Comment.Id == 2);
-                return ourComment.ChildrenOfType<OsuSpriteText>().All(x => x.Text != "delete");
+                return ourComment.ChildrenOfType<CommentReportButton>().Any();
             });
         }
 
@@ -104,11 +123,7 @@ namespace osu.Game.Tests.Visual.Online
                 ourComment = comments.SingleOrDefault(x => x.Comment.Id == 1);
                 return ourComment != null;
             });
-            AddStep("It has delete button", () =>
-            {
-                var btn = ourComment.ChildrenOfType<OsuSpriteText>().Single(x => x.Text == "delete");
-                InputManager.MoveMouseTo(btn);
-            });
+            AddStep("It has delete button", () => InputManager.MoveMouseTo(getDeleteLinkSprite(ourComment!)));
             AddStep("Click delete button", () =>
             {
                 InputManager.Click(MouseButton.Left);
@@ -177,11 +192,7 @@ namespace osu.Game.Tests.Visual.Online
                 ourComment = comments.SingleOrDefault(x => x.Comment.Id == 1);
                 return ourComment != null;
             });
-            AddStep("It has delete button", () =>
-            {
-                var btn = ourComment.ChildrenOfType<OsuSpriteText>().Single(x => x.Text == "delete");
-                InputManager.MoveMouseTo(btn);
-            });
+            AddStep("It has delete button", () => InputManager.MoveMouseTo(getDeleteLinkSprite(ourComment!)));
             AddStep("Click delete button", () =>
             {
                 InputManager.Click(MouseButton.Left);
@@ -249,8 +260,7 @@ namespace osu.Game.Tests.Visual.Online
             });
             AddStep("Click the button", () =>
             {
-                var btn = targetComment.ChildrenOfType<OsuSpriteText>().Single(x => x.Text == "report");
-                InputManager.MoveMouseTo(btn);
+                InputManager.MoveMouseTo(getReportLinkSprite(targetComment!));
                 InputManager.Click(MouseButton.Left);
             });
             AddStep("Set reason to other", () =>
@@ -336,24 +346,22 @@ namespace osu.Game.Tests.Visual.Online
             });
             AddStep("Click reply button", () =>
             {
-                var btn = targetComment.ChildrenOfType<LinkFlowContainer>().Skip(1).First();
-                var texts = btn.ChildrenOfType<SpriteText>();
-                InputManager.MoveMouseTo(texts.Skip(1).First());
-                InputManager.Click(MouseButton.Left);
+                getActionsContainer(targetComment!).ChildrenOfType<DrawableLinkCompiler>().ElementAt(1).TriggerClick();
             });
             AddAssert("There is 0 replies", () =>
             {
                 var replLabel = targetComment.ChildrenOfType<ShowRepliesButton>().First().ChildrenOfType<SpriteText>().First();
                 return replLabel.Text.ToString().Contains('0') && targetComment!.Comment.RepliesCount == 0;
             });
+            AddUntilStep("reply editor visible", () => targetComment!.ChildrenOfType<TextBox>().Any());
             AddStep("Focus field", () =>
             {
-                InputManager.MoveMouseTo(targetComment.ChildrenOfType<TextBox>().First());
+                InputManager.MoveMouseTo(targetComment!.ChildrenOfType<TextBox>().First());
                 InputManager.Click(MouseButton.Left);
             });
             AddStep("Enter text", () =>
             {
-                targetComment.ChildrenOfType<TextBox>().First().Current.Value = "random reply";
+                targetComment!.ChildrenOfType<TextBox>().First().Current.Value = "random reply";
             });
             AddStep("Submit", () =>
             {
@@ -408,6 +416,7 @@ namespace osu.Game.Tests.Visual.Online
             });
 
             AddStep("show comments", () => commentsContainer.ShowComments(CommentableType.Beatmapset, 123));
+            AddUntilStep("comments loaded", () => this.ChildrenOfType<DrawableComment>().Count() >= 2);
         }
 
         private void setUpCommentsResponse(CommentBundle commentBundle)

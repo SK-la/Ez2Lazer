@@ -14,6 +14,7 @@ using osu.Framework.Testing;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Models;
 using osu.Game.Online.API.Requests.Responses;
@@ -55,15 +56,23 @@ namespace osu.Game.Tests.Visual.UserInterface
         {
             Children = new Drawable[]
             {
-                leaderboard = new BeatmapLeaderboardWedge
+                new OsuContextMenuContainer
                 {
-                    Origin = Anchor.Centre,
-                    Anchor = Anchor.Centre,
-                    Size = new Vector2(0.6f),
+                    RelativeSizeAxes = Axes.Both,
+                    Child = leaderboard = new BeatmapLeaderboardWedge
+                    {
+                        Origin = Anchor.Centre,
+                        Anchor = Anchor.Centre,
+                        Size = new Vector2(0.6f),
+                    },
                 },
                 dialogOverlay = new DialogOverlay()
             };
         }
+
+        private DrawableOsuMenuItem getDeleteMenuItem() =>
+            this.ChildrenOfType<DrawableOsuMenuItem>()
+                .First(i => i.Item is OsuMenuItem menu && menu.Type == MenuItemType.Destructive);
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
         {
@@ -150,10 +159,11 @@ namespace osu.Game.Tests.Visual.UserInterface
             // Ensure the context menu has finished showing
             AddStep("finish transforms", () => leaderboard.FinishTransforms(true));
 
+            AddUntilStep("context menu has delete", () => this.ChildrenOfType<DrawableOsuMenuItem>()
+                                                                   .Any(i => i.Item is OsuMenuItem menu && menu.Type == MenuItemType.Destructive));
             AddStep("click delete option", () =>
             {
-                InputManager.MoveMouseTo(leaderboard.ChildrenOfType<DrawableOsuMenuItem>()
-                                                    .First(i => string.Equals(i.Item.Text.Value.ToString(), "delete", System.StringComparison.OrdinalIgnoreCase)));
+                InputManager.MoveMouseTo(getDeleteMenuItem());
                 InputManager.Click(MouseButton.Left);
             });
 
@@ -179,9 +189,12 @@ namespace osu.Game.Tests.Visual.UserInterface
             ScoreInfo scoreBeingDeleted = null!;
             AddStep("corrupt top score mods json", () =>
             {
-                scoreBeingDeleted = importedScores.First();
-                Realm.Write(_ =>
+                var leaderboardScore = leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().First();
+                var scoreId = leaderboardScore.Score.ID;
+
+                Realm.Write(r =>
                 {
+                    scoreBeingDeleted = r.Find<ScoreInfo>(scoreId)!;
                     scoreBeingDeleted.ModsJson = "{ definitely not valid json }";
                 });
             });
@@ -197,10 +210,11 @@ namespace osu.Game.Tests.Visual.UserInterface
 
             // Ensure the context menu and delete dialog are shown without crashing.
             AddStep("finish transforms", () => leaderboard.FinishTransforms(true));
+            AddUntilStep("context menu has delete", () => this.ChildrenOfType<DrawableOsuMenuItem>()
+                                                                .Any(i => i.Item is OsuMenuItem menu && menu.Type == MenuItemType.Destructive));
             AddStep("click delete option", () =>
             {
-                InputManager.MoveMouseTo(leaderboard.ChildrenOfType<DrawableOsuMenuItem>()
-                                                    .First(i => string.Equals(i.Item.Text.Value.ToString(), "delete", System.StringComparison.OrdinalIgnoreCase)));
+                InputManager.MoveMouseTo(getDeleteMenuItem());
                 InputManager.Click(MouseButton.Left);
             });
             AddStep("finish transforms", () => dialogOverlay.FinishTransforms(true));

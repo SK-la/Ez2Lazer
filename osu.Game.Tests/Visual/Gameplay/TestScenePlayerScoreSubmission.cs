@@ -437,8 +437,9 @@ namespace osu.Game.Tests.Visual.Gameplay
 
             AddStep("force successfuly hit", () =>
             {
-                Player.ScoreProcessor.RevertResult(Player.Results.First());
-                Player.ScoreProcessor.ApplyResult(new OsuJudgementResult(Beatmap.Value.Beatmap.HitObjects.First(), new OsuJudgement())
+                var firstResult = Player.Results.First();
+                Player.ScoreProcessor.RevertResult(firstResult);
+                Player.ScoreProcessor.ApplyResult(new JudgementResult(firstResult.HitObject, firstResult.Judgement)
                 {
                     Type = HitResult.Great,
                 });

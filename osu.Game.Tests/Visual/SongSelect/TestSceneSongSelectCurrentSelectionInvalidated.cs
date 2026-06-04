@@ -35,6 +35,8 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             base.SetUpSteps();
 
+            AddStep("enable converts", () => Config.SetValue(OsuSetting.ShowConvertedBeatmaps, true));
+
             for (int i = 0; i < 5; i++)
                 ImportBeatmapForRuleset(0);
 
@@ -195,6 +197,8 @@ namespace osu.Game.Tests.Visual.SongSelect
             waitForFiltering(2);
 
             AddAssert("selected beatmap below", () => selectedBeatmap!.BeatmapSet, () => Is.EqualTo(hiddenBeatmap.BeatmapSet));
+
+            AddUntilStep("selection changed after hide", () => Beatmap.Value.BeatmapInfo, () => Is.Not.EqualTo(hiddenBeatmap));
 
             AddStep("hide selected", () => Beatmaps.Hide(hiddenBeatmap = selectedBeatmap!));
             waitForFiltering(3);
