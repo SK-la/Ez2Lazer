@@ -191,20 +191,25 @@ namespace osu.Game.Tests.Visual.SongSelect
             makePanelSelected<PanelBeatmapSet>(2);
             makePanelSelected<PanelBeatmap>(1);
 
+            AddUntilStep("global beatmap synced", () => Beatmap.Value.BeatmapInfo.ID == selectedBeatmap!.ID);
+
             BeatmapInfo hiddenBeatmap = null!;
 
             AddStep("hide selected", () => Beatmaps.Hide(hiddenBeatmap = selectedBeatmap!));
-            waitForFiltering(2);
+            checkMatchedBeatmaps(14);
 
             AddAssert("selected beatmap below", () => selectedBeatmap!.BeatmapSet, () => Is.EqualTo(hiddenBeatmap.BeatmapSet));
 
-            AddUntilStep("selection changed after hide", () => Beatmap.Value.BeatmapInfo, () => Is.Not.EqualTo(hiddenBeatmap));
+            makePanelSelected<PanelBeatmap>(1);
+            AddUntilStep("global beatmap synced after reselect", () => Beatmap.Value.BeatmapInfo.ID == selectedBeatmap!.ID);
 
-            AddStep("hide selected", () => Beatmaps.Hide(hiddenBeatmap = selectedBeatmap!));
-            waitForFiltering(3);
+            AddStep("hide selected", () => Beatmaps.Hide(hiddenBeatmap = Beatmap.Value.BeatmapInfo));
+            checkMatchedBeatmaps(13);
 
             AddAssert("selected beatmap below", () => selectedBeatmap!.BeatmapSet, () => Is.EqualTo(hiddenBeatmap.BeatmapSet));
-            assertPanelSelected<PanelBeatmap>(0);
+
+            AddUntilStep("working beatmap is not hidden", () => !Beatmap.Value.BeatmapInfo.Hidden);
+            AddAssert("selection remains in set", () => Beatmap.Value.BeatmapInfo.BeatmapSet, () => Is.EqualTo(hiddenBeatmap.BeatmapSet));
         }
 
         [Test]
@@ -243,6 +248,9 @@ namespace osu.Game.Tests.Visual.SongSelect
             // Interactively, things fail as expected.
             AddUntilStep("selection has changed after debounce", () => selectedBeatmapDuringDebounce, () => Is.Not.EqualTo(Beatmap.Value.BeatmapInfo));
         }
+
+        private void checkMatchedBeatmaps(int expected) =>
+            AddUntilStep($"{expected} matching shown", () => Carousel.MatchedBeatmapsCount, () => Is.EqualTo(expected));
 
         private void waitForFiltering(int filterCount = 1)
         {
