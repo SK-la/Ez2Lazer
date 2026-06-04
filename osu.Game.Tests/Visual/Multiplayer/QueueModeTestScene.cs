@@ -13,6 +13,7 @@ using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Rooms;
@@ -47,6 +48,9 @@ namespace osu.Game.Tests.Visual.Multiplayer
         private TestMultiplayerComponents multiplayerComponents = null!;
 
         protected TestMultiplayerClient MultiplayerClient => multiplayerComponents.MultiplayerClient;
+
+        [Resolved]
+        private OsuConfigManager config { get; set; } = null!;
 
         [BackgroundDependencyLoader]
         private void load(GameHost host, AudioManager audio)
@@ -126,6 +130,7 @@ namespace osu.Game.Tests.Visual.Multiplayer
         protected void AddBeatmapFromSongSelect(Func<BeatmapInfo> beatmap, RulesetInfo? ruleset = null, IReadOnlyList<Mod>? mods = null)
         {
             Screens.Select.SongSelect? songSelect = null;
+            BeatmapInfo? selectedBeatmap = null;
 
             AddStep("click add button", () =>
             {
@@ -137,12 +142,28 @@ namespace osu.Game.Tests.Visual.Multiplayer
             AddUntilStep("wait for loaded", () => songSelect.IsCurrentScreen() && !songSelect.AsNonNull().IsFiltering);
 
             if (ruleset != null)
+            {
+                if (ruleset.OnlineID != 0)
+                    AddStep("enable converted beatmaps", () => config.SetValue(OsuSetting.ShowConvertedBeatmaps, true));
+
                 AddStep($"set {ruleset.Name} ruleset", () => songSelect.AsNonNull().Ruleset.Value = ruleset);
+                AddUntilStep("wait for filtering", () => !songSelect.AsNonNull().IsFiltering);
+            }
 
             if (mods != null)
+            {
                 AddStep($"set mods to {string.Join(",", mods.Select(m => m.Acronym))}", () => songSelect.AsNonNull().Mods.Value = mods);
+                AddUntilStep("wait for filtering after mods", () => !songSelect.AsNonNull().IsFiltering);
+            }
 
-            AddStep("select other beatmap", () => songSelect.AsNonNull().Beatmap.Value = Beatmaps.GetWorkingBeatmap(beatmap()));
+            AddStep("select other beatmap", () =>
+            {
+                selectedBeatmap = beatmap();
+                songSelect.AsNonNull().Beatmap.Value = Beatmaps.GetWorkingBeatmap(selectedBeatmap);
+            });
+            AddUntilStep("wait for selection", () => songSelect.AsNonNull().Beatmap.Value.BeatmapInfo.Equals(selectedBeatmap));
+            AddUntilStep("wait for ongoing operation", () => !(CurrentScreen as OnlinePlayScreen).ChildrenOfType<OngoingOperationTracker>().Single().InProgress.Value);
+
             AddStep("confirm selection", () => InputManager.Key(Key.Enter));
             AddUntilStep("wait for return to match", () => CurrentSubScreen is MultiplayerMatchSubScreen);
         }
