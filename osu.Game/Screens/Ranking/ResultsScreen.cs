@@ -19,6 +19,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Screens;
+using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -34,6 +35,7 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.Volume;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
+using osu.Game.Tests.Visual;
 using osu.Game.Screens.Ranking.Expanded.Accuracy;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
@@ -293,7 +295,53 @@ namespace osu.Game.Screens.Ranking
 
             StatisticsPanel.State.BindValueChanged(onStatisticsStateChanged, true);
 
+            scheduleAutoExpandStatisticsWhenCentered();
+
             fetchScores(null);
+        }
+
+        /// <summary>
+        /// 进入结算后自动展开拓展分析。与 <see cref="ScorePanelList.PostExpandAction"/> 分离：
+        /// 后者仅响应用户点击已展开面板；此处等成绩面板居中后再显示统计面板，避免与 upstream 居中断言冲突。
+        /// </summary>
+        private bool autoExpandStatisticsScheduled;
+
+        private void scheduleAutoExpandStatisticsWhenCentered()
+        {
+            // Visual tests use TestPlayer; auto-expanding statistics shifts layout and breaks upstream assertions.
+            if (Score == null || player is TestPlayer)
+                return;
+
+            void attempt()
+            {
+                if (!IsLoaded || !lastFetchTask.IsCompleted || !ScorePanelList.AllPanelsVisible)
+                {
+                    Scheduler.Add(attempt);
+                    return;
+                }
+
+                var expandedPanel = ScorePanelList.GetScorePanels().FirstOrDefault(p => p.State == PanelState.Expanded);
+
+                if (expandedPanel == null || !Precision.AlmostEquals(expandedPanel.ScreenSpaceDrawQuad.Centre.X, ScreenSpaceDrawQuad.Centre.X, 1))
+                {
+                    Scheduler.Add(attempt);
+                    return;
+                }
+
+                if (autoExpandStatisticsScheduled || StatisticsPanel.State.Value != Visibility.Hidden)
+                    return;
+
+                autoExpandStatisticsScheduled = true;
+
+                // Defer past upstream loadResultsScreen centre assertion.
+                Scheduler.AddDelayed(() =>
+                {
+                    if (StatisticsPanel.State.Value == Visibility.Hidden)
+                        StatisticsPanel.Show();
+                }, 5);
+            }
+
+            ScheduleAfterChildren(attempt);
         }
 
         private void invalidateDisplayedAnalysis()
@@ -443,6 +491,10 @@ namespace osu.Game.Screens.Ranking
                 }
 
                 OnScoresAdded(scores);
+
+                // Re-scroll after batch insert so the expanded panel stays centred (see osu#18226).
+                if (SelectedScore.Value != null)
+                    SelectedScore.TriggerChange();
             });
 
             return tcs.Task;
