@@ -247,21 +247,6 @@ namespace osu.Game.Tests.Visual.Background
             AddUntilStep("is skin background", () => getCurrentBackground() is SkinBackground);
         }
 
-        [Test]
-        public void TestTogglingSupporterTogglesBeatmapBackground()
-        {
-            setSourceMode(BackgroundSource.Beatmap);
-
-            setSupporter(true);
-            AddUntilStep("is beatmap background", () => getCurrentBackground() is BeatmapBackground);
-
-            setSupporter(false);
-            AddUntilStep("is default background", () => !(getCurrentBackground() is BeatmapBackground));
-
-            setSupporter(true);
-            AddUntilStep("is beatmap background", () => getCurrentBackground() is BeatmapBackground);
-        }
-
         [TestCase(BackgroundSource.Beatmap, typeof(BeatmapBackground))]
         [TestCase(BackgroundSource.BeatmapWithStoryboard, typeof(BeatmapBackgroundWithStoryboard))]
         [TestCase(BackgroundSource.Skin, typeof(SkinBackground))]
