@@ -654,6 +654,18 @@ namespace osu.Game.Screens.Select
 
             // Refetch only if explicitly requested (e.g. when returning to screen after potential external changes).
             // Avoid refetching during normal beatmap selection to prevent unnecessary cache invalidation and memory spikes.
+            if (!refetch && !Beatmap.IsDefault)
+            {
+                var id = Beatmap.Value.BeatmapInfo.ID;
+
+                if (beatmaps.QueryBeatmap(b => b.ID == id) == null)
+                {
+                    Beatmap.SetDefault();
+                    performDebounceSelection();
+                    return false;
+                }
+            }
+
             var currentBeatmap = beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo, refetch);
             bool validSelection = checkBeatmapValidForSelection(currentBeatmap.BeatmapInfo);
 
