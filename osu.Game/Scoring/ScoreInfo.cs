@@ -399,19 +399,31 @@ namespace osu.Game.Scoring
                 if (mods != null)
                     return mods;
 
-                List<Mod> parsedMods = new List<Mod>();
-                var ruleset = Ruleset.CreateInstance();
+                var apiModList = APIMods;
+                if (apiModList.Length == 0)
+                    return Array.Empty<Mod>();
 
-                foreach (var apiMod in APIMods)
+                List<Mod> parsedMods = new List<Mod>();
+
+                try
                 {
-                    try
+                    var ruleset = Ruleset.CreateInstance();
+
+                    foreach (var apiMod in apiModList)
                     {
-                        parsedMods.Add(apiMod.ToMod(ruleset));
+                        try
+                        {
+                            parsedMods.Add(apiMod.ToMod(ruleset));
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"Failed to deserialize score mod '{apiMod}': {ex.Message}");
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"Failed to deserialize score mod '{apiMod}': {ex.Message}");
-                    }
+                }
+                catch (RulesetLoadException ex)
+                {
+                    Logger.Log($"Failed to load ruleset for score mods (ruleset: {Ruleset.ShortName}): {ex.Message}");
                 }
 
                 return parsedMods.ToArray();
