@@ -10,24 +10,18 @@ using osu.Framework.Input.Events;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Skinning.Argon;
 using osu.Game.Rulesets.Mania.Skinning.Default;
-using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Edit.Blueprints.Components
 {
     public partial class EditHoldNoteEndPiece : CompositeDrawable
     {
         /// <summary>
-        /// Minimum height for editor drag handles. Ez skins may hide the tail drawable (zero <see cref="Drawable.DrawHeight"/>);
-        /// the interaction area must remain usable regardless of skin visuals.
+        /// Minimum height for editor drag handles when Ez skins report zero tail/head <see cref="Drawable.DrawHeight"/>.
         /// </summary>
         public const float MINIMUM_INTERACTION_HEIGHT = ArgonNotePiece.NOTE_HEIGHT;
 
         public static float GetInteractionHeight(float skinDrawableHeight) =>
             Math.Max(skinDrawableHeight, MINIMUM_INTERACTION_HEIGHT);
-
-        public Action? DragStarted { get; init; }
-        public Action<Vector2>? Dragging { get; init; }
-        public Action? DragEnded { get; init; }
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
@@ -62,25 +56,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Blueprints.Components
             base.OnHoverLost(e);
         }
 
-        protected override bool OnDragStart(DragStartEvent e)
-        {
-            DragStarted?.Invoke();
-            return true;
-        }
-
-        protected override void OnDrag(DragEvent e)
-        {
-            base.OnDrag(e);
-            Dragging?.Invoke(e.ScreenSpaceMousePosition);
-            updateState();
-        }
-
-        protected override void OnDragEnd(DragEndEvent e)
-        {
-            base.OnDragEnd(e);
-            DragEnded?.Invoke();
-            updateState();
-        }
+        protected override bool OnDragStart(DragStartEvent e) => false;
 
         private void updateState()
         {

@@ -15,6 +15,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Screens.Edit.Components.TernaryButtons;
 using osu.Game.Screens.Edit.Compose.Components;
 using osuTK;
+using osuTK.Input;
 
 namespace osu.Game.Rulesets.Mania.Edit
 {
@@ -67,6 +68,25 @@ namespace osu.Game.Rulesets.Mania.Edit
         protected override SelectionHandler<HitObject> CreateSelectionHandler() => new ManiaSelectionHandler();
 
         protected sealed override DragBox CreateDragBox() => new ScrollingDragBox(Composer.Playfield);
+
+        private bool shouldDeferHoldHandleDrag(Vector2 screenSpacePos) =>
+            SelectionHandler.SelectedBlueprints.Any(b => b is HoldNoteSelectionBlueprint hold && hold.IsHandleAt(screenSpacePos));
+
+        protected override bool OnMouseDown(MouseDownEvent e)
+        {
+            if (e.Button == MouseButton.Left && shouldDeferHoldHandleDrag(e.ScreenSpaceMouseDownPosition))
+                return false;
+
+            return base.OnMouseDown(e);
+        }
+
+        protected override bool OnDragStart(DragStartEvent e)
+        {
+            if (shouldDeferHoldHandleDrag(e.ScreenSpaceMouseDownPosition))
+                return false;
+
+            return base.OnDragStart(e);
+        }
 
         protected override bool TryMoveBlueprints(DragEvent e, IList<(SelectionBlueprint<HitObject> blueprint, Vector2[] originalSnapPositions)> blueprints)
         {

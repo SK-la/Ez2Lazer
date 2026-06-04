@@ -3,10 +3,13 @@
 
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Allocation;
 using osu.Framework.Testing;
+using osu.Game.Database;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Screens.Edit.Compose.Components.Timeline;
+using osu.Game.Skinning;
 using osu.Game.Tests.Visual;
 using osuTK;
 using osuTK.Input;
@@ -16,12 +19,16 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
 {
     public partial class TestSceneHoldNoteTailDrag : EditorTestScene
     {
+        [Resolved]
+        private SkinManager skins { get; set; } = null!;
+
         protected override Ruleset CreateEditorRuleset() => new ManiaRuleset();
 
         [SetUpSteps]
         public override void SetUpSteps()
         {
             base.SetUpSteps();
+            AddStep("use argon skin", () => skins.CurrentSkinInfo.Value = ArgonSkin.CreateInfo().ToLiveUnmanaged());
             AddStep("Clear objects", () => EditorBeatmap.Clear());
         }
 
@@ -277,37 +284,23 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
         {
             AddStep("Add hold notes", () =>
             {
+                // Offset start times so timeline tail drag areas are not stacked (selected blueprint is drawn on top).
                 EditorBeatmap.AddRange([
                     new HoldNote { StartTime = 2170, Duration = 937.5, Column = 0 },
-                    new HoldNote { StartTime = 2170, Duration = 937.5, Column = 1 }
+                    new HoldNote { StartTime = 2400, Duration = 937.5, Column = 1 }
                 ]);
             });
 
             AddStep("Select the back stack slider", () =>
             {
-                EditorBeatmap.SelectedHitObjects.Add(EditorBeatmap.HitObjects.Last());
+                EditorBeatmap.SelectedHitObjects.Add(EditorBeatmap.HitObjects.OfType<HoldNote>().Single(h => h.Column == 1));
             });
 
             HoldNote column0Hold = null!;
-            DragArea column0DragArea = null!;
-            TimelineHitObjectBlueprint column0Blueprint = null!;
 
             AddStep("cache column 0 hold", () => column0Hold = EditorBeatmap.HitObjects.OfType<HoldNote>().Single(h => h.Column == 0));
 
-            AddStep("raise column 0 above selection", () =>
-            {
-                column0Blueprint = this.ChildrenOfType<TimelineHitObjectBlueprint>().Single(b => b.Item == column0Hold);
-                column0Blueprint.Depth = 10;
-            });
-
-            AddStep("press tail", () =>
-            {
-                column0DragArea = getDragAreaFor(column0Hold);
-                InputManager.MoveMouseTo(column0DragArea);
-                InputManager.PressButton(MouseButton.Left);
-            });
-
-            AddRepeatStep("drag tail", () => InputManager.MoveMouseTo(new Vector2(700, 110)), 5);
+            AddStep("Drag tail", () => dragBackward(getDragAreaFor(column0Hold)));
 
             AddStep("Release tail", () => InputManager.ReleaseButton(MouseButton.Left));
 
