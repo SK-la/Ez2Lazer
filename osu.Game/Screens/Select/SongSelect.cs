@@ -367,7 +367,7 @@ namespace osu.Game.Screens.Select
         /// </summary>
         protected abstract void OnStart();
 
-        public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons() => new ScreenFooterButton[]
+        public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons()
         {
             footerButtonMods = new FooterButtonMods(modSelectOverlay)
             {
@@ -375,8 +375,13 @@ namespace osu.Game.Screens.Select
                 Mods = Mods,
                 Ruleset = Ruleset,
                 RequestDeselectAllMods = () => modRestoreController.ClearOrRestore(Mods, modSelectOverlay),
-            },
-            new FooterButtonRandom
+            };
+            footerButtonMods.Add(new EzModFooterAltHint());
+
+            return new ScreenFooterButton[]
+            {
+                footerButtonMods,
+                new FooterButtonRandom
             {
                 NextRandom = () =>
                 {
@@ -403,7 +408,8 @@ namespace osu.Game.Screens.Select
                     updateBeatmapPreviewSelection();
                 },
                 ezBeatmapPreviewOverlay.ExpandedState)
-        };
+            };
+        }
 
         protected override void LoadComplete()
         {
@@ -434,13 +440,6 @@ namespace osu.Game.Screens.Select
                 ensureTrackLooping(Beatmap.Value, TrackChangeDirection.None);
                 ensurePlayingSelected();
             }, true);
-
-            OnLoadComplete += _ => addEzModFooterHelpers();
-        }
-
-        private void addEzModFooterHelpers()
-        {
-            footerButtonMods.Add(new EzModFooterAltHint());
 
             var keyboardHandler = EzSongSelectKeyboardHandler.ForSongSelect(modRestoreController, Mods, modSelectOverlay);
             keyboardHandler.Depth = float.MinValue;
