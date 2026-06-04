@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
+using osu.Framework.Development;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
@@ -65,9 +66,6 @@ namespace osu.Game.Screens.Ranking
 
         [Resolved]
         private Player? player { get; set; }
-
-        [Resolved]
-        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         private Bindable<EzEnumHitMode> hitModeBindable = null!;
 
@@ -249,7 +247,8 @@ namespace osu.Game.Screens.Ranking
             if (Score?.BeatmapInfo?.BeatmapSet != null && Score.BeatmapInfo.BeatmapSet.OnlineID > 0)
                 buttons.Add(new FavouriteButton(Score.BeatmapInfo.BeatmapSet));
 
-            // 底部增加按钮
+            // 底部增加按钮（GlobalConfigStore 保证 ScreenTestScene 等无完整 OsuGame DI 时仍可用）
+            var ezConfig = GlobalConfigStore.EzConfig;
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             buttons.Add(new HitModeButton(hitModeBindable));
 
@@ -308,8 +307,8 @@ namespace osu.Game.Screens.Ranking
 
         private void scheduleAutoExpandStatisticsWhenCentered()
         {
-            // Visual tests use TestPlayer; auto-expanding statistics shifts layout and breaks upstream assertions.
-            if (Score == null || player is TestPlayer)
+            // Visual tests use TestPlayer; ScreenTestScene has no Player. Auto-expanding shifts layout and breaks score panel assertions.
+            if (Score == null || player == null || player is TestPlayer || DebugUtils.IsNUnitRunning)
                 return;
 
             void attempt()

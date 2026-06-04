@@ -307,8 +307,14 @@ namespace osu.Game.Screens.Select
                     operationDifficultyCache.Value = null;
                     operationPpCache.Value = null;
 
-                    if (Criteria != null)
-                        Filter(Criteria, true);
+                    if (Criteria == null)
+                        return;
+
+                    // Avoid redundant filters when branch metadata changes but the carousel is not using that branch (or xxy sort/group).
+                    if (!useActiveSongsBranchAsBeatmapSource && !usesXxyStarRatingOperations(Criteria))
+                        return;
+
+                    Filter(Criteria, true);
                 });
             }, false);
         }

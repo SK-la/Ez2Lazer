@@ -123,7 +123,10 @@ namespace osu.Game.Screens.Ranking
                 api.Queue(listTagsRequest);
             }
 
-            var getBeatmapSetRequest = new GetBeatmapSetRequest(beatmapInfo.BeatmapSet!.OnlineID);
+            if (beatmapInfo.BeatmapSet == null || beatmapInfo.BeatmapSet.OnlineID <= 0)
+                return;
+
+            var getBeatmapSetRequest = new GetBeatmapSetRequest(beatmapInfo.BeatmapSet.OnlineID);
             getBeatmapSetRequest.Success += set => apiBeatmap.Value = set.Beatmaps.SingleOrDefault(b => b.MatchesOnlineID(beatmapInfo));
             api.Queue(getBeatmapSetRequest);
         }
