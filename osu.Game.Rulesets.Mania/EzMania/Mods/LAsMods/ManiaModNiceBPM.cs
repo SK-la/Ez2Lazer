@@ -3,7 +3,7 @@
 
 using System;
 using System.Linq;
-using osu.Game.EzOsuGame.Mods;
+using osu.Game.EzOsuGame.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.Mods;
 
@@ -13,8 +13,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
     {
         public override Type[] IncompatibleMods => base.IncompatibleMods.Concat(new[]
         {
-            typeof(ManiaModHealthAdaptive),
-            typeof(ManiaModAccuracyAdaptive),
             typeof(ManiaModChangeSpeedByAccuracy),
         }).ToArray();
     }

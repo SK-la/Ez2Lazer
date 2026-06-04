@@ -15,7 +15,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
 
-namespace osu.Game.EzOsuGame.Mods
+namespace osu.Game.EzOsuGame.Mods.LAsMods
 {
     public class ModReconcile : Mod, IApplicableToHUD, IApplicableToHealthProcessor, IApplicableFailOverride
     {

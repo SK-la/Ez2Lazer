@@ -14,7 +14,7 @@ using osu.Game.Beatmaps.Timing;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 
-namespace osu.Game.EzOsuGame.Mods
+namespace osu.Game.EzOsuGame.Mods.LAsMods
 {
     public class UniversalLoopPlayClip : ModLoopPlayClip, IApplicableAfterBeatmapConversion, IApplicableToBeatmapConverter
     {
@@ -31,7 +31,7 @@ namespace osu.Game.EzOsuGame.Mods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            if (beatmap == null || beatmap.HitObjects.Count == 0)
+            if (beatmap.HitObjects.Count == 0)
                 return;
 
             if (!appliedToConverter)
@@ -49,7 +49,7 @@ namespace osu.Game.EzOsuGame.Mods
             var beatmap = beatmapConverter.Beatmap;
 
             // 保留，可以防止开启mod并切换规则集时出现 beatmapConverter.Beatmap 变为 null 导致的崩溃。
-            if (beatmap == null || beatmap.HitObjects.Count == 0)
+            if (beatmap.HitObjects.Count == 0)
                 return;
 
             converterBeatmap = beatmap;

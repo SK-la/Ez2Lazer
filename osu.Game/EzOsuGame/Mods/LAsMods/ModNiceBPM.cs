@@ -25,7 +25,7 @@ using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 using osuTK;
 
-namespace osu.Game.EzOsuGame.Mods
+namespace osu.Game.EzOsuGame.Mods.LAsMods
 {
     public partial class ModNiceBPM : ModRateAdjust, IApplicableToDrawableHitObject, IApplicableToBeatmap, IUpdatableByPlayfield, IApplicableToHUD
     {

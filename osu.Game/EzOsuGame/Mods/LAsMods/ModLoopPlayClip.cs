@@ -17,7 +17,7 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Play;
 
-namespace osu.Game.EzOsuGame.Mods
+namespace osu.Game.EzOsuGame.Mods.LAsMods
 {
     /// <summary>
     /// 继承Mod需要自己实现IApplicableToPlayer, IApplicableToHUD接口的使用
