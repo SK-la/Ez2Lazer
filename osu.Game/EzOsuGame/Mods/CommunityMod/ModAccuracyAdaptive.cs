@@ -144,6 +144,7 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
         {
             MinValue = 0.4,
             MaxValue = 2.5,
+            Precision = 0.01,
         };
 
         private readonly RateAdjustModHelper rateAdjustHelper;

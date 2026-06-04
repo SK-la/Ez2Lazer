@@ -101,6 +101,7 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
         {
             MinValue = 0.1,
             MaxValue = 3.0,
+            Precision = 0.01,
         };
 
         private double targetRate = 1d;
