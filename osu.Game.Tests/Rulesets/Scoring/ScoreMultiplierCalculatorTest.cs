@@ -3,6 +3,7 @@
 
 using NUnit.Framework;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -87,6 +88,16 @@ namespace osu.Game.Tests.Rulesets.Scoring
             double multiplier = calculator.CalculateFor([new OsuModDaycore(), new OsuModHardRock(), new OsuModEasy()]);
 
             Assert.That(multiplier, Is.EqualTo(0.003 * 1.4));
+        }
+
+        [Test]
+        public void TestMultipleUnknownModsDoNotThrow()
+        {
+            var calculator = new TestScoreMultiplierCalculator(new ScoreMultiplierContext(new BeatmapDifficulty()));
+
+            double multiplier = calculator.CalculateFor([new UnknownMod("OJ"), new UnknownMod("OH")]);
+
+            Assert.That(multiplier, Is.EqualTo(1));
         }
 
         private class TestScoreMultiplierCalculator : ScoreMultiplierCalculator

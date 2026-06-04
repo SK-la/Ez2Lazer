@@ -58,7 +58,8 @@ namespace osu.Game.Rulesets.Scoring
         /// </summary>
         public double CalculateFor(IEnumerable<Mod> mods)
         {
-            var allModsByType = mods.ToDictionary(m => m.GetType());
+            // Multiple unresolved legacy mods all instantiate as UnknownMod; they share a type and have no registered multipliers.
+            var allModsByType = mods.Where(m => m is not UnknownMod).ToDictionary(m => m.GetType());
 
             if (allModsByType.Count == 0)
                 return 1;
