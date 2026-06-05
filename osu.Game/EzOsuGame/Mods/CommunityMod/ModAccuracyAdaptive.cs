@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
     /// <summary>
     /// 根据 accuracy 改变速度
     /// </summary>
-    public class ModAccuracyAdaptive : ModRateAdjust, IApplicableToBeatmap, IApplicableToScoreProcessor, IApplicableToDrawableHitObject, IUpdatableByPlayfield
+    public class ModAccuracyAdaptive : ModDynamicSpeedAdjust, IApplicableToBeatmap, IApplicableToScoreProcessor, IApplicableToDrawableHitObject, IUpdatableByPlayfield
     {
         public override string Name => "Accuracy Adaptive";
 

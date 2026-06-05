@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
     /// <summary>
     /// 根据玩家血量动态调整速度
     /// </summary>
-    public class ModHealthAdaptive : ModRateAdjust, IApplicableToBeatmap, IApplicableToScoreProcessor, IApplicableToHealthProcessor, IApplicableToDrawableHitObject, IUpdatableByPlayfield
+    public class ModHealthAdaptive : ModDynamicSpeedAdjust, IApplicableToBeatmap, IApplicableToScoreProcessor, IApplicableToHealthProcessor, IApplicableToDrawableHitObject, IUpdatableByPlayfield
     {
         public override string Name => "Health Adaptive";
 

@@ -141,5 +141,30 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString PAUSE_SETTINGS_PREVIEW_PAUSED = new EzLocalizationManager.EzLocalisableString("暂停中", "Paused");
         public static readonly LocalisableString PAUSE_SETTINGS_PREVIEW_LABEL = new EzLocalizationManager.EzLocalisableString("预览", "Preview");
+
+        // EzHUDDynamicSpeedDisplay
+        public static readonly LocalisableString DYNAMIC_SPEED_SHOW_LINE_LABEL = new EzLocalizationManager.EzLocalisableString("显示速度折线", "Show Speed Line");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_SHOW_LINE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "是否显示速度折线图区域。",
+            "Whether to show the speed line chart area.");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_LINE_WIDTH_LABEL = new EzLocalizationManager.EzLocalisableString("速度折线宽度", "Speed Line Width");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_LINE_WIDTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "速度折线图的总绘制宽度（像素）。",
+            "Total draw width of the speed line chart in pixels.");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_LINE_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("速度区间高度", "Speed Range Height");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_LINE_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "速度折线区域的垂直高度。联动 mod 时上下边为 mod 速度区间；否则以进图速度居中，每 0.01x 对应 2px。",
+            "Vertical height of the speed line area. With a linked mod, top/bottom match the mod speed range; otherwise centred on entry speed at 2px per 0.01x.");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_ENDPOINT_BLINK_LABEL = new EzLocalizationManager.EzLocalisableString("端点闪烁", "Endpoint Blink");
+
+        public static readonly LocalisableString DYNAMIC_SPEED_ENDPOINT_BLINK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "速度变化时在折线右端显示不显眼的闪烁白点。",
+            "Show a subtle blinking white dot at the line endpoint while speed is changing.");
     }
 }

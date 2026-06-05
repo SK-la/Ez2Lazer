@@ -6,15 +6,11 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
@@ -22,12 +18,10 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
-using osu.Game.Screens.Play;
-using osuTK;
 
 namespace osu.Game.EzOsuGame.Mods.LAsMods
 {
-    public partial class ModNiceBPM : ModRateAdjust, IApplicableToDrawableHitObject, IApplicableToBeatmap, IUpdatableByPlayfield, IApplicableToHUD
+    public partial class ModNiceBPM : ModDynamicSpeedAdjust, IApplicableToDrawableHitObject, IApplicableToBeatmap, IUpdatableByPlayfield
     {
         public override string Name => "Nice BPM";
 
@@ -310,11 +304,6 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
             rateAdjustHelper.ApplyToTrack(track);
         }
 
-        public void ApplyToHUD(HUDOverlay overlay)
-        {
-            overlay.Add(new NiceBPMRateDisplay(SpeedChange));
-        }
-
         public void Update(Playfield playfield)
         {
             SpeedChange.Value = Interpolation.DampContinuously(SpeedChange.Value, targetRate, 50, playfield.Clock.ElapsedFrameTime);
@@ -473,43 +462,6 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
 
             // 根据一致性缩放速率调整
             targetRate = Interpolation.Lerp(targetRate, recentRates.Average(), Math.Abs(consistency) / (recent_rate_count - 1d));
-        }
-
-        private partial class NiceBPMRateDisplay : CompositeDrawable
-        {
-            private readonly BindableNumber<double> sourceRate;
-            private readonly BindableDouble displayedRate = new BindableDouble();
-
-            private OsuSpriteText rateText = null!;
-
-            public NiceBPMRateDisplay(BindableNumber<double> sourceRate)
-            {
-                this.sourceRate = sourceRate;
-
-                AutoSizeAxes = Axes.Both;
-                Anchor = Anchor.BottomLeft;
-                Origin = Anchor.BottomLeft;
-                Position = new Vector2(50, -50);
-            }
-
-            protected override void LoadComplete()
-            {
-                base.LoadComplete();
-
-                InternalChild = rateText = new OsuSpriteText
-                {
-                    Font = OsuFont.Default.With(size: 24),
-                };
-
-                displayedRate.BindTo(sourceRate);
-                displayedRate.BindValueChanged(rate => rateText.Text = $"Speed Rate: {rate.NewValue:0.00}x", true);
-            }
-
-            protected override void Dispose(bool isDisposing)
-            {
-                base.Dispose(isDisposing);
-                displayedRate.UnbindAll();
-            }
         }
     }
 
