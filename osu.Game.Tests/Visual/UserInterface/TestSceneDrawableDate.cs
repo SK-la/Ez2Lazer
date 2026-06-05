@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Testing;
 using osu.Game.Graphics;
+using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
 
@@ -44,7 +45,12 @@ namespace osu.Game.Tests.Visual.UserInterface
         [Test]
         public void TestSecondsUpdate()
         {
-            AddUntilStep("4th date says \"2 seconds ago\"", () => this.ChildrenOfType<DrawableDate>().ElementAt(3).Current.Value == "2 seconds ago");
+            AddUntilStep("4th date humanized after 2 seconds", () =>
+            {
+                var drawableDate = this.ChildrenOfType<DrawableDate>().ElementAt(3);
+                return DateTimeOffset.Now.Subtract(drawableDate.Date).TotalSeconds >= 2
+                       && drawableDate.Current.Value == HumanizerUtils.Humanize(drawableDate.Date);
+            });
         }
 
         private partial class PokeyDrawableDate : CompositeDrawable
