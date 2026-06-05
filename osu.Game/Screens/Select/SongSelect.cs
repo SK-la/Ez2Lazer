@@ -1144,6 +1144,8 @@ namespace osu.Game.Screens.Select
                     skinnableContent.ScaleTo(1.2f, 600, Easing.OutQuint);
                     skinnableContent.FadeOut(200, Easing.OutQuint);
 
+                    ezBeatmapPreviewOverlay.SetSongSelectBackgroundRevealed(true);
+
                     updateBackgroundDim();
 
                     Footer?.Hide();
@@ -1173,6 +1175,8 @@ namespace osu.Game.Screens.Select
                 skinnableContent.ResizeWidthTo(1f, 500, Easing.OutQuint);
                 skinnableContent.ScaleTo(1, 500, Easing.OutQuint);
                 skinnableContent.FadeIn(500, Easing.OutQuint);
+
+                ezBeatmapPreviewOverlay.SetSongSelectBackgroundRevealed(false);
 
                 Footer?.Show();
             }

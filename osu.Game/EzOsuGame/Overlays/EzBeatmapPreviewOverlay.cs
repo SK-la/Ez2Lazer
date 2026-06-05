@@ -148,6 +148,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private bool expanded;
         private bool fullMapFocusActive;
+        private bool songSelectBackgroundRevealed;
         private float focusSavedPanelWidth;
         private float focusSavedPanelHeight;
 
@@ -456,8 +457,36 @@ namespace osu.Game.EzOsuGame.Overlays
             }
         }
 
+        /// <summary>
+        /// Match song select background-hold reveal: hide all preview UI while only the beatmap background remains visible.
+        /// </summary>
+        public void SetSongSelectBackgroundRevealed(bool revealed)
+        {
+            if (songSelectBackgroundRevealed == revealed)
+                return;
+
+            songSelectBackgroundRevealed = revealed;
+
+            if (revealed)
+            {
+                if (fullMapFocusActive)
+                    setFullMapFocusState(false);
+
+                ClearTransforms();
+                this.FadeOut(200, Easing.OutQuint);
+                this.ScaleTo(1.2f, 600, Easing.OutQuint);
+                return;
+            }
+
+            ClearTransforms();
+            this.FadeIn(500, Easing.OutQuint);
+            this.ScaleTo(1f, 500, Easing.OutQuint);
+        }
+
         public void SuspendForScreenExit()
         {
+            SetSongSelectBackgroundRevealed(false);
+
             selectionLoadInProgress = false;
             cancelScheduledSelectionLoad();
             cancelPendingLoad();
