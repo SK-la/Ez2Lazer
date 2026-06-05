@@ -16,6 +16,7 @@ using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Mods.LAsMods;
+using osu.Game.EzOsuGame.Mods.CommunityMod;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
@@ -169,6 +170,13 @@ namespace osu.Game.Rulesets.Osu
                         new ModNiceBPM(),
                         new ModReconcile(),
                         new UniversalLoopPlayClip(),
+                    };
+
+                case ModType.CommunityMod:
+                    return new Mod[]
+                    {
+                        new ModHealthAdaptive(),
+                        new ModAccuracyAdaptive(),
                     };
 
                 case ModType.DifficultyReduction:
