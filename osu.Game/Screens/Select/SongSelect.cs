@@ -239,7 +239,11 @@ namespace osu.Game.Screens.Select
                                                         // Pad enough to only reset scroll when well into the left wedge areas.
                                                         Padding = new MarginPadding { Right = 40 },
                                                         RelativeSizeAxes = Axes.Both,
-                                                        Child = new LeftSideInteractionContainer(() => carousel.ScrollToSelection())
+                                                        Child = new LeftSideInteractionContainer(() =>
+                                                        {
+                                                            if (!carousel.UserScrolling)
+                                                                carousel.ScrollToSelection();
+                                                        })
                                                         {
                                                             RelativeSizeAxes = Axes.Both,
                                                         },

@@ -228,7 +228,11 @@ namespace osu.Game.Graphics.Carousel
                 AbsoluteScrolling = true;
             }
 
-            private void endAbsoluteScrolling() => AbsoluteScrolling = false;
+            private void endAbsoluteScrolling()
+            {
+                AbsoluteScrolling = false;
+                PreserveUserScroll();
+            }
 
             #endregion
 

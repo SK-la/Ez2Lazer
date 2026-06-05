@@ -50,8 +50,18 @@ namespace osu.Game.Graphics.Containers
         protected override void ScrollToAbsolutePosition(Vector2 screenSpacePosition)
         {
             UserScrolling = true;
-            base.ScrollToAbsolutePosition(screenSpacePosition);
+
+            float fromScrollbarPosition = FromScrollbarPosition(ToLocalSpace(screenSpacePosition)[ScrollDim]);
+            float scrollbarCentreOffset = FromScrollbarPosition(Scrollbar.DrawHeight) * 0.5f;
+
+            // Use base.ScrollTo to avoid clearing UserScrolling via this type's ScrollTo override.
+            base.ScrollTo(Clamp(fromScrollbarPosition - scrollbarCentreOffset), true, DistanceDecayOnAbsoluteScroll);
         }
+
+        /// <summary>
+        /// Mark that the user has manually overridden scroll position.
+        /// </summary>
+        public void PreserveUserScroll() => UserScrolling = true;
 
         public new void ScrollTo(double value, bool animated = true, double? distanceDecay = null)
         {

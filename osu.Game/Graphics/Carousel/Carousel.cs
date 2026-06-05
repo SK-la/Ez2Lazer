@@ -78,6 +78,11 @@ namespace osu.Game.Graphics.Carousel
         public bool AbsoluteScrolling => Scroll.AbsoluteScrolling;
 
         /// <summary>
+        /// Whether the user has manually overridden the carousel scroll position.
+        /// </summary>
+        public bool UserScrolling => Scroll.UserScrolling;
+
+        /// <summary>
         /// The number of times filter operations have been triggered.
         /// </summary>
         public int FilterCount { get; private set; }
