@@ -21,47 +21,62 @@ namespace osu.Game.Tests.Skins
     [TestFixture]
     public class ScriptedSkinLoaderTest
     {
-        private static string fixtureDirectory => Path.Combine(findRepositoryRoot(), "docs", "TestScriptedSkin");
+        private const string resource_directory_suffix = "Resources.EzProScriptedSkin.";
 
-        private static string findRepositoryRoot()
+        private static readonly Lazy<string> fixture_directory = new Lazy<string>(() =>
         {
-            var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            string tempDir = Path.Combine(Path.GetTempPath(), "ScriptedSkinLoaderTest", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
 
-            while (directory != null)
-            {
-                if (Directory.Exists(Path.Combine(directory.FullName, "docs", "TestScriptedSkin")))
-                    return directory.FullName;
+            extractEmbeddedResourceToFile("EzProSkin.csx", tempDir);
+            extractEmbeddedResourceToFile("ManiaEzProSkinTransformer.csx", tempDir);
 
-                directory = directory.Parent;
-            }
+            return tempDir;
+        });
 
-            throw new InvalidOperationException("Could not locate docs/TestScriptedSkin fixture directory.");
+        private static string fixtureDirectoryValue => fixture_directory.Value;
+
+        private static void extractEmbeddedResourceToFile(string fileName, string targetDirectory)
+        {
+            var assembly = typeof(ScriptedSkinLoaderTest).Assembly;
+            string resourceName = assembly.GetManifestResourceNames()
+                                          .Single(n => n.EndsWith(resource_directory_suffix + fileName, StringComparison.Ordinal));
+
+            using var resourceStream = assembly.GetManifestResourceStream(resourceName);
+
+            if (resourceStream == null)
+                throw new InvalidOperationException($"Embedded resource missing: {resourceName}");
+
+            string targetPath = Path.Combine(targetDirectory, fileName);
+            using var fileStream = File.Create(targetPath);
+            resourceStream.CopyTo(fileStream);
         }
 
         [Test]
         public void TestFixtureDirectoryExists()
         {
-            Assert.That(Directory.Exists(fixtureDirectory), Is.True, $"Fixture directory not found: {fixtureDirectory}");
-            Assert.That(File.Exists(Path.Combine(fixtureDirectory, "TestScriptedSkin.csx")), Is.True);
-            Assert.That(File.Exists(Path.Combine(fixtureDirectory, "skin.ini")), Is.True);
+            string directory = fixtureDirectoryValue;
+            Assert.That(Directory.Exists(directory), Is.True, $"Fixture directory not found: {directory}");
+            Assert.That(File.Exists(Path.Combine(directory, "EzProSkin.csx")), Is.True);
+            Assert.That(File.Exists(Path.Combine(directory, "ManiaEzProSkinTransformer.csx")), Is.True);
         }
 
         [Test]
         public async Task TestMainScriptCompiles()
         {
             var runner = new SandboxedScriptRunner();
-            string scriptPath = Path.Combine(fixtureDirectory, "TestScriptedSkin.csx");
+            string scriptPath = Path.Combine(fixtureDirectoryValue, "EzProSkin.csx");
 
             SkinInfo? info = await runner.LoadScriptInfoAsync(scriptPath);
 
             Assert.That(info, Is.Not.Null);
-            Assert.That(info!.Name, Is.EqualTo("TestScriptedSkin"));
+            Assert.That(info!.Name, Is.EqualTo("Ez Pro"));
         }
 
         [Test]
         public void TestMainScriptDoesNotEmitNullableAnnotationWarnings()
         {
-            string scriptPath = Path.Combine(fixtureDirectory, "TestScriptedSkin.csx");
+            string scriptPath = Path.Combine(fixtureDirectoryValue, "EzProSkin.csx");
             string scriptCode = File.ReadAllText(scriptPath);
 
             var script = ScriptedSkinCompilation.CreateScript(scriptCode);
@@ -78,15 +93,15 @@ namespace osu.Game.Tests.Skins
         public async Task TestMainScriptLoadsWithSkinIni()
         {
             var runner = new SandboxedScriptRunner();
-            string scriptPath = Path.Combine(fixtureDirectory, "TestScriptedSkin.csx");
+            string scriptPath = Path.Combine(fixtureDirectoryValue, "EzProSkin.csx");
 
             var resources = createMockResourceProvider();
-            var skinInfo = new SkinInfo { Name = "TestScriptedSkin", Creator = "Test" };
+            var skinInfo = new SkinInfo { Name = "Ez Pro", Creator = "Test" };
 
             IScriptedSkin skin = await runner.LoadScriptAsync<IScriptedSkin>(scriptPath, skinInfo, resources.Object);
 
             Assert.That(skin, Is.Not.Null);
-            Assert.That(skin.Name, Is.EqualTo("TestScriptedSkin"));
+            Assert.That(skin.Name, Is.EqualTo("Ez Pro"));
 
             var combo = skin.GetConfig<GlobalSkinColours, IReadOnlyList<Color4>>(GlobalSkinColours.ComboColours);
             Assert.That(combo?.Value, Is.Not.Null);
@@ -97,7 +112,7 @@ namespace osu.Game.Tests.Skins
         public async Task TestManiaTransformerCompiles()
         {
             var runner = new SandboxedScriptRunner();
-            string scriptPath = Path.Combine(fixtureDirectory, "ManiaTestScriptedSkinTransformer.csx");
+            string scriptPath = Path.Combine(fixtureDirectoryValue, "ManiaEzProSkinTransformer.csx");
 
             var beatmap = new ManiaBeatmap(new StageDefinition(4));
             var mockSkin = new Mock<ISkin>();
@@ -105,7 +120,7 @@ namespace osu.Game.Tests.Skins
             SkinTransformer transformer = await runner.LoadScriptAsync<SkinTransformer>(scriptPath, mockSkin.Object, beatmap);
 
             Assert.That(transformer, Is.Not.Null);
-            Assert.That(transformer.GetType().Name, Is.EqualTo("ManiaTestScriptedSkinTransformer"));
+            Assert.That(transformer.GetType().Name, Is.EqualTo("ManiaEzProSkinTransformer"));
         }
 
         private static Mock<IStorageResourceProvider> createMockResourceProvider()
