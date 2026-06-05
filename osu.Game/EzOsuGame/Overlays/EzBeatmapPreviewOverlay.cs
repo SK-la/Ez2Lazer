@@ -123,6 +123,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private IManiaStaticPreviewRenderer? maniaStaticRenderer;
         private PreviewDensityController densityController = null!;
         private Bindable<double> previewDensity = null!;
+        private Bindable<EzBeatmapPreviewMode> sharedPreviewModeConfig = null!;
+        private Bindable<EzBeatmapPreviewMode> maniaPreviewModeConfig = null!;
 
         [Resolved(CanBeNull = true)]
         private ISkin? skin { get; set; }
@@ -324,9 +326,11 @@ namespace osu.Game.EzOsuGame.Overlays
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            previewMode.BindTo(ezConfig.GetBindable<EzBeatmapPreviewMode>(Ez2Setting.BeatmapPreviewMode));
+            sharedPreviewModeConfig = ezConfig.GetBindable<EzBeatmapPreviewMode>(Ez2Setting.BeatmapPreviewMode);
+            maniaPreviewModeConfig = ezConfig.GetBindable<EzBeatmapPreviewMode>(Ez2Setting.BeatmapPreviewModeMania);
             previewDensity = ezConfig.GetBindable<double>(Ez2Setting.BeatmapPreviewDensity);
             densityController = new PreviewDensityController(previewDensity);
+            applyPreviewModeForCurrentRuleset();
         }
 
         protected override void LoadComplete()
@@ -415,11 +419,16 @@ namespace osu.Game.EzOsuGame.Overlays
 
             this.playableBeatmap = playableBeatmap;
             string beatmapHash = playableBeatmap.BeatmapInfo.Hash;
+            bool rulesetChanged = currentRulesetOnlineId != ruleset.OnlineID;
             bool beatmapSame = currentRulesetOnlineId == ruleset.OnlineID && currentBeatmapHash == beatmapHash;
 
             bool unchanged = !forceReload && beatmapSame;
 
             currentRuleset = ruleset;
+
+            if (rulesetChanged)
+                applyPreviewModeForCurrentRuleset();
+
             updatePreviewModeButtons();
 
             if (unchanged)
@@ -933,7 +942,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 // 清理所有引用
                 playableBeatmap = null;
                 currentRuleset = null;
-                previewMode.UnbindAll();
+                sharedPreviewModeConfig.UnbindAll();
+                maniaPreviewModeConfig.UnbindAll();
             }
         }
 
@@ -1262,10 +1272,66 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void setPreviewMode(EzBeatmapPreviewMode mode)
         {
-            if (previewMode.Value == mode)
+            EzBeatmapPreviewMode validated = getValidatedPreviewMode(mode, currentRuleset);
+
+            if (previewMode.Value == validated)
                 return;
 
-            previewMode.Value = mode;
+            previewMode.Value = validated;
+            persistPreviewMode(validated);
+        }
+
+        private void applyPreviewModeForCurrentRuleset()
+        {
+            EzBeatmapPreviewMode target = getValidatedPreviewMode(getStoredPreviewMode(), currentRuleset);
+
+            if (previewMode.Value == target)
+                return;
+
+            previewMode.Value = target;
+        }
+
+        private EzBeatmapPreviewMode getStoredPreviewMode()
+        {
+            try
+            {
+                return isManiaRuleset(currentRuleset) ? maniaPreviewModeConfig.Value : sharedPreviewModeConfig.Value;
+            }
+            catch
+            {
+                return getDefaultPreviewMode(currentRuleset);
+            }
+        }
+
+        private void persistPreviewMode(EzBeatmapPreviewMode mode)
+        {
+            try
+            {
+                if (isManiaRuleset(currentRuleset))
+                    maniaPreviewModeConfig.Value = mode;
+                else
+                    sharedPreviewModeConfig.Value = mode;
+            }
+            catch
+            {
+                // Keep the in-session choice even if persistence fails.
+            }
+        }
+
+        private static EzBeatmapPreviewMode getDefaultPreviewMode(RulesetInfo? ruleset) =>
+            isManiaRuleset(ruleset) ? EzBeatmapPreviewMode.StaticFullMap : EzBeatmapPreviewMode.Static;
+
+        private static EzBeatmapPreviewMode getValidatedPreviewMode(EzBeatmapPreviewMode mode, RulesetInfo? ruleset)
+        {
+            if (!Enum.IsDefined(mode))
+                return getDefaultPreviewMode(ruleset);
+
+            IReadOnlyList<EzBeatmapPreviewMode> availableModes = isManiaRuleset(ruleset) ? mania_preview_modes : shared_preview_modes;
+
+            if (availableModes.Contains(mode))
+                return mode;
+
+            return getDefaultPreviewMode(ruleset);
         }
 
         private void onPreviewModeChanged()
@@ -1317,15 +1383,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private IReadOnlyList<EzBeatmapPreviewMode> getAvailablePreviewModes() => isManiaRuleset(currentRuleset) ? mania_preview_modes : shared_preview_modes;
 
-        private EzBeatmapPreviewMode getHighlightedPreviewMode()
-        {
-            IReadOnlyList<EzBeatmapPreviewMode> availableModes = getAvailablePreviewModes();
-
-            if (availableModes.Contains(previewMode.Value))
-                return previewMode.Value;
-
-            return dynamicMode ? EzBeatmapPreviewMode.Dynamic : EzBeatmapPreviewMode.Static;
-        }
+        private EzBeatmapPreviewMode getHighlightedPreviewMode() =>
+            getValidatedPreviewMode(previewMode.Value, currentRuleset);
 
         private static bool isManiaRuleset(RulesetInfo? ruleset) => ruleset?.OnlineID == 3;
 

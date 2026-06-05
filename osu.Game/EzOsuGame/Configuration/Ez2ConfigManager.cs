@@ -102,6 +102,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
             SetDefault(Ez2Setting.BeatmapPreviewMode, EzBeatmapPreviewMode.Static);
+            SetDefault(Ez2Setting.BeatmapPreviewModeMania, EzBeatmapPreviewMode.StaticFullMap);
             SetDefault(Ez2Setting.BeatmapPreviewDensity, 1.0, 0.1, 5.0, 0.05);
             SetDefault(Ez2Setting.EditorSyncTimelineSpacing, true);
 
@@ -772,6 +773,7 @@ namespace osu.Game.EzOsuGame.Configuration
         // 界面功能
         KeySoundPreviewMode,
         BeatmapPreviewMode,
+        BeatmapPreviewModeMania,
         BeatmapPreviewDensity,
         EditorSyncTimelineSpacing,
 
