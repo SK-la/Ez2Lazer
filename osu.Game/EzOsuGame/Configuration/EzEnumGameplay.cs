@@ -68,13 +68,13 @@ namespace osu.Game.EzOsuGame.Configuration
         [Description("")]
         Ez2Ac = 4,
 
-        [Description("IIDX Hard(Testing)")]
+        [Description("IIDX Hard")]
         IIDX_HD = 5,
 
-        [Description("LR2 Hard(Testing)")]
+        [Description("LR2 Hard")]
         LR2_HD = 6,
 
-        [Description("raja Hard(Testing)")]
+        [Description("raja Hard")]
         Raja_HD = 7,
     }
 
