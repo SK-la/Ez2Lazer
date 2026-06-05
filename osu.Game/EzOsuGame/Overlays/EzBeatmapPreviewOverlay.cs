@@ -39,7 +39,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private const float panel_right_margin = 20;
         private const float default_panel_height = 340;
         private const float min_panel_width = 360;
-        private const float max_panel_width = 560;
+        private const float fallback_max_panel_width = 560;
         private const float panel_background_opacity = 0.78f;
         private const float panel_background_focus_opacity = 0.92f;
         private const float min_panel_height = 180;
@@ -1118,9 +1118,22 @@ namespace osu.Game.EzOsuGame.Overlays
                 stageScaleContainer.Clear(true);
         }
 
+        private float getWedgeAlignedMaxPanelWidth()
+        {
+            if (DefaultPanelRightEdgeInScreenSpace != null)
+            {
+                float targetRightEdge = ToLocalSpace(new Vector2(DefaultPanelRightEdgeInScreenSpace(), 0)).X;
+
+                if (!float.IsNaN(targetRightEdge) && !float.IsInfinity(targetRightEdge))
+                    return Math.Max(min_panel_width, targetRightEdge - panel_left_margin);
+            }
+
+            return Math.Min(fallback_max_panel_width, DrawWidth - panel_left_margin - panel_right_margin);
+        }
+
         private float clampPanelWidth(float width)
         {
-            float maxWidth = Math.Min(max_panel_width, DrawWidth - panel_left_margin - panel_right_margin);
+            float maxWidth = getWedgeAlignedMaxPanelWidth();
             return Math.Clamp(width, min_panel_width, Math.Max(min_panel_width, maxWidth));
         }
 
