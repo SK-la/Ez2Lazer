@@ -81,13 +81,7 @@ Self-built copies hide in-game update settings and do not check SK-la/Ez2Lazer R
 
 ## Release Notes Automation
 
-Use the helper script to generate a categorized draft from commit range:
-
-```powershell
-pwsh ./GenerateReleaseNotes.ps1 -FromRef "2026.5.1" -ToRef "2026.5.6" -Output "../release-2026.5.6.md" -Title "Release 2026.5.6"
-```
-
-Then polish the draft and publish it on GitHub Releases.
+Use the helper script to generate a bilingual release draft. By default it compares the latest two `*-ez2lazer` tags (skipping upstream ppy tags like `2026.605.0`):
 
 ## Special Thanks
 - [osu!](https://github.com/ppy/osu): The original game and framework.
