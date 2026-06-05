@@ -120,6 +120,10 @@ namespace osu.Game.EzOsuGame.Statistics
                 // Then generate hit events
                 return generator.Generate(databasedScore, playableBeatmap, cancellationToken);
             }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
             catch (Exception ex)
             {
                 Logger.Error(
