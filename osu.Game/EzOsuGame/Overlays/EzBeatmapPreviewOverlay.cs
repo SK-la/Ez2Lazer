@@ -40,6 +40,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private const float default_panel_height = 340;
         private const float min_panel_width = 360;
         private const float max_panel_width = 560;
+        private const float panel_background_opacity = 0.78f;
+        private const float panel_background_focus_opacity = 0.92f;
         private const float min_panel_height = 180;
         private const float max_panel_height = 560;
         private const float bottom_controls_height = 56;
@@ -75,6 +77,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Bindable<EzBeatmapPreviewMode> previewMode = new Bindable<EzBeatmapPreviewMode>();
 
         private readonly Container panelContainer;
+        private readonly Box panelBackground;
         private readonly Container stageViewport;
         private readonly Container stageScaleContainer;
         private readonly Container stageAreaContainer;
@@ -177,10 +180,10 @@ namespace osu.Game.EzOsuGame.Overlays
                         RelativeSizeAxes = Axes.Both,
                         Children = new Drawable[]
                         {
-                            new Box
+                            panelBackground = new Box
                             {
                                 RelativeSizeAxes = Axes.Both,
-                                Colour = Color4.Black.Opacity(0.78f)
+                                Colour = Color4.Black.Opacity(panel_background_opacity)
                             },
                             loadTimeText = new OsuSpriteText
                             {
@@ -759,7 +762,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (base.OnMouseDown(e))
                 return true;
 
-            if (customManiaStaticMode && fullMapMode && stageViewport.ReceivePositionalInputAt(e.ScreenSpaceMousePosition))
+            if (stageViewport.ReceivePositionalInputAt(e.ScreenSpaceMousePosition))
             {
                 setFullMapFocusState(true);
                 return true;
@@ -1330,6 +1333,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             fullMapFocusActive = focused;
             FullMapFocusState.Value = focused;
+
+            panelBackground.FadeColour(Color4.Black.Opacity(focused ? panel_background_focus_opacity : panel_background_opacity), 100, Easing.OutQuint);
 
             previewModeButtonList.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             loadTimeText.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
