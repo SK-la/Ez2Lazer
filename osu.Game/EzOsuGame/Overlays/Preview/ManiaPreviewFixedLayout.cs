@@ -63,6 +63,43 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
             return entries;
         }
 
+        public static List<ManiaPreviewLayoutEntry> BuildTimeBased(ManiaPreviewData data)
+        {
+            var entries = new List<ManiaPreviewLayoutEntry>();
+            if (data.Notes.Count == 0 || data.MsPerMeasure <= 0)
+                return entries;
+
+            double msPerRow = data.MsPerMeasure / ROWS_PER_MEASURE;
+
+            int timeToRow(double time) => Math.Max(0, (int)Math.Round((time - data.StartTimeMs) / msPerRow));
+
+            foreach (ManiaPreviewNote note in data.Notes)
+            {
+                int startRow = timeToRow(note.StartTime);
+
+                switch (note.Kind)
+                {
+                    case ManiaPreviewNoteKind.Tap:
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, note.Kind));
+                        break;
+
+                    case ManiaPreviewNoteKind.HoldHead:
+                    {
+                        int endRow = Math.Max(startRow + 1, timeToRow(note.EndTime));
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, startRow, ManiaPreviewNoteKind.HoldHead));
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, startRow, endRow, ManiaPreviewNoteKind.HoldBody));
+                        entries.Add(new ManiaPreviewLayoutEntry(note.Column, endRow, endRow, ManiaPreviewNoteKind.HoldTail));
+                        break;
+                    }
+
+                    case ManiaPreviewNoteKind.HoldTail:
+                        break;
+                }
+            }
+
+            return entries;
+        }
+
         public static int GetTotalRows(IReadOnlyList<ManiaPreviewLayoutEntry> entries)
         {
             if (entries.Count == 0)

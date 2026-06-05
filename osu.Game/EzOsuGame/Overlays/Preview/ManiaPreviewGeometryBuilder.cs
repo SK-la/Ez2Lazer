@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -22,6 +23,8 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
 
             int totalColumns = getTotalColumns(beatmap, hitObjects);
             var notes = new List<ManiaPreviewNote>();
+            double startTimeMs = hitObjects[0].StartTime;
+            double endTimeMs = startTimeMs;
 
             foreach (HitObject obj in hitObjects)
             {
@@ -29,6 +32,8 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                     continue;
 
                 double endTime = obj is IHasDuration hasDuration ? obj.StartTime + Math.Max(0, hasDuration.Duration) : obj.StartTime;
+                startTimeMs = Math.Min(startTimeMs, obj.StartTime);
+                endTimeMs = Math.Max(endTimeMs, endTime);
                 bool isHold = endTime - obj.StartTime > hold_threshold_ms;
 
                 if (!isHold)
@@ -46,7 +51,17 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                 return cmp != 0 ? cmp : a.Kind.CompareTo(b.Kind);
             });
 
-            return new ManiaPreviewData(totalColumns, buildSeparatorMap(totalColumns), notes);
+            double msPerMeasure = getMsPerMeasure(beatmap, startTimeMs);
+            return new ManiaPreviewData(totalColumns, buildSeparatorMap(totalColumns), notes, startTimeMs, endTimeMs, msPerMeasure);
+        }
+
+        private static double getMsPerMeasure(IBeatmap beatmap, double time)
+        {
+            if (beatmap.ControlPointInfo.TimingPoints.Count == 0)
+                return 2000;
+
+            TimingControlPoint timing = beatmap.ControlPointInfo.TimingPointAt(time);
+            return timing.BeatLength * 4;
         }
 
         private static int getTotalColumns(IBeatmap beatmap, IReadOnlyList<HitObject> objects)

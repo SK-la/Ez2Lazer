@@ -40,7 +40,6 @@ namespace osu.Game.EzOsuGame.Overlays
         private const float default_panel_height = 340;
         private const float min_panel_width = 360;
         private const float fallback_max_panel_width = 560;
-        private const float panel_background_opacity = 0.78f;
         private const float panel_background_focus_opacity = 0.92f;
         private const float min_panel_height = 180;
         private const float max_panel_height = 560;
@@ -183,7 +182,7 @@ namespace osu.Game.EzOsuGame.Overlays
                             panelBackground = new Box
                             {
                                 RelativeSizeAxes = Axes.Both,
-                                Colour = Color4.Black.Opacity(panel_background_opacity)
+                                Colour = Color4.Black.Opacity(panel_background_focus_opacity)
                             },
                             loadTimeText = new OsuSpriteText
                             {
@@ -1347,7 +1346,7 @@ namespace osu.Game.EzOsuGame.Overlays
             fullMapFocusActive = focused;
             FullMapFocusState.Value = focused;
 
-            panelBackground.FadeColour(Color4.Black.Opacity(focused ? panel_background_focus_opacity : panel_background_opacity), 100, Easing.OutQuint);
+            panelBackground.FadeColour(Color4.Black.Opacity(panel_background_focus_opacity), 100, Easing.OutQuint);
 
             previewModeButtonList.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             loadTimeText.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
