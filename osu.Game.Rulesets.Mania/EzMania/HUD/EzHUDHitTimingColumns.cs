@@ -10,11 +10,12 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.Localization;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Objects.Types;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
@@ -24,8 +25,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
     public partial class EzHUDHitTimingColumns : HitErrorMeter
     {
-        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.MINIMUM_HIT_RESULT_LABEL), nameof(EzHUDManiaStrings.MINIMUM_HIT_RESULT_DESCRIPTION))]
-        public Bindable<HitResult> MinimumHitResult { get; } = new Bindable<HitResult>(HitResult.Good);
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.JUDGEMENT_FILTER_LABEL), nameof(EzCommonModStrings.JUDGEMENT_FILTER_DESCRIPTION))]
+        public Bindable<EzEnumHitResult> JudgementFilter { get; } = new Bindable<EzEnumHitResult>(EzEnumHitResult.Good);
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.JUDGEMENT_FILTER_DIRECTION_LABEL), nameof(EzCommonModStrings.JUDGEMENT_FILTER_DIRECTION_DESCRIPTION))]
+        public Bindable<JudgementFilterDirection> FilterDirection { get; } = new Bindable<JudgementFilterDirection>(JudgementFilterDirection.IgnoreBetter);
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.MARKERS_HEIGHT_LABEL), nameof(EzHUDManiaStrings.MARKERS_HEIGHT_DESCRIPTION))]
         public BindableNumber<float> MarkerHeight { get; } = new BindableNumber<float>(2)
@@ -54,11 +58,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.BACKGROUND_COLOUR_LABEL), nameof(EzHUDManiaStrings.BACKGROUND_COLOUR_DESCRIPTION))]
         public BindableColour4 BackgroundColour { get; } = new BindableColour4(Colour4.Gray);
 
-        private double[] floatingAverages = null!;
-        private Box[] judgementMarkers = null!;
-        private Box backgroundBox = null!;
-        private Container[] columns = null!;
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.UNIFIED_MOVEMENT_LABEL), nameof(EzHUDManiaStrings.UNIFIED_MOVEMENT_DESCRIPTION))]
+        public BindableBool UnifiedMovement { get; } = new BindableBool();
 
+        private Container[]? columns;
+        private Box[] judgementMarkers = null!;
+        private Box? backgroundBox;
+
+        private double[] floatingAverages = null!;
         private int keyCount;
 
         private Bindable<double> columnWidth = null!;
@@ -90,8 +97,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                 floatingAverages = Array.Empty<double>();
                 judgementMarkers = Array.Empty<Box>();
                 columns = Array.Empty<Container>();
+                backgroundBox = null!;
                 return;
             }
+
             floatingAverages = new double[keyCount];
             judgementMarkers = new Box[keyCount];
             InternalChild = new Container
@@ -188,19 +197,27 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             // 更新背景透明度
             BackgroundAlpha.BindValueChanged(alpha =>
             {
+                if (backgroundBox == null)
+                    return;
+
                 backgroundBox.Alpha = alpha.NewValue;
             }, true);
 
             // 更新背景颜色
             BackgroundColour.BindValueChanged(colour =>
             {
+                if (backgroundBox == null)
+                    return;
+
                 backgroundBox.Colour = colour.NewValue;
             }, true);
+
+            UnifiedMovement.BindValueChanged(_ => updateAllMarkerPositions());
         }
 
         private void updateWidth()
         {
-            if (keyCount <= 0)
+            if (keyCount <= 0 || columns == null)
                 return;
 
             float totalWidth = 0;
@@ -222,10 +239,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         protected override void OnNewJudgement(JudgementResult judgement)
         {
-            if (!judgement.IsHit || !judgement.Type.IsScorable())
-                return;
-
-            if (judgement.Type > MinimumHitResult.Value)
+            if (!judgement.IsHit || !shouldCountJudgement(judgement.Type))
                 return;
 
             int columnIndex = -1;
@@ -238,16 +252,86 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
             floatingAverages[columnIndex] = floatingAverages[columnIndex] * 0.9 + judgement.TimeOffset * 0.1;
 
-            const int marker_move_duration = 800;
-            var marker = judgementMarkers[columnIndex];
+            if (UnifiedMovement.Value)
+            {
+                float targetY = getRelativeJudgementPosition(getOverallAverage());
+                moveAllMarkers(targetY, columnIndex, judgement.Type);
+            }
+            else
+            {
+                float targetY = getRelativeJudgementPosition(floatingAverages[columnIndex]);
+                moveMarker(judgementMarkers[columnIndex], targetY, judgement.Type);
+            }
+        }
 
-            float targetY = getRelativeJudgementPosition(floatingAverages[columnIndex]);
+        private bool shouldCountJudgement(HitResult result)
+        {
+            if (!result.IsBasic())
+                return false;
+
+            int judgementIndex = result.GetIndexForOrderedDisplay();
+            int filterIndex = JudgementFilter.Value.ToHitResult().GetIndexForOrderedDisplay();
+
+            return FilterDirection.Value switch
+            {
+                JudgementFilterDirection.IgnoreBetter => judgementIndex >= filterIndex,
+                JudgementFilterDirection.IgnoreWorse => judgementIndex <= filterIndex,
+                _ => true,
+            };
+        }
+
+        private double getOverallAverage()
+        {
+            if (keyCount <= 0)
+                return 0;
+
+            double sum = 0;
+
+            for (int i = 0; i < keyCount; i++)
+                sum += floatingAverages[i];
+
+            return sum / keyCount;
+        }
+
+        private void updateAllMarkerPositions()
+        {
+            if (judgementMarkers.Length == 0)
+                return;
+
+            if (UnifiedMovement.Value)
+            {
+                float targetY = getRelativeJudgementPosition(getOverallAverage());
+
+                foreach (var marker in judgementMarkers)
+                    moveMarker(marker, targetY);
+            }
+            else
+            {
+                for (int i = 0; i < judgementMarkers.Length; i++)
+                    moveMarker(judgementMarkers[i], getRelativeJudgementPosition(floatingAverages[i]));
+            }
+        }
+
+        private void moveAllMarkers(float targetY, int judgedColumnIndex, HitResult hitResult)
+        {
+            for (int i = 0; i < judgementMarkers.Length; i++)
+            {
+                if (i == judgedColumnIndex)
+                    moveMarker(judgementMarkers[i], targetY, hitResult);
+                else
+                    moveMarker(judgementMarkers[i], targetY);
+            }
+        }
+
+        private void moveMarker(Box marker, float targetY, HitResult? hitResult = null)
+        {
+            const int marker_move_duration = 800;
 
             marker.Y = targetY;
-
             marker.MoveToY(targetY, marker_move_duration, Easing.OutQuint);
 
-            marker.Colour = GetColourForHitResult(judgement.Type);
+            if (hitResult != null)
+                marker.Colour = GetColourForHitResult(hitResult.Value);
         }
 
         private float getRelativeJudgementPosition(double value)

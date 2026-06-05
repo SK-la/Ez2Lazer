@@ -61,5 +61,17 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString DURATION_LIMIT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("LN的最大持续时间（秒）。（设置为0时无限制）",
             "The max duration(second) of a LN.(No limit when set to 0)");
+
+        public static readonly LocalisableString JUDGEMENT_FILTER_LABEL = new EzLocalizationManager.EzLocalisableString("判定过滤", "Judgement Filter");
+
+        public static readonly LocalisableString JUDGEMENT_FILTER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "作为过滤基准的判定等级",
+            "The judgement level used as the filter threshold.");
+
+        public static readonly LocalisableString JUDGEMENT_FILTER_DIRECTION_LABEL = new EzLocalizationManager.EzLocalisableString("过滤方向", "Filter Direction");
+
+        public static readonly LocalisableString JUDGEMENT_FILTER_DIRECTION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "选择忽略更好或更差的判定",
+            "Choose whether to ignore better or worse judgements relative to the filter.");
     }
 }

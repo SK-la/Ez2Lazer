@@ -37,5 +37,8 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SCREENSHOT_ACTION_SAVE_ONLY = new EzLocalizationManager.EzLocalisableString("仅保存图片", "Save image only");
         public static readonly LocalisableString SCREENSHOT_ACTION_SAVE_AND_COPY = new EzLocalizationManager.EzLocalisableString("保存图片并复制到剪贴板", "Save image and copy to clipboard");
         public static readonly LocalisableString SCREENSHOT_ACTION_COPY_ONLY = new EzLocalizationManager.EzLocalisableString("仅将图片复制到剪贴板", "Copy image to clipboard only");
+
+        public static readonly LocalisableString IGNORE_BETTER = new EzLocalizationManager.EzLocalisableString("忽略更好", "Ignore Better");
+        public static readonly LocalisableString IGNORE_WORSE = new EzLocalizationManager.EzLocalisableString("忽略更差", "Ignore Worse");
     }
 }

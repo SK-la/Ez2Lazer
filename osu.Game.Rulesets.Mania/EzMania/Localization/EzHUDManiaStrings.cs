@@ -55,10 +55,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Localization
         public static readonly LocalisableString NUMBER_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("数字透明度", "Number Alpha");
         public static readonly LocalisableString NUMBER_ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("偏移数字的透明度值", "The alpha value of the offset number.");
 
-        // EzComHitTimingColumns
-        public static readonly LocalisableString MINIMUM_HIT_RESULT_LABEL = new EzLocalizationManager.EzLocalisableString("最小判定等级", "Minimum Hit Result");
-        public static readonly LocalisableString MINIMUM_HIT_RESULT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("过滤掉低于此等级的判定", "Filter out judgments worse than this.");
-
         public static readonly LocalisableString MARKERS_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("标记高度", "Markers Height");
         public static readonly LocalisableString MARKERS_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("判定标记的高度", "Height of the judgement markers.");
 
@@ -70,5 +66,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Localization
 
         public static readonly LocalisableString BACKGROUND_COLOUR_LABEL = new EzLocalizationManager.EzLocalisableString("背景颜色", "Background Colour");
         public static readonly LocalisableString BACKGROUND_COLOUR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("背景框的颜色", "Colour of the background box.");
+
+        public static readonly LocalisableString UNIFIED_MOVEMENT_LABEL = new EzLocalizationManager.EzLocalisableString("整体移动", "Unified Movement");
+        public static readonly LocalisableString UNIFIED_MOVEMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("所有标记按全键平均偏差一起移动", "Move all markers together based on the average deviation across all keys.");
     }
 }

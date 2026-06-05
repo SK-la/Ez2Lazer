@@ -2,6 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.ComponentModel;
+using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.EzOsuGame.Configuration
@@ -25,6 +27,15 @@ namespace osu.Game.EzOsuGame.Configuration
 
         [Description("KPoor")]
         Poor,
+    }
+
+    public enum JudgementFilterDirection
+    {
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.IGNORE_BETTER))]
+        IgnoreBetter,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.IGNORE_WORSE))]
+        IgnoreWorse,
     }
 
     public static class EzEnumHitResultExtensions
