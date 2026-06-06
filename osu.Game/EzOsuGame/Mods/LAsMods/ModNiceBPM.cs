@@ -69,10 +69,6 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
             Precision = 0.01
         };
 
-        // 每次速度变化的阈值，如果有需要以后再增加设置。
-        private const double min_rate_change_factor = 0.9d;
-        private const double max_rate_change_factor = 1.11d;
-
         [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.MISS_COUNT_THRESHOLD_LABEL), nameof(NiceBPMStrings.MISS_COUNT_THRESHOLD_DESCRIPTION),
             SettingControlType = typeof(SettingsSlider<int>))]
         public BindableInt MissThreshold { get; } = new BindableInt(3)
@@ -80,15 +76,6 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
             MinValue = 1,
             MaxValue = 10,
             Precision = 1
-        };
-
-        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.RATE_CHANGE_ON_MISS_LABEL), nameof(NiceBPMStrings.RATE_CHANGE_ON_MISS_DESCRIPTION),
-            SettingControlType = typeof(MultiplierSettingsSlider))]
-        public BindableNumber<double> RateChangeOnMiss { get; } = new BindableDouble(0.95)
-        {
-            MinValue = 0.5,
-            MaxValue = 1.0,
-            Precision = 0.01
         };
 
         public override BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
@@ -136,7 +123,7 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                 yield return (NiceBPMStrings.MIN_ALLOWABLE_RATE_LABEL, $"{MinAllowableRate.Value:N2}");
                 yield return (NiceBPMStrings.MAX_ALLOWABLE_RATE_LABEL, $"{MaxAllowableRate.Value:N2}");
                 yield return (NiceBPMStrings.MISS_COUNT_THRESHOLD_LABEL, $"{MissThreshold.Value}");
-                yield return (NiceBPMStrings.RATE_CHANGE_ON_MISS_LABEL, $"{RateChangeOnMiss.Value:N2}");
+                yield return (DynamicSpeedAdjustStrings.RATE_CHANGE_STEP_LABEL, $"{RateChangeStep.Value:N3}");
             }
         }
 
@@ -422,13 +409,14 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                 // 当出现失误时增加失误计数器
                 currentMissCount++;
 
-                // 如果失误计数达到阈值，返回失误速率变化
+                // 累积达到阈值时降速一次，然后重新计数
                 if (currentMissCount >= MissThreshold.Value)
                 {
-                    return RateChangeOnMiss.Value;
+                    currentMissCount = 0;
+                    return MissRateChangeFactor;
                 }
 
-                // 如果失误计数未达到阈值，返回1.0（无速率变化）
+                // 未达阈值时不改变速度
                 return 1.0;
             }
             else
@@ -439,8 +427,8 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                 double prevEndTime = precedingEndTimes[result.HitObject];
                 return Math.Clamp(
                     (result.HitObject.GetEndTime() - prevEndTime) / (result.TimeAbsolute - prevEndTime),
-                    min_rate_change_factor,
-                    max_rate_change_factor
+                    MinRateChangeFactor,
+                    MaxRateChangeFactor
                 );
             }
         }
@@ -487,11 +475,6 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
         public static readonly LocalisableString MISS_COUNT_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("Miss计数阈值", "Miss Count Threshold");
 
         public static readonly LocalisableString MISS_COUNT_THRESHOLD_DESCRIPTION =
-            new EzLocalizationManager.EzLocalisableString("触发降速所需的Miss数量", "Number of misses required to trigger rate decrease");
-
-        public static readonly LocalisableString RATE_CHANGE_ON_MISS_LABEL = new EzLocalizationManager.EzLocalisableString("Miss时的速率变化", "Rate Change On Miss");
-
-        public static readonly LocalisableString RATE_CHANGE_ON_MISS_DESCRIPTION =
-            new EzLocalizationManager.EzLocalisableString("达到Miss阈值时应用的速率倍数", "Rate multiplier applied when miss threshold is reached");
+            new EzLocalizationManager.EzLocalisableString("每累积该数量的 Miss 降速一次，之后重新计数", "Decrease speed once per this many accumulated misses, then count again");
     }
 }

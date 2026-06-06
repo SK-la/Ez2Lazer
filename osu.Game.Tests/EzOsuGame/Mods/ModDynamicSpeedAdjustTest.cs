@@ -71,6 +71,85 @@ namespace osu.Game.Tests.EzOsuGame.Mods
         }
 
         [Test]
+        public void TestRateChangeStepDefaultAndBounds()
+        {
+            var mod = new ModNiceBPM();
+
+            Assert.That(mod.RateChangeStep.Value, Is.EqualTo(0.002).Within(0.0001));
+            Assert.That(mod.RateChangeStep.MinValue, Is.EqualTo(0.001).Within(0.0001));
+            Assert.That(mod.RateChangeStep.MaxValue, Is.EqualTo(0.1).Within(0.0001));
+        }
+
+        [Test]
+        public void TestNiceBpmRateChangeClampedToStep()
+        {
+            var mod = new ModNiceBPM();
+            mod.RateChangeStep.Value = 0.002;
+
+            var getRelativeRateChange = typeof(ModNiceBPM).GetMethod("getRelativeRateChange", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var precedingEndTimesField = typeof(ModNiceBPM).GetField("precedingEndTimes", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+            var hitObject = new HitObject { StartTime = 1000 };
+            ((Dictionary<HitObject, double>)precedingEndTimesField.GetValue(mod)!).Add(hitObject, 900);
+
+            var earlyHit = new JudgementResult(hitObject, new Judgement()) { Type = HitResult.Good };
+            earlyHit.TimeOffset = -50;
+
+            double hitFactor = (double)getRelativeRateChange.Invoke(mod, new object[] { earlyHit })!;
+            Assert.That(hitFactor, Is.EqualTo(1.002).Within(0.0001));
+        }
+
+        [Test]
+        public void TestNiceBpmMissSlowdownEveryThreeMisses()
+        {
+            var mod = new ModNiceBPM();
+            mod.MissThreshold.Value = 3;
+            mod.RateChangeStep.Value = 0.002;
+
+            var getRelativeRateChange = typeof(ModNiceBPM).GetMethod("getRelativeRateChange", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var missCountField = typeof(ModNiceBPM).GetField("currentMissCount", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var miss = new JudgementResult(new HitObject(), new Judgement()) { Type = HitResult.Miss };
+
+            Assert.That(getRelativeRateChange.Invoke(mod, new object[] { miss }), Is.EqualTo(1.0));
+            Assert.That(getRelativeRateChange.Invoke(mod, new object[] { miss }), Is.EqualTo(1.0));
+            Assert.That(getRelativeRateChange.Invoke(mod, new object[] { miss }), Is.EqualTo(0.998).Within(0.0001));
+            Assert.That(missCountField.GetValue(mod), Is.EqualTo(0));
+
+            Assert.That(getRelativeRateChange.Invoke(mod, new object[] { miss }), Is.EqualTo(1.0));
+            Assert.That(getRelativeRateChange.Invoke(mod, new object[] { miss }), Is.EqualTo(1.0));
+            Assert.That(getRelativeRateChange.Invoke(mod, new object[] { miss }), Is.EqualTo(0.998).Within(0.0001));
+            Assert.That(missCountField.GetValue(mod), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void TestNiceBpmHitResetsMissAccumulator()
+        {
+            var mod = new ModNiceBPM();
+            mod.MissThreshold.Value = 3;
+
+            var getRelativeRateChange = typeof(ModNiceBPM).GetMethod("getRelativeRateChange", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var missCountField = typeof(ModNiceBPM).GetField("currentMissCount", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var precedingEndTimesField = typeof(ModNiceBPM).GetField("precedingEndTimes", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+            var hitObject = new HitObject { StartTime = 1000 };
+            ((Dictionary<HitObject, double>)precedingEndTimesField.GetValue(mod)!).Add(hitObject, 900);
+
+            var miss = new JudgementResult(hitObject, new Judgement()) { Type = HitResult.Miss };
+            var good = new JudgementResult(hitObject, new Judgement()) { Type = HitResult.Good };
+            good.TimeOffset = 0;
+
+            getRelativeRateChange.Invoke(mod, new object[] { miss });
+            getRelativeRateChange.Invoke(mod, new object[] { miss });
+            Assert.That(missCountField.GetValue(mod), Is.EqualTo(2));
+
+            getRelativeRateChange.Invoke(mod, new object[] { good });
+            Assert.That(missCountField.GetValue(mod), Is.EqualTo(0));
+
+            getRelativeRateChange.Invoke(mod, new object[] { miss });
+            Assert.That(getRelativeRateChange.Invoke(mod, new object[] { miss }), Is.EqualTo(1.0));
+        }
+
+        [Test]
         public void TestNiceBpmJudgementFilter()
         {
             var mod = new ModNiceBPM();

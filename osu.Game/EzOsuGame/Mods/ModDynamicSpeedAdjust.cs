@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Utils;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Play;
 
@@ -29,6 +30,30 @@ namespace osu.Game.EzOsuGame.Mods
 
         [SettingSource(typeof(DynamicSpeedHUDStrings), nameof(DynamicSpeedHUDStrings.SHOW_SPEED_LINE_LABEL), nameof(DynamicSpeedHUDStrings.SHOW_SPEED_LINE_DESCRIPTION))]
         public BindableBool ShowSpeedLine { get; } = new BindableBool(true);
+
+        [SettingSource(typeof(DynamicSpeedAdjustStrings), nameof(DynamicSpeedAdjustStrings.RATE_CHANGE_STEP_LABEL), nameof(DynamicSpeedAdjustStrings.RATE_CHANGE_STEP_DESCRIPTION),
+            SettingControlType = typeof(MultiplierSettingsSlider))]
+        public BindableNumber<double> RateChangeStep { get; } = new BindableDouble(0.002)
+        {
+            MinValue = 0.001,
+            MaxValue = 0.1,
+            Precision = 0.001,
+        };
+
+        /// <summary>
+        /// Lower bound for a single judgement-driven rate multiplier factor.
+        /// </summary>
+        protected double MinRateChangeFactor => 1 - RateChangeStep.Value;
+
+        /// <summary>
+        /// Upper bound for a single judgement-driven rate multiplier factor.
+        /// </summary>
+        protected double MaxRateChangeFactor => 1 + RateChangeStep.Value;
+
+        /// <summary>
+        /// Rate multiplier factor applied when a miss threshold is reached.
+        /// </summary>
+        protected double MissRateChangeFactor => MinRateChangeFactor;
 
         public void ApplyToHUD(HUDOverlay overlay) => DynamicSpeedHUDApplicator.Apply(this, overlay);
 
