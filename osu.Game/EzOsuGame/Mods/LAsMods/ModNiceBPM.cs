@@ -118,8 +118,6 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
         /// </summary>
         private readonly Dictionary<HitObject, double> ratesForRewinding = new Dictionary<HitObject, double>();
 
-        private readonly RateAdjustModHelper rateAdjustHelper;
-
         private double originalBPM;
         private bool hasAppliedFreeBPM;
         private int currentMissCount;
@@ -144,8 +142,7 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
 
         public ModNiceBPM()
         {
-            rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
-            rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
+            InitialiseDynamicSpeedAdjust(AdjustPitch);
 
             // 当最小/最大允许速率值更改时更新速度变化范围
             MinAllowableRate.BindValueChanged(val =>
@@ -162,8 +159,8 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                 }
 
                 SpeedChange.MinValue = val.NewValue;
-                if (SpeedChange.Value < val.NewValue)
-                    SpeedChange.Value = val.NewValue;
+                if (GameplaySpeed.Value < val.NewValue)
+                    SetGameplayAndDisplaySpeed(val.NewValue);
 
                 // 确保最小允许速率不超过最大允许速率
                 if (val.NewValue > MaxAllowableRate.Value)
@@ -188,8 +185,8 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                 }
 
                 SpeedChange.MaxValue = val.NewValue;
-                if (SpeedChange.Value > val.NewValue)
-                    SpeedChange.Value = val.NewValue;
+                if (GameplaySpeed.Value > val.NewValue)
+                    SetGameplayAndDisplaySpeed(val.NewValue);
 
                 // 确保最大允许速率不低于最小允许速率
                 if (val.NewValue < MinAllowableRate.Value)
@@ -205,7 +202,7 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                 // 仅在未设置FreeBPM时应用初始速率
                 if (!FreeBPM.Value.HasValue)
                 {
-                    SpeedChange.Value = val.NewValue;
+                    SetGameplayAndDisplaySpeed(val.NewValue);
                     targetRate = val.NewValue;
                 }
             }, true);
@@ -218,7 +215,7 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                     if (originalBPM > 0)
                     {
                         double freeRate = val.NewValue.Value / originalBPM;
-                        SpeedChange.Value = freeRate;
+                        SetGameplayAndDisplaySpeed(freeRate);
                         targetRate = freeRate;
                         hasAppliedFreeBPM = true;
                     }
@@ -229,7 +226,7 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                     // 当清除FreeBPM时，如果动态BPM被禁用，则恢复到初始速率
                     if (!EnableDynamicBPM.Value)
                     {
-                        SpeedChange.Value = InitialRate.Value;
+                        SetGameplayAndDisplaySpeed(InitialRate.Value);
                         targetRate = InitialRate.Value;
                     }
 
@@ -249,13 +246,13 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                         if (originalBPM > 0)
                         {
                             double freeRate = FreeBPM.Value.Value / originalBPM;
-                            SpeedChange.Value = freeRate;
+                            SetGameplayAndDisplaySpeed(freeRate);
                             targetRate = freeRate;
                         }
                     }
                     else
                     {
-                        SpeedChange.Value = InitialRate.Value;
+                        SetGameplayAndDisplaySpeed(InitialRate.Value);
                         targetRate = InitialRate.Value;
                     }
 
@@ -270,7 +267,7 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
             if (FreeBPM.Value.HasValue && FreeBPM.Value > 0 && originalBPM > 0)
             {
                 double freeRate = FreeBPM.Value.Value / originalBPM;
-                SpeedChange.Value = freeRate;
+                SetGameplayAndDisplaySpeed(freeRate);
                 targetRate = freeRate;
 
                 // 如果启用了动态BPM，则用自由速率初始化最近速率
@@ -288,25 +285,25 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
             else if (FreeBPM.Value.HasValue && FreeBPM.Value > 0 && !hasAppliedFreeBPM && originalBPM <= 0)
             {
                 // 如果设置了FreeBPM但原始BPM尚不可用，则推迟应用（保持 1.0x，与基类 ApplyToRate 一致）
-                SpeedChange.Value = 1;
+                SetGameplayAndDisplaySpeed(1);
                 targetRate = 1;
                 recentRates.Clear();
                 recentRates.AddRange(Enumerable.Repeat(1d, recent_rate_count));
             }
             else
             {
-                SpeedChange.Value = InitialRate.Value;
+                SetGameplayAndDisplaySpeed(InitialRate.Value);
                 targetRate = InitialRate.Value;
                 recentRates.Clear();
                 recentRates.AddRange(Enumerable.Repeat(InitialRate.Value, recent_rate_count));
             }
 
-            rateAdjustHelper.ApplyToTrack(track);
+            RateAdjustHelper.ApplyToTrack(track);
         }
 
         public void Update(Playfield playfield)
         {
-            SpeedChange.Value = Interpolation.DampContinuously(SpeedChange.Value, targetRate, 50, playfield.Clock.ElapsedFrameTime);
+            DampGameplaySpeedTowards(targetRate, playfield.Clock.ElapsedFrameTime);
         }
 
         public void ApplyToDrawableHitObject(DrawableHitObject drawable)
@@ -319,7 +316,7 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                 ratesForRewinding.Add(result.HitObject, recentRates[0]);
                 recentRates.RemoveAt(0);
 
-                recentRates.Add(Math.Clamp(getRelativeRateChange(result) * SpeedChange.Value, MinAllowableRate.Value, MaxAllowableRate.Value));
+                recentRates.Add(Math.Clamp(getRelativeRateChange(result) * GameplaySpeed.Value, MinAllowableRate.Value, MaxAllowableRate.Value));
 
                 updateTargetRate();
             };
@@ -339,6 +336,9 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
+            precedingEndTimes.Clear();
+            ratesForRewinding.Clear();
+
             // 从谱面计算原始BPM
             originalBPM = beatmap.BeatmapInfo.BPM;
 
@@ -346,7 +346,7 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
             if (FreeBPM.Value.HasValue && FreeBPM.Value > 0 && !hasAppliedFreeBPM)
             {
                 double freeRate = FreeBPM.Value.Value / originalBPM;
-                SpeedChange.Value = freeRate;
+                SetGameplayAndDisplaySpeed(freeRate);
                 targetRate = freeRate;
                 hasAppliedFreeBPM = true;
 
@@ -366,7 +366,7 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
             else if (FreeBPM.Value.HasValue && FreeBPM.Value > 0 && hasAppliedFreeBPM)
             {
                 double freeRate = FreeBPM.Value.Value / originalBPM;
-                SpeedChange.Value = freeRate;
+                SetGameplayAndDisplaySpeed(freeRate);
                 targetRate = freeRate;
             }
 
@@ -460,8 +460,11 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                 consistency += Math.Sign(recentRates[i] - recentRates[i - 1]);
             }
 
-            // 根据一致性缩放速率调整
-            targetRate = Interpolation.Lerp(targetRate, recentRates.Average(), Math.Abs(consistency) / (recent_rate_count - 1d));
+            // 根据一致性缩放速率调整；稳定同向判定时 consistency 为 0，仍需最小响应
+            const double min_target_rate_lerp = 0.25;
+            double lerpFactor = Math.Abs(consistency) / (recent_rate_count - 1d);
+            lerpFactor = Math.Max(min_target_rate_lerp, lerpFactor);
+            targetRate = Interpolation.Lerp(targetRate, recentRates.Average(), lerpFactor);
         }
     }
 

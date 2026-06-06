@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Bindables;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
@@ -21,15 +22,19 @@ namespace osu.Game.Rulesets.Mania.Mods
 
         void IApplicableToHitObject.ApplyToHitObject(HitObject hitObject)
         {
+            double speedMultiplier = this is ModDynamicSpeedAdjust dynamicSpeed
+                ? dynamicSpeed.GameplaySpeed.Value
+                : SpeedChange.Value;
+
             switch (hitObject)
             {
                 case Note:
-                    ((ManiaHitWindows)hitObject.HitWindows).SpeedMultiplier = SpeedChange.Value;
+                    ((ManiaHitWindows)hitObject.HitWindows).SpeedMultiplier = speedMultiplier;
                     break;
 
                 case HoldNote hold:
-                    ((ManiaHitWindows)hold.Head.HitWindows).SpeedMultiplier = SpeedChange.Value;
-                    ((ManiaHitWindows)hold.Tail.HitWindows).SpeedMultiplier = SpeedChange.Value;
+                    ((ManiaHitWindows)hold.Head.HitWindows).SpeedMultiplier = speedMultiplier;
+                    ((ManiaHitWindows)hold.Tail.HitWindows).SpeedMultiplier = speedMultiplier;
                     break;
             }
         }

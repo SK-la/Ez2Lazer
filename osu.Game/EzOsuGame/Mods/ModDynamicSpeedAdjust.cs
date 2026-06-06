@@ -1,7 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Audio;
 using osu.Framework.Bindables;
+using osu.Framework.Utils;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Rulesets.Mods;
@@ -11,6 +13,14 @@ namespace osu.Game.EzOsuGame.Mods
 {
     public abstract partial class ModDynamicSpeedAdjust : ModRateAdjust, ILinkedDynamicSpeedHUD
     {
+        /// <summary>
+        /// Full-precision runtime speed used for audio binding and per-frame interpolation.
+        /// <see cref="SpeedChange"/> remains the display/settings bindable with <see cref="BindableNumber{T}.Precision"/>.
+        /// </summary>
+        public BindableDouble GameplaySpeed { get; } = new BindableDouble(1);
+
+        protected RateAdjustModHelper RateAdjustHelper { get; private set; } = null!;
+
         [SettingSource(typeof(DynamicSpeedHUDStrings), nameof(DynamicSpeedHUDStrings.LINK_SPEED_HUD_LABEL), nameof(DynamicSpeedHUDStrings.LINK_SPEED_HUD_DESCRIPTION))]
         public BindableBool LinkSpeedHUD { get; } = new BindableBool(true);
 
@@ -21,5 +31,46 @@ namespace osu.Game.EzOsuGame.Mods
         public BindableBool ShowSpeedLine { get; } = new BindableBool(true);
 
         public void ApplyToHUD(HUDOverlay overlay) => DynamicSpeedHUDApplicator.Apply(this, overlay);
+
+        /// <summary>
+        /// Wire <see cref="GameplaySpeed"/> to audio adjustments and sync display speed from runtime speed.
+        /// Call from subclass constructors after <see cref="SpeedChange"/> is initialised.
+        /// </summary>
+        protected void InitialiseDynamicSpeedAdjust(BindableBool adjustPitch)
+        {
+            SyncSpeedBoundsFromDisplay();
+
+            RateAdjustHelper = new RateAdjustModHelper(GameplaySpeed);
+            RateAdjustHelper.HandleAudioAdjustments(adjustPitch);
+
+            GameplaySpeed.BindValueChanged(v => SpeedChange.Value = v.NewValue, true);
+        }
+
+        /// <summary>
+        /// Copy min/max from <see cref="SpeedChange"/> to <see cref="GameplaySpeed"/> and keep them aligned on future changes.
+        /// </summary>
+        protected void SyncSpeedBoundsFromDisplay()
+        {
+            GameplaySpeed.MinValue = SpeedChange.MinValue;
+            GameplaySpeed.MaxValue = SpeedChange.MaxValue;
+
+            SpeedChange.MinValueChanged += _ => GameplaySpeed.MinValue = SpeedChange.MinValue;
+            SpeedChange.MaxValueChanged += _ => GameplaySpeed.MaxValue = SpeedChange.MaxValue;
+        }
+
+        protected void SetGameplayAndDisplaySpeed(double value)
+        {
+            GameplaySpeed.Value = value;
+        }
+
+        protected void DampGameplaySpeedTowards(double targetRate, double elapsedFrameTime)
+        {
+            GameplaySpeed.Value = Interpolation.DampContinuously(GameplaySpeed.Value, targetRate, 50, elapsedFrameTime);
+        }
+
+        public override void ApplyToSample(IAdjustableAudioComponent sample)
+        {
+            sample.AddAdjustment(AdjustableProperty.Frequency, GameplaySpeed);
+        }
     }
 }

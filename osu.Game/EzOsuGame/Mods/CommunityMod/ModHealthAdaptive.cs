@@ -7,7 +7,6 @@ using System.Linq;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Timing;
 using osu.Game.Configuration;
@@ -148,8 +147,6 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
             Precision = 0.01,
         };
 
-        private readonly RateAdjustModHelper rateAdjustHelper;
-
         private double targetRate = 1d;
 
         // timers track time since last change for increase/decrease
@@ -188,7 +185,7 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
                 if (ratesForRewinding.ContainsKey(result.HitObject)) return;
                 if (!shouldProcessResult(result)) return;
 
-                ratesForRewinding.Add(result.HitObject, new Snapshot(targetRate, increaseTimer, decreaseTimer) { Speed = SpeedChange.Value });
+                ratesForRewinding.Add(result.HitObject, new Snapshot(targetRate, increaseTimer, decreaseTimer) { Speed = GameplaySpeed.Value });
             };
 
             drawable.OnRevertResult += (_, result) =>
@@ -199,7 +196,7 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
                 targetRate = s.TargetRate;
                 increaseTimer = s.IncreaseTimer;
                 decreaseTimer = s.DecreaseTimer;
-                SpeedChange.Value = s.Speed;
+                SetGameplayAndDisplaySpeed(s.Speed);
 
                 ratesForRewinding.Remove(result.HitObject);
             };
@@ -207,13 +204,12 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
 
         public ModHealthAdaptive()
         {
-            rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
-            rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
+            InitialiseDynamicSpeedAdjust(AdjustPitch);
 
             MinAllowableRate.BindValueChanged(v =>
             {
                 SpeedChange.MinValue = v.NewValue;
-                if (SpeedChange.Value < v.NewValue) SpeedChange.Value = v.NewValue;
+                if (GameplaySpeed.Value < v.NewValue) SetGameplayAndDisplaySpeed(v.NewValue);
                 if (targetRate < v.NewValue) targetRate = v.NewValue;
                 if (v.NewValue > MaxAllowableRate.Value) MinAllowableRate.Value = MaxAllowableRate.Value;
             }, true);
@@ -221,7 +217,7 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
             MaxAllowableRate.BindValueChanged(v =>
             {
                 SpeedChange.MaxValue = v.NewValue;
-                if (SpeedChange.Value > v.NewValue) SpeedChange.Value = v.NewValue;
+                if (GameplaySpeed.Value > v.NewValue) SetGameplayAndDisplaySpeed(v.NewValue);
                 if (targetRate > v.NewValue) targetRate = v.NewValue;
                 if (v.NewValue < MinAllowableRate.Value) MaxAllowableRate.Value = MinAllowableRate.Value;
             }, true);
@@ -229,7 +225,7 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
             InitialRate.BindValueChanged(val =>
             {
                 double clamped = Math.Clamp(val.NewValue, MinAllowableRate.Value, MaxAllowableRate.Value);
-                SpeedChange.Value = clamped;
+                SetGameplayAndDisplaySpeed(clamped);
                 targetRate = clamped;
             }, true);
         }
@@ -237,12 +233,7 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
         public override void ApplyToTrack(IAdjustableAudioComponent track)
         {
             InitialRate.TriggerChange();
-            rateAdjustHelper.ApplyToTrack(track);
-        }
-
-        public override void ApplyToSample(IAdjustableAudioComponent sample)
-        {
-            sample.AddAdjustment(AdjustableProperty.Frequency, SpeedChange);
+            RateAdjustHelper.ApplyToTrack(track);
         }
 
         public void Update(Playfield playfield)
@@ -260,7 +251,7 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
             double maxRate = SpeedChange.MaxValue;
 
             // Smooth towards target rate
-            SpeedChange.Value = Interpolation.DampContinuously(SpeedChange.Value, targetRate, 50, elapsed);
+            DampGameplaySpeedTowards(targetRate, elapsed);
 
             bool withinSong = currentTime >= StartTime && currentTime <= EndTime;
             bool inBreak = false;
