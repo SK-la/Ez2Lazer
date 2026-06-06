@@ -51,8 +51,6 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
-            private EzDisplayKpc ezDisplayKpc = null!;
-
             private ModSettingChangeTracker? settingChangeTracker;
 
             [Resolved]
@@ -64,6 +62,9 @@ namespace osu.Game.Screens.Select
             private OsuSpriteText mappedByText = null!;
             private OsuHoverContainer mapperLink = null!;
             private OsuSpriteText mapperText = null!;
+
+            private EzDisplayKpc ezDisplayKpc = null!;
+            private SpreadDisplay spreadDisplay = null!;
 
             private GridContainer ratingAndNameContainer = null!;
             private DifficultyStatisticsDisplay countStatisticsDisplay = null!;
@@ -108,6 +109,7 @@ namespace osu.Game.Screens.Select
                                     new Dimension(GridSizeMode.AutoSize),
                                     new Dimension(GridSizeMode.Absolute, 6),
                                     new Dimension(),
+                                    new Dimension(GridSizeMode.AutoSize, maxSize: 160),
                                 },
                                 Content = new[]
                                 {
@@ -154,6 +156,12 @@ namespace osu.Game.Screens.Select
                                                     },
                                                 },
                                             },
+                                        },
+                                        spreadDisplay = new SpreadDisplay
+                                        {
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
+                                            Margin = new MarginPadding { Left = 8f, Right = 10f },
                                         },
                                     }
                                 },
@@ -262,6 +270,8 @@ namespace osu.Game.Screens.Select
                 {
                     ratingAndNameContainer.FadeOut(300, Easing.OutQuint);
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
+                    spreadDisplay.Beatmap.Value = null;
+                    spreadDisplay.StarDifficulty.UnbindAll();
                 }
                 else
                 {
@@ -269,9 +279,16 @@ namespace osu.Game.Screens.Select
                     difficultyText.Text = beatmap.Value.BeatmapInfo.DifficultyName;
                     mapperLink.Action = () => linkHandler?.HandleLink(new LinkDetails(LinkAction.OpenUserProfile, beatmap.Value.Metadata.Author));
                     mapperText.Text = beatmap.Value.Metadata.Author.Username;
+                    spreadDisplay.Beatmap.Value = beatmap.Value.BeatmapInfo;
                 }
 
                 starRatingDisplay.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+
+                if (!beatmap.IsDefault)
+                {
+                    spreadDisplay.StarDifficulty.UnbindAll();
+                    spreadDisplay.StarDifficulty.BindTo(starRatingDisplay.Current);
+                }
 
                 updateCountStatistics(cancellationSource.Token);
                 updateDifficultyStatistics();
@@ -393,6 +410,7 @@ namespace osu.Game.Screens.Select
 
                 difficultyText.Colour = col;
                 mappedByText.Colour = Colour4.WhiteSmoke;
+                spreadDisplay.Current.Colour = starRatingDisplay.DisplayedDifficultyColour;
                 countStatisticsDisplay.AccentColour = col;
                 difficultyStatisticsDisplay.AccentColour = col;
             }
