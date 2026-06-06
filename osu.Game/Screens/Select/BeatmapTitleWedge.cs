@@ -55,6 +55,8 @@ namespace osu.Game.Screens.Select
         private ModSettingChangeTracker? settingChangeTracker;
 
         private BeatmapSetOnlineStatusPill statusPill = null!;
+        private Container modeArea = null!;
+        private EzManiaModeFlow maniaModeFlow = null!;
         private OsuHoverContainer titleLink = null!;
         private MarqueeContainer titleLabel = null!;
         private OsuHoverContainer artistLink = null!;
@@ -84,6 +86,8 @@ namespace osu.Game.Screens.Select
 
         private FillFlowContainer statisticsFlow = null!;
 
+        private static readonly float status_row_height = OsuFont.Style.Caption1.Size + 2f;
+
         public BeatmapTitleWedge()
         {
             RelativeSizeAxes = Axes.X;
@@ -112,12 +116,44 @@ namespace osu.Game.Screens.Select
                     Spacing = new Vector2(0f, 4f),
                     Children = new Drawable[]
                     {
-                        new ShearAligningWrapper(statusPill = new BeatmapSetOnlineStatusPill
+                        new ShearAligningWrapper(new GridContainer
                         {
                             Shear = -OsuGame.SHEAR,
-                            ShowUnknownStatus = true,
-                            TextSize = OsuFont.Style.Caption1.Size,
-                            TextPadding = new MarginPadding { Horizontal = 6, Vertical = 1 },
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Padding = new MarginPadding { Horizontal = 6, Vertical = 1 },
+                            ColumnDimensions = new[]
+                            {
+                                new Dimension(GridSizeMode.AutoSize),
+                                new Dimension(GridSizeMode.Absolute, 30),
+                                new Dimension(),
+                            },
+                            Content = new[]
+                            {
+                                new[]
+                                {
+                                    statusPill = new BeatmapSetOnlineStatusPill
+                                    {
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                        ShowUnknownStatus = true,
+                                        TextSize = OsuFont.Style.Caption1.Size,
+                                        TextPadding = new MarginPadding { Horizontal = 6, Vertical = 1 },
+                                    },
+                                    Empty(),
+                                    modeArea = new Container
+                                    {
+                                        RelativeSizeAxes = Axes.X,
+                                        AutoSizeAxes = Axes.Y,
+                                        // Padding = new MarginPadding { Right = 2f },
+                                        Child = maniaModeFlow = new EzManiaModeFlow
+                                        {
+                                            Anchor = Anchor.CentreRight,
+                                            Origin = Anchor.CentreRight,
+                                        },
+                                    },
+                                },
+                            },
                         }),
                         new ShearAligningWrapper(new Container
                         {
@@ -218,6 +254,12 @@ namespace osu.Game.Screens.Select
 
             statisticsFlow.AutoSizeDuration = 100;
             statisticsFlow.AutoSizeEasing = Easing.OutQuint;
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+            maniaModeFlow.SetAvailableWidth(Math.Max(modeArea.DrawWidth - modeArea.Padding.TotalHorizontal, 0));
         }
 
         protected override void PopIn()
