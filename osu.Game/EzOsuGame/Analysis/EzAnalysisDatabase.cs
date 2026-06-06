@@ -205,7 +205,6 @@ namespace osu.Game.EzOsuGame.Analysis
             return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
         }
 
-
         public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
         {
             var beatmapList = beatmaps.Distinct().ToList();
@@ -519,6 +518,26 @@ namespace osu.Game.EzOsuGame.Analysis
             return persistentStore.GetBeatmapsNeedingRecompute(beatmaps);
         }
 
+        public bool TrySetForceRecompute(bool force)
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return false;
+
+            return persistentStore.TrySetForceRecompute(force);
+        }
+
+        public bool ShouldRunAutomaticSqliteWarmup()
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return false;
+
+            string databasePath = persistentStore.GetMainDatabasePath();
+            return EzAnalysisSchemaManager.ShouldRunAutomaticSqliteWarmup(databasePath);
+        }
+
+        public void EnsureInitialised()
+            => persistentStore.Initialise();
+
         /// <summary>
         /// 扫描所有分支库：v2+ legacy 库补写版本 meta；v1 迁移后标记全量 refresh；返回 xxy 或 PP 算法落后、需要重算的分支计划。
         /// </summary>
@@ -575,6 +594,40 @@ namespace osu.Game.EzOsuGame.Analysis
                         supportsXxy ? currentXxyVersion : 0,
                         supportsPp ? currentPpVersion : 0));
                 }
+            }
+
+            return plans;
+        }
+
+        /// <summary>
+        /// 为每个可用分支曲库生成强制 refresh 计划（忽略 stored 版本）。
+        /// </summary>
+        public IReadOnlyList<SongsBranchRefreshPlan> GetAllSongsBranchesForceRefreshPlans()
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return Array.Empty<SongsBranchRefreshPlan>();
+
+            var plans = new List<SongsBranchRefreshPlan>();
+
+            foreach (var branch in persistentStore.GetAvailableSongsBranches())
+            {
+                var rulesetInfo = rulesetStore.GetRuleset(branch.Metadata.RulesetOnlineId);
+
+                if (rulesetInfo is not RulesetInfo localRulesetInfo)
+                    continue;
+
+                bool supportsXxy = EzXxyStarRatingSupport.TryGetXxyStarRatingVersion(localRulesetInfo, out int currentXxyVersion);
+                bool supportsPp = tryGetOfficialPerformancePointsVersion(localRulesetInfo, out int currentPpVersion);
+
+                if (!supportsXxy && !supportsPp)
+                    continue;
+
+                plans.Add(new SongsBranchRefreshPlan(
+                    branch,
+                    RefreshXxy: supportsXxy,
+                    RefreshPp: supportsPp,
+                    CurrentXxyVersion: supportsXxy ? currentXxyVersion : 0,
+                    CurrentPpVersion: supportsPp ? currentPpVersion : 0));
             }
 
             return plans;
