@@ -1,10 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
@@ -14,17 +11,10 @@ using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
-    public partial class EzDataRebuildSettingsSection : FillFlowContainer
+    public static partial class EzDataRebuildSettingsSection
     {
-        public EzDataRebuildSettingsSection()
-        {
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
-            Direction = FillDirection.Vertical;
-        }
-
-        [BackgroundDependencyLoader]
-        private void load(
+        public static void AddTo(
+            SettingsSubsection subsection,
             BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
             EzAnalysisWarmupProcessor? analysisWarmupProcessor,
             IDialogOverlay? dialogOverlay,
@@ -33,7 +23,7 @@ namespace osu.Game.EzOsuGame.Overlays
             var rebuildTarget = new Bindable<EzDataRebuildTarget>(EzDataRebuildTarget.RealmAll);
             var maintenanceHandler = new EzDataRebuildMaintenanceHandler(backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
 
-            var executeButton = new DangerousSettingsButton
+            var executeButton = new DangerousSettingsButtonV2
             {
                 Text = EzSettingsStrings.DATA_REBUILD_EXECUTE,
                 TooltipText = EzSettingsStrings.DATA_REBUILD_EXECUTE_TOOLTIP,
@@ -48,19 +38,17 @@ namespace osu.Game.EzOsuGame.Overlays
             executeButton.Action = () => maintenanceHandler.RequestExecute(rebuildTarget.Value);
             rebuildTarget.BindValueChanged(_ => updateExecuteButtonState(), true);
 
-            AddRange(new Drawable[]
+            subsection.Add(new SettingsItemV2(new FormEnumDropdown<EzDataRebuildTarget>
             {
-                new SettingsItemV2(new FormEnumDropdown<EzDataRebuildTarget>
-                {
-                    Caption = EzSettingsStrings.DATA_REBUILD_TARGET,
-                    HintText = EzSettingsStrings.DATA_REBUILD_TARGET_TOOLTIP,
-                    Current = rebuildTarget,
-                })
-                {
-                    Keywords = new[] { "realm", "tag", "xxy", "pp", "metadata", "backfill", "force", "recalculate", "sqlite", "rebuild", "maintenance" }
-                },
-                executeButton,
+                Caption = EzSettingsStrings.DATA_REBUILD_TARGET,
+                HintText = EzSettingsStrings.DATA_REBUILD_TARGET_TOOLTIP,
+                Current = rebuildTarget,
+            })
+            {
+                Keywords = new[] { "realm", "tag", "xxy", "pp", "metadata", "backfill", "force", "recalculate", "sqlite", "rebuild", "maintenance" }
             });
+
+            subsection.Add(executeButton);
         }
     }
 }

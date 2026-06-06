@@ -116,8 +116,8 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("执行", "Execute");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_EXECUTE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "确认后可选补算缺失或完全重算。大库可能耗时较长，请留意右下角进度通知。",
-            "Choose backfill missing or force full rebuild. Large libraries may take a while; watch the progress notification.");
+            "确认后可选补算缺失或完全重算。大库可能耗时较长，请留意右上角进度通知。",
+            "Choose backfill missing or force full rebuild. Large libraries may take a while; watch the progress notification in the top-right corner.");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_HEADER =
             new EzLocalizationManager.EzLocalisableString("数据维护", "Data maintenance");
@@ -168,9 +168,9 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_FORCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "先将所有谱面的 Tag / XxySR / PP 标记为未计算，再执行完整补算。"
-            + "\n谱面较多时耗时较长，请留意右下角进度通知。",
+            + "\n谱面较多时耗时较长，请留意右上角进度通知。",
             "Marks all beatmaps' Tag / XxySR / PP as uncomputed, then runs a full backfill."
-            + "\nMay take a long time for large libraries; watch the progress notification.");
+            + "\nMay take a long time for large libraries; watch the progress notification in the top-right corner.");
 
         #region 机制类
 

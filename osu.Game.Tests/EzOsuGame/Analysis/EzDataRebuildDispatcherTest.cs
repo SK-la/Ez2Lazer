@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using NUnit.Framework;
-using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Database;
 
@@ -101,7 +100,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [TestCase(EzDataRebuildTarget.RealmAll)]
         public void TestRealmTargetsUnavailableWhenProcessorMissing(EzDataRebuildTarget target)
         {
-            var dispatcher = new EzDataRebuildDispatcher((BackgroundDataStoreProcessor?)null, (EzAnalysisWarmupProcessor?)null);
+            var dispatcher = new EzDataRebuildDispatcher(null, null);
 
             Assert.That(dispatcher.Execute(target, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.UnavailableProcessor));
         }
@@ -110,7 +109,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [TestCase(EzDataRebuildTarget.SqliteSongsBranches)]
         public void TestSqliteTargetsUnavailableWhenProcessorMissing(EzDataRebuildTarget target)
         {
-            var dispatcher = new EzDataRebuildDispatcher((BackgroundDataStoreProcessor?)null, (EzAnalysisWarmupProcessor?)null);
+            var dispatcher = new EzDataRebuildDispatcher(null, null);
 
             Assert.That(dispatcher.Execute(target, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.UnavailableProcessor));
         }
