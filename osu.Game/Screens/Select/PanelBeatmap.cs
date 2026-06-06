@@ -223,11 +223,13 @@ namespace osu.Game.Screens.Select
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.4f)
                                         },
-                                        ezDisplayKpc = new EzDisplayKpc
+                                        ezDisplayKpsGraph = new EzDisplayKpsGraph
                                         {
-                                            Origin = Anchor.CentreLeft,
+                                            Size = new Vector2(300, 15),
+                                            Blending = BlendingParameters.Mixture,
                                             Anchor = Anchor.CentreLeft,
-                                            Margin = new MarginPadding(2f),
+                                            Origin = Anchor.CentreLeft,
+                                            Margin = new MarginPadding { Left = 4f },
                                         },
                                     },
                                 },
@@ -244,12 +246,11 @@ namespace osu.Game.Screens.Select
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        ezDisplayKpsGraph = new EzDisplayKpsGraph
+                                        ezDisplayKpc = new EzDisplayKpc
                                         {
-                                            Size = new Vector2(300, 15),
-                                            Blending = BlendingParameters.Mixture,
-                                            Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
+                                            Anchor = Anchor.CentreLeft,
+                                            Margin = new MarginPadding(2f),
                                         },
                                     }
                                 },

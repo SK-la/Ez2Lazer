@@ -93,7 +93,7 @@ namespace osu.Game.Screens.Select
 
         private ConstrainedIconContainer difficultyIcon = null!;
         private StarRatingDisplay starRatingDisplay = null!;
-        private SpreadDisplay spreadDisplay = null!;
+
         private PanelLocalRankDisplay localRank = null!;
         private OsuSpriteText keyCountText = null!;
         private OsuSpriteText difficultyText = null!;
@@ -213,19 +213,13 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft
                                         },
-                                        ezDisplayKps = new EzDisplayKps
-                                        {
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
-                                            Scale = new Vector2(0.875f),
-                                        },
-                                        Empty(),
                                         ezDisplayKpsGraph = new EzDisplayKpsGraph
                                         {
                                             Size = new Vector2(300, 20),
                                             Blending = BlendingParameters.Mixture,
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft,
+                                            Margin = new MarginPadding { Left = 4f },
                                         },
                                     }
                                 },
@@ -248,16 +242,22 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        spreadDisplay = new SpreadDisplay
+                                        // spreadDisplay = new SpreadDisplay
+                                        // {
+                                        //     Origin = Anchor.CentreLeft,
+                                        //     Anchor = Anchor.CentreLeft,
+                                        // },
+                                        ezDisplayKps = new EzDisplayKps
                                         {
-                                            Origin = Anchor.CentreLeft,
-                                            Anchor = Anchor.CentreLeft,
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                            Scale = new Vector2(0.875f),
                                         },
                                         ezDisplayKpc = new EzDisplayKpc
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
-                                            Margin = new MarginPadding(2f),
+                                            Margin = new MarginPadding(0f),
                                         },
                                     },
                                 },
@@ -293,7 +293,7 @@ namespace osu.Game.Screens.Select
             Selected.BindValueChanged(s =>
             {
                 Expanded.Value = s.NewValue;
-                spreadDisplay.Enabled.Value = s.NewValue;
+                // spreadDisplay.Enabled.Value = s.NewValue;
             }, true);
         }
 
@@ -318,7 +318,7 @@ namespace osu.Game.Screens.Select
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
             computeStarRating();
-            spreadDisplay.Beatmap.Value = beatmap;
+            // spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
 
             resetEzDisplay();
@@ -361,7 +361,7 @@ namespace osu.Game.Screens.Select
             updateButton.BeatmapSet = null;
             localRank.Beatmap = null;
             starDifficultyBindable = null;
-            spreadDisplay.Beatmap.Value = null;
+            // spreadDisplay.Beatmap.Value = null;
 
             starDifficultyCancellationSource?.Cancel();
             starDifficultyCancellationSource?.Dispose();
@@ -466,7 +466,7 @@ namespace osu.Game.Screens.Select
             starDifficultyBindable.BindValueChanged(starDifficulty =>
             {
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
-                spreadDisplay.StarDifficulty.Value = starDifficulty.NewValue;
+                // spreadDisplay.StarDifficulty.Value = starDifficulty.NewValue;
             }, true);
         }
 
@@ -500,7 +500,7 @@ namespace osu.Game.Screens.Select
                 : starColour;
 
             AccentColour = diffColour;
-            spreadDisplay.Current.Colour = starColour;
+            // spreadDisplay.Current.Colour = starColour;
 
             backgroundBorder.Colour = diffColour;
             difficultyIcon.Colour = starRatingDisplay.DisplayedDifficultyTextColour;
