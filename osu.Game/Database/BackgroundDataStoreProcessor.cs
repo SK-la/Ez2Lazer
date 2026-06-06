@@ -87,15 +87,10 @@ namespace osu.Game.Database
         /// <param name="forceAll">When true, clears persisted values first so all supported beatmaps are recomputed.</param>
         public void QueueEzRealmMetadataBackfill(bool forceAll = false)
         {
-            lock (ezRealmBackfillLock)
+            if (!tryBeginEzRealmMetadataBackfill())
             {
-                if (ezRealmBackfillQueued)
-                {
-                    Logger.Log("Ez Realm metadata backfill is already running; ignoring duplicate request.");
-                    return;
-                }
-
-                ezRealmBackfillQueued = true;
+                Logger.Log("Ez Realm metadata backfill is already running; ignoring duplicate request.");
+                return;
             }
 
             Task.Factory.StartNew(() =>
@@ -113,10 +108,27 @@ namespace osu.Game.Database
                 }
                 finally
                 {
-                    lock (ezRealmBackfillLock)
-                        ezRealmBackfillQueued = false;
+                    endEzRealmMetadataBackfill();
                 }
             }, TaskCreationOptions.LongRunning);
+        }
+
+        private bool tryBeginEzRealmMetadataBackfill()
+        {
+            lock (ezRealmBackfillLock)
+            {
+                if (ezRealmBackfillQueued)
+                    return false;
+
+                ezRealmBackfillQueued = true;
+                return true;
+            }
+        }
+
+        private void endEzRealmMetadataBackfill()
+        {
+            lock (ezRealmBackfillLock)
+                ezRealmBackfillQueued = false;
         }
 
         protected override void LoadComplete()
@@ -135,7 +147,21 @@ namespace osu.Game.Database
                     clearOutdatedXxyStarRatings();
 
                     // Run Ez Realm backfill before official star population so it is not blocked for long periods.
-                    runEzRealmMetadataBackfill();
+                    if (tryBeginEzRealmMetadataBackfill())
+                    {
+                        try
+                        {
+                            runEzRealmMetadataBackfill();
+                        }
+                        finally
+                        {
+                            endEzRealmMetadataBackfill();
+                        }
+                    }
+                    else
+                    {
+                        Logger.Log("Skipping startup Ez Realm metadata backfill because another backfill is already running.");
+                    }
 
                     populateMissingStarRatings();
                     processOnlineBeatmapSetsWithNoUpdate();

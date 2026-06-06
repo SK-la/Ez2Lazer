@@ -40,5 +40,12 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString IGNORE_BETTER = new EzLocalizationManager.EzLocalisableString("忽略更好", "Ignore Better");
         public static readonly LocalisableString IGNORE_WORSE = new EzLocalizationManager.EzLocalisableString("忽略更差", "Ignore Worse");
+
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_TAGS = new EzLocalizationManager.EzLocalisableString("Realm Tag", "Realm Tag");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_XXY = new EzLocalizationManager.EzLocalisableString("Realm Xxy 星级", "Realm Xxy SR");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_PP = new EzLocalizationManager.EzLocalisableString("Realm PP", "Realm PP");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_ALL = new EzLocalizationManager.EzLocalisableString("Realm 全部元数据", "Realm all metadata");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_MAIN = new EzLocalizationManager.EzLocalisableString("SQLite 主库 kps/KPC", "SQLite main kps/KPC");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_BRANCHES = new EzLocalizationManager.EzLocalisableString("SQLite 分支曲库 xxy/PP", "SQLite songs branches xxy/PP");
     }
 }

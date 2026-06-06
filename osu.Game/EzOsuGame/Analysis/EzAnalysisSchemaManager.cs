@@ -174,6 +174,55 @@ WHERE {COL_UPDATED_AT} <> 0;
             rebuildMainDatabaseInPlace(connection);
         }
 
+        /// <summary>
+        /// 当前版本主库文件已存在且 schema / analysis 版本与代码一致。
+        /// </summary>
+        public static bool IsMainDatabaseMatching(string databasePath)
+        {
+            if (!File.Exists(databasePath))
+                return false;
+
+            try
+            {
+                using var connection = OpenConnection(databasePath);
+
+                if (!tableExists(connection, TABLE_ENTRY))
+                    return false;
+
+                if (!int.TryParse(TryGetMeta(connection, META_KEY_SCHEMA_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out int storedSchemaVersion)
+                    || storedSchemaVersion != MAIN_SCHEMA_VERSION)
+                    return false;
+
+                if (!int.TryParse(TryGetMeta(connection, META_KEY_ANALYSIS_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out int storedAnalysisVersion)
+                    || storedAnalysisVersion != ANALYSIS_VERSION)
+                    return false;
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 存在可迁移的旧版主库，或当前主库需要 schema / 版本升级。
+        /// 已匹配的最新版文件不应触发启动预热。
+        /// </summary>
+        public static bool ShouldRunAutomaticSqliteWarmup(string databasePath)
+        {
+            if (IsMainDatabaseMatching(databasePath))
+                return false;
+
+            if (!File.Exists(databasePath))
+            {
+                string? directory = Path.GetDirectoryName(databasePath);
+                return !string.IsNullOrEmpty(directory) && findLatestPreviousMainDatabase(directory, databasePath) != null;
+            }
+
+            return true;
+        }
+
         public static void EnsureMetaTableExists(SqliteConnection connection)
         {
             using var cmd = connection.CreateCommand();

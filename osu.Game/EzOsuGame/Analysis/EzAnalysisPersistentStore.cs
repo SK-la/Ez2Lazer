@@ -88,6 +88,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static string DatabaseFilename => $"{LEGACY_DATABASE_FILENAME_PREFIX}{ANALYSIS_VERSION}.sqlite";
 
+        public string GetMainDatabasePath() => storage.GetFullPath(DatabaseFilename, true);
+
         /// <summary>
         /// 旧版稳定文件名（中间分支）；v7 启动时会从此文件迁移一次。
         /// </summary>
