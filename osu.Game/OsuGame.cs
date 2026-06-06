@@ -1246,7 +1246,7 @@ namespace osu.Game
             loadComponentSingleFile(new MedalOverlay(), topMostOverlayContent.Add);
 
             loadComponentSingleFile(new BackgroundDataStoreProcessor(), Add, true);
-            loadComponentSingleFile(new EzAnalysisWarmupProcessor(), Add);
+            loadComponentSingleFile(new EzAnalysisWarmupProcessor(), Add, true);
             loadComponentSingleFile<BeatmapStore>(detachedBeatmapStore = new RealmDetachedBeatmapStore(), Add, true);
             loadComponentSingleFile(new QueueController(), Add, true);
 

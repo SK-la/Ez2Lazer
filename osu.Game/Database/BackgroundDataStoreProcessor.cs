@@ -18,6 +18,7 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Database;
 using osu.Game.Extensions;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
@@ -85,12 +86,18 @@ namespace osu.Game.Database
         /// Queue Ez Realm metadata backfill (Tag / XxySR / PP) on a background thread.
         /// </summary>
         /// <param name="forceAll">When true, clears persisted values first so all supported beatmaps are recomputed.</param>
-        public void QueueEzRealmMetadataBackfill(bool forceAll = false)
+        public EzDataRebuildDispatchResult QueueEzRealmMetadataBackfill(bool forceAll = false)
+            => QueueEzRealmMetadataRebuild(EzRealmMetadataScope.All, forceAll);
+
+        /// <summary>
+        /// Queue scoped Ez Realm metadata rebuild on a background thread.
+        /// </summary>
+        public EzDataRebuildDispatchResult QueueEzRealmMetadataRebuild(EzRealmMetadataScope scope, bool forceAll)
         {
             if (!tryBeginEzRealmMetadataBackfill())
             {
                 Logger.Log("Ez Realm metadata backfill is already running; ignoring duplicate request.");
-                return;
+                return EzDataRebuildDispatchResult.AlreadyRunning;
             }
 
             Task.Factory.StartNew(() =>
@@ -98,9 +105,9 @@ namespace osu.Game.Database
                 try
                 {
                     if (forceAll)
-                        forceEzRealmMetadataRecalculation();
+                        clearEzRealmMetadata(scope);
 
-                    runEzRealmMetadataBackfill();
+                    runEzRealmMetadataBackfill(scope);
                 }
                 catch (Exception e)
                 {
@@ -111,6 +118,8 @@ namespace osu.Game.Database
                     endEzRealmMetadataBackfill();
                 }
             }, TaskCreationOptions.LongRunning);
+
+            return EzDataRebuildDispatchResult.Queued;
         }
 
         private bool tryBeginEzRealmMetadataBackfill()
@@ -262,15 +271,23 @@ namespace osu.Game.Database
         }
 
         private void runEzRealmMetadataBackfill()
+            => runEzRealmMetadataBackfill(EzRealmMetadataScope.All);
+
+        private void runEzRealmMetadataBackfill(EzRealmMetadataScope scope)
         {
-            populateMissingXxyStarRatings();
-            populateMissingPerformancePoints();
-            populateMissingBeatmapTagFlags();
+            if (scope.HasFlag(EzRealmMetadataScope.Xxy))
+                populateMissingXxyStarRatings();
+
+            if (scope.HasFlag(EzRealmMetadataScope.Pp))
+                populateMissingPerformancePoints();
+
+            if (scope.HasFlag(EzRealmMetadataScope.Tags))
+                populateMissingBeatmapTagFlags();
         }
 
-        private void forceEzRealmMetadataRecalculation()
+        private void clearEzRealmMetadata(EzRealmMetadataScope scope)
         {
-            Logger.Log("Forcing Ez Realm metadata recalculation (Tag / XxySR / PP)...");
+            Logger.Log($"Forcing Ez Realm metadata recalculation ({scope})...");
 
             int beatmapCount = 0;
 
@@ -281,8 +298,11 @@ namespace osu.Game.Database
                     if (beatmap.BeatmapSet == null)
                         continue;
 
-                    beatmap.HasVideo = null;
-                    beatmap.HasStoryboard = null;
+                    if (scope.HasFlag(EzRealmMetadataScope.Tags))
+                    {
+                        beatmap.HasVideo = null;
+                        beatmap.HasStoryboard = null;
+                    }
 
                     // Third-party / unavailable rulesets: keep persisted xxy/pp until the assembly is loadable again.
                     if (!EzXxyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
@@ -291,17 +311,21 @@ namespace osu.Game.Database
                         continue;
                     }
 
-                    beatmap.PerformancePoints = -1;
+                    if (scope.HasFlag(EzRealmMetadataScope.Pp))
+                        beatmap.PerformancePoints = -1;
 
-                    if (EzXxyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
+                    if (scope.HasFlag(EzRealmMetadataScope.Xxy) && EzXxyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
                         beatmap.XxyStarRating = -1;
 
                     beatmapCount++;
                 }
             });
 
-            Logger.Log($"Marked {beatmapCount} beatmaps for Ez Realm metadata recalculation.");
+            Logger.Log($"Marked {beatmapCount} beatmaps for Ez Realm metadata recalculation ({scope}).");
         }
+
+        private void forceEzRealmMetadataRecalculation()
+            => clearEzRealmMetadata(EzRealmMetadataScope.All);
 
         /// <remarks>
         /// This is split out from <see cref="processOnlineBeatmapSetsWithNoUpdate"/> as a separate process to prevent high server-side load
@@ -397,9 +421,19 @@ namespace osu.Game.Database
 
             realmAccess.Run(r =>
             {
-                foreach (var b in r.All<BeatmapInfo>().Where(b => b.XxyStarRating < 0 && b.BeatmapSet != null).AsEnumerable()
-                                   .Where(b => EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset)))
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null)
+                        continue;
+
+                    if (b.XxyStarRating >= 0)
+                        continue;
+
+                    if (!EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset))
+                        continue;
+
                     beatmapIds.Add(b.ID);
+                }
             });
 
             if (beatmapIds.Count == 0)
@@ -463,9 +497,16 @@ namespace osu.Game.Database
 
             realmAccess.Run(r =>
             {
-                foreach (var beatmap in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null).AsEnumerable()
-                                         .Where(b => b.HasVideo == null || b.HasStoryboard == null))
+                foreach (var beatmap in r.All<BeatmapInfo>())
+                {
+                    if (beatmap.BeatmapSet == null)
+                        continue;
+
+                    if (beatmap.HasVideo != null && beatmap.HasStoryboard != null)
+                        continue;
+
                     beatmapIds.Add(beatmap.ID);
+                }
             });
 
             if (beatmapIds.Count == 0)
@@ -533,9 +574,19 @@ namespace osu.Game.Database
 
             realmAccess.Run(r =>
             {
-                foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && b.PerformancePoints < 0).AsEnumerable()
-                                   .Where(b => EzXxyStarRatingSupport.IsRulesetAvailable(b.Ruleset)))
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null)
+                        continue;
+
+                    if (b.PerformancePoints >= 0)
+                        continue;
+
+                    if (!EzXxyStarRatingSupport.IsRulesetAvailable(b.Ruleset))
+                        continue;
+
                     beatmapIds.Add(b.ID);
+                }
             });
 
             if (beatmapIds.Count == 0)
@@ -1216,10 +1267,23 @@ namespace osu.Game.Database
             config.SetValue(OsuSetting.LastOnlineTagsPopulation, metadataSourceFetchDate);
         }
 
+        private int lastNotificationProgressReported = -1;
+
+        private const int notification_progress_update_interval = 50;
+
         private void updateNotificationProgress(ProgressNotification? notification, int processedCount, int totalCount)
         {
             if (notification == null)
                 return;
+
+            bool shouldUpdate = processedCount == 0
+                                  || processedCount >= totalCount
+                                  || processedCount - lastNotificationProgressReported >= notification_progress_update_interval;
+
+            if (!shouldUpdate)
+                return;
+
+            lastNotificationProgressReported = processedCount;
 
             Schedule(() =>
             {
@@ -1278,6 +1342,8 @@ namespace osu.Game.Database
                 CompletionText = completed,
                 State = ProgressNotificationState.Active
             };
+
+            lastNotificationProgressReported = -1;
 
             Schedule(() => notificationOverlay?.Post(notification));
 

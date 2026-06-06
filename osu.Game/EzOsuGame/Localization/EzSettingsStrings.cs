@@ -100,10 +100,53 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("启用 Ez 分析本地数据（SQLite）", "Enable Ez analysis local data (SQLite)");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "控制主 analysis SQLite（kps/KPC 缓存、启动预热）与分支曲库（预生成 Mod 快照）的读写。"
-            + "\n不影响 Realm 中的 xxy/PP 基线；Mod 下面板动态重算由上方「分析重算」开关控制。",
-            "Controls main analysis SQLite (kps/KPC cache, startup warmup) and songs branch libraries (precomputed mod snapshots)."
-            + "\nDoes not affect Realm xxy/PP baselines; mod-aware panel recompute is controlled by the recompute switch above.");
+            "控制主 analysis SQLite（kps/KPC 缓存）与分支曲库（预生成 Mod 快照）的读写。"
+            + "\n仅在缺少当前版本文件或需要 schema 升级时自动预热；已有匹配文件时请在下方的维护控件手动补算/重算。",
+            "Controls main analysis SQLite (kps/KPC cache) and songs branch libraries (precomputed mod snapshots)."
+            + "\nAuto-warmup runs only when the current database is missing or needs schema upgrade; use maintenance controls below when a matching file already exists.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_TARGET =
+            new EzLocalizationManager.EzLocalisableString("数据维护目标", "Data maintenance target");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_TARGET_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "选择要维护的数据范围。SQLite 在已有匹配的最新版文件时不会自动预热；Realm 缺失项仍会在启动时自动补算。",
+            "Choose which data to maintain. SQLite is not auto-warmed when a matching current database exists; Realm missing values are still filled at startup.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_EXECUTE =
+            new EzLocalizationManager.EzLocalisableString("执行", "Execute");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_EXECUTE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "确认后可选补算缺失或完全重算。大库可能耗时较长，请留意右上角进度通知。",
+            "Choose backfill missing or force full rebuild. Large libraries may take a while; watch the progress notification in the top-right corner.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_HEADER =
+            new EzLocalizationManager.EzLocalisableString("数据维护", "Data maintenance");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_BODY = new EzLocalizationManager.EzLocalisableString(
+            "即将对所选目标执行后台维护。\n补算缺失仅处理未写入的数据；完全重算会先清除已有结果再全部重算。",
+            "Background maintenance will run for the selected target.\nBackfill missing only fills gaps; force rebuild clears existing results first.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_BACKFILL =
+            new EzLocalizationManager.EzLocalisableString("尝试补算", "Backfill missing");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_FORCE =
+            new EzLocalizationManager.EzLocalisableString("完全重算", "Force rebuild");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString(
+            "无法执行数据维护：所需后台处理器不可用。",
+            "Cannot run data maintenance: the required background processor is unavailable.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_ALREADY_RUNNING = new EzLocalizationManager.EzLocalisableString(
+            "数据维护已在后台运行，请等待当前任务完成。",
+            "Data maintenance is already running in the background. Wait for the current task to finish.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_SQLITE_DISABLED = new EzLocalizationManager.EzLocalisableString(
+            "SQLite 分析缓存已关闭，请在上方启用后再执行。",
+            "SQLite analysis cache is disabled. Enable it above before running this action.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_DIALOG_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString(
+            "无法打开确认对话框，请稍后重试。",
+            "Cannot open the confirmation dialog. Try again later.");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL =
             new EzLocalizationManager.EzLocalisableString("补算 Realm 元数据（Tag / XxySR / PP）", "Backfill Realm metadata (Tag / XxySR / PP)");
@@ -125,9 +168,9 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_REALM_METADATA_BACKFILL_FORCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "先将所有谱面的 Tag / XxySR / PP 标记为未计算，再执行完整补算。"
-            + "\n谱面较多时耗时较长，请留意右下角进度通知。",
+            + "\n谱面较多时耗时较长，请留意右上角进度通知。",
             "Marks all beatmaps' Tag / XxySR / PP as uncomputed, then runs a full backfill."
-            + "\nMay take a long time for large libraries; watch the progress notification.");
+            + "\nMay take a long time for large libraries; watch the progress notification in the top-right corner.");
 
         #region 机制类
 
