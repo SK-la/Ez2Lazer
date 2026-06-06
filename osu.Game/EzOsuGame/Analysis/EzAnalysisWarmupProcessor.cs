@@ -158,17 +158,17 @@ namespace osu.Game.EzOsuGame.Analysis
             }, TaskCreationOptions.LongRunning);
         }
 
-        public void QueueSqliteMainRebuild(bool forceAll)
+        public EzDataRebuildDispatchResult QueueSqliteMainRebuild(bool forceAll)
         {
             if (!sqliteEnabled)
-                return;
+                return EzDataRebuildDispatchResult.SqliteDisabled;
 
             lock (sqliteManualRebuildLock)
             {
                 if (sqliteMainRebuildQueued)
                 {
                     Logger.Log("SQLite main rebuild is already queued; ignoring duplicate request.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                    return;
+                    return EzDataRebuildDispatchResult.AlreadyRunning;
                 }
 
                 sqliteMainRebuildQueued = true;
@@ -190,19 +190,21 @@ namespace osu.Game.EzOsuGame.Analysis
                         sqliteMainRebuildQueued = false;
                 }
             }, TaskCreationOptions.LongRunning);
+
+            return EzDataRebuildDispatchResult.Queued;
         }
 
-        public void QueueSqliteSongsBranchesRebuild(bool forceAll)
+        public EzDataRebuildDispatchResult QueueSqliteSongsBranchesRebuild(bool forceAll)
         {
             if (!sqliteEnabled)
-                return;
+                return EzDataRebuildDispatchResult.SqliteDisabled;
 
             lock (sqliteManualRebuildLock)
             {
                 if (sqliteSongsBranchesRebuildQueued)
                 {
                     Logger.Log("SQLite songs branch rebuild is already queued; ignoring duplicate request.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                    return;
+                    return EzDataRebuildDispatchResult.AlreadyRunning;
                 }
 
                 sqliteSongsBranchesRebuildQueued = true;
@@ -224,6 +226,8 @@ namespace osu.Game.EzOsuGame.Analysis
                         sqliteSongsBranchesRebuildQueued = false;
                 }
             }, TaskCreationOptions.LongRunning);
+
+            return EzDataRebuildDispatchResult.Queued;
         }
 
         private void executeSqliteMainRebuild(bool forceAll)

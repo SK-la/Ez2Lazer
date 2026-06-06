@@ -86,18 +86,18 @@ namespace osu.Game.Database
         /// Queue Ez Realm metadata backfill (Tag / XxySR / PP) on a background thread.
         /// </summary>
         /// <param name="forceAll">When true, clears persisted values first so all supported beatmaps are recomputed.</param>
-        public void QueueEzRealmMetadataBackfill(bool forceAll = false)
+        public EzDataRebuildDispatchResult QueueEzRealmMetadataBackfill(bool forceAll = false)
             => QueueEzRealmMetadataRebuild(EzRealmMetadataScope.All, forceAll);
 
         /// <summary>
         /// Queue scoped Ez Realm metadata rebuild on a background thread.
         /// </summary>
-        public void QueueEzRealmMetadataRebuild(EzRealmMetadataScope scope, bool forceAll)
+        public EzDataRebuildDispatchResult QueueEzRealmMetadataRebuild(EzRealmMetadataScope scope, bool forceAll)
         {
             if (!tryBeginEzRealmMetadataBackfill())
             {
                 Logger.Log("Ez Realm metadata backfill is already running; ignoring duplicate request.");
-                return;
+                return EzDataRebuildDispatchResult.AlreadyRunning;
             }
 
             Task.Factory.StartNew(() =>
@@ -118,6 +118,8 @@ namespace osu.Game.Database
                     endEzRealmMetadataBackfill();
                 }
             }, TaskCreationOptions.LongRunning);
+
+            return EzDataRebuildDispatchResult.Queued;
         }
 
         private bool tryBeginEzRealmMetadataBackfill()
