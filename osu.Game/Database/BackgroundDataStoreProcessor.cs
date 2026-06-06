@@ -18,6 +18,7 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Database;
 using osu.Game.Extensions;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
@@ -86,6 +87,12 @@ namespace osu.Game.Database
         /// </summary>
         /// <param name="forceAll">When true, clears persisted values first so all supported beatmaps are recomputed.</param>
         public void QueueEzRealmMetadataBackfill(bool forceAll = false)
+            => QueueEzRealmMetadataRebuild(EzRealmMetadataScope.All, forceAll);
+
+        /// <summary>
+        /// Queue scoped Ez Realm metadata rebuild on a background thread.
+        /// </summary>
+        public void QueueEzRealmMetadataRebuild(EzRealmMetadataScope scope, bool forceAll)
         {
             if (!tryBeginEzRealmMetadataBackfill())
             {
@@ -98,9 +105,9 @@ namespace osu.Game.Database
                 try
                 {
                     if (forceAll)
-                        forceEzRealmMetadataRecalculation();
+                        clearEzRealmMetadata(scope);
 
-                    runEzRealmMetadataBackfill();
+                    runEzRealmMetadataBackfill(scope);
                 }
                 catch (Exception e)
                 {
@@ -262,15 +269,23 @@ namespace osu.Game.Database
         }
 
         private void runEzRealmMetadataBackfill()
+            => runEzRealmMetadataBackfill(EzRealmMetadataScope.All);
+
+        private void runEzRealmMetadataBackfill(EzRealmMetadataScope scope)
         {
-            populateMissingXxyStarRatings();
-            populateMissingPerformancePoints();
-            populateMissingBeatmapTagFlags();
+            if (scope.HasFlag(EzRealmMetadataScope.Xxy))
+                populateMissingXxyStarRatings();
+
+            if (scope.HasFlag(EzRealmMetadataScope.Pp))
+                populateMissingPerformancePoints();
+
+            if (scope.HasFlag(EzRealmMetadataScope.Tags))
+                populateMissingBeatmapTagFlags();
         }
 
-        private void forceEzRealmMetadataRecalculation()
+        private void clearEzRealmMetadata(EzRealmMetadataScope scope)
         {
-            Logger.Log("Forcing Ez Realm metadata recalculation (Tag / XxySR / PP)...");
+            Logger.Log($"Forcing Ez Realm metadata recalculation ({scope})...");
 
             int beatmapCount = 0;
 
@@ -281,8 +296,11 @@ namespace osu.Game.Database
                     if (beatmap.BeatmapSet == null)
                         continue;
 
-                    beatmap.HasVideo = null;
-                    beatmap.HasStoryboard = null;
+                    if (scope.HasFlag(EzRealmMetadataScope.Tags))
+                    {
+                        beatmap.HasVideo = null;
+                        beatmap.HasStoryboard = null;
+                    }
 
                     // Third-party / unavailable rulesets: keep persisted xxy/pp until the assembly is loadable again.
                     if (!EzXxyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
@@ -291,17 +309,21 @@ namespace osu.Game.Database
                         continue;
                     }
 
-                    beatmap.PerformancePoints = -1;
+                    if (scope.HasFlag(EzRealmMetadataScope.Pp))
+                        beatmap.PerformancePoints = -1;
 
-                    if (EzXxyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
+                    if (scope.HasFlag(EzRealmMetadataScope.Xxy) && EzXxyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
                         beatmap.XxyStarRating = -1;
 
                     beatmapCount++;
                 }
             });
 
-            Logger.Log($"Marked {beatmapCount} beatmaps for Ez Realm metadata recalculation.");
+            Logger.Log($"Marked {beatmapCount} beatmaps for Ez Realm metadata recalculation ({scope}).");
         }
+
+        private void forceEzRealmMetadataRecalculation()
+            => clearEzRealmMetadata(EzRealmMetadataScope.All);
 
         /// <remarks>
         /// This is split out from <see cref="processOnlineBeatmapSetsWithNoUpdate"/> as a separate process to prevent high server-side load
