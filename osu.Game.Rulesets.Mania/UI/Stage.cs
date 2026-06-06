@@ -76,8 +76,6 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<double> columnBlur = null!;
         private bool blurEnabledByConfig;
 
-        private bool showBlur => GlobalConfigStore.EzConfig.Get<double>(Ez2Setting.ColumnBlur) > 0;
-
         private readonly Box dimBox;
         private readonly BackdropBlurDrawable? stageBackdropBlur;
         private readonly SkinnableDrawable stageForeground;
@@ -97,20 +95,16 @@ namespace osu.Game.Rulesets.Mania.UI
             Container columnBackgrounds;
             Container topLevelContainer;
 
-            InternalChildren = new[]
+            InternalChildren = new Drawable[]
             {
-                (stageBackdropBlur = showBlur
-                    ? new BackdropBlurDrawable
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        EffectEnabled = false,
-                        // FrameBufferScale = new Vector2(0.2f),
-                        CaptureFrameInterval = 3,
-                        MaxCapturesPerSecond = 300,
-                    }
-                    : null) ?? Empty(),
+                stageBackdropBlur = new BackdropBlurDrawable
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    // 初始关闭；由 ColumnBlur 配置在运行时驱动开关，确保即时生效。
+                    EffectEnabled = false,
+                },
                 dimBox = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
