@@ -421,9 +421,19 @@ namespace osu.Game.Database
 
             realmAccess.Run(r =>
             {
-                foreach (var b in r.All<BeatmapInfo>().Where(b => b.XxyStarRating < 0 && b.BeatmapSet != null).AsEnumerable()
-                                   .Where(b => EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset)))
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null)
+                        continue;
+
+                    if (b.XxyStarRating >= 0)
+                        continue;
+
+                    if (!EzXxyStarRatingSupport.SupportsRuleset(b.Ruleset))
+                        continue;
+
                     beatmapIds.Add(b.ID);
+                }
             });
 
             if (beatmapIds.Count == 0)
@@ -487,9 +497,16 @@ namespace osu.Game.Database
 
             realmAccess.Run(r =>
             {
-                foreach (var beatmap in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null).AsEnumerable()
-                                         .Where(b => b.HasVideo == null || b.HasStoryboard == null))
+                foreach (var beatmap in r.All<BeatmapInfo>())
+                {
+                    if (beatmap.BeatmapSet == null)
+                        continue;
+
+                    if (beatmap.HasVideo != null && beatmap.HasStoryboard != null)
+                        continue;
+
                     beatmapIds.Add(beatmap.ID);
+                }
             });
 
             if (beatmapIds.Count == 0)
@@ -557,9 +574,19 @@ namespace osu.Game.Database
 
             realmAccess.Run(r =>
             {
-                foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && b.PerformancePoints < 0).AsEnumerable()
-                                   .Where(b => EzXxyStarRatingSupport.IsRulesetAvailable(b.Ruleset)))
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null)
+                        continue;
+
+                    if (b.PerformancePoints >= 0)
+                        continue;
+
+                    if (!EzXxyStarRatingSupport.IsRulesetAvailable(b.Ruleset))
+                        continue;
+
                     beatmapIds.Add(b.ID);
+                }
             });
 
             if (beatmapIds.Count == 0)
@@ -1240,10 +1267,23 @@ namespace osu.Game.Database
             config.SetValue(OsuSetting.LastOnlineTagsPopulation, metadataSourceFetchDate);
         }
 
+        private int lastNotificationProgressReported = -1;
+
+        private const int notification_progress_update_interval = 50;
+
         private void updateNotificationProgress(ProgressNotification? notification, int processedCount, int totalCount)
         {
             if (notification == null)
                 return;
+
+            bool shouldUpdate = processedCount == 0
+                                  || processedCount >= totalCount
+                                  || processedCount - lastNotificationProgressReported >= notification_progress_update_interval;
+
+            if (!shouldUpdate)
+                return;
+
+            lastNotificationProgressReported = processedCount;
 
             Schedule(() =>
             {
@@ -1302,6 +1342,8 @@ namespace osu.Game.Database
                 CompletionText = completed,
                 State = ProgressNotificationState.Active
             };
+
+            lastNotificationProgressReported = -1;
 
             Schedule(() => notificationOverlay?.Post(notification));
 
