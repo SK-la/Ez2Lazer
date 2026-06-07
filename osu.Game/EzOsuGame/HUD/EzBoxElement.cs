@@ -6,6 +6,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Acrylic;
@@ -75,6 +76,9 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved(canBeNull: true)]
         private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
 
+        [Resolved]
+        private IRenderer renderer { get; set; } = null!;
+
         public EzBoxElement()
         {
             Size = new Vector2(400, 80);
@@ -113,15 +117,30 @@ namespace osu.Game.EzOsuGame.HUD
 
         public void SyncAcrylicCaptureState()
         {
+            bool needsScopeCapture = WantsAcrylicCapture && !renderer.SupportsBackbufferRegionCopy;
+
             if (WantsAcrylicCapture)
             {
-                if (!captureAcquired && acrylicCaptureRegistrar != null)
+                if (needsScopeCapture)
                 {
-                    acrylicCaptureRegistrar.AcquireCapture();
-                    captureAcquired = true;
-                }
+                    if (!captureAcquired && acrylicCaptureRegistrar != null)
+                    {
+                        acrylicCaptureRegistrar.AcquireCapture();
+                        captureAcquired = true;
+                    }
 
-                acrylicBackdrop.EffectEnabled = captureAcquired;
+                    acrylicBackdrop.EffectEnabled = captureAcquired;
+                }
+                else
+                {
+                    if (captureAcquired && acrylicCaptureRegistrar != null)
+                    {
+                        acrylicCaptureRegistrar.ReleaseCapture();
+                        captureAcquired = false;
+                    }
+
+                    acrylicBackdrop.EffectEnabled = true;
+                }
             }
             else
             {
