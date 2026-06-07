@@ -130,12 +130,13 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public static Dictionary<int, int> GetColumnNoteCountsOptimized(IBeatmap beatmap)
         {
-            // 预过滤非Duration类型的Column对象
+            // 收集所有带列信息的对象（包含普通 note 与长按 LN），以生成每列的总 note 数。
+            // 统一口径：ColumnCounts 表示每列的总 note 数（包括 LNs）。
             var columnObjects = new List<IHasColumn>(beatmap.HitObjects.Count);
 
             foreach (var obj in beatmap.HitObjects)
             {
-                if (obj is IHasColumn columnObj && !(obj is IHasDuration))
+                if (obj is IHasColumn columnObj)
                 {
                     columnObjects.Add(columnObj);
                 }
@@ -205,6 +206,7 @@ namespace osu.Game.EzOsuGame.Analysis
             {
                 if (obj is IHasColumn columnObj)
                 {
+                    // 统一口径：columnCounts 统计总 note（含 LN），holdNoteCounts 单独统计 LN。
                     columnCounts[columnObj.Column] = columnCounts.GetValueOrDefault(columnObj.Column) + 1;
                     if (obj is IHasDuration)
                         holdNoteCounts[columnObj.Column] = holdNoteCounts.GetValueOrDefault(columnObj.Column) + 1;
@@ -217,11 +219,11 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// 计算粗略 KPS 曲线并返回平均/最大值。使用固定较少的桶（bucket）以快速得到可展示的基线数据。
         /// </summary>
-        public static (double averageKps, double maxKps, List<double> kpsList) GetKpsCoarse(IBeatmap beatmap, int buckets = 64)
+        public static List<double> GetKpsCoarse(IBeatmap beatmap, int buckets = 64)
         {
             var hitObjects = beatmap.HitObjects;
             if (hitObjects.Count == 0)
-                return (0, 0, new List<double>());
+                return new List<double>();
 
             double songStart = hitObjects[0].StartTime;
             double songEnd = hitObjects[^1].StartTime;
@@ -242,10 +244,10 @@ namespace osu.Game.EzOsuGame.Analysis
             for (int i = 0; i < buckets; i++)
                 kpsList.Add(bucketsCounts[i] / (intervalMs / 1000.0));
 
-            double avg = kpsList.Sum() / kpsList.Count;
-            double max = kpsList.Max();
+            // double avg = kpsList.Sum() / kpsList.Count;
+            // double max = kpsList.Max();
 
-            return (avg, max, kpsList);
+            return kpsList;
         }
 
         /// <summary>

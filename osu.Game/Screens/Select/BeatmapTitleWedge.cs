@@ -342,7 +342,7 @@ namespace osu.Game.Screens.Select
                 }
                 else
                 {
-                    var (_, _, computedKpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(beatmap, buckets: 64);
+                    var computedKpsList = OptimizedBeatmapCalculator.GetKpsCoarse(beatmap, buckets: 64);
                     kpsList = computedKpsList;
                 }
 

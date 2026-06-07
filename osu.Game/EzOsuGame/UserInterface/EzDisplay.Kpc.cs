@@ -227,16 +227,16 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             if (barEntries == null) return;
 
-            // 计算最大值用于归一化
+            // 计算最大值用于归一化。
+            // 对齐: columnNoteCounts already contains total hit objects for the column (includes LNs).
+            // 因此归一化应基于 total，而不是 total + hold（否则会重复计入 LN）。
             int maxCount = 0;
 
             for (int i = 0; i < currentColumnCount; i++)
             {
                 int total = i < columns ? columnNoteCounts[i] : 0;
-                int hold = (holdNoteCounts != null && i < columns) ? holdNoteCounts[i] : 0;
-                int sum = total + hold;
-                if (sum > maxCount)
-                    maxCount = sum;
+                if (total > maxCount)
+                    maxCount = total;
             }
 
             if (maxCount == 0)
@@ -426,13 +426,15 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             sb.AppendLine();
 
-            // Note 行
+            // Note 行 —— 显示普通 note（regular = total - hold），遵循口径 A（ColumnCounts 为总数）
             sb.Append("| notes |");
 
             for (int i = 0; i < lastKnownCount; i++)
             {
-                int count = lastKnownColumns[i];
-                sb.Append($" {(count > 0 ? count.ToString() : "-")} |");
+                int total = lastKnownColumns[i];
+                int hold = lastKnownHolds?[i] ?? 0;
+                int regular = Math.Max(0, total - hold);
+                sb.Append($" {(regular > 0 ? regular.ToString() : "-")} |");
             }
 
             sb.AppendLine();
