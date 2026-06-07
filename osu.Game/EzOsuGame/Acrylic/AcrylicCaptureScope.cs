@@ -1,6 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osuTK;
@@ -29,7 +31,7 @@ namespace osu.Game.EzOsuGame.Acrylic
             if (captureRefCount++ > 0)
                 return;
 
-            Schedule(activateCapture);
+            invokeCaptureMutation(activateCapture);
         }
 
         public void ReleaseCapture()
@@ -40,7 +42,15 @@ namespace osu.Game.EzOsuGame.Acrylic
             if (--captureRefCount > 0)
                 return;
 
-            Schedule(deactivateCapture);
+            invokeCaptureMutation(deactivateCapture);
+        }
+
+        private void invokeCaptureMutation(Action mutation)
+        {
+            if (LoadState == LoadState.Loaded && ThreadSafety.IsUpdateThread)
+                mutation();
+            else
+                Schedule(mutation);
         }
 
         private void activateCapture()
