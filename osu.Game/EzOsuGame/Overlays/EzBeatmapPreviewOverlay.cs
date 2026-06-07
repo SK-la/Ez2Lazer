@@ -351,6 +351,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             expanded = true;
             ExpandedState.Value = true;
+            panelBackground.AcrylicCaptureVisible = true;
+            panelBackground.SyncAcrylicCaptureState();
 
             if (drawableRuleset == null && playableBeatmap != null && currentRuleset != null)
                 selectionDirty = true;
@@ -373,6 +375,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             expanded = false;
             ExpandedState.Value = false;
+            panelBackground.AcrylicCaptureVisible = false;
+            panelBackground.SyncAcrylicCaptureState();
             heightResizeActive = false;
             widthResizeActive = false;
             selectionLoadInProgress = false;

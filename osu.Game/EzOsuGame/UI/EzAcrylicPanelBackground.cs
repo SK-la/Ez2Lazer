@@ -19,7 +19,12 @@ namespace osu.Game.EzOsuGame.UI
     /// </summary>
     public partial class EzAcrylicPanelBackground : Container, IAcrylicBackdropConsumer
     {
-        public bool WantsAcrylicCapture => acrylicUiEnabled?.Value ?? false;
+        /// <summary>
+        /// 宿主面板是否处于需要采样的可见状态（例如预览展开）。收起时应为 false 以释放离屏承载层引用。
+        /// </summary>
+        public bool AcrylicCaptureVisible { get; set; }
+
+        public bool WantsAcrylicCapture => (acrylicUiEnabled?.Value ?? false) && AcrylicCaptureVisible;
 
         public Box TintBox { get; private set; }
 
@@ -77,7 +82,7 @@ namespace osu.Game.EzOsuGame.UI
 
         private void syncAcrylicState()
         {
-            captureController?.Sync(acrylicUiEnabled.Value, (float)acrylicUiBlurStrength.Value);
+            captureController?.Sync(WantsAcrylicCapture, (float)acrylicUiBlurStrength.Value);
         }
 
         protected override void Dispose(bool isDisposing)
