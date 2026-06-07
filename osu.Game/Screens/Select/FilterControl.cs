@@ -23,6 +23,7 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -117,7 +118,7 @@ namespace osu.Game.Screens.Select
                     RelativeSizeAxes = Axes.Both,
                     CornerRadius = corner_radius,
                     Masking = true,
-                    Child = new WedgeBackground
+                    Child = new EzSongSelectWedgeBackground
                     {
                         Anchor = Anchor.TopRight,
                         Scale = new Vector2(-1, 1),

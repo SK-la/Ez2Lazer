@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.HUD;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Containers;
 using osu.Game.Screens.Select;
 using osuTK;
@@ -34,7 +35,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 Shear = OsuGame.SHEAR,
                 Children = new Drawable[]
                 {
-                    new WedgeBackground(),
+                    new EzSongSelectWedgeBackground(),
                     new Container
                     {
                         RelativeSizeAxes = Axes.X,

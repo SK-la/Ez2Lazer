@@ -6,8 +6,8 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Rendering;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Localization;
@@ -71,7 +71,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private readonly AcrylicBackdropDrawable acrylicBackdrop;
         private readonly Box tintBox;
-        private bool captureAcquired;
+        private EzAcrylicCaptureController? captureController;
 
         [Resolved(canBeNull: true)]
         private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
@@ -104,55 +104,17 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
+            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, renderer, acrylicBackdrop);
+
             BoxWidth.BindValueChanged(v => Width = v.NewValue, true);
             BoxHeight.BindValueChanged(v => Height = v.NewValue, true);
             AccentColour.BindValueChanged(v => tintBox.Colour = v.NewValue, true);
             BlurEnabled.BindValueChanged(_ => SyncAcrylicCaptureState(), true);
-            BlurStrength.BindValueChanged(v =>
-            {
-                acrylicBackdrop.BlurSigma = new Vector2(v.NewValue);
-                SyncAcrylicCaptureState();
-            }, true);
+            BlurStrength.BindValueChanged(_ => SyncAcrylicCaptureState(), true);
         }
 
         public void SyncAcrylicCaptureState()
-        {
-            bool needsScopeCapture = WantsAcrylicCapture && !renderer.SupportsBackbufferRegionCopy;
-
-            if (WantsAcrylicCapture)
-            {
-                if (needsScopeCapture)
-                {
-                    if (!captureAcquired && acrylicCaptureRegistrar != null)
-                    {
-                        acrylicCaptureRegistrar.AcquireCapture();
-                        captureAcquired = true;
-                    }
-
-                    acrylicBackdrop.EffectEnabled = captureAcquired;
-                }
-                else
-                {
-                    if (captureAcquired && acrylicCaptureRegistrar != null)
-                    {
-                        acrylicCaptureRegistrar.ReleaseCapture();
-                        captureAcquired = false;
-                    }
-
-                    acrylicBackdrop.EffectEnabled = true;
-                }
-            }
-            else
-            {
-                acrylicBackdrop.EffectEnabled = false;
-
-                if (captureAcquired && acrylicCaptureRegistrar != null)
-                {
-                    acrylicCaptureRegistrar.ReleaseCapture();
-                    captureAcquired = false;
-                }
-            }
-        }
+            => captureController?.Sync(WantsAcrylicCapture, BlurStrength.Value);
 
         protected override void Update()
         {
@@ -164,15 +126,7 @@ namespace osu.Game.EzOsuGame.HUD
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing)
-            {
-                acrylicBackdrop.EffectEnabled = false;
-
-                if (captureAcquired && acrylicCaptureRegistrar != null)
-                {
-                    acrylicCaptureRegistrar.ReleaseCapture();
-                    captureAcquired = false;
-                }
-            }
+                captureController?.Dispose();
 
             base.Dispose(isDisposing);
         }

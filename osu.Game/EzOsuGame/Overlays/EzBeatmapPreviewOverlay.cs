@@ -20,6 +20,7 @@ using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Overlays.Preview;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -76,7 +77,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Bindable<EzBeatmapPreviewMode> previewMode = new Bindable<EzBeatmapPreviewMode>();
 
         private readonly Container panelContainer;
-        private readonly Box panelBackground;
+        private readonly EzAcrylicPanelBackground panelBackground;
         private readonly Container stageViewport;
         private readonly Container stageScaleContainer;
         private readonly Container stageAreaContainer;
@@ -182,11 +183,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         RelativeSizeAxes = Axes.Both,
                         Children = new Drawable[]
                         {
-                            panelBackground = new Box
-                            {
-                                RelativeSizeAxes = Axes.Both,
-                                Colour = Color4.Black.Opacity(panel_background_focus_opacity)
-                            },
+                            panelBackground = new EzAcrylicPanelBackground(Color4.Black.Opacity(panel_background_focus_opacity)),
                             loadTimeText = new OsuSpriteText
                             {
                                 Text = "Load Time: 0ms",
@@ -1434,7 +1431,7 @@ namespace osu.Game.EzOsuGame.Overlays
             fullMapFocusActive = focused;
             FullMapFocusState.Value = focused;
 
-            panelBackground.FadeColour(Color4.Black.Opacity(panel_background_focus_opacity), 100, Easing.OutQuint);
+            panelBackground.TintBox.FadeColour(Color4.Black.Opacity(panel_background_focus_opacity), 100, Easing.OutQuint);
 
             previewModeButtonList.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);
             loadTimeText.FadeTo(focused ? 0 : 1, 100, Easing.OutQuint);

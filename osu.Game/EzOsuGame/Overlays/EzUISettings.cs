@@ -50,6 +50,32 @@ namespace osu.Game.EzOsuGame.Overlays
 
             EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
 
+            var acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            var acrylicUiBlurStrength = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength);
+
+            AddRange(new Drawable[]
+            {
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.ACRYLIC_UI_ENABLED,
+                    HintText = EzSettingsStrings.ACRYLIC_UI_ENABLED_TOOLTIP,
+                    Current = acrylicUiEnabled,
+                })
+                {
+                    Keywords = new[] { "acrylic", "glass", "blur", "song select", "ui", "毛玻璃" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.ACRYLIC_UI_BLUR_STRENGTH,
+                    HintText = EzSettingsStrings.ACRYLIC_UI_BLUR_STRENGTH_TOOLTIP,
+                    Current = acrylicUiBlurStrength,
+                    KeyboardStep = 1,
+                })
+                {
+                    Keywords = new[] { "acrylic", "blur", "strength", "song select", "ui", "虚化" }
+                },
+            });
+
             AddRange(new Drawable[]
             {
                 new SettingsItemV2(new FormCheckBox

@@ -20,6 +20,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
@@ -148,7 +149,7 @@ namespace osu.Game.Screens.Select
                         Alpha = 0f,
                         Children = new Drawable[]
                         {
-                            new WedgeBackground(),
+                            new EzSongSelectWedgeBackground(),
                             // Required because wedge background blocks input from passing through
                             // to the main context menu container above.
                             new OsuContextMenuContainer

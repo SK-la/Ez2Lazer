@@ -14,6 +14,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Containers;
 using osu.Game.Localisation;
 using osu.Game.Online;
@@ -97,7 +98,7 @@ namespace osu.Game.Screens.Select
                         AutoSizeAxes = Axes.Y,
                         Children = new Drawable[]
                         {
-                            new WedgeBackground(),
+                            new EzSongSelectWedgeBackground(),
                             new Container
                             {
                                 RelativeSizeAxes = Axes.X,
@@ -190,7 +191,7 @@ namespace osu.Game.Screens.Select
                         AutoSizeAxes = Axes.Y,
                         Children = new Drawable[]
                         {
-                            new WedgeBackground(),
+                            new EzSongSelectWedgeBackground(),
                             new GridContainer
                             {
                                 RelativeSizeAxes = Axes.X,
@@ -229,7 +230,7 @@ namespace osu.Game.Screens.Select
                         AutoSizeAxes = Axes.Y,
                         Children = new Drawable[]
                         {
-                            new WedgeBackground(),
+                            new EzSongSelectWedgeBackground(),
                             new Container
                             {
                                 RelativeSizeAxes = Axes.X,

@@ -57,6 +57,22 @@ namespace osu.Game.EzOsuGame.Localization
             "开启后将隐藏主界面底部的在线新闻/广告轮播图。",
             "When enabled, the online news/advertisement banner at the bottom of the main menu will be hidden.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("毛玻璃 UI", "Acrylic UI");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后，选歌界面的 Wedge、过滤器、谱面预览等面板背景将使用穿透虚化（采样当前屏幕内容）。"
+            + "\n会启用全屏 capture 缓冲，仅建议在选歌界面使用。",
+            "When enabled, song select wedge, filter, and beatmap preview panel backgrounds use true backdrop acrylic blur."
+            + "\nEnables a full-screen capture buffer while any acrylic panel is visible on song select.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_BLUR_STRENGTH =
+            new EzLocalizationManager.EzLocalisableString("毛玻璃虚化强度", "Acrylic blur strength");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_BLUR_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "选歌界面毛玻璃面板的模糊强度。总开关关闭时不生效。",
+            "Blur strength for song select acrylic panels. Has no effect when acrylic UI is disabled.");
+
         public static readonly EzLocalizationManager.EzLocalisableString NOTIFICATION_BEHAVIOUR =
             new EzLocalizationManager.EzLocalisableString("通知行为", "Notification behaviour");
 

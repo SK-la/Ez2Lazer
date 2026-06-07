@@ -100,6 +100,8 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
+            SetDefault(Ez2Setting.AcrylicUiEnabled, false);
+            SetDefault(Ez2Setting.AcrylicUiBlurStrength, 16.0, 0.0, 40.0, 1.0);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
             SetDefault(Ez2Setting.BeatmapPreviewMode, EzBeatmapPreviewMode.Static);
             SetDefault(Ez2Setting.BeatmapPreviewModeMania, EzBeatmapPreviewMode.StaticFullMap);
@@ -769,6 +771,8 @@ namespace osu.Game.EzOsuGame.Configuration
         ManiaSkipEmptyEdgeColumns,
         SkipWithGameplayKeys,
         StoryboardAutoVideoSize,
+        AcrylicUiEnabled,
+        AcrylicUiBlurStrength,
 
         // 界面功能
         KeySoundPreviewMode,

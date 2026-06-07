@@ -21,6 +21,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
@@ -102,7 +103,7 @@ namespace osu.Game.Screens.Select
 
             InternalChildren = new Drawable[]
             {
-                new WedgeBackground(),
+                new EzSongSelectWedgeBackground(),
                 new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,
