@@ -63,6 +63,26 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString BACKGROUND_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("背景透明度", "Box Element Alpha");
         public static readonly LocalisableString BOX_ELEMENT_ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("背景框的透明度值", "The alpha value of background.");
 
+        public static readonly LocalisableString BOX_ELEMENT_WIDTH_LABEL = new EzLocalizationManager.EzLocalisableString("宽度", "Width");
+        public static readonly LocalisableString BOX_ELEMENT_WIDTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("背景框的宽度", "The width of the background box.");
+
+        public static readonly LocalisableString BOX_ELEMENT_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("高度", "Height");
+        public static readonly LocalisableString BOX_ELEMENT_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("背景框的高度", "The height of the background box.");
+
+        public static readonly LocalisableString BOX_ELEMENT_BLUR_LABEL = new EzLocalizationManager.EzLocalisableString("背景虚化", "Backdrop Blur");
+
+        public static readonly LocalisableString BOX_ELEMENT_BLUR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后在游戏界面虚化谱面背景与故事板（需屏幕提供捕获源）。"
+            + "\n选歌界面与皮肤编辑器中不可用；关闭或强度为 0 时无额外 GPU 开销。",
+            "When enabled during gameplay, blurs the beatmap background and storyboard (requires a capture source from the screen)."
+            + "\nUnavailable on song select and in the skin editor; no extra GPU cost when disabled or strength is 0.");
+
+        public static readonly LocalisableString BOX_ELEMENT_BLUR_STRENGTH_LABEL = new EzLocalizationManager.EzLocalisableString("虚化强度", "Blur Strength");
+
+        public static readonly LocalisableString BOX_ELEMENT_BLUR_STRENGTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "背景虚化的模糊强度。设为 0 等效于关闭虚化。",
+            "Blur strength for the backdrop effect. A value of 0 is equivalent to disabling blur.");
+
         // EzHUDAccuracyCounter
         public static readonly LocalisableString FILL_DIRECTION_LABEL = new EzLocalizationManager.EzLocalisableString("排列方向", "Fill Direction");
         public static readonly LocalisableString FILL_DIRECTION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择组件的排列方向", "Select the arrangement direction of components.");
