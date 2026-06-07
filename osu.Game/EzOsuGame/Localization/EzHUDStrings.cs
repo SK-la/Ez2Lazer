@@ -72,10 +72,10 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString BOX_ELEMENT_BLUR_LABEL = new EzLocalizationManager.EzLocalisableString("背景虚化", "Backdrop Blur");
 
         public static readonly LocalisableString BOX_ELEMENT_BLUR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "开启后在游戏界面虚化谱面背景与故事板（需屏幕提供捕获源）。"
-            + "\n选歌界面与皮肤编辑器中不可用；关闭或强度为 0 时无额外 GPU 开销。",
-            "When enabled during gameplay, blurs the beatmap background and storyboard (requires a capture source from the screen)."
-            + "\nUnavailable on song select and in the skin editor; no extra GPU cost when disabled or strength is 0.");
+            "开启后真穿透虚化框下方 OsuScreenStack 内已绘制内容（壁纸、选歌 UI、游戏 HUD/playfield 等）。"
+            + "\n不含 footer、Logo、设置/通知浮层；关闭或强度为 0 时不声明离屏承载层、无额外 GPU 开销。",
+            "When enabled, acrylic-blurs content already rendered within OsuScreenStack beneath the box (wallpaper, song select UI, gameplay HUD/playfield, etc.)."
+            + "\nExcludes footer, logo, and global settings/notification overlays; no offscreen buffer when disabled or strength is 0.");
 
         public static readonly LocalisableString BOX_ELEMENT_BLUR_STRENGTH_LABEL = new EzLocalizationManager.EzLocalisableString("虚化强度", "Blur Strength");
 

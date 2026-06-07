@@ -39,6 +39,7 @@ using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -234,6 +235,8 @@ namespace osu.Game
         private RealmDetachedBeatmapStore detachedBeatmapStore;
 
         private ScreenStackFooter screenStackFooter;
+
+        private AcrylicCaptureScope acrylicCaptureScope;
 
         private readonly string[] args;
 
@@ -1110,7 +1113,7 @@ namespace osu.Game
                             Children = new Drawable[]
                             {
                                 backReceptor = new ScreenFooter.BackReceptor(),
-                                ScreenStack = new OsuScreenStack { RelativeSizeAxes = Axes.Both },
+                                acrylicCaptureScope = new AcrylicCaptureScope(ScreenStack = new OsuScreenStack { RelativeSizeAxes = Axes.Both }),
                                 logoContainer = new Container { RelativeSizeAxes = Axes.Both },
                                 // TODO: what is this? why is this?
                                 // TODO: this is being screen scaled even though it's probably AN OVERLAY.
@@ -1150,6 +1153,7 @@ namespace osu.Game
                 new ConfineMouseTracker()
             });
 
+            dependencies.CacheAs<IAcrylicCaptureRegistrar>(acrylicCaptureScope);
             dependencies.Cache(ScreenFooter);
 
             ScreenStack.ScreenPushed += screenPushed;

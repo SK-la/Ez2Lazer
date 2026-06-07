@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.Localisation.SkinComponents;
@@ -19,10 +20,10 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.HUD
 {
     /// <summary>
-    /// 可皮肤化的圆角背景框。虚化使用 <see cref="BackdropBlurDrawable"/> 局部捕获，
-    /// 仅在组件存在且开启虚化时产生 GPU 开销；不修改屏幕级渲染结构。
+    /// 可皮肤化的圆角背景框。虚化由本组件自行向 <see cref="IAcrylicCaptureRegistrar"/> 声明需求，
+    /// 使用 <see cref="AcrylicBackdropDrawable"/> 真穿透采样 OsuScreenStack 内已绘制内容。
     /// </summary>
-    public partial class EzBoxElement : CompositeDrawable, ISerialisableDrawable
+    public partial class EzBoxElement : CompositeDrawable, ISerialisableDrawable, IAcrylicBackdropConsumer
     {
         public bool UsesFixedAnchor { get; set; }
 
@@ -65,11 +66,14 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(new Color4(1f, 1f, 1f, 0.12f));
 
-        private readonly BackdropBlurDrawable backdropBlur;
+        public bool WantsAcrylicCapture => BlurEnabled.Value && BlurStrength.Value > 0;
+
+        private readonly AcrylicBackdropDrawable acrylicBackdrop;
         private readonly Box tintBox;
+        private bool captureAcquired;
 
         [Resolved(canBeNull: true)]
-        private IBackdropCaptureSourceProvider? backdropCaptureSourceProvider { get; set; }
+        private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
 
         public EzBoxElement()
         {
@@ -78,10 +82,11 @@ namespace osu.Game.EzOsuGame.HUD
 
             InternalChildren = new Drawable[]
             {
-                backdropBlur = new BackdropBlurDrawable
+                acrylicBackdrop = new AcrylicBackdropDrawable
                 {
                     RelativeSizeAxes = Axes.Both,
                     EffectEnabled = false,
+                    FrameBufferScale = Vector2.One,
                 },
                 tintBox = new Box
                 {
@@ -91,13 +96,6 @@ namespace osu.Game.EzOsuGame.HUD
             };
         }
 
-        [BackgroundDependencyLoader]
-        private void load()
-        {
-            if (backdropCaptureSourceProvider != null)
-                backdropBlur.CaptureSourceProvider = backdropCaptureSourceProvider;
-        }
-
         protected override void LoadComplete()
         {
             base.LoadComplete();
@@ -105,8 +103,36 @@ namespace osu.Game.EzOsuGame.HUD
             BoxWidth.BindValueChanged(v => Width = v.NewValue, true);
             BoxHeight.BindValueChanged(v => Height = v.NewValue, true);
             AccentColour.BindValueChanged(v => tintBox.Colour = v.NewValue, true);
-            BlurEnabled.BindValueChanged(_ => updateBlurState(), true);
-            BlurStrength.BindValueChanged(v => backdropBlur.BlurSigma = new Vector2(v.NewValue), true);
+            BlurEnabled.BindValueChanged(_ => SyncAcrylicCaptureState(), true);
+            BlurStrength.BindValueChanged(v =>
+            {
+                acrylicBackdrop.BlurSigma = new Vector2(v.NewValue);
+                SyncAcrylicCaptureState();
+            }, true);
+        }
+
+        public void SyncAcrylicCaptureState()
+        {
+            if (WantsAcrylicCapture)
+            {
+                if (!captureAcquired && acrylicCaptureRegistrar != null)
+                {
+                    acrylicCaptureRegistrar.AcquireCapture();
+                    captureAcquired = true;
+                }
+
+                acrylicBackdrop.EffectEnabled = captureAcquired;
+            }
+            else
+            {
+                acrylicBackdrop.EffectEnabled = false;
+
+                if (captureAcquired && acrylicCaptureRegistrar != null)
+                {
+                    acrylicCaptureRegistrar.ReleaseCapture();
+                    captureAcquired = false;
+                }
+            }
         }
 
         protected override void Update()
@@ -116,21 +142,17 @@ namespace osu.Game.EzOsuGame.HUD
             base.CornerRadius = CornerRadius.Value * Math.Min(DrawWidth, DrawHeight);
         }
 
-        private void updateBlurState()
-        {
-            backdropBlur.EffectEnabled = BlurEnabled.Value
-                                         && BlurStrength.Value > 0
-                                         && backdropCaptureSourceProvider != null;
-        }
-
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing)
             {
-                backdropBlur.EffectEnabled = false;
-                backdropBlur.CaptureSourceProvider = null;
-                backdropBlur.CaptureTarget = null;
-                backdropBlur.CaptureTargets.Clear();
+                acrylicBackdrop.EffectEnabled = false;
+
+                if (captureAcquired && acrylicCaptureRegistrar != null)
+                {
+                    acrylicCaptureRegistrar.ReleaseCapture();
+                    captureAcquired = false;
+                }
             }
 
             base.Dispose(isDisposing);
