@@ -38,47 +38,44 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                 RelativeSizeAxes = Axes.Both,
                 Child = new FillFlowContainer
                 {
-                    RelativeSizeAxes = Axes.Y,
-                    AutoSizeAxes = Axes.X,
+                    RelativeSizeAxes = Axes.Both,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Direction = FillDirection.Horizontal,
-                    Spacing = new Vector2(15, 0),
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(0, 10),
                     Padding = new MarginPadding(10),
                     Children = new[]
                     {
-                        createColumn(skin, useTransformed: false, "Before"),
-                        createColumn(skin, useTransformed: true, "After"),
+                        createPreviewRow(skin, "Note", isHold: false),
+                        createPreviewRow(skin, "LN", isHold: true),
                     }
                 }
             };
         }
 
-        private SkinProvidingContainer createColumn(ISkin skin, bool useTransformed, string label)
+        private Drawable createPreviewRow(ISkin skin, string label, bool isHold)
         {
-            var skinToProvide = useTransformed ? createTransformedSkin(skin) : skin;
-            var hold = new HoldNote { StartTime = 0, Duration = 500, Column = 0 };
-            hold.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
+            var transformedSkin = createTransformedSkin(skin);
 
-            return new SkinProvidingContainer(skinToProvide)
+            ManiaHitObject hitObject = isHold
+                ? new HoldNote { StartTime = 0, Duration = 500, Column = 0 }
+                : new Note { StartTime = 0, Column = 0 };
+
+            hitObject.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
+
+            DrawableHitObject drawable = isHold
+                ? new DrawableHoldNote((HoldNote)hitObject)
+                : new DrawableNote((Note)hitObject);
+
+            return new SkinProvidingContainer(transformedSkin)
             {
-                RelativeSizeAxes = Axes.Y,
-                Width = preview_column_width + 10,
-                Child = new Container
+                RelativeSizeAxes = Axes.X,
+                Height = 260,
+                Child = new PreviewDependencyContainer(preview_key_count, 0, ManiaAction.Key1)
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Children = new Drawable[]
+                    Child = new EzNoteContainer(ScrollingDirection.Down, label)
                     {
-                        new PreviewDependencyContainer(preview_key_count, 0, ManiaAction.Key1)
-                        {
-                            Child = new EzNoteContainer(ScrollingDirection.Down, label)
-                            {
-                                Child = new DrawableHoldNote(hold)
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                }
-                            }
-                        },
+                        Child = drawable,
                     }
                 }
             };

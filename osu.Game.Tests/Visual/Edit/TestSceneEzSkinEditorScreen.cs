@@ -1,27 +1,46 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Allocation;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Platform;
 using osu.Framework.Testing;
-using osu.Game.Graphics.Sprites;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Overlays.Dialog;
 using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Screens.Edit.Components.Menus;
+using osu.Game.Skinning;
+using osuTK.Input;
 
 namespace osu.Game.Tests.Visual.Edit
 {
     public partial class TestSceneEzSkinEditorScreen : ScreenTestScene
     {
+        [Resolved]
+        private SkinManager skinManager { get; set; } = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
+        private Storage storage { get; set; } = null!;
+
         private EzSkinEditorScreen editorScreen = null!;
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
             Ruleset.Value = new ManiaRuleset().RulesetInfo;
+            SkinEditorProviderRegistry.Register(3, () => new EzSkinLNEditorProvider());
         }
 
         protected override void BackButtonPressed()
@@ -46,6 +65,9 @@ namespace osu.Game.Tests.Visual.Edit
 
         private void switchScene(EzSkinEditorSceneType scene) =>
             AddStep($"switch to {scene}", () => editorScreen.CurrentScene.Value = scene);
+
+        private void ensureMutableSkin() =>
+            AddStep("ensure mutable skin", () => skinManager.EnsureMutableSkin());
 
         [Test]
         public void TestLayoutShell()
@@ -81,23 +103,27 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
-        public void TestSizeSceneGroups()
+        public void TestSizeSceneComparisonDrawables()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
+            AddAssert("mania preview provider registered", () => SkinEditorProviderRegistry.Get(3) != null);
             switchScene(EzSkinEditorSceneType.Size);
 
+            AddUntilStep("comparison grid visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Single().ChildrenOfType<GridContainer>().Any());
             AddUntilStep("at least one sidebar group", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
-            AddUntilStep("comparison area visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString().Contains("对比区")));
+            AddAssert("no comparison placeholder", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("对比区") != true));
+            AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("Comparison preview not supported") != true));
+            AddUntilStep("static note label visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "Note"));
+            AddUntilStep("static ln label visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "LN"));
             AddUntilStep("playback and comparison are horizontal", () =>
             {
                 var preview = editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().SingleOrDefault();
-                var comparisonText = editorScreen.ChildrenOfType<OsuSpriteText>()
-                                                 .SingleOrDefault(t => t.Text.ToString().Contains("对比区"));
+                var comparisonLabel = editorScreen.ChildrenOfType<OsuSpriteText>().FirstOrDefault(t => t.Text.ToString() == "LN");
 
                 return preview != null
-                       && comparisonText != null
-                       && comparisonText.ScreenSpaceDrawQuad.Centre.X > preview.ScreenSpaceDrawQuad.Centre.X;
+                       && comparisonLabel != null
+                       && comparisonLabel.ScreenSpaceDrawQuad.Centre.X > preview.ScreenSpaceDrawQuad.Centre.X;
             });
         }
 
@@ -120,6 +146,101 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddUntilStep("playback only host", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
             AddUntilStep("save footer button", () => editorScreen.ChildrenOfType<OsuButton>().Any(b => b.Text.ToString() == "保存 Skin.ini"));
+        }
+
+        [Test]
+        public void TestApplySavesEzConfig()
+        {
+            const double target_alpha = 0.42;
+
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddStep("change hit target alpha", () => ezConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha).Value = target_alpha);
+            AddStep("apply settings", () => editorScreen.ApplySettings());
+
+            AddAssert("bindable retained", () => ezConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha).Value, () => Is.EqualTo(target_alpha));
+            AddAssert("EzSkinSettings.ini written", () => storage.Exists("EzSkinSettings.ini"));
+        }
+
+        [Test]
+        public void TestSkinIniSessionLoadSave()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.SkinIni);
+
+            AddUntilStep("session loaded", () => editorScreen.SkinIniSession != null);
+
+            string savedText = null!;
+            string dirtyText = null!;
+
+            AddStep("capture saved text", () =>
+            {
+                savedText = editorScreen.SkinIniSession!.SavedText;
+                dirtyText = savedText + "\n; m2 test marker";
+            });
+
+            AddStep("set dirty draft", () => editorScreen.SkinIniSession!.SetDraftText(dirtyText));
+            AddAssert("session dirty", () => editorScreen.SkinIniSession!.IsDirty);
+
+            AddStep("discard draft", () => editorScreen.SkinIniSession!.Discard());
+            AddAssert("session clean after discard", () => !editorScreen.SkinIniSession!.IsDirty);
+            AddAssert("draft restored", () => editorScreen.SkinIniSession!.DraftText, () => Is.EqualTo(savedText));
+
+            ensureMutableSkin();
+            AddUntilStep("session reloaded for mutable skin", () => editorScreen.SkinIniSession!.SkinId == skinManager.CurrentSkinInfo.Value.ID);
+
+            AddStep("set dirty draft again", () => editorScreen.SkinIniSession!.SetDraftText(dirtyText));
+            AddStep("commit draft", () => editorScreen.SkinIniSession!.Commit());
+            AddAssert("session clean after commit", () => !editorScreen.SkinIniSession!.IsDirty);
+            AddAssert("saved text updated", () => editorScreen.SkinIniSession!.SavedText, () => Is.EqualTo(dirtyText));
+        }
+
+        [Test]
+        public void TestSkinIniSessionPerSkin()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.SkinIni);
+
+            AddUntilStep("session loaded", () => editorScreen.SkinIniSession != null);
+
+            System.Guid originalSkinId = Guid.Empty;
+
+            AddStep("capture skin id and dirty draft", () =>
+            {
+                originalSkinId = editorScreen.SkinIniSession!.SkinId;
+                editorScreen.SkinIniSession.SetDraftText(editorScreen.SkinIniSession.SavedText + "\n; per-skin leak test");
+            });
+
+            AddStep("switch skin", () => skinManager.SetSkinFromConfiguration(SkinInfo.TRIANGLES_SKIN.ToString()));
+            AddUntilStep("session bound to new skin", () => editorScreen.SkinIniSession!.SkinId != originalSkinId);
+            AddAssert("draft not dirty after switch", () => !editorScreen.SkinIniSession!.IsDirty);
+            AddAssert("draft matches saved for new skin", () => editorScreen.SkinIniSession!.DraftText == editorScreen.SkinIniSession!.SavedText);
+        }
+
+        [Test]
+        public void TestExitDialogSkinIniDirty()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.SkinIni);
+
+            AddUntilStep("session loaded", () => editorScreen.SkinIniSession != null);
+
+            AddStep("set dirty draft", () => editorScreen.SkinIniSession!.SetDraftText(editorScreen.SkinIniSession.SavedText + "\n; exit test"));
+            AddStep("show exit dialog", () => editorScreen.ShowExitDialog());
+            AddUntilStep("dialog visible", () => DialogOverlay.CurrentDialog is ConfirmDialog);
+
+            AddStep("discard via cancel", () =>
+            {
+                InputManager.MoveMouseTo(DialogOverlay.CurrentDialog!.ChildrenOfType<PopupDialogButton>().Last());
+                InputManager.Click(MouseButton.Left);
+            });
+
+            AddUntilStep("screen exited", () => Stack.CurrentScreen == null);
+            AddAssert("session clean after discard exit", () => !editorScreen.SkinIniSession!.IsDirty);
         }
 
         [Test]

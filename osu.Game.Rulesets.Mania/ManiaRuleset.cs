@@ -15,6 +15,7 @@ using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
+using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Configuration;
@@ -56,6 +57,12 @@ namespace osu.Game.Rulesets.Mania
 {
     public class ManiaRuleset : Ruleset, ILegacyRuleset
     {
+        static ManiaRuleset()
+        {
+            // Ensure Mania skin editor provider is registered when the ruleset assembly is used.
+            _ = typeof(EzSkinLNEditorProvider);
+        }
+
         /// <summary>
         /// The maximum number of supported keys in a single stage.
         /// </summary>

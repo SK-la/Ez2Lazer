@@ -2,11 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK.Graphics;
 
@@ -14,7 +11,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
     /// Hosts the virtual playback scene. With comparison enabled (size scene only),
-    /// playback is on the left and the before/after comparison placeholder is on the right.
+    /// playback is on the left and Note/LN static preview is on the right.
     /// </summary>
     public partial class EzSkinEditorPreviewHost : Container
     {
@@ -60,7 +57,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             };
 
             populatePlayback();
-            populateComparisonPlaceholder();
+            populateComparison();
         }
 
         private void populatePlayback()
@@ -86,24 +83,27 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
         }
 
-        private void populateComparisonPlaceholder()
+        private void populateComparison()
         {
-            comparisonContainer.Children = new Drawable[]
+            if (context.Provider != null)
             {
-                new Box
+                comparisonContainer.Child = context.Provider.CreateStaticPart(context.EditorSkin).With(d =>
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = Color4.Black.Opacity(0.35f),
-                },
-                new OsuSpriteText
+                    d.RelativeSizeAxes = Axes.Both;
+                    d.Anchor = Anchor.Centre;
+                    d.Origin = Anchor.Centre;
+                });
+            }
+            else
+            {
+                comparisonContainer.Child = new OsuSpriteText
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Text = "Note/LN 对比区（里程碑 2）",
-                    Font = OsuFont.Default.With(size: 18, weight: FontWeight.Bold),
+                    Text = "Comparison preview not supported",
                     Colour = Color4.White,
-                },
-            };
+                };
+            }
         }
     }
 }

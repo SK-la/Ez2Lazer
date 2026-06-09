@@ -15,6 +15,10 @@ namespace osu.Game.EzOsuGame.Edit
 
         public ISkin EditorSkin { get; init; } = null!;
 
+        public EzSkinIniSession? SkinIniSession { get; init; }
+
         public Action? RequestSceneRefresh { get; init; }
+
+        public Action? CommitSkinIni { get; init; }
     }
 }

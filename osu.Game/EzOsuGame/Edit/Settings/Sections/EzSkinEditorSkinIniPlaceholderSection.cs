@@ -30,7 +30,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 },
                 new OsuSpriteText
                 {
-                    Text = "里程碑 3：将在此显示 Skin.ini 各项设置。",
+                    Text = "编辑当前皮肤的 skin.ini（General + 规则集段）。M3 将在此提供完整表单；请使用底部按钮保存。",
                     Font = OsuFont.Default.With(size: 14),
                     Colour = Color4.Gray,
                 },
