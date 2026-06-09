@@ -20,8 +20,11 @@ namespace osu.Game.EzOsuGame.Edit
     {
         private readonly SkinManager skinManager;
         private readonly IResourceStore<byte[]> skinFiles;
+        private readonly EzSkinIniBackupService backupService;
 
         public Guid SkinId { get; private set; }
+
+        public string? LastBackupFilename { get; private set; }
 
         public string SavedText { get; private set; } = string.Empty;
 
@@ -33,6 +36,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             this.skinManager = skinManager;
             skinFiles = ((IStorageResourceProvider)skinManager).Files;
+            backupService = new EzSkinIniBackupService(skinManager);
         }
 
         public void LoadFromSkin(Live<SkinInfo> skinInfo)
@@ -44,6 +48,10 @@ namespace osu.Game.EzOsuGame.Edit
         }
 
         public void SetDraftText(string text) => DraftText = text;
+
+        public EzSkinIniDocument ParseDraftDocument() => EzSkinIniDocument.Parse(DraftText);
+
+        public void ApplyDocument(EzSkinIniDocument document) => DraftText = document.Serialize();
 
         public void Discard() => DraftText = SavedText;
 
@@ -57,7 +65,11 @@ namespace osu.Game.EzOsuGame.Edit
             if (live.ID != SkinId)
                 throw new InvalidOperationException("Cannot commit skin.ini for a skin that is no longer current.");
 
-            live.PerformWrite(skin => writeSkinIniText(skin, DraftText));
+            live.PerformWrite(skin =>
+            {
+                LastBackupFilename = backupService.BackupCurrentSkinIni(skin, SavedText);
+                writeSkinIniText(skin, DraftText);
+            });
             skinManager.CurrentSkinInfo.TriggerChange();
             SavedText = DraftText;
             return true;
