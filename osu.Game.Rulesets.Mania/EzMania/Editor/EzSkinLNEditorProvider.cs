@@ -33,16 +33,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
         static EzSkinLNEditorProvider()
         {
-            // Register this provider for the Mania ruleset in the global registry.
-            try
-            {
-                int rulesetId = new ManiaRuleset().RulesetInfo.OnlineID;
-                SkinEditorProviderRegistry.Register(rulesetId, () => new EzSkinLNEditorProvider());
-            }
-            catch
-            {
-                // swallow - registration is best-effort (assembly load ordering may vary)
-            }
+            // Mania ruleset online ID is stable across osu! releases.
+            SkinEditorProviderRegistry.Register(3, () => new EzSkinLNEditorProvider());
         }
 
         protected sealed class PreviewScrollingInfo : IScrollingInfo

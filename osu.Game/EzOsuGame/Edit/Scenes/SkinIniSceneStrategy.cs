@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -33,16 +34,16 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
             };
 
         public Drawable CreateSidebarFooter(EzSkinEditorSceneContext context) =>
-            new SkinIniSaveFooter(context);
+            new SkinIniSaveFooter(context.CommitSkinIni);
     }
 
     internal partial class SkinIniSaveFooter : Container
     {
-        private readonly EzSkinEditorSceneContext context;
+        private readonly Action? commitSkinIni;
 
-        public SkinIniSaveFooter(EzSkinEditorSceneContext context)
+        public SkinIniSaveFooter(Action? commitSkinIni)
         {
-            this.context = context;
+            this.commitSkinIni = commitSkinIni;
             RelativeSizeAxes = Axes.X;
             Height = 40;
         }
@@ -55,7 +56,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
                 Text = "保存 Skin.ini",
                 RelativeSizeAxes = Axes.X,
                 Height = 40,
-                Action = () => context.RequestSceneRefresh?.Invoke(),
+                Action = () => commitSkinIni?.Invoke(),
             };
         }
 

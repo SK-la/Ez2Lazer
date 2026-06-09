@@ -7,6 +7,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
+using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -37,6 +39,9 @@ namespace osu.Game.EzOsuGame.Edit
         [Resolved]
         private SkinManager skinManager { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
+
         [Resolved(canBeNull: true)]
         private IDialogOverlay? dialogOverlay { get; set; }
 
@@ -51,6 +56,11 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorSceneContext? sceneContext;
 
         public Bindable<EzSkinEditorSceneType> CurrentScene => sceneBar.CurrentScene;
+
+        /// <summary>
+        /// Per-skin skin.ini session. Skin-layer only.
+        /// </summary>
+        public EzSkinIniSession? SkinIniSession { get; private set; }
 
         public EzSkinEditorScreen()
         {
@@ -162,10 +172,13 @@ namespace osu.Game.EzOsuGame.Edit
         {
             base.LoadComplete();
             sceneBar.CurrentScene.BindValueChanged(_ => Schedule(applyCurrentScene), true);
+            skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             updateHeaderText();
         }
 
         public void PopulateSettings() => refreshScene();
+
+        public void ApplySettings() => applySettings();
 
         private void refreshScene()
         {
@@ -173,23 +186,29 @@ namespace osu.Game.EzOsuGame.Edit
             backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
 
             updateHeaderText();
+            ensureSkinIniSession();
 
+            sceneContext = buildSceneContext();
+            applyCurrentScene();
+        }
+
+        private EzSkinEditorSceneContext buildSceneContext()
+        {
             provider = SkinEditorProviderResolver.Resolve(Beatmap.Value?.Beatmap);
 
-            sceneContext = new EzSkinEditorSceneContext
+            return new EzSkinEditorSceneContext
             {
                 Provider = provider,
                 EditorSkin = getEditorSkin(),
+                SkinIniSession = SkinIniSession,
                 RequestSceneRefresh = refreshScene,
+                CommitSkinIni = commitSkinIni,
             };
-
-            applyCurrentScene();
         }
 
         private void applyCurrentScene()
         {
-            if (sceneContext == null)
-                return;
+            sceneContext = buildSceneContext();
 
             var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
             sceneContentHost.Child = strategy.CreateSceneContent(sceneContext);
@@ -198,8 +217,52 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void applySettings()
         {
-            // Milestone 2: commit draft to config and refresh preview.
-            applyCurrentScene();
+            ezSkinConfig.Save();
+
+            if (SkinIniSession?.IsDirty == true)
+                SkinIniSession.Commit();
+
+            refreshScene();
+        }
+
+        private void commitSkinIni()
+        {
+            if (SkinIniSession?.IsDirty != true)
+                return;
+
+            SkinIniSession.Commit();
+            refreshScene();
+        }
+
+        private void ensureSkinIniSession()
+        {
+            var currentSkin = skinManager.CurrentSkinInfo.Value;
+            Guid currentSkinId = currentSkin.ID;
+
+            SkinIniSession ??= new EzSkinIniSession(skinManager);
+
+            if (SkinIniSession.SkinId == currentSkinId)
+                return;
+
+            if (SkinIniSession.IsDirty)
+                SkinIniSession.Discard();
+
+            SkinIniSession.LoadFromSkin(currentSkin);
+        }
+
+        private void onCurrentSkinInfoChanged(ValueChangedEvent<Live<SkinInfo>> skin)
+        {
+            if (SkinIniSession == null)
+                return;
+
+            if (SkinIniSession.SkinId == skin.NewValue.ID)
+                return;
+
+            if (SkinIniSession.IsDirty)
+                SkinIniSession.Discard();
+
+            SkinIniSession.LoadFromSkin(skin.NewValue);
+            Schedule(refreshScene);
         }
 
         private ISkin getEditorSkin()
@@ -239,6 +302,12 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
+            if (SkinIniSession?.IsDirty != true)
+            {
+                this.Exit();
+                return;
+            }
+
             dialogOverlay.Push(new ConfirmDialog("应用更改到皮肤？", () =>
             {
                 applySettings();
@@ -247,6 +316,8 @@ namespace osu.Game.EzOsuGame.Edit
                     this.Exit();
             }, () =>
             {
+                SkinIniSession?.Discard();
+
                 if (this.IsCurrentScreen())
                     this.Exit();
             }));
