@@ -4,83 +4,53 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Graphics;
+using osu.Framework.Input.Events;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Overlays;
-using osuTK;
+using osu.Game.Screens.Edit.Components;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
-    public partial class EzSkinEditorCollapsibleSection : Container
+    /// <summary>
+    /// Sidebar group using <see cref="EditorSidebarSection"/> styling with optional collapse.
+    /// </summary>
+    public partial class EzSkinEditorCollapsibleSection : EditorSidebarSection
     {
         private readonly EzSkinEditorSidebarGroupDefinition definition;
-        private Container contentContainer = null!;
         private bool expanded;
 
         public EzSkinEditorCollapsibleSection(EzSkinEditorSidebarGroupDefinition definition)
+            : base(definition.Title)
         {
             this.definition = definition;
             expanded = definition.ExpandedByDefault;
-
-            RelativeSizeAxes = Axes.X;
-            AutoSizeAxes = Axes.Y;
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colourProvider)
+        private void load()
         {
-            InternalChild = new FillFlowContainer
-            {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Spacing = new Vector2(4),
-                Children = new Drawable[]
-                {
-                    new SectionHeaderButton(definition.Title.ToString(), () => setExpanded(!expanded)),
-                    contentContainer = new Container
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Padding = new MarginPadding { Left = 5, Right = 5, Bottom = 8 },
-                        Child = definition.CreateContent(),
-                    },
-                },
-            };
-
+            Content.Child = definition.CreateContent();
             applyExpandedState();
         }
 
-        private void setExpanded(bool value)
+        protected override bool OnClick(ClickEvent e)
         {
-            expanded = value;
-            applyExpandedState();
+            // Toggle when clicking the section header area (top portion).
+            if (e.ScreenSpaceMousePosition.Y < ScreenSpaceDrawQuad.TopLeft.Y + 40)
+            {
+                expanded = !expanded;
+                applyExpandedState();
+                return true;
+            }
+
+            return base.OnClick(e);
         }
 
         private void applyExpandedState()
         {
             if (expanded)
-                contentContainer.Show();
+                Content.Show();
             else
-                contentContainer.Hide();
-        }
-
-        private partial class SectionHeaderButton : OsuButton
-        {
-            public SectionHeaderButton(string title, System.Action action)
-            {
-                RelativeSizeAxes = Axes.X;
-                Height = 28;
-                Action = action;
-                Text = title;
-            }
-
-            [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider colourProvider, OsuColour colours)
-            {
-                BackgroundColour = colourProvider.Background4;
-                Content.CornerRadius = 4;
-            }
+                Content.Hide();
         }
     }
 }

@@ -10,7 +10,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
-using osu.Game.Graphics.UserInterface;
+using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
 using osuTK;
@@ -20,6 +21,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
     public partial class EzSkinEditorSceneBar : CompositeDrawable
     {
         public const float HEIGHT = SkinEditorSceneLibrary.HEIGHT;
+
+        private const float padding = 10;
 
         public Bindable<EzSkinEditorSceneType> CurrentScene { get; } = new Bindable<EzSkinEditorSceneType>(EzSkinEditorSceneType.Appearance);
 
@@ -32,27 +35,34 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colourProvider)
+        private void load(OverlayColourProvider overlayColourProvider)
         {
             InternalChildren = new Drawable[]
             {
                 new Box
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = colourProvider.Background6,
+                    Colour = overlayColourProvider.Background6,
                 },
-                new FillFlowContainer
+                new OsuScrollContainer(Direction.Horizontal)
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Direction = FillDirection.Horizontal,
-                    Spacing = new Vector2(10),
-                    Padding = new MarginPadding(10),
-                    Children = EzSkinEditorSceneRegistry.All.Select(strategy =>
+                    Child = new FillFlowContainer
                     {
-                        var button = new SceneTabButton(strategy.SceneType, strategy.TabTitle.ToString(), () => CurrentScene.Value = strategy.SceneType);
-                        tabButtons[strategy.SceneType] = button;
-                        return button;
-                    }).ToArray(),
+                        Name = @"Ez scene library",
+                        AutoSizeAxes = Axes.X,
+                        RelativeSizeAxes = Axes.Y,
+                        Spacing = new Vector2(padding),
+                        Padding = new MarginPadding(padding),
+                        Direction = FillDirection.Horizontal,
+                        Children = buildSceneButtons().Prepend(new OsuSpriteText
+                        {
+                            Text = "场景",
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Margin = new MarginPadding(10),
+                        }).ToArray(),
+                    },
                 },
             };
         }
@@ -63,13 +73,21 @@ namespace osu.Game.EzOsuGame.Edit.Components
             CurrentScene.BindValueChanged(e => updateActiveTab(e.NewValue), true);
         }
 
+        private IEnumerable<Drawable> buildSceneButtons() =>
+            EzSkinEditorSceneRegistry.All.Select(strategy =>
+            {
+                var button = new SceneTabButton(strategy.SceneType, strategy.TabTitle.ToString(), () => CurrentScene.Value = strategy.SceneType);
+                tabButtons[strategy.SceneType] = button;
+                return button;
+            });
+
         private void updateActiveTab(EzSkinEditorSceneType scene)
         {
             foreach (var (sceneType, button) in tabButtons)
                 button.Active = sceneType == scene;
         }
 
-        private partial class SceneTabButton : OsuButton
+        private partial class SceneTabButton : SkinEditorSceneLibrary.SceneButton
         {
             public EzSkinEditorSceneType SceneType { get; }
 
@@ -87,28 +105,28 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
 
             private OsuColour colours = null!;
+            private OverlayColourProvider? colourProvider;
 
             public SceneTabButton(EzSkinEditorSceneType sceneType, string text, Action action)
             {
                 SceneType = sceneType;
                 Text = text;
                 Action = action;
-                Width = 100;
-                Height = SkinEditorSceneLibrary.BUTTON_HEIGHT;
             }
 
             [BackgroundDependencyLoader]
             private void load(OsuColour colours, OverlayColourProvider? overlayColourProvider)
             {
                 this.colours = colours;
-                BackgroundColour = overlayColourProvider?.Background3 ?? colours.Blue3;
-                Content.CornerRadius = 5;
+                this.colourProvider = overlayColourProvider;
                 updateColours();
             }
 
             private void updateColours()
             {
-                BackgroundColour = active ? colours.YellowDark : colours.Blue3;
+                BackgroundColour = active
+                    ? colours.YellowDark
+                    : colourProvider?.Background3 ?? colours.Blue3;
             }
         }
     }

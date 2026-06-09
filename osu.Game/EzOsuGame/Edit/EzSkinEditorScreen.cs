@@ -8,8 +8,10 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.Graphics.Cursor;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Screens;
 using osu.Game.Skinning;
 
@@ -79,33 +81,60 @@ namespace osu.Game.EzOsuGame.Edit
             InternalChildren = new Drawable[]
             {
                 backgroundContainer = new Container { RelativeSizeAxes = Axes.Both },
-                new GridContainer
+                new OsuContextMenuContainer
                 {
                     RelativeSizeAxes = Axes.Both,
-                    RowDimensions = new[]
+                    Child = new GridContainer
                     {
-                        new Dimension(GridSizeMode.Absolute, EzSkinEditorMenuBar.HEIGHT),
-                        new Dimension(GridSizeMode.Absolute, EzSkinEditorSceneBar.HEIGHT),
-                        new Dimension(),
-                    },
-                    Content = new[]
-                    {
-                        new Drawable[] { menuBar = new EzSkinEditorMenuBar { ApplyAction = applySettings } },
-                        new Drawable[] { sceneBar = new EzSkinEditorSceneBar() },
-                        new Drawable[]
+                        RelativeSizeAxes = Axes.Both,
+                        RowDimensions = new[]
                         {
-                            new GridContainer
+                            new Dimension(GridSizeMode.AutoSize),
+                            new Dimension(GridSizeMode.AutoSize),
+                            new Dimension(),
+                        },
+                        Content = new[]
+                        {
+                            new Drawable[]
                             {
-                                RelativeSizeAxes = Axes.Both,
-                                ColumnDimensions = new[]
+                                new Container
                                 {
-                                    new Dimension(),
-                                    new Dimension(GridSizeMode.AutoSize),
+                                    Name = @"Menu container",
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = SkinEditor.MENU_HEIGHT,
+                                    Child = menuBar = new EzSkinEditorMenuBar
+                                    {
+                                        RelativeSizeAxes = Axes.Both,
+                                        ApplyAction = applySettings,
+                                        ExitAction = tryExit,
+                                    },
                                 },
-                                Content = new[]
+                            },
+                            new Drawable[]
+                            {
+                                sceneBar = new EzSkinEditorSceneBar
                                 {
-                                    new Drawable[] { sceneContentHost = new Container { RelativeSizeAxes = Axes.Both } },
-                                    new Drawable[] { sidebar = new EzSkinEditorSidebar() },
+                                    RelativeSizeAxes = Axes.X,
+                                },
+                            },
+                            new Drawable[]
+                            {
+                                new GridContainer
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    ColumnDimensions = new[]
+                                    {
+                                        new Dimension(),
+                                        new Dimension(GridSizeMode.AutoSize),
+                                    },
+                                    Content = new[]
+                                    {
+                                        new Drawable[]
+                                        {
+                                            sceneContentHost = new Container { RelativeSizeAxes = Axes.Both },
+                                            sidebar = new EzSkinEditorSidebar(),
+                                        },
+                                    },
                                 },
                             },
                         },
@@ -164,8 +193,17 @@ namespace osu.Game.EzOsuGame.Edit
                 : new EzStyleProSkin(skinManager);
         }
 
+        private void tryExit()
+        {
+            if (this.IsCurrentScreen())
+                ShowExitDialog();
+        }
+
         public void ShowExitDialog()
         {
+            if (!this.IsCurrentScreen())
+                return;
+
             if (dialogOverlay == null)
             {
                 this.Exit();
@@ -175,8 +213,14 @@ namespace osu.Game.EzOsuGame.Edit
             dialogOverlay.Push(new ConfirmDialog("应用更改到皮肤？", () =>
             {
                 applySettings();
-                this.Exit();
-            }, this.Exit));
+
+                if (this.IsCurrentScreen())
+                    this.Exit();
+            }, () =>
+            {
+                if (this.IsCurrentScreen())
+                    this.Exit();
+            }));
         }
 
         public void PresentGameplay()

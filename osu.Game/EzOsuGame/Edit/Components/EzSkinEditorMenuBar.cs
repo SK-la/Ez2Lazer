@@ -5,11 +5,11 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
-using osu.Game.Graphics;
+using osu.Framework.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Overlays;
+using osu.Game.Localisation;
 using osu.Game.Overlays.SkinEditor;
+using osu.Game.Screens.Edit.Components.Menus;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
@@ -19,6 +19,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Action? ApplyAction { get; set; }
 
+        public Action? ExitAction { get; set; }
+
         public EzSkinEditorMenuBar()
         {
             RelativeSizeAxes = Axes.X;
@@ -26,36 +28,26 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colourProvider, OsuColour colours)
+        private void load()
         {
-            InternalChildren = new Drawable[]
+            Child = new EditorMenuBar
             {
-                new Box
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                RelativeSizeAxes = Axes.Both,
+                Items = new[]
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = colourProvider.Background6,
-                },
-                new MenuBarButton
-                {
-                    Text = "应用",
-                    X = 10,
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                    Action = () => ApplyAction?.Invoke(),
+                    new MenuItem(CommonStrings.MenuBarFile)
+                    {
+                        Items = new OsuMenuItem[]
+                        {
+                            new EditorMenuItem("应用", MenuItemType.Standard, () => ApplyAction?.Invoke()),
+                            new OsuMenuItemSpacer(),
+                            new EditorMenuItem(CommonStrings.Exit, MenuItemType.Standard, () => ExitAction?.Invoke()),
+                        },
+                    },
                 },
             };
-        }
-
-        private partial class MenuBarButton : OsuButton
-        {
-            [BackgroundDependencyLoader]
-            private void load(OsuColour colours)
-            {
-                BackgroundColour = colours.Blue3;
-                Content.CornerRadius = 4;
-                Width = 80;
-                Height = 28;
-            }
         }
     }
 }

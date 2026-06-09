@@ -9,6 +9,7 @@ using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.Mania;
+using osu.Game.Screens.Edit.Components.Menus;
 
 namespace osu.Game.Tests.Visual.Edit
 {
@@ -22,10 +23,25 @@ namespace osu.Game.Tests.Visual.Edit
             Ruleset.Value = new ManiaRuleset().RulesetInfo;
         }
 
+        protected override void BackButtonPressed()
+        {
+            if (Stack.CurrentScreen is EzSkinEditorScreen ezScreen)
+            {
+                ezScreen.ShowExitDialog();
+                return;
+            }
+
+            if (Stack.CurrentScreen != null)
+                Stack.Exit();
+        }
+
         private void loadScreen()
         {
             LoadScreen(editorScreen = new EzSkinEditorScreen());
         }
+
+        private void waitForScreenLoaded() =>
+            AddUntilStep("wait for screen load", () => editorScreen.IsLoaded);
 
         private void switchScene(EzSkinEditorSceneType scene) =>
             AddStep($"switch to {scene}", () => editorScreen.CurrentScene.Value = scene);
@@ -34,17 +50,28 @@ namespace osu.Game.Tests.Visual.Edit
         public void TestLayoutShell()
         {
             AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
 
-            AddUntilStep("menu bar visible", () => editorScreen.ChildrenOfType<EzSkinEditorMenuBar>().Any());
+            AddUntilStep("menu bar visible", () => editorScreen.ChildrenOfType<EditorMenuBar>().Any());
             AddUntilStep("scene bar visible", () => editorScreen.ChildrenOfType<EzSkinEditorSceneBar>().Any());
             AddUntilStep("sidebar visible", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Any());
             AddUntilStep("preview host visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
+            AddUntilStep("scene and sidebar are horizontal", () =>
+            {
+                var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().SingleOrDefault();
+                var preview = editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().SingleOrDefault();
+
+                return sidebar != null && preview != null
+                       && sidebar.ScreenSpaceDrawQuad.Width > 0
+                       && sidebar.ScreenSpaceDrawQuad.TopLeft.X > preview.ScreenSpaceDrawQuad.TopLeft.X;
+            });
         }
 
         [Test]
         public void TestAppearanceSceneGroups()
         {
             AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Appearance);
 
             AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorCollapsibleSection>().Count() == 2);
@@ -55,6 +82,7 @@ namespace osu.Game.Tests.Visual.Edit
         public void TestSizeSceneGroups()
         {
             AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Size);
 
             AddUntilStep("at least one sidebar group", () => editorScreen.ChildrenOfType<EzSkinEditorCollapsibleSection>().Any());
@@ -64,6 +92,7 @@ namespace osu.Game.Tests.Visual.Edit
         public void TestColourSceneGroups()
         {
             AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Colour);
 
             AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorCollapsibleSection>().Count() == 2);
@@ -73,6 +102,7 @@ namespace osu.Game.Tests.Visual.Edit
         public void TestSkinIniScenePlaybackAndSaveFooter()
         {
             AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.SkinIni);
 
             AddUntilStep("playback only host", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
@@ -83,6 +113,7 @@ namespace osu.Game.Tests.Visual.Edit
         public void TestSidebarCollapse()
         {
             AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
 
             AddStep("collapse sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().ExpandedState.Value = false);
             AddAssert("sidebar contracted", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().DrawWidth <= EzSkinEditorSidebar.CONTRACTED_WIDTH + 1);

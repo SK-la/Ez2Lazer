@@ -5,27 +5,26 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
+using osu.Game.Screens.Edit.Components;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
+    /// <summary>
+    /// Right settings sidebar aligned with <see cref="EditorSidebar"/> layout.
+    /// </summary>
     public partial class EzSkinEditorSidebar : Container
     {
-        public const float EXPANDED_WIDTH = 250;
+        public const float EXPANDED_WIDTH = EditorSidebar.WIDTH;
         public const float CONTRACTED_WIDTH = 48;
 
         private readonly BindableBool pinned = new BindableBool(true);
 
-        private FillFlowContainer groupsFlow = null!;
+        private EzSkinEditorSidebarBody body = null!;
         private Container footerContainer = null!;
-        private Container sidebarContent = null!;
         private InputManager inputManager = null!;
 
         public IBindable<bool> Pinned => pinned;
@@ -39,62 +38,42 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colourProvider)
+        private void load()
         {
             InternalChildren = new Drawable[]
             {
-                new Box
+                body = new EzSkinEditorSidebarBody
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = colourProvider.Background5,
+                    Padding = new MarginPadding { Top = 70, Bottom = 55 },
                 },
-                sidebarContent = new Container
+                new FillFlowContainer
                 {
-                    RelativeSizeAxes = Axes.Both,
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Padding = new MarginPadding(EditorSidebar.PADDING),
+                    Spacing = new Vector2(4),
                     Children = new Drawable[]
                     {
-                        new OsuScrollContainer
+                        new SidebarChromeButton
                         {
-                            RelativeSizeAxes = Axes.Both,
-                            Padding = new MarginPadding { Top = 70, Bottom = 60 },
-                            Child = groupsFlow = new FillFlowContainer
-                            {
-                                RelativeSizeAxes = Axes.X,
-                                AutoSizeAxes = Axes.Y,
-                                Direction = FillDirection.Vertical,
-                                Spacing = new Vector2(6),
-                                Padding = new MarginPadding(5),
-                            },
+                            Text = "折叠",
+                            Action = () => ExpandedState.Value = !ExpandedState.Value,
                         },
-                        new FillFlowContainer
+                        new SettingsCheckbox
                         {
-                            RelativeSizeAxes = Axes.X,
-                            AutoSizeAxes = Axes.Y,
-                            Padding = new MarginPadding(5),
-                            Spacing = new Vector2(4),
-                            Children = new Drawable[]
-                            {
-                                new SidebarIconButton
-                                {
-                                    Text = "折叠",
-                                    Action = () => ExpandedState.Value = !ExpandedState.Value,
-                                },
-                                new SettingsCheckbox
-                                {
-                                    LabelText = "固定显示",
-                                    Current = pinned,
-                                },
-                            },
-                        },
-                        footerContainer = new Container
-                        {
-                            Anchor = Anchor.BottomLeft,
-                            Origin = Anchor.BottomLeft,
-                            RelativeSizeAxes = Axes.X,
-                            Height = 50,
-                            Padding = new MarginPadding(5),
+                            LabelText = "固定显示",
+                            Current = pinned,
                         },
                     },
+                },
+                footerContainer = new Container
+                {
+                    Anchor = Anchor.BottomLeft,
+                    Origin = Anchor.BottomLeft,
+                    RelativeSizeAxes = Axes.X,
+                    Height = 50,
+                    Padding = new MarginPadding(EditorSidebar.PADDING),
                 },
             };
         }
@@ -120,12 +99,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public void ApplyStrategy(IEzSkinEditorSceneStrategy strategy, EzSkinEditorSceneContext context)
         {
-            groupsFlow.Clear();
+            body.ApplyStrategy(strategy, context);
+
             footerContainer.Clear();
-
-            foreach (var group in strategy.CreateSidebarGroups(context))
-                groupsFlow.Add(new EzSkinEditorCollapsibleSection(group));
-
             var footer = strategy.CreateSidebarFooter(context);
 
             if (footer != null)
@@ -135,17 +111,29 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private void applyExpandedState(bool isExpanded)
         {
             Width = isExpanded ? EXPANDED_WIDTH : CONTRACTED_WIDTH;
-            sidebarContent.Alpha = isExpanded ? 1 : 0;
+            Alpha = isExpanded ? 1 : 0;
         }
 
-        private partial class SidebarIconButton : OsuButton
+        private partial class EzSkinEditorSidebarBody : EditorSidebar
+        {
+            public void ApplyStrategy(IEzSkinEditorSceneStrategy strategy, EzSkinEditorSceneContext context)
+            {
+                Content.Clear();
+
+                foreach (var group in strategy.CreateSidebarGroups(context))
+                    Content.Add(new EzSkinEditorCollapsibleSection(group));
+            }
+        }
+
+        private partial class SidebarChromeButton : OsuButton
         {
             [BackgroundDependencyLoader]
-            private void load(OsuColour colours)
+            private void load(osu.Game.Graphics.OsuColour colours)
             {
                 BackgroundColour = colours.Blue3;
                 Content.CornerRadius = 4;
                 Height = 28;
+                RelativeSizeAxes = Axes.X;
             }
         }
     }
