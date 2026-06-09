@@ -5,6 +5,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Testing;
+using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.Graphics.UserInterface;
@@ -62,8 +63,8 @@ namespace osu.Game.Tests.Visual.Edit
                 var preview = editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().SingleOrDefault();
 
                 return sidebar != null && preview != null
-                       && sidebar.ScreenSpaceDrawQuad.Width > 0
-                       && sidebar.ScreenSpaceDrawQuad.TopLeft.X > preview.ScreenSpaceDrawQuad.TopLeft.X;
+                                       && sidebar.ScreenSpaceDrawQuad.Width > 0
+                                       && sidebar.ScreenSpaceDrawQuad.TopLeft.X > preview.ScreenSpaceDrawQuad.TopLeft.X;
             });
         }
 
@@ -74,8 +75,9 @@ namespace osu.Game.Tests.Visual.Edit
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Appearance);
 
-            AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorCollapsibleSection>().Count() == 2);
+            AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
             AddAssert("texture group present", () => editorScreen.ChildrenOfType<Dropdown<string>>().Any());
+            AddAssert("no comparison placeholder", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("对比区") != true));
         }
 
         [Test]
@@ -85,7 +87,18 @@ namespace osu.Game.Tests.Visual.Edit
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Size);
 
-            AddUntilStep("at least one sidebar group", () => editorScreen.ChildrenOfType<EzSkinEditorCollapsibleSection>().Any());
+            AddUntilStep("at least one sidebar group", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
+            AddUntilStep("comparison area visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString().Contains("对比区")));
+            AddUntilStep("playback and comparison are horizontal", () =>
+            {
+                var preview = editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().SingleOrDefault();
+                var comparisonText = editorScreen.ChildrenOfType<OsuSpriteText>()
+                                                 .SingleOrDefault(t => t.Text.ToString().Contains("对比区"));
+
+                return preview != null
+                       && comparisonText != null
+                       && comparisonText.ScreenSpaceDrawQuad.Centre.X > preview.ScreenSpaceDrawQuad.Centre.X;
+            });
         }
 
         [Test]
@@ -95,7 +108,7 @@ namespace osu.Game.Tests.Visual.Edit
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Colour);
 
-            AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorCollapsibleSection>().Count() == 2);
+            AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
         }
 
         [Test]
@@ -115,8 +128,9 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
 
+            AddStep("unpin sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().Pinned.Value = false);
             AddStep("collapse sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().ExpandedState.Value = false);
-            AddAssert("sidebar contracted", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().DrawWidth <= EzSkinEditorSidebar.CONTRACTED_WIDTH + 1);
+            AddUntilStep("sidebar contracted", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().DrawWidth <= EzSkinEditorSidebar.CONTRACTED_WIDTH + 1);
         }
     }
 }

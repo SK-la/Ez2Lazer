@@ -20,7 +20,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         public LocalisableString TabTitle => "skin.ini";
 
         public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
-            new EzSkinEditorPreviewHost(SceneType, context, playbackOnly: true);
+            new EzSkinEditorPreviewHost(context);
 
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) =>
             new[]

@@ -16,7 +16,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         public LocalisableString TabTitle => "外观";
 
         public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
-            new EzSkinEditorPreviewHost(SceneType, context);
+            new EzSkinEditorPreviewHost(context);
 
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) =>
             new[]

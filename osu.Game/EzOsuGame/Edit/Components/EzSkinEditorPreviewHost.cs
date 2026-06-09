@@ -13,29 +13,28 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Hosts virtual playback and comparison preview placeholders for appearance/size/colour scenes.
+    /// Hosts the virtual playback scene. With comparison enabled (size scene only),
+    /// playback is on the left and the before/after comparison placeholder is on the right.
     /// </summary>
     public partial class EzSkinEditorPreviewHost : Container
     {
-        private readonly EzSkinEditorSceneType sceneType;
         private readonly EzSkinEditorSceneContext context;
-        private readonly bool playbackOnly;
+        private readonly bool showComparison;
 
         private Container playbackContainer = null!;
         private Container comparisonContainer = null!;
 
-        public EzSkinEditorPreviewHost(EzSkinEditorSceneType sceneType, EzSkinEditorSceneContext context, bool playbackOnly = false)
+        public EzSkinEditorPreviewHost(EzSkinEditorSceneContext context, bool showComparison = false)
         {
-            this.sceneType = sceneType;
             this.context = context;
-            this.playbackOnly = playbackOnly;
+            this.showComparison = showComparison;
             RelativeSizeAxes = Axes.Both;
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
-            if (playbackOnly)
+            if (!showComparison)
             {
                 InternalChild = playbackContainer = new Container { RelativeSizeAxes = Axes.Both };
                 populatePlayback();
@@ -45,7 +44,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             InternalChild = new GridContainer
             {
                 RelativeSizeAxes = Axes.Both,
-                RowDimensions = new[]
+                ColumnDimensions = new[]
                 {
                     new Dimension(GridSizeMode.Relative, 0.55f),
                     new Dimension(GridSizeMode.Relative, 0.45f),
@@ -55,9 +54,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     new Drawable[]
                     {
                         playbackContainer = new Container { RelativeSizeAxes = Axes.Both },
-                    },
-                    new Drawable[]
-                    {
                         comparisonContainer = new Container { RelativeSizeAxes = Axes.Both },
                     },
                 },
@@ -103,7 +99,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Text = $"{sceneType} — Note/LN 对比区（里程碑 2）",
+                    Text = "Note/LN 对比区（里程碑 2）",
                     Font = OsuFont.Default.With(size: 18, weight: FontWeight.Bold),
                     Colour = Color4.White,
                 },

@@ -24,7 +24,7 @@ namespace osu.Game.EzOsuGame.Edit
     // M4: export, EzSkin.json, advanced colouring
 
     /// <summary>
-    /// Ez skin editor screen with menu bar, scene bar, scene content and collapsible settings sidebar.
+    /// Ez skin editor screen with menu bar, scene bar, scene content and toolbox-style settings sidebar.
     /// Scene switching is driven by <see cref="IEzSkinEditorSceneStrategy"/> — not by sidebar groups.
     /// </summary>
     public partial class EzSkinEditorScreen : OsuScreen
