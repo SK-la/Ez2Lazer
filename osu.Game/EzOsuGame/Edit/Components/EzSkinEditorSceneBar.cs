@@ -73,13 +73,23 @@ namespace osu.Game.EzOsuGame.Edit.Components
             CurrentScene.BindValueChanged(e => updateActiveTab(e.NewValue), true);
         }
 
-        private IEnumerable<Drawable> buildSceneButtons() =>
-            EzSkinEditorSceneRegistry.All.Select(strategy =>
-            {
-                var button = new SceneTabButton(strategy.SceneType, strategy.TabTitle.ToString(), () => CurrentScene.Value = strategy.SceneType);
-                tabButtons[strategy.SceneType] = button;
-                return button;
-            });
+        private IEnumerable<Drawable> buildSceneButtons() => EzSkinEditorSceneRegistry.All.Select(strategy =>
+        {
+            var button = new SceneTabButton(strategy.SceneType, strategy.TabTitle.ToString(), () => CurrentScene.Value = strategy.SceneType);
+            tabButtons[strategy.SceneType] = button;
+            return button;
+        });
+
+        public void SetSceneVisible(EzSkinEditorSceneType scene, bool visible)
+        {
+            if (!tabButtons.TryGetValue(scene, out var button))
+                return;
+
+            if (visible)
+                button.Show();
+            else
+                button.Hide();
+        }
 
         private void updateActiveTab(EzSkinEditorSceneType scene)
         {
@@ -118,7 +128,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             private void load(OsuColour colours, OverlayColourProvider? overlayColourProvider)
             {
                 this.colours = colours;
-                this.colourProvider = overlayColourProvider;
+                colourProvider = overlayColourProvider;
                 updateColours();
             }
 

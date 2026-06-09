@@ -171,9 +171,20 @@ namespace osu.Game.EzOsuGame.Edit
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            sceneBar.CurrentScene.BindValueChanged(_ => Schedule(applyCurrentScene), true);
+            sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             updateHeaderText();
+        }
+
+        private void onSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
+        {
+            if (change.NewValue == EzSkinEditorSceneType.SkinIni && !isSkinIniSupported())
+            {
+                sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
+                return;
+            }
+
+            Schedule(applyCurrentScene);
         }
 
         public void PopulateSettings() => refreshScene();
@@ -219,7 +230,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             ezSkinConfig.Save();
 
-            if (SkinIniSession?.IsDirty == true)
+            if (SkinIniSession is { IsSupported: true, IsDirty: true })
                 SkinIniSession.Commit();
 
             refreshScene();
@@ -227,18 +238,36 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void commitSkinIni()
         {
-            if (SkinIniSession?.IsDirty != true)
+            if (SkinIniSession is not { IsSupported: true, IsDirty: true })
                 return;
 
             SkinIniSession.Commit();
             refreshScene();
         }
 
+        private bool isSkinIniSupported() => EzSkinIniSupport.IsSupported(skinManager.CurrentSkinInfo.Value);
+
         private void ensureSkinIniSession()
         {
             var currentSkin = skinManager.CurrentSkinInfo.Value;
-            Guid currentSkinId = currentSkin.ID;
 
+            if (!isSkinIniSupported())
+            {
+                if (SkinIniSession?.IsDirty == true)
+                    SkinIniSession.Discard();
+
+                SkinIniSession = null;
+                sceneBar.SetSceneVisible(EzSkinEditorSceneType.SkinIni, false);
+
+                if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.SkinIni)
+                    sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
+
+                return;
+            }
+
+            sceneBar.SetSceneVisible(EzSkinEditorSceneType.SkinIni, true);
+
+            Guid currentSkinId = currentSkin.ID;
             SkinIniSession ??= new EzSkinIniSession(skinManager);
 
             if (SkinIniSession.SkinId == currentSkinId)
@@ -252,16 +281,6 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void onCurrentSkinInfoChanged(ValueChangedEvent<Live<SkinInfo>> skin)
         {
-            if (SkinIniSession == null)
-                return;
-
-            if (SkinIniSession.SkinId == skin.NewValue.ID)
-                return;
-
-            if (SkinIniSession.IsDirty)
-                SkinIniSession.Discard();
-
-            SkinIniSession.LoadFromSkin(skin.NewValue);
             Schedule(refreshScene);
         }
 
