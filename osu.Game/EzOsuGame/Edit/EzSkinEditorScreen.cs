@@ -2,83 +2,74 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Logging;
 using osu.Framework.Screens;
-using osu.Game.Beatmaps;
-using osu.Game.Configuration;
-using osu.Game.EzOsuGame.ScriptedSkin;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
-using osu.Game.Graphics.UserInterface;
+using osu.Game.Graphics.Cursor;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Screens;
 using osu.Game.Skinning;
-using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit
 {
-    //TODO: 重排布局，增加普通note的前后对比
-    // 1.游戏内完整Skin.ini编辑
-    // 2.实现完整Ez特有皮肤设置，并可覆写进Skin.ini
-    // 3.游戏内PS、图片导出(包括渐变动画)
-    // 4.设计原则 & 禁止：
-    // 4.1 多参数设置使用string?类型，mania的多列用","分隔符, 输入时自动替换到英文字符。
-    // 4.2 包裹导出方法，覆写前备份，所有皮肤源文件备份到皮肤文件夹SkinName/Backup/路径下。
-    // 4.3 禁止使用自定义的Skin.ini，使用系统自带的。
-    // 4.4 未来考虑在皮肤中增加EzSkin.json或ini，自定义映射不同的Skin{#}.ini
-    // 4.5 note编辑，等待着色功能，导出使用文件名模版，悬浮时提示note1优先用白色，可以提供按小节线染色功能。
-    // 4.6 这个场景中，未来可以考虑按谱面编辑器的皮肤面板绘制，然后在EzSkin.json中自定义各种颜色模版，小节线颜色，UI组件显示等。
+    // Milestone index — see EzSkinEditor refactor plan:
+    // M1: layout shell + scene strategies + sidebar groups
+    // M2: Saved/Draft session + Note/LN comparison preview
+    // M3: Skin.ini editor + backup + save footer
+    // M4: export, EzSkin.json, advanced colouring
 
     /// <summary>
-    /// Ez皮肤编辑界面，提供预览和参数调整功能。通过按钮打开，该场景应与GameplayScreen和SongSelect并列存在，以同样的形式进行切换。
-    /// <para>分为三个区域：</para>
-    /// 1.左侧, 虚拟播放场景（循环连续播放note下落，包含循环命中，和循环Miss）;
-    /// 2.中间, 当前皮肤note显示 vs 编辑中note显示对比（LN的Head, Body, Tail显示容器着色边框）;
-    /// 3.右侧, 设置面板, 放置相关设置，投皮面尾编辑一类。
+    /// Ez skin editor screen with menu bar, scene bar, scene content and toolbox-style settings sidebar.
+    /// Scene switching is driven by <see cref="IEzSkinEditorSceneStrategy"/> — not by sidebar groups.
     /// </summary>
     public partial class EzSkinEditorScreen : OsuScreen
     {
+        [Cached]
+        private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
+
         [Resolved]
         private SkinManager skinManager { get; set; } = null!;
 
-        // 必须这样，否则会构建失败
         [Resolved(canBeNull: true)]
         private IDialogOverlay? dialogOverlay { get; set; }
 
-        private ISkinEditorVirtualProvider? provider;
-
         private Container? backgroundContainer;
-        private Container? leftPlaybackContainer;
-        private Container? centerNoteDisplayContainer;
-        private OsuScrollContainer? settingsScrollContainer;
+        private Container sceneContentHost = null!;
+        private EzSkinEditorMenuBar menuBar = null!;
+        private EzSkinEditorSceneBar sceneBar = null!;
+        private EzSkinEditorSidebar sidebar = null!;
+        private OsuTextFlowContainer headerText = null!;
+
+        private ISkinEditorVirtualProvider? provider;
+        private EzSkinEditorSceneContext? sceneContext;
+
+        public Bindable<EzSkinEditorSceneType> CurrentScene => sceneBar.CurrentScene;
 
         public EzSkinEditorScreen()
         {
             RelativeSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
-
-            // AddLayout(drawSizeLayout = new LayoutValue(Invalidation.DrawSize));
         }
 
         public override void OnEntering(ScreenTransitionEvent e)
         {
             base.OnEntering(e);
-            Schedule(populateSettings);
+            Schedule(refreshScene);
             this.FadeInFromZero(200, Easing.OutQuint);
         }
 
         public override void OnResuming(ScreenTransitionEvent e)
         {
             base.OnResuming(e);
-            Schedule(populateSettings);
+            Schedule(refreshScene);
         }
 
         public override bool OnExiting(ScreenExitEvent e)
@@ -88,145 +79,181 @@ namespace osu.Game.EzOsuGame.Edit
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config, OsuColour colours)
+        private void load()
         {
             InternalChildren = new Drawable[]
             {
-                new Container
+                backgroundContainer = new Container { RelativeSizeAxes = Axes.Both },
+                new OsuContextMenuContainer
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Children = new Drawable[]
+                    Child = new GridContainer
                     {
-                        // Background plate (use the same skin component as mania stage background).
-                        backgroundContainer = new Container
+                        RelativeSizeAxes = Axes.Both,
+                        RowDimensions = new[]
                         {
-                            RelativeSizeAxes = Axes.Both,
+                            new Dimension(GridSizeMode.AutoSize),
+                            new Dimension(GridSizeMode.AutoSize),
+                            new Dimension(),
                         },
-                        new GridContainer
+                        Content = new[]
                         {
-                            RelativeSizeAxes = Axes.Both,
-                            Padding = new MarginPadding(10),
-                            ColumnDimensions = new[]
+                            new Drawable[]
                             {
-                                new Dimension(GridSizeMode.Relative, 0.3f),
-                                new Dimension(GridSizeMode.Relative, 0.4f),
-                                new Dimension(GridSizeMode.Relative, 0.3f),
-                            },
-                            RowDimensions = new[]
-                            {
-                                new Dimension(GridSizeMode.Relative, 1),
-                            },
-                            Content = new[]
-                            {
-                                new Drawable[]
+                                new Container
                                 {
-                                    // 左侧：虚拟播放场景
-                                    leftPlaybackContainer = new Container
+                                    Name = @"Menu container",
+                                    RelativeSizeAxes = Axes.X,
+                                    Depth = float.MinValue,
+                                    Height = SkinEditor.MENU_HEIGHT,
+                                    Children = new Drawable[]
                                     {
-                                        RelativeSizeAxes = Axes.Both,
-                                    },
-                                    // 中间：note 显示
-                                    centerNoteDisplayContainer = new Container
-                                    {
-                                        RelativeSizeAxes = Axes.Both,
-                                    },
-                                    // 右侧：设置面板
-                                    new Container
-                                    {
-                                        RelativeSizeAxes = Axes.Both,
-                                        Children = new Drawable[]
+                                        menuBar = new EzSkinEditorMenuBar
                                         {
-                                            settingsScrollContainer = new OsuScrollContainer
-                                            {
-                                                RelativeSizeAxes = Axes.Both,
-                                                Height = 0.9f, // 为应用按钮留出空间
-                                            },
-                                            new ApplySettingsButton
-                                            {
-                                                Text = "Apply Settings",
-                                                RelativeSizeAxes = Axes.X,
-                                                Height = 40,
-                                                Anchor = Anchor.BottomCentre,
-                                                Origin = Anchor.BottomCentre,
-                                                Action = applySettings,
-                                            }
-                                        }
+                                            ApplyAction = applySettings,
+                                            ExitAction = tryExit,
+                                        },
+                                        headerText = new OsuTextFlowContainer
+                                        {
+                                            TextAnchor = Anchor.TopRight,
+                                            Padding = new MarginPadding(5),
+                                            Anchor = Anchor.TopRight,
+                                            Origin = Anchor.TopRight,
+                                            AutoSizeAxes = Axes.X,
+                                            RelativeSizeAxes = Axes.Y,
+                                        },
                                     },
-                                }
-                            }
-                        }
-                    }
-                }
+                                },
+                            },
+                            new Drawable[]
+                            {
+                                sceneBar = new EzSkinEditorSceneBar
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                },
+                            },
+                            new Drawable[]
+                            {
+                                new GridContainer
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    ColumnDimensions = new[]
+                                    {
+                                        new Dimension(),
+                                        new Dimension(GridSizeMode.AutoSize),
+                                    },
+                                    Content = new[]
+                                    {
+                                        new Drawable[]
+                                        {
+                                            sceneContentHost = new Container { RelativeSizeAxes = Axes.Both },
+                                            sidebar = new EzSkinEditorSidebar(),
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
             };
         }
 
-        public void PopulateSettings() => populateSettings();
-
-        private void populateSettings()
+        protected override void LoadComplete()
         {
-            // 注意：这里不要创建 HitObjectComposer（会引入编辑器依赖）。
-            // 尽量确保 mania 程序集已加载，以便其在模块初始化时完成 provider 注册。
+            base.LoadComplete();
+            sceneBar.CurrentScene.BindValueChanged(_ => Schedule(applyCurrentScene), true);
+            updateHeaderText();
+        }
 
+        public void PopulateSettings() => refreshScene();
+
+        private void refreshScene()
+        {
             backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
             backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
 
-            provider = createProviderOrNull(Beatmap.Value?.Beatmap);
+            updateHeaderText();
 
-            // 当调用时初始化屏幕
-            initializeLeftPlayback();
-            initializeCenterDisplay();
-            initializeRightSettings();
+            provider = SkinEditorProviderResolver.Resolve(Beatmap.Value?.Beatmap);
+
+            sceneContext = new EzSkinEditorSceneContext
+            {
+                Provider = provider,
+                EditorSkin = getEditorSkin(),
+                RequestSceneRefresh = refreshScene,
+            };
+
+            applyCurrentScene();
         }
 
-        private static ISkinEditorVirtualProvider? createProviderOrNull(IBeatmap? beatmap)
+        private void applyCurrentScene()
         {
-            // Prefer a ruleset-registered provider when a beatmap is available.
-            try
+            if (sceneContext == null)
+                return;
+
+            var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
+            sceneContentHost.Child = strategy.CreateSceneContent(sceneContext);
+            sidebar.ApplyStrategy(strategy, sceneContext);
+        }
+
+        private void applySettings()
+        {
+            // Milestone 2: commit draft to config and refresh preview.
+            applyCurrentScene();
+        }
+
+        private ISkin getEditorSkin()
+        {
+            var currentSkin = skinManager.CurrentSkin.Value;
+
+            return currentSkin is EzStyleProSkin or Ez2Skin or SbISkin
+                ? currentSkin
+                : new EzStyleProSkin(skinManager);
+        }
+
+        private void updateHeaderText()
+        {
+            headerText.Clear();
+            headerText.AddText(@"Ez ", t => t.Font = OsuFont.TorusAlternate);
+            headerText.AddText(@"Skin Editor", t =>
             {
-                int rulesetId = beatmap?.BeatmapInfo.Ruleset.OnlineID ?? 0;
+                t.Font = OsuFont.TorusAlternate;
+                t.Colour = colourProvider.Highlight1;
+            });
+        }
 
-                if (rulesetId != 0)
-                {
-                    var fromRegistry = SkinEditorProviderRegistry.Get(rulesetId);
-                    if (fromRegistry != null)
-                        return fromRegistry;
-                }
+        private void tryExit()
+        {
+            if (this.IsCurrentScreen())
+                ShowExitDialog();
+        }
 
-                // Fallback: discover any loaded type that implements ISkinEditorVirtualProvider.
-                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-                {
-                    Type[] types;
+        public void ShowExitDialog()
+        {
+            if (!this.IsCurrentScreen())
+                return;
 
-                    try
-                    {
-                        types = asm.GetTypes();
-                    }
-                    catch
-                    {
-                        continue;
-                    }
-
-                    foreach (var t in types)
-                    {
-                        if (typeof(ISkinEditorVirtualProvider).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
-                        {
-                            try
-                            {
-                                return Activator.CreateInstance(t) as ISkinEditorVirtualProvider;
-                            }
-                            catch
-                            {
-                                // ignore and continue
-                            }
-                        }
-                    }
-                }
-            }
-            catch
+            if (dialogOverlay == null)
             {
+                this.Exit();
+                return;
             }
 
-            return null;
+            dialogOverlay.Push(new ConfirmDialog("应用更改到皮肤？", () =>
+            {
+                applySettings();
+
+                if (this.IsCurrentScreen())
+                    this.Exit();
+            }, () =>
+            {
+                if (this.IsCurrentScreen())
+                    this.Exit();
+            }));
+        }
+
+        public void PresentGameplay()
+        {
         }
 
         private static Drawable? createManiaStageBackgroundOrNull()
@@ -235,10 +262,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (lookup == null)
                 return null;
 
-            return new SkinnableDrawable(lookup)
-            {
-                RelativeSizeAxes = Axes.Both
-            };
+            return new SkinnableDrawable(lookup) { RelativeSizeAxes = Axes.Both };
         }
 
         private static ISkinComponentLookup? tryCreateManiaSkinComponentLookupOrNull(string componentName)
@@ -260,236 +284,6 @@ namespace osu.Game.EzOsuGame.Edit
             catch
             {
                 return null;
-            }
-        }
-
-        private void initializeLeftPlayback()
-        {
-            var currentSkin = getEditorSkin();
-
-            if (provider != null)
-            {
-                var dynamicPart = provider.CreateDynamicPart(currentSkin);
-
-                leftPlaybackContainer!.Children = new[]
-                {
-                    dynamicPart.With(p =>
-                    {
-                        p.RelativeSizeAxes = Axes.Both;
-                        p.Anchor = Anchor.Centre;
-                        p.Origin = Anchor.Centre;
-                    })
-                };
-            }
-            else
-            {
-                // Fallback if not supported
-                leftPlaybackContainer!.Children = new Drawable[]
-                {
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        Text = "Virtual playfield not supported for this ruleset",
-                        Colour = Color4.White,
-                    }
-                };
-            }
-        }
-
-        private void initializeCenterDisplay()
-        {
-            var currentSkin = getEditorSkin();
-
-            if (provider != null)
-            {
-                centerNoteDisplayContainer!.Children = new[]
-                {
-                    provider.CreateStaticPart(currentSkin)
-                };
-            }
-            else
-            {
-                centerNoteDisplayContainer!.Children = new Drawable[]
-                {
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        Text = "Note display not supported for this ruleset",
-                        Colour = Color4.White,
-                    }
-                };
-            }
-        }
-
-        private void initializeRightSettings()
-        {
-            var currentSkin = getEditorSkin();
-
-            // 检查是否为脚本皮肤
-            if (currentSkin is ScriptedSkinWrapper scriptedWrapper)
-            {
-                var scriptedSkin = scriptedWrapper.GetScriptedSkin();
-
-                var configEditor = new ScriptedSkinConfigEditor();
-                configEditor.SetSkin(scriptedSkin);
-
-                // 创建重载按钮
-                var reloadButton = new ReloadScriptButton
-                {
-                    Text = "重载脚本",
-                    RelativeSizeAxes = Axes.X,
-                    Height = 40,
-                    Action = () =>
-                    {
-                        // 使用 Task.Run 在后台线程执行异步操作，避免 async void
-                        _ = Task.Run(async () =>
-                        {
-                            try
-                            {
-                                // 获取当前脚本路径
-                                string scriptPath = skinManager.GetScriptPath(scriptedWrapper.SkinInfo.Value);
-
-                                if (!string.IsNullOrEmpty(scriptPath))
-                                {
-                                    bool success = await skinManager.TriggerScriptReload(scriptPath).ConfigureAwait(false);
-
-                                    if (success)
-                                    {
-                                        // 在主线程刷新配置编辑器
-                                        Schedule(() =>
-                                        {
-                                            configEditor.SetSkin(scriptedWrapper.GetScriptedSkin());
-                                        });
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                // 记录错误但不崩溃
-                                Logger.Log($"重载脚本失败: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
-                            }
-                        });
-                    }
-                };
-
-                settingsScrollContainer!.Child = new FillFlowContainer
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Direction = FillDirection.Vertical,
-                    Spacing = new Vector2(0, 15),
-                    Padding = new MarginPadding(10),
-                    Children = new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "脚本皮肤配置",
-                            Colour = Color4.White,
-                            Font = OsuFont.Default.With(size: 18, weight: FontWeight.Bold),
-                        },
-                        reloadButton,
-                        configEditor,
-                    }
-                };
-            }
-            else if (provider != null)
-            {
-                // Provider may provide a full parameters UI; prefer that when available.
-                settingsScrollContainer!.Child = provider.CreateParametersPart(currentSkin);
-            }
-            else
-            {
-                // Default placeholder when provider not present
-                settingsScrollContainer!.Child = new FillFlowContainer
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Direction = FillDirection.Vertical,
-                    Spacing = new Vector2(10),
-                    Padding = new MarginPadding(10),
-                    Children = new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "皮肤参数调整",
-                            Colour = Color4.White,
-                            Font = OsuFont.Default.With(size: 18),
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = "TODO: 添加参数控件",
-                            Colour = Color4.Gray,
-                            Font = OsuFont.Default.With(size: 14),
-                        }
-                    }
-                };
-            }
-        }
-
-        private void applySettings()
-        {
-            // TODO: 将设置应用到当前皮肤
-            // 目前只是刷新中间显示
-            initializeCenterDisplay();
-        }
-
-        private ISkin getEditorSkin()
-        {
-            var currentSkin = skinManager.CurrentSkin.Value;
-
-            return currentSkin is EzStyleProSkin or Ez2Skin or SbISkin
-                ? currentSkin
-                : new EzStyleProSkin(skinManager);
-        }
-
-        private void showExitDialog()
-        {
-            // 里程碑A阶段：dialog overlay 可能在当前依赖树里不可用，务必降级为直接退出。
-            if (dialogOverlay == null)
-            {
-                this.Exit();
-                return;
-            }
-
-            dialogOverlay.Push(new ConfirmDialog("应用更改到皮肤？", () =>
-            {
-                applySettings();
-                this.Exit();
-            }, this.Exit));
-        }
-
-        public void PresentGameplay()
-        {
-            // 作为 overlay，这里不应 Push/Present gameplay。
-        }
-
-        private static OsuSpriteText createUnavailableText(string text) => new OsuSpriteText
-        {
-            Anchor = Anchor.Centre,
-            Origin = Anchor.Centre,
-            Text = text,
-            Colour = Color4.White,
-        };
-
-        private partial class ApplySettingsButton : OsuButton
-        {
-            [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider? overlayColourProvider, OsuColour colours)
-            {
-                BackgroundColour = overlayColourProvider?.Background3 ?? colours.Blue3;
-                Content.CornerRadius = 5;
-            }
-        }
-
-        private partial class ReloadScriptButton : OsuButton
-        {
-            [BackgroundDependencyLoader]
-            private void load(OsuColour colours)
-            {
-                BackgroundColour = colours.Green3;
-                Content.CornerRadius = 5;
             }
         }
     }
