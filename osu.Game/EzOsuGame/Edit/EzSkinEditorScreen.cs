@@ -8,6 +8,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
@@ -43,6 +45,7 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorMenuBar menuBar = null!;
         private EzSkinEditorSceneBar sceneBar = null!;
         private EzSkinEditorSidebar sidebar = null!;
+        private OsuTextFlowContainer headerText = null!;
 
         private ISkinEditorVirtualProvider? provider;
         private EzSkinEditorSceneContext? sceneContext;
@@ -101,12 +104,24 @@ namespace osu.Game.EzOsuGame.Edit
                                 {
                                     Name = @"Menu container",
                                     RelativeSizeAxes = Axes.X,
+                                    Depth = float.MinValue,
                                     Height = SkinEditor.MENU_HEIGHT,
-                                    Child = menuBar = new EzSkinEditorMenuBar
+                                    Children = new Drawable[]
                                     {
-                                        RelativeSizeAxes = Axes.Both,
-                                        ApplyAction = applySettings,
-                                        ExitAction = tryExit,
+                                        menuBar = new EzSkinEditorMenuBar
+                                        {
+                                            ApplyAction = applySettings,
+                                            ExitAction = tryExit,
+                                        },
+                                        headerText = new OsuTextFlowContainer
+                                        {
+                                            TextAnchor = Anchor.TopRight,
+                                            Padding = new MarginPadding(5),
+                                            Anchor = Anchor.TopRight,
+                                            Origin = Anchor.TopRight,
+                                            AutoSizeAxes = Axes.X,
+                                            RelativeSizeAxes = Axes.Y,
+                                        },
                                     },
                                 },
                             },
@@ -147,6 +162,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             base.LoadComplete();
             sceneBar.CurrentScene.BindValueChanged(_ => Schedule(applyCurrentScene), true);
+            updateHeaderText();
         }
 
         public void PopulateSettings() => refreshScene();
@@ -155,6 +171,8 @@ namespace osu.Game.EzOsuGame.Edit
         {
             backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
             backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
+
+            updateHeaderText();
 
             provider = SkinEditorProviderResolver.Resolve(Beatmap.Value?.Beatmap);
 
@@ -191,6 +209,17 @@ namespace osu.Game.EzOsuGame.Edit
             return currentSkin is EzStyleProSkin or Ez2Skin or SbISkin
                 ? currentSkin
                 : new EzStyleProSkin(skinManager);
+        }
+
+        private void updateHeaderText()
+        {
+            headerText.Clear();
+            headerText.AddText(@"Ez ", t => t.Font = OsuFont.TorusAlternate);
+            headerText.AddText(@"Skin Editor", t =>
+            {
+                t.Font = OsuFont.TorusAlternate;
+                t.Colour = colourProvider.Highlight1;
+            });
         }
 
         private void tryExit()
