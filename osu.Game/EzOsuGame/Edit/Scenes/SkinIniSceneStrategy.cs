@@ -20,21 +20,40 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public LocalisableString TabTitle => "skin.ini";
 
-        public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
-            new EzSkinEditorPreviewHost(context);
+        public Drawable CreateSceneContent(EzSkinEditorSceneContext context) => new EzSkinEditorPreviewHost(context);
 
-        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) =>
-            new[]
+        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context)
+        {
+            if (context.SkinIniSession is not { IsSupported: true })
+                return Array.Empty<EzSkinEditorSidebarGroupDefinition>();
+
+            return new[]
             {
                 new EzSkinEditorSidebarGroupDefinition
                 {
-                    Title = "Skin.ini",
-                    CreateContent = () => new EzSkinEditorSkinIniPlaceholderSection(),
+                    Title = "General",
+                    CreateContent = () => new EzSkinEditorSkinIniGeneralSection(context.SkinIniSession),
+                },
+                new EzSkinEditorSidebarGroupDefinition
+                {
+                    Title = "Colours",
+                    CreateContent = () => new EzSkinEditorSkinIniColoursSection(context.SkinIniSession),
+                },
+                new EzSkinEditorSidebarGroupDefinition
+                {
+                    Title = "模式",
+                    CreateContent = () => new EzSkinEditorSkinIniManiaSection(context.SkinIniSession),
                 },
             };
+        }
 
-        public Drawable CreateSidebarFooter(EzSkinEditorSceneContext context) =>
-            new SkinIniSaveFooter(context.CommitSkinIni);
+        public Drawable CreateSidebarFooter(EzSkinEditorSceneContext context)
+        {
+            if (context.SkinIniSession is not { IsSupported: true })
+                return null;
+
+            return new SkinIniSaveFooter(context.CommitSkinIni);
+        }
     }
 
     internal partial class SkinIniSaveFooter : Container

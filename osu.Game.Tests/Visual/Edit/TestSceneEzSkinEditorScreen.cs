@@ -5,20 +5,24 @@ using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
+using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays.Dialog;
+using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Screens.Edit.Components.Menus;
 using osu.Game.Skinning;
+using osu.Game.Tests.Resources;
 using osuTK.Input;
 
 namespace osu.Game.Tests.Visual.Edit
@@ -60,14 +64,15 @@ namespace osu.Game.Tests.Visual.Edit
             LoadScreen(editorScreen = new EzSkinEditorScreen());
         }
 
-        private void waitForScreenLoaded() =>
-            AddUntilStep("wait for screen load", () => editorScreen.IsLoaded);
+        private void waitForScreenLoaded() => AddUntilStep("wait for screen load", () => editorScreen.IsLoaded);
 
-        private void switchScene(EzSkinEditorSceneType scene) =>
-            AddStep($"switch to {scene}", () => editorScreen.CurrentScene.Value = scene);
+        private void switchScene(EzSkinEditorSceneType scene) => AddStep($"switch to {scene}", () => editorScreen.CurrentScene.Value = scene);
 
-        private void ensureMutableSkin() =>
-            AddStep("ensure mutable skin", () => skinManager.EnsureMutableSkin());
+        private void importLegacySkin() => AddStep("import legacy skin", () =>
+        {
+            var imported = skinManager.Import(new ImportTask(TestResources.OpenResource(@"Archives/modified-ezSkin.osk"), "modified-ezSkin.osk")).GetResultSafely();
+            skinManager.CurrentSkinInfo.Value = imported;
+        });
 
         [Test]
         public void TestLayoutShell()
@@ -140,12 +145,60 @@ namespace osu.Game.Tests.Visual.Edit
         [Test]
         public void TestSkinIniScenePlaybackAndSaveFooter()
         {
+            importLegacySkin();
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.SkinIni);
 
             AddUntilStep("playback only host", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
             AddUntilStep("save footer button", () => editorScreen.ChildrenOfType<OsuButton>().Any(b => b.Text.ToString() == "保存 Skin.ini"));
+            AddUntilStep("three sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
+            AddUntilStep("skin.ini form fields visible", () => editorScreen.ChildrenOfType<SettingsTextBox>().Any());
+            AddAssert("no placeholder copy", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("M3 将在此") != true));
+        }
+
+        [Test]
+        public void TestSkinIniFooterDoesNotOverlapLastField()
+        {
+            importLegacySkin();
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.SkinIni);
+
+            AddUntilStep("sidebar groups loaded", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
+
+            AddAssert("footer reserve height applied", () =>
+            {
+                var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
+                return sidebar.FooterReservedHeight == EzSkinEditorSidebar.FOOTER_HEIGHT;
+            });
+
+            AddAssert("scroll content bottom padding applied", () =>
+            {
+                var sidebar = editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single();
+                return sidebar.ContentBottomPadding == EzSkinEditorSidebar.FOOTER_HEIGHT;
+            });
+        }
+
+        [Test]
+        public void TestSkinIniEditorUpdatesDraft()
+        {
+            importLegacySkin();
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.SkinIni);
+
+            AddUntilStep("session loaded", () => editorScreen.SkinIniSession != null);
+
+            AddStep("update name via document", () =>
+            {
+                var document = editorScreen.SkinIniSession!.ParseDraftDocument();
+                document.SetValue(EzSkinIniDocument.GENERAL_SECTION, "Name", "M3 Draft Skin");
+                editorScreen.SkinIniSession.ApplyDocument(document);
+            });
+
+            AddAssert("draft dirty", () => editorScreen.SkinIniSession!.IsDirty);
+            AddAssert("draft contains updated name", () => editorScreen.SkinIniSession!.DraftText.Contains("Name: M3 Draft Skin", StringComparison.Ordinal));
         }
 
         [Test]
@@ -166,6 +219,7 @@ namespace osu.Game.Tests.Visual.Edit
         [Test]
         public void TestSkinIniSessionLoadSave()
         {
+            importLegacySkin();
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.SkinIni);
@@ -188,25 +242,28 @@ namespace osu.Game.Tests.Visual.Edit
             AddAssert("session clean after discard", () => !editorScreen.SkinIniSession!.IsDirty);
             AddAssert("draft restored", () => editorScreen.SkinIniSession!.DraftText, () => Is.EqualTo(savedText));
 
-            ensureMutableSkin();
-            AddUntilStep("session reloaded for mutable skin", () => editorScreen.SkinIniSession!.SkinId == skinManager.CurrentSkinInfo.Value.ID);
+            AddUntilStep("session bound to imported skin", () => editorScreen.SkinIniSession!.SkinId == skinManager.CurrentSkinInfo.Value.ID);
 
             AddStep("set dirty draft again", () => editorScreen.SkinIniSession!.SetDraftText(dirtyText));
             AddStep("commit draft", () => editorScreen.SkinIniSession!.Commit());
             AddAssert("session clean after commit", () => !editorScreen.SkinIniSession!.IsDirty);
             AddAssert("saved text updated", () => editorScreen.SkinIniSession!.SavedText, () => Is.EqualTo(dirtyText));
+            AddAssert("backup filename recorded", () => editorScreen.SkinIniSession!.LastBackupFilename!.StartsWith("Backup/skin.ini.", StringComparison.Ordinal));
+            AddAssert("backup file stored on skin",
+                () => skinManager.CurrentSkinInfo.Value.PerformRead(skin => skin.Files.Any(file => file.Filename.StartsWith("Backup/skin.ini.", StringComparison.Ordinal))));
         }
 
         [Test]
         public void TestSkinIniSessionPerSkin()
         {
+            importLegacySkin();
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.SkinIni);
 
             AddUntilStep("session loaded", () => editorScreen.SkinIniSession != null);
 
-            System.Guid originalSkinId = Guid.Empty;
+            Guid originalSkinId = Guid.Empty;
 
             AddStep("capture skin id and dirty draft", () =>
             {
@@ -215,14 +272,25 @@ namespace osu.Game.Tests.Visual.Edit
             });
 
             AddStep("switch skin", () => skinManager.SetSkinFromConfiguration(SkinInfo.TRIANGLES_SKIN.ToString()));
-            AddUntilStep("session bound to new skin", () => editorScreen.SkinIniSession!.SkinId != originalSkinId);
-            AddAssert("draft not dirty after switch", () => !editorScreen.SkinIniSession!.IsDirty);
-            AddAssert("draft matches saved for new skin", () => editorScreen.SkinIniSession!.DraftText == editorScreen.SkinIniSession!.SavedText);
+            AddUntilStep("session cleared for built-in skin", () => editorScreen.SkinIniSession == null);
+        }
+
+        [Test]
+        public void TestSkinIniUnavailableOnBuiltInSkin()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddAssert("no skin.ini session on built-in skin", () => editorScreen.SkinIniSession == null);
+
+            AddStep("attempt skin.ini scene", () => editorScreen.CurrentScene.Value = EzSkinEditorSceneType.SkinIni);
+            AddAssert("redirected away from skin.ini", () => editorScreen.CurrentScene.Value == EzSkinEditorSceneType.Appearance);
         }
 
         [Test]
         public void TestExitDialogSkinIniDirty()
         {
+            importLegacySkin();
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.SkinIni);
@@ -241,6 +309,40 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddUntilStep("screen exited", () => Stack.CurrentScreen == null);
             AddAssert("session clean after discard exit", () => !editorScreen.SkinIniSession!.IsDirty);
+        }
+
+        [Test]
+        public void TestExitDialogSkinIniApplyOnLegacySkin()
+        {
+            const string marker = "; exit apply test";
+
+            importLegacySkin();
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.SkinIni);
+
+            AddUntilStep("session loaded", () => editorScreen.SkinIniSession is { IsSupported: true });
+
+            string dirtyText = null!;
+
+            AddStep("set dirty draft", () =>
+            {
+                dirtyText = editorScreen.SkinIniSession!.SavedText + marker;
+                editorScreen.SkinIniSession.SetDraftText(dirtyText);
+            });
+
+            AddStep("show exit dialog", () => editorScreen.ShowExitDialog());
+            AddUntilStep("dialog visible", () => DialogOverlay.CurrentDialog is ConfirmDialog);
+
+            AddStep("apply via confirm", () =>
+            {
+                InputManager.MoveMouseTo(DialogOverlay.CurrentDialog!.ChildrenOfType<PopupDialogButton>().First());
+                InputManager.Click(MouseButton.Left);
+            });
+
+            AddUntilStep("screen exited", () => Stack.CurrentScreen == null);
+            AddAssert("session clean after apply exit", () => !editorScreen.SkinIniSession!.IsDirty);
+            AddAssert("saved text contains marker", () => editorScreen.SkinIniSession!.SavedText.Contains(marker, StringComparison.Ordinal));
         }
 
         [Test]

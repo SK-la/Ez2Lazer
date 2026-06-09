@@ -7,8 +7,8 @@ using System.Text;
 using osu.Framework.IO.Stores;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.IO;
 using osu.Game.Extensions;
+using osu.Game.IO;
 using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.Edit
@@ -20,46 +20,80 @@ namespace osu.Game.EzOsuGame.Edit
     {
         private readonly SkinManager skinManager;
         private readonly IResourceStore<byte[]> skinFiles;
+        private readonly EzSkinIniBackupService backupService;
 
         public Guid SkinId { get; private set; }
+
+        public string? LastBackupFilename { get; private set; }
 
         public string SavedText { get; private set; } = string.Empty;
 
         public string DraftText { get; private set; } = string.Empty;
 
-        public bool IsDirty => DraftText != SavedText;
+        public bool IsDirty => IsSupported && DraftText != SavedText;
+
+        public bool IsSupported { get; private set; }
 
         public EzSkinIniSession(SkinManager skinManager)
         {
             this.skinManager = skinManager;
             skinFiles = ((IStorageResourceProvider)skinManager).Files;
+            backupService = new EzSkinIniBackupService(skinManager);
         }
 
         public void LoadFromSkin(Live<SkinInfo> skinInfo)
         {
-            string text = skinInfo.PerformRead(readSkinIniText);
+            IsSupported = EzSkinIniSupport.IsSupported(skinInfo);
             SkinId = skinInfo.ID;
+
+            if (!IsSupported)
+            {
+                SavedText = string.Empty;
+                DraftText = string.Empty;
+                return;
+            }
+
+            string text = skinInfo.PerformRead(readSkinIniText);
             SavedText = text;
             DraftText = text;
         }
 
         public void SetDraftText(string text) => DraftText = text;
 
+        public EzSkinIniDocument ParseDraftDocument() => EzSkinIniDocument.Parse(DraftText);
+
+        public void ApplyDocument(EzSkinIniDocument document) => DraftText = document.Serialize();
+
         public void Discard() => DraftText = SavedText;
 
         public bool Commit()
         {
-            if (!IsDirty)
+            if (!IsSupported || !IsDirty)
                 return false;
 
             var live = skinManager.CurrentSkinInfo.Value;
 
+            if (!EzSkinIniSupport.IsSupported(live))
+                return false;
+
             if (live.ID != SkinId)
                 throw new InvalidOperationException("Cannot commit skin.ini for a skin that is no longer current.");
 
-            live.PerformWrite(skin => writeSkinIniText(skin, DraftText));
+            if (!live.IsManaged)
+                throw new InvalidOperationException("Cannot commit skin.ini because the current skin is not writable.");
+
+            string textToCommit = DraftText;
+            string savedTextForBackup = SavedText;
+
+            live.PerformWrite(skin =>
+            {
+                LastBackupFilename = backupService.BackupCurrentSkinIni(skin, savedTextForBackup);
+                writeSkinIniText(skin, textToCommit);
+            });
             skinManager.CurrentSkinInfo.TriggerChange();
-            SavedText = DraftText;
+
+            SavedText = textToCommit;
+            DraftText = textToCommit;
             return true;
         }
 

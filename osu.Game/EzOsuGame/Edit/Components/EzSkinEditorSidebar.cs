@@ -27,6 +27,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
     {
         private const float padding = 10;
 
+        /// <summary>
+        /// Reserved height for the skin.ini save footer (40px button + 10px vertical padding each side).
+        /// </summary>
+        public const float FOOTER_HEIGHT = 60;
+
         public const float EXPANDED_WIDTH = SettingsToolboxGroup.CONTAINER_WIDTH + padding * 2;
         public const float CONTRACTED_WIDTH = 0;
 
@@ -38,6 +43,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
         public BindableBool Pinned { get; } = new BindableBool(true);
 
         public BindableBool ExpandedState => Expanded;
+
+        internal float FooterReservedHeight => footerContainer.Height;
+
+        internal float ContentBottomPadding => FillFlow.Padding.Bottom;
 
         protected override bool ExpandOnHover => false;
 
@@ -75,7 +84,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
                     RelativeSizeAxes = Axes.X,
-                    Height = 50,
+                    Height = 0,
                     Padding = new MarginPadding(padding),
                 },
             });
@@ -132,7 +141,22 @@ namespace osu.Game.EzOsuGame.Edit.Components
             var footer = strategy.CreateSidebarFooter(context);
 
             if (footer != null)
+            {
+                footerContainer.Height = FOOTER_HEIGHT;
                 footerContainer.Child = footer;
+                FillFlow.Padding = new MarginPadding
+                {
+                    Left = padding,
+                    Right = padding,
+                    Top = padding,
+                    Bottom = FOOTER_HEIGHT,
+                };
+            }
+            else
+            {
+                footerContainer.Height = 0;
+                FillFlow.Padding = new MarginPadding(padding);
+            }
         }
 
         protected override void OnHoverLost(HoverLostEvent e)
@@ -150,9 +174,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             float screenMouseX = inputManager.CurrentState.Mouse.Position.X;
 
-            Expanded.Value =
-                (screenMouseX >= expandButton.ScreenSpaceDrawQuad.TopLeft.X && screenMouseX <= ToScreenSpace(new Vector2(DrawWidth + EXPANDED_WIDTH, 0)).X)
-                || inputManager.DraggedDrawable != null;
+            Expanded.Value = screenMouseX >= expandButton.ScreenSpaceDrawQuad.TopLeft.X && screenMouseX <= ToScreenSpace(new Vector2(DrawWidth + EXPANDED_WIDTH, 0)).X
+                             || inputManager.DraggedDrawable != null;
         }
     }
 }
