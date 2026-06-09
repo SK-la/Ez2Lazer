@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
                 new EzSkinEditorSidebarGroupDefinition
                 {
                     Title = "Skin.ini",
-                    CreateContent = () => new EzSkinEditorSkinIniPlaceholderSection(),
+                    CreateContent = () => new EzSkinEditorSkinIniSection(context.SkinIniSession),
                 },
             };
 
