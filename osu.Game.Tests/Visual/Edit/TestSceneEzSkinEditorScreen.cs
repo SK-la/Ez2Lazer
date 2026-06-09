@@ -15,6 +15,7 @@ using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays.Dialog;
+using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Screens.Edit.Components.Menus;
@@ -146,6 +147,28 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddUntilStep("playback only host", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
             AddUntilStep("save footer button", () => editorScreen.ChildrenOfType<OsuButton>().Any(b => b.Text.ToString() == "保存 Skin.ini"));
+            AddUntilStep("skin.ini form fields visible", () => editorScreen.ChildrenOfType<SettingsTextBox>().Any());
+            AddAssert("no placeholder copy", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("M3 将在此") != true));
+        }
+
+        [Test]
+        public void TestSkinIniEditorUpdatesDraft()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.SkinIni);
+
+            AddUntilStep("session loaded", () => editorScreen.SkinIniSession != null);
+
+            AddStep("update name via document", () =>
+            {
+                var document = editorScreen.SkinIniSession!.ParseDraftDocument();
+                document.SetValue(EzSkinIniDocument.GENERAL_SECTION, "Name", "M3 Draft Skin");
+                editorScreen.SkinIniSession.ApplyDocument(document);
+            });
+
+            AddAssert("draft dirty", () => editorScreen.SkinIniSession!.IsDirty);
+            AddAssert("draft contains updated name", () => editorScreen.SkinIniSession!.DraftText.Contains("Name: M3 Draft Skin", StringComparison.Ordinal));
         }
 
         [Test]
@@ -195,6 +218,9 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("commit draft", () => editorScreen.SkinIniSession!.Commit());
             AddAssert("session clean after commit", () => !editorScreen.SkinIniSession!.IsDirty);
             AddAssert("saved text updated", () => editorScreen.SkinIniSession!.SavedText, () => Is.EqualTo(dirtyText));
+            AddAssert("backup filename recorded", () => editorScreen.SkinIniSession!.LastBackupFilename!.StartsWith("Backup/skin.ini.", StringComparison.Ordinal));
+            AddAssert("backup file stored on skin", () => skinManager.CurrentSkinInfo.Value.PerformRead(skin =>
+                skin.Files.Any(file => file.Filename.StartsWith("Backup/skin.ini.", StringComparison.Ordinal))));
         }
 
         [Test]
@@ -206,7 +232,7 @@ namespace osu.Game.Tests.Visual.Edit
 
             AddUntilStep("session loaded", () => editorScreen.SkinIniSession != null);
 
-            System.Guid originalSkinId = Guid.Empty;
+            Guid originalSkinId = Guid.Empty;
 
             AddStep("capture skin id and dirty draft", () =>
             {
