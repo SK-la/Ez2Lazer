@@ -3,7 +3,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
+using osu.Framework.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -13,6 +15,7 @@ namespace osu.Game.EzOsuGame.Edit
     public sealed class EzSkinIniDocument
     {
         public const string GENERAL_SECTION = "General";
+        public const string COLOURS_SECTION = "Colours";
         public const string MANIA_SECTION = "Mania";
 
         private readonly List<EzSkinIniSection> sections = new List<EzSkinIniSection>();
@@ -50,7 +53,13 @@ namespace osu.Game.EzOsuGame.Edit
                 }
 
                 if (trySplitKeyValue(line, out string key, out string value))
-                    currentSection.UpsertKeyLine(key, value);
+                {
+                    // Mania blocks are anchored by repeated Keys lines and must preserve order.
+                    if (currentSection.Name == MANIA_SECTION)
+                        currentSection.Lines.Add(new EzSkinIniKeyLine(key, value));
+                    else
+                        currentSection.UpsertKeyLine(key, value);
+                }
                 else
                     currentSection.Lines.Add(new EzSkinIniRawLine(line));
             }
@@ -68,6 +77,63 @@ namespace osu.Game.EzOsuGame.Edit
         public void SetValue(string sectionName, string key, string value)
         {
             ensureSection(sectionName).UpsertKeyLine(key, value);
+        }
+
+        public string? GetColourValue(string key) => GetValue(COLOURS_SECTION, key);
+
+        public bool TryGetColourValue(string key, out Colour4 colour)
+        {
+            if (TryParseColourValue(GetColourValue(key), out colour))
+                return true;
+
+            colour = Colour4.White;
+            return false;
+        }
+
+        public void SetColourValue(string key, Colour4 colour, bool includeAlpha = false) => SetValue(COLOURS_SECTION, key, EzSkinIniColourFormat.ToIniString(colour, includeAlpha));
+
+        public static bool TryParseColourValue(string? value, out Colour4 colour) => EzSkinIniColourFormat.TryParse(value, out colour);
+
+        public IReadOnlyList<int> GetManiaKeys()
+        {
+            parseManiaSection(out _, out var blocks);
+            var keys = new List<int>(blocks.Count);
+
+            foreach (var block in blocks)
+                keys.Add(block.Keys);
+
+            return keys;
+        }
+
+        public string? GetManiaValue(int keys, string key)
+        {
+            parseManiaSection(out var preamble, out var blocks);
+
+            foreach (var block in blocks)
+            {
+                if (block.Keys != keys)
+                    continue;
+
+                return getLineValue(block.Lines, key);
+            }
+
+            return keys == 0 ? getLineValue(preamble, key) : null;
+        }
+
+        public void SetManiaValue(int keys, string key, string value)
+        {
+            parseManiaSection(out var preamble, out var blocks);
+            var block = findOrCreateManiaBlock(blocks, keys);
+            upsertLineValue(block.Lines, key, value);
+            rebuildManiaSection(preamble, blocks);
+        }
+
+        public EzSkinIniManiaBlock EnsureManiaBlock(int keys)
+        {
+            parseManiaSection(out var preamble, out var blocks);
+            var block = findOrCreateManiaBlock(blocks, keys);
+            rebuildManiaSection(preamble, blocks);
+            return block;
         }
 
         public string Serialize()
@@ -108,6 +174,85 @@ namespace osu.Game.EzOsuGame.Edit
             return null;
         }
 
+        private void parseManiaSection(out List<IEzSkinIniLine> preamble, out List<EzSkinIniManiaBlock> blocks)
+        {
+            preamble = new List<IEzSkinIniLine>();
+            blocks = new List<EzSkinIniManiaBlock>();
+            var section = findSection(MANIA_SECTION);
+
+            if (section == null)
+                return;
+
+            EzSkinIniManiaBlock? currentBlock = null;
+
+            foreach (var line in section.Lines)
+            {
+                if (line is EzSkinIniKeyLine { Key: "Keys" } keysLine
+                    && int.TryParse(keysLine.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int keys))
+                {
+                    currentBlock = new EzSkinIniManiaBlock(keys);
+                    blocks.Add(currentBlock);
+                    continue;
+                }
+
+                if (currentBlock == null)
+                    preamble.Add(line);
+                else
+                    currentBlock.Lines.Add(line);
+            }
+        }
+
+        private void rebuildManiaSection(List<IEzSkinIniLine> preamble, List<EzSkinIniManiaBlock> blocks)
+        {
+            var section = ensureSection(MANIA_SECTION);
+            section.Lines.Clear();
+            section.Lines.AddRange(preamble);
+
+            foreach (var block in blocks)
+            {
+                section.Lines.Add(new EzSkinIniKeyLine("Keys", block.Keys.ToString(CultureInfo.InvariantCulture)));
+                section.Lines.AddRange(block.Lines);
+            }
+        }
+
+        private static EzSkinIniManiaBlock findOrCreateManiaBlock(List<EzSkinIniManiaBlock> blocks, int keys)
+        {
+            foreach (var block in blocks)
+            {
+                if (block.Keys == keys)
+                    return block;
+            }
+
+            var created = new EzSkinIniManiaBlock(keys);
+            blocks.Add(created);
+            return created;
+        }
+
+        private static string? getLineValue(List<IEzSkinIniLine> lines, string key)
+        {
+            foreach (var line in lines)
+            {
+                if (line is EzSkinIniKeyLine keyLine && string.Equals(keyLine.Key, key, StringComparison.Ordinal))
+                    return keyLine.Value;
+            }
+
+            return null;
+        }
+
+        private static void upsertLineValue(List<IEzSkinIniLine> lines, string key, string value)
+        {
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (lines[i] is EzSkinIniKeyLine keyLine && string.Equals(keyLine.Key, key, StringComparison.Ordinal))
+                {
+                    lines[i] = new EzSkinIniKeyLine(key, value);
+                    return;
+                }
+            }
+
+            lines.Add(new EzSkinIniKeyLine(key, value));
+        }
+
         private static bool trySplitKeyValue(string line, out string key, out string value)
         {
             int separator = line.IndexOf(':');
@@ -123,6 +268,15 @@ namespace osu.Game.EzOsuGame.Edit
             value = line[(separator + 1)..].TrimStart();
             return key.Length > 0;
         }
+    }
+
+    public sealed class EzSkinIniManiaBlock
+    {
+        public int Keys { get; }
+
+        public List<IEzSkinIniLine> Lines { get; } = new List<IEzSkinIniLine>();
+
+        public EzSkinIniManiaBlock(int keys) => Keys = keys;
     }
 
     public sealed class EzSkinIniSection
