@@ -46,6 +46,9 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
             var nameOfNote = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             var nameOfStage = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
+
+            ensureDropdownItems(nameOfNote, availableNoteSets);
+            ensureDropdownItems(nameOfStage, availableStageSets);
             var nameOfGameTheme = ezSkinConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
 
             Children = new Drawable[]
@@ -71,6 +74,18 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     Items = availableNoteSets,
                 },
             };
+        }
+
+        private static void ensureDropdownItems(Bindable<string> current, List<string> items)
+        {
+            if (!string.IsNullOrEmpty(current.Value) && !items.Contains(current.Value))
+                items.Insert(0, current.Value);
+
+            if (items.Count == 0)
+                items.Add(string.Empty);
+
+            if (string.IsNullOrEmpty(current.Value))
+                current.Value = items[0];
         }
 
         private void loadFolderSets(string type, List<string> targetList)

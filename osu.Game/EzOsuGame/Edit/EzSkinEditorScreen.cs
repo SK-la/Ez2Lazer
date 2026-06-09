@@ -7,7 +7,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
-using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
@@ -28,6 +27,9 @@ namespace osu.Game.EzOsuGame.Edit
     /// </summary>
     public partial class EzSkinEditorScreen : OsuScreen
     {
+        [Cached]
+        private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
+
         [Resolved]
         private SkinManager skinManager { get; set; } = null!;
 
@@ -174,7 +176,7 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 applySettings();
                 this.Exit();
-            }, () => this.Exit()));
+            }, this.Exit));
         }
 
         public void PresentGameplay()
