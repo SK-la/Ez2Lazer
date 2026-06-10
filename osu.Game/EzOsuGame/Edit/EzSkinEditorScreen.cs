@@ -267,7 +267,17 @@ namespace osu.Game.EzOsuGame.Edit
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             bindConfigPreviewRefresh();
+            bindColumnKeyModePreviewRefresh();
             bindSceneBarPlayback();
+        }
+
+        private void bindColumnKeyModePreviewRefresh()
+        {
+            ezSkinConfig.GetBindable<int>(Ez2Setting.ColumnTypeListSelect).BindValueChanged(_ =>
+            {
+                if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Colour)
+                    Schedule(refreshPreviewContent);
+            });
         }
 
         protected override void Update()
@@ -458,7 +468,14 @@ namespace osu.Game.EzOsuGame.Edit
             bool allowBeatmapPreview = currentScene == EzSkinEditorSceneType.Appearance
                                        && PreviewState.Source.Value == EzSkinEditorPreviewSource.Beatmap;
 
-            bool useVirtualComparisonPreview = currentScene is EzSkinEditorSceneType.Size or EzSkinEditorSceneType.Colour;
+            bool useVirtualComparisonPreview = currentScene == EzSkinEditorSceneType.Size;
+
+            int virtualPreviewKeyCount = currentScene switch
+            {
+                EzSkinEditorSceneType.Colour => getColourPreviewKeyMode(),
+                EzSkinEditorSceneType.Size => 4,
+                _ => 4,
+            };
             bool useNoteComparisonOnly = currentScene == EzSkinEditorSceneType.Note;
 
             // Size/colour scenes always use the mania LN virtual provider, not the loaded beatmap ruleset.
@@ -487,6 +504,7 @@ namespace osu.Game.EzOsuGame.Edit
                 CommitSkinIni = commitSkinIni,
                 AllowBeatmapPreview = allowBeatmapPreview,
                 UseVirtualComparisonPreview = useVirtualComparisonPreview,
+                VirtualPreviewKeyCount = virtualPreviewKeyCount,
                 UseNoteComparisonOnly = useNoteComparisonOnly,
                 PreviewSource = PreviewState.Source.Value,
                 PreviewBeatmap = PreviewState.PreviewBeatmap,
@@ -899,6 +917,12 @@ namespace osu.Game.EzOsuGame.Edit
             return ezSkinConfig.Get<int>(Ez2Setting.ColumnTypeListSelect);
         }
 
+        private int getColourPreviewKeyMode()
+        {
+            int selected = ezSkinConfig.Get<int>(Ez2Setting.ColumnTypeListSelect);
+            return selected > 0 ? selected : 0;
+        }
+
         private bool canExportOsk() => RuntimeInfo.IsDesktop
                                        && !skinManager.CurrentSkin.Disabled
                                        && skinManager.CurrentSkinInfo.Value.PerformRead(s => !s.Protected);
@@ -1127,6 +1151,13 @@ namespace osu.Game.EzOsuGame.Edit
                 appearanceContent.RefreshFromContext(sceneContext);
                 applyEmbeddedPlayerToAppearanceContent();
                 refreshSceneBarPlayback();
+                return;
+            }
+
+            if (getSceneContent<EzSkinEditorPreviewHost>() is EzSkinEditorPreviewHost previewHost)
+            {
+                previewHost.RefreshFromContext(sceneContext);
+                Schedule(refreshSceneBarPlayback);
                 return;
             }
 

@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
     {
         private Drawable createStaticPartImpl(ISkin skin)
         {
-            var transformedSkin = createTransformedSkin(skin);
+            var transformedSkin = createTransformedSkin(skin, preview_key_count);
 
             return new SkinProvidingContainer(transformedSkin)
             {
@@ -55,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
         private Drawable createPreviewRow(ISkin skin, string label, bool isHold, int columnIndex = 0, bool isSpecial = false)
         {
-            var transformedSkin = createTransformedSkin(skin);
+            var transformedSkin = createTransformedSkin(skin, preview_key_count);
 
             ManiaHitObject hitObject = isHold
                 ? new HoldNote { StartTime = 0, Duration = 500, Column = columnIndex }

@@ -19,28 +19,33 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 {
     public partial class EzSkinLNEditorProvider
     {
-        private Drawable createDynamicPartImpl(ISkin skin)
+        private Drawable createDynamicPartImpl(ISkin skin, int keyCount)
         {
-            var transformedSkin = createTransformedSkin(skin);
+            var transformedSkin = createTransformedSkin(skin, keyCount);
 
             return new SkinProvidingContainer(transformedSkin)
             {
                 RelativeSizeAxes = Axes.Both,
-                Child = new VirtualPlayfieldPreview(),
+                Child = new VirtualPlayfieldPreview(keyCount),
             };
         }
 
-        private static ManiaBeatmap buildVirtualPreviewBeatmap()
+        private static ManiaBeatmap buildVirtualPreviewBeatmap(int keyCount)
         {
-            var beatmap = new ManiaBeatmap(new StageDefinition(preview_key_count));
+            var stageDefinition = new StageDefinition(keyCount);
+            var beatmap = new ManiaBeatmap(stageDefinition);
             const int spacing = preview_hold_duration;
-            const int cycle_length = spacing * preview_key_count;
+            int displayColumns = ManiaEzColumnLayout.GetDisplayColumnCount(stageDefinition);
+            int cycleLength = spacing * displayColumns;
 
             for (int cycle = 0; cycle < 16; cycle++)
             {
-                for (int column = 0; column < preview_key_count; column++)
+                for (int column = 0; column < keyCount; column++)
                 {
-                    double holdStart = cycle * cycle_length + (column + 1) * spacing;
+                    if (ManiaEzColumnLayout.ShouldSkipBeatmapColumn(stageDefinition, column))
+                        continue;
+
+                    double holdStart = cycle * cycleLength + (column + 1) * spacing;
                     double noteStart = holdStart - spacing * 0.75;
 
                     var note = new Note
@@ -67,6 +72,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
         private sealed partial class VirtualPlayfieldPreview : Container, IEzSkinEditorScenePlaybackSource
         {
+            private readonly int keyCount;
             private readonly StopwatchClock playbackClock = new StopwatchClock(true);
             private readonly FramedClock framedClock;
 
@@ -75,8 +81,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             private double beatmapMinTime;
             private double beatmapMaxTime;
 
-            public VirtualPlayfieldPreview()
+            public VirtualPlayfieldPreview(int keyCount)
             {
+                this.keyCount = keyCount;
                 framedClock = new FramedClock(playbackClock);
                 RelativeSizeAxes = Axes.Both;
             }
@@ -84,7 +91,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             [BackgroundDependencyLoader]
             private void load()
             {
-                previewBeatmap = buildVirtualPreviewBeatmap();
+                previewBeatmap = buildVirtualPreviewBeatmap(keyCount);
                 beatmapMinTime = 0;
                 beatmapMaxTime = Math.Max(previewBeatmap.GetLastObjectTime() + 1500, 1);
 

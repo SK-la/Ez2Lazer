@@ -53,9 +53,14 @@ namespace osu.Game.EzOsuGame.Edit
         public bool AllowBeatmapPreview { get; init; }
 
         /// <summary>
-        /// Size/colour scenes use the virtual playfield on the left and Note/LN comparison on the right.
+        /// Size scene uses the virtual playfield on the left and Note/LN comparison on the right.
         /// </summary>
         public bool UseVirtualComparisonPreview { get; init; }
+
+        /// <summary>
+        /// Mania column count for virtual playfield preview (0 = not ready, e.g. key mode not selected).
+        /// </summary>
+        public int VirtualPreviewKeyCount { get; init; }
 
         /// <summary>
         /// Note scene uses full-width live vs note-edit-snapshot comparison only.

@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 {
     public partial class EzSkinLNEditorProvider : ISkinEditorVirtualProvider
     {
-        public Drawable CreateDynamicPart(ISkin skin) => createDynamicPartImpl(skin);
+        public Drawable CreateDynamicPart(ISkin skin, int keyCount) => createDynamicPartImpl(skin, keyCount);
 
         public Drawable CreateStaticPart(ISkin skin) => createStaticPartImpl(skin);
 
@@ -26,10 +26,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
         private const int preview_column_width = 100;
         private const int preview_hold_duration = 1000;
 
-        private static ISkin createTransformedSkin(ISkin skin)
+        private static ISkin createTransformedSkin(ISkin skin, int keyCount)
         {
             var ruleset = new ManiaRuleset();
-            var beatmap = new ManiaBeatmap(new StageDefinition(preview_key_count));
+            var beatmap = new ManiaBeatmap(new StageDefinition(keyCount));
             return ruleset.CreateSkinTransformer(skin, beatmap) ?? skin;
         }
 
