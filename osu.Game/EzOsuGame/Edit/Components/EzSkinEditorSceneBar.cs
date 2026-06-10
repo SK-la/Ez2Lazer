@@ -11,7 +11,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
@@ -26,6 +25,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private const float padding = 10;
 
         public Bindable<EzSkinEditorSceneType> CurrentScene { get; } = new Bindable<EzSkinEditorSceneType>(EzSkinEditorSceneType.Appearance);
+
+        public EzSkinEditorPlaybackControls PlaybackControls { get; private set; } = null!;
 
         private readonly Dictionary<EzSkinEditorSceneType, SceneTabButton> tabButtons = new Dictionary<EzSkinEditorSceneType, SceneTabButton>();
 
@@ -48,32 +49,47 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     RelativeSizeAxes = Axes.Both,
                     Colour = overlayColourProvider.Background6,
                 },
-                new OsuScrollContainer(Direction.Horizontal)
+                new GridContainer
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Padding = new MarginPadding { Right = skin_dropdown_area_width },
-                    Child = new FillFlowContainer
+                    ColumnDimensions = new[]
                     {
-                        Name = @"Ez scene library",
-                        AutoSizeAxes = Axes.X,
-                        RelativeSizeAxes = Axes.Y,
-                        Spacing = new Vector2(padding),
-                        Padding = new MarginPadding(padding),
-                        Direction = FillDirection.Horizontal,
-                        Children = buildSceneButtons().Prepend(new OsuSpriteText
-                        {
-                            Text = EzEditorStrings.SCENE_LIBRARY_LABEL,
-                            Anchor = Anchor.CentreLeft,
-                            Origin = Anchor.CentreLeft,
-                            Margin = new MarginPadding(10),
-                        }).ToArray(),
+                        new Dimension(GridSizeMode.AutoSize),
+                        new Dimension(),
+                        new Dimension(GridSizeMode.Absolute, skin_dropdown_area_width),
                     },
-                },
-                new EzSkinEditorSkinDropdown
-                {
-                    Anchor = Anchor.CentreRight,
-                    Origin = Anchor.CentreRight,
-                    Margin = new MarginPadding { Right = padding },
+                    Content = new[]
+                    {
+                        new Drawable[]
+                        {
+                            new FillFlowContainer
+                            {
+                                Name = @"Ez scene library",
+                                AutoSizeAxes = Axes.X,
+                                RelativeSizeAxes = Axes.Y,
+                                Spacing = new Vector2(padding),
+                                Padding = new MarginPadding(padding),
+                                Direction = FillDirection.Horizontal,
+                                Children = buildSceneButtons().Prepend(new OsuSpriteText
+                                {
+                                    Text = EzEditorStrings.SCENE_LIBRARY_LABEL,
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                    Margin = new MarginPadding(10),
+                                }).ToArray(),
+                            },
+                            PlaybackControls = new EzSkinEditorPlaybackControls
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                            },
+                            new EzSkinEditorSkinDropdown
+                            {
+                                Anchor = Anchor.CentreRight,
+                                Origin = Anchor.CentreRight,
+                                Margin = new MarginPadding { Right = padding },
+                            },
+                        },
+                    },
                 },
             };
         }

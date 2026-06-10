@@ -29,8 +29,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// </summary>
     public partial class EzSkinEditorBeatmapPreviewHost : Container
     {
-        private const float playback_controls_height = 48;
-
         private readonly EzSkinEditorSceneContext context;
 
         private readonly StopwatchClock previewClock = new StopwatchClock();
@@ -38,7 +36,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private Container stageViewport = null!;
         private Container stageScaleContainer = null!;
-        private EzSkinEditorPlaybackControls playbackControls = null!;
 
         private DrawableRuleset? drawableRuleset;
         private IManiaStaticPreviewRenderer? maniaStaticRenderer;
@@ -47,11 +44,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private IBeatmap? playableBeatmap;
         private RulesetInfo? rulesetInfo;
         private EzBeatmapPreviewMode previewMode;
-        private double beatmapMinTime;
-        private double beatmapMaxTime;
-        private double lastProgressDisplayTime = double.MinValue;
-
         private Bindable<EzBeatmapPreviewMode>? previewModeBindable;
+
+        public double BeatmapMinTime { get; private set; }
+
+        public double BeatmapMaxTime { get; private set; }
+
+        public double CurrentTime => previewClock.CurrentTime;
+
+        public bool HasActivePreview => playableBeatmap != null;
 
         public EzSkinEditorBeatmapPreviewHost(EzSkinEditorSceneContext context)
         {
@@ -69,53 +70,28 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 previewModeBindable.BindValueChanged(onPreviewModeChanged, true);
             }
 
-            InternalChild = new GridContainer
+            InternalChild = stageViewport = new Container
             {
                 RelativeSizeAxes = Axes.Both,
-                RowDimensions = new[]
+                Masking = true,
+                Padding = new MarginPadding(10),
+                Child = stageScaleContainer = new Container
                 {
-                    new Dimension(GridSizeMode.Relative, 1),
-                    new Dimension(GridSizeMode.Absolute, playback_controls_height),
-                },
-                Content = new[]
-                {
-                    new Drawable[]
-                    {
-                        stageViewport = new Container
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Masking = true,
-                            Padding = new MarginPadding(10),
-                            Child = stageScaleContainer = new Container
-                            {
-                                Anchor = Anchor.Centre,
-                                Origin = Anchor.Centre,
-                                RelativeSizeAxes = Axes.Both,
-                            },
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        playbackControls = new EzSkinEditorPlaybackControls
-                        {
-                            OnSeek = seekTo,
-                            OnPlayStateChanged = setPlaying,
-                        },
-                    },
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = Axes.Both,
                 },
             };
 
             if (context.PreviewBeatmap == null || context.PreviewRuleset == null)
             {
                 stageScaleContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_BEATMAP_NOT_LOADED);
-                playbackControls.Alpha = 0;
                 return;
             }
 
             if (!EzSkinEditorPreviewModes.SupportsBeatmapPreview(context.PreviewRuleset))
             {
                 stageScaleContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_RULESET_PREVIEW_NOT_SUPPORTED);
-                playbackControls.Alpha = 0;
                 return;
             }
 
@@ -140,7 +116,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
             catch
             {
                 stageScaleContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_BEATMAP_LOAD_FAILED);
-                playbackControls.Alpha = 0;
                 return;
             }
 
@@ -148,26 +123,16 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
 
             playableBeatmap = beatmap;
-            beatmapMinTime = 0;
-            beatmapMaxTime = Math.Max(beatmap.BeatmapInfo.Length, beatmap.HitObjects.Count > 0 ? beatmap.GetLastObjectTime() + 1000 : beatmapMinTime + 1);
-
-            playbackControls.Alpha = 1;
-            playbackControls.SetRange(beatmapMinTime, beatmapMaxTime);
+            BeatmapMinTime = 0;
+            BeatmapMaxTime = Math.Max(beatmap.BeatmapInfo.Length, beatmap.HitObjects.Count > 0 ? beatmap.GetLastObjectTime() + 1000 : BeatmapMinTime + 1);
 
             mountPreview(token);
-            previewClock.Seek(beatmapMinTime);
-            updateProgressDisplay(beatmapMinTime);
+            previewClock.Seek(BeatmapMinTime);
 
             if (isDynamicPlayback)
-            {
-                playbackControls.SetPlaying(true);
                 previewClock.Start();
-            }
             else
-            {
-                playbackControls.SetPlaying(false);
                 previewClock.Stop();
-            }
         }
 
         private void mountPreview(CancellationToken token)
@@ -260,17 +225,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             base.Update();
 
-            if (isDynamicPlayback && drawableRuleset != null && previewClock.IsRunning)
-            {
-                if (previewClock.CurrentTime >= beatmapMaxTime)
-                    previewClock.Seek(beatmapMinTime);
-
-                if (previewClock.CurrentTime - lastProgressDisplayTime >= 16)
-                {
-                    updateProgressDisplay(previewClock.CurrentTime);
-                    lastProgressDisplayTime = previewClock.CurrentTime;
-                }
-            }
+            if (isDynamicPlayback && drawableRuleset != null && previewClock.IsRunning && previewClock.CurrentTime >= BeatmapMaxTime)
+                previewClock.Seek(BeatmapMinTime);
         }
 
         protected override void UpdateAfterChildren()
@@ -293,9 +249,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
             stageScaleContainer.Scale = new Vector2(Math.Max(0.05f, scale));
         }
 
-        private void seekTo(double time)
+        public void Seek(double time)
         {
-            double clamped = Math.Clamp(time, beatmapMinTime, beatmapMaxTime);
+            double clamped = Math.Clamp(time, BeatmapMinTime, BeatmapMaxTime);
             previewClock.Seek(clamped);
 
             if (maniaStaticRenderer != null)
@@ -304,29 +260,20 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
                 if (maniaStaticRenderer is StaticScrollPreviewRenderer scrollRenderer)
                 {
-                    float progress = beatmapMaxTime > beatmapMinTime
-                        ? (float)((clamped - beatmapMinTime) / (beatmapMaxTime - beatmapMinTime))
+                    float progress = BeatmapMaxTime > BeatmapMinTime
+                        ? (float)((clamped - BeatmapMinTime) / (BeatmapMaxTime - BeatmapMinTime))
                         : 0;
                     scrollRenderer.SetScrollProgress(progress);
                 }
             }
-
-            updateProgressDisplay(clamped);
         }
 
-        private void setPlaying(bool playing)
+        public void SetPlaying(bool playing)
         {
             if (playing)
                 previewClock.Start();
             else
                 previewClock.Stop();
-
-            playbackControls.SetPlaying(playing);
-        }
-
-        private void updateProgressDisplay(double time)
-        {
-            playbackControls.SetCurrentTime(time);
         }
 
         private void disposePreviewResources()
@@ -346,15 +293,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
 
             if (change.NewValue == EzBeatmapPreviewMode.Dynamic)
-            {
-                playbackControls.SetPlaying(true);
                 previewClock.Start();
-            }
             else
-            {
-                playbackControls.SetPlaying(false);
                 previewClock.Stop();
-            }
 
             beginLoad();
         }

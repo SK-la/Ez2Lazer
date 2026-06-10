@@ -107,6 +107,8 @@ namespace osu.Game.EzOsuGame.Edit
         private string embeddedPlayerBeatmapHash = string.Empty;
         private int embeddedPlayerRulesetId;
         private Guid embeddedPlayerSkinId;
+        private double lastSceneBarProgressDisplayTime = double.MinValue;
+        private Bindable<EzBeatmapPreviewMode>? sceneBarPreviewModeBindable;
 
         public Bindable<EzSkinEditorSceneType> CurrentScene => sceneBar.CurrentScene;
 
@@ -265,6 +267,68 @@ namespace osu.Game.EzOsuGame.Edit
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             bindConfigPreviewRefresh();
+            bindSceneBarPlayback();
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            var player = embeddedPlayer;
+
+            if (sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Appearance || player == null)
+                return;
+
+            if (!player.GameplayClock.IsRunning)
+                return;
+
+            if (player.GameplayClock.CurrentTime - lastSceneBarProgressDisplayTime < 16)
+                return;
+
+            sceneBar.PlaybackControls.SetCurrentTime(player.GameplayClock.CurrentTime);
+            lastSceneBarProgressDisplayTime = player.GameplayClock.CurrentTime;
+        }
+
+        private void bindSceneBarPlayback()
+        {
+            var controls = sceneBar.PlaybackControls;
+            controls.OnSeek = seekSceneBarPlayback;
+            controls.OnPlayStateChanged = setSceneBarPlaybackPlaying;
+
+            sceneBarPreviewModeBindable = PreviewState.Mode.GetBoundCopy();
+            sceneBarPreviewModeBindable.BindValueChanged(mode =>
+            {
+                bool playing = mode.NewValue == EzBeatmapPreviewMode.Dynamic;
+                embeddedPlayer?.SetPlaying(playing);
+                sceneBar.PlaybackControls.SetPlaying(playing);
+            }, true);
+        }
+
+        private void seekSceneBarPlayback(double time) => embeddedPlayer?.Seek(time);
+
+        private void setSceneBarPlaybackPlaying(bool playing)
+        {
+            if (playing)
+                PreviewState.ResumeBeatmapPlayback();
+            else
+                PreviewState.PauseBeatmapPlayback();
+        }
+
+        private void refreshSceneBarPlayback()
+        {
+            var controls = sceneBar.PlaybackControls;
+            var player = embeddedPlayer;
+
+            if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance && player != null && player.CanBeMounted)
+            {
+                controls.Alpha = 1;
+                controls.SetRange(player.BeatmapMinTime, player.BeatmapMaxTime);
+                controls.SetCurrentTime(player.GameplayClock.CurrentTime);
+                controls.SetPlaying(PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic);
+                return;
+            }
+
+            controls.Alpha = 0;
         }
 
         private void onSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
@@ -330,6 +394,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance)
                 mountAppearanceEmbeddedPlayer();
 
+            refreshSceneBarPlayback();
             menuBar.RefreshMenuState();
         }
 
@@ -473,7 +538,11 @@ namespace osu.Game.EzOsuGame.Edit
             applyEmbeddedPlayerToAppearanceContent();
 
             bool shouldPlay = PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic;
-            Schedule(() => embeddedPlayer?.SetPlaying(shouldPlay));
+            Schedule(() =>
+            {
+                embeddedPlayer?.SetPlaying(shouldPlay);
+                refreshSceneBarPlayback();
+            });
         }
 
         private T? getSceneContent<T>() where T : Drawable
@@ -1049,6 +1118,7 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 appearanceContent.RefreshFromContext(sceneContext);
                 applyEmbeddedPlayerToAppearanceContent();
+                refreshSceneBarPlayback();
                 return;
             }
 
