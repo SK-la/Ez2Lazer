@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Extensions;
 using SixLabors.ImageSharp;
@@ -20,6 +21,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Cursor;
 using osu.Game.IO;
@@ -43,6 +45,7 @@ namespace osu.Game.EzOsuGame.Edit
     // M7: preview toolbar + skin popover + virtual comparison on size/colour scenes
     // M8: size/colour virtual provider registration fix
     // M9: config snapshot comparison + create/restore snapshot + auto-save on navigate
+    // M10: Note scene with independent note-edit snapshot comparison + export
 
     /// <summary>
     /// Ez skin editor screen with menu bar, scene bar, scene content and toolbox-style settings sidebar.
@@ -92,6 +95,8 @@ namespace osu.Game.EzOsuGame.Edit
         private bool attemptedGlobalBeatmapPreview;
         private bool comparisonSnapshotInitialized;
         private Guid comparisonSnapshotSkinId;
+        private bool noteSnapshotInitialized;
+        private Guid noteSnapshotSkinId;
         private bool configPreviewRefreshBound;
 
         private ISkinEditorVirtualProvider? provider;
@@ -198,6 +203,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                 CanWriteColoursToSkinIni = () => SkinIniSession is { IsSupported: true } && getCurrentKeyMode() > 0,
                                                 CanWriteSizesToSkinIni = () => SkinIniSession is { IsSupported: true } && getCurrentKeyMode() > 0,
                                                 CanExportOsk = canExportOsk,
+                                                CanUseConfigSnapshot = () => sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Note,
                                             },
                                             topToolbar = new EzSkinEditorTopToolbar
                                             {
@@ -282,6 +288,14 @@ namespace osu.Game.EzOsuGame.Edit
 
         internal EzSkinEditorComparisonSnapshot ComparisonSnapshotForTesting { get; } = new EzSkinEditorComparisonSnapshot();
 
+        internal EzSkinEditorNoteEditSession NoteSessionForTesting { get; } = new EzSkinEditorNoteEditSession();
+
+        internal EzSkinEditorNoteEditSnapshot NoteSnapshotForTesting { get; } = new EzSkinEditorNoteEditSnapshot();
+
+        internal void CreateNoteSnapshotForTesting() => createNoteSnapshot();
+
+        internal void RestoreNoteSnapshotForTesting() => restoreNoteSnapshot();
+
         private void refreshScene()
         {
             ensureGlobalBeatmapPreview();
@@ -292,6 +306,7 @@ namespace osu.Game.EzOsuGame.Edit
             ensureSkinIniSession();
             ensureSkinJsonSession();
             ensureComparisonSnapshotForCurrentSkin();
+            ensureNoteSnapshotForCurrentSkin();
 
             sceneContext = buildSceneContext();
             applyCurrentScene();
@@ -357,6 +372,7 @@ namespace osu.Game.EzOsuGame.Edit
                                        && PreviewState.Source.Value == EzSkinEditorPreviewSource.Beatmap;
 
             bool useVirtualComparisonPreview = currentScene is EzSkinEditorSceneType.Size or EzSkinEditorSceneType.Colour;
+            bool useNoteComparisonOnly = currentScene == EzSkinEditorSceneType.Note;
 
             // Size/colour scenes always use the mania LN virtual provider, not the loaded beatmap ruleset.
             var previewBeatmap = allowBeatmapPreview
@@ -377,11 +393,17 @@ namespace osu.Game.EzOsuGame.Edit
                 CommitSkinIni = commitSkinIni,
                 AllowBeatmapPreview = allowBeatmapPreview,
                 UseVirtualComparisonPreview = useVirtualComparisonPreview,
+                UseNoteComparisonOnly = useNoteComparisonOnly,
                 PreviewSource = PreviewState.Source.Value,
                 PreviewBeatmap = PreviewState.PreviewBeatmap,
                 PreviewRuleset = PreviewState.Ruleset.Value,
                 PreviewMode = PreviewState.Mode.Value,
-                ComparisonSnapshot = ComparisonSnapshotForTesting,
+                ComparisonSnapshot = useNoteComparisonOnly ? null : ComparisonSnapshotForTesting,
+                NoteSession = NoteSessionForTesting,
+                NoteSnapshot = NoteSnapshotForTesting,
+                CreateNoteSnapshot = createNoteSnapshot,
+                RestoreNoteSnapshot = restoreNoteSnapshot,
+                ExportNotePreview = exportNotePreview,
             };
         }
 
@@ -693,6 +715,105 @@ namespace osu.Game.EzOsuGame.Edit
             ComparisonSnapshotForTesting.ApplyTo(ezSkinConfig, SkinIniSession);
             postNotification(EzEditorStrings.NOTIFY_RESTORED_CONFIG_SNAPSHOT);
             refreshScene();
+        }
+
+        private void ensureNoteSnapshotForCurrentSkin()
+        {
+            var currentSkinId = skinManager.CurrentSkinInfo.Value.ID;
+
+            if (noteSnapshotInitialized && noteSnapshotSkinId == currentSkinId)
+                return;
+
+            initializeNoteSessionDefaults();
+            recaptureNoteSnapshot();
+            noteSnapshotInitialized = true;
+            noteSnapshotSkinId = currentSkinId;
+        }
+
+        private void initializeNoteSessionDefaults()
+        {
+            if (NoteSessionForTesting.Ruleset.Value is not null)
+                return;
+
+            var profile = EzSkinEditorNoteRulesetProfileRegistry.All.FirstOrDefault();
+
+            if (profile == null)
+                return;
+
+            NoteSessionForTesting.Ruleset.Value = profile.RulesetInfo;
+            NoteSessionForTesting.VariantId.Value = profile.GetDefaultVariantId(getEditorSkin(), NoteSessionForTesting.Part.Value);
+        }
+
+        private void recaptureNoteSnapshot()
+        {
+            NoteSnapshotForTesting.CaptureFrom(NoteSessionForTesting);
+        }
+
+        private void createNoteSnapshot()
+        {
+            recaptureNoteSnapshot();
+            postNotification(EzEditorStrings.NOTIFY_CREATED_NOTE_SNAPSHOT);
+            refreshScene();
+        }
+
+        private void restoreNoteSnapshot()
+        {
+            NoteSnapshotForTesting.ApplyTo(NoteSessionForTesting);
+            postNotification(EzEditorStrings.NOTIFY_RESTORED_NOTE_SNAPSHOT);
+            refreshScene();
+        }
+
+        private void exportNotePreview()
+        {
+            if (!RuntimeInfo.IsDesktop)
+                return;
+
+            var skinInfo = skinManager.CurrentSkinInfo.Value;
+
+            if (skinInfo.PerformRead(s => s.Protected))
+            {
+                postNotification(EzEditorStrings.NOTIFY_CANNOT_EXPORT_NOTE_PREVIEW);
+                return;
+            }
+
+            string exportName = string.IsNullOrWhiteSpace(NoteSessionForTesting.ExportName.Value)
+                ? "note-preview"
+                : NoteSessionForTesting.ExportName.Value.Trim();
+
+            foreach (char invalid in Path.GetInvalidFileNameChars())
+                exportName = exportName.Replace(invalid, '_');
+
+            host.TakeScreenshotAsync().ContinueWith(async task =>
+            {
+                if (task.IsFaulted)
+                {
+                    Schedule(() => postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORT_FAILED, task.Exception?.GetBaseException().Message ?? "unknown error")));
+                    return;
+                }
+
+                try
+                {
+                    using Image<Rgba32> image = task.GetResultSafely();
+                    var detached = skinInfo.PerformRead(s => s.Detach());
+                    var edit = await skinManager.BeginExternalEditing(detached).ConfigureAwait(false);
+                    string directory = Path.Combine(edit.MountedPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), "_ez_note_edit");
+                    Directory.CreateDirectory(directory);
+                    string filePath = Path.Combine(directory, $"{exportName}.png");
+                    image.SaveAsPng(filePath);
+
+                    Schedule(() =>
+                    {
+                        host.OpenFileExternally(directory + Path.DirectorySeparatorChar);
+                        postNotification(EzEditorStrings.NOTIFY_NOTE_EXPORTED);
+                    });
+
+                    await edit.Finish().ConfigureAwait(false);
+                }
+                catch (Exception e)
+                {
+                    Schedule(() => postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORT_FAILED, e.Message)));
+                }
+            }, TaskScheduler.Default);
         }
 
         private void persistEditorConfig()

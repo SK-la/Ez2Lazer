@@ -4,6 +4,7 @@
 using System;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.Rulesets;
 using osu.Game.Skinning;
 
@@ -39,6 +40,21 @@ namespace osu.Game.EzOsuGame.Edit
         /// Size/colour scenes use the virtual playfield on the left and Note/LN comparison on the right.
         /// </summary>
         public bool UseVirtualComparisonPreview { get; init; }
+
+        /// <summary>
+        /// Note scene uses full-width live vs note-edit-snapshot comparison only.
+        /// </summary>
+        public bool UseNoteComparisonOnly { get; init; }
+
+        public EzSkinEditorNoteEditSession? NoteSession { get; init; }
+
+        public EzSkinEditorNoteEditSnapshot? NoteSnapshot { get; init; }
+
+        public Action? CreateNoteSnapshot { get; init; }
+
+        public Action? RestoreNoteSnapshot { get; init; }
+
+        public Action? ExportNotePreview { get; init; }
 
         public IWorkingBeatmap? PreviewBeatmap { get; init; }
 

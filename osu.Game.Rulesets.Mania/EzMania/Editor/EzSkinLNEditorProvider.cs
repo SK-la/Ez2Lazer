@@ -5,6 +5,7 @@ using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Edit;
+using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Rulesets.UI.Scrolling.Algorithms;
@@ -35,6 +36,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
         {
             // Mania ruleset online ID is stable across osu! releases.
             SkinEditorProviderRegistry.Register(3, () => new EzSkinLNEditorProvider());
+            EzSkinEditorNoteRulesetProfileRegistry.Register(new ManiaEzSkinEditorNoteRulesetProfile());
         }
 
         protected sealed class PreviewScrollingInfo : IScrollingInfo

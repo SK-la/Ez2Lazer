@@ -63,6 +63,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Func<bool>? CanExportPreviewImage { get; set; }
 
+        public Func<bool>? CanUseConfigSnapshot { get; set; }
+
         private readonly EditorMenuItem createConfigSnapshotItem;
         private readonly EditorMenuItem restoreConfigSnapshotItem;
         private readonly EditorMenuItem exportPreviewImageItem;
@@ -121,8 +123,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public void RefreshMenuState()
         {
-            createConfigSnapshotItem.Action.Disabled = false;
-            restoreConfigSnapshotItem.Action.Disabled = false;
+            bool canUseConfigSnapshot = CanUseConfigSnapshot?.Invoke() ?? true;
+            createConfigSnapshotItem.Action.Disabled = !canUseConfigSnapshot;
+            restoreConfigSnapshotItem.Action.Disabled = !canUseConfigSnapshot;
             exportPreviewImageItem.Action.Disabled = !(CanExportPreviewImage?.Invoke() ?? false);
             createJsonItem.Action.Disabled = !(CanCreateEzSkinJson?.Invoke() ?? false);
             updateSnapshotItem.Action.Disabled = !(CanUpdateEzSkinJsonSnapshot?.Invoke() ?? false);
