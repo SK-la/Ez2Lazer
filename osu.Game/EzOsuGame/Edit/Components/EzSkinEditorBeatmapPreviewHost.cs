@@ -3,15 +3,14 @@
 
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
-using osu.Framework.Extensions;
+using osu.Framework.Bindables;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.Graphics.Sprites;
@@ -51,6 +50,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private double beatmapMaxTime;
         private double nextDynamicLoopStartTime;
 
+        private Bindable<EzBeatmapPreviewMode>? previewModeBindable;
+
         public EzSkinEditorBeatmapPreviewHost(EzSkinEditorSceneContext context)
         {
             this.context = context;
@@ -61,6 +62,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
         [BackgroundDependencyLoader]
         private void load()
         {
+            if (context.PreviewState != null)
+            {
+                previewModeBindable = context.PreviewState.Mode.GetBoundCopy();
+                previewModeBindable.BindValueChanged(onPreviewModeChanged, true);
+            }
+
             InternalChild = stageViewport = new Container
             {
                 RelativeSizeAxes = Axes.Both,
@@ -96,43 +103,37 @@ namespace osu.Game.EzOsuGame.Edit.Components
             loadCancellation = new CancellationTokenSource();
             var token = loadCancellation.Token;
 
-            Task.Run(() =>
-            {
-                token.ThrowIfCancellationRequested();
+            IBeatmap beatmap;
+            double startTime;
 
+            try
+            {
                 var ruleset = rulesetInfo!;
-                var beatmap = context.PreviewBeatmap!.GetPlayableBeatmap(ruleset);
-                double startTime = computeDefaultStartTime(beatmap, ruleset, beatmap.HitObjects.Count > 0 ? beatmap.HitObjects[0].StartTime : 0);
-                return (beatmap, startTime);
-            }, token).ContinueWith(task =>
+                beatmap = context.PreviewBeatmap!.GetPlayableBeatmap(ruleset);
+                startTime = computeDefaultStartTime(beatmap, ruleset, beatmap.HitObjects.Count > 0 ? beatmap.HitObjects[0].StartTime : 0);
+            }
+            catch
             {
-                Schedule(() =>
-                {
-                    if (token.IsCancellationRequested || task.IsCanceled)
-                        return;
+                stageScaleContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_BEATMAP_LOAD_FAILED);
+                return;
+            }
 
-                    if (task.IsFaulted)
-                    {
-                        stageScaleContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_BEATMAP_LOAD_FAILED);
-                        return;
-                    }
+            if (token.IsCancellationRequested)
+                return;
 
-                    var (beatmap, startTime) = task.GetResultSafely();
-                    playableBeatmap = beatmap;
-                    playbackStartTime = startTime;
-                    beatmapMinTime = 0;
-                    beatmapMaxTime = Math.Max(beatmap.BeatmapInfo.Length, beatmapMinTime + 1);
+            playableBeatmap = beatmap;
+            playbackStartTime = startTime;
+            beatmapMinTime = 0;
+            beatmapMaxTime = Math.Max(beatmap.BeatmapInfo.Length, beatmapMinTime + 1);
 
-                    mountPreview(token);
-                    previewClock.Seek(playbackStartTime);
+            mountPreview(token);
+            previewClock.Seek(playbackStartTime);
 
-                    if (previewMode == EzBeatmapPreviewMode.Dynamic)
-                    {
-                        nextDynamicLoopStartTime = Time.Current;
-                        previewClock.Start();
-                    }
-                });
-            }, CancellationToken.None);
+            if (previewMode == EzBeatmapPreviewMode.Dynamic)
+            {
+                nextDynamicLoopStartTime = Time.Current;
+                previewClock.Start();
+            }
         }
 
         private void mountPreview(CancellationToken token)
@@ -171,15 +172,18 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             LoadComponentAsync(previewRoot, loaded =>
             {
-                if (token.IsCancellationRequested)
+                Schedule(() =>
                 {
-                    loaded.Dispose();
-                    return;
-                }
+                    if (token.IsCancellationRequested || !IsLoaded || IsDisposed)
+                    {
+                        loaded.Dispose();
+                        return;
+                    }
 
-                stageScaleContainer.Child = loaded;
-                drawableRuleset = newDrawableRuleset;
-                maniaStaticRenderer = null;
+                    stageScaleContainer.Child = loaded;
+                    drawableRuleset = newDrawableRuleset;
+                    maniaStaticRenderer = null;
+                });
             }, token);
         }
 
@@ -209,11 +213,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
             drawableRuleset = null;
         }
 
+        private bool isDynamicPlayback =>
+            (previewModeBindable?.Value ?? previewMode) == EzBeatmapPreviewMode.Dynamic;
+
         protected override void Update()
         {
             base.Update();
 
-            if (previewMode != EzBeatmapPreviewMode.Dynamic || drawableRuleset == null)
+            if (!isDynamicPlayback || drawableRuleset == null)
                 return;
 
             if (previewClock.IsRunning)
@@ -260,12 +267,32 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 stageScaleContainer.Clear(true);
         }
 
+        private void onPreviewModeChanged(ValueChangedEvent<EzBeatmapPreviewMode> change)
+        {
+            previewMode = change.NewValue;
+
+            if (change.NewValue == EzBeatmapPreviewMode.Dynamic)
+            {
+                nextDynamicLoopStartTime = Time.Current;
+                previewClock.Start();
+            }
+            else
+            {
+                nextDynamicLoopStartTime = double.PositiveInfinity;
+                previewClock.Stop();
+            }
+        }
+
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing)
             {
+                previewModeBindable?.UnbindAll();
                 loadCancellation?.Cancel();
-                disposePreviewResources();
+                loadCancellation?.Dispose();
+                loadCancellation = null;
+                drawableRuleset = null;
+                maniaStaticRenderer = null;
             }
 
             base.Dispose(isDisposing);

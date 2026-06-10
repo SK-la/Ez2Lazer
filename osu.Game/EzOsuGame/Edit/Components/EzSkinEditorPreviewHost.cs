@@ -64,7 +64,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private void populatePlayback()
         {
-            if (context.PreviewSource == EzSkinEditorPreviewSource.Beatmap)
+            if (context.AllowBeatmapPreview && context.PreviewSource == EzSkinEditorPreviewSource.Beatmap)
             {
                 playbackContainer.Child = new EzSkinEditorBeatmapPreviewHost(context).With(d =>
                 {

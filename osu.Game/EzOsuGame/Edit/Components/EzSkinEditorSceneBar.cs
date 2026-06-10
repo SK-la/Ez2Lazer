@@ -33,11 +33,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             RelativeSizeAxes = Axes.X;
             Height = HEIGHT;
+            Masking = true;
         }
 
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider overlayColourProvider)
         {
+            const float skin_dropdown_area_width = EzSkinEditorSkinDropdown.DEFAULT_WIDTH + padding * 2;
+
             InternalChildren = new Drawable[]
             {
                 new Box
@@ -48,6 +51,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 new OsuScrollContainer(Direction.Horizontal)
                 {
                     RelativeSizeAxes = Axes.Both,
+                    Padding = new MarginPadding { Right = skin_dropdown_area_width },
                     Child = new FillFlowContainer
                     {
                         Name = @"Ez scene library",
@@ -64,6 +68,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
                             Margin = new MarginPadding(10),
                         }).ToArray(),
                     },
+                },
+                new EzSkinEditorSkinDropdown
+                {
+                    Anchor = Anchor.CentreRight,
+                    Origin = Anchor.CentreRight,
+                    Margin = new MarginPadding { Right = padding },
                 },
             };
         }

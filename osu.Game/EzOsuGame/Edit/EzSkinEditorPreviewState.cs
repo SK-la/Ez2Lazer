@@ -42,6 +42,12 @@ namespace osu.Game.EzOsuGame.Edit
             SuggestedKeyMode.Value = resolveKeyModeFromBeatmap(workingBeatmap);
         }
 
+        public bool HasBeatmapLoaded => Source.Value == EzSkinEditorPreviewSource.Beatmap && PreviewBeatmap != null;
+
+        public void PauseBeatmapPlayback() => Mode.Value = EzBeatmapPreviewMode.Static;
+
+        public void ResumeBeatmapPlayback() => Mode.Value = EzBeatmapPreviewMode.Dynamic;
+
         private static int? resolveKeyModeFromBeatmap(IWorkingBeatmap workingBeatmap)
         {
             if (workingBeatmap.BeatmapInfo.Ruleset.OnlineID != 3)

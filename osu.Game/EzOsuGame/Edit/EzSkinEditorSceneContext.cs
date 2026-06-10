@@ -30,6 +30,11 @@ namespace osu.Game.EzOsuGame.Edit
 
         public EzSkinEditorPreviewSource PreviewSource { get; init; } = EzSkinEditorPreviewSource.Static;
 
+        /// <summary>
+        /// Beatmap preview is only shown in the appearance scene.
+        /// </summary>
+        public bool AllowBeatmapPreview { get; init; }
+
         public IWorkingBeatmap? PreviewBeatmap { get; init; }
 
         public RulesetInfo? PreviewRuleset { get; init; }

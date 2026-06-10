@@ -33,6 +33,11 @@ namespace osu.Game.EzOsuGame.Edit
         public static EzBeatmapPreviewMode GetDefaultMode(RulesetInfo ruleset) =>
             IsManiaRuleset(ruleset) ? EzBeatmapPreviewMode.StaticFullMap : EzBeatmapPreviewMode.Static;
 
+        /// <summary>
+        /// Appearance scene loads a full playable beatmap preview.
+        /// </summary>
+        public static EzBeatmapPreviewMode GetAppearanceLoadMode(RulesetInfo ruleset) => EzBeatmapPreviewMode.Dynamic;
+
         public static EzBeatmapPreviewMode ValidateMode(EzBeatmapPreviewMode mode, RulesetInfo ruleset)
         {
             var available = GetAvailableModes(ruleset);
