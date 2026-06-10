@@ -53,13 +53,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             };
         }
 
-        private Drawable createPreviewRow(ISkin skin, string label, bool isHold)
+        private Drawable createPreviewRow(ISkin skin, string label, bool isHold, int columnIndex = 0, bool isSpecial = false)
         {
             var transformedSkin = createTransformedSkin(skin);
 
             ManiaHitObject hitObject = isHold
-                ? new HoldNote { StartTime = 0, Duration = 500, Column = 0 }
-                : new Note { StartTime = 0, Column = 0 };
+                ? new HoldNote { StartTime = 0, Duration = 500, Column = columnIndex }
+                : new Note { StartTime = 0, Column = columnIndex };
 
             hitObject.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
 
@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             {
                 RelativeSizeAxes = Axes.X,
                 Height = 260,
-                Child = new PreviewDependencyContainer(preview_key_count, 0, ManiaAction.Key1)
+                Child = new PreviewDependencyContainer(preview_key_count, columnIndex, ManiaAction.Key1, isSpecial)
                 {
                     Child = new EzNoteContainer(ScrollingDirection.Down, label)
                     {
@@ -181,14 +181,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             private readonly PreviewGameplayClock gameplayClockDependency = new PreviewGameplayClock();
             private readonly ManualClock previewClock = new ManualClock();
 
-            public PreviewDependencyContainer(int keyCount, int column, ManiaAction action)
+            public PreviewDependencyContainer(int keyCount, int column, ManiaAction action, bool isSpecial = false)
             {
                 RelativeSizeAxes = Axes.Both;
                 Clock = new FramedClock(previewClock);
 
                 stageDefinition = new StageDefinition(keyCount);
                 beatmapDependency = new ManiaBeatmap(stageDefinition);
-                columnDependency = new Column(column, isSpecial: false);
+                columnDependency = new Column(column, isSpecial: isSpecial);
                 columnDependency.Action.Value = action;
 
                 InternalChildren = new Drawable[]
