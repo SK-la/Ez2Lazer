@@ -160,7 +160,15 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
         private void updateColumnsType(int keyModeForList)
         {
-            if (!colorSettingsEnabled.Value)
+            if (!IsLoaded)
+                return;
+
+            Schedule(() => updateColumnsTypeInternal(keyModeForList));
+        }
+
+        private void updateColumnsTypeInternal(int keyModeForList)
+        {
+            if (!IsLoaded || !colorSettingsEnabled.Value)
                 return;
 
             if (columnSelectorCache.TryGetValue(keyModeForList, out var cachedSelectors))

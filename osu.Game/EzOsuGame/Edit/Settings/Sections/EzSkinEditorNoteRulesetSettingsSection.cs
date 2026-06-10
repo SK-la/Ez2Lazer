@@ -63,12 +63,9 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 Spacing = new Vector2(8),
             });
 
-            session.Ruleset.BindValueChanged(_ =>
-            {
-                refreshRulesetSettings();
-                requestRefresh();
-            }, true);
-            session.Part.BindValueChanged(_ => requestRefresh());
+            session.Ruleset.BindValueChanged(_ => refreshRulesetSettings(), true);
+            session.Ruleset.BindValueChanged(_ => requestRefresh(), false);
+            session.Part.BindValueChanged(_ => requestRefresh(), false);
         }
 
         private void refreshRulesetSettings()
@@ -77,8 +74,10 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
             var profile = EzSkinEditorNoteRulesetProfileRegistry.Get(session.Ruleset.Value);
 
-            if (profile != null)
-                rulesetSettingsContainer.Add(profile.CreateRulesetSettingsContent());
+            var rulesetSettings = profile?.CreateRulesetSettingsContent();
+
+            if (rulesetSettings != null)
+                rulesetSettingsContainer.Add(rulesetSettings);
         }
     }
 }
