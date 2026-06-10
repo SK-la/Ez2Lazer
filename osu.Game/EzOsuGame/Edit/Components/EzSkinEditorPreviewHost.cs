@@ -4,6 +4,8 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Sprites;
 using osuTK.Graphics;
 
@@ -82,7 +84,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
             else
             {
-                playbackContainer.Child = createPlaceholder("Virtual playfield not supported");
+                playbackContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_VIRTUAL_PLAYFIELD_NOT_SUPPORTED);
             }
         }
 
@@ -99,11 +101,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
             else
             {
-                comparisonContainer.Child = createPlaceholder("Comparison preview not supported");
+                comparisonContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED);
             }
         }
 
-        private static OsuSpriteText createPlaceholder(string text) => new OsuSpriteText
+        private static OsuSpriteText createPlaceholder(LocalisableString text) => new OsuSpriteText
         {
             Anchor = Anchor.Centre,
             Origin = Anchor.Centre,

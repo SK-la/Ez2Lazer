@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 
@@ -18,7 +19,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     {
         public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.SkinIni;
 
-        public LocalisableString TabTitle => "skin.ini";
+        public LocalisableString TabTitle => EzEditorStrings.TAB_SKIN_INI;
 
         public Drawable CreateSceneContent(EzSkinEditorSceneContext context) => new EzSkinEditorPreviewHost(context);
 
@@ -31,23 +32,23 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
             {
                 new EzSkinEditorSidebarGroupDefinition
                 {
-                    Title = "General",
+                    Title = EzEditorStrings.GROUP_GENERAL,
                     CreateContent = () => new EzSkinEditorSkinIniGeneralSection(context.SkinIniSession),
                 },
                 new EzSkinEditorSidebarGroupDefinition
                 {
-                    Title = "Colours",
+                    Title = EzEditorStrings.GROUP_COLOURS,
                     CreateContent = () => new EzSkinEditorSkinIniColoursSection(context.SkinIniSession),
                 },
                 new EzSkinEditorSidebarGroupDefinition
                 {
-                    Title = "模式",
+                    Title = EzEditorStrings.GROUP_MODE,
                     CreateContent = () => new EzSkinEditorSkinIniManiaSection(context.SkinIniSession),
                 },
             };
         }
 
-        public Drawable CreateSidebarFooter(EzSkinEditorSceneContext context)
+        public Drawable? CreateSidebarFooter(EzSkinEditorSceneContext context)
         {
             if (context.SkinIniSession is not { IsSupported: true })
                 return null;
@@ -72,7 +73,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         {
             Child = new SaveButton
             {
-                Text = "保存 Skin.ini",
+                Text = EzEditorStrings.SKIN_INI_SAVE_BUTTON,
                 RelativeSizeAxes = Axes.X,
                 Height = 40,
                 Action = () => commitSkinIni?.Invoke(),

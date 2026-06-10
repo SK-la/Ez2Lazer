@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.Edit.Scenes
@@ -14,7 +15,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     {
         public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.Size;
 
-        public LocalisableString TabTitle => "尺寸";
+        public LocalisableString TabTitle => EzEditorStrings.TAB_SIZE;
 
         public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
             new EzSkinEditorPreviewHost(context, showComparison: true);
@@ -25,7 +26,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
             {
                 new EzSkinEditorSidebarGroupDefinition
                 {
-                    Title = "尺寸",
+                    Title = EzEditorStrings.GROUP_SIZE,
                     CreateContent = () => new EzSkinEditorSizeSettingsSection(),
                 },
             };
@@ -34,7 +35,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
             {
                 groups.Add(new EzSkinEditorSidebarGroupDefinition
                 {
-                    Title = "皮肤专用",
+                    Title = EzEditorStrings.GROUP_SKIN_SPECIFIC,
                     CreateContent = () => new EzSkinEditorSkinSpecificSettingsSection(context.EditorSkin),
                 });
             }

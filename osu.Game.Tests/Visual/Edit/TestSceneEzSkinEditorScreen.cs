@@ -14,6 +14,7 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays.Dialog;
@@ -118,7 +119,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("comparison grid visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Single().ChildrenOfType<GridContainer>().Any());
             AddUntilStep("at least one sidebar group", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
             AddAssert("no comparison placeholder", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("对比区") != true));
-            AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("Comparison preview not supported") != true));
+            AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED.ToString()) != true));
             AddUntilStep("static note label visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "Note"));
             AddUntilStep("static ln label visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "LN"));
             AddUntilStep("playback and comparison are horizontal", () =>
@@ -151,7 +152,7 @@ namespace osu.Game.Tests.Visual.Edit
             switchScene(EzSkinEditorSceneType.SkinIni);
 
             AddUntilStep("playback only host", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
-            AddUntilStep("save footer button", () => editorScreen.ChildrenOfType<OsuButton>().Any(b => b.Text.ToString() == "保存 Skin.ini"));
+            AddUntilStep("save footer button", () => editorScreen.ChildrenOfType<OsuButton>().Any(b => b.Text.ToString() == EzEditorStrings.SKIN_INI_SAVE_BUTTON.ToString()));
             AddUntilStep("three sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
             AddUntilStep("skin.ini form fields visible", () => editorScreen.ChildrenOfType<SettingsTextBox>().Any());
             AddAssert("no placeholder copy", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("M3 将在此") != true));
@@ -387,7 +388,7 @@ namespace osu.Game.Tests.Visual.Edit
             waitForScreenLoaded();
 
             AddUntilStep("config menu items", () => editorScreen.ChildrenOfType<EditorMenuBar>().Any()
-                                                    && editorScreen.ChildrenOfType<EditorMenuItem>().Any(i => i.Text.ToString() == "配置"));
+                                                    && editorScreen.ChildrenOfType<EditorMenuItem>().Any(i => i.Text.ToString() == EzEditorStrings.MENU_CONFIG.ToString()));
         }
 
         [Test]
@@ -481,9 +482,9 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
 
-            AddAssert("export osk menu present", () => editorScreen.ChildrenOfType<EditorMenuItem>().Any(i => i.Text.ToString() == "导出 .osk"));
+            AddAssert("export osk menu present", () => editorScreen.ChildrenOfType<EditorMenuItem>().Any(i => i.Text.ToString() == EzEditorStrings.MENU_EXPORT_OSK.ToString()));
             AddAssert("export disabled on built-in skin",
-                () => editorScreen.ChildrenOfType<EditorMenuItem>().First(i => i.Text.ToString() == "导出 .osk").Action.Disabled);
+                () => editorScreen.ChildrenOfType<EditorMenuItem>().First(i => i.Text.ToString() == EzEditorStrings.MENU_EXPORT_OSK.ToString()).Action.Disabled);
         }
     }
 }

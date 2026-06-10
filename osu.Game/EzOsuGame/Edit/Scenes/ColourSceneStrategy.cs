@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
+using osu.Game.EzOsuGame.Localization;
 
 namespace osu.Game.EzOsuGame.Edit.Scenes
 {
@@ -13,7 +14,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     {
         public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.Colour;
 
-        public LocalisableString TabTitle => "颜色";
+        public LocalisableString TabTitle => EzEditorStrings.TAB_COLOUR;
 
         public Drawable CreateSceneContent(EzSkinEditorSceneContext context) => new EzSkinEditorPreviewHost(context);
 
@@ -21,12 +22,12 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         {
             new EzSkinEditorSidebarGroupDefinition
             {
-                Title = "基础颜色",
+                Title = EzEditorStrings.GROUP_BASE_COLOURS,
                 CreateContent = () => new EzSkinEditorBaseColourSettingsSection(),
             },
             new EzSkinEditorSidebarGroupDefinition
             {
-                Title = "列配色",
+                Title = EzEditorStrings.GROUP_COLUMN_COLOURS,
                 CreateContent = () => new EzSkinEditorColumnColourSettingsSection(context.PreviewState),
             },
         };

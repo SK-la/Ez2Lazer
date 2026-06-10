@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input;
 using osu.Framework.Input.Events;
 using osu.Game.Graphics.Containers;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
@@ -91,7 +92,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             FillFlow.Add(new SettingsCheckbox
             {
-                LabelText = "固定显示",
+                LabelText = EzEditorStrings.SIDEBAR_PIN_LABEL,
                 Current = Pinned,
             });
 

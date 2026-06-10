@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -28,7 +29,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
             Add(new OsuSpriteText
             {
-                Text = "编辑当前皮肤的 skin.ini。保存前会自动备份到 Backup/。",
+                Text = EzEditorStrings.SKIN_INI_GENERAL_HINT,
                 Font = OsuFont.Default.With(size: 14),
                 Colour = Color4.Gray,
             });
@@ -83,7 +84,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         {
             public RawEditorPlaceholderButton()
             {
-                Text = "编辑原始 skin.ini";
+                Text = EzEditorStrings.SKIN_INI_RAW_EDITOR_PLACEHOLDER;
                 Enabled.Value = false;
             }
 

@@ -9,6 +9,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -57,7 +58,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                         Direction = FillDirection.Horizontal,
                         Children = buildSceneButtons().Prepend(new OsuSpriteText
                         {
-                            Text = "场景",
+                            Text = EzEditorStrings.SCENE_LIBRARY_LABEL,
                             Anchor = Anchor.CentreLeft,
                             Origin = Anchor.CentreLeft,
                             Margin = new MarginPadding(10),

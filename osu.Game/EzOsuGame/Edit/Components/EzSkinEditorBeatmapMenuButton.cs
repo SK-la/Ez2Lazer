@@ -51,7 +51,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public EzSkinEditorBeatmapMenuButton()
         {
-            Text = "实际谱面";
+            Text = EzEditorStrings.TOOLBAR_REAL_BEATMAP;
             Width = 110;
         }
 
@@ -119,7 +119,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 {
                     yield return new OsuSpriteText
                     {
-                        Text = "预览尚未支持",
+                        Text = EzEditorStrings.TOOLBAR_PREVIEW_NOT_SUPPORTED,
                         Font = OsuFont.Default.With(size: 12),
                         Colour = Color4.Gray,
                         Margin = new MarginPadding { Bottom = 4 },

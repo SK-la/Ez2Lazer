@@ -9,8 +9,10 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Localisation;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.Graphics;
@@ -62,7 +64,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             {
                 new OsuSpriteText
                 {
-                    Text = "Key Mode (键位数)",
+                    Text = EzEditorStrings.KEY_MODE_LABEL,
                     Font = OsuFont.GetFont(weight: FontWeight.Bold, size: 14),
                 }.WithUnderline(),
                 new SettingsDropdown<int>
@@ -180,7 +182,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             {
                 columnsContainer.Add(new OsuSpriteText
                 {
-                    Text = "请先选择键位数模式",
+                    Text = EzEditorStrings.SELECT_KEY_MODE_FIRST,
                     Font = OsuFont.GetFont(weight: FontWeight.Bold),
                     Margin = new MarginPadding(5f),
                 });
@@ -194,7 +196,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         {
             columnsContainer.Add(new OsuSpriteText
             {
-                Text = $"{keyMode}K ColumnType 列类型",
+                Text = LocalisableString.Format(EzEditorStrings.COLUMN_TYPE_HEADER, keyMode),
                 Font = OsuFont.GetFont(weight: FontWeight.SemiBold),
                 Margin = new MarginPadding { Bottom = 5 },
             }.WithUnderline());

@@ -63,7 +63,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     {
                         new OsuSpriteText
                         {
-                            Text = "Base Colors (基础颜色)",
+                            Text = EzEditorStrings.BASE_COLOURS_HEADER,
                             Font = OsuFont.GetFont(weight: FontWeight.Bold, size: 14),
                         }.WithUnderline(),
                         SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_A, colorBindables[Ez2Setting.ColumnTypeA]),

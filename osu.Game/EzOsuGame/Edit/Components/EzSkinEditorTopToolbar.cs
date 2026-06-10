@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Overlays;
@@ -106,7 +107,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             public StaticPreviewButton()
             {
-                Text = "静态皮肤";
+                Text = EzEditorStrings.TOOLBAR_STATIC_SKIN;
                 Width = 100;
             }
 

@@ -8,12 +8,14 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Cursor;
 using osu.Game.IO;
 using osu.Game.Overlays;
@@ -270,7 +272,7 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 notifications?.Post(new SimpleNotification
                 {
-                    Text = "未找到可用谱面",
+                    Text = EzEditorStrings.NOTIFY_BEATMAP_NOT_FOUND,
                 });
                 return;
             }
@@ -391,11 +393,11 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (SkinJsonSession == null || !SkinJsonSession.CreateInitial(ezSkinConfig))
             {
-                postNotification("无法创建 EzSkin.json");
+                postNotification(EzEditorStrings.NOTIFY_CANNOT_CREATE_EZSKIN_JSON);
                 return;
             }
 
-            postNotification("已创建 EzSkin.json");
+            postNotification(EzEditorStrings.NOTIFY_CREATED_EZSKIN_JSON);
             refreshScene();
         }
 
@@ -405,11 +407,11 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (SkinJsonSession == null || !SkinJsonSession.Commit(ezSkinConfig))
             {
-                postNotification("无法更新 EzSkin.json 快照");
+                postNotification(EzEditorStrings.NOTIFY_CANNOT_UPDATE_EZSKIN_JSON_SNAPSHOT);
                 return;
             }
 
-            postNotification("已更新 EzSkin.json 快照");
+            postNotification(EzEditorStrings.NOTIFY_UPDATED_EZSKIN_JSON_SNAPSHOT);
             refreshScene();
         }
 
@@ -419,11 +421,11 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (SkinJsonSession == null || !SkinJsonSession.Remove())
             {
-                postNotification("无法移除 EzSkin.json");
+                postNotification(EzEditorStrings.NOTIFY_CANNOT_REMOVE_EZSKIN_JSON);
                 return;
             }
 
-            postNotification("已移除 EzSkin.json");
+            postNotification(EzEditorStrings.NOTIFY_REMOVED_EZSKIN_JSON);
             refreshScene();
         }
 
@@ -433,7 +435,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (SkinJsonSession is not { HasFile: true })
             {
-                postNotification("当前皮肤没有 EzSkin.json");
+                postNotification(EzEditorStrings.NOTIFY_NO_EZSKIN_JSON_ON_SKIN);
                 return;
             }
 
@@ -441,12 +443,12 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (json == null)
             {
-                postNotification("无法读取 EzSkin.json");
+                postNotification(EzEditorStrings.NOTIFY_CANNOT_READ_EZSKIN_JSON);
                 return;
             }
 
             EzSkinJsonBridge.Apply(EzSkinJsonDocument.Parse(json), ezSkinConfig);
-            postNotification("已从皮肤导入配置到内存");
+            postNotification(EzEditorStrings.NOTIFY_IMPORTED_FROM_SKIN_TO_MEMORY);
             refreshScene();
         }
 
@@ -456,7 +458,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (selector == null)
             {
-                postNotification("当前平台不支持文件选择");
+                postNotification(EzEditorStrings.NOTIFY_FILE_SELECTOR_NOT_SUPPORTED);
                 return;
             }
 
@@ -472,12 +474,12 @@ namespace osu.Game.EzOsuGame.Edit
                     else
                         EzSkinJsonBridge.Apply(document, ezSkinConfig);
 
-                    postNotification("已导入 JSON 配置");
+                    postNotification(EzEditorStrings.NOTIFY_IMPORTED_JSON);
                     refreshScene();
                 }
                 catch (Exception e)
                 {
-                    postNotification($"导入失败: {e.Message}");
+                    postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_IMPORT_FAILED, e.Message));
                 }
                 finally
                 {
@@ -495,11 +497,11 @@ namespace osu.Game.EzOsuGame.Edit
                 var exportStorage = (storage as OsuStorage)?.GetExportStorage() ?? storage.GetStorageForDirectory(@"exports");
                 string skinName = skinManager.CurrentSkinInfo.Value.PerformRead(s => s.Name);
                 string path = EzSkinJsonStorage.ExportToStorage(exportStorage, ezSkinConfig, skinName);
-                postNotification($"已导出到 {path}");
+                postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORTED_TO, path));
             }
             catch (Exception e)
             {
-                postNotification($"导出失败: {e.Message}");
+                postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORT_FAILED, e.Message));
             }
         }
 
@@ -509,11 +511,11 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (SkinIniSession == null || !EzSkinColourSkinIniWriter.TryWriteManiaColumnColours(keyMode, ezSkinConfig, SkinIniSession))
             {
-                postNotification("无法写入 skin.ini 列色");
+                postNotification(EzEditorStrings.NOTIFY_CANNOT_WRITE_SKIN_INI_COLOURS);
                 return;
             }
 
-            postNotification($"已将 {keyMode}K 列色写入 skin.ini 草稿，请应用保存");
+            postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_COLOURS_WRITTEN_TO_DRAFT, keyMode));
             refreshScene();
         }
 
@@ -523,11 +525,11 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (SkinIniSession == null || !EzSkinSizeSkinIniWriter.TryWriteManiaSizeSettings(keyMode, ezSkinConfig, SkinIniSession))
             {
-                postNotification("无法写入 skin.ini 尺寸");
+                postNotification(EzEditorStrings.NOTIFY_CANNOT_WRITE_SKIN_INI_SIZES);
                 return;
             }
 
-            postNotification($"已将 {keyMode}K 尺寸写入 skin.ini 草稿，请应用保存");
+            postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_SIZES_WRITTEN_TO_DRAFT, keyMode));
             refreshScene();
         }
 
@@ -535,7 +537,7 @@ namespace osu.Game.EzOsuGame.Edit
         {
             if (!canExportOsk())
             {
-                postNotification(RuntimeInfo.IsDesktop ? "当前皮肤无法导出" : "当前平台不支持导出");
+                postNotification(RuntimeInfo.IsDesktop ? EzEditorStrings.NOTIFY_CANNOT_EXPORT_SKIN : EzEditorStrings.NOTIFY_EXPORT_NOT_SUPPORTED_PLATFORM);
                 return;
             }
 
@@ -550,12 +552,12 @@ namespace osu.Game.EzOsuGame.Edit
                 }
 
                 skinManager.ExportCurrentSkin();
-                postNotification(committedSkinIni ? "已保存 skin.ini 并导出 .osk…" : "正在导出 .osk…");
+                postNotification(committedSkinIni ? EzEditorStrings.NOTIFY_SAVED_SKIN_INI_AND_EXPORTING_OSK : EzEditorStrings.NOTIFY_EXPORTING_OSK);
                 refreshScene();
             }
             catch (Exception e)
             {
-                postNotification($"导出失败: {e.Message}");
+                postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORT_FAILED, e.Message));
             }
         }
 
@@ -571,7 +573,7 @@ namespace osu.Game.EzOsuGame.Edit
                                        && !skinManager.CurrentSkin.Disabled
                                        && skinManager.CurrentSkinInfo.Value.PerformRead(s => !s.Protected);
 
-        private void postNotification(string text) => notifications?.Post(new SimpleNotification { Text = text });
+        private void postNotification(LocalisableString text) => notifications?.Post(new SimpleNotification { Text = text });
 
         private void onCurrentSkinInfoChanged(ValueChangedEvent<Live<SkinInfo>> skin)
         {
@@ -610,7 +612,7 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
-            dialogOverlay.Push(new ConfirmDialog("应用更改到皮肤？", () =>
+            dialogOverlay.Push(new ConfirmDialog(EzEditorStrings.EXIT_CONFIRM_APPLY_TO_SKIN, () =>
             {
                 applySettings();
 

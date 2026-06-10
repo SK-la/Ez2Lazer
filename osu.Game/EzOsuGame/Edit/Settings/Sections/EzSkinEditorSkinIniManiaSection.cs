@@ -5,7 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Localisation;
 using osu.Framework.Graphics.Containers;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
@@ -38,14 +40,14 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
             Add(new OsuSpriteText
             {
-                Text = "Mania 规则集配置。按 Keys 分组编辑；未列出的键仍保留在文件中。",
+                Text = EzEditorStrings.SKIN_INI_MANIA_HINT,
                 Font = OsuFont.Default.With(size: 14),
                 Colour = Color4.Gray,
             });
 
             Add(keysDropdown = new SettingsDropdown<int>
             {
-                LabelText = "Keys",
+                LabelText = EzEditorStrings.SKIN_INI_MANIA_KEYS_LABEL,
                 Current = selectedKeys,
                 Items = new[] { default_keys },
             });
@@ -66,10 +68,10 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 Spacing = new Vector2(8),
             });
 
-            addFieldGroup(staticFields, "布局", EzSkinIniFieldCatalog.ManiaLayoutFields);
-            addFieldGroup(staticFields, "位置", EzSkinIniFieldCatalog.ManiaPositionFields);
-            addFieldGroup(staticFields, "显示", EzSkinIniFieldCatalog.ManiaDisplayFields);
-            addFieldGroup(staticFields, "爆炸", EzSkinIniFieldCatalog.ManiaExplosionFields);
+            addFieldGroup(staticFields, EzEditorStrings.SKIN_INI_FIELD_GROUP_LAYOUT, EzSkinIniFieldCatalog.ManiaLayoutFields);
+            addFieldGroup(staticFields, EzEditorStrings.SKIN_INI_FIELD_GROUP_POSITION, EzSkinIniFieldCatalog.ManiaPositionFields);
+            addFieldGroup(staticFields, EzEditorStrings.SKIN_INI_FIELD_GROUP_DISPLAY, EzSkinIniFieldCatalog.ManiaDisplayFields);
+            addFieldGroup(staticFields, EzEditorStrings.SKIN_INI_FIELD_GROUP_EXPLOSION, EzSkinIniFieldCatalog.ManiaExplosionFields);
 
             selectedKeys.ValueChanged += _ =>
             {
@@ -80,7 +82,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             reloadFromSession();
         }
 
-        private void addFieldGroup(FillFlowContainer container, string title, IReadOnlyList<EzSkinIniFieldDefinition> fields)
+        private void addFieldGroup(FillFlowContainer container, LocalisableString title, IReadOnlyList<EzSkinIniFieldDefinition> fields)
         {
             container.Add(CreateSubheader(title));
 
@@ -141,7 +143,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private void rebuildPerKeyFields(int keys)
         {
             perKeyFields.Clear();
-            perKeyFields.Add(CreateSubheader("键位颜色"));
+            perKeyFields.Add(CreateSubheader(EzEditorStrings.SKIN_INI_PER_KEY_COLOURS));
 
             foreach (string key in EzSkinIniFieldCatalog.GetManiaPerKeyColourKeys(keys))
                 addColourField(perKeyFields, key, key);

@@ -10,7 +10,9 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
+using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets;
@@ -73,13 +75,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (context.PreviewBeatmap == null || context.PreviewRuleset == null)
             {
-                stageScaleContainer.Child = createPlaceholder("未加载谱面");
+                stageScaleContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_BEATMAP_NOT_LOADED);
                 return;
             }
 
             if (!EzSkinEditorPreviewModes.SupportsBeatmapPreview(context.PreviewRuleset))
             {
-                stageScaleContainer.Child = createPlaceholder("该规则集预览尚未支持");
+                stageScaleContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_RULESET_PREVIEW_NOT_SUPPORTED);
                 return;
             }
 
@@ -111,7 +113,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
                     if (task.IsFaulted)
                     {
-                        stageScaleContainer.Child = createPlaceholder("谱面加载失败");
+                        stageScaleContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_BEATMAP_LOAD_FAILED);
                         return;
                     }
 
@@ -269,7 +271,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             base.Dispose(isDisposing);
         }
 
-        private static OsuSpriteText createPlaceholder(string text) => new OsuSpriteText
+        private static OsuSpriteText createPlaceholder(LocalisableString text) => new OsuSpriteText
         {
             Anchor = Anchor.Centre,
             Origin = Anchor.Centre,

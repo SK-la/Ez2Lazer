@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK.Graphics;
@@ -28,7 +29,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
             Add(new OsuSpriteText
             {
-                Text = "skin.ini 颜色（[Colours]）。与 Ez 颜色设置无关。",
+                Text = EzEditorStrings.SKIN_INI_COLOURS_HINT,
                 Font = OsuFont.Default.With(size: 14),
                 Colour = Color4.Gray,
             });

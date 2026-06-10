@@ -3,6 +3,7 @@
 
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Localisation;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -27,7 +28,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             Spacing = new Vector2(8);
         }
 
-        protected Drawable CreateSubheader(string text) =>
+        protected Drawable CreateSubheader(LocalisableString text) =>
             new OsuSpriteText
             {
                 Text = text,

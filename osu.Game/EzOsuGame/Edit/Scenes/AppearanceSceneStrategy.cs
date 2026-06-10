@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Settings.Sections;
+using osu.Game.EzOsuGame.Localization;
 
 namespace osu.Game.EzOsuGame.Edit.Scenes
 {
@@ -13,7 +14,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
     {
         public EzSkinEditorSceneType SceneType => EzSkinEditorSceneType.Appearance;
 
-        public LocalisableString TabTitle => "外观";
+        public LocalisableString TabTitle => EzEditorStrings.TAB_APPEARANCE;
 
         public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
             new EzSkinEditorPreviewHost(context);
@@ -23,12 +24,12 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
             {
                 new EzSkinEditorSidebarGroupDefinition
                 {
-                    Title = "纹理",
+                    Title = EzEditorStrings.GROUP_TEXTURE,
                     CreateContent = () => new EzSkinEditorTextureSettingsSection(),
                 },
                 new EzSkinEditorSidebarGroupDefinition
                 {
-                    Title = "舞台",
+                    Title = EzEditorStrings.GROUP_STAGE,
                     CreateContent = () => new EzSkinEditorStageSettingsSection(),
                 },
             };
