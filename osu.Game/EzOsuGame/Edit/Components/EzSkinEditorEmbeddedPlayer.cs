@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// <summary>
     /// Embedded endless autoplay preview without HUD or storyboard (playfield only).
     /// </summary>
-    public partial class EzSkinEditorEmbeddedPlayer : CompositeDrawable
+    public partial class EzSkinEditorEmbeddedPlayer : CompositeDrawable, IEzSkinEditorScenePlaybackSource
     {
         public GameplayClockContainer GameplayClock { get; private set; } = null!;
 
@@ -219,6 +219,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         public bool CanBeMounted => !IsDisposed;
+
+        bool IEzSkinEditorScenePlaybackSource.IsActive => CanBeMounted;
+
+        double IEzSkinEditorScenePlaybackSource.CurrentTime => GameplayClock.CurrentTime;
+
+        bool IEzSkinEditorScenePlaybackSource.IsPlaying => GameplayClock.IsRunning;
 
         public void DetachForRemount()
         {

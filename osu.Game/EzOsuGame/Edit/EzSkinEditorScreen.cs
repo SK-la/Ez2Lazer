@@ -274,19 +274,16 @@ namespace osu.Game.EzOsuGame.Edit
         {
             base.Update();
 
-            var player = embeddedPlayer;
+            var source = getActiveScenePlaybackSource();
 
-            if (sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Appearance || player == null)
+            if (source == null || !source.IsPlaying)
                 return;
 
-            if (!player.GameplayClock.IsRunning)
+            if (source.CurrentTime - lastSceneBarProgressDisplayTime < 16)
                 return;
 
-            if (player.GameplayClock.CurrentTime - lastSceneBarProgressDisplayTime < 16)
-                return;
-
-            sceneBar.PlaybackControls.SetCurrentTime(player.GameplayClock.CurrentTime);
-            lastSceneBarProgressDisplayTime = player.GameplayClock.CurrentTime;
+            sceneBar.PlaybackControls.SetCurrentTime(source.CurrentTime);
+            lastSceneBarProgressDisplayTime = source.CurrentTime;
         }
 
         private void bindSceneBarPlayback()
@@ -299,12 +296,12 @@ namespace osu.Game.EzOsuGame.Edit
             sceneBarPreviewModeBindable.BindValueChanged(mode =>
             {
                 bool playing = mode.NewValue == EzBeatmapPreviewMode.Dynamic;
-                embeddedPlayer?.SetPlaying(playing);
+                getActiveScenePlaybackSource()?.SetPlaying(playing);
                 sceneBar.PlaybackControls.SetPlaying(playing);
             }, true);
         }
 
-        private void seekSceneBarPlayback(double time) => embeddedPlayer?.Seek(time);
+        private void seekSceneBarPlayback(double time) => getActiveScenePlaybackSource()?.Seek(time);
 
         private void setSceneBarPlaybackPlaying(bool playing)
         {
@@ -317,18 +314,29 @@ namespace osu.Game.EzOsuGame.Edit
         private void refreshSceneBarPlayback()
         {
             var controls = sceneBar.PlaybackControls;
-            var player = embeddedPlayer;
+            var source = getActiveScenePlaybackSource();
 
-            if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance && player != null && player.CanBeMounted)
+            if (source == null)
             {
-                controls.Alpha = 1;
-                controls.SetRange(player.BeatmapMinTime, player.BeatmapMaxTime);
-                controls.SetCurrentTime(player.GameplayClock.CurrentTime);
-                controls.SetPlaying(PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic);
+                controls.Alpha = 0;
                 return;
             }
 
-            controls.Alpha = 0;
+            controls.Alpha = 1;
+            controls.SetRange(source.BeatmapMinTime, source.BeatmapMaxTime);
+            controls.SetCurrentTime(source.CurrentTime);
+            controls.SetPlaying(source.IsPlaying);
+        }
+
+        private IEzSkinEditorScenePlaybackSource? getActiveScenePlaybackSource()
+        {
+            if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance)
+                return embeddedPlayer is { CanBeMounted: true } player ? player : null;
+
+            if (sceneBar.CurrentScene.Value is EzSkinEditorSceneType.Size or EzSkinEditorSceneType.Colour)
+                return sceneContentHost.ChildrenOfType<IEzSkinEditorScenePlaybackSource>().FirstOrDefault(s => s.IsActive);
+
+            return null;
         }
 
         private void onSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
@@ -394,7 +402,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance)
                 mountAppearanceEmbeddedPlayer();
 
-            refreshSceneBarPlayback();
+            Schedule(refreshSceneBarPlayback);
             menuBar.RefreshMenuState();
         }
 
@@ -1124,6 +1132,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
             sceneContentHost.Child = strategy.CreateSceneContent(sceneContext);
+            Schedule(refreshSceneBarPlayback);
         }
 
         private void exportPreviewImage()

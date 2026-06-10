@@ -65,13 +65,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             return beatmap;
         }
 
-        private sealed partial class VirtualPlayfieldPreview : Container
+        private sealed partial class VirtualPlayfieldPreview : Container, IEzSkinEditorScenePlaybackSource
         {
             private readonly StopwatchClock playbackClock = new StopwatchClock(true);
             private readonly FramedClock framedClock;
 
             private DrawableRuleset drawableRuleset = null!;
             private ManiaBeatmap previewBeatmap = null!;
+            private double beatmapMinTime;
             private double beatmapMaxTime;
 
             public VirtualPlayfieldPreview()
@@ -84,6 +85,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             private void load()
             {
                 previewBeatmap = buildVirtualPreviewBeatmap();
+                beatmapMinTime = 0;
                 beatmapMaxTime = Math.Max(previewBeatmap.GetLastObjectTime() + 1500, 1);
 
                 var ruleset = new ManiaRuleset();
@@ -109,8 +111,32 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             {
                 base.Update();
 
-                if (playbackClock.CurrentTime >= beatmapMaxTime)
-                    playbackClock.Seek(0);
+                if (playbackClock.IsRunning && playbackClock.CurrentTime >= beatmapMaxTime)
+                    playbackClock.Seek(beatmapMinTime);
+            }
+
+            bool IEzSkinEditorScenePlaybackSource.IsActive => IsLoaded && !IsDisposed;
+
+            double IEzSkinEditorScenePlaybackSource.BeatmapMinTime => beatmapMinTime;
+
+            double IEzSkinEditorScenePlaybackSource.BeatmapMaxTime => beatmapMaxTime;
+
+            double IEzSkinEditorScenePlaybackSource.CurrentTime => playbackClock.CurrentTime;
+
+            bool IEzSkinEditorScenePlaybackSource.IsPlaying => playbackClock.IsRunning;
+
+            void IEzSkinEditorScenePlaybackSource.Seek(double time)
+            {
+                double clamped = Math.Clamp(time, beatmapMinTime, beatmapMaxTime);
+                playbackClock.Seek(clamped);
+            }
+
+            void IEzSkinEditorScenePlaybackSource.SetPlaying(bool playing)
+            {
+                if (playing)
+                    playbackClock.Start();
+                else
+                    playbackClock.Stop();
             }
         }
     }
