@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public EzSkinEditorNoteDrawablePreview()
         {
-            RelativeSizeAxes = Axes.Both;
+            AutoSizeAxes = Axes.Both;
 
             hitboxBorderEdges = new[]
             {
