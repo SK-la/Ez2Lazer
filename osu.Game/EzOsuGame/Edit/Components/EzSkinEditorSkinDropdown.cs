@@ -27,13 +27,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// <summary>
     /// Skin selector anchored to the scene bar. Uses a popover so the list does not expand inline over the editor.
     /// </summary>
-    public partial class EzSkinEditorSkinDropdown : CompositeDrawable, IHasPopover
+    public partial class EzSkinEditorSkinDropdown : SkinEditorSceneLibrary.SceneButton, IHasPopover
     {
         public const float DEFAULT_WIDTH = 200;
 
         private readonly List<Live<SkinInfo>> dropdownItems = new List<Live<SkinInfo>>();
-
-        private SkinPickerButton pickerButton = null!;
 
         [Resolved]
         private SkinManager skins { get; set; } = null!;
@@ -45,19 +43,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public EzSkinEditorSkinDropdown()
         {
-            RelativeSizeAxes = Axes.None;
             Width = DEFAULT_WIDTH;
-            Height = SkinEditorSceneLibrary.BUTTON_HEIGHT;
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OverlayColourProvider? colourProvider, OsuColour colours)
         {
-            InternalChild = pickerButton = new SkinPickerButton
-            {
-                RelativeSizeAxes = Axes.Both,
-                Action = this.ShowPopover,
-            };
+            BackgroundColour = colourProvider?.Background3 ?? colours.Blue3;
+            Action = this.ShowPopover;
         }
 
         protected override void LoadComplete()
@@ -68,7 +61,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                                                          .Where(s => !s.DeletePending)
                                                                          .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase), skinsChanged);
 
-            skins.CurrentSkinInfo.BindValueChanged(e => pickerButton.Text = e.NewValue.ToString() ?? string.Empty, true);
+            skins.CurrentSkinInfo.BindValueChanged(e => Text = e.NewValue.ToString() ?? string.Empty, true);
 
             skins.ScriptedSkinsCatalogUpdated += refreshSkinsList;
             refreshSkinsList();
@@ -99,16 +92,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
 
             base.Dispose(isDisposing);
-        }
-
-        private partial class SkinPickerButton : OsuButton
-        {
-            [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider? colourProvider, OsuColour colours)
-            {
-                BackgroundColour = colourProvider?.Background3 ?? colours.Blue3;
-                Content.CornerRadius = 5;
-            }
         }
 
         private partial class SkinListPopover : OsuPopover
