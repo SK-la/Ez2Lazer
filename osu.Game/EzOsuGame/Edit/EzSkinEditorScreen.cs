@@ -846,6 +846,14 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
+            var profile = EzSkinEditorNoteRulesetProfileRegistry.Get(NoteSessionForTesting.Ruleset.Value);
+
+            if (profile == null)
+            {
+                postNotification(EzEditorStrings.PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED);
+                return;
+            }
+
             string exportName = string.IsNullOrWhiteSpace(NoteSessionForTesting.ExportName.Value)
                 ? "note-preview"
                 : NoteSessionForTesting.ExportName.Value.Trim();
@@ -853,21 +861,26 @@ namespace osu.Game.EzOsuGame.Edit
             foreach (char invalid in Path.GetInvalidFileNameChars())
                 exportName = exportName.Replace(invalid, '_');
 
-            host.TakeScreenshotAsync().ContinueWith(async task =>
-            {
-                if (task.IsFaulted)
-                {
-                    Schedule(() => postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORT_FAILED, task.Exception?.GetBaseException().Message ?? "unknown error")));
-                    return;
-                }
+            bool usesEzVariants = EzSkinEditorNoteVariantResolver.UsesEzVariants(skinManager.CurrentSkin.Value);
+            var request = NoteSessionForTesting.ToPreviewRequest(usesEzVariants, NoteCompareKind.Value);
 
+            Task.Run(async () =>
+            {
                 try
                 {
-                    using Image<Rgba32> image = task.GetResultSafely();
                     var detached = skinInfo.PerformRead(s => s.Detach());
                     var edit = await skinManager.BeginExternalEditing(detached).ConfigureAwait(false);
-                    string directory = Path.Combine(edit.MountedPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), "_ez_note_edit");
-                    Directory.CreateDirectory(directory);
+                    string directory = edit.MountedPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+                    using var image = EzSkinEditorNoteImageExporter.Export(profile, request, directory);
+
+                    if (image == null)
+                    {
+                        await edit.Finish().ConfigureAwait(false);
+                        Schedule(() => postNotification(EzEditorStrings.NOTIFY_CANNOT_EXPORT_NOTE_PREVIEW));
+                        return;
+                    }
+
                     string filePath = Path.Combine(directory, $"{exportName}.png");
                     await image.SaveAsPngAsync(filePath).ConfigureAwait(false);
 
@@ -876,14 +889,12 @@ namespace osu.Game.EzOsuGame.Edit
                         host.OpenFileExternally(directory + Path.DirectorySeparatorChar);
                         postNotification(EzEditorStrings.NOTIFY_NOTE_EXPORTED);
                     });
-
-                    await edit.Finish().ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {
                     Schedule(() => postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORT_FAILED, e.Message)));
                 }
-            }, TaskScheduler.Default);
+            });
         }
 
         private void persistEditorConfig()
