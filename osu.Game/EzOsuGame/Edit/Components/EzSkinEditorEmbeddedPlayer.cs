@@ -7,8 +7,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
-using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
+using osu.Game.Configuration;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -216,6 +216,17 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             gameplayState.HasPassed = false;
             GameplayClock.Seek(BeatmapMinTime);
+        }
+
+        public bool CanBeMounted => !IsDisposed;
+
+        public void DetachForRemount()
+        {
+            if (IsDisposed)
+                return;
+
+            if (Parent is Container<Drawable> parentContainer)
+                parentContainer.Remove(this, false);
         }
     }
 }

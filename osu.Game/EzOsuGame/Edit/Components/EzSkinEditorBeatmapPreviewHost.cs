@@ -84,6 +84,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                         stageViewport = new Container
                         {
                             RelativeSizeAxes = Axes.Both,
+                            Masking = true,
                             Padding = new MarginPadding(10),
                             Child = stageScaleContainer = new Container
                             {

@@ -2,9 +2,11 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Sprites;
 using osuTK.Graphics;
@@ -12,7 +14,7 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Appearance scene foreground: transparent overlay with bottom playback controls bound to the embedded player.
+    /// Appearance scene: gameplay viewport in the scene content region plus bottom playback controls.
     /// </summary>
     public partial class EzSkinEditorAppearanceSceneContent : Container
     {
@@ -21,9 +23,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private readonly EzSkinEditorSceneContext context;
 
         private EzSkinEditorPlaybackControls playbackControls = null!;
-        private Container placeholderContainer = null!;
+        private Container playerViewport = null!;
 
         private double lastProgressDisplayTime = double.MinValue;
+
+        private Bindable<EzBeatmapPreviewMode>? previewModeBindable;
 
         public EzSkinEditorAppearanceSceneContent(EzSkinEditorSceneContext context)
         {
@@ -46,7 +50,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 {
                     new Drawable[]
                     {
-                        placeholderContainer = new Container { RelativeSizeAxes = Axes.Both },
+                        playerViewport = new Container { RelativeSizeAxes = Axes.Both, Masking = true },
                     },
                     new Drawable[]
                     {
@@ -59,7 +63,36 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 },
             };
 
+            bindPreviewMode();
+            showPlaceholder();
+        }
+
+        public void SetEmbeddedPlayer(EzSkinEditorEmbeddedPlayer? player)
+        {
+            playerViewport.Clear();
+
+            if (player == null)
+            {
+                showPlaceholder();
+                return;
+            }
+
+            if (!player.CanBeMounted)
+            {
+                showPlaceholder();
+                return;
+            }
+
+            player.DetachForRemount();
+
+            playerViewport.Child = new EzSkinEditorEmbeddedPlayerHost(player);
             refreshControls();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            previewModeBindable?.UnbindAll();
+            base.Dispose(isDisposing);
         }
 
         protected override void Update()
@@ -84,22 +117,42 @@ namespace osu.Game.EzOsuGame.Edit.Components
             refreshControls();
         }
 
+        private void showPlaceholder()
+        {
+            playerViewport.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_BEATMAP_NOT_LOADED);
+            playbackControls.Alpha = 0;
+        }
+
         private void refreshControls()
         {
             var player = context.GetEmbeddedPlayer?.Invoke();
 
             if (player == null)
             {
-                placeholderContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_BEATMAP_NOT_LOADED);
-                playbackControls.Alpha = 0;
+                showPlaceholder();
                 return;
             }
 
-            placeholderContainer.Clear();
             playbackControls.Alpha = 1;
             playbackControls.SetRange(player.BeatmapMinTime, player.BeatmapMaxTime);
             playbackControls.SetCurrentTime(player.GameplayClock.CurrentTime);
-            playbackControls.SetPlaying(player.GameplayClock.IsRunning);
+            playbackControls.SetPlaying(context.PreviewState?.Mode.Value == EzBeatmapPreviewMode.Dynamic);
+        }
+
+        private void bindPreviewMode()
+        {
+            previewModeBindable?.UnbindAll();
+
+            if (context.PreviewState == null)
+                return;
+
+            previewModeBindable = context.PreviewState.Mode.GetBoundCopy();
+            previewModeBindable.BindValueChanged(mode =>
+            {
+                bool playing = mode.NewValue == EzBeatmapPreviewMode.Dynamic;
+                context.GetEmbeddedPlayer?.Invoke()?.SetPlaying(playing);
+                playbackControls.SetPlaying(playing);
+            }, true);
         }
 
         private void seekTo(double time)
@@ -110,8 +163,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private void setPlaying(bool playing)
         {
-            context.GetEmbeddedPlayer?.Invoke()?.SetPlaying(playing);
-            playbackControls.SetPlaying(playing);
+            if (playing)
+                context.PreviewState?.ResumeBeatmapPlayback();
+            else
+                context.PreviewState?.PauseBeatmapPlayback();
         }
 
         private static OsuSpriteText createPlaceholder(LocalisableString text) => new OsuSpriteText

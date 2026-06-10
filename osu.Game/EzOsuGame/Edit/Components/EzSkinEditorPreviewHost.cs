@@ -33,7 +33,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             if (!context.UseVirtualComparisonPreview)
             {
-                InternalChild = playbackContainer = new Container { RelativeSizeAxes = Axes.Both };
+                InternalChild = playbackContainer = new Container { RelativeSizeAxes = Axes.Both, Masking = true };
                 populatePlayback();
                 return;
             }
@@ -50,7 +50,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 {
                     new Drawable[]
                     {
-                        playbackContainer = new Container { RelativeSizeAxes = Axes.Both },
+                        playbackContainer = new Container { RelativeSizeAxes = Axes.Both, Masking = true },
                         comparisonContainer = new Container { RelativeSizeAxes = Axes.Both },
                     },
                 },
@@ -73,12 +73,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (context.Provider != null)
             {
-                playbackContainer.Child = context.Provider.CreateDynamicPart(context.EditorSkin).With(d =>
-                {
-                    d.RelativeSizeAxes = Axes.Both;
-                    d.Anchor = Anchor.Centre;
-                    d.Origin = Anchor.Centre;
-                });
+                playbackContainer.Child = context.Provider.CreateDynamicPart(context.EditorSkin).With(d => d.RelativeSizeAxes = Axes.Both);
             }
             else
             {
