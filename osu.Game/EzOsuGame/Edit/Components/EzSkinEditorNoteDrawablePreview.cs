@@ -22,7 +22,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private readonly Box[] hitboxBorderEdges;
         private readonly Container drawableHost;
 
-        private EzSkinEditorNoteCompareKind loadedKind;
+        private string? loadedDrawableKey;
+        private ISkin? pendingSkin;
+        private IEzSkinEditorNoteRulesetProfile? pendingProfile;
+        private EzSkinEditorNotePreviewRequest? pendingRequest;
 
         public EzSkinEditorNoteDrawablePreview()
         {
@@ -62,21 +65,45 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public void Apply(ISkin skin, IEzSkinEditorNoteRulesetProfile profile, EzSkinEditorNotePreviewRequest request)
         {
+            pendingSkin = skin;
+            pendingProfile = profile;
+            pendingRequest = request;
+
+            if (IsLoaded)
+                applyInternal();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (pendingSkin != null && pendingProfile != null && pendingRequest != null)
+                applyInternal();
+        }
+
+        private void applyInternal()
+        {
+            if (pendingSkin == null || pendingProfile == null || pendingRequest == null)
+                return;
+
+            var request = pendingRequest.Value;
             hitboxContainer.Size = new Vector2((float)request.Width, (float)request.Height);
             hitboxFill.Colour = request.NoteColour.Opacity(0.25f);
 
             foreach (var edge in hitboxBorderEdges)
                 edge.Colour = request.NoteColour;
 
-            if (request.CompareKind != loadedKind)
+            string drawableKey = $"{request.CompareKind}:{request.UseEzNoteVariants}:{request.VariantId}:{request.Part}";
+
+            if (drawableKey != loadedDrawableKey)
             {
-                loadedKind = request.CompareKind;
+                loadedDrawableKey = drawableKey;
                 drawableHost.Clear(true);
             }
 
             if (drawableHost.Count == 0)
             {
-                var drawable = profile.CreateDrawableComparisonPreview(skin, request);
+                var drawable = pendingProfile.CreateDrawableComparisonPreview(pendingSkin, request);
 
                 if (drawable != null)
                     drawableHost.Child = drawable;
