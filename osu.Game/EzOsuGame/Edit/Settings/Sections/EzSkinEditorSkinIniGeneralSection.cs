@@ -18,8 +18,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private readonly Dictionary<string, Bindable<string>> textFields = new Dictionary<string, Bindable<string>>();
         private readonly Dictionary<string, Bindable<bool>> boolFields = new Dictionary<string, Bindable<bool>>();
 
-        public EzSkinEditorSkinIniGeneralSection(EzSkinIniSession? session)
-            : base(session)
+        public EzSkinEditorSkinIniGeneralSection(EzSkinIniSession? session, EzSkinEditorComparisonSnapshot? comparisonSnapshot = null)
+            : base(session, comparisonSnapshot)
         {
         }
 
@@ -70,12 +70,21 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             WithApplying(() =>
             {
                 var document = ParseDocument();
+                var snapshotDocument = ParseSnapshotDocument();
 
                 foreach (var (key, bindable) in textFields)
-                    bindable.Value = document?.GetValue(EzSkinIniDocument.GENERAL_SECTION, key) ?? string.Empty;
+                {
+                    string value = document?.GetValue(EzSkinIniDocument.GENERAL_SECTION, key) ?? string.Empty;
+                    bindable.Value = value;
+                    EzSkinIniBridge.SyncTextDefault(bindable, snapshotDocument?.GetValue(EzSkinIniDocument.GENERAL_SECTION, key), value);
+                }
 
                 foreach (var (key, bindable) in boolFields)
-                    bindable.Value = document?.GetValue(EzSkinIniDocument.GENERAL_SECTION, key) == "1";
+                {
+                    bool value = document?.GetValue(EzSkinIniDocument.GENERAL_SECTION, key) == "1";
+                    bindable.Value = value;
+                    EzSkinIniBridge.SyncBoolDefault(bindable, snapshotDocument?.GetValue(EzSkinIniDocument.GENERAL_SECTION, key), value);
+                }
             });
         }
 

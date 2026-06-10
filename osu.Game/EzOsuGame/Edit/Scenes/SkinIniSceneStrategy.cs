@@ -33,17 +33,17 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
                 new EzSkinEditorSidebarGroupDefinition
                 {
                     Title = EzEditorStrings.GROUP_GENERAL,
-                    CreateContent = () => new EzSkinEditorSkinIniGeneralSection(context.SkinIniSession),
+                    CreateContent = () => new EzSkinEditorSkinIniGeneralSection(context.SkinIniSession, context.ComparisonSnapshot),
                 },
                 new EzSkinEditorSidebarGroupDefinition
                 {
                     Title = EzEditorStrings.GROUP_COLOURS,
-                    CreateContent = () => new EzSkinEditorSkinIniColoursSection(context.SkinIniSession),
+                    CreateContent = () => new EzSkinEditorSkinIniColoursSection(context.SkinIniSession, context.ComparisonSnapshot),
                 },
                 new EzSkinEditorSidebarGroupDefinition
                 {
                     Title = EzEditorStrings.GROUP_MODE,
-                    CreateContent = () => new EzSkinEditorSkinIniManiaSection(context.SkinIniSession),
+                    CreateContent = () => new EzSkinEditorSkinIniManiaSection(context.SkinIniSession, context.ComparisonSnapshot),
                 },
             };
         }
