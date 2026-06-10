@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Globalization;
 using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Edit
@@ -17,16 +16,18 @@ namespace osu.Game.EzOsuGame.Edit
                 return false;
 
             var document = session.ParseDraftDocument();
-            document.EnsureManiaBlock(keyMode);
-
-            document.SetManiaValue(keyMode, "ColumnWidth", format(config.Get<double>(Ez2Setting.ColumnWidth)));
-            document.SetManiaValue(keyMode, "HitPosition", format(config.Get<double>(Ez2Setting.HitPosition)));
-            document.SetManiaValue(keyMode, "WidthForNoteHeightScale", format(config.Get<double>(Ez2Setting.ColumnWidth)));
-
+            WriteManiaSizeSettingsToDocument(keyMode, config, document);
             session.ApplyDocument(document);
             return true;
         }
 
-        private static string format(double value) => value.ToString(CultureInfo.InvariantCulture);
+        internal static void WriteManiaSizeSettingsToDocument(int keyMode, Ez2ConfigManager config, EzSkinIniDocument document)
+        {
+            document.EnsureManiaBlock(keyMode);
+
+            document.SetManiaValue(keyMode, "ColumnWidth", EzSkinLegacyManiaIniFormat.FormatColumnWidthArray(keyMode, config));
+            document.SetManiaValue(keyMode, "HitPosition", EzSkinLegacyManiaIniFormat.FormatHitPosition((float)config.Get<double>(Ez2Setting.HitPosition)));
+            document.SetManiaValue(keyMode, "WidthForNoteHeightScale", EzSkinLegacyManiaIniFormat.FormatWidthForNoteHeightScale(keyMode, config));
+        }
     }
 }
