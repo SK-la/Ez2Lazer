@@ -220,6 +220,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
                     stageScaleContainer.Child = loaded;
                     drawableRuleset = newDrawableRuleset;
+                    EzSkinEditorRulesetPreviewBootstrap.ApplyAutoplayReplay(newDrawableRuleset, playableBeatmap!);
                     maniaStaticRenderer = null;
                 });
             }, token);

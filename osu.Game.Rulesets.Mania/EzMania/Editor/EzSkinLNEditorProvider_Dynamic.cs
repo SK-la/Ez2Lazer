@@ -10,6 +10,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.EzOsuGame.Edit;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
@@ -70,6 +71,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             private readonly FramedClock framedClock;
 
             private DrawableRuleset drawableRuleset = null!;
+            private ManiaBeatmap previewBeatmap = null!;
             private double beatmapMaxTime;
 
             public VirtualPlayfieldPreview()
@@ -81,20 +83,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             [BackgroundDependencyLoader]
             private void load()
             {
-                var beatmap = buildVirtualPreviewBeatmap();
-                beatmapMaxTime = Math.Max(beatmap.GetLastObjectTime() + 1500, 1);
+                previewBeatmap = buildVirtualPreviewBeatmap();
+                beatmapMaxTime = Math.Max(previewBeatmap.GetLastObjectTime() + 1500, 1);
 
                 var ruleset = new ManiaRuleset();
                 Mod? autoplayMod = ruleset.GetAutoplayMod();
 
                 drawableRuleset = ruleset.CreateDrawableRulesetWith(
-                    beatmap,
+                    previewBeatmap,
                     autoplayMod != null ? new[] { autoplayMod } : null);
 
                 drawableRuleset.Clock = framedClock;
                 drawableRuleset.Playfield.DisplayJudgements.Value = true;
 
                 Child = drawableRuleset;
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+                EzSkinEditorRulesetPreviewBootstrap.ApplyAutoplayReplay(drawableRuleset, previewBeatmap);
             }
 
             protected override void Update()
