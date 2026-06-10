@@ -378,5 +378,85 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("preview host visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
             AddAssert("still static preview", () => editorScreen.PreviewSource.Value == EzSkinEditorPreviewSource.Static);
         }
+
+        [Test]
+        public void TestConfigMenuPresent()
+        {
+            importLegacySkin();
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddUntilStep("config menu items", () => editorScreen.ChildrenOfType<EditorMenuBar>().Any()
+                                                    && editorScreen.ChildrenOfType<EditorMenuItem>().Any(i => i.Text.ToString() == "配置"));
+        }
+
+        [Test]
+        public void TestCreateEzSkinJsonWritesFile()
+        {
+            importLegacySkin();
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddUntilStep("json session ready", () => editorScreen.SkinJsonSession is { HasFile: false });
+
+            AddStep("create EzSkin.json", () => editorScreen.CreateEzSkinJsonForTesting());
+            AddAssert("has file", () => editorScreen.SkinJsonSession!.HasFile);
+            AddAssert("json stored on skin",
+                () => skinManager.CurrentSkinInfo.Value.PerformRead(skin => skin.Files.Any(f => f.Filename == EzSkinJsonDocument.FILENAME)));
+        }
+
+        [Test]
+        public void TestApplyWithoutJsonFileDoesNotWriteSkinJson()
+        {
+            importLegacySkin();
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddUntilStep("no json file", () => editorScreen.SkinJsonSession is { HasFile: false });
+
+            AddStep("change setting and apply", () =>
+            {
+                ezConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha).Value = 0.33;
+                editorScreen.ApplySettings();
+            });
+
+            AddAssert("still no skin json file",
+                () => skinManager.CurrentSkinInfo.Value.PerformRead(skin => skin.Files.All(f => f.Filename != EzSkinJsonDocument.FILENAME)));
+        }
+
+        [Test]
+        public void TestApplyDoesNotCommitSkinJsonSnapshot()
+        {
+            const double dirty_alpha = 0.37;
+
+            importLegacySkin();
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddStep("create EzSkin.json", () => editorScreen.CreateEzSkinJsonForTesting());
+
+            string snapshotBeforeApply = null!;
+
+            AddStep("capture snapshot and dirty memory", () =>
+            {
+                snapshotBeforeApply = editorScreen.SkinJsonSession!.IsDirty(ezConfig)
+                    ? string.Empty
+                    : EzSkinJsonBridge.CreateNormalizedSnapshot(ezConfig);
+
+                ezConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha).Value = dirty_alpha;
+            });
+
+            AddAssert("memory dirty vs snapshot file", () => editorScreen.SkinJsonSession!.IsDirty(ezConfig));
+
+            AddStep("apply settings", () => editorScreen.ApplySettings());
+
+            AddAssert("bindable retained in memory", () => ezConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha).Value, () => Is.EqualTo(dirty_alpha));
+            AddAssert("skin json snapshot unchanged",
+                () => skinManager.CurrentSkinInfo.Value.PerformRead(skin =>
+                {
+                    string? json = EzSkinJsonStorage.TryReadJson(skinManager, skin);
+                    return json != null && !json.Contains(dirty_alpha.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
+                }));
+        }
     }
 }
