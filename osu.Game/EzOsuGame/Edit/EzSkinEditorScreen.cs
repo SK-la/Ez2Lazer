@@ -91,6 +91,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private bool attemptedGlobalBeatmapPreview;
         private bool comparisonSnapshotInitialized;
+        private Guid comparisonSnapshotSkinId;
         private bool configPreviewRefreshBound;
 
         private ISkinEditorVirtualProvider? provider;
@@ -283,7 +284,6 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void refreshScene()
         {
-            ensureComparisonSnapshot();
             ensureGlobalBeatmapPreview();
 
             backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
@@ -291,6 +291,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             ensureSkinIniSession();
             ensureSkinJsonSession();
+            ensureComparisonSnapshotForCurrentSkin();
 
             sceneContext = buildSceneContext();
             applyCurrentScene();
@@ -656,27 +657,27 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void onCurrentSkinInfoChanged(ValueChangedEvent<Live<SkinInfo>> skin)
         {
-            if (skin.OldValue?.ID != skin.NewValue?.ID)
-            {
+            if (skin.OldValue.ID != skin.NewValue.ID)
                 persistEditorConfig();
-                recaptureComparisonSnapshot();
-            }
 
             Schedule(refreshScene);
         }
 
-        private void ensureComparisonSnapshot()
+        private void ensureComparisonSnapshotForCurrentSkin()
         {
-            if (comparisonSnapshotInitialized)
+            var currentSkinId = skinManager.CurrentSkinInfo.Value.ID;
+
+            if (comparisonSnapshotInitialized && comparisonSnapshotSkinId == currentSkinId)
                 return;
 
             recaptureComparisonSnapshot();
             comparisonSnapshotInitialized = true;
+            comparisonSnapshotSkinId = currentSkinId;
         }
 
         private void recaptureComparisonSnapshot()
         {
-            ComparisonSnapshotForTesting.CaptureFrom(ezSkinConfig);
+            ComparisonSnapshotForTesting.CaptureFrom(ezSkinConfig, SkinIniSession);
             ComparisonSnapshotForTesting.SyncBindableDefaults(ezSkinConfig);
         }
 
@@ -689,7 +690,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void restoreConfigSnapshot()
         {
-            ComparisonSnapshotForTesting.ApplyTo(ezSkinConfig);
+            ComparisonSnapshotForTesting.ApplyTo(ezSkinConfig, SkinIniSession);
             postNotification(EzEditorStrings.NOTIFY_RESTORED_CONFIG_SNAPSHOT);
             refreshScene();
         }
