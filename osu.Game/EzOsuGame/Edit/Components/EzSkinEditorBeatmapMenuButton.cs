@@ -60,7 +60,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
             updateColours();
         }
 
-        public Popover GetPopover() => new BeatmapPreviewPopover(rulesets, BeatmapPreviewRequested);
+        public Action? ClearBeatmapPreviewRequested { get; set; }
+
+        public Popover GetPopover() => new BeatmapPreviewPopover(rulesets, BeatmapPreviewRequested, ClearBeatmapPreviewRequested);
 
         private void updateColours()
         {
@@ -74,23 +76,36 @@ namespace osu.Game.EzOsuGame.Edit.Components
     {
         private readonly IRulesetStore rulesets;
         private readonly Action<RulesetInfo>? onSelected;
+        private readonly Action? onClear;
 
-        public BeatmapPreviewPopover(IRulesetStore rulesets, Action<RulesetInfo>? onSelected)
+        public BeatmapPreviewPopover(IRulesetStore rulesets, Action<RulesetInfo>? onSelected, Action? onClear = null)
         {
             this.rulesets = rulesets;
             this.onSelected = onSelected;
+            this.onClear = onClear;
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
+            var children = new List<Drawable>(buildRulesetButtons());
+
+            if (onClear != null)
+            {
+                children.Add(new ModeSelectButton(EzEditorStrings.TOOLBAR_CLEAR_BEATMAP_PREVIEW, () =>
+                {
+                    onClear.Invoke();
+                    this.HidePopover();
+                }));
+            }
+
             Child = new FillFlowContainer
             {
                 Width = 220,
                 AutoSizeAxes = Axes.Y,
                 Direction = FillDirection.Vertical,
                 Spacing = new Vector2(0, 6),
-                Children = buildRulesetButtons().ToArray(),
+                Children = children.ToArray(),
             };
         }
 

@@ -3,6 +3,10 @@
 
 using System;
 using System.IO;
+using System.Threading.Tasks;
+using osu.Framework.Extensions;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -31,12 +35,14 @@ namespace osu.Game.EzOsuGame.Edit
 {
     // Milestone index — see EzSkinEditor refactor plan:
     // M1: layout shell + scene strategies + sidebar groups
-    // M2: Saved/Draft session + Note/LN comparison preview
+    // M2: live vs snapshot comparison + Note/LN preview (skin.ini keeps Saved/Draft)
     // M3: Skin.ini editor + backup + save footer
     // M4: top-bar preview controls + static/beatmap scene backends
     // M5: EzSkin.json + advanced colouring + config menu (json/colour→ini)
     // M6: size→ini, .osk export
     // M7: preview toolbar + skin popover + virtual comparison on size/colour scenes
+    // M8: size/colour virtual provider registration fix
+    // M9: config snapshot comparison + create/restore snapshot + auto-save on navigate
 
     /// <summary>
     /// Ez skin editor screen with menu bar, scene bar, scene content and toolbox-style settings sidebar.
@@ -84,6 +90,8 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorBeatmapPicker? beatmapPicker;
 
         private bool attemptedGlobalBeatmapPreview;
+        private bool comparisonSnapshotInitialized;
+        private bool configPreviewRefreshBound;
 
         private ISkinEditorVirtualProvider? provider;
         private EzSkinEditorSceneContext? sceneContext;
@@ -126,6 +134,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         public override bool OnExiting(ScreenExitEvent e)
         {
+            persistEditorConfig();
             this.FadeOut(200, Easing.OutQuint);
             return base.OnExiting(e);
         }
@@ -176,7 +185,11 @@ namespace osu.Game.EzOsuGame.Edit
                                                 WriteColoursToSkinIniAction = writeColoursToSkinIni,
                                                 WriteSizesToSkinIniAction = writeSizesToSkinIni,
                                                 ExportOskAction = exportOsk,
+                                                CreateConfigSnapshotAction = createConfigSnapshot,
+                                                RestoreConfigSnapshotAction = restoreConfigSnapshot,
+                                                ExportPreviewImageAction = exportPreviewImage,
                                                 CanCreateEzSkinJson = () => SkinJsonSession is { IsSupported: true, HasFile: false },
+                                                CanExportPreviewImage = () => RuntimeInfo.IsDesktop,
                                                 CanUpdateEzSkinJsonSnapshot = () => SkinJsonSession is { IsSupported: true, HasFile: true }
                                                                                     && SkinJsonSession.IsDirty(ezSkinConfig),
                                                 CanRemoveEzSkinJson = () => SkinJsonSession is { IsSupported: true, HasFile: true },
@@ -191,6 +204,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                 PreviewMode = PreviewState.Mode,
                                                 ToggleBeatmapPlaybackRequested = toggleBeatmapPlayback,
                                                 BeatmapPreviewRequested = selectBeatmapPreview,
+                                                ClearBeatmapPreviewRequested = clearBeatmapPreview,
                                             },
                                         },
                                     },
@@ -236,6 +250,7 @@ namespace osu.Game.EzOsuGame.Edit
             beatmapPicker = new EzSkinEditorBeatmapPicker(realm, beatmapManager);
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
+            bindConfigPreviewRefresh();
         }
 
         private void onSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
@@ -245,6 +260,9 @@ namespace osu.Game.EzOsuGame.Edit
                 sceneBar.CurrentScene.Value = EzSkinEditorSceneType.Appearance;
                 return;
             }
+
+            if (change.OldValue != change.NewValue)
+                persistEditorConfig();
 
             Schedule(applyCurrentScene);
         }
@@ -257,8 +275,15 @@ namespace osu.Game.EzOsuGame.Edit
 
         internal void WriteSizesToSkinIniForTesting() => writeSizesToSkinIni();
 
+        internal void CreateConfigSnapshotForTesting() => createConfigSnapshot();
+
+        internal void RestoreConfigSnapshotForTesting() => restoreConfigSnapshot();
+
+        internal EzSkinEditorComparisonSnapshot ComparisonSnapshotForTesting { get; } = new EzSkinEditorComparisonSnapshot();
+
         private void refreshScene()
         {
+            ensureComparisonSnapshot();
             ensureGlobalBeatmapPreview();
 
             backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
@@ -317,6 +342,12 @@ namespace osu.Game.EzOsuGame.Edit
             refreshScene();
         }
 
+        private void clearBeatmapPreview()
+        {
+            PreviewState.SetStatic();
+            refreshScene();
+        }
+
         private EzSkinEditorSceneContext buildSceneContext()
         {
             var currentScene = sceneBar.CurrentScene.Value;
@@ -349,6 +380,7 @@ namespace osu.Game.EzOsuGame.Edit
                 PreviewBeatmap = PreviewState.PreviewBeatmap,
                 PreviewRuleset = PreviewState.Ruleset.Value,
                 PreviewMode = PreviewState.Mode.Value,
+                ComparisonSnapshot = ComparisonSnapshotForTesting,
             };
         }
 
@@ -624,14 +656,111 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void onCurrentSkinInfoChanged(ValueChangedEvent<Live<SkinInfo>> skin)
         {
+            if (skin.OldValue?.ID != skin.NewValue?.ID)
+            {
+                persistEditorConfig();
+                recaptureComparisonSnapshot();
+            }
+
             Schedule(refreshScene);
+        }
+
+        private void ensureComparisonSnapshot()
+        {
+            if (comparisonSnapshotInitialized)
+                return;
+
+            recaptureComparisonSnapshot();
+            comparisonSnapshotInitialized = true;
+        }
+
+        private void recaptureComparisonSnapshot()
+        {
+            ComparisonSnapshotForTesting.CaptureFrom(ezSkinConfig);
+            ComparisonSnapshotForTesting.SyncBindableDefaults(ezSkinConfig);
+        }
+
+        private void createConfigSnapshot()
+        {
+            recaptureComparisonSnapshot();
+            postNotification(EzEditorStrings.NOTIFY_CREATED_CONFIG_SNAPSHOT);
+            refreshScene();
+        }
+
+        private void restoreConfigSnapshot()
+        {
+            ComparisonSnapshotForTesting.ApplyTo(ezSkinConfig);
+            postNotification(EzEditorStrings.NOTIFY_RESTORED_CONFIG_SNAPSHOT);
+            refreshScene();
+        }
+
+        private void persistEditorConfig()
+        {
+            ezSkinConfig.Save();
+            skinManager.CurrentSkinInfo.TriggerChange();
+        }
+
+        private void bindConfigPreviewRefresh()
+        {
+            if (configPreviewRefreshBound)
+                return;
+
+            configPreviewRefreshBound = true;
+
+            foreach (var setting in EzSkinJsonSettingCatalog.All)
+                EzSkinJsonBridge.BindSettingValueChanged(ezSkinConfig, setting, () => Schedule(refreshPreviewContent));
+        }
+
+        private void refreshPreviewContent()
+        {
+            if (!IsLoaded)
+                return;
+
+            sceneContext = buildSceneContext();
+
+            var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
+            sceneContentHost.Child = strategy.CreateSceneContent(sceneContext);
+        }
+
+        private void exportPreviewImage()
+        {
+            if (!RuntimeInfo.IsDesktop)
+                return;
+
+            host.TakeScreenshotAsync().ContinueWith(task =>
+            {
+                if (task.IsFaulted)
+                {
+                    Schedule(() => postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORT_FAILED, task.Exception?.GetBaseException().Message ?? "unknown error")));
+                    return;
+                }
+
+                Schedule(() =>
+                {
+                    try
+                    {
+                        using Image<Rgba32> image = task.GetResultSafely();
+                        string filename = $"ez-skin-editor-preview-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.png";
+                        var exportStorage = (storage as OsuStorage)?.GetExportStorage() ?? storage.GetStorageForDirectory(@"exports");
+
+                        using (var stream = exportStorage.CreateFileSafely(filename))
+                            image.SaveAsPng(stream);
+
+                        postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORTED_TO, filename));
+                    }
+                    catch (Exception e)
+                    {
+                        postNotification(LocalisableString.Format(EzEditorStrings.NOTIFY_EXPORT_FAILED, e.Message));
+                    }
+                });
+            }, TaskScheduler.Default);
         }
 
         private ISkin getEditorSkin()
         {
             var currentSkin = skinManager.CurrentSkin.Value;
 
-            return currentSkin is EzStyleProSkin or Ez2Skin or SbISkin
+            return currentSkin is EzStyleProSkin or Ez2Skin or SbISkin or ScriptedSkinWrapper
                 ? currentSkin
                 : new EzStyleProSkin(skinManager);
         }

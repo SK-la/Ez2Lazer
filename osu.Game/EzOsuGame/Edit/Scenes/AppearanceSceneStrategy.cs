@@ -32,6 +32,11 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
                     Title = EzEditorStrings.GROUP_STAGE,
                     CreateContent = () => new EzSkinEditorStageSettingsSection(),
                 },
+                new EzSkinEditorSidebarGroupDefinition
+                {
+                    Title = EzEditorStrings.GROUP_SCRIPTED_SKIN,
+                    CreateContent = () => new EzSkinEditorScriptedSkinSettingsSection(),
+                },
             };
     }
 }
