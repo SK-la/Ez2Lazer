@@ -2,16 +2,19 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.IO;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.Graphics.Cursor;
+using osu.Game.IO;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Notifications;
@@ -27,7 +30,8 @@ namespace osu.Game.EzOsuGame.Edit
     // M2: Saved/Draft session + Note/LN comparison preview
     // M3: Skin.ini editor + backup + save footer
     // M4: top-bar preview controls + static/beatmap scene backends
-    // M5: export, EzSkin.json, advanced colouring
+    // M5: EzSkin.json + advanced colouring + config menu (json/colour→ini)
+    // M6: size→ini, .osk export
 
     /// <summary>
     /// Ez skin editor screen with menu bar, scene bar, scene content and toolbox-style settings sidebar.
@@ -50,6 +54,12 @@ namespace osu.Game.EzOsuGame.Edit
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
 
+        [Resolved]
+        private GameHost host { get; set; } = null!;
+
+        [Resolved]
+        private Storage storage { get; set; } = null!;
+
         [Resolved(canBeNull: true)]
         private IDialogOverlay? dialogOverlay { get; set; }
 
@@ -63,7 +73,6 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorSidebar sidebar = null!;
         private EzSkinEditorTopToolbar topToolbar = null!;
 
-        private readonly EzSkinEditorPreviewState previewState = new EzSkinEditorPreviewState();
         private EzSkinEditorBeatmapPicker? beatmapPicker;
 
         private ISkinEditorVirtualProvider? provider;
@@ -71,12 +80,19 @@ namespace osu.Game.EzOsuGame.Edit
 
         public Bindable<EzSkinEditorSceneType> CurrentScene => sceneBar.CurrentScene;
 
-        internal Bindable<EzSkinEditorPreviewSource> PreviewSource => previewState.Source;
+        internal Bindable<EzSkinEditorPreviewSource> PreviewSource => PreviewState.Source;
 
         /// <summary>
         /// Per-skin skin.ini session. Skin-layer only.
         /// </summary>
         public EzSkinIniSession? SkinIniSession { get; private set; }
+
+        /// <summary>
+        /// Per-skin EzSkin.json session. Created only via config menu.
+        /// </summary>
+        public EzSkinJsonSession? SkinJsonSession { get; private set; }
+
+        internal EzSkinEditorPreviewState PreviewState { get; } = new EzSkinEditorPreviewState();
 
         public EzSkinEditorScreen()
         {
@@ -138,10 +154,27 @@ namespace osu.Game.EzOsuGame.Edit
                                         {
                                             ApplyAction = applySettings,
                                             ExitAction = tryExit,
+                                            CreateEzSkinJsonAction = createEzSkinJson,
+                                            UpdateEzSkinJsonSnapshotAction = updateEzSkinJsonSnapshot,
+                                            RemoveEzSkinJsonAction = removeEzSkinJson,
+                                            ImportJsonAction = importJson,
+                                            ImportFromSkinJsonAction = importFromSkinJson,
+                                            ExportJsonAction = exportJson,
+                                            WriteColoursToSkinIniAction = writeColoursToSkinIni,
+                                            WriteSizesToSkinIniAction = writeSizesToSkinIni,
+                                            ExportOskAction = exportOsk,
+                                            CanCreateEzSkinJson = () => SkinJsonSession is { IsSupported: true, HasFile: false },
+                                            CanUpdateEzSkinJsonSnapshot = () => SkinJsonSession is { IsSupported: true, HasFile: true }
+                                                                                && SkinJsonSession.IsDirty(ezSkinConfig),
+                                            CanRemoveEzSkinJson = () => SkinJsonSession is { IsSupported: true, HasFile: true },
+                                            CanImportFromSkinJson = () => SkinJsonSession is { IsSupported: true, HasFile: true },
+                                            CanWriteColoursToSkinIni = () => SkinIniSession is { IsSupported: true } && getCurrentKeyMode() > 0,
+                                            CanWriteSizesToSkinIni = () => SkinIniSession is { IsSupported: true } && getCurrentKeyMode() > 0,
+                                            CanExportOsk = canExportOsk,
                                         },
                                         topToolbar = new EzSkinEditorTopToolbar
                                         {
-                                            PreviewSource = previewState.Source,
+                                            PreviewSource = PreviewState.Source,
                                             StaticPreviewRequested = selectStaticPreview,
                                             BeatmapPreviewRequested = selectBeatmapPreview,
                                         },
@@ -204,20 +237,24 @@ namespace osu.Game.EzOsuGame.Edit
 
         public void ApplySettings() => applySettings();
 
+        internal void CreateEzSkinJsonForTesting() => createEzSkinJson();
+
         private void refreshScene()
         {
             backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
             backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
 
             ensureSkinIniSession();
+            ensureSkinJsonSession();
 
             sceneContext = buildSceneContext();
             applyCurrentScene();
+            menuBar.RefreshMenuState();
         }
 
         private void selectStaticPreview()
         {
-            previewState.SetStatic();
+            PreviewState.SetStatic();
             refreshScene();
         }
 
@@ -235,14 +272,14 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
-            previewState.SetBeatmap(workingBeatmap!, ruleset, EzSkinEditorPreviewModes.ValidateMode(mode, ruleset));
+            PreviewState.SetBeatmap(workingBeatmap!, ruleset, EzSkinEditorPreviewModes.ValidateMode(mode, ruleset));
             refreshScene();
         }
 
         private EzSkinEditorSceneContext buildSceneContext()
         {
-            var previewBeatmap = previewState.Source.Value == EzSkinEditorPreviewSource.Beatmap
-                ? previewState.PreviewBeatmap?.Beatmap
+            var previewBeatmap = PreviewState.Source.Value == EzSkinEditorPreviewSource.Beatmap
+                ? PreviewState.PreviewBeatmap?.Beatmap
                 : null;
 
             provider = SkinEditorProviderResolver.Resolve(previewBeatmap);
@@ -252,12 +289,14 @@ namespace osu.Game.EzOsuGame.Edit
                 Provider = provider,
                 EditorSkin = getEditorSkin(),
                 SkinIniSession = SkinIniSession,
+                SkinJsonSession = SkinJsonSession,
+                PreviewState = PreviewState,
                 RequestSceneRefresh = refreshScene,
                 CommitSkinIni = commitSkinIni,
-                PreviewSource = previewState.Source.Value,
-                PreviewBeatmap = previewState.PreviewBeatmap,
-                PreviewRuleset = previewState.Ruleset.Value,
-                PreviewMode = previewState.Mode.Value,
+                PreviewSource = PreviewState.Source.Value,
+                PreviewBeatmap = PreviewState.PreviewBeatmap,
+                PreviewRuleset = PreviewState.Ruleset.Value,
+                PreviewMode = PreviewState.Mode.Value,
             };
         }
 
@@ -277,6 +316,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (SkinIniSession is { IsSupported: true, IsDirty: true })
                 SkinIniSession.Commit();
 
+            skinManager.CurrentSkinInfo.TriggerChange();
             refreshScene();
         }
 
@@ -322,6 +362,203 @@ namespace osu.Game.EzOsuGame.Edit
 
             SkinIniSession.LoadFromSkin(currentSkin);
         }
+
+        private void ensureSkinJsonSession()
+        {
+            var currentSkin = skinManager.CurrentSkinInfo.Value;
+
+            if (!EzSkinJsonSupport.IsSupported(currentSkin))
+            {
+                SkinJsonSession = null;
+                return;
+            }
+
+            Guid currentSkinId = currentSkin.ID;
+            SkinJsonSession ??= new EzSkinJsonSession(skinManager);
+
+            if (SkinJsonSession.SkinId == currentSkinId)
+                return;
+
+            SkinJsonSession.LoadFromSkin(currentSkin);
+        }
+
+        private void createEzSkinJson()
+        {
+            ensureSkinJsonSession();
+
+            if (SkinJsonSession == null || !SkinJsonSession.CreateInitial(ezSkinConfig))
+            {
+                postNotification("无法创建 EzSkin.json");
+                return;
+            }
+
+            postNotification("已创建 EzSkin.json");
+            refreshScene();
+        }
+
+        private void updateEzSkinJsonSnapshot()
+        {
+            ensureSkinJsonSession();
+
+            if (SkinJsonSession == null || !SkinJsonSession.Commit(ezSkinConfig))
+            {
+                postNotification("无法更新 EzSkin.json 快照");
+                return;
+            }
+
+            postNotification("已更新 EzSkin.json 快照");
+            refreshScene();
+        }
+
+        private void removeEzSkinJson()
+        {
+            ensureSkinJsonSession();
+
+            if (SkinJsonSession == null || !SkinJsonSession.Remove())
+            {
+                postNotification("无法移除 EzSkin.json");
+                return;
+            }
+
+            postNotification("已移除 EzSkin.json");
+            refreshScene();
+        }
+
+        private void importFromSkinJson()
+        {
+            ensureSkinJsonSession();
+
+            if (SkinJsonSession is not { HasFile: true })
+            {
+                postNotification("当前皮肤没有 EzSkin.json");
+                return;
+            }
+
+            string? json = skinManager.CurrentSkinInfo.Value.PerformRead(skin => EzSkinJsonStorage.TryReadJson(skinManager, skin));
+
+            if (json == null)
+            {
+                postNotification("无法读取 EzSkin.json");
+                return;
+            }
+
+            EzSkinJsonBridge.Apply(EzSkinJsonDocument.Parse(json), ezSkinConfig);
+            postNotification("已从皮肤导入配置到内存");
+            refreshScene();
+        }
+
+        private void importJson()
+        {
+            var selector = host.CreateSystemFileSelector(new[] { ".json" });
+
+            if (selector == null)
+            {
+                postNotification("当前平台不支持文件选择");
+                return;
+            }
+
+            selector.Selected += file =>
+            {
+                try
+                {
+                    string text = File.ReadAllText(file.FullName);
+                    var document = EzSkinJsonDocument.Parse(text);
+
+                    if (SkinJsonSession is { IsSupported: true })
+                        SkinJsonSession.ApplyImportedDocument(document, ezSkinConfig);
+                    else
+                        EzSkinJsonBridge.Apply(document, ezSkinConfig);
+
+                    postNotification("已导入 JSON 配置");
+                    refreshScene();
+                }
+                catch (Exception e)
+                {
+                    postNotification($"导入失败: {e.Message}");
+                }
+                finally
+                {
+                    selector.Dispose();
+                }
+            };
+
+            selector.Present();
+        }
+
+        private void exportJson()
+        {
+            try
+            {
+                var exportStorage = (storage as OsuStorage)?.GetExportStorage() ?? storage.GetStorageForDirectory(@"exports");
+                string skinName = skinManager.CurrentSkinInfo.Value.PerformRead(s => s.Name);
+                string path = EzSkinJsonStorage.ExportToStorage(exportStorage, ezSkinConfig, skinName);
+                postNotification($"已导出到 {path}");
+            }
+            catch (Exception e)
+            {
+                postNotification($"导出失败: {e.Message}");
+            }
+        }
+
+        private void writeColoursToSkinIni()
+        {
+            int keyMode = getCurrentKeyMode();
+
+            if (SkinIniSession == null || !EzSkinColourSkinIniWriter.TryWriteManiaColumnColours(keyMode, ezSkinConfig, SkinIniSession))
+            {
+                postNotification("无法写入 skin.ini 列色");
+                return;
+            }
+
+            postNotification($"已将 {keyMode}K 列色写入 skin.ini 草稿，请应用保存");
+            refreshScene();
+        }
+
+        private void writeSizesToSkinIni()
+        {
+            int keyMode = getCurrentKeyMode();
+
+            if (SkinIniSession == null || !EzSkinSizeSkinIniWriter.TryWriteManiaSizeSettings(keyMode, ezSkinConfig, SkinIniSession))
+            {
+                postNotification("无法写入 skin.ini 尺寸");
+                return;
+            }
+
+            postNotification($"已将 {keyMode}K 尺寸写入 skin.ini 草稿，请应用保存");
+            refreshScene();
+        }
+
+        private void exportOsk()
+        {
+            if (!canExportOsk())
+            {
+                postNotification("当前皮肤无法导出");
+                return;
+            }
+
+            try
+            {
+                skinManager.ExportCurrentSkin();
+                postNotification("正在导出 .osk…");
+            }
+            catch (Exception e)
+            {
+                postNotification($"导出失败: {e.Message}");
+            }
+        }
+
+        private int getCurrentKeyMode()
+        {
+            if (PreviewState.SuggestedKeyMode.Value is int suggested and > 0)
+                return suggested;
+
+            return ezSkinConfig.Get<int>(Ez2Setting.ColumnTypeListSelect);
+        }
+
+        private bool canExportOsk() => !skinManager.CurrentSkin.Disabled
+                                       && skinManager.CurrentSkinInfo.Value.PerformRead(s => !s.Protected);
+
+        private void postNotification(string text) => notifications?.Post(new SimpleNotification { Text = text });
 
         private void onCurrentSkinInfoChanged(ValueChangedEvent<Live<SkinInfo>> skin)
         {
