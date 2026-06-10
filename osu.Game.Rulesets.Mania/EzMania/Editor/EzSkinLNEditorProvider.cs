@@ -24,6 +24,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
 
         private const int preview_key_count = 4;
         private const int preview_column_width = 100;
+        private const int preview_hold_duration = 1000;
 
         private static ISkin createTransformedSkin(ISkin skin)
         {

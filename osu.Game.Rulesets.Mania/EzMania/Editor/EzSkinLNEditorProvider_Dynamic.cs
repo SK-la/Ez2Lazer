@@ -11,8 +11,8 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Screens.Play;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Editor
@@ -26,107 +26,84 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             return new SkinProvidingContainer(transformedSkin)
             {
                 RelativeSizeAxes = Axes.Both,
-                Child = new ScrollingPreview()
+                Child = new VirtualPlayfieldPreview(),
             };
         }
 
-        private sealed partial class ScrollingPreview : CompositeDrawable
+        private static ManiaBeatmap buildVirtualPreviewBeatmap()
         {
-            private static int timeSpeed { get; set; } = 3000;
-            private static int holdDuration { get; set; } = 1000;
-            private int cycleLength { get; } = holdDuration * preview_key_count;
+            var beatmap = new ManiaBeatmap(new StageDefinition(preview_key_count));
+            int spacing = preview_hold_duration;
+            int cycleLength = spacing * preview_key_count;
 
-            private readonly PreviewScrollingInfo scrollingInfo = new PreviewScrollingInfo();
-            private readonly PreviewGameplayClock gameplayClockDependency = new PreviewGameplayClock();
-            private readonly StageDefinition stageDefinition = new StageDefinition(preview_key_count);
-            private readonly IBeatmap beatmapDependency;
-
-            private readonly StopwatchClock playbackClock = new StopwatchClock(true);
-            private readonly ManualClock manualClock = new ManualClock();
-
-            private Stage stage = null!;
-            private int nextCycleIndex;
-            private double lastAddedStart = double.NegativeInfinity;
-
-            public ScrollingPreview()
+            for (int cycle = 0; cycle < 16; cycle++)
             {
-                beatmapDependency = new ManiaBeatmap(stageDefinition);
+                for (int column = 0; column < preview_key_count; column++)
+                {
+                    double holdStart = cycle * cycleLength + (column + 1) * spacing;
+                    double noteStart = holdStart - spacing * 0.75;
 
-                RelativeSizeAxes = Axes.Both;
-                Clock = new FramedClock(manualClock);
+                    var note = new Note
+                    {
+                        Column = column,
+                        StartTime = noteStart,
+                    };
+                    note.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
+                    beatmap.HitObjects.Add(note);
+
+                    var hold = new HoldNote
+                    {
+                        Column = column,
+                        StartTime = holdStart,
+                        Duration = spacing * 0.9,
+                    };
+                    hold.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
+                    beatmap.HitObjects.Add(hold);
+                }
             }
 
-            protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+            return beatmap;
+        }
+
+        private sealed partial class VirtualPlayfieldPreview : Container
+        {
+            private readonly StopwatchClock playbackClock = new StopwatchClock(true);
+            private readonly FramedClock framedClock;
+
+            private DrawableRuleset drawableRuleset = null!;
+            private double beatmapMaxTime;
+
+            public VirtualPlayfieldPreview()
             {
-                var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
-                dependencies.CacheAs<IScrollingInfo>(scrollingInfo);
-                dependencies.Cache(stageDefinition);
-                dependencies.CacheAs(beatmapDependency);
-                dependencies.CacheAs<IGameplayClock>(gameplayClockDependency);
-                return dependencies;
+                framedClock = new FramedClock(playbackClock);
+                RelativeSizeAxes = Axes.Both;
             }
 
             [BackgroundDependencyLoader]
             private void load()
             {
-                scrollingInfo.TimeRangeBindable.Value = timeSpeed;
+                var beatmap = buildVirtualPreviewBeatmap();
+                beatmapMaxTime = Math.Max(beatmap.GetLastObjectTime() + 1500, 1);
 
-                ManiaAction action = ManiaAction.Key1;
-                stage = new Stage(0, stageDefinition, ref action)
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    RelativeSizeAxes = Axes.Y,
-                    Height = 1,
-                };
+                var ruleset = new ManiaRuleset();
+                Mod? autoplayMod = ruleset.GetAutoplayMod();
 
-                InternalChild = stage;
+                drawableRuleset = ruleset.CreateDrawableRulesetWith(
+                    beatmap,
+                    autoplayMod != null ? new[] { autoplayMod } : null);
 
-                // Add a small number of initial cycles; further cycles will be added on-demand
-                // during Update to ensure a continuous stream of upcoming hitobjects.
-                for (int r = 0; r < 3; r++)
-                {
-                    addCycle(r);
-                }
+                drawableRuleset.Clock = framedClock;
+                drawableRuleset.Playfield.DisplayJudgements.Value = true;
 
-                nextCycleIndex = 3;
-            }
-
-            private void addCycle(int r)
-            {
-                for (int i = 0; i < preview_key_count; i++)
-                {
-                    var hold = new HoldNote
-                    {
-                        StartTime = r * cycleLength + (1 + i) * holdDuration,
-                        Duration = holdDuration,
-                        Column = i,
-                    };
-
-                    hold.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
-                    stage.Add(hold);
-                    lastAddedStart = Math.Max(lastAddedStart, hold.StartTime);
-                }
+                Child = drawableRuleset;
             }
 
             protected override void Update()
             {
                 base.Update();
 
-                // Use the continuous playback clock as the gameplay clock so notes
-                // scroll smoothly. Ensure we always have upcoming cycles generated
-                // up to a small buffer beyond the visible TimeRange.
-                double currentTime = playbackClock.CurrentTime;
-                // Add cycles on-demand to cover current time + visible range + buffer.
-                double requiredUpTo = currentTime + scrollingInfo.TimeRangeBindable.Value + cycleLength * 2;
-
-                while (lastAddedStart < requiredUpTo)
-                {
-                    addCycle(nextCycleIndex++);
-                }
-
-                manualClock.CurrentTime = currentTime;
-                gameplayClockDependency.CurrentTime = currentTime;
+                if (playbackClock.CurrentTime >= beatmapMaxTime)
+                    playbackClock.Seek(0);
             }
         }
     }
