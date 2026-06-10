@@ -14,6 +14,7 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Edit.Components;
+using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -445,6 +446,34 @@ namespace osu.Game.Tests.Visual.Edit
                 var document = editorScreen.SkinIniSession!.ParseDraftDocument();
                 return (document.GetValue(EzSkinIniDocument.GENERAL_SECTION, "Name") ?? string.Empty) == baselineName;
             });
+        }
+
+        [Test]
+        public void TestNoteSceneComparisonHost()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Note);
+
+            AddUntilStep("note comparison host visible", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
+            AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            AddAssert("mania note profile registered", () => EzSkinEditorNoteRulesetProfileRegistry.Get(3) != null);
+        }
+
+        [Test]
+        public void TestNoteSnapshotRestore()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.Note);
+
+            AddUntilStep("note host visible", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
+
+            AddStep("change variant", () => editorScreen.NoteSessionForTesting.VariantId.Value = "2");
+            AddStep("create note snapshot", () => editorScreen.CreateNoteSnapshotForTesting());
+            AddStep("change variant again", () => editorScreen.NoteSessionForTesting.VariantId.Value = "S");
+            AddStep("restore note snapshot", () => editorScreen.RestoreNoteSnapshotForTesting());
+            AddAssert("variant restored", () => editorScreen.NoteSessionForTesting.VariantId.Value == "2");
         }
 
         [Test]
