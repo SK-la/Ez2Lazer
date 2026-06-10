@@ -18,7 +18,7 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
         public LocalisableString TabTitle => EzEditorStrings.TAB_SIZE;
 
         public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
-            new EzSkinEditorPreviewHost(context, showComparison: true);
+            new EzSkinEditorPreviewHost(context);
 
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context)
         {

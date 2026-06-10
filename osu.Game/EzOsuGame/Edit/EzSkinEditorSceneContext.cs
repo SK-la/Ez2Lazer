@@ -35,6 +35,11 @@ namespace osu.Game.EzOsuGame.Edit
         /// </summary>
         public bool AllowBeatmapPreview { get; init; }
 
+        /// <summary>
+        /// Size/colour scenes use the virtual playfield on the left and Note/LN comparison on the right.
+        /// </summary>
+        public bool UseVirtualComparisonPreview { get; init; }
+
         public IWorkingBeatmap? PreviewBeatmap { get; init; }
 
         public RulesetInfo? PreviewRuleset { get; init; }

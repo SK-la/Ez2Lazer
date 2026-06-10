@@ -36,6 +36,7 @@ namespace osu.Game.EzOsuGame.Edit
     // M4: top-bar preview controls + static/beatmap scene backends
     // M5: EzSkin.json + advanced colouring + config menu (json/colour→ini)
     // M6: size→ini, .osk export
+    // M7: preview toolbar + skin popover + virtual comparison on size/colour scenes
 
     /// <summary>
     /// Ez skin editor screen with menu bar, scene bar, scene content and toolbox-style settings sidebar.
@@ -231,6 +232,7 @@ namespace osu.Game.EzOsuGame.Edit
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            SkinEditorProviderResolver.EnsureDefaultProviderRegistered();
             beatmapPicker = new EzSkinEditorBeatmapPicker(realm, beatmapManager);
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
@@ -317,13 +319,19 @@ namespace osu.Game.EzOsuGame.Edit
 
         private EzSkinEditorSceneContext buildSceneContext()
         {
-            bool allowBeatmapPreview = sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance
+            var currentScene = sceneBar.CurrentScene.Value;
+
+            bool allowBeatmapPreview = currentScene == EzSkinEditorSceneType.Appearance
                                        && PreviewState.Source.Value == EzSkinEditorPreviewSource.Beatmap;
 
+            bool useVirtualComparisonPreview = currentScene is EzSkinEditorSceneType.Size or EzSkinEditorSceneType.Colour;
+
+            // Size/colour scenes always use the mania LN virtual provider, not the loaded beatmap ruleset.
             var previewBeatmap = allowBeatmapPreview
                 ? PreviewState.PreviewBeatmap?.Beatmap
                 : null;
 
+            SkinEditorProviderResolver.EnsureDefaultProviderRegistered();
             provider = SkinEditorProviderResolver.Resolve(previewBeatmap);
 
             return new EzSkinEditorSceneContext
@@ -336,6 +344,7 @@ namespace osu.Game.EzOsuGame.Edit
                 RequestSceneRefresh = refreshScene,
                 CommitSkinIni = commitSkinIni,
                 AllowBeatmapPreview = allowBeatmapPreview,
+                UseVirtualComparisonPreview = useVirtualComparisonPreview,
                 PreviewSource = PreviewState.Source.Value,
                 PreviewBeatmap = PreviewState.PreviewBeatmap,
                 PreviewRuleset = PreviewState.Ruleset.Value,

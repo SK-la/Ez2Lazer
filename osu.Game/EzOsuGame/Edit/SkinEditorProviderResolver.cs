@@ -4,6 +4,7 @@
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using osu.Game.Beatmaps;
 
 namespace osu.Game.EzOsuGame.Edit
@@ -13,6 +14,17 @@ namespace osu.Game.EzOsuGame.Edit
         private const int mania_ruleset_online_id = 3;
 
         private const string mania_provider_type_name = "osu.Game.Rulesets.Mania.EzMania.Editor.EzSkinLNEditorProvider, osu.Game.Rulesets.Mania";
+
+        /// <summary>
+        /// Ensures the default mania virtual preview provider is registered.
+        /// </summary>
+        public static void EnsureDefaultProviderRegistered()
+        {
+            if (SkinEditorProviderRegistry.Get(mania_ruleset_online_id) != null)
+                return;
+
+            ensureManiaProviderRegistered();
+        }
 
         public static ISkinEditorVirtualProvider? Resolve(IBeatmap? beatmap)
         {
@@ -33,11 +45,19 @@ namespace osu.Game.EzOsuGame.Edit
         {
             try
             {
-                var assembly = AppDomain.CurrentDomain.GetAssemblies()
-                                        .FirstOrDefault(a => a.GetName().Name == "osu.Game.Rulesets.Mania")
-                               ?? Assembly.Load(new AssemblyName("osu.Game.Rulesets.Mania"));
+                var type = Type.GetType(mania_provider_type_name, throwOnError: false);
 
-                _ = assembly.GetType("osu.Game.Rulesets.Mania.EzMania.Editor.EzSkinLNEditorProvider", throwOnError: false);
+                if (type == null)
+                {
+                    var assembly = AppDomain.CurrentDomain.GetAssemblies()
+                                            .FirstOrDefault(a => a.GetName().Name == "osu.Game.Rulesets.Mania")
+                                   ?? Assembly.Load(new AssemblyName("osu.Game.Rulesets.Mania"));
+
+                    type = assembly.GetType("osu.Game.Rulesets.Mania.EzMania.Editor.EzSkinLNEditorProvider", throwOnError: false);
+                }
+
+                if (type != null)
+                    RuntimeHelpers.RunClassConstructor(type.TypeHandle);
             }
             catch
             {

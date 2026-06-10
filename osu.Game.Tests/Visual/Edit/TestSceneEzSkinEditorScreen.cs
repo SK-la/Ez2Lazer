@@ -134,13 +134,18 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
-        public void TestColourSceneGroups()
+        public void TestColourSceneComparisonDrawables()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
+            AddAssert("mania preview provider registered", () => SkinEditorProviderRegistry.Get(3) != null);
             switchScene(EzSkinEditorSceneType.Colour);
 
+            AddUntilStep("comparison grid visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Single().ChildrenOfType<GridContainer>().Any());
             AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED.ToString()) != true));
+            AddUntilStep("static note label visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "Note"));
+            AddUntilStep("static ln label visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "LN"));
         }
 
         [Test]
