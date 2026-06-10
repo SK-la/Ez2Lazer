@@ -23,6 +23,10 @@ on:
         required: false
         default: ''
 
+permissions:
+  contents: write
+  packages: read
+
 jobs:
   prepare:
     runs-on: ubuntu-latest
