@@ -39,9 +39,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
             int height = Math.Max(1, (int)Math.Round(request.Height));
             var result = new Image<Rgba32>(width, height);
 
-            source.Mutate(c => c.Resize(width, height));
-            applyTint(source, request.NoteColour);
-            result.Mutate(c => c.DrawImage(source, new Point(0, 0), 1f));
+            drawLayer(result, source, y: 0, width, height, request.NoteColour);
 
             return result;
         }
@@ -66,28 +64,31 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
             if (head != null)
             {
-                head.Mutate(c => c.Resize(width, headHeight));
-                applyTint(head, request.NoteColour);
-                result.Mutate(c => c.DrawImage(head, new Point(0, y), 1f));
+                drawLayer(result, head, y, width, headHeight, request.NoteColour);
                 y += headHeight;
             }
 
             if (body != null)
             {
-                body.Mutate(c => c.Resize(width, bodyHeight));
-                applyTint(body, request.NoteColour);
-                result.Mutate(c => c.DrawImage(body, new Point(0, y), 1f));
+                drawLayer(result, body, y, width, bodyHeight, request.NoteColour);
                 y += bodyHeight;
             }
 
             if (tail != null)
-            {
-                tail.Mutate(c => c.Resize(width, tailHeight));
-                applyTint(tail, request.NoteColour);
-                result.Mutate(c => c.DrawImage(tail, new Point(0, y), 1f));
-            }
+                drawLayer(result, tail, y, width, tailHeight, request.NoteColour);
 
             return result;
+        }
+
+        private static void drawLayer(Image<Rgba32> result, Image<Rgba32> source, int y, int width, int height, Colour4 tint)
+        {
+            using var layer = source.Clone();
+
+            layer.Mutate(c => c.Resize(width, height));
+            applyTint(layer, tint);
+
+            int drawY = y;
+            result.Mutate(c => c.DrawImage(layer, new Point(0, drawY), 1f));
         }
 
         private static Image<Rgba32>? loadTextureImage(string mountedSkinPath, string? textureName)
