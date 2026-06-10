@@ -62,6 +62,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private void populatePlayback()
         {
+            if (context.PreviewSource == EzSkinEditorPreviewSource.Beatmap)
+            {
+                playbackContainer.Child = new EzSkinEditorBeatmapPreviewHost(context).With(d =>
+                {
+                    d.RelativeSizeAxes = Axes.Both;
+                });
+                return;
+            }
+
             if (context.Provider != null)
             {
                 playbackContainer.Child = context.Provider.CreateDynamicPart(context.EditorSkin).With(d =>
@@ -73,13 +82,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
             else
             {
-                playbackContainer.Child = new OsuSpriteText
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    Text = "Virtual playfield not supported",
-                    Colour = Color4.White,
-                };
+                playbackContainer.Child = createPlaceholder("Virtual playfield not supported");
             }
         }
 
@@ -96,14 +99,16 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
             else
             {
-                comparisonContainer.Child = new OsuSpriteText
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    Text = "Comparison preview not supported",
-                    Colour = Color4.White,
-                };
+                comparisonContainer.Child = createPlaceholder("Comparison preview not supported");
             }
         }
+
+        private static OsuSpriteText createPlaceholder(string text) => new OsuSpriteText
+        {
+            Anchor = Anchor.Centre,
+            Origin = Anchor.Centre,
+            Text = text,
+            Colour = Color4.White,
+        };
     }
 }

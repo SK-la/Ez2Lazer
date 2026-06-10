@@ -355,5 +355,28 @@ namespace osu.Game.Tests.Visual.Edit
             AddStep("collapse sidebar", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().ExpandedState.Value = false);
             AddUntilStep("sidebar contracted", () => editorScreen.ChildrenOfType<EzSkinEditorSidebar>().Single().DrawWidth <= EzSkinEditorSidebar.CONTRACTED_WIDTH + 1);
         }
+
+        [Test]
+        public void TestTopToolbarControls()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddUntilStep("top toolbar visible", () => editorScreen.ChildrenOfType<EzSkinEditorTopToolbar>().Any());
+            AddUntilStep("skin dropdown visible", () => editorScreen.ChildrenOfType<EzSkinEditorSkinDropdown>().Any());
+            AddUntilStep("beatmap menu button visible", () => editorScreen.ChildrenOfType<EzSkinEditorBeatmapMenuButton>().Any());
+            AddAssert("default static preview", () => editorScreen.PreviewSource.Value == EzSkinEditorPreviewSource.Static);
+        }
+
+        [Test]
+        public void TestStaticPreviewAfterSkinSwitch()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            importLegacySkin();
+
+            AddUntilStep("preview host visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Any());
+            AddAssert("still static preview", () => editorScreen.PreviewSource.Value == EzSkinEditorPreviewSource.Static);
+        }
     }
 }

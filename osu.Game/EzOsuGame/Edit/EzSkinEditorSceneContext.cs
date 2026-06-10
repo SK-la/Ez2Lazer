@@ -2,6 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets;
 using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.Edit
@@ -20,5 +23,13 @@ namespace osu.Game.EzOsuGame.Edit
         public Action? RequestSceneRefresh { get; init; }
 
         public Action? CommitSkinIni { get; init; }
+
+        public EzSkinEditorPreviewSource PreviewSource { get; init; } = EzSkinEditorPreviewSource.Static;
+
+        public IWorkingBeatmap? PreviewBeatmap { get; init; }
+
+        public RulesetInfo? PreviewRuleset { get; init; }
+
+        public EzBeatmapPreviewMode PreviewMode { get; init; } = EzBeatmapPreviewMode.Static;
     }
 }

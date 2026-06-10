@@ -7,15 +7,16 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
+using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.SkinEditor;
+using osu.Game.Rulesets;
 using osu.Game.Screens;
 using osu.Game.Skinning;
 
@@ -25,7 +26,8 @@ namespace osu.Game.EzOsuGame.Edit
     // M1: layout shell + scene strategies + sidebar groups
     // M2: Saved/Draft session + Note/LN comparison preview
     // M3: Skin.ini editor + backup + save footer
-    // M4: export, EzSkin.json, advanced colouring
+    // M4: top-bar preview controls + static/beatmap scene backends
+    // M5: export, EzSkin.json, advanced colouring
 
     /// <summary>
     /// Ez skin editor screen with menu bar, scene bar, scene content and toolbox-style settings sidebar.
@@ -42,20 +44,34 @@ namespace osu.Game.EzOsuGame.Edit
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
+        [Resolved]
+        private BeatmapManager beatmapManager { get; set; } = null!;
+
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
+
         [Resolved(canBeNull: true)]
         private IDialogOverlay? dialogOverlay { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private INotificationOverlay? notifications { get; set; }
 
         private Container? backgroundContainer;
         private Container sceneContentHost = null!;
         private EzSkinEditorMenuBar menuBar = null!;
         private EzSkinEditorSceneBar sceneBar = null!;
         private EzSkinEditorSidebar sidebar = null!;
-        private OsuTextFlowContainer headerText = null!;
+        private EzSkinEditorTopToolbar topToolbar = null!;
+
+        private readonly EzSkinEditorPreviewState previewState = new EzSkinEditorPreviewState();
+        private EzSkinEditorBeatmapPicker? beatmapPicker;
 
         private ISkinEditorVirtualProvider? provider;
         private EzSkinEditorSceneContext? sceneContext;
 
         public Bindable<EzSkinEditorSceneType> CurrentScene => sceneBar.CurrentScene;
+
+        internal Bindable<EzSkinEditorPreviewSource> PreviewSource => previewState.Source;
 
         /// <summary>
         /// Per-skin skin.ini session. Skin-layer only.
@@ -123,14 +139,11 @@ namespace osu.Game.EzOsuGame.Edit
                                             ApplyAction = applySettings,
                                             ExitAction = tryExit,
                                         },
-                                        headerText = new OsuTextFlowContainer
+                                        topToolbar = new EzSkinEditorTopToolbar
                                         {
-                                            TextAnchor = Anchor.TopRight,
-                                            Padding = new MarginPadding(5),
-                                            Anchor = Anchor.TopRight,
-                                            Origin = Anchor.TopRight,
-                                            AutoSizeAxes = Axes.X,
-                                            RelativeSizeAxes = Axes.Y,
+                                            PreviewSource = previewState.Source,
+                                            StaticPreviewRequested = selectStaticPreview,
+                                            BeatmapPreviewRequested = selectBeatmapPreview,
                                         },
                                     },
                                 },
@@ -171,9 +184,9 @@ namespace osu.Game.EzOsuGame.Edit
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            beatmapPicker = new EzSkinEditorBeatmapPicker(realm, beatmapManager);
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
-            updateHeaderText();
         }
 
         private void onSceneChanged(ValueChangedEvent<EzSkinEditorSceneType> change)
@@ -196,16 +209,43 @@ namespace osu.Game.EzOsuGame.Edit
             backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
             backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
 
-            updateHeaderText();
             ensureSkinIniSession();
 
             sceneContext = buildSceneContext();
             applyCurrentScene();
         }
 
+        private void selectStaticPreview()
+        {
+            previewState.SetStatic();
+            refreshScene();
+        }
+
+        private void selectBeatmapPreview(RulesetInfo ruleset, EzBeatmapPreviewMode mode)
+        {
+            if (beatmapPicker == null)
+                return;
+
+            if (!beatmapPicker.TryPickRandom(ruleset, out var workingBeatmap))
+            {
+                notifications?.Post(new SimpleNotification
+                {
+                    Text = "未找到可用谱面",
+                });
+                return;
+            }
+
+            previewState.SetBeatmap(workingBeatmap!, ruleset, EzSkinEditorPreviewModes.ValidateMode(mode, ruleset));
+            refreshScene();
+        }
+
         private EzSkinEditorSceneContext buildSceneContext()
         {
-            provider = SkinEditorProviderResolver.Resolve(Beatmap.Value?.Beatmap);
+            var previewBeatmap = previewState.Source.Value == EzSkinEditorPreviewSource.Beatmap
+                ? previewState.PreviewBeatmap?.Beatmap
+                : null;
+
+            provider = SkinEditorProviderResolver.Resolve(previewBeatmap);
 
             return new EzSkinEditorSceneContext
             {
@@ -214,6 +254,10 @@ namespace osu.Game.EzOsuGame.Edit
                 SkinIniSession = SkinIniSession,
                 RequestSceneRefresh = refreshScene,
                 CommitSkinIni = commitSkinIni,
+                PreviewSource = previewState.Source.Value,
+                PreviewBeatmap = previewState.PreviewBeatmap,
+                PreviewRuleset = previewState.Ruleset.Value,
+                PreviewMode = previewState.Mode.Value,
             };
         }
 
@@ -291,17 +335,6 @@ namespace osu.Game.EzOsuGame.Edit
             return currentSkin is EzStyleProSkin or Ez2Skin or SbISkin
                 ? currentSkin
                 : new EzStyleProSkin(skinManager);
-        }
-
-        private void updateHeaderText()
-        {
-            headerText.Clear();
-            headerText.AddText(@"Ez ", t => t.Font = OsuFont.TorusAlternate);
-            headerText.AddText(@"Skin Editor", t =>
-            {
-                t.Font = OsuFont.TorusAlternate;
-                t.Colour = colourProvider.Highlight1;
-            });
         }
 
         private void tryExit()
