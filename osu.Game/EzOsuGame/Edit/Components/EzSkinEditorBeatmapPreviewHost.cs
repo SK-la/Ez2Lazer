@@ -29,15 +29,16 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// </summary>
     public partial class EzSkinEditorBeatmapPreviewHost : Container
     {
-        private const double dynamic_preview_repeat_delay = 500;
+        private const float playback_controls_height = 48;
 
         private readonly EzSkinEditorSceneContext context;
 
         private readonly StopwatchClock previewClock = new StopwatchClock();
         private readonly FramedClock framedPreviewClock;
 
-        private Container stageScaleContainer = null!;
         private Container stageViewport = null!;
+        private Container stageScaleContainer = null!;
+        private EzSkinEditorPlaybackControls playbackControls = null!;
 
         private DrawableRuleset? drawableRuleset;
         private IManiaStaticPreviewRenderer? maniaStaticRenderer;
@@ -46,10 +47,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private IBeatmap? playableBeatmap;
         private RulesetInfo? rulesetInfo;
         private EzBeatmapPreviewMode previewMode;
-        private double playbackStartTime;
         private double beatmapMinTime;
         private double beatmapMaxTime;
-        private double nextDynamicLoopStartTime;
+        private double lastProgressDisplayTime = double.MinValue;
 
         private Bindable<EzBeatmapPreviewMode>? previewModeBindable;
 
@@ -69,27 +69,52 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 previewModeBindable.BindValueChanged(onPreviewModeChanged, true);
             }
 
-            InternalChild = stageViewport = new Container
+            InternalChild = new GridContainer
             {
                 RelativeSizeAxes = Axes.Both,
-                Padding = new MarginPadding(10),
-                Child = stageScaleContainer = new Container
+                RowDimensions = new[]
                 {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    RelativeSizeAxes = Axes.Both,
+                    new Dimension(GridSizeMode.Relative, 1),
+                    new Dimension(GridSizeMode.Absolute, playback_controls_height),
+                },
+                Content = new[]
+                {
+                    new Drawable[]
+                    {
+                        stageViewport = new Container
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Padding = new MarginPadding(10),
+                            Child = stageScaleContainer = new Container
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                RelativeSizeAxes = Axes.Both,
+                            },
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        playbackControls = new EzSkinEditorPlaybackControls
+                        {
+                            OnSeek = seekTo,
+                            OnPlayStateChanged = setPlaying,
+                        },
+                    },
                 },
             };
 
             if (context.PreviewBeatmap == null || context.PreviewRuleset == null)
             {
                 stageScaleContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_BEATMAP_NOT_LOADED);
+                playbackControls.Alpha = 0;
                 return;
             }
 
             if (!EzSkinEditorPreviewModes.SupportsBeatmapPreview(context.PreviewRuleset))
             {
                 stageScaleContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_RULESET_PREVIEW_NOT_SUPPORTED);
+                playbackControls.Alpha = 0;
                 return;
             }
 
@@ -114,6 +139,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
             catch
             {
                 stageScaleContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_BEATMAP_LOAD_FAILED);
+                playbackControls.Alpha = 0;
                 return;
             }
 
@@ -121,17 +147,25 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
 
             playableBeatmap = beatmap;
-            playbackStartTime = 0;
             beatmapMinTime = 0;
             beatmapMaxTime = Math.Max(beatmap.BeatmapInfo.Length, beatmap.HitObjects.Count > 0 ? beatmap.GetLastObjectTime() + 1000 : beatmapMinTime + 1);
 
-            mountPreview(token);
-            previewClock.Seek(playbackStartTime);
+            playbackControls.Alpha = 1;
+            playbackControls.SetRange(beatmapMinTime, beatmapMaxTime);
 
-            if (previewMode == EzBeatmapPreviewMode.Dynamic)
+            mountPreview(token);
+            previewClock.Seek(beatmapMinTime);
+            updateProgressDisplay(beatmapMinTime);
+
+            if (isDynamicPlayback)
             {
-                nextDynamicLoopStartTime = Time.Current;
+                playbackControls.SetPlaying(true);
                 previewClock.Start();
+            }
+            else
+            {
+                playbackControls.SetPlaying(false);
+                previewClock.Stop();
             }
         }
 
@@ -224,22 +258,16 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             base.Update();
 
-            if (!isDynamicPlayback || drawableRuleset == null)
-                return;
-
-            if (previewClock.IsRunning)
+            if (isDynamicPlayback && drawableRuleset != null && previewClock.IsRunning)
             {
                 if (previewClock.CurrentTime >= beatmapMaxTime)
+                    previewClock.Seek(beatmapMinTime);
+
+                if (previewClock.CurrentTime - lastProgressDisplayTime >= 16)
                 {
-                    previewClock.Stop();
-                    previewClock.Seek(playbackStartTime);
-                    nextDynamicLoopStartTime = Time.Current + dynamic_preview_repeat_delay;
+                    updateProgressDisplay(previewClock.CurrentTime);
+                    lastProgressDisplayTime = previewClock.CurrentTime;
                 }
-            }
-            else if (Time.Current >= nextDynamicLoopStartTime)
-            {
-                previewClock.Seek(playbackStartTime);
-                previewClock.Start();
             }
         }
 
@@ -247,7 +275,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             base.UpdateAfterChildren();
 
-            if (drawableRuleset == null || maniaStaticRenderer != null)
+            if (drawableRuleset == null && maniaStaticRenderer == null)
                 return;
 
             float viewportWidth = stageViewport.DrawWidth;
@@ -256,8 +284,47 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (viewportWidth <= 1 || viewportHeight <= 1)
                 return;
 
+            if (maniaStaticRenderer != null)
+                return;
+
             float scale = Math.Min(viewportWidth / stageScaleContainer.Width, viewportHeight / stageScaleContainer.Height);
             stageScaleContainer.Scale = new Vector2(Math.Max(0.05f, scale));
+        }
+
+        private void seekTo(double time)
+        {
+            double clamped = Math.Clamp(time, beatmapMinTime, beatmapMaxTime);
+            previewClock.Seek(clamped);
+
+            if (maniaStaticRenderer != null)
+            {
+                maniaStaticRenderer.SetCurrentTime(clamped);
+
+                if (maniaStaticRenderer is StaticScrollPreviewRenderer scrollRenderer)
+                {
+                    float progress = beatmapMaxTime > beatmapMinTime
+                        ? (float)((clamped - beatmapMinTime) / (beatmapMaxTime - beatmapMinTime))
+                        : 0;
+                    scrollRenderer.SetScrollProgress(progress);
+                }
+            }
+
+            updateProgressDisplay(clamped);
+        }
+
+        private void setPlaying(bool playing)
+        {
+            if (playing)
+                previewClock.Start();
+            else
+                previewClock.Stop();
+
+            playbackControls.SetPlaying(playing);
+        }
+
+        private void updateProgressDisplay(double time)
+        {
+            playbackControls.SetCurrentTime(time);
         }
 
         private void disposePreviewResources()
@@ -273,16 +340,21 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             previewMode = change.NewValue;
 
+            if (playableBeatmap == null)
+                return;
+
             if (change.NewValue == EzBeatmapPreviewMode.Dynamic)
             {
-                nextDynamicLoopStartTime = Time.Current;
+                playbackControls.SetPlaying(true);
                 previewClock.Start();
             }
             else
             {
-                nextDynamicLoopStartTime = double.PositiveInfinity;
+                playbackControls.SetPlaying(false);
                 previewClock.Stop();
             }
+
+            beginLoad();
         }
 
         protected override void Dispose(bool isDisposing)
@@ -307,41 +379,5 @@ namespace osu.Game.EzOsuGame.Edit.Components
             Text = text,
             Colour = Color4.White,
         };
-
-        private static double computeDefaultStartTime(IBeatmap playableBeatmap, RulesetInfo ruleset, double fallback)
-        {
-            if (ruleset.OnlineID == 3)
-            {
-                int previewTime = playableBeatmap.Metadata.PreviewTime;
-                if (previewTime > 0)
-                    return previewTime;
-            }
-            else
-            {
-                double kiaiStart = getKiaiStartTime(playableBeatmap);
-                if (!double.IsNaN(kiaiStart))
-                    return kiaiStart;
-            }
-
-            return fallback;
-        }
-
-        private static double getKiaiStartTime(IBeatmap beatmap)
-        {
-            try
-            {
-                foreach (var effectPoint in beatmap.ControlPointInfo.EffectPoints)
-                {
-                    if (effectPoint.KiaiMode)
-                        return effectPoint.Time;
-                }
-            }
-            catch
-            {
-                // ignored
-            }
-
-            return double.NaN;
-        }
     }
 }
