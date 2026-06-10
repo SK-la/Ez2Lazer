@@ -3,8 +3,11 @@
 
 using System.Collections.Generic;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Textures;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Note;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Editor
 {
@@ -50,6 +53,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             useEzNoteVariants
                 ? resolveEzTextureName(part, variantId)
                 : resolveLegacyTextureName(part, variantId);
+
+        public Texture? GetNoteTexture(ISkin skin, EzSkinEditorNotePreviewRequest request, EzSkinEditorNotePart part)
+        {
+            string variantId = string.IsNullOrEmpty(request.VariantId)
+                ? GetDefaultVariantId(request.UseEzNoteVariants, part)
+                : request.VariantId;
+
+            string textureName = ResolveTextureName(request.UseEzNoteVariants, part, variantId);
+
+            var maniaRuleset = new ManiaRuleset();
+            var beatmap = new ManiaBeatmap(new StageDefinition(4));
+            var resolvedSkin = maniaRuleset.CreateSkinTransformer(skin, beatmap) ?? skin;
+            return resolvedSkin.GetTexture(textureName) ?? skin.GetTexture(textureName);
+        }
 
         public Drawable? CreateRulesetSettingsContent() => null;
 

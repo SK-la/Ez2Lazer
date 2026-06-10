@@ -2,9 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
+
 namespace osu.Game.EzOsuGame.Edit.Note
 {
     public static class EzSkinEditorNotePreviewRequestFactory
@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
                 Ruleset = ruleset,
                 Part = exportPart,
                 VariantId = variantId,
-                NoteColour = Colour4.White,
+                NoteColour = config.GetColumnColorByType(EzColumnType.A),
                 Width = config.Get<double>(Ez2Setting.ColumnWidth),
                 Height = Math.Max(1, config.Get<double>(Ez2Setting.ColumnWidth) * config.Get<double>(Ez2Setting.NoteHeightScaleToWidth)),
             };

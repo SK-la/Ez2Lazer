@@ -3,7 +3,9 @@
 
 using System.Collections.Generic;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Textures;
 using osu.Game.Rulesets;
+using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.Edit.Note
 {
@@ -20,6 +22,8 @@ namespace osu.Game.EzOsuGame.Edit.Note
         string GetDefaultVariantId(bool useEzNoteVariants, EzSkinEditorNotePart part);
 
         string? ResolveTextureName(bool useEzNoteVariants, EzSkinEditorNotePart part, string variantId);
+
+        Texture? GetNoteTexture(ISkin skin, EzSkinEditorNotePreviewRequest request, EzSkinEditorNotePart part);
 
         Drawable? CreateRulesetSettingsContent();
     }

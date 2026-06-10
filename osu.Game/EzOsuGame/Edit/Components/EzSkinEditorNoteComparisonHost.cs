@@ -10,7 +10,6 @@ using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
-using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit.Components
@@ -22,6 +21,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     {
         private EzSkinEditorSceneContext context;
 
+        private Bindable<EzSkinEditorNoteCompareKind> compareKind = null!;
         private Container liveContainer = null!;
         private Container snapshotContainer = null!;
         private EzSkinEditorNoteMemoryPreview? livePreview;
@@ -36,34 +36,43 @@ namespace osu.Game.EzOsuGame.Edit.Components
         [BackgroundDependencyLoader]
         private void load()
         {
-            var compareKind = context.NoteCompareKind ?? new Bindable<EzSkinEditorNoteCompareKind>();
+            compareKind = context.NoteCompareKind ?? new Bindable<EzSkinEditorNoteCompareKind>();
 
-            InternalChild = new FillFlowContainer
+            InternalChild = new GridContainer
             {
                 RelativeSizeAxes = Axes.Both,
-                Direction = FillDirection.Vertical,
-                Spacing = new Vector2(0, 8),
-                Children = new Drawable[]
+                RowDimensions = new[]
                 {
-                    new SettingsEnumDropdown<EzSkinEditorNoteCompareKind>
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.Relative, 1),
+                },
+                Content = new[]
+                {
+                    new Drawable[]
                     {
-                        LabelText = EzEditorStrings.NOTE_COMPARE_KIND_LABEL,
-                        Current = compareKind,
-                    },
-                    new GridContainer
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        ColumnDimensions = new[]
+                        new SettingsEnumDropdown<EzSkinEditorNoteCompareKind>
                         {
-                            new Dimension(GridSizeMode.Relative, 0.5f),
-                            new Dimension(GridSizeMode.Relative, 0.5f),
+                            LabelText = EzEditorStrings.NOTE_COMPARE_KIND_LABEL,
+                            Current = compareKind,
                         },
-                        Content = new[]
+                    },
+                    new Drawable[]
+                    {
+                        new GridContainer
                         {
-                            new Drawable[]
+                            RelativeSizeAxes = Axes.Both,
+                            ColumnDimensions = new[]
                             {
-                                liveContainer = new Container { RelativeSizeAxes = Axes.Both },
-                                snapshotContainer = new Container { RelativeSizeAxes = Axes.Both },
+                                new Dimension(GridSizeMode.Relative, 0.5f),
+                                new Dimension(GridSizeMode.Relative, 0.5f),
+                            },
+                            Content = new[]
+                            {
+                                new Drawable[]
+                                {
+                                    liveContainer = new Container { RelativeSizeAxes = Axes.Both, Padding = new MarginPadding { Right = 4 } },
+                                    snapshotContainer = new Container { RelativeSizeAxes = Axes.Both, Padding = new MarginPadding { Left = 4 } },
+                                },
                             },
                         },
                     },
@@ -125,7 +134,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
             }
 
-            livePreview ??= attachPreview(liveContainer);
+            livePreview = attachPreview(liveContainer);
             livePreview.Apply(context.EditorSkin, profile, source.GetLiveRequest(currentCompareKind));
         }
 
@@ -149,7 +158,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
             }
 
-            snapshotPreview ??= attachPreview(snapshotContainer);
+            snapshotPreview = attachPreview(snapshotContainer);
             snapshotPreview.Apply(context.EditorSkin, profile, source.GetSnapshotRequest(currentCompareKind));
         }
 

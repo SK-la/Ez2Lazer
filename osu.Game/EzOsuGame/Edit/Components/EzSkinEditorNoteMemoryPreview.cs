@@ -6,7 +6,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.Textures;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.Skinning;
 using osuTK;
@@ -21,6 +20,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private const float hitbox_border_thickness = 2;
 
         private readonly Container hitboxContainer;
+        private readonly Box hitboxFill;
         private readonly Box[] hitboxBorderEdges;
         private readonly Container tapContent;
         private readonly Sprite tapSprite;
@@ -49,6 +49,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 Origin = Anchor.Centre,
                 Children = new Drawable[]
                 {
+                    hitboxFill = new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Colour4.Transparent,
+                    },
                     hitboxBorderEdges[0],
                     hitboxBorderEdges[1],
                     hitboxBorderEdges[2],
@@ -87,11 +92,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
             holdContent.Alpha = isHold ? 1 : 0;
 
             hitboxContainer.Size = new Vector2((float)request.Width, (float)request.Height);
+            hitboxFill.Colour = request.NoteColour.Opacity(0.25f);
 
             foreach (var edge in hitboxBorderEdges)
                 edge.Colour = request.NoteColour;
 
-            string textureKey = $"{request.CompareKind}:{request.UseEzNoteVariants}:{request.VariantId}";
+            string textureKey = $"{request.CompareKind}:{request.UseEzNoteVariants}:{request.VariantId}:{request.Part}";
 
             if (textureKey != loadedTextureKey)
             {
@@ -99,13 +105,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
                 if (isHold)
                 {
-                    holdHeadSprite.Texture = loadTexture(skin, profile, request, EzSkinEditorNotePart.HoldHead);
-                    holdBodySprite.Texture = loadTexture(skin, profile, request, EzSkinEditorNotePart.HoldBody);
-                    holdTailSprite.Texture = loadTexture(skin, profile, request, EzSkinEditorNotePart.HoldTail);
+                    holdHeadSprite.Texture = profile.GetNoteTexture(skin, request, EzSkinEditorNotePart.HoldHead);
+                    holdBodySprite.Texture = profile.GetNoteTexture(skin, request, EzSkinEditorNotePart.HoldBody);
+                    holdTailSprite.Texture = profile.GetNoteTexture(skin, request, EzSkinEditorNotePart.HoldTail);
                 }
                 else
                 {
-                    tapSprite.Texture = loadTexture(skin, profile, request, EzSkinEditorNotePart.Note);
+                    tapSprite.Texture = profile.GetNoteTexture(skin, request, EzSkinEditorNotePart.Note);
                 }
             }
 
@@ -127,12 +133,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 tapSprite.Colour = tint;
                 fitSpriteToHitbox(tapSprite);
             }
-        }
-
-        private static Texture? loadTexture(ISkin skin, IEzSkinEditorNoteRulesetProfile profile, EzSkinEditorNotePreviewRequest request, EzSkinEditorNotePart part)
-        {
-            string? textureName = profile.ResolveTextureName(request.UseEzNoteVariants, part, request.VariantId);
-            return textureName != null ? skin.GetTexture(textureName) : null;
         }
 
         private void fitSpriteToHitbox(Sprite sprite)
