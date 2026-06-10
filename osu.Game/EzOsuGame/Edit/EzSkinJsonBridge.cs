@@ -48,6 +48,46 @@ namespace osu.Game.EzOsuGame.Edit
         public static string CreateNormalizedSnapshot(Ez2ConfigManager config) =>
             EzSkinJsonDocument.SerializeNormalized(Capture(config));
 
+        /// <summary>
+        /// Sets bindable defaults to the values stored in <paramref name="document"/> so settings controls reset to the snapshot baseline.
+        /// </summary>
+        public static void SyncBindableDefaults(Ez2ConfigManager config, EzSkinJsonDocument document)
+        {
+            foreach (var pair in document.Settings)
+            {
+                if (!Enum.TryParse(pair.Key, out Ez2Setting setting))
+                    continue;
+
+                if (!EzSkinJsonSettingCatalog.Contains(setting))
+                    continue;
+
+                syncBindableDefault(config, setting, pair.Value);
+            }
+        }
+
+        private static void syncBindableDefault(Ez2ConfigManager config, Ez2Setting setting, string value)
+        {
+            var bindable = getTypedBindable(config, setting);
+
+            if (bindable == null)
+                return;
+
+            var valueProperty = bindable.GetType().GetProperty("Value");
+            var defaultProperty = bindable.GetType().GetProperty("Default");
+
+            if (valueProperty == null || defaultProperty == null)
+                return;
+
+            object? previousValue = valueProperty.GetValue(bindable);
+
+            if (bindable is IParseable parseable)
+                parseable.Parse(value, CultureInfo.InvariantCulture);
+
+            object? snapshotValue = valueProperty.GetValue(bindable);
+            defaultProperty.SetValue(bindable, snapshotValue);
+            valueProperty.SetValue(bindable, previousValue);
+        }
+
         private static bool tryCaptureSetting(Ez2ConfigManager config, Ez2Setting setting, out string value)
         {
             value = string.Empty;
@@ -79,7 +119,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private static IBindable? getTypedBindable(Ez2ConfigManager config, Ez2Setting setting)
         {
-            Type? valueType = getBindableValueType(config, setting);
+            Type? valueType = getBindableValueType(setting);
 
             if (valueType == null)
                 return null;
@@ -87,7 +127,28 @@ namespace osu.Game.EzOsuGame.Edit
             return (IBindable?)get_bindable_method.MakeGenericMethod(valueType).Invoke(config, new object[] { setting });
         }
 
-        private static Type? getBindableValueType(Ez2ConfigManager config, Ez2Setting setting)
+        public static Type? GetBindableValueType(Ez2Setting setting) => getBindableValueType(setting);
+
+        public static void BindSettingValueChanged(Ez2ConfigManager config, Ez2Setting setting, Action onChanged)
+        {
+            var valueType = getBindableValueType(setting);
+
+            if (valueType == null)
+                return;
+
+            var method = typeof(EzSkinJsonBridge).GetMethod(nameof(bindSettingValueChangedGeneric), BindingFlags.Static | BindingFlags.NonPublic)!
+                                                 .MakeGenericMethod(valueType);
+
+            method.Invoke(null, new object[] { config, setting, onChanged });
+        }
+
+        private static void bindSettingValueChangedGeneric<T>(Ez2ConfigManager config, Ez2Setting setting, Action onChanged)
+            where T : notnull
+        {
+            config.GetBindable<T>(setting).BindValueChanged(_ => onChanged());
+        }
+
+        private static Type? getBindableValueType(Ez2Setting setting)
         {
             // Access default type via a temporary bindable lookup through public getters for known settings.
             return setting switch

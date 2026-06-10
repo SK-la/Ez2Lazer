@@ -45,5 +45,10 @@ namespace osu.Game.EzOsuGame.Edit
         public RulesetInfo? PreviewRuleset { get; init; }
 
         public EzBeatmapPreviewMode PreviewMode { get; init; } = EzBeatmapPreviewMode.Static;
+
+        /// <summary>
+        /// Configuration snapshot used for comparison preview (right pane) and control reset baselines.
+        /// </summary>
+        public EzSkinEditorComparisonSnapshot? ComparisonSnapshot { get; init; }
     }
 }

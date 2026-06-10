@@ -77,9 +77,37 @@ namespace osu.Game.EzOsuGame.Localization
             "将 EzSkin 尺寸写入 Skin.ini",
             "Write EzSkin sizes to skin.ini");
 
+        public static readonly LocalisableString MENU_CREATE_CONFIG_SNAPSHOT = new EzLocalizationManager.EzLocalisableString(
+            "创建配置快照",
+            "Create config snapshot");
+
+        public static readonly LocalisableString MENU_RESTORE_CONFIG_SNAPSHOT = new EzLocalizationManager.EzLocalisableString(
+            "回到上一个快照",
+            "Restore previous snapshot");
+
+        public static readonly LocalisableString MENU_EXPORT_PREVIEW_IMAGE = new EzLocalizationManager.EzLocalisableString(
+            "导出预览图片",
+            "Export preview image");
+
+        public static readonly LocalisableString TOOLBAR_CLEAR_BEATMAP_PREVIEW = new EzLocalizationManager.EzLocalisableString(
+            "清除谱面预览",
+            "Clear beatmap preview");
+
         #endregion
 
         #region Notifications
+
+        public static readonly LocalisableString NOTIFY_CREATED_CONFIG_SNAPSHOT = new EzLocalizationManager.EzLocalisableString(
+            "已创建配置快照",
+            "Created config snapshot");
+
+        public static readonly LocalisableString NOTIFY_RESTORED_CONFIG_SNAPSHOT = new EzLocalizationManager.EzLocalisableString(
+            "已恢复到上一个配置快照",
+            "Restored previous config snapshot");
+
+        public static readonly LocalisableString NOTIFY_EXPORTED_PREVIEW_IMAGE = new EzLocalizationManager.EzLocalisableString(
+            "已导出预览图片",
+            "Exported preview image");
 
         public static readonly LocalisableString NOTIFY_BEATMAP_NOT_FOUND = new EzLocalizationManager.EzLocalisableString(
             "未找到可用谱面",
@@ -198,6 +226,8 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString GROUP_SIZE = new EzLocalizationManager.EzLocalisableString("尺寸", "Size");
 
         public static readonly LocalisableString GROUP_SKIN_SPECIFIC = new EzLocalizationManager.EzLocalisableString("皮肤专用", "Skin-specific");
+
+        public static readonly LocalisableString GROUP_SCRIPTED_SKIN = new EzLocalizationManager.EzLocalisableString("脚本皮肤", "Scripted skin");
 
         public static readonly LocalisableString GROUP_BASE_COLOURS = new EzLocalizationManager.EzLocalisableString("基础颜色", "Base colours");
 

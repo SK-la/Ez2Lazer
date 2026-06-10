@@ -41,6 +41,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Action? ExportOskAction { get; set; }
 
+        public Action? CreateConfigSnapshotAction { get; set; }
+
+        public Action? RestoreConfigSnapshotAction { get; set; }
+
+        public Action? ExportPreviewImageAction { get; set; }
+
         public Func<bool>? CanCreateEzSkinJson { get; set; }
 
         public Func<bool>? CanUpdateEzSkinJsonSnapshot { get; set; }
@@ -55,6 +61,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Func<bool>? CanExportOsk { get; set; }
 
+        public Func<bool>? CanExportPreviewImage { get; set; }
+
+        private readonly EditorMenuItem createConfigSnapshotItem;
+        private readonly EditorMenuItem restoreConfigSnapshotItem;
+        private readonly EditorMenuItem exportPreviewImageItem;
         private readonly EditorMenuItem createJsonItem;
         private readonly EditorMenuItem updateSnapshotItem;
         private readonly EditorMenuItem removeJsonItem;
@@ -88,6 +99,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 {
                     Items = new OsuMenuItem[]
                     {
+                        createConfigSnapshotItem = new EditorMenuItem(EzEditorStrings.MENU_CREATE_CONFIG_SNAPSHOT, MenuItemType.Standard, () => CreateConfigSnapshotAction?.Invoke()),
+                        restoreConfigSnapshotItem = new EditorMenuItem(EzEditorStrings.MENU_RESTORE_CONFIG_SNAPSHOT, MenuItemType.Standard, () => RestoreConfigSnapshotAction?.Invoke()),
+                        new OsuMenuItemSpacer(),
+                        exportPreviewImageItem = new EditorMenuItem(EzEditorStrings.MENU_EXPORT_PREVIEW_IMAGE, MenuItemType.Standard, () => ExportPreviewImageAction?.Invoke()),
+                        new OsuMenuItemSpacer(),
                         createJsonItem = new EditorMenuItem(EzEditorStrings.MENU_CREATE_EZSKIN_JSON, MenuItemType.Standard, () => CreateEzSkinJsonAction?.Invoke()),
                         updateSnapshotItem = new EditorMenuItem(EzEditorStrings.MENU_UPDATE_EZSKIN_JSON_SNAPSHOT, MenuItemType.Standard, () => UpdateEzSkinJsonSnapshotAction?.Invoke()),
                         removeJsonItem = new EditorMenuItem(EzEditorStrings.MENU_REMOVE_EZSKIN_JSON, MenuItemType.Standard, () => RemoveEzSkinJsonAction?.Invoke()),
@@ -105,6 +121,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public void RefreshMenuState()
         {
+            createConfigSnapshotItem.Action.Disabled = false;
+            restoreConfigSnapshotItem.Action.Disabled = false;
+            exportPreviewImageItem.Action.Disabled = !(CanExportPreviewImage?.Invoke() ?? false);
             createJsonItem.Action.Disabled = !(CanCreateEzSkinJson?.Invoke() ?? false);
             updateSnapshotItem.Action.Disabled = !(CanUpdateEzSkinJsonSnapshot?.Invoke() ?? false);
             removeJsonItem.Action.Disabled = !(CanRemoveEzSkinJson?.Invoke() ?? false);
