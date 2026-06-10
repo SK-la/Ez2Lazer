@@ -458,5 +458,32 @@ namespace osu.Game.Tests.Visual.Edit
                     return json != null && !json.Contains(dirty_alpha.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
                 }));
         }
+
+        [Test]
+        public void TestWriteSizesToSkinIniUpdatesDraft()
+        {
+            importLegacySkin();
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddUntilStep("skin.ini session loaded", () => editorScreen.SkinIniSession != null);
+
+            AddStep("change column width", () => ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth).Value = 99);
+            AddStep("write sizes to skin.ini draft", () => editorScreen.WriteSizesToSkinIniForTesting());
+
+            AddAssert("draft dirty", () => editorScreen.SkinIniSession!.IsDirty);
+            AddAssert("draft contains column width", () => editorScreen.SkinIniSession!.DraftText.Contains("ColumnWidth:", StringComparison.Ordinal));
+        }
+
+        [Test]
+        public void TestExportOskMenuPresent()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            AddAssert("export osk menu present", () => editorScreen.ChildrenOfType<EditorMenuItem>().Any(i => i.Text.ToString() == "导出 .osk"));
+            AddAssert("export disabled on built-in skin",
+                () => editorScreen.ChildrenOfType<EditorMenuItem>().First(i => i.Text.ToString() == "导出 .osk").Action.Disabled);
+        }
     }
 }
