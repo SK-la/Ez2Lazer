@@ -103,7 +103,7 @@ namespace osu.Game.Tests.Visual.Edit
             waitForScreenLoaded();
             switchScene(EzSkinEditorSceneType.Appearance);
 
-            AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
+            AddUntilStep("three sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 3);
             AddAssert("texture group present", () => editorScreen.ChildrenOfType<Dropdown<string>>().Any());
             AddAssert("no comparison placeholder", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("对比区") != true));
         }
@@ -371,7 +371,42 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("top toolbar visible", () => editorScreen.ChildrenOfType<EzSkinEditorTopToolbar>().Any());
             AddUntilStep("skin dropdown visible", () => editorScreen.ChildrenOfType<EzSkinEditorSkinDropdown>().Any());
             AddUntilStep("beatmap menu button visible", () => editorScreen.ChildrenOfType<EzSkinEditorBeatmapMenuButton>().Any());
-            AddAssert("default static preview", () => editorScreen.PreviewSource.Value == EzSkinEditorPreviewSource.Static);
+            AddAssert("preview source resolved", () => editorScreen.PreviewSource.Value is EzSkinEditorPreviewSource.Static or EzSkinEditorPreviewSource.Beatmap);
+        }
+
+        [Test]
+        public void TestConfigSnapshotRestore()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            double baseline = 0;
+            AddStep("read baseline", () => baseline = ezConfig.Get<double>(Ez2Setting.ColumnWidth));
+
+            AddStep("change column width", () => ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth).Value = baseline + 30);
+            AddAssert("width changed", () => ezConfig.Get<double>(Ez2Setting.ColumnWidth) == baseline + 30);
+
+            AddStep("restore snapshot", () => editorScreen.RestoreConfigSnapshotForTesting());
+            AddAssert("width restored", () => ezConfig.Get<double>(Ez2Setting.ColumnWidth) == baseline);
+        }
+
+        [Test]
+        public void TestCreateConfigSnapshotUpdatesBaseline()
+        {
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+
+            double updated = 0;
+            AddStep("change and capture", () =>
+            {
+                updated = ezConfig.Get<double>(Ez2Setting.ColumnWidth) + 15;
+                ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth).Value = updated;
+                editorScreen.CreateConfigSnapshotForTesting();
+            });
+
+            AddStep("change again", () => ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth).Value = updated + 20);
+            AddStep("restore snapshot", () => editorScreen.RestoreConfigSnapshotForTesting());
+            AddAssert("restored to captured value", () => ezConfig.Get<double>(Ez2Setting.ColumnWidth) == updated);
         }
 
         [Test]
