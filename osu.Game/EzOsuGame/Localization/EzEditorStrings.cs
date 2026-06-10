@@ -213,9 +213,11 @@ namespace osu.Game.EzOsuGame.Localization
 
         #region Toolbar and preview
 
-        public static readonly LocalisableString TOOLBAR_STATIC_SKIN = new EzLocalizationManager.EzLocalisableString("静态皮肤", "Static skin");
+        public static readonly LocalisableString TOOLBAR_PAUSE_BEATMAP = new EzLocalizationManager.EzLocalisableString("暂停谱面", "Pause beatmap");
 
-        public static readonly LocalisableString TOOLBAR_REAL_BEATMAP = new EzLocalizationManager.EzLocalisableString("实际谱面", "Beatmap");
+        public static readonly LocalisableString TOOLBAR_PLAY_BEATMAP = new EzLocalizationManager.EzLocalisableString("播放谱面", "Play beatmap");
+
+        public static readonly LocalisableString TOOLBAR_SELECT_MODE = new EzLocalizationManager.EzLocalisableString("选择模式", "Select mode");
 
         public static readonly LocalisableString TOOLBAR_PREVIEW_NOT_SUPPORTED = new EzLocalizationManager.EzLocalisableString(
             "预览尚未支持",

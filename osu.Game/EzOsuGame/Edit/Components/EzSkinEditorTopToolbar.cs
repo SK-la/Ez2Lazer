@@ -19,13 +19,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
 {
     public partial class EzSkinEditorTopToolbar : FillFlowContainer
     {
-        public Action? StaticPreviewRequested { get; set; }
+        public Action? ToggleBeatmapPlaybackRequested { get; set; }
 
-        public Action<RulesetInfo, EzBeatmapPreviewMode>? BeatmapPreviewRequested { get; set; }
+        public Action<RulesetInfo>? BeatmapPreviewRequested { get; set; }
 
         public Bindable<EzSkinEditorPreviewSource>? PreviewSource { get; set; }
 
-        private StaticPreviewButton staticButton = null!;
+        public Bindable<EzBeatmapPreviewMode>? PreviewMode { get; set; }
+
+        private BeatmapPlaybackButton playbackButton = null!;
         private EzSkinEditorBeatmapMenuButton beatmapButton = null!;
 
         public EzSkinEditorTopToolbar()
@@ -43,15 +45,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             Children = new Drawable[]
             {
-                staticButton = new StaticPreviewButton
-                {
-                    Action = () => StaticPreviewRequested?.Invoke(),
-                },
+                playbackButton = new BeatmapPlaybackButton(),
                 beatmapButton = new EzSkinEditorBeatmapMenuButton
                 {
-                    BeatmapPreviewRequested = (ruleset, mode) => BeatmapPreviewRequested?.Invoke(ruleset, mode),
+                    BeatmapPreviewRequested = ruleset => BeatmapPreviewRequested?.Invoke(ruleset),
                 },
-                new EzSkinEditorSkinDropdown(),
                 new OsuTextFlowContainer
                 {
                     TextAnchor = Anchor.CentreLeft,
@@ -75,55 +73,41 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             base.LoadComplete();
 
+            playbackButton.Action = () => ToggleBeatmapPlaybackRequested?.Invoke();
+
             PreviewSource?.BindValueChanged(_ => updateActiveState(), true);
+            PreviewMode?.BindValueChanged(_ => updateActiveState(), true);
         }
 
         private void updateActiveState()
         {
-            if (PreviewSource == null)
-                return;
+            bool beatmapLoaded = PreviewSource?.Value == EzSkinEditorPreviewSource.Beatmap;
+            bool playing = beatmapLoaded && PreviewMode?.Value == EzBeatmapPreviewMode.Dynamic;
 
-            staticButton.Active = PreviewSource.Value == EzSkinEditorPreviewSource.Static;
-            beatmapButton.Active = PreviewSource.Value == EzSkinEditorPreviewSource.Beatmap;
+            playbackButton.Enabled.Value = beatmapLoaded;
+            playbackButton.ShowPausedState = beatmapLoaded && !playing;
+
+            beatmapButton.Active = beatmapLoaded;
         }
 
-        private partial class StaticPreviewButton : SkinEditorSceneLibrary.SceneButton
+        private partial class BeatmapPlaybackButton : SkinEditorSceneLibrary.SceneButton
         {
-            private bool active;
-
-            public bool Active
+            public bool ShowPausedState
             {
-                get => active;
-                set
-                {
-                    active = value;
-                    if (IsLoaded)
-                        updateColours();
-                }
+                set => Text = value ? EzEditorStrings.TOOLBAR_PLAY_BEATMAP : EzEditorStrings.TOOLBAR_PAUSE_BEATMAP;
             }
 
-            private OsuColour colours = null!;
-            private OverlayColourProvider? colourProvider;
-
-            public StaticPreviewButton()
+            public BeatmapPlaybackButton()
             {
-                Text = EzEditorStrings.TOOLBAR_STATIC_SKIN;
-                Width = 100;
+                Text = EzEditorStrings.TOOLBAR_PAUSE_BEATMAP;
+                Width = 110;
             }
 
             [BackgroundDependencyLoader]
-            private void load(OsuColour colours, OverlayColourProvider? overlayColourProvider)
+            private void load(OverlayColourProvider? overlayColourProvider, OsuColour colours)
             {
-                this.colours = colours;
-                colourProvider = overlayColourProvider;
-                updateColours();
-            }
-
-            private void updateColours()
-            {
-                BackgroundColour = active
-                    ? colours.YellowDark
-                    : colourProvider?.Background3 ?? colours.Blue3;
+                BackgroundColour = overlayColourProvider?.Background3 ?? colours.Blue3;
+                Content.CornerRadius = 5;
             }
         }
     }

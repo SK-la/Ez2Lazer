@@ -8,6 +8,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
@@ -55,6 +56,9 @@ namespace osu.Game.EzOsuGame.Edit
         private BeatmapManager beatmapManager { get; set; } = null!;
 
         [Resolved]
+        private IBindable<WorkingBeatmap> gameBeatmap { get; set; } = null!;
+
+        [Resolved]
         private RealmAccess realm { get; set; } = null!;
 
         [Resolved]
@@ -77,6 +81,8 @@ namespace osu.Game.EzOsuGame.Edit
         private EzSkinEditorTopToolbar topToolbar = null!;
 
         private EzSkinEditorBeatmapPicker? beatmapPicker;
+
+        private bool attemptedGlobalBeatmapPreview;
 
         private ISkinEditorVirtualProvider? provider;
         private EzSkinEditorSceneContext? sceneContext;
@@ -132,81 +138,86 @@ namespace osu.Game.EzOsuGame.Edit
                 new OsuContextMenuContainer
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Child = new GridContainer
+                    Child = new PopoverContainer
                     {
                         RelativeSizeAxes = Axes.Both,
-                        RowDimensions = new[]
+                        Child = new GridContainer
                         {
-                            new Dimension(GridSizeMode.AutoSize),
-                            new Dimension(GridSizeMode.AutoSize),
-                            new Dimension(),
-                        },
-                        Content = new[]
-                        {
-                            new Drawable[]
+                            RelativeSizeAxes = Axes.Both,
+                            RowDimensions = new[]
                             {
-                                new Container
+                                new Dimension(GridSizeMode.AutoSize),
+                                new Dimension(GridSizeMode.AutoSize),
+                                new Dimension(),
+                            },
+                            Content = new[]
+                            {
+                                new Drawable[]
                                 {
-                                    Name = @"Menu container",
-                                    RelativeSizeAxes = Axes.X,
-                                    Depth = float.MinValue,
-                                    Height = SkinEditor.MENU_HEIGHT,
-                                    Children = new Drawable[]
+                                    new Container
                                     {
-                                        menuBar = new EzSkinEditorMenuBar
+                                        Name = @"Menu container",
+                                        RelativeSizeAxes = Axes.X,
+                                        Depth = float.MinValue,
+                                        Height = SkinEditor.MENU_HEIGHT,
+                                        Children = new Drawable[]
                                         {
-                                            ApplyAction = applySettings,
-                                            ExitAction = tryExit,
-                                            CreateEzSkinJsonAction = createEzSkinJson,
-                                            UpdateEzSkinJsonSnapshotAction = updateEzSkinJsonSnapshot,
-                                            RemoveEzSkinJsonAction = removeEzSkinJson,
-                                            ImportJsonAction = importJson,
-                                            ImportFromSkinJsonAction = importFromSkinJson,
-                                            ExportJsonAction = exportJson,
-                                            WriteColoursToSkinIniAction = writeColoursToSkinIni,
-                                            WriteSizesToSkinIniAction = writeSizesToSkinIni,
-                                            ExportOskAction = exportOsk,
-                                            CanCreateEzSkinJson = () => SkinJsonSession is { IsSupported: true, HasFile: false },
-                                            CanUpdateEzSkinJsonSnapshot = () => SkinJsonSession is { IsSupported: true, HasFile: true }
-                                                                                && SkinJsonSession.IsDirty(ezSkinConfig),
-                                            CanRemoveEzSkinJson = () => SkinJsonSession is { IsSupported: true, HasFile: true },
-                                            CanImportFromSkinJson = () => SkinJsonSession is { IsSupported: true, HasFile: true },
-                                            CanWriteColoursToSkinIni = () => SkinIniSession is { IsSupported: true } && getCurrentKeyMode() > 0,
-                                            CanWriteSizesToSkinIni = () => SkinIniSession is { IsSupported: true } && getCurrentKeyMode() > 0,
-                                            CanExportOsk = canExportOsk,
-                                        },
-                                        topToolbar = new EzSkinEditorTopToolbar
-                                        {
-                                            PreviewSource = PreviewState.Source,
-                                            StaticPreviewRequested = selectStaticPreview,
-                                            BeatmapPreviewRequested = selectBeatmapPreview,
+                                            menuBar = new EzSkinEditorMenuBar
+                                            {
+                                                ApplyAction = applySettings,
+                                                ExitAction = tryExit,
+                                                CreateEzSkinJsonAction = createEzSkinJson,
+                                                UpdateEzSkinJsonSnapshotAction = updateEzSkinJsonSnapshot,
+                                                RemoveEzSkinJsonAction = removeEzSkinJson,
+                                                ImportJsonAction = importJson,
+                                                ImportFromSkinJsonAction = importFromSkinJson,
+                                                ExportJsonAction = exportJson,
+                                                WriteColoursToSkinIniAction = writeColoursToSkinIni,
+                                                WriteSizesToSkinIniAction = writeSizesToSkinIni,
+                                                ExportOskAction = exportOsk,
+                                                CanCreateEzSkinJson = () => SkinJsonSession is { IsSupported: true, HasFile: false },
+                                                CanUpdateEzSkinJsonSnapshot = () => SkinJsonSession is { IsSupported: true, HasFile: true }
+                                                                                    && SkinJsonSession.IsDirty(ezSkinConfig),
+                                                CanRemoveEzSkinJson = () => SkinJsonSession is { IsSupported: true, HasFile: true },
+                                                CanImportFromSkinJson = () => SkinJsonSession is { IsSupported: true, HasFile: true },
+                                                CanWriteColoursToSkinIni = () => SkinIniSession is { IsSupported: true } && getCurrentKeyMode() > 0,
+                                                CanWriteSizesToSkinIni = () => SkinIniSession is { IsSupported: true } && getCurrentKeyMode() > 0,
+                                                CanExportOsk = canExportOsk,
+                                            },
+                                            topToolbar = new EzSkinEditorTopToolbar
+                                            {
+                                                PreviewSource = PreviewState.Source,
+                                                PreviewMode = PreviewState.Mode,
+                                                ToggleBeatmapPlaybackRequested = toggleBeatmapPlayback,
+                                                BeatmapPreviewRequested = selectBeatmapPreview,
+                                            },
                                         },
                                     },
                                 },
-                            },
-                            new Drawable[]
-                            {
-                                sceneBar = new EzSkinEditorSceneBar
+                                new Drawable[]
                                 {
-                                    RelativeSizeAxes = Axes.X,
-                                },
-                            },
-                            new Drawable[]
-                            {
-                                new GridContainer
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                    ColumnDimensions = new[]
+                                    sceneBar = new EzSkinEditorSceneBar
                                     {
-                                        new Dimension(),
-                                        new Dimension(GridSizeMode.AutoSize),
+                                        RelativeSizeAxes = Axes.X,
                                     },
-                                    Content = new[]
+                                },
+                                new Drawable[]
+                                {
+                                    new GridContainer
                                     {
-                                        new Drawable[]
+                                        RelativeSizeAxes = Axes.Both,
+                                        ColumnDimensions = new[]
                                         {
-                                            sceneContentHost = new Container { RelativeSizeAxes = Axes.Both },
-                                            sidebar = new EzSkinEditorSidebar(),
+                                            new Dimension(),
+                                            new Dimension(GridSizeMode.AutoSize),
+                                        },
+                                        Content = new[]
+                                        {
+                                            new Drawable[]
+                                            {
+                                                sceneContentHost = new Container { RelativeSizeAxes = Axes.Both },
+                                                sidebar = new EzSkinEditorSidebar(),
+                                            },
                                         },
                                     },
                                 },
@@ -246,6 +257,8 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void refreshScene()
         {
+            ensureGlobalBeatmapPreview();
+
             backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
             backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
 
@@ -257,13 +270,34 @@ namespace osu.Game.EzOsuGame.Edit
             menuBar.RefreshMenuState();
         }
 
-        private void selectStaticPreview()
+        private void ensureGlobalBeatmapPreview()
         {
-            PreviewState.SetStatic();
-            refreshScene();
+            if (attemptedGlobalBeatmapPreview || PreviewState.HasBeatmapLoaded)
+                return;
+
+            attemptedGlobalBeatmapPreview = true;
+
+            if (!EzSkinEditorBeatmapPicker.CanUseAsPreview(gameBeatmap.Value))
+                return;
+
+            if (gameBeatmap.Value.BeatmapInfo.Ruleset is not RulesetInfo ruleset)
+                return;
+
+            PreviewState.SetBeatmap(gameBeatmap.Value, ruleset, EzSkinEditorPreviewModes.GetAppearanceLoadMode(ruleset));
         }
 
-        private void selectBeatmapPreview(RulesetInfo ruleset, EzBeatmapPreviewMode mode)
+        private void toggleBeatmapPlayback()
+        {
+            if (!PreviewState.HasBeatmapLoaded)
+                return;
+
+            if (PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic)
+                PreviewState.PauseBeatmapPlayback();
+            else
+                PreviewState.ResumeBeatmapPlayback();
+        }
+
+        private void selectBeatmapPreview(RulesetInfo ruleset)
         {
             if (beatmapPicker == null)
                 return;
@@ -277,13 +311,16 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
-            PreviewState.SetBeatmap(workingBeatmap!, ruleset, EzSkinEditorPreviewModes.ValidateMode(mode, ruleset));
+            PreviewState.SetBeatmap(workingBeatmap!, ruleset, EzSkinEditorPreviewModes.GetAppearanceLoadMode(ruleset));
             refreshScene();
         }
 
         private EzSkinEditorSceneContext buildSceneContext()
         {
-            var previewBeatmap = PreviewState.Source.Value == EzSkinEditorPreviewSource.Beatmap
+            bool allowBeatmapPreview = sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance
+                                       && PreviewState.Source.Value == EzSkinEditorPreviewSource.Beatmap;
+
+            var previewBeatmap = allowBeatmapPreview
                 ? PreviewState.PreviewBeatmap?.Beatmap
                 : null;
 
@@ -298,6 +335,7 @@ namespace osu.Game.EzOsuGame.Edit
                 PreviewState = PreviewState,
                 RequestSceneRefresh = refreshScene,
                 CommitSkinIni = commitSkinIni,
+                AllowBeatmapPreview = allowBeatmapPreview,
                 PreviewSource = PreviewState.Source.Value,
                 PreviewBeatmap = PreviewState.PreviewBeatmap,
                 PreviewRuleset = PreviewState.Ruleset.Value,

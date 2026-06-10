@@ -11,24 +11,20 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Localisation;
 using osu.Framework.Graphics.UserInterface;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     public partial class EzSkinEditorBeatmapMenuButton : SkinEditorSceneLibrary.SceneButton, IHasPopover
     {
-        public Action<RulesetInfo, EzBeatmapPreviewMode>? BeatmapPreviewRequested;
+        public Action<RulesetInfo>? BeatmapPreviewRequested;
 
         private bool active;
 
@@ -51,8 +47,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public EzSkinEditorBeatmapMenuButton()
         {
-            Text = EzEditorStrings.TOOLBAR_REAL_BEATMAP;
-            Width = 110;
+            Text = EzEditorStrings.TOOLBAR_SELECT_MODE;
+            Width = 100;
         }
 
         [BackgroundDependencyLoader]
@@ -77,9 +73,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
     public partial class BeatmapPreviewPopover : OsuPopover
     {
         private readonly IRulesetStore rulesets;
-        private readonly Action<RulesetInfo, EzBeatmapPreviewMode>? onSelected;
+        private readonly Action<RulesetInfo>? onSelected;
 
-        public BeatmapPreviewPopover(IRulesetStore rulesets, Action<RulesetInfo, EzBeatmapPreviewMode>? onSelected)
+        public BeatmapPreviewPopover(IRulesetStore rulesets, Action<RulesetInfo>? onSelected)
         {
             this.rulesets = rulesets;
             this.onSelected = onSelected;
@@ -88,68 +84,32 @@ namespace osu.Game.EzOsuGame.Edit.Components
         [BackgroundDependencyLoader]
         private void load()
         {
-            Child = new OsuScrollContainer
+            Child = new FillFlowContainer
             {
-                Width = 280,
-                Height = 360,
-                Child = new FillFlowContainer
-                {
-                    AutoSizeAxes = Axes.Y,
-                    Width = 260,
-                    Direction = FillDirection.Vertical,
-                    Spacing = new Vector2(0, 6),
-                    Padding = new MarginPadding(10),
-                    Children = buildSections().ToArray(),
-                },
+                Width = 220,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 6),
+                Children = buildRulesetButtons().ToArray(),
             };
         }
 
-        private IEnumerable<Drawable> buildSections()
+        private IEnumerable<Drawable> buildRulesetButtons()
         {
             foreach (var ruleset in rulesets.AvailableRulesets.OfType<RulesetInfo>())
             {
-                yield return new OsuSpriteText
-                {
-                    Text = ruleset.Name,
-                    Font = OsuFont.Default.With(weight: FontWeight.Bold, size: 14),
-                    Margin = new MarginPadding { Top = 4 },
-                };
-
                 if (!EzSkinEditorPreviewModes.SupportsBeatmapPreview(ruleset))
-                {
-                    yield return new OsuSpriteText
-                    {
-                        Text = EzEditorStrings.TOOLBAR_PREVIEW_NOT_SUPPORTED,
-                        Font = OsuFont.Default.With(size: 12),
-                        Colour = Color4.Gray,
-                        Margin = new MarginPadding { Bottom = 4 },
-                    };
-
                     continue;
-                }
 
-                foreach (var mode in EzSkinEditorPreviewModes.GetAvailableModes(ruleset))
+                var capturedRuleset = ruleset;
+
+                yield return new ModeSelectButton(ruleset.Name, () =>
                 {
-                    var capturedRuleset = ruleset;
-                    var capturedMode = mode;
-
-                    yield return new ModeSelectButton(getModeLabel(mode), () =>
-                    {
-                        onSelected?.Invoke(capturedRuleset, capturedMode);
-                        this.HidePopover();
-                    });
-                }
+                    onSelected?.Invoke(capturedRuleset);
+                    this.HidePopover();
+                });
             }
         }
-
-        private static LocalisableString getModeLabel(EzBeatmapPreviewMode mode) => mode switch
-        {
-            EzBeatmapPreviewMode.Dynamic => EzEnumStrings.DYNAMIC,
-            EzBeatmapPreviewMode.Static => EzEnumStrings.STATIC,
-            EzBeatmapPreviewMode.StaticFullMap => EzEnumStrings.STATIC_FULL_MAP,
-            EzBeatmapPreviewMode.StaticScroll => EzEnumStrings.STATIC_SCROLL,
-            _ => mode.ToString(),
-        };
 
         private partial class ModeSelectButton : OsuButton
         {
