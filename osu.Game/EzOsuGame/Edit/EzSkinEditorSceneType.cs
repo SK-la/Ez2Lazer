@@ -12,5 +12,6 @@ namespace osu.Game.EzOsuGame.Edit
         Size,
         Colour,
         SkinIni,
+        Note,
     }
 }

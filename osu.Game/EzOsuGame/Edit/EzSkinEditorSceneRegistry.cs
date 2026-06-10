@@ -15,6 +15,7 @@ namespace osu.Game.EzOsuGame.Edit
             new SizeSceneStrategy(),
             new ColourSceneStrategy(),
             new SkinIniSceneStrategy(),
+            new NoteSceneStrategy(),
         };
 
         public static IEzSkinEditorSceneStrategy Get(EzSkinEditorSceneType sceneType) =>
