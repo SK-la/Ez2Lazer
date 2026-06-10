@@ -16,7 +16,7 @@ namespace osu.Game.EzOsuGame.Mods
     {
         /// <summary>
         /// Full-precision runtime speed used for audio binding and per-frame interpolation.
-        /// <see cref="SpeedChange"/> remains the display/settings bindable with <see cref="BindableNumber{T}.Precision"/>.
+        /// <see cref="ModRateAdjust.SpeedChange"/> remains the display/settings bindable with <see cref="BindableNumber{T}.Precision"/>.
         /// </summary>
         public BindableDouble GameplaySpeed { get; } = new BindableDouble(1);
 
@@ -59,7 +59,7 @@ namespace osu.Game.EzOsuGame.Mods
 
         /// <summary>
         /// Wire <see cref="GameplaySpeed"/> to audio adjustments and sync display speed from runtime speed.
-        /// Call from subclass constructors after <see cref="SpeedChange"/> is initialised.
+        /// Call from subclass constructors after <see cref="ModRateAdjust.SpeedChange"/> is initialised.
         /// </summary>
         protected void InitialiseDynamicSpeedAdjust(BindableBool adjustPitch)
         {
@@ -72,7 +72,7 @@ namespace osu.Game.EzOsuGame.Mods
         }
 
         /// <summary>
-        /// Copy min/max from <see cref="SpeedChange"/> to <see cref="GameplaySpeed"/> and keep them aligned on future changes.
+        /// Copy min/max from <see cref="ModRateAdjust.SpeedChange"/> to <see cref="GameplaySpeed"/> and keep them aligned on future changes.
         /// </summary>
         protected void SyncSpeedBoundsFromDisplay()
         {

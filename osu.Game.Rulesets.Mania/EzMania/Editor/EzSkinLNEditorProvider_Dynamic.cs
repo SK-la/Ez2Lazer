@@ -10,7 +10,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
@@ -33,14 +32,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
         private static ManiaBeatmap buildVirtualPreviewBeatmap()
         {
             var beatmap = new ManiaBeatmap(new StageDefinition(preview_key_count));
-            int spacing = preview_hold_duration;
-            int cycleLength = spacing * preview_key_count;
+            const int spacing = preview_hold_duration;
+            const int cycle_length = spacing * preview_key_count;
 
             for (int cycle = 0; cycle < 16; cycle++)
             {
                 for (int column = 0; column < preview_key_count; column++)
                 {
-                    double holdStart = cycle * cycleLength + (column + 1) * spacing;
+                    double holdStart = cycle * cycle_length + (column + 1) * spacing;
                     double noteStart = holdStart - spacing * 0.75;
 
                     var note = new Note

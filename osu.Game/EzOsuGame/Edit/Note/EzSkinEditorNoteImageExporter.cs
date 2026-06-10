@@ -4,7 +4,6 @@
 using System;
 using System.IO;
 using osu.Framework.Graphics;
-using osuTK.Graphics;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;

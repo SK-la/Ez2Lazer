@@ -9,7 +9,7 @@ using osu.Game.Rulesets;
 namespace osu.Game.EzOsuGame.Edit
 {
     /// <summary>
-    /// Local preview state for Ez skin editor. Does not mutate global <see cref="OsuGame.Beatmap"/> / <see cref="OsuGame.Ruleset"/>.
+    /// Local preview state for Ez skin editor. Does not mutate global <see cref="OsuGameBase.Beatmap"/> / <see cref="OsuGameBase.Ruleset"/>.
     /// </summary>
     public sealed class EzSkinEditorPreviewState
     {
