@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -238,6 +239,8 @@ namespace osu.Game.EzOsuGame.Edit
         public void ApplySettings() => applySettings();
 
         internal void CreateEzSkinJsonForTesting() => createEzSkinJson();
+
+        internal void WriteSizesToSkinIniForTesting() => writeSizesToSkinIni();
 
         private void refreshScene()
         {
@@ -532,14 +535,23 @@ namespace osu.Game.EzOsuGame.Edit
         {
             if (!canExportOsk())
             {
-                postNotification("当前皮肤无法导出");
+                postNotification(RuntimeInfo.IsDesktop ? "当前皮肤无法导出" : "当前平台不支持导出");
                 return;
             }
 
             try
             {
+                bool committedSkinIni = false;
+
+                if (SkinIniSession is { IsDirty: true })
+                {
+                    SkinIniSession.Commit();
+                    committedSkinIni = true;
+                }
+
                 skinManager.ExportCurrentSkin();
-                postNotification("正在导出 .osk…");
+                postNotification(committedSkinIni ? "已保存 skin.ini 并导出 .osk…" : "正在导出 .osk…");
+                refreshScene();
             }
             catch (Exception e)
             {
@@ -555,7 +567,8 @@ namespace osu.Game.EzOsuGame.Edit
             return ezSkinConfig.Get<int>(Ez2Setting.ColumnTypeListSelect);
         }
 
-        private bool canExportOsk() => !skinManager.CurrentSkin.Disabled
+        private bool canExportOsk() => RuntimeInfo.IsDesktop
+                                       && !skinManager.CurrentSkin.Disabled
                                        && skinManager.CurrentSkinInfo.Value.PerformRead(s => !s.Protected);
 
         private void postNotification(string text) => notifications?.Post(new SimpleNotification { Text = text });
