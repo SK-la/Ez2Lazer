@@ -210,6 +210,8 @@ jobs:
   build:
     needs: prepare
     if: ${{ needs.prepare.outputs.skip_release != 'true' }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
