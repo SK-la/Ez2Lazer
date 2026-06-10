@@ -12,28 +12,26 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Hosts the virtual playback scene. With comparison enabled (size scene only),
+    /// Hosts the virtual playback scene. With comparison enabled (size/colour scenes),
     /// playback is on the left and Note/LN static preview is on the right.
     /// </summary>
     public partial class EzSkinEditorPreviewHost : Container
     {
         private readonly EzSkinEditorSceneContext context;
-        private readonly bool showComparison;
 
         private Container playbackContainer = null!;
         private Container comparisonContainer = null!;
 
-        public EzSkinEditorPreviewHost(EzSkinEditorSceneContext context, bool showComparison = false)
+        public EzSkinEditorPreviewHost(EzSkinEditorSceneContext context)
         {
             this.context = context;
-            this.showComparison = showComparison;
             RelativeSizeAxes = Axes.Both;
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
-            if (!showComparison)
+            if (!context.UseVirtualComparisonPreview)
             {
                 InternalChild = playbackContainer = new Container { RelativeSizeAxes = Axes.Both };
                 populatePlayback();

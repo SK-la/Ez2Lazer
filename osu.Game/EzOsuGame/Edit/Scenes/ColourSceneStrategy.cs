@@ -16,7 +16,8 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public LocalisableString TabTitle => EzEditorStrings.TAB_COLOUR;
 
-        public Drawable CreateSceneContent(EzSkinEditorSceneContext context) => new EzSkinEditorPreviewHost(context);
+        public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
+            new EzSkinEditorPreviewHost(context);
 
         public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) => new[]
         {
