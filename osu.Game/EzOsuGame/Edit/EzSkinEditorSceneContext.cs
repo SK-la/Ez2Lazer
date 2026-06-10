@@ -5,6 +5,7 @@ using System;
 using osu.Game.Beatmaps;
 using osu.Framework.Bindables;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.Rulesets;
 using osu.Game.Skinning;
@@ -39,6 +40,8 @@ namespace osu.Game.EzOsuGame.Edit
         /// Rebuild scene content only (preview area), without replacing sidebar groups.
         /// </summary>
         public Action? RequestPreviewRefresh { get; init; }
+
+        public Func<EzSkinEditorEmbeddedPlayer?>? GetEmbeddedPlayer { get; set; }
 
         public Action? CommitSkinIni { get; init; }
 

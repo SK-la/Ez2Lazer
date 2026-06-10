@@ -103,6 +103,11 @@ namespace osu.Game.EzOsuGame.Edit
         private ISkinEditorVirtualProvider? provider;
         private EzSkinEditorSceneContext? sceneContext;
 
+        private EzSkinEditorEmbeddedPlayer? embeddedPlayer;
+        private string embeddedPlayerBeatmapHash = string.Empty;
+        private int embeddedPlayerRulesetId;
+        private Guid embeddedPlayerSkinId;
+
         public Bindable<EzSkinEditorSceneType> CurrentScene => sceneBar.CurrentScene;
 
         internal Bindable<EzSkinEditorPreviewSource> PreviewSource => PreviewState.Source;
@@ -303,8 +308,14 @@ namespace osu.Game.EzOsuGame.Edit
         {
             ensureGlobalBeatmapPreview();
 
-            backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
-            backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
+            if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance)
+                mountAppearanceEmbeddedPlayer();
+            else
+            {
+                disposeEmbeddedPlayer();
+                backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
+                backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
+            }
 
             ensureSkinIniSession();
             ensureSkinJsonSession();
@@ -334,6 +345,19 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void toggleBeatmapPlayback()
         {
+            if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Appearance)
+            {
+                if (embeddedPlayer == null)
+                    return;
+
+                if (embeddedPlayer.GameplayClock.IsRunning)
+                    embeddedPlayer.SetPlaying(false);
+                else
+                    embeddedPlayer.SetPlaying(true);
+
+                return;
+            }
+
             if (!PreviewState.HasBeatmapLoaded)
                 return;
 
@@ -414,7 +438,64 @@ namespace osu.Game.EzOsuGame.Edit
                 CreateNoteSnapshot = createNoteSnapshot,
                 RestoreNoteSnapshot = restoreNoteSnapshot,
                 ExportNotePreview = exportNotePreview,
+                GetEmbeddedPlayer = () => embeddedPlayer,
             };
+        }
+
+        private void mountAppearanceEmbeddedPlayer()
+        {
+            var workingBeatmap = resolveAppearanceWorkingBeatmap();
+            var ruleset = resolveAppearanceRuleset(workingBeatmap);
+
+            if (workingBeatmap == null || ruleset == null)
+            {
+                disposeEmbeddedPlayer();
+                backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
+                backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
+                return;
+            }
+
+            string beatmapHash = workingBeatmap.BeatmapInfo.Hash;
+            int rulesetId = ruleset.OnlineID;
+            var skinId = skinManager.CurrentSkinInfo.Value.ID;
+
+            if (embeddedPlayer != null
+                && embeddedPlayerBeatmapHash == beatmapHash
+                && embeddedPlayerRulesetId == rulesetId
+                && embeddedPlayerSkinId == skinId)
+                return;
+
+            disposeEmbeddedPlayer();
+
+            embeddedPlayer = new EzSkinEditorEmbeddedPlayer(workingBeatmap, ruleset, getEditorSkin());
+            embeddedPlayerBeatmapHash = beatmapHash;
+            embeddedPlayerRulesetId = rulesetId;
+            embeddedPlayerSkinId = skinId;
+
+            backgroundContainer!.Child = new EzSkinEditorEmbeddedPlayerHost(embeddedPlayer);
+        }
+
+        private WorkingBeatmap? resolveAppearanceWorkingBeatmap()
+        {
+            if (PreviewState.PreviewBeatmap is WorkingBeatmap preview)
+                return preview;
+
+            if (EzSkinEditorBeatmapPicker.CanUseAsPreview(gameBeatmap.Value))
+                return gameBeatmap.Value;
+
+            return null;
+        }
+
+        private RulesetInfo? resolveAppearanceRuleset(WorkingBeatmap? workingBeatmap) =>
+            PreviewState.Ruleset.Value ?? workingBeatmap?.BeatmapInfo.Ruleset;
+
+        private void disposeEmbeddedPlayer()
+        {
+            embeddedPlayer?.Expire();
+            embeddedPlayer = null;
+            embeddedPlayerBeatmapHash = string.Empty;
+            embeddedPlayerRulesetId = -1;
+            embeddedPlayerSkinId = Guid.Empty;
         }
 
         private IEzSkinEditorNoteComparisonSource? buildNoteComparisonSource(bool useNoteComparisonOnly, bool useVirtualComparisonPreview, bool usesEzNoteVariants)
@@ -927,6 +1008,12 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
+            if (sceneContentHost.Child is EzSkinEditorAppearanceSceneContent appearanceContent)
+            {
+                appearanceContent.RefreshFromContext(sceneContext);
+                return;
+            }
+
             var strategy = EzSkinEditorSceneRegistry.Get(sceneBar.CurrentScene.Value);
             sceneContentHost.Child = strategy.CreateSceneContent(sceneContext);
         }
@@ -1014,6 +1101,12 @@ namespace osu.Game.EzOsuGame.Edit
 
         public void PresentGameplay()
         {
+            if (sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Appearance)
+                return;
+
+            mountAppearanceEmbeddedPlayer();
+            embeddedPlayer?.Restart();
+            refreshPreviewContent();
         }
 
         private static Drawable? createManiaStageBackgroundOrNull()

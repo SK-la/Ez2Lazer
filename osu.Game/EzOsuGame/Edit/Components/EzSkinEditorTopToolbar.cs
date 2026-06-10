@@ -23,8 +23,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Action<RulesetInfo>? BeatmapPreviewRequested { get; set; }
 
-        public Action? ClearBeatmapPreviewRequested { get; set; }
-
         public Bindable<EzSkinEditorPreviewSource>? PreviewSource { get; set; }
 
         public Bindable<EzBeatmapPreviewMode>? PreviewMode { get; set; }
@@ -51,7 +49,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 beatmapButton = new EzSkinEditorBeatmapMenuButton
                 {
                     BeatmapPreviewRequested = ruleset => BeatmapPreviewRequested?.Invoke(ruleset),
-                    ClearBeatmapPreviewRequested = () => ClearBeatmapPreviewRequested?.Invoke(),
                 },
                 new OsuTextFlowContainer
                 {
