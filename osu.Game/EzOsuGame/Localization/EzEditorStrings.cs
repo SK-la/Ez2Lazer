@@ -255,6 +255,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString NOTE_VARIANT_LABEL = new EzLocalizationManager.EzLocalisableString("变体", "Variant");
 
+        public static readonly LocalisableString NOTE_COMPARE_KIND_LABEL = new EzLocalizationManager.EzLocalisableString("对比类型", "Comparison type");
+
         public static readonly LocalisableString NOTE_COLOUR_LABEL = new EzLocalizationManager.EzLocalisableString("颜色", "Colour");
 
         public static readonly LocalisableString NOTE_TRUE_COLOURING_LABEL = new EzLocalizationManager.EzLocalisableString("真着色", "True colouring");

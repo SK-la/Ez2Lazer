@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Extensions;
+using osu.Framework.Testing;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using osu.Framework;
@@ -117,6 +118,8 @@ namespace osu.Game.EzOsuGame.Edit
         public EzSkinJsonSession? SkinJsonSession { get; private set; }
 
         internal EzSkinEditorPreviewState PreviewState { get; } = new EzSkinEditorPreviewState();
+
+        internal Bindable<EzSkinEditorNoteCompareKind> NoteCompareKind { get; } = new Bindable<EzSkinEditorNoteCompareKind>();
 
         public EzSkinEditorScreen()
         {
@@ -382,12 +385,16 @@ namespace osu.Game.EzOsuGame.Edit
             SkinEditorProviderResolver.EnsureDefaultProviderRegistered();
             provider = SkinEditorProviderResolver.Resolve(previewBeatmap);
 
+            bool usesEzNoteVariants = EzSkinEditorNoteVariantResolver.UsesEzVariants(skinManager.CurrentSkin.Value);
+
             return new EzSkinEditorSceneContext
             {
                 Provider = provider,
                 EditorSkin = getEditorSkin(),
                 ActualSkin = skinManager.CurrentSkin.Value,
-                UsesEzNoteVariants = EzSkinEditorNoteVariantResolver.UsesEzVariants(skinManager.CurrentSkin.Value),
+                UsesEzNoteVariants = usesEzNoteVariants,
+                NoteComparisonSource = buildNoteComparisonSource(useNoteComparisonOnly, useVirtualComparisonPreview, usesEzNoteVariants),
+                NoteCompareKind = NoteCompareKind,
                 SkinIniSession = SkinIniSession,
                 SkinJsonSession = SkinJsonSession,
                 PreviewState = PreviewState,
@@ -408,6 +415,29 @@ namespace osu.Game.EzOsuGame.Edit
                 RestoreNoteSnapshot = restoreNoteSnapshot,
                 ExportNotePreview = exportNotePreview,
             };
+        }
+
+        private IEzSkinEditorNoteComparisonSource? buildNoteComparisonSource(bool useNoteComparisonOnly, bool useVirtualComparisonPreview, bool usesEzNoteVariants)
+        {
+            if (!useNoteComparisonOnly && !useVirtualComparisonPreview)
+                return null;
+
+            if (useNoteComparisonOnly)
+                return new NoteEditComparisonSource(NoteSessionForTesting, NoteSnapshotForTesting, usesEzNoteVariants);
+
+            var profile = EzSkinEditorNoteRulesetProfileRegistry.All.FirstOrDefault();
+
+            if (profile == null)
+                return null;
+
+            string variantId = profile.GetDefaultVariantId(usesEzNoteVariants, EzSkinEditorNotePart.Note);
+
+            return new ConfigSnapshotComparisonSource(
+                ezSkinConfig,
+                ComparisonSnapshotForTesting,
+                usesEzNoteVariants,
+                variantId,
+                profile.RulesetInfo);
         }
 
         private void applyCurrentScene()
@@ -770,7 +800,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void refreshNoteComparisonSnapshotPane()
         {
-            if (sceneContentHost.Child is EzSkinEditorNoteComparisonHost noteHost)
+            if (tryGetNoteComparisonHost(out var noteHost))
                 noteHost.RefreshSnapshotPane();
             else
                 Schedule(refreshPreviewContent);
@@ -778,10 +808,29 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void refreshNoteComparisonLivePane()
         {
-            if (sceneContentHost.Child is EzSkinEditorNoteComparisonHost noteHost)
+            if (tryGetNoteComparisonHost(out var noteHost))
                 noteHost.UpdateContext(buildSceneContext());
             else
                 Schedule(refreshPreviewContent);
+        }
+
+        private bool tryGetNoteComparisonHost(out EzSkinEditorNoteComparisonHost noteHost)
+        {
+            if (sceneContentHost.Child is EzSkinEditorNoteComparisonHost directHost)
+            {
+                noteHost = directHost;
+                return true;
+            }
+
+            if (sceneContentHost.Child is EzSkinEditorPreviewHost previewHost
+                && previewHost.ChildrenOfType<EzSkinEditorNoteComparisonHost>().FirstOrDefault() is EzSkinEditorNoteComparisonHost nestedHost)
+            {
+                noteHost = nestedHost;
+                return true;
+            }
+
+            noteHost = null!;
+            return false;
         }
 
         private void exportNotePreview()
@@ -861,8 +910,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             sceneContext = buildSceneContext();
 
-            if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Note
-                && sceneContentHost.Child is EzSkinEditorNoteComparisonHost noteHost)
+            if (tryGetNoteComparisonHost(out var noteHost))
             {
                 noteHost.UpdateContext(sceneContext);
                 return;

@@ -121,16 +121,15 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("at least one sidebar group", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Any());
             AddAssert("no comparison placeholder", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains("对比区") != true));
             AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED.ToString()) != true));
-            AddUntilStep("static note label visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "Note"));
-            AddUntilStep("static ln label visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "LN"));
+            AddUntilStep("unified note comparison host visible", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
             AddUntilStep("playback and comparison are horizontal", () =>
             {
                 var preview = editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().SingleOrDefault();
-                var comparisonLabel = editorScreen.ChildrenOfType<OsuSpriteText>().FirstOrDefault(t => t.Text.ToString() == "LN");
+                var comparisonHost = editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().SingleOrDefault();
 
                 return preview != null
-                       && comparisonLabel != null
-                       && comparisonLabel.ScreenSpaceDrawQuad.Centre.X > preview.ScreenSpaceDrawQuad.Centre.X;
+                       && comparisonHost != null
+                       && comparisonHost.ScreenSpaceDrawQuad.Centre.X > preview.ScreenSpaceDrawQuad.Centre.X;
             });
         }
 
@@ -145,8 +144,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("comparison grid visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Single().ChildrenOfType<GridContainer>().Any());
             AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
             AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED.ToString()) != true));
-            AddUntilStep("static note label visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "Note"));
-            AddUntilStep("static ln label visible", () => editorScreen.ChildrenOfType<OsuSpriteText>().Any(t => t.Text.ToString() == "LN"));
+            AddUntilStep("unified note comparison host visible", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
         }
 
         [Test]

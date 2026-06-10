@@ -13,6 +13,8 @@ namespace osu.Game.EzOsuGame.Edit.Note
     {
         public bool UseEzNoteVariants { get; init; }
 
+        public EzSkinEditorNoteCompareKind CompareKind { get; init; }
+
         public RulesetInfo Ruleset { get; init; }
 
         public EzSkinEditorNotePart Part { get; init; }

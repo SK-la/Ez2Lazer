@@ -28,9 +28,10 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         public Bindable<string> ExportName { get; } = new Bindable<string>("note-preview");
 
-        public EzSkinEditorNotePreviewRequest ToPreviewRequest(bool useEzNoteVariants) => new EzSkinEditorNotePreviewRequest
+        public EzSkinEditorNotePreviewRequest ToPreviewRequest(bool useEzNoteVariants, EzSkinEditorNoteCompareKind compareKind) => new EzSkinEditorNotePreviewRequest
         {
             UseEzNoteVariants = useEzNoteVariants,
+            CompareKind = compareKind,
             Ruleset = Ruleset.Value,
             Part = Part.Value,
             VariantId = VariantId.Value,

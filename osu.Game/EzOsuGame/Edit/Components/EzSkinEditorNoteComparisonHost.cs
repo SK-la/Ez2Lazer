@@ -2,19 +2,21 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Overlays.Settings;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Full-width live vs note-edit-snapshot comparison for the Note scene.
-    /// Live pane binds to session layout fields without reloading skin textures.
+    /// Shared live vs snapshot note comparison for Note, Size and Colour scenes.
     /// </summary>
     public partial class EzSkinEditorNoteComparisonHost : Container
     {
@@ -34,24 +36,41 @@ namespace osu.Game.EzOsuGame.Edit.Components
         [BackgroundDependencyLoader]
         private void load()
         {
-            InternalChild = new GridContainer
+            var compareKind = context.NoteCompareKind ?? new Bindable<EzSkinEditorNoteCompareKind>();
+
+            InternalChild = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.Both,
-                ColumnDimensions = new[]
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 8),
+                Children = new Drawable[]
                 {
-                    new Dimension(GridSizeMode.Relative, 0.5f),
-                    new Dimension(GridSizeMode.Relative, 0.5f),
-                },
-                Content = new[]
-                {
-                    new Drawable[]
+                    new SettingsEnumDropdown<EzSkinEditorNoteCompareKind>
                     {
-                        liveContainer = new Container { RelativeSizeAxes = Axes.Both },
-                        snapshotContainer = new Container { RelativeSizeAxes = Axes.Both },
+                        LabelText = EzEditorStrings.NOTE_COMPARE_KIND_LABEL,
+                        Current = compareKind,
+                    },
+                    new GridContainer
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        ColumnDimensions = new[]
+                        {
+                            new Dimension(GridSizeMode.Relative, 0.5f),
+                            new Dimension(GridSizeMode.Relative, 0.5f),
+                        },
+                        Content = new[]
+                        {
+                            new Drawable[]
+                            {
+                                liveContainer = new Container { RelativeSizeAxes = Axes.Both },
+                                snapshotContainer = new Container { RelativeSizeAxes = Axes.Both },
+                            },
+                        },
                     },
                 },
             };
 
+            compareKind.BindValueChanged(_ => populate(), false);
             populate();
         }
 
@@ -62,7 +81,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (context.NoteSession == null)
                 return;
 
-            context.NoteSession.Part.BindValueChanged(_ => refreshLivePane(), false);
             context.NoteSession.VariantId.BindValueChanged(_ => refreshLivePane(), false);
             context.NoteSession.Ruleset.BindValueChanged(_ => refreshLivePane(), false);
             context.NoteSession.NoteColour.BindValueChanged(_ => applyLiveLayout(), false);
@@ -84,16 +102,21 @@ namespace osu.Game.EzOsuGame.Edit.Components
             refreshSnapshotPane();
         }
 
+        private EzSkinEditorNoteCompareKind currentCompareKind =>
+            context.NoteCompareKind?.Value ?? EzSkinEditorNoteCompareKind.Tap;
+
         private void refreshLivePane()
         {
-            if (context.NoteSession == null)
+            var source = context.NoteComparisonSource;
+
+            if (source == null)
             {
                 liveContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
                 livePreview = null;
                 return;
             }
 
-            var profile = EzSkinEditorNoteRulesetProfileRegistry.Get(context.NoteSession.Ruleset.Value);
+            var profile = EzSkinEditorNoteRulesetProfileRegistry.Get(source.Ruleset);
 
             if (profile == null)
             {
@@ -103,19 +126,21 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
 
             livePreview ??= attachPreview(liveContainer);
-            livePreview.Apply(context.EditorSkin, profile, context.NoteSession.ToPreviewRequest(context.UsesEzNoteVariants));
+            livePreview.Apply(context.EditorSkin, profile, source.GetLiveRequest(currentCompareKind));
         }
 
         private void refreshSnapshotPane()
         {
-            if (context.NoteSnapshot == null)
+            var source = context.NoteComparisonSource;
+
+            if (source == null)
             {
                 snapshotContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE);
                 snapshotPreview = null;
                 return;
             }
 
-            var profile = EzSkinEditorNoteRulesetProfileRegistry.Get(context.NoteSnapshot.Ruleset);
+            var profile = EzSkinEditorNoteRulesetProfileRegistry.Get(source.Ruleset);
 
             if (profile == null)
             {
@@ -125,20 +150,20 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
 
             snapshotPreview ??= attachPreview(snapshotContainer);
-            snapshotPreview.Apply(context.EditorSkin, profile, context.NoteSnapshot.ToPreviewRequest(context.UsesEzNoteVariants));
+            snapshotPreview.Apply(context.EditorSkin, profile, source.GetSnapshotRequest(currentCompareKind));
         }
 
         private void applyLiveLayout()
         {
-            if (livePreview == null || context.NoteSession == null)
+            if (livePreview == null || context.NoteComparisonSource == null)
                 return;
 
-            var profile = EzSkinEditorNoteRulesetProfileRegistry.Get(context.NoteSession.Ruleset.Value);
+            var profile = EzSkinEditorNoteRulesetProfileRegistry.Get(context.NoteComparisonSource.Ruleset);
 
             if (profile == null)
                 return;
 
-            livePreview.Apply(context.EditorSkin, profile, context.NoteSession.ToPreviewRequest(context.UsesEzNoteVariants));
+            livePreview.Apply(context.EditorSkin, profile, context.NoteComparisonSource.GetLiveRequest(currentCompareKind));
         }
 
         private static EzSkinEditorNoteMemoryPreview attachPreview(Container container)

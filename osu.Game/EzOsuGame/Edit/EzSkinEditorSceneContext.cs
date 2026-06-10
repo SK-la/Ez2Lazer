@@ -3,6 +3,7 @@
 
 using System;
 using osu.Game.Beatmaps;
+using osu.Framework.Bindables;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.Rulesets;
@@ -57,6 +58,10 @@ namespace osu.Game.EzOsuGame.Edit
         /// Note scene uses full-width live vs note-edit-snapshot comparison only.
         /// </summary>
         public bool UseNoteComparisonOnly { get; init; }
+
+        public IEzSkinEditorNoteComparisonSource? NoteComparisonSource { get; init; }
+
+        public Bindable<EzSkinEditorNoteCompareKind>? NoteCompareKind { get; init; }
 
         public EzSkinEditorNoteEditSession? NoteSession { get; init; }
 
