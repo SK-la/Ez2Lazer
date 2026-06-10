@@ -19,6 +19,13 @@ namespace osu.Game.EzOsuGame.Edit
 
         public ISkin EditorSkin { get; init; } = null!;
 
+        /// <summary>
+        /// Equipped skin instance (not the editor preview wrapper). Used for variant family detection.
+        /// </summary>
+        public ISkin ActualSkin { get; init; } = null!;
+
+        public bool UsesEzNoteVariants { get; init; }
+
         public EzSkinIniSession? SkinIniSession { get; init; }
 
         public EzSkinJsonSession? SkinJsonSession { get; init; }
@@ -26,6 +33,11 @@ namespace osu.Game.EzOsuGame.Edit
         public EzSkinEditorPreviewState? PreviewState { get; init; }
 
         public Action? RequestSceneRefresh { get; init; }
+
+        /// <summary>
+        /// Rebuild scene content only (preview area), without replacing sidebar groups.
+        /// </summary>
+        public Action? RequestPreviewRefresh { get; init; }
 
         public Action? CommitSkinIni { get; init; }
 

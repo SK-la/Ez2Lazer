@@ -22,14 +22,15 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         public Bindable<bool> TrueColouring { get; } = new Bindable<bool>();
 
-        public Bindable<double> Width { get; } = new Bindable<double>(100);
+        public BindableNumber<double> Width { get; } = new BindableDouble(100) { MinValue = 1, MaxValue = 512 };
 
-        public Bindable<double> Height { get; } = new Bindable<double>(100);
+        public BindableNumber<double> Height { get; } = new BindableDouble(100) { MinValue = 1, MaxValue = 512 };
 
         public Bindable<string> ExportName { get; } = new Bindable<string>("note-preview");
 
-        public EzSkinEditorNotePreviewRequest ToPreviewRequest() => new EzSkinEditorNotePreviewRequest
+        public EzSkinEditorNotePreviewRequest ToPreviewRequest(bool useEzNoteVariants) => new EzSkinEditorNotePreviewRequest
         {
+            UseEzNoteVariants = useEzNoteVariants,
             Ruleset = Ruleset.Value,
             Part = Part.Value,
             VariantId = VariantId.Value,

@@ -11,6 +11,8 @@ namespace osu.Game.EzOsuGame.Edit.Note
     /// </summary>
     public readonly struct EzSkinEditorNotePreviewRequest
     {
+        public bool UseEzNoteVariants { get; init; }
+
         public RulesetInfo Ruleset { get; init; }
 
         public EzSkinEditorNotePart Part { get; init; }

@@ -47,8 +47,9 @@ namespace osu.Game.EzOsuGame.Edit.Note
             session.ExportName.Value = ExportName;
         }
 
-        public EzSkinEditorNotePreviewRequest ToPreviewRequest() => new EzSkinEditorNotePreviewRequest
+        public EzSkinEditorNotePreviewRequest ToPreviewRequest(bool useEzNoteVariants) => new EzSkinEditorNotePreviewRequest
         {
+            UseEzNoteVariants = useEzNoteVariants,
             Ruleset = Ruleset,
             Part = Part,
             VariantId = VariantId,

@@ -2,15 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
-using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Note;
-using osu.Game.Localisation;
-using osu.Game.Overlays.Settings;
-using osu.Game.Rulesets.Mania.Configuration;
-using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Editor
 {
@@ -40,52 +34,59 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             new EzSkinEditorNoteVariant(nameof(EzColumnType.P), "P"),
         };
 
-        private readonly EzSkinLNEditorProvider previewProvider = new EzSkinLNEditorProvider();
-
         public int RulesetOnlineId => new ManiaRuleset().RulesetInfo.OnlineID;
 
         public RulesetInfo RulesetInfo => new ManiaRuleset().RulesetInfo;
 
         public IReadOnlyList<EzSkinEditorNotePart> SupportedParts => supported_parts;
 
-        public IReadOnlyList<EzSkinEditorNoteVariant> GetVariants(ISkin skin, EzSkinEditorNotePart part) =>
-            isEzSkin(skin) ? ez_variants : legacy_variants;
+        public IReadOnlyList<EzSkinEditorNoteVariant> GetVariants(bool useEzNoteVariants, EzSkinEditorNotePart part) =>
+            useEzNoteVariants ? ez_variants : legacy_variants;
 
-        public string GetDefaultVariantId(ISkin skin, EzSkinEditorNotePart part) =>
-            isEzSkin(skin) ? nameof(EzColumnType.A) : "1";
+        public string GetDefaultVariantId(bool useEzNoteVariants, EzSkinEditorNotePart part) =>
+            useEzNoteVariants ? nameof(EzColumnType.A) : "1";
 
-        public Drawable CreateNotePreview(ISkin skin, EzSkinEditorNotePreviewRequest request) =>
-            previewProvider.CreateNotePreview(skin, request);
+        public string ResolveTextureName(bool useEzNoteVariants, EzSkinEditorNotePart part, string variantId) =>
+            useEzNoteVariants
+                ? resolveEzTextureName(part, variantId)
+                : resolveLegacyTextureName(part, variantId);
 
-        public Drawable CreateRulesetSettingsContent() => new ManiaNoteRulesetSettingsSection();
+        public Drawable? CreateRulesetSettingsContent() => null;
 
-        private static bool isEzSkin(ISkin skin) =>
-            skin is EzStyleProSkin or Ez2Skin or SbISkin;
-
-        private partial class ManiaNoteRulesetSettingsSection : FillFlowContainer
+        private static string resolveLegacyTextureName(EzSkinEditorNotePart part, string variantId)
         {
-            [Resolved]
-            private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
-
-            public ManiaNoteRulesetSettingsSection()
+            string index = variantId switch
             {
-                RelativeSizeAxes = Axes.X;
-                AutoSizeAxes = Axes.Y;
-                Direction = FillDirection.Vertical;
-                Spacing = new osuTK.Vector2(8);
-            }
+                "2" => "2",
+                "S" => "S",
+                _ => "1",
+            };
 
-            [BackgroundDependencyLoader]
-            private void load()
+            return part switch
             {
-                var config = (ManiaRulesetConfigManager)rulesetConfigCache.GetConfigFor(new ManiaRuleset())!;
+                EzSkinEditorNotePart.HoldHead => $"mania-note{index}H",
+                EzSkinEditorNotePart.HoldBody => $"mania-note{index}L",
+                EzSkinEditorNotePart.HoldTail => $"mania-note{index}T",
+                _ => $"mania-note{index}",
+            };
+        }
 
-                Add(new SettingsCheckbox
-                {
-                    LabelText = RulesetSettingsStrings.TimingBasedColouring,
-                    Current = config.GetBindable<bool>(ManiaRulesetSetting.TimingBasedNoteColouring),
-                });
-            }
+        private static string resolveEzTextureName(EzSkinEditorNotePart part, string variantId)
+        {
+            string prefix = variantId switch
+            {
+                nameof(EzColumnType.B) => "blue",
+                nameof(EzColumnType.S) or nameof(EzColumnType.P) => "green",
+                _ => "white",
+            };
+
+            return part switch
+            {
+                EzSkinEditorNotePart.HoldHead => $"{prefix}longnote/head",
+                EzSkinEditorNotePart.HoldBody => $"{prefix}longnote/middle",
+                EzSkinEditorNotePart.HoldTail => $"{prefix}longnote/tail",
+                _ => $"{prefix}note",
+            };
         }
     }
 }

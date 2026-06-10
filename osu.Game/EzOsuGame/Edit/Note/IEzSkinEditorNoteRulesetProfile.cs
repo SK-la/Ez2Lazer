@@ -4,7 +4,6 @@
 using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Game.Rulesets;
-using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.Edit.Note
 {
@@ -16,12 +15,12 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         IReadOnlyList<EzSkinEditorNotePart> SupportedParts { get; }
 
-        IReadOnlyList<EzSkinEditorNoteVariant> GetVariants(ISkin skin, EzSkinEditorNotePart part);
+        IReadOnlyList<EzSkinEditorNoteVariant> GetVariants(bool useEzNoteVariants, EzSkinEditorNotePart part);
 
-        string GetDefaultVariantId(ISkin skin, EzSkinEditorNotePart part);
+        string GetDefaultVariantId(bool useEzNoteVariants, EzSkinEditorNotePart part);
 
-        Drawable CreateNotePreview(ISkin skin, EzSkinEditorNotePreviewRequest request);
+        string? ResolveTextureName(bool useEzNoteVariants, EzSkinEditorNotePart part, string variantId);
 
-        Drawable CreateRulesetSettingsContent();
+        Drawable? CreateRulesetSettingsContent();
     }
 }

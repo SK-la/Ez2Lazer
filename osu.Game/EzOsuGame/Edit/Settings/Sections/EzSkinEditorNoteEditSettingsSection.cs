@@ -8,7 +8,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
-using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
@@ -16,29 +15,26 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
     public partial class EzSkinEditorNoteEditSettingsSection : FillFlowContainer
     {
         private readonly EzSkinEditorNoteEditSession session;
+        private readonly Func<bool> usesEzNoteVariants;
         private readonly Action createNoteSnapshot;
         private readonly Action restoreNoteSnapshot;
         private readonly Action exportNotePreview;
-        private readonly Action requestRefresh;
-        private readonly ISkin editorSkin;
 
         private readonly BindableList<string> variantItems = new BindableList<string>();
         private SettingsDropdown<string> variantDropdown = null!;
 
         public EzSkinEditorNoteEditSettingsSection(
             EzSkinEditorNoteEditSession session,
-            ISkin editorSkin,
+            Func<bool> usesEzNoteVariants,
             Action createNoteSnapshot,
             Action restoreNoteSnapshot,
-            Action exportNotePreview,
-            Action requestRefresh)
+            Action exportNotePreview)
         {
             this.session = session;
-            this.editorSkin = editorSkin;
+            this.usesEzNoteVariants = usesEzNoteVariants;
             this.createNoteSnapshot = createNoteSnapshot;
             this.restoreNoteSnapshot = restoreNoteSnapshot;
             this.exportNotePreview = exportNotePreview;
-            this.requestRefresh = requestRefresh;
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
             Direction = FillDirection.Vertical;
@@ -107,10 +103,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             session.TrueColouring.Disabled = true;
             refreshVariants();
 
-            session.VariantId.BindValueChanged(_ => requestRefresh());
-            session.NoteColour.BindValueChanged(_ => requestRefresh());
-            session.Width.BindValueChanged(_ => requestRefresh());
-            session.Height.BindValueChanged(_ => requestRefresh());
+            session.Ruleset.BindValueChanged(_ => refreshVariants(), false);
+            session.Part.BindValueChanged(_ => refreshVariants(), false);
         }
 
         private void refreshVariants()
@@ -122,14 +116,14 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             if (profile == null)
                 return;
 
-            foreach (var variant in profile.GetVariants(editorSkin, session.Part.Value))
+            foreach (var variant in profile.GetVariants(usesEzNoteVariants(), session.Part.Value))
                 variantItems.Add(variant.Id);
 
             if (variantItems.Count == 0)
                 return;
 
             if (!variantItems.Contains(session.VariantId.Value))
-                session.VariantId.Value = profile.GetDefaultVariantId(editorSkin, session.Part.Value);
+                session.VariantId.Value = profile.GetDefaultVariantId(usesEzNoteVariants(), session.Part.Value);
         }
     }
 }

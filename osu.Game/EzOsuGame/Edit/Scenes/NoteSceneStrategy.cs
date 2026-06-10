@@ -32,18 +32,17 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
                     Title = EzEditorStrings.GROUP_NOTE_RULESET,
                     CreateContent = () => new EzSkinEditorNoteRulesetSettingsSection(
                         context.NoteSession,
-                        () => context.RequestSceneRefresh?.Invoke()),
+                        () => context.RequestPreviewRefresh?.Invoke()),
                 },
                 new EzSkinEditorSidebarGroupDefinition
                 {
                     Title = EzEditorStrings.GROUP_NOTE_EDIT,
                     CreateContent = () => new EzSkinEditorNoteEditSettingsSection(
                         context.NoteSession,
-                        context.EditorSkin,
+                        () => context.UsesEzNoteVariants,
                         () => context.CreateNoteSnapshot?.Invoke(),
                         () => context.RestoreNoteSnapshot?.Invoke(),
-                        () => context.ExportNotePreview?.Invoke(),
-                        () => context.RequestSceneRefresh?.Invoke()),
+                        () => context.ExportNotePreview?.Invoke()),
                 },
             };
         }
