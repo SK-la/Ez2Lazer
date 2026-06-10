@@ -29,8 +29,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         private FillFlowContainer staticFields = null!;
         private FillFlowContainer perKeyFields = null!;
 
-        public EzSkinEditorSkinIniManiaSection(EzSkinIniSession? session)
-            : base(session)
+        public EzSkinEditorSkinIniManiaSection(EzSkinIniSession? session, EzSkinEditorComparisonSnapshot? comparisonSnapshot = null)
+            : base(session, comparisonSnapshot)
         {
         }
 
@@ -110,6 +110,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             WithApplying(() =>
             {
                 var document = ParseDocument();
+                var snapshotDocument = ParseSnapshotDocument();
                 var keysList = document?.GetManiaKeys().ToList() ?? new List<int>();
 
                 if (keysList.Count == 0)
@@ -127,15 +128,31 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 rebuildPerKeyFields(keys);
 
                 foreach (var (key, bindable) in textFields)
-                    bindable.Value = document?.GetManiaValue(keys, key) ?? string.Empty;
+                {
+                    string value = document?.GetManiaValue(keys, key) ?? string.Empty;
+                    bindable.Value = value;
+                    EzSkinIniBridge.SyncTextDefault(bindable, snapshotDocument?.GetManiaValue(keys, key), value);
+                }
 
                 foreach (var (key, bindable) in boolFields)
-                    bindable.Value = document?.GetManiaValue(keys, key) == "1";
+                {
+                    bool value = document?.GetManiaValue(keys, key) == "1";
+                    bindable.Value = value;
+                    EzSkinIniBridge.SyncBoolDefault(bindable, snapshotDocument?.GetManiaValue(keys, key), value);
+                }
 
                 foreach (var (key, bindable) in colourFields)
                 {
                     string? raw = document?.GetManiaValue(keys, key);
-                    bindable.Value = raw != null && EzSkinIniColourFormat.TryParse(raw, out var colour) ? colour : Colour4.White;
+                    Colour4 value = raw != null && EzSkinIniColourFormat.TryParse(raw, out var colour) ? colour : Colour4.White;
+                    bindable.Value = value;
+
+                    string? snapshotRaw = snapshotDocument?.GetManiaValue(keys, key);
+                    Colour4? snapshotColour = snapshotRaw != null && EzSkinIniColourFormat.TryParse(snapshotRaw, out var snapshotParsedColour)
+                        ? snapshotParsedColour
+                        : null;
+
+                    EzSkinIniBridge.SyncColourDefault(bindable, snapshotColour, value);
                 }
             });
         }

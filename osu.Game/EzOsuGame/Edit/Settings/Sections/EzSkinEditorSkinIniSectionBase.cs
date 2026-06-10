@@ -17,11 +17,14 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
     {
         protected readonly EzSkinIniSession? Session;
 
+        protected readonly EzSkinEditorComparisonSnapshot? ComparisonSnapshot;
+
         protected bool Applying { get; private set; }
 
-        protected EzSkinEditorSkinIniSectionBase(EzSkinIniSession? session)
+        protected EzSkinEditorSkinIniSectionBase(EzSkinIniSession? session, EzSkinEditorComparisonSnapshot? comparisonSnapshot = null)
         {
             Session = session;
+            ComparisonSnapshot = comparisonSnapshot;
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
             Direction = FillDirection.Vertical;
@@ -121,5 +124,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         }
 
         protected EzSkinIniDocument? ParseDocument() => Session?.ParseDraftDocument();
+
+        protected EzSkinIniDocument? ParseSnapshotDocument() =>
+            EzSkinIniBridge.TryParseSnapshotDocument(ComparisonSnapshot?.SkinIniDraftText);
     }
 }

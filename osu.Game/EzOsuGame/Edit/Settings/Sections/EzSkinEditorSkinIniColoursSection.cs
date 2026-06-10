@@ -18,8 +18,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
     {
         private readonly Dictionary<string, Bindable<Colour4>> colourFields = new Dictionary<string, Bindable<Colour4>>();
 
-        public EzSkinEditorSkinIniColoursSection(EzSkinIniSession? session)
-            : base(session)
+        public EzSkinEditorSkinIniColoursSection(EzSkinIniSession? session, EzSkinEditorComparisonSnapshot? comparisonSnapshot = null)
+            : base(session, comparisonSnapshot)
         {
         }
 
@@ -50,13 +50,24 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             WithApplying(() =>
             {
                 var document = ParseDocument();
+                var snapshotDocument = ParseSnapshotDocument();
 
                 foreach (var (key, bindable) in colourFields)
                 {
+                    Colour4 value;
+
                     if (document != null && document.TryGetColourValue(key, out var colour))
-                        bindable.Value = colour;
+                        value = colour;
                     else
-                        bindable.Value = Colour4.White;
+                        value = Colour4.White;
+
+                    bindable.Value = value;
+
+                    Colour4? snapshotColour = snapshotDocument != null && snapshotDocument.TryGetColourValue(key, out var parsedSnapshotColour)
+                        ? parsedSnapshotColour
+                        : null;
+
+                    EzSkinIniBridge.SyncColourDefault(bindable, snapshotColour, value);
                 }
             });
         }

@@ -410,6 +410,44 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
+        public void TestSkinIniConfigSnapshotRestore()
+        {
+            importLegacySkin();
+            AddStep("load screen", loadScreen);
+            waitForScreenLoaded();
+            switchScene(EzSkinEditorSceneType.SkinIni);
+
+            AddUntilStep("session loaded", () => editorScreen.SkinIniSession != null);
+
+            string baselineName = null!;
+            AddStep("read baseline name", () =>
+            {
+                var document = editorScreen.SkinIniSession!.ParseDraftDocument();
+                baselineName = document.GetValue(EzSkinIniDocument.GENERAL_SECTION, "Name") ?? string.Empty;
+            });
+
+            AddStep("change name", () =>
+            {
+                var document = editorScreen.SkinIniSession!.ParseDraftDocument();
+                document.SetValue(EzSkinIniDocument.GENERAL_SECTION, "Name", "Snapshot Test Name");
+                editorScreen.SkinIniSession.ApplyDocument(document);
+            });
+
+            AddAssert("name changed", () =>
+            {
+                var document = editorScreen.SkinIniSession!.ParseDraftDocument();
+                return (document.GetValue(EzSkinIniDocument.GENERAL_SECTION, "Name") ?? string.Empty) == "Snapshot Test Name";
+            });
+
+            AddStep("restore snapshot", () => editorScreen.RestoreConfigSnapshotForTesting());
+            AddAssert("name restored", () =>
+            {
+                var document = editorScreen.SkinIniSession!.ParseDraftDocument();
+                return (document.GetValue(EzSkinIniDocument.GENERAL_SECTION, "Name") ?? string.Empty) == baselineName;
+            });
+        }
+
+        [Test]
         public void TestStaticPreviewAfterSkinSwitch()
         {
             AddStep("load screen", loadScreen);
