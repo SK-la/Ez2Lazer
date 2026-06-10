@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -15,6 +16,7 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osuTK;
@@ -27,7 +29,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// </summary>
     public partial class EzSkinEditorBeatmapPreviewHost : Container
     {
-        private const double dynamic_preview_duration = 10000;
         private const double dynamic_preview_repeat_delay = 500;
 
         private readonly EzSkinEditorSceneContext context;
@@ -104,13 +105,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
             var token = loadCancellation.Token;
 
             IBeatmap beatmap;
-            double startTime;
 
             try
             {
                 var ruleset = rulesetInfo!;
                 beatmap = context.PreviewBeatmap!.GetPlayableBeatmap(ruleset);
-                startTime = computeDefaultStartTime(beatmap, ruleset, beatmap.HitObjects.Count > 0 ? beatmap.HitObjects[0].StartTime : 0);
             }
             catch
             {
@@ -122,9 +121,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
 
             playableBeatmap = beatmap;
-            playbackStartTime = startTime;
+            playbackStartTime = 0;
             beatmapMinTime = 0;
-            beatmapMaxTime = Math.Max(beatmap.BeatmapInfo.Length, beatmapMinTime + 1);
+            beatmapMaxTime = Math.Max(beatmap.BeatmapInfo.Length, beatmap.HitObjects.Count > 0 ? beatmap.GetLastObjectTime() + 1000 : beatmapMinTime + 1);
 
             mountPreview(token);
             previewClock.Seek(playbackStartTime);
@@ -151,14 +150,19 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }
 
             var ruleset = rulesetInfo.CreateInstance();
-            var newDrawableRuleset = ruleset.CreateDrawableRulesetWith(playableBeatmap);
+            IReadOnlyList<Mod>? autoplayMods = null;
+
+            if (ruleset.GetAutoplayMod() is Mod autoplayMod)
+                autoplayMods = new[] { autoplayMod };
+
+            var newDrawableRuleset = ruleset.CreateDrawableRulesetWith(playableBeatmap, autoplayMods);
 
             stageScaleContainer.RelativeSizeAxes = Axes.None;
             stageScaleContainer.Size = new Vector2(640, 480);
 
             newDrawableRuleset.Clock = framedPreviewClock;
             newDrawableRuleset.FrameStablePlayback = false;
-            newDrawableRuleset.Playfield.DisplayJudgements.Value = false;
+            newDrawableRuleset.Playfield.DisplayJudgements.Value = true;
 
             var previewRoot = new RulesetSkinProvidingContainer(ruleset, playableBeatmap, context.EditorSkin)
             {
@@ -225,9 +229,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (previewClock.IsRunning)
             {
-                double elapsed = previewClock.CurrentTime - playbackStartTime;
-
-                if (elapsed >= dynamic_preview_duration)
+                if (previewClock.CurrentTime >= beatmapMaxTime)
                 {
                     previewClock.Stop();
                     previewClock.Seek(playbackStartTime);
