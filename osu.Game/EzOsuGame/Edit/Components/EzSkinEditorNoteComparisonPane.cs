@@ -11,7 +11,7 @@ using osuTK;
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// One side of the note comparison (live or snapshot): Note and LN hitbox previews stacked together.
+    /// One side of the note comparison (live or snapshot): Note and LN hitbox previews side by side.
     /// </summary>
     public partial class EzSkinEditorNoteComparisonPane : Container
     {
@@ -33,8 +33,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 Child = new FillFlowContainer
                 {
                     AutoSizeAxes = Axes.Both,
-                    Direction = FillDirection.Vertical,
-                    Spacing = new Vector2(0, 12),
+                    Direction = FillDirection.Horizontal,
+                    Spacing = new Vector2(12, 0),
                     Children = new Drawable[]
                     {
                         tapPreview,
