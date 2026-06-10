@@ -38,8 +38,10 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Acrylic;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -447,6 +449,7 @@ namespace osu.Game
 
             // Transfer any runtime changes back to configuration file.
             SkinManager.CurrentSkinInfo.ValueChanged += skin => configSkin.Value = skin.NewValue.ID.ToString();
+            SkinManager.CurrentSkinInfo.ValueChanged += onCurrentSkinChangedForEzJson;
 
             UserPlayingState.BindValueChanged(p =>
             {
@@ -1056,6 +1059,17 @@ namespace osu.Game
                 { FrameworkSetting.VolumeEffect, 0.6 },
                 { FrameworkSetting.AudioUseExperimentalWasapi, true },
             };
+        }
+
+        private void onCurrentSkinChangedForEzJson(ValueChangedEvent<Live<SkinInfo>> skin)
+        {
+            if (ScreenStack.CurrentScreen is EzSkinEditorScreen)
+                return;
+
+            if (!Ez2ConfigManager.Get<bool>(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange))
+                return;
+
+            EzSkinJsonAutoApply.TryApplyForSkin(SkinManager, skin.NewValue, Ez2ConfigManager);
         }
 
         protected override void LoadComplete()

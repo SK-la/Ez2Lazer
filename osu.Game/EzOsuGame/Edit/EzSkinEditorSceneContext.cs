@@ -20,6 +20,10 @@ namespace osu.Game.EzOsuGame.Edit
 
         public EzSkinIniSession? SkinIniSession { get; init; }
 
+        public EzSkinJsonSession? SkinJsonSession { get; init; }
+
+        public EzSkinEditorPreviewState? PreviewState { get; init; }
+
         public Action? RequestSceneRefresh { get; init; }
 
         public Action? CommitSkinIni { get; init; }

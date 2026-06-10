@@ -19,6 +19,7 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -53,6 +54,9 @@ namespace osu.Game.Overlays.Settings.Sections
         [Resolved]
         private RealmAccess realm { get; set; }
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; }
+
         private IDisposable realmSubscription;
 
         [BackgroundDependencyLoader(permitNulls: true)]
@@ -86,14 +90,23 @@ namespace osu.Game.Overlays.Settings.Sections
                     Text = SkinSettingsStrings.SkinLayoutEditor,
                     Action = () => skinEditor?.ToggleVisibility(),
                 },
+                // TODO: 本地化
                 new SettingsButtonV2
                 {
-                    Text = "Note Editor(Testing)",
+                    Text = "Skin Editor(Madding)",
                     TooltipText = "(画饼)长期施工中，目标："
                                   + "\n1.游戏内完整Skin.ini编辑"
                                   + "\n2.实现完整Ez特有皮肤设置，并可覆写进Skin.ini"
                                   + "\n3.游戏内PS、图片导出(包括渐变动画)",
                     Action = () => skinEditor?.ToggleEzSkinEditor(),
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "自动切换皮肤配置",
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange),
+                })
+                {
+                    Note = { Value = new SettingsNote.Data("开启后换肤将皮肤的 EzSkin.json 导入内存（不写 EzSkinSettings.ini）；关闭后恢复磁盘全局配置。", SettingsNote.Type.Informational) },
                 },
                 new SettingsButtonV2
                 {
@@ -122,6 +135,12 @@ namespace osu.Game.Overlays.Settings.Sections
                     skins.CurrentSkinInfo.Value = skin.OldValue;
                     skins.SelectRandomSkin();
                 }
+            });
+
+            ezConfig.GetBindable<bool>(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange).BindValueChanged(change =>
+            {
+                if (change.OldValue && !change.NewValue)
+                    ezConfig.Load();
             });
 
             skins.ScriptedSkinsCatalogUpdated += refreshSkinsList;

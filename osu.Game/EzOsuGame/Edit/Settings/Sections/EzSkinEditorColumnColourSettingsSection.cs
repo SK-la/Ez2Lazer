@@ -4,13 +4,12 @@
 using System;
 using System.Collections.Generic;
 using osu.Framework.Allocation;
-using osu.Framework.Extensions.Color4Extensions;
-using osu.Framework.Testing;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.Beatmaps;
+using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Screens;
@@ -26,6 +25,8 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
     {
         private static readonly List<int> available_key_modes = new List<int> { 0, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
 
+        private readonly EzSkinEditorPreviewState? previewState;
+
         private readonly Dictionary<int, List<EzSelectorColour>> columnSelectorCache = new Dictionary<int, List<EzSelectorColour>>();
         private readonly Dictionary<Ez2Setting, BindableColour4> colorBindables = new Dictionary<Ez2Setting, BindableColour4>();
 
@@ -36,11 +37,9 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        [Resolved]
-        private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
-
-        public EzSkinEditorColumnColourSettingsSection()
+        public EzSkinEditorColumnColourSettingsSection(EzSkinEditorPreviewState? previewState = null)
         {
+            this.previewState = previewState;
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
             Direction = FillDirection.Vertical;
@@ -86,7 +85,7 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 },
             };
 
-            updateKeyModeFromCurrentBeatmap();
+            updateKeyModeFromPreview();
         }
 
         protected override void LoadComplete()
@@ -95,11 +94,40 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 
             columnTypeListSelectBindable.BindValueChanged(e => updateColumnsType(e.NewValue), true);
 
+            colorSettingsEnabled.BindValueChanged(e => onColorSettingsEnabledChanged(e.NewValue), true);
+
             colorBindables[Ez2Setting.ColumnTypeA].BindValueChanged(e => updateBaseColour(e.NewValue, EzConstants.COLUMN_TYPE_A));
             colorBindables[Ez2Setting.ColumnTypeB].BindValueChanged(e => updateBaseColour(e.NewValue, EzConstants.COLUMN_TYPE_B));
             colorBindables[Ez2Setting.ColumnTypeS].BindValueChanged(e => updateBaseColour(e.NewValue, EzConstants.COLUMN_TYPE_S));
             colorBindables[Ez2Setting.ColumnTypeE].BindValueChanged(e => updateBaseColour(e.NewValue, EzConstants.COLUMN_TYPE_E));
             colorBindables[Ez2Setting.ColumnTypeP].BindValueChanged(e => updateBaseColour(e.NewValue, EzConstants.COLUMN_TYPE_P));
+
+            previewState?.SuggestedKeyMode.BindValueChanged(e => updateKeyModeFromPreview(), true);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            columnTypeListSelectBindable.UnbindAll();
+            colorSettingsEnabled.UnbindAll();
+
+            foreach (var bindable in colorBindables.Values)
+                bindable.UnbindAll();
+
+            previewState?.SuggestedKeyMode.UnbindAll();
+            base.Dispose(isDisposing);
+        }
+
+        private void onColorSettingsEnabledChanged(bool enabled)
+        {
+            if (enabled)
+            {
+                columnsContainer.Show();
+                updateColumnsType(columnTypeListSelectBindable.Value);
+            }
+            else
+            {
+                columnsContainer.Hide();
+            }
         }
 
         private BindableColour4 createColorBindable(Ez2Setting setting)
@@ -118,22 +146,21 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 selector.SetColorMapping(type, newColor);
         }
 
-        private void updateKeyModeFromCurrentBeatmap()
+        private void updateKeyModeFromPreview()
         {
-            if (beatmap.Value?.Beatmap == null)
+            int? suggested = previewState?.SuggestedKeyMode.Value;
+
+            if (suggested == null || !available_key_modes.Contains(suggested.Value))
                 return;
 
-            if (beatmap.Value.BeatmapInfo.Ruleset.OnlineID == 3)
-            {
-                int currentKeyCount = (int)beatmap.Value.Beatmap.Difficulty.CircleSize;
-
-                if (currentKeyCount > 0 && available_key_modes.Contains(currentKeyCount))
-                    columnTypeListSelectBindable.Value = currentKeyCount;
-            }
+            columnTypeListSelectBindable.Value = suggested.Value;
         }
 
         private void updateColumnsType(int keyModeForList)
         {
+            if (!colorSettingsEnabled.Value)
+                return;
+
             if (columnSelectorCache.TryGetValue(keyModeForList, out var cachedSelectors))
             {
                 columnsContainer.Clear(false);

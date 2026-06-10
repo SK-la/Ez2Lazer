@@ -88,6 +88,16 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             }, true);
         }
 
+        protected override void Dispose(bool isDisposing)
+        {
+            colorSettingsEnabled.UnbindAll();
+
+            foreach (var bindable in colorBindables.Values)
+                bindable.UnbindAll();
+
+            base.Dispose(isDisposing);
+        }
+
         private BindableColour4 createColorBindable(Ez2Setting setting)
         {
             var result = new BindableColour4();

@@ -15,22 +15,20 @@ namespace osu.Game.EzOsuGame.Edit.Scenes
 
         public LocalisableString TabTitle => "颜色";
 
-        public Drawable CreateSceneContent(EzSkinEditorSceneContext context) =>
-            new EzSkinEditorPreviewHost(context);
+        public Drawable CreateSceneContent(EzSkinEditorSceneContext context) => new EzSkinEditorPreviewHost(context);
 
-        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) =>
-            new[]
+        public IReadOnlyList<EzSkinEditorSidebarGroupDefinition> CreateSidebarGroups(EzSkinEditorSceneContext context) => new[]
+        {
+            new EzSkinEditorSidebarGroupDefinition
             {
-                new EzSkinEditorSidebarGroupDefinition
-                {
-                    Title = "基础颜色",
-                    CreateContent = () => new EzSkinEditorBaseColourSettingsSection(),
-                },
-                new EzSkinEditorSidebarGroupDefinition
-                {
-                    Title = "列配色",
-                    CreateContent = () => new EzSkinEditorColumnColourSettingsSection(),
-                },
-            };
+                Title = "基础颜色",
+                CreateContent = () => new EzSkinEditorBaseColourSettingsSection(),
+            },
+            new EzSkinEditorSidebarGroupDefinition
+            {
+                Title = "列配色",
+                CreateContent = () => new EzSkinEditorColumnColourSettingsSection(context.PreviewState),
+            },
+        };
     }
 }
