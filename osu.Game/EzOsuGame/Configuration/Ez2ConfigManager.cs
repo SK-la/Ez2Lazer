@@ -140,6 +140,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
 
             SetDefault(Ez2Setting.HitPositionGlobalEnable, false);
+            SetDefault(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange, false);
             SetDefault(Ez2Setting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
             SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
             SetDefault(Ez2Setting.HitTargetAlpha, 0.6, 0, 1, 0.01);
@@ -802,6 +803,10 @@ namespace osu.Game.EzOsuGame.Configuration
         // 皮肤与舞台资源
         ColumnWidthStyle,
         HitPositionGlobalEnable, // 未来要考虑，是否统一成，整套系统套用在传统皮肤上，变成切换设置
+        /// <summary>
+        /// When enabled, switching skins applies per-skin EzSkin.json to in-memory Ez config only.
+        /// </summary>
+        EzSkinJsonAutoApplyOnSkinChange,
         GlobalTextureName,
         GameThemeName,
 
