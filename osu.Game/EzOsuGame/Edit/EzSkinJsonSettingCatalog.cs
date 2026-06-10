@@ -8,6 +8,7 @@ namespace osu.Game.EzOsuGame.Edit
 {
     /// <summary>
     /// Ez settings persisted in per-skin <see cref="EzSkinJsonDocument"/> (editor catalog only).
+    /// This is the Ez2Config subset that participates in <see cref="EzSkinEditorComparisonSnapshot"/> default baselines.
     /// </summary>
     public static class EzSkinJsonSettingCatalog
     {

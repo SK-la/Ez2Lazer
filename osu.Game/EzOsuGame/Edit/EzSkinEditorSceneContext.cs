@@ -48,6 +48,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         /// <summary>
         /// Configuration snapshot used for comparison preview (right pane) and control reset baselines.
+        /// Covers Ez2Config and skin.ini only — not RulesetConfig, ScriptedSkin, or Note edit state.
         /// </summary>
         public EzSkinEditorComparisonSnapshot? ComparisonSnapshot { get; init; }
     }

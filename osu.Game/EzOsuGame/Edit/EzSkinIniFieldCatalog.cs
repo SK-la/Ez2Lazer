@@ -23,6 +23,7 @@ namespace osu.Game.EzOsuGame.Edit
 
     /// <summary>
     /// Known editable <c>skin.ini</c> keys aligned with legacy decoders.
+    /// Fields exposed in the skin editor sidebar participate in <see cref="EzSkinEditorComparisonSnapshot"/> default baselines.
     /// </summary>
     public static class EzSkinIniFieldCatalog
     {
