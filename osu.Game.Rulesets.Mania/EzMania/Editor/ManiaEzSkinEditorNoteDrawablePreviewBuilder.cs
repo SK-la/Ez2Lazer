@@ -3,7 +3,6 @@
 
 using System;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Edit.Note;
@@ -15,6 +14,9 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Editor
 {
+    /// <summary>
+    /// Builds a mania ruleset drawable note that fills the comparison hitbox (see <see cref="EzSkinEditorNoteDrawablePreview"/>).
+    /// </summary>
     public static class ManiaEzSkinEditorNoteDrawablePreviewBuilder
     {
         private const int preview_key_count = 4;
@@ -35,25 +37,31 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                 ? new DrawableHoldNote((HoldNote)hitObject)
                 : new DrawableNote((Note)hitObject);
 
-            // Comparison panes are hitbox-sized; EzNoteContainer's fixed column layout pushes content off-screen.
+            configureDrawableLayout(hitDrawable, isHold);
+
             return new SkinProvidingContainer(transformedSkin)
             {
                 RelativeSizeAxes = Axes.Both,
                 Child = new EzSkinLNEditorProvider.PreviewDependencyContainer(preview_key_count, 0, ManiaAction.Key1)
                 {
-                    Child = new Container
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Child = hitDrawable.With(d =>
-                        {
-                            d.Anchor = Anchor.Centre;
-                            d.Origin = Anchor.Centre;
-                            d.RelativeSizeAxes = Axes.X;
-                            d.Width = 1;
-                        }),
-                    },
+                    RelativeSizeAxes = Axes.Both,
+                    Child = hitDrawable,
                 },
             };
+        }
+
+        private static void configureDrawableLayout(DrawableHitObject hitDrawable, bool isHold)
+        {
+            if (isHold)
+            {
+                hitDrawable.RelativeSizeAxes = Axes.Both;
+                return;
+            }
+
+            hitDrawable.Anchor = Anchor.Centre;
+            hitDrawable.Origin = Anchor.Centre;
+            hitDrawable.RelativeSizeAxes = Axes.X;
+            hitDrawable.Width = 1;
         }
 
         private static ISkin createTransformedSkin(ISkin skin)

@@ -11,7 +11,7 @@ using osuTK;
 namespace osu.Game.EzOsuGame.Edit.Components
 {
     /// <summary>
-    /// Drawable note/LN preview with coloured hitbox border (replaces texture-sprite path for Ez skins).
+    /// Note comparison pane: ruleset drawable note inside a coloured hitbox sized to the actual note width/height from config or the note-edit session.
     /// </summary>
     public partial class EzSkinEditorNoteDrawablePreview : Container
     {
@@ -20,7 +20,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private readonly Container hitboxContainer;
         private readonly Box hitboxFill;
         private readonly Box[] hitboxBorderEdges;
-        private readonly Container drawableHost;
+        private readonly Container noteHost;
 
         private string? loadedDrawableKey;
         private ISkin? pendingSkin;
@@ -54,10 +54,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
                     hitboxBorderEdges[1],
                     hitboxBorderEdges[2],
                     hitboxBorderEdges[3],
-                    drawableHost = new Container
+                    noteHost = new Container
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Padding = new MarginPadding(4),
+                        Padding = new MarginPadding(hitbox_border_thickness),
                     },
                 },
             };
@@ -87,27 +87,25 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 return;
 
             var request = pendingRequest.Value;
+
             hitboxContainer.Size = new Vector2((float)request.Width, (float)request.Height);
             hitboxFill.Colour = request.NoteColour.Opacity(0.25f);
 
             foreach (var edge in hitboxBorderEdges)
                 edge.Colour = request.NoteColour;
 
-            string drawableKey = $"{request.CompareKind}:{request.UseEzNoteVariants}:{request.VariantId}:{request.Part}";
+            string drawableKey = $"{request.CompareKind}:{request.UseEzNoteVariants}:{request.VariantId}:{request.Part}:{request.Width:F2}:{request.Height:F2}";
 
-            if (drawableKey != loadedDrawableKey)
-            {
-                loadedDrawableKey = drawableKey;
-                drawableHost.Clear(true);
-            }
+            if (drawableKey == loadedDrawableKey)
+                return;
 
-            if (drawableHost.Count == 0)
-            {
-                var drawable = pendingProfile.CreateDrawableComparisonPreview(pendingSkin, request);
+            loadedDrawableKey = drawableKey;
+            noteHost.Clear(true);
 
-                if (drawable != null)
-                    drawableHost.Child = drawable;
-            }
+            var drawable = pendingProfile.CreateDrawableComparisonPreview(pendingSkin, request);
+
+            if (drawable != null)
+                noteHost.Child = drawable;
         }
     }
 }
