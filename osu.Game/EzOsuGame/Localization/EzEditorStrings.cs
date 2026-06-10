@@ -215,6 +215,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString TAB_SKIN_INI = new EzLocalizationManager.EzLocalisableString("skin.ini", "skin.ini");
 
+        public static readonly LocalisableString TAB_NOTE = new EzLocalizationManager.EzLocalisableString("Note", "Note");
+
         #endregion
 
         #region Sidebar groups
@@ -239,6 +241,56 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString GROUP_MODE = new EzLocalizationManager.EzLocalisableString("模式", "Mode");
 
+        public static readonly LocalisableString GROUP_NOTE_RULESET = new EzLocalizationManager.EzLocalisableString("规则集", "Ruleset");
+
+        public static readonly LocalisableString GROUP_NOTE_EDIT = new EzLocalizationManager.EzLocalisableString("Note 编辑", "Note edit");
+
+        #endregion
+
+        #region Note scene
+
+        public static readonly LocalisableString NOTE_RULESET_LABEL = new EzLocalizationManager.EzLocalisableString("规则集", "Ruleset");
+
+        public static readonly LocalisableString NOTE_PART_LABEL = new EzLocalizationManager.EzLocalisableString("部件类型", "Part type");
+
+        public static readonly LocalisableString NOTE_VARIANT_LABEL = new EzLocalizationManager.EzLocalisableString("变体", "Variant");
+
+        public static readonly LocalisableString NOTE_COLOUR_LABEL = new EzLocalizationManager.EzLocalisableString("颜色", "Colour");
+
+        public static readonly LocalisableString NOTE_TRUE_COLOURING_LABEL = new EzLocalizationManager.EzLocalisableString("真着色", "True colouring");
+
+        public static readonly LocalisableString NOTE_TRUE_COLOURING_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "TODO: EzNoteTrueColourProcessor",
+            "TODO: EzNoteTrueColourProcessor");
+
+        public static readonly LocalisableString NOTE_WIDTH_LABEL = new EzLocalizationManager.EzLocalisableString("宽度", "Width");
+
+        public static readonly LocalisableString NOTE_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("高度", "Height");
+
+        public static readonly LocalisableString NOTE_EXPORT_NAME_LABEL = new EzLocalizationManager.EzLocalisableString("导出名称", "Export name");
+
+        public static readonly LocalisableString NOTE_CREATE_SNAPSHOT = new EzLocalizationManager.EzLocalisableString("创建 Note 对比快照", "Create note comparison snapshot");
+
+        public static readonly LocalisableString NOTE_RESTORE_SNAPSHOT = new EzLocalizationManager.EzLocalisableString("恢复 Note 对比快照", "Restore note comparison snapshot");
+
+        public static readonly LocalisableString NOTE_EXPORT_BUTTON = new EzLocalizationManager.EzLocalisableString("导出 PNG", "Export PNG");
+
+        public static readonly LocalisableString NOTIFY_CREATED_NOTE_SNAPSHOT = new EzLocalizationManager.EzLocalisableString(
+            "已创建 Note 对比快照",
+            "Created note comparison snapshot");
+
+        public static readonly LocalisableString NOTIFY_RESTORED_NOTE_SNAPSHOT = new EzLocalizationManager.EzLocalisableString(
+            "已恢复 Note 对比快照",
+            "Restored note comparison snapshot");
+
+        public static readonly LocalisableString NOTIFY_NOTE_EXPORTED = new EzLocalizationManager.EzLocalisableString(
+            "已导出 Note 预览到皮肤 _ez_note_edit 目录",
+            "Exported note preview to skin _ez_note_edit folder");
+
+        public static readonly LocalisableString NOTIFY_CANNOT_EXPORT_NOTE_PREVIEW = new EzLocalizationManager.EzLocalisableString(
+            "当前皮肤无法导出 Note 预览",
+            "Cannot export note preview for the current skin");
+
         #endregion
 
         #region Toolbar and preview
@@ -256,6 +308,14 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString PLACEHOLDER_VIRTUAL_PLAYFIELD_NOT_SUPPORTED = new EzLocalizationManager.EzLocalisableString(
             "Virtual playfield not supported",
             "Virtual playfield not supported");
+
+        public static readonly LocalisableString PLACEHOLDER_NOTE_PREVIEW_NOT_AVAILABLE = new EzLocalizationManager.EzLocalisableString(
+            "Note 预览不可用",
+            "Note preview not available");
+
+        public static readonly LocalisableString PLACEHOLDER_NOTE_RULESET_NOT_SUPPORTED = new EzLocalizationManager.EzLocalisableString(
+            "当前规则集暂不支持 Note 预览",
+            "Note preview is not supported for the selected ruleset");
 
         public static readonly LocalisableString PLACEHOLDER_COMPARISON_NOT_SUPPORTED = new EzLocalizationManager.EzLocalisableString(
             "Comparison preview not supported",
