@@ -68,6 +68,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
             return resolvedSkin.GetTexture(textureName) ?? skin.GetTexture(textureName);
         }
 
+        public Drawable CreateDrawableComparisonPreview(ISkin skin, EzSkinEditorNotePreviewRequest request) =>
+            ManiaEzSkinEditorNoteDrawablePreviewBuilder.Create(skin, request);
+
         public Drawable? CreateRulesetSettingsContent() => null;
 
         private static string resolveLegacyTextureName(EzSkinEditorNotePart part, string variantId)

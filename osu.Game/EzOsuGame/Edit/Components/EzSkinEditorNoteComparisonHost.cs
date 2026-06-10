@@ -24,8 +24,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private Bindable<EzSkinEditorNoteCompareKind> compareKind = null!;
         private Container liveContainer = null!;
         private Container snapshotContainer = null!;
-        private EzSkinEditorNoteMemoryPreview? livePreview;
-        private EzSkinEditorNoteMemoryPreview? snapshotPreview;
+        private EzSkinEditorNoteDrawablePreview? livePreview;
+        private EzSkinEditorNoteDrawablePreview? snapshotPreview;
 
         public EzSkinEditorNoteComparisonHost(EzSkinEditorSceneContext context)
         {
@@ -175,9 +175,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
             livePreview.Apply(context.EditorSkin, profile, context.NoteComparisonSource.GetLiveRequest(currentCompareKind));
         }
 
-        private static EzSkinEditorNoteMemoryPreview attachPreview(Container container)
+        private static EzSkinEditorNoteDrawablePreview attachPreview(Container container)
         {
-            var preview = new EzSkinEditorNoteMemoryPreview();
+            var preview = new EzSkinEditorNoteDrawablePreview();
             container.Child = preview;
             return preview;
         }

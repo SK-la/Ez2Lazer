@@ -25,6 +25,8 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         Texture? GetNoteTexture(ISkin skin, EzSkinEditorNotePreviewRequest request, EzSkinEditorNotePart part);
 
+        Drawable? CreateDrawableComparisonPreview(ISkin skin, EzSkinEditorNotePreviewRequest request);
+
         Drawable? CreateRulesetSettingsContent();
     }
 }
