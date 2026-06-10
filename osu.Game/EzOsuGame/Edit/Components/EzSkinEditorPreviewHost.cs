@@ -88,19 +88,21 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private void populateComparison()
         {
-            if (context.Provider != null)
+            if (context.Provider == null)
             {
-                comparisonContainer.Child = context.Provider.CreateStaticPart(context.EditorSkin).With(d =>
+                comparisonContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED);
+                return;
+            }
+
+            var snapshotDocument = context.ComparisonSnapshot?.Document ?? new EzSkinJsonDocument();
+
+            comparisonContainer.Child = new EzSkinEditorConfigSnapshotScope(snapshotDocument, () =>
+                context.Provider!.CreateStaticPart(context.EditorSkin).With(d =>
                 {
                     d.RelativeSizeAxes = Axes.Both;
                     d.Anchor = Anchor.Centre;
                     d.Origin = Anchor.Centre;
-                });
-            }
-            else
-            {
-                comparisonContainer.Child = createPlaceholder(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED);
-            }
+                }));
         }
 
         private static OsuSpriteText createPlaceholder(LocalisableString text) => new OsuSpriteText
