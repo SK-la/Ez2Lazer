@@ -13,6 +13,7 @@ using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Edit.Checks.Components;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Storyboards;
 
@@ -27,7 +28,7 @@ namespace osu.Game.EzOsuGame.Audio
     {
         public BindableBool EnabledBindable { get; } = new BindableBool();
 
-        // 预览时，谱面中存在足够多的 beatmap note sample 才启用 hitsound 预览，避免把 1-5 个固定音效误判成 keysound。
+        // 预览时，谱面包内 hitsound 音效文件达到阈值才启用 note 预览，避免把少量固定音效误判成 keysound。
         private const int hitsound_threshold = 10;
         private const double tick_ms = 8; // 调度间隔与事件触发容差（~120fps）
         private const double preload_lookahead_ms = 2000;
@@ -90,7 +91,7 @@ namespace osu.Game.EzOsuGame.Audio
             playback.ResetPlaybackProgress();
 
             var playableBeatmap = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
-            previewHitSoundsEnabled = fastCheckShouldPreviewHitSounds(playableBeatmap, hitsound_threshold);
+            previewHitSoundsEnabled = fastCheckShouldPreviewHitSounds(beatmap, hitsound_threshold);
             previewStoryboardEnabled = hasStoryboardSamples(beatmap.Storyboard);
 
             if (!previewHitSoundsEnabled && !previewStoryboardEnabled)
@@ -122,38 +123,32 @@ namespace osu.Game.EzOsuGame.Audio
             playback.ResetPlaybackProgress();
         }
 
-        private bool fastCheckShouldPreviewHitSounds(IBeatmap beatmap, int threshold)
+        /// <summary>
+        /// 按谱面包内实际音效文件数量判断（排除主音频轨），而非 note 上的 sample 引用数。
+        /// </summary>
+        private static bool fastCheckShouldPreviewHitSounds(IWorkingBeatmap beatmap, int threshold)
+            => countBeatmapHitsoundFiles(beatmap) >= threshold;
+
+        private static int countBeatmapHitsoundFiles(IWorkingBeatmap beatmap)
         {
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var files = beatmap.BeatmapInfo.BeatmapSet?.Files;
+            if (files == null)
+                return 0;
 
-            foreach (var obj in beatmap.HitObjects)
+            string? mainAudio = beatmap.BeatmapInfo.Metadata.AudioFile;
+            int count = 0;
+
+            foreach (var file in files)
             {
-                var stack = new Stack<HitObject>();
-                stack.Push(obj);
+                if (!string.IsNullOrEmpty(mainAudio)
+                    && string.Equals(file.Filename, mainAudio, StringComparison.OrdinalIgnoreCase))
+                    continue;
 
-                while (stack.Count > 0)
-                {
-                    var ho = stack.Pop();
-
-                    foreach (var sm in ho.Samples)
-                    {
-                        if (!sm.UseBeatmapSamples)
-                            continue;
-
-                        string? first = sm.LookupNames.FirstOrDefault();
-                        if (first == null || !set.Add(first))
-                            continue;
-
-                        if (set.Count >= threshold)
-                            return true;
-                    }
-
-                    foreach (var n in ho.NestedHitObjects)
-                        stack.Push(n);
-                }
+                if (AudioCheckUtils.HasAudioExtension(file.Filename))
+                    count++;
             }
 
-            return set.Count >= threshold;
+            return count;
         }
 
         private static bool hasStoryboardSamples(Storyboard? storyboard)
