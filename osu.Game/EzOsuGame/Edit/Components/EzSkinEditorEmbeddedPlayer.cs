@@ -43,6 +43,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private HealthProcessor healthProcessor = null!;
         private BreakTracker breakTracker = null!;
 
+        private bool desiredPlaying;
+
         private DependencyContainer dependencies = null!;
 
         public EzSkinEditorEmbeddedPlayer(WorkingBeatmap workingBeatmap, RulesetInfo rulesetInfo, ISkin editorSkin)
@@ -178,17 +180,31 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             EzSkinEditorRulesetPreviewBootstrap.ApplyAutoplayReplay(DrawableRuleset, playableBeatmap);
             GameplayClock.Reset(DrawableRuleset.GameplayStartTime, startClock: false);
+            applyPlayingState();
         }
 
         public void Seek(double time)
         {
+            if (LoadState < LoadState.Ready)
+                return;
+
             double clamped = Math.Clamp(time, BeatmapMinTime, BeatmapMaxTime);
             GameplayClock.Seek(clamped);
         }
 
         public void SetPlaying(bool playing)
         {
-            if (playing)
+            desiredPlaying = playing;
+
+            if (LoadState < LoadState.Ready)
+                return;
+
+            applyPlayingState();
+        }
+
+        private void applyPlayingState()
+        {
+            if (desiredPlaying)
                 GameplayClock.Start();
             else
                 GameplayClock.Stop();
