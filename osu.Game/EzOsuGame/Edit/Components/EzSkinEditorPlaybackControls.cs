@@ -19,7 +19,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private readonly IconButton playPauseButton;
         private readonly OsuSpriteText progressText;
 
-        private bool isPlaying = true;
+        private bool isPlaying;
 
         public Action<double>? OnSeek { get; set; }
 
