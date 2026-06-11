@@ -94,8 +94,10 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
             if (compilation is not CSharpCompilation csharpCompilation)
                 return compilation;
 
-            var options = (CSharpCompilationOptions)csharpCompilation.Options;
+            var options = csharpCompilation.Options;
 
+            // SafeMetadataResolver is available for optional #r directive restrictions; wiring it as the sole
+            // MetadataReferenceResolver can break transitive type resolution during Emit.
             return csharpCompilation.WithOptions(options.WithNullableContextOptions(NullableContextOptions.Enable));
         }
 

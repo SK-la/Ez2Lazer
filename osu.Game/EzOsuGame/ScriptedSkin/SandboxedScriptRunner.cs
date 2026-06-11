@@ -345,33 +345,10 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
                         if (createInfo.Invoke(null, null) is SkinInfo skinInfo)
                             return skinInfo;
                     }
-
-                    if (typeof(Skin).IsAssignableFrom(type) && type.GetConstructor(Type.EmptyTypes) != null)
-                    {
-                        if (Activator.CreateInstance(type) is Skin skin)
-                            return skin.SkinInfo.Value;
-                    }
-
-                    if (typeof(IScriptedSkin).IsAssignableFrom(type) && type.GetConstructor(Type.EmptyTypes) != null)
-                    {
-                        if (Activator.CreateInstance(type) is IScriptedSkin scriptedSkin)
-                        {
-                            var protectedProperty = scriptedSkin.GetType().GetProperty("Protected", BindingFlags.Public | BindingFlags.Instance);
-
-                            if (protectedProperty?.PropertyType == typeof(bool) && protectedProperty.GetValue(scriptedSkin) is bool isProtected)
-                            {
-                                return new SkinInfo(scriptedSkin.Name, scriptedSkin.Author, typeof(ScriptedSkinWrapper).GetInvariantInstantiationInfo())
-                                {
-                                    Protected = isProtected,
-                                };
-                            }
-
-                            return new SkinInfo(scriptedSkin.Name, scriptedSkin.Author, typeof(ScriptedSkinWrapper).GetInvariantInstantiationInfo());
-                        }
-                    }
                 }
 
-                return null;
+                string fallbackName = Path.GetFileNameWithoutExtension(scriptPath);
+                return new SkinInfo(fallbackName, string.Empty, typeof(ScriptedSkinWrapper).GetInvariantInstantiationInfo());
             }
             catch (CompilationErrorException ex)
             {

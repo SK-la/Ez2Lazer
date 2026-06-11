@@ -4,6 +4,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
@@ -19,26 +20,41 @@ namespace osu.Game.Rulesets.Mania.Skinning.Scripted
     /// </summary>
     public class ManiaScriptedSkinTransformer : SkinTransformer
     {
-        private readonly SkinTransformer? maniaTransformer;
+        private readonly ISkin sourceSkin;
+        private readonly ScriptedSkinWrapper? scriptedWrapper;
+        private readonly IBeatmap beatmap;
+        private SkinTransformer? maniaTransformer;
+        private bool maniaTransformerLoadAttempted;
 
         public ManiaScriptedSkinTransformer(ISkin skin, IBeatmap beatmap)
             : base(skin)
         {
-            // ✨ 尝试加载 Mania 专用的 transformer
-            if (skin is ScriptedSkinWrapper wrapper)
-            {
-                maniaTransformer = loadManiaTransformer(wrapper, skin, beatmap);
-            }
+            sourceSkin = skin;
+            this.beatmap = beatmap;
+            scriptedWrapper = skin as ScriptedSkinWrapper;
+        }
+
+        private SkinTransformer? getManiaTransformer()
+        {
+            if (maniaTransformerLoadAttempted)
+                return maniaTransformer;
+
+            maniaTransformerLoadAttempted = true;
+
+            if (scriptedWrapper == null)
+                return null;
+
+            maniaTransformer = loadManiaTransformer(scriptedWrapper);
+            return maniaTransformer;
         }
 
         /// <summary>
         /// 加载 Mania 专用的 transformer 脚本
         /// </summary>
-        private SkinTransformer? loadManiaTransformer(ScriptedSkinWrapper wrapper, ISkin skin, IBeatmap beatmap)
+        private SkinTransformer? loadManiaTransformer(ScriptedSkinWrapper wrapper)
         {
             try
             {
-                // 获取脚本目录
                 string? scriptPath = wrapper.ScriptPath ?? SkinManager.GetScriptPathStatic(wrapper.SkinInfo.Value);
                 if (string.IsNullOrEmpty(scriptPath))
                     return null;
@@ -57,7 +73,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Scripted
                     return null;
 
                 Logger.Log($"发现 Mania Transformer: {Path.GetFileName(maniaTransformerPath)}", LoggingTarget.Information);
-                return wrapper.ScriptRunner.LoadScriptAsync<SkinTransformer>(maniaTransformerPath, skin, beatmap).GetAwaiter().GetResult();
+                return Task.Run(() => wrapper.ScriptRunner.LoadScriptAsync<SkinTransformer>(maniaTransformerPath, sourceSkin, beatmap)).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -68,8 +84,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Scripted
 
         public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
         {
+            var transformer = getManiaTransformer();
+
             // 1️⃣ 如果有 Mania transformer，先尝试从它获取配置
-            var transformerConfig = maniaTransformer?.GetConfig<TLookup, TValue>(lookup);
+            var transformerConfig = transformer?.GetConfig<TLookup, TValue>(lookup);
             if (transformerConfig != null)
                 return transformerConfig;
 
@@ -99,8 +117,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Scripted
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
         {
+            var transformer = getManiaTransformer();
+
             // 1️⃣ 如果有 Mania transformer，先尝试从它获取组件
-            var transformerComponent = maniaTransformer?.GetDrawableComponent(lookup);
+            var transformerComponent = transformer?.GetDrawableComponent(lookup);
             if (transformerComponent != null)
                 return transformerComponent;
 
