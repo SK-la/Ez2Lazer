@@ -596,37 +596,7 @@ namespace osu.Game.Skinning
         /// <summary>
         /// 获取脚本文件的路径。
         /// </summary>
-        private string getScriptPath(SkinInfo skinInfo)
-        {
-            string scriptDirectory = getScriptDirectory(skinInfo);
-            return scriptDirectory == null ? null : findPrimaryScriptPath(scriptDirectory);
-        }
-
-        /// <summary>
-        /// 获取皮肤目录路径。
-        /// </summary>
-        private string getSkinDirectory(SkinInfo skinInfo)
-        {
-            // 尝试从 Realm 中获取皮肤的文件存储路径
-            return Realm.Run(r =>
-            {
-                var managedSkin = r.Find<SkinInfo>(skinInfo.ID);
-                if (managedSkin == null)
-                    return null;
-
-                // 获取皮肤的根目录
-                var files = managedSkin.Files.ToArray();
-                if (files.Length == 0)
-                    return null;
-
-                // 假设第一个文件在皮肤根目录下
-                var firstFile = files[0].File;
-                string storagePath = firstFile.GetStoragePath();
-
-                // 返回父目录（皮肤根目录）
-                return Path.GetDirectoryName(storagePath);
-            });
-        }
+        private string getScriptPath(SkinInfo skinInfo) => ScriptedSkinSupport.GetScriptPath(skinInfo, getEzResourcesBasePath());
 
         /// <summary>
         /// Ensure that the current skin is in a state it can accept user modifications.
@@ -679,11 +649,46 @@ namespace osu.Game.Skinning
         /// <returns>Whether any change actually occurred.</returns>
         public bool Save(Skin skin)
         {
+            if (ScriptedSkinSupport.IsScriptedSkin(skin.SkinInfo))
+                return SaveScriptedSkinLayout(skin);
+
             if (!skin.SkinInfo.IsManaged)
                 throw new InvalidOperationException($"Attempting to save a skin which is not yet tracked. Call {nameof(EnsureMutableSkin)} first.");
 
             return skinImporter.Save(skin);
         }
+
+        /// <summary>
+        /// Save HUD layout JSON files for a scripted skin into its on-disk script directory.
+        /// </summary>
+        public bool SaveScriptedSkinLayout(Skin skin) => ScriptedSkinSupport.SaveLayoutToScriptDirectory(skin, getEzResourcesBasePath());
+
+        /// <summary>
+        /// Reload the current scripted skin from disk after external file edits.
+        /// </summary>
+        public void ReloadCurrentScriptedSkinIfActive()
+        {
+            CurrentSkinInfo.Value.PerformRead(skinInfo =>
+            {
+                if (!ScriptedSkinSupport.IsScriptedSkin(skinInfo))
+                    return;
+
+                string scriptPath = getScriptPath(skinInfo);
+
+                if (string.IsNullOrEmpty(scriptPath))
+                    return;
+
+                invalidateScriptedSkinCaches(scriptPath);
+                CurrentSkin.Value = getOrLoadScriptedSkin(skinInfo);
+            });
+
+            SourceChanged.Invoke();
+        }
+
+        /// <summary>
+        /// Resolves the on-disk directory for a scripted skin.
+        /// </summary>
+        public string GetScriptDirectory(SkinInfo skinInfo) => ScriptedSkinSupport.GetScriptDirectory(skinInfo, getEzResourcesBasePath());
 
         /// <summary>
         /// Perform a lookup query on available <see cref="SkinInfo"/>s.
@@ -883,61 +888,8 @@ namespace osu.Game.Skinning
         /// </summary>
         /// <param name="skinInfo">皮肤信息</param>
         /// <returns>脚本文件路径，如果不是脚本皮肤则返回 null</returns>
-        public static string GetScriptPathStatic(SkinInfo skinInfo)
-        {
-            string scriptDirectory = getScriptDirectoryStatic(skinInfo);
-            return scriptDirectory == null ? null : findPrimaryScriptPath(scriptDirectory);
-        }
-
-        private string getScriptDirectory(SkinInfo skinInfo)
-        {
-            string scriptBasePath = Path.Combine(getEzResourcesBasePath(), "ScriptedSkin");
-
-            if (!string.IsNullOrWhiteSpace(skinInfo.Hash))
-            {
-                string hashDirectory = Path.Combine(scriptBasePath, skinInfo.Hash);
-
-                if (Directory.Exists(hashDirectory))
-                    return hashDirectory;
-            }
-
-            if (skinInfo.Name.StartsWith("[Script] ", StringComparison.Ordinal))
-            {
-                string skinName = skinInfo.Name.Substring("[Script] ".Length);
-                string scriptDirectory = Path.Combine(scriptBasePath, skinName);
-
-                if (Directory.Exists(scriptDirectory))
-                    return scriptDirectory;
-            }
-
-            string directDirectory = Path.Combine(scriptBasePath, skinInfo.Name);
-            return Directory.Exists(directDirectory) ? directDirectory : null;
-        }
-
-        private static string getScriptDirectoryStatic(SkinInfo skinInfo)
-        {
-            string scriptBasePath = Path.Combine(Path.GetFullPath(EzModifyPath.RESOURCES_PATH), "ScriptedSkin");
-
-            if (!string.IsNullOrWhiteSpace(skinInfo.Hash))
-            {
-                string hashDirectory = Path.Combine(scriptBasePath, skinInfo.Hash);
-
-                if (Directory.Exists(hashDirectory))
-                    return hashDirectory;
-            }
-
-            if (skinInfo.Name.StartsWith("[Script] ", StringComparison.Ordinal))
-            {
-                string skinName = skinInfo.Name.Substring("[Script] ".Length);
-                string scriptDirectory = Path.Combine(scriptBasePath, skinName);
-
-                if (Directory.Exists(scriptDirectory))
-                    return scriptDirectory;
-            }
-
-            string directDirectory = Path.Combine(scriptBasePath, skinInfo.Name);
-            return Directory.Exists(directDirectory) ? directDirectory : null;
-        }
+        public static string GetScriptPathStatic(SkinInfo skinInfo) =>
+            ScriptedSkinSupport.GetScriptPath(skinInfo, Path.GetFullPath(EzModifyPath.RESOURCES_PATH));
 
         private string getEzResourcesBasePath()
         {
@@ -973,27 +925,7 @@ namespace osu.Game.Skinning
             return reloaded;
         }
 
-        private static string findPrimaryScriptPath(string scriptDirectory)
-        {
-            if (!Directory.Exists(scriptDirectory))
-                return null;
-
-            string[] preferred = Directory.GetFiles(scriptDirectory, "*Skin.csx", SearchOption.TopDirectoryOnly)
-                                          .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
-                                          .ToArray();
-
-            if (preferred.Length > 0)
-                return preferred.FirstOrDefault();
-
-            string skinFile = Path.Combine(scriptDirectory, "Skin.csx");
-            if (File.Exists(skinFile))
-                return skinFile;
-
-            return Directory.GetFiles(scriptDirectory, "*.csx", SearchOption.TopDirectoryOnly)
-                            .Where(file => !Path.GetFileNameWithoutExtension(file).EndsWith("Transformer", StringComparison.OrdinalIgnoreCase))
-                            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
-                            .FirstOrDefault();
-        }
+        private static string findPrimaryScriptPath(string scriptDirectory) => ScriptedSkinSupport.FindPrimaryScriptPath(scriptDirectory);
 
         /// <summary>
         /// 手动触发指定脚本的重载。

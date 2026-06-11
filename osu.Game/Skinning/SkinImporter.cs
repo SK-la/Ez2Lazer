@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
@@ -57,7 +58,14 @@ namespace osu.Game.Skinning
         {
             return await Realm.WriteAsync<Live<SkinInfo>?>(r =>
             {
-                var skinInfo = r.Find<SkinInfo>(original.ID)!;
+                var skinInfo = r.Find<SkinInfo>(original.ID);
+
+                if (skinInfo == null)
+                {
+                    Logger.Log($"Skipping skin import update: skin {original.ID} is not tracked in Realm.", LoggingTarget.Database, LogLevel.Error);
+                    return null;
+                }
+
                 skinInfo.Files.Clear();
 
                 string[] filesInMountedDirectory = Directory.EnumerateFiles(task.Path, "*.*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(task.Path, f)).ToArray();
