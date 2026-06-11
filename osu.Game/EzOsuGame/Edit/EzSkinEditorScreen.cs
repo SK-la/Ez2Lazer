@@ -309,21 +309,28 @@ namespace osu.Game.EzOsuGame.Edit
             sceneBarPreviewModeBindable = PreviewState.Mode.GetBoundCopy();
             sceneBarPreviewModeBindable.BindValueChanged(mode =>
             {
-                bool playing = mode.NewValue == EzBeatmapPreviewMode.Dynamic;
-                getActiveScenePlaybackSource()?.SetPlaying(playing);
-                sceneBar.PlaybackControls.SetPlaying(playing);
-                applyPreviewAudioPolicy(playing);
+                setBeatmapPlaybackPlaying(mode.NewValue == EzBeatmapPreviewMode.Dynamic, updateMode: false);
             }, true);
         }
 
         private void seekSceneBarPlayback(double time) => getActiveScenePlaybackSource()?.Seek(time);
 
-        private void setSceneBarPlaybackPlaying(bool playing)
+        private void setSceneBarPlaybackPlaying(bool playing) => setBeatmapPlaybackPlaying(playing);
+
+        private void setBeatmapPlaybackPlaying(bool playing, bool updateMode = true)
         {
-            if (playing)
-                PreviewState.ResumeBeatmapPlayback();
-            else
-                PreviewState.PauseBeatmapPlayback();
+            if (updateMode)
+            {
+                if (playing)
+                    PreviewState.ResumeBeatmapPlayback();
+                else
+                    PreviewState.PauseBeatmapPlayback();
+            }
+
+            getActiveScenePlaybackSource()?.SetPlaying(playing);
+            sceneBar.PlaybackControls.SetPlaying(playing);
+            applyPreviewAudioPolicy();
+            refreshSceneBarPlayback();
         }
 
         private void refreshSceneBarPlayback()
@@ -442,10 +449,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (!PreviewState.HasBeatmapLoaded)
                 return;
 
-            if (PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic)
-                PreviewState.PauseBeatmapPlayback();
-            else
-                PreviewState.ResumeBeatmapPlayback();
+            setBeatmapPlaybackPlaying(PreviewState.Mode.Value != EzBeatmapPreviewMode.Dynamic);
         }
 
         private void selectBeatmapPreview(RulesetInfo ruleset)
@@ -557,6 +561,7 @@ namespace osu.Game.EzOsuGame.Edit
                 && embeddedPlayerSkinId == skinId)
             {
                 applyEmbeddedPlayerToAppearanceContent();
+                Schedule(() => setBeatmapPlaybackPlaying(PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic, updateMode: false));
                 return;
             }
 
@@ -571,13 +576,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             applyEmbeddedPlayerToAppearanceContent();
 
-            bool shouldPlay = PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic;
-            Schedule(() =>
-            {
-                embeddedPlayer?.SetPlaying(shouldPlay);
-                applyPreviewAudioPolicy(shouldPlay);
-                refreshSceneBarPlayback();
-            });
+            Schedule(() => setBeatmapPlaybackPlaying(PreviewState.Mode.Value == EzBeatmapPreviewMode.Dynamic, updateMode: false));
         }
 
         private T? getSceneContent<T>() where T : Drawable
@@ -635,35 +634,13 @@ namespace osu.Game.EzOsuGame.Edit
                 beatmap.Track.Stop();
         }
 
-        private void applyPreviewAudioPolicy(bool dynamicPlaybackActive)
+        private void applyPreviewAudioPolicy()
         {
             if (sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Appearance)
                 return;
 
-            if (dynamicPlaybackActive)
-            {
-                // Embedded player drives beatmap audio; keep global music from stacking on top.
-                musicController.Stop();
-                return;
-            }
-
-            if (!shouldSyncPreviewWithGlobalMusic())
-                return;
-
-            double time = getActiveScenePlaybackSource()?.CurrentTime ?? 0;
-            musicController.SeekTo(time);
-            musicController.Play();
-        }
-
-        private bool shouldSyncPreviewWithGlobalMusic()
-        {
-            if (sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Appearance)
-                return false;
-
-            if (PreviewState.PreviewBeatmap == null)
-                return false;
-
-            return PreviewState.PreviewBeatmap.BeatmapInfo.Hash == gameBeatmap.Value.BeatmapInfo.Hash;
+            // Preview audio is owned by the embedded player while dynamic; global music must stay off.
+            musicController.Stop();
         }
 
         private IEzSkinEditorNoteComparisonSource? buildNoteComparisonSource(bool useNoteComparisonOnly, bool useVirtualComparisonPreview, bool usesEzNoteVariants)
