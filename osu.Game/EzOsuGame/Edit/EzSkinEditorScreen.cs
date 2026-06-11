@@ -84,6 +84,9 @@ namespace osu.Game.EzOsuGame.Edit
         [Resolved(canBeNull: true)]
         private INotificationOverlay? notifications { get; set; }
 
+        [Resolved]
+        private MusicController musicController { get; set; } = null!;
+
         private Container? backgroundContainer;
         private Container sceneContentHost = null!;
         private EzSkinEditorMenuBar menuBar = null!;
@@ -308,6 +311,7 @@ namespace osu.Game.EzOsuGame.Edit
                 bool playing = mode.NewValue == EzBeatmapPreviewMode.Dynamic;
                 getActiveScenePlaybackSource()?.SetPlaying(playing);
                 sceneBar.PlaybackControls.SetPlaying(playing);
+                applyPreviewAudioPolicy(playing);
             }, true);
         }
 
@@ -457,6 +461,9 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
+            embeddedPlayer?.StopAudio();
+            stopPreviewBeatmapTrack(PreviewState.PreviewBeatmap);
+            musicController.Stop();
             PreviewState.SetBeatmap(workingBeatmap!, ruleset, EzSkinEditorPreviewModes.GetAppearanceLoadMode(ruleset));
             refreshScene();
         }
@@ -567,6 +574,7 @@ namespace osu.Game.EzOsuGame.Edit
             Schedule(() =>
             {
                 embeddedPlayer?.SetPlaying(shouldPlay);
+                applyPreviewAudioPolicy(shouldPlay);
                 refreshSceneBarPlayback();
             });
         }
@@ -607,6 +615,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void disposeEmbeddedPlayer()
         {
+            embeddedPlayer?.StopAudio();
             embeddedPlayer?.Expire();
             embeddedPlayer = null;
             embeddedPlayerBeatmapHash = string.Empty;
@@ -614,6 +623,46 @@ namespace osu.Game.EzOsuGame.Edit
             embeddedPlayerSkinId = Guid.Empty;
 
             applyEmbeddedPlayerToAppearanceContent();
+        }
+
+        private static void stopPreviewBeatmapTrack(IWorkingBeatmap? beatmap)
+        {
+            if (beatmap is not { TrackLoaded: true })
+                return;
+
+            if (beatmap.Track.IsRunning)
+                beatmap.Track.Stop();
+        }
+
+        private void applyPreviewAudioPolicy(bool dynamicPlaybackActive)
+        {
+            if (sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Appearance)
+                return;
+
+            if (dynamicPlaybackActive)
+            {
+                // Embedded player drives beatmap audio; keep global music from stacking on top.
+                musicController.Stop();
+                return;
+            }
+
+            if (!shouldSyncPreviewWithGlobalMusic())
+                return;
+
+            double time = getActiveScenePlaybackSource()?.CurrentTime ?? 0;
+            musicController.SeekTo(time);
+            musicController.Play();
+        }
+
+        private bool shouldSyncPreviewWithGlobalMusic()
+        {
+            if (sceneBar.CurrentScene.Value != EzSkinEditorSceneType.Appearance)
+                return false;
+
+            if (PreviewState.PreviewBeatmap == null)
+                return false;
+
+            return PreviewState.PreviewBeatmap.BeatmapInfo.Hash == gameBeatmap.Value.BeatmapInfo.Hash;
         }
 
         private IEzSkinEditorNoteComparisonSource? buildNoteComparisonSource(bool useNoteComparisonOnly, bool useVirtualComparisonPreview, bool usesEzNoteVariants)

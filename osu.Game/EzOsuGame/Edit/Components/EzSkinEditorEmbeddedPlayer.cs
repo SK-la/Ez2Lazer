@@ -194,6 +194,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 GameplayClock.Stop();
         }
 
+        public void StopAudio()
+        {
+            if (LoadState >= LoadState.Ready && GameplayClock.IsRunning)
+                SetPlaying(false);
+
+            if (workingBeatmap.TrackLoaded && workingBeatmap.Track.IsRunning)
+                workingBeatmap.Track.Stop();
+        }
+
         public void Restart()
         {
             gameplayState.HasPassed = false;
@@ -233,6 +242,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (Parent is Container<Drawable> parentContainer)
                 parentContainer.Remove(this, false);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+                StopAudio();
+
+            base.Dispose(isDisposing);
         }
     }
 }
