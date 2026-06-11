@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
@@ -110,9 +111,9 @@ namespace osu.Game.EzOsuGame.Audio
             updateDelegate = null;
 
             prepareGeneration++;
-            clearPendingPreloadActions();
 
             stopActiveChannels();
+            clearSampleCaches();
             saveCurrentBeatmapToCache();
 
             currentBeatmap = null;
@@ -187,6 +188,7 @@ namespace osu.Game.EzOsuGame.Audio
                     Math.Max(playback.PreviewStartTime + trackLoopLength, longestHitTimeEstimate),
                     longestStoryboardTimeEstimate) + tick_ms;
 
+                clearSampleCaches();
                 bool cacheHit = restoreFromCache(beatmap);
 
                 if (!cacheHit)
@@ -316,6 +318,13 @@ namespace osu.Game.EzOsuGame.Audio
         {
             pendingPreloadActions.Clear();
             sampleScheduler.PreloadQueuedKeys.Clear();
+        }
+
+        private void clearSampleCaches()
+        {
+            sampleScheduler.HitSampleCache.Clear();
+            sampleScheduler.StoryboardSampleCache.Clear();
+            clearPendingPreloadActions();
         }
 
         private void enqueueLookaheadPreload(double logicalTime)
@@ -664,7 +673,12 @@ namespace osu.Game.EzOsuGame.Audio
                 return null;
 
             if (sampleScheduler.HitSampleCache.TryGetValue(key, out var cached))
-                return cached;
+            {
+                if (cached is AudioComponent { IsDisposed: true })
+                    sampleScheduler.HitSampleCache.Remove(key);
+                else
+                    return cached;
+            }
 
             ISample? sample = currentBeatmap?.Skin.GetSample(info);
             sampleScheduler.HitSampleCache[key] = sample;
@@ -705,7 +719,12 @@ namespace osu.Game.EzOsuGame.Audio
             string normalizedPath = info.Path.Replace('\\', '/');
 
             if (sampleScheduler.StoryboardSampleCache.TryGetValue(normalizedPath, out var cached))
-                return cached;
+            {
+                if (cached is AudioComponent { IsDisposed: true })
+                    sampleScheduler.StoryboardSampleCache.Remove(normalizedPath);
+                else
+                    return cached;
+            }
 
             ISample? sample = currentBeatmap?.Skin.GetSample(info);
             sampleScheduler.StoryboardSampleCache[normalizedPath] = sample;
