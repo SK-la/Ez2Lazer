@@ -10,6 +10,7 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
 using osu.Game.Audio;
 using osu.Game.Extensions;
+using osu.Framework.IO.Stores;
 using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.IO;
 
@@ -38,7 +39,7 @@ namespace osu.Game.Skinning
                                    SandboxedScriptRunner? scriptRunner = null,
                                    SkinInfo? skinInfo = null,
                                    string? scriptPath = null)
-            : base(createInfoForScriptedSkin(scriptedSkin, skinInfo), resources)
+            : base(createInfoForScriptedSkin(scriptedSkin, skinInfo), resources, createScriptDirectoryStore(scriptPath))
         {
             this.scriptedSkin = scriptedSkin;
             ScriptRunner = scriptRunner ?? new SandboxedScriptRunner();
@@ -53,6 +54,14 @@ namespace osu.Game.Skinning
             {
                 Logger.Log($"Failed to initialize scripted skin '{scriptedSkin.Name}': {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
             }
+        }
+
+        private static IResourceStore<byte[]>? createScriptDirectoryStore(string? scriptPath)
+        {
+            if (string.IsNullOrEmpty(scriptPath))
+                return null;
+
+            return ScriptedSkinCompilation.CreateDirectoryResourceStore(scriptPath);
         }
 
         /// <summary>
@@ -166,27 +175,15 @@ namespace osu.Game.Skinning
         /// <summary>
         /// 重新加载脚本（用于热重载）。
         /// </summary>
-        /// <param name="scriptPath">脚本文件路径。</param>
-        /// <returns>是否成功重新加载。</returns>
-        public async Task<bool> ReloadAsync(string scriptPath)
+        /// <remarks>
+        /// Wrapper instances cannot replace their underlying scripted skin in-place.
+        /// Use <see cref="SkinManager.ReloadCurrentScriptedSkinIfActive"/> or <see cref="SkinManager.TriggerScriptReload"/> instead.
+        /// </remarks>
+        [Obsolete("Use SkinManager.ReloadCurrentScriptedSkinIfActive() to rebuild the wrapper after script changes.")]
+        public Task<bool> ReloadAsync(string scriptPath)
         {
-            try
-            {
-                var newSkin = await ScriptRunner.LoadScriptAsync(scriptPath).ConfigureAwait(false);
-
-                // 清理旧实例
-                scriptedSkin.Dispose();
-
-                // 替换为新实例（注意：这里需要特殊处理，因为字段是 readonly）
-                // 实际实现中可能需要重新创建整个包装器
-                Logger.Log($"Reloaded scripted skin: {newSkin.Name}", LoggingTarget.Information);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Failed to reload scripted skin: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
-                return false;
-            }
+            Logger.Log("ScriptedSkinWrapper.ReloadAsync is obsolete; use SkinManager.ReloadCurrentScriptedSkinIfActive().", LoggingTarget.Runtime, LogLevel.Important);
+            return Task.FromResult(false);
         }
     }
 }

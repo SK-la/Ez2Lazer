@@ -21,6 +21,7 @@ using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
@@ -1136,21 +1137,35 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 try
                 {
-                    var detached = skinInfo.PerformRead(s => s.Detach());
-                    var edit = await skinManager.BeginExternalEditing(detached).ConfigureAwait(false);
-                    string directory = edit.MountedPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    string? directory = ScriptedSkinSupport.IsScriptedSkin(skinInfo)
+                        ? skinManager.GetScriptDirectory(skinInfo.Value)
+                        : null;
+
+                    ExternalEditOperation<SkinInfo>? edit = null;
+
+                    if (directory == null)
+                    {
+                        var detached = skinInfo.PerformRead(s => s.Detach());
+                        edit = await skinManager.BeginExternalEditing(detached).ConfigureAwait(false);
+                        directory = edit.MountedPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    }
 
                     using var image = EzSkinEditorNoteImageExporter.Export(profile, request, directory);
 
                     if (image == null)
                     {
-                        await edit.Finish().ConfigureAwait(false);
+                        if (edit != null)
+                            await edit.Finish().ConfigureAwait(false);
+
                         Schedule(() => postNotification(EzEditorStrings.NOTIFY_CANNOT_EXPORT_NOTE_PREVIEW));
                         return;
                     }
 
                     string filePath = Path.Combine(directory, $"{exportName}.png");
                     await image.SaveAsPngAsync(filePath).ConfigureAwait(false);
+
+                    if (edit != null)
+                        await edit.Finish().ConfigureAwait(false);
 
                     Schedule(() =>
                     {

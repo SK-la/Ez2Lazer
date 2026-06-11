@@ -32,6 +32,7 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Screens.Edit.Components.Menus;
+using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.Skinning;
 using osu.Framework.Graphics.Cursor;
 using osu.Game.Input.Bindings;
@@ -112,6 +113,9 @@ namespace osu.Game.Overlays.SkinEditor
 
         private Task? externalEditOperation;
 
+        private EditorMenuItem editExternallyMenuItem = null!;
+        private EditorMenuItem openScriptFolderMenuItem = null!;
+
         public SkinEditor()
         {
         }
@@ -167,7 +171,8 @@ namespace osu.Game.Overlays.SkinEditor
                                                     {
                                                         new EditorMenuItem(Web.CommonStrings.ButtonsSave, MenuItemType.Standard, () => Save()) { Hotkey = new Hotkey(PlatformAction.Save) },
                                                         new EditorMenuItem(CommonStrings.Export, MenuItemType.Standard, () => skins.ExportCurrentSkin()) { Action = { Disabled = !RuntimeInfo.IsDesktop } },
-                                                        new EditorMenuItem(EditorStrings.EditExternally, MenuItemType.Standard, () => _ = editExternally()) { Action = { Disabled = !RuntimeInfo.IsDesktop } },
+                                                        editExternallyMenuItem = new EditorMenuItem(EditorStrings.EditExternally, MenuItemType.Standard, () => _ = editExternally()) { Action = { Disabled = !RuntimeInfo.IsDesktop } },
+                                                        openScriptFolderMenuItem = new EditorMenuItem("Open script folder", MenuItemType.Standard, () => _ = openScriptedSkinFolder()) { Action = { Disabled = !RuntimeInfo.IsDesktop } },
                                                         new OsuMenuItemSpacer(),
                                                         new EditorMenuItem(CommonStrings.RevertToDefault, MenuItemType.Destructive, () => dialogOverlay?.Push(new RevertConfirmDialog(revert))),
                                                         new OsuMenuItemSpacer(),
@@ -287,11 +292,41 @@ namespace osu.Game.Overlays.SkinEditor
 
         private async Task editExternally()
         {
+            if (!ScriptedSkinSupport.CanUseRealmExternalEdit(currentSkin.Value.SkinInfo))
+                return;
+
             Save();
 
             var skin = currentSkin.Value.SkinInfo.PerformRead(s => s.Detach());
 
             externalEditOperation = await externalEditOverlay!.Begin(skin).ConfigureAwait(false);
+        }
+
+        private async Task openScriptedSkinFolder()
+        {
+            if (!ScriptedSkinSupport.IsScriptedSkin(currentSkin.Value.SkinInfo))
+                return;
+
+            Save();
+
+            string? scriptDirectory = skins.GetScriptDirectory(currentSkin.Value.SkinInfo.Value);
+
+            if (string.IsNullOrEmpty(scriptDirectory))
+                return;
+
+            externalEditOperation = await externalEditOverlay!.BeginScripted(scriptDirectory).ConfigureAwait(false);
+        }
+
+        private void updateExternalEditMenuState()
+        {
+            if (editExternallyMenuItem == null || openScriptFolderMenuItem == null)
+                return;
+
+            bool isScripted = ScriptedSkinSupport.IsScriptedSkin(currentSkin.Value.SkinInfo);
+            bool canRealmEdit = ScriptedSkinSupport.CanUseRealmExternalEdit(currentSkin.Value.SkinInfo);
+
+            editExternallyMenuItem.Action.Disabled = !RuntimeInfo.IsDesktop || !canRealmEdit;
+            openScriptFolderMenuItem.Action.Disabled = !RuntimeInfo.IsDesktop || !isScripted;
         }
 
         public bool OnPressed(KeyBindingPressEvent<PlatformAction> e)
@@ -476,6 +511,8 @@ namespace osu.Game.Overlays.SkinEditor
                 cp.Font = OsuFont.Default.With(size: 12, weight: FontWeight.Bold);
                 cp.Colour = colours.Yellow;
             });
+
+            updateExternalEditMenuState();
 
             changeHandler?.Dispose();
             changeHandler = null;
