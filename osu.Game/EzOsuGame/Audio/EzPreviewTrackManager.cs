@@ -29,12 +29,8 @@ namespace osu.Game.EzOsuGame.Audio
 
         // 预览时，谱面中存在足够多的 beatmap note sample 才启用 hitsound 预览，避免把 1-5 个固定音效误判成 keysound。
         private const int hitsound_threshold = 10;
-        private const double scheduler_interval = 8; // ~120fps
-        private const double trigger_tolerance = 8; // ms 容差
-        private const double channel_cleanup_grace = 10; // ms 容忍采样通道启动延迟，防止同时播放音效时，因时序导致音效被提前释放
-        private const int preload_batch_size = 3;
+        private const double tick_ms = 8; // 调度间隔与事件触发容差（~120fps）
         private const double preload_lookahead_ms = 2000;
-        private const double default_preview_window_ms = 30_000;
         private const int max_cached_beatmaps = 3; // LRU 缓存：最多保留最近 3 首谱面的调度表
 
         private readonly SampleSchedulerState sampleScheduler = new SampleSchedulerState();
@@ -189,12 +185,12 @@ namespace osu.Game.EzOsuGame.Audio
 
                 double trackTimelineEndTime = currentTrack?.Length ?? 0;
                 double trackLoopLength = Math.Max(1, trackTimelineEndTime - playback.PreviewStartTime);
-                double scheduleWindowStart = playback.PreviewStartTime - trigger_tolerance;
+                double scheduleWindowStart = playback.PreviewStartTime - tick_ms;
                 double longestHitTimeEstimate = playableBeatmap.GetLastObjectTime();
                 double longestStoryboardTimeEstimate = beatmap.Storyboard?.LatestEventTime ?? 0;
                 double scheduleWindowEnd = Math.Max(
-                    playback.PreviewStartTime + Math.Max(trackLoopLength, default_preview_window_ms) + trigger_tolerance,
-                    Math.Max(longestHitTimeEstimate, longestStoryboardTimeEstimate) + trigger_tolerance);
+                    Math.Max(playback.PreviewStartTime + trackLoopLength, longestHitTimeEstimate),
+                    longestStoryboardTimeEstimate) + tick_ms;
 
                 bool cacheHit = restoreFromCache(beatmap);
 
@@ -237,7 +233,7 @@ namespace osu.Game.EzOsuGame.Audio
                     playback.PreviewEndTime = Math.Max(trackTimelineEndTime, playback.PreviewStartTime + 1);
 
                 playback.TrackLoopLength = Math.Max(1, trackTimelineEndTime - playback.PreviewStartTime);
-                playback.ShortBgmOneShotMode = previewMainAudioAvailable && mainAudioEndTime + trigger_tolerance < playback.PreviewEndTime;
+                playback.ShortBgmOneShotMode = previewMainAudioAvailable && mainAudioEndTime + tick_ms < playback.PreviewEndTime;
                 playback.ResetPlaybackProgress();
                 playback.ResetLogicalClock(playback.PreviewStartTime, Time.Current);
 
@@ -259,7 +255,7 @@ namespace osu.Game.EzOsuGame.Audio
                 }
 
                 playback.IsPlaying = true;
-                updateDelegate = Scheduler.AddDelayed(updateSamples, scheduler_interval, true);
+                updateDelegate = Scheduler.AddDelayed(updateSamples, tick_ms, true);
                 updateSamples();
             }
             catch (Exception ex)
@@ -337,7 +333,7 @@ namespace osu.Game.EzOsuGame.Audio
                 int index = findNextValidIndex(
                     sampleScheduler.ScheduledHitSounds,
                     sampleScheduler.NextHitSoundIndex,
-                    logicalTime - trigger_tolerance);
+                    logicalTime - tick_ms);
 
                 while (index < sampleScheduler.ScheduledHitSounds.Count)
                 {
@@ -376,7 +372,7 @@ namespace osu.Game.EzOsuGame.Audio
                 int index = findNextValidIndex(
                     sampleScheduler.ScheduledStoryboardSamples,
                     sampleScheduler.NextStoryboardSampleIndex,
-                    logicalTime - trigger_tolerance);
+                    logicalTime - tick_ms);
 
                 while (index < sampleScheduler.ScheduledStoryboardSamples.Count)
                 {
@@ -414,7 +410,7 @@ namespace osu.Game.EzOsuGame.Audio
             {
                 int count = 0;
 
-                while (count < preload_batch_size && pendingPreloadActions.Count > 0)
+                while (count < 3 && pendingPreloadActions.Count > 0)
                 {
                     pendingPreloadActions.Dequeue().Invoke();
                     count++;
@@ -488,7 +484,7 @@ namespace osu.Game.EzOsuGame.Audio
                 logicalTime = playback.LogicalClockTime;
             }
 
-            if (logicalTime > playback.PreviewEndTime + trigger_tolerance)
+            if (logicalTime > playback.PreviewEndTime + tick_ms)
             {
                 restartPreviewCycle();
                 return;
@@ -510,7 +506,7 @@ namespace osu.Game.EzOsuGame.Audio
         private void processScheduledEvents<T>(List<T> list, ref int nextIndex, double logicalTime, Action<T> trigger)
             where T : struct, ITimedScheduleEntry
         {
-            nextIndex = findNextValidIndex(list, nextIndex, logicalTime - trigger_tolerance);
+            nextIndex = findNextValidIndex(list, nextIndex, logicalTime - tick_ms);
 
             while (nextIndex < list.Count)
             {
@@ -522,17 +518,17 @@ namespace osu.Game.EzOsuGame.Audio
                     continue;
                 }
 
-                if (entry.Time > logicalTime + trigger_tolerance)
+                if (entry.Time > logicalTime + tick_ms)
                     break;
 
-                if (Math.Abs(entry.Time - logicalTime) <= trigger_tolerance)
+                if (Math.Abs(entry.Time - logicalTime) <= tick_ms)
                 {
                     trigger(entry);
                     entry.HasTriggered = true;
                     list[nextIndex] = entry;
                     nextIndex++;
                 }
-                else if (entry.Time < logicalTime - trigger_tolerance)
+                else if (entry.Time < logicalTime - tick_ms)
                 {
                     entry.HasTriggered = true;
                     list[nextIndex] = entry;
@@ -555,7 +551,7 @@ namespace osu.Game.EzOsuGame.Audio
                     continue;
 
                 if (sampleScheduler.ActiveChannelStartTimes.TryGetValue(channel, out double startedAt)
-                    && Time.Current - startedAt < channel_cleanup_grace)
+                    && Time.Current - startedAt < tick_ms + 2)
                 {
                     continue;
                 }
