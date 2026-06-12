@@ -365,44 +365,64 @@ namespace osu.Game.EzOsuGame.Localization
 
         #region Pixiv 背景
 
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTH_TOOL_HINT = new EzLocalizationManager.EzLocalisableString(
+            "请从 github.com/SK-la/EzPixivAuth Releases 下载 EzPixivAuth，双击运行后会自动写入本机 pixiv_auth.json（与 client.realm 同目录）。",
+            "Download EzPixivAuth from github.com/SK-la/EzPixivAuth Releases and run it to write pixiv_auth.json next to client.realm.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_MANUAL_TOKEN = new EzLocalizationManager.EzLocalisableString(
+            "手动输入 refresh_token", "Enter refresh_token manually");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_MANUAL_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "仅当你已从其他途径获得 refresh_token 时使用。输入为隐藏显示，勿泄露给他人。",
+            "Only if you already have a refresh_token from elsewhere. Input is masked; do not share it.");
+
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_REFRESH_TOKEN = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv refresh token", "Pixiv refresh token");
+            "refresh_token", "refresh_token");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_REFRESH_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "首次使用请运行仓库 tools/GetPixivRefreshToken.ps1 完成官方 OAuth，或在下方粘贴 refresh_token 后点保存。"
-            + "\n凭证仅写入数据目录 pixiv_auth.json（与 client.realm 同级），不写入 framework.ini。",
-            "Run tools/GetPixivRefreshToken.ps1 once for official OAuth, or paste a refresh_token below and save."
-            + "\nCredentials are stored only in pixiv_auth.json (osu data folder), not in framework.ini.");
+            "粘贴后点「保存」。仅保存在本机。",
+            "Paste and click Save. Stored locally only.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN = new EzLocalizationManager.EzLocalisableString("保存 Pixiv 凭证", "Save Pixiv credentials");
+        public const string PIXIV_AUTH_TOOL_RELEASES_URL = "https://github.com/SK-la/EzPixivAuth/releases";
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN = new EzLocalizationManager.EzLocalisableString("保存", "Save");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "写入 pixiv_auth.json。", "Writes to pixiv_auth.json.");
+            "保存到本机。", "Saves locally.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_TOKEN = new EzLocalizationManager.EzLocalisableString("验证 Pixiv 登录", "Verify Pixiv login");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CHECK_LOGIN = new EzLocalizationManager.EzLocalisableString("检查登录", "Check login");
 
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "使用 refresh_token 换取 access_token 并显示 Pixiv 账号。", "Exchanges the refresh token and shows the Pixiv account name.");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CHECK_LOGIN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "验证凭证是否可用。", "Verifies the saved credential.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CLEAR_TOKEN = new EzLocalizationManager.EzLocalisableString("清除 Pixiv 凭证", "Clear Pixiv credentials");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_STATUS_NOT_CONFIGURED = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv：尚未保存登录凭证。", "Pixiv: no credential saved yet.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_STATUS_LOGGED_IN = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv：已登录 @{0}", "Pixiv: logged in as @{0}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_STATUS_INVALID = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv：凭证无效，请重新运行 EzPixivAuth 或手动保存。", "Pixiv: invalid credential; run EzPixivAuth again or save manually.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CLEAR_TOKEN = new EzLocalizationManager.EzLocalisableString("清除", "Clear");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CLEAR_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "删除 pixiv_auth.json。", "Deletes pixiv_auth.json.");
+            "删除本机保存的凭证。", "Deletes the locally saved credential.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_SAVED = new EzLocalizationManager.EzLocalisableString("Pixiv 凭证已保存。", "Pixiv credentials saved.");
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_CLEARED = new EzLocalizationManager.EzLocalisableString("Pixiv 凭证已清除。", "Pixiv credentials cleared.");
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_EMPTY = new EzLocalizationManager.EzLocalisableString("refresh_token 不能为空。", "refresh_token cannot be empty.");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_SAVED = new EzLocalizationManager.EzLocalisableString("已保存。", "Saved.");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_CLEARED = new EzLocalizationManager.EzLocalisableString("已清除。", "Cleared.");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_EMPTY = new EzLocalizationManager.EzLocalisableString("请先粘贴 refresh_token。", "Paste a refresh_token first.");
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_SUCCESS = new EzLocalizationManager.EzLocalisableString("Pixiv 登录成功：@{0}", "Pixiv login OK: @{0}");
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_FAILED = new EzLocalizationManager.EzLocalisableString("Pixiv 登录验证失败。", "Pixiv login verification failed.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTO_DOWNLOAD_ENABLED = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv 后台自动下载", "Pixiv background auto-download");
+            "Pixiv 自动下载", "Pixiv background auto-download");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTO_DOWNLOAD_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启后每 3 分钟从关注流下载 1 张尚未缓存的作品到 EzResources/BG_PIXIV。"
-            + "\n与菜单背景显示独立；凭证失效时自动暂停。",
-            "When enabled, downloads one uncached follow-feed illustration to EzResources/BG_PIXIV every 3 minutes."
-            + "\nIndependent from menu background display; pauses automatically if credentials fail.");
+            "切歌时优先显示 BG_PIXIV 已有图片（不阻塞界面），并在后台每次追加下载 1 张。"
+            + "\n开启后额外持续预缓存；未缓存不足 10 张时自动再拉一页关注流。",
+            "Song changes show a random cached BG_PIXIV image immediately without blocking, while one new illustration downloads in the background."
+            + "\nWhen enabled, also keeps prefetching and fetches another feed page when fewer than 10 are cached.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTO_DOWNLOAD_PAUSED = new EzLocalizationManager.EzLocalisableString(
             "Pixiv 自动下载已暂停：{0}", "Pixiv auto-download paused: {0}");
@@ -418,43 +438,43 @@ namespace osu.Game.EzOsuGame.Localization
             "画师 account 白名单", "Artist account whitelist");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_WHITELIST_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "非空时仅允许列表中的 @ 句柄；每行一项，也可用逗号分隔。",
-            "When non-empty, only listed @ handles are allowed. One entry per line, or comma-separated.");
+            "非空时仅允许列表中的画师 account 句柄；多项用空格分隔（与 osu 标签类似，也可用逗号/分号）。",
+            "When non-empty, only listed artist account handles are allowed. Separate with spaces (like osu tags), or commas/semicolons.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_BLACKLIST = new EzLocalizationManager.EzLocalisableString(
             "画师 account 黑名单", "Artist account blacklist");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_BLACKLIST_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "命中则跳过；每行一项，也可用逗号分隔。",
-            "Matching accounts are skipped. One entry per line, or comma-separated.");
+            "命中则跳过；多项用空格分隔（也可用逗号/分号）。",
+            "Matching accounts are skipped. Separate with spaces, or commas/semicolons.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_INCLUDE = new EzLocalizationManager.EzLocalisableString(
             "标签包含（任一）", "Tag include (any)");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_INCLUDE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "非空时作品须至少包含其中一个标签（不区分大小写）。",
-            "When non-empty, works must include at least one listed tag (case-insensitive).");
+            "非空时作品须至少包含其中一个标签（不区分大小写）；多项用空格分隔。含空格的标签请用逗号括起，如：女の子,AI Generated",
+            "When non-empty, works must include at least one listed tag (case-insensitive). Separate with spaces; use commas for tags that contain spaces.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_EXCLUDE = new EzLocalizationManager.EzLocalisableString(
             "标签排除", "Tag exclude");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_EXCLUDE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "命中任一标签则跳过；每行一项，也可用逗号分隔。",
-            "Works with any listed tag are skipped. One entry per line, or comma-separated.");
+            "命中任一标签则跳过；多项用空格分隔。含空格的标签请用逗号括起。",
+            "Works with any listed tag are skipped. Separate with spaces; use commas for tags that contain spaces.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_ACCOUNT_PREFIXES = new EzLocalizationManager.EzLocalisableString(
             "落盘跳过：account 前缀", "Skip save: account prefixes");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_ACCOUNT_PREFIXES_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "画师 @ 句柄以这些前缀开头时不写入 BG_PIXIV；每行一项。",
-            "Do not write to BG_PIXIV when the artist @ handle starts with any prefix. One per line.");
+            "画师 account 以这些前缀开头时不写入 BG_PIXIV；多项用空格分隔（也可用逗号/分号）。",
+            "Do not write to BG_PIXIV when the artist account starts with any prefix. Separate with spaces, or commas/semicolons.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_TAGS = new EzLocalizationManager.EzLocalisableString(
             "落盘跳过：标签", "Skip save: tags");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_TAGS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "作品含任一标签时不写入 BG_PIXIV；每行一项，也可用逗号分隔。",
-            "Do not write to BG_PIXIV when the work has any listed tag. One per line, or comma-separated.");
+            "作品含任一标签时不写入 BG_PIXIV；多项用空格分隔。含空格的标签请用逗号括起。",
+            "Do not write to BG_PIXIV when the work has any listed tag. Separate with spaces; use commas for tags that contain spaces.");
 
         #endregion
 
