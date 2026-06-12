@@ -13,6 +13,9 @@ namespace osu.Game.Online
     {
         protected override string GetLookupUrl(string url)
         {
+            if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) && isPixivTrustedHost(uri))
+                return url;
+
             ServerPreset customApiUrl = GlobalConfigStore.EzConfig.Get<ServerPreset>(Ez2Setting.ServerPreset);
 
             switch (customApiUrl)
@@ -21,7 +24,7 @@ namespace osu.Game.Online
                 case ServerPreset.Gu:
                     #if DEBUG
                     // 任何从服务器获取资源的事件都会引发这个日志输出
-                    if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri1) || !uri1.Host.EndsWith(@".ppy.sh", StringComparison.OrdinalIgnoreCase))
+                    if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? customUri) || !customUri.Host.EndsWith(@".ppy.sh", StringComparison.OrdinalIgnoreCase))
                     {
                         Logger.Log($@"[Ez2Lazer] Using Custom ApiUrl {url}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                     }
@@ -30,14 +33,28 @@ namespace osu.Game.Online
                     return url;
 
                 default:
-                    if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) || !uri.Host.EndsWith(@".ppy.sh", StringComparison.OrdinalIgnoreCase))
+                    if (!Uri.TryCreate(url, UriKind.Absolute, out uri))
                     {
                         Logger.Log($@"Blocking resource lookup from external website: {url}", LoggingTarget.Network, LogLevel.Important);
                         return string.Empty;
                     }
 
-                    return url;
+                    if (uri.Host.EndsWith(@".ppy.sh", StringComparison.OrdinalIgnoreCase))
+                        return url;
+
+                    Logger.Log($@"Blocking resource lookup from external website: {url}", LoggingTarget.Network, LogLevel.Important);
+                    return string.Empty;
             }
+        }
+
+        private static bool isPixivTrustedHost(Uri uri)
+        {
+            string host = uri.Host;
+
+            return host.Equals(@"pixiv.net", StringComparison.OrdinalIgnoreCase)
+                   || host.EndsWith(@".pixiv.net", StringComparison.OrdinalIgnoreCase)
+                   || host.Equals(@"pximg.net", StringComparison.OrdinalIgnoreCase)
+                   || host.EndsWith(@".pximg.net", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

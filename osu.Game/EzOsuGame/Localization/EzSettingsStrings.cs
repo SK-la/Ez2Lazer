@@ -363,6 +363,37 @@ namespace osu.Game.EzOsuGame.Localization
 
         #endregion
 
+        #region Pixiv 背景
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_REFRESH_TOKEN = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv refresh token", "Pixiv refresh token");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_REFRESH_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "首次使用请运行仓库 tools/GetPixivRefreshToken.ps1 完成官方 OAuth，或在下方粘贴 refresh_token 后点保存。"
+            + "\n凭证仅写入数据目录 pixiv_auth.json（与 client.realm 同级），不写入 framework.ini。",
+            "Run tools/GetPixivRefreshToken.ps1 once for official OAuth, or paste a refresh_token below and save."
+            + "\nCredentials are stored only in pixiv_auth.json (osu data folder), not in framework.ini.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN = new EzLocalizationManager.EzLocalisableString("保存 Pixiv 凭证", "Save Pixiv credentials");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "写入 pixiv_auth.json。", "Writes to pixiv_auth.json.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_TOKEN = new EzLocalizationManager.EzLocalisableString("验证 Pixiv 登录", "Verify Pixiv login");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "使用 refresh_token 换取 access_token 并显示 Pixiv 账号。", "Exchanges the refresh token and shows the Pixiv account name.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CLEAR_TOKEN = new EzLocalizationManager.EzLocalisableString("清除 Pixiv 凭证", "Clear Pixiv credentials");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CLEAR_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "删除 pixiv_auth.json。", "Deletes pixiv_auth.json.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_SAVED = new EzLocalizationManager.EzLocalisableString("Pixiv 凭证已保存。", "Pixiv credentials saved.");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_CLEARED = new EzLocalizationManager.EzLocalisableString("Pixiv 凭证已清除。", "Pixiv credentials cleared.");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_EMPTY = new EzLocalizationManager.EzLocalisableString("refresh_token 不能为空。", "refresh_token cannot be empty.");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_SUCCESS = new EzLocalizationManager.EzLocalisableString("Pixiv 登录成功：@{0}", "Pixiv login OK: @{0}");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_FAILED = new EzLocalizationManager.EzLocalisableString("Pixiv 登录验证失败。", "Pixiv login verification failed.");
+
+        #endregion
+
         #region 实验性功能
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_ACCOUNT = new EzLocalizationManager.EzLocalisableString(
