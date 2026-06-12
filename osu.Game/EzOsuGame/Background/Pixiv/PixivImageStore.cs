@@ -9,7 +9,6 @@ using System.Net.Http;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Utils;
-using osu.Game.EzOsuGame;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
@@ -48,6 +47,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
                     if (!PixivFileNamer.TryParseFileName(Path.GetFileName(file), out string account, out long illustId, out int page))
                         continue;
+
+                    account = PixivAccountNormalizer.Normalize(account);
 
                     if (!filters.AllowsCachedAccount(account))
                         continue;
@@ -118,16 +119,16 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                     return false;
                 }
 
-                byte[] data = request.GetResponseData();
+                byte[]? data = request.GetResponseData();
 
-                if (data.Length == 0)
+                if (data != null && data.Length == 0)
                 {
                     error = "Downloaded Pixiv image was empty.";
                     return false;
                 }
 
                 using var stream = storage.CreateFileSafely(resourcePath);
-                stream.Write(data, 0, data.Length);
+                if (data != null) stream.Write(data, 0, data.Length);
                 return true;
             }
             catch (Exception ex)

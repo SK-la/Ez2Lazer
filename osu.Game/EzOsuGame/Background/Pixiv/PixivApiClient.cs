@@ -155,23 +155,79 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         {
             info = default;
 
-            string? account = token["user"]?["account"]?.ToString();
+            string? rawAccount = token["user"]?["account"]?.ToString();
+
+            if (string.IsNullOrWhiteSpace(rawAccount))
+                rawAccount = token["user"]?["name"]?.ToString();
+
+            string account = PixivAccountNormalizer.Normalize(rawAccount);
             long illustId = token["id"]?.Value<long>() ?? 0;
+
             if (string.IsNullOrWhiteSpace(account) || illustId <= 0)
                 return false;
 
-            int pageCount = token["page_count"]?.Value<int>() ?? 1;
-            int page = pageCount <= 1 ? 0 : RNG.Next(0, pageCount);
+            int page = selectLandscapePage(token, out int width, out int height);
+
+            if (page < 0)
+                return false;
 
             string? imageUrl = getImageUrl(token, page);
+
             if (string.IsNullOrWhiteSpace(imageUrl))
                 return false;
 
             int sanityLevel = token["sanity_level"]?.Value<int>() ?? 0;
             string[] tags = extractTags(token);
+            string illustType = token["type"]?.ToString() ?? "illust";
+            int illustAiType = token["illust_ai_type"]?.Value<int>() ?? 0;
 
-            info = new PixivIllustInfo(account, illustId, page, imageUrl, sanityLevel, tags);
+            info = new PixivIllustInfo(account, illustId, page, imageUrl, sanityLevel, tags, illustType, width, height, illustAiType);
             return true;
+        }
+
+        private static int selectLandscapePage(JToken token, out int width, out int height)
+        {
+            width = 0;
+            height = 0;
+
+            int pageCount = token["page_count"]?.Value<int>() ?? 1;
+            var landscapePages = new List<int>();
+
+            for (int page = 0; page < pageCount; page++)
+            {
+                (int pageWidth, int pageHeight) = getPageDimensions(token, page);
+
+                if (pageWidth > pageHeight)
+                    landscapePages.Add(page);
+            }
+
+            if (landscapePages.Count == 0)
+                return -1;
+
+            int selectedPage = landscapePages[RNG.Next(landscapePages.Count)];
+            (width, height) = getPageDimensions(token, selectedPage);
+            return selectedPage;
+        }
+
+        private static (int width, int height) getPageDimensions(JToken token, int page)
+        {
+            if (page == 0)
+            {
+                return (
+                    token["width"]?.Value<int>() ?? 0,
+                    token["height"]?.Value<int>() ?? 0);
+            }
+
+            var pages = token["meta_pages"] as JArray;
+
+            if (pages == null || page >= pages.Count)
+                return (0, 0);
+
+            JToken pageToken = pages[page];
+
+            return (
+                pageToken["width"]?.Value<int>() ?? token["width"]?.Value<int>() ?? 0,
+                pageToken["height"]?.Value<int>() ?? token["height"]?.Value<int>() ?? 0);
         }
 
         private static string[] extractTags(JToken token)

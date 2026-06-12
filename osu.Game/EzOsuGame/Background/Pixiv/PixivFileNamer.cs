@@ -5,7 +5,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using osu.Game.EzOsuGame;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
@@ -15,10 +14,12 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
         public static string SanitizeAccount(string account)
         {
+            account = PixivAccountNormalizer.Normalize(account);
+
             if (string.IsNullOrWhiteSpace(account))
                 return "unknown";
 
-            string sanitized = invalid_chars.Replace(account.Trim(), "_");
+            string sanitized = invalid_chars.Replace(account, "_");
             return string.IsNullOrWhiteSpace(sanitized) ? "unknown" : sanitized;
         }
 

@@ -27,10 +27,13 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (!passesR18Rules(illust.SanityLevel, illust.Tags))
                 return false;
 
+            if (!passesIllustQualityRules(illust))
+                return false;
+
             return true;
         }
 
-        public bool AllowsCachedAccount(string account) => passesAccountRules(account);
+        public bool AllowsCachedAccount(string account) => passesAccountRules(PixivAccountNormalizer.Normalize(account));
 
         public bool ShouldSaveToDisk(PixivIllustInfo illust)
         {
@@ -50,17 +53,53 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
         private bool passesAccountRules(string account)
         {
+            account = PixivAccountNormalizer.Normalize(account);
+
+            if (string.IsNullOrEmpty(account))
+                return false;
+
             string[] whitelist = PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivAccountWhitelist));
 
-            if (whitelist.Length > 0 && !whitelist.Any(entry => string.Equals(entry, account, StringComparison.OrdinalIgnoreCase)))
+            if (whitelist.Length > 0 && !whitelist.Any(entry => string.Equals(PixivAccountNormalizer.Normalize(entry), account, StringComparison.OrdinalIgnoreCase)))
                 return false;
 
             string[] blacklist = PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivAccountBlacklist));
 
-            if (blacklist.Any(entry => string.Equals(entry, account, StringComparison.OrdinalIgnoreCase)))
+            if (blacklist.Any(entry => string.Equals(PixivAccountNormalizer.Normalize(entry), account, StringComparison.OrdinalIgnoreCase)))
                 return false;
 
             return true;
+        }
+
+        private static bool passesIllustQualityRules(PixivIllustInfo illust)
+        {
+            if (!string.Equals(illust.IllustType, "illust", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (illust.Width <= illust.Height)
+                return false;
+
+            if (illust.IllustAiType == PixivConstants.ILLUST_AI_TYPE_AI)
+                return false;
+
+            return !isAiTagged(illust.Tags);
+        }
+
+        private static bool isAiTagged(string[] tags)
+        {
+            foreach (string tag in tags)
+            {
+                if (string.Equals(tag, "AI", StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                foreach (string pattern in PixivConstants.AI_GENERATED_TAG_PATTERNS)
+                {
+                    if (tag.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         private bool passesTagRules(string[] tags)

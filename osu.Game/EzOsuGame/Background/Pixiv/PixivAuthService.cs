@@ -9,7 +9,6 @@ using System.Net.Http;
 using Newtonsoft.Json.Linq;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
-using osu.Game.EzOsuGame;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {

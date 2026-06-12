@@ -13,9 +13,23 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         public string ImageUrl { get; }
         public int SanityLevel { get; }
         public string[] Tags { get; }
+        public string IllustType { get; }
+        public int Width { get; }
+        public int Height { get; }
+        public int IllustAiType { get; }
         public string AttributionLabel => $"{Account}_{IllustId}";
 
-        public PixivIllustInfo(string account, long illustId, int page, string imageUrl, int sanityLevel = 0, string[]? tags = null)
+        public PixivIllustInfo(
+            string account,
+            long illustId,
+            int page,
+            string imageUrl,
+            int sanityLevel = 0,
+            string[]? tags = null,
+            string illustType = "illust",
+            int width = 0,
+            int height = 0,
+            int illustAiType = 0)
         {
             Account = account;
             IllustId = illustId;
@@ -23,6 +37,10 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             ImageUrl = imageUrl;
             SanityLevel = sanityLevel;
             Tags = tags ?? Array.Empty<string>();
+            IllustType = illustType;
+            Width = width;
+            Height = height;
+            IllustAiType = illustAiType;
         }
     }
 }

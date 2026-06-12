@@ -18,5 +18,24 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         public const string APP_VERSION = "5.0.234";
 
         public const double AUTO_DOWNLOAD_INTERVAL_MS = 3 * 60 * 1000;
+
+        /// <summary>
+        /// Pixiv API: 1 = AI-generated work.
+        /// </summary>
+        public const int ILLUST_AI_TYPE_AI = 1;
+
+        public static readonly string[] AI_GENERATED_TAG_PATTERNS =
+        {
+            "AI生成",
+            "AI Generated",
+            "Stable Diffusion",
+            "StableDiffusion",
+            "novelAI",
+            "NovelAI",
+            "Midjourney",
+            "DALL·E",
+            "DALL-E",
+            "生成AI",
+        };
     }
 }

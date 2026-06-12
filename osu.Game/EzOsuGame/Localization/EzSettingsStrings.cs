@@ -375,14 +375,17 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nCredentials are stored only in pixiv_auth.json (osu data folder), not in framework.ini.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN = new EzLocalizationManager.EzLocalisableString("保存 Pixiv 凭证", "Save Pixiv credentials");
+
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "写入 pixiv_auth.json。", "Writes to pixiv_auth.json.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_TOKEN = new EzLocalizationManager.EzLocalisableString("验证 Pixiv 登录", "Verify Pixiv login");
+
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "使用 refresh_token 换取 access_token 并显示 Pixiv 账号。", "Exchanges the refresh token and shows the Pixiv account name.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CLEAR_TOKEN = new EzLocalizationManager.EzLocalisableString("清除 Pixiv 凭证", "Clear Pixiv credentials");
+
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CLEAR_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "删除 pixiv_auth.json。", "Deletes pixiv_auth.json.");
 
