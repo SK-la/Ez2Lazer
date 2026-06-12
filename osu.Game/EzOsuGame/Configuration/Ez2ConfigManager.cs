@@ -203,8 +203,6 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.PixivAccountBlacklist, string.Empty);
             SetDefault(Ez2Setting.PixivTagInclude, string.Empty);
             SetDefault(Ez2Setting.PixivTagExclude, string.Empty);
-            SetDefault(Ez2Setting.PixivSkipSaveAccountPrefixes, string.Empty);
-            SetDefault(Ez2Setting.PixivSkipSaveTags, string.Empty);
             SetDefault(Ez2Setting.PixivAutoDownloadEnabled, false);
 
             #endregion
@@ -896,8 +894,6 @@ namespace osu.Game.EzOsuGame.Configuration
         PixivAccountBlacklist,
         PixivTagInclude,
         PixivTagExclude,
-        PixivSkipSaveAccountPrefixes,
-        PixivSkipSaveTags,
         PixivAutoDownloadEnabled,
 
         // 实验性功能

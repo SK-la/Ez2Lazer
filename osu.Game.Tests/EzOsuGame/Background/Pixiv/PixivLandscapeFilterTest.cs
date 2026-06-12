@@ -33,6 +33,7 @@ namespace osu.Game.Tests.EzOsuGame.Background.Pixiv
         {
             using var host = new CleanRunHeadlessGameHost();
             var config = new Ez2ConfigManager(host.Storage);
+            config.GetBindable<bool>(Ez2Setting.PixivLandscapeOnly).Value = false;
             var filters = new PixivFilterService(config);
 
             var portrait = new PixivIllustInfo("artist", 1, 0, "https://example.test/a.jpg", width: 1000, height: 1500);

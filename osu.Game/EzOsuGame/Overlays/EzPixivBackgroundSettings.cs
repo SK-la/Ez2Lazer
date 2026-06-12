@@ -195,10 +195,6 @@ namespace osu.Game.EzOsuGame.Overlays
                     new[] { "pixiv", "tag", "include", "filter" }),
                 createListSetting(ezConfig, Ez2Setting.PixivTagExclude, EzSettingsStrings.PIXIV_TAG_EXCLUDE, EzSettingsStrings.PIXIV_TAG_EXCLUDE_TOOLTIP,
                     new[] { "pixiv", "tag", "exclude", "filter" }),
-                createListSetting(ezConfig, Ez2Setting.PixivSkipSaveAccountPrefixes, EzSettingsStrings.PIXIV_SKIP_SAVE_ACCOUNT_PREFIXES,
-                    EzSettingsStrings.PIXIV_SKIP_SAVE_ACCOUNT_PREFIXES_TOOLTIP, new[] { "pixiv", "save", "prefix", "account", "naming" }),
-                createListSetting(ezConfig, Ez2Setting.PixivSkipSaveTags, EzSettingsStrings.PIXIV_SKIP_SAVE_TAGS, EzSettingsStrings.PIXIV_SKIP_SAVE_TAGS_TOOLTIP,
-                    new[] { "pixiv", "save", "tag", "naming" }),
             };
 
             backgroundSource.BindValueChanged(change =>

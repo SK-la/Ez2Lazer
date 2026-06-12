@@ -431,8 +431,8 @@ namespace osu.Game.EzOsuGame.Localization
             "允许 R-18 作品", "Allow R-18 works");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ALLOW_R18_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "关闭时过滤 sanity_level ≥ 4 或含 R-18 标签的作品（下载与关注流候选）。",
-            "When disabled, filters works with sanity_level ≥ 4 or R-18 tags from follow-feed candidates.");
+            "关闭时过滤 sanity_level ≥ 4 或含 R-18 标签的作品。",
+            "When disabled, filters works with sanity_level ≥ 4 or R-18 tags.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_LANDSCAPE_ONLY = new EzLocalizationManager.EzLocalisableString(
             "仅横图", "Landscape only");
@@ -468,20 +468,6 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_EXCLUDE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "命中任一标签则跳过；多项用空格分隔。含空格的标签请用逗号括起。",
             "Works with any listed tag are skipped. Separate with spaces; use commas for tags that contain spaces.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_ACCOUNT_PREFIXES = new EzLocalizationManager.EzLocalisableString(
-            "落盘跳过：account 前缀", "Skip save: account prefixes");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_ACCOUNT_PREFIXES_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "画师 account 以这些前缀开头时不写入 BG_PIXIV；多项用空格分隔（也可用逗号/分号）。",
-            "Do not write to BG_PIXIV when the artist account starts with any prefix. Separate with spaces, or commas/semicolons.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_TAGS = new EzLocalizationManager.EzLocalisableString(
-            "落盘跳过：标签", "Skip save: tags");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_TAGS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "作品含任一标签时不写入 BG_PIXIV；多项用空格分隔。含空格的标签请用逗号括起。",
-            "Do not write to BG_PIXIV when the work has any listed tag. Separate with spaces; use commas for tags that contain spaces.");
 
         #endregion
 

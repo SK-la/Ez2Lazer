@@ -96,22 +96,6 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         public bool HasAccountWhitelist()
             => PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivAccountWhitelist)).Length > 0;
 
-        public bool ShouldSaveToDisk(PixivIllustInfo illust)
-        {
-            foreach (string prefix in PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivSkipSaveAccountPrefixes)))
-            {
-                if (illust.Account.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    return false;
-            }
-
-            string[] skipTags = PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivSkipSaveTags));
-
-            if (skipTags.Length > 0 && illust.Tags.Any(tag => containsEntry(skipTags, tag)))
-                return false;
-
-            return true;
-        }
-
         private bool passesAccountRules(string account)
         {
             account = PixivAccountNormalizer.Normalize(account);

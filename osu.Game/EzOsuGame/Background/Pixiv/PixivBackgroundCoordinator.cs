@@ -115,9 +115,6 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (!Catalog.TryGetNextUncached(lastIllustId > 0 ? lastIllustId : null, out PixivIllustInfo illust))
                 return false;
 
-            if (!Filters.ShouldSaveToDisk(illust))
-                return false;
-
             return Images.TryEnsureCached(illust, out _, out error);
         }
 
