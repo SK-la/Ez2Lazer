@@ -44,6 +44,22 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return true;
         }
 
+        public bool TryDownloadNextUncached(out string? error)
+        {
+            error = null;
+
+            if (!Auth.HasRefreshToken)
+            {
+                error = "Pixiv refresh token is not configured.";
+                return false;
+            }
+
+            if (!Api.TryGetUncachedFollowIllust(Images, out PixivIllustInfo illust, out error))
+                return false;
+
+            return Images.TryEnsureCached(illust, out _, out error);
+        }
+
         public void LogFailure(string context, string? error)
         {
             if (string.IsNullOrWhiteSpace(error))

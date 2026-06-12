@@ -25,11 +25,39 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             illust = default;
             error = null;
 
+            if (!tryCollectFollowCandidates(out var candidates, out error))
+                return false;
+
+            illust = candidates[RNG.Next(candidates.Count)];
+            return true;
+        }
+
+        public bool TryGetUncachedFollowIllust(PixivImageStore images, out PixivIllustInfo illust, out string? error)
+        {
+            illust = default;
+            error = null;
+
+            if (!tryCollectFollowCandidates(out var candidates, out error))
+                return false;
+
+            var uncached = candidates.Where(c => !images.IsCached(c)).ToList();
+
+            if (uncached.Count == 0)
+                return false;
+
+            illust = uncached[RNG.Next(uncached.Count)];
+            return true;
+        }
+
+        private bool tryCollectFollowCandidates(out List<PixivIllustInfo> candidates, out string? error)
+        {
+            candidates = new List<PixivIllustInfo>();
+            error = null;
+
             if (!authService.TryRefreshAccessToken(out string? accessToken, out error))
                 return false;
 
-            var candidates = new List<PixivIllustInfo>();
-            string? nextUrl = $"{PixivConstants.ApiBaseUrl}/v1/illust/follow?restrict=public";
+            string? nextUrl = $"{PixivConstants.API_BASE_URL}/v1/illust/follow?restrict=public";
 
             for (int page = 0; page < 3 && nextUrl != null; page++)
             {
@@ -46,7 +74,6 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 return false;
             }
 
-            illust = candidates[RNG.Next(candidates.Count)];
             return true;
         }
 
@@ -60,7 +87,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
             try
             {
-                using var request = createApiRequest($"{PixivConstants.ApiBaseUrl}/v2/user/account", accessToken!);
+                using var request = createApiRequest($"{PixivConstants.API_BASE_URL}/v2/user/account", accessToken!);
                 request.Perform();
 
                 if (request.ResponseStatusCode != HttpStatusCode.OK)
@@ -174,8 +201,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
             return tags.Any(t =>
             {
-                string? name = t["name"]?.ToString() ?? t.ToString();
-                return name != null && name.Contains("R-18", StringComparison.OrdinalIgnoreCase);
+                string name = t["name"]?.ToString() ?? t.ToString();
+                return name.Contains("R-18", StringComparison.OrdinalIgnoreCase);
             });
         }
 
@@ -187,10 +214,10 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             };
 
             request.AddHeader("Authorization", $"Bearer {accessToken}");
-            request.AddHeader("User-Agent", PixivConstants.UserAgent);
-            request.AddHeader("App-OS", PixivConstants.AppOs);
-            request.AddHeader("App-OS-Version", PixivConstants.AppOsVersion);
-            request.AddHeader("App-Version", PixivConstants.AppVersion);
+            request.AddHeader("User-Agent", PixivConstants.USER_AGENT);
+            request.AddHeader("App-OS", PixivConstants.APP_OS);
+            request.AddHeader("App-OS-Version", PixivConstants.APP_OS_VERSION);
+            request.AddHeader("App-Version", PixivConstants.APP_VERSION);
             request.AddHeader("Accept-Language", "zh-CN");
 
             return request;

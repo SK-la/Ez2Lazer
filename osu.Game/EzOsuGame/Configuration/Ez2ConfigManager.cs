@@ -197,6 +197,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ServerGuToken, string.Empty);
             SetDefault(Ez2Setting.ServerManualUsername, string.Empty);
             SetDefault(Ez2Setting.ServerManualToken, string.Empty);
+            SetDefault(Ez2Setting.PixivAutoDownloadEnabled, false);
 
             #endregion
 
@@ -879,6 +880,8 @@ namespace osu.Game.EzOsuGame.Configuration
         ServerGuToken,
         ServerManualUsername,
         ServerManualToken,
+
+        PixivAutoDownloadEnabled,
 
         // 实验性功能
         InputAudioLatencyTracker,
