@@ -64,26 +64,11 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                     string account = string.Empty;
                     string userName = string.Empty;
 
-                    if (PixivIllustMetadata.TryRead(storage, normalizedPath, out string metaAccount, out string metaUserName))
-                    {
-                        account = metaAccount;
-                        userName = metaUserName;
-                    }
-                    else if (PixivFileNamer.TryParseFileLabel(Path.GetFileName(file), out string fileLabel))
-                    {
+                    if (PixivFileNamer.TryParseFileLabel(Path.GetFileName(file), out string fileLabel))
                         userName = PixivAccountNormalizer.Normalize(fileLabel);
-                        account = userName;
-                    }
 
-                    if (string.IsNullOrEmpty(account))
-                    {
-                        if (filters.HasAccountWhitelist())
-                            continue;
-                    }
-                    else if (!filters.AllowsCachedAccount(account))
-                    {
+                    if (!filters.AllowsCachedIllust(account, userName))
                         continue;
-                    }
 
                     if (string.IsNullOrEmpty(userName))
                         userName = account;
@@ -199,8 +184,6 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
                 using var stream = storage.CreateFileSafely(resourcePath);
                 if (data != null) stream.Write(data, 0, data.Length);
-
-                PixivIllustMetadata.Write(storage, resourcePath, illust);
                 return true;
             }
             catch (Exception ex)

@@ -71,6 +71,20 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
         public bool AllowsCachedAccount(string account) => passesAccountRules(PixivAccountNormalizer.Normalize(account));
 
+        public bool AllowsCachedIllust(string account, string userName)
+        {
+            account = PixivAccountNormalizer.Normalize(account);
+            userName = PixivAccountNormalizer.Normalize(userName);
+
+            if (!string.IsNullOrEmpty(account))
+                return passesAccountRules(account);
+
+            if (!string.IsNullOrEmpty(userName))
+                return passesAccountRules(userName);
+
+            return !HasAccountWhitelist();
+        }
+
         public bool HasAccountWhitelist()
             => PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivAccountWhitelist)).Length > 0;
 
