@@ -335,7 +335,7 @@ namespace osu.Game
             GlobalConfigStore.Config = LocalConfig;
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);
-            dependencies.Cache(new EzOsuGame.Background.Pixiv.PixivBackgroundCoordinator(Storage));
+            dependencies.Cache(new EzOsuGame.Background.Pixiv.PixivBackgroundCoordinator(Storage, Ez2ConfigManager));
 
             bindFrameLimiter(Ez2ConfigManager, frameworkConfig);
             EzSkinInfo = new EzSkinInfo(Ez2ConfigManager);

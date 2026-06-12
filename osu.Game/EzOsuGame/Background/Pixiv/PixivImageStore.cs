@@ -15,6 +15,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 {
     public class PixivImageStore
     {
+        private const int max_cached_pick_attempts = 32;
+
         private readonly Storage storage;
 
         public PixivImageStore(Storage storage)
@@ -22,7 +24,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             this.storage = storage;
         }
 
-        public bool TryGetRandomCachedIllust(out PixivIllustInfo illust, out string resourcePath)
+        public bool TryGetRandomCachedIllust(PixivFilterService filters, out PixivIllustInfo illust, out string resourcePath)
         {
             illust = default;
             resourcePath = string.Empty;
@@ -38,14 +40,24 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 if (files.Length == 0)
                     return false;
 
-                string file = files[RNG.Next(files.Length)];
-                resourcePath = file.Replace('\\', '/');
+                int attempts = Math.Min(files.Length, max_cached_pick_attempts);
 
-                if (!PixivFileNamer.TryParseFileName(Path.GetFileName(file), out string account, out long illustId, out int page))
-                    return false;
+                for (int i = 0; i < attempts; i++)
+                {
+                    string file = files[RNG.Next(files.Length)];
 
-                illust = new PixivIllustInfo(account, illustId, page, string.Empty);
-                return true;
+                    if (!PixivFileNamer.TryParseFileName(Path.GetFileName(file), out string account, out long illustId, out int page))
+                        continue;
+
+                    if (!filters.AllowsCachedAccount(account))
+                        continue;
+
+                    resourcePath = file.Replace('\\', '/');
+                    illust = new PixivIllustInfo(account, illustId, page, string.Empty);
+                    return true;
+                }
+
+                return false;
             }
             catch (Exception ex)
             {
