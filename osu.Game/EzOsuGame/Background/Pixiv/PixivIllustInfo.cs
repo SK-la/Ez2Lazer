@@ -8,6 +8,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
     public readonly struct PixivIllustInfo
     {
         public string Account { get; }
+        public string UserName { get; }
         public long IllustId { get; }
         public int Page { get; }
         public string ImageUrl { get; }
@@ -17,7 +18,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         public int Width { get; }
         public int Height { get; }
         public int IllustAiType { get; }
-        public string AttributionLabel => $"{Account}_{IllustId}";
+        public int XRestrict { get; }
+        public string AttributionLabel => $"{(string.IsNullOrWhiteSpace(UserName) ? Account : UserName)}_{IllustId}";
 
         public PixivIllustInfo(
             string account,
@@ -29,9 +31,12 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             string illustType = "illust",
             int width = 0,
             int height = 0,
-            int illustAiType = 0)
+            int illustAiType = 0,
+            int xRestrict = 0,
+            string userName = "")
         {
             Account = account;
+            UserName = userName;
             IllustId = illustId;
             Page = page;
             ImageUrl = imageUrl;
@@ -41,6 +46,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             Width = width;
             Height = height;
             IllustAiType = illustAiType;
+            XRestrict = xRestrict;
         }
     }
 }

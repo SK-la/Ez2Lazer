@@ -12,31 +12,49 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
     {
         private static readonly Regex invalid_chars = new Regex(@"[\\/:*?""<>|]", RegexOptions.Compiled);
 
-        public static string SanitizeAccount(string account)
-        {
-            account = PixivAccountNormalizer.Normalize(account);
+        public static string GetDisplayLabel(PixivIllustInfo illust)
+            => string.IsNullOrWhiteSpace(illust.UserName) ? illust.Account : illust.UserName;
 
-            if (string.IsNullOrWhiteSpace(account))
+        public static string SanitizeFileLabel(string label)
+        {
+            label = PixivAccountNormalizer.Normalize(label);
+
+            if (string.IsNullOrWhiteSpace(label))
                 return "unknown";
 
-            string sanitized = invalid_chars.Replace(account, "_");
+            string sanitized = invalid_chars.Replace(label, "_");
             return string.IsNullOrWhiteSpace(sanitized) ? "unknown" : sanitized;
         }
 
-        public static string BuildFileName(string account, long illustId, int page, string extension = ".png")
+        /// <summary>
+        /// On-disk download name, e.g. ヒトこもる_145826326_p0.png
+        /// </summary>
+        public static string BuildDownloadFileName(PixivIllustInfo illust, string? extension = null)
+        {
+            extension ??= GetExtensionFromUrl(illust.ImageUrl);
+
+            if (!extension.StartsWith('.'))
+                extension = "." + extension;
+
+            return $"{SanitizeFileLabel(GetDisplayLabel(illust))}_{illust.IllustId}_p{illust.Page}{extension}";
+        }
+
+        public static string BuildDownloadRelativePath(PixivIllustInfo illust, string? extension = null)
+            => Path.Combine(EzModifyPath.BG_PIXIV_PATH, BuildDownloadFileName(illust, extension)).Replace('\\', '/');
+
+        /// <summary>
+        /// Id-only key for queue / dedupe lookups, e.g. 145826326_p0.png
+        /// </summary>
+        public static string BuildIdKeyFileName(long illustId, int page, string extension = ".png")
         {
             if (!extension.StartsWith('.'))
                 extension = "." + extension;
 
-            return $"{SanitizeAccount(account)}_{illustId}_p{page}{extension}";
+            return $"{illustId}_p{page}{extension}";
         }
 
-        public static string BuildRelativePath(string account, long illustId, int page, string extension = ".png")
-            => Path.Combine(EzModifyPath.BG_PIXIV_PATH, BuildFileName(account, illustId, page, extension)).Replace('\\', '/');
-
-        public static bool TryParseFileName(string fileName, out string account, out long illustId, out int page)
+        public static bool TryParseFileName(string fileName, out long illustId, out int page)
         {
-            account = string.Empty;
             illustId = 0;
             page = 0;
 
@@ -51,16 +69,41 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (!int.TryParse(name.AsSpan(pageIndex + 2), out page))
                 return false;
 
-            string prefix = name.Substring(0, pageIndex);
-            int idIndex = prefix.LastIndexOf('_');
+            string idPart = name.Substring(0, pageIndex);
+
+            if (long.TryParse(idPart, out illustId))
+                return true;
+
+            int idIndex = idPart.LastIndexOf('_');
             if (idIndex < 0)
                 return false;
 
-            if (!long.TryParse(prefix.AsSpan(idIndex + 1), out illustId))
+            return long.TryParse(idPart.AsSpan(idIndex + 1), out illustId);
+        }
+
+        public static bool TryParseFileLabel(string fileName, out string fileLabel)
+        {
+            fileLabel = string.Empty;
+
+            string name = Path.GetFileNameWithoutExtension(fileName);
+            if (string.IsNullOrEmpty(name))
                 return false;
 
-            account = prefix.Substring(0, idIndex);
-            return !string.IsNullOrEmpty(account);
+            int pageIndex = name.LastIndexOf("_p", StringComparison.Ordinal);
+            if (pageIndex < 0)
+                return false;
+
+            string idPart = name.Substring(0, pageIndex);
+
+            if (long.TryParse(idPart, out _))
+                return false;
+
+            int idIndex = idPart.LastIndexOf('_');
+            if (idIndex < 0)
+                return false;
+
+            fileLabel = idPart.Substring(0, idIndex);
+            return fileLabel.Length > 0;
         }
 
         public static bool IsSupportedImageExtension(string fileName)

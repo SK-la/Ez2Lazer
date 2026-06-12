@@ -198,12 +198,11 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ServerManualUsername, string.Empty);
             SetDefault(Ez2Setting.ServerManualToken, string.Empty);
             SetDefault(Ez2Setting.PixivAllowR18, false);
+            SetDefault(Ez2Setting.PixivLandscapeOnly, true);
             SetDefault(Ez2Setting.PixivAccountWhitelist, string.Empty);
             SetDefault(Ez2Setting.PixivAccountBlacklist, string.Empty);
             SetDefault(Ez2Setting.PixivTagInclude, string.Empty);
             SetDefault(Ez2Setting.PixivTagExclude, string.Empty);
-            SetDefault(Ez2Setting.PixivSkipSaveAccountPrefixes, string.Empty);
-            SetDefault(Ez2Setting.PixivSkipSaveTags, string.Empty);
             SetDefault(Ez2Setting.PixivAutoDownloadEnabled, false);
 
             #endregion
@@ -890,12 +889,11 @@ namespace osu.Game.EzOsuGame.Configuration
         ServerManualToken,
 
         PixivAllowR18,
+        PixivLandscapeOnly,
         PixivAccountWhitelist,
         PixivAccountBlacklist,
         PixivTagInclude,
         PixivTagExclude,
-        PixivSkipSaveAccountPrefixes,
-        PixivSkipSaveTags,
         PixivAutoDownloadEnabled,
 
         // 实验性功能

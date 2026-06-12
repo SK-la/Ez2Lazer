@@ -7,7 +7,9 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using Newtonsoft.Json.Linq;
+using osu.Framework.Logging;
 using osu.Framework.Utils;
+using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
@@ -15,6 +17,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
     {
         private readonly PixivAuthService authService;
         private readonly PixivFilterService filters;
+        private string? accessToken;
 
         public PixivApiClient(PixivAuthService authService, PixivFilterService filters)
         {
@@ -22,58 +25,28 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             this.filters = filters;
         }
 
-        public bool TryGetRandomFollowIllust(out PixivIllustInfo illust, out string? error)
+        public void SetAccessToken(string token) => accessToken = token;
+
+        public bool TryFetchFollowFeedPage(string url, List<PixivIllustInfo> output, out string? nextUrl, out string? error)
         {
-            illust = default;
+            nextUrl = null;
             error = null;
 
-            if (!tryCollectFollowCandidates(out var candidates, out error))
-                return false;
-
-            illust = candidates[RNG.Next(candidates.Count)];
-            return true;
-        }
-
-        public bool TryGetUncachedFollowIllust(PixivImageStore images, out PixivIllustInfo illust, out string? error)
-        {
-            illust = default;
-            error = null;
-
-            if (!tryCollectFollowCandidates(out var candidates, out error))
-                return false;
-
-            var uncached = candidates.Where(c => !images.IsCached(c)).ToList();
-
-            if (uncached.Count == 0)
-                return false;
-
-            illust = uncached[RNG.Next(uncached.Count)];
-            return true;
-        }
-
-        private bool tryCollectFollowCandidates(out List<PixivIllustInfo> candidates, out string? error)
-        {
-            candidates = new List<PixivIllustInfo>();
-            error = null;
-
-            if (!authService.TryRefreshAccessToken(out string? accessToken, out error))
-                return false;
-
-            string? nextUrl = $"{PixivConstants.API_BASE_URL}/v1/illust/follow?restrict=public";
-
-            for (int page = 0; page < 3 && nextUrl != null; page++)
+            if (string.IsNullOrWhiteSpace(accessToken))
             {
-                if (!tryFetchIllusts(nextUrl, accessToken!, candidates, out nextUrl, out error))
-                    return false;
-
-                if (candidates.Count >= 30)
-                    break;
+                error = "Pixiv access token is not set.";
+                return false;
             }
 
-            if (candidates.Count == 0)
-            {
-                error = "No suitable illustrations found in Pixiv follow feed.";
+            var stats = new FeedCollectStats();
+
+            if (!tryFetchIllusts(url, output, ref stats, out nextUrl, out error))
                 return false;
+
+            if (stats.Parsed > 0 && stats.Accepted == 0)
+            {
+                Logger.Log($"[Pixiv] Active filters: {filters.DescribeActiveFilterConfig()}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log($"[Pixiv] Follow feed page filtered all items: {stats.DescribeRejections()}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
             }
 
             return true;
@@ -84,22 +57,36 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             account = null;
             error = null;
 
-            if (!authService.TryRefreshAccessToken(out string? accessToken, out error))
+            if (!authService.TryRefreshAccessToken(out string? token, out error))
                 return false;
+
+            SetAccessToken(token!);
+
+            if (!tryProbeAuthenticatedApi(accessToken!, out error))
+                return false;
+
+            account = authService.LoadAccountName();
+
+            if (string.IsNullOrWhiteSpace(account))
+                account = "?";
+
+            return true;
+        }
+
+        private bool tryProbeAuthenticatedApi(string token, out string? error)
+        {
+            error = null;
 
             try
             {
-                using var request = createApiRequest($"{PixivConstants.API_BASE_URL}/v2/user/account", accessToken!);
+                using var request = createApiRequest(PixivConstants.ILLUST_FOLLOW_INITIAL_URL, token);
                 request.Perform();
 
-                if (request.ResponseStatusCode != HttpStatusCode.OK)
-                {
-                    error = request.GetResponseString() ?? "Failed to load Pixiv account.";
-                    return false;
-                }
+                if (request.ResponseStatusCode == HttpStatusCode.OK)
+                    return true;
 
-                account = JObject.Parse(request.GetResponseString() ?? string.Empty)["user"]?["account"]?.ToString();
-                return !string.IsNullOrWhiteSpace(account);
+                error = request.GetResponseString() ?? "Pixiv login verification failed.";
+                return false;
             }
             catch (Exception ex)
             {
@@ -108,14 +95,14 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
         }
 
-        private bool tryFetchIllusts(string url, string accessToken, List<PixivIllustInfo> output, out string? nextUrl, out string? error)
+        private bool tryFetchIllusts(string url, List<PixivIllustInfo> output, ref FeedCollectStats stats, out string? nextUrl, out string? error)
         {
             nextUrl = null;
             error = null;
 
             try
             {
-                using var request = createApiRequest(url, accessToken);
+                using var request = createApiRequest(url, accessToken!);
                 request.Perform();
 
                 if (request.ResponseStatusCode != HttpStatusCode.OK)
@@ -125,20 +112,36 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 }
 
                 var json = JObject.Parse(request.GetResponseString() ?? string.Empty);
-                nextUrl = json["next_url"]?.ToString();
+                nextUrl = PixivJsonHelper.ResolveNextUrl(json);
 
-                var illusts = json["illusts"] as JArray;
-                if (illusts == null)
-                    return true;
+                var illusts = PixivJsonHelper.ExtractIllustTokens(json);
+                stats.SeenIllustCount += illusts.Count;
+
+                if (!stats.LoggedShape && illusts.Count == 0)
+                {
+                    stats.LoggedShape = true;
+                    Logger.Log($"[Pixiv] Follow feed page had 0 illust entries. JSON keys: {PixivJsonHelper.DescribeTopLevelKeys(json)}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                }
 
                 foreach (var token in illusts)
                 {
-                    if (!tryParseIllust(token, out PixivIllustInfo info))
+                    stats.Raw++;
+
+                    if (!tryParseIllust(token, filters.LandscapeOnly, out PixivIllustInfo info))
                         continue;
 
-                    if (!filters.PassesContentFilter(info))
+                    stats.Parsed++;
+
+                    if (!filters.TryGetContentFilterRejection(info, out string? rejection))
+                    {
+                        stats.RecordRejection(rejection);
+                        continue;
+                    }
+
+                    if (output.Any(existing => existing.IllustId == info.IllustId && existing.Page == info.Page))
                         continue;
 
+                    stats.Accepted++;
                     output.Add(info);
                 }
 
@@ -151,60 +154,96 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
         }
 
-        private static bool tryParseIllust(JToken token, out PixivIllustInfo info)
+        private static bool tryParseIllust(JToken token, bool landscapeOnly, out PixivIllustInfo info)
         {
             info = default;
 
-            string? rawAccount = token["user"]?["account"]?.ToString();
+            JToken data = PixivJsonHelper.UnwrapIllust(token);
+
+            JToken? visible = PixivJsonHelper.Field(data, "visible");
+            if (visible?.Type == JTokenType.Boolean && !visible.Value<bool>())
+                return false;
+
+            JToken? user = PixivJsonHelper.Field(data, "user");
+
+            string? rawAccount = user?["account"]?.ToString();
+            string? rawUserName = user?["name"]?.ToString();
 
             if (string.IsNullOrWhiteSpace(rawAccount))
-                rawAccount = token["user"]?["name"]?.ToString();
+                rawAccount = rawUserName;
+
+            if (string.IsNullOrWhiteSpace(rawAccount))
+                rawAccount = PixivJsonHelper.StringValue(data, "user_name");
+
+            if (string.IsNullOrWhiteSpace(rawUserName))
+                rawUserName = PixivJsonHelper.StringValue(data, "user_name");
+
+            if (string.IsNullOrWhiteSpace(rawAccount))
+            {
+                long userId = PixivJsonHelper.LongValue(user ?? data, "id");
+
+                if (userId > 0)
+                    rawAccount = $"user_{userId}";
+            }
 
             string account = PixivAccountNormalizer.Normalize(rawAccount);
-            long illustId = token["id"]?.Value<long>() ?? 0;
+            string userName = PixivAccountNormalizer.Normalize(rawUserName);
+
+            if (string.IsNullOrWhiteSpace(userName))
+                userName = account;
+            long illustId = PixivJsonHelper.LongValue(data, "id");
 
             if (string.IsNullOrWhiteSpace(account) || illustId <= 0)
                 return false;
 
-            int page = selectLandscapePage(token, out int width, out int height);
+            int page = selectDisplayPage(data, landscapeOnly, out int width, out int height);
 
             if (page < 0)
                 return false;
 
-            string? imageUrl = getImageUrl(token, page);
+            string? imageUrl = getImageUrl(data, page);
 
             if (string.IsNullOrWhiteSpace(imageUrl))
                 return false;
 
-            int sanityLevel = token["sanity_level"]?.Value<int>() ?? 0;
-            string[] tags = extractTags(token);
-            string illustType = token["type"]?.ToString() ?? "illust";
-            int illustAiType = token["illust_ai_type"]?.Value<int>() ?? 0;
+            int sanityLevel = PixivJsonHelper.IntValue(data, "sanity_level");
+            int xRestrict = PixivJsonHelper.IntValue(data, "x_restrict");
+            string[] tags = extractTags(data);
+            string illustType = PixivJsonHelper.StringValue(data, "type") ?? "illust";
+            int illustAiType = PixivJsonHelper.IntValue(data, "illust_ai_type");
 
-            info = new PixivIllustInfo(account, illustId, page, imageUrl, sanityLevel, tags, illustType, width, height, illustAiType);
+            info = new PixivIllustInfo(account, illustId, page, imageUrl, sanityLevel, tags, illustType, width, height, illustAiType, xRestrict, userName);
             return true;
         }
 
-        private static int selectLandscapePage(JToken token, out int width, out int height)
+        private static int selectDisplayPage(JToken token, bool landscapeOnly, out int width, out int height)
         {
             width = 0;
             height = 0;
 
-            int pageCount = token["page_count"]?.Value<int>() ?? 1;
-            var landscapePages = new List<int>();
+            int pageCount = PixivJsonHelper.IntValue(token, "page_count");
+            if (pageCount <= 0)
+                pageCount = 1;
+
+            var validPages = new List<int>();
 
             for (int page = 0; page < pageCount; page++)
             {
                 (int pageWidth, int pageHeight) = getPageDimensions(token, page);
 
-                if (pageWidth > pageHeight)
-                    landscapePages.Add(page);
+                if (pageWidth <= 0 || pageHeight <= 0)
+                    continue;
+
+                if (landscapeOnly && pageWidth <= pageHeight)
+                    continue;
+
+                validPages.Add(page);
             }
 
-            if (landscapePages.Count == 0)
+            if (validPages.Count == 0)
                 return -1;
 
-            int selectedPage = landscapePages[RNG.Next(landscapePages.Count)];
+            int selectedPage = validPages[RNG.Next(validPages.Count)];
             (width, height) = getPageDimensions(token, selectedPage);
             return selectedPage;
         }
@@ -214,11 +253,11 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (page == 0)
             {
                 return (
-                    token["width"]?.Value<int>() ?? 0,
-                    token["height"]?.Value<int>() ?? 0);
+                    PixivJsonHelper.IntValue(token, "width"),
+                    PixivJsonHelper.IntValue(token, "height"));
             }
 
-            var pages = token["meta_pages"] as JArray;
+            var pages = PixivJsonHelper.Field(token, "meta_pages") as JArray;
 
             if (pages == null || page >= pages.Count)
                 return (0, 0);
@@ -226,13 +265,13 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             JToken pageToken = pages[page];
 
             return (
-                pageToken["width"]?.Value<int>() ?? token["width"]?.Value<int>() ?? 0,
-                pageToken["height"]?.Value<int>() ?? token["height"]?.Value<int>() ?? 0);
+                PixivJsonHelper.IntValue(pageToken, "width") > 0 ? PixivJsonHelper.IntValue(pageToken, "width") : PixivJsonHelper.IntValue(token, "width"),
+                PixivJsonHelper.IntValue(pageToken, "height") > 0 ? PixivJsonHelper.IntValue(pageToken, "height") : PixivJsonHelper.IntValue(token, "height"));
         }
 
         private static string[] extractTags(JToken token)
         {
-            if (token["tags"] is not JArray tagArray)
+            if (PixivJsonHelper.Field(token, "tags") is not JArray tagArray)
                 return Array.Empty<string>();
 
             return tagArray
@@ -246,37 +285,107 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         {
             if (page == 0)
             {
-                string? original = token["meta_single_page"]?["original_image_url"]?.ToString();
+                JToken? metaSinglePage = PixivJsonHelper.Field(token, "meta_single_page");
+                string? original = metaSinglePage != null ? PixivJsonHelper.StringValue(metaSinglePage, "original_image_url") : null;
                 if (!string.IsNullOrWhiteSpace(original))
                     return original;
 
-                return token["image_urls"]?["large"]?.ToString()
-                       ?? token["image_urls"]?["square_medium"]?.ToString();
+                JToken? imageUrls = PixivJsonHelper.Field(token, "image_urls");
+                return PixivJsonHelper.StringValue(imageUrls ?? new JObject(), "large")
+                       ?? PixivJsonHelper.StringValue(imageUrls ?? new JObject(), "square_medium")
+                       ?? PixivJsonHelper.StringValue(imageUrls ?? new JObject(), "medium");
             }
 
-            var pages = token["meta_pages"] as JArray;
+            var pages = PixivJsonHelper.Field(token, "meta_pages") as JArray;
             if (pages == null || page >= pages.Count)
                 return null;
 
-            return pages[page]["image_urls"]?["large"]?.ToString()
-                   ?? pages[page]["image_urls"]?["square_medium"]?.ToString();
+            JToken? pageUrls = PixivJsonHelper.Field(pages[page], "image_urls");
+            return PixivJsonHelper.StringValue(pageUrls ?? new JObject(), "large")
+                   ?? PixivJsonHelper.StringValue(pageUrls ?? new JObject(), "square_medium")
+                   ?? PixivJsonHelper.StringValue(pageUrls ?? new JObject(), "medium");
         }
 
-        private static Framework.IO.Network.WebRequest createApiRequest(string url, string accessToken)
+        private static Framework.IO.Network.WebRequest createApiRequest(string url, string token)
         {
             var request = new Framework.IO.Network.WebRequest(url)
             {
                 Method = HttpMethod.Get,
             };
 
-            request.AddHeader("Authorization", $"Bearer {accessToken}");
-            request.AddHeader("User-Agent", PixivConstants.USER_AGENT);
-            request.AddHeader("App-OS", PixivConstants.APP_OS);
-            request.AddHeader("App-OS-Version", PixivConstants.APP_OS_VERSION);
-            request.AddHeader("App-Version", PixivConstants.APP_VERSION);
-            request.AddHeader("Accept-Language", "zh-CN");
-
+            PixivRequestHeaders.ApplyAppApiHeaders(request, token);
             return request;
+        }
+
+        private struct FeedCollectStats
+        {
+            public int Raw;
+            public int Parsed;
+            public int Accepted;
+            public int SeenIllustCount;
+            public bool LoggedShape;
+            public int RejectedAccount;
+            public int RejectedTag;
+            public int RejectedR18;
+            public int RejectedType;
+            public int RejectedDimensions;
+            public int RejectedLandscape;
+            public int RejectedAi;
+            public int RejectedAiTag;
+
+            public void RecordRejection(string? reason)
+            {
+                switch (reason)
+                {
+                    case "account":
+                        RejectedAccount++;
+                        break;
+
+                    case "tag":
+                        RejectedTag++;
+                        break;
+
+                    case "r18":
+                        RejectedR18++;
+                        break;
+
+                    case "type":
+                        RejectedType++;
+                        break;
+
+                    case "dimensions":
+                        RejectedDimensions++;
+                        break;
+
+                    case "landscape":
+                        RejectedLandscape++;
+                        break;
+
+                    case "ai":
+                        RejectedAi++;
+                        break;
+
+                    case "ai_tag":
+                        RejectedAiTag++;
+                        break;
+                }
+            }
+
+            public string DescribeRejections()
+            {
+                var parts = new List<string>();
+
+                if (RejectedAccount > 0) parts.Add($"account={RejectedAccount}");
+                if (RejectedTag > 0) parts.Add($"tag={RejectedTag}");
+                if (RejectedR18 > 0) parts.Add($"r18={RejectedR18}");
+                if (RejectedType > 0) parts.Add($"type={RejectedType}");
+                if (RejectedDimensions > 0) parts.Add($"dimensions={RejectedDimensions}");
+                if (RejectedLandscape > 0) parts.Add($"landscape={RejectedLandscape}");
+                if (RejectedAi > 0) parts.Add($"ai={RejectedAi}");
+                if (RejectedAiTag > 0) parts.Add($"ai_tag={RejectedAiTag}");
+
+                return parts.Count > 0 ? string.Join(", ", parts) : "unknown";
+            }
         }
     }
 }

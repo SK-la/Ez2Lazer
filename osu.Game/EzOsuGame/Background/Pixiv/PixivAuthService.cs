@@ -17,6 +17,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         private readonly Storage storage;
 
         private string? cachedAccessToken;
+        private string? cachedAccount;
         private DateTimeOffset accessTokenExpiresAt = DateTimeOffset.MinValue;
         private readonly object tokenLock = new object();
 
@@ -29,13 +30,25 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
         public string? LoadRefreshToken() => loadRefreshTokenFromFile();
 
-        public void SaveRefreshToken(string refreshToken)
+        public string? LoadAccountName() => loadAuthFromFile()?.Account ?? cachedAccount;
+
+        public void SaveRefreshToken(string refreshToken, string? account = null, bool invalidateAccessTokenCache = true)
         {
             if (string.IsNullOrWhiteSpace(refreshToken))
                 throw new ArgumentException("Refresh token cannot be empty.", nameof(refreshToken));
 
-            writeRefreshTokenToFile(refreshToken);
-            invalidateAccessToken();
+            var existing = loadAuthFromFile();
+            writeAuthToFile(new PixivAuthFile
+            {
+                RefreshToken = refreshToken,
+                Account = account ?? existing?.Account ?? cachedAccount,
+            });
+
+            if (!string.IsNullOrWhiteSpace(account))
+                cachedAccount = account;
+
+            if (invalidateAccessTokenCache)
+                invalidateAccessToken();
         }
 
         public void ClearRefreshToken()
@@ -69,7 +82,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 if (string.IsNullOrWhiteSpace(refreshToken))
                 {
                     accessToken = null;
-                    error = "Pixiv refresh token is not configured. Run tools/GetPixivRefreshToken.ps1 or paste a token in settings.";
+                    error = "Pixiv 未配置：请使用 EzPixivAuth 工具登录，或在高级选项中手动保存 refresh_token。";
                     return false;
                 }
 
@@ -93,14 +106,26 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                     }
 
                     var json = JObject.Parse(request.GetResponseString() ?? string.Empty);
-                    cachedAccessToken = json["access_token"]?.ToString();
-                    string? newRefresh = json["refresh_token"]?.ToString();
+                    var tokenPayload = PixivJsonHelper.Field(json, "response") as JObject ?? json;
+                    string? accessTokenFromResponse = PixivJsonHelper.StringValue(tokenPayload, "access_token");
+                    string? newRefresh = PixivJsonHelper.StringValue(tokenPayload, "refresh_token");
 
-                    if (!string.IsNullOrWhiteSpace(newRefresh) && newRefresh != refreshToken)
-                        SaveRefreshToken(newRefresh);
+                    string? responseAccount = PixivJsonHelper.Field(tokenPayload, "user")?["account"]?.ToString();
+
+                    if (!string.IsNullOrWhiteSpace(responseAccount))
+                    {
+                        cachedAccount = responseAccount;
+                        string tokenToStore = !string.IsNullOrWhiteSpace(newRefresh) ? newRefresh : refreshToken;
+                        SaveRefreshToken(tokenToStore, responseAccount, invalidateAccessTokenCache: false);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(newRefresh) && newRefresh != refreshToken)
+                    {
+                        SaveRefreshToken(newRefresh, invalidateAccessTokenCache: false);
+                    }
 
                     int expiresIn = json["expires_in"]?.Value<int>() ?? 3600;
                     accessTokenExpiresAt = DateTimeOffset.UtcNow.AddSeconds(expiresIn);
+                    cachedAccessToken = accessTokenFromResponse;
 
                     if (string.IsNullOrWhiteSpace(cachedAccessToken))
                     {
@@ -135,7 +160,9 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             accessTokenExpiresAt = DateTimeOffset.MinValue;
         }
 
-        private string? loadRefreshTokenFromFile()
+        private string? loadRefreshTokenFromFile() => loadAuthFromFile()?.RefreshToken;
+
+        private PixivAuthFile? loadAuthFromFile()
         {
             try
             {
@@ -150,7 +177,14 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                     return null;
 
                 var auth = Newtonsoft.Json.JsonConvert.DeserializeObject<PixivAuthFile>(content);
-                return string.IsNullOrWhiteSpace(auth?.RefreshToken) ? null : auth.RefreshToken;
+
+                if (auth == null || string.IsNullOrWhiteSpace(auth.RefreshToken))
+                    return null;
+
+                if (!string.IsNullOrWhiteSpace(auth.Account))
+                    cachedAccount = auth.Account;
+
+                return auth;
             }
             catch (Exception ex)
             {
@@ -159,11 +193,11 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
         }
 
-        private void writeRefreshTokenToFile(string refreshToken)
+        private void writeAuthToFile(PixivAuthFile auth)
         {
             try
             {
-                string json = Newtonsoft.Json.JsonConvert.SerializeObject(new PixivAuthFile { RefreshToken = refreshToken }, Newtonsoft.Json.Formatting.Indented);
+                string json = Newtonsoft.Json.JsonConvert.SerializeObject(auth, Newtonsoft.Json.Formatting.Indented);
                 using var stream = storage.CreateFileSafely(EzModifyPath.PIXIV_AUTH_FILE);
                 using var writer = new StreamWriter(stream);
                 writer.Write(json);
@@ -181,10 +215,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 Method = HttpMethod.Post,
             };
 
-            request.AddHeader("User-Agent", PixivConstants.USER_AGENT);
-            request.AddHeader("App-OS", PixivConstants.APP_OS);
-            request.AddHeader("App-OS-Version", PixivConstants.APP_OS_VERSION);
-            request.AddHeader("App-Version", PixivConstants.APP_VERSION);
+            PixivRequestHeaders.ApplyOAuthHeaders(request);
             request.AddParameter("client_id", PixivConstants.CLIENT_ID);
             request.AddParameter("client_secret", PixivConstants.CLIENT_SECRET);
 

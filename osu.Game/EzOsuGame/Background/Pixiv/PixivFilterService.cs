@@ -17,39 +17,84 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         }
 
         public bool PassesContentFilter(PixivIllustInfo illust)
+            => TryGetContentFilterRejection(illust, out _);
+
+        public bool TryGetContentFilterRejection(PixivIllustInfo illust, out string? reason)
         {
             if (!passesAccountRules(illust.Account))
+            {
+                reason = "account";
                 return false;
+            }
 
             if (!passesTagRules(illust.Tags))
+            {
+                reason = "tag";
                 return false;
+            }
 
-            if (!passesR18Rules(illust.SanityLevel, illust.Tags))
+            if (!passesR18Rules(illust.SanityLevel, illust.XRestrict, illust.Tags))
+            {
+                reason = "r18";
                 return false;
+            }
 
-            if (!passesIllustQualityRules(illust))
+            if (!isSupportedIllustType(illust.IllustType))
+            {
+                reason = "type";
                 return false;
+            }
 
+            if (illust.Width <= 0 || illust.Height <= 0)
+            {
+                reason = "dimensions";
+                return false;
+            }
+
+            if (!passesLandscapeRules(illust.Width, illust.Height))
+            {
+                reason = "landscape";
+                return false;
+            }
+
+            if (PixivAiFilter.IsAiGenerated(illust))
+            {
+                reason = illust.IllustAiType == PixivConstants.ILLUST_AI_TYPE_AI ? "ai" : "ai_tag";
+                return false;
+            }
+
+            reason = null;
             return true;
         }
+
+        public string DescribeActiveFilterConfig()
+        {
+            int whitelistCount = PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivAccountWhitelist)).Length;
+            int tagIncludeCount = PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivTagInclude)).Length;
+
+            return $"AllowR18={config.Get<bool>(Ez2Setting.PixivAllowR18)}, landscapeOnly={config.Get<bool>(Ez2Setting.PixivLandscapeOnly)}, accountWhitelist={whitelistCount}, tagInclude={tagIncludeCount}";
+        }
+
+        public bool LandscapeOnly => config.Get<bool>(Ez2Setting.PixivLandscapeOnly);
 
         public bool AllowsCachedAccount(string account) => passesAccountRules(PixivAccountNormalizer.Normalize(account));
 
-        public bool ShouldSaveToDisk(PixivIllustInfo illust)
+        public bool AllowsCachedIllust(string account, string userName)
         {
-            foreach (string prefix in PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivSkipSaveAccountPrefixes)))
-            {
-                if (illust.Account.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    return false;
-            }
+            account = PixivAccountNormalizer.Normalize(account);
+            userName = PixivAccountNormalizer.Normalize(userName);
 
-            string[] skipTags = PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivSkipSaveTags));
+            if (!string.IsNullOrEmpty(account))
+                return passesAccountRules(account);
 
-            if (skipTags.Length > 0 && illust.Tags.Any(tag => containsEntry(skipTags, tag)))
-                return false;
+            if (!string.IsNullOrEmpty(userName))
+                return passesAccountRules(userName);
 
-            return true;
+            return !HasAccountWhitelist();
         }
+
+        public bool HasAccountWhitelist()
+            => PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivAccountWhitelist)).Length > 0;
 
         private bool passesAccountRules(string account)
         {
@@ -71,35 +116,14 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return true;
         }
 
-        private static bool passesIllustQualityRules(PixivIllustInfo illust)
+        private static bool isSupportedIllustType(string? type)
         {
-            if (!string.Equals(illust.IllustType, "illust", StringComparison.OrdinalIgnoreCase))
-                return false;
+            if (string.IsNullOrWhiteSpace(type))
+                return true;
 
-            if (illust.Width <= illust.Height)
-                return false;
-
-            if (illust.IllustAiType == PixivConstants.ILLUST_AI_TYPE_AI)
-                return false;
-
-            return !isAiTagged(illust.Tags);
-        }
-
-        private static bool isAiTagged(string[] tags)
-        {
-            foreach (string tag in tags)
-            {
-                if (string.Equals(tag, "AI", StringComparison.OrdinalIgnoreCase))
-                    return true;
-
-                foreach (string pattern in PixivConstants.AI_GENERATED_TAG_PATTERNS)
-                {
-                    if (tag.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                        return true;
-                }
-            }
-
-            return false;
+            return string.Equals(type, "illust", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(type, "manga", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(type, "ugoira", StringComparison.OrdinalIgnoreCase);
         }
 
         private bool passesTagRules(string[] tags)
@@ -117,12 +141,20 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return true;
         }
 
-        private bool passesR18Rules(int sanityLevel, string[] tags)
+        private bool passesLandscapeRules(int width, int height)
+        {
+            if (!LandscapeOnly)
+                return true;
+
+            return width > height;
+        }
+
+        private bool passesR18Rules(int sanityLevel, int xRestrict, string[] tags)
         {
             if (config.Get<bool>(Ez2Setting.PixivAllowR18))
                 return true;
 
-            if (sanityLevel >= 4)
+            if (xRestrict >= 1 || sanityLevel >= 4)
                 return false;
 
             return !tags.Any(tag => tag.Contains("R-18", StringComparison.OrdinalIgnoreCase));

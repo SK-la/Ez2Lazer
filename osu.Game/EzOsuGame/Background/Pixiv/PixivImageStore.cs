@@ -24,6 +24,12 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         }
 
         public bool TryGetRandomCachedIllust(PixivFilterService filters, out PixivIllustInfo illust, out string resourcePath)
+            => TryGetRandomCachedIllust(filters, excludeResourcePath: null, excludeIllustId: null, out illust, out resourcePath);
+
+        public bool TryGetRandomCachedIllust(PixivFilterService filters, string? excludeResourcePath, out PixivIllustInfo illust, out string resourcePath)
+            => TryGetRandomCachedIllust(filters, excludeResourcePath, excludeIllustId: null, out illust, out resourcePath);
+
+        public bool TryGetRandomCachedIllust(PixivFilterService filters, string? excludeResourcePath, long? excludeIllustId, out PixivIllustInfo illust, out string resourcePath)
         {
             illust = default;
             resourcePath = string.Empty;
@@ -44,17 +50,31 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 for (int i = 0; i < attempts; i++)
                 {
                     string file = files[RNG.Next(files.Length)];
+                    string normalizedPath = file.Replace('\\', '/');
 
-                    if (!PixivFileNamer.TryParseFileName(Path.GetFileName(file), out string account, out long illustId, out int page))
+                    if (pathsEqual(normalizedPath, excludeResourcePath))
                         continue;
 
-                    account = PixivAccountNormalizer.Normalize(account);
-
-                    if (!filters.AllowsCachedAccount(account))
+                    if (!PixivFileNamer.TryParseFileName(Path.GetFileName(file), out long illustId, out int page))
                         continue;
 
-                    resourcePath = file.Replace('\\', '/');
-                    illust = new PixivIllustInfo(account, illustId, page, string.Empty);
+                    if (excludeIllustId is long excludedIllustId && illustId == excludedIllustId)
+                        continue;
+
+                    string account = string.Empty;
+                    string userName = string.Empty;
+
+                    if (PixivFileNamer.TryParseFileLabel(Path.GetFileName(file), out string fileLabel))
+                        userName = PixivAccountNormalizer.Normalize(fileLabel);
+
+                    if (!filters.AllowsCachedIllust(account, userName))
+                        continue;
+
+                    if (string.IsNullOrEmpty(userName))
+                        userName = account;
+
+                    resourcePath = normalizedPath;
+                    illust = new PixivIllustInfo(account, illustId, page, string.Empty, userName: userName);
                     return true;
                 }
 
@@ -68,31 +88,66 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         }
 
         public bool IsCached(PixivIllustInfo illust)
-        {
-            string resourcePath = PixivFileNamer.BuildRelativePath(
-                illust.Account,
-                illust.IllustId,
-                illust.Page,
-                PixivFileNamer.GetExtensionFromUrl(illust.ImageUrl));
-
-            return storage.Exists(resourcePath);
-        }
+            => tryResolveExistingPath(illust, out _);
 
         public bool TryEnsureCached(PixivIllustInfo illust, out string resourcePath, out string? error)
         {
-            resourcePath = PixivFileNamer.BuildRelativePath(
-                illust.Account,
-                illust.IllustId,
-                illust.Page,
-                PixivFileNamer.GetExtensionFromUrl(illust.ImageUrl));
-
-            if (storage.Exists(resourcePath))
+            if (tryResolveExistingPath(illust, out resourcePath))
             {
                 error = null;
                 return true;
             }
 
+            resourcePath = PixivFileNamer.BuildDownloadRelativePath(illust);
             return tryDownload(illust, resourcePath, out error);
+        }
+
+        private bool tryResolveExistingPath(PixivIllustInfo illust, out string resourcePath)
+        {
+            string extension = PixivFileNamer.GetExtensionFromUrl(illust.ImageUrl);
+
+            string downloadPath = PixivFileNamer.BuildDownloadRelativePath(illust, extension);
+            if (storage.Exists(downloadPath))
+            {
+                resourcePath = downloadPath;
+                return true;
+            }
+
+            string idKeyPath = Path.Combine(EzModifyPath.BG_PIXIV_PATH, PixivFileNamer.BuildIdKeyFileName(illust.IllustId, illust.Page, extension))
+                .Replace('\\', '/');
+
+            if (storage.Exists(idKeyPath))
+            {
+                resourcePath = idKeyPath;
+                return true;
+            }
+
+            foreach (string legacyLabel in getLegacyLabels(illust))
+            {
+                string legacyPath = Path.Combine(
+                        EzModifyPath.BG_PIXIV_PATH,
+                        $"{PixivFileNamer.SanitizeFileLabel(legacyLabel)}_{illust.IllustId}_p{illust.Page}{extension}")
+                    .Replace('\\', '/');
+
+                if (storage.Exists(legacyPath))
+                {
+                    resourcePath = legacyPath;
+                    return true;
+                }
+            }
+
+            resourcePath = string.Empty;
+            return false;
+        }
+
+        private static System.Collections.Generic.IEnumerable<string> getLegacyLabels(PixivIllustInfo illust)
+        {
+            if (!string.IsNullOrWhiteSpace(illust.Account))
+                yield return illust.Account;
+
+            if (!string.IsNullOrWhiteSpace(illust.UserName)
+                && !string.Equals(illust.UserName, illust.Account, StringComparison.OrdinalIgnoreCase))
+                yield return illust.UserName;
         }
 
         private bool tryDownload(PixivIllustInfo illust, string resourcePath, out string? error)
@@ -144,5 +199,9 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (!Directory.Exists(fullPath))
                 Directory.CreateDirectory(fullPath);
         }
+
+        private static bool pathsEqual(string left, string? right)
+            => !string.IsNullOrWhiteSpace(right)
+               && string.Equals(left.Replace('\\', '/'), right.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
     }
 }

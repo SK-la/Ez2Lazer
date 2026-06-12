@@ -34,6 +34,8 @@ namespace osu.Game.Screens.Backgrounds
     public partial class BackgroundScreenDefault : BackgroundScreen
     {
         private Background background;
+        private PixivAttributionBadge pixivAttribution;
+        private PixivIllustInfo pendingPixivAttribution;
 
         private int currentDisplay;
         private const int background_count = 8;
@@ -143,8 +145,38 @@ namespace osu.Game.Screens.Backgrounds
             background?.FadeOut(800, Easing.OutQuint);
             background?.Expire();
 
+            removePixivAttribution();
+
             AddInternal(background = newBackground);
+
+            if (pendingPixivAttribution.IllustId > 0)
+                showPixivAttribution(pendingPixivAttribution);
+
+            pendingPixivAttribution = default;
             currentDisplay++;
+        }
+
+        [Resolved(CanBeNull = true)]
+        private OsuGame game { get; set; }
+
+        private void showPixivAttribution(PixivIllustInfo illust)
+        {
+            string artworkUrl = $"https://www.pixiv.net/artworks/{illust.IllustId}";
+
+            AddInternal(pixivAttribution = new PixivAttributionBadge(illust, () =>
+            {
+                if (game != null)
+                    game.OpenUrlExternally(artworkUrl);
+                else
+                    gameHost.OpenUrlExternally(artworkUrl);
+            }));
+        }
+
+        private void removePixivAttribution()
+        {
+            pixivAttribution?.FadeOut(400);
+            pixivAttribution?.Expire();
+            pixivAttribution = null;
         }
 
         [Resolved]
@@ -155,6 +187,9 @@ namespace osu.Game.Screens.Backgrounds
 
         [Resolved]
         private LargeTextureStore largeTextures { get; set; } = null!;
+
+        [Resolved]
+        private PixivBackgroundCoordinator pixivCoordinator { get; set; } = null!;
 
         private bool storageTextureSourceAdded;
 
@@ -272,7 +307,20 @@ namespace osu.Game.Screens.Backgrounds
                 case BackgroundSource.PixivFollow:
                 {
                     ensureStorageTextureSource();
-                    return new PixivBackground();
+
+                    bool hasLocal = pixivCoordinator.TryPickImmediateLocalBackground(out PixivIllustInfo illust, out string resourcePath);
+                    pendingPixivAttribution = hasLocal ? illust : default;
+
+                    var pixivBackground = new PixivBackground(hasLocal ? illust : null, hasLocal ? resourcePath : null);
+
+                    if (pixivBackground.Equals(background))
+                    {
+                        pendingPixivAttribution = default;
+                        return background;
+                    }
+
+                    pixivCoordinator.EnqueueSongChangeDownload();
+                    return pixivBackground;
                 }
             }
 

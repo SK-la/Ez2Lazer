@@ -9,5 +9,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
     {
         [JsonProperty("refresh_token")]
         public string? RefreshToken { get; set; }
+
+        [JsonProperty("account")]
+        public string? Account { get; set; }
     }
 }

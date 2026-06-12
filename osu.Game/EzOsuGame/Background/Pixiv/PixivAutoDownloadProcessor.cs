@@ -15,7 +15,8 @@ using osu.Game.Overlays.Notifications;
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
     /// <summary>
-    /// Periodically downloads one uncached illustration from the Pixiv follow feed into BG_PIXIV.
+    /// Optional background prefetch for the shared Pixiv follow-feed catalog.
+    /// Song changes always enqueue one background download; this adds periodic prefetch when enabled.
     /// </summary>
     public partial class PixivAutoDownloadProcessor : Component
     {
@@ -29,8 +30,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         private INotificationOverlay? notifications { get; set; }
 
         private IBindable<bool> autoDownloadEnabled = null!;
-        private ScheduledDelegate? scheduledDownload;
-        private bool downloadInFlight;
+        private ScheduledDelegate? scheduledPrefetch;
+        private bool prefetchInFlight;
         private bool authFailureNotified;
 
         protected override void LoadComplete()
@@ -46,40 +47,40 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
         private void updateSchedule(bool enabled)
         {
-            scheduledDownload?.Cancel();
-            scheduledDownload = null;
+            scheduledPrefetch?.Cancel();
+            scheduledPrefetch = null;
             authFailureNotified = false;
 
             if (!enabled || !coordinator.Auth.HasRefreshToken)
                 return;
 
-            scheduleNext(PixivConstants.AUTO_DOWNLOAD_INTERVAL_MS);
+            scheduleNext(0);
         }
 
         private void scheduleNext(double delay)
         {
-            scheduledDownload = Scheduler.AddDelayed(() =>
+            scheduledPrefetch = Scheduler.AddDelayed(() =>
             {
                 if (!autoDownloadEnabled.Value)
                     return;
 
-                runDownload();
-                scheduleNext(PixivConstants.AUTO_DOWNLOAD_INTERVAL_MS);
+                runPrefetch();
+                scheduleNext(PixivConstants.AUTO_PREFETCH_INTERVAL_MS);
             }, delay);
         }
 
-        private void runDownload()
+        private void runPrefetch()
         {
-            if (downloadInFlight)
+            if (prefetchInFlight)
                 return;
 
-            downloadInFlight = true;
+            prefetchInFlight = true;
 
             Task.Run(() =>
             {
                 try
                 {
-                    if (!coordinator.TryDownloadNextUncached(out string? error))
+                    if (!coordinator.RunBackgroundPrefetch(out string? error))
                     {
                         if (!string.IsNullOrWhiteSpace(error))
                             Scheduler.Add(() => handleFailure(error));
@@ -87,14 +88,14 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 }
                 finally
                 {
-                    downloadInFlight = false;
+                    prefetchInFlight = false;
                 }
             });
         }
 
         private void handleFailure(string error)
         {
-            coordinator.LogFailure("Auto download", error);
+            coordinator.LogFailure("Auto prefetch", error);
 
             if (authFailureNotified)
                 return;
