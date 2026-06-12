@@ -178,6 +178,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "pixiv", "r-18", "r18", "nsfw", "filter" }
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.PIXIV_LANDSCAPE_ONLY,
+                    HintText = EzSettingsStrings.PIXIV_LANDSCAPE_ONLY_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.PixivLandscapeOnly),
+                })
+                {
+                    Keywords = new[] { "pixiv", "landscape", "horizontal", "横图", "filter", "aspect" }
+                },
                 createListSetting(ezConfig, Ez2Setting.PixivAccountWhitelist, EzSettingsStrings.PIXIV_ACCOUNT_WHITELIST, EzSettingsStrings.PIXIV_ACCOUNT_WHITELIST_TOOLTIP,
                     new[] { "pixiv", "whitelist", "account", "artist", "filter" }),
                 createListSetting(ezConfig, Ez2Setting.PixivAccountBlacklist, EzSettingsStrings.PIXIV_ACCOUNT_BLACKLIST, EzSettingsStrings.PIXIV_ACCOUNT_BLACKLIST_TOOLTIP,

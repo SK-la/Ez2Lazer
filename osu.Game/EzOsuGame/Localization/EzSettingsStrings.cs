@@ -434,6 +434,13 @@ namespace osu.Game.EzOsuGame.Localization
             "关闭时过滤 sanity_level ≥ 4 或含 R-18 标签的作品（下载与关注流候选）。",
             "When disabled, filters works with sanity_level ≥ 4 or R-18 tags from follow-feed candidates.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_LANDSCAPE_ONLY = new EzLocalizationManager.EzLocalisableString(
+            "仅横图", "Landscape only");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_LANDSCAPE_ONLY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启时只接受宽大于高的页面（width > height）；多页作品仅在横页中随机。",
+            "When enabled, only pages wider than tall are accepted (width > height). Multi-page works pick randomly from landscape pages only.");
+
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_WHITELIST = new EzLocalizationManager.EzLocalisableString(
             "画师 account 白名单", "Artist account whitelist");
 

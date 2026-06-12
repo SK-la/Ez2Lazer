@@ -127,7 +127,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 {
                     stats.Raw++;
 
-                    if (!tryParseIllust(token, out PixivIllustInfo info))
+                    if (!tryParseIllust(token, filters.LandscapeOnly, out PixivIllustInfo info))
                         continue;
 
                     stats.Parsed++;
@@ -154,7 +154,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
         }
 
-        private static bool tryParseIllust(JToken token, out PixivIllustInfo info)
+        private static bool tryParseIllust(JToken token, bool landscapeOnly, out PixivIllustInfo info)
         {
             info = default;
 
@@ -196,7 +196,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (string.IsNullOrWhiteSpace(account) || illustId <= 0)
                 return false;
 
-            int page = selectDisplayPage(data, out int width, out int height);
+            int page = selectDisplayPage(data, landscapeOnly, out int width, out int height);
 
             if (page < 0)
                 return false;
@@ -216,7 +216,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return true;
         }
 
-        private static int selectDisplayPage(JToken token, out int width, out int height)
+        private static int selectDisplayPage(JToken token, bool landscapeOnly, out int width, out int height)
         {
             width = 0;
             height = 0;
@@ -231,8 +231,13 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             {
                 (int pageWidth, int pageHeight) = getPageDimensions(token, page);
 
-                if (pageWidth > 0 && pageHeight > 0)
-                    validPages.Add(page);
+                if (pageWidth <= 0 || pageHeight <= 0)
+                    continue;
+
+                if (landscapeOnly && pageWidth <= pageHeight)
+                    continue;
+
+                validPages.Add(page);
             }
 
             if (validPages.Count == 0)
@@ -324,6 +329,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             public int RejectedR18;
             public int RejectedType;
             public int RejectedDimensions;
+            public int RejectedLandscape;
             public int RejectedAi;
             public int RejectedAiTag;
 
@@ -351,6 +357,10 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                         RejectedDimensions++;
                         break;
 
+                    case "landscape":
+                        RejectedLandscape++;
+                        break;
+
                     case "ai":
                         RejectedAi++;
                         break;
@@ -370,6 +380,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 if (RejectedR18 > 0) parts.Add($"r18={RejectedR18}");
                 if (RejectedType > 0) parts.Add($"type={RejectedType}");
                 if (RejectedDimensions > 0) parts.Add($"dimensions={RejectedDimensions}");
+                if (RejectedLandscape > 0) parts.Add($"landscape={RejectedLandscape}");
                 if (RejectedAi > 0) parts.Add($"ai={RejectedAi}");
                 if (RejectedAiTag > 0) parts.Add($"ai_tag={RejectedAiTag}");
 

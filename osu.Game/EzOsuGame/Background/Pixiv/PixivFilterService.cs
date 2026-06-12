@@ -51,6 +51,12 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 return false;
             }
 
+            if (!passesLandscapeRules(illust.Width, illust.Height))
+            {
+                reason = "landscape";
+                return false;
+            }
+
             if (PixivAiFilter.IsAiGenerated(illust))
             {
                 reason = illust.IllustAiType == PixivConstants.ILLUST_AI_TYPE_AI ? "ai" : "ai_tag";
@@ -66,8 +72,10 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             int whitelistCount = PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivAccountWhitelist)).Length;
             int tagIncludeCount = PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivTagInclude)).Length;
 
-            return $"AllowR18={config.Get<bool>(Ez2Setting.PixivAllowR18)}, accountWhitelist={whitelistCount}, tagInclude={tagIncludeCount}";
+            return $"AllowR18={config.Get<bool>(Ez2Setting.PixivAllowR18)}, landscapeOnly={config.Get<bool>(Ez2Setting.PixivLandscapeOnly)}, accountWhitelist={whitelistCount}, tagInclude={tagIncludeCount}";
         }
+
+        public bool LandscapeOnly => config.Get<bool>(Ez2Setting.PixivLandscapeOnly);
 
         public bool AllowsCachedAccount(string account) => passesAccountRules(PixivAccountNormalizer.Normalize(account));
 
@@ -147,6 +155,14 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 return false;
 
             return true;
+        }
+
+        private bool passesLandscapeRules(int width, int height)
+        {
+            if (!LandscapeOnly)
+                return true;
+
+            return width > height;
         }
 
         private bool passesR18Rules(int sanityLevel, int xRestrict, string[] tags)

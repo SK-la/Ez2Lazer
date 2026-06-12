@@ -198,6 +198,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ServerManualUsername, string.Empty);
             SetDefault(Ez2Setting.ServerManualToken, string.Empty);
             SetDefault(Ez2Setting.PixivAllowR18, false);
+            SetDefault(Ez2Setting.PixivLandscapeOnly, true);
             SetDefault(Ez2Setting.PixivAccountWhitelist, string.Empty);
             SetDefault(Ez2Setting.PixivAccountBlacklist, string.Empty);
             SetDefault(Ez2Setting.PixivTagInclude, string.Empty);
@@ -890,6 +891,7 @@ namespace osu.Game.EzOsuGame.Configuration
         ServerManualToken,
 
         PixivAllowR18,
+        PixivLandscapeOnly,
         PixivAccountWhitelist,
         PixivAccountBlacklist,
         PixivTagInclude,
