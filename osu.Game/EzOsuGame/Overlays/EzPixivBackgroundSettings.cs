@@ -4,6 +4,7 @@
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Background.Pixiv;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
@@ -14,7 +15,7 @@ namespace osu.Game.EzOsuGame.Overlays
 {
     public static partial class EzPixivBackgroundSettings
     {
-        public static void AddTo(SettingsSubsection subsection, PixivBackgroundCoordinator coordinator, INotificationOverlay? notifications)
+        public static void AddTo(SettingsSubsection subsection, Ez2ConfigManager ezConfig, PixivBackgroundCoordinator coordinator, INotificationOverlay? notifications)
         {
             var tokenInput = new Bindable<string>(coordinator.Auth.LoadRefreshToken() ?? string.Empty);
 
@@ -91,6 +92,16 @@ namespace osu.Game.EzOsuGame.Overlays
             subsection.Add(saveButton);
             subsection.Add(verifyButton);
             subsection.Add(clearButton);
+
+            subsection.Add(new SettingsItemV2(new FormCheckBox
+            {
+                Caption = EzSettingsStrings.PIXIV_AUTO_DOWNLOAD_ENABLED,
+                HintText = EzSettingsStrings.PIXIV_AUTO_DOWNLOAD_ENABLED_TOOLTIP,
+                Current = ezConfig.GetBindable<bool>(Ez2Setting.PixivAutoDownloadEnabled),
+            })
+            {
+                Keywords = new[] { "pixiv", "background", "download", "auto", "cache", "bg_pixiv" }
+            });
         }
 
         private static void post(INotificationOverlay? notifications, LocalisableString text)

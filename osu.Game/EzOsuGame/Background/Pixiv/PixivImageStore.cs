@@ -9,6 +9,7 @@ using System.Net.Http;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Utils;
+using osu.Game.EzOsuGame;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
@@ -53,6 +54,17 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
         }
 
+        public bool IsCached(PixivIllustInfo illust)
+        {
+            string resourcePath = PixivFileNamer.BuildRelativePath(
+                illust.Account,
+                illust.IllustId,
+                illust.Page,
+                PixivFileNamer.GetExtensionFromUrl(illust.ImageUrl));
+
+            return storage.Exists(resourcePath);
+        }
+
         public bool TryEnsureCached(PixivIllustInfo illust, out string resourcePath, out string? error)
         {
             resourcePath = PixivFileNamer.BuildRelativePath(
@@ -83,8 +95,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                     Method = HttpMethod.Get,
                 };
 
-                request.AddHeader("Referer", PixivConstants.ImageReferer);
-                request.AddHeader("User-Agent", PixivConstants.UserAgent);
+                request.AddHeader("Referer", PixivConstants.IMAGE_REFERER);
+                request.AddHeader("User-Agent", PixivConstants.USER_AGENT);
 
                 request.Perform();
 

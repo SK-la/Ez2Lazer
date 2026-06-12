@@ -28,7 +28,7 @@ namespace osu.Game.EzOsuGame.Overlays
             IDialogOverlay? dialogOverlay,
             INotificationOverlay? notifications)
         {
-            EzPixivBackgroundSettings.AddTo(this, pixivBackgroundCoordinator, notifications);
+            EzPixivBackgroundSettings.AddTo(this, ezConfig, pixivBackgroundCoordinator, notifications);
 
             AddRange(new Drawable[]
             {

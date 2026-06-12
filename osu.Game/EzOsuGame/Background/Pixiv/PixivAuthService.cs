@@ -177,17 +177,17 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
         private static Framework.IO.Network.WebRequest createTokenRequest(Dictionary<string, string> formData)
         {
-            var request = new Framework.IO.Network.WebRequest(PixivConstants.AuthTokenUrl)
+            var request = new Framework.IO.Network.WebRequest(PixivConstants.AUTH_TOKEN_URL)
             {
                 Method = HttpMethod.Post,
             };
 
-            request.AddHeader("User-Agent", PixivConstants.UserAgent);
-            request.AddHeader("App-OS", PixivConstants.AppOs);
-            request.AddHeader("App-OS-Version", PixivConstants.AppOsVersion);
-            request.AddHeader("App-Version", PixivConstants.AppVersion);
-            request.AddParameter("client_id", PixivConstants.ClientId);
-            request.AddParameter("client_secret", PixivConstants.ClientSecret);
+            request.AddHeader("User-Agent", PixivConstants.USER_AGENT);
+            request.AddHeader("App-OS", PixivConstants.APP_OS);
+            request.AddHeader("App-OS-Version", PixivConstants.APP_OS_VERSION);
+            request.AddHeader("App-Version", PixivConstants.APP_VERSION);
+            request.AddParameter("client_id", PixivConstants.CLIENT_ID);
+            request.AddParameter("client_secret", PixivConstants.CLIENT_SECRET);
 
             foreach (var pair in formData)
                 request.AddParameter(pair.Key, pair.Value);

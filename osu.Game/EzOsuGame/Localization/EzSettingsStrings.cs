@@ -392,6 +392,18 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_SUCCESS = new EzLocalizationManager.EzLocalisableString("Pixiv 登录成功：@{0}", "Pixiv login OK: @{0}");
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_FAILED = new EzLocalizationManager.EzLocalisableString("Pixiv 登录验证失败。", "Pixiv login verification failed.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTO_DOWNLOAD_ENABLED = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv 后台自动下载", "Pixiv background auto-download");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTO_DOWNLOAD_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后每 3 分钟从关注流下载 1 张尚未缓存的作品到 EzResources/BG_PIXIV。"
+            + "\n与菜单背景显示独立；凭证失效时自动暂停。",
+            "When enabled, downloads one uncached follow-feed illustration to EzResources/BG_PIXIV every 3 minutes."
+            + "\nIndependent from menu background display; pauses automatically if credentials fail.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTO_DOWNLOAD_PAUSED = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv 自动下载已暂停：{0}", "Pixiv auto-download paused: {0}");
+
         #endregion
 
         #region 实验性功能
