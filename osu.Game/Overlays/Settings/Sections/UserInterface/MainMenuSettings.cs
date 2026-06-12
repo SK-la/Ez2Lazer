@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
@@ -11,8 +10,6 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
-using osu.Game.Online.API;
-using osu.Game.Online.API.Requests.Responses;
 
 namespace osu.Game.Overlays.Settings.Sections.UserInterface
 {
@@ -20,18 +17,11 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
     {
         protected override LocalisableString Header => UserInterfaceStrings.MainMenuHeader;
 
-        private IBindable<APIUser> user = null!;
-
-        private readonly Bindable<SettingsNote.Data?> backgroundSourceNote = new Bindable<SettingsNote.Data?>();
-
         [BackgroundDependencyLoader]
         private void load(OsuConfigManager config, Ez2ConfigManager ezConfig,
-                          IAPIProvider api,
                           PixivBackgroundCoordinator pixivBackgroundCoordinator,
                           INotificationOverlay? notifications)
         {
-            user = api.LocalUser.GetBoundCopy();
-
             var backgroundSource = config.GetBindable<BackgroundSource>(OsuSetting.MenuBackgroundSource);
 
             Children = new Drawable[]
@@ -66,10 +56,7 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                 {
                     Caption = UserInterfaceStrings.BackgroundSource,
                     Current = backgroundSource,
-                })
-                {
-                    Note = { BindTarget = backgroundSourceNote },
-                },
+                }),
                 new EzPixivBackgroundSettings(ezConfig, pixivBackgroundCoordinator, notifications, backgroundSource),
                 new SettingsItemV2(new FormEnumDropdown<SeasonalBackgroundMode>
                 {
@@ -77,19 +64,6 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                     Current = config.GetBindable<SeasonalBackgroundMode>(OsuSetting.SeasonalBackgroundMode),
                 })
             };
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            user.BindValueChanged(u =>
-            {
-                if (u.NewValue?.IsSupporter != true)
-                    backgroundSourceNote.Value = new SettingsNote.Data(UserInterfaceStrings.NotSupporterNote, SettingsNote.Type.Informational);
-                else
-                    backgroundSourceNote.Value = null;
-            }, true);
         }
     }
 }
