@@ -23,6 +23,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.EzOsuGame.Background;
+using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -266,6 +267,12 @@ namespace osu.Game.Screens.Backgrounds
                     }
 
                     return new Background($@"Backgrounds/bg{RNG.Next(0, 5) % 5 + 1}");
+                }
+
+                case BackgroundSource.PixivFollow:
+                {
+                    ensureStorageTextureSource();
+                    return new PixivBackground();
                 }
             }
 
