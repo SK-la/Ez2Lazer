@@ -14,10 +14,12 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
     public class PixivApiClient
     {
         private readonly PixivAuthService authService;
+        private readonly PixivFilterService filters;
 
-        public PixivApiClient(PixivAuthService authService)
+        public PixivApiClient(PixivAuthService authService, PixivFilterService filters)
         {
             this.authService = authService;
+            this.filters = filters;
         }
 
         public bool TryGetRandomFollowIllust(out PixivIllustInfo illust, out string? error)
@@ -134,7 +136,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                     if (!tryParseIllust(token, out PixivIllustInfo info))
                         continue;
 
-                    if (isRestricted(token))
+                    if (!filters.PassesContentFilter(info))
                         continue;
 
                     output.Add(info);
@@ -165,8 +167,23 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (string.IsNullOrWhiteSpace(imageUrl))
                 return false;
 
-            info = new PixivIllustInfo(account, illustId, page, imageUrl);
+            int sanityLevel = token["sanity_level"]?.Value<int>() ?? 0;
+            string[] tags = extractTags(token);
+
+            info = new PixivIllustInfo(account, illustId, page, imageUrl, sanityLevel, tags);
             return true;
+        }
+
+        private static string[] extractTags(JToken token)
+        {
+            if (token["tags"] is not JArray tagArray)
+                return Array.Empty<string>();
+
+            return tagArray
+                   .Select(t => t["name"]?.ToString())
+                   .Where(name => !string.IsNullOrWhiteSpace(name))
+                   .Distinct(StringComparer.OrdinalIgnoreCase)
+                   .ToArray()!;
         }
 
         private static string? getImageUrl(JToken token, int page)
@@ -187,23 +204,6 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
             return pages[page]["image_urls"]?["large"]?.ToString()
                    ?? pages[page]["image_urls"]?["square_medium"]?.ToString();
-        }
-
-        private static bool isRestricted(JToken token)
-        {
-            int sanityLevel = token["sanity_level"]?.Value<int>() ?? 0;
-            if (sanityLevel >= 4)
-                return true;
-
-            var tags = token["tags"] as JArray;
-            if (tags == null)
-                return false;
-
-            return tags.Any(t =>
-            {
-                string name = t["name"]?.ToString() ?? t.ToString();
-                return name.Contains("R-18", StringComparison.OrdinalIgnoreCase);
-            });
         }
 
         private static Framework.IO.Network.WebRequest createApiRequest(string url, string accessToken)

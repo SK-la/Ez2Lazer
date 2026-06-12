@@ -404,6 +404,55 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTO_DOWNLOAD_PAUSED = new EzLocalizationManager.EzLocalisableString(
             "Pixiv 自动下载已暂停：{0}", "Pixiv auto-download paused: {0}");
 
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ALLOW_R18 = new EzLocalizationManager.EzLocalisableString(
+            "允许 R-18 作品", "Allow R-18 works");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ALLOW_R18_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "关闭时过滤 sanity_level ≥ 4 或含 R-18 标签的作品（下载与关注流候选）。",
+            "When disabled, filters works with sanity_level ≥ 4 or R-18 tags from follow-feed candidates.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_WHITELIST = new EzLocalizationManager.EzLocalisableString(
+            "画师 account 白名单", "Artist account whitelist");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_WHITELIST_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "非空时仅允许列表中的 @ 句柄；每行一项，也可用逗号分隔。",
+            "When non-empty, only listed @ handles are allowed. One entry per line, or comma-separated.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_BLACKLIST = new EzLocalizationManager.EzLocalisableString(
+            "画师 account 黑名单", "Artist account blacklist");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_BLACKLIST_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "命中则跳过；每行一项，也可用逗号分隔。",
+            "Matching accounts are skipped. One entry per line, or comma-separated.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_INCLUDE = new EzLocalizationManager.EzLocalisableString(
+            "标签包含（任一）", "Tag include (any)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_INCLUDE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "非空时作品须至少包含其中一个标签（不区分大小写）。",
+            "When non-empty, works must include at least one listed tag (case-insensitive).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_EXCLUDE = new EzLocalizationManager.EzLocalisableString(
+            "标签排除", "Tag exclude");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_EXCLUDE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "命中任一标签则跳过；每行一项，也可用逗号分隔。",
+            "Works with any listed tag are skipped. One entry per line, or comma-separated.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_ACCOUNT_PREFIXES = new EzLocalizationManager.EzLocalisableString(
+            "落盘跳过：account 前缀", "Skip save: account prefixes");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_ACCOUNT_PREFIXES_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "画师 @ 句柄以这些前缀开头时不写入 BG_PIXIV；每行一项。",
+            "Do not write to BG_PIXIV when the artist @ handle starts with any prefix. One per line.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_TAGS = new EzLocalizationManager.EzLocalisableString(
+            "落盘跳过：标签", "Skip save: tags");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SKIP_SAVE_TAGS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "作品含任一标签时不写入 BG_PIXIV；每行一项，也可用逗号分隔。",
+            "Do not write to BG_PIXIV when the work has any listed tag. One per line, or comma-separated.");
+
         #endregion
 
         #region 实验性功能

@@ -9,14 +9,18 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 {
     public class PixivBackgroundCoordinator
     {
+        private const int max_resolve_attempts = 5;
+
         public PixivAuthService Auth { get; }
         public PixivApiClient Api { get; }
         public PixivImageStore Images { get; }
+        public PixivFilterService Filters { get; }
 
-        public PixivBackgroundCoordinator(Storage storage)
+        public PixivBackgroundCoordinator(Storage storage, Ez2ConfigManager ezConfig)
         {
             Auth = new PixivAuthService(storage);
-            Api = new PixivApiClient(Auth);
+            Filters = new PixivFilterService(ezConfig);
+            Api = new PixivApiClient(Auth, Filters);
             Images = new PixivImageStore(storage);
         }
 
@@ -32,16 +36,26 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 return false;
             }
 
-            if (Images.TryGetRandomCachedIllust(out illust, out resourcePath))
+            if (Images.TryGetRandomCachedIllust(Filters, out illust, out resourcePath))
                 return true;
 
-            if (!Api.TryGetRandomFollowIllust(out illust, out error))
-                return false;
+            for (int attempt = 0; attempt < max_resolve_attempts; attempt++)
+            {
+                if (!Api.TryGetRandomFollowIllust(out illust, out error))
+                    return false;
 
-            if (!Images.TryEnsureCached(illust, out resourcePath, out error))
-                return false;
+                if (!Filters.ShouldSaveToDisk(illust))
+                    continue;
 
-            return true;
+                if (Images.TryEnsureCached(illust, out resourcePath, out error))
+                    return true;
+
+                if (!string.IsNullOrWhiteSpace(error))
+                    return false;
+            }
+
+            error = "No Pixiv illustrations matched the current filter rules.";
+            return false;
         }
 
         public bool TryDownloadNextUncached(out string? error)
@@ -54,10 +68,18 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 return false;
             }
 
-            if (!Api.TryGetUncachedFollowIllust(Images, out PixivIllustInfo illust, out error))
-                return false;
+            for (int attempt = 0; attempt < max_resolve_attempts; attempt++)
+            {
+                if (!Api.TryGetUncachedFollowIllust(Images, out PixivIllustInfo illust, out error))
+                    return false;
 
-            return Images.TryEnsureCached(illust, out _, out error);
+                if (!Filters.ShouldSaveToDisk(illust))
+                    continue;
+
+                return Images.TryEnsureCached(illust, out _, out error);
+            }
+
+            return false;
         }
 
         public void LogFailure(string context, string? error)

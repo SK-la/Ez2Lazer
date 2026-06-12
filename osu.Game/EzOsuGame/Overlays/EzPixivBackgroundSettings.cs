@@ -102,6 +102,53 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 Keywords = new[] { "pixiv", "background", "download", "auto", "cache", "bg_pixiv" }
             });
+
+            subsection.Add(new SettingsItemV2(new FormCheckBox
+            {
+                Caption = EzSettingsStrings.PIXIV_ALLOW_R18,
+                HintText = EzSettingsStrings.PIXIV_ALLOW_R18_TOOLTIP,
+                Current = ezConfig.GetBindable<bool>(Ez2Setting.PixivAllowR18),
+            })
+            {
+                Keywords = new[] { "pixiv", "r-18", "r18", "nsfw", "filter" }
+            });
+
+            addListSetting(subsection, ezConfig, Ez2Setting.PixivAccountWhitelist, EzSettingsStrings.PIXIV_ACCOUNT_WHITELIST, EzSettingsStrings.PIXIV_ACCOUNT_WHITELIST_TOOLTIP,
+                new[] { "pixiv", "whitelist", "account", "artist", "filter" });
+
+            addListSetting(subsection, ezConfig, Ez2Setting.PixivAccountBlacklist, EzSettingsStrings.PIXIV_ACCOUNT_BLACKLIST, EzSettingsStrings.PIXIV_ACCOUNT_BLACKLIST_TOOLTIP,
+                new[] { "pixiv", "blacklist", "account", "artist", "filter" });
+
+            addListSetting(subsection, ezConfig, Ez2Setting.PixivTagInclude, EzSettingsStrings.PIXIV_TAG_INCLUDE, EzSettingsStrings.PIXIV_TAG_INCLUDE_TOOLTIP,
+                new[] { "pixiv", "tag", "include", "filter" });
+
+            addListSetting(subsection, ezConfig, Ez2Setting.PixivTagExclude, EzSettingsStrings.PIXIV_TAG_EXCLUDE, EzSettingsStrings.PIXIV_TAG_EXCLUDE_TOOLTIP,
+                new[] { "pixiv", "tag", "exclude", "filter" });
+
+            addListSetting(subsection, ezConfig, Ez2Setting.PixivSkipSaveAccountPrefixes, EzSettingsStrings.PIXIV_SKIP_SAVE_ACCOUNT_PREFIXES,
+                EzSettingsStrings.PIXIV_SKIP_SAVE_ACCOUNT_PREFIXES_TOOLTIP, new[] { "pixiv", "save", "prefix", "account", "naming" });
+
+            addListSetting(subsection, ezConfig, Ez2Setting.PixivSkipSaveTags, EzSettingsStrings.PIXIV_SKIP_SAVE_TAGS, EzSettingsStrings.PIXIV_SKIP_SAVE_TAGS_TOOLTIP,
+                new[] { "pixiv", "save", "tag", "naming" });
+        }
+
+        private static void addListSetting(
+            SettingsSubsection subsection,
+            Ez2ConfigManager ezConfig,
+            Ez2Setting setting,
+            EzLocalizationManager.EzLocalisableString caption,
+            EzLocalizationManager.EzLocalisableString hint,
+            string[] keywords)
+        {
+            subsection.Add(new SettingsItemV2(new FormTextBox
+            {
+                Caption = caption,
+                HintText = hint,
+                Current = ezConfig.GetBindable<string>(setting),
+            })
+            {
+                Keywords = keywords
+            });
         }
 
         private static void post(INotificationOverlay? notifications, LocalisableString text)

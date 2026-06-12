@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using osu.Game.EzOsuGame;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
