@@ -23,5 +23,8 @@ namespace osu.Game.Configuration
 
         [Description("'EzResources/BG/*' from osu data folder")]
         Picture = 4,
+
+        [Description("Pixiv follow feed (requires pixiv_auth.json)")]
+        PixivFollow = 5,
     }
 }
