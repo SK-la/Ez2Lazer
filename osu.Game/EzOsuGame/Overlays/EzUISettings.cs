@@ -6,7 +6,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -22,14 +21,11 @@ namespace osu.Game.EzOsuGame.Overlays
         [BackgroundDependencyLoader]
         private void load(
             Ez2ConfigManager ezConfig,
-            PixivBackgroundCoordinator pixivBackgroundCoordinator,
             BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
             EzAnalysisWarmupProcessor? analysisWarmupProcessor,
             IDialogOverlay? dialogOverlay,
             INotificationOverlay? notifications)
         {
-            EzPixivBackgroundSettings.AddTo(this, ezConfig, pixivBackgroundCoordinator, notifications);
-
             AddRange(new Drawable[]
             {
                 new SettingsItemV2(new FormCheckBox

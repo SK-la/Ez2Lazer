@@ -6,6 +6,9 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Background.Pixiv;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -22,9 +25,14 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
         private readonly Bindable<SettingsNote.Data?> backgroundSourceNote = new Bindable<SettingsNote.Data?>();
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config, IAPIProvider api)
+        private void load(OsuConfigManager config, Ez2ConfigManager ezConfig,
+                          IAPIProvider api,
+                          PixivBackgroundCoordinator pixivBackgroundCoordinator,
+                          INotificationOverlay? notifications)
         {
             user = api.LocalUser.GetBoundCopy();
+
+            var backgroundSource = config.GetBindable<BackgroundSource>(OsuSetting.MenuBackgroundSource);
 
             Children = new Drawable[]
             {
@@ -57,11 +65,12 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                 new SettingsItemV2(new FormEnumDropdown<BackgroundSource>
                 {
                     Caption = UserInterfaceStrings.BackgroundSource,
-                    Current = config.GetBindable<BackgroundSource>(OsuSetting.MenuBackgroundSource),
+                    Current = backgroundSource,
                 })
                 {
                     Note = { BindTarget = backgroundSourceNote },
                 },
+                new EzPixivBackgroundSettings(ezConfig, pixivBackgroundCoordinator, notifications, backgroundSource),
                 new SettingsItemV2(new FormEnumDropdown<SeasonalBackgroundMode>
                 {
                     Caption = UserInterfaceStrings.SeasonalBackgrounds,
