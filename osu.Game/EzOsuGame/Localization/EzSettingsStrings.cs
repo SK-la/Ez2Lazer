@@ -365,12 +365,17 @@ namespace osu.Game.EzOsuGame.Localization
 
         #region Pixiv 背景
 
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTH_TOOL_HINT = new EzLocalizationManager.EzLocalisableString(
-            "请从 github.com/SK-la/EzPixivAuth Releases 下载 EzPixivAuth，双击运行后会自动写入本机 pixiv_auth.json（与 client.realm 同目录）。",
-            "Download EzPixivAuth from github.com/SK-la/EzPixivAuth Releases and run it to write pixiv_auth.json next to client.realm.");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTH_TOOL_HINT_PREFIX = new EzLocalizationManager.EzLocalisableString(
+            "请从 ",
+            "Download EzPixivAuth from ");
 
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_MANUAL_TOKEN = new EzLocalizationManager.EzLocalisableString(
-            "手动输入 refresh_token", "Enter refresh_token manually");
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTH_TOOL_HINT_LINK = new EzLocalizationManager.EzLocalisableString(
+            "EzPixivAuth Releases",
+            "EzPixivAuth Releases");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTH_TOOL_HINT_SUFFIX = new EzLocalizationManager.EzLocalisableString(
+            " 下载 EzPixivAuth，双击运行后会自动写入本机 pixiv_auth.json（与 client.realm 同目录）。",
+            " and run it to write pixiv_auth.json next to client.realm.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_MANUAL_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "仅当你已从其他途径获得 refresh_token 时使用。输入为隐藏显示，勿泄露给他人。",

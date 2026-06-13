@@ -77,7 +77,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 post(notifications, EzSettingsStrings.PIXIV_TOKEN_CLEARED);
             };
 
-            var manualToggleButton = createActionButton(EzSettingsStrings.PIXIV_MANUAL_TOKEN, EzSettingsStrings.PIXIV_MANUAL_TOKEN_TOOLTIP,
+            var manualToggleButton = createActionButton("refresh token", EzSettingsStrings.PIXIV_MANUAL_TOKEN_TOOLTIP,
                 new[] { "pixiv", "manual", "token", "advanced" }, new MarginPadding());
             manualToggleButton.Action = () => showManualTokenInput.Value = !showManualTokenInput.Value;
 
@@ -137,14 +137,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
                     Padding = SettingsPanel.CONTENT_PADDING,
-                    Child = new SettingsNote
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        Current =
-                        {
-                            Value = new SettingsNote.Data(EzSettingsStrings.PIXIV_AUTH_TOOL_HINT, SettingsNote.Type.Informational),
-                        },
-                    },
+                    Child = new EzPixivAuthToolHintNote(),
                 },
                 new FillFlowContainer
                 {
