@@ -70,11 +70,8 @@ namespace osu.Game.Screens.Select
 
         private IBindable<EzAnalysisResult>? ezAnalysisBindable;
         private CancellationTokenSource? ezAnalysisCancellationSource;
-        private ScheduledDelegate? scheduledEzAnalysisUpdate;
 
         private string? scratchText;
-
-        private const int mania_ui_update_throttle_ms = 15;
 
         private bool supportsEzAnalysis => EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value);
 
@@ -282,14 +279,9 @@ namespace osu.Game.Screens.Select
             {
                 resetEzDisplay();
                 updateKeyCount();
-                computeEzAnalysis();
             }, true);
 
-            mods.BindValueChanged(_ =>
-            {
-                updateKeyCount();
-                computeEzAnalysis();
-            }, true);
+            mods.BindValueChanged(_ => updateKeyCount(), true);
 
             Selected.BindValueChanged(s =>
             {
@@ -372,9 +364,6 @@ namespace osu.Game.Screens.Select
 
         private void clearEzAnalysisBinding(bool resetDisplay = true)
         {
-            scheduledEzAnalysisUpdate?.Cancel();
-            scheduledEzAnalysisUpdate = null;
-
             ezAnalysisBindable?.UnbindAll();
             ezAnalysisBindable = null;
 
@@ -411,7 +400,10 @@ namespace osu.Game.Screens.Select
                 scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, metrics.MaxKps, metrics.KpsList);
                 updateKeyCount();
                 ezDisplayKpc.ManiaSummary = maniaSummary;
-                displaySR.Current.Value = maniaSummary ?? EzManiaSummary.EMPTY;
+
+                var summaryForDisplay = maniaSummary ?? EzManiaSummary.EMPTY;
+                if (displaySR.Current.Value.XxySr != summaryForDisplay.XxySr)
+                    displaySR.Current.Value = summaryForDisplay;
             }
         }
 
@@ -425,36 +417,28 @@ namespace osu.Game.Screens.Select
 
         private void computeEzAnalysis()
         {
-            ezAnalysisCancellationSource?.Cancel();
-            ezAnalysisCancellationSource?.Dispose();
-            ezAnalysisCancellationSource = new CancellationTokenSource();
-
             if (Item == null)
                 return;
 
-            resetEzDisplay();
+            clearEzAnalysisBinding(resetDisplay: false);
+
+            ezAnalysisCancellationSource = new CancellationTokenSource();
 
             ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
-
-            if (EzSongSelectAnalysisDisplay.ShouldApplyPanelUpdate(ezAnalysisBindable.Value, mods.Value))
-                updateKPS(ezAnalysisBindable.Value);
-
             ezAnalysisBindable.BindValueChanged(result =>
             {
                 if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelUpdate(result.NewValue, mods.Value))
                     return;
 
-                scheduledEzAnalysisUpdate?.Cancel();
-                scheduledEzAnalysisUpdate = Scheduler.AddDelayed(() =>
-                {
-                    updateKPS(result.NewValue);
-                    scheduledEzAnalysisUpdate = null;
-                }, mania_ui_update_throttle_ms);
-            });
+                updateKPS(result.NewValue);
+            }, true);
         }
 
         private void computeStarRating()
         {
+            starDifficultyBindable?.UnbindAll();
+            starDifficultyBindable = null;
+
             starDifficultyCancellationSource?.Cancel();
             starDifficultyCancellationSource?.Dispose();
             starDifficultyCancellationSource = new CancellationTokenSource();
