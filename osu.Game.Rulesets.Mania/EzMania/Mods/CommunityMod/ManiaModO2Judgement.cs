@@ -1,6 +1,7 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -19,6 +20,7 @@ using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
+    [Obsolete("此Mod已废弃，游戏内功能已完全实现，不依赖Mod。")]
     public partial class ManiaModO2Judgement : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>, IApplicableToHUD
     {
         public static ManiaHitWindows HitWindows = new ManiaHitWindows();

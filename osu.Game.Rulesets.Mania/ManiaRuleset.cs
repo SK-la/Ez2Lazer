@@ -319,7 +319,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModPlayfieldTransformation(),
                         new ManiaModReleaseAdjust(),
                         new ManiaModRemedy(),
-                        new ModStarRatingRebirth(),
+                        // new ModStarRatingRebirth(),
                     };
 
                 case ModType.DifficultyReduction:

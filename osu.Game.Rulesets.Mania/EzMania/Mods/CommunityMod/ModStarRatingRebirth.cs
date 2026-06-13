@@ -17,6 +17,7 @@ using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
+    [Obsolete("此Mod已废弃，游戏内功能已完全实现，不依赖Mod。")]
     public class ModStarRatingRebirth : Mod, IApplicableAfterBeatmapConversion
     {
         public override string Name => "Star Rating Rebirth";

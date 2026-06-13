@@ -1,6 +1,7 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
@@ -13,6 +14,7 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
+    [Obsolete("此Mod已废弃，游戏内功能已完全实现，不依赖Mod。")]
     public class ManiaModO2Health : ModFailCondition, IApplicableAfterBeatmapConversion
     {
         public const int MAX_HEALTH = 1000;

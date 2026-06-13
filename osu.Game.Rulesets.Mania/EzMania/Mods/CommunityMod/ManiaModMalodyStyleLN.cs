@@ -20,6 +20,7 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
+    [Obsolete("此Mod已废弃，游戏内功能已完全实现，不依赖Mod。")]
     internal partial class ManiaModMalodyStyleLN : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
     {
         public override string Name => "No LN Judgement";
