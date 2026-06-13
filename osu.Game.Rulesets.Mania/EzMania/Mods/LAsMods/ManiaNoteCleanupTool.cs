@@ -9,42 +9,55 @@ using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
+    public enum NoteCleanupKeepStrategy
+    {
+        Older = 1,
+        Newer = 2,
+    }
+
+    public sealed class NoteCleanupOptions
+    {
+        public static NoteCleanupOptions Default { get; } = new NoteCleanupOptions();
+
+        public bool CleanOverlap { get; init; } = true;
+        public bool EnforceMinimumGaps { get; init; } = true;
+        public bool EnforceHoldReleaseGap { get; init; } = true;
+        public int BeatDivisor { get; init; } = 8;
+        public int MinimumGapMs { get; init; } = 30;
+        public NoteCleanupKeepStrategy KeepStrategy { get; init; } = NoteCleanupKeepStrategy.Older;
+    }
+
     public static class ManiaNoteCleanupTool
     {
         /// <summary>
-        /// 统一格式化铺面，去除重叠、高分等无法正常游玩的内容。
+        /// 统一格式化铺面，去除重叠、过密等无法正常游玩的内容。
         /// <para></para>缝隙检测为 30ms ~ 1/8 beatLength
         /// </summary>
-        /// <param name="beatmap"></param>
-        /// <param name="seed"></param>
-        public static void CleanupBeatmap(ManiaBeatmap beatmap, int? seed = null)
+        public static void CleanupBeatmap(ManiaBeatmap beatmap, int? seed = null) =>
+            CleanupBeatmap(beatmap, NoteCleanupOptions.Default);
+
+        public static void CleanupBeatmap(ManiaBeatmap beatmap, NoteCleanupOptions options)
         {
             if (beatmap.HitObjects.Count == 0)
                 return;
 
-            // 1) 先解决列冲突（考虑长按）
-            // if (beatmap.TotalColumns > 0)
-            // {
-            //     int usedSeed = seed ?? KrrConversionHelper.ComputeSeedFromBeatmap(beatmap);
-            //     var rng = new Random(usedSeed);
-            //     var resolved = KrrConversionHelper.ResolveFinalConflicts(beatmap.HitObjects.ToList(), beatmap.TotalColumns, gap, rng);
-            //     beatmap.HitObjects.Clear();
-            //     beatmap.HitObjects.AddRange(resolved);
-            // }
+            if (options.CleanOverlap)
+                CleanOverlapNotes(beatmap, options);
 
-            // 去除重叠并降低密度
-            CleanOverlapNotes(beatmap);
-            // Enforce hold-release gap and convert too-short holds to notes.
-            EnforceHoldReleaseGap(beatmap);
-            // 调整/转换可能再次引入过小间距，做一次最终兜底。
-            EnforceMinimumGaps(beatmap);
+            if (options.EnforceHoldReleaseGap)
+                EnforceHoldReleaseGap(beatmap, options);
+
+            if (options.EnforceMinimumGaps)
+                EnforceMinimumGaps(beatmap, options);
         }
 
         /// <summary>
         /// 清理重叠note，重叠LN
         /// </summary>
-        /// <param name="beatmap"></param>
-        public static void CleanOverlapNotes(ManiaBeatmap beatmap)
+        public static void CleanOverlapNotes(ManiaBeatmap beatmap) =>
+            CleanOverlapNotes(beatmap, NoteCleanupOptions.Default);
+
+        public static void CleanOverlapNotes(ManiaBeatmap beatmap, NoteCleanupOptions options)
         {
             if (beatmap.HitObjects.Count == 0)
                 return;
@@ -87,25 +100,32 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             return getMinimumGapAtTime(beatmap, startTime, beat);
         }
 
-        private static double getMinimumGapAtTime(ManiaBeatmap beatmap, double time, int beat = 8)
+        public static double GetMinimumGapMs(ManiaBeatmap beatmap, double time, NoteCleanupOptions options) =>
+            getMinimumGapAtTime(beatmap, time, options);
+
+        private static double getMinimumGapAtTime(ManiaBeatmap beatmap, double time, NoteCleanupOptions options)
         {
-            int safeBeatDivisor = Math.Max(1, beat);
+            int safeBeatDivisor = Math.Max(1, options.BeatDivisor);
             double beatLength = beatmap.ControlPointInfo.TimingPointAt(time).BeatLength;
 
             if (beatLength <= 0)
-                return 30;
+                return options.MinimumGapMs;
 
             double beatGap = beatLength / safeBeatDivisor;
 
-            // 保留“按节拍”判定，同时使用 30ms 作为保守下限，避免高速段阈值过小。
-            return Math.Max(30, beatGap);
+            return Math.Max(options.MinimumGapMs, beatGap);
         }
+
+        private static double getMinimumGapAtTime(ManiaBeatmap beatmap, double time, int beat = 8) =>
+            getMinimumGapAtTime(beatmap, time, new NoteCleanupOptions { BeatDivisor = beat });
 
         /// <summary>
         /// 中位去除高速note，长按
         /// </summary>
-        /// <param name="beatmap"></param>
-        public static void EnforceMinimumGaps(ManiaBeatmap beatmap)
+        public static void EnforceMinimumGaps(ManiaBeatmap beatmap) =>
+            EnforceMinimumGaps(beatmap, NoteCleanupOptions.Default);
+
+        public static void EnforceMinimumGaps(ManiaBeatmap beatmap, NoteCleanupOptions options)
         {
             if (beatmap.HitObjects.Count == 0)
                 return;
@@ -129,11 +149,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     var current = list[i];
 
                     double prevEnd = prev is HoldNote prevHold ? prevHold.EndTime : prev.StartTime;
-                    double requiredGap = getMinimumGapAtTime(beatmap, prevEnd);
+                    double requiredGap = getMinimumGapAtTime(beatmap, prevEnd, options);
                     double actualGap = current.StartTime - prevEnd;
 
                     if (actualGap < requiredGap)
+                    {
+                        if (options.KeepStrategy == NoteCleanupKeepStrategy.Newer)
+                        {
+                            kept.RemoveAt(kept.Count - 1);
+                            kept.Add(current);
+                        }
+
                         continue;
+                    }
 
                     kept.Add(current);
                 }
@@ -141,18 +169,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 survivors.AddRange(kept);
             }
 
-            // 用筛选后的音符替换地图中的对象，并保留顺序
             beatmap.HitObjects.Clear();
             beatmap.HitObjects.AddRange(survivors.OrderBy(o => o.StartTime).ThenBy(o => o.Column));
         }
 
         /// <summary>
-        /// 截断过短的 反键缝隙，默认最大允许 1/8 beat
+        /// 截断过短的反键缝隙，默认最大允许 1/8 beat
         /// <para>面尾缩短避让下一个note</para>面过短则降低为米
         /// </summary>
-        /// <param name="beatmap"></param>
-        /// <param name="beat"></param>
-        public static void EnforceHoldReleaseGap(ManiaBeatmap beatmap, int beat = 8)
+        public static void EnforceHoldReleaseGap(ManiaBeatmap beatmap, int beat = 8) =>
+            EnforceHoldReleaseGap(beatmap, new NoteCleanupOptions { BeatDivisor = beat });
+
+        public static void EnforceHoldReleaseGap(ManiaBeatmap beatmap, NoteCleanupOptions options)
         {
             if (beatmap.HitObjects.Count == 0)
                 return;
@@ -169,21 +197,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                         continue;
 
                     var next = list[i + 1];
-                    double minGapMs = getMinimumGapAtTime(beatmap, next.StartTime, beat);
+                    double minGapMs = getMinimumGapAtTime(beatmap, next.StartTime, options);
                     double gap = next.StartTime - hold.EndTime;
 
                     if (gap >= minGapMs)
                         continue;
 
-                    // 反键缝隙微调
                     double newEnd = next.StartTime - minGapMs;
 
                     if (newEnd <= hold.EndTime)
-                    {
                         hold.EndTime = newEnd;
-                    }
 
-                    // 长按过短就转米
                     if (hold.EndTime - hold.StartTime < minGapMs)
                     {
                         var note = new Note { StartTime = hold.StartTime, Column = hold.Column, Samples = hold.Samples.ToList() };

@@ -275,6 +275,7 @@ namespace osu.Game.Rulesets.Mania
                     {
                         new ManiaModEz2Settings(),
                         new ManiaModCleanColumn(),
+                        new ManiaModNoteCleanup(),
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
                         new ManiaModPatternShift(),
@@ -299,7 +300,6 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModAdjust(),
                         new ManiaModNtoM(),
                         new ManiaModNtoMAnother(),
-                        new ManiaModCleaner(),
                         new ManiaModNewJudgement(),
                         new ManiaModNoteAdjust(),
                         new ManiaModHealthAdaptive(),
