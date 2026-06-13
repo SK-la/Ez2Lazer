@@ -377,6 +377,14 @@ namespace osu.Game.EzOsuGame.Localization
             " 下载 EzPixivAuth，双击运行后会自动写入本机 pixiv_auth.json（与 client.realm 同目录）。",
             " and run it to write pixiv_auth.json next to client.realm.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CUSTOM_TOOL_HINT = new EzLocalizationManager.EzLocalisableString(
+            "自定义",
+            "Custom");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CUSTOM_TOOL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "展开高级选项：手动 refresh_token、反代地址、过滤、黑白名单。",
+            "Show advanced options: manual refresh_token, proxy URL, filters, and artist/tag lists.");
+
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_MANUAL_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "仅当你已从其他途径获得 refresh_token 时使用。输入为隐藏显示，勿泄露给他人。",
             "Only if you already have a refresh_token from elsewhere. Input is masked; do not share it.");

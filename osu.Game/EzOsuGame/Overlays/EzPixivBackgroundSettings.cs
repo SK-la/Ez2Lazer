@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly INotificationOverlay? notifications;
         private readonly Bindable<SettingsNote.Data?> statusNote = new Bindable<SettingsNote.Data?>();
         private readonly Bindable<string> tokenInput = new Bindable<string>(string.Empty);
-        private readonly BindableBool showManualTokenInput = new BindableBool();
+        private readonly BindableBool showAdvancedSettings = new BindableBool();
 
         public EzPixivBackgroundSettings(
             Ez2ConfigManager ezConfig,
@@ -75,11 +75,11 @@ namespace osu.Game.EzOsuGame.Overlays
                 post(notifications, EzSettingsStrings.PIXIV_TOKEN_CLEARED);
             };
 
-            var manualToggleButton = createActionButton("refresh token", EzSettingsStrings.PIXIV_MANUAL_TOKEN_TOOLTIP,
-                new[] { "pixiv", "manual", "token", "advanced" }, new MarginPadding());
-            manualToggleButton.Action = () => showManualTokenInput.Value = !showManualTokenInput.Value;
+            var customToggleButton = createActionButton(EzSettingsStrings.PIXIV_CUSTOM_TOOL_HINT, EzSettingsStrings.PIXIV_CUSTOM_TOOL_TOOLTIP,
+                new[] { "pixiv", "custom", "advanced", "filter", "proxy", "token" }, new MarginPadding());
+            customToggleButton.Action = () => showAdvancedSettings.Value = !showAdvancedSettings.Value;
 
-            var manualTokenSection1 = new FillFlowContainer
+            var advancedSection1 = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
@@ -89,11 +89,19 @@ namespace osu.Game.EzOsuGame.Overlays
                     new SettingsItemV2(new PixivTokenFormTextBox
                     {
                         Caption = EzSettingsStrings.PIXIV_REFRESH_TOKEN,
-                        HintText = EzSettingsStrings.PIXIV_REFRESH_TOKEN_TOOLTIP,
+                        HintText = EzSettingsStrings.PIXIV_MANUAL_TOKEN_TOOLTIP,
                         Current = tokenInput,
                     })
                     {
                         Keywords = new[] { "pixiv", "background", "refresh", "token", "auth", "manual" }
+                    },
+                    new FillFlowContainer
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Direction = FillDirection.Horizontal,
+                        Padding = SettingsPanel.CONTENT_PADDING,
+                        Children = new Drawable[] { saveButton },
                     },
                     new SettingsItemV2(new FormTextBox
                     {
@@ -104,24 +112,42 @@ namespace osu.Game.EzOsuGame.Overlays
                     {
                         Keywords = new[] { "pixiv", "background", "proxy", "api", "reverse", "反代" }
                     },
-                    new FillFlowContainer
+                    new SettingsItemV2(new FormCheckBox
                     {
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Direction = FillDirection.Horizontal,
-                        Padding = SettingsPanel.CONTENT_PADDING,
-                        Children = new Drawable[] { saveButton },
+                        Caption = EzSettingsStrings.PIXIV_ALLOW_R18,
+                        HintText = EzSettingsStrings.PIXIV_ALLOW_R18_TOOLTIP,
+                        Current = ezConfig.GetBindable<bool>(Ez2Setting.PixivAllowR18),
+                    })
+                    {
+                        Keywords = new[] { "pixiv", "r-18", "r18", "nsfw", "filter" }
                     },
+                    new SettingsItemV2(new FormCheckBox
+                    {
+                        Caption = EzSettingsStrings.PIXIV_LANDSCAPE_ONLY,
+                        HintText = EzSettingsStrings.PIXIV_LANDSCAPE_ONLY_TOOLTIP,
+                        Current = ezConfig.GetBindable<bool>(Ez2Setting.PixivLandscapeOnly),
+                    })
+                    {
+                        Keywords = new[] { "pixiv", "landscape", "horizontal", "横图", "filter", "aspect" }
+                    },
+                    createListSetting(ezConfig, Ez2Setting.PixivAccountWhitelist, EzSettingsStrings.PIXIV_ACCOUNT_WHITELIST, EzSettingsStrings.PIXIV_ACCOUNT_WHITELIST_TOOLTIP,
+                        new[] { "pixiv", "whitelist", "account", "artist", "filter" }),
+                    createListSetting(ezConfig, Ez2Setting.PixivAccountBlacklist, EzSettingsStrings.PIXIV_ACCOUNT_BLACKLIST, EzSettingsStrings.PIXIV_ACCOUNT_BLACKLIST_TOOLTIP,
+                        new[] { "pixiv", "blacklist", "account", "artist", "filter" }),
+                    createListSetting(ezConfig, Ez2Setting.PixivTagInclude, EzSettingsStrings.PIXIV_TAG_INCLUDE, EzSettingsStrings.PIXIV_TAG_INCLUDE_TOOLTIP,
+                        new[] { "pixiv", "tag", "include", "filter" }),
+                    createListSetting(ezConfig, Ez2Setting.PixivTagExclude, EzSettingsStrings.PIXIV_TAG_EXCLUDE, EzSettingsStrings.PIXIV_TAG_EXCLUDE_TOOLTIP,
+                        new[] { "pixiv", "tag", "exclude", "filter" }),
                 },
             };
 
-            showManualTokenInput.BindValueChanged(change =>
+            showAdvancedSettings.BindValueChanged(change =>
             {
                 if (change.NewValue)
-                    manualTokenSection1.Show();
+                    advancedSection1.Show();
                 else
                 {
-                    manualTokenSection1.Hide();
+                    advancedSection1.Hide();
                     tokenInput.Value = string.Empty;
                 }
             }, true);
@@ -156,10 +182,10 @@ namespace osu.Game.EzOsuGame.Overlays
                     {
                         checkButton,
                         clearButton,
-                        manualToggleButton,
+                        customToggleButton,
                     }
                 },
-                manualTokenSection1,
+                advancedSection1,
                 new SettingsItemV2(new FormCheckBox
                 {
                     Caption = EzSettingsStrings.PIXIV_AUTO_DOWNLOAD_ENABLED,
@@ -169,32 +195,6 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "pixiv", "background", "download", "auto", "cache", "bg_pixiv" }
                 },
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = EzSettingsStrings.PIXIV_ALLOW_R18,
-                    HintText = EzSettingsStrings.PIXIV_ALLOW_R18_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.PixivAllowR18),
-                })
-                {
-                    Keywords = new[] { "pixiv", "r-18", "r18", "nsfw", "filter" }
-                },
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = EzSettingsStrings.PIXIV_LANDSCAPE_ONLY,
-                    HintText = EzSettingsStrings.PIXIV_LANDSCAPE_ONLY_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.PixivLandscapeOnly),
-                })
-                {
-                    Keywords = new[] { "pixiv", "landscape", "horizontal", "横图", "filter", "aspect" }
-                },
-                createListSetting(ezConfig, Ez2Setting.PixivAccountWhitelist, EzSettingsStrings.PIXIV_ACCOUNT_WHITELIST, EzSettingsStrings.PIXIV_ACCOUNT_WHITELIST_TOOLTIP,
-                    new[] { "pixiv", "whitelist", "account", "artist", "filter" }),
-                createListSetting(ezConfig, Ez2Setting.PixivAccountBlacklist, EzSettingsStrings.PIXIV_ACCOUNT_BLACKLIST, EzSettingsStrings.PIXIV_ACCOUNT_BLACKLIST_TOOLTIP,
-                    new[] { "pixiv", "blacklist", "account", "artist", "filter" }),
-                createListSetting(ezConfig, Ez2Setting.PixivTagInclude, EzSettingsStrings.PIXIV_TAG_INCLUDE, EzSettingsStrings.PIXIV_TAG_INCLUDE_TOOLTIP,
-                    new[] { "pixiv", "tag", "include", "filter" }),
-                createListSetting(ezConfig, Ez2Setting.PixivTagExclude, EzSettingsStrings.PIXIV_TAG_EXCLUDE, EzSettingsStrings.PIXIV_TAG_EXCLUDE_TOOLTIP,
-                    new[] { "pixiv", "tag", "exclude", "filter" }),
             };
 
             backgroundSource.BindValueChanged(change =>
