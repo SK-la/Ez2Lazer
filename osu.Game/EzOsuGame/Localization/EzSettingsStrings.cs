@@ -443,6 +443,36 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_SUCCESS = new EzLocalizationManager.EzLocalisableString("Pixiv 登录成功：@{0}", "Pixiv login OK: @{0}");
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_FAILED = new EzLocalizationManager.EzLocalisableString("Pixiv 登录验证失败。", "Pixiv login verification failed.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_TOKEN_REFRESH_FAILED = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv 凭证刷新失败。", "Pixiv token refresh failed.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_TOKEN_REFRESH_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv 凭证刷新未返回 access token。", "Pixiv token refresh returned an empty access token.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_ACCESS_TOKEN_NOT_SET = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv access token 未就绪。", "Pixiv access token is not set.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_FOLLOW_FEED_FAILED = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv 关注流加载失败。", "Failed to load Pixiv follow feed.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_FOLLOW_FEED_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv 关注流过滤后无可用插图。", "Pixiv follow feed returned no illustrations after filtering.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_IMAGE_DOWNLOAD_FAILED = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv 插图下载失败。", "Failed to download Pixiv image.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_IMAGE_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv 插图下载结果为空。", "Downloaded Pixiv image was empty.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_REQUEST_FAILED = new EzLocalizationManager.EzLocalisableString(
+            "Pixiv 网络请求失败。", "Pixiv network request failed.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_LOG_SONG_CHANGE_DOWNLOAD = new EzLocalizationManager.EzLocalisableString(
+            "切歌下载", "Song change download");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_LOG_AUTO_PREFETCH = new EzLocalizationManager.EzLocalisableString(
+            "自动预缓存", "Auto prefetch");
+
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTO_DOWNLOAD_ENABLED = new EzLocalizationManager.EzLocalisableString(
             "Pixiv 自动下载", "Pixiv background auto-download");
 

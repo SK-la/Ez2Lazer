@@ -8,8 +8,10 @@ using System.Net;
 using System.Net.Http;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.EzOsuGame.Localization;
 using WebRequest = osu.Framework.IO.Network.WebRequest;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
@@ -68,7 +70,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
         }
 
-        public bool TryRefreshAccessToken(out string? accessToken, out string? error)
+        public bool TryRefreshAccessToken(out string? accessToken, out LocalisableString? error)
         {
             lock (tokenLock)
             {
@@ -85,7 +87,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (string.IsNullOrWhiteSpace(refreshToken))
             {
                 accessToken = null;
-                error = "Pixiv 未配置：请使用 EzPixivAuth 工具登录，或在高级选项中手动保存 refresh_token。";
+                error = EzSettingsStrings.PIXIV_STATUS_NOT_CONFIGURED;
                 return false;
             }
 
@@ -103,7 +105,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 if (request.ResponseStatusCode != HttpStatusCode.OK)
                 {
                     accessToken = null;
-                    error = request.GetResponseString() ?? "Pixiv token refresh failed.";
+                    error = EzSettingsStrings.PIXIV_ERROR_TOKEN_REFRESH_FAILED;
+                    Logger.Log($"[Pixiv] token refresh HTTP {request.ResponseStatusCode}: {request.GetResponseString()}", LoggingTarget.Network, LogLevel.Important);
                     invalidateAccessToken();
                     return false;
                 }
@@ -136,7 +139,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                     if (string.IsNullOrWhiteSpace(cachedAccessToken))
                     {
                         accessToken = null;
-                        error = "Pixiv token refresh returned an empty access token.";
+                        error = EzSettingsStrings.PIXIV_ERROR_TOKEN_REFRESH_EMPTY;
                         invalidateAccessToken();
                         return false;
                     }
@@ -149,7 +152,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             catch (Exception ex)
             {
                 accessToken = null;
-                error = ex.Message;
+                error = EzSettingsStrings.PIXIV_ERROR_REQUEST_FAILED;
+                Logger.Log($"[Pixiv] token refresh: {ex.Message}", LoggingTarget.Network, LogLevel.Important);
                 invalidateAccessToken();
                 return false;
             }

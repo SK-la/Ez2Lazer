@@ -7,10 +7,12 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Utils;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using WebRequest = osu.Framework.IO.Network.WebRequest;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
@@ -94,7 +96,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
         public bool IsCached(PixivIllustInfo illust) => tryResolveExistingPath(illust, out _);
 
-        public bool TryEnsureCached(PixivIllustInfo illust, out string resourcePath, out string? error)
+        public bool TryEnsureCached(PixivIllustInfo illust, out string resourcePath, out LocalisableString? error)
         {
             if (tryResolveExistingPath(illust, out resourcePath))
             {
@@ -155,7 +157,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 yield return illust.UserName;
         }
 
-        private bool tryDownload(PixivIllustInfo illust, string resourcePath, out string? error)
+        private bool tryDownload(PixivIllustInfo illust, string resourcePath, out LocalisableString? error)
         {
             error = null;
 
@@ -180,7 +182,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
                 if (request.ResponseStatusCode != HttpStatusCode.OK)
                 {
-                    error = request.GetResponseString() ?? "Failed to download Pixiv image.";
+                    error = EzSettingsStrings.PIXIV_ERROR_IMAGE_DOWNLOAD_FAILED;
+                    Logger.Log($"[Pixiv] image download HTTP {request.ResponseStatusCode}: {request.GetResponseString()}", LoggingTarget.Network, LogLevel.Important);
                     return false;
                 }
 
@@ -188,7 +191,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
                 if (data != null && data.Length == 0)
                 {
-                    error = "Downloaded Pixiv image was empty.";
+                    error = EzSettingsStrings.PIXIV_ERROR_IMAGE_EMPTY;
                     return false;
                 }
 
@@ -198,7 +201,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
             catch (Exception ex)
             {
-                error = ex.Message;
+                error = EzSettingsStrings.PIXIV_ERROR_REQUEST_FAILED;
+                Logger.Log($"[Pixiv] image download: {ex.Message}", LoggingTarget.Network, LogLevel.Important);
                 return false;
             }
         }

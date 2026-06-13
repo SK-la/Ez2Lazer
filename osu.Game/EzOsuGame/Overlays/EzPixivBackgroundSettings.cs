@@ -242,7 +242,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             Task.Run(() =>
             {
-                bool success = coordinator.TryVerifyLogin(out string? account, out string? error);
+                bool success = coordinator.TryVerifyLogin(out string? account, out LocalisableString? error);
 
                 Schedule(() =>
                 {

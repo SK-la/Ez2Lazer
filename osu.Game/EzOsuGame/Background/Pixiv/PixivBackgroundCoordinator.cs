@@ -3,9 +3,11 @@
 
 using System.Threading;
 using System.Threading.Tasks;
+using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
@@ -72,8 +74,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             {
                 try
                 {
-                    if (!tryDownloadOnSongChange(out string? error))
-                        LogFailure("Song change download", error);
+                    if (!tryDownloadOnSongChange(out LocalisableString? error))
+                        LogFailure(EzSettingsStrings.PIXIV_LOG_SONG_CHANGE_DOWNLOAD, error);
                 }
                 finally
                 {
@@ -82,7 +84,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             });
         }
 
-        public bool RunBackgroundPrefetch(out string? error)
+        public bool RunBackgroundPrefetch(out LocalisableString? error)
         {
             if (!ezConfig.Get<bool>(Ez2Setting.PixivAutoDownloadEnabled))
             {
@@ -96,14 +98,14 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         /// <summary>
         /// Refreshes the access token and returns the saved account name. Intended for background threads only.
         /// </summary>
-        public bool TryVerifyLogin(out string? account, out string? error)
+        public bool TryVerifyLogin(out string? account, out LocalisableString? error)
         {
             account = null;
             error = null;
 
             if (!Auth.HasRefreshToken)
             {
-                error = "Pixiv refresh token is not configured.";
+                error = EzSettingsStrings.PIXIV_STATUS_NOT_CONFIGURED;
                 return false;
             }
 
@@ -118,9 +120,9 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return true;
         }
 
-        public void LogFailure(string context, string? error)
+        public void LogFailure(LocalisableString context, LocalisableString? error)
         {
-            if (string.IsNullOrWhiteSpace(error))
+            if (error == null)
                 return;
 
             Logger.Log($"[Pixiv] {context}: {error}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
@@ -129,7 +131,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         /// <summary>
         /// Song change: at most one feed page and one image download.
         /// </summary>
-        private bool tryDownloadOnSongChange(out string? error)
+        private bool tryDownloadOnSongChange(out LocalisableString? error)
         {
             error = null;
             long? excludeIllustId = lastIllustId > 0 ? lastIllustId : null;
@@ -146,13 +148,13 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return Images.TryEnsureCached(illust, out _, out error);
         }
 
-        private bool tryDownloadNextCatalogIllust(out string? error)
+        private bool tryDownloadNextCatalogIllust(out LocalisableString? error)
         {
             error = null;
 
             if (!Auth.HasRefreshToken)
             {
-                error = "Pixiv refresh token is not configured.";
+                error = EzSettingsStrings.PIXIV_STATUS_NOT_CONFIGURED;
                 return false;
             }
 

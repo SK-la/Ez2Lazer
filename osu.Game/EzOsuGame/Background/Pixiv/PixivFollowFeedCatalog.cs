@@ -3,9 +3,11 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Utils;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
@@ -46,15 +48,15 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 return entries.Count(entry => !images.IsCached(entry));
         }
 
-        public bool EnsureMinimum(out string? error) => EnsureMinimum(PixivConstants.FOLLOW_FEED_MIN_CATALOG_SIZE, out error);
+        public bool EnsureMinimum(out LocalisableString? error) => EnsureMinimum(PixivConstants.FOLLOW_FEED_MIN_CATALOG_SIZE, out error);
 
-        public bool EnsureMinimum(int minimum, out string? error)
+        public bool EnsureMinimum(int minimum, out LocalisableString? error)
         {
             lock (gate)
                 return ensureMinimumLocked(minimum, out error);
         }
 
-        public bool AppendNextPage(out string? error)
+        public bool AppendNextPage(out LocalisableString? error)
         {
             lock (gate)
             {
@@ -120,7 +122,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
         }
 
-        private bool ensureMinimumLocked(int minimum, out string? error)
+        private bool ensureMinimumLocked(int minimum, out LocalisableString? error)
         {
             error = null;
 
@@ -141,14 +143,14 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
             if (entries.Count == 0)
             {
-                error = "Pixiv follow feed returned no illustrations after filtering.";
+                error = EzSettingsStrings.PIXIV_ERROR_FOLLOW_FEED_EMPTY;
                 return false;
             }
 
             return true;
         }
 
-        private bool appendPageLocked(out string? error)
+        private bool appendPageLocked(out LocalisableString? error)
         {
             error = null;
 
@@ -170,7 +172,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return true;
         }
 
-        private bool refreshAccessToken(out string? error)
+        private bool refreshAccessToken(out LocalisableString? error)
         {
             if (!auth.TryRefreshAccessToken(out string? accessToken, out error))
                 return false;

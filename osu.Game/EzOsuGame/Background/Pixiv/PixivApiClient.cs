@@ -7,8 +7,10 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using Newtonsoft.Json.Linq;
+using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using WebRequest = osu.Framework.IO.Network.WebRequest;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
@@ -29,14 +31,14 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
         public void SetAccessToken(string token) => accessToken = token;
 
-        public bool TryFetchFollowFeedPage(string url, List<PixivIllustInfo> output, out string? nextUrl, out string? error)
+        public bool TryFetchFollowFeedPage(string url, List<PixivIllustInfo> output, out string? nextUrl, out LocalisableString? error)
         {
             nextUrl = null;
             error = null;
 
             if (string.IsNullOrWhiteSpace(accessToken))
             {
-                error = "Pixiv access token is not set.";
+                error = EzSettingsStrings.PIXIV_ERROR_ACCESS_TOKEN_NOT_SET;
                 return false;
             }
 
@@ -54,7 +56,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return true;
         }
 
-        public bool TryGetUserAccount(out string? account, out string? error)
+        public bool TryGetUserAccount(out string? account, out LocalisableString? error)
         {
             account = null;
             error = null;
@@ -75,7 +77,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return true;
         }
 
-        private bool tryProbeAuthenticatedApi(string token, out string? error)
+        private bool tryProbeAuthenticatedApi(string token, out LocalisableString? error)
         {
             error = null;
 
@@ -87,17 +89,19 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 if (request.ResponseStatusCode == HttpStatusCode.OK)
                     return true;
 
-                error = request.GetResponseString() ?? "Pixiv login verification failed.";
+                error = EzSettingsStrings.PIXIV_VERIFY_FAILED;
+                Logger.Log($"[Pixiv] login probe HTTP {request.ResponseStatusCode}: {request.GetResponseString()}", LoggingTarget.Network, LogLevel.Important);
                 return false;
             }
             catch (Exception ex)
             {
-                error = ex.Message;
+                error = EzSettingsStrings.PIXIV_ERROR_REQUEST_FAILED;
+                Logger.Log($"[Pixiv] login probe: {ex.Message}", LoggingTarget.Network, LogLevel.Important);
                 return false;
             }
         }
 
-        private bool tryFetchIllusts(string url, List<PixivIllustInfo> output, ref FeedCollectStats stats, out string? nextUrl, out string? error)
+        private bool tryFetchIllusts(string url, List<PixivIllustInfo> output, ref FeedCollectStats stats, out string? nextUrl, out LocalisableString? error)
         {
             nextUrl = null;
             error = null;
@@ -109,7 +113,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
                 if (request.ResponseStatusCode != HttpStatusCode.OK)
                 {
-                    error = request.GetResponseString() ?? "Failed to load Pixiv follow feed.";
+                    error = EzSettingsStrings.PIXIV_ERROR_FOLLOW_FEED_FAILED;
+                    Logger.Log($"[Pixiv] follow feed HTTP {request.ResponseStatusCode}: {request.GetResponseString()}", LoggingTarget.Network, LogLevel.Important);
                     return false;
                 }
 
@@ -152,7 +157,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
             catch (Exception ex)
             {
-                error = ex.Message;
+                error = EzSettingsStrings.PIXIV_ERROR_REQUEST_FAILED;
+                Logger.Log($"[Pixiv] follow feed: {ex.Message}", LoggingTarget.Network, LogLevel.Important);
                 return false;
             }
         }

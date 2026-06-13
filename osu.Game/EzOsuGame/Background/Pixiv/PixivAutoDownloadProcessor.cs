@@ -6,8 +6,10 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Development;
 using osu.Framework.Graphics;
+using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
@@ -73,10 +75,10 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             {
                 try
                 {
-                    coordinator.RunBackgroundPrefetch(out string? error);
+                    coordinator.RunBackgroundPrefetch(out LocalisableString? error);
 
-                    if (!string.IsNullOrWhiteSpace(error))
-                        coordinator.LogFailure("Auto prefetch", error);
+                    if (error != null)
+                        coordinator.LogFailure(EzSettingsStrings.PIXIV_LOG_AUTO_PREFETCH, error);
                 }
                 finally
                 {
