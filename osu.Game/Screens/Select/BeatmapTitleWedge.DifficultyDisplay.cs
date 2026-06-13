@@ -26,6 +26,7 @@ using osu.Game.Online.Chat;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Screens.Select
@@ -215,7 +216,8 @@ namespace osu.Game.Screens.Select
                                                     {
                                                         Anchor = Anchor.CentreLeft,
                                                         Origin = Anchor.CentreLeft,
-                                                        RelativeSizeAxes = Axes.Y,
+                                                        Scale = new Vector2(1.25f),
+                                                        // RelativeSizeAxes = Axes.Y,
                                                     },
                                                     Empty(),
                                                     difficultyStatisticsDisplay = new DifficultyStatisticsDisplay(autoSize: true),

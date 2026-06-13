@@ -64,12 +64,11 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             AutoSizeAxes = Axes.X;
             RelativeSizeAxes = Axes.Y;
-            Margin = new MarginPadding { Horizontal = 8f, Vertical = 2f };
 
             InternalChild = new Container
             {
                 Masking = true,
-                CornerRadius = 5,
+                CornerRadius = 6,
                 AutoSizeAxes = Axes.X,
                 RelativeSizeAxes = Axes.Y,
                 Children = new Drawable[]
@@ -77,14 +76,14 @@ namespace osu.Game.EzOsuGame.UserInterface
                     new Box
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = Colour4.Black.Opacity(0.6f),
+                        Colour = Color4Extensions.FromHex("303d47"),
                     },
                     new Container
                     {
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
                         AutoSizeAxes = Axes.Both,
-                        Margin = new MarginPadding { Horizontal = 8f, Vertical = 2f },
+                        Margin = new MarginPadding { Horizontal = 7f, Vertical = 1.5f },
                         Children = new[]
                         {
                             columnNotesContainer = new FillFlowContainer
@@ -93,8 +92,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                                 Anchor = Anchor.CentreLeft,
                                 Origin = Anchor.CentreLeft,
                                 Direction = FillDirection.Horizontal,
-                                Spacing = new Vector2(5f, 0),
-                                Padding = new MarginPadding { Horizontal = 5f },
+                                Spacing = new Vector2(5f, 0f),
                             },
                         }
                     }
@@ -243,8 +241,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 for (int i = 0; i < currentColumnCount; i++)
                 {
-                    var c = barEntries[i].Container;
-                    if (c.Alpha < 0.99f) c.Show();
                     barEntries[i].SetValues(0, 0, 1);
                 }
 
@@ -255,8 +251,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 int total = i < columns ? columnNoteCounts[i] : 0;
                 int hold = (holdNoteCounts != null && i < columns) ? holdNoteCounts[i] : 0;
-                var c = barEntries[i].Container;
-                if (c.Alpha < 0.99f) c.Show();
+
                 barEntries[i].SetValues(total, hold, maxCount);
             }
         }
