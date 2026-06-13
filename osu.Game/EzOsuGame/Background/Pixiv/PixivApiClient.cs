@@ -18,12 +18,14 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
     {
         private readonly PixivAuthService authService;
         private readonly PixivFilterService filters;
+        private readonly Ez2ConfigManager ezConfig;
         private string? accessToken;
 
-        public PixivApiClient(PixivAuthService authService, PixivFilterService filters)
+        public PixivApiClient(PixivAuthService authService, PixivFilterService filters, Ez2ConfigManager ezConfig)
         {
             this.authService = authService;
             this.filters = filters;
+            this.ezConfig = ezConfig;
         }
 
         public void SetAccessToken(string token) => accessToken = token;
@@ -114,6 +116,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
                 var json = JObject.Parse(request.GetResponseString() ?? string.Empty);
                 nextUrl = PixivJsonHelper.ResolveNextUrl(json);
+                nextUrl = resolveApiUrl(nextUrl);
 
                 var illusts = PixivJsonHelper.ExtractIllustTokens(json);
                 stats.SeenIllustCount += illusts.Count;
@@ -307,9 +310,16 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                    ?? PixivJsonHelper.StringValue(pageUrls ?? new JObject(), "medium");
         }
 
-        private static WebRequest createApiRequest(string url, string token)
+        public string ResolveApiUrl(string url) => resolveApiUrl(url);
+
+        public string GetInitialFollowFeedUrl() => PixivApiProxy.GetInitialFollowFeedUrl(ezConfig.Get<string>(Ez2Setting.PixivApiProxyBaseUrl));
+
+        private string resolveApiUrl(string? url)
+            => PixivApiProxy.RewriteApiUrl(url ?? string.Empty, ezConfig.Get<string>(Ez2Setting.PixivApiProxyBaseUrl));
+
+        private WebRequest createApiRequest(string url, string token)
         {
-            var request = new WebRequest(url)
+            var request = new WebRequest(resolveApiUrl(url))
             {
                 Method = HttpMethod.Get,
             };

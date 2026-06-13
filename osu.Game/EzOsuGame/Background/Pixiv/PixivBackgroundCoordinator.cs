@@ -28,9 +28,11 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             this.ezConfig = ezConfig;
             Auth = new PixivAuthService(storage);
             Filters = new PixivFilterService(ezConfig);
-            Api = new PixivApiClient(Auth, Filters);
+            Api = new PixivApiClient(Auth, Filters, ezConfig);
             Images = new PixivImageStore(storage);
             Catalog = new PixivFollowFeedCatalog(Api, Auth, Images);
+
+            ezConfig.GetBindable<string>(Ez2Setting.PixivApiProxyBaseUrl).BindValueChanged(_ => Catalog.Invalidate());
         }
 
         /// <summary>

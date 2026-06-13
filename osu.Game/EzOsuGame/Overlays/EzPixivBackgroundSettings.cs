@@ -29,8 +29,6 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Bindable<string> tokenInput = new Bindable<string>(string.Empty);
         private readonly BindableBool showManualTokenInput = new BindableBool();
 
-        private FillFlowContainer manualTokenSection = null!;
-
         public EzPixivBackgroundSettings(
             Ez2ConfigManager ezConfig,
             PixivBackgroundCoordinator coordinator,
@@ -81,7 +79,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 new[] { "pixiv", "manual", "token", "advanced" }, new MarginPadding());
             manualToggleButton.Action = () => showManualTokenInput.Value = !showManualTokenInput.Value;
 
-            manualTokenSection = new FillFlowContainer
+            var manualTokenSection1 = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
@@ -97,6 +95,15 @@ namespace osu.Game.EzOsuGame.Overlays
                     {
                         Keywords = new[] { "pixiv", "background", "refresh", "token", "auth", "manual" }
                     },
+                    new SettingsItemV2(new FormTextBox
+                    {
+                        Caption = EzSettingsStrings.PIXIV_API_PROXY_BASE_URL,
+                        HintText = EzSettingsStrings.PIXIV_API_PROXY_BASE_URL_TOOLTIP,
+                        Current = ezConfig.GetBindable<string>(Ez2Setting.PixivApiProxyBaseUrl),
+                    })
+                    {
+                        Keywords = new[] { "pixiv", "background", "proxy", "api", "reverse", "反代" }
+                    },
                     new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.X,
@@ -111,10 +118,10 @@ namespace osu.Game.EzOsuGame.Overlays
             showManualTokenInput.BindValueChanged(change =>
             {
                 if (change.NewValue)
-                    manualTokenSection.Show();
+                    manualTokenSection1.Show();
                 else
                 {
-                    manualTokenSection.Hide();
+                    manualTokenSection1.Hide();
                     tokenInput.Value = string.Empty;
                 }
             }, true);
@@ -152,7 +159,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         manualToggleButton,
                     }
                 },
-                manualTokenSection,
+                manualTokenSection1,
                 new SettingsItemV2(new FormCheckBox
                 {
                     Caption = EzSettingsStrings.PIXIV_AUTO_DOWNLOAD_ENABLED,

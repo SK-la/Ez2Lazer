@@ -388,6 +388,21 @@ namespace osu.Game.EzOsuGame.Localization
             "粘贴后点「保存」。仅保存在本机。",
             "Paste and click Save. Stored locally only.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_API_PROXY_BASE_URL = new EzLocalizationManager.EzLocalisableString(
+            "API 反代地址", "API proxy base URL");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_API_PROXY_BASE_URL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "仅替换 app-api.pixiv.net 的 API 请求（OAuth 与图片下载仍直连）。"
+            + "\n留空则使用官方 API。"
+            + "\nCloudflare Workers 示例：https://pixiv.yourdomain.com"
+            + "\nVercel 示例：https://your-project.vercel.app/api"
+            + "\n参考：https://github.com/vmoranv/pixiv-proxy",
+            "Rewrites app-api.pixiv.net API calls only (OAuth and image downloads stay direct)."
+            + "\nLeave empty for the official API."
+            + "\nCloudflare Workers example: https://pixiv.yourdomain.com"
+            + "\nVercel example: https://your-project.vercel.app/api"
+            + "\nSee: https://github.com/vmoranv/pixiv-proxy");
+
         public const string PIXIV_AUTH_TOOL_RELEASES_URL = "https://github.com/SK-la/EzPixivAuth/releases";
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN = new EzLocalizationManager.EzLocalisableString("保存", "Save");

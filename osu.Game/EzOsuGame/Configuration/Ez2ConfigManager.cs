@@ -204,6 +204,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.PixivTagInclude, string.Empty);
             SetDefault(Ez2Setting.PixivTagExclude, string.Empty);
             SetDefault(Ez2Setting.PixivAutoDownloadEnabled, false);
+            SetDefault(Ez2Setting.PixivApiProxyBaseUrl, string.Empty);
 
             #endregion
 
@@ -895,6 +896,7 @@ namespace osu.Game.EzOsuGame.Configuration
         PixivTagInclude,
         PixivTagExclude,
         PixivAutoDownloadEnabled,
+        PixivApiProxyBaseUrl,
 
         // 实验性功能
         InputAudioLatencyTracker,

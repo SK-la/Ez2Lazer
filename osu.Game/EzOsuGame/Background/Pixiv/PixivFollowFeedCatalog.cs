@@ -18,8 +18,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         private readonly PixivAuthService auth;
         private readonly PixivImageStore images;
 
-        private readonly object gate = new();
-        private readonly List<PixivIllustInfo> entries = new();
+        private readonly object gate = new object();
+        private readonly List<PixivIllustInfo> entries = new List<PixivIllustInfo>();
 
         private string? nextPageUrl;
         private bool feedExhausted;
@@ -158,7 +158,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (!refreshAccessToken(out error))
                 return false;
 
-            string requestUrl = nextPageUrl ?? PixivConstants.ILLUST_FOLLOW_INITIAL_URL;
+            string requestUrl = nextPageUrl ?? api.GetInitialFollowFeedUrl();
 
             if (!api.TryFetchFollowFeedPage(requestUrl, entries, out string? newNextUrl, out error))
                 return false;
