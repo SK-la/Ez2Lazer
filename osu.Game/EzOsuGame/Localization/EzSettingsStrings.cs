@@ -389,16 +389,16 @@ namespace osu.Game.EzOsuGame.Localization
             "Paste and click Save. Stored locally only.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_API_PROXY_BASE_URL = new EzLocalizationManager.EzLocalisableString(
-            "API 反代地址", "API proxy base URL");
+            "反代地址", "Proxy base URL");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_API_PROXY_BASE_URL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "仅替换 app-api.pixiv.net 的 API 请求（OAuth 与图片下载仍直连）。"
-            + "\n留空则使用官方 API。"
+            "替换 app-api.pixiv.net 与 i.pximg.net 请求（OAuth 登录仍直连）。"
+            + "\n留空则全部直连官方。"
             + "\nCloudflare Workers 示例：https://pixiv.yourdomain.com"
             + "\nVercel 示例：https://your-project.vercel.app/api"
             + "\n参考：https://github.com/vmoranv/pixiv-proxy",
-            "Rewrites app-api.pixiv.net API calls only (OAuth and image downloads stay direct)."
-            + "\nLeave empty for the official API."
+            "Rewrites app-api.pixiv.net API calls and i.pximg.net image downloads (OAuth login stays direct)."
+            + "\nLeave empty to use official endpoints."
             + "\nCloudflare Workers example: https://pixiv.yourdomain.com"
             + "\nVercel example: https://your-project.vercel.app/api"
             + "\nSee: https://github.com/vmoranv/pixiv-proxy");

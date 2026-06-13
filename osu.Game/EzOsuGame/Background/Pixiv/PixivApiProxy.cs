@@ -6,12 +6,15 @@ using System;
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
     /// <summary>
-    /// Rewrites <c>app-api.pixiv.net</c> requests to a user-provided reverse proxy base (API only).
+    /// Rewrites Pixiv API and image CDN requests to a user-provided reverse proxy base.
     /// Compatible with proxies such as <see href="https://github.com/vmoranv/pixiv-proxy">pixiv-proxy</see>.
+    /// OAuth (<c>oauth.secure.pixiv.net</c>) is never rewritten.
     /// </summary>
     internal static class PixivApiProxy
     {
         private const string official_api_host = "app-api.pixiv.net";
+        private const string official_image_host = "i.pximg.net";
+        private const string image_proxy_path_prefix = "/image";
 
         public static string NormalizeBase(string? proxyBase)
         {
@@ -25,6 +28,12 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             => RewriteApiUrl(PixivConstants.ILLUST_FOLLOW_INITIAL_URL, proxyBase);
 
         public static string RewriteApiUrl(string url, string? proxyBase)
+            => rewriteUrl(url, proxyBase, official_api_host, additionalPathPrefix: null);
+
+        public static string RewriteImageUrl(string url, string? proxyBase)
+            => rewriteUrl(url, proxyBase, official_image_host, image_proxy_path_prefix);
+
+        private static string rewriteUrl(string url, string? proxyBase, string officialHost, string? additionalPathPrefix)
         {
             string normalizedBase = NormalizeBase(proxyBase);
 
@@ -34,7 +43,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? sourceUri))
                 return url;
 
-            if (!sourceUri.Host.Equals(official_api_host, StringComparison.OrdinalIgnoreCase))
+            if (!sourceUri.Host.Equals(officialHost, StringComparison.OrdinalIgnoreCase))
                 return url;
 
             if (!Uri.TryCreate(normalizedBase, UriKind.Absolute, out Uri? proxyUri))
@@ -42,6 +51,9 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
             string proxyPath = proxyUri.AbsolutePath.TrimEnd('/');
             string requestPath = sourceUri.AbsolutePath;
+
+            if (!string.IsNullOrEmpty(additionalPathPrefix))
+                requestPath = additionalPathPrefix + requestPath;
 
             string combinedPath = string.IsNullOrEmpty(proxyPath) || proxyPath == "/"
                 ? requestPath

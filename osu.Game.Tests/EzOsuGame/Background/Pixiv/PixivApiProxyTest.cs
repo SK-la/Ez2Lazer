@@ -54,12 +54,52 @@ namespace osu.Game.Tests.EzOsuGame.Background.Pixiv
         }
 
         [Test]
-        public void TestNonOfficialUrlIsUntouched()
+        public void TestNonOfficialApiUrlIsUntouched()
         {
+            const string oauth = "https://oauth.secure.pixiv.net/auth/token";
+
+            Assert.That(
+                PixivApiProxy.RewriteApiUrl(oauth, "https://pixiv.example.com"),
+                Is.EqualTo(oauth));
+        }
+
+        [Test]
+        public void TestCloudflareWorkerStyleImageProxy()
+        {
+            const string proxy = "https://pixiv.example.com";
             const string image = "https://i.pximg.net/img-original/img/2024/01/01/12345_p0.png";
 
             Assert.That(
-                PixivApiProxy.RewriteApiUrl(image, "https://pixiv.example.com"),
+                PixivApiProxy.RewriteImageUrl(image, proxy),
+                Is.EqualTo("https://pixiv.example.com/image/img-original/img/2024/01/01/12345_p0.png"));
+        }
+
+        [Test]
+        public void TestVercelImageProxy()
+        {
+            const string proxy = "https://pixiv-proxy-ivory.vercel.app/api";
+            const string image = "https://i.pximg.net/img-original/img/2024/01/01/12345_p0.png";
+
+            Assert.That(
+                PixivApiProxy.RewriteImageUrl(image, proxy),
+                Is.EqualTo("https://pixiv-proxy-ivory.vercel.app/api/image/img-original/img/2024/01/01/12345_p0.png"));
+        }
+
+        [Test]
+        public void TestEmptyProxyLeavesImageUrl()
+        {
+            const string image = "https://i.pximg.net/img-original/img/2024/01/01/12345_p0.png";
+
+            Assert.That(PixivApiProxy.RewriteImageUrl(image, null), Is.EqualTo(image));
+        }
+
+        [Test]
+        public void TestNonPixivImageHostIsUntouched()
+        {
+            const string image = "https://example.com/foo.png";
+
+            Assert.That(
+                PixivApiProxy.RewriteImageUrl(image, "https://pixiv.example.com"),
                 Is.EqualTo(image));
         }
 

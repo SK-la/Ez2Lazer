@@ -10,6 +10,7 @@ using System.Net.Http;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Utils;
+using osu.Game.EzOsuGame.Configuration;
 using WebRequest = osu.Framework.IO.Network.WebRequest;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
@@ -19,10 +20,12 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         private const int max_cached_pick_attempts = 32;
 
         private readonly Storage storage;
+        private readonly Ez2ConfigManager ezConfig;
 
-        public PixivImageStore(Storage storage)
+        public PixivImageStore(Storage storage, Ez2ConfigManager ezConfig)
         {
             this.storage = storage;
+            this.ezConfig = ezConfig;
         }
 
         public bool TryGetRandomCachedIllust(PixivFilterService filters, out PixivIllustInfo illust, out string resourcePath) =>
@@ -160,7 +163,11 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             {
                 ensureCacheDirectory();
 
-                using var request = new WebRequest(illust.ImageUrl)
+                string downloadUrl = PixivApiProxy.RewriteImageUrl(
+                    illust.ImageUrl,
+                    ezConfig.Get<string>(Ez2Setting.PixivApiProxyBaseUrl));
+
+                using var request = new WebRequest(downloadUrl)
                 {
                     Method = HttpMethod.Get,
                 };
