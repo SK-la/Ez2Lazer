@@ -236,15 +236,15 @@ namespace osu.Game.Screens.Select
                                 new FillFlowContainer
                                 {
                                     Direction = FillDirection.Horizontal,
+                                    Padding = new MarginPadding { Top = 2, Bottom = 2 },
+                                    Spacing = new Vector2(3),
                                     AutoSizeAxes = Axes.Both,
-                                    // Padding = new MarginPadding { Bottom = 2 },
                                     Children = new Drawable[]
                                     {
                                         ezDisplayKps = new EzDisplayKps
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
-                                            Scale = new Vector2(0.875f),
                                         },
                                         ezDisplayKpc = new EzDisplayKpc
                                         {

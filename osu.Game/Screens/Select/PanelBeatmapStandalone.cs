@@ -226,6 +226,7 @@ namespace osu.Game.Screens.Select
                                 new FillFlowContainer
                                 {
                                     Direction = FillDirection.Horizontal,
+                                    Padding = new MarginPadding { Top = 2, Bottom = 2 },
                                     Spacing = new Vector2(3),
                                     AutoSizeAxes = Axes.Both,
                                     Children = new Drawable[]
@@ -252,7 +253,6 @@ namespace osu.Game.Screens.Select
                                         {
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft,
-                                            Scale = new Vector2(0.875f),
                                         },
                                         ezDisplayKpc = new EzDisplayKpc
                                         {
