@@ -39,12 +39,21 @@ namespace osu.Game.EzOsuGame.UserInterface
                     return;
                 }
 
-                bool dataChanged = maniaSummary != value;
                 maniaSummary = value;
 
-                // 只在数据真正变化时才更新显示
-                if (dataChanged)
-                    onDataChanged();
+                var columnCounts = value.Value.ColumnCounts;
+                var holdCounts = value.Value.HoldNoteCounts;
+
+                if (columnCounts.Count == 0)
+                {
+                    clear();
+                    return;
+                }
+
+                if (countsMatchCached(columnCounts, holdCounts))
+                    return;
+
+                onDataChanged();
             }
         }
 
@@ -130,6 +139,36 @@ namespace osu.Game.EzOsuGame.UserInterface
             // 渲染显示
             if (lastKnownColumns != null)
                 rebuildAndRender(lastKnownColumns, lastKnownHolds, lastKnownCount);
+        }
+
+        private bool countsMatchCached(Dictionary<int, int> columnNoteCounts, Dictionary<int, int> holdNoteCounts)
+        {
+            if (lastKnownColumns == null)
+                return false;
+
+            int maxKey = 0;
+
+            foreach (int k in columnNoteCounts.Keys)
+            {
+                if (k > maxKey)
+                    maxKey = k;
+            }
+
+            int kc = maxKey + 1;
+
+            if (lastKnownCount != kc)
+                return false;
+
+            for (int i = 0; i < kc; i++)
+            {
+                if (lastKnownColumns[i] != columnNoteCounts.GetValueOrDefault(i))
+                    return false;
+
+                if ((lastKnownHolds?[i] ?? 0) != holdNoteCounts.GetValueOrDefault(i))
+                    return false;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -347,6 +386,8 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             public void SetValues(int totalNotes, int holdNotes, int maxCount)
             {
+                holdNotes = Math.Clamp(holdNotes, 0, totalNotes);
+
                 if (lastTotalNotes == totalNotes && lastHoldNotes == holdNotes && lastMaxCount == maxCount)
                     return;
 
@@ -356,10 +397,33 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                 int regularNotes = totalNotes - holdNotes;
 
-                float totalHeight = maxCount > 0 ? (float)totalNotes / maxCount * max_bar_height : 0;
-                float regularHeight = maxCount > 0 ? (float)regularNotes / maxCount * max_bar_height : 0;
+                float regularHeight = 0;
+                float holdHeight = 0;
 
-                float holdHeight = Math.Max(0, totalHeight - regularHeight);
+                if (maxCount > 0)
+                {
+                    float scale = max_bar_height / maxCount;
+                    regularHeight = regularNotes * scale;
+
+                    if (holdNotes > 0)
+                    {
+                        holdHeight = holdNotes * scale;
+
+                        // Keep tiny LN segments visible instead of flickering at sub-pixel heights.
+                        if (holdHeight > 0 && holdHeight < 1f)
+                            holdHeight = 1f;
+                    }
+                }
+
+                float combinedHeight = regularHeight + holdHeight;
+
+                if (combinedHeight > max_bar_height)
+                {
+                    float ratio = max_bar_height / combinedHeight;
+                    regularHeight *= ratio;
+                    holdHeight *= ratio;
+                }
+
                 regularBox.Height = regularHeight;
                 holdBox.Height = holdHeight;
                 holdBox.Margin = new MarginPadding { Bottom = regularHeight };
