@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -19,6 +20,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override string Name => "Krr DP Converter";
         public override string Acronym => "KDP";
         public override LocalisableString Description => KrrDPStrings.KRR_DP_DESCRIPTION;
+        public override IconUsage? Icon => FontAwesome.Solid.Columns;
         public override ModType Type => ModType.LA_Mod;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;

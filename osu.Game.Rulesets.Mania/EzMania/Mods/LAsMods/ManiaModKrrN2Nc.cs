@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
@@ -24,6 +25,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override string Acronym => "N2N";
 
         public override LocalisableString Description => KrrN2NcStrings.KRR_N2N_DESCRIPTION;
+
+        public override IconUsage? Icon => FontAwesome.Solid.ExchangeAlt;
 
         public override ModType Type => ModType.LA_Mod;
 

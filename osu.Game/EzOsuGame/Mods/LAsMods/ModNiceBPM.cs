@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
@@ -28,6 +29,8 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
         public override string Acronym => "NB";
 
         public override LocalisableString Description => NiceBPMStrings.NICE_BPM_DESCRIPTION;
+
+        public override IconUsage? Icon => FontAwesome.Solid.TachometerAlt;
 
         public override ModType Type => ModType.LA_Mod;
 

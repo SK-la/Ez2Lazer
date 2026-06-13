@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
@@ -26,6 +27,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public override string Acronym => "PFT";
 
         public override LocalisableString Description => PlayfieldTransformationStrings.PLAYFIELD_TRANSFORMATION_DESCRIPTION;
+
+        public override IconUsage? Icon => FontAwesome.Solid.CompressArrowsAlt;
 
         public override ModType Type => ModType.CommunityMod;
         public override bool Ranked => false;

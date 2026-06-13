@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public override ModType Type => ModType.CommunityMod;
 
-        public override IconUsage? Icon => FontAwesome.Solid.Shower;
+        public override IconUsage? Icon => FontAwesome.Solid.SlidersH;
 
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;

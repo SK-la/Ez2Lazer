@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -19,6 +20,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override string Name => "Krr LN Converter";
         public override string Acronym => "KLN";
         public override LocalisableString Description => KrrLNStrings.KRR_LN_DESCRIPTION;
+        public override IconUsage? Icon => FontAwesome.Solid.RulerVertical;
         public override ModType Type => ModType.LA_Mod;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;

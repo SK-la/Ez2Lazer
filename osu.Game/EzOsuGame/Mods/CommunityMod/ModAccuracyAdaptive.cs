@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Timing;
@@ -31,6 +32,8 @@ namespace osu.Game.EzOsuGame.Mods.CommunityMod
         public override string Acronym => "AA";
 
         public override LocalisableString Description => "Adapt track speed based on your accuracy over time.";
+
+        public override IconUsage? Icon => FontAwesome.Solid.ChartLine;
 
         public override ModType Type => ModType.CommunityMod;
 

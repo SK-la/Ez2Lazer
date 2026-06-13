@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -20,6 +21,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public override string Acronym => "NJ";
 
         public override LocalisableString Description => NewJudgementStrings.NEW_JUDGEMENT_DESCRIPTION;
+
+        public override IconUsage? Icon => FontAwesome.Solid.Crosshairs;
 
         public override ModType Type => ModType.CommunityMod;
         public override bool Ranked => false;

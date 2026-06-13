@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
@@ -24,6 +25,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public override string Acronym => "DSp";
 
         public override LocalisableString Description => DoubleSpaceStrings.DOUBLE_SPACE_DESCRIPTION;
+
+        public override IconUsage? Icon => FontAwesome.Solid.ExpandArrowsAlt;
 
         public override ModType Type => ModType.CommunityMod;
 

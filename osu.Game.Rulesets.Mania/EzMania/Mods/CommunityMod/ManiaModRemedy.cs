@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -29,6 +30,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public override string Acronym => "RY";
 
         public override LocalisableString Description => RemedyStrings.REMEDY_DESCRIPTION;
+
+        public override IconUsage? Icon => FontAwesome.Solid.FirstAid;
 
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
