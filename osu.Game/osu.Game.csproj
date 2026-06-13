@@ -27,7 +27,7 @@
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
     <!-- Held back due to .NET 9 requirement. See https://github.com/Humanizr/Humanizer?tab=readme-ov-file#supported-frameworks-->
     <PackageReference Include="Humanizer" Version="2.14.1" />
-    <PackageReference Include="MessagePack" Version="3.1.6" />
+    <PackageReference Include="MessagePack" Version="3.1.7" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="10.0.8" />
