@@ -70,6 +70,12 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public Dictionary<int, int> HoldNoteCounts => holdNoteCounts ?? empty_counts;
 
+        /// <summary>
+        /// Whether <see cref="HoldNoteCounts"/> were supplied by the producer.
+        /// When false, consumers should not treat an empty hold map as "zero LNs".
+        /// </summary>
+        public bool HasHoldNoteCounts => holdNoteCounts != null;
+
         public EzManiaSummary(Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts, double? xxySr,
                               double? xxySrFullLN4 = null, double? xxySrFullLN8 = null)
         {

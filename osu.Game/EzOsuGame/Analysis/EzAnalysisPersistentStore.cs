@@ -456,8 +456,17 @@ LIMIT 1;
                     return true;
             }
 
-            var storedHoldNoteCounts = storedManiaSummary?.HoldNoteCounts ?? new Dictionary<int, int>();
-            var computedHoldNoteCounts = computedManiaSummary?.HoldNoteCounts ?? new Dictionary<int, int>();
+            bool storedHasHolds = storedManiaSummary?.HasHoldNoteCounts ?? false;
+            bool computedHasHolds = computedManiaSummary?.HasHoldNoteCounts ?? false;
+
+            if (storedHasHolds != computedHasHolds)
+                return true;
+
+            if (!storedHasHolds)
+                return false;
+
+            var storedHoldNoteCounts = storedManiaSummary!.Value.HoldNoteCounts;
+            var computedHoldNoteCounts = computedManiaSummary!.Value.HoldNoteCounts;
 
             // 检查长按统计
             if (storedHoldNoteCounts.Count != computedHoldNoteCounts.Count)
@@ -2446,7 +2455,9 @@ WHERE {EzAnalysisSchemaManager.COL_BEATMAP_ID} = $id;
                 }
 
                 string columnCountsJson = JsonSerializer.Serialize(maniaSummary.Value.ColumnCounts);
-                string holdNoteCountsJson = JsonSerializer.Serialize(maniaSummary.Value.HoldNoteCounts);
+                string holdNoteCountsJson = maniaSummary.Value.HasHoldNoteCounts
+                    ? JsonSerializer.Serialize(maniaSummary.Value.HoldNoteCounts)
+                    : "{}";
 
                 mania.CommandText = $@"
 INSERT INTO {EzAnalysisSchemaManager.TABLE_MANIA}(

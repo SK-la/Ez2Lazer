@@ -22,9 +22,14 @@ namespace osu.Game.EzOsuGame.Beatmaps
                 ? analysisXxy
                 : beatmap.GetPersistedXxyStarRating() ?? analysisSummary?.XxySr;
 
+            if (!analysisSummary.HasValue)
+                return new EzManiaSummary(null, null, xxy);
+
+            var summary = analysisSummary.Value;
+
             return new EzManiaSummary(
-                analysisSummary?.ColumnCounts,
-                analysisSummary?.HoldNoteCounts,
+                summary.ColumnCounts,
+                summary.HasHoldNoteCounts ? summary.HoldNoteCounts : null,
                 xxy);
         }
     }

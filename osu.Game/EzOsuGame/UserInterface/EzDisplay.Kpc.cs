@@ -41,14 +41,27 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                 maniaSummary = value;
 
-                var columnCounts = value.Value.ColumnCounts;
-                var holdCounts = value.Value.HoldNoteCounts;
+                var summary = value.Value;
+                var columnCounts = summary.ColumnCounts;
 
                 if (columnCounts.Count == 0)
                 {
                     clear();
                     return;
                 }
+
+                // Analysis may resend column totals without LN breakdown (e.g. partial cache refresh).
+                // Do not wipe previously rendered LN segments when holds were omitted.
+                if (!summary.HasHoldNoteCounts)
+                {
+                    if (columnsMatchCached(columnCounts))
+                        return;
+
+                    onDataChanged(preserveCachedHolds: true);
+                    return;
+                }
+
+                var holdCounts = summary.HoldNoteCounts;
 
                 if (countsMatchCached(columnCounts, holdCounts))
                     return;
@@ -128,17 +141,42 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// <summary>
         /// 数据变化时调用（ManiaSummary setter）
         /// </summary>
-        private void onDataChanged()
+        private void onDataChanged(bool preserveCachedHolds = false)
         {
             if (maniaSummary == null)
                 return;
 
-            // 解析并缓存数据
-            parseAndCacheData(maniaSummary.Value.ColumnCounts, maniaSummary.Value.HoldNoteCounts);
+            parseAndCacheData(maniaSummary.Value.ColumnCounts, maniaSummary.Value.HasHoldNoteCounts ? maniaSummary.Value.HoldNoteCounts : null, preserveCachedHolds);
 
-            // 渲染显示
             if (lastKnownColumns != null)
                 rebuildAndRender(lastKnownColumns, lastKnownHolds, lastKnownCount);
+        }
+
+        private bool columnsMatchCached(Dictionary<int, int> columnNoteCounts)
+        {
+            if (lastKnownColumns == null)
+                return false;
+
+            int maxKey = 0;
+
+            foreach (int k in columnNoteCounts.Keys)
+            {
+                if (k > maxKey)
+                    maxKey = k;
+            }
+
+            int kc = maxKey + 1;
+
+            if (lastKnownCount != kc)
+                return false;
+
+            for (int i = 0; i < kc; i++)
+            {
+                if (lastKnownColumns[i] != columnNoteCounts.GetValueOrDefault(i))
+                    return false;
+            }
+
+            return true;
         }
 
         private bool countsMatchCached(Dictionary<int, int> columnNoteCounts, Dictionary<int, int> holdNoteCounts)
@@ -174,7 +212,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// <summary>
         /// 解析并缓存数据
         /// </summary>
-        private void parseAndCacheData(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
+        private void parseAndCacheData(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null, bool preserveCachedHolds = false)
         {
             if (columnNoteCounts.Count == 0)
             {
@@ -201,7 +239,11 @@ namespace osu.Game.EzOsuGame.UserInterface
                 for (int i = 0; i < kc; i++)
                 {
                     normalized[i] = columnNoteCounts.GetValueOrDefault(i);
-                    normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+
+                    if (preserveCachedHolds && holdNoteCounts == null && lastKnownHolds != null && i < lastKnownCount)
+                        normalizedHold[i] = lastKnownHolds[i];
+                    else
+                        normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
                 }
 
                 // 缓存数据
@@ -423,6 +465,9 @@ namespace osu.Game.EzOsuGame.UserInterface
                     regularHeight *= ratio;
                     holdHeight *= ratio;
                 }
+
+                if (holdNotes > 0 && holdHeight > 0 && holdHeight < 1f)
+                    holdHeight = 1f;
 
                 regularBox.Height = regularHeight;
                 holdBox.Height = holdHeight;
