@@ -416,7 +416,8 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN = new EzLocalizationManager.EzLocalisableString("保存", "Save");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "保存到本机。", "Saves locally.");
+            "将上方输入框中的 refresh_token 保存到本机。",
+            "Saves the refresh_token from the input field above to local storage.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CHECK_LOGIN = new EzLocalizationManager.EzLocalisableString("检查登录", "Check login");
 

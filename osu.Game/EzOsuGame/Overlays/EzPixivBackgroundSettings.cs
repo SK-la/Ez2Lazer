@@ -137,23 +137,23 @@ namespace osu.Game.EzOsuGame.Overlays
 
             Children = new Drawable[]
             {
-                new Container
+                new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Vertical,
+                    Spacing = Vector2.Zero,
+                    Margin = new MarginPadding { Top = 0 },
                     Padding = SettingsPanel.CONTENT_PADDING,
-                    Child = new SettingsNote
+                    Children = new Drawable[]
                     {
-                        RelativeSizeAxes = Axes.X,
-                        Current = { BindTarget = statusNote },
+                        new SettingsNote
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Current = { BindTarget = statusNote },
+                        },
+                        new EzPixivAuthToolHintNote(),
                     },
-                },
-                new Container
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Padding = SettingsPanel.CONTENT_PADDING,
-                    Child = new EzPixivAuthToolHintNote(),
                 },
                 new FillFlowContainer
                 {

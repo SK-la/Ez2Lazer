@@ -9,7 +9,6 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Overlays;
-using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
@@ -31,7 +30,6 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
-                Padding = new MarginPadding { Top = SettingsSection.ITEM_SPACING_V2 },
                 Child = new Container
                 {
                     RelativeSizeAxes = Axes.X,
