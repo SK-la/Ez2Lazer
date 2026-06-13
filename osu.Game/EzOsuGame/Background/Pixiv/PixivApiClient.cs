@@ -8,7 +8,6 @@ using System.Net;
 using System.Net.Http;
 using Newtonsoft.Json.Linq;
 using osu.Framework.Logging;
-using osu.Framework.Utils;
 using osu.Game.EzOsuGame.Configuration;
 using WebRequest = osu.Framework.IO.Network.WebRequest;
 
@@ -142,7 +141,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                         continue;
                     }
 
-                    if (output.Any(existing => existing.IllustId == info.IllustId && existing.Page == info.Page))
+                    if (output.Any(existing => existing.IllustId == info.IllustId))
                         continue;
 
                     stats.Accepted++;
@@ -200,11 +199,10 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (string.IsNullOrWhiteSpace(account) || illustId <= 0)
                 return false;
 
-            int page = selectDisplayPage(data, landscapeOnly, out int width, out int height);
-
-            if (page < 0)
+            if (!PixivIllustPageSelector.TrySelectDisplayPage(data, landscapeOnly, out int width, out int height))
                 return false;
 
+            int page = PixivIllustPageSelector.display_page;
             string? imageUrl = getImageUrl(data, page);
 
             if (string.IsNullOrWhiteSpace(imageUrl))
@@ -218,59 +216,6 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
             info = new PixivIllustInfo(account, illustId, page, imageUrl, sanityLevel, tags, illustType, width, height, illustAiType, xRestrict, userName);
             return true;
-        }
-
-        private static int selectDisplayPage(JToken token, bool landscapeOnly, out int width, out int height)
-        {
-            width = 0;
-            height = 0;
-
-            int pageCount = PixivJsonHelper.IntValue(token, "page_count");
-            if (pageCount <= 0)
-                pageCount = 1;
-
-            var validPages = new List<int>();
-
-            for (int page = 0; page < pageCount; page++)
-            {
-                (int pageWidth, int pageHeight) = getPageDimensions(token, page);
-
-                if (pageWidth <= 0 || pageHeight <= 0)
-                    continue;
-
-                if (landscapeOnly && pageWidth <= pageHeight)
-                    continue;
-
-                validPages.Add(page);
-            }
-
-            if (validPages.Count == 0)
-                return -1;
-
-            int selectedPage = validPages[RNG.Next(validPages.Count)];
-            (width, height) = getPageDimensions(token, selectedPage);
-            return selectedPage;
-        }
-
-        private static (int width, int height) getPageDimensions(JToken token, int page)
-        {
-            if (page == 0)
-            {
-                return (
-                    PixivJsonHelper.IntValue(token, "width"),
-                    PixivJsonHelper.IntValue(token, "height"));
-            }
-
-            var pages = PixivJsonHelper.Field(token, "meta_pages") as JArray;
-
-            if (pages == null || page >= pages.Count)
-                return (0, 0);
-
-            JToken pageToken = pages[page];
-
-            return (
-                PixivJsonHelper.IntValue(pageToken, "width") > 0 ? PixivJsonHelper.IntValue(pageToken, "width") : PixivJsonHelper.IntValue(token, "width"),
-                PixivJsonHelper.IntValue(pageToken, "height") > 0 ? PixivJsonHelper.IntValue(pageToken, "height") : PixivJsonHelper.IntValue(token, "height"));
         }
 
         private static string[] extractTags(JToken token)

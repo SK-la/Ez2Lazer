@@ -458,8 +458,8 @@ namespace osu.Game.EzOsuGame.Localization
             "仅横图", "Landscape only");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_LANDSCAPE_ONLY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启时只接受宽大于高的页面（width > height）；多页作品仅在横页中随机。",
-            "When enabled, only pages wider than tall are accepted (width > height). Multi-page works pick randomly from landscape pages only.");
+            "开启时只接受宽大于高的第一页（p0；多页作品不会选用 p1 及之后）。",
+            "When enabled, only accepts page 0 (p0) when wider than tall; later pages of multi-page works are never used.");
 
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_WHITELIST = new EzLocalizationManager.EzLocalisableString(
             "画师 account 白名单", "Artist account whitelist");
