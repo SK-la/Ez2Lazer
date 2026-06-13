@@ -48,6 +48,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             }
         }
 
+        private readonly Box background;
         private readonly FillFlowContainer columnNotesContainer;
 
         private List<BarChartColumnEntry>? barEntries;
@@ -59,6 +60,21 @@ namespace osu.Game.EzOsuGame.UserInterface
         private int[]? lastKnownColumns;
         private int[]? lastKnownHolds;
         private int lastKnownCount;
+
+        /// <summary>
+        /// Whether the capsule background is shown.
+        /// </summary>
+        public bool ShowBackground
+        {
+            get => background.IsPresent;
+            set
+            {
+                if (value)
+                    background.Show();
+                else
+                    background.Hide();
+            }
+        }
 
         public EzDisplayKpc()
         {
@@ -73,7 +89,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 RelativeSizeAxes = Axes.Y,
                 Children = new Drawable[]
                 {
-                    new Box
+                    background = new Box
                     {
                         RelativeSizeAxes = Axes.Both,
                         Colour = Color4Extensions.FromHex("303d47"),

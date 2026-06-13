@@ -217,7 +217,7 @@ namespace osu.Game.Screens.Select
                                                         Anchor = Anchor.CentreLeft,
                                                         Origin = Anchor.CentreLeft,
                                                         Scale = new Vector2(1.25f),
-                                                        // RelativeSizeAxes = Axes.Y,
+                                                        ShowBackground = false,
                                                     },
                                                     Empty(),
                                                     difficultyStatisticsDisplay = new DifficultyStatisticsDisplay(autoSize: true),
