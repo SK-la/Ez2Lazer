@@ -12,8 +12,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
     {
         private static readonly Regex invalid_chars = new Regex(@"[\\/:*?""<>|]", RegexOptions.Compiled);
 
-        public static string GetDisplayLabel(PixivIllustInfo illust)
-            => string.IsNullOrWhiteSpace(illust.UserName) ? illust.Account : illust.UserName;
+        public static string GetDisplayLabel(PixivIllustInfo illust) => string.IsNullOrWhiteSpace(illust.UserName) ? illust.Account : illust.UserName;
 
         public static string SanitizeFileLabel(string label)
         {
@@ -39,8 +38,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return $"{SanitizeFileLabel(GetDisplayLabel(illust))}_{illust.IllustId}_p{illust.Page}{extension}";
         }
 
-        public static string BuildDownloadRelativePath(PixivIllustInfo illust, string? extension = null)
-            => Path.Combine(EzModifyPath.BG_PIXIV_PATH, BuildDownloadFileName(illust, extension)).Replace('\\', '/');
+        public static string BuildDownloadRelativePath(PixivIllustInfo illust, string? extension = null) =>
+            Path.Combine(EzModifyPath.BG_PIXIV_PATH, BuildDownloadFileName(illust, extension)).Replace('\\', '/');
 
         /// <summary>
         /// Id-only key for queue / dedupe lookups, e.g. 145826326_p0.png

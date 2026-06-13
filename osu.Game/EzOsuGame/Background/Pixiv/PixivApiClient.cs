@@ -10,6 +10,7 @@ using Newtonsoft.Json.Linq;
 using osu.Framework.Logging;
 using osu.Framework.Utils;
 using osu.Game.EzOsuGame.Configuration;
+using WebRequest = osu.Framework.IO.Network.WebRequest;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
@@ -306,9 +307,9 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                    ?? PixivJsonHelper.StringValue(pageUrls ?? new JObject(), "medium");
         }
 
-        private static Framework.IO.Network.WebRequest createApiRequest(string url, string token)
+        private static WebRequest createApiRequest(string url, string token)
         {
-            var request = new Framework.IO.Network.WebRequest(url)
+            var request = new WebRequest(url)
             {
                 Method = HttpMethod.Get,
             };

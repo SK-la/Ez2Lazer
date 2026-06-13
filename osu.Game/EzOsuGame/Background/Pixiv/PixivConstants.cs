@@ -33,6 +33,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         /// Pixiv API illust_ai_type: 0 = unspecified, 1 = human-created, 2 = AI-generated.
         /// </summary>
         public const int ILLUST_AI_TYPE_UNSPECIFIED = 0;
+
         public const int ILLUST_AI_TYPE_HUMAN = 1;
         public const int ILLUST_AI_TYPE_AI = 2;
 

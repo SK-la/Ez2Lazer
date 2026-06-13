@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -9,6 +10,7 @@ using System.Net.Http;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Utils;
+using WebRequest = osu.Framework.IO.Network.WebRequest;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
@@ -23,11 +25,11 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             this.storage = storage;
         }
 
-        public bool TryGetRandomCachedIllust(PixivFilterService filters, out PixivIllustInfo illust, out string resourcePath)
-            => TryGetRandomCachedIllust(filters, excludeResourcePath: null, excludeIllustId: null, out illust, out resourcePath);
+        public bool TryGetRandomCachedIllust(PixivFilterService filters, out PixivIllustInfo illust, out string resourcePath) =>
+            TryGetRandomCachedIllust(filters, excludeResourcePath: null, excludeIllustId: null, out illust, out resourcePath);
 
-        public bool TryGetRandomCachedIllust(PixivFilterService filters, string? excludeResourcePath, out PixivIllustInfo illust, out string resourcePath)
-            => TryGetRandomCachedIllust(filters, excludeResourcePath, excludeIllustId: null, out illust, out resourcePath);
+        public bool TryGetRandomCachedIllust(PixivFilterService filters, string? excludeResourcePath, out PixivIllustInfo illust, out string resourcePath) =>
+            TryGetRandomCachedIllust(filters, excludeResourcePath, excludeIllustId: null, out illust, out resourcePath);
 
         public bool TryGetRandomCachedIllust(PixivFilterService filters, string? excludeResourcePath, long? excludeIllustId, out PixivIllustInfo illust, out string resourcePath)
         {
@@ -87,8 +89,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
         }
 
-        public bool IsCached(PixivIllustInfo illust)
-            => tryResolveExistingPath(illust, out _);
+        public bool IsCached(PixivIllustInfo illust) => tryResolveExistingPath(illust, out _);
 
         public bool TryEnsureCached(PixivIllustInfo illust, out string resourcePath, out string? error)
         {
@@ -107,6 +108,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             string extension = PixivFileNamer.GetExtensionFromUrl(illust.ImageUrl);
 
             string downloadPath = PixivFileNamer.BuildDownloadRelativePath(illust, extension);
+
             if (storage.Exists(downloadPath))
             {
                 resourcePath = downloadPath;
@@ -114,7 +116,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
 
             string idKeyPath = Path.Combine(EzModifyPath.BG_PIXIV_PATH, PixivFileNamer.BuildIdKeyFileName(illust.IllustId, illust.Page, extension))
-                .Replace('\\', '/');
+                                   .Replace('\\', '/');
 
             if (storage.Exists(idKeyPath))
             {
@@ -125,9 +127,9 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             foreach (string legacyLabel in getLegacyLabels(illust))
             {
                 string legacyPath = Path.Combine(
-                        EzModifyPath.BG_PIXIV_PATH,
-                        $"{PixivFileNamer.SanitizeFileLabel(legacyLabel)}_{illust.IllustId}_p{illust.Page}{extension}")
-                    .Replace('\\', '/');
+                                            EzModifyPath.BG_PIXIV_PATH,
+                                            $"{PixivFileNamer.SanitizeFileLabel(legacyLabel)}_{illust.IllustId}_p{illust.Page}{extension}")
+                                        .Replace('\\', '/');
 
                 if (storage.Exists(legacyPath))
                 {
@@ -140,7 +142,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return false;
         }
 
-        private static System.Collections.Generic.IEnumerable<string> getLegacyLabels(PixivIllustInfo illust)
+        private static IEnumerable<string> getLegacyLabels(PixivIllustInfo illust)
         {
             if (!string.IsNullOrWhiteSpace(illust.Account))
                 yield return illust.Account;
@@ -158,7 +160,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             {
                 ensureCacheDirectory();
 
-                using var request = new Framework.IO.Network.WebRequest(illust.ImageUrl)
+                using var request = new WebRequest(illust.ImageUrl)
                 {
                     Method = HttpMethod.Get,
                 };
@@ -200,8 +202,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 Directory.CreateDirectory(fullPath);
         }
 
-        private static bool pathsEqual(string left, string? right)
-            => !string.IsNullOrWhiteSpace(right)
-               && string.Equals(left.Replace('\\', '/'), right.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
+        private static bool pathsEqual(string left, string? right) => !string.IsNullOrWhiteSpace(right)
+                                                                      && string.Equals(left.Replace('\\', '/'), right.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
     }
 }

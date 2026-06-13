@@ -46,8 +46,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 return entries.Count(entry => !images.IsCached(entry));
         }
 
-        public bool EnsureMinimum(out string? error)
-            => EnsureMinimum(PixivConstants.FOLLOW_FEED_MIN_CATALOG_SIZE, out error);
+        public bool EnsureMinimum(out string? error) => EnsureMinimum(PixivConstants.FOLLOW_FEED_MIN_CATALOG_SIZE, out error);
 
         public bool EnsureMinimum(int minimum, out string? error)
         {

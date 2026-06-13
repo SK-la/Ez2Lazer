@@ -60,8 +60,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return 0;
         }
 
-        public static string? StringValue(JToken token, string snakeCaseName)
-            => Field(token, snakeCaseName)?.ToString();
+        public static string? StringValue(JToken token, string snakeCaseName) => Field(token, snakeCaseName)?.ToString();
 
         public static string? ResolveNextUrl(JObject root)
         {
@@ -101,8 +100,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return results;
         }
 
-        public static string DescribeTopLevelKeys(JObject root)
-            => string.Join(", ", root.Properties().Select(property => property.Name));
+        public static string DescribeTopLevelKeys(JObject root) => string.Join(", ", root.Properties().Select(property => property.Name));
 
         private static IEnumerable<JObject> enumeratePayloads(JObject root)
         {

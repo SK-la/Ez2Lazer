@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Utils;
@@ -55,7 +56,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 return leftIllustId > 0
                        && leftIllustId == rightIllustId
                        && leftPath.Length > 0
-                       && string.Equals(leftPath, rightPath, System.StringComparison.OrdinalIgnoreCase);
+                       && string.Equals(leftPath, rightPath, StringComparison.OrdinalIgnoreCase);
             }
 
             return base.Equals(other);

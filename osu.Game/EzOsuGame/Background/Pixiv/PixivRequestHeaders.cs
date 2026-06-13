@@ -4,12 +4,13 @@
 using System;
 using System.Security.Cryptography;
 using System.Text;
+using osu.Framework.IO.Network;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
     internal static class PixivRequestHeaders
     {
-        public static void ApplyAppApiHeaders(Framework.IO.Network.WebRequest request, string? accessToken = null)
+        public static void ApplyAppApiHeaders(WebRequest request, string? accessToken = null)
         {
             if (!string.IsNullOrWhiteSpace(accessToken))
                 request.AddHeader("Authorization", $"Bearer {accessToken}");
@@ -26,7 +27,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             request.AddHeader("X-Client-Hash", computeClientHash(clientTime));
         }
 
-        public static void ApplyOAuthHeaders(Framework.IO.Network.WebRequest request)
+        public static void ApplyOAuthHeaders(WebRequest request)
         {
             request.AddHeader("User-Agent", PixivConstants.USER_AGENT);
             request.AddHeader("App-OS", PixivConstants.APP_OS);

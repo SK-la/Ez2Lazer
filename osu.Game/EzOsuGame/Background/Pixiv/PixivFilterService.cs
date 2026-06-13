@@ -16,8 +16,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             this.config = config;
         }
 
-        public bool PassesContentFilter(PixivIllustInfo illust)
-            => TryGetContentFilterRejection(illust, out _);
+        public bool PassesContentFilter(PixivIllustInfo illust) => TryGetContentFilterRejection(illust, out _);
 
         public bool TryGetContentFilterRejection(PixivIllustInfo illust, out string? reason)
         {
@@ -72,7 +71,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             int whitelistCount = PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivAccountWhitelist)).Length;
             int tagIncludeCount = PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivTagInclude)).Length;
 
-            return $"AllowR18={config.Get<bool>(Ez2Setting.PixivAllowR18)}, landscapeOnly={config.Get<bool>(Ez2Setting.PixivLandscapeOnly)}, accountWhitelist={whitelistCount}, tagInclude={tagIncludeCount}";
+            return
+                $"AllowR18={config.Get<bool>(Ez2Setting.PixivAllowR18)}, landscapeOnly={config.Get<bool>(Ez2Setting.PixivLandscapeOnly)}, accountWhitelist={whitelistCount}, tagInclude={tagIncludeCount}";
         }
 
         public bool LandscapeOnly => config.Get<bool>(Ez2Setting.PixivLandscapeOnly);
@@ -93,8 +93,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return !HasAccountWhitelist();
         }
 
-        public bool HasAccountWhitelist()
-            => PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivAccountWhitelist)).Length > 0;
+        public bool HasAccountWhitelist() => PixivFilterListParser.Parse(config.Get<string>(Ez2Setting.PixivAccountWhitelist)).Length > 0;
 
         private bool passesAccountRules(string account)
         {
@@ -160,7 +159,6 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return !tags.Any(tag => tag.Contains("R-18", StringComparison.OrdinalIgnoreCase));
         }
 
-        private static bool containsEntry(string[] entries, string value)
-            => entries.Any(entry => string.Equals(entry, value, StringComparison.OrdinalIgnoreCase));
+        private static bool containsEntry(string[] entries, string value) => entries.Any(entry => string.Equals(entry, value, StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -6,9 +6,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using WebRequest = osu.Framework.IO.Network.WebRequest;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
@@ -176,7 +178,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 if (string.IsNullOrWhiteSpace(content))
                     return null;
 
-                var auth = Newtonsoft.Json.JsonConvert.DeserializeObject<PixivAuthFile>(content);
+                var auth = JsonConvert.DeserializeObject<PixivAuthFile>(content);
 
                 if (auth == null || string.IsNullOrWhiteSpace(auth.RefreshToken))
                     return null;
@@ -197,7 +199,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         {
             try
             {
-                string json = Newtonsoft.Json.JsonConvert.SerializeObject(auth, Newtonsoft.Json.Formatting.Indented);
+                string json = JsonConvert.SerializeObject(auth, Formatting.Indented);
                 using var stream = storage.CreateFileSafely(EzModifyPath.PIXIV_AUTH_FILE);
                 using var writer = new StreamWriter(stream);
                 writer.Write(json);
@@ -208,9 +210,9 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
         }
 
-        private static Framework.IO.Network.WebRequest createTokenRequest(Dictionary<string, string> formData)
+        private static WebRequest createTokenRequest(Dictionary<string, string> formData)
         {
-            var request = new Framework.IO.Network.WebRequest(PixivConstants.AUTH_TOKEN_URL)
+            var request = new WebRequest(PixivConstants.AUTH_TOKEN_URL)
             {
                 Method = HttpMethod.Post,
             };
