@@ -31,8 +31,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Bindable<string> tokenInput = new Bindable<string>(string.Empty);
         private readonly BindableBool showAdvancedSettings = new BindableBool();
 
-        private SettingsButton checkButton = null!;
-        private FillFlowContainer advancedSection = null!;
+        private readonly SettingsButton checkButton;
         private int loginRequestInFlight;
 
         public EzPixivBackgroundSettings(
@@ -49,47 +48,12 @@ namespace osu.Game.EzOsuGame.Overlays
             Direction = FillDirection.Vertical;
             Spacing = new Vector2(0, SettingsSection.ITEM_SPACING_V2);
 
-            var saveButton = createActionButton(EzSettingsStrings.PIXIV_SAVE_TOKEN, EzSettingsStrings.PIXIV_SAVE_TOKEN_TOOLTIP, new[] { "pixiv", "save", "token" },
-                new MarginPadding { Right = 2.5f });
-            saveButton.Action = () =>
-            {
-                string token = tokenInput.Value?.Trim() ?? string.Empty;
-
-                if (string.IsNullOrWhiteSpace(token))
-                {
-                    post(notifications, EzSettingsStrings.PIXIV_TOKEN_EMPTY);
-                    return;
-                }
-
-                coordinator.Auth.SaveRefreshToken(token);
-                tokenInput.Value = string.Empty;
-                refreshLocalStatus();
-                post(notifications, EzSettingsStrings.PIXIV_TOKEN_SAVED);
-            };
-
-            checkButton = createActionButton(EzSettingsStrings.PIXIV_CHECK_LOGIN, EzSettingsStrings.PIXIV_CHECK_LOGIN_TOOLTIP, new[] { "pixiv", "login", "verify", "auth" },
-                new MarginPadding { Horizontal = 2.5f });
-            checkButton.Action = checkLogin;
-
-            var clearButton = createActionButton(EzSettingsStrings.PIXIV_CLEAR_TOKEN, EzSettingsStrings.PIXIV_CLEAR_TOKEN_TOOLTIP, new[] { "pixiv", "clear", "logout", "token" },
-                new MarginPadding { Left = 2.5f });
-            clearButton.Action = () =>
-            {
-                coordinator.Auth.ClearRefreshToken();
-                tokenInput.Value = string.Empty;
-                refreshLocalStatus();
-                post(notifications, EzSettingsStrings.PIXIV_TOKEN_CLEARED);
-            };
-
-            var customToggleButton = createActionButton(EzSettingsStrings.PIXIV_CUSTOM_TOOL_HINT, EzSettingsStrings.PIXIV_CUSTOM_TOOL_TOOLTIP,
-                new[] { "pixiv", "custom", "advanced", "filter", "proxy", "token" }, new MarginPadding());
-            customToggleButton.Action = () => showAdvancedSettings.Value = !showAdvancedSettings.Value;
-
-            advancedSection = new FillFlowContainer
+            var advancedSection = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
                 Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, SettingsSection.ITEM_SPACING_V2),
                 Children = new Drawable[]
                 {
                     new SettingsItemV2(new PixivTokenFormTextBox
@@ -101,13 +65,26 @@ namespace osu.Game.EzOsuGame.Overlays
                     {
                         Keywords = new[] { "pixiv", "background", "refresh", "token", "auth", "manual" }
                     },
-                    new FillFlowContainer
+                    new SettingsButtonV2
                     {
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Direction = FillDirection.Horizontal,
-                        Padding = SettingsPanel.CONTENT_PADDING,
-                        Children = new Drawable[] { saveButton },
+                        Text = EzSettingsStrings.PIXIV_SAVE_TOKEN,
+                        TooltipText = EzSettingsStrings.PIXIV_SAVE_TOKEN_TOOLTIP,
+                        Keywords = new[] { "pixiv", "save", "token" },
+                        Action = () =>
+                        {
+                            string token = tokenInput.Value?.Trim() ?? string.Empty;
+
+                            if (string.IsNullOrWhiteSpace(token))
+                            {
+                                post(notifications, EzSettingsStrings.PIXIV_TOKEN_EMPTY);
+                                return;
+                            }
+
+                            coordinator.Auth.SaveRefreshToken(token);
+                            tokenInput.Value = string.Empty;
+                            refreshLocalStatus();
+                            post(notifications, EzSettingsStrings.PIXIV_TOKEN_SAVED);
+                        },
                     },
                     new SettingsItemV2(new FormTextBox
                     {
@@ -186,10 +163,43 @@ namespace osu.Game.EzOsuGame.Overlays
                     Padding = SettingsPanel.CONTENT_PADDING,
                     Children = new Drawable[]
                     {
-                        checkButton,
-                        clearButton,
-                        customToggleButton,
-                    }
+                        checkButton = new SettingsButton
+                        {
+                            Text = EzSettingsStrings.PIXIV_CHECK_LOGIN,
+                            TooltipText = EzSettingsStrings.PIXIV_CHECK_LOGIN_TOOLTIP,
+                            Keywords = new[] { "pixiv", "login", "verify", "auth" },
+                            Width = 1 / 3f,
+                            Margin = new MarginPadding { Vertical = 0 },
+                            Padding = new MarginPadding { Right = 2.5f },
+                            Action = checkLogin,
+                        },
+                        new SettingsButton
+                        {
+                            Text = EzSettingsStrings.PIXIV_CLEAR_TOKEN,
+                            TooltipText = EzSettingsStrings.PIXIV_CLEAR_TOKEN_TOOLTIP,
+                            Keywords = new[] { "pixiv", "clear", "logout", "token" },
+                            Width = 1 / 3f,
+                            Margin = new MarginPadding { Vertical = 0 },
+                            Padding = new MarginPadding { Horizontal = 2.5f },
+                            Action = () =>
+                            {
+                                coordinator.Auth.ClearRefreshToken();
+                                tokenInput.Value = string.Empty;
+                                refreshLocalStatus();
+                                post(notifications, EzSettingsStrings.PIXIV_TOKEN_CLEARED);
+                            },
+                        },
+                        new SettingsButton
+                        {
+                            Text = EzSettingsStrings.PIXIV_CUSTOM_TOOL_HINT,
+                            TooltipText = EzSettingsStrings.PIXIV_CUSTOM_TOOL_TOOLTIP,
+                            Keywords = new[] { "pixiv", "custom", "advanced", "filter", "proxy", "token" },
+                            Width = 1 / 3f,
+                            Margin = new MarginPadding { Vertical = 0 },
+                            Padding = new MarginPadding { Left = 2.5f },
+                            Action = () => showAdvancedSettings.Value = !showAdvancedSettings.Value,
+                        },
+                    },
                 },
                 advancedSection,
                 new SettingsItemV2(new FormCheckBox
@@ -274,20 +284,6 @@ namespace osu.Game.EzOsuGame.Overlays
             statusNote.Value = new SettingsNote.Data(
                 EzSettingsStrings.PIXIV_STATUS_LOGGED_IN.Format(coordinator.Auth.LoadAccountName() ?? "?"),
                 SettingsNote.Type.Informational);
-        }
-
-        private static SettingsButton createActionButton(LocalisableString text, LocalisableString tooltip, string[] keywords, MarginPadding spacingPadding)
-        {
-            return new SettingsButton
-            {
-                Text = text,
-                TooltipText = tooltip,
-                Keywords = keywords,
-                RelativeSizeAxes = Axes.X,
-                Width = 1 / 3f,
-                Margin = new MarginPadding { Vertical = 0 },
-                Padding = spacingPadding,
-            };
         }
 
         private static SettingsItemV2 createListSetting(
