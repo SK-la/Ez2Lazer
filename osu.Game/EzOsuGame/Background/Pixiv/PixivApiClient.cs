@@ -270,6 +270,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             };
 
             PixivRequestHeaders.ApplyAppApiHeaders(request, token);
+            PixivWebRequest.ConfigureApi(request);
             return request;
         }
 

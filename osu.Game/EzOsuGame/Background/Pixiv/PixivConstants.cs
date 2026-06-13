@@ -22,12 +22,13 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
         public const int FOLLOW_FEED_MIN_CATALOG_SIZE = 10;
 
-        /// <summary>
-        /// Maximum follow-feed pages fetched in one catalog fill burst.
-        /// </summary>
         public const int FOLLOW_FEED_MAX_PAGES_PER_BUILD = 8;
 
         public const double AUTO_PREFETCH_INTERVAL_MS = 60 * 1000;
+
+        public const int API_REQUEST_TIMEOUT_MS = 10_000;
+
+        public const int IMAGE_REQUEST_TIMEOUT_MS = 30_000;
 
         /// <summary>
         /// Pixiv API illust_ai_type: 0 = unspecified, 1 = human-created, 2 = AI-generated.

@@ -78,54 +78,58 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                     error = null;
                     return true;
                 }
+            }
 
-                string? refreshToken = LoadRefreshToken();
+            string? refreshToken = LoadRefreshToken();
 
-                if (string.IsNullOrWhiteSpace(refreshToken))
+            if (string.IsNullOrWhiteSpace(refreshToken))
+            {
+                accessToken = null;
+                error = "Pixiv 未配置：请使用 EzPixivAuth 工具登录，或在高级选项中手动保存 refresh_token。";
+                return false;
+            }
+
+            try
+            {
+                using var request = createTokenRequest(new Dictionary<string, string>
+                {
+                    ["grant_type"] = "refresh_token",
+                    ["refresh_token"] = refreshToken,
+                    ["include_policy"] = "true",
+                });
+
+                request.Perform();
+
+                if (request.ResponseStatusCode != HttpStatusCode.OK)
                 {
                     accessToken = null;
-                    error = "Pixiv 未配置：请使用 EzPixivAuth 工具登录，或在高级选项中手动保存 refresh_token。";
+                    error = request.GetResponseString() ?? "Pixiv token refresh failed.";
+                    invalidateAccessToken();
                     return false;
                 }
 
-                try
+                var json = JObject.Parse(request.GetResponseString() ?? string.Empty);
+                var tokenPayload = PixivJsonHelper.Field(json, "response") as JObject ?? json;
+                string? accessTokenFromResponse = PixivJsonHelper.StringValue(tokenPayload, "access_token");
+                string? newRefresh = PixivJsonHelper.StringValue(tokenPayload, "refresh_token");
+
+                string? responseAccount = PixivJsonHelper.Field(tokenPayload, "user")?["account"]?.ToString();
+
+                if (!string.IsNullOrWhiteSpace(responseAccount))
                 {
-                    using var request = createTokenRequest(new Dictionary<string, string>
-                    {
-                        ["grant_type"] = "refresh_token",
-                        ["refresh_token"] = refreshToken,
-                        ["include_policy"] = "true",
-                    });
+                    cachedAccount = responseAccount;
+                    string tokenToStore = !string.IsNullOrWhiteSpace(newRefresh) ? newRefresh : refreshToken;
+                    SaveRefreshToken(tokenToStore, responseAccount, invalidateAccessTokenCache: false);
+                }
+                else if (!string.IsNullOrWhiteSpace(newRefresh) && newRefresh != refreshToken)
+                {
+                    SaveRefreshToken(newRefresh, invalidateAccessTokenCache: false);
+                }
 
-                    request.Perform();
+                int expiresIn = json["expires_in"]?.Value<int>() ?? 3600;
 
-                    if (request.ResponseStatusCode != HttpStatusCode.OK)
-                    {
-                        accessToken = null;
-                        error = request.GetResponseString() ?? "Pixiv token refresh failed.";
-                        invalidateAccessToken();
-                        return false;
-                    }
-
-                    var json = JObject.Parse(request.GetResponseString() ?? string.Empty);
-                    var tokenPayload = PixivJsonHelper.Field(json, "response") as JObject ?? json;
-                    string? accessTokenFromResponse = PixivJsonHelper.StringValue(tokenPayload, "access_token");
-                    string? newRefresh = PixivJsonHelper.StringValue(tokenPayload, "refresh_token");
-
-                    string? responseAccount = PixivJsonHelper.Field(tokenPayload, "user")?["account"]?.ToString();
-
-                    if (!string.IsNullOrWhiteSpace(responseAccount))
-                    {
-                        cachedAccount = responseAccount;
-                        string tokenToStore = !string.IsNullOrWhiteSpace(newRefresh) ? newRefresh : refreshToken;
-                        SaveRefreshToken(tokenToStore, responseAccount, invalidateAccessTokenCache: false);
-                    }
-                    else if (!string.IsNullOrWhiteSpace(newRefresh) && newRefresh != refreshToken)
-                    {
-                        SaveRefreshToken(newRefresh, invalidateAccessTokenCache: false);
-                    }
-
-                    int expiresIn = json["expires_in"]?.Value<int>() ?? 3600;
+                lock (tokenLock)
+                {
                     accessTokenExpiresAt = DateTimeOffset.UtcNow.AddSeconds(expiresIn);
                     cachedAccessToken = accessTokenFromResponse;
 
@@ -141,13 +145,13 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                     error = null;
                     return true;
                 }
-                catch (Exception ex)
-                {
-                    accessToken = null;
-                    error = ex.Message;
-                    invalidateAccessToken();
-                    return false;
-                }
+            }
+            catch (Exception ex)
+            {
+                accessToken = null;
+                error = ex.Message;
+                invalidateAccessToken();
+                return false;
             }
         }
 
@@ -224,6 +228,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             foreach (var pair in formData)
                 request.AddParameter(pair.Key, pair.Value);
 
+            PixivWebRequest.ConfigureApi(request);
             return request;
         }
     }

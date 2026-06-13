@@ -452,9 +452,6 @@ namespace osu.Game.EzOsuGame.Localization
             "Song changes show a random cached BG_PIXIV image immediately without blocking, while one new illustration downloads in the background."
             + "\nWhen enabled, also keeps prefetching and fetches another feed page when fewer than 10 are cached.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTO_DOWNLOAD_PAUSED = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv 自动下载已暂停：{0}", "Pixiv auto-download paused: {0}");
-
         public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ALLOW_R18 = new EzLocalizationManager.EzLocalisableString(
             "允许 R-18 作品", "Allow R-18 works");
 

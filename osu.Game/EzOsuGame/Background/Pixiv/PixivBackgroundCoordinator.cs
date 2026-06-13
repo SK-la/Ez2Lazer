@@ -58,10 +58,13 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         }
 
         /// <summary>
-        /// Queues one follow-feed download for the next switch. Never blocks the caller.
+        /// Queues one lightweight follow-feed download per song change. Never blocks the caller.
         /// </summary>
         public void EnqueueSongChangeDownload()
         {
+            if (!Auth.HasRefreshToken)
+                return;
+
             if (Interlocked.CompareExchange(ref songChangeDownloadInFlight, 1, 0) != 0)
                 return;
 
@@ -69,8 +72,8 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             {
                 try
                 {
-                    if (!tryDownloadNextCatalogIllust(out string? error))
-                        LogFailure("Background prefetch", error);
+                    if (!tryDownloadOnSongChange(out string? error))
+                        LogFailure("Song change download", error);
                 }
                 finally
                 {
@@ -90,12 +93,57 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             return tryDownloadNextCatalogIllust(out error);
         }
 
+        /// <summary>
+        /// Refreshes the access token and returns the saved account name. Intended for background threads only.
+        /// </summary>
+        public bool TryVerifyLogin(out string? account, out string? error)
+        {
+            account = null;
+            error = null;
+
+            if (!Auth.HasRefreshToken)
+            {
+                error = "Pixiv refresh token is not configured.";
+                return false;
+            }
+
+            if (!Auth.TryRefreshAccessToken(out _, out error))
+                return false;
+
+            account = Auth.LoadAccountName();
+
+            if (string.IsNullOrWhiteSpace(account))
+                account = "?";
+
+            return true;
+        }
+
         public void LogFailure(string context, string? error)
         {
             if (string.IsNullOrWhiteSpace(error))
                 return;
 
             Logger.Log($"[Pixiv] {context}: {error}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+        }
+
+        /// <summary>
+        /// Song change: at most one feed page and one image download.
+        /// </summary>
+        private bool tryDownloadOnSongChange(out string? error)
+        {
+            error = null;
+            long? excludeIllustId = lastIllustId > 0 ? lastIllustId : null;
+
+            if (Catalog.TryGetNextUncached(excludeIllustId, out PixivIllustInfo illust))
+                return Images.TryEnsureCached(illust, out _, out error);
+
+            if (!Catalog.AppendNextPage(out error))
+                return false;
+
+            if (!Catalog.TryGetNextUncached(excludeIllustId, out illust))
+                return true;
+
+            return Images.TryEnsureCached(illust, out _, out error);
         }
 
         private bool tryDownloadNextCatalogIllust(out string? error)

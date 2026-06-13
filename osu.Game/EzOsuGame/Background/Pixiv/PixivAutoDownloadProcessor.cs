@@ -8,15 +8,13 @@ using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Threading;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Localization;
-using osu.Game.Overlays;
-using osu.Game.Overlays.Notifications;
 
 namespace osu.Game.EzOsuGame.Background.Pixiv
 {
     /// <summary>
-    /// Optional background prefetch for the shared Pixiv follow-feed catalog.
-    /// Song changes always enqueue one background download; this adds periodic prefetch when enabled.
+    /// Periodic prefetch when <see cref="Ez2Setting.PixivAutoDownloadEnabled"/> is on.
+    /// Song changes use <see cref="PixivBackgroundCoordinator.EnqueueSongChangeDownload"/> separately.
+    /// Network failures are logged only; the next attempt is the next scheduled tick or a song change.
     /// </summary>
     public partial class PixivAutoDownloadProcessor : Component
     {
@@ -26,13 +24,9 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        [Resolved(CanBeNull = true)]
-        private INotificationOverlay? notifications { get; set; }
-
         private IBindable<bool> autoDownloadEnabled = null!;
         private ScheduledDelegate? scheduledPrefetch;
         private bool prefetchInFlight;
-        private bool authFailureNotified;
 
         protected override void LoadComplete()
         {
@@ -49,7 +43,6 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         {
             scheduledPrefetch?.Cancel();
             scheduledPrefetch = null;
-            authFailureNotified = false;
 
             if (!enabled || !coordinator.Auth.HasRefreshToken)
                 return;
@@ -80,32 +73,15 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             {
                 try
                 {
-                    if (!coordinator.RunBackgroundPrefetch(out string? error))
-                    {
-                        if (!string.IsNullOrWhiteSpace(error))
-                            Scheduler.Add(() => handleFailure(error));
-                    }
+                    coordinator.RunBackgroundPrefetch(out string? error);
+
+                    if (!string.IsNullOrWhiteSpace(error))
+                        coordinator.LogFailure("Auto prefetch", error);
                 }
                 finally
                 {
                     prefetchInFlight = false;
                 }
-            });
-        }
-
-        private void handleFailure(string error)
-        {
-            coordinator.LogFailure("Auto prefetch", error);
-
-            if (authFailureNotified)
-                return;
-
-            authFailureNotified = true;
-            ezConfig.SetValue(Ez2Setting.PixivAutoDownloadEnabled, false);
-
-            notifications?.Post(new SimpleNotification
-            {
-                Text = EzSettingsStrings.PIXIV_AUTO_DOWNLOAD_PAUSED.Format(error),
             });
         }
     }

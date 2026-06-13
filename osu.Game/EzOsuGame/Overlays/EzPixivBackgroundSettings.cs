@@ -1,6 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -28,6 +30,10 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Bindable<SettingsNote.Data?> statusNote = new Bindable<SettingsNote.Data?>();
         private readonly Bindable<string> tokenInput = new Bindable<string>(string.Empty);
         private readonly BindableBool showAdvancedSettings = new BindableBool();
+
+        private SettingsButton checkButton = null!;
+        private FillFlowContainer advancedSection = null!;
+        private int loginRequestInFlight;
 
         public EzPixivBackgroundSettings(
             Ez2ConfigManager ezConfig,
@@ -57,11 +63,11 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 coordinator.Auth.SaveRefreshToken(token);
                 tokenInput.Value = string.Empty;
-                refreshStatus();
+                refreshLocalStatus();
                 post(notifications, EzSettingsStrings.PIXIV_TOKEN_SAVED);
             };
 
-            var checkButton = createActionButton(EzSettingsStrings.PIXIV_CHECK_LOGIN, EzSettingsStrings.PIXIV_CHECK_LOGIN_TOOLTIP, new[] { "pixiv", "login", "verify", "auth" },
+            checkButton = createActionButton(EzSettingsStrings.PIXIV_CHECK_LOGIN, EzSettingsStrings.PIXIV_CHECK_LOGIN_TOOLTIP, new[] { "pixiv", "login", "verify", "auth" },
                 new MarginPadding { Horizontal = 2.5f });
             checkButton.Action = checkLogin;
 
@@ -71,7 +77,7 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 coordinator.Auth.ClearRefreshToken();
                 tokenInput.Value = string.Empty;
-                refreshStatus();
+                refreshLocalStatus();
                 post(notifications, EzSettingsStrings.PIXIV_TOKEN_CLEARED);
             };
 
@@ -79,7 +85,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 new[] { "pixiv", "custom", "advanced", "filter", "proxy", "token" }, new MarginPadding());
             customToggleButton.Action = () => showAdvancedSettings.Value = !showAdvancedSettings.Value;
 
-            var advancedSection1 = new FillFlowContainer
+            advancedSection = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
@@ -144,10 +150,10 @@ namespace osu.Game.EzOsuGame.Overlays
             showAdvancedSettings.BindValueChanged(change =>
             {
                 if (change.NewValue)
-                    advancedSection1.Show();
+                    advancedSection.Show();
                 else
                 {
-                    advancedSection1.Hide();
+                    advancedSection.Hide();
                     tokenInput.Value = string.Empty;
                 }
             }, true);
@@ -185,7 +191,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         customToggleButton,
                     }
                 },
-                advancedSection1,
+                advancedSection,
                 new SettingsItemV2(new FormCheckBox
                 {
                     Caption = EzSettingsStrings.PIXIV_AUTO_DOWNLOAD_ENABLED,
@@ -202,7 +208,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 if (change.NewValue == BackgroundSource.PixivFollow)
                 {
                     Show();
-                    refreshStatus();
+                    refreshLocalStatus();
                 }
                 else
                 {
@@ -213,6 +219,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void checkLogin()
         {
+            if (Interlocked.CompareExchange(ref loginRequestInFlight, 1, 0) != 0)
+                return;
+
             string token = tokenInput.Value?.Trim() ?? string.Empty;
 
             if (!string.IsNullOrWhiteSpace(token))
@@ -223,31 +232,38 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (!coordinator.Auth.HasRefreshToken)
             {
-                refreshStatus();
+                Interlocked.Exchange(ref loginRequestInFlight, 0);
+                refreshLocalStatus();
                 post(notifications, EzSettingsStrings.PIXIV_STATUS_NOT_CONFIGURED);
                 return;
             }
 
-            if (!coordinator.Auth.TryRefreshAccessToken(out _, out string? error))
-            {
-                refreshStatus();
-                post(notifications, error ?? EzSettingsStrings.PIXIV_VERIFY_FAILED);
-                return;
-            }
+            checkButton.Enabled.Value = false;
 
-            if (coordinator.Api.TryGetUserAccount(out string? account, out error))
+            Task.Run(() =>
             {
-                refreshStatus();
-                post(notifications, EzSettingsStrings.PIXIV_VERIFY_SUCCESS.Format(account ?? "?"));
-            }
-            else
-            {
-                refreshStatus();
-                post(notifications, error ?? EzSettingsStrings.PIXIV_VERIFY_FAILED);
-            }
+                bool success = coordinator.TryVerifyLogin(out string? account, out string? error);
+
+                Schedule(() =>
+                {
+                    Interlocked.Exchange(ref loginRequestInFlight, 0);
+                    checkButton.Enabled.Value = true;
+
+                    if (success)
+                    {
+                        statusNote.Value = new SettingsNote.Data(EzSettingsStrings.PIXIV_STATUS_LOGGED_IN.Format(account ?? "?"), SettingsNote.Type.Informational);
+                        post(notifications, EzSettingsStrings.PIXIV_VERIFY_SUCCESS.Format(account ?? "?"));
+                    }
+                    else
+                    {
+                        statusNote.Value = new SettingsNote.Data(EzSettingsStrings.PIXIV_STATUS_INVALID, SettingsNote.Type.Warning);
+                        post(notifications, error ?? EzSettingsStrings.PIXIV_VERIFY_FAILED);
+                    }
+                });
+            });
         }
 
-        private void refreshStatus()
+        private void refreshLocalStatus()
         {
             if (!coordinator.Auth.HasRefreshToken)
             {
@@ -255,10 +271,9 @@ namespace osu.Game.EzOsuGame.Overlays
                 return;
             }
 
-            if (coordinator.Auth.TryRefreshAccessToken(out _, out _) && coordinator.Api.TryGetUserAccount(out string? account, out _))
-                statusNote.Value = new SettingsNote.Data(EzSettingsStrings.PIXIV_STATUS_LOGGED_IN.Format(account ?? "?"), SettingsNote.Type.Informational);
-            else
-                statusNote.Value = new SettingsNote.Data(EzSettingsStrings.PIXIV_STATUS_INVALID, SettingsNote.Type.Warning);
+            statusNote.Value = new SettingsNote.Data(
+                EzSettingsStrings.PIXIV_STATUS_LOGGED_IN.Format(coordinator.Auth.LoadAccountName() ?? "?"),
+                SettingsNote.Type.Informational);
         }
 
         private static SettingsButton createActionButton(LocalisableString text, LocalisableString tooltip, string[] keywords, MarginPadding spacingPadding)

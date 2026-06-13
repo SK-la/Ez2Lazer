@@ -174,6 +174,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
                 request.AddHeader("Referer", PixivConstants.IMAGE_REFERER);
                 request.AddHeader("User-Agent", PixivConstants.USER_AGENT);
+                PixivWebRequest.ConfigureImageDownload(request);
 
                 request.Perform();
 
