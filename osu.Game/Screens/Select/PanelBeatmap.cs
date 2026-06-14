@@ -306,6 +306,8 @@ namespace osu.Game.Screens.Select
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
+            ezDisplayKps.SetKpsMetrics(0, 0);
+            ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolveRealmBaselinePp(beatmap));
             computeStarRating();
             updateKeyCount();
 
@@ -384,6 +386,8 @@ namespace osu.Game.Screens.Select
             displaySR.Current.Value = EzManiaSummary.EMPTY;
             ezDisplayKpc.ManiaSummary = null;
             ezDisplayKpsGraph.SetPoints(Array.Empty<double>());
+            ezDisplayKps.SetKpsMetrics(0, 0);
+            ezDisplayKps.SetPp(null);
         }
 
         private void updateKPS(EzAnalysisResult ezAnalysisResult)
@@ -396,8 +400,8 @@ namespace osu.Game.Screens.Select
 
             var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
 
-            ezDisplayKps.SetKps(null, metrics.AverageKps, metrics.MaxKps);
             ezDisplayKpsGraph.SetPoints(metrics.KpsList);
+            ezDisplayKps.SetKpsMetrics(metrics);
 
             if (!supportsEzAnalysis || !beatmap.SupportsXxyStarRating())
                 return;
@@ -447,6 +451,8 @@ namespace osu.Game.Screens.Select
 
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
                 starCounter.Current = (float)starDifficulty.NewValue.Stars;
+
+                ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolvePanelPp(starDifficulty.NewValue, beatmap));
             }, true);
         }
 

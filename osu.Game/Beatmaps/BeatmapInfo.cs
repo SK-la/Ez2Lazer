@@ -100,7 +100,9 @@ namespace osu.Game.Beatmaps
         public double XxyStarRating { get; set; } = -1;
 
         /// <summary>
-        /// Ez2Lazer: Baseline perfect-play performance points (no mods). Defaults to -1 (not yet calculated). Populated by <see cref="BeatmapUpdater"/>.
+        /// Ez2Lazer: Baseline perfect-play performance points (no mods). Defaults to -1 (not yet calculated).
+        /// L1 Panel/sort placeholder; invalidated with <see cref="StarRating"/> on <see cref="Rulesets.RulesetInfo.LastAppliedDifficultyVersion"/> bump.
+        /// L2 display uses <see cref="StarDifficulty.PerformanceAttributes"/> from <see cref="BeatmapDifficultyCache"/>.
         /// </summary>
         public double PerformancePoints { get; set; } = -1;
 

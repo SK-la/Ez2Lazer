@@ -112,13 +112,13 @@ namespace osu.Game.EzOsuGame.Localization
             + "\n· 有 Mod：按当前 Mod 即时计算 kps/xxy 等（无匹配分支快照时）；"
             + "\n· 分支库：仍读取已激活分支的预生成快照，本开关不替代分支构建。"
             + "\n关闭时仅读已落盘 SQLite 数据，不触发选歌实时计算。"
-            + "\n不影响 Realm 元数据回填与官方星级/PP 缓存。",
+            + "\n不影响 Realm 元数据回填；Panel PP 随官方星级缓存（BeatmapDifficultyCache），与开关无关。",
             "Controls whether Ez SQLite metrics are computed on demand during song select:"
             + "\n· Main DB: backfill missing NoMod kps/KPC (and mania column stats) after debounce;"
             + "\n· With mods: compute kps/xxy live for the current mod set when no matching branch snapshot exists;"
             + "\n· Branch DB: still reads precomputed snapshots from the active branch; this switch does not replace branch builds."
             + "\nWhen disabled, only stored SQLite values are read; no live song-select computation."
-            + "\nDoes not affect Realm metadata backfill or the official star/PP cache.");
+            + "\nDoes not affect Realm metadata backfill; panel PP follows the official star cache (BeatmapDifficultyCache) and is not gated by this switch.");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED =
             new EzLocalizationManager.EzLocalisableString("启用 Ez 分析 SQLite", "Enable Ez analysis SQLite");

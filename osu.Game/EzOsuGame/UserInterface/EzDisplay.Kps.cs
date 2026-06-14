@@ -5,20 +5,21 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK;
 using osuTK.Graphics;
-using osu.Framework.Graphics.Sprites;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
     public partial class EzDisplayKps : CompositeDrawable
     {
-        private readonly Box background;
+        private const float pp_value_width = 32f;
 
-        // private readonly OsuSpriteText ppIcon;
-        private readonly OsuSpriteText ppText;
+        private readonly OsuSpriteText ppLabel;
+        private readonly OsuSpriteText ppValue;
         private readonly SpriteIcon kpsIcon;
         private readonly OsuSpriteText kpsText;
 
@@ -32,7 +33,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 AutoSizeAxes = Axes.Both,
                 Children = new Drawable[]
                 {
-                    background = new Box
+                    new Box
                     {
                         RelativeSizeAxes = Axes.Both,
                         Colour = Color4Extensions.FromHex("303d47"),
@@ -45,9 +46,8 @@ namespace osu.Game.EzOsuGame.UserInterface
                         Margin = new MarginPadding { Horizontal = 7f },
                         ColumnDimensions = new[]
                         {
-                            // new Dimension(GridSizeMode.AutoSize),
-                            // new Dimension(GridSizeMode.Absolute, 3f),
-                            new Dimension(GridSizeMode.AutoSize, minSize: 25f),
+                            new Dimension(GridSizeMode.AutoSize),
+                            new Dimension(GridSizeMode.Absolute, pp_value_width),
                             new Dimension(GridSizeMode.Absolute, 8f),
                             new Dimension(GridSizeMode.AutoSize),
                             new Dimension(GridSizeMode.Absolute, 3f),
@@ -58,20 +58,21 @@ namespace osu.Game.EzOsuGame.UserInterface
                         {
                             new[]
                             {
-                                // ppIcon = new OsuSpriteText
-                                // {
-                                //     Anchor = Anchor.Centre,
-                                //     Origin = Anchor.Centre,
-                                //     Text = LegacySpriteText.PP_SUFFIX_CHAR.ToString(),
-                                //     Font = OsuFont.Style.Body.With(size: 16f, weight: FontWeight.Bold),
-                                //     Colour = Color4.Gold,
-                                // },
-                                // Empty(),
-                                ppText = new OsuSpriteText
+                                ppLabel = new OsuSpriteText
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
+                                    Text = "PP",
                                     Margin = new MarginPadding { Bottom = 1.5f },
+                                    Font = OsuFont.Torus.With(size: 14.4f, weight: FontWeight.Bold, fixedWidth: true),
+                                    Shadow = false,
+                                    Colour = Color4.LightSteelBlue,
+                                },
+                                ppValue = new OsuSpriteText
+                                {
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                    Margin = new MarginPadding { Bottom = 1.5f, Left = 2f },
                                     Font = OsuFont.Torus.With(size: 14.4f, weight: FontWeight.Bold, fixedWidth: true),
                                     Shadow = false,
                                     Colour = Color4.LightSteelBlue,
@@ -103,49 +104,28 @@ namespace osu.Game.EzOsuGame.UserInterface
         }
 
         /// <summary>
-        /// 设置KPS显示值
+        /// 设置 Panel PP 数值；「PP」标签固定，数值列预留宽度。无值传 <see langword="null"/>。
         /// </summary>
-        /// <param name="pp">理论满分PP</param>
-        /// <param name="averageKps">平均KPS</param>
-        /// <param name="maxKps">最大KPS</param>
-        public void SetKps(double? pp, double averageKps, double maxKps)
+        public void SetPp(double? pp) =>
+            ppValue.Text = pp?.ToString("F1") ?? string.Empty;
+
+        /// <summary>
+        /// 设置 KPS 指标；<paramref name="averageKps"/> ≤ 0 时清空 KPS 区（如 reset 传 0）。
+        /// </summary>
+        public void SetKpsMetrics(double averageKps, double maxKps)
         {
-            string ppValueText = pp is double ppValue ? $"PP {ppValue:F1}" : string.Empty;
-            string kpsValueText = averageKps > 0 ? $"{averageKps:F1} ({maxKps:F1})" : string.Empty;
-
-            // 更新PP显示
-            if (string.IsNullOrEmpty(ppValueText))
-            {
-                // ppIcon.Alpha = 0;
-                ppText.Text = string.Empty;
-            }
-            else
-            {
-                // ppIcon.Alpha = 1;
-                ppText.Text = ppValueText;
-            }
-
-            // 更新KPS显示
-            if (string.IsNullOrEmpty(kpsValueText))
+            if (averageKps <= 0)
             {
                 kpsIcon.Alpha = 0;
                 kpsText.Text = string.Empty;
-            }
-            else
-            {
-                kpsIcon.Alpha = 1;
-                kpsText.Text = kpsValueText;
+                return;
             }
 
-            // 如果两者都为空，隐藏整个组件
-            if (string.IsNullOrEmpty(ppValueText) && string.IsNullOrEmpty(kpsValueText))
-            {
-                Alpha = 0;
-            }
-            else
-            {
-                Alpha = 1;
-            }
+            kpsIcon.Alpha = 1;
+            kpsText.Text = $"{averageKps:F1} ({maxKps:F1})";
         }
+
+        public void SetKpsMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics) =>
+            SetKpsMetrics(metrics.AverageKps, metrics.MaxKps);
     }
 }

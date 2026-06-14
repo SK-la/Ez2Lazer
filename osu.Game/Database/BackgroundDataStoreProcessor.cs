@@ -201,6 +201,7 @@ namespace osu.Game.Database
         /// <summary>
         /// Check whether the databased difficulty calculation version matches the latest ruleset provided version.
         /// If it doesn't, clear out any existing difficulties so they can be incrementally recalculated.
+        /// Baseline PP (<see cref="BeatmapInfo.PerformancePoints"/>) is invalidated alongside star ratings.
         /// </summary>
         private void clearOutdatedStarRatings()
         {
@@ -211,7 +212,7 @@ namespace osu.Game.Database
 
                 if (ruleset.LastAppliedDifficultyVersion < currentVersion)
                 {
-                    Logger.Log($"Resetting star ratings for {ruleset.Name} (difficulty calculation version updated from {ruleset.LastAppliedDifficultyVersion} to {currentVersion})");
+                    Logger.Log($"Resetting star ratings and baseline PP for {ruleset.Name} (difficulty calculation version updated from {ruleset.LastAppliedDifficultyVersion} to {currentVersion})");
 
                     int countReset = 0;
 
@@ -222,6 +223,7 @@ namespace osu.Game.Database
                             if (b.Ruleset.ShortName == ruleset.ShortName)
                             {
                                 b.StarRating = -1;
+                                b.PerformancePoints = -1;
                                 countReset++;
                             }
                         }
@@ -229,7 +231,7 @@ namespace osu.Game.Database
                         r.Find<RulesetInfo>(ruleset.ShortName)!.LastAppliedDifficultyVersion = currentVersion;
                     });
 
-                    Logger.Log($"Finished resetting {countReset} beatmap sets for {ruleset.Name}");
+                    Logger.Log($"Finished resetting {countReset} beatmaps for {ruleset.Name}");
                 }
             }
         }
@@ -1276,9 +1278,9 @@ namespace osu.Game.Database
             if (notification == null)
                 return;
 
-            bool shouldUpdate = processedCount == 0
-                                  || processedCount >= totalCount
-                                  || processedCount - lastNotificationProgressReported >= notification_progress_update_interval;
+            bool shouldUpdate = processedCount == 0 ||
+                                processedCount >= totalCount ||
+                                processedCount - lastNotificationProgressReported >= notification_progress_update_interval;
 
             if (!shouldUpdate)
                 return;
