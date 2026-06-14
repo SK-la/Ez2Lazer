@@ -15,33 +15,33 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
     public class EzSongSelectAnalysisDisplayTest
     {
         [Test]
-        public void Resolve_uses_realm_pp_for_non_mania_when_dynamic_has_no_kps()
+        public void Resolve_returns_kps_only()
         {
             var beatmap = createOsuBeatmap(performancePoints: 123.4);
-            var emptyAnalysis = new EzAnalysisResult(new KpsSummary(0, 0, Array.Empty<double>()));
+            var analysis = new EzAnalysisResult(new KpsSummary(12.3, 45.6, new[] { 1.0, 2.0 }));
 
-            var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, emptyAnalysis, Array.Empty<Mod>());
+            var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, analysis, Array.Empty<Mod>());
 
-            Assert.That(metrics.PerformancePoints, Is.EqualTo(123.4));
-            Assert.That(metrics.AverageKps, Is.EqualTo(0));
-            Assert.That(metrics.KpsList, Is.Empty);
+            Assert.That(metrics.AverageKps, Is.EqualTo(12.3));
+            Assert.That(metrics.MaxKps, Is.EqualTo(45.6));
+            Assert.That(metrics.KpsList, Has.Count.EqualTo(2));
         }
 
         [Test]
-        public void ShouldApplyPanelUpdate_allows_empty_kps_when_no_mods()
+        public void ShouldApplyPanelKpsUpdate_allows_empty_kps_when_no_mods()
         {
             var emptyAnalysis = new EzAnalysisResult(new KpsSummary(0, 0, Array.Empty<double>()));
 
             Assert.That(EzSongSelectAnalysisDisplay.HasDisplayableKps(emptyAnalysis), Is.False);
-            Assert.That(EzSongSelectAnalysisDisplay.ShouldApplyPanelUpdate(emptyAnalysis, Array.Empty<Mod>()), Is.True);
+            Assert.That(EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(emptyAnalysis, Array.Empty<Mod>()), Is.True);
         }
 
         [Test]
-        public void ShouldApplyPanelUpdate_skips_empty_kps_when_mods_active()
+        public void ShouldApplyPanelKpsUpdate_skips_empty_kps_when_mods_active()
         {
             var emptyAnalysis = new EzAnalysisResult(new KpsSummary(0, 0, Array.Empty<double>()));
 
-            Assert.That(EzSongSelectAnalysisDisplay.ShouldApplyPanelUpdate(emptyAnalysis, new Mod[] { new OsuModHardRock() }), Is.False);
+            Assert.That(EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(emptyAnalysis, new Mod[] { new OsuModHardRock() }), Is.False);
         }
 
         private static BeatmapInfo createOsuBeatmap(double performancePoints)

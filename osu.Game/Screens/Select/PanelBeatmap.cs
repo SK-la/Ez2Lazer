@@ -311,7 +311,10 @@ namespace osu.Game.Screens.Select
 
             resetEzDisplay();
             ezDisplayTag.Beatmap = beatmap;
-            updateManiaDisplayFromBeatmap();
+
+            if (supportsEzAnalysis && beatmap.SupportsXxyStarRating())
+                displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
+
             computeEzAnalysis();
         }
 
@@ -388,32 +391,27 @@ namespace osu.Game.Screens.Select
             if (Item?.IsVisible != true)
                 return;
 
+            if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(ezAnalysisResult, mods.Value))
+                return;
+
             var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
 
-            ezDisplayKps.SetKps(metrics.PerformancePoints, metrics.AverageKps, metrics.MaxKps);
+            ezDisplayKps.SetKps(null, metrics.AverageKps, metrics.MaxKps);
             ezDisplayKpsGraph.SetPoints(metrics.KpsList);
 
-            if (supportsEzAnalysis && beatmap.SupportsXxyStarRating())
-            {
-                var maniaSummary = metrics.ManiaSummary;
-                var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
-
-                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, metrics.MaxKps, metrics.KpsList);
-                updateKeyCount();
-                ezDisplayKpc.ManiaSummary = maniaSummary;
-
-                var summaryForDisplay = maniaSummary ?? EzManiaSummary.EMPTY;
-                if (displaySR.Current.Value.XxySr != summaryForDisplay.XxySr)
-                    displaySR.Current.Value = summaryForDisplay;
-            }
-        }
-
-        private void updateManiaDisplayFromBeatmap()
-        {
             if (!supportsEzAnalysis || !beatmap.SupportsXxyStarRating())
                 return;
 
-            displaySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
+            var maniaSummary = metrics.ManiaSummary;
+            var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
+
+            scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, metrics.MaxKps, metrics.KpsList);
+            updateKeyCount();
+            ezDisplayKpc.ManiaSummary = maniaSummary;
+
+            var summaryForDisplay = maniaSummary ?? EzManiaSummary.EMPTY;
+            if (displaySR.Current.Value.XxySr != summaryForDisplay.XxySr)
+                displaySR.Current.Value = summaryForDisplay;
         }
 
         private void computeEzAnalysis()
@@ -426,13 +424,7 @@ namespace osu.Game.Screens.Select
             ezAnalysisCancellationSource = new CancellationTokenSource();
 
             ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
-            ezAnalysisBindable.BindValueChanged(result =>
-            {
-                if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelUpdate(result.NewValue, mods.Value))
-                    return;
-
-                updateKPS(result.NewValue);
-            }, true);
+            ezAnalysisBindable.BindValueChanged(result => updateKPS(result.NewValue), true);
         }
 
         private void computeStarRating()
@@ -450,6 +442,9 @@ namespace osu.Game.Screens.Select
             starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             starDifficultyBindable.BindValueChanged(starDifficulty =>
             {
+                if (Item?.IsVisible != true)
+                    return;
+
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
                 starCounter.Current = (float)starDifficulty.NewValue.Stars;
             }, true);

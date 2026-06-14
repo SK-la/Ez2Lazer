@@ -328,7 +328,7 @@ namespace osu.Game.Screens.Select
                 ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmapInfo, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
                 ezAnalysisBindable.BindValueChanged(result =>
                 {
-                    if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelUpdate(result.NewValue, mods.Value))
+                    if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(result.NewValue, mods.Value))
                         return;
 
                     var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmapInfo, result.NewValue, mods.Value);

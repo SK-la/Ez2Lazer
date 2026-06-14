@@ -1,22 +1,23 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
     /// 选歌面板 Ez 分析显示合成（kps/KPC/xxy 等 SQLite 体系指标）。
-    /// Panel PP 应对齐官方 <see cref="BeatmapDifficultyCache"/> / <see cref="BeatmapInfo.PerformancePoints"/>，不经 Ez SQLite 即时计算开关。
+    /// Panel PP 见 <see cref="EzPanelPerformancePoints"/>（L2 cache + L1 Realm），不在此合成。
     /// L1 Realm 提供 NoMod xxy 基线；L2/L3 <see cref="EzAnalysisResult"/> 提供 kps/KPC 与 mod 动态 xxy（受 <see cref="Ez2Setting.EzAnalysisRecEnabled"/>）。
     /// </summary>
     public static class EzSongSelectAnalysisDisplay
     {
         public readonly record struct PanelMetrics(
-            double? PerformancePoints,
             double AverageKps,
             double MaxKps,
             IReadOnlyList<double> KpsList,
@@ -28,25 +29,18 @@ namespace osu.Game.EzOsuGame.Analysis
             => result.KpsList.Count > 0 || result.AverageKps > 0 || result.MaxKps > 0;
 
         /// <summary>
-        /// 避免 bindable 在异步重算完成前用空占位结果清空折线（尤其有 Mod 时）。
+        /// 避免 bindable 在异步重算完成前用空占位结果清空 KPS 折线（尤其有 Mod 时）。
         /// </summary>
-        public static bool ShouldApplyPanelUpdate(in EzAnalysisResult result, IReadOnlyList<Mod>? mods)
+        public static bool ShouldApplyPanelKpsUpdate(in EzAnalysisResult result, IReadOnlyList<Mod>? mods)
             => HasDisplayableKps(result) || !HasActiveMods(mods);
 
         public static PanelMetrics Resolve(BeatmapInfo beatmap, EzAnalysisResult? dynamic, IReadOnlyList<Mod>? mods)
         {
-            bool hasMods = HasActiveMods(mods);
-            bool useDynamicStarMetrics = hasMods && dynamicHasStarMetrics(dynamic);
-
-            double? pp = useDynamicStarMetrics && dynamic!.Value.Pp is double dynamicPp
-                ? dynamicPp
-                : beatmap.PerformancePoints >= 0
-                    ? beatmap.PerformancePoints
-                    : dynamic?.Pp;
+            bool useDynamicStarMetrics = HasActiveMods(mods) && dynamic?.ManiaSummary?.XxySr != null;
 
             double avgKps = 0;
             double maxKps = 0;
-            IReadOnlyList<double> kpsList = System.Array.Empty<double>();
+            IReadOnlyList<double> kpsList = Array.Empty<double>();
 
             if (dynamic is { } analysis && HasDisplayableKps(analysis))
             {
@@ -59,20 +53,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 dynamic?.ManiaSummary,
                 preferAnalysisValues: useDynamicStarMetrics);
 
-            return new PanelMetrics(pp, avgKps, maxKps, kpsList, maniaSummary);
-        }
-
-        private static bool dynamicHasStarMetrics(EzAnalysisResult? dynamic)
-        {
-            if (!dynamic.HasValue)
-                return false;
-
-            var result = dynamic.Value;
-
-            if (result.Pp != null)
-                return true;
-
-            return result.ManiaSummary?.XxySr != null;
+            return new PanelMetrics(avgKps, maxKps, kpsList, maniaSummary);
         }
     }
 }

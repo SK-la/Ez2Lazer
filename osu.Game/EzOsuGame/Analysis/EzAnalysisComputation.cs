@@ -132,7 +132,6 @@ namespace osu.Game.EzOsuGame.Analysis
             }
 
             double? xxySr = null;
-            double? pp = tryComputePerfectPp(playableWorkingBeatmap, analysisBeatmap, lookup, cancellationToken);
 
             if (!onlyKps)
                 tryComputeXxySr(analysisBeatmap, lookup, cancellationToken, out xxySr);
@@ -146,7 +145,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 ? null
                 : new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
 
-            return new EzAnalysisResult(commonSummary, pp, maniaSummary);
+            return new EzAnalysisResult(commonSummary, pp: null, maniaSummary);
         }
 
         public static bool TryComputeRulesetSpecificRadarData(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
