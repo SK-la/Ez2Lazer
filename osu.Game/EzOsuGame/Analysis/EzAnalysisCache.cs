@@ -144,6 +144,19 @@ namespace osu.Game.EzOsuGame.Analysis
             return bindable;
         }
 
+        internal int GetTrackedBindableCount()
+        {
+            lock (bindableUpdateLock)
+            {
+                int count = 0;
+
+                foreach (var _ in trackedBindables)
+                    count++;
+
+                return count;
+            }
+        }
+
         public virtual Task<EzAnalysisResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo = null, IEnumerable<Mod>? mods = null,
                                                                 CancellationToken cancellationToken = default, int computationDelay = 0)
         {

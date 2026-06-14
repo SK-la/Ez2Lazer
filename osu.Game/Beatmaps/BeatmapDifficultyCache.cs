@@ -150,6 +150,19 @@ namespace osu.Game.Beatmaps
             return bindable;
         }
 
+        internal int GetTrackedBindableCount()
+        {
+            lock (bindableUpdateLock)
+            {
+                int count = 0;
+
+                foreach (var _ in trackedBindables)
+                    count++;
+
+                return count;
+            }
+        }
+
         /// <summary>
         /// Retrieves the difficulty of a <see cref="IBeatmapInfo"/>.
         /// </summary>
