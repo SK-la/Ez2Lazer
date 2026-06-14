@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -9,7 +8,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Lists;
+using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
@@ -30,6 +31,12 @@ namespace osu.Game.Tests.Visual.SongSelect
         [Resolved]
         private BeatmapManager beatmaps { get; set; } = null!;
 
+        [Resolved]
+        private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
+
+        [Resolved]
+        private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
+
         private FillFlowContainer scenarioHost = null!;
         private OsuSpriteText summaryText = null!;
 
@@ -47,6 +54,8 @@ namespace osu.Game.Tests.Visual.SongSelect
         private PanelBeatmapStandalone? reusablePanel;
         private int beatmapIndex;
         private long baselineManagedMemory;
+        private int baselineEzAnalysisTrackedBindables;
+        private int baselineStarDifficultyTrackedBindables;
 
         public TestScenePanelBeatmapMemoryDiagnostics()
             : base(false)
@@ -58,6 +67,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             populateBeatmaps();
             Ruleset.Value = new ManiaRuleset().RulesetInfo;
+            SelectedMods.SetDefault();
             CreateThemedContent(OverlayColourScheme.Aquamarine);
             resetDiagnostics();
         });
@@ -68,8 +78,8 @@ namespace osu.Game.Tests.Visual.SongSelect
             AddStep("reset diagnostics", resetDiagnostics);
             AddRepeatStep("recreate selected panel", recreateSelectedPanel, 40);
             AddStep("clear host", clearScenarioHost);
-            AddUntilStep("no leaked panels", () => collectAndCount(panelWeakReferences) == 0);
-            AddUntilStep("no leaked items", () => collectAndCount(panelItemWeakReferences) == 0);
+            AddUntilStep("no leaked panels", () => ManiaModStressSteps.collectAndCount(panelWeakReferences) == 0);
+            AddUntilStep("no leaked items", () => ManiaModStressSteps.collectAndCount(panelItemWeakReferences) == 0);
         }
 
         [Test]
@@ -79,21 +89,52 @@ namespace osu.Game.Tests.Visual.SongSelect
             AddStep("create reusable panel", createReusablePanel);
             AddRepeatStep("swap beatmap item", swapReusablePanelBeatmap, 60);
             AddStep("clear host", clearScenarioHost);
-            AddUntilStep("no leaked panels", () => collectAndCount(panelWeakReferences) == 0);
-            AddUntilStep("no leaked items", () => collectAndCount(panelItemWeakReferences) == 0);
+            AddUntilStep("no leaked panels", () => ManiaModStressSteps.collectAndCount(panelWeakReferences) == 0);
+            AddUntilStep("no leaked items", () => ManiaModStressSteps.collectAndCount(panelItemWeakReferences) == 0);
+        }
+
+        [Test]
+        public void TestPanelRecreationWithManiaModToggleDoesNotLeakReferences()
+        {
+            AddStep("reset diagnostics", resetDiagnostics);
+            AddRepeatStep("recreate panel and cycle PS/SB mods", recreateSelectedPanelWithModCycle, ManiaModStressSteps.default_cycle_count);
+            AddWaitStep("wait for analysis to settle", ManiaModStressSteps.analysis_settle_wait_steps);
+            AddStep("clear mods", () => SelectedMods.SetDefault());
+            AddStep("clear host", clearScenarioHost);
+            assertNoReferenceLeaks();
+            assertCacheBindablesReturnToBaseline();
+        }
+
+        [Test]
+        public void TestPanelBeatmapSwapWithManiaModToggleDoesNotLeakReferences()
+        {
+            AddStep("reset diagnostics", resetDiagnostics);
+            AddStep("create reusable panel", createReusablePanel);
+            AddRepeatStep("swap beatmap and cycle PS/SB mods", swapBeatmapAndCycleMods, ManiaModStressSteps.default_cycle_count);
+            AddWaitStep("wait for analysis to settle", ManiaModStressSteps.analysis_settle_wait_steps);
+            AddStep("clear mods", () => SelectedMods.SetDefault());
+            AddStep("clear host", clearScenarioHost);
+            assertNoReferenceLeaks();
+            assertCacheBindablesReturnToBaseline();
         }
 
         [Test]
         public void TestEzComponentsDoNotLeakReferences()
         {
             AddStep("reset diagnostics", resetDiagnostics);
+            AddStep("create reusable panel", createReusablePanel);
+            AddRepeatStep("swap beatmap item", swapReusablePanelBeatmap, 20);
+            AddRepeatStep("cycle PS/SB mod toggles", performFullModCycle, 8);
+            AddWaitStep("wait for analysis to settle", ManiaModStressSteps.analysis_settle_wait_steps);
+            AddStep("clear mods", () => SelectedMods.SetDefault());
             AddStep("clear host", clearScenarioHost);
-            AddUntilStep("no leaked component hosts", () => collectAndCount(componentHostWeakReferences) == 0);
-            AddUntilStep("no leaked graphs", () => collectAndCount(graphWeakReferences) == 0);
-            AddUntilStep("no leaked kps displays", () => collectAndCount(kpsWeakReferences) == 0);
-            AddUntilStep("no leaked kpc displays", () => collectAndCount(kpcWeakReferences) == 0);
-            AddUntilStep("no leaked xxySR displays", () => collectAndCount(xxyWeakReferences) == 0);
-            AddUntilStep("no leaked tag displays", () => collectAndCount(tagWeakReferences) == 0);
+            AddUntilStep("no leaked component hosts", () => ManiaModStressSteps.collectAndCount(componentHostWeakReferences) == 0);
+            AddUntilStep("no leaked graphs", () => ManiaModStressSteps.collectAndCount(graphWeakReferences) == 0);
+            AddUntilStep("no leaked kps displays", () => ManiaModStressSteps.collectAndCount(kpsWeakReferences) == 0);
+            AddUntilStep("no leaked kpc displays", () => ManiaModStressSteps.collectAndCount(kpcWeakReferences) == 0);
+            AddUntilStep("no leaked xxySR displays", () => ManiaModStressSteps.collectAndCount(xxyWeakReferences) == 0);
+            AddUntilStep("no leaked tag displays", () => ManiaModStressSteps.collectAndCount(tagWeakReferences) == 0);
+            assertCacheBindablesReturnToBaseline();
         }
 
         [Test]
@@ -121,9 +162,41 @@ namespace osu.Game.Tests.Visual.SongSelect
 
         [Test]
         [Explicit]
+        public void TestPanelRecreationWithModToggleMemoryDiagnostics()
+        {
+            AddStep("reset diagnostics", resetDiagnostics);
+            AddRepeatStep("recreate panel and cycle PS/SB mods", recreateSelectedPanelWithModCycle, ManiaModStressSteps.default_cycle_count);
+            AddWaitStep("wait for analysis to settle", ManiaModStressSteps.analysis_settle_wait_steps);
+            AddStep("clear mods", () => SelectedMods.SetDefault());
+            AddStep("clear host", clearScenarioHost);
+            AddStep("collect and summarise", () => updateSummary(createModStressSummary("Panel recreation + mod toggle")));
+            AddAssert("summary available", () => summaryText.Text.ToString().Length, () => Is.GreaterThan(0));
+        }
+
+        [Test]
+        [Explicit]
+        public void TestPanelBeatmapSwapWithModToggleMemoryDiagnostics()
+        {
+            AddStep("reset diagnostics", resetDiagnostics);
+            AddStep("create reusable panel", createReusablePanel);
+            AddRepeatStep("swap beatmap and cycle PS/SB mods", swapBeatmapAndCycleMods, ManiaModStressSteps.default_cycle_count);
+            AddWaitStep("wait for analysis to settle", ManiaModStressSteps.analysis_settle_wait_steps);
+            AddStep("clear mods", () => SelectedMods.SetDefault());
+            AddStep("clear host", clearScenarioHost);
+            AddStep("collect and summarise", () => updateSummary(createModStressSummary("Panel swap + mod toggle")));
+            AddAssert("summary available", () => summaryText.Text.ToString().Length, () => Is.GreaterThan(0));
+        }
+
+        [Test]
+        [Explicit]
         public void TestEzComponentMemoryDiagnostics()
         {
             AddStep("reset diagnostics", resetDiagnostics);
+            AddStep("create reusable panel", createReusablePanel);
+            AddRepeatStep("swap beatmap item", swapReusablePanelBeatmap, 20);
+            AddRepeatStep("cycle PS/SB mod toggles", performFullModCycle, 8);
+            AddWaitStep("wait for analysis to settle", ManiaModStressSteps.analysis_settle_wait_steps);
+            AddStep("clear mods", () => SelectedMods.SetDefault());
             AddStep("clear host", clearScenarioHost);
             AddStep("collect and summarise", () => updateSummary(createEzComponentSummary()));
             AddAssert("component summary available", () => summaryText.Text.ToString().Length, () => Is.GreaterThan(0));
@@ -155,6 +228,20 @@ namespace osu.Game.Tests.Visual.SongSelect
                     }
                 }
             };
+        }
+
+        private void assertNoReferenceLeaks()
+        {
+            AddUntilStep("no leaked panels", () => ManiaModStressSteps.collectAndCount(panelWeakReferences) == 0);
+            AddUntilStep("no leaked items", () => ManiaModStressSteps.collectAndCount(panelItemWeakReferences) == 0);
+        }
+
+        private void assertCacheBindablesReturnToBaseline()
+        {
+            AddUntilStep("ez analysis tracked bindables return to baseline",
+                () => ezAnalysisCache.GetTrackedBindableCount() <= baselineEzAnalysisTrackedBindables);
+            AddUntilStep("star difficulty tracked bindables return to baseline",
+                () => difficultyCache.GetTrackedBindableCount() <= baselineStarDifficultyTrackedBindables);
         }
 
         private void populateBeatmaps()
@@ -189,8 +276,31 @@ namespace osu.Game.Tests.Visual.SongSelect
             beatmapIndex = 0;
 
             clearScenarioHost();
-            baselineManagedMemory = forceCollectionAndGetManagedMemory();
+            SelectedMods.SetDefault();
+            baselineManagedMemory = ManiaModStressSteps.forceCollectionAndGetManagedMemory();
+            captureCacheBaselines();
             updateSummary("Diagnostics reset. Managed baseline captured.");
+        }
+
+        private void captureCacheBaselines()
+        {
+            ManiaModStressSteps.forceCollectionAndGetManagedMemory();
+            baselineEzAnalysisTrackedBindables = ezAnalysisCache.GetTrackedBindableCount();
+            baselineStarDifficultyTrackedBindables = difficultyCache.GetTrackedBindableCount();
+        }
+
+        private void performFullModCycle() => ManiaModStressSteps.performFullModCycle(SelectedMods);
+
+        private void recreateSelectedPanelWithModCycle()
+        {
+            recreateSelectedPanel();
+            performFullModCycle();
+        }
+
+        private void swapBeatmapAndCycleMods()
+        {
+            swapReusablePanelBeatmap();
+            performFullModCycle();
         }
 
         private void recreateSelectedPanel()
@@ -207,9 +317,10 @@ namespace osu.Game.Tests.Visual.SongSelect
 
             panelWeakReferences.Add(panel);
             panelItemWeakReferences.Add(panel.Item);
+            trackEzComponents(panel);
             scenarioHost.Add(panel);
 
-            updateSummary($"Panel recreation iteration {countAlive(panelWeakReferences)} running...");
+            updateSummary($"Panel recreation iteration {ManiaModStressSteps.countAlive(panelWeakReferences)} running...");
         }
 
         private void createReusablePanel()
@@ -218,6 +329,7 @@ namespace osu.Game.Tests.Visual.SongSelect
 
             reusablePanel = new PanelBeatmapStandalone();
             panelWeakReferences.Add(reusablePanel);
+            trackEzComponents(reusablePanel);
             scenarioHost.Add(reusablePanel);
 
             swapReusablePanelBeatmap();
@@ -235,7 +347,27 @@ namespace osu.Game.Tests.Visual.SongSelect
             reusablePanel.Selected.Value = true;
             reusablePanel.KeyboardSelected.Value = true;
 
-            updateSummary($"Panel swap iteration {countAlive(panelItemWeakReferences)} running...");
+            updateSummary($"Panel swap iteration {ManiaModStressSteps.countAlive(panelItemWeakReferences)} running...");
+        }
+
+        private void trackEzComponents(PanelBeatmapStandalone panel)
+        {
+            componentHostWeakReferences.Add(panel);
+
+            foreach (var graph in panel.ChildrenOfType<EzDisplayKpsGraph>())
+                graphWeakReferences.Add(graph);
+
+            foreach (var kps in panel.ChildrenOfType<EzDisplayKps>())
+                kpsWeakReferences.Add(kps);
+
+            foreach (var kpc in panel.ChildrenOfType<EzDisplayKpc>())
+                kpcWeakReferences.Add(kpc);
+
+            foreach (var xxy in panel.ChildrenOfType<EzDisplaySR>())
+                xxyWeakReferences.Add(xxy);
+
+            foreach (var tag in panel.ChildrenOfType<EzDisplayTag>())
+                tagWeakReferences.Add(tag);
         }
 
         private void clearScenarioHost()
@@ -255,23 +387,30 @@ namespace osu.Game.Tests.Visual.SongSelect
 
         private string createPanelRecreationSummary()
         {
-            long managed = forceCollectionAndGetManagedMemory();
+            long managed = ManiaModStressSteps.forceCollectionAndGetManagedMemory();
 
-            return $"Panel recreation diagnostics | panel survivors: {countAlive(panelWeakReferences)} | item survivors: {countAlive(panelItemWeakReferences)} | managed delta: {formatMemoryDelta(managed - baselineManagedMemory)}";
+            return $"Panel recreation diagnostics | panel survivors: {ManiaModStressSteps.countAlive(panelWeakReferences)} | item survivors: {ManiaModStressSteps.countAlive(panelItemWeakReferences)} | managed delta: {ManiaModStressSteps.formatMemoryDelta(managed - baselineManagedMemory)}";
         }
 
         private string createPanelSwapSummary()
         {
-            long managed = forceCollectionAndGetManagedMemory();
+            long managed = ManiaModStressSteps.forceCollectionAndGetManagedMemory();
 
-            return $"Panel swap diagnostics | panel survivors: {countAlive(panelWeakReferences)} | item survivors: {countAlive(panelItemWeakReferences)} | managed delta: {formatMemoryDelta(managed - baselineManagedMemory)}";
+            return $"Panel swap diagnostics | panel survivors: {ManiaModStressSteps.countAlive(panelWeakReferences)} | item survivors: {ManiaModStressSteps.countAlive(panelItemWeakReferences)} | managed delta: {ManiaModStressSteps.formatMemoryDelta(managed - baselineManagedMemory)}";
+        }
+
+        private string createModStressSummary(string scenario)
+        {
+            long managed = ManiaModStressSteps.forceCollectionAndGetManagedMemory();
+
+            return $"{scenario} diagnostics | panel survivors: {ManiaModStressSteps.countAlive(panelWeakReferences)} | item survivors: {ManiaModStressSteps.countAlive(panelItemWeakReferences)} | ez tracked: {ezAnalysisCache.GetTrackedBindableCount()} (baseline {baselineEzAnalysisTrackedBindables}) | star tracked: {difficultyCache.GetTrackedBindableCount()} (baseline {baselineStarDifficultyTrackedBindables}) | managed delta: {ManiaModStressSteps.formatMemoryDelta(managed - baselineManagedMemory)}";
         }
 
         private string createEzComponentSummary()
         {
-            long managed = forceCollectionAndGetManagedMemory();
+            long managed = ManiaModStressSteps.forceCollectionAndGetManagedMemory();
 
-            return $"Ez component diagnostics | hosts: {countAlive(componentHostWeakReferences)} | graphs: {countAlive(graphWeakReferences)} | kps displays: {countAlive(kpsWeakReferences)} | kpc displays: {countAlive(kpcWeakReferences)} | xxySR displays: {countAlive(xxyWeakReferences)} | tag displays: {countAlive(tagWeakReferences)} | managed delta: {formatMemoryDelta(managed - baselineManagedMemory)}";
+            return $"Ez component diagnostics | hosts: {ManiaModStressSteps.countAlive(componentHostWeakReferences)} | graphs: {ManiaModStressSteps.countAlive(graphWeakReferences)} | kps displays: {ManiaModStressSteps.countAlive(kpsWeakReferences)} | kpc displays: {ManiaModStressSteps.countAlive(kpcWeakReferences)} | xxySR displays: {ManiaModStressSteps.countAlive(xxyWeakReferences)} | tag displays: {ManiaModStressSteps.countAlive(tagWeakReferences)} | ez tracked: {ezAnalysisCache.GetTrackedBindableCount()} | star tracked: {difficultyCache.GetTrackedBindableCount()} | managed delta: {ManiaModStressSteps.formatMemoryDelta(managed - baselineManagedMemory)}";
         }
 
         private void updateSummary(string summary)
@@ -280,38 +419,6 @@ namespace osu.Game.Tests.Visual.SongSelect
             summaryText.Colour = summary.Contains("survivors: 0") || summary.Contains("Diagnostics reset")
                 ? Color4.White
                 : Color4.OrangeRed;
-        }
-
-        private static int countAlive<T>(WeakList<T> weakList)
-            where T : class
-        {
-            int count = 0;
-
-            foreach (var _ in weakList)
-                count++;
-
-            return count;
-        }
-
-        private static int collectAndCount<T>(WeakList<T> weakList)
-            where T : class
-        {
-            forceCollectionAndGetManagedMemory();
-            return countAlive(weakList);
-        }
-
-        private static string formatMemoryDelta(long delta)
-        {
-            double kiloBytes = delta / 1024.0;
-            return $"{kiloBytes:+0.0;-0.0;0.0} KB";
-        }
-
-        private static long forceCollectionAndGetManagedMemory()
-        {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            return GC.GetTotalMemory(true);
         }
     }
 }
