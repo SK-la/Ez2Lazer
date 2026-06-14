@@ -16,11 +16,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 {
     public partial class EzDisplayKps : CompositeDrawable
     {
-        private const float pp_value_width = 32f;
-
-        private readonly OsuSpriteText ppLabel;
         private readonly OsuSpriteText ppValue;
-        private readonly SpriteIcon kpsIcon;
         private readonly OsuSpriteText kpsText;
 
         public EzDisplayKps()
@@ -47,7 +43,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                         ColumnDimensions = new[]
                         {
                             new Dimension(GridSizeMode.AutoSize),
-                            new Dimension(GridSizeMode.Absolute, pp_value_width),
+                            new Dimension(GridSizeMode.AutoSize, minSize: 32f),
                             new Dimension(GridSizeMode.Absolute, 8f),
                             new Dimension(GridSizeMode.AutoSize),
                             new Dimension(GridSizeMode.Absolute, 3f),
@@ -58,7 +54,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                         {
                             new[]
                             {
-                                ppLabel = new OsuSpriteText
+                                new OsuSpriteText
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
@@ -78,7 +74,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                                     Colour = Color4.LightSteelBlue,
                                 },
                                 Empty(),
-                                kpsIcon = new SpriteIcon
+                                new SpriteIcon
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
@@ -104,7 +100,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         }
 
         /// <summary>
-        /// 设置 Panel PP 数值；「PP」标签固定，数值列预留宽度。无值传 <see langword="null"/>。
+        /// 设置 Panel PP 数值；「PP」标签固定，数值列最小宽度占位、随文本扩展。无值传 <see langword="null"/>。
         /// </summary>
         public void SetPp(double? pp) =>
             ppValue.Text = pp?.ToString("F1") ?? string.Empty;
@@ -114,15 +110,9 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// </summary>
         public void SetKpsMetrics(double averageKps, double maxKps)
         {
-            if (averageKps <= 0)
-            {
-                kpsIcon.Alpha = 0;
-                kpsText.Text = string.Empty;
-                return;
-            }
-
-            kpsIcon.Alpha = 1;
-            kpsText.Text = $"{averageKps:F1} ({maxKps:F1})";
+            kpsText.Text = averageKps <= 0
+                ? string.Empty
+                : $"{averageKps:F1} ({maxKps:F1})";
         }
 
         public void SetKpsMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics) =>
