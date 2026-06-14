@@ -306,7 +306,7 @@ namespace osu.Game.Screens.Select
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
-            ezDisplayKps.SetKpsMetrics(0, 0);
+            applyPanelKps(default);
             ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolveRealmBaselinePp(beatmap));
             computeStarRating();
             updateKeyCount();
@@ -385,9 +385,14 @@ namespace osu.Game.Screens.Select
 
             displaySR.Current.Value = EzManiaSummary.EMPTY;
             ezDisplayKpc.ManiaSummary = null;
-            ezDisplayKpsGraph.SetPoints(Array.Empty<double>());
-            ezDisplayKps.SetKpsMetrics(0, 0);
+            applyPanelKps(default);
             ezDisplayKps.SetPp(null);
+        }
+
+        private void applyPanelKps(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
+        {
+            ezDisplayKpsGraph.SetPoints(metrics.KpsList ?? Array.Empty<double>());
+            ezDisplayKps.SetKpsMetrics(metrics);
         }
 
         private void updateKPS(EzAnalysisResult ezAnalysisResult)
@@ -399,9 +404,7 @@ namespace osu.Game.Screens.Select
                 return;
 
             var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, ezAnalysisResult, mods.Value);
-
-            ezDisplayKpsGraph.SetPoints(metrics.KpsList);
-            ezDisplayKps.SetKpsMetrics(metrics);
+            applyPanelKps(metrics);
 
             if (!supportsEzAnalysis || !beatmap.SupportsXxyStarRating())
                 return;
