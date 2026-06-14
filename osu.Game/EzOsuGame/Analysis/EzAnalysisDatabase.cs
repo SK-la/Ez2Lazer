@@ -875,7 +875,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private static bool hasStorableNoModSlice(in EzAnalysisResult analysis)
         {
-            if (EzSongSelectAnalysisDisplay.HasDisplayableKps(analysis))
+            if (analysis.KpsList.Count > 0)
                 return true;
 
             return analysis.ManiaSummary?.ColumnCounts.Count > 0;

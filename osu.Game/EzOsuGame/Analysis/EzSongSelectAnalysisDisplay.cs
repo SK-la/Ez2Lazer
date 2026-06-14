@@ -23,16 +23,15 @@ namespace osu.Game.EzOsuGame.Analysis
             IReadOnlyList<double> KpsList,
             EzManiaSummary? ManiaSummary);
 
-        public static bool HasActiveMods(IReadOnlyList<Mod>? mods) => mods != null && mods.Count > 0;
+        public static readonly PanelMetrics Empty = new(0, 0, Array.Empty<double>(), null);
 
-        public static bool HasDisplayableKps(in EzAnalysisResult result)
-            => result.KpsList.Count > 0 || result.AverageKps > 0 || result.MaxKps > 0;
+        public static bool HasActiveMods(IReadOnlyList<Mod>? mods) => mods != null && mods.Count > 0;
 
         /// <summary>
         /// 避免 bindable 在异步重算完成前用空占位结果清空 KPS 折线（尤其有 Mod 时）。
         /// </summary>
         public static bool ShouldApplyPanelKpsUpdate(in EzAnalysisResult result, IReadOnlyList<Mod>? mods)
-            => HasDisplayableKps(result) || !HasActiveMods(mods);
+            => result.KpsList.Count > 0 || !HasActiveMods(mods);
 
         public static PanelMetrics Resolve(BeatmapInfo beatmap, EzAnalysisResult? dynamic, IReadOnlyList<Mod>? mods)
         {
@@ -42,7 +41,7 @@ namespace osu.Game.EzOsuGame.Analysis
             double maxKps = 0;
             IReadOnlyList<double> kpsList = Array.Empty<double>();
 
-            if (dynamic is { } analysis && HasDisplayableKps(analysis))
+            if (dynamic is { } analysis && analysis.KpsList.Count > 0)
             {
                 avgKps = analysis.AverageKps;
                 maxKps = analysis.MaxKps;

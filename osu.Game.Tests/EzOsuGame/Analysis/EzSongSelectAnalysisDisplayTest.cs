@@ -15,6 +15,15 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
     public class EzSongSelectAnalysisDisplayTest
     {
         [Test]
+        public void Empty_has_non_null_empty_kps_list()
+        {
+            Assert.That(EzSongSelectAnalysisDisplay.Empty.KpsList, Is.Not.Null);
+            Assert.That(EzSongSelectAnalysisDisplay.Empty.KpsList, Is.Empty);
+            Assert.That(EzSongSelectAnalysisDisplay.Empty.AverageKps, Is.Zero);
+            Assert.That(EzSongSelectAnalysisDisplay.Empty.MaxKps, Is.Zero);
+        }
+
+        [Test]
         public void Resolve_returns_kps_only()
         {
             var beatmap = createOsuBeatmap(performancePoints: 123.4);
@@ -32,7 +41,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             var emptyAnalysis = new EzAnalysisResult(new KpsSummary(0, 0, Array.Empty<double>()));
 
-            Assert.That(EzSongSelectAnalysisDisplay.HasDisplayableKps(emptyAnalysis), Is.False);
+            Assert.That(emptyAnalysis.KpsList, Is.Empty);
             Assert.That(EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(emptyAnalysis, Array.Empty<Mod>()), Is.True);
         }
 

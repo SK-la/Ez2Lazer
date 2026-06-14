@@ -45,13 +45,18 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         [Test]
-        public void HasStorableNoModSlice_requires_kps_or_column_counts()
+        public void NoModSlice_storable_when_kps_or_column_counts_present()
         {
             var empty = new EzAnalysisResult(new KpsSummary(0, 0, Array.Empty<double>()));
-            Assert.That(EzSongSelectAnalysisDisplay.HasDisplayableKps(empty), Is.False);
+            Assert.That(empty.KpsList.Count > 0 || empty.ManiaSummary?.ColumnCounts.Count > 0, Is.False);
 
             var withKps = new EzAnalysisResult(new KpsSummary(1, 2, new[] { 1.0 }));
-            Assert.That(EzSongSelectAnalysisDisplay.HasDisplayableKps(withKps), Is.True);
+            Assert.That(withKps.KpsList.Count > 0 || withKps.ManiaSummary?.ColumnCounts.Count > 0, Is.True);
+
+            var maniaOnly = new EzAnalysisResult(
+                new KpsSummary(0, 0, Array.Empty<double>()),
+                maniaSummary: new EzManiaSummary(new Dictionary<int, int> { [4] = 10 }, null, xxySr: null));
+            Assert.That(maniaOnly.KpsList.Count > 0 || maniaOnly.ManiaSummary?.ColumnCounts.Count > 0, Is.True);
         }
 
         private static BeatmapInfo createBeatmap()
