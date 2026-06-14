@@ -79,6 +79,9 @@ namespace osu.Game.Screens.Select
         private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
         [Resolved]
+        private EzAnalysisDatabase ezAnalysisDatabase { get; set; } = null!;
+
+        [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;
 
         [Resolved]
@@ -270,6 +273,7 @@ namespace osu.Game.Screens.Select
 
             ruleset.BindValueChanged(_ =>
             {
+                scratchText = null;
                 resetEzDisplay();
                 updateKeyCount();
             }, true);
@@ -306,8 +310,13 @@ namespace osu.Game.Screens.Select
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
-            applyPanelKps(default);
+            applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
             ezDisplayKps.SetPp(EzPanelPerformancePoints.ResolveRealmBaselinePp(beatmap));
+
+            if (ruleset.Value is RulesetInfo rulesetInfo
+                && EzPanelKpsMetrics.TryResolveBaselineFromSqlite(ezAnalysisDatabase, beatmap, rulesetInfo, mods.Value, out var baselineKps))
+                applyPanelKps(baselineKps);
+
             computeStarRating();
             updateKeyCount();
 
@@ -385,13 +394,13 @@ namespace osu.Game.Screens.Select
 
             displaySR.Current.Value = EzManiaSummary.EMPTY;
             ezDisplayKpc.ManiaSummary = null;
-            applyPanelKps(default);
+            applyPanelKps(EzSongSelectAnalysisDisplay.Empty);
             ezDisplayKps.SetPp(null);
         }
 
         private void applyPanelKps(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
         {
-            ezDisplayKpsGraph.SetPoints(metrics.KpsList ?? Array.Empty<double>());
+            ezDisplayKpsGraph.SetPoints(metrics.KpsList);
             ezDisplayKps.SetKpsMetrics(metrics);
         }
 
