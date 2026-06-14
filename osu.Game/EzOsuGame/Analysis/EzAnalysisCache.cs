@@ -25,13 +25,14 @@ using osu.Game.Screens.Select;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 选歌分析前台缓存，对齐官方 <see cref="BeatmapDifficultyCache"/> 的 mod 按需重算语义。
+    /// 选歌 Ez 分析前台缓存；<see cref="Ez2Setting.EzAnalysisRecEnabled"/> 控制本 cache 是否对 SQLite 体系指标做即时计算。
     ///
-    /// - L1 Realm 基线 xxy/PP：由 UI 直读 <see cref="BeatmapInfo"/>（见 <see cref="EzSongSelectAnalysisDisplay"/>），不经本 cache。
-    /// - L2 主 SQLite：NoMod 时仅提供 kps/KPC 切片（<see cref="EzAnalysisDatabase.TryGetStoredSqliteSlice"/>）。
-    /// - L3 本 cache：当前 ruleset/mods 下的动态 <see cref="EzAnalysisResult"/>（含 mod 后 xxy/PP/kps）。
-    /// NoMod 面板语义对齐 <see cref="BeatmapDifficultyCache"/>：先 L2 预填，debounce 后总调度检验；检验走 <see cref="EzAnalysisDatabase.BackfillStoredDataAsync"/>（齐全则只读 SQLite）。
-    /// 不承担预热、Realm 回填或分支库写入。
+    /// - L1 Realm 基线 xxy/PP：UI 直读 <see cref="BeatmapInfo"/>，不经本 cache；Panel PP 应对齐官方 <see cref="BeatmapDifficultyCache"/>。
+    /// - L2 主 SQLite（<see cref="Ez2Setting.EzAnalysisSqliteEnabled"/>）：NoMod kps/KPC 切片；只读，不含 xxy/PP。
+    /// - L3 本 cache（受 Rec 开关）：当前 ruleset/mods 下即时计算 <see cref="EzAnalysisResult"/>（kps、mod xxy 等）；Rec 关则仅 L2 预填/回退。
+    /// 分支库 xxy/PP 为预生成快照，由 <see cref="EzAnalysisDatabase"/> 读取；Rec 关时不为分支场景做选歌补算。
+    /// NoMod 语义对齐 <see cref="BeatmapDifficultyCache"/>：先 L2 预填，debounce 后 <see cref="EzAnalysisDatabase.BackfillStoredDataAsync"/>（Rec 开且缺失时补算主库）。
+    /// 不承担启动预热、Realm 回填或分支库构建。
     /// </summary>
     public partial class EzAnalysisCache : MemoryCachingComponent<EzAnalysisLookupCache, EzAnalysisResult?>
     {

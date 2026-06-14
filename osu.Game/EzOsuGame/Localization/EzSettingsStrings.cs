@@ -104,22 +104,34 @@ namespace osu.Game.EzOsuGame.Localization
             + "which may crop some of the video but will better adapt to different resolutions and screen ratios.");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED =
-            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析重算", "Enable Ez analysis recomputation");
+            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析即时计算", "Enable Ez analysis on-demand computation");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启后，选歌界面会像官方星级一样按当前 Mod 按需重算 xxy/PP/KPS 并刷新面板。"
-            + "\n关闭时，有 Mod 仍显示 Realm 无 Mod 基线。不控制 SQLite 与 Realm 回填。",
-            "When enabled, song select recomputes xxy/PP/KPS for the current mods on demand (like official star rating) and refreshes panels."
-            + "\nWhen disabled, mods still show the NoMod Realm baseline. Does not control SQLite or Realm backfill.");
+            "控制 Ez SQLite 体系内指标在选歌时是否按需即时计算："
+            + "\n· 主库：NoMod 的 kps/KPC（及 mania 列统计）缺失时 debounce 后补算；"
+            + "\n· 有 Mod：按当前 Mod 即时计算 kps/xxy 等（无匹配分支快照时）；"
+            + "\n· 分支库：仍读取已激活分支的预生成快照，本开关不替代分支构建。"
+            + "\n关闭时仅读已落盘 SQLite 数据，不触发选歌实时计算。"
+            + "\n不影响 Realm 元数据回填与官方星级/PP 缓存。",
+            "Controls whether Ez SQLite metrics are computed on demand during song select:"
+            + "\n· Main DB: backfill missing NoMod kps/KPC (and mania column stats) after debounce;"
+            + "\n· With mods: compute kps/xxy live for the current mod set when no matching branch snapshot exists;"
+            + "\n· Branch DB: still reads precomputed snapshots from the active branch; this switch does not replace branch builds."
+            + "\nWhen disabled, only stored SQLite values are read; no live song-select computation."
+            + "\nDoes not affect Realm metadata backfill or the official star/PP cache.");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED =
-            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析本地数据（SQLite）", "Enable Ez analysis local data (SQLite)");
+            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析 SQLite", "Enable Ez analysis SQLite");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "控制主 analysis SQLite（kps/KPC 缓存）与分支曲库（预生成 Mod 快照）的读写。"
-            + "\n仅在缺少当前版本文件或需要 schema 升级时自动预热；已有匹配文件时请在下方的维护控件手动补算/重算。",
-            "Controls main analysis SQLite (kps/KPC cache) and songs branch libraries (precomputed mod snapshots)."
-            + "\nAuto-warmup runs only when the current database is missing or needs schema upgrade; use maintenance controls below when a matching file already exists.");
+            "启用 Ez 分析 SQLite 主库与分支曲库的读写（kps/KPC、分支 xxy/PP 快照等）。"
+            + "\n关闭后不加载、不写入上述本地缓存。"
+            + "\n自动预热仅在缺少当前版本库或需 schema 升级时触发；已有匹配库时请用下方维护控件手动补算。"
+            + "\n即时计算行为由「Ez 分析即时计算」开关单独控制。",
+            "Enables read/write for the Ez analysis main SQLite database and songs branch libraries (kps/KPC, branch xxy/PP snapshots, etc.)."
+            + "\nWhen disabled, stored local caches are neither loaded nor written."
+            + "\nAuto-warmup runs only when the current database is missing or needs a schema upgrade; use maintenance controls below when a matching file already exists."
+            + "\nOn-demand computation is controlled separately by \"Enable Ez analysis on-demand computation\".");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_TARGET =
             new EzLocalizationManager.EzLocalisableString("数据维护目标", "Data maintenance target");

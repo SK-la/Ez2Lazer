@@ -772,8 +772,17 @@ namespace osu.Game.EzOsuGame.Configuration
         FrameLimiterBase,
         UpdateFrameLimiter,
 
+        /// <summary>
+        /// 选歌时是否对 Ez SQLite 体系内指标（主库 kps/KPC、有 Mod 时的 kps/xxy 等）做即时计算；关闭则只读已落盘数据。
+        /// 分支库快照仍只读；PP 显示应对齐官方 Star 缓存，不由本开关控制。
+        /// </summary>
         EzAnalysisRecEnabled,
+
+        /// <summary>
+        /// Ez 分析 SQLite 主库与分支曲库读写总开关；与 <see cref="EzAnalysisRecEnabled"/> 分工（存储 vs 即时计算）。
+        /// </summary>
         EzAnalysisSqliteEnabled,
+
         HideMainMenuOnlineBanner,
         NotificationBehaviour,
         ScreenshotAction,

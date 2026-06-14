@@ -23,7 +23,8 @@ namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
     /// 启动时仅在 SQLite 主库需要版本/ schema 升级时自动补算；已匹配最新版文件时不自动预热。
-    /// 其余 SQLite 维护由设置页手动触发；Realm 基线仍由 BackgroundDataStoreProcessor 负责。
+    /// 受 <see cref="Ez2Setting.EzAnalysisSqliteEnabled"/> 控制；选歌即时计算由 <see cref="Ez2Setting.EzAnalysisRecEnabled"/> 经 <see cref="EzAnalysisCache"/> 负责。
+    /// 其余 SQLite/分支库维护由设置页手动触发；Realm 基线仍由 BackgroundDataStoreProcessor 负责。
     /// </summary>
     public partial class EzAnalysisWarmupProcessor : Component
     {

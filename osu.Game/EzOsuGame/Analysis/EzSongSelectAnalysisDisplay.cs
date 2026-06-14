@@ -9,8 +9,9 @@ using osu.Game.Rulesets.Mods;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 选歌面板分析显示合成：对齐官方星级缓存（BeatmapDifficultyCache）与 <see cref="BeatmapInfo.StarRating"/> 的分工。
-    /// L1 Realm 提供 NoMod xxy/PP 基线；L2/L3 的 <see cref="EzAnalysisResult"/> 仅提供 kps/KPC 与 mod 动态指标。
+    /// 选歌面板 Ez 分析显示合成（kps/KPC/xxy 等 SQLite 体系指标）。
+    /// Panel PP 应对齐官方 <see cref="BeatmapDifficultyCache"/> / <see cref="BeatmapInfo.PerformancePoints"/>，不经 Ez SQLite 即时计算开关。
+    /// L1 Realm 提供 NoMod xxy 基线；L2/L3 <see cref="EzAnalysisResult"/> 提供 kps/KPC 与 mod 动态 xxy（受 <see cref="Ez2Setting.EzAnalysisRecEnabled"/>）。
     /// </summary>
     public static class EzSongSelectAnalysisDisplay
     {
