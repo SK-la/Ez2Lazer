@@ -538,6 +538,47 @@ namespace osu.Game.Rulesets.Scoring
         }
 
         /// <summary>
+        /// [Ez] Applies forced miss judgements for any remaining objects that could not be resolved via drawables.
+        /// </summary>
+        public void ApplyRemainingForcedMisses(HealthProcessor? healthProcessor)
+        {
+            var beatmap = Beatmap.Value;
+            if (beatmap == null)
+                return;
+
+            var judgedHitObjects = new HashSet<HitObject>(HitEvents.Select(e => e.HitObject));
+
+            int safety = Math.Max(MaximumJudgements, 1) * 2;
+
+            while (JudgedHits < MaximumJudgements && safety-- > 0)
+            {
+                bool appliedAny = false;
+
+                foreach (var hitObject in EnumerateHitObjects(beatmap))
+                {
+                    if (judgedHitObjects.Contains(hitObject))
+                        continue;
+
+                    var result = CreateResult(hitObject, hitObject.Judgement);
+                    if (result == null)
+                        continue;
+
+                    result.Type = result.Judgement.MinResult;
+                    result.RawTime = hitObject.GetEndTime();
+
+                    healthProcessor?.ApplyResult(result);
+                    ApplyResult(result);
+                    judgedHitObjects.Add(hitObject);
+                    appliedAny = true;
+                    break;
+                }
+
+                if (!appliedAny)
+                    break;
+            }
+        }
+
+        /// <summary>
         /// Populates a failed score, marking it with the <see cref="ScoreRank.F"/> rank.
         /// </summary>
         public void FailScore(ScoreInfo score)

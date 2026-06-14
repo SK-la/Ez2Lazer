@@ -38,6 +38,8 @@ namespace osu.Game.Screens.Play
     {
         private ReplaySettingsOverlay pauseReplaySettingsOverlay;
         private PauseSettingsPreviewHint pauseSettingsPreviewHint;
+        private PauseForceResultsButton pauseForceResultsButton;
+        private bool pauseSettingsPreviewActive;
 
         /// <summary>
         /// The token to be used for the current submission. This is fetched via a request created by <see cref="CreateTokenRequest"/>.
@@ -84,6 +86,14 @@ namespace osu.Game.Screens.Play
                 Alpha = 0
             });
             GameplayClockContainer.Add(pauseSettingsPreviewHint = new PauseSettingsPreviewHint());
+            GameplayClockContainer.Add(pauseForceResultsButton = new PauseForceResultsButton
+            {
+                Action = () =>
+                {
+                    bool durationMet = GameplayClockContainer.CurrentTime >= GameplayState.Beatmap.GetLastObjectTime();
+                    ForceCompleteGameplayAndProgressToResults(!durationMet);
+                },
+            });
 
             // We probably want to move this display to something more global.
             // Probably using the OSD somehow.
@@ -112,8 +122,11 @@ namespace osu.Game.Screens.Play
                     pauseReplaySettingsOverlay.Expanded.Value = false;
                     updatePauseSettingsPreview(false);
                 }
+
+                updatePauseForceResultsVisibility();
             };
             pauseReplaySettingsOverlay.Alpha = PauseOverlay.State.Value == Visibility.Visible ? 1 : 0;
+            updatePauseForceResultsVisibility();
 
             pauseReplaySettingsOverlay.Expanded.BindValueChanged(e =>
             {
@@ -126,8 +139,20 @@ namespace osu.Game.Screens.Play
 
         private void updatePauseSettingsPreview(bool previewing)
         {
+            pauseSettingsPreviewActive = previewing;
             PauseOverlay.SetSettingsPreviewMode(previewing);
             pauseSettingsPreviewHint.SetVisible(previewing);
+            updatePauseForceResultsVisibility();
+        }
+
+        private void updatePauseForceResultsVisibility()
+        {
+            if (pauseForceResultsButton == null)
+                return;
+
+            bool pauseVisible = PauseOverlay.State.Value == Visibility.Visible;
+            bool show = pauseVisible && !pauseSettingsPreviewActive && ShouldShowPauseForceResultsButton();
+            pauseForceResultsButton.SetVisible(show);
         }
 
         protected override GameplayClockContainer CreateGameplayClockContainer(WorkingBeatmap beatmap, double gameplayStart) => new MasterGameplayClockContainer(beatmap, gameplayStart)

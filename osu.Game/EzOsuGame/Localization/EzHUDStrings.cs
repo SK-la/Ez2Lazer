@@ -162,6 +162,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString PAUSE_SETTINGS_PREVIEW_PAUSED = new EzLocalizationManager.EzLocalisableString("暂停中", "Paused");
         public static readonly LocalisableString PAUSE_SETTINGS_PREVIEW_LABEL = new EzLocalizationManager.EzLocalisableString("预览", "Preview");
 
+        public static readonly LocalisableString PAUSE_FORCE_RESULTS_LABEL = new EzLocalizationManager.EzLocalisableString("强制进入结算", "Force results");
+        public static readonly LocalisableString PAUSE_FORCE_RESULTS_HOLDING = new EzLocalizationManager.EzLocalisableString("按住 2 秒…", "Hold for 2 seconds…");
+
         // EzHUDDynamicSpeedDisplay
         public static readonly LocalisableString DYNAMIC_SPEED_SHOW_LINE_LABEL = new EzLocalizationManager.EzLocalisableString("显示速度折线", "Show Speed Line");
 

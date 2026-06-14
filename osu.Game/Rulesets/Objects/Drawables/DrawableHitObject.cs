@@ -781,6 +781,11 @@ namespace osu.Game.Rulesets.Objects.Drawables
         protected void ApplyMaxResult() => ApplyResult((r, _) => r.Type = r.Judgement.MaxResult);
         protected void ApplyMinResult() => ApplyResult((r, _) => r.Type = r.Judgement.MinResult);
 
+        /// <summary>
+        /// Causes this <see cref="DrawableHitObject"/> to get missed, disregarding timing conditions.
+        /// </summary>
+        public virtual void MissForcefully() => ApplyMinResult();
+
         protected void ApplyResult(HitResult type) => ApplyResult(static (result, state) => result.Type = state, type);
 
         protected void ApplyResult(Action<JudgementResult, DrawableHitObject> application) => ApplyResult(application, this);

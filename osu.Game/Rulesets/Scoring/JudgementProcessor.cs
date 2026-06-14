@@ -41,6 +41,11 @@ namespace osu.Game.Rulesets.Scoring
         /// </summary>
         public int JudgedHits { get; private set; }
 
+        /// <summary>
+        /// [Ez] The maximum number of final judgements for the current beatmap.
+        /// </summary>
+        public int MaximumJudgements => MaxHits;
+
         private JudgementResult? lastAppliedResult;
 
         private readonly BindableBool hasCompleted = new BindableBool();

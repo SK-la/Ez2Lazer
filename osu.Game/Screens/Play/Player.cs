@@ -30,6 +30,7 @@ using osu.Game.IO.Archives;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Screens.Play;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
@@ -939,6 +940,11 @@ namespace osu.Game.Screens.Play
         private ScheduledDelegate resultsDisplayDelegate;
 
         /// <summary>
+        /// [Ez] When set, allows results preparation even if <see cref="JudgementProcessor.HasCompleted"/> is still false after a forced completion.
+        /// </summary>
+        private bool ezForceResultsImport;
+
+        /// <summary>
         /// The Time.Current value when the results were queued. Used for fallback timeout checks.
         /// </summary>
         private double resultsDisplayQueuedTime;
@@ -1008,6 +1014,72 @@ namespace osu.Game.Screens.Play
 
             EzOsuGame.Diagnostics.EzTimingTrace.Record("CheckScoreCompleted.Passed", "Queuing progressToResults(withDelay=true)");
             progressToResults(true);
+        }
+
+        /// <summary>
+        /// [Ez] Whether the pause-screen force-results button should be available.
+        /// </summary>
+        protected bool ShouldShowPauseForceResultsButton()
+        {
+            if (!Configuration.ShowResults || GameplayState.HasPassed || GameplayState.HasFailed)
+                return false;
+
+            const double near_end_buffer_ms = 5000;
+            double lastObjectTime = GameplayState.Beatmap.GetLastObjectTime();
+
+            if (GameplayClockContainer.CurrentTime >= lastObjectTime - near_end_buffer_ms)
+                return true;
+
+            int maxHits = ScoreProcessor.MaximumJudgements;
+            if (maxHits > 0 && ScoreProcessor.JudgedHits >= maxHits * 0.95)
+                return true;
+
+            return resultsDisplayDelegate != null && Time.Current - resultsDisplayQueuedTime > 2000;
+        }
+
+        /// <summary>
+        /// [Ez] Force-apply remaining misses and progress to the results screen from the pause menu.
+        /// </summary>
+        /// <param name="forceFailGrade">When true, the score is marked with <see cref="ScoreRank.F"/> regardless of accuracy.</param>
+        protected void ForceCompleteGameplayAndProgressToResults(bool forceFailGrade)
+        {
+            if (!Configuration.ShowResults || GameplayState.HasPassed || GameplayState.HasFailed)
+                return;
+
+            EzOsuGame.Diagnostics.EzTimingTrace.Record(
+                "ForceResults.Begin",
+                $"forceFail={forceFailGrade} judged={ScoreProcessor.JudgedHits}/{ScoreProcessor.MaximumJudgements} hasCompleted={ScoreProcessor.HasCompleted.Value} time={GameplayClockContainer.CurrentTime:F0}");
+
+            PauseOverlay.Hide();
+
+            EzGameplayForceCompleter.CompleteRemainingJudgements(
+                DrawableRuleset,
+                ScoreProcessor,
+                HealthProcessor,
+                GameplayClockContainer,
+                GameplayState.Beatmap);
+
+            if (!ScoreProcessor.HasCompleted.Value)
+            {
+                ezForceResultsImport = true;
+                EzOsuGame.Diagnostics.EzTimingTrace.Record("ForceResults.BypassHasCompleted", "HasCompleted still false after force completion");
+            }
+
+            if (forceFailGrade)
+                ScoreProcessor.FailScore(Score.ScoreInfo);
+
+            GameplayState.HasPassed = true;
+            ValidForResume = false;
+            skipOutroOverlay.Hide();
+
+            progressToResults(false);
+
+            if (ezForceResultsImport)
+                prepareAndImportScoreAsync(forceImport: true);
+
+            EzOsuGame.Diagnostics.EzTimingTrace.Record(
+                "ForceResults.End",
+                $"hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed} rank={ScoreProcessor.Rank.Value}");
         }
 
         /// <summary>
@@ -1099,7 +1171,8 @@ namespace osu.Game.Screens.Play
                 return prepareScoreForDisplayTask;
 
             // We do not want to import the score in cases where we don't show results
-            bool canShowResults = Configuration.ShowResults && ScoreProcessor.HasCompleted.Value && GameplayState.HasPassed;
+            bool canShowResults = Configuration.ShowResults && GameplayState.HasPassed
+                                  && (ScoreProcessor.HasCompleted.Value || ezForceResultsImport);
 
             // [Ez] Trace the canShowResults decision to expose HasCompleted race conditions.
             EzOsuGame.Diagnostics.EzTimingTrace.Record(
