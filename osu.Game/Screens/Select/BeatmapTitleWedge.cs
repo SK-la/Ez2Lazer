@@ -81,9 +81,21 @@ namespace osu.Game.Screens.Select
         private RealmAccess realm { get; set; } = null!;
 
         [Resolved]
-        private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
+        private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
+        [Resolved]
+        private EzAnalysisDatabase ezAnalysisDatabase { get; set; } = null!;
+
+        private DifficultyDisplay difficultyDisplay = null!;
         private EzDisplayKpsGraph kpsGraph = null!;
+
+        private IBindable<EzAnalysisResult>? ezAnalysisBindable;
+        private CancellationTokenSource? ezAnalysisCancellationSource;
+
+        private double lastDrainLengthMs;
+        private double lastBaselineLengthMs;
+        private bool wedgeMetricsApplied;
+        private EzSongSelectAnalysisDisplay.PanelMetrics lastWedgeMetrics;
 
         private FillFlowContainer statisticsFlow = null!;
 
@@ -226,7 +238,7 @@ namespace osu.Game.Screens.Select
                             AutoSizeAxes = Axes.Y,
                             Margin = new MarginPadding { Left = -SongSelect.WEDGE_CONTENT_MARGIN },
                             Padding = new MarginPadding { Right = -SongSelect.WEDGE_CONTENT_MARGIN },
-                            Child = new DifficultyDisplay(),
+                            Child = difficultyDisplay = new DifficultyDisplay(),
                         }),
                     },
                 }
@@ -246,6 +258,7 @@ namespace osu.Game.Screens.Select
                 settingChangeTracker?.Dispose();
 
                 updateLengthAndBpmStatistics();
+                computeEzAnalysis();
 
                 settingChangeTracker = new ModSettingChangeTracker(m.NewValue);
                 settingChangeTracker.SettingChanged += _ => updateLengthAndBpmStatistics();
@@ -302,8 +315,79 @@ namespace osu.Game.Screens.Select
             artistLink.Action = () => songSelect?.Search(artistText.GetPreferred(localisation.CurrentParameters.Value.PreferOriginalScript));
             DisplayedArtist = artistText.ToString();
 
+            updateEzAnalysisDisplay();
             updateLengthAndBpmStatistics();
             updateOnlineDisplay();
+        }
+
+        private void updateEzAnalysisDisplay()
+        {
+            clearEzAnalysisBinding();
+            kpsGraph.SetPoints(EzSongSelectAnalysisDisplay.Empty.KpsList);
+            wedgeMetricsApplied = false;
+            difficultyDisplay.ApplyKpcMetrics(EzSongSelectAnalysisDisplay.Empty);
+
+            if (working.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
+                return;
+
+            if (ruleset.Value is RulesetInfo rulesetInfo
+                && EzPanelKpsMetrics.TryResolveBaselineFromSqlite(ezAnalysisDatabase, beatmapInfo, rulesetInfo, mods.Value, out var baseline))
+                applyWedgeMetrics(baseline);
+
+            computeEzAnalysis();
+        }
+
+        private void clearEzAnalysisBinding()
+        {
+            ezAnalysisBindable?.UnbindAll();
+            ezAnalysisBindable = null;
+
+            ezAnalysisCancellationSource?.Cancel();
+            ezAnalysisCancellationSource?.Dispose();
+            ezAnalysisCancellationSource = null;
+        }
+
+        private void computeEzAnalysis()
+        {
+            if (working.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
+                return;
+
+            clearEzAnalysisBinding();
+
+            ezAnalysisCancellationSource = new CancellationTokenSource();
+            ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmapInfo, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            ezAnalysisBindable.BindValueChanged(result => applyWedgeEzAnalysis(result.NewValue), true);
+        }
+
+        private void applyWedgeEzAnalysis(EzAnalysisResult result)
+        {
+            if (working.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
+                return;
+
+            if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(result, mods.Value))
+                return;
+
+            applyWedgeMetrics(EzSongSelectAnalysisDisplay.Resolve(beatmapInfo, result, mods.Value));
+        }
+
+        private void applyWedgeMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
+        {
+            lastWedgeMetrics = metrics;
+            wedgeMetricsApplied = true;
+            applyWedgeKpsGraph(metrics);
+            difficultyDisplay.ApplyKpcMetrics(metrics);
+        }
+
+        private void applyWedgeKpsGraph(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
+        {
+            kpsGraph.SetPoints(
+                metrics.KpsList,
+                sourceLengthMs: lastDrainLengthMs,
+                baselineLengthMs: lastBaselineLengthMs,
+                extendToBaseline: true,
+                heatmapEnabled: true);
+
+            Scheduler.Add(updateKPSGraphSize);
         }
 
         private CancellationTokenSource? lengthBpmCancellationSource;
@@ -320,7 +404,6 @@ namespace osu.Game.Screens.Select
                 var beatmapInfo = working.Value.BeatmapInfo;
                 // This can take time as it is a synchronous task.
                 var beatmap = working.Value.Beatmap;
-                var selectedRuleset = ruleset.Value;
                 var selectedMods = mods.Value;
 
                 double rate = ModUtils.CalculateRateWithMods(selectedMods);
@@ -332,20 +415,6 @@ namespace osu.Game.Screens.Select
                 double drainLength = Math.Round(beatmap.CalculateDrainLength() / rate);
                 double hitLength = Math.Round(beatmapInfo.Length / rate);
                 double audioLength = working.Value.TrackLoaded ? Math.Round(working.Value.Track.Length / rate) : hitLength;
-
-                IReadOnlyList<double> kpsList;
-
-                if (selectedMods.Count == 0
-                    && analysisDatabase.TryGetStoredSqliteSlice(beatmapInfo, selectedRuleset, out var storedAnalysis)
-                    && storedAnalysis.KpsList is { Count: > 0 } storedKpsList)
-                {
-                    kpsList = storedKpsList;
-                }
-                else
-                {
-                    var computedKpsList = OptimizedBeatmapCalculator.GetKpsCoarse(beatmap, buckets: 64);
-                    kpsList = computedKpsList;
-                }
 
                 Schedule(() =>
                 {
@@ -359,7 +428,11 @@ namespace osu.Game.Screens.Select
                         ? $"{bpmMin}"
                         : LocalisableString.Interpolate($"{bpmMin}-{bpmMax} ({SongSelectStrings.MostlyBPM(mostCommonBPM)})");
 
-                    kpsGraph.SetPoints(kpsList, sourceLengthMs: drainLength, baselineLengthMs: Math.Max(drainLength, audioLength), extendToBaseline: true, heatmapEnabled: true);
+                    lastDrainLengthMs = drainLength;
+                    lastBaselineLengthMs = Math.Max(drainLength, audioLength);
+
+                    if (wedgeMetricsApplied)
+                        applyWedgeKpsGraph(lastWedgeMetrics);
 
                     // 由于 bpmStatistic.Text 变化会触发布局动画（100ms），需要延迟更新 KPS 图表尺寸以确保获取正确的宽度
                     Scheduler.Add(updateKPSGraphSize);
@@ -426,6 +499,10 @@ namespace osu.Game.Screens.Select
 
         protected override void Dispose(bool isDisposing)
         {
+            clearEzAnalysisBinding();
+            lengthBpmCancellationSource?.Cancel();
+            lengthBpmCancellationSource?.Dispose();
+            lengthBpmCancellationSource = null;
             onlineDisplayCancellationSource?.Dispose();
             onlineDisplayCancellationSource = null;
             base.Dispose(isDisposing);

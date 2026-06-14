@@ -47,9 +47,6 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
-            [Resolved]
-            private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
-
             private ModSettingChangeTracker? settingChangeTracker;
 
             [Resolved]
@@ -70,8 +67,6 @@ namespace osu.Game.Screens.Select
             private DifficultyStatisticsDisplay difficultyStatisticsDisplay = null!;
 
             private CancellationTokenSource? cancellationSource;
-            private IBindable<EzAnalysisResult>? ezAnalysisBindable;
-            private CancellationTokenSource? ezAnalysisCancellationSource;
 
             public DifficultyDisplay()
             {
@@ -267,7 +262,6 @@ namespace osu.Game.Screens.Select
             {
                 cancellationSource?.Cancel();
                 cancellationSource = new CancellationTokenSource();
-                clearEzAnalysisBinding();
 
                 if (beatmap.IsDefault)
                 {
@@ -291,50 +285,25 @@ namespace osu.Game.Screens.Select
                 {
                     spreadDisplay.StarDifficulty.UnbindAll();
                     spreadDisplay.StarDifficulty.BindTo(starRatingDisplay.Current);
-                    computeEzAnalysis(cancellationSource.Token);
                 }
 
                 updateCountStatistics(cancellationSource.Token);
                 updateDifficultyStatistics();
             }
 
-            private void clearEzAnalysisBinding()
+            public void ApplyKpcMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
             {
-                ezAnalysisBindable?.UnbindAll();
-                ezAnalysisBindable = null;
-
-                ezAnalysisCancellationSource?.Cancel();
-                ezAnalysisCancellationSource?.Dispose();
-                ezAnalysisCancellationSource = null;
-            }
-
-            private void computeEzAnalysis(CancellationToken cancellationToken)
-            {
-                if (beatmap.IsDefault || beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
+                if (beatmap.IsDefault || beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo
+                    || !EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value)
+                    || !beatmapInfo.SupportsXxyStarRating())
                 {
                     ezDisplayKpc.ManiaSummary = null;
                     ezDisplayKpc.Hide();
                     return;
                 }
 
-                if (!EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value) || !beatmapInfo.SupportsXxyStarRating())
-                {
-                    ezDisplayKpc.ManiaSummary = null;
-                    ezDisplayKpc.Hide();
-                    return;
-                }
-
-                ezAnalysisCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmapInfo, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
-                ezAnalysisBindable.BindValueChanged(result =>
-                {
-                    if (!EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(result.NewValue, mods.Value))
-                        return;
-
-                    var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmapInfo, result.NewValue, mods.Value);
-                    ezDisplayKpc.ManiaSummary = metrics.ManiaSummary;
-                    ezDisplayKpc.Show();
-                }, true);
+                ezDisplayKpc.ManiaSummary = metrics.ManiaSummary;
+                ezDisplayKpc.Show();
             }
 
             private void updateCountStatistics(CancellationToken cancellationToken)
