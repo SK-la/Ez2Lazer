@@ -88,10 +88,22 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            // Holding to the tail should auto-judge at/past 0 offset.
-            // Before the tail, only an early release should judge using the timing table below.
-            if (!userTriggered && timeOffset < 0)
-                return;
+            bool headMissOrBreak = !HoldNote.Head.IsHit || HoldNote.Body.HasHoldBreak;
+
+            // Non-user path: missed/broken holds only auto-min past the window — never auto-Good without input.
+            if (!userTriggered)
+            {
+                if (timeOffset < 0)
+                    return;
+
+                if (headMissOrBreak)
+                {
+                    if (!HitObject.HitWindows.CanBeHit(timeOffset))
+                        ApplyMinResult();
+
+                    return;
+                }
+            }
 
             var result = HitObject.HitWindows.ResultFor(timeOffset);
 
@@ -119,8 +131,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                     break;
             }
 
-            // 大失误降级处理
-            if (!HoldNote.Head.IsHit || HoldNote.Body.HasHoldBreak)
+            // 大失误降级处理（仅用户输入路径：尾点有操作才给 GOOD）
+            if (userTriggered && headMissOrBreak)
             {
                 if (result > HitResult.Meh)
                 {
