@@ -3,6 +3,7 @@
 
 using System;
 using System.Linq;
+using System.Reflection;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -61,13 +62,39 @@ namespace osu.Game.EzOsuGame.Screens.Play
             {
                 try
                 {
-                    hitObject.MissForcefully();
+                    if (!tryInvokeRulesetMissForcefully(hitObject))
+                        return;
                 }
                 catch (InvalidOperationException)
                 {
                     // Some objects may already have a result by the time nested misses propagate.
                 }
+                catch (TargetInvocationException ex) when (ex.InnerException is InvalidOperationException)
+                {
+                    // Reflection wrapper around the same already-judged case.
+                }
             }
+        }
+
+        /// <summary>
+        /// Invokes a ruleset-defined <c>MissForcefully()</c> when present, without adding a base virtual on <see cref="DrawableHitObject"/>.
+        /// Taiko/Catch and other rulesets without this method rely on <see cref="ScoreProcessor.ApplyRemainingForcedMisses"/>.
+        /// </summary>
+        private static bool tryInvokeRulesetMissForcefully(DrawableHitObject hitObject)
+        {
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
+
+            for (var type = hitObject.GetType(); type != null && type != typeof(DrawableHitObject); type = type.BaseType)
+            {
+                var method = type.GetMethod("MissForcefully", flags, null, Type.EmptyTypes, null);
+                if (method == null)
+                    continue;
+
+                method.Invoke(hitObject, null);
+                return true;
+            }
+
+            return false;
         }
     }
 }
