@@ -115,6 +115,9 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
         // 防止 Min/Max AllowableRate 相互调整时的循环触发
         private bool isUpdatingMinMax;
 
+        private const double default_min_speed = 0.1;
+        private const double default_max_speed = 3.0;
+
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
             get
@@ -134,57 +137,34 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
         {
             InitialiseDynamicSpeedAdjust(AdjustPitch);
 
-            // 当最小/最大允许速率值更改时更新速度变化范围
-            MinAllowableRate.BindValueChanged(val =>
+            MinAllowableRate.BindValueChanged(_ =>
             {
                 if (isUpdatingMinMax) return;
 
-                // 如果新最小值大于当前最大值，需要先调整最大值
-                if (val.NewValue > SpeedChange.MaxValue)
-                {
-                    isUpdatingMinMax = true;
-                    SpeedChange.MaxValue = val.NewValue;
-                    MaxAllowableRate.Value = val.NewValue;
-                    isUpdatingMinMax = false;
-                }
-
-                SpeedChange.MinValue = val.NewValue;
-                if (GameplaySpeed.Value < val.NewValue)
-                    SetGameplayAndDisplaySpeed(val.NewValue);
-
-                // 确保最小允许速率不超过最大允许速率
-                if (val.NewValue > MaxAllowableRate.Value)
+                if (MinAllowableRate.Value > MaxAllowableRate.Value)
                 {
                     isUpdatingMinMax = true;
                     MinAllowableRate.Value = MaxAllowableRate.Value;
                     isUpdatingMinMax = false;
+                    return;
                 }
+
+                applySpeedChangeBounds();
             }, true);
 
-            MaxAllowableRate.BindValueChanged(val =>
+            MaxAllowableRate.BindValueChanged(_ =>
             {
                 if (isUpdatingMinMax) return;
 
-                // 如果新最大值小于当前最小值，需要先调整最小值
-                if (val.NewValue < SpeedChange.MinValue)
-                {
-                    isUpdatingMinMax = true;
-                    SpeedChange.MinValue = val.NewValue;
-                    MinAllowableRate.Value = val.NewValue;
-                    isUpdatingMinMax = false;
-                }
-
-                SpeedChange.MaxValue = val.NewValue;
-                if (GameplaySpeed.Value > val.NewValue)
-                    SetGameplayAndDisplaySpeed(val.NewValue);
-
-                // 确保最大允许速率不低于最小允许速率
-                if (val.NewValue < MinAllowableRate.Value)
+                if (MaxAllowableRate.Value < MinAllowableRate.Value)
                 {
                     isUpdatingMinMax = true;
                     MaxAllowableRate.Value = MinAllowableRate.Value;
                     isUpdatingMinMax = false;
+                    return;
                 }
+
+                applySpeedChangeBounds();
             }, true);
 
             InitialRate.BindValueChanged(val =>
@@ -227,6 +207,8 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
 
             EnableDynamicBPM.BindValueChanged(val =>
             {
+                applySpeedChangeBounds();
+
                 if (!val.NewValue)
                 {
                     // 如果动态BPM被禁用，则恢复到FreeBPM或初始速率
@@ -249,6 +231,29 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
                     currentMissCount = 0; // 当动态BPM被禁用时重置失误计数
                 }
             }, true);
+        }
+
+        /// <summary>
+        /// 动态 BPM 启用时，将运行时速度限制在最小/最大允许速率内；
+        /// 禁用时恢复默认范围，初始速度不受动态 BPM 边界约束。
+        /// </summary>
+        private void applySpeedChangeBounds()
+        {
+            if (EnableDynamicBPM.Value)
+            {
+                SpeedChange.MinValue = MinAllowableRate.Value;
+                SpeedChange.MaxValue = MaxAllowableRate.Value;
+
+                if (GameplaySpeed.Value < MinAllowableRate.Value)
+                    SetGameplayAndDisplaySpeed(MinAllowableRate.Value);
+                else if (GameplaySpeed.Value > MaxAllowableRate.Value)
+                    SetGameplayAndDisplaySpeed(MaxAllowableRate.Value);
+            }
+            else
+            {
+                SpeedChange.MinValue = default_min_speed;
+                SpeedChange.MaxValue = default_max_speed;
+            }
         }
 
         public override void ApplyToTrack(IAdjustableAudioComponent track)

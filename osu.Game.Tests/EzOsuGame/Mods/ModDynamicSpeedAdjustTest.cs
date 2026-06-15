@@ -52,8 +52,13 @@ namespace osu.Game.Tests.EzOsuGame.Mods
         [Test]
         public void TestNiceBpmStableRateFactorsUpdateTargetRate()
         {
-            var mod = new ModNiceBPM();
-            mod.EnableDynamicBPM.Value = true;
+            var mod = new ModNiceBPM
+            {
+                EnableDynamicBPM =
+                {
+                    Value = true
+                }
+            };
 
             var recentRatesField = typeof(ModNiceBPM).GetField("recentRates", BindingFlags.Instance | BindingFlags.NonPublic)!;
             var targetRateField = typeof(ModNiceBPM).GetField("targetRate", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -83,8 +88,13 @@ namespace osu.Game.Tests.EzOsuGame.Mods
         [Test]
         public void TestNiceBpmRateChangeClampedToStep()
         {
-            var mod = new ModNiceBPM();
-            mod.RateChangeStep.Value = 0.002;
+            var mod = new ModNiceBPM
+            {
+                RateChangeStep =
+                {
+                    Value = 0.002
+                }
+            };
 
             var getRelativeRateChange = typeof(ModNiceBPM).GetMethod("getRelativeRateChange", BindingFlags.Instance | BindingFlags.NonPublic)!;
             var precedingEndTimesField = typeof(ModNiceBPM).GetField("precedingEndTimes", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -92,8 +102,11 @@ namespace osu.Game.Tests.EzOsuGame.Mods
             var hitObject = new HitObject { StartTime = 1000 };
             ((Dictionary<HitObject, double>)precedingEndTimesField.GetValue(mod)!).Add(hitObject, 900);
 
-            var earlyHit = new JudgementResult(hitObject, new Judgement()) { Type = HitResult.Good };
-            earlyHit.TimeOffset = -50;
+            var earlyHit = new JudgementResult(hitObject, new Judgement())
+            {
+                Type = HitResult.Good,
+                TimeOffset = -50
+            };
 
             double hitFactor = (double)getRelativeRateChange.Invoke(mod, new object[] { earlyHit })!;
             Assert.That(hitFactor, Is.EqualTo(1.002).Within(0.0001));
@@ -102,9 +115,17 @@ namespace osu.Game.Tests.EzOsuGame.Mods
         [Test]
         public void TestNiceBpmMissSlowdownEveryThreeMisses()
         {
-            var mod = new ModNiceBPM();
-            mod.MissThreshold.Value = 3;
-            mod.RateChangeStep.Value = 0.002;
+            var mod = new ModNiceBPM
+            {
+                MissThreshold =
+                {
+                    Value = 3
+                },
+                RateChangeStep =
+                {
+                    Value = 0.002
+                }
+            };
 
             var getRelativeRateChange = typeof(ModNiceBPM).GetMethod("getRelativeRateChange", BindingFlags.Instance | BindingFlags.NonPublic)!;
             var missCountField = typeof(ModNiceBPM).GetField("currentMissCount", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -124,8 +145,13 @@ namespace osu.Game.Tests.EzOsuGame.Mods
         [Test]
         public void TestNiceBpmHitResetsMissAccumulator()
         {
-            var mod = new ModNiceBPM();
-            mod.MissThreshold.Value = 3;
+            var mod = new ModNiceBPM
+            {
+                MissThreshold =
+                {
+                    Value = 3
+                }
+            };
 
             var getRelativeRateChange = typeof(ModNiceBPM).GetMethod("getRelativeRateChange", BindingFlags.Instance | BindingFlags.NonPublic)!;
             var missCountField = typeof(ModNiceBPM).GetField("currentMissCount", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -135,8 +161,11 @@ namespace osu.Game.Tests.EzOsuGame.Mods
             ((Dictionary<HitObject, double>)precedingEndTimesField.GetValue(mod)!).Add(hitObject, 900);
 
             var miss = new JudgementResult(hitObject, new Judgement()) { Type = HitResult.Miss };
-            var good = new JudgementResult(hitObject, new Judgement()) { Type = HitResult.Good };
-            good.TimeOffset = 0;
+            var good = new JudgementResult(hitObject, new Judgement())
+            {
+                Type = HitResult.Good,
+                TimeOffset = 0
+            };
 
             getRelativeRateChange.Invoke(mod, new object[] { miss });
             getRelativeRateChange.Invoke(mod, new object[] { miss });
@@ -150,10 +179,72 @@ namespace osu.Game.Tests.EzOsuGame.Mods
         }
 
         [Test]
+        public void TestNiceBpmInitialSpeedNotClampedByAllowableRateWhenDynamicDisabled()
+        {
+            var mod = new ModNiceBPM
+            {
+                EnableDynamicBPM =
+                {
+                    Value = false
+                },
+                MinAllowableRate =
+                {
+                    Value = 0.7
+                },
+                MaxAllowableRate =
+                {
+                    Value = 1.2
+                },
+                InitialRate =
+                {
+                    Value = 1.5
+                }
+            };
+
+            Assert.That(mod.GameplaySpeed.Value, Is.EqualTo(1.5).Within(0.001));
+
+            mod.GetType().GetField("originalBPM", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(mod, 200d);
+            mod.FreeBPM.Value = 300;
+
+            Assert.That(mod.GameplaySpeed.Value, Is.EqualTo(1.5).Within(0.001));
+        }
+
+        [Test]
+        public void TestNiceBpmGameplaySpeedClampedToAllowableRateWhenDynamicEnabled()
+        {
+            var mod = new ModNiceBPM
+            {
+                MinAllowableRate =
+                {
+                    Value = 0.7
+                },
+                MaxAllowableRate =
+                {
+                    Value = 1.2
+                },
+                EnableDynamicBPM =
+                {
+                    Value = true
+                },
+                InitialRate =
+                {
+                    Value = 1.5
+                }
+            };
+
+            Assert.That(mod.GameplaySpeed.Value, Is.EqualTo(1.2).Within(0.001));
+        }
+
+        [Test]
         public void TestNiceBpmJudgementFilter()
         {
-            var mod = new ModNiceBPM();
-            mod.EnableDynamicBPM.Value = true;
+            var mod = new ModNiceBPM
+            {
+                EnableDynamicBPM =
+                {
+                    Value = true
+                }
+            };
 
             var shouldProcessResult = typeof(ModNiceBPM).GetMethod("shouldProcessResult", BindingFlags.Instance | BindingFlags.NonPublic)!;
             var precedingEndTimesField = typeof(ModNiceBPM).GetField("precedingEndTimes", BindingFlags.Instance | BindingFlags.NonPublic)!;
