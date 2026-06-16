@@ -122,8 +122,6 @@ namespace osu.Game.Screens.Play
 
             public Drawable StoryboardSource { get; private set; }
 
-            public bool StoryboardPreferred { get; private set; }
-
             public event Action SourcesChanged;
 
             public IReadOnlyList<Drawable> CaptureSources => captureSources;
@@ -146,14 +144,6 @@ namespace osu.Game.Screens.Play
                 BeatmapBackgroundSource = source;
                 updateCaptureSources();
                 SourcesChanged?.Invoke();
-            }
-
-            public void SetStoryboardPreferred(bool preferred)
-            {
-                if (StoryboardPreferred == preferred)
-                    return;
-
-                StoryboardPreferred = preferred;
             }
 
             private void updateCaptureSources()
@@ -279,16 +269,6 @@ namespace osu.Game.Screens.Play
             ScoreProcessor.OnResetFromReplayFrame += () => ScoreProcessor.PopulateScore(Score.ScoreInfo);
 
             gameActive.BindValueChanged(_ => updatePauseOnFocusLostState(), true);
-        }
-
-        protected override void Update()
-        {
-            base.Update();
-
-            if (DimmableStoryboard == null)
-                return;
-
-            BackdropSource.SetStoryboardPreferred(DimmableStoryboard.ContentDisplayed && !DimmableStoryboard.HasStoryboardEnded.Value);
         }
 
         /// <summary>
