@@ -104,7 +104,7 @@ namespace osu.Game.Database
         /// 51   2025-07-22    Add ScoreInfo.Pauses.
         ///
         /// Ez2Lazer-only revisions are tracked separately via <see cref="EZ_REALM_SCHEMA_VERSION"/>.
-        /// The on-disk Realm schema version is <see cref="file_schema_version"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 51007).
+        /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 51007).
         /// Ez v1: Add ScoreInfo.ManiaHitMode and ManiaHealthMode.
         /// Ez v2: Add BeatmapInfo.HasVideo and HasStoryboard.
         /// Ez v3: Add BeatmapInfo.XxyStarRating.
@@ -113,21 +113,22 @@ namespace osu.Game.Database
         /// Ez v6: Add RulesetInfo.LastAppliedXxySrVersion.
         /// </summary>
         private const int schema_version = 51;
+        public const int UpstreamSchemaVersion = schema_version;
 
         /// <summary>
         /// Ez2Lazer schema revision. Bump when adding Ez-persisted fields; do not change <see cref="schema_version"/> for Ez-only work.
         /// </summary>
         public const int EZ_REALM_SCHEMA_VERSION = 7;
 
-        private const int file_schema_version = schema_version * 1000 + EZ_REALM_SCHEMA_VERSION;
+        public static int EzFileSchemaVersion => UpstreamSchemaVersion * 1000 + EZ_REALM_SCHEMA_VERSION;
 
-        private readonly IRealmSchemaProfile schemaProfile;
+        private readonly RealmSchemaMode schemaMode;
 
         private readonly bool useDevelopmentVersionedFilenames;
 
         private readonly bool allowDestructiveRecoveryOnSchemaMismatch;
 
-        /// <summary>为 true 时按 <see cref="IRealmSchemaProfile.FileSchemaVersion"/> 迁移；外部工具应设为 false 并指定 <see cref="pinnedDiskSchemaVersion"/>。</summary>
+        /// <summary>为 true 时按当前 <see cref="RealmSchemaMode"/> 的磁盘 schema 迁移；外部工具应设为 false 并指定 <see cref="pinnedDiskSchemaVersion"/>。</summary>
         private readonly bool performSchemaMigration;
 
         private readonly ulong? pinnedDiskSchemaVersion;
@@ -228,7 +229,7 @@ namespace osu.Game.Database
         /// <param name="performSchemaMigration">When <c>false</c>, opens at <paramref name="pinnedDiskSchemaVersion"/> without running migrations (EzRealmSync 等工具).</param>
         /// <param name="pinnedDiskSchemaVersion">磁盘上已有的 schema 版本；<paramref name="performSchemaMigration"/> 为 false 时必填。</param>
         public RealmAccess(Storage storage, string filename, GameThread? updateThread = null, bool useDevelopmentVersionedFilenames = true, bool allowDestructiveRecoveryOnSchemaMismatch = true, bool performSchemaMigration = true, ulong? pinnedDiskSchemaVersion = null)
-            : this(storage, filename, EzRealmSchemaProfile.Instance, updateThread, useDevelopmentVersionedFilenames, allowDestructiveRecoveryOnSchemaMismatch, performSchemaMigration, pinnedDiskSchemaVersion)
+            : this(storage, filename, RealmSchemaMode.Ez, updateThread, useDevelopmentVersionedFilenames, allowDestructiveRecoveryOnSchemaMismatch, performSchemaMigration, pinnedDiskSchemaVersion)
         {
         }
 
@@ -241,11 +242,11 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// Construct a new instance with an explicit schema profile (Ez or official).
+        /// Construct a new instance with an explicit schema mode (Ez or official).
         /// </summary>
         /// <param name="storage">The game storage which will be used to create the realm backing file.</param>
         /// <param name="filename">The filename to use for the realm backing file.</param>
-        /// <param name="schemaProfile">Schema encoding and migration set (Ez vs official).</param>
+        /// <param name="schemaMode">Schema encoding and migration set (Ez vs official).</param>
         /// <param name="updateThread">The game update thread, used to post realm operations into a thread-safe context.</param>
         /// <param name="useDevelopmentVersionedFilenames">When <c>true</c>, use <c>client_{FileSchemaVersion}.realm</c> filenames.</param>
         /// <param name="allowDestructiveRecoveryOnSchemaMismatch">When <c>false</c>, do not delete/recreate the realm file on schema downgrade.</param>
@@ -254,7 +255,7 @@ namespace osu.Game.Database
         protected RealmAccess(
             Storage storage,
             string filename,
-            IRealmSchemaProfile schemaProfile,
+            RealmSchemaMode schemaMode,
             GameThread? updateThread = null,
             bool? useDevelopmentVersionedFilenames = null,
             bool allowDestructiveRecoveryOnSchemaMismatch = true,
@@ -262,8 +263,8 @@ namespace osu.Game.Database
             ulong? pinnedDiskSchemaVersion = null)
         {
             this.storage = storage;
-            this.schemaProfile = schemaProfile;
-            this.useDevelopmentVersionedFilenames = useDevelopmentVersionedFilenames ?? schemaProfile is EzRealmSchemaProfile;
+            this.schemaMode = schemaMode;
+            this.useDevelopmentVersionedFilenames = useDevelopmentVersionedFilenames ?? schemaMode == RealmSchemaMode.Ez;
             this.allowDestructiveRecoveryOnSchemaMismatch = allowDestructiveRecoveryOnSchemaMismatch;
             this.performSchemaMigration = performSchemaMigration;
             this.pinnedDiskSchemaVersion = pinnedDiskSchemaVersion;
@@ -300,9 +301,7 @@ namespace osu.Game.Database
         private void applyFilenameSchemaSuffix(ref string filename)
         {
             string originalFilename = filename;
-            int targetVersion = schemaProfile.EzRealmSchemaVersion > 0
-                ? schemaProfile.FileSchemaVersion
-                : schemaProfile.UpstreamSchemaVersion;
+            int targetVersion = fileSchemaVersionForMode;
 
             filename = GetVersionedRealmFilename(originalFilename, targetVersion);
 
@@ -310,7 +309,7 @@ namespace osu.Game.Database
             if (storage.Exists(filename))
                 return;
 
-            foreach (string previousFilename in EnumerateSidecarPredecessorFilenames(originalFilename, schemaProfile))
+            foreach (string previousFilename in EnumerateSidecarPredecessorFilenames(originalFilename, schemaMode))
             {
                 if (storage.Exists(previousFilename))
                 {
@@ -338,20 +337,20 @@ namespace osu.Game.Database
             return originalFilename.Replace(realm_extension, $"_{version}{realm_extension}");
         }
 
-        internal static IEnumerable<string> EnumerateSidecarPredecessorFilenames(string originalFilename, IRealmSchemaProfile schemaProfile)
+        internal static IEnumerable<string> EnumerateSidecarPredecessorFilenames(string originalFilename, RealmSchemaMode schemaMode)
         {
-            if (schemaProfile.EzRealmSchemaVersion > 0)
+            if (schemaMode == RealmSchemaMode.Ez)
             {
-                int baseVersion = schemaProfile.UpstreamSchemaVersion * 1000;
+                int baseVersion = UpstreamSchemaVersion * 1000;
 
-                for (int ez = schemaProfile.EzRealmSchemaVersion - 1; ez >= 1; ez--)
+                for (int ez = EZ_REALM_SCHEMA_VERSION - 1; ez >= 1; ez--)
                     yield return GetVersionedRealmFilename(originalFilename, baseVersion + ez);
 
-                yield return GetVersionedRealmFilename(originalFilename, schemaProfile.UpstreamSchemaVersion);
+                yield return GetVersionedRealmFilename(originalFilename, UpstreamSchemaVersion);
             }
             else
             {
-                for (int version = schemaProfile.UpstreamSchemaVersion - 1; version >= 0; version--)
+                for (int version = UpstreamSchemaVersion - 1; version >= 0; version--)
                     yield return GetVersionedRealmFilename(originalFilename, version);
             }
 
@@ -918,7 +917,7 @@ namespace osu.Game.Database
 
             return new RealmConfiguration(storage.GetFullPath(filename ?? Filename, true))
             {
-                SchemaVersion = pinnedDiskSchemaVersion ?? (ulong)schemaProfile.FileSchemaVersion,
+                SchemaVersion = pinnedDiskSchemaVersion ?? (ulong)fileSchemaVersionForMode,
                 MigrationCallback = performSchemaMigration ? onMigration : null,
                 FallbackPipePath = tempPathLocation,
             };
@@ -926,7 +925,7 @@ namespace osu.Game.Database
 
         private void onMigration(Migration migration, ulong lastSchemaVersion)
         {
-            int upstreamVersion = schemaProfile.UpstreamSchemaVersion;
+            int upstreamVersion = UpstreamSchemaVersion;
 
             if (lastSchemaVersion < (ulong)upstreamVersion)
             {
@@ -934,16 +933,20 @@ namespace osu.Game.Database
                     applyMigrationsForVersion(migration, i);
             }
 
-            if (schemaProfile.EzRealmSchemaVersion <= 0)
+            if (ezRealmSchemaVersionForMode <= 0)
                 return;
 
-            int startingEzVersion = lastSchemaVersion >= (ulong)schemaProfile.FileSchemaVersion - (ulong)schemaProfile.EzRealmSchemaVersion
+            int startingEzVersion = lastSchemaVersion >= (ulong)fileSchemaVersionForMode - (ulong)ezRealmSchemaVersionForMode
                 ? (int)(lastSchemaVersion - (ulong)upstreamVersion * 1000)
                 : 0;
 
-            for (int ez = startingEzVersion + 1; ez <= schemaProfile.EzRealmSchemaVersion; ez++)
+            for (int ez = startingEzVersion + 1; ez <= ezRealmSchemaVersionForMode; ez++)
                 applyEzMigrationsForVersion(migration, ez);
         }
+
+        private int ezRealmSchemaVersionForMode => schemaMode == RealmSchemaMode.Ez ? EZ_REALM_SCHEMA_VERSION : 0;
+
+        private int fileSchemaVersionForMode => schemaMode == RealmSchemaMode.Ez ? EzFileSchemaVersion : UpstreamSchemaVersion;
 
         private void applyMigrationsForVersion(Migration migration, ulong targetVersion)
         {
@@ -1460,7 +1463,7 @@ namespace osu.Game.Database
 
         private void applyEzMigrationsForVersion(Migration migration, int targetEzVersion)
         {
-            Logger.Log($"Running Ez realm migration to ez version {targetEzVersion} (file schema {schemaProfile.UpstreamSchemaVersion * 1000 + targetEzVersion})...");
+            Logger.Log($"Running Ez realm migration to ez version {targetEzVersion} (file schema {UpstreamSchemaVersion * 1000 + targetEzVersion})...");
             Stopwatch stopwatch = Stopwatch.StartNew();
 
             switch (targetEzVersion)

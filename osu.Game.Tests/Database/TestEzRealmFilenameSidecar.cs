@@ -14,30 +14,30 @@ namespace osu.Game.Tests.Database
         public void GetVersionedRealmFilename_uses_file_schema_version()
         {
             Assert.That(
-                RealmAccess.GetVersionedRealmFilename("client.realm", EzRealmSchemaProfile.Instance.FileSchemaVersion),
-                Is.EqualTo($"client_{EzRealmSchemaProfile.Instance.FileSchemaVersion}.realm"));
+                RealmAccess.GetVersionedRealmFilename("client.realm", RealmAccess.EzFileSchemaVersion),
+                Is.EqualTo($"client_{RealmAccess.EzFileSchemaVersion}.realm"));
         }
 
         [Test]
         public void EnumerateSidecarPredecessorFilenames_prefers_earlier_ez_versions_then_legacy_upstream_then_client_realm()
         {
-            var predecessors = RealmAccess.EnumerateSidecarPredecessorFilenames("client.realm", EzRealmSchemaProfile.Instance).ToList();
+            var predecessors = RealmAccess.EnumerateSidecarPredecessorFilenames("client.realm", RealmSchemaMode.Ez).ToList();
 
-            int baseVersion = EzRealmSchemaProfile.UPSTREAM_SCHEMA_VERSION * 1000;
+            int baseVersion = RealmAccess.UpstreamSchemaVersion * 1000;
 
-            for (int ez = EzRealmSchemaProfile.EZ_REALM_SCHEMA_VERSION - 1; ez >= 1; ez--)
+            for (int ez = RealmAccess.EZ_REALM_SCHEMA_VERSION - 1; ez >= 1; ez--)
                 Assert.That(predecessors, Does.Contain($"client_{baseVersion + ez}.realm"));
 
-            Assert.That(predecessors, Does.Contain($"client_{EzRealmSchemaProfile.UPSTREAM_SCHEMA_VERSION}.realm"));
+            Assert.That(predecessors, Does.Contain($"client_{RealmAccess.UpstreamSchemaVersion}.realm"));
             Assert.That(predecessors[^1], Is.EqualTo("client.realm"));
         }
 
         [Test]
-        public void EnumerateSidecarPredecessorFilenames_for_official_profile_uses_upstream_chain()
+        public void EnumerateSidecarPredecessorFilenames_for_official_mode_uses_upstream_chain()
         {
-            var predecessors = RealmAccess.EnumerateSidecarPredecessorFilenames("client.realm", OfficialRealmSchemaProfile.Instance).ToList();
+            var predecessors = RealmAccess.EnumerateSidecarPredecessorFilenames("client.realm", RealmSchemaMode.Official).ToList();
 
-            Assert.That(predecessors, Does.Contain("client_50.realm"));
+            Assert.That(predecessors, Does.Contain($"client_{RealmAccess.UpstreamSchemaVersion - 1}.realm"));
             Assert.That(predecessors, Does.Contain("client_0.realm"));
             Assert.That(predecessors[^1], Is.EqualTo("client.realm"));
             Assert.That(predecessors.Any(f => f.Contains("510")), Is.False);

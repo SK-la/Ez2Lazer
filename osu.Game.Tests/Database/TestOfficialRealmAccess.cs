@@ -16,7 +16,7 @@ namespace osu.Game.Tests.Database
             {
                 official.Run(realm =>
                 {
-                    Assert.That(realm.Config.SchemaVersion, Is.EqualTo(OfficialRealmSchemaProfile.UPSTREAM_SCHEMA_VERSION));
+                    Assert.That(realm.Config.SchemaVersion, Is.EqualTo(RealmAccess.UpstreamSchemaVersion));
                 });
             });
         }

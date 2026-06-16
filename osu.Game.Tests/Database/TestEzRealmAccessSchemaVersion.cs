@@ -16,7 +16,7 @@ namespace osu.Game.Tests.Database
             {
                 realm.Run(r =>
                 {
-                    Assert.That(r.Config.SchemaVersion, Is.EqualTo(EzRealmSchemaProfile.Instance.FileSchemaVersion));
+                    Assert.That(r.Config.SchemaVersion, Is.EqualTo(RealmAccess.EzFileSchemaVersion));
                 });
             });
         }

@@ -32,7 +32,7 @@ namespace osu.Game.Database
             bool allowDestructiveRecoveryOnSchemaMismatch,
             bool performSchemaMigration,
             ulong? pinnedDiskSchemaVersion)
-            : base(storage, filename, OfficialRealmSchemaProfile.Instance, updateThread, useDevelopmentVersionedFilenames: false, allowDestructiveRecoveryOnSchemaMismatch: allowDestructiveRecoveryOnSchemaMismatch, performSchemaMigration: performSchemaMigration, pinnedDiskSchemaVersion: pinnedDiskSchemaVersion)
+            : base(storage, filename, RealmSchemaMode.Official, updateThread, useDevelopmentVersionedFilenames: false, allowDestructiveRecoveryOnSchemaMismatch: allowDestructiveRecoveryOnSchemaMismatch, performSchemaMigration: performSchemaMigration, pinnedDiskSchemaVersion: pinnedDiskSchemaVersion)
         {
         }
     }
