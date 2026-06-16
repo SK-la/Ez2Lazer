@@ -53,6 +53,27 @@ namespace osu.Game.EzOsuGame.Analysis
             return true;
         }
 
+        /// <summary>
+        /// Computes baseline NoMod xxy SR for persisting to <see cref="BeatmapInfo.XxyStarRating"/>.
+        /// Returns -1 when unsupported or failed, 0 for empty beatmaps.
+        /// </summary>
+        public static double ComputeBaselineXxyStarRatingForRealm(BeatmapManager beatmapManager, BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
+        {
+            var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+
+            if (!EzXxyStarRatingSupport.SupportsBeatmap(working.Beatmap, beatmapInfo.Ruleset))
+                return -1;
+
+            if (working.Beatmap.HitObjects.Count == 0)
+                return 0;
+
+            var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
+
+            return TryComputeXxySr(beatmapManager, lookup, cancellationToken, out double xxySr)
+                ? xxySr
+                : -1;
+        }
+
         public static bool TryComputeXxySrAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
                                                 out double? xxySr, out double? pp)
         {

@@ -102,29 +102,12 @@ namespace osu.Game.Beatmaps
             });
         }
 
-        public double ComputeXxyStarRating(BeatmapInfo beatmapInfo)
-        {
-            var working = workingBeatmapCache.GetWorkingBeatmap(beatmapInfo);
-
-            if (!EzXxyStarRatingSupport.SupportsBeatmap(working.Beatmap, beatmapInfo.Ruleset))
-                return -1;
-
-            if (working.Beatmap.HitObjects.Count == 0)
-                return 0;
-
-            if (beatmapManager == null)
-                return -1;
-
-            var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
-
-            return EzAnalysisComputation.TryComputeXxySr(beatmapManager, lookup, CancellationToken.None, out double xxySr)
-                ? xxySr
-                : -1;
-        }
-
         private void updateXxyStarRating(BeatmapInfo beatmap)
         {
-            beatmap.XxyStarRating = ComputeXxyStarRating(beatmap);
+            if (beatmapManager == null)
+                return;
+
+            beatmap.XxyStarRating = EzAnalysisComputation.ComputeBaselineXxyStarRatingForRealm(beatmapManager, beatmap);
         }
 
         private void updatePerformancePoints(BeatmapInfo beatmap, WorkingBeatmap working)
