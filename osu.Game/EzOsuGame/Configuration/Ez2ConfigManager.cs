@@ -109,7 +109,6 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.EditorSyncTimelineSpacing, true);
 
             SetDefault(Ez2Setting.EzAnalysisFilter, false);
-            SetDefault(Ez2Setting.EzRealmMetadataBackfillVersion, 0);
             SetDefault(Ez2Setting.EzSelectCsMode, string.Empty);
             SetDefault(Ez2Setting.ColumnTypeListSelect, 4);
 
@@ -801,10 +800,6 @@ namespace osu.Game.EzOsuGame.Configuration
 
         EzAnalysisFilter,
 
-        /// <summary>
-        /// Last Ez Realm metadata schema version for which tag/xxy/PP backfill completed (see RealmAccess.EZ_REALM_SCHEMA_VERSION).
-        /// </summary>
-        EzRealmMetadataBackfillVersion,
         EzSelectCsMode,
         ColumnTypeListSelect,
 

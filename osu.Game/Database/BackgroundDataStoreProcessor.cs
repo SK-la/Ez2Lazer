@@ -77,8 +77,8 @@ namespace osu.Game.Database
 
         private LocalCachedBeatmapMetadataSource localMetadataSource = null!;
 
-        private readonly object ezRealmBackfillLock = new object();
-        private bool ezRealmBackfillQueued;
+        private readonly object ezRealmMetadataBackfillLock = new object();
+        private bool ezRealmMetadataBackfillQueued;
 
         protected virtual int TimeToSleepDuringGameplay => 30000;
 
@@ -124,20 +124,20 @@ namespace osu.Game.Database
 
         private bool tryBeginEzRealmMetadataBackfill()
         {
-            lock (ezRealmBackfillLock)
+            lock (ezRealmMetadataBackfillLock)
             {
-                if (ezRealmBackfillQueued)
+                if (ezRealmMetadataBackfillQueued)
                     return false;
 
-                ezRealmBackfillQueued = true;
+                ezRealmMetadataBackfillQueued = true;
                 return true;
             }
         }
 
         private void endEzRealmMetadataBackfill()
         {
-            lock (ezRealmBackfillLock)
-                ezRealmBackfillQueued = false;
+            lock (ezRealmMetadataBackfillLock)
+                ezRealmMetadataBackfillQueued = false;
         }
 
         protected override void LoadComplete()
@@ -467,7 +467,7 @@ namespace osu.Game.Database
 
                 try
                 {
-                    double xxyStarRating = beatmapUpdater.ComputeXxyStarRating(beatmap);
+                    double xxyStarRating = EzAnalysisComputation.ComputeBaselineXxyStarRatingForRealm(beatmapManager, beatmap, CancellationToken.None);
 
                     realmAccess.Write(r =>
                     {
