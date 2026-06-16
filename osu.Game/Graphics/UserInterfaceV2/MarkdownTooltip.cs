@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -8,9 +9,11 @@ using osu.Framework.Allocation;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Containers.Markdown;
 using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
+using osu.Framework.Testing;
 using osu.Framework.Utils;
 using osu.Game.Graphics.Containers.Markdown;
 using osuTK;
@@ -23,13 +26,14 @@ namespace osu.Game.Graphics.UserInterfaceV2
     /// </summary>
     public partial class MarkdownTooltip : VisibilityContainer, osu.Framework.Graphics.Cursor.ITooltip<LocalisableString>
     {
-        private const float max_width = 500;
+        private const float max_width = 600;
 
         private Box background = null!;
         private OsuMarkdownContainer? markdown;
         private TextFlowContainer? textFlow;
 
         private bool instantMovement = true;
+        private bool pendingMarkdownWidthUpdate;
         private LocalisableString lastContent;
 
         public MarkdownTooltip()
@@ -73,6 +77,7 @@ namespace osu.Game.Graphics.UserInterfaceV2
                 // Use a reduced line spacing for tooltip context
                 markdown.LineSpacing = 16;
                 markdown.Text = s;
+                pendingMarkdownWidthUpdate = true;
             }
             else if (textFlow != null)
             {
@@ -120,6 +125,8 @@ namespace osu.Game.Graphics.UserInterfaceV2
             {
                 AutoSizeAxes = Axes.Y,
                 Width = max_width,
+                DocumentPadding = new MarginPadding(5),
+                DocumentMargin = new MarginPadding(5),
             };
 
             Children = new Drawable[]
@@ -154,6 +161,70 @@ namespace osu.Game.Graphics.UserInterfaceV2
         }
 
         protected override void PopOut() => this.Delay(150).FadeOut(300, Easing.OutQuint);
+
+        protected override void UpdateAfterChildren()
+        {
+            base.UpdateAfterChildren();
+
+            if (!pendingMarkdownWidthUpdate || markdown == null || !markdown.IsPresent)
+                return;
+
+            float intrinsicWidth = computeMarkdownIntrinsicWidth();
+
+            if (intrinsicWidth <= 0)
+                return;
+
+            float targetWidth = Math.Min(max_width, intrinsicWidth);
+
+            if (!Precision.AlmostEquals(markdown.Width, targetWidth))
+                markdown.Width = targetWidth;
+
+            pendingMarkdownWidthUpdate = false;
+        }
+
+        private float computeMarkdownIntrinsicWidth()
+        {
+            if (markdown == null)
+                return 0;
+
+            float contentWidth = 0;
+
+            foreach (var table in markdown.ChildrenOfType<MarkdownTable>())
+            {
+                var grid = table.ChildrenOfType<GridContainer>().FirstOrDefault();
+
+                if (grid?.Content == null || grid.Content.Count == 0)
+                    continue;
+
+                int columnCount = grid.Content[0].Count;
+                var columnWidths = new float[columnCount];
+
+                for (int r = 0; r < grid.Content.Count; r++)
+                {
+                    var row = grid.Content[r];
+
+                    for (int c = 0; c < columnCount && c < row.Count; c++)
+                    {
+                        if (row[c] is MarkdownTableCell cell)
+                            columnWidths[c] = Math.Max(columnWidths[c], cell.ContentWidth);
+                    }
+                }
+
+                float tableWidth = 0;
+
+                for (int i = 0; i < columnCount; i++)
+                    tableWidth += columnWidths[i];
+
+                contentWidth = Math.Max(contentWidth, tableWidth);
+            }
+
+            if (contentWidth <= 0)
+                return 0;
+
+            return contentWidth
+                   + markdown.DocumentPadding.Left + markdown.DocumentPadding.Right
+                   + markdown.DocumentMargin.Left + markdown.DocumentMargin.Right;
+        }
 
         private void parseAndRenderRichText(string content, TextFlowContainer text)
         {
