@@ -289,14 +289,6 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             switch (v.NewValue)
             {
-                case EzEnumHitMode.EZ2AC:
-                    RegisterPool<Note, Ez2AcDrawableNote>(10, 50);
-                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, Ez2AcDrawableLNHead>(10, 50);
-                    RegisterPool<TailNote, Ez2AcDrawableLNTail>(10, 50);
-                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
-                    break;
-
                 case EzEnumHitMode.Malody_E:
                 case EzEnumHitMode.Malody_B:
                     RegisterPool<Note, DrawableNote>(10, 50);
@@ -304,24 +296,6 @@ namespace osu.Game.Rulesets.Mania.UI
                     RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
                     RegisterPool<TailNote, MalodyDrawableLNTail>(10, 50);
                     RegisterPool<HoldNoteBody, MalodyDrawableLNBody>(10, 50);
-                    break;
-
-                case EzEnumHitMode.IIDX_HD:
-                case EzEnumHitMode.LR2_HD:
-                case EzEnumHitMode.Raja_NM:
-                    RegisterPool<Note, BMSDrawableNote>(10, 50);
-                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, BMSDrawableHoldNoteHead>(10, 50);
-                    RegisterPool<TailNote, BMSDrawableHoldNoteTail>(10, 50);
-                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
-                    break;
-
-                case EzEnumHitMode.O2Jam:
-                    RegisterPool<Note, O2DrawableNote>(10, 50);
-                    RegisterPool<HoldNote, O2DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, O2DrawableHoldNoteHead>(10, 50);
-                    RegisterPool<TailNote, O2DrawableHoldNoteTail>(10, 50);
-                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
                     break;
 
                 default:

@@ -13,6 +13,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Skinning.Default;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Edit;
@@ -84,6 +85,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            if (ManiaEzDrawableJudgement.TryHitModeCheckForResult(this, userTriggered, timeOffset))
+                return;
+
             Debug.Assert(HitObject.HitWindows != null);
 
             if (!userTriggered)
@@ -110,6 +114,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         public virtual bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
+            if (e.Action == Action.Value && ManiaEzDrawableJudgement.TryBmsOnPressed(this, e))
+                return true;
+
             if (e.Action != Action.Value)
                 return false;
 
@@ -131,5 +138,20 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             Colour = configTimingBasedNoteColouring.Value ? BindableBeatDivisor.GetColourFor(snapDivisor, colours) : Color4.White;
         }
+
+        public bool CanRouteToKPoor => ManiaEzDrawableJudgement.CanRouteToKPoor(this);
+
+        internal void EzApplyFinalResult(HitResult result)
+        {
+            ApplyResult(static (r, state) =>
+            {
+                r.Type = state;
+
+                if (state == HitResult.Meh || state == HitResult.Miss)
+                    r.IsComboHit = false;
+            }, result);
+        }
+
+        internal void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);
     }
 }

@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -169,13 +168,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         }
 
         private static bool isPostBadKPoorRoutable(DrawableHitObject obj)
-            => obj switch
-            {
-                BMSDrawableNote note => note.CanRouteToKPoor,
-                BMSDrawableHoldNoteHead head => head.CanRouteToKPoor,
-                BMSDrawableHoldNoteTail tail => tail.CanRouteToKPoor,
-                _ => false
-            };
+        {
+            if (obj is DrawableHoldNoteTail tail)
+                return tail.CanRouteToKPoor;
+
+            if (obj is DrawableNote note)
+                return note.CanRouteToKPoor;
+
+            return false;
+        }
 
         private static bool isWithinMissWindow(DrawableHitObject obj, double time)
         {

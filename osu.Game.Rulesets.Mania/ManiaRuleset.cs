@@ -55,7 +55,7 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania
 {
-    public class ManiaRuleset : Ruleset, ILegacyRuleset
+    public partial class ManiaRuleset : Ruleset, ILegacyRuleset
     {
         static ManiaRuleset()
         {
