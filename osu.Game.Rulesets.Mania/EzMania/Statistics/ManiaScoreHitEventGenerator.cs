@@ -26,6 +26,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         {
             EzScoreReloadBridge.RegisterImplementation("mania", Instance);
             EzScoreReloadBridge.RegisterImplementation("3", Instance);
+
+            EzScoreTimelineBridge.RegisterManiaTimelineBuilder((score, beatmap, cancellationToken) =>
+            {
+                var environment = GameplayEnvironment.FromScore(score.ScoreInfo, GlobalConfigStore.EzConfig);
+                return ManiaReplaySession.RunTimeline(score, beatmap, environment, cancellationToken);
+            });
         }
 
         public bool Validate(Score score)

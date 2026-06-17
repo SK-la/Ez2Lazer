@@ -42,6 +42,19 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
+        public void TestRunTimelineFinalScoreMatchesSessionRun()
+        {
+            var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
+
+            var hitEvents = ManiaReplaySession.Run(score, beatmap, environment);
+            var timeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
+
+            Assert.That(timeline.FinalTotalScore, Is.EqualTo(hitEvents.Last().TotalScore ?? 0));
+            Assert.That(timeline.QueryAtTime(0).TotalScore, Is.EqualTo(0));
+            Assert.That(timeline.QueryAtTime(2500).TotalScore, Is.EqualTo(timeline.FinalTotalScore));
+        }
+
+        [Test]
         public void TestLazerTapSessionMatchesGeneratorJudgements()
         {
             var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();

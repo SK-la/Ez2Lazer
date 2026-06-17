@@ -20,7 +20,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
     {
         private const double combo_base = 4;
         private double calOD = 8;
-        private EzEnumHitMode hitMode => GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+
+        /// <summary>
+        /// Ghost 时间线重放时覆盖 HitMode，使用成绩自带环境而非当前玩家全局配置。
+        /// </summary>
+        public EzEnumHitMode? TimelineHitModeOverride { get; set; }
+
+        private EzEnumHitMode hitMode => TimelineHitModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
 
         public ManiaScoreProcessor()
             : base(new ManiaRuleset())

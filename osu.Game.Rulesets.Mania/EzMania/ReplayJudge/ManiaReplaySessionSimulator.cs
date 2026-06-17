@@ -34,6 +34,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             IManiaNoteJudgementStrategy noteStrategy,
             IManiaHoldJudgementStrategy holdStrategy,
             ScoreProcessor scoreProcessor,
+            ManiaReplayTimelineRecorder? timelineRecorder,
             CancellationToken cancellationToken)
         {
             bool poorEnabled = HealthModeHelper.IsBMSHealthMode(environment.ManiaHealthMode)
@@ -76,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         input.Time,
                         environment.OffsetPlusMania,
                         hitWindowHelper,
-                        (target, result) => ApplyTransientResult(scoreProcessor, target, result, input.Time - target.StartTime + environment.OffsetPlusMania, input.Time, gameplayRate));
+                        (target, result) => ApplyTransientResult(scoreProcessor, target, result, input.Time - target.StartTime + environment.OffsetPlusMania, input.Time, gameplayRate, timelineRecorder));
                 }
 
                 if (candidates.Count == 0)
@@ -140,7 +141,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                     if (sessionOutcome.Kind == BmsHitModeJudgement.SessionPressKind.DispatchExtra)
                     {
-                        ApplyTransientResult(scoreProcessor, target, BmsHitModeJudgement.MapTo(sessionOutcome.Judge), timeOffsetForJudgement, input.Time, gameplayRate);
+                        ApplyTransientResult(scoreProcessor, target, BmsHitModeJudgement.MapTo(sessionOutcome.Judge), timeOffsetForJudgement, input.Time, gameplayRate, timelineRecorder);
                         continue;
                     }
 
@@ -160,13 +161,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 {
                     forced.Judged = true;
                     forced.Result = HitResult.Miss;
-                    ApplyFinalResult(scoreProcessor, forced.Target, HitResult.Miss, input.Time, gameplayRate);
+                    ApplyFinalResult(scoreProcessor, forced.Target, HitResult.Miss, input.Time, gameplayRate, timelineRecorder);
                 }
 
                 selected.Judged = true;
                 selected.Result = result;
 
-                ApplyFinalResult(scoreProcessor, target, result, input.Time, gameplayRate);
+                ApplyFinalResult(scoreProcessor, target, result, input.Time, gameplayRate, timelineRecorder);
 
                 if (target is HeadNote head)
                     headWasHit[head] = result.IsHit();
@@ -377,7 +378,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return bpm;
         }
 
-        internal static void ApplyFinalResult(ScoreProcessor scoreProcessor, HitObject target, HitResult result, double eventTime, double gameplayRate)
+        internal static void ApplyFinalResult(ScoreProcessor scoreProcessor, HitObject target, HitResult result, double eventTime, double gameplayRate,
+            ManiaReplayTimelineRecorder? timelineRecorder = null)
         {
             var judgementResult = new JudgementResult(target, target.Judgement)
             {
@@ -385,9 +387,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             };
 
             scoreProcessor.ApplyResult(judgementResult);
+            timelineRecorder?.Record(scoreProcessor, eventTime, result);
         }
 
-        internal static void ApplyTransientResult(ScoreProcessor scoreProcessor, HitObject target, HitResult result, double timeOffset, double eventTime, double gameplayRate)
+        internal static void ApplyTransientResult(ScoreProcessor scoreProcessor, HitObject target, HitResult result, double timeOffset, double eventTime, double gameplayRate,
+            ManiaReplayTimelineRecorder? timelineRecorder = null)
         {
             var judgementResult = new JudgementResult(target, target.Judgement)
             {
@@ -396,6 +400,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             };
 
             scoreProcessor.ApplyResult(judgementResult);
+            timelineRecorder?.Record(scoreProcessor, eventTime, result);
         }
     }
 }
