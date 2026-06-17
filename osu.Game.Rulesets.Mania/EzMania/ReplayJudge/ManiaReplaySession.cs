@@ -36,15 +36,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return result.Timeline ?? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>());
         }
 
+        internal static long RunFinalTotalScore(Score score, IBeatmap beatmap, IGameplayEnvironment environment, CancellationToken cancellationToken = default)
+            => run(score, beatmap, environment, recordTimeline: false, cancellationToken).FinalTotalScore;
+
         private readonly struct SessionRunResult
         {
             public IReadOnlyList<HitEvent> HitEvents { get; }
             public EzScoreTimeline? Timeline { get; }
+            public long FinalTotalScore { get; }
 
-            public SessionRunResult(IReadOnlyList<HitEvent> hitEvents, EzScoreTimeline? timeline)
+            public SessionRunResult(IReadOnlyList<HitEvent> hitEvents, EzScoreTimeline? timeline, long finalTotalScore)
             {
                 HitEvents = hitEvents;
                 Timeline = timeline;
+                FinalTotalScore = finalTotalScore;
             }
         }
 
@@ -56,7 +61,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             ArgumentNullException.ThrowIfNull(environment);
 
             if (score.Replay.Frames.Count == 0)
-                return new SessionRunResult(Array.Empty<HitEvent>(), recordTimeline ? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>()) : null);
+                return new SessionRunResult(Array.Empty<HitEvent>(), recordTimeline ? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>()) : null, 0);
 
             var noteStrategy = ManiaJudgementRegistry.GetNoteStrategy(environment);
 
@@ -124,7 +129,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 ManiaReplaySessionSimulator.ApplyFinalResult(scoreProcessor, state.Target, HitResult.Miss, state.Target.GetEndTime(), gameplayRate, recorder);
             }
 
-            return new SessionRunResult(scoreProcessor.HitEvents.ToList(), recorder?.Build());
+            return new SessionRunResult(scoreProcessor.HitEvents.ToList(), recorder?.Build(), scoreProcessor.TotalScore.Value);
         }
 
         private static void alignHitWindows(IBeatmap beatmap, IGameplayEnvironment environment)

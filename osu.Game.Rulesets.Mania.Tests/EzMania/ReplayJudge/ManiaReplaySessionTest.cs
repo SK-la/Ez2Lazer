@@ -7,7 +7,6 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.EzMania.Statistics;
@@ -43,19 +42,29 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
-        public void TestRunTimelineFinalScoreMatchesSessionRun()
+        public void TestRunTimelineFinalScoreMatchesSessionRunTotal()
         {
             var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
 
             var hitEvents = ManiaReplaySession.Run(score, beatmap, environment);
+            long sessionTotal = ManiaReplaySession.RunFinalTotalScore(score, beatmap, environment);
             var timeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
 
             Assert.That(hitEvents, Has.Count.EqualTo(2));
-            Assert.That(timeline.FinalTotalScore, Is.GreaterThan(0));
+            Assert.That(sessionTotal, Is.GreaterThan(0));
+            Assert.That(timeline.FinalTotalScore, Is.EqualTo(sessionTotal));
             Assert.That(timeline.QueryAtTime(0).TotalScore, Is.EqualTo(0));
             Assert.That(timeline.QueryAtTime(2500).TotalScore, Is.EqualTo(timeline.FinalTotalScore));
+        }
 
+        [Test]
+        public void TestRunTimelineIsDeterministic()
+        {
+            var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
+
+            var timeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
             var timelineRepeat = ManiaReplaySession.RunTimeline(score, beatmap, environment);
+
             Assert.That(timelineRepeat.FinalTotalScore, Is.EqualTo(timeline.FinalTotalScore));
         }
 
