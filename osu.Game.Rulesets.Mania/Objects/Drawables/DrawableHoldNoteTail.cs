@@ -6,6 +6,7 @@
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.Drawables
@@ -55,9 +56,14 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         public void UpdateResult() => base.UpdateResult(true);
 
-        protected override void CheckForResult(bool userTriggered, double timeOffset) =>
+        protected override void CheckForResult(bool userTriggered, double timeOffset)
+        {
+            if (ManiaEzDrawableJudgement.TryHoldTailCheckForResult(this, userTriggered, timeOffset))
+                return;
+
             // Factor in the release lenience
             base.CheckForResult(userTriggered, timeOffset / TailNote.RELEASE_WINDOW_LENIENCE);
+        }
 
         protected override HitResult GetCappedResult(HitResult result)
         {
@@ -75,5 +81,15 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         public override void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
         {
         }
+
+        public new bool CanRouteToKPoor => ManiaEzDrawableJudgement.CanRouteToKPoor(this);
+
+        public override bool DisplayResult => !ManiaEzDrawableJudgement.ShouldHideTailDisplayResult() && base.DisplayResult;
+
+        internal new void EzApplyFinalResult(HitResult result) => ApplyResult(result);
+
+        internal new void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);
+
+        internal void EzApplyMinResult() => ApplyMinResult();
     }
 }

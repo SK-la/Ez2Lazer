@@ -3,6 +3,7 @@
 
 #nullable disable
 
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -16,6 +17,7 @@ using osu.Game.Rulesets.Mania.Judgements;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
@@ -222,6 +224,8 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             base.Update();
 
+            ManiaEzDrawableJudgement.TryO2HoldUpdate(this);
+
             if (Head.Judged && !Head.IsHit)
                 missingStartTime.Value ??= Head.Result.TimeAbsolute;
             if (Body.HasHoldBreak)
@@ -277,6 +281,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            if (ManiaEzDrawableJudgement.TryO2HoldCheckForResult(this, userTriggered, timeOffset))
+                return;
+
             if (Tail.AllJudged)
             {
                 if (Tail.IsHit)
@@ -386,5 +393,53 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             slidingSample.ClearSamples();
             base.OnFree();
         }
+
+        internal void EzFinalizeO2HoldFromTail()
+        {
+            if (EzTailIsHit)
+                EzApplyO2HoldHeadResult(EzTailBreaksCombo);
+            else
+                EzMissForcefully();
+
+            EzTriggerBodyIfNeeded(EzTailIsHit);
+            EzReportHoldReleased();
+        }
+
+        internal bool EzTailAllJudged => Tail.AllJudged;
+
+        internal bool EzTailIsHit => Tail.IsHit;
+
+        internal bool EzTailBreaksCombo => Tail.Result.Type == HitResult.Meh;
+
+        internal bool EzHasEarlyHoldBreak => Body != null && Tail != null && Body.HasHoldBreak && Time.Current < Tail.HitObject.StartTime;
+
+        internal IBindable<bool> EzIsHoldingBindable => IsHolding;
+
+        internal Func<DrawableHitObject, double, bool> EzCheckHittable => CheckHittable;
+
+        internal void EzApplyO2HoldHeadResult(bool breakComboFromTailMeh)
+        {
+            ApplyResult(static (r, breakCombo) =>
+            {
+                r.Type = r.Judgement.MaxResult;
+
+                if (breakCombo)
+                    r.IsComboHit = false;
+            }, breakComboFromTailMeh);
+        }
+
+        internal void EzMissForcefully() => MissForcefully();
+
+        internal void EzTriggerBodyIfNeeded(bool tailHit)
+        {
+            if (!Body.AllJudged)
+                Body.TriggerResult(tailHit);
+        }
+
+        internal void EzReportHoldReleased() => Result.ReportHoldState(Time.Current, false);
+
+        internal void EzRestoreCheckHittable(Func<DrawableHitObject, double, bool> backup) => CheckHittable = backup;
+
+        internal void EzDisableCheckHittable() => CheckHittable = (_, _) => false;
     }
 }

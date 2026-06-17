@@ -13,7 +13,6 @@ using osu.Game.Rulesets.Mania.EzMania.HUD;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Scoring;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
@@ -50,18 +49,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)
         {
-            var maniaRuleset = (DrawableManiaRuleset)drawableRuleset;
-
-            foreach (var stage in maniaRuleset.Playfield.Stages)
-            {
-                foreach (var column in stage.Columns)
-                {
-                    column.RegisterPool<Note, O2DrawableNote>(10, 50);
-                    column.RegisterPool<HoldNote, O2DrawableHoldNote>(10, 50);
-                    column.RegisterPool<HeadNote, O2DrawableHoldNoteHead>(10, 50);
-                    column.RegisterPool<TailNote, O2DrawableHoldNoteTail>(10, 50);
-                }
-            }
+            // O2 判定已并入 DrawableNote Ez Switcher；不再注册 O2 专用 Drawable 池。
         }
 
         public void ApplyToBeatmap(IBeatmap beatmap)
