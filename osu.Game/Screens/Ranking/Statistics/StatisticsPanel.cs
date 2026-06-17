@@ -60,7 +60,6 @@ namespace osu.Game.Screens.Ranking.Statistics
 
         private readonly Container content;
         private readonly LoadingSpinner spinner;
-        private readonly EzScoreServer.AnalysisHost analysisHost;
 
         private bool wasOpened;
         private Sample? popInSample;
@@ -83,7 +82,6 @@ namespace osu.Game.Screens.Ranking.Statistics
                 {
                     content = new Container { RelativeSizeAxes = Axes.Both },
                     spinner = new LoadingSpinner(),
-                    analysisHost = new EzScoreServer.AnalysisHost(),
                 }
             };
         }
@@ -101,7 +99,6 @@ namespace osu.Game.Screens.Ranking.Statistics
         {
             loadCancellation?.Cancel();
             loadCancellation = null;
-            analysisHost.CancelPendingAnalysis();
 
             foreach (var child in content)
                 child.FadeOut(150).Expire();
@@ -134,17 +131,6 @@ namespace osu.Game.Screens.Ranking.Statistics
 
                     if (databasedScore != null)
                     {
-                        // try
-                        // {
-                        //     generatedHitEvents = analysisHost.GenerateAsync(databasedScore, loadCancellation.Token).GetResultSafely();
-                        //     if (generatedHitEvents != null)
-                        //         Logger.Log($"[EzScore] Score From analysisHost.GenerateAsync", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                        // }
-                        // catch (Exception ex)
-                        // {
-                        //     Logger.Error(ex, "[EzScore] analysisHost.GenerateAsync failed; skipping fallback generator.", Ez2ConfigManager.LOGGER_NAME);
-                        // }
-
                         EzScoreReloadBridge.InitializeAllGenerators();
                         generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
                     }

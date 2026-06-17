@@ -47,7 +47,18 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 },
             };
 
-            return (createScore(ruleset, replay), beatmap, createEnvironment());
+            return createWithEmbeddedModes(ruleset, beatmap, replay, createEnvironment());
+        }
+
+        private static (Score score, IBeatmap beatmap, GameplayEnvironment environment) createWithEmbeddedModes(
+            ManiaRuleset ruleset,
+            IBeatmap beatmap,
+            Replay replay,
+            GameplayEnvironment environment)
+        {
+            var score = createScore(ruleset, replay);
+            ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
+            return (score, beatmap, environment);
         }
 
         private static GameplayEnvironment createEnvironment() => new GameplayEnvironment

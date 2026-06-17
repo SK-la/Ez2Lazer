@@ -13,12 +13,24 @@
 
 ### 双轨
 
-| 路径 | 判定源 |
-|------|--------|
-| Lazer/Classic 游玩 | 官方 `DrawableNote.CheckForResult` inline（不抽离） |
-| Lazer/Classic Session | `Replicas/Lazer*JudgementReplica` |
-| Ez HitMode 游玩 | `DrawableNote` 一行 Switcher → `ManiaEzDrawableJudgement` → Mapping |
-| Ez HitMode Session / Generator | `ManiaReplaySession` → `ManiaJudgementRegistry` → 同一 Mapping |
+| 路径                             | 判定源                                                               |
+|--------------------------------|-------------------------------------------------------------------|
+| Lazer/Classic 游玩               | 官方 `DrawableNote.CheckForResult` inline（不抽离）                      |
+| Lazer/Classic Session          | `Replicas/Lazer*JudgementReplica`                                 |
+| Ez HitMode 游玩                  | `DrawableNote` 一行 Switcher → `ManiaEzDrawableJudgement` → Mapping |
+| Ez HitMode Session / Generator | `ManiaReplaySession` → `ManiaJudgementRegistry` → 同一 Mapping      |
+
+### 成绩统计环境
+
+| 字段                                 | 来源                                                                                   |
+|------------------------------------|--------------------------------------------------------------------------------------|
+| HitMode / HealthMode               | `ScoreInfo.ManiaHitMode` / `ManiaHealthMode`（提交时写入）→ `GameplayEnvironment.FromScore` |
+| JudgePrecedence / OffsetPlusMania  | 当前全局配置（`FromLive` fallback）                                                          |
+| **BmsPoorHitResultEnable (KPoor)** | **当前全局配置**（未写入 ScoreInfo；统计重算沿用打开成绩时的全局 KPoor 开关，与当时游玩可能不一致）                         |
+
+生产入口：`StatisticsPanel` → `EzScoreReloadBridge` → `ManiaScoreHitEventGenerator` → `ManiaReplaySession`。
+
+`ManiaRuleset.RunReplayAsync` 为无 UI 公开 API，与 Generator 同源；CLI/工具可直调。
 
 ---
 
@@ -37,6 +49,7 @@
 3. **Ez Mapping 不需 diff 官方**；合并上游后若 HitMode 行为变更，只改对应 `Mappings/*HitModeJudgement.cs`。
 
 4. **跑 parity**
-   - `ManiaReplaySessionTest`（Session vs Generator）
-   - `TestSceneReplaySessionParity`（Drawable vs Session，Lazer）
+   - `ManiaReplaySessionTest`（Session vs Generator，含 `FromScore`）
+   - `TestSceneReplaySessionParity`（Drawable vs Session：Lazer tap/hold、IIDX tap/hold、O2 tap、Ez2AC hold）
    - `JudgePrecedenceRoutingRegressionTest`
+   - `dotnet test osu.Game.Rulesets.Mania.Tests`（全量）

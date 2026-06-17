@@ -20,6 +20,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         Bad,
         Miss,
     }
+
     /// <summary>
     /// Session 侧跨输入事件的可变判定状态（如 O2 Pill）。
     /// </summary>
@@ -99,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
             public Func<DrawableHitObject, double, bool>? CheckHittableBackup;
         }
 
-        public ManiaNoteJudgementOutcome? EvaluateDrawableNotePress(double timeOffset, HitWindows hitWindows, in DrawableNoteContext context)
+        public ManiaNoteJudgementOutcome? EvaluateDrawableNotePress(double timeOffset, HitWindows hitWindows, in DrawableNoteContext context, ManiaReplayJudgementState state)
         {
             if (!context.PillCheckPassed)
                 return ManiaNoteJudgementOutcome.Ignore;
@@ -111,6 +112,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
                 PillModeEnabled = true,
                 PillCheckPassed = true,
                 UpgradeToPerfect = context.UpgradeToPerfect,
+                State = state,
             });
 
             return outcome;

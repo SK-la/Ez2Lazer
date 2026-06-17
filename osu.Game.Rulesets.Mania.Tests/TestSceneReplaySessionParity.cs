@@ -23,7 +23,7 @@ using osu.Game.Tests.Visual;
 namespace osu.Game.Rulesets.Mania.Tests
 {
     /// <summary>
-    /// Drawable replay 路径（与 <see cref="EzOsuGame.Statistics.ReplayAnalysisRunner"/> 同源）与 <see cref="ManiaReplaySession"/> 的 parity。
+    /// Drawable replay 路径与 <see cref="ManiaReplaySession"/> 的 parity（Lazer + Ez HitMode）。
     /// </summary>
     public partial class TestSceneReplaySessionParity : RateAdjustedBeatmapTestScene
     {
@@ -121,6 +121,81 @@ namespace osu.Game.Rulesets.Mania.Tests
                     new ManiaReplayFrame(1100),
                     new ManiaReplayFrame(2000, ManiaAction.Key1),
                     new ManiaReplayFrame(2100),
+                });
+        }
+
+        [Test]
+        public void TestIidxHoldDrawableMatchesSession()
+        {
+            parityEnvironment = new GameplayEnvironment
+            {
+                ManiaHitMode = EzEnumHitMode.IIDX_HD,
+                ManiaHealthMode = EzEnumHealthMode.IIDX_HD,
+                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
+            };
+
+            const double head = 1500;
+            const double tail = 4000;
+
+            runDrawableParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(tail),
+                });
+        }
+
+        [Test]
+        public void TestO2TapDrawableMatchesSession()
+        {
+            parityEnvironment = new GameplayEnvironment
+            {
+                ManiaHitMode = EzEnumHitMode.O2Jam,
+                ManiaHealthMode = EzEnumHealthMode.O2JamNormal,
+                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
+            };
+
+            runDrawableParityTest(
+                new List<ManiaHitObject>
+                {
+                    new Note { StartTime = 1000, Column = 0 },
+                    new Note { StartTime = 2000, Column = 0 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(1000, ManiaAction.Key1),
+                    new ManiaReplayFrame(1100),
+                    new ManiaReplayFrame(2000, ManiaAction.Key1),
+                    new ManiaReplayFrame(2100),
+                });
+        }
+
+        [Test]
+        public void TestEz2AcHoldDrawableMatchesSession()
+        {
+            parityEnvironment = new GameplayEnvironment
+            {
+                ManiaHitMode = EzEnumHitMode.EZ2AC,
+                ManiaHealthMode = EzEnumHealthMode.Ez2Ac,
+                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
+            };
+
+            const double head = 1000;
+            const double tail = 2000;
+
+            runDrawableParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(tail),
                 });
         }
 

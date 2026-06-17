@@ -3,6 +3,7 @@
 
 using System;
 using System.Runtime.CompilerServices;
+using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
@@ -11,7 +12,9 @@ using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Scoring;
+using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 {
@@ -25,6 +28,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         private static readonly ConditionalWeakTable<DrawableHoldNote, O2HitModeJudgement.HoldBreakState> o2_hold_states =
             new ConditionalWeakTable<DrawableHoldNote, O2HitModeJudgement.HoldBreakState>();
+
+        private static readonly ConditionalWeakTable<DrawableRuleset, ManiaReplayJudgementState> o2_judgement_states =
+            new ConditionalWeakTable<DrawableRuleset, ManiaReplayJudgementState>();
 
         public static bool CanRouteToKPoor(DrawableNote note) => GetBmsState(note).CanRouteToKPoor;
 
@@ -41,6 +47,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal static BmsHitModeJudgement.BmsRouteState GetBmsState(DrawableHoldNoteTail tail)
             => tail_bms_states.GetValue(tail, _ => new BmsHitModeJudgement.BmsRouteState());
+
+        private static ManiaReplayJudgementState getO2JudgementState(DrawableHitObject drawable)
+        {
+            var ruleset = drawable.FindClosestParent<DrawableRuleset>();
+
+            if (ruleset == null)
+                return new ManiaReplayJudgementState();
+
+            return o2_judgement_states.GetValue(ruleset, _ => new ManiaReplayJudgementState());
+        }
 
         internal static bool TryHitModeCheckForResult(DrawableNote note, bool userTriggered, double timeOffset)
             => TryApplyEzNoteCheckForResult(note, userTriggered, timeOffset);
@@ -162,7 +178,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         CurrentTime = drawable.Time.Current,
                         PillCheckPassed = cont,
                         UpgradeToPerfect = upgradeToPerfect,
-                    });
+                    }, getO2JudgementState(drawable));
 
                     if (outcome != null)
                         ApplyNoteOutcome(drawable, outcome.Value);
@@ -260,7 +276,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     HoldBroken = drawable.HoldNote.Body.HasHoldBreak,
                     WasHolding = drawable.HoldNote.IsHolding.Value,
                     PillModeEnabled = environment.ManiaHealthMode.ToString().Contains("O2Jam"),
-                }, new ManiaReplayJudgementState());
+                }, getO2JudgementState(drawable));
 
                 if (result != null)
                     drawable.EzApplyFinalResult(result.Value);

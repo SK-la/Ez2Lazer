@@ -3,6 +3,7 @@
 
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
@@ -20,6 +21,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         {
             ApplyToGlobalConfig(environment);
             return GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
+        }
+
+        public static void ApplyEmbeddedModes(Score score, GameplayEnvironment environment)
+        {
+            score.ScoreInfo.ManiaHitMode = (int)environment.ManiaHitMode;
+            score.ScoreInfo.ManiaHealthMode = (int)environment.ManiaHealthMode;
         }
     }
 }

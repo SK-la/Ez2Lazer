@@ -351,7 +351,6 @@ namespace osu.Game.Screens.Ranking
                 return;
 
             displayedScore.HitEvents.Clear();
-            EzScoreServer.Invalidate(displayedScore);
             StatisticsPanel.Score.TriggerChange();
         }
 

@@ -16,6 +16,7 @@ namespace osu.Game.Rulesets.Mania
     {
         /// <summary>
         /// 无绘制 replay 判定：返回与真 <see cref="ScoreProcessor"/> 同源的 <see cref="HitEvent"/> 列表。
+        /// 成绩统计页经 <see cref="EzMania.Statistics.ManiaScoreHitEventGenerator"/> 调用同一 Session 路径。
         /// </summary>
         public Task<IReadOnlyList<HitEvent>> RunReplayAsync(Score score, IBeatmap playable, IGameplayEnvironment environment, CancellationToken cancellationToken = default)
         {

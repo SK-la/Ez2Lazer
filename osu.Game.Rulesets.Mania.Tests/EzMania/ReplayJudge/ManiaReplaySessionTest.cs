@@ -111,6 +111,28 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(BmsHitModeJudgement.MapTo(BmsJudge.KPoor), Is.EqualTo(HitResult.Poor));
         }
 
+        [Test]
+        public void TestGeneratorUsesScoreEmbeddedHitModeNotLiveConfig()
+        {
+            var (score, beatmap, iidxEnvironment) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
+            ReplayJudgeTestConfig.ApplyEmbeddedModes(score, iidxEnvironment);
+
+            var lazerEnvironment = LazerTapReplayFixtures.CreateTwoNoteColumnTap().environment;
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(lazerEnvironment);
+            GlobalConfigStore.EzConfig.SetValue(Ez2Setting.BmsPoorHitResultEnable, true);
+
+            var fromScore = GameplayEnvironment.FromScore(score.ScoreInfo, GlobalConfigStore.EzConfig);
+            var generatorEvents = ManiaScoreHitEventGenerator.Instance.Generate(score, beatmap);
+            var sessionFromScore = ManiaReplaySession.Run(score, beatmap, fromScore);
+            var sessionLazer = ManiaReplaySession.Run(score, beatmap, lazerEnvironment);
+
+            Assert.That(fromScore.ManiaHitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
+            Assert.That(GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode), Is.EqualTo(EzEnumHitMode.Lazer));
+            Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionFromScore), Is.True,
+                () => ManiaReplayParityHelper.DescribeJudgements(generatorEvents));
+            Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionLazer), Is.False);
+        }
+
         private static void runSessionAndGeneratorParity(
             Score score,
             IBeatmap beatmap,
@@ -118,10 +140,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Action? configure = null)
         {
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+            ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
             configure?.Invoke();
-            var live = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
 
-            var sessionEvents = ManiaReplaySession.Run(score, beatmap, live);
+            var sessionEnvironment = GameplayEnvironment.FromScore(score.ScoreInfo, GlobalConfigStore.EzConfig);
+            var sessionEvents = ManiaReplaySession.Run(score, beatmap, sessionEnvironment);
             var generatorEvents = ManiaScoreHitEventGenerator.Instance.Generate(score, beatmap);
 
             Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionEvents), Is.True,
