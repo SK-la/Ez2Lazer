@@ -60,6 +60,50 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
+        public void TestRunTimelineRespectsScoreHitMode()
+        {
+            var (score, beatmap, lazerEnvironment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
+            ReplayJudgeTestConfig.ApplyEmbeddedModes(score, lazerEnvironment);
+
+            var lazerTimeline = ManiaReplaySession.RunTimeline(score, beatmap, GameplayEnvironment.FromScore(score.ScoreInfo, GlobalConfigStore.EzConfig));
+            Assert.That(lazerTimeline.FinalTotalScore, Is.GreaterThan(0));
+
+            var iidxEnvironment = BmsTapReplayFixtures.CreateTwoNoteColumnTap().environment;
+            ReplayJudgeTestConfig.ApplyEmbeddedModes(score, iidxEnvironment);
+
+            var iidxTimeline = ManiaReplaySession.RunTimeline(score, beatmap, GameplayEnvironment.FromScore(score.ScoreInfo, GlobalConfigStore.EzConfig));
+
+            Assert.That(iidxTimeline.FinalTotalScore, Is.Not.EqualTo(lazerTimeline.FinalTotalScore));
+        }
+
+        [Test]
+        public void TestManiaTimelineBridgeMatchesRunTimeline()
+        {
+            _ = ManiaScoreHitEventGenerator.Instance;
+
+            var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
+
+            var sessionTimeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
+            var bridgeTimeline = EzScoreTimelineBridge.TryBuildManiaTimeline(score, beatmap);
+
+            Assert.That(bridgeTimeline, Is.Not.Null);
+            Assert.That(bridgeTimeline!.FinalTotalScore, Is.EqualTo(sessionTimeline.FinalTotalScore));
+            Assert.That(bridgeTimeline.QueryAtTime(2500).TotalScore, Is.EqualTo(sessionTimeline.FinalTotalScore));
+        }
+
+        [Test]
+        public void TestRunTimelineReturnsEmptyForEmptyReplayFrames()
+        {
+            var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
+            score.Replay!.Frames.Clear();
+
+            var timeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
+
+            Assert.That(timeline.FinalTotalScore, Is.EqualTo(0));
+            Assert.That(timeline.QueryAtTime(0).TotalScore, Is.EqualTo(0));
+        }
+
+        [Test]
         public void TestLazerTapSessionMatchesGeneratorJudgements()
         {
             var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();

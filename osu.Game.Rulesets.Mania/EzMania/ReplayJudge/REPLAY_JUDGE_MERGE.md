@@ -43,6 +43,7 @@ Drawable replay 播放时，`ManiaEzDrawableJudgement` 优先从 `DrawableRulese
 
 - **禁止** Mania 生产路径：`HitEvents` → `buildFromHitEvents` → 第二遍 SP。
 - 下游（如角逐 HUD）只调用 `EzScoreTimelineBuilder.TryBuild`；`EzScoreTimelineBridge` 在 Mania 侧注册 `RunTimeline`。
+- 无本地 replay（`GetScore` 后 `Replay == null` 或空帧）→ `TryBuild` 返回 `null`；HUD 仅显示 `ScoreInfo` 静态最终分/准度，无分数轨。
 - 时钟轴 = replay 输入时刻（`input.Time`），与游玩 `GameplayClock` 对齐。
 
 ---

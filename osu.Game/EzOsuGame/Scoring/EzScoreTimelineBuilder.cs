@@ -20,8 +20,13 @@ using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Scoring
 {
+    /// <summary>
+    /// 从本地 replay 构建分数时间线。Mania 走 Session 一遍 SP 快照；其他规则集暂用 HitEvents 重放（仅非 Mania）。
+    /// 进程内缓存；算法变更时 bump <see cref="timeline_cache_version"/>。
+    /// </summary>
     public static class EzScoreTimelineBuilder
     {
+        /// <summary>进程内缓存失效版本；非磁盘持久化。</summary>
         private const string timeline_cache_version = "v1";
 
         private static readonly ConcurrentDictionary<string, EzScoreTimeline> timeline_cache = new ConcurrentDictionary<string, EzScoreTimeline>();
@@ -48,13 +53,11 @@ namespace osu.Game.EzOsuGame.Scoring
             if (!string.IsNullOrEmpty(cacheKey) && timeline_cache.TryGetValue(cacheKey, out var cached))
                 return cached;
 
-            if (!hasReplayFile(scoreInfo))
-                return null;
-
             cancellationToken.ThrowIfCancellationRequested();
 
             var databasedScore = scoreManager.GetScore(scoreInfo);
 
+            // 唯一门槛：磁盘/库内是否有可读的 replay 帧（不依赖 ScoreInfo.Files 元数据）。
             if (databasedScore?.Replay == null || databasedScore.Replay.Frames.Count == 0)
                 return null;
 
@@ -82,10 +85,12 @@ namespace osu.Game.EzOsuGame.Scoring
 
             if (scoreInfo.Ruleset.OnlineID == 3)
             {
+                // Mania 生产路径：Session 一遍 SP 快照，禁止 buildFromHitEvents。
                 timeline = EzScoreTimelineBridge.TryBuildManiaTimeline(databasedScore, playableBeatmap, cancellationToken);
             }
             else
             {
+                // 非 Mania：统计页临时 HitEvents 或从 replay 生成；不是 Mania HUD 输入。
                 var (hitEvents, offsetsRelativeToEnd) = resolveHitEvents(databasedScore, playableBeatmap, cancellationToken);
 
                 if (hitEvents == null || hitEvents.Count == 0)
@@ -114,6 +119,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
         private static (List<HitEvent>? hitEvents, bool offsetsRelativeToEnd) resolveHitEvents(Score databasedScore, IBeatmap playableBeatmap, CancellationToken cancellationToken)
         {
+            // 统计页打开时 ScoreInfo 上可能有临时 HitEvents（[Ignored]，不持久化）。
             if (databasedScore.ScoreInfo.HitEvents.Count > 0)
                 return (databasedScore.ScoreInfo.HitEvents.ToList(), true);
 
@@ -333,6 +339,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
             if (scoreInfo!.Ruleset.OnlineID == 3)
             {
+                // 与 GameplayEnvironment.FromScore 一致；环境变则重算。
                 var environment = GameplayEnvironment.FromScore(scoreInfo, GlobalConfigStore.EzConfig);
                 return $"{timeline_cache_version}:{identity}:hm{(int)environment.ManiaHitMode}:hh{(int)environment.ManiaHealthMode}:jp{(int)environment.JudgePrecedence}";
             }
@@ -362,8 +369,5 @@ namespace osu.Game.EzOsuGame.Scoring
             generatorsInitialised = true;
             EzScoreReloadBridge.InitializeAllGenerators();
         }
-
-        private static bool hasReplayFile(ScoreInfo scoreInfo)
-            => scoreInfo.Files.Any(f => f.Filename.EndsWith(".osr", StringComparison.OrdinalIgnoreCase));
     }
 }
