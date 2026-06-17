@@ -34,6 +34,17 @@ Drawable replay 播放时，`ManiaEzDrawableJudgement` 优先从 `DrawableRulese
 
 `ManiaRuleset.RunReplayAsync` 为无 UI 公开 API，与 Generator 同源；CLI/工具可直调。
 
+### 分数时间线（角逐 HUD 等下游消费）
+
+| 路径 | 数据源 |
+|------|--------|
+| 统计 / HitEvents | `ManiaReplaySession.Run` → `ScoreProcessor.HitEvents` |
+| **时间线** | `ManiaReplaySession.RunTimeline` → 同一遍 SP，每次 `ApplyResult` 后采 `TotalScore`/`Accuracy`/… 快照 → `EzScoreTimeline` |
+
+- **禁止** Mania 生产路径：`HitEvents` → `buildFromHitEvents` → 第二遍 SP。
+- 下游（如角逐 HUD）只调用 `EzScoreTimelineBuilder.TryBuild`；`EzScoreTimelineBridge` 在 Mania 侧注册 `RunTimeline`。
+- 时钟轴 = replay 输入时刻（`input.Time`），与游玩 `GameplayClock` 对齐。
+
 ---
 
 ## 合并 ppy/osu master 后

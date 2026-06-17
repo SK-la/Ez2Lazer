@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Scoring
         private const string timeline_cache_version = "v1";
 
         private static readonly ConcurrentDictionary<string, EzScoreTimeline> timeline_cache = new ConcurrentDictionary<string, EzScoreTimeline>();
-        private static bool generators_initialised;
+        private static bool generatorsInitialised;
 
         public static EzScoreTimeline? TryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, CancellationToken cancellationToken = default)
             => tryBuild(scoreManager, beatmaps, scoreInfo, sharedPlayableBeatmap: null, cancellationToken);
@@ -108,7 +108,7 @@ namespace osu.Game.EzOsuGame.Scoring
             if (scoreInfo == null)
                 return;
 
-            foreach (var key in timeline_cache.Keys.Where(k => k.Contains(getScoreIdentity(scoreInfo) ?? string.Empty)).ToArray())
+            foreach (string key in timeline_cache.Keys.Where(k => k.Contains(getScoreIdentity(scoreInfo) ?? string.Empty)).ToArray())
                 timeline_cache.TryRemove(key, out _);
         }
 
@@ -356,10 +356,10 @@ namespace osu.Game.EzOsuGame.Scoring
 
         private static void ensureGeneratorsInitialised()
         {
-            if (generators_initialised)
+            if (generatorsInitialised)
                 return;
 
-            generators_initialised = true;
+            generatorsInitialised = true;
             EzScoreReloadBridge.InitializeAllGenerators();
         }
 
