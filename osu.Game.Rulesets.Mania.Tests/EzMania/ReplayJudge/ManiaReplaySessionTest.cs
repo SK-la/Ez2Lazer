@@ -236,6 +236,20 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
+        public void TestMalodyHoldSessionMatchesGenerator()
+        {
+            var (score, beatmap, environment) = HitModeReplayFixtures.CreateMalodyHoldPerfect();
+            runSessionAndGeneratorParity(score, beatmap, environment);
+        }
+
+        [Test]
+        public void TestMalodyHoldEarlyReleaseSessionMatchesGenerator()
+        {
+            var (score, beatmap, environment) = HitModeReplayFixtures.CreateMalodyHoldEarlyRelease();
+            runSessionAndGeneratorParity(score, beatmap, environment);
+        }
+
+        [Test]
         public void TestEz2AcHoldHeadSessionMatchesGenerator()
         {
             var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadPerfect();

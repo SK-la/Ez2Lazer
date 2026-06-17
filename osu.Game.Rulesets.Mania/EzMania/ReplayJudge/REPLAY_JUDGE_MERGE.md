@@ -17,8 +17,10 @@
 |--------------------------------|-------------------------------------------------------------------|
 | Lazer/Classic 游玩               | 官方 `DrawableNote.CheckForResult` inline（不抽离）                      |
 | Lazer/Classic Session          | `Replicas/Lazer*JudgementReplica`                                 |
-| Ez HitMode 游玩                  | `DrawableNote` 一行 Switcher → `ManiaEzDrawableJudgement` → Mapping |
+| Ez HitMode 游玩                  | `DrawableNote` 一行 Switcher → `ManiaEzDrawableJudgement` → Mapping（**禁止** HitMode 专用 Drawable 子类；Malody LN 等同理） |
 | Ez HitMode Session / Generator | `ManiaReplaySession` → `ManiaJudgementRegistry` → 同一 Mapping      |
+
+Drawable replay 播放时，`ManiaEzDrawableJudgement` 优先从 `DrawableRuleset.ReplayScore.ScoreInfo` 取 HitMode（`FromScore`），无 embedded 时回退 `FromLive`。
 
 ### 成绩统计环境
 
@@ -50,6 +52,6 @@
 
 4. **跑 parity**
    - `ManiaReplaySessionTest`（Session vs Generator，含 `FromScore`）
-   - `TestSceneReplaySessionParity`（Drawable vs Session：Lazer tap/hold、IIDX tap/hold、O2 tap、Ez2AC hold）
+   - `TestSceneReplaySessionParity`（Drawable vs Session：Lazer tap/hold、IIDX tap/hold、O2 tap/hold/pill、Ez2AC hold、Malody hold）
    - `JudgePrecedenceRoutingRegressionTest`
    - `dotnet test osu.Game.Rulesets.Mania.Tests`（全量）

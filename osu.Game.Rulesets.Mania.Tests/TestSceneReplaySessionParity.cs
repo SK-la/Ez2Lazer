@@ -175,6 +175,67 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         [Test]
+        public void TestMalodyHoldDrawableMatchesSession()
+        {
+            parityEnvironment = new GameplayEnvironment
+            {
+                ManiaHitMode = EzEnumHitMode.Malody_E,
+                ManiaHealthMode = EzEnumHealthMode.Lazer,
+                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
+            };
+
+            const double head = 1500;
+            const double tail = 4000;
+
+            runDrawableParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(tail),
+                });
+        }
+
+        [Test]
+        public void TestO2HoldDrawableMatchesSession()
+        {
+            parityEnvironment = new GameplayEnvironment
+            {
+                ManiaHitMode = EzEnumHitMode.O2Jam,
+                ManiaHealthMode = EzEnumHealthMode.O2JamNormal,
+                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
+            };
+
+            const double head = 1500;
+            const double tail = 4000;
+
+            runDrawableParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(tail),
+                });
+        }
+
+        [Test]
+        public void TestO2PillDrawableMatchesSession()
+        {
+            var (score, beatmap, environment) = HitModeReplayFixtures.CreateO2PillUpgradeOnBadRange();
+            parityEnvironment = environment;
+
+            runDrawableParityTest(
+                beatmap.HitObjects.Cast<ManiaHitObject>().ToList(),
+                score.Replay.Frames);
+        }
+
+        [Test]
         public void TestEz2AcHoldDrawableMatchesSession()
         {
             parityEnvironment = new GameplayEnvironment

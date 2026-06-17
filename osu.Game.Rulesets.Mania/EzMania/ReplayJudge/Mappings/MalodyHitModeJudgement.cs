@@ -1,7 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -32,20 +32,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 
         public ManiaNoteJudgementOutcome EvaluatePress(double timeOffset, HitWindows hitWindows) => lazerNote.EvaluatePress(timeOffset, hitWindows);
 
-        public HitResult EvaluateTail(in HoldTailEvaluationContext context) => MapTo(EvaluateTailJudge(context));
+        /// <summary>
+        /// Malody LN：tail 仅以 <see cref="HitResult.IgnoreHit"/> 完成，不计入成绩。
+        /// </summary>
+        public HitResult EvaluateTail(in HoldTailEvaluationContext context) => HitResult.IgnoreHit;
 
-        public MalodyJudge EvaluateTailJudge(in HoldTailEvaluationContext context)
-        {
-            if (!context.HeadHit)
-                return MalodyJudge.Miss;
-
-            return context.RawOffset > 0 || Math.Abs(context.RawOffset) <= context.HitWindows.WindowFor(HitResult.Meh) * TailNote.RELEASE_WINDOW_LENIENCE
-                ? MalodyJudge.Perfect
-                : MalodyJudge.Miss;
-        }
+        public MalodyJudge EvaluateTailJudge(in HoldTailEvaluationContext context) => MalodyJudge.None;
 
         public bool CanBeginHoldAt(double time, TailNote tail) => LazerHoldJudgementReplica.Instance.CanBeginHoldAt(time, tail);
 
-        public bool IsHoldBreak(double rawOffset, HitWindows hitWindows) => LazerHoldJudgementReplica.Instance.IsHoldBreak(rawOffset, hitWindows);
+        public bool IsHoldBreak(double rawOffset, HitWindows hitWindows) => false;
+
+        public static bool IsMalodyMode(EzEnumHitMode hitMode)
+            => hitMode is EzEnumHitMode.Malody_E or EzEnumHitMode.Malody_B;
     }
 }

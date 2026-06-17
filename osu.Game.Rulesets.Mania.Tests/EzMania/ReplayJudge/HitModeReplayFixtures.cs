@@ -140,6 +140,109 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateMalodyHoldPerfect(EzEnumHitMode hitMode = EzEnumHitMode.Malody_E)
+        {
+            const double head = 1500;
+            const double tail = 4000;
+
+            var ruleset = new ManiaRuleset();
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                },
+                ControlPointInfo = new ControlPointInfo(),
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var replay = new Replay
+            {
+                Frames = new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(tail),
+                },
+            };
+
+            var environment = createMalodyEnvironment(hitMode);
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+            return (createScore(ruleset, replay), beatmap, environment);
+        }
+
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateMalodyHoldEarlyRelease(EzEnumHitMode hitMode = EzEnumHitMode.Malody_E)
+        {
+            const double head = 1500;
+            const double tail = 4000;
+            const double early_release = 2500;
+
+            var ruleset = new ManiaRuleset();
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                },
+                ControlPointInfo = new ControlPointInfo(),
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var replay = new Replay
+            {
+                Frames = new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(early_release),
+                },
+            };
+
+            var environment = createMalodyEnvironment(hitMode);
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+            return (createScore(ruleset, replay), beatmap, environment);
+        }
+
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateO2HoldPerfect()
+        {
+            const double head = 1500;
+            const double tail = 4000;
+
+            var ruleset = new ManiaRuleset();
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                },
+                ControlPointInfo = new ControlPointInfo(),
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var replay = new Replay
+            {
+                Frames = new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(tail),
+                },
+            };
+
+            var environment = new GameplayEnvironment
+            {
+                ManiaHitMode = EzEnumHitMode.O2Jam,
+                ManiaHealthMode = EzEnumHealthMode.O2JamNormal,
+                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
+            };
+
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+            return (createScore(ruleset, replay), beatmap, environment);
+        }
+
         public static BmsJudge ToBmsJudge(HitResult result) => BmsHitModeJudgement.FromHitResult(result);
 
         public static O2Judge ToO2Judge(HitResult result) => O2HitModeJudgement.FromHitResult(result);
@@ -330,6 +433,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             ManiaHealthMode = EzEnumHealthMode.IIDX_HD,
             JudgePrecedence = EzEnumJudgePrecedence.Earliest,
             OffsetPlusMania = 0,
+        };
+
+        private static GameplayEnvironment createMalodyEnvironment(EzEnumHitMode hitMode) => new GameplayEnvironment
+        {
+            ManiaHitMode = hitMode,
+            ManiaHealthMode = EzEnumHealthMode.Lazer,
+            JudgePrecedence = EzEnumJudgePrecedence.Earliest,
         };
 
         private static ControlPointInfo createTiming120()

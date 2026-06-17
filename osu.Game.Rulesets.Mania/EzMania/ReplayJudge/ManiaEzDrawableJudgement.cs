@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         public static bool ShouldHideTailDisplayResult()
         {
-            var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
+            var environment = getGameplayEnvironment();
             return environment.ManiaHitMode == EzEnumHitMode.O2Jam;
         }
 
@@ -56,6 +56,46 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return new ManiaReplayJudgementState();
 
             return o2_judgement_states.GetValue(ruleset, _ => new ManiaReplayJudgementState());
+        }
+
+        private static GameplayEnvironment getGameplayEnvironment(DrawableHitObject? drawable = null)
+        {
+            var ruleset = drawable?.FindClosestParent<DrawableRuleset>();
+
+            if (ruleset?.ReplayScore?.ScoreInfo != null)
+                return GameplayEnvironment.FromScore(ruleset.ReplayScore.ScoreInfo, GlobalConfigStore.EzConfig);
+
+            return GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
+        }
+
+        internal static bool TryMalodyHoldOnReleased(DrawableHoldNote hold)
+        {
+            var environment = getGameplayEnvironment(hold);
+
+            if (!MalodyHitModeJudgement.IsMalodyMode(environment.ManiaHitMode))
+                return false;
+
+            if (!hold.IsHolding.Value)
+                return false;
+
+            hold.Tail.UpdateResult();
+            hold.EzTriggerMalodyBodyOnRelease();
+            hold.EzReportHoldReleased();
+            return true;
+        }
+
+        internal static bool TryMalodyHoldCheckForResult(DrawableHoldNote hold, bool userTriggered, double timeOffset)
+        {
+            var environment = getGameplayEnvironment(hold);
+
+            if (!MalodyHitModeJudgement.IsMalodyMode(environment.ManiaHitMode))
+                return false;
+
+            if (!hold.Tail.AllJudged)
+                return false;
+
+            hold.EzFinalizeMalodyHoldFromTail();
+            return true;
         }
 
         internal static bool TryHitModeCheckForResult(DrawableNote note, bool userTriggered, double timeOffset)
@@ -81,7 +121,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal static void TryO2HoldUpdate(DrawableHoldNote hold)
         {
-            var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
+            var environment = getGameplayEnvironment(hold);
 
             if (environment.ManiaHitMode != EzEnumHitMode.O2Jam)
                 return;
@@ -92,7 +132,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal static bool TryO2HoldCheckForResult(DrawableHoldNote hold, bool userTriggered, double timeOffset)
         {
-            var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
+            var environment = getGameplayEnvironment(hold);
 
             if (environment.ManiaHitMode != EzEnumHitMode.O2Jam)
                 return false;
@@ -142,7 +182,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal static bool TryApplyEzNoteCheckForResult(DrawableNote drawable, bool userTriggered, double timeOffset)
         {
-            var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
+            var environment = getGameplayEnvironment(drawable);
 
             if (!ManiaJudgementRegistry.IsEzHitMode(environment.ManiaHitMode))
                 return false;
@@ -214,7 +254,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal static bool TryApplyEzHoldTailCheckForResult(DrawableHoldNoteTail drawable, bool userTriggered, double timeOffset)
         {
-            var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
+            var environment = getGameplayEnvironment(drawable);
 
             if (!ManiaJudgementRegistry.IsEzHitMode(environment.ManiaHitMode))
                 return false;

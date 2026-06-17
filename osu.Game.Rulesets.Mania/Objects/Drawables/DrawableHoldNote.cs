@@ -281,6 +281,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            if (ManiaEzDrawableJudgement.TryMalodyHoldCheckForResult(this, userTriggered, timeOffset))
+                return;
+
             if (ManiaEzDrawableJudgement.TryO2HoldCheckForResult(this, userTriggered, timeOffset))
                 return;
 
@@ -358,6 +361,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             // the user has released too early (before the tail).
             //
             // In such a case, we want to record this against the DrawableHoldNoteBody.
+            if (ManiaEzDrawableJudgement.TryMalodyHoldOnReleased(this))
+                return;
+
             if (isHolding.Value)
             {
                 Tail.UpdateResult();
@@ -393,6 +399,19 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             slidingSample.ClearSamples();
             base.OnFree();
         }
+
+        internal void EzFinalizeMalodyHoldFromTail()
+        {
+            if (Head.IsHit)
+                ApplyMaxResult();
+            else
+                MissForcefully();
+
+            EzTriggerBodyIfNeeded(Head.IsHit);
+            EzReportHoldReleased();
+        }
+
+        internal void EzTriggerMalodyBodyOnRelease() => Body.TriggerResult(true);
 
         internal void EzFinalizeO2HoldFromTail()
         {

@@ -20,7 +20,6 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -105,7 +104,6 @@ namespace osu.Game.Rulesets.Mania.UI
         public Bindable<Colour4> EzNoteColourBindable = null!;
         public Bindable<Vector2> EzNoteSizeBindable = null!;
         public Bindable<EzColumnType> EzNoteTypeBindable = null!;
-        private Bindable<EzEnumHitMode> hitModeBindable = null!;
 
         private KeySoundPreviewMode keySoundPreviewMode;
 
@@ -161,12 +159,16 @@ namespace osu.Game.Rulesets.Mania.UI
             BackgroundContainer.Add(background);
             TopLevelContainer.Add(HitObjectArea.Explosions.CreateProxy());
 
+            RegisterPool<Note, DrawableNote>(10, 50);
+            RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
+            RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
+            RegisterPool<TailNote, DrawableHoldNoteTail>(10, 50);
+            RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
+
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
 
             keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
-            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            hitModeBindable.BindValueChanged(configurePools, true);
         }
 
         private void onSourceChanged()
@@ -235,8 +237,6 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
             dependencies.CacheAs<IBindable<ManiaAction>>(Action);
-            // dependencies.CacheAs(EzSkinInfo);
-
             return dependencies;
         }
 
@@ -283,29 +283,6 @@ namespace osu.Game.Rulesets.Mania.UI
             // Extend input coverage to the gaps close to this column.
             var spacingInflation = new MarginPadding { Left = leftColumnSpacing, Right = rightColumnSpacing };
             return DrawRectangle.Inflate(spacingInflation).Contains(ToLocalSpace(screenSpacePos));
-        }
-
-        private void configurePools(ValueChangedEvent<EzEnumHitMode> v)
-        {
-            switch (v.NewValue)
-            {
-                case EzEnumHitMode.Malody_E:
-                case EzEnumHitMode.Malody_B:
-                    RegisterPool<Note, DrawableNote>(10, 50);
-                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
-                    RegisterPool<TailNote, MalodyDrawableLNTail>(10, 50);
-                    RegisterPool<HoldNoteBody, MalodyDrawableLNBody>(10, 50);
-                    break;
-
-                default:
-                    RegisterPool<Note, DrawableNote>(10, 50);
-                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
-                    RegisterPool<TailNote, DrawableHoldNoteTail>(10, 50);
-                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
-                    break;
-            }
         }
 
         #region Touch Input
