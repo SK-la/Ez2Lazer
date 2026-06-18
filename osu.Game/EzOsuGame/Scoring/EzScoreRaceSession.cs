@@ -57,12 +57,6 @@ namespace osu.Game.EzOsuGame.Scoring
             this.scheduleCallback = scheduleCallback;
         }
 
-        public void Configure(EzScoreModFilter filter, int maxEntriesCount)
-        {
-            modFilter = filter;
-            MaxEntryCount = Math.Clamp(maxEntriesCount, 1, 10);
-        }
-
         public void EnsureLoaded()
         {
             if (loadCancellation != null)
