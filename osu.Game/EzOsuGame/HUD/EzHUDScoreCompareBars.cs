@@ -298,9 +298,12 @@ namespace osu.Game.EzOsuGame.HUD
                 maxBarSize = maxSize;
                 barThickness = thickness;
 
-                barTrack.Size = new Vector2(barThickness, maxSize);
+                if (barTrack == null)
+                    return;
 
-                trackBackground.Size = new Vector2(barThickness, maxSize);
+                var trackSize = new Vector2(barThickness, maxSize);
+                barTrack.Size = trackSize;
+                trackBackground.Size = trackSize;
 
                 bar.Width = barThickness;
                 applyBarAnchor();
@@ -325,12 +328,14 @@ namespace osu.Game.EzOsuGame.HUD
                         },
                         barTrack = new Container
                         {
+                            RelativeSizeAxes = Axes.None,
                             Size = new Vector2(barThickness, maxBarSize),
                             Children = new Drawable[]
                             {
                                 trackBackground = new Box
                                 {
-                                    RelativeSizeAxes = Axes.Both,
+                                    RelativeSizeAxes = Axes.None,
+                                    Size = new Vector2(barThickness, maxBarSize),
                                     Colour = Color4.White.Opacity(0.12f),
                                 },
                                 bar = new Box
