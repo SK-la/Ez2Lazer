@@ -105,7 +105,7 @@ namespace osu.Game.EzOsuGame.HUD
                 if (state.Tracked)
                     continue;
 
-                var timeline = findTimeline(state.ScoreInfoId);
+                var timeline = state.Timeline;
 
                 if (timeline == null)
                 {
@@ -214,7 +214,24 @@ namespace osu.Game.EzOsuGame.HUD
             if (needsStructuralRebuild())
                 rebuildRows();
             else
+            {
+                refreshTimelineRefs();
                 UpdateDisplay();
+            }
+        }
+
+        private void refreshTimelineRefs()
+        {
+            if (Session == null)
+                return;
+
+            foreach (var state in entryStates)
+            {
+                if (state.Tracked)
+                    continue;
+
+                state.Timeline = Session.Entries.FirstOrDefault(e => e.ScoreInfo.ID == state.ScoreInfoId)?.Timeline;
+            }
         }
 
         private bool needsStructuralRebuild()
@@ -236,8 +253,6 @@ namespace osu.Game.EzOsuGame.HUD
 
             return false;
         }
-
-        private EzScoreTimeline? findTimeline(Guid scoreInfoId) => Session?.Entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfoId)?.Timeline;
 
         private static GameplayLeaderboardScore createGhostLeaderboardScore(EzScoreRaceEntry entry)
         {
@@ -326,6 +341,7 @@ namespace osu.Game.EzOsuGame.HUD
             public bool Tracked { get; }
             public long Tiebreaker { get; }
             public int MissCount { get; set; }
+            public EzScoreTimeline? Timeline { get; set; }
             public GameplayLeaderboardScore LeaderboardScore { get; }
             public DrawableGameplayLeaderboardScore Drawable { get; }
 
@@ -334,6 +350,7 @@ namespace osu.Game.EzOsuGame.HUD
                 ScoreInfoId = entry.ScoreInfo.ID;
                 Tracked = entry.Tracked;
                 Tiebreaker = entry.ScoreInfo.Date.ToUnixTimeSeconds();
+                Timeline = entry.Timeline;
                 LeaderboardScore = leaderboardScore;
                 Drawable = drawable;
             }
