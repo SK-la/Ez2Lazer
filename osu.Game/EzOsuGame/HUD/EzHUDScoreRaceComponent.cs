@@ -127,13 +127,11 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected virtual void ConfigureSession()
         {
-            Session?.Configure(ModFilter.Value, getEffectiveMaxEntryCount());
+            Session?.ReloadIfNeeded(ModFilter.Value, getEffectiveMaxEntryCount());
         }
 
         private void reloadSession()
-        {
-            Session?.ReloadIfNeeded(ModFilter.Value, getEffectiveMaxEntryCount());
-        }
+            => ConfigureSession();
 
         private int getEffectiveMaxEntryCount()
             => ContributesMaxEntryCount ? MaxEntries.Value : Session?.MaxEntryCount ?? MaxEntries.Value;
