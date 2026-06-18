@@ -24,15 +24,13 @@ namespace osu.Game.EzOsuGame.Scoring
     /// 从本地 replay 构建分数时间线。Mania 走 Session 一遍 SP 快照；其他规则集暂用 HitEvents 重放（仅非 Mania）。
     /// 进程内缓存；重启进程即清空，无磁盘持久化。
     /// </summary>
+    // TODO(EZ-SR-TL-020): Osu Session 对齐后更新类注释，移除 HitEvents 重放描述。
     public static class EzScoreTimelineBuilder
     {
         private static readonly ConcurrentDictionary<string, EzScoreTimeline> timeline_cache = new ConcurrentDictionary<string, EzScoreTimeline>();
         private static bool generatorsInitialised;
 
-        public static EzScoreTimeline? TryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, CancellationToken cancellationToken = default)
-            => tryBuild(scoreManager, beatmaps, scoreInfo, sharedPlayableBeatmap: null, cancellationToken);
-
-        public static EzScoreTimeline? TryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap,
+        public static EzScoreTimeline? TryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap = null,
             CancellationToken cancellationToken = default)
             => tryBuild(scoreManager, beatmaps, scoreInfo, sharedPlayableBeatmap, cancellationToken);
 
@@ -92,6 +90,7 @@ namespace osu.Game.EzOsuGame.Scoring
                     break;
 
                 case EzScoreRaceGhostTimelineMode.HitEvents:
+                    // TODO(EZ-SR-TL-007): 改走 OsuReplaySession + Bridge，勿再 resolveHitEvents/buildFromHitEvents。
                     var (hitEvents, offsetsRelativeToEnd) = resolveHitEvents(databasedScore, playableBeatmap, cancellationToken);
 
                     if (hitEvents == null || hitEvents.Count == 0)
@@ -113,15 +112,7 @@ namespace osu.Game.EzOsuGame.Scoring
             return timeline;
         }
 
-        public static void InvalidateCache(ScoreInfo? scoreInfo)
-        {
-            if (scoreInfo == null)
-                return;
-
-            foreach (string key in timeline_cache.Keys.Where(k => k.Contains(getScoreIdentity(scoreInfo) ?? string.Empty)).ToArray())
-                timeline_cache.TryRemove(key, out _);
-        }
-
+        // TODO(EZ-SR-TL-010): Osu Session 完成后删除；角逐 timeline 不再二次从 HitEvents 构建。
         private static (List<HitEvent>? hitEvents, bool offsetsRelativeToEnd) resolveHitEvents(Score databasedScore, IBeatmap playableBeatmap, CancellationToken cancellationToken)
         {
             // 统计页打开时 ScoreInfo 上可能有临时 HitEvents（[Ignored]，不持久化）。
@@ -131,6 +122,7 @@ namespace osu.Game.EzOsuGame.Scoring
             return (EzScoreReloadBridge.TryGenerate(databasedScore, playableBeatmap, cancellationToken), false);
         }
 
+        // TODO(EZ-SR-TL-011): Osu Session 完成后删除 buildFromHitEvents 及 BuildFromHitEventsForTesting。
         internal static EzScoreTimeline BuildFromHitEventsForTesting(Ruleset ruleset, IBeatmap beatmap, ScoreInfo scoreInfo, IReadOnlyList<HitEvent> hitEvents,
             bool offsetsRelativeToEnd = false)
             => buildFromHitEvents(ruleset, beatmap, scoreInfo, hitEvents, offsetsRelativeToEnd);
@@ -183,12 +175,14 @@ namespace osu.Game.EzOsuGame.Scoring
             return new EzScoreTimeline(snapshots);
         }
 
+        // TODO(EZ-SR-TL-012): Osu Session 完成后删除；仅 HitEvents 重放路径使用。
         private static double getJudgementTime(HitEvent hitEvent, bool offsetsRelativeToEnd, IBeatmap beatmap, double fallbackMissWindow, HitObject? beatmapHitObject = null)
         {
             beatmapHitObject ??= findBeatmapHitObject(beatmap, hitEvent.HitObject);
             return EzScoreTimelineJudgementTime.Get(hitEvent, offsetsRelativeToEnd, beatmapHitObject, fallbackMissWindow);
         }
 
+        // TODO(EZ-SR-TL-013): Osu Session 完成后删除 HitObject 查找补丁（findBeatmapHitObject 等）。
         private static HitObject findBeatmapHitObject(IBeatmap beatmap, HitObject hitObject)
         {
             foreach (var candidate in beatmap.HitObjects)
@@ -251,6 +245,7 @@ namespace osu.Game.EzOsuGame.Scoring
             return true;
         }
 
+        // TODO(EZ-SR-TL-014): Osu Session 完成后删除；Mania TimelineHitModeOverride 已在 ManiaReplaySession 内设置。
         private static void applyScoreProcessorContext(ScoreProcessor scoreProcessor, ScoreInfo scoreInfo)
         {
             if (scoreInfo.IsLegacyScore)
@@ -267,6 +262,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 overrideProperty.SetValue(scoreProcessor, environment.ManiaHitMode);
         }
 
+        // TODO(EZ-SR-TL-015): Osu Session 完成后删除 ensureHitWindows/resolveFallbackMissWindow 等 HitEvents 专用辅助。
         private static void ensureHitWindows(IBeatmap beatmap, HitObject hitObject)
         {
             if (beatmap.BeatmapInfo == null)
@@ -322,6 +318,7 @@ namespace osu.Game.EzOsuGame.Scoring
             return null;
         }
 
+        // TODO(EZ-SR-TL-016): Osu Session 完成后删除；与 ManiaReplayTimelineRecorder 重复。
         private static EzScoreTimelineSnapshot createSnapshot(double clockTime, ScoreProcessor scoreProcessor, int missCount)
         {
             return new EzScoreTimelineSnapshot
@@ -352,6 +349,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 }
 
                 case EzScoreRaceGhostTimelineMode.HitEvents:
+                    // TODO(EZ-SR-TL-008): Osu Session 对齐后定义 Osu 缓存键策略（参照 ManiaSession 环境键）。
                     return $"{identity}:mods:{getModFingerprint(scoreInfo.Mods)}";
 
                 default:

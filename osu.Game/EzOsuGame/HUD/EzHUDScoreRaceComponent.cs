@@ -5,14 +5,11 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Beatmaps;
-using osu.Game.Database;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
 using osu.Game.Screens.Play;
 
@@ -20,15 +17,6 @@ namespace osu.Game.EzOsuGame.HUD
 {
     public abstract partial class EzHUDScoreRaceComponent : CompositeDrawable
     {
-        [Resolved]
-        protected RealmAccess Realm { get; private set; } = null!;
-
-        [Resolved]
-        protected ScoreManager ScoreManager { get; private set; } = null!;
-
-        [Resolved]
-        protected BeatmapManager Beatmaps { get; private set; } = null!;
-
         [Resolved(canBeNull: true)]
         protected GameplayState? GameplayState { get; private set; }
 
@@ -139,13 +127,11 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected virtual void ConfigureSession()
         {
-            Session?.Configure(ModFilter.Value, getEffectiveMaxEntryCount());
+            Session?.ReloadIfNeeded(ModFilter.Value, getEffectiveMaxEntryCount());
         }
 
         private void reloadSession()
-        {
-            Session?.ReloadIfNeeded(ModFilter.Value, getEffectiveMaxEntryCount());
-        }
+            => ConfigureSession();
 
         private int getEffectiveMaxEntryCount()
             => ContributesMaxEntryCount ? MaxEntries.Value : Session?.MaxEntryCount ?? MaxEntries.Value;

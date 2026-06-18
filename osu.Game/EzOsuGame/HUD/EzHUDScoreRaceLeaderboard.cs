@@ -105,22 +105,14 @@ namespace osu.Game.EzOsuGame.HUD
                 if (state.Tracked)
                     continue;
 
-                var timeline = findTimeline(state.ScoreInfoId);
-
-                if (timeline == null)
-                {
-                    state.MissCount = 0;
-                    continue;
-                }
-
-                var snapshot = timeline.QueryAtTime(clockTime);
+                var snapshot = EzScoreRaceSession.QuerySnapshot(state.Timeline, clockTime);
                 state.LeaderboardScore.TotalScore.Value = snapshot.TotalScore;
                 state.LeaderboardScore.Accuracy.Value = snapshot.Accuracy;
                 state.LeaderboardScore.Combo.Value = snapshot.HighestCombo;
                 state.MissCount = snapshot.MissCount;
             }
 
-            sortAndApply();
+            sortAndApplyIfNeeded();
         }
 
         protected override void Update()
@@ -204,8 +196,6 @@ namespace osu.Game.EzOsuGame.HUD
                 var state = new RaceEntryState(entry, leaderboardScore, drawable);
                 entryStates.Add(state);
                 Flow.Add(drawable);
-
-                drawable.DisplayOrder.BindValueChanged(_ => Schedule(sortAndApply), true);
             }
 
             sortAndApply();
@@ -216,7 +206,24 @@ namespace osu.Game.EzOsuGame.HUD
             if (needsStructuralRebuild())
                 rebuildRows();
             else
+            {
+                refreshTimelineRefs();
                 UpdateDisplay();
+            }
+        }
+
+        private void refreshTimelineRefs()
+        {
+            if (Session == null)
+                return;
+
+            foreach (var state in entryStates)
+            {
+                if (state.Tracked)
+                    continue;
+
+                state.Timeline = Session.Entries.FirstOrDefault(e => e.ScoreInfo.ID == state.ScoreInfoId)?.Timeline;
+            }
         }
 
         private bool needsStructuralRebuild()
@@ -238,8 +245,6 @@ namespace osu.Game.EzOsuGame.HUD
 
             return false;
         }
-
-        private EzScoreTimeline? findTimeline(Guid scoreInfoId) => Session?.Entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfoId)?.Timeline;
 
         private static GameplayLeaderboardScore createGhostLeaderboardScore(EzScoreRaceEntry entry)
         {
@@ -263,27 +268,38 @@ namespace osu.Game.EzOsuGame.HUD
             };
         }
 
-        private void sortAndApply()
+        private void sortAndApplyIfNeeded()
         {
-            IOrderedEnumerable<RaceEntryState> ordered = SortCriterionSetting.Value switch
+            var orderedList = getOrderedEntryStates();
+
+            for (int i = 0; i < orderedList.Count; i++)
             {
-                EzScoreRaceMetric.Accuracy => entryStates
-                                              .OrderByDescending(s => s.LeaderboardScore.Accuracy.Value)
-                                              .ThenByDescending(s => s.LeaderboardScore.TotalScore.Value),
+                if (orderedList[i].LeaderboardScore.DisplayOrder.Value != i + 1)
+                {
+                    applySortOrder(orderedList);
+                    return;
+                }
+            }
+        }
 
-                EzScoreRaceMetric.MaxCombo => entryStates
-                                              .OrderByDescending(s => s.LeaderboardScore.Combo.Value)
-                                              .ThenByDescending(s => s.LeaderboardScore.TotalScore.Value),
+        private void sortAndApply()
+            => applySortOrder(getOrderedEntryStates());
 
-                EzScoreRaceMetric.MissCount => entryStates
-                                               .OrderBy(s => getMissCount(s))
-                                               .ThenByDescending(s => s.LeaderboardScore.TotalScore.Value),
+        private List<RaceEntryState> getOrderedEntryStates()
+        {
+            var ordered = EzScoreRaceMetricOrdering.ApplyMetricOrdering(
+                entryStates,
+                SortCriterionSetting.Value,
+                s => s.LeaderboardScore.TotalScore.Value,
+                s => s.LeaderboardScore.Accuracy.Value,
+                s => s.LeaderboardScore.Combo.Value,
+                getMissCount);
 
-                _ => entryStates.OrderByDescending(s => s.LeaderboardScore.TotalScore.Value),
-            };
+            return ordered.ThenBy(s => s.Tracked ? long.MaxValue : s.Tiebreaker).ToList();
+        }
 
-            var orderedList = ordered.ThenBy(s => s.Tracked ? long.MaxValue : s.Tiebreaker).ToList();
-
+        private void applySortOrder(List<RaceEntryState> orderedList)
+        {
             for (int i = 0; i < orderedList.Count; i++)
             {
                 var state = orderedList[i];
@@ -308,6 +324,7 @@ namespace osu.Game.EzOsuGame.HUD
             public bool Tracked { get; }
             public long Tiebreaker { get; }
             public int MissCount { get; set; }
+            public EzScoreTimeline? Timeline { get; set; }
             public GameplayLeaderboardScore LeaderboardScore { get; }
             public DrawableGameplayLeaderboardScore Drawable { get; }
 
@@ -316,6 +333,7 @@ namespace osu.Game.EzOsuGame.HUD
                 ScoreInfoId = entry.ScoreInfo.ID;
                 Tracked = entry.Tracked;
                 Tiebreaker = entry.ScoreInfo.Date.ToUnixTimeSeconds();
+                Timeline = entry.Timeline;
                 LeaderboardScore = leaderboardScore;
                 Drawable = drawable;
             }

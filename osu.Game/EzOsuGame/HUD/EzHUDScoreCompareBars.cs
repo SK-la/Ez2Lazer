@@ -52,9 +52,6 @@ namespace osu.Game.EzOsuGame.HUD
 
         public bool WantsAcrylicCapture => BackgroundVisible.Value && BackdropBlurEnabled.Value;
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_MOD_FILTER_LABEL), nameof(EzHUDStrings.SCORE_RACE_MOD_FILTER_DESCRIPTION))]
-        public Bindable<EzScoreModFilter> ModFilterSetting { get; } = new Bindable<EzScoreModFilter>(EzScoreModFilter.Any);
-
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_DESCRIPTION))]
         public Bindable<EzScoreRaceMetric> CompareCondition1Setting { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.Accuracy);
 
@@ -144,16 +141,8 @@ namespace osu.Game.EzOsuGame.HUD
             };
         }
 
-        protected override void ConfigureSession()
-        {
-            // 仅同步 Mod 过滤；条目数由角逐榜组件负责。
-            Session?.ReloadIfNeeded(ModFilter.Value, Session.MaxEntryCount);
-        }
-
         protected override void LoadComplete()
         {
-            ModFilter.BindTo(ModFilterSetting);
-
             captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, renderer, acrylicBackdrop);
 
             barsContainer = new Container
@@ -237,7 +226,7 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
-            long barScore = EzScoreRaceSession.QueryTimelineScore(pickedEntry, clockTime);
+            long barScore = EzScoreRaceSession.QuerySnapshot(pickedEntry, clockTime).TotalScore;
             bar.UpdateValues(
                 metric.GetLocalisableDescription(),
                 formatBarValue(barScore, pickedEntry),

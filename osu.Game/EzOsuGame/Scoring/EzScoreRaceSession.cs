@@ -38,7 +38,6 @@ namespace osu.Game.EzOsuGame.Scoring
         private bool scorePoolDirty = true;
 
         public IBindable<bool> IsReady => isReady;
-        public EzScoreRacePlayMode PlayMode { get; }
         public bool SupportsGhostRace { get; }
 
         public IReadOnlyList<EzScoreRaceEntry> Entries => entries;
@@ -53,16 +52,9 @@ namespace osu.Game.EzOsuGame.Scoring
             this.scoreManager = scoreManager;
             this.beatmaps = beatmaps;
             this.gameplayState = gameplayState;
-            PlayMode = playMode;
             SupportsGhostRace = EzScoreRaceRulesetSupport.SupportsGhostRace(gameplayState.Ruleset.RulesetInfo)
                                 && playMode != EzScoreRacePlayMode.SpectatingLive;
             this.scheduleCallback = scheduleCallback;
-        }
-
-        public void Configure(EzScoreModFilter filter, int maxEntriesCount)
-        {
-            modFilter = filter;
-            MaxEntryCount = Math.Clamp(maxEntriesCount, 1, 10);
         }
 
         public void EnsureLoaded()
@@ -98,7 +90,7 @@ namespace osu.Game.EzOsuGame.Scoring
             if (!SupportsGhostRace)
                 return null;
 
-            var scoreInfo = EzLocalScoreQueries.PickBest(GetModFilteredScores(), metric);
+            var scoreInfo = EzLocalScoreQueries.PickBest(getModFilteredScores(), metric);
 
             if (scoreInfo == null)
                 return null;
@@ -112,17 +104,31 @@ namespace osu.Game.EzOsuGame.Scoring
         }
 
         /// <summary>
+        /// 读取 ghost 在指定时钟的 timeline 快照；未就绪返回 <see cref="EzScoreTimelineSnapshot.Empty"/>。
+        /// </summary>
+        public static EzScoreTimelineSnapshot QuerySnapshot(EzScoreRaceEntry? entry, double clockTime)
+        {
+            if (entry == null || entry.Tracked)
+                return EzScoreTimelineSnapshot.Empty;
+
+            return QuerySnapshot(entry.Timeline, clockTime);
+        }
+
+        public static EzScoreTimelineSnapshot QuerySnapshot(EzScoreTimeline? timeline, double clockTime)
+        {
+            if (timeline == null)
+                return EzScoreTimelineSnapshot.Empty;
+
+            return timeline.QueryAtTime(clockTime);
+        }
+
+        /// <summary>
         /// 读取 ghost 在指定时钟的 timeline 分数；未就绪返回 0（禁止终局分回退）。
         /// </summary>
         public static long QueryTimelineScore(EzScoreRaceEntry? entry, double clockTime)
-        {
-            if (entry == null || entry.Tracked || entry.Timeline == null)
-                return 0;
+            => QuerySnapshot(entry, clockTime).TotalScore;
 
-            return entry.Timeline.QueryAtTime(clockTime).TotalScore;
-        }
-
-        public IReadOnlyList<ScoreInfo> GetModFilteredScores()
+        private IReadOnlyList<ScoreInfo> getModFilteredScores()
         {
             if (!scorePoolDirty)
                 return modFilteredScores;
@@ -173,7 +179,7 @@ namespace osu.Game.EzOsuGame.Scoring
         }
 
         private IReadOnlyList<ScoreInfo> queryLeaderboardGhostScores()
-            => EzLocalScoreQueries.GetTopByTotalScore(GetModFilteredScores(), MaxEntryCount);
+            => EzLocalScoreQueries.GetTopByTotalScore(getModFilteredScores(), MaxEntryCount);
 
         private void ensureLeaderboardGhostPlaceholders()
         {

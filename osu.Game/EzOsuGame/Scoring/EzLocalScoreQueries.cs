@@ -55,14 +55,18 @@ namespace osu.Game.EzOsuGame.Scoring
             if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
                 return null;
 
-            return metric switch
-            {
-                EzScoreRaceMetric.TotalScore => scores.OrderByDescending(s => s.TotalScore).ThenByDescending(s => s.Date).FirstOrDefault(),
-                EzScoreRaceMetric.Accuracy => scores.OrderByDescending(s => s.Accuracy).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
-                EzScoreRaceMetric.MaxCombo => scores.OrderByDescending(s => s.MaxCombo).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
-                EzScoreRaceMetric.MissCount => scores.OrderBy(GetMissCount).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
-                _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
-            };
+            var ordered = EzScoreRaceMetricOrdering.ApplyMetricOrdering(
+                scores,
+                metric,
+                s => s.TotalScore,
+                s => s.Accuracy,
+                s => s.MaxCombo,
+                GetMissCount);
+
+            if (metric == EzScoreRaceMetric.TotalScore)
+                return ordered.ThenByDescending(s => s.Date).FirstOrDefault();
+
+            return ordered.FirstOrDefault();
         }
 
         public static List<ScoreInfo> GetTopByTotalScore(IEnumerable<ScoreInfo> scores, int take)
