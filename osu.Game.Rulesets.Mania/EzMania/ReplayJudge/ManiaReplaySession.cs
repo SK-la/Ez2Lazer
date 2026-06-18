@@ -25,6 +25,35 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     public static class ManiaReplaySession
     {
         public static IReadOnlyList<HitEvent> Run(Score score, IBeatmap beatmap, IGameplayEnvironment environment, CancellationToken cancellationToken = default)
+            => run(score, beatmap, environment, recordTimeline: false, cancellationToken).HitEvents;
+
+        /// <summary>
+        /// 一遍 Session 判定同时采集分数时间线（与 <see cref="Run"/> 同源 SP，不经 HitEvents 二次重放）。
+        /// </summary>
+        public static EzScoreTimeline RunTimeline(Score score, IBeatmap beatmap, IGameplayEnvironment environment, CancellationToken cancellationToken = default)
+        {
+            var result = run(score, beatmap, environment, recordTimeline: true, cancellationToken);
+            return result.Timeline ?? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>());
+        }
+
+        internal static long RunFinalTotalScore(Score score, IBeatmap beatmap, IGameplayEnvironment environment, CancellationToken cancellationToken = default)
+            => run(score, beatmap, environment, recordTimeline: false, cancellationToken).FinalTotalScore;
+
+        private readonly struct SessionRunResult
+        {
+            public IReadOnlyList<HitEvent> HitEvents { get; }
+            public EzScoreTimeline? Timeline { get; }
+            public long FinalTotalScore { get; }
+
+            public SessionRunResult(IReadOnlyList<HitEvent> hitEvents, EzScoreTimeline? timeline, long finalTotalScore)
+            {
+                HitEvents = hitEvents;
+                Timeline = timeline;
+                FinalTotalScore = finalTotalScore;
+            }
+        }
+
+        private static SessionRunResult run(Score score, IBeatmap beatmap, IGameplayEnvironment environment, bool recordTimeline, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(score);
             ArgumentNullException.ThrowIfNull(score.Replay);
@@ -32,7 +61,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             ArgumentNullException.ThrowIfNull(environment);
 
             if (score.Replay.Frames.Count == 0)
-                return Array.Empty<HitEvent>();
+                return new SessionRunResult(Array.Empty<HitEvent>(), recordTimeline ? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>()) : null, 0);
 
             var noteStrategy = ManiaJudgementRegistry.GetNoteStrategy(environment);
 
@@ -42,6 +71,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var scoreProcessor = ruleset.CreateScoreProcessor();
             scoreProcessor.Mods.Value = score.ScoreInfo.Mods;
             scoreProcessor.ApplyBeatmap(beatmap);
+
+            if (scoreProcessor is ManiaScoreProcessor maniaScoreProcessor)
+                maniaScoreProcessor.TimelineHitModeOverride = environment.ManiaHitMode;
+
+            if (score.ScoreInfo.IsLegacyScore)
+                scoreProcessor.IsLegacyScore = true;
 
             foreach (var mod in score.ScoreInfo.Mods.OfType<IApplicableToScoreProcessor>())
                 mod.ApplyToScoreProcessor(scoreProcessor);
@@ -64,6 +99,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             }
 
             double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
+            var recorder = recordTimeline ? new ManiaReplayTimelineRecorder() : null;
+            recorder?.RecordInitial(scoreProcessor);
 
             ManiaReplaySessionSimulator.Simulate(
                 score,
@@ -77,6 +114,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 noteStrategy,
                 holdStrategy,
                 scoreProcessor,
+                recorder,
                 cancellationToken);
 
             foreach (var state in targets)
@@ -88,10 +126,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                 state.Judged = true;
                 state.Result = HitResult.Miss;
-                ManiaReplaySessionSimulator.ApplyFinalResult(scoreProcessor, state.Target, HitResult.Miss, state.Target.GetEndTime(), gameplayRate);
+                ManiaReplaySessionSimulator.ApplyFinalResult(scoreProcessor, state.Target, HitResult.Miss, state.Target.GetEndTime(), gameplayRate, recorder);
             }
 
-            return scoreProcessor.HitEvents.ToList();
+            return new SessionRunResult(scoreProcessor.HitEvents.ToList(), recorder?.Build(), scoreProcessor.TotalScore.Value);
         }
 
         private static void alignHitWindows(IBeatmap beatmap, IGameplayEnvironment environment)

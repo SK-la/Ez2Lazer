@@ -42,6 +42,82 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
+        public void TestRunTimelineFinalScoreMatchesSessionRunTotal()
+        {
+            var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
+
+            var hitEvents = ManiaReplaySession.Run(score, beatmap, environment);
+            long sessionTotal = ManiaReplaySession.RunFinalTotalScore(score, beatmap, environment);
+            var timeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
+
+            Assert.That(hitEvents, Has.Count.EqualTo(2));
+            Assert.That(sessionTotal, Is.GreaterThan(0));
+            Assert.That(timeline.FinalTotalScore, Is.EqualTo(sessionTotal));
+            Assert.That(timeline.QueryAtTime(0).TotalScore, Is.EqualTo(0));
+            Assert.That(timeline.QueryAtTime(2500).TotalScore, Is.EqualTo(timeline.FinalTotalScore));
+        }
+
+        [Test]
+        public void TestRunTimelineIsDeterministic()
+        {
+            var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
+
+            var timeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
+            var timelineRepeat = ManiaReplaySession.RunTimeline(score, beatmap, environment);
+
+            Assert.That(timelineRepeat.FinalTotalScore, Is.EqualTo(timeline.FinalTotalScore));
+        }
+
+        [Test]
+        public void TestRunTimelineUsesLiveHitModeNotScoreEmbedded()
+        {
+            var (score, beatmap, lazerEnvironment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
+            var iidxEnvironment = BmsTapReplayFixtures.CreateTwoNoteColumnTap().environment;
+
+            ReplayJudgeTestConfig.ApplyEmbeddedModes(score, iidxEnvironment);
+
+            var liveTimeline = ManiaReplaySession.RunTimeline(score, beatmap, GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig));
+            var lazerTimeline = ManiaReplaySession.RunTimeline(score, beatmap, lazerEnvironment);
+            var iidxTimeline = ManiaReplaySession.RunTimeline(score, beatmap, iidxEnvironment);
+
+            Assert.That(liveTimeline.FinalTotalScore, Is.EqualTo(lazerTimeline.FinalTotalScore));
+            Assert.That(liveTimeline.FinalTotalScore, Is.Not.EqualTo(iidxTimeline.FinalTotalScore));
+
+            _ = ManiaScoreHitEventGenerator.Instance;
+            var bridgeTimeline = EzScoreTimelineBridge.TryBuildManiaTimeline(score, beatmap);
+
+            Assert.That(bridgeTimeline, Is.Not.Null);
+            Assert.That(bridgeTimeline!.FinalTotalScore, Is.EqualTo(lazerTimeline.FinalTotalScore));
+        }
+
+        [Test]
+        public void TestManiaTimelineBridgeMatchesRunTimeline()
+        {
+            _ = ManiaScoreHitEventGenerator.Instance;
+
+            var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
+
+            var sessionTimeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
+            var bridgeTimeline = EzScoreTimelineBridge.TryBuildManiaTimeline(score, beatmap);
+
+            Assert.That(bridgeTimeline, Is.Not.Null);
+            Assert.That(bridgeTimeline!.FinalTotalScore, Is.EqualTo(sessionTimeline.FinalTotalScore));
+            Assert.That(bridgeTimeline.QueryAtTime(2500).TotalScore, Is.EqualTo(sessionTimeline.FinalTotalScore));
+        }
+
+        [Test]
+        public void TestRunTimelineReturnsEmptyForEmptyReplayFrames()
+        {
+            var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
+            score.Replay!.Frames.Clear();
+
+            var timeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
+
+            Assert.That(timeline.FinalTotalScore, Is.EqualTo(0));
+            Assert.That(timeline.QueryAtTime(0).TotalScore, Is.EqualTo(0));
+        }
+
+        [Test]
         public void TestLazerTapSessionMatchesGeneratorJudgements()
         {
             var (score, beatmap, environment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
@@ -260,6 +336,43 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionEvents), Is.True,
                 () => $"generator=[{ManiaReplayParityHelper.DescribeJudgements(generatorEvents)}] session=[{ManiaReplayParityHelper.DescribeJudgements(sessionEvents)}]");
             Assert.That(sessionEvents.Single(e => e.HitObject is HeadNote).Result, Is.EqualTo(Ez2AcHitModeJudgement.MapTo(Ez2AcJudge.Perfect)));
+        }
+
+        [Test]
+        public void TestEz2AcTimelineTotalScoreMonotonicAndScalesFromZero()
+        {
+            const int note_count = 20;
+            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcManyNoteTap(note_count);
+            var timeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
+
+            Assert.That(timeline.QueryAtTime(0).TotalScore, Is.EqualTo(0));
+            Assert.That(timeline.FinalTotalScore, Is.GreaterThan(0));
+
+            long firstJudgementScore = timeline.QueryAtTime(1000).TotalScore;
+            Assert.That(firstJudgementScore, Is.GreaterThan(0));
+            Assert.That(firstJudgementScore, Is.LessThan(timeline.FinalTotalScore * 0.2));
+
+            long previousScore = 0;
+
+            for (int i = 0; i < note_count; i++)
+            {
+                double time = 1000 + i * 500;
+                long scoreAtTime = timeline.QueryAtTime(time).TotalScore;
+                Assert.That(scoreAtTime, Is.GreaterThanOrEqualTo(previousScore), $"TotalScore decreased at t={time}");
+                previousScore = scoreAtTime;
+            }
+
+            Assert.That(timeline.QueryAtTime(1000 + (note_count - 1) * 500).TotalScore, Is.EqualTo(timeline.FinalTotalScore));
+        }
+
+        [Test]
+        public void TestRunTimelineFinalTotalScoreMatchesRunFinalTotalScore()
+        {
+            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcManyNoteTap();
+            long sessionTotal = ManiaReplaySession.RunFinalTotalScore(score, beatmap, environment);
+            var timeline = ManiaReplaySession.RunTimeline(score, beatmap, environment);
+
+            Assert.That(timeline.FinalTotalScore, Is.EqualTo(sessionTotal));
         }
     }
 }
