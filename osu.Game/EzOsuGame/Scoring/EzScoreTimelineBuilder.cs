@@ -29,10 +29,7 @@ namespace osu.Game.EzOsuGame.Scoring
         private static readonly ConcurrentDictionary<string, EzScoreTimeline> timeline_cache = new ConcurrentDictionary<string, EzScoreTimeline>();
         private static bool generatorsInitialised;
 
-        public static EzScoreTimeline? TryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, CancellationToken cancellationToken = default)
-            => tryBuild(scoreManager, beatmaps, scoreInfo, sharedPlayableBeatmap: null, cancellationToken);
-
-        public static EzScoreTimeline? TryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap,
+        public static EzScoreTimeline? TryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap = null,
             CancellationToken cancellationToken = default)
             => tryBuild(scoreManager, beatmaps, scoreInfo, sharedPlayableBeatmap, cancellationToken);
 
