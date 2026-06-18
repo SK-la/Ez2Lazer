@@ -8,6 +8,7 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -66,10 +67,10 @@ namespace osu.Game.EzOsuGame.HUD
         };
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_BAR_WIDTH_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_BAR_WIDTH_DESCRIPTION))]
-        public BindableNumber<float> BarWidth { get; } = new BindableNumber<float>(50)
+        public BindableNumber<float> BarWidth { get; } = new BindableNumber<float>(38)
         {
-            MinValue = 20,
-            MaxValue = 100,
+            MinValue = 10,
+            MaxValue = 80,
             Precision = 1,
         };
 
@@ -84,6 +85,9 @@ namespace osu.Game.EzOsuGame.HUD
         private ScoreInfo? pickedScoreForCondition1;
         private ScoreInfo? pickedScoreForCondition2;
         private bool compareCacheDirty = true;
+
+        [Cached]
+        private OsuColour colours { get; set; } = null!;
 
         public EzHUDScoreCompareBars()
         {
@@ -157,17 +161,37 @@ namespace osu.Game.EzOsuGame.HUD
             long condition1BarScore = getBarScoreForMetric(CompareCondition1.Value, pickedScoreForCondition1, clockTime);
             long condition2BarScore = getBarScoreForMetric(CompareCondition2.Value, pickedScoreForCondition2, clockTime);
 
-            bars[0].UpdateValues(EzHUDStrings.SCORE_COMPARE_NOW_LABEL, formatScore(nowBarScore), nowBarScore, barScoreScale);
+            bars[0].UpdateValues(EzHUDStrings.SCORE_COMPARE_NOW_LABEL, formatScore(nowBarScore), nowBarScore, barScoreScale, getBarColour(isCurrent: true));
             bars[1].UpdateValues(
                 CompareCondition1.Value.GetLocalisableDescription(),
                 formatScore(condition1BarScore),
                 condition1BarScore,
-                barScoreScale);
+                barScoreScale,
+                getBarColour(CompareCondition1.Value));
             bars[2].UpdateValues(
                 CompareCondition2.Value.GetLocalisableDescription(),
                 formatScore(condition2BarScore),
                 condition2BarScore,
-                barScoreScale);
+                barScoreScale,
+                getBarColour(CompareCondition2.Value));
+        }
+
+        /// <summary>
+        /// 与角逐榜面板色系一致：当前=绿、最高分数=黄、最低 Miss=红、其余=蓝。
+        /// </summary>
+        private Color4 getBarColour(EzScoreRaceMetric metric = default, bool isCurrent = false)
+        {
+            const float alpha = 0.85f;
+
+            if (isCurrent)
+                return colours.Lime2.Opacity(alpha);
+
+            return metric switch
+            {
+                EzScoreRaceMetric.TotalScore => colours.YellowLight.Opacity(alpha),
+                EzScoreRaceMetric.MissCount => colours.Red2.Opacity(alpha),
+                _ => colours.Blue4.Opacity(alpha),
+            };
         }
 
         private void onCompareSelectionChanged()
@@ -300,6 +324,7 @@ namespace osu.Game.EzOsuGame.HUD
             private LocalisableString lastTitle;
             private string lastValue = string.Empty;
             private float lastBarHeight = -1;
+            private Color4 lastBarColour;
 
             public CompareBar()
             {
@@ -342,7 +367,6 @@ namespace osu.Game.EzOsuGame.HUD
                             {
                                 RelativeSizeAxes = Axes.None,
                                 Width = barThickness,
-                                Colour = new Color4(0.4f, 0.75f, 1f, 0.85f),
                             },
                         },
                         valueText = new OsuSpriteText
@@ -371,7 +395,7 @@ namespace osu.Game.EzOsuGame.HUD
                 }
             }
 
-            public void UpdateValues(LocalisableString title, string value, long barScore, long maxBarScore)
+            public void UpdateValues(LocalisableString title, string value, long barScore, long maxBarScore, Color4 barColour)
             {
                 Alpha = 1;
 
@@ -385,6 +409,12 @@ namespace osu.Game.EzOsuGame.HUD
                 {
                     valueText.Text = value;
                     lastValue = value;
+                }
+
+                if (lastBarColour != barColour)
+                {
+                    bar.Colour = barColour;
+                    lastBarColour = barColour;
                 }
 
                 float ratio = maxBarScore <= 0 ? 0 : (float)barScore / maxBarScore;
