@@ -208,7 +208,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SCORE_RACE_MAX_ENTRIES_LABEL = new EzLocalizationManager.EzLocalisableString("列表条目数", "List Entry Count");
         public static readonly LocalisableString SCORE_RACE_MAX_ENTRIES_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("角逐排行榜显示的最大成绩数", "Maximum scores shown in the race leaderboard.");
         public static readonly LocalisableString SCORE_RACE_SORT_CRITERION_LABEL = new EzLocalizationManager.EzLocalisableString("排序依据", "Sort By");
-        public static readonly LocalisableString SCORE_RACE_SORT_CRITERION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("角逐榜实时排名的比较指标", "Metric used to rank entries during the race.");
+        public static readonly LocalisableString SCORE_RACE_SORT_CRITERION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("角逐榜实时排名的比较指标（分数 / Acc / Combo / Miss）", "Metric used to rank entries during the race (score / acc / combo / miss).");
         public static readonly LocalisableString SCORE_RACE_LOADING_LABEL = new EzLocalizationManager.EzLocalisableString("加载角逐成绩…", "Loading race scores…");
     }
 }

@@ -5,22 +5,24 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using System.Reflection;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Localisation;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
+using Container = osu.Framework.Graphics.Containers.Container;
 
 namespace osu.Game.EzOsuGame.HUD
 {
@@ -47,10 +49,10 @@ namespace osu.Game.EzOsuGame.HUD
         public Bindable<EzScoreModFilter> ModFilterSetting { get; } = new Bindable<EzScoreModFilter>(EzScoreModFilter.Any);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_DESCRIPTION))]
-        public Bindable<EzScoreCompareCondition> CompareCondition1 { get; } = new Bindable<EzScoreCompareCondition>(EzScoreCompareCondition.BestAccuracy);
+        public Bindable<EzScoreRaceMetric> CompareCondition1 { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.Accuracy);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION2_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION2_DESCRIPTION))]
-        public Bindable<EzScoreCompareCondition> CompareCondition2 { get; } = new Bindable<EzScoreCompareCondition>(EzScoreCompareCondition.BestTotalScore);
+        public Bindable<EzScoreRaceMetric> CompareCondition2 { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.TheoreticalMaxScore);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_BAR_DIRECTION_LABEL), nameof(EzHUDStrings.SCORE_RACE_BAR_DIRECTION_DESCRIPTION))]
         public Bindable<EzScoreCompareBarDirection> BarDirection { get; } = new Bindable<EzScoreCompareBarDirection>(EzScoreCompareBarDirection.Upward);
@@ -75,7 +77,7 @@ namespace osu.Game.EzOsuGame.HUD
         private const float label_area_height = 36;
         private const float container_padding = 6;
 
-        private osu.Framework.Graphics.Containers.Container barsContainer = null!;
+        private Container barsContainer = null!;
         private readonly CompareBar[] bars = new CompareBar[3];
 
         public EzHUDScoreCompareBars()
@@ -97,7 +99,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             ModFilter.BindTo(ModFilterSetting);
 
-            barsContainer = new osu.Framework.Graphics.Containers.Container
+            barsContainer = new Container
             {
                 RelativeSizeAxes = Axes.Both,
                 Padding = new MarginPadding(container_padding),
@@ -150,12 +152,12 @@ namespace osu.Game.EzOsuGame.HUD
 
             bars[0].UpdateValues(EzHUDStrings.SCORE_COMPARE_NOW_LABEL, formatScore(nowBarScore), nowBarScore, maxBarScore);
             bars[1].UpdateValues(
-                new LocalisableString(formatCondition(CompareCondition1.Value)),
+                CompareCondition1.Value.GetLocalisableDescription(),
                 formatScore(condition1BarScore),
                 condition1BarScore,
                 maxBarScore);
             bars[2].UpdateValues(
-                new LocalisableString(formatCondition(CompareCondition2.Value)),
+                CompareCondition2.Value.GetLocalisableDescription(),
                 formatScore(condition2BarScore),
                 condition2BarScore,
                 maxBarScore);
@@ -171,18 +173,18 @@ namespace osu.Game.EzOsuGame.HUD
 
         private ScoreInfo? getExcludeForCondition2()
         {
-            if (CompareCondition1.Value == EzScoreCompareCondition.TheoreticalMaxScore)
+            if (CompareCondition1.Value == EzScoreRaceMetric.TheoreticalMaxScore)
                 return null;
 
             return EzLocalScoreQueries.PickBest(getCompareCandidates(), CompareCondition1.Value);
         }
 
-        private long getBarScoreAtTime(EzScoreCompareCondition condition, double clockTime, ScoreInfo? exclude)
+        private long getBarScoreAtTime(EzScoreRaceMetric metric, double clockTime, ScoreInfo? exclude)
         {
-            if (condition == EzScoreCompareCondition.TheoreticalMaxScore)
+            if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
                 return getTheoreticalScoreAtTime();
 
-            var scoreInfo = EzLocalScoreQueries.PickBest(getCompareCandidates(), condition, exclude);
+            var scoreInfo = EzLocalScoreQueries.PickBest(getCompareCandidates(), metric, exclude);
             return getTotalScoreAtTime(scoreInfo, clockTime);
         }
 
@@ -213,7 +215,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (ScoreProcessor == null)
                 return 0;
 
-            return (long)Math.Round(ScoreProcessor.MinimumAccuracy.Value * osu.Game.Rulesets.Scoring.ScoreProcessor.MAX_SCORE);
+            return (long)Math.Round(ScoreProcessor.MinimumAccuracy.Value * ScoreProcessor.MAX_SCORE);
         }
 
         private static string formatScore(long score) => score.ToString("N0");
@@ -240,23 +242,12 @@ namespace osu.Game.EzOsuGame.HUD
             }
         }
 
-        private static string formatCondition(EzScoreCompareCondition condition)
-        {
-            var field = typeof(EzScoreCompareCondition).GetField(condition.ToString());
-
-            if (field == null)
-                return condition.ToString();
-
-            var description = field.GetCustomAttribute<DescriptionAttribute>()?.Description;
-            return string.IsNullOrEmpty(description) ? condition.ToString() : description;
-        }
-
         private partial class CompareBar : CompositeDrawable
         {
             private Box bar = null!;
             private OsuSpriteText titleText = null!;
             private OsuSpriteText valueText = null!;
-            private osu.Framework.Graphics.Containers.Container barTrack = null!;
+            private Container barTrack = null!;
             private EzScoreCompareBarDirection direction = EzScoreCompareBarDirection.Upward;
             private float maxBarSize;
 
@@ -294,7 +285,7 @@ namespace osu.Game.EzOsuGame.HUD
                             Origin = Anchor.TopCentre,
                             Font = OsuFont.GetFont(size: 11, weight: FontWeight.Bold),
                         },
-                        barTrack = new osu.Framework.Graphics.Containers.Container
+                        barTrack = new Container
                         {
                             RelativeSizeAxes = Axes.X,
                             Height = maxBarSize,

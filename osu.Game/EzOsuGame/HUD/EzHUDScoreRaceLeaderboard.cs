@@ -40,7 +40,7 @@ namespace osu.Game.EzOsuGame.HUD
         };
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_SORT_CRITERION_LABEL), nameof(EzHUDStrings.SCORE_RACE_SORT_CRITERION_DESCRIPTION))]
-        public Bindable<EzScoreRaceSortCriterion> SortCriterionSetting { get; } = new Bindable<EzScoreRaceSortCriterion>(EzScoreRaceSortCriterion.TotalScore);
+        public Bindable<EzScoreRaceMetric> SortCriterionSetting { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.TotalScore);
 
         protected readonly FillFlowContainer<DrawableGameplayLeaderboardScore> Flow;
 
@@ -239,8 +239,7 @@ namespace osu.Game.EzOsuGame.HUD
             return false;
         }
 
-        private EzScoreTimeline? findTimeline(Guid scoreInfoId)
-            => Session?.Entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfoId)?.Timeline;
+        private EzScoreTimeline? findTimeline(Guid scoreInfoId) => Session?.Entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfoId)?.Timeline;
 
         private static GameplayLeaderboardScore createGhostLeaderboardScore(EzScoreRaceEntry entry)
         {
@@ -268,13 +267,17 @@ namespace osu.Game.EzOsuGame.HUD
         {
             IOrderedEnumerable<RaceEntryState> ordered = SortCriterionSetting.Value switch
             {
-                EzScoreRaceSortCriterion.Accuracy => entryStates
-                    .OrderByDescending(s => s.LeaderboardScore.Accuracy.Value)
-                    .ThenByDescending(s => s.LeaderboardScore.TotalScore.Value),
+                EzScoreRaceMetric.Accuracy => entryStates
+                                              .OrderByDescending(s => s.LeaderboardScore.Accuracy.Value)
+                                              .ThenByDescending(s => s.LeaderboardScore.TotalScore.Value),
 
-                EzScoreRaceSortCriterion.MissCount => entryStates
-                    .OrderBy(s => getMissCount(s))
-                    .ThenByDescending(s => s.LeaderboardScore.TotalScore.Value),
+                EzScoreRaceMetric.MaxCombo => entryStates
+                                              .OrderByDescending(s => s.LeaderboardScore.Combo.Value)
+                                              .ThenByDescending(s => s.LeaderboardScore.TotalScore.Value),
+
+                EzScoreRaceMetric.MissCount => entryStates
+                                               .OrderBy(s => getMissCount(s))
+                                               .ThenByDescending(s => s.LeaderboardScore.TotalScore.Value),
 
                 _ => entryStates.OrderByDescending(s => s.LeaderboardScore.TotalScore.Value),
             };

@@ -50,36 +50,22 @@ namespace osu.Game.EzOsuGame.Scoring
 
         public static bool ModsMatch(Mod[] left, Mod[] right) => modsMatch(left, right);
 
-        public static ScoreInfo? PickBest(IEnumerable<ScoreInfo> scores, EzScorePickCriterion criterion, ScoreInfo? exclude = null)
+        public static ScoreInfo? PickBest(IEnumerable<ScoreInfo> scores, EzScoreRaceMetric metric, ScoreInfo? exclude = null)
         {
-            var candidates = scores.Where(s => exclude == null || s.ID != exclude.ID);
-
-            return criterion switch
-            {
-                EzScorePickCriterion.TotalScore => candidates.OrderByDescending(s => s.TotalScore).ThenByDescending(s => s.Date).FirstOrDefault(),
-                EzScorePickCriterion.Accuracy => candidates.OrderByDescending(s => s.Accuracy).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
-                EzScorePickCriterion.MaxCombo => candidates.OrderByDescending(s => s.MaxCombo).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
-                EzScorePickCriterion.MissCount => candidates.OrderBy(GetMissCount).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
-                _ => throw new ArgumentOutOfRangeException(nameof(criterion), criterion, null),
-            };
-        }
-
-        public static ScoreInfo? PickBest(IEnumerable<ScoreInfo> scores, EzScoreCompareCondition condition, ScoreInfo? exclude = null)
-        {
-            if (condition == EzScoreCompareCondition.TheoreticalMaxScore)
+            if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
                 return null;
 
-            return PickBest(scores, toPickCriterion(condition), exclude);
-        }
+            var candidates = scores.Where(s => exclude == null || s.ID != exclude.ID);
 
-        private static EzScorePickCriterion toPickCriterion(EzScoreCompareCondition condition) => condition switch
-        {
-            EzScoreCompareCondition.BestTotalScore => EzScorePickCriterion.TotalScore,
-            EzScoreCompareCondition.BestAccuracy => EzScorePickCriterion.Accuracy,
-            EzScoreCompareCondition.BestMaxCombo => EzScorePickCriterion.MaxCombo,
-            EzScoreCompareCondition.BestMissCount => EzScorePickCriterion.MissCount,
-            _ => throw new ArgumentOutOfRangeException(nameof(condition), condition, null),
-        };
+            return metric switch
+            {
+                EzScoreRaceMetric.TotalScore => candidates.OrderByDescending(s => s.TotalScore).ThenByDescending(s => s.Date).FirstOrDefault(),
+                EzScoreRaceMetric.Accuracy => candidates.OrderByDescending(s => s.Accuracy).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
+                EzScoreRaceMetric.MaxCombo => candidates.OrderByDescending(s => s.MaxCombo).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
+                EzScoreRaceMetric.MissCount => candidates.OrderBy(GetMissCount).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
+                _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
+            };
+        }
 
         public static List<ScoreInfo> GetTopByTotalScore(IEnumerable<ScoreInfo> scores, int take)
         {

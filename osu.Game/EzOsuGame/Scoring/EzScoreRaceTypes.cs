@@ -1,64 +1,50 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.ComponentModel;
+using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Localization;
 
 namespace osu.Game.EzOsuGame.Scoring
 {
-    public enum EzScorePickCriterion
-    {
-        [Description("Total score")]
-        TotalScore,
-
-        [Description("Accuracy")]
-        Accuracy,
-
-        [Description("Max combo")]
-        MaxCombo,
-
-        [Description("Miss count")]
-        MissCount,
-    }
-
     /// <summary>
-    /// 三柱对比条件：筛选要对比的历史成绩；柱高始终按分数绘制。
+    /// 角逐 HUD 共用指标维度。三柱 HUD 用于筛选对比哪条成绩；角逐榜用于实时排序。
     /// </summary>
-    public enum EzScoreCompareCondition
+    public enum EzScoreRaceMetric
     {
-        [Description("理论最高分数")]
+        [LocalisableDescription(typeof(EzScoreRaceStrings), nameof(EzScoreRaceStrings.METRIC_THEORETICAL_MAX_SCORE))]
         TheoreticalMaxScore,
 
-        [Description("历史最高分数")]
-        BestTotalScore,
-
-        [Description("历史最高 Acc")]
-        BestAccuracy,
-
-        [Description("历史最大 Combo")]
-        BestMaxCombo,
-
-        [Description("历史最低 Miss")]
-        BestMissCount,
-    }
-
-    public enum EzScoreRaceSortCriterion
-    {
-        [Description("Total score")]
+        [LocalisableDescription(typeof(EzScoreRaceStrings), nameof(EzScoreRaceStrings.METRIC_TOTAL_SCORE))]
         TotalScore,
 
-        [Description("Accuracy")]
+        [LocalisableDescription(typeof(EzScoreRaceStrings), nameof(EzScoreRaceStrings.METRIC_ACCURACY))]
         Accuracy,
 
-        [Description("Miss count")]
+        [LocalisableDescription(typeof(EzScoreRaceStrings), nameof(EzScoreRaceStrings.METRIC_MAX_COMBO))]
+        MaxCombo,
+
+        [LocalisableDescription(typeof(EzScoreRaceStrings), nameof(EzScoreRaceStrings.METRIC_MISS_COUNT))]
         MissCount,
     }
 
     public enum EzScoreModFilter
     {
-        [Description("Same mods as current")]
+        [LocalisableDescription(typeof(EzScoreRaceStrings), nameof(EzScoreRaceStrings.MOD_FILTER_SAME_AS_CURRENT))]
         SameAsCurrent,
 
-        [Description("Any mods")]
+        [LocalisableDescription(typeof(EzScoreRaceStrings), nameof(EzScoreRaceStrings.MOD_FILTER_ANY))]
         Any,
+    }
+
+    public static class EzScoreRaceStrings
+    {
+        public static readonly LocalisableString METRIC_THEORETICAL_MAX_SCORE = new EzLocalizationManager.EzLocalisableString("理论最高分", "Theoretical max score");
+        public static readonly LocalisableString METRIC_TOTAL_SCORE = new EzLocalizationManager.EzLocalisableString("分数", "Score");
+        public static readonly LocalisableString METRIC_ACCURACY = new EzLocalizationManager.EzLocalisableString("Acc", "Acc");
+        public static readonly LocalisableString METRIC_MAX_COMBO = new EzLocalizationManager.EzLocalisableString("Combo", "Combo");
+        public static readonly LocalisableString METRIC_MISS_COUNT = new EzLocalizationManager.EzLocalisableString("Miss", "Miss");
+
+        public static readonly LocalisableString MOD_FILTER_SAME_AS_CURRENT = new EzLocalizationManager.EzLocalisableString("相同 Mod", "Same mods as current");
+        public static readonly LocalisableString MOD_FILTER_ANY = new EzLocalizationManager.EzLocalisableString("任意 Mod", "Any mods");
     }
 }
