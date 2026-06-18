@@ -69,20 +69,25 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
-        public void TestRunTimelineRespectsScoreHitMode()
+        public void TestRunTimelineUsesLiveHitModeNotScoreEmbedded()
         {
             var (score, beatmap, lazerEnvironment) = LazerTapReplayFixtures.CreateTwoNoteColumnTap();
-            ReplayJudgeTestConfig.ApplyEmbeddedModes(score, lazerEnvironment);
-
-            var lazerTimeline = ManiaReplaySession.RunTimeline(score, beatmap, GameplayEnvironment.FromScore(score.ScoreInfo, GlobalConfigStore.EzConfig));
-            Assert.That(lazerTimeline.FinalTotalScore, Is.GreaterThan(0));
-
             var iidxEnvironment = BmsTapReplayFixtures.CreateTwoNoteColumnTap().environment;
+
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, iidxEnvironment);
 
-            var iidxTimeline = ManiaReplaySession.RunTimeline(score, beatmap, GameplayEnvironment.FromScore(score.ScoreInfo, GlobalConfigStore.EzConfig));
+            var liveTimeline = ManiaReplaySession.RunTimeline(score, beatmap, GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig));
+            var lazerTimeline = ManiaReplaySession.RunTimeline(score, beatmap, lazerEnvironment);
+            var iidxTimeline = ManiaReplaySession.RunTimeline(score, beatmap, iidxEnvironment);
 
-            Assert.That(iidxTimeline.FinalTotalScore, Is.Not.EqualTo(lazerTimeline.FinalTotalScore));
+            Assert.That(liveTimeline.FinalTotalScore, Is.EqualTo(lazerTimeline.FinalTotalScore));
+            Assert.That(liveTimeline.FinalTotalScore, Is.Not.EqualTo(iidxTimeline.FinalTotalScore));
+
+            _ = ManiaScoreHitEventGenerator.Instance;
+            var bridgeTimeline = EzScoreTimelineBridge.TryBuildManiaTimeline(score, beatmap);
+
+            Assert.That(bridgeTimeline, Is.Not.Null);
+            Assert.That(bridgeTimeline!.FinalTotalScore, Is.EqualTo(lazerTimeline.FinalTotalScore));
         }
 
         [Test]
@@ -348,6 +353,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(firstJudgementScore, Is.LessThan(timeline.FinalTotalScore * 0.2));
 
             long previousScore = 0;
+
             for (int i = 0; i < note_count; i++)
             {
                 double time = 1000 + i * 500;

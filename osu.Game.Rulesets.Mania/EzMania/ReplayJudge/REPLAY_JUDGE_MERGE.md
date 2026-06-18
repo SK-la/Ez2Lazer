@@ -26,7 +26,8 @@ Drawable replay 播放时，`ManiaEzDrawableJudgement` 优先从 `DrawableRulese
 
 | 字段                                 | 来源                                                                                   |
 |------------------------------------|--------------------------------------------------------------------------------------|
-| HitMode / HealthMode               | `ScoreInfo.ManiaHitMode` / `ManiaHealthMode`（提交时写入）→ `GameplayEnvironment.FromScore` |
+| HitMode / HealthMode（统计 HitEvents） | `ScoreInfo.ManiaHitMode` / `ManiaHealthMode`（提交时写入）→ `GameplayEnvironment.FromScore` |
+| HitMode / HealthMode（角逐时间线）     | **当前全局** `FromLive`；不读成绩嵌入字段                                                     |
 | JudgePrecedence / OffsetPlusMania  | 当前全局配置（`FromLive` fallback）                                                          |
 | **BmsPoorHitResultEnable (KPoor)** | **当前全局配置**（未写入 ScoreInfo；统计重算沿用打开成绩时的全局 KPoor 开关，与当时游玩可能不一致）                         |
 
@@ -52,7 +53,7 @@ Drawable replay 播放时，`ManiaEzDrawableJudgement` 优先从 `DrawableRulese
 1. 本地 Mania 谱面 ≥2 条带 replay 的 ghost + 角逐排行榜：占位先出（分数 0），时间线异步填入后分数/准度/Combo 随时钟变化。
 2. 同一时刻：主界面 ScoreCounter ≈ 角逐 Tracked 行 ≈ ghost 行（对应 replay 进度）；分数从 0 累积，无 acc 子集反算虚高。
 3. 角逐榜排序可配置（默认 TotalScore，可选 Accuracy / MissCount）；只影响榜位，不参与计分。
-4. ghost 成绩嵌入 HitMode 与全局不同：分数轨仍按成绩 HitMode 重算（非当前全局）。
+4. ghost 分数轨统一按**当前全局** HitMode/HealthMode 重算（`FromLive`）；不用成绩嵌入 HitMode，也不按嵌入 HitMode 过滤 ghost 列表。
 5. 无 replay 的 ghost：不进入角逐列表（`TryBuild` 返回 null）。
 6. DT/HT：时钟与 ghost 分数轨无明显错位（若有问题记录谱面与 mod 组合）。
 

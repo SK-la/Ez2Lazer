@@ -251,7 +251,7 @@ namespace osu.Game.EzOsuGame.Scoring
             if (scoreInfo.Ruleset.OnlineID != 3)
                 return;
 
-            var environment = GameplayEnvironment.FromScore(scoreInfo, GlobalConfigStore.EzConfig);
+            var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
 
             PropertyInfo? overrideProperty = scoreProcessor.GetType().GetProperty("TimelineHitModeOverride", BindingFlags.Public | BindingFlags.Instance);
 
@@ -336,8 +336,8 @@ namespace osu.Game.EzOsuGame.Scoring
 
             if (scoreInfo!.Ruleset.OnlineID == 3)
             {
-                // 与 GameplayEnvironment.FromScore 一致；环境变则重算。
-                var environment = GameplayEnvironment.FromScore(scoreInfo, GlobalConfigStore.EzConfig);
+                // 与角逐 HUD 一致：全局 HitMode/HealthMode，不读成绩嵌入字段。
+                var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
                 return $"{identity}:hm{(int)environment.ManiaHitMode}:hh{(int)environment.ManiaHealthMode}:jp{(int)environment.JudgePrecedence}";
             }
 

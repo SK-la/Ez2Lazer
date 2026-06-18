@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             EzScoreTimelineBridge.RegisterManiaTimelineBuilder((score, beatmap, cancellationToken) =>
             {
-                var environment = GameplayEnvironment.FromScore(score.ScoreInfo, GlobalConfigStore.EzConfig);
+                var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
                 return ManiaReplaySession.RunTimeline(score, beatmap, environment, cancellationToken);
             });
         }
