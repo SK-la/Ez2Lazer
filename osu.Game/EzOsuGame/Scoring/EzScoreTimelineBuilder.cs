@@ -113,15 +113,6 @@ namespace osu.Game.EzOsuGame.Scoring
             return timeline;
         }
 
-        public static void InvalidateCache(ScoreInfo? scoreInfo)
-        {
-            if (scoreInfo == null)
-                return;
-
-            foreach (string key in timeline_cache.Keys.Where(k => k.Contains(getScoreIdentity(scoreInfo) ?? string.Empty)).ToArray())
-                timeline_cache.TryRemove(key, out _);
-        }
-
         private static (List<HitEvent>? hitEvents, bool offsetsRelativeToEnd) resolveHitEvents(Score databasedScore, IBeatmap playableBeatmap, CancellationToken cancellationToken)
         {
             // 统计页打开时 ScoreInfo 上可能有临时 HitEvents（[Ignored]，不持久化）。
