@@ -50,11 +50,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
                        + bonusPortion;
             }
 
-            // 由于Acc架构不同，非lazer模式在总分制下，只能依靠Acc反算分数。
             if (hitMode != EzEnumHitMode.Lazer && hitMode != EzEnumHitMode.Classic)
             {
-                // 对于满分制，只考虑判定准确性，不考虑combo和奖励加分
-                return 1000000 * Accuracy.Value;
+                // 满分制：TotalScore = 已获得 ex / 整谱最大 ex，从 0 随判定累积（非已判子集 acc 反算）
+                return 1_000_000 * MinimumAccuracy.Value;
             }
 
             return 150000 * comboProgress

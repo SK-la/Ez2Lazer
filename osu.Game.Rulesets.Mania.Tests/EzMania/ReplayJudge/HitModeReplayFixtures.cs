@@ -140,6 +140,42 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateEz2AcManyNoteTap(int noteCount = 20)
+        {
+            var ruleset = new ManiaRuleset();
+            var hitObjects = new List<HitObject>();
+            var frames = new List<ReplayFrame>();
+
+            for (int i = 0; i < noteCount; i++)
+            {
+                double time = 1000 + i * 500;
+                hitObjects.Add(new Note { StartTime = time, Column = 0 });
+                frames.Add(new ManiaReplayFrame(time, ManiaAction.Key1));
+                frames.Add(new ManiaReplayFrame(time + 50));
+            }
+
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = hitObjects,
+                ControlPointInfo = new ControlPointInfo(),
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var replay = new Replay { Frames = frames };
+
+            var environment = new GameplayEnvironment
+            {
+                ManiaHitMode = EzEnumHitMode.EZ2AC,
+                ManiaHealthMode = EzEnumHealthMode.Ez2Ac,
+                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
+            };
+
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+            return (createScore(ruleset, replay), beatmap, environment);
+        }
+
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateMalodyHoldPerfect(EzEnumHitMode hitMode = EzEnumHitMode.Malody_E)
         {
             const double head = 1500;

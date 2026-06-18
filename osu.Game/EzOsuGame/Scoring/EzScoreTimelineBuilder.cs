@@ -22,13 +22,10 @@ namespace osu.Game.EzOsuGame.Scoring
 {
     /// <summary>
     /// 从本地 replay 构建分数时间线。Mania 走 Session 一遍 SP 快照；其他规则集暂用 HitEvents 重放（仅非 Mania）。
-    /// 进程内缓存；算法变更时 bump <see cref="timeline_cache_version"/>。
+    /// 进程内缓存；重启进程即清空，无磁盘持久化。
     /// </summary>
     public static class EzScoreTimelineBuilder
     {
-        /// <summary>进程内缓存失效版本；非磁盘持久化。</summary>
-        private const string timeline_cache_version = "v1";
-
         private static readonly ConcurrentDictionary<string, EzScoreTimeline> timeline_cache = new ConcurrentDictionary<string, EzScoreTimeline>();
         private static bool generatorsInitialised;
 
@@ -341,10 +338,10 @@ namespace osu.Game.EzOsuGame.Scoring
             {
                 // 与 GameplayEnvironment.FromScore 一致；环境变则重算。
                 var environment = GameplayEnvironment.FromScore(scoreInfo, GlobalConfigStore.EzConfig);
-                return $"{timeline_cache_version}:{identity}:hm{(int)environment.ManiaHitMode}:hh{(int)environment.ManiaHealthMode}:jp{(int)environment.JudgePrecedence}";
+                return $"{identity}:hm{(int)environment.ManiaHitMode}:hh{(int)environment.ManiaHealthMode}:jp{(int)environment.JudgePrecedence}";
             }
 
-            return $"{timeline_cache_version}:{identity}";
+            return identity;
         }
 
         private static string? getScoreIdentity(ScoreInfo? scoreInfo)
