@@ -105,6 +105,8 @@ namespace osu.Game.EzOsuGame.HUD
 
         private EzScoreRaceEntry? pickedEntryForCondition1;
         private EzScoreRaceEntry? pickedEntryForCondition2;
+        private EzScoreRaceTimelineScoreProcessor? ghostProcessor1;
+        private EzScoreRaceTimelineScoreProcessor? ghostProcessor2;
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
@@ -158,6 +160,14 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             AddInternal(barsContainer);
+
+            ghostProcessor1 = new EzScoreRaceTimelineScoreProcessor();
+            ghostProcessor2 = new EzScoreRaceTimelineScoreProcessor();
+            AddInternal(ghostProcessor1);
+            AddInternal(ghostProcessor2);
+            ghostProcessor1.TotalScore.BindValueChanged(_ => updateGhostCompareBar(1));
+            ghostProcessor2.TotalScore.BindValueChanged(_ => updateGhostCompareBar(2));
+
             EnsureLoadingOverlay();
 
             base.LoadComplete();
@@ -182,6 +192,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.Update();
 
+            updateCurrentAndTheoreticalBars();
             base.CornerRadius = CornerRadius.Value * Math.Min(DrawWidth, DrawHeight);
         }
 
@@ -192,45 +203,58 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void OnEntriesChangedScheduled()
         {
-            UpdateDisplay();
+            refreshPickedEntries();
+            updateGhostCompareBar(1);
+            updateGhostCompareBar(2);
         }
 
-        protected override void UpdateDisplay()
+        private void updateCurrentAndTheoreticalBars()
         {
-            double clockTime = GetCurrentClockTime();
             long barScoreScale = getBarScoreScale();
             long nowBarScore = GetLiveDisplayScore();
 
             bars[0].UpdateValues(EzHUDStrings.SCORE_COMPARE_NOW_LABEL, formatScore(nowBarScore), nowBarScore, barScoreScale, getBarColour(isCurrent: true));
-            updateCompareBar(bars[1], CompareCondition1Setting.Value, pickedEntryForCondition1, clockTime, barScoreScale);
-            updateCompareBar(bars[2], CompareCondition2Setting.Value, pickedEntryForCondition2, clockTime, barScoreScale);
+
+            if (CompareCondition1Setting.Value == EzScoreRaceMetric.TheoreticalMaxScore)
+                updateTheoreticalCompareBar(bars[1], CompareCondition1Setting.Value, barScoreScale);
+
+            if (CompareCondition2Setting.Value == EzScoreRaceMetric.TheoreticalMaxScore)
+                updateTheoreticalCompareBar(bars[2], CompareCondition2Setting.Value, barScoreScale);
         }
 
-        private void updateCompareBar(CompareBar bar, EzScoreRaceMetric metric, EzScoreRaceEntry? pickedEntry, double clockTime, long barScoreScale)
+        private void updateGhostCompareBar(int conditionIndex)
         {
+            var metric = conditionIndex == 1 ? CompareCondition1Setting.Value : CompareCondition2Setting.Value;
+
             if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
+                return;
+
+            var pickedEntry = conditionIndex == 1 ? pickedEntryForCondition1 : pickedEntryForCondition2;
+            var processor = conditionIndex == 1 ? ghostProcessor1 : ghostProcessor2;
+            long barScoreScale = getBarScoreScale();
+
+            if (Session == null || !Session.IsReady.Value || processor == null)
             {
-                long theoreticalScore = getTheoreticalScoreAtTime();
-                bar.UpdateValues(
-                    metric.GetLocalisableDescription(),
-                    formatScore(theoreticalScore),
-                    theoreticalScore,
-                    barScoreScale,
-                    getBarColour(metric));
+                bars[conditionIndex].UpdateValues(metric.GetLocalisableDescription(), string.Empty, 0, barScoreScale, getBarColour(metric));
                 return;
             }
 
-            if (Session == null || !Session.IsReady.Value)
-            {
-                bar.UpdateValues(metric.GetLocalisableDescription(), string.Empty, 0, barScoreScale, getBarColour(metric));
-                return;
-            }
-
-            long barScore = EzScoreRaceSession.QuerySnapshot(pickedEntry, clockTime).TotalScore;
-            bar.UpdateValues(
+            long barScore = processor.TotalScore.Value;
+            bars[conditionIndex].UpdateValues(
                 metric.GetLocalisableDescription(),
                 formatBarValue(barScore, pickedEntry),
                 barScore,
+                barScoreScale,
+                getBarColour(metric));
+        }
+
+        private void updateTheoreticalCompareBar(CompareBar bar, EzScoreRaceMetric metric, long barScoreScale)
+        {
+            long theoreticalScore = getTheoreticalScoreAtTime();
+            bar.UpdateValues(
+                metric.GetLocalisableDescription(),
+                formatScore(theoreticalScore),
+                theoreticalScore,
                 barScoreScale,
                 getBarColour(metric));
         }
@@ -240,7 +264,8 @@ namespace osu.Game.EzOsuGame.HUD
             refreshPickedEntries();
             bars[1].ResetVisualCache();
             bars[2].ResetVisualCache();
-            UpdateDisplay();
+            updateGhostCompareBar(1);
+            updateGhostCompareBar(2);
         }
 
         protected override void Dispose(bool isDisposing)
@@ -281,6 +306,8 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 pickedEntryForCondition1 = null;
                 pickedEntryForCondition2 = null;
+                ghostProcessor1?.SetTimeline(null);
+                ghostProcessor2?.SetTimeline(null);
                 return;
             }
 
@@ -290,6 +317,9 @@ namespace osu.Game.EzOsuGame.HUD
             pickedEntryForCondition2 = CompareCondition2Setting.Value == EzScoreRaceMetric.TheoreticalMaxScore
                 ? null
                 : Session.PickGhost(CompareCondition2Setting.Value);
+
+            ghostProcessor1?.SetTimeline(pickedEntryForCondition1?.Timeline);
+            ghostProcessor2?.SetTimeline(pickedEntryForCondition2?.Timeline);
         }
 
         private static string formatScore(long score) => score.ToString("N0");
