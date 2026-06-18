@@ -103,7 +103,11 @@ namespace osu.Game.EzOsuGame.Scoring
                 return null;
 
             var entry = getOrCreatePickEntry(scoreInfo);
-            ensureTimelinesLoaded(new[] { scoreInfo });
+            syncTimelineFromEntries(entry);
+
+            if (entry.Timeline == null)
+                ensureTimelinesLoaded(new[] { scoreInfo });
+
             return entry;
         }
 

@@ -56,10 +56,10 @@ namespace osu.Game.EzOsuGame.HUD
         public Bindable<EzScoreModFilter> ModFilterSetting { get; } = new Bindable<EzScoreModFilter>(EzScoreModFilter.Any);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_DESCRIPTION))]
-        public Bindable<EzScoreRaceMetric> CompareCondition1 { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.Accuracy);
+        public Bindable<EzScoreRaceMetric> CompareCondition1Setting { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.Accuracy);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION2_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION2_DESCRIPTION))]
-        public Bindable<EzScoreRaceMetric> CompareCondition2 { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.TheoreticalMaxScore);
+        public Bindable<EzScoreRaceMetric> CompareCondition2Setting { get; } = new Bindable<EzScoreRaceMetric>(EzScoreRaceMetric.TotalScore);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_BAR_DIRECTION_LABEL), nameof(EzHUDStrings.SCORE_RACE_BAR_DIRECTION_DESCRIPTION))]
         public Bindable<EzScoreCompareBarDirection> BarDirection { get; } = new Bindable<EzScoreCompareBarDirection>(EzScoreCompareBarDirection.Upward);
@@ -176,8 +176,8 @@ namespace osu.Game.EzOsuGame.HUD
             BackgroundVisible.BindValueChanged(_ => updateBackgroundVisibility(), true);
             BackdropBlurEnabled.BindValueChanged(_ => SyncAcrylicCaptureState(), true);
 
-            CompareCondition1.BindValueChanged(_ => refreshPickedEntries(), true);
-            CompareCondition2.BindValueChanged(_ => refreshPickedEntries(), true);
+            CompareCondition1Setting.BindValueChanged(_ => onCompareConditionChanged(), true);
+            CompareCondition2Setting.BindValueChanged(_ => onCompareConditionChanged(), true);
             BarDirection.BindValueChanged(_ => layoutBars(), true);
             BarHeight.BindValueChanged(_ => layoutBars(), true);
             BarWidth.BindValueChanged(_ => layoutBars(), true);
@@ -198,39 +198,61 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void OnSessionReady()
         {
-            Session?.IsReady.BindValueChanged(_ => refreshPickedEntries(), true);
+            Session?.IsReady.BindValueChanged(_ => onCompareConditionChanged(), true);
         }
 
         protected override void OnEntriesChangedScheduled()
         {
-            refreshPickedEntries();
+            // 时间线就绪后只刷新显示；勿重跑 PickGhost（会打断条件 2 刚发起的加载）。
+            UpdateDisplay();
         }
 
         protected override void UpdateDisplay()
         {
-            if (Session == null || !Session.IsReady.Value)
-                return;
-
             double clockTime = GetCurrentClockTime();
             long barScoreScale = getBarScoreScale();
-
             long nowBarScore = GetLiveDisplayScore();
-            long condition1BarScore = getBarScoreForMetric(CompareCondition1.Value, pickedEntryForCondition1, clockTime);
-            long condition2BarScore = getBarScoreForMetric(CompareCondition2.Value, pickedEntryForCondition2, clockTime);
 
             bars[0].UpdateValues(EzHUDStrings.SCORE_COMPARE_NOW_LABEL, formatScore(nowBarScore), nowBarScore, barScoreScale, getBarColour(isCurrent: true));
-            bars[1].UpdateValues(
-                CompareCondition1.Value.GetLocalisableDescription(),
-                formatScoreOrDash(condition1BarScore, pickedEntryForCondition1, CompareCondition1.Value),
-                condition1BarScore,
+            updateCompareBar(bars[1], CompareCondition1Setting.Value, pickedEntryForCondition1, clockTime, barScoreScale);
+            updateCompareBar(bars[2], CompareCondition2Setting.Value, pickedEntryForCondition2, clockTime, barScoreScale);
+        }
+
+        private void updateCompareBar(CompareBar bar, EzScoreRaceMetric metric, EzScoreRaceEntry? pickedEntry, double clockTime, long barScoreScale)
+        {
+            if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
+            {
+                long theoreticalScore = getTheoreticalScoreAtTime();
+                bar.UpdateValues(
+                    metric.GetLocalisableDescription(),
+                    formatScore(theoreticalScore),
+                    theoreticalScore,
+                    barScoreScale,
+                    getBarColour(metric));
+                return;
+            }
+
+            if (Session == null || !Session.IsReady.Value)
+            {
+                bar.UpdateValues(metric.GetLocalisableDescription(), "-", 0, barScoreScale, getBarColour(metric));
+                return;
+            }
+
+            long barScore = EzScoreRaceSession.QueryTimelineScore(pickedEntry, clockTime);
+            bar.UpdateValues(
+                metric.GetLocalisableDescription(),
+                formatScoreOrDash(barScore, pickedEntry, metric),
+                barScore,
                 barScoreScale,
-                getBarColour(CompareCondition1.Value));
-            bars[2].UpdateValues(
-                CompareCondition2.Value.GetLocalisableDescription(),
-                formatScoreOrDash(condition2BarScore, pickedEntryForCondition2, CompareCondition2.Value),
-                condition2BarScore,
-                barScoreScale,
-                getBarColour(CompareCondition2.Value));
+                getBarColour(metric));
+        }
+
+        private void onCompareConditionChanged()
+        {
+            refreshPickedEntries();
+            bars[1].ResetVisualCache();
+            bars[2].ResetVisualCache();
+            UpdateDisplay();
         }
 
         protected override void Dispose(bool isDisposing)
@@ -274,17 +296,11 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
-            pickedEntryForCondition1 = Session.PickGhost(CompareCondition1.Value);
-            pickedEntryForCondition2 = Session.PickGhost(CompareCondition2.Value, pickedEntryForCondition1?.ScoreInfo);
+            pickedEntryForCondition1 = Session.PickGhost(CompareCondition1Setting.Value);
+            pickedEntryForCondition2 = Session.PickGhost(CompareCondition2Setting.Value, pickedEntryForCondition1?.ScoreInfo);
         }
 
-        private long getBarScoreForMetric(EzScoreRaceMetric metric, EzScoreRaceEntry? pickedEntry, double clockTime)
-        {
-            if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
-                return getTheoreticalScoreAtTime();
-
-            return EzScoreRaceSession.QueryTimelineScore(pickedEntry, clockTime);
-        }
+        private static string formatScore(long score) => score.ToString("N0");
 
         /// <summary>
         /// 当前时刻「已判定区间全 Perfect」应达到的分数（≥ 当前实际分，与 live SP 同源）。
@@ -319,8 +335,6 @@ namespace osu.Game.EzOsuGame.HUD
 
             return (long)ScoreProcessor.MAX_SCORE;
         }
-
-        private static string formatScore(long score) => score.ToString("N0");
 
         private static string formatScoreOrDash(long score, EzScoreRaceEntry? pickedEntry, EzScoreRaceMetric metric)
         {
@@ -380,9 +394,6 @@ namespace osu.Game.EzOsuGame.HUD
                 maxBarSize = maxSize;
                 barThickness = thickness;
 
-                if (barTrack == null)
-                    return;
-
                 barTrack.Size = new Vector2(barThickness, maxSize);
                 bar.Width = barThickness;
                 applyBarAnchor();
@@ -439,6 +450,11 @@ namespace osu.Game.EzOsuGame.HUD
                     bar.Anchor = Anchor.TopCentre;
                     bar.Origin = Anchor.TopCentre;
                 }
+            }
+
+            public void ResetVisualCache()
+            {
+                lastBarHeight = -1;
             }
 
             public void UpdateValues(LocalisableString title, string value, long barScore, long maxBarScore, Color4 barColour)
