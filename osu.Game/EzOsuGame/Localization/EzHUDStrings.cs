@@ -199,6 +199,19 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SCORE_COMPARE_BAR_WIDTH_LABEL = new EzLocalizationManager.EzLocalisableString("柱状图宽度", "Bar Width");
         public static readonly LocalisableString SCORE_COMPARE_BAR_WIDTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("单根柱体的像素宽度", "Pixel width of each bar.");
         public static readonly LocalisableString SCORE_COMPARE_NOW_LABEL = new EzLocalizationManager.EzLocalisableString("当前", "Now");
+
+        public static readonly LocalisableString SCORE_COMPARE_BACKGROUND_VISIBLE_LABEL = new EzLocalizationManager.EzLocalisableString("显示背景", "Show Background");
+
+        public static readonly LocalisableString SCORE_COMPARE_BACKGROUND_VISIBLE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "显示整块圆角背景框（不含单柱分区底色）。",
+            "Show a single rounded background behind all bars (not per-bar track colours).");
+
+        public static readonly LocalisableString SCORE_COMPARE_BACKDROP_BLUR_LABEL = new EzLocalizationManager.EzLocalisableString("穿透虚化", "Backdrop Blur");
+
+        public static readonly LocalisableString SCORE_COMPARE_BACKDROP_BLUR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后真穿透虚化背景框下方 OsuScreenStack 内已绘制内容；关闭时仅显示半透明底色。",
+            "When enabled, acrylic-blurs content rendered within OsuScreenStack beneath the background; when disabled, only the tint is shown.");
+
         public static readonly LocalisableString SCORE_RACE_MOD_FILTER_LABEL = new EzLocalizationManager.EzLocalisableString("Mod 过滤", "Mod Filter");
         public static readonly LocalisableString SCORE_RACE_MOD_FILTER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("对比成绩的 Mod 范围", "Which mod combinations to include when selecting scores.");
         public static readonly LocalisableString SCORE_RACE_BAR_DIRECTION_LABEL = new EzLocalizationManager.EzLocalisableString("柱图方向", "Bar Direction");

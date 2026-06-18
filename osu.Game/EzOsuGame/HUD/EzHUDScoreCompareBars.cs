@@ -9,13 +9,17 @@ using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Localisation.SkinComponents;
+using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
@@ -38,11 +42,15 @@ namespace osu.Game.EzOsuGame.HUD
     /// 柱高与标签数值始终按 TotalScore 绘制；柱图总高度对应整谱理论满分。
     /// Ghost 查询与时间线经 <see cref="EzScoreRaceSession"/> 统一提供。
     /// </summary>
-    public partial class EzHUDScoreCompareBars : EzHUDScoreRaceComponent, ISerialisableDrawable
+    public partial class EzHUDScoreCompareBars : EzHUDScoreRaceComponent, ISerialisableDrawable, IAcrylicBackdropConsumer
     {
+        private const float backdrop_blur_strength = 16;
+
         public bool UsesFixedAnchor { get; set; }
 
         protected override bool ContributesMaxEntryCount => false;
+
+        public bool WantsAcrylicCapture => BackgroundVisible.Value && BackdropBlurEnabled.Value;
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_MOD_FILTER_LABEL), nameof(EzHUDStrings.SCORE_RACE_MOD_FILTER_DESCRIPTION))]
         public Bindable<EzScoreModFilter> ModFilterSetting { get; } = new Bindable<EzScoreModFilter>(EzScoreModFilter.Any);
@@ -72,12 +80,31 @@ namespace osu.Game.EzOsuGame.HUD
             Precision = 1,
         };
 
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_BACKGROUND_VISIBLE_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_BACKGROUND_VISIBLE_DESCRIPTION))]
+        public BindableBool BackgroundVisible { get; } = new BindableBool(true);
+
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.CornerRadius), nameof(SkinnableComponentStrings.CornerRadiusDescription),
+            SettingControlType = typeof(SettingsPercentageSlider<float>))]
+        public new BindableFloat CornerRadius { get; } = new BindableFloat(0.12f)
+        {
+            MinValue = 0,
+            MaxValue = 0.5f,
+            Precision = 0.01f,
+        };
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_BACKDROP_BLUR_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_BACKDROP_BLUR_DESCRIPTION))]
+        public BindableBool BackdropBlurEnabled { get; } = new BindableBool(false);
+
         private const float bar_spacing = 4;
         private const float label_area_height = 36;
         private const float container_padding = 6;
 
+        private readonly AcrylicBackdropDrawable acrylicBackdrop;
+        private readonly Box backgroundTint;
+        private readonly Container backgroundLayer;
         private Container barsContainer = null!;
         private readonly CompareBar[] bars = new CompareBar[3];
+        private EzAcrylicCaptureController? captureController;
 
         private EzScoreRaceEntry? pickedEntryForCondition1;
         private EzScoreRaceEntry? pickedEntryForCondition2;
@@ -85,10 +112,36 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
+        [Resolved(canBeNull: true)]
+        private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
+
+        [Resolved]
+        private IRenderer renderer { get; set; } = null!;
+
         public EzHUDScoreCompareBars()
         {
             Width = 3 * BarWidth.Value + 2 * bar_spacing + container_padding * 2;
             Height = BarHeight.Value + label_area_height + container_padding * 2;
+            Masking = true;
+
+            InternalChild = backgroundLayer = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Children = new Drawable[]
+                {
+                    acrylicBackdrop = new AcrylicBackdropDrawable
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        EffectEnabled = false,
+                        FrameBufferScale = Vector2.One,
+                    },
+                    backgroundTint = new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Color4.White.Opacity(0.12f),
+                    },
+                },
+            };
         }
 
         protected override void ConfigureSession()
@@ -100,6 +153,8 @@ namespace osu.Game.EzOsuGame.HUD
         protected override void LoadComplete()
         {
             ModFilter.BindTo(ModFilterSetting);
+
+            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, renderer, acrylicBackdrop);
 
             barsContainer = new Container
             {
@@ -118,13 +173,27 @@ namespace osu.Game.EzOsuGame.HUD
 
             base.LoadComplete();
 
+            BackgroundVisible.BindValueChanged(_ => updateBackgroundVisibility(), true);
+            BackdropBlurEnabled.BindValueChanged(_ => SyncAcrylicCaptureState(), true);
+
             CompareCondition1.BindValueChanged(_ => refreshPickedEntries(), true);
             CompareCondition2.BindValueChanged(_ => refreshPickedEntries(), true);
             BarDirection.BindValueChanged(_ => layoutBars(), true);
             BarHeight.BindValueChanged(_ => layoutBars(), true);
             BarWidth.BindValueChanged(_ => layoutBars(), true);
 
+            SyncAcrylicCaptureState();
             layoutBars();
+        }
+
+        public void SyncAcrylicCaptureState()
+            => captureController?.Sync(WantsAcrylicCapture, backdrop_blur_strength);
+
+        protected override void Update()
+        {
+            base.Update();
+
+            base.CornerRadius = CornerRadius.Value * Math.Min(DrawWidth, DrawHeight);
         }
 
         protected override void OnSessionReady()
@@ -162,6 +231,20 @@ namespace osu.Game.EzOsuGame.HUD
                 condition2BarScore,
                 barScoreScale,
                 getBarColour(CompareCondition2.Value));
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+                captureController?.Dispose();
+
+            base.Dispose(isDisposing);
+        }
+
+        private void updateBackgroundVisibility()
+        {
+            backgroundLayer.Alpha = BackgroundVisible.Value ? 1 : 0;
+            SyncAcrylicCaptureState();
         }
 
         /// <summary>
@@ -274,7 +357,6 @@ namespace osu.Game.EzOsuGame.HUD
             private const float min_bar_height = 3;
 
             private Box bar = null!;
-            private Box trackBackground = null!;
             private OsuSpriteText titleText = null!;
             private OsuSpriteText valueText = null!;
             private Container barTrack = null!;
@@ -301,10 +383,7 @@ namespace osu.Game.EzOsuGame.HUD
                 if (barTrack == null)
                     return;
 
-                var trackSize = new Vector2(barThickness, maxSize);
-                barTrack.Size = trackSize;
-                trackBackground.Size = trackSize;
-
+                barTrack.Size = new Vector2(barThickness, maxSize);
                 bar.Width = barThickness;
                 applyBarAnchor();
             }
@@ -330,19 +409,10 @@ namespace osu.Game.EzOsuGame.HUD
                         {
                             RelativeSizeAxes = Axes.None,
                             Size = new Vector2(barThickness, maxBarSize),
-                            Children = new Drawable[]
+                            Child = bar = new Box
                             {
-                                trackBackground = new Box
-                                {
-                                    RelativeSizeAxes = Axes.None,
-                                    Size = new Vector2(barThickness, maxBarSize),
-                                    Colour = Color4.White.Opacity(0.12f),
-                                },
-                                bar = new Box
-                                {
-                                    RelativeSizeAxes = Axes.None,
-                                    Width = barThickness,
-                                },
+                                RelativeSizeAxes = Axes.None,
+                                Width = barThickness,
                             },
                         },
                         valueText = new OsuSpriteText
