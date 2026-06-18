@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
@@ -85,6 +87,9 @@ namespace osu.Game.EzOsuGame.HUD
         private ScoreInfo? pickedScoreForCondition1;
         private ScoreInfo? pickedScoreForCondition2;
         private bool compareCacheDirty = true;
+        private readonly Dictionary<Guid, EzScoreTimeline> pickedTimelines = new Dictionary<Guid, EzScoreTimeline>();
+        private readonly HashSet<Guid> pickedTimelineLoadsPending = new HashSet<Guid>();
+        private CancellationTokenSource? pickedTimelineLoadCts;
 
         [Cached]
         private OsuColour colours { get; set; } = null!;
@@ -164,13 +169,13 @@ namespace osu.Game.EzOsuGame.HUD
             bars[0].UpdateValues(EzHUDStrings.SCORE_COMPARE_NOW_LABEL, formatScore(nowBarScore), nowBarScore, barScoreScale, getBarColour(isCurrent: true));
             bars[1].UpdateValues(
                 CompareCondition1.Value.GetLocalisableDescription(),
-                formatScore(condition1BarScore),
+                formatScoreOrDash(condition1BarScore, pickedScoreForCondition1, CompareCondition1.Value),
                 condition1BarScore,
                 barScoreScale,
                 getBarColour(CompareCondition1.Value));
             bars[2].UpdateValues(
                 CompareCondition2.Value.GetLocalisableDescription(),
-                formatScore(condition2BarScore),
+                formatScoreOrDash(condition2BarScore, pickedScoreForCondition2, CompareCondition2.Value),
                 condition2BarScore,
                 barScoreScale,
                 getBarColour(CompareCondition2.Value));
@@ -197,12 +202,23 @@ namespace osu.Game.EzOsuGame.HUD
         private void onCompareSelectionChanged()
         {
             if (!compareCacheDirty)
+            {
                 rebuildPickedScores();
+                schedulePickedTimelineLoads();
+            }
 
             refreshHistoricalBars();
         }
 
-        private void invalidateCompareCache() => compareCacheDirty = true;
+        private void invalidateCompareCache()
+        {
+            compareCacheDirty = true;
+            pickedTimelines.Clear();
+            pickedTimelineLoadsPending.Clear();
+            pickedTimelineLoadCts?.Cancel();
+            pickedTimelineLoadCts?.Dispose();
+            pickedTimelineLoadCts = null;
+        }
 
         private void ensureCompareCache()
         {
@@ -212,6 +228,7 @@ namespace osu.Game.EzOsuGame.HUD
             compareCandidates = queryCompareCandidates();
             rebuildPickedScores();
             compareCacheDirty = false;
+            schedulePickedTimelineLoads();
         }
 
         private void rebuildPickedScores()
@@ -233,12 +250,100 @@ namespace osu.Game.EzOsuGame.HUD
             UpdateDisplay();
         }
 
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                pickedTimelineLoadCts?.Cancel();
+                pickedTimelineLoadCts?.Dispose();
+            }
+
+            base.Dispose(isDisposing);
+        }
+
         private long getBarScoreForMetric(EzScoreRaceMetric metric, ScoreInfo? pickedScore, double clockTime)
         {
             if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
                 return getTheoreticalScoreAtTime();
 
             return getTotalScoreAtTime(pickedScore, clockTime);
+        }
+
+        private EzScoreTimeline? findTimeline(ScoreInfo scoreInfo)
+        {
+            var sessionEntry = Session?.Entries.FirstOrDefault(e => !e.Tracked && e.ScoreInfo.ID == scoreInfo.ID);
+
+            if (sessionEntry?.Timeline != null)
+                return sessionEntry.Timeline;
+
+            pickedTimelines.TryGetValue(scoreInfo.ID, out var timeline);
+            return timeline;
+        }
+
+        private void schedulePickedTimelineLoads()
+        {
+            if (Session == null || GameplayState == null)
+                return;
+
+            var playableBeatmap = GameplayState.Beatmap;
+            var cancellationToken = getPickedTimelineLoadToken();
+            var scoresToLoad = new List<ScoreInfo>();
+
+            foreach (var scoreInfo in new[] { pickedScoreForCondition1, pickedScoreForCondition2 })
+            {
+                if (scoreInfo == null || findTimeline(scoreInfo) != null)
+                    continue;
+
+                if (!pickedTimelineLoadsPending.Add(scoreInfo.ID))
+                    continue;
+
+                scoresToLoad.Add(scoreInfo);
+            }
+
+            if (scoresToLoad.Count == 0)
+                return;
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var buildTasks = scoresToLoad.Select(scoreInfo => Task.Run(() =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return (scoreInfo.ID, EzScoreTimelineBuilder.TryBuild(ScoreManager, Beatmaps, scoreInfo, playableBeatmap, cancellationToken));
+                    }, cancellationToken)).ToArray();
+
+                    var results = await Task.WhenAll(buildTasks).ConfigureAwait(false);
+
+                    foreach (var (scoreId, timeline) in results)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                            return;
+
+                        if (timeline == null)
+                        {
+                            Schedule(() => pickedTimelineLoadsPending.Remove(scoreId));
+                            continue;
+                        }
+
+                        Schedule(() =>
+                        {
+                            pickedTimelineLoadsPending.Remove(scoreId);
+                            pickedTimelines[scoreId] = timeline;
+                            refreshHistoricalBars();
+                        });
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            }, cancellationToken);
+        }
+
+        private CancellationToken getPickedTimelineLoadToken()
+        {
+            pickedTimelineLoadCts ??= new CancellationTokenSource();
+            return pickedTimelineLoadCts.Token;
         }
 
         private List<ScoreInfo> queryCompareCandidates()
@@ -255,23 +360,36 @@ namespace osu.Game.EzOsuGame.HUD
             if (scoreInfo == null || Session == null)
                 return 0;
 
-            var entry = Session.Entries.FirstOrDefault(e => !e.Tracked && e.ScoreInfo.ID == scoreInfo.ID);
+            var timeline = findTimeline(scoreInfo);
 
-            if (entry?.Timeline != null)
-                return entry.Timeline.QueryAtTime(clockTime).TotalScore;
+            if (timeline != null)
+                return timeline.QueryAtTime(clockTime).TotalScore;
 
-            return scoreInfo.TotalScore;
+            // 禁止用终局分充当实时柱高；时间线未就绪前保持 0。
+            return 0;
         }
 
         /// <summary>
-        /// 当前时刻理论满分进度（与 live SP 一致）。
+        /// 当前时刻「已判定区间全 Perfect」应达到的分数（≥ 当前实际分，与 live SP 同源）。
         /// </summary>
         private long getTheoreticalScoreAtTime()
         {
             if (ScoreProcessor == null)
                 return 0;
 
-            return (long)Math.Round(ScoreProcessor.MinimumAccuracy.Value * ScoreProcessor.MAX_SCORE);
+            double accuracy = ScoreProcessor.Accuracy.Value;
+
+            if (accuracy <= double.Epsilon)
+                return 0;
+
+            long currentScore = GetLiveDisplayScore();
+
+            if (currentScore <= 0)
+                return 0;
+
+            // MinimumAccuracy/Accuracy = 当前已出现 ex 上限 / 整谱 ex（Perfect 时等于 MinimumAccuracy）。
+            double perfectProgressRatio = ScoreProcessor.MinimumAccuracy.Value / accuracy;
+            return (long)Math.Round(currentScore * perfectProgressRatio);
         }
 
         /// <summary>
@@ -282,10 +400,18 @@ namespace osu.Game.EzOsuGame.HUD
             if (ScoreProcessor != null && ScoreProcessor.MaximumTotalScore > 0)
                 return ScoreProcessor.MaximumTotalScore;
 
-            return (long)ScoreProcessor.MAX_SCORE;
+            return (long)global::osu.Game.Rulesets.Scoring.ScoreProcessor.MAX_SCORE;
         }
 
         private static string formatScore(long score) => score.ToString("N0");
+
+        private static string formatScoreOrDash(long score, ScoreInfo? pickedScore, EzScoreRaceMetric metric)
+        {
+            if (metric == EzScoreRaceMetric.TheoreticalMaxScore || pickedScore == null)
+                return formatScore(score);
+
+            return score > 0 ? formatScore(score) : "-";
+        }
 
         private void layoutBars()
         {
@@ -314,6 +440,7 @@ namespace osu.Game.EzOsuGame.HUD
             private const float min_bar_height = 3;
 
             private Box bar = null!;
+            private Box trackBackground = null!;
             private OsuSpriteText titleText = null!;
             private OsuSpriteText valueText = null!;
             private Container barTrack = null!;
@@ -337,7 +464,13 @@ namespace osu.Game.EzOsuGame.HUD
                 maxBarSize = maxSize;
                 barThickness = thickness;
 
+                if (barTrack == null)
+                    return;
+
                 barTrack.Size = new Vector2(barThickness, maxSize);
+
+                if (trackBackground != null)
+                    trackBackground.Size = new Vector2(barThickness, maxSize);
 
                 bar.Width = barThickness;
                 applyBarAnchor();
@@ -363,10 +496,18 @@ namespace osu.Game.EzOsuGame.HUD
                         barTrack = new Container
                         {
                             Size = new Vector2(barThickness, maxBarSize),
-                            Child = bar = new Box
+                            Children = new Drawable[]
                             {
-                                RelativeSizeAxes = Axes.None,
-                                Width = barThickness,
+                                trackBackground = new Box
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Colour = Color4.White.Opacity(0.12f),
+                                },
+                                bar = new Box
+                                {
+                                    RelativeSizeAxes = Axes.None,
+                                    Width = barThickness,
+                                },
                             },
                         },
                         valueText = new OsuSpriteText
