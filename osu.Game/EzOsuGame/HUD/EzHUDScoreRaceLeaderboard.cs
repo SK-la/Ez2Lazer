@@ -287,22 +287,13 @@ namespace osu.Game.EzOsuGame.HUD
 
         private List<RaceEntryState> getOrderedEntryStates()
         {
-            IOrderedEnumerable<RaceEntryState> ordered = SortCriterionSetting.Value switch
-            {
-                EzScoreRaceMetric.Accuracy => entryStates
-                                              .OrderByDescending(s => s.LeaderboardScore.Accuracy.Value)
-                                              .ThenByDescending(s => s.LeaderboardScore.TotalScore.Value),
-
-                EzScoreRaceMetric.MaxCombo => entryStates
-                                              .OrderByDescending(s => s.LeaderboardScore.Combo.Value)
-                                              .ThenByDescending(s => s.LeaderboardScore.TotalScore.Value),
-
-                EzScoreRaceMetric.MissCount => entryStates
-                                               .OrderBy(s => getMissCount(s))
-                                               .ThenByDescending(s => s.LeaderboardScore.TotalScore.Value),
-
-                _ => entryStates.OrderByDescending(s => s.LeaderboardScore.TotalScore.Value),
-            };
+            var ordered = EzScoreRaceMetricOrdering.ApplyMetricOrdering(
+                entryStates,
+                SortCriterionSetting.Value,
+                s => s.LeaderboardScore.TotalScore.Value,
+                s => s.LeaderboardScore.Accuracy.Value,
+                s => s.LeaderboardScore.Combo.Value,
+                getMissCount);
 
             return ordered.ThenBy(s => s.Tracked ? long.MaxValue : s.Tiebreaker).ToList();
         }
