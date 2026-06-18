@@ -105,15 +105,7 @@ namespace osu.Game.EzOsuGame.HUD
                 if (state.Tracked)
                     continue;
 
-                var timeline = state.Timeline;
-
-                if (timeline == null)
-                {
-                    state.MissCount = 0;
-                    continue;
-                }
-
-                var snapshot = timeline.QueryAtTime(clockTime);
+                var snapshot = EzScoreRaceSession.QuerySnapshot(state.Timeline, clockTime);
                 state.LeaderboardScore.TotalScore.Value = snapshot.TotalScore;
                 state.LeaderboardScore.Accuracy.Value = snapshot.Accuracy;
                 state.LeaderboardScore.Combo.Value = snapshot.HighestCombo;
