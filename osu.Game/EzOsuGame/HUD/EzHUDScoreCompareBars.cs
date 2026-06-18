@@ -2,11 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
@@ -21,7 +17,6 @@ using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -41,6 +36,7 @@ namespace osu.Game.EzOsuGame.HUD
     /// <summary>
     /// BMS 风格三柱分数对比：当前局 + 两条按对比条件选出的参考柱。
     /// 柱高与标签数值始终按 TotalScore 绘制；柱图总高度对应整谱理论满分。
+    /// Ghost 查询与时间线经 <see cref="EzScoreRaceSession"/> 统一提供。
     /// </summary>
     public partial class EzHUDScoreCompareBars : EzHUDScoreRaceComponent, ISerialisableDrawable
     {
@@ -83,15 +79,10 @@ namespace osu.Game.EzOsuGame.HUD
         private Container barsContainer = null!;
         private readonly CompareBar[] bars = new CompareBar[3];
 
-        private List<ScoreInfo> compareCandidates = new List<ScoreInfo>();
-        private ScoreInfo? pickedScoreForCondition1;
-        private ScoreInfo? pickedScoreForCondition2;
-        private bool compareCacheDirty = true;
-        private readonly Dictionary<Guid, EzScoreTimeline> pickedTimelines = new Dictionary<Guid, EzScoreTimeline>();
-        private readonly HashSet<Guid> pickedTimelineLoadsPending = new HashSet<Guid>();
-        private CancellationTokenSource? pickedTimelineLoadCts;
+        private EzScoreRaceEntry? pickedEntryForCondition1;
+        private EzScoreRaceEntry? pickedEntryForCondition2;
 
-        [Cached]
+        [Resolved]
         private OsuColour colours { get; set; } = null!;
 
         public EzHUDScoreCompareBars()
@@ -109,7 +100,6 @@ namespace osu.Game.EzOsuGame.HUD
         protected override void LoadComplete()
         {
             ModFilter.BindTo(ModFilterSetting);
-            ModFilter.BindValueChanged(_ => invalidateCompareCache(), true);
 
             barsContainer = new Container
             {
@@ -128,8 +118,8 @@ namespace osu.Game.EzOsuGame.HUD
 
             base.LoadComplete();
 
-            CompareCondition1.BindValueChanged(_ => onCompareSelectionChanged(), true);
-            CompareCondition2.BindValueChanged(_ => onCompareSelectionChanged(), true);
+            CompareCondition1.BindValueChanged(_ => refreshPickedEntries(), true);
+            CompareCondition2.BindValueChanged(_ => refreshPickedEntries(), true);
             BarDirection.BindValueChanged(_ => layoutBars(), true);
             BarHeight.BindValueChanged(_ => layoutBars(), true);
             BarWidth.BindValueChanged(_ => layoutBars(), true);
@@ -139,17 +129,12 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void OnSessionReady()
         {
-            Session?.IsReady.BindValueChanged(_ =>
-            {
-                invalidateCompareCache();
-                refreshHistoricalBars();
-            }, true);
+            Session?.IsReady.BindValueChanged(_ => refreshPickedEntries(), true);
         }
 
         protected override void OnEntriesChangedScheduled()
         {
-            invalidateCompareCache();
-            refreshHistoricalBars();
+            refreshPickedEntries();
         }
 
         protected override void UpdateDisplay()
@@ -157,25 +142,23 @@ namespace osu.Game.EzOsuGame.HUD
             if (Session == null || !Session.IsReady.Value)
                 return;
 
-            ensureCompareCache();
-
             double clockTime = GetCurrentClockTime();
             long barScoreScale = getBarScoreScale();
 
             long nowBarScore = GetLiveDisplayScore();
-            long condition1BarScore = getBarScoreForMetric(CompareCondition1.Value, pickedScoreForCondition1, clockTime);
-            long condition2BarScore = getBarScoreForMetric(CompareCondition2.Value, pickedScoreForCondition2, clockTime);
+            long condition1BarScore = getBarScoreForMetric(CompareCondition1.Value, pickedEntryForCondition1, clockTime);
+            long condition2BarScore = getBarScoreForMetric(CompareCondition2.Value, pickedEntryForCondition2, clockTime);
 
             bars[0].UpdateValues(EzHUDStrings.SCORE_COMPARE_NOW_LABEL, formatScore(nowBarScore), nowBarScore, barScoreScale, getBarColour(isCurrent: true));
             bars[1].UpdateValues(
                 CompareCondition1.Value.GetLocalisableDescription(),
-                formatScoreOrDash(condition1BarScore, pickedScoreForCondition1, CompareCondition1.Value),
+                formatScoreOrDash(condition1BarScore, pickedEntryForCondition1, CompareCondition1.Value),
                 condition1BarScore,
                 barScoreScale,
                 getBarColour(CompareCondition1.Value));
             bars[2].UpdateValues(
                 CompareCondition2.Value.GetLocalisableDescription(),
-                formatScoreOrDash(condition2BarScore, pickedScoreForCondition2, CompareCondition2.Value),
+                formatScoreOrDash(condition2BarScore, pickedEntryForCondition2, CompareCondition2.Value),
                 condition2BarScore,
                 barScoreScale,
                 getBarColour(CompareCondition2.Value));
@@ -199,174 +182,25 @@ namespace osu.Game.EzOsuGame.HUD
             };
         }
 
-        private void onCompareSelectionChanged()
-        {
-            if (!compareCacheDirty)
-            {
-                rebuildPickedScores();
-                schedulePickedTimelineLoads();
-            }
-
-            refreshHistoricalBars();
-        }
-
-        private void invalidateCompareCache()
-        {
-            compareCacheDirty = true;
-            pickedTimelines.Clear();
-            pickedTimelineLoadsPending.Clear();
-            pickedTimelineLoadCts?.Cancel();
-            pickedTimelineLoadCts?.Dispose();
-            pickedTimelineLoadCts = null;
-        }
-
-        private void ensureCompareCache()
-        {
-            if (!compareCacheDirty)
-                return;
-
-            compareCandidates = queryCompareCandidates();
-            rebuildPickedScores();
-            compareCacheDirty = false;
-            schedulePickedTimelineLoads();
-        }
-
-        private void rebuildPickedScores()
-        {
-            pickedScoreForCondition1 = CompareCondition1.Value == EzScoreRaceMetric.TheoreticalMaxScore
-                ? null
-                : EzLocalScoreQueries.PickBest(compareCandidates, CompareCondition1.Value);
-
-            pickedScoreForCondition2 = CompareCondition2.Value == EzScoreRaceMetric.TheoreticalMaxScore
-                ? null
-                : EzLocalScoreQueries.PickBest(compareCandidates, CompareCondition2.Value, exclude: pickedScoreForCondition1);
-        }
-
-        private void refreshHistoricalBars()
+        private void refreshPickedEntries()
         {
             if (Session == null || !Session.IsReady.Value)
-                return;
-
-            UpdateDisplay();
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
             {
-                pickedTimelineLoadCts?.Cancel();
-                pickedTimelineLoadCts?.Dispose();
+                pickedEntryForCondition1 = null;
+                pickedEntryForCondition2 = null;
+                return;
             }
 
-            base.Dispose(isDisposing);
+            pickedEntryForCondition1 = Session.PickGhost(CompareCondition1.Value);
+            pickedEntryForCondition2 = Session.PickGhost(CompareCondition2.Value, pickedEntryForCondition1?.ScoreInfo);
         }
 
-        private long getBarScoreForMetric(EzScoreRaceMetric metric, ScoreInfo? pickedScore, double clockTime)
+        private long getBarScoreForMetric(EzScoreRaceMetric metric, EzScoreRaceEntry? pickedEntry, double clockTime)
         {
             if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
                 return getTheoreticalScoreAtTime();
 
-            return getTotalScoreAtTime(pickedScore, clockTime);
-        }
-
-        private EzScoreTimeline? findTimeline(ScoreInfo scoreInfo)
-        {
-            var sessionEntry = Session?.Entries.FirstOrDefault(e => !e.Tracked && e.ScoreInfo.ID == scoreInfo.ID);
-
-            if (sessionEntry?.Timeline != null)
-                return sessionEntry.Timeline;
-
-            pickedTimelines.TryGetValue(scoreInfo.ID, out var timeline);
-            return timeline;
-        }
-
-        private void schedulePickedTimelineLoads()
-        {
-            if (Session == null || GameplayState == null)
-                return;
-
-            var playableBeatmap = GameplayState.Beatmap;
-            var cancellationToken = getPickedTimelineLoadToken();
-            var scoresToLoad = new List<ScoreInfo>();
-
-            foreach (var scoreInfo in new[] { pickedScoreForCondition1, pickedScoreForCondition2 })
-            {
-                if (scoreInfo == null || findTimeline(scoreInfo) != null)
-                    continue;
-
-                if (!pickedTimelineLoadsPending.Add(scoreInfo.ID))
-                    continue;
-
-                scoresToLoad.Add(scoreInfo);
-            }
-
-            if (scoresToLoad.Count == 0)
-                return;
-
-            Task.Run(async () =>
-            {
-                try
-                {
-                    var buildTasks = scoresToLoad.Select(scoreInfo => Task.Run(() =>
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        return (scoreInfo.ID, EzScoreTimelineBuilder.TryBuild(ScoreManager, Beatmaps, scoreInfo, playableBeatmap, cancellationToken));
-                    }, cancellationToken)).ToArray();
-
-                    var results = await Task.WhenAll(buildTasks).ConfigureAwait(false);
-
-                    foreach (var (scoreId, timeline) in results)
-                    {
-                        if (cancellationToken.IsCancellationRequested)
-                            return;
-
-                        if (timeline == null)
-                        {
-                            Schedule(() => pickedTimelineLoadsPending.Remove(scoreId));
-                            continue;
-                        }
-
-                        Schedule(() =>
-                        {
-                            pickedTimelineLoadsPending.Remove(scoreId);
-                            pickedTimelines[scoreId] = timeline;
-                            refreshHistoricalBars();
-                        });
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                }
-            }, cancellationToken);
-        }
-
-        private CancellationToken getPickedTimelineLoadToken()
-        {
-            pickedTimelineLoadCts ??= new CancellationTokenSource();
-            return pickedTimelineLoadCts.Token;
-        }
-
-        private List<ScoreInfo> queryCompareCandidates()
-        {
-            if (GameplayState == null)
-                return new List<ScoreInfo>();
-
-            var localScores = EzLocalScoreQueries.GetLocalScoresWithReplay(Realm, GameplayState.Beatmap.BeatmapInfo, GameplayState.Ruleset.RulesetInfo);
-            return EzLocalScoreQueries.FilterByMods(localScores, GameplayState.Mods.ToArray(), ModFilter.Value).ToList();
-        }
-
-        private long getTotalScoreAtTime(ScoreInfo? scoreInfo, double clockTime)
-        {
-            if (scoreInfo == null || Session == null)
-                return 0;
-
-            var timeline = findTimeline(scoreInfo);
-
-            if (timeline != null)
-                return timeline.QueryAtTime(clockTime).TotalScore;
-
-            // 禁止用终局分充当实时柱高；时间线未就绪前保持 0。
-            return 0;
+            return EzScoreRaceSession.QueryTimelineScore(pickedEntry, clockTime);
         }
 
         /// <summary>
@@ -400,14 +234,14 @@ namespace osu.Game.EzOsuGame.HUD
             if (ScoreProcessor != null && ScoreProcessor.MaximumTotalScore > 0)
                 return ScoreProcessor.MaximumTotalScore;
 
-            return (long)global::osu.Game.Rulesets.Scoring.ScoreProcessor.MAX_SCORE;
+            return (long)ScoreProcessor.MAX_SCORE;
         }
 
         private static string formatScore(long score) => score.ToString("N0");
 
-        private static string formatScoreOrDash(long score, ScoreInfo? pickedScore, EzScoreRaceMetric metric)
+        private static string formatScoreOrDash(long score, EzScoreRaceEntry? pickedEntry, EzScoreRaceMetric metric)
         {
-            if (metric == EzScoreRaceMetric.TheoreticalMaxScore || pickedScore == null)
+            if (metric == EzScoreRaceMetric.TheoreticalMaxScore || pickedEntry == null)
                 return formatScore(score);
 
             return score > 0 ? formatScore(score) : "-";
@@ -464,13 +298,9 @@ namespace osu.Game.EzOsuGame.HUD
                 maxBarSize = maxSize;
                 barThickness = thickness;
 
-                if (barTrack == null)
-                    return;
-
                 barTrack.Size = new Vector2(barThickness, maxSize);
 
-                if (trackBackground != null)
-                    trackBackground.Size = new Vector2(barThickness, maxSize);
+                trackBackground.Size = new Vector2(barThickness, maxSize);
 
                 bar.Width = barThickness;
                 applyBarAnchor();

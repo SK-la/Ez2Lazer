@@ -16,6 +16,10 @@ using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.Scoring
 {
+    /// <summary>
+    /// 单局共享角逐 Session：Mod 过滤、按指标 Pick ghost、时间线构建的唯一入口。
+    /// 两个 HUD 只读 <see cref="Entries"/> / 调用 <see cref="PickGhost"/>，禁止各自查 Realm 或自建 timeline。
+    /// </summary>
     public sealed class EzScoreRaceSession
     {
         private readonly RealmAccess realm;
@@ -26,9 +30,13 @@ namespace osu.Game.EzOsuGame.Scoring
 
         private readonly BindableBool isReady = new BindableBool();
         private readonly List<EzScoreRaceEntry> entries = new List<EzScoreRaceEntry>();
+        private readonly Dictionary<Guid, EzScoreRaceEntry> pickEntries = new Dictionary<Guid, EzScoreRaceEntry>();
+        private readonly HashSet<Guid> timelineLoadsPending = new HashSet<Guid>();
 
         private CancellationTokenSource? loadCancellation;
         private EzScoreModFilter modFilter = EzScoreModFilter.SameAsCurrent;
+        private List<ScoreInfo> modFilteredScores = new List<ScoreInfo>();
+        private bool scorePoolDirty = true;
 
         public IBindable<bool> IsReady => isReady;
         public EzScoreRacePlayMode PlayMode { get; }
@@ -39,13 +47,13 @@ namespace osu.Game.EzOsuGame.Scoring
         public event Action? EntriesChanged;
 
         public EzScoreRaceSession(RealmAccess realm, ScoreManager scoreManager, BeatmapManager beatmaps, GameplayState gameplayState, EzScoreRacePlayMode playMode,
-            Action<Action>? scheduleCallback = null)
+                                  Action<Action>? scheduleCallback = null)
         {
             this.realm = realm;
             this.scoreManager = scoreManager;
             this.beatmaps = beatmaps;
             this.gameplayState = gameplayState;
-            this.PlayMode = playMode;
+            PlayMode = playMode;
             this.scheduleCallback = scheduleCallback;
         }
 
@@ -75,8 +83,54 @@ namespace osu.Game.EzOsuGame.Scoring
             MaxEntryCount = clamped;
             cancelLoad();
             entries.RemoveAll(e => !e.Tracked);
+            pickEntries.Clear();
+            scorePoolDirty = true;
             loadCancellation = new CancellationTokenSource();
             beginLoad(loadCancellation.Token);
+        }
+
+        /// <summary>
+        /// 在 Mod 过滤后的全量候选里，按指标选出 ghost 并确保 Session 条目与时间线加载。
+        /// </summary>
+        public EzScoreRaceEntry? PickGhost(EzScoreRaceMetric metric, ScoreInfo? exclude = null)
+        {
+            if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
+                return null;
+
+            var scoreInfo = EzLocalScoreQueries.PickBest(GetModFilteredScores(), metric, exclude);
+
+            if (scoreInfo == null)
+                return null;
+
+            var entry = getOrCreatePickEntry(scoreInfo);
+            ensureTimelinesLoaded(new[] { scoreInfo });
+            return entry;
+        }
+
+        /// <summary>
+        /// 读取 ghost 在指定时钟的 timeline 分数；未就绪返回 0（禁止终局分回退）。
+        /// </summary>
+        public static long QueryTimelineScore(EzScoreRaceEntry? entry, double clockTime)
+        {
+            if (entry == null || entry.Tracked || entry.Timeline == null)
+                return 0;
+
+            return entry.Timeline.QueryAtTime(clockTime).TotalScore;
+        }
+
+        public IReadOnlyList<ScoreInfo> GetModFilteredScores()
+        {
+            if (!scorePoolDirty)
+                return modFilteredScores;
+
+            var beatmapInfo = gameplayState.Beatmap.BeatmapInfo;
+            var rulesetInfo = gameplayState.Ruleset.RulesetInfo;
+            var currentMods = gameplayState.Mods.ToArray();
+
+            var localScores = EzLocalScoreQueries.GetLocalScoresWithReplay(realm, beatmapInfo, rulesetInfo);
+            modFilteredScores = EzLocalScoreQueries.FilterByMods(localScores, currentMods, modFilter).ToList();
+            scorePoolDirty = false;
+            return modFilteredScores;
         }
 
         public void Dispose()
@@ -94,7 +148,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 ensureTrackedEntry();
 
                 if (PlayMode != EzScoreRacePlayMode.SpectatingLive)
-                    ensureGhostPlaceholders();
+                    ensureLeaderboardGhostPlaceholders();
 
                 isReady.Value = true;
                 notifyEntriesChanged();
@@ -103,7 +157,7 @@ namespace osu.Game.EzOsuGame.Scoring
             if (PlayMode == EzScoreRacePlayMode.SpectatingLive)
                 return;
 
-            loadGhostTimelinesAsync(cancellationToken);
+            ensureTimelinesLoaded(queryLeaderboardGhostScores(), cancellationToken);
         }
 
         private void ensureTrackedEntry()
@@ -114,45 +168,95 @@ namespace osu.Game.EzOsuGame.Scoring
             entries.Add(new EzScoreRaceEntry(gameplayState.Score.ScoreInfo, tracked: true));
         }
 
-        private IReadOnlyList<ScoreInfo> queryGhostScores()
-        {
-            var beatmapInfo = gameplayState.Beatmap.BeatmapInfo;
-            var rulesetInfo = gameplayState.Ruleset.RulesetInfo;
-            var currentMods = gameplayState.Mods.ToArray();
+        private IReadOnlyList<ScoreInfo> queryLeaderboardGhostScores()
+            => EzLocalScoreQueries.GetTopByTotalScore(GetModFilteredScores(), MaxEntryCount);
 
-            var localScores = EzLocalScoreQueries.GetLocalScoresWithReplay(realm, beatmapInfo, rulesetInfo);
-            var filteredScores = EzLocalScoreQueries.FilterByMods(localScores, currentMods, modFilter).ToList();
-            return EzLocalScoreQueries.GetTopByTotalScore(filteredScores, MaxEntryCount);
+        private void ensureLeaderboardGhostPlaceholders()
+        {
+            foreach (var scoreInfo in queryLeaderboardGhostScores())
+                ensureGhostEntry(scoreInfo);
         }
 
-        private void ensureGhostPlaceholders()
+        private EzScoreRaceEntry getOrCreatePickEntry(ScoreInfo scoreInfo)
         {
-            foreach (var scoreInfo in queryGhostScores())
+            if (pickEntries.TryGetValue(scoreInfo.ID, out var existing))
             {
-                if (entries.Any(e => !e.Tracked && e.ScoreInfo.ID == scoreInfo.ID))
-                    continue;
-
-                int trackedIndex = entries.FindIndex(e => e.Tracked);
-                var ghostEntry = new EzScoreRaceEntry(scoreInfo);
-
-                if (trackedIndex >= 0)
-                    entries.Insert(trackedIndex, ghostEntry);
-                else
-                    entries.Add(ghostEntry);
+                syncTimelineFromEntries(existing);
+                return existing;
             }
+
+            var pickEntry = new EzScoreRaceEntry(scoreInfo);
+            syncTimelineFromEntries(pickEntry);
+            pickEntries[scoreInfo.ID] = pickEntry;
+            return pickEntry;
         }
 
-        private void loadGhostTimelinesAsync(CancellationToken cancellationToken)
+        private EzScoreRaceEntry ensureGhostEntry(ScoreInfo scoreInfo)
         {
-            var topScores = queryGhostScores();
+            var existing = entries.FirstOrDefault(e => !e.Tracked && e.ScoreInfo.ID == scoreInfo.ID);
+
+            if (existing != null)
+                return existing;
+
+            int trackedIndex = entries.FindIndex(e => e.Tracked);
+            var ghostEntry = new EzScoreRaceEntry(scoreInfo);
+
+            if (trackedIndex >= 0)
+                entries.Insert(trackedIndex, ghostEntry);
+            else
+                entries.Add(ghostEntry);
+
+            syncTimelineFromEntries(ghostEntry);
+            return ghostEntry;
+        }
+
+        private void syncTimelineFromEntries(EzScoreRaceEntry entry)
+        {
+            if (entry.Timeline != null)
+                return;
+
+            var sessionEntry = entries.FirstOrDefault(e => e.ScoreInfo.ID == entry.ScoreInfo.ID);
+
+            if (sessionEntry?.Timeline != null)
+                entry.Timeline = sessionEntry.Timeline;
+        }
+
+        private void assignTimeline(ScoreInfo scoreInfo, EzScoreTimeline timeline)
+        {
+            var sessionEntry = entries.FirstOrDefault(e => !e.Tracked && e.ScoreInfo.ID == scoreInfo.ID);
+
+            if (sessionEntry != null)
+                sessionEntry.Timeline = timeline;
+
+            if (pickEntries.TryGetValue(scoreInfo.ID, out var pickEntry))
+                pickEntry.Timeline = timeline;
+        }
+
+        private void ensureTimelinesLoaded(IEnumerable<ScoreInfo> scoreInfos, CancellationToken cancellationToken = default)
+        {
+            if (PlayMode == EzScoreRacePlayMode.SpectatingLive)
+                return;
+
+            cancellationToken = cancellationToken == CancellationToken.None ? loadCancellation?.Token ?? CancellationToken.None : cancellationToken;
+
+            if (cancellationToken == CancellationToken.None)
+                return;
+
+            var scoresToLoad = scoreInfos
+                               .Where(s => !hasTimeline(s) && timelineLoadsPending.Add(s.ID))
+                               .ToList();
+
+            if (scoresToLoad.Count == 0)
+                return;
+
             var currentMods = gameplayState.Mods.ToArray();
-            IBeatmap? sharedPlayableBeatmap = gameplayState.Beatmap;
+            IBeatmap sharedPlayableBeatmap = gameplayState.Beatmap;
 
             Task.Run(async () =>
             {
                 try
                 {
-                    var buildTasks = topScores.Select(scoreInfo => Task.Run(() =>
+                    var buildTasks = scoresToLoad.Select(scoreInfo => Task.Run(() =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();
 
@@ -182,20 +286,20 @@ namespace osu.Game.EzOsuGame.Scoring
                         if (cancellationToken.IsCancellationRequested)
                             return;
 
-                        if (timeline == null)
-                            continue;
-
                         schedule(() =>
                         {
+                            timelineLoadsPending.Remove(scoreInfo.ID);
+
                             if (cancellationToken.IsCancellationRequested)
                                 return;
 
-                            var entry = entries.FirstOrDefault(e => !e.Tracked && e.ScoreInfo.ID == scoreInfo.ID);
-
-                            if (entry == null || entry.Timeline != null)
+                            if (timeline == null)
                                 return;
 
-                            entry.Timeline = timeline;
+                            if (hasTimeline(scoreInfo))
+                                return;
+
+                            assignTimeline(scoreInfo, timeline);
                             notifyEntriesChanged();
                         });
                     }
@@ -204,6 +308,14 @@ namespace osu.Game.EzOsuGame.Scoring
                 {
                 }
             }, cancellationToken);
+        }
+
+        private bool hasTimeline(ScoreInfo scoreInfo)
+        {
+            if (entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfo.ID)?.Timeline != null)
+                return true;
+
+            return pickEntries.TryGetValue(scoreInfo.ID, out var pickEntry) && pickEntry.Timeline != null;
         }
 
         private void notifyEntriesChanged() => EntriesChanged?.Invoke();
@@ -221,6 +333,7 @@ namespace osu.Game.EzOsuGame.Scoring
             loadCancellation?.Cancel();
             loadCancellation?.Dispose();
             loadCancellation = null;
+            timelineLoadsPending.Clear();
         }
     }
 }
