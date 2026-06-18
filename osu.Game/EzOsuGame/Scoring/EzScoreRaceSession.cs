@@ -38,7 +38,6 @@ namespace osu.Game.EzOsuGame.Scoring
         private bool scorePoolDirty = true;
 
         public IBindable<bool> IsReady => isReady;
-        public EzScoreRacePlayMode PlayMode { get; }
         public bool SupportsGhostRace { get; }
 
         public IReadOnlyList<EzScoreRaceEntry> Entries => entries;
@@ -53,7 +52,6 @@ namespace osu.Game.EzOsuGame.Scoring
             this.scoreManager = scoreManager;
             this.beatmaps = beatmaps;
             this.gameplayState = gameplayState;
-            PlayMode = playMode;
             SupportsGhostRace = EzScoreRaceRulesetSupport.SupportsGhostRace(gameplayState.Ruleset.RulesetInfo)
                                 && playMode != EzScoreRacePlayMode.SpectatingLive;
             this.scheduleCallback = scheduleCallback;
