@@ -122,7 +122,7 @@ namespace osu.Game.EzOsuGame.Scoring
             return entry.Timeline.QueryAtTime(clockTime).TotalScore;
         }
 
-        public IReadOnlyList<ScoreInfo> GetModFilteredScores()
+        private IReadOnlyList<ScoreInfo> GetModFilteredScores()
         {
             if (!scorePoolDirty)
                 return modFilteredScores;
