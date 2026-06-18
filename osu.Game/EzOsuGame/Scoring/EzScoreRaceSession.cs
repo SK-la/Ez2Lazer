@@ -96,7 +96,7 @@ namespace osu.Game.EzOsuGame.Scoring
             if (!SupportsGhostRace)
                 return null;
 
-            var scoreInfo = EzLocalScoreQueries.PickBest(GetModFilteredScores(), metric);
+            var scoreInfo = EzLocalScoreQueries.PickBest(getModFilteredScores(), metric);
 
             if (scoreInfo == null)
                 return null;
@@ -114,10 +114,18 @@ namespace osu.Game.EzOsuGame.Scoring
         /// </summary>
         public static EzScoreTimelineSnapshot QuerySnapshot(EzScoreRaceEntry? entry, double clockTime)
         {
-            if (entry == null || entry.Tracked || entry.Timeline == null)
+            if (entry == null || entry.Tracked)
                 return EzScoreTimelineSnapshot.Empty;
 
-            return entry.Timeline.QueryAtTime(clockTime);
+            return QuerySnapshot(entry.Timeline, clockTime);
+        }
+
+        public static EzScoreTimelineSnapshot QuerySnapshot(EzScoreTimeline? timeline, double clockTime)
+        {
+            if (timeline == null)
+                return EzScoreTimelineSnapshot.Empty;
+
+            return timeline.QueryAtTime(clockTime);
         }
 
         /// <summary>
@@ -126,7 +134,7 @@ namespace osu.Game.EzOsuGame.Scoring
         public static long QueryTimelineScore(EzScoreRaceEntry? entry, double clockTime)
             => QuerySnapshot(entry, clockTime).TotalScore;
 
-        private IReadOnlyList<ScoreInfo> GetModFilteredScores()
+        private IReadOnlyList<ScoreInfo> getModFilteredScores()
         {
             if (!scorePoolDirty)
                 return modFilteredScores;
@@ -177,7 +185,7 @@ namespace osu.Game.EzOsuGame.Scoring
         }
 
         private IReadOnlyList<ScoreInfo> queryLeaderboardGhostScores()
-            => EzLocalScoreQueries.GetTopByTotalScore(GetModFilteredScores(), MaxEntryCount);
+            => EzLocalScoreQueries.GetTopByTotalScore(getModFilteredScores(), MaxEntryCount);
 
         private void ensureLeaderboardGhostPlaceholders()
         {
