@@ -237,7 +237,7 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
-            long barScore = EzScoreRaceSession.QueryTimelineScore(pickedEntry, clockTime);
+            long barScore = EzScoreRaceSession.QuerySnapshot(pickedEntry, clockTime).TotalScore;
             bar.UpdateValues(
                 metric.GetLocalisableDescription(),
                 formatBarValue(barScore, pickedEntry),
