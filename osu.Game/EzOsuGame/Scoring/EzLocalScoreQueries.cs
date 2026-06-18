@@ -64,6 +64,23 @@ namespace osu.Game.EzOsuGame.Scoring
             };
         }
 
+        public static ScoreInfo? PickBest(IEnumerable<ScoreInfo> scores, EzScoreCompareCondition condition, ScoreInfo? exclude = null)
+        {
+            if (condition == EzScoreCompareCondition.TheoreticalMaxScore)
+                return null;
+
+            return PickBest(scores, toPickCriterion(condition), exclude);
+        }
+
+        private static EzScorePickCriterion toPickCriterion(EzScoreCompareCondition condition) => condition switch
+        {
+            EzScoreCompareCondition.BestTotalScore => EzScorePickCriterion.TotalScore,
+            EzScoreCompareCondition.BestAccuracy => EzScorePickCriterion.Accuracy,
+            EzScoreCompareCondition.BestMaxCombo => EzScorePickCriterion.MaxCombo,
+            EzScoreCompareCondition.BestMissCount => EzScorePickCriterion.MissCount,
+            _ => throw new ArgumentOutOfRangeException(nameof(condition), condition, null),
+        };
+
         public static List<ScoreInfo> GetTopByTotalScore(IEnumerable<ScoreInfo> scores, int take)
         {
             return scores.OrderByDescending(s => s.TotalScore)

@@ -2,12 +2,15 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Localisation;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
@@ -31,63 +34,73 @@ namespace osu.Game.EzOsuGame.HUD
     }
 
     /// <summary>
-    /// BMS 风格三柱分数对比：当前局 + 两条按条件选出的历史最佳成绩。
-    /// 柱高始终按 TotalScore 绘制；上下文字分别为指标名与指标值。
+    /// BMS 风格三柱分数对比：当前局 + 两条按对比条件选出的参考柱。
+    /// 柱高与标签数值始终按 TotalScore 绘制；对比条件仅用于筛选对比哪条成绩。
     /// </summary>
     public partial class EzHUDScoreCompareBars : EzHUDScoreRaceComponent, ISerialisableDrawable
     {
         public bool UsesFixedAnchor { get; set; }
 
-        protected override bool ContributesMaxEntryCount => true;
+        protected override bool ContributesMaxEntryCount => false;
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_MOD_FILTER_LABEL), nameof(EzHUDStrings.SCORE_RACE_MOD_FILTER_DESCRIPTION))]
         public Bindable<EzScoreModFilter> ModFilterSetting { get; } = new Bindable<EzScoreModFilter>(EzScoreModFilter.Any);
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_MAX_ENTRIES_LABEL), nameof(EzHUDStrings.SCORE_RACE_MAX_ENTRIES_DESCRIPTION))]
-        public BindableNumber<int> MaxEntriesSetting { get; } = new BindableNumber<int>(10)
-        {
-            MinValue = 1,
-            MaxValue = 10,
-        };
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION1_DESCRIPTION))]
+        public Bindable<EzScoreCompareCondition> CompareCondition1 { get; } = new Bindable<EzScoreCompareCondition>(EzScoreCompareCondition.BestAccuracy);
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_SLOT1_CRITERION_LABEL), nameof(EzHUDStrings.SCORE_RACE_SLOT1_CRITERION_DESCRIPTION))]
-        public Bindable<EzScorePickCriterion> Slot1Criterion { get; } = new Bindable<EzScorePickCriterion>(EzScorePickCriterion.Accuracy);
-
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_SLOT2_CRITERION_LABEL), nameof(EzHUDStrings.SCORE_RACE_SLOT2_CRITERION_DESCRIPTION))]
-        public Bindable<EzScorePickCriterion> Slot2Criterion { get; } = new Bindable<EzScorePickCriterion>(EzScorePickCriterion.TotalScore);
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION2_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_CONDITION2_DESCRIPTION))]
+        public Bindable<EzScoreCompareCondition> CompareCondition2 { get; } = new Bindable<EzScoreCompareCondition>(EzScoreCompareCondition.BestTotalScore);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_BAR_DIRECTION_LABEL), nameof(EzHUDStrings.SCORE_RACE_BAR_DIRECTION_DESCRIPTION))]
         public Bindable<EzScoreCompareBarDirection> BarDirection { get; } = new Bindable<EzScoreCompareBarDirection>(EzScoreCompareBarDirection.Upward);
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_RACE_MAX_BAR_HEIGHT_LABEL), nameof(EzHUDStrings.SCORE_RACE_MAX_BAR_HEIGHT_DESCRIPTION))]
-        public BindableNumber<float> MaxBarHeight { get; } = new BindableNumber<float>(120)
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_BAR_HEIGHT_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_BAR_HEIGHT_DESCRIPTION))]
+        public BindableNumber<float> BarHeight { get; } = new BindableNumber<float>(120)
         {
             MinValue = 40,
             MaxValue = 400,
             Precision = 1,
         };
 
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_BAR_WIDTH_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_BAR_WIDTH_DESCRIPTION))]
+        public BindableNumber<float> BarWidth { get; } = new BindableNumber<float>(88)
+        {
+            MinValue = 40,
+            MaxValue = 200,
+            Precision = 1,
+        };
+
         private const float bar_spacing = 4;
         private const float label_area_height = 36;
+        private const float container_padding = 6;
 
         private osu.Framework.Graphics.Containers.Container barsContainer = null!;
         private readonly CompareBar[] bars = new CompareBar[3];
 
         public EzHUDScoreCompareBars()
         {
-            Width = 340;
-            Height = 210;
+            Width = 3 * BarWidth.Value + 2 * bar_spacing + container_padding * 2;
+            Height = BarHeight.Value + label_area_height + container_padding * 2;
+        }
+
+        protected override void ConfigureSession()
+        {
+            if (Session == null)
+                return;
+
+            // 仅同步 Mod 过滤；条目数由角逐榜组件负责。
+            Session.ReloadIfNeeded(ModFilter.Value, Session.MaxEntryCount);
         }
 
         protected override void LoadComplete()
         {
             ModFilter.BindTo(ModFilterSetting);
-            MaxEntries.BindTo(MaxEntriesSetting);
 
             barsContainer = new osu.Framework.Graphics.Containers.Container
             {
                 RelativeSizeAxes = Axes.Both,
-                Padding = new MarginPadding(6),
+                Padding = new MarginPadding(container_padding),
             };
 
             for (int i = 0; i < bars.Length; i++)
@@ -101,10 +114,11 @@ namespace osu.Game.EzOsuGame.HUD
 
             base.LoadComplete();
 
-            Slot1Criterion.BindValueChanged(_ => refreshHistoricalBars(), true);
-            Slot2Criterion.BindValueChanged(_ => refreshHistoricalBars(), true);
+            CompareCondition1.BindValueChanged(_ => refreshHistoricalBars(), true);
+            CompareCondition2.BindValueChanged(_ => refreshHistoricalBars(), true);
             BarDirection.BindValueChanged(_ => layoutBars(), true);
-            MaxBarHeight.BindValueChanged(_ => layoutBars(), true);
+            BarHeight.BindValueChanged(_ => layoutBars(), true);
+            BarWidth.BindValueChanged(_ => layoutBars(), true);
 
             layoutBars();
         }
@@ -127,25 +141,23 @@ namespace osu.Game.EzOsuGame.HUD
             double clockTime = GetCurrentClockTime();
 
             long nowBarScore = GetLiveDisplayScore();
-            var slot1Info = getSlotScoreInfo(1);
-            var slot2Info = getSlotScoreInfo(2);
-            long slot1BarScore = getTotalScoreAtTime(slot1Info, clockTime);
-            long slot2BarScore = getTotalScoreAtTime(slot2Info, clockTime);
+            long condition1BarScore = getBarScoreAtTime(CompareCondition1.Value, clockTime, exclude: null);
+            long condition2BarScore = getBarScoreAtTime(CompareCondition2.Value, clockTime, getExcludeForCondition2());
 
             long maxBarScore = Math.Max(1, nowBarScore);
-            maxBarScore = Math.Max(maxBarScore, slot1BarScore);
-            maxBarScore = Math.Max(maxBarScore, slot2BarScore);
+            maxBarScore = Math.Max(maxBarScore, condition1BarScore);
+            maxBarScore = Math.Max(maxBarScore, condition2BarScore);
 
-            bars[0].UpdateValues("Now", formatMetricValue(EzScorePickCriterion.TotalScore, nowBarScore, null), nowBarScore, maxBarScore);
+            bars[0].UpdateValues(EzHUDStrings.SCORE_COMPARE_NOW_LABEL, formatScore(nowBarScore), nowBarScore, maxBarScore);
             bars[1].UpdateValues(
-                formatCriterion(Slot1Criterion.Value),
-                formatMetricValue(Slot1Criterion.Value, 0, slot1Info, clockTime),
-                slot1BarScore,
+                new LocalisableString(formatCondition(CompareCondition1.Value)),
+                formatScore(condition1BarScore),
+                condition1BarScore,
                 maxBarScore);
             bars[2].UpdateValues(
-                formatCriterion(Slot2Criterion.Value),
-                formatMetricValue(Slot2Criterion.Value, 0, slot2Info, clockTime),
-                slot2BarScore,
+                new LocalisableString(formatCondition(CompareCondition2.Value)),
+                formatScore(condition2BarScore),
+                condition2BarScore,
                 maxBarScore);
         }
 
@@ -157,19 +169,30 @@ namespace osu.Game.EzOsuGame.HUD
             UpdateDisplay();
         }
 
-        private ScoreInfo? getSlotScoreInfo(int slot)
+        private ScoreInfo? getExcludeForCondition2()
         {
-            if (Session == null)
+            if (CompareCondition1.Value == EzScoreCompareCondition.TheoreticalMaxScore)
                 return null;
 
-            var candidates = Session.Entries.Where(e => !e.Tracked).Select(e => e.ScoreInfo).ToList();
+            return EzLocalScoreQueries.PickBest(getCompareCandidates(), CompareCondition1.Value);
+        }
 
-            return slot switch
-            {
-                1 => EzLocalScoreQueries.PickBest(candidates, Slot1Criterion.Value),
-                2 => EzLocalScoreQueries.PickBest(candidates, Slot2Criterion.Value, exclude: EzLocalScoreQueries.PickBest(candidates, Slot1Criterion.Value)),
-                _ => null,
-            };
+        private long getBarScoreAtTime(EzScoreCompareCondition condition, double clockTime, ScoreInfo? exclude)
+        {
+            if (condition == EzScoreCompareCondition.TheoreticalMaxScore)
+                return getTheoreticalScoreAtTime();
+
+            var scoreInfo = EzLocalScoreQueries.PickBest(getCompareCandidates(), condition, exclude);
+            return getTotalScoreAtTime(scoreInfo, clockTime);
+        }
+
+        private List<ScoreInfo> getCompareCandidates()
+        {
+            if (GameplayState == null)
+                return new List<ScoreInfo>();
+
+            var localScores = EzLocalScoreQueries.GetLocalScoresWithReplay(Realm, GameplayState.Beatmap.BeatmapInfo, GameplayState.Ruleset.RulesetInfo);
+            return EzLocalScoreQueries.FilterByMods(localScores, GameplayState.Mods.ToArray(), ModFilter.Value).ToList();
         }
 
         private long getTotalScoreAtTime(ScoreInfo? scoreInfo, double clockTime)
@@ -185,89 +208,48 @@ namespace osu.Game.EzOsuGame.HUD
             return scoreInfo.TotalScore;
         }
 
-        private long getMetricAtTime(ScoreInfo? scoreInfo, EzScorePickCriterion criterion, double clockTime)
+        private long getTheoreticalScoreAtTime()
         {
-            if (scoreInfo == null || Session == null)
+            if (ScoreProcessor == null)
                 return 0;
 
-            var entry = Session.Entries.FirstOrDefault(e => !e.Tracked && e.ScoreInfo.ID == scoreInfo.ID);
-
-            if (entry?.Timeline != null)
-                return getSnapshotMetric(entry.Timeline.QueryAtTime(clockTime), criterion, scoreInfo);
-
-            return getStaticMetric(scoreInfo, criterion);
+            return (long)Math.Round(ScoreProcessor.MinimumAccuracy.Value * osu.Game.Rulesets.Scoring.ScoreProcessor.MAX_SCORE);
         }
 
-        private string formatMetricValue(EzScorePickCriterion criterion, long liveValue, ScoreInfo? scoreInfo, double clockTime = 0)
-        {
-            if (criterion == EzScorePickCriterion.TotalScore && scoreInfo == null)
-                return liveValue.ToString("N0");
-
-            if (scoreInfo == null)
-                return "-";
-
-            long metric = getMetricAtTime(scoreInfo, criterion, clockTime);
-
-            return criterion switch
-            {
-                EzScorePickCriterion.TotalScore => metric.ToString("N0"),
-                EzScorePickCriterion.Accuracy => (metric / 1_000_000.0).ToString("P2"),
-                EzScorePickCriterion.MaxCombo => metric.ToString("N0"),
-                EzScorePickCriterion.MissCount => metric.ToString("N0"),
-                _ => metric.ToString("N0"),
-            };
-        }
-
-        private static long getSnapshotMetric(EzScoreTimelineSnapshot snapshot, EzScorePickCriterion criterion, ScoreInfo scoreInfo)
-        {
-            return criterion switch
-            {
-                EzScorePickCriterion.TotalScore => snapshot.TotalScore,
-                EzScorePickCriterion.Accuracy => (long)Math.Round(snapshot.Accuracy * 1_000_000),
-                EzScorePickCriterion.MaxCombo => snapshot.HighestCombo,
-                EzScorePickCriterion.MissCount => snapshot.MissCount,
-                _ => 0,
-            };
-        }
-
-        private static long getStaticMetric(ScoreInfo scoreInfo, EzScorePickCriterion criterion)
-        {
-            return criterion switch
-            {
-                EzScorePickCriterion.TotalScore => scoreInfo.TotalScore,
-                EzScorePickCriterion.Accuracy => (long)Math.Round(scoreInfo.Accuracy * 1_000_000),
-                EzScorePickCriterion.MaxCombo => scoreInfo.MaxCombo,
-                EzScorePickCriterion.MissCount => EzLocalScoreQueries.GetMissCount(scoreInfo),
-                _ => 0,
-            };
-        }
+        private static string formatScore(long score) => score.ToString("N0");
 
         private void layoutBars()
         {
-            float barThickness = Math.Max(88, (barsContainer.DrawWidth - bar_spacing * 2) / 3);
+            float barThickness = BarWidth.Value;
+            float barAxisHeight = BarHeight.Value;
             var direction = BarDirection.Value;
+
+            Width = bars.Length * barThickness + (bars.Length - 1) * bar_spacing + container_padding * 2;
+            Height = barAxisHeight + label_area_height + container_padding * 2;
 
             for (int i = 0; i < bars.Length; i++)
             {
                 var bar = bars[i];
-                bar.Configure(direction, MaxBarHeight.Value);
+                bar.Configure(direction, barAxisHeight);
 
                 bar.Anchor = Anchor.BottomLeft;
                 bar.Origin = Anchor.BottomLeft;
                 bar.Width = barThickness;
-                bar.Height = MaxBarHeight.Value + label_area_height;
+                bar.Height = barAxisHeight + label_area_height;
                 bar.X = i * (barThickness + bar_spacing);
             }
         }
 
-        private static string formatCriterion(EzScorePickCriterion criterion) => criterion switch
+        private static string formatCondition(EzScoreCompareCondition condition)
         {
-            EzScorePickCriterion.TotalScore => "Score",
-            EzScorePickCriterion.Accuracy => "Acc",
-            EzScorePickCriterion.MaxCombo => "Combo",
-            EzScorePickCriterion.MissCount => "Miss",
-            _ => criterion.ToString(),
-        };
+            var field = typeof(EzScoreCompareCondition).GetField(condition.ToString());
+
+            if (field == null)
+                return condition.ToString();
+
+            var description = field.GetCustomAttribute<DescriptionAttribute>()?.Description;
+            return string.IsNullOrEmpty(description) ? condition.ToString() : description;
+        }
 
         private partial class CompareBar : CompositeDrawable
         {
@@ -350,7 +332,7 @@ namespace osu.Game.EzOsuGame.HUD
                 }
             }
 
-            public void UpdateValues(string title, string value, long barScore, long maxBarScore)
+            public void UpdateValues(LocalisableString title, string value, long barScore, long maxBarScore)
             {
                 Alpha = 1;
                 titleText.Text = title;

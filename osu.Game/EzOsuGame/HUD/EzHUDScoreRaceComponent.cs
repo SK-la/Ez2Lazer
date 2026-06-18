@@ -76,7 +76,7 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
-            Session.Configure(ModFilter.Value, getEffectiveMaxEntryCount());
+            ConfigureSession();
 
             ModFilter.BindValueChanged(_ => reloadSession(), true);
             MaxEntries.BindValueChanged(_ => reloadSession(), true);
@@ -134,9 +134,17 @@ namespace osu.Game.EzOsuGame.HUD
             AddInternal(loadingText);
         }
 
+        protected virtual void ConfigureSession()
+        {
+            Session?.Configure(ModFilter.Value, getEffectiveMaxEntryCount());
+        }
+
         private void reloadSession()
         {
-            Session?.ReloadIfNeeded(ModFilter.Value, getEffectiveMaxEntryCount());
+            if (Session == null)
+                return;
+
+            Session.ReloadIfNeeded(ModFilter.Value, getEffectiveMaxEntryCount());
         }
 
         private int getEffectiveMaxEntryCount()

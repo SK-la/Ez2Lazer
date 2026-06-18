@@ -190,16 +190,19 @@ namespace osu.Game.EzOsuGame.Localization
             "速度变化时在折线右端显示不显眼的闪烁白点。",
             "Show a subtle blinking white dot at the line endpoint while speed is changing.");
 
-        public static readonly LocalisableString SCORE_RACE_SLOT1_CRITERION_LABEL = new EzLocalizationManager.EzLocalisableString("历史柱 1 条件", "History Bar 1 Criterion");
-        public static readonly LocalisableString SCORE_RACE_SLOT1_CRITERION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按此条件选择第一条历史最佳成绩", "Pick the first historical score by this criterion.");
-        public static readonly LocalisableString SCORE_RACE_SLOT2_CRITERION_LABEL = new EzLocalizationManager.EzLocalisableString("历史柱 2 条件", "History Bar 2 Criterion");
-        public static readonly LocalisableString SCORE_RACE_SLOT2_CRITERION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按此条件选择第二条历史最佳成绩", "Pick the second historical score by this criterion.");
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION1_LABEL = new EzLocalizationManager.EzLocalisableString("对比条件 1", "Compare Condition 1");
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION1_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按此条件筛选第一条对比成绩（柱高始终为分数）", "Pick the first comparison score by this criterion (bar height is always score).");
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION2_LABEL = new EzLocalizationManager.EzLocalisableString("对比条件 2", "Compare Condition 2");
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION2_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按此条件筛选第二条对比成绩（柱高始终为分数）", "Pick the second comparison score by this criterion (bar height is always score).");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("柱状图高度", "Bar Height");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("柱体主轴的像素高度", "Pixel height of the bar axis.");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_WIDTH_LABEL = new EzLocalizationManager.EzLocalisableString("柱状图宽度", "Bar Width");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_WIDTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("单根柱体的像素宽度", "Pixel width of each bar.");
+        public static readonly LocalisableString SCORE_COMPARE_NOW_LABEL = new EzLocalizationManager.EzLocalisableString("当前", "Now");
         public static readonly LocalisableString SCORE_RACE_MOD_FILTER_LABEL = new EzLocalizationManager.EzLocalisableString("Mod 过滤", "Mod Filter");
         public static readonly LocalisableString SCORE_RACE_MOD_FILTER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("对比成绩的 Mod 范围", "Which mod combinations to include when selecting scores.");
         public static readonly LocalisableString SCORE_RACE_BAR_DIRECTION_LABEL = new EzLocalizationManager.EzLocalisableString("柱图方向", "Bar Direction");
         public static readonly LocalisableString SCORE_RACE_BAR_DIRECTION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("柱体向上或向下增长", "Bars grow upward or downward.");
-        public static readonly LocalisableString SCORE_RACE_MAX_BAR_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("柱图最大尺寸", "Max Bar Size");
-        public static readonly LocalisableString SCORE_RACE_MAX_BAR_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("柱图主轴的最大像素长度", "Maximum pixel length along the bar axis.");
         public static readonly LocalisableString SCORE_RACE_SHOW_LABELS_LABEL = new EzLocalizationManager.EzLocalisableString("显示标签", "Show Labels");
         public static readonly LocalisableString SCORE_RACE_SHOW_LABELS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("显示柱下条件与统计标签", "Show criterion and stat labels under bars.");
         public static readonly LocalisableString SCORE_RACE_MAX_ENTRIES_LABEL = new EzLocalizationManager.EzLocalisableString("列表条目数", "List Entry Count");
