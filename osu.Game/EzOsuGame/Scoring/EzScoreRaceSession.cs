@@ -30,7 +30,6 @@ namespace osu.Game.EzOsuGame.Scoring
 
         private readonly BindableBool isReady = new BindableBool();
         private readonly List<EzScoreRaceEntry> entries = new List<EzScoreRaceEntry>();
-        private readonly Dictionary<Guid, EzScoreRaceEntry> pickEntries = new Dictionary<Guid, EzScoreRaceEntry>();
         private readonly HashSet<Guid> timelineLoadsPending = new HashSet<Guid>();
 
         private CancellationTokenSource? loadCancellation;
@@ -86,7 +85,6 @@ namespace osu.Game.EzOsuGame.Scoring
             MaxEntryCount = clamped;
             cancelLoad();
             entries.RemoveAll(e => !e.Tracked);
-            pickEntries.Clear();
             scorePoolDirty = true;
             loadCancellation = new CancellationTokenSource();
             beginLoad(loadCancellation.Token);
@@ -95,21 +93,17 @@ namespace osu.Game.EzOsuGame.Scoring
         /// <summary>
         /// 在 Mod 过滤后的全量候选里，按指标选出 ghost 并确保 Session 条目与时间线加载。
         /// </summary>
-        public EzScoreRaceEntry? PickGhost(EzScoreRaceMetric metric, ScoreInfo? exclude = null)
+        public EzScoreRaceEntry? PickGhost(EzScoreRaceMetric metric)
         {
             if (!SupportsGhostRace)
                 return null;
 
-            if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
-                return null;
-
-            var scoreInfo = EzLocalScoreQueries.PickBest(GetModFilteredScores(), metric, exclude);
+            var scoreInfo = EzLocalScoreQueries.PickBest(GetModFilteredScores(), metric);
 
             if (scoreInfo == null)
                 return null;
 
-            var entry = getOrCreatePickEntry(scoreInfo);
-            syncTimelineFromEntries(entry);
+            var entry = ensureGhostEntry(scoreInfo);
 
             if (entry.Timeline == null)
                 ensureTimelinesLoaded(new[] { scoreInfo });
@@ -187,20 +181,6 @@ namespace osu.Game.EzOsuGame.Scoring
                 ensureGhostEntry(scoreInfo);
         }
 
-        private EzScoreRaceEntry getOrCreatePickEntry(ScoreInfo scoreInfo)
-        {
-            if (pickEntries.TryGetValue(scoreInfo.ID, out var existing))
-            {
-                syncTimelineFromEntries(existing);
-                return existing;
-            }
-
-            var pickEntry = new EzScoreRaceEntry(scoreInfo);
-            syncTimelineFromEntries(pickEntry);
-            pickEntries[scoreInfo.ID] = pickEntry;
-            return pickEntry;
-        }
-
         private EzScoreRaceEntry ensureGhostEntry(ScoreInfo scoreInfo)
         {
             var existing = entries.FirstOrDefault(e => !e.Tracked && e.ScoreInfo.ID == scoreInfo.ID);
@@ -216,30 +196,15 @@ namespace osu.Game.EzOsuGame.Scoring
             else
                 entries.Add(ghostEntry);
 
-            syncTimelineFromEntries(ghostEntry);
             return ghostEntry;
-        }
-
-        private void syncTimelineFromEntries(EzScoreRaceEntry entry)
-        {
-            if (entry.Timeline != null)
-                return;
-
-            var sessionEntry = entries.FirstOrDefault(e => e.ScoreInfo.ID == entry.ScoreInfo.ID);
-
-            if (sessionEntry?.Timeline != null)
-                entry.Timeline = sessionEntry.Timeline;
         }
 
         private void assignTimeline(ScoreInfo scoreInfo, EzScoreTimeline timeline)
         {
-            var sessionEntry = entries.FirstOrDefault(e => !e.Tracked && e.ScoreInfo.ID == scoreInfo.ID);
+            var entry = entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfo.ID);
 
-            if (sessionEntry != null)
-                sessionEntry.Timeline = timeline;
-
-            if (pickEntries.TryGetValue(scoreInfo.ID, out var pickEntry))
-                pickEntry.Timeline = timeline;
+            if (entry != null)
+                entry.Timeline = timeline;
         }
 
         private void ensureTimelinesLoaded(IEnumerable<ScoreInfo> scoreInfos, CancellationToken cancellationToken = default)
@@ -321,12 +286,7 @@ namespace osu.Game.EzOsuGame.Scoring
         }
 
         private bool hasTimeline(ScoreInfo scoreInfo)
-        {
-            if (entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfo.ID)?.Timeline != null)
-                return true;
-
-            return pickEntries.TryGetValue(scoreInfo.ID, out var pickEntry) && pickEntry.Timeline != null;
-        }
+            => entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfo.ID)?.Timeline != null;
 
         private void notifyEntriesChanged() => EntriesChanged?.Invoke();
 

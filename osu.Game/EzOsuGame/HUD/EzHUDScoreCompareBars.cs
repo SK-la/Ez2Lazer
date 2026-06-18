@@ -203,7 +203,6 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void OnEntriesChangedScheduled()
         {
-            // 时间线就绪后只刷新显示；勿重跑 PickGhost（会打断条件 2 刚发起的加载）。
             UpdateDisplay();
         }
 
@@ -234,14 +233,14 @@ namespace osu.Game.EzOsuGame.HUD
 
             if (Session == null || !Session.IsReady.Value)
             {
-                bar.UpdateValues(metric.GetLocalisableDescription(), "-", 0, barScoreScale, getBarColour(metric));
+                bar.UpdateValues(metric.GetLocalisableDescription(), string.Empty, 0, barScoreScale, getBarColour(metric));
                 return;
             }
 
             long barScore = EzScoreRaceSession.QueryTimelineScore(pickedEntry, clockTime);
             bar.UpdateValues(
                 metric.GetLocalisableDescription(),
-                formatScoreOrDash(barScore, pickedEntry, metric),
+                formatBarValue(barScore, pickedEntry),
                 barScore,
                 barScoreScale,
                 getBarColour(metric));
@@ -296,11 +295,23 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
-            pickedEntryForCondition1 = Session.PickGhost(CompareCondition1Setting.Value);
-            pickedEntryForCondition2 = Session.PickGhost(CompareCondition2Setting.Value, pickedEntryForCondition1?.ScoreInfo);
+            pickedEntryForCondition1 = CompareCondition1Setting.Value == EzScoreRaceMetric.TheoreticalMaxScore
+                ? null
+                : Session.PickGhost(CompareCondition1Setting.Value);
+            pickedEntryForCondition2 = CompareCondition2Setting.Value == EzScoreRaceMetric.TheoreticalMaxScore
+                ? null
+                : Session.PickGhost(CompareCondition2Setting.Value);
         }
 
         private static string formatScore(long score) => score.ToString("N0");
+
+        private static string formatBarValue(long barScore, EzScoreRaceEntry? pickedEntry)
+        {
+            if (pickedEntry == null || barScore <= 0)
+                return string.Empty;
+
+            return formatScore(barScore);
+        }
 
         /// <summary>
         /// 当前时刻「已判定区间全 Perfect」应达到的分数（≥ 当前实际分，与 live SP 同源）。
@@ -322,14 +333,6 @@ namespace osu.Game.EzOsuGame.HUD
                 return ScoreProcessor.MaximumTotalScore;
 
             return (long)ScoreProcessor.MAX_SCORE;
-        }
-
-        private static string formatScoreOrDash(long score, EzScoreRaceEntry? pickedEntry, EzScoreRaceMetric metric)
-        {
-            if (metric == EzScoreRaceMetric.TheoreticalMaxScore || pickedEntry == null)
-                return formatScore(score);
-
-            return score > 0 ? formatScore(score) : "-";
         }
 
         private void layoutBars()

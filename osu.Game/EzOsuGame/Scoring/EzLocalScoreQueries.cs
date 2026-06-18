@@ -50,19 +50,17 @@ namespace osu.Game.EzOsuGame.Scoring
 
         public static bool ModsMatch(Mod[] left, Mod[] right) => modsMatch(left, right);
 
-        public static ScoreInfo? PickBest(IEnumerable<ScoreInfo> scores, EzScoreRaceMetric metric, ScoreInfo? exclude = null)
+        public static ScoreInfo? PickBest(IEnumerable<ScoreInfo> scores, EzScoreRaceMetric metric)
         {
             if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
                 return null;
 
-            var candidates = scores.Where(s => exclude == null || s.ID != exclude.ID);
-
             return metric switch
             {
-                EzScoreRaceMetric.TotalScore => candidates.OrderByDescending(s => s.TotalScore).ThenByDescending(s => s.Date).FirstOrDefault(),
-                EzScoreRaceMetric.Accuracy => candidates.OrderByDescending(s => s.Accuracy).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
-                EzScoreRaceMetric.MaxCombo => candidates.OrderByDescending(s => s.MaxCombo).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
-                EzScoreRaceMetric.MissCount => candidates.OrderBy(GetMissCount).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
+                EzScoreRaceMetric.TotalScore => scores.OrderByDescending(s => s.TotalScore).ThenByDescending(s => s.Date).FirstOrDefault(),
+                EzScoreRaceMetric.Accuracy => scores.OrderByDescending(s => s.Accuracy).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
+                EzScoreRaceMetric.MaxCombo => scores.OrderByDescending(s => s.MaxCombo).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
+                EzScoreRaceMetric.MissCount => scores.OrderBy(GetMissCount).ThenByDescending(s => s.TotalScore).FirstOrDefault(),
                 _ => throw new ArgumentOutOfRangeException(nameof(metric), metric, null),
             };
         }

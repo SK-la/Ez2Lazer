@@ -144,10 +144,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void reloadSession()
         {
-            if (Session == null)
-                return;
-
-            Session.ReloadIfNeeded(ModFilter.Value, getEffectiveMaxEntryCount());
+            Session?.ReloadIfNeeded(ModFilter.Value, getEffectiveMaxEntryCount());
         }
 
         private int getEffectiveMaxEntryCount()
