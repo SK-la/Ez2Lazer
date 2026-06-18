@@ -289,7 +289,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void refreshPickedEntries()
         {
-            if (Session == null || !Session.IsReady.Value)
+            if (!SupportsGhostRace || Session == null || !Session.IsReady.Value)
             {
                 pickedEntryForCondition1 = null;
                 pickedEntryForCondition2 = null;

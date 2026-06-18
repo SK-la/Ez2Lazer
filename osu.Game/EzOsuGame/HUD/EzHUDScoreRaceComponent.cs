@@ -49,6 +49,9 @@ namespace osu.Game.EzOsuGame.HUD
         /// </summary>
         protected virtual bool ContributesMaxEntryCount => true;
 
+        protected bool SupportsGhostRace =>
+            Session?.SupportsGhostRace ?? EzScoreRaceRulesetSupport.SupportsGhostRace(GameplayState?.Ruleset.RulesetInfo);
+
         private OsuSpriteText? loadingText;
 
         protected override void LoadComplete()
@@ -154,6 +157,12 @@ namespace osu.Game.EzOsuGame.HUD
         {
             if (loadingText == null)
                 return;
+
+            if (!SupportsGhostRace)
+            {
+                loadingText.Alpha = 0;
+                return;
+            }
 
             loadingText.Alpha = Session?.IsReady.Value == true ? 0 : 1;
         }

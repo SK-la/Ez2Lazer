@@ -40,6 +40,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
         public IBindable<bool> IsReady => isReady;
         public EzScoreRacePlayMode PlayMode { get; }
+        public bool SupportsGhostRace { get; }
 
         public IReadOnlyList<EzScoreRaceEntry> Entries => entries;
         public int MaxEntryCount { get; private set; } = 10;
@@ -54,6 +55,8 @@ namespace osu.Game.EzOsuGame.Scoring
             this.beatmaps = beatmaps;
             this.gameplayState = gameplayState;
             PlayMode = playMode;
+            SupportsGhostRace = EzScoreRaceRulesetSupport.SupportsGhostRace(gameplayState.Ruleset.RulesetInfo)
+                                && playMode != EzScoreRacePlayMode.SpectatingLive;
             this.scheduleCallback = scheduleCallback;
         }
 
@@ -94,6 +97,9 @@ namespace osu.Game.EzOsuGame.Scoring
         /// </summary>
         public EzScoreRaceEntry? PickGhost(EzScoreRaceMetric metric, ScoreInfo? exclude = null)
         {
+            if (!SupportsGhostRace)
+                return null;
+
             if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
                 return null;
 
@@ -151,14 +157,14 @@ namespace osu.Game.EzOsuGame.Scoring
 
                 ensureTrackedEntry();
 
-                if (PlayMode != EzScoreRacePlayMode.SpectatingLive)
+                if (SupportsGhostRace)
                     ensureLeaderboardGhostPlaceholders();
 
                 isReady.Value = true;
                 notifyEntriesChanged();
             });
 
-            if (PlayMode == EzScoreRacePlayMode.SpectatingLive)
+            if (!SupportsGhostRace)
                 return;
 
             ensureTimelinesLoaded(queryLeaderboardGhostScores(), cancellationToken);
@@ -238,7 +244,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
         private void ensureTimelinesLoaded(IEnumerable<ScoreInfo> scoreInfos, CancellationToken cancellationToken = default)
         {
-            if (PlayMode == EzScoreRacePlayMode.SpectatingLive)
+            if (!SupportsGhostRace)
                 return;
 
             cancellationToken = cancellationToken == CancellationToken.None ? loadCancellation?.Token ?? CancellationToken.None : cancellationToken;
