@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.HUD
 
     /// <summary>
     /// BMS 风格三柱分数对比：当前局 + 两条按对比条件选出的参考柱。
-    /// 柱高与标签数值始终按 TotalScore 绘制；对比条件仅用于筛选对比哪条成绩。
+    /// 柱高与标签数值始终按 TotalScore 绘制；柱图总高度对应整谱理论满分。
     /// </summary>
     public partial class EzHUDScoreCompareBars : EzHUDScoreRaceComponent, ISerialisableDrawable
     {
@@ -66,10 +66,10 @@ namespace osu.Game.EzOsuGame.HUD
         };
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_COMPARE_BAR_WIDTH_LABEL), nameof(EzHUDStrings.SCORE_COMPARE_BAR_WIDTH_DESCRIPTION))]
-        public BindableNumber<float> BarWidth { get; } = new BindableNumber<float>(88)
+        public BindableNumber<float> BarWidth { get; } = new BindableNumber<float>(50)
         {
-            MinValue = 40,
-            MaxValue = 200,
+            MinValue = 20,
+            MaxValue = 100,
             Precision = 1,
         };
 
@@ -80,6 +80,11 @@ namespace osu.Game.EzOsuGame.HUD
         private Container barsContainer = null!;
         private readonly CompareBar[] bars = new CompareBar[3];
 
+        private List<ScoreInfo> compareCandidates = new List<ScoreInfo>();
+        private ScoreInfo? pickedScoreForCondition1;
+        private ScoreInfo? pickedScoreForCondition2;
+        private bool compareCacheDirty = true;
+
         public EzHUDScoreCompareBars()
         {
             Width = 3 * BarWidth.Value + 2 * bar_spacing + container_padding * 2;
@@ -88,16 +93,14 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void ConfigureSession()
         {
-            if (Session == null)
-                return;
-
             // 仅同步 Mod 过滤；条目数由角逐榜组件负责。
-            Session.ReloadIfNeeded(ModFilter.Value, Session.MaxEntryCount);
+            Session?.ReloadIfNeeded(ModFilter.Value, Session.MaxEntryCount);
         }
 
         protected override void LoadComplete()
         {
             ModFilter.BindTo(ModFilterSetting);
+            ModFilter.BindValueChanged(_ => invalidateCompareCache(), true);
 
             barsContainer = new Container
             {
@@ -116,8 +119,8 @@ namespace osu.Game.EzOsuGame.HUD
 
             base.LoadComplete();
 
-            CompareCondition1.BindValueChanged(_ => refreshHistoricalBars(), true);
-            CompareCondition2.BindValueChanged(_ => refreshHistoricalBars(), true);
+            CompareCondition1.BindValueChanged(_ => onCompareSelectionChanged(), true);
+            CompareCondition2.BindValueChanged(_ => onCompareSelectionChanged(), true);
             BarDirection.BindValueChanged(_ => layoutBars(), true);
             BarHeight.BindValueChanged(_ => layoutBars(), true);
             BarWidth.BindValueChanged(_ => layoutBars(), true);
@@ -127,11 +130,16 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void OnSessionReady()
         {
-            Session?.IsReady.BindValueChanged(_ => refreshHistoricalBars(), true);
+            Session?.IsReady.BindValueChanged(_ =>
+            {
+                invalidateCompareCache();
+                refreshHistoricalBars();
+            }, true);
         }
 
         protected override void OnEntriesChangedScheduled()
         {
+            invalidateCompareCache();
             refreshHistoricalBars();
         }
 
@@ -140,27 +148,57 @@ namespace osu.Game.EzOsuGame.HUD
             if (Session == null || !Session.IsReady.Value)
                 return;
 
+            ensureCompareCache();
+
             double clockTime = GetCurrentClockTime();
+            long barScoreScale = getBarScoreScale();
 
             long nowBarScore = GetLiveDisplayScore();
-            long condition1BarScore = getBarScoreAtTime(CompareCondition1.Value, clockTime, exclude: null);
-            long condition2BarScore = getBarScoreAtTime(CompareCondition2.Value, clockTime, getExcludeForCondition2());
+            long condition1BarScore = getBarScoreForMetric(CompareCondition1.Value, pickedScoreForCondition1, clockTime);
+            long condition2BarScore = getBarScoreForMetric(CompareCondition2.Value, pickedScoreForCondition2, clockTime);
 
-            long maxBarScore = Math.Max(1, nowBarScore);
-            maxBarScore = Math.Max(maxBarScore, condition1BarScore);
-            maxBarScore = Math.Max(maxBarScore, condition2BarScore);
-
-            bars[0].UpdateValues(EzHUDStrings.SCORE_COMPARE_NOW_LABEL, formatScore(nowBarScore), nowBarScore, maxBarScore);
+            bars[0].UpdateValues(EzHUDStrings.SCORE_COMPARE_NOW_LABEL, formatScore(nowBarScore), nowBarScore, barScoreScale);
             bars[1].UpdateValues(
                 CompareCondition1.Value.GetLocalisableDescription(),
                 formatScore(condition1BarScore),
                 condition1BarScore,
-                maxBarScore);
+                barScoreScale);
             bars[2].UpdateValues(
                 CompareCondition2.Value.GetLocalisableDescription(),
                 formatScore(condition2BarScore),
                 condition2BarScore,
-                maxBarScore);
+                barScoreScale);
+        }
+
+        private void onCompareSelectionChanged()
+        {
+            if (!compareCacheDirty)
+                rebuildPickedScores();
+
+            refreshHistoricalBars();
+        }
+
+        private void invalidateCompareCache() => compareCacheDirty = true;
+
+        private void ensureCompareCache()
+        {
+            if (!compareCacheDirty)
+                return;
+
+            compareCandidates = queryCompareCandidates();
+            rebuildPickedScores();
+            compareCacheDirty = false;
+        }
+
+        private void rebuildPickedScores()
+        {
+            pickedScoreForCondition1 = CompareCondition1.Value == EzScoreRaceMetric.TheoreticalMaxScore
+                ? null
+                : EzLocalScoreQueries.PickBest(compareCandidates, CompareCondition1.Value);
+
+            pickedScoreForCondition2 = CompareCondition2.Value == EzScoreRaceMetric.TheoreticalMaxScore
+                ? null
+                : EzLocalScoreQueries.PickBest(compareCandidates, CompareCondition2.Value, exclude: pickedScoreForCondition1);
         }
 
         private void refreshHistoricalBars()
@@ -171,24 +209,15 @@ namespace osu.Game.EzOsuGame.HUD
             UpdateDisplay();
         }
 
-        private ScoreInfo? getExcludeForCondition2()
-        {
-            if (CompareCondition1.Value == EzScoreRaceMetric.TheoreticalMaxScore)
-                return null;
-
-            return EzLocalScoreQueries.PickBest(getCompareCandidates(), CompareCondition1.Value);
-        }
-
-        private long getBarScoreAtTime(EzScoreRaceMetric metric, double clockTime, ScoreInfo? exclude)
+        private long getBarScoreForMetric(EzScoreRaceMetric metric, ScoreInfo? pickedScore, double clockTime)
         {
             if (metric == EzScoreRaceMetric.TheoreticalMaxScore)
                 return getTheoreticalScoreAtTime();
 
-            var scoreInfo = EzLocalScoreQueries.PickBest(getCompareCandidates(), metric, exclude);
-            return getTotalScoreAtTime(scoreInfo, clockTime);
+            return getTotalScoreAtTime(pickedScore, clockTime);
         }
 
-        private List<ScoreInfo> getCompareCandidates()
+        private List<ScoreInfo> queryCompareCandidates()
         {
             if (GameplayState == null)
                 return new List<ScoreInfo>();
@@ -210,12 +239,26 @@ namespace osu.Game.EzOsuGame.HUD
             return scoreInfo.TotalScore;
         }
 
+        /// <summary>
+        /// 当前时刻理论满分进度（与 live SP 一致）。
+        /// </summary>
         private long getTheoreticalScoreAtTime()
         {
             if (ScoreProcessor == null)
                 return 0;
 
             return (long)Math.Round(ScoreProcessor.MinimumAccuracy.Value * ScoreProcessor.MAX_SCORE);
+        }
+
+        /// <summary>
+        /// 柱图满刻度 = 整谱理论满分（<see cref="ScoreProcessor.MaximumTotalScore"/>）。
+        /// </summary>
+        private long getBarScoreScale()
+        {
+            if (ScoreProcessor != null && ScoreProcessor.MaximumTotalScore > 0)
+                return ScoreProcessor.MaximumTotalScore;
+
+            return (long)ScoreProcessor.MAX_SCORE;
         }
 
         private static string formatScore(long score) => score.ToString("N0");
@@ -232,7 +275,7 @@ namespace osu.Game.EzOsuGame.HUD
             for (int i = 0; i < bars.Length; i++)
             {
                 var bar = bars[i];
-                bar.Configure(direction, barAxisHeight);
+                bar.Configure(direction, barAxisHeight, barThickness);
 
                 bar.Anchor = Anchor.BottomLeft;
                 bar.Origin = Anchor.BottomLeft;
@@ -244,27 +287,34 @@ namespace osu.Game.EzOsuGame.HUD
 
         private partial class CompareBar : CompositeDrawable
         {
+            private const float min_bar_height = 3;
+
             private Box bar = null!;
             private OsuSpriteText titleText = null!;
             private OsuSpriteText valueText = null!;
             private Container barTrack = null!;
             private EzScoreCompareBarDirection direction = EzScoreCompareBarDirection.Upward;
             private float maxBarSize;
+            private float barThickness;
+
+            private LocalisableString lastTitle;
+            private string lastValue = string.Empty;
+            private float lastBarHeight = -1;
 
             public CompareBar()
             {
                 RelativeSizeAxes = Axes.None;
             }
 
-            public void Configure(EzScoreCompareBarDirection barDirection, float maxSize)
+            public void Configure(EzScoreCompareBarDirection barDirection, float maxSize, float thickness)
             {
                 direction = barDirection;
                 maxBarSize = maxSize;
+                barThickness = thickness;
 
-                if (barTrack == null)
-                    return;
+                barTrack.Size = new Vector2(barThickness, maxSize);
 
-                barTrack.Height = maxSize;
+                bar.Width = barThickness;
                 applyBarAnchor();
             }
 
@@ -287,10 +337,11 @@ namespace osu.Game.EzOsuGame.HUD
                         },
                         barTrack = new Container
                         {
-                            RelativeSizeAxes = Axes.X,
-                            Height = maxBarSize,
+                            Size = new Vector2(barThickness, maxBarSize),
                             Child = bar = new Box
                             {
+                                RelativeSizeAxes = Axes.None,
+                                Width = barThickness,
                                 Colour = new Color4(0.4f, 0.75f, 1f, 0.85f),
                             },
                         },
@@ -308,9 +359,6 @@ namespace osu.Game.EzOsuGame.HUD
 
             private void applyBarAnchor()
             {
-                if (bar == null)
-                    return;
-
                 if (direction == EzScoreCompareBarDirection.Upward)
                 {
                     bar.Anchor = Anchor.BottomCentre;
@@ -326,14 +374,34 @@ namespace osu.Game.EzOsuGame.HUD
             public void UpdateValues(LocalisableString title, string value, long barScore, long maxBarScore)
             {
                 Alpha = 1;
-                titleText.Text = title;
-                valueText.Text = value;
+
+                if (!lastTitle.Equals(title))
+                {
+                    titleText.Text = title;
+                    lastTitle = title;
+                }
+
+                if (lastValue != value)
+                {
+                    valueText.Text = value;
+                    lastValue = value;
+                }
 
                 float ratio = maxBarScore <= 0 ? 0 : (float)barScore / maxBarScore;
                 ratio = Math.Clamp(ratio, 0, 1);
 
-                bar.RelativeSizeAxes = Axes.X;
-                bar.Height = maxBarSize * ratio;
+                float barHeight = maxBarSize * ratio;
+
+                if (barScore > 0 && barHeight < min_bar_height)
+                    barHeight = min_bar_height;
+
+                if (Math.Abs(lastBarHeight - barHeight) < 0.01f)
+                    return;
+
+                lastBarHeight = barHeight;
+                bar.RelativeSizeAxes = Axes.None;
+                bar.Width = barThickness;
+                bar.Height = barHeight;
             }
         }
     }

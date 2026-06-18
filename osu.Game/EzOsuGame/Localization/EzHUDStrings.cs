@@ -195,7 +195,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SCORE_COMPARE_CONDITION2_LABEL = new EzLocalizationManager.EzLocalisableString("对比条件 2", "Compare Condition 2");
         public static readonly LocalisableString SCORE_COMPARE_CONDITION2_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按此条件筛选第二条对比成绩（柱高始终为分数）", "Pick the second comparison score by this criterion (bar height is always score).");
         public static readonly LocalisableString SCORE_COMPARE_BAR_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("柱状图高度", "Bar Height");
-        public static readonly LocalisableString SCORE_COMPARE_BAR_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("柱体主轴的像素高度", "Pixel height of the bar axis.");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("柱体主轴像素高度；满柱对应整谱理论满分", "Pixel height of the bar axis; full bar equals theoretical max score.");
         public static readonly LocalisableString SCORE_COMPARE_BAR_WIDTH_LABEL = new EzLocalizationManager.EzLocalisableString("柱状图宽度", "Bar Width");
         public static readonly LocalisableString SCORE_COMPARE_BAR_WIDTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("单根柱体的像素宽度", "Pixel width of each bar.");
         public static readonly LocalisableString SCORE_COMPARE_NOW_LABEL = new EzLocalizationManager.EzLocalisableString("当前", "Now");
