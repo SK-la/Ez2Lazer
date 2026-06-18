@@ -120,7 +120,7 @@ namespace osu.Game.EzOsuGame.HUD
                 state.MissCount = snapshot.MissCount;
             }
 
-            sortAndApply();
+            sortAndApplyIfNeeded();
         }
 
         protected override void Update()
@@ -204,8 +204,6 @@ namespace osu.Game.EzOsuGame.HUD
                 var state = new RaceEntryState(entry, leaderboardScore, drawable);
                 entryStates.Add(state);
                 Flow.Add(drawable);
-
-                drawable.DisplayOrder.BindValueChanged(_ => Schedule(sortAndApply), true);
             }
 
             sortAndApply();
@@ -263,7 +261,24 @@ namespace osu.Game.EzOsuGame.HUD
             };
         }
 
+        private void sortAndApplyIfNeeded()
+        {
+            var orderedList = getOrderedEntryStates();
+
+            for (int i = 0; i < orderedList.Count; i++)
+            {
+                if (orderedList[i].LeaderboardScore.DisplayOrder.Value != i + 1)
+                {
+                    applySortOrder(orderedList);
+                    return;
+                }
+            }
+        }
+
         private void sortAndApply()
+            => applySortOrder(getOrderedEntryStates());
+
+        private List<RaceEntryState> getOrderedEntryStates()
         {
             IOrderedEnumerable<RaceEntryState> ordered = SortCriterionSetting.Value switch
             {
@@ -282,8 +297,11 @@ namespace osu.Game.EzOsuGame.HUD
                 _ => entryStates.OrderByDescending(s => s.LeaderboardScore.TotalScore.Value),
             };
 
-            var orderedList = ordered.ThenBy(s => s.Tracked ? long.MaxValue : s.Tiebreaker).ToList();
+            return ordered.ThenBy(s => s.Tracked ? long.MaxValue : s.Tiebreaker).ToList();
+        }
 
+        private void applySortOrder(List<RaceEntryState> orderedList)
+        {
             for (int i = 0; i < orderedList.Count; i++)
             {
                 var state = orderedList[i];
