@@ -110,15 +110,21 @@ namespace osu.Game.EzOsuGame.Scoring
         }
 
         /// <summary>
+        /// 读取 ghost 在指定时钟的 timeline 快照；未就绪返回 <see cref="EzScoreTimelineSnapshot.Empty"/>。
+        /// </summary>
+        public static EzScoreTimelineSnapshot QuerySnapshot(EzScoreRaceEntry? entry, double clockTime)
+        {
+            if (entry == null || entry.Tracked || entry.Timeline == null)
+                return EzScoreTimelineSnapshot.Empty;
+
+            return entry.Timeline.QueryAtTime(clockTime);
+        }
+
+        /// <summary>
         /// 读取 ghost 在指定时钟的 timeline 分数；未就绪返回 0（禁止终局分回退）。
         /// </summary>
         public static long QueryTimelineScore(EzScoreRaceEntry? entry, double clockTime)
-        {
-            if (entry == null || entry.Tracked || entry.Timeline == null)
-                return 0;
-
-            return entry.Timeline.QueryAtTime(clockTime).TotalScore;
-        }
+            => QuerySnapshot(entry, clockTime).TotalScore;
 
         private IReadOnlyList<ScoreInfo> GetModFilteredScores()
         {
