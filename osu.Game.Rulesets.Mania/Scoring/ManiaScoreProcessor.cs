@@ -61,6 +61,31 @@ namespace osu.Game.Rulesets.Mania.Scoring
                    + bonusPortion;
         }
 
+        protected override double ComputeTheoreticalPerfectJudgedTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
+        {
+            if (IsLegacyScore || hitMode == EzEnumHitMode.Classic)
+            {
+                return 150000 * comboProgress
+                       + 850000 * accuracyProgress
+                       + bonusPortion;
+            }
+
+            if (hitMode != EzEnumHitMode.Lazer && hitMode != EzEnumHitMode.Classic)
+            {
+                var stats = GetScoreProcessorStatistics();
+                double maximumBaseScoreOnChart = MinimumAccuracy.Value > 0 ? stats.BaseScore / MinimumAccuracy.Value : 0;
+
+                if (maximumBaseScoreOnChart <= 0)
+                    return 0;
+
+                return MAX_SCORE * stats.MaximumBaseScore / maximumBaseScoreOnChart;
+            }
+
+            return 150000 * comboProgress
+                   + 850000 * accuracyProgress
+                   + bonusPortion;
+        }
+
         protected override double GetComboScoreChange(JudgementResult result)
         {
             return getBaseComboScoreForResult(result.Type) * Math.Min(Math.Max(0.5, Math.Log(result.ComboAfterJudgement, combo_base)), Math.Log(400, combo_base));

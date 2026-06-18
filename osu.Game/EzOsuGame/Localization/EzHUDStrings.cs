@@ -189,5 +189,39 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DYNAMIC_SPEED_ENDPOINT_BLINK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "速度变化时在折线右端显示不显眼的闪烁白点。",
             "Show a subtle blinking white dot at the line endpoint while speed is changing.");
+
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION1_LABEL = new EzLocalizationManager.EzLocalisableString("对比条件 1", "Compare Condition 1");
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION1_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按此条件筛选第一条对比成绩（柱高始终为分数）", "Pick the first comparison score by this criterion (bar height is always score).");
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION2_LABEL = new EzLocalizationManager.EzLocalisableString("对比条件 2", "Compare Condition 2");
+        public static readonly LocalisableString SCORE_COMPARE_CONDITION2_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按此条件筛选第二条对比成绩（柱高始终为分数）", "Pick the second comparison score by this criterion (bar height is always score).");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_HEIGHT_LABEL = new EzLocalizationManager.EzLocalisableString("柱状图高度", "Bar Height");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_HEIGHT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("柱体主轴像素高度；满柱对应整谱理论满分", "Pixel height of the bar axis; full bar equals theoretical max score.");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_WIDTH_LABEL = new EzLocalizationManager.EzLocalisableString("柱状图宽度", "Bar Width");
+        public static readonly LocalisableString SCORE_COMPARE_BAR_WIDTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("单根柱体的像素宽度", "Pixel width of each bar.");
+        public static readonly LocalisableString SCORE_COMPARE_NOW_LABEL = new EzLocalizationManager.EzLocalisableString("当前", "Now");
+
+        public static readonly LocalisableString SCORE_COMPARE_BACKGROUND_VISIBLE_LABEL = new EzLocalizationManager.EzLocalisableString("显示背景", "Show Background");
+
+        public static readonly LocalisableString SCORE_COMPARE_BACKGROUND_VISIBLE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "显示整块圆角背景框（不含单柱分区底色）。",
+            "Show a single rounded background behind all bars (not per-bar track colours).");
+
+        public static readonly LocalisableString SCORE_COMPARE_BACKDROP_BLUR_LABEL = new EzLocalizationManager.EzLocalisableString("穿透虚化", "Backdrop Blur");
+
+        public static readonly LocalisableString SCORE_COMPARE_BACKDROP_BLUR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后真穿透虚化背景框下方 OsuScreenStack 内已绘制内容；关闭时仅显示半透明底色。",
+            "When enabled, acrylic-blurs content rendered within OsuScreenStack beneath the background; when disabled, only the tint is shown.");
+
+        public static readonly LocalisableString SCORE_RACE_MOD_FILTER_LABEL = new EzLocalizationManager.EzLocalisableString("Mod 过滤", "Mod Filter");
+        public static readonly LocalisableString SCORE_RACE_MOD_FILTER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("对比成绩的 Mod 范围", "Which mod combinations to include when selecting scores.");
+        public static readonly LocalisableString SCORE_RACE_BAR_DIRECTION_LABEL = new EzLocalizationManager.EzLocalisableString("柱图方向", "Bar Direction");
+        public static readonly LocalisableString SCORE_RACE_BAR_DIRECTION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("柱体向上或向下增长", "Bars grow upward or downward.");
+        public static readonly LocalisableString SCORE_RACE_SHOW_LABELS_LABEL = new EzLocalizationManager.EzLocalisableString("显示标签", "Show Labels");
+        public static readonly LocalisableString SCORE_RACE_SHOW_LABELS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("显示柱下条件与统计标签", "Show criterion and stat labels under bars.");
+        public static readonly LocalisableString SCORE_RACE_MAX_ENTRIES_LABEL = new EzLocalizationManager.EzLocalisableString("列表条目数", "List Entry Count");
+        public static readonly LocalisableString SCORE_RACE_MAX_ENTRIES_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("角逐排行榜显示的最大成绩数", "Maximum scores shown in the race leaderboard.");
+        public static readonly LocalisableString SCORE_RACE_SORT_CRITERION_LABEL = new EzLocalizationManager.EzLocalisableString("排序依据", "Sort By");
+        public static readonly LocalisableString SCORE_RACE_SORT_CRITERION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("角逐榜实时排名的比较指标（分数 / Acc / Combo / Miss）", "Metric used to rank entries during the race (score / acc / combo / miss).");
+        public static readonly LocalisableString SCORE_RACE_LOADING_LABEL = new EzLocalizationManager.EzLocalisableString("加载角逐成绩…", "Loading race scores…");
     }
 }

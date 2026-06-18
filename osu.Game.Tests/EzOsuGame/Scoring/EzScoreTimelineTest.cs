@@ -7,6 +7,7 @@ using NUnit.Framework;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
@@ -149,6 +150,39 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var bmsTimeline = EzScoreTimelineBuilder.BuildFromHitEventsForTesting(ruleset, beatmap, bmsScoreInfo, hitEvents);
 
             Assert.That(lazerTimeline.FinalTotalScore, Is.Not.EqualTo(bmsTimeline.FinalTotalScore));
+        }
+
+        [Test]
+        public void TestOsuTimelineFinalScoreMatchesScoreProcessorFeed()
+        {
+            var ruleset = new OsuRuleset();
+            var testBeatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HitCircle { StartTime = 1000 },
+                    new HitCircle { StartTime = 2000 },
+                },
+            };
+            var beatmap = ruleset.CreateBeatmapConverter(testBeatmap).Convert();
+            var circle1 = (HitCircle)beatmap.HitObjects[0];
+            var circle2 = (HitCircle)beatmap.HitObjects[1];
+            var scoreInfo = new ScoreInfo { Ruleset = ruleset.RulesetInfo };
+
+            var hitEvents = new List<HitEvent>
+            {
+                new HitEvent(0, 1.0, HitResult.Great, circle1, null, null),
+                new HitEvent(0, 1.0, HitResult.Great, circle2, circle1, null),
+            };
+
+            var timeline = EzScoreTimelineBuilder.BuildFromHitEventsForTesting(ruleset, beatmap, scoreInfo, hitEvents);
+
+            var scoreProcessor = ruleset.CreateScoreProcessor();
+            scoreProcessor.ApplyBeatmap(beatmap);
+            scoreProcessor.ApplyResult(new JudgementResult(circle1, circle1.CreateJudgement()) { Type = HitResult.Great });
+            scoreProcessor.ApplyResult(new JudgementResult(circle2, circle2.CreateJudgement()) { Type = HitResult.Great });
+
+            Assert.That(timeline.FinalTotalScore, Is.EqualTo(scoreProcessor.TotalScore.Value));
         }
     }
 }

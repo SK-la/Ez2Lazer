@@ -45,7 +45,12 @@ namespace osu.Game.EzOsuGame.Scoring
 
             ensureGeneratorsInitialised();
 
-            string? cacheKey = getCacheKey(scoreInfo);
+            var timelineMode = EzScoreRaceRulesetSupport.GetGhostTimelineMode(scoreInfo.Ruleset);
+
+            if (timelineMode == EzScoreRaceGhostTimelineMode.None)
+                return null;
+
+            string? cacheKey = getCacheKey(scoreInfo, timelineMode);
 
             if (!string.IsNullOrEmpty(cacheKey) && timeline_cache.TryGetValue(cacheKey, out var cached))
                 return cached;
@@ -80,20 +85,23 @@ namespace osu.Game.EzOsuGame.Scoring
 
             EzScoreTimeline? timeline;
 
-            if (scoreInfo.Ruleset.OnlineID == 3)
+            switch (timelineMode)
             {
-                // Mania 生产路径：Session 一遍 SP 快照，禁止 buildFromHitEvents。
-                timeline = EzScoreTimelineBridge.TryBuildManiaTimeline(databasedScore, playableBeatmap, cancellationToken);
-            }
-            else
-            {
-                // 非 Mania：统计页临时 HitEvents 或从 replay 生成；不是 Mania HUD 输入。
-                var (hitEvents, offsetsRelativeToEnd) = resolveHitEvents(databasedScore, playableBeatmap, cancellationToken);
+                case EzScoreRaceGhostTimelineMode.ManiaSession:
+                    timeline = EzScoreTimelineBridge.TryBuildManiaTimeline(databasedScore, playableBeatmap, cancellationToken);
+                    break;
 
-                if (hitEvents == null || hitEvents.Count == 0)
+                case EzScoreRaceGhostTimelineMode.HitEvents:
+                    var (hitEvents, offsetsRelativeToEnd) = resolveHitEvents(databasedScore, playableBeatmap, cancellationToken);
+
+                    if (hitEvents == null || hitEvents.Count == 0)
+                        return null;
+
+                    timeline = buildFromHitEvents(ruleset, playableBeatmap, scoreInfo, hitEvents, offsetsRelativeToEnd);
+                    break;
+
+                default:
                     return null;
-
-                timeline = buildFromHitEvents(ruleset, playableBeatmap, scoreInfo, hitEvents, offsetsRelativeToEnd);
             }
 
             if (timeline == null)
@@ -327,22 +335,32 @@ namespace osu.Game.EzOsuGame.Scoring
             };
         }
 
-        private static string? getCacheKey(ScoreInfo? scoreInfo)
+        private static string? getCacheKey(ScoreInfo? scoreInfo, EzScoreRaceGhostTimelineMode timelineMode)
         {
             string? identity = getScoreIdentity(scoreInfo);
 
-            if (identity == null)
+            if (identity == null || scoreInfo == null)
                 return null;
 
-            if (scoreInfo!.Ruleset.OnlineID == 3)
+            switch (timelineMode)
             {
-                // 与角逐 HUD 一致：全局 HitMode/HealthMode，不读成绩嵌入字段。
-                var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
-                return $"{identity}:hm{(int)environment.ManiaHitMode}:hh{(int)environment.ManiaHealthMode}:jp{(int)environment.JudgePrecedence}";
-            }
+                case EzScoreRaceGhostTimelineMode.ManiaSession:
+                {
+                    // 与角逐 HUD 一致：全局 HitMode/HealthMode，不读成绩嵌入字段。
+                    var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
+                    return $"{identity}:hm{(int)environment.ManiaHitMode}:hh{(int)environment.ManiaHealthMode}:jp{(int)environment.JudgePrecedence}";
+                }
 
-            return identity;
+                case EzScoreRaceGhostTimelineMode.HitEvents:
+                    return $"{identity}:mods:{getModFingerprint(scoreInfo.Mods)}";
+
+                default:
+                    return null;
+            }
         }
+
+        private static string getModFingerprint(IReadOnlyList<Mod> mods)
+            => string.Join(',', mods.OrderBy(m => m.Acronym).Select(m => m.Acronym));
 
         private static string? getScoreIdentity(ScoreInfo? scoreInfo)
         {

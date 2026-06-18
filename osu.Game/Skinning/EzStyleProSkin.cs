@@ -125,6 +125,8 @@ namespace osu.Game.Skinning
                                 var pps = container.OfType<ArgonPerformancePointsCounter>().FirstOrDefault();
                                 var acc = container.OfType<EzHUDAccuracyCounter>().FirstOrDefault();
                                 var songProgress = container.OfType<ArgonSongProgress>().FirstOrDefault();
+                                var scoreRaceLeaderboard = container.OfType<EzHUDScoreRaceLeaderboard>().FirstOrDefault();
+                                var unused = container.OfType<EzHUDScoreCompareBars>().FirstOrDefault();
 
                                 const float x_offset = 20;
                                 const float padding = 10;
@@ -201,6 +203,13 @@ namespace osu.Game.Skinning
                                         }
                                     }
 
+                                    if (scoreRaceLeaderboard != null)
+                                    {
+                                        scoreRaceLeaderboard.Anchor = Anchor.BottomLeft;
+                                        scoreRaceLeaderboard.Origin = Anchor.BottomLeft;
+                                        scoreRaceLeaderboard.Position = new Vector2(x_offset, 0);
+                                    }
+
                                     if (songProgress != null)
                                     {
                                         songProgress.Position = new Vector2(0, -padding);
@@ -232,6 +241,7 @@ namespace osu.Game.Skinning
                                         Origin = Anchor.CentreLeft,
                                         Position = new Vector2(20, 0),
                                     },
+                                    new EzHUDScoreRaceLeaderboard(),
                                 }
                             };
 
