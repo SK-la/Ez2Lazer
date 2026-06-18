@@ -467,6 +467,28 @@ namespace osu.Game.Rulesets.Scoring
         }
 
         /// <summary>
+        /// 已判定区间全 Perfect 时应达到的标准化总分（含 Mod 倍率）。
+        /// 与 live <see cref="TotalScore"/> 同源公式，按规则集 / HitMode 切换计分方式。
+        /// </summary>
+        public long GetTheoreticalPerfectJudgedDisplayScore()
+        {
+            double comboProgress = maximumComboPortion > 0 ? currentComboPortion / maximumComboPortion : 1;
+            double accuracyProgress = maximumAccuracyJudgementCount > 0 ? (double)currentAccuracyJudgementCount / maximumAccuracyJudgementCount : 1;
+            double theoreticalWithoutMods = ComputeTheoreticalPerfectJudgedTotalScore(comboProgress, accuracyProgress, currentBonusPortion);
+            return (long)Math.Round(theoreticalWithoutMods * scoreMultiplier);
+        }
+
+        /// <summary>
+        /// 已判定区间全 Perfect 时的标准化总分（不含 Mod 倍率）。
+        /// </summary>
+        protected virtual double ComputeTheoreticalPerfectJudgedTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
+        {
+            return 500000 * comboProgress +
+                   500000 * accuracyProgress +
+                   bonusPortion;
+        }
+
+        /// <summary>
         /// Resets this ScoreProcessor to a default state.
         /// </summary>
         /// <param name="storeResults">Whether to store the current state of the <see cref="ScoreProcessor"/> for future use.</param>

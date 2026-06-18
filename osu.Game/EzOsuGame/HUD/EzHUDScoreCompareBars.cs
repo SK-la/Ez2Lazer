@@ -310,19 +310,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (ScoreProcessor == null)
                 return 0;
 
-            double accuracy = ScoreProcessor.Accuracy.Value;
-
-            if (accuracy <= double.Epsilon)
-                return 0;
-
-            long currentScore = GetLiveDisplayScore();
-
-            if (currentScore <= 0)
-                return 0;
-
-            // MinimumAccuracy/Accuracy = 当前已出现 ex 上限 / 整谱 ex（Perfect 时等于 MinimumAccuracy）。
-            double perfectProgressRatio = ScoreProcessor.MinimumAccuracy.Value / accuracy;
-            return (long)Math.Round(currentScore * perfectProgressRatio);
+            return ScoreProcessor.GetTheoreticalPerfectJudgedDisplayScore();
         }
 
         /// <summary>
