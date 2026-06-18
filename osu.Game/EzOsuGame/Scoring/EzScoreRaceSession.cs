@@ -36,6 +36,7 @@ namespace osu.Game.EzOsuGame.Scoring
         private EzScoreModFilter modFilter = EzScoreModFilter.SameAsCurrent;
         private List<ScoreInfo> modFilteredScores = new List<ScoreInfo>();
         private bool scorePoolDirty = true;
+        private bool entriesChangedScheduled;
 
         public IBindable<bool> IsReady => isReady;
         public bool SupportsGhostRace { get; }
@@ -262,28 +263,26 @@ namespace osu.Game.EzOsuGame.Scoring
 
                     var results = await Task.WhenAll(buildTasks).ConfigureAwait(false);
 
-                    foreach (var (scoreInfo, timeline) in results)
+                    schedule(() =>
                     {
                         if (cancellationToken.IsCancellationRequested)
                             return;
 
-                        schedule(() =>
+                        foreach (var (scoreInfo, timeline) in results)
                         {
                             timelineLoadsPending.Remove(scoreInfo.ID);
 
-                            if (cancellationToken.IsCancellationRequested)
-                                return;
-
                             if (timeline == null)
-                                return;
+                                continue;
 
                             if (hasTimeline(scoreInfo))
-                                return;
+                                continue;
 
                             assignTimeline(scoreInfo, timeline);
-                            notifyEntriesChanged();
-                        });
-                    }
+                        }
+
+                        notifyEntriesChanged();
+                    });
                 }
                 catch (OperationCanceledException)
                 {
@@ -294,7 +293,18 @@ namespace osu.Game.EzOsuGame.Scoring
         private bool hasTimeline(ScoreInfo scoreInfo)
             => entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfo.ID)?.Timeline != null;
 
-        private void notifyEntriesChanged() => EntriesChanged?.Invoke();
+        private void notifyEntriesChanged()
+        {
+            if (entriesChangedScheduled)
+                return;
+
+            entriesChangedScheduled = true;
+            schedule(() =>
+            {
+                entriesChangedScheduled = false;
+                EntriesChanged?.Invoke();
+            });
+        }
 
         private void schedule(Action action)
         {

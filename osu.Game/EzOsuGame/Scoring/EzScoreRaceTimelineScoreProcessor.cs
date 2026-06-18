@@ -7,7 +7,7 @@ using osu.Framework.Graphics;
 namespace osu.Game.EzOsuGame.Scoring
 {
     /// <summary>
-    /// 在 <see cref="GameplayClockContainer"/> 子树内按谱面时钟查询 ghost timeline，驱动 bindable 分数（对齐观战 <see cref="osu.Game.Online.Spectator.SpectatorScoreProcessor"/>）。
+    /// 在 <see cref="osu.Game.Screens.Play.GameplayClockContainer"/> 子树内按谱面时钟查询 ghost timeline，驱动 bindable 分数（对齐观战 <see cref="osu.Game.Online.Spectator.SpectatorScoreProcessor"/>）。
     /// </summary>
     public partial class EzScoreRaceTimelineScoreProcessor : Component
     {

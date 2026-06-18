@@ -84,12 +84,6 @@ namespace osu.Game.EzOsuGame.HUD
         {
         }
 
-        protected override void Update()
-        {
-            base.Update();
-            UpdateDisplay();
-        }
-
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing && Session != null)
@@ -97,8 +91,6 @@ namespace osu.Game.EzOsuGame.HUD
 
             base.Dispose(isDisposing);
         }
-
-        protected abstract void UpdateDisplay();
 
         protected double GetCurrentClockTime()
         {
