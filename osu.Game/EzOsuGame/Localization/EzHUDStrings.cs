@@ -189,5 +189,13 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DYNAMIC_SPEED_ENDPOINT_BLINK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "速度变化时在折线右端显示不显眼的闪烁白点。",
             "Show a subtle blinking white dot at the line endpoint while speed is changing.");
+
+        public static readonly LocalisableString SCORE_RACE_MOD_FILTER_LABEL = new EzLocalizationManager.EzLocalisableString("Mod 过滤", "Mod Filter");
+        public static readonly LocalisableString SCORE_RACE_MOD_FILTER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("对比成绩的 Mod 范围", "Which mod combinations to include when selecting scores.");
+        public static readonly LocalisableString SCORE_RACE_MAX_ENTRIES_LABEL = new EzLocalizationManager.EzLocalisableString("列表条目数", "List Entry Count");
+        public static readonly LocalisableString SCORE_RACE_MAX_ENTRIES_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("角逐排行榜显示的最大成绩数", "Maximum scores shown in the race leaderboard.");
+        public static readonly LocalisableString SCORE_RACE_SORT_CRITERION_LABEL = new EzLocalizationManager.EzLocalisableString("排序依据", "Sort By");
+        public static readonly LocalisableString SCORE_RACE_SORT_CRITERION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("角逐榜实时排名的比较指标", "Metric used to rank entries during the race.");
+        public static readonly LocalisableString SCORE_RACE_LOADING_LABEL = new EzLocalizationManager.EzLocalisableString("加载角逐成绩…", "Loading race scores…");
     }
 }

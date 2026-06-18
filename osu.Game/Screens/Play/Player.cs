@@ -250,6 +250,7 @@ namespace osu.Game.Screens.Play
         }
 
         private ScreenSuspensionHandler screenSuspension;
+        private EzScoreRaceSessionHost scoreRaceSessionHost;
 
         private DependencyContainer dependencies;
 
@@ -355,6 +356,9 @@ namespace osu.Game.Screens.Play
             Score.ScoreInfo.Mods = gameplayMods;
 
             dependencies.CacheAs(GameplayState = new GameplayState(playableBeatmap, ruleset, gameplayMods, Score, ScoreProcessor, HealthProcessor, Beatmap.Value.Storyboard, PlayingState));
+
+            AddInternal(scoreRaceSessionHost = new EzScoreRaceSessionHost());
+            dependencies.CacheAs(scoreRaceSessionHost);
 
             var rulesetSkinProvider = new RulesetSkinProvidingContainer(ruleset, playableBeatmap, Beatmap.Value.Skin);
             config.BindWith(OsuSetting.BeatmapSkins, rulesetSkinProvider.BeatmapSkins);
