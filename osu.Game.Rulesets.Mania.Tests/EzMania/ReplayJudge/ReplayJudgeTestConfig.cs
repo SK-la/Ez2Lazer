@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Scoring;
 
@@ -21,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public static ManiaGameplayEnvironment ApplyAndSnapshot(ManiaGameplayEnvironment environment)
         {
             ApplyToGlobalConfig(environment);
-            return ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ManiaReplayRunPurpose.ForLiveAnalysis);
+            return ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForLiveAnalysis);
         }
 
         public static void ApplyEmbeddedModes(Score score, ManiaGameplayEnvironment environment)

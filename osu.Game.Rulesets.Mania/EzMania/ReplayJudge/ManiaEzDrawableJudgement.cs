@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.Objects;
@@ -63,9 +64,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var ruleset = drawable?.FindClosestParent<DrawableRuleset>();
 
             if (ruleset?.ReplayScore?.ScoreInfo != null)
-                return ManiaRuleset.ResolveEnvironment(ruleset.ReplayScore.ScoreInfo, GlobalConfigStore.EzConfig, ManiaReplayRunPurpose.ForStoredStatistics);
+                return ManiaRuleset.ResolveEnvironment(ruleset.ReplayScore.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
 
-            return ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ManiaReplayRunPurpose.ForLiveAnalysis);
+            return ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForLiveAnalysis);
         }
 
         internal static bool TryMalodyHoldOnReleased(DrawableHoldNote hold)

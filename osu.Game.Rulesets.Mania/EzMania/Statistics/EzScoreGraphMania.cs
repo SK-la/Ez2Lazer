@@ -15,6 +15,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Framework.Graphics.Colour;
 using osu.Game.EzOsuGame.Extensions;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
@@ -163,7 +164,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         protected override HitResult GetDisplayResult(HitEvent hitEvent) => hitEvent.Result;
 
         private ManiaGameplayEnvironment createSessionEnvironment()
-            => ManiaRuleset.ResolveEnvironment(null, ezConfig, ManiaReplayRunPurpose.ForLiveAnalysis) with { OffsetPlusMania = 0 };
+            => ManiaRuleset.ResolveEnvironment(null, ezConfig, ReplayRunPurpose.ForLiveAnalysis) with { OffsetPlusMania = 0 };
 
         private void invalidateSessionCache() => lastSessionEnvironment = null;
 

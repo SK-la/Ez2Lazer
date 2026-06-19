@@ -78,7 +78,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, iidxEnvironment);
 
-            var liveTimeline = ManiaReplaySession.RunTimeline(score, beatmap, ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ManiaReplayRunPurpose.ForRaceTimeline));
+            var liveTimeline = ManiaReplaySession.RunTimeline(score, beatmap, ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForRaceTimeline));
             var lazerTimeline = ManiaReplaySession.RunTimeline(score, beatmap, lazerEnvironment);
             var iidxTimeline = ManiaReplaySession.RunTimeline(score, beatmap, iidxEnvironment);
 
@@ -193,7 +193,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var lazerEnvironment = LazerTapReplayFixtures.CreateTwoNoteColumnTap().environment;
             ReplayJudgeTestConfig.ApplyToGlobalConfig(lazerEnvironment);
 
-            var fromScore = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ManiaReplayRunPurpose.ForStoredStatistics);
+            var fromScore = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
             var generatorEvents = ManiaScoreHitEventGenerator.Instance.Generate(score, beatmap);
             var sessionFromScore = ManiaReplaySession.RunHitEvents(score, beatmap, fromScore);
             var sessionLazer = ManiaReplaySession.RunHitEvents(score, beatmap, lazerEnvironment);
@@ -215,7 +215,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
             configure?.Invoke();
 
-            var sessionEnvironment = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ManiaReplayRunPurpose.ForStoredStatistics);
+            var sessionEnvironment = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
             var sessionEvents = ManiaReplaySession.RunHitEvents(score, beatmap, sessionEnvironment);
             var generatorEvents = ManiaScoreHitEventGenerator.Instance.Generate(score, beatmap);
 

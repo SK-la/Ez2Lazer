@@ -26,14 +26,14 @@ namespace osu.Game.Rulesets.Mania
         /// <summary>
         /// Mania replay 环境唯一解析入口（替代分散的 FromScore / FromLive）。
         /// </summary>
-        public static ManiaGameplayEnvironment ResolveEnvironment(ScoreInfo? score, Ez2ConfigManager config, ManiaReplayRunPurpose purpose)
+        public static ManiaGameplayEnvironment ResolveEnvironment(ScoreInfo? score, Ez2ConfigManager config, ReplayRunPurpose purpose)
         {
             bool bmsPoor = config.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
 
             return purpose switch
             {
-                ManiaReplayRunPurpose.ForStoredStatistics => resolveForStoredStatistics(score, config, bmsPoor),
-                ManiaReplayRunPurpose.ForLiveAnalysis or ManiaReplayRunPurpose.ForRaceTimeline => readLive(config, bmsPoor),
+                ReplayRunPurpose.ForStoredStatistics => resolveForStoredStatistics(score, config, bmsPoor),
+                ReplayRunPurpose.ForLiveAnalysis or ReplayRunPurpose.ForRaceTimeline => readLive(config, bmsPoor),
                 _ => readLive(config, bmsPoor),
             };
         }

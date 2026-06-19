@@ -3,6 +3,7 @@
 
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge;
 using osu.Game.Scoring;
@@ -29,7 +30,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         [Test]
         public void TestForLiveAnalysisReadsAllLiveFields()
         {
-            var env = ManiaRuleset.ResolveEnvironment(null, config, ManiaReplayRunPurpose.ForLiveAnalysis);
+            var env = ManiaRuleset.ResolveEnvironment(null, config, ReplayRunPurpose.ForLiveAnalysis);
 
             Assert.That(env, Is.EqualTo(liveBaseline));
         }
@@ -40,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
             var scoreInfo = new ScoreInfo { Ruleset = new ManiaRuleset().RulesetInfo };
             ReplayJudgeTestConfig.ApplyEmbeddedModes(new Score { ScoreInfo = scoreInfo }, ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD));
 
-            var env = ManiaRuleset.ResolveEnvironment(scoreInfo, config, ManiaReplayRunPurpose.ForStoredStatistics);
+            var env = ManiaRuleset.ResolveEnvironment(scoreInfo, config, ReplayRunPurpose.ForStoredStatistics);
 
             Assert.That(env.ManiaHitMode, Is.EqualTo(EzEnumHitMode.IIDX_HD));
             Assert.That(env.ManiaHealthMode, Is.EqualTo(EzEnumHealthMode.IIDX_HD));
@@ -54,8 +55,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         {
             var scoreInfo = new ScoreInfo { Ruleset = new ManiaRuleset().RulesetInfo };
 
-            var live = ManiaRuleset.ResolveEnvironment(null, config, ManiaReplayRunPurpose.ForLiveAnalysis);
-            var stored = ManiaRuleset.ResolveEnvironment(scoreInfo, config, ManiaReplayRunPurpose.ForStoredStatistics);
+            var live = ManiaRuleset.ResolveEnvironment(null, config, ReplayRunPurpose.ForLiveAnalysis);
+            var stored = ManiaRuleset.ResolveEnvironment(scoreInfo, config, ReplayRunPurpose.ForStoredStatistics);
 
             Assert.That(stored, Is.EqualTo(live));
         }
@@ -65,7 +66,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
         {
             ReplayJudgeTestConfig.ApplyToGlobalConfig(liveBaseline with { BmsPoorHitResultEnable = false });
 
-            var env = ManiaRuleset.ResolveEnvironment(null, config, ManiaReplayRunPurpose.ForLiveAnalysis);
+            var env = ManiaRuleset.ResolveEnvironment(null, config, ReplayRunPurpose.ForLiveAnalysis);
 
             Assert.That(env.BmsPoorHitResultEnable, Is.False);
         }
