@@ -7,7 +7,7 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
@@ -33,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         private IReadOnlyList<HitEvent> drawableHitEvents = null!;
         private IBeatmap playableBeatmap = null!;
         private Score replayScore = null!;
-        private GameplayEnvironment parityEnvironment = null!;
+        private ManiaGameplayEnvironment parityEnvironment = null!;
 
         [TearDown]
         public void TearDown()
@@ -47,12 +47,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestLazerTapDrawableMatchesSession()
         {
-            parityEnvironment = new GameplayEnvironment
-            {
-                ManiaHitMode = EzEnumHitMode.Lazer,
-                ManiaHealthMode = EzEnumHealthMode.Lazer,
-                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
-            };
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
 
             runDrawableParityTest(
                 new List<ManiaHitObject>
@@ -72,12 +67,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestLazerHoldDrawableMatchesSession()
         {
-            parityEnvironment = new GameplayEnvironment
-            {
-                ManiaHitMode = EzEnumHitMode.Lazer,
-                ManiaHealthMode = EzEnumHealthMode.Lazer,
-                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
-            };
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
 
             const double head = 1500;
             const double tail = 4000;
@@ -102,12 +92,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestIidxTapDrawableMatchesSession()
         {
-            parityEnvironment = new GameplayEnvironment
-            {
-                ManiaHitMode = EzEnumHitMode.IIDX_HD,
-                ManiaHealthMode = EzEnumHealthMode.IIDX_HD,
-                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
-            };
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
 
             runDrawableParityTest(
                 new List<ManiaHitObject>
@@ -127,12 +112,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestIidxHoldDrawableMatchesSession()
         {
-            parityEnvironment = new GameplayEnvironment
-            {
-                ManiaHitMode = EzEnumHitMode.IIDX_HD,
-                ManiaHealthMode = EzEnumHealthMode.IIDX_HD,
-                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
-            };
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
 
             const double head = 1500;
             const double tail = 4000;
@@ -152,12 +132,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestO2TapDrawableMatchesSession()
         {
-            parityEnvironment = new GameplayEnvironment
-            {
-                ManiaHitMode = EzEnumHitMode.O2Jam,
-                ManiaHealthMode = EzEnumHealthMode.O2JamNormal,
-                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
-            };
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
 
             runDrawableParityTest(
                 new List<ManiaHitObject>
@@ -177,12 +152,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestMalodyHoldDrawableMatchesSession()
         {
-            parityEnvironment = new GameplayEnvironment
-            {
-                ManiaHitMode = EzEnumHitMode.Malody_E,
-                ManiaHealthMode = EzEnumHealthMode.Lazer,
-                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
-            };
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Malody_E, EzEnumHealthMode.Lazer);
 
             const double head = 1500;
             const double tail = 4000;
@@ -202,12 +172,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestO2HoldDrawableMatchesSession()
         {
-            parityEnvironment = new GameplayEnvironment
-            {
-                ManiaHitMode = EzEnumHitMode.O2Jam,
-                ManiaHealthMode = EzEnumHealthMode.O2JamNormal,
-                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
-            };
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
 
             const double head = 1500;
             const double tail = 4000;
@@ -238,12 +203,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestEz2AcHoldDrawableMatchesSession()
         {
-            parityEnvironment = new GameplayEnvironment
-            {
-                ManiaHitMode = EzEnumHitMode.EZ2AC,
-                ManiaHealthMode = EzEnumHealthMode.Ez2Ac,
-                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
-            };
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
 
             const double head = 1000;
             const double tail = 2000;

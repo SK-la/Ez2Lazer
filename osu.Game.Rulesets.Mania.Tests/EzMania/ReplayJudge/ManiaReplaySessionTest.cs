@@ -7,6 +7,7 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.EzMania.Statistics;
@@ -77,7 +78,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, iidxEnvironment);
 
-            var liveTimeline = ManiaReplaySession.RunTimeline(score, beatmap, GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig));
+            var liveTimeline = ManiaReplaySession.RunTimeline(score, beatmap, ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ManiaReplayRunPurpose.ForRaceTimeline));
             var lazerTimeline = ManiaReplaySession.RunTimeline(score, beatmap, lazerEnvironment);
             var iidxTimeline = ManiaReplaySession.RunTimeline(score, beatmap, iidxEnvironment);
 
@@ -174,12 +175,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [Test]
         public void TestRegistryReturnsBmsStrategyForIidx()
         {
-            var environment = new GameplayEnvironment
-            {
-                ManiaHitMode = EzEnumHitMode.IIDX_HD,
-                ManiaHealthMode = EzEnumHealthMode.IIDX_HD,
-                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
-            };
+            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
 
             Assert.That(ManiaJudgementRegistry.GetHitModeJudgement(EzEnumHitMode.IIDX_HD), Is.SameAs(BmsHitModeJudgement.Instance));
             Assert.That(ManiaJudgementRegistry.GetNoteStrategy(environment), Is.SameAs(BmsHitModeJudgement.Instance));
@@ -196,9 +192,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             var lazerEnvironment = LazerTapReplayFixtures.CreateTwoNoteColumnTap().environment;
             ReplayJudgeTestConfig.ApplyToGlobalConfig(lazerEnvironment);
-            GlobalConfigStore.EzConfig.SetValue(Ez2Setting.BmsPoorHitResultEnable, true);
 
-            var fromScore = GameplayEnvironment.FromScore(score.ScoreInfo, GlobalConfigStore.EzConfig);
+            var fromScore = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ManiaReplayRunPurpose.ForStoredStatistics);
             var generatorEvents = ManiaScoreHitEventGenerator.Instance.Generate(score, beatmap);
             var sessionFromScore = ManiaReplaySession.RunHitEvents(score, beatmap, fromScore);
             var sessionLazer = ManiaReplaySession.RunHitEvents(score, beatmap, lazerEnvironment);
@@ -213,14 +208,14 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         private static void runSessionAndGeneratorParity(
             Score score,
             IBeatmap beatmap,
-            GameplayEnvironment environment,
+            ManiaGameplayEnvironment environment,
             Action? configure = null)
         {
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
             configure?.Invoke();
 
-            var sessionEnvironment = GameplayEnvironment.FromScore(score.ScoreInfo, GlobalConfigStore.EzConfig);
+            var sessionEnvironment = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ManiaReplayRunPurpose.ForStoredStatistics);
             var sessionEvents = ManiaReplaySession.RunHitEvents(score, beatmap, sessionEnvironment);
             var generatorEvents = ManiaScoreHitEventGenerator.Instance.Generate(score, beatmap);
 
@@ -243,8 +238,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void TestBmsPostBadKPoorSessionMatchesGenerator()
         {
             var (score, beatmap, environment) = HitModeReplayFixtures.CreateBmsEarlyBadWithPostBadKPoor();
-            runSessionAndGeneratorParity(score, beatmap, environment, () =>
-                GlobalConfigStore.EzConfig.SetValue(Ez2Setting.BmsPoorHitResultEnable, true));
+            runSessionAndGeneratorParity(score, beatmap, environment);
         }
 
         [Test]

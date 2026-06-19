@@ -7,6 +7,7 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Replays;
@@ -29,7 +30,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             EzScoreTimelineBridge.RegisterManiaTimelineBuilder((score, beatmap, cancellationToken) =>
             {
-                var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
+                var environment = ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ManiaReplayRunPurpose.ForRaceTimeline);
                 return ManiaReplaySession.RunTimeline(score, beatmap, environment, cancellationToken);
             });
         }
@@ -49,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         public List<HitEvent> Generate(Score score, IBeatmap playableBeatmap, CancellationToken cancellationToken = default)
         {
-            var environment = GameplayEnvironment.FromScore(score.ScoreInfo, GlobalConfigStore.EzConfig);
+            var environment = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ManiaReplayRunPurpose.ForStoredStatistics);
             return ManiaReplaySession.Run(score, playableBeatmap, environment, cancellationToken).ScoreInfo.HitEvents.ToList();
         }
     }

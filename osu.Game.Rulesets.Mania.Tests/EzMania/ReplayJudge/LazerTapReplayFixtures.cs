@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     internal static class LazerTapReplayFixtures
     {
-        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateTwoNoteColumnTap()
+        public static (Score score, IBeatmap beatmap, ManiaGameplayEnvironment environment) CreateTwoNoteColumnTap()
         {
             var ruleset = new ManiaRuleset();
             var beatmap = new TestBeatmap(ruleset.RulesetInfo)
@@ -50,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, createEnvironment());
         }
 
-        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateSingleHoldPerfect()
+        public static (Score score, IBeatmap beatmap, ManiaGameplayEnvironment environment) CreateSingleHoldPerfect()
         {
             const double head = 1500;
             const double tail = 4000;
@@ -84,7 +84,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, createEnvironment());
         }
 
-        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateSingleHoldLateRelease()
+        public static (Score score, IBeatmap beatmap, ManiaGameplayEnvironment environment) CreateSingleHoldLateRelease()
         {
             const double head = 1500;
             const double tail = 4000;
@@ -119,12 +119,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, createEnvironment());
         }
 
-        private static GameplayEnvironment createEnvironment() => new GameplayEnvironment
-        {
-            ManiaHitMode = EzEnumHitMode.Lazer,
-            ManiaHealthMode = EzEnumHealthMode.Lazer,
-            JudgePrecedence = EzEnumJudgePrecedence.Earliest,
-        };
+        private static ManiaGameplayEnvironment createEnvironment() => ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
 
         private static Score createScore(ManiaRuleset ruleset, Replay replay) => new Score
         {

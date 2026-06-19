@@ -15,7 +15,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Framework.Graphics.Colour;
 using osu.Game.EzOsuGame.Extensions;
-using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
@@ -32,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 {
     /// <summary>
     /// Mania 判定偏移分布图。Original 用 Realm 静态 <see cref="ScoreInfo"/>；
-    /// Now 暂经 <see cref="ManiaReplaySession"/>（FromLive，OffsetPlusMania=0）；offset 滑条仅展示层 fake 平移。
+    /// Now 暂经 <see cref="ManiaReplaySession"/>（ResolveEnvironment ForLiveAnalysis，OffsetPlusMania=0）；offset 滑条仅展示层 fake 平移。
     /// </summary>
     public partial class EzScoreGraphMania : EzScoreGraphBase
     {
@@ -48,7 +48,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// <summary>Now 行：Session 在 Score 副本上运行，避免污染 Original 快照。</summary>
         private Score? nowScore;
 
-        private GameplayEnvironment? lastSessionEnvironment;
+        private ManiaGameplayEnvironment? lastSessionEnvironment;
 
         private readonly double originalAccuracy;
         private readonly long originalTotalScore;
@@ -162,18 +162,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override HitResult GetDisplayResult(HitEvent hitEvent) => hitEvent.Result;
 
-        private GameplayEnvironment createSessionEnvironment()
-        {
-            var live = GameplayEnvironment.FromLive(ezConfig);
-
-            return new GameplayEnvironment
-            {
-                ManiaHitMode = live.ManiaHitMode,
-                ManiaHealthMode = live.ManiaHealthMode,
-                JudgePrecedence = live.JudgePrecedence,
-                OffsetPlusMania = 0,
-            };
-        }
+        private ManiaGameplayEnvironment createSessionEnvironment()
+            => ManiaRuleset.ResolveEnvironment(null, ezConfig, ManiaReplayRunPurpose.ForLiveAnalysis) with { OffsetPlusMania = 0 };
 
         private void invalidateSessionCache() => lastSessionEnvironment = null;
 
@@ -212,10 +202,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                    && replay.Frames.All(f => f is ManiaReplayFrame);
         }
 
-        private static bool sessionEnvironmentEquals(GameplayEnvironment a, GameplayEnvironment b)
-            => a.ManiaHitMode == b.ManiaHitMode
-               && a.ManiaHealthMode == b.ManiaHealthMode
-               && a.JudgePrecedence == b.JudgePrecedence;
+        private static bool sessionEnvironmentEquals(ManiaGameplayEnvironment a, ManiaGameplayEnvironment b) => a == b;
 
         private Dictionary<HitResult, int> extractDisplayCounts(IReadOnlyDictionary<HitResult, int> statistics)
             => ExtractDisplayCounts(statistics, currentHitMode);
