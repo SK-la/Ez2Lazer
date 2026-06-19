@@ -4,12 +4,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Judgements;
@@ -47,11 +50,35 @@ namespace osu.Game.EzOsuGame.Statistics
         // 用于绘制主图表的容器（位于左侧统计宽度 LeftMarginConst 的右侧）。
         private Container graphContainer = null!;
 
+        // 边界线独立容器 — redrawScatterAndHealthWithOffset 只清 graphContainer，不碰边界线
+        private Container boundaryContainer = null!;
+
         // 左侧预留用于判定区间标签的容器。派生类可在 X = LeftMarginConst - labelAreaWidth 处创建并赋值给它以预留标签区域。
         protected Container? LeftLabelContainer;
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
+
+        // 通过 EzReplaySessionRegistry 访问，Generator 静态初始化后自动可用
+        // TODO(P3-Rest): Registry 注册后 Graph/Panel/Race 可用；P3-Rest 阶段各 Ruleset 应通过 DI 注入替代
+        protected IEzReplaySession? ReplaySession => EzReplaySessionRegistry.Instance;
+
+        // Graph-UX: 双轨刷新状态管理
+        // TODO(P3-Rest): CommittedNowScore/committedEnvironment 应由 IEzReplaySession.RunRequestAsync(ForLiveAnalysis) 填充
+        // displayOffset 由 RefreshDisplayOnly 管理（拖动时），RefreshFromService 成功后重置为 0
+        protected Score? CommittedNowScore;
+#pragma warning disable IDE0051 // committedEnvironment 为 P3-Rest 阶段预留，当前暂未使用
+        private IGameplayEnvironment? committedEnvironment;
+#pragma warning restore IDE0051
+        private double displayOffset;
+
+        // Fake offset 统计（拖动时显示）
+        private double fakeAccuracy;
+        private Dictionary<HitResult, int> fakeCounts = new Dictionary<HitResult, int>();
+
+        // Debounce 控制 — offset 拖动时仅展示，落定后触发 Session
+        private CancellationTokenSource? debounceCancellation;
+        private const int debounce_ms = 300; // offset 落定延迟
 
         protected double V1Accuracy { get; set; }
         protected long V1Score { get; set; }
@@ -127,7 +154,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
             // 必须在 ApplyBeatmap() 前设置 Legacy 标记：
             // ManiaScoreProcessor 会在 ApplyBeatmap() 内缓存 hitMode，
-            // 若顺序反了就会把当前 hitmode 当成 V1 路线，导致 classic 结果随 hitmode 改变。
+            // 若顺序反了就会把当前 HitMode 当成 V1 路线，导致 classic 结果随 HitMode 改变。
             v1ScoreProcessor.IsLegacyScore = true;
             v1ScoreProcessor.ApplyBeatmap(Beatmap);
             v1ScoreProcessor.Mods.Value = Score.Mods;
@@ -231,6 +258,50 @@ namespace osu.Game.EzOsuGame.Statistics
             V2Counts = v2Counts;
         }
 
+        /// <summary>
+        /// 根据 fake offset 计算判定统计（用于拖动时的实时反馈）。
+        /// 基类提供通用实现：遍历 OriginalHitEvents，叠加 fake offset 到 TimeOffset，
+        /// 对每个事件调用 <see cref="GetDisplayResult"/> 获取 fake 判定结果。
+        /// 派生类可重写以提供 HitMode 过滤等额外逻辑。
+        /// </summary>
+        protected virtual void CalculateFakeOffsetStats()
+        {
+            int totalHit = 0;
+            int totalMiss = 0;
+            var counts = new Dictionary<HitResult, int>();
+
+            foreach (var e in OriginalHitEvents)
+            {
+                var fakeEvent = new HitEvent(
+                    e.TimeOffset + displayOffset,
+                    e.GameplayRate,
+                    e.Result,
+                    e.HitObject,
+                    e.LastHitObject,
+                    e.Position);
+
+                var result = GetDisplayResult(fakeEvent);
+
+                if (result == HitResult.Miss)
+                {
+                    totalMiss++;
+                    counts.TryGetValue(HitResult.Miss, out int mc);
+                    counts[HitResult.Miss] = mc + 1;
+                    continue;
+                }
+
+                totalHit++;
+                counts.TryGetValue(result, out int c);
+                counts[result] = c + 1;
+            }
+
+            fakeAccuracy = totalHit + totalMiss > 0
+                ? (double)totalHit / (totalHit + totalMiss)
+                : 0;
+
+            fakeCounts = counts;
+        }
+
         protected virtual void UpdateDisplay()
         {
             if (!IsAlive || IsDisposed)
@@ -263,9 +334,23 @@ namespace osu.Game.EzOsuGame.Statistics
 
             AddInternal(graphContainer);
 
+            // 边界线独立容器 — redrawScatterAndHealthWithOffset 只清 graphContainer，不碰边界线
+            boundaryContainer = new Container
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopLeft,
+                Position = new Vector2(LeftMarginConst, 0),
+                Size = new Vector2(DrawWidth - LeftMarginConst - RightMarginConst, DrawHeight),
+                RelativeSizeAxes = Axes.None,
+                AutoSizeAxes = Axes.None,
+                Masking = false
+            };
+
+            AddInternal(boundaryContainer);
+
             // 背景中心线（表示 0 ms）
             float centerY = projectOffsetToY(0, minTime);
-            graphContainer.Add(new Box
+            boundaryContainer.Add(new Box
             {
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.CentreLeft,
@@ -286,16 +371,15 @@ namespace osu.Game.EzOsuGame.Statistics
 
             var sortedHitEvents = GetDisplayHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
 
-            drawHealthLine(sortedHitEvents);
-            drawPointsGraph(sortedHitEvents);
+            drawHealthLine(sortedHitEvents, applyOffset: false);
+            drawPointsGraph(sortedHitEvents, applyOffset: false);
         }
 
-        private void drawPointsGraph(List<HitEvent> sortedHitEvents)
+        private void drawPointsGraph(List<HitEvent> sortedHitEvents, bool applyOffset)
         {
             var pointList = new List<(Vector2 pos, Color4 colour)>();
 
             float availableWidth = DrawWidth - LeftMarginConst - RightMarginConst;
-            float centerY = DrawHeight / 2f;
 
             foreach (var e in sortedHitEvents)
             {
@@ -304,7 +388,9 @@ namespace osu.Game.EzOsuGame.Statistics
                 var displayResult = GetDisplayResult(e);
 
                 float x = xPosition * availableWidth;
-                float y = projectOffsetToY(e.TimeOffset, time);
+                float y = projectOffsetToY(
+                    applyOffset ? e.TimeOffset + displayOffset : e.TimeOffset,
+                    time);
 
                 pointList.Add((new Vector2(x, y), colours.ForHitResult(displayResult)));
             }
@@ -332,6 +418,173 @@ namespace osu.Game.EzOsuGame.Statistics
         protected void Refresh()
         {
             Scheduler.AddOnce(UpdateDisplay);
+        }
+
+        // ==================== Graph-UX: 双轨刷新机制 ====================
+
+        /// <summary>
+        /// 轻量重绘：仅应用 fake offset 到展示层，不触发 Session
+        /// Graph-UX: 用于拖动时的即时反馈，避免重建边界线
+        /// </summary>
+        /// <param name="fakeOffset">展示的偏移量（毫秒）</param>
+        protected void RefreshDisplayOnly(double fakeOffset)
+        {
+            displayOffset = fakeOffset;
+
+            // 仅重绘 scatter/health，不清空边界线，避免拖动卡顿
+            redrawScatterAndHealthWithOffset(fakeOffset);
+        }
+
+        /// <summary>
+        /// 真实重算：调用 Session，更新 committed Now
+        /// Graph-UX: offset 落定后触发，使用 ForLiveAnalysis 目的
+        /// </summary>
+        protected async Task RefreshFromService()
+        {
+            if (ReplaySession == null || Beatmap == null)
+                return;
+
+            var environment = CreateLiveAnalysisEnvironment();
+            var inputScore = ResolveInputScore();
+
+            if (inputScore == null)
+                return;
+
+            try
+            {
+                // TODO(P3-Rest): 应使用 ReplayRunRequest(ForLiveAnalysis) 统一入口
+                // 当前暂时直接调用 RunAsync，P3-Rest 阶段改为 RunRequestAsync
+                if (environment != null)
+                {
+                    CommittedNowScore = await ReplaySession.RunAsync(
+                        inputScore.DeepClone(),
+                        Beatmap,
+                        environment
+                    ).ConfigureAwait(false);
+
+                    committedEnvironment = environment;
+                }
+
+                displayOffset = 0; // 重置展示 offset
+
+                // 全量刷新（现在基于新的 committedNowScore）
+                Schedule(Refresh);
+            }
+            catch (OperationCanceledException)
+            {
+                // 取消的请求忽略
+            }
+            catch
+            {
+                // Session 失败时清空 committedNowScore
+                CommittedNowScore = null;
+                committedEnvironment = null;
+                Schedule(Refresh);
+            }
+        }
+
+        /// <summary>
+        /// Offset 变化处理：debounce 逻辑
+        /// Graph-UX: 拖动时立即 display-only，停止后 debounce (300ms) 触发 service
+        /// </summary>
+        /// <param name="newOffset">新的 offset 值</param>
+        protected void OnOffsetChanged(double newOffset)
+        {
+            // 取消之前的 debounce
+            debounceCancellation?.Cancel();
+            debounceCancellation = new CancellationTokenSource();
+
+            var token = debounceCancellation.Token;
+
+            // 立即应用 display-only（轻量重绘）
+            RefreshDisplayOnly(newOffset);
+
+            // debounce 后触发 service（真实重算）
+            // fire-and-forget：故意不等待，由 CancellationToken 控制生命周期
+#pragma warning disable CS4014
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(debounce_ms, token).ConfigureAwait(false);
+                    if (!token.IsCancellationRequested)
+                        RefreshFromService();
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            }, token);
+#pragma warning restore CS4014
+        }
+
+        /// <summary>
+        /// 轻量重绘 scatter + health line（带 offset）
+        /// Graph-UX: 使用 OriginalHitEvents（无 fake offset）仅重建 scatter 和血量，
+        /// 不清空边界线，拖动时性能友好。
+        /// 注意：drawPointsGraph 内部会加 offset，避免与 FilterHitEvents 的
+        /// applyFakeOffsetToEvents 叠加导致双重 offset。
+        /// </summary>
+        private void redrawScatterAndHealthWithOffset(double offset)
+        {
+            if (graphContainer == null)
+                return;
+
+            // 移除旧的 scatter 和血量 path（保留边界线）
+            var toRemove = graphContainer.Children
+                .Where(c => c is GirdPoints || c is Path)
+                .ToList();
+
+            foreach (var child in toRemove)
+                graphContainer.Remove(child, true);
+
+            // 使用 OriginalHitEvents（不含 fake offset），offset 由 drawPointsGraph 单独加
+            var originalEvents = OriginalHitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
+            drawPointsGraph(originalEvents, applyOffset: true);
+
+            // drawHealthLine 用原始 events + applyOffset: true，GetDisplayResult 内部会读到正确的 Result
+            drawHealthLine(originalEvents, applyOffset: true);
+        }
+
+        /// <summary>
+        /// 获取用于展示的 HitEvents（应用 displayOffset）
+        /// </summary>
+        protected IReadOnlyList<HitEvent> GetDisplayEventsWithOffset()
+        {
+            var baseEvents = CommittedNowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents;
+
+#pragma warning disable IDE0046 // displayOffset == 0 的简化写法
+            if (displayOffset == 0)
+                return baseEvents;
+#pragma warning restore IDE0046
+
+            return baseEvents.Select(e => new HitEvent(
+                e.TimeOffset + displayOffset,
+                e.GameplayRate,
+                e.Result,
+                e.HitObject,
+                e.LastHitObject,
+                e.Position
+            )).ToList();
+        }
+
+        /// <summary>
+        /// 创建 ForLiveAnalysis 环境（offset=0）
+        /// 子类应重写以提供规则集特定的环境解析
+        /// </summary>
+        protected virtual IGameplayEnvironment? CreateLiveAnalysisEnvironment()
+        {
+            // 默认返回 null，子类必须重写
+            return null;
+        }
+
+        /// <summary>
+        /// 解析输入 Score（用于 Session 运行）
+        /// 子类应重写以提供规则集特定的 Score 获取逻辑
+        /// </summary>
+        protected virtual Score? ResolveInputScore()
+        {
+            // 默认返回 null，子类必须重写
+            return null;
         }
 
         private void updateTimeExtentsFromDisplayEvents()
@@ -385,6 +638,52 @@ namespace osu.Game.EzOsuGame.Statistics
             }
         }
 
+        private void drawHealthLine(List<HitEvent> sortedHitEvents, bool applyOffset)
+        {
+            List<Vector2> healthPoints = new List<Vector2>();
+            double currentHealth = GetInitialHealth();
+
+            float availableWidth = DrawWidth - LeftMarginConst - RightMarginConst;
+
+            foreach (var e in sortedHitEvents)
+            {
+                // applyOffset 时需要创建带 offset 的临时 HitEvent 来获取 displayResult
+                HitEvent displayEvent = applyOffset
+                    ? new HitEvent(
+                        e.TimeOffset + displayOffset,
+                        e.GameplayRate,
+                        e.Result,
+                        e.HitObject,
+                        e.LastHitObject,
+                        e.Position)
+                    : e;
+
+                var displayResult = GetDisplayResult(displayEvent);
+                double healthIncrease = GetDisplayHealthIncrease(displayEvent, displayResult, currentHealth);
+                currentHealth = Math.Clamp(currentHealth + healthIncrease, 0, 1);
+
+                double time = e.HitObject.StartTime;
+                float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0;
+                float x = xPosition * availableWidth;
+                float y = (float)((1 - currentHealth) * DrawHeight);
+
+                healthPoints.Add(new Vector2(x, y));
+            }
+
+            if (healthPoints.Count > 1)
+            {
+                graphContainer.Add(new Path
+                {
+                    Anchor = Anchor.TopLeft,
+                    Origin = Anchor.TopLeft,
+                    PathRadius = 1,
+                    Colour = Color4.Red,
+                    Alpha = 0.3f,
+                    Vertices = healthPoints.ToArray()
+                });
+            }
+        }
+
         private void drawBoundaryLine(HitResult result, bool isNegative)
         {
             float availableWidth = DrawWidth - LeftMarginConst - RightMarginConst;
@@ -402,7 +701,7 @@ namespace osu.Game.EzOsuGame.Statistics
                 vertices.Add(new Vector2(x, y));
             }
 
-            graphContainer.Add(new Path
+            boundaryContainer.Add(new Path
             {
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.TopLeft,

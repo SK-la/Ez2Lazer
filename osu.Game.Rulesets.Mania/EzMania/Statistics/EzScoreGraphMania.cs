@@ -17,9 +17,9 @@ using osu.Framework.Graphics.Colour;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.Scoring;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
-using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Replays;
@@ -33,10 +33,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 {
     /// <summary>
     /// Mania 判定偏移分布图。Original 用 Realm 静态 <see cref="ScoreInfo"/>；
-    /// Now 暂经 <see cref="ManiaReplaySession"/>（ResolveEnvironment ForLiveAnalysis，OffsetPlusMania=0）；offset 滑条仅展示层 fake 平移。
+    /// Now 经 <see cref="ManiaReplaySession"/>（ForLiveAnalysis，含 live config offset）；
+    /// offset 滑条同步控制展示层 fake 平移与 Session 真实 offset。
     /// </summary>
     public partial class EzScoreGraphMania : EzScoreGraphBase
     {
+        // TODO(P3-Rest): 删除静态服务实例，改用基类 ReplaySession（由 DI 注入）
+        // private static readonly ManiaReplaySessionService replay_session = new ManiaReplaySessionService();
+
         private readonly ManiaHitWindows hitWindowsV2 = new ManiaHitWindows();
         private readonly HitModeHelper hitWindowsV1 = new HitModeHelper(EzEnumHitMode.Classic);
 
@@ -46,17 +50,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private EzEnumHealthMode currentHealthMode;
         private Bindable<double> offsetPlusMania = new Bindable<double>(0);
 
-        /// <summary>Now 行：Session 在 Score 副本上运行，避免污染 Original 快照。</summary>
-        private Score? nowScore;
-
-        private ManiaGameplayEnvironment? lastSessionEnvironment;
-
         private readonly double originalAccuracy;
         private readonly long originalTotalScore;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
+        // TODO(P3-Rest): resolveSessionInputScore() 应移除，改为通过 IEzReplaySession.RunRequestAsync(ForLiveAnalysis)
+        // 当前临时方案：保留 scoreManager 用于获取 databased score
         [Resolved]
         private ScoreManager scoreManager { get; set; } = null!;
 
@@ -72,15 +73,30 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             originalTotalScore = score.TotalScore;
         }
 
-        private IReadOnlyList<HitEvent> getNowSourceEvents()
-            => nowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents;
-
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
-            => filterForCurrentHitMode(getNowSourceEvents());
+            => filterForCurrentHitMode(
+                CommittedNowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents);
+
+        protected override void CalculateV2Accuracy()
+        {
+            var info = CommittedNowScore?.ScoreInfo;
+
+            if (info != null)
+            {
+                V2Accuracy = info.Accuracy;
+                V2Score = info.TotalScore;
+                V2Counts = extractDisplayCounts(info.Statistics);
+                return;
+            }
+
+            V2Accuracy = 0;
+            V2Score = 0;
+            V2Counts = new Dictionary<HitResult, int>();
+        }
 
         protected override IReadOnlyList<HitEvent> GetV1HitEvents()
         {
-            // Classic 路线固定使用原始基础事件，不受当前 hitmode 可见结果集合影响。
+            // Classic 路线固定使用原始基础事件，不受当前 HitMode 可见结果集合影响。
             return applyFakeOffsetToEvents(OriginalHitEvents.Where(e => e.Result.IsBasic()));
         }
 
@@ -95,53 +111,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             {
                 currentHitMode = v.NewValue;
                 hitWindowsV2.SetHitMode(currentHitMode);
-                invalidateSessionCache();
-                Refresh();
+                Schedule(() => RefreshFromService().ConfigureAwait(false));
             }, true);
 
             healthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
-            healthModeBindable.BindValueChanged(v =>
+            healthModeBindable.BindValueChanged(__ =>
             {
-                currentHealthMode = v.NewValue;
-                invalidateSessionCache();
-                Refresh();
+                currentHealthMode = healthModeBindable.Value;
+                Schedule(() => RefreshFromService().ConfigureAwait(false));
             }, true);
 
             ezConfig.GetBindable<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence)
-                     .BindValueChanged(_ =>
-                     {
-                         invalidateSessionCache();
-                         Refresh();
-                     }, true);
+                    .BindValueChanged(__ => Schedule(() => RefreshFromService().ConfigureAwait(false)), true);
 
             ezConfig.GetBindable<bool>(Ez2Setting.BmsPoorHitResultEnable)
-                     .BindValueChanged(_ =>
-                     {
-                         invalidateSessionCache();
-                         Refresh();
-                     }, true);
+                    .BindValueChanged(__ => Schedule(() => RefreshFromService().ConfigureAwait(false)), true);
 
             offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
-            offsetPlusMania.BindValueChanged(_ => Refresh(), true);
+            offsetPlusMania.BindValueChanged(v => OnOffsetChanged(v.NewValue), true);
 
             Refresh();
-        }
-
-        protected override void CalculateV2Accuracy()
-        {
-            if (tryRunSessionForNow())
-            {
-                var info = nowScore!.ScoreInfo;
-                V2Accuracy = info.Accuracy;
-                V2Score = info.TotalScore;
-                V2Counts = extractDisplayCounts(info.Statistics);
-                return;
-            }
-
-            nowScore = null;
-            V2Accuracy = 0;
-            V2Score = 0;
-            V2Counts = new Dictionary<HitResult, int>();
         }
 
         protected override double UpdateBoundary(HitResult result, double? time = null)
@@ -163,31 +152,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override HitResult GetDisplayResult(HitEvent hitEvent) => hitEvent.Result;
 
+        // P3-Rest 前过渡：通过 scoreManager 获取 databased score
+        // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLiveAnalysis)
+        protected override Score? ResolveInputScore() => resolveSessionInputScore();
+
+        // P3-Rest 前过渡：返回 ForLiveAnalysis 环境（读 live config offset）
+        // TODO(P3-Rest): createSessionEnvironment() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLiveAnalysis)
+        protected override IGameplayEnvironment? CreateLiveAnalysisEnvironment() => createSessionEnvironment();
+
         private ManiaGameplayEnvironment createSessionEnvironment()
-            => ManiaRuleset.ResolveEnvironment(null, ezConfig, ReplayRunPurpose.ForLiveAnalysis) with { OffsetPlusMania = 0 };
+            => ManiaRuleset.ResolveEnvironment(null, ezConfig, ReplayRunPurpose.ForLiveAnalysis);
 
-        private void invalidateSessionCache() => lastSessionEnvironment = null;
-
-        private bool tryRunSessionForNow()
-        {
-            var environment = createSessionEnvironment();
-
-            if (nowScore != null && lastSessionEnvironment != null && sessionEnvironmentEquals(lastSessionEnvironment, environment))
-                return true;
-
-            var input = resolveSessionInputScore();
-
-            if (input == null)
-            {
-                nowScore = null;
-                return false;
-            }
-
-            nowScore = ManiaReplaySession.Run(input.DeepClone(), Beatmap, environment);
-            lastSessionEnvironment = environment;
-            return true;
-        }
-
+        // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLiveAnalysis)
         private Score? resolveSessionInputScore()
         {
             var databased = scoreManager.GetScore(Score);
@@ -202,8 +178,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                    && replay.Frames.Count > 0
                    && replay.Frames.All(f => f is ManiaReplayFrame);
         }
-
-        private static bool sessionEnvironmentEquals(ManiaGameplayEnvironment a, ManiaGameplayEnvironment b) => a == b;
 
         private Dictionary<HitResult, int> extractDisplayCounts(IReadOnlyDictionary<HitResult, int> statistics)
             => ExtractDisplayCounts(statistics, currentHitMode);
@@ -343,8 +317,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             double scAcc = originalAccuracy * 100;
             long scScore = originalTotalScore;
 
-            string nowAccText = nowScore != null ? (V2Accuracy * 100).ToString("F1") + "%" : "—";
-            string nowScoreText = nowScore != null ? (V2Score / 1000.0).ToString("F0") + "k" : "—";
+            string nowAccText = CommittedNowScore != null ? (V2Accuracy * 100).ToString("F1") + "%" : "—";
+            string nowScoreText = CommittedNowScore != null ? (V2Score / 1000.0).ToString("F0") + "k" : "—";
 
             var items = new List<SimpleStatisticItem>
             {

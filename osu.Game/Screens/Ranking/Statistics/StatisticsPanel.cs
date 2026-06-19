@@ -16,6 +16,7 @@ using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -57,6 +58,9 @@ namespace osu.Game.Screens.Ranking.Statistics
 
         [Resolved]
         private IAPIProvider api { get; set; } = null!;
+
+        // TODO(P3-Rest): 改为 DI 注入（parent Cache）；当前通过 EzReplaySessionRegistry 访问
+        protected IEzReplaySession? ReplaySession => EzReplaySessionRegistry.Instance;
 
         private readonly Container content;
         private readonly LoadingSpinner spinner;
@@ -131,6 +135,7 @@ namespace osu.Game.Screens.Ranking.Statistics
 
                     if (databasedScore != null)
                     {
+                        // TODO(P3-Rest): 改为 ReplaySession.RunAsync(ForStoredStatistics)，删除 Bridge 调用
                         EzScoreReloadBridge.InitializeAllGenerators();
                         generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
                     }
