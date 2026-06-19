@@ -307,8 +307,8 @@ namespace osu.Game.Screens.Ranking
 
         private void scheduleAutoExpandStatisticsWhenCentered()
         {
-            // Visual tests use TestPlayer; ScreenTestScene has no Player. Auto-expanding shifts layout and breaks score panel assertions.
-            if (Score == null || player == null || player is TestPlayer || DebugUtils.IsNUnitRunning)
+            // Visual tests use TestPlayer; NUnit/ScreenTestScene 无 Player 时跳过。排行榜 PresentScore 路径无 Player，仍应自动展开。
+            if (Score == null || player is TestPlayer || DebugUtils.IsNUnitRunning)
                 return;
 
             void attempt()
