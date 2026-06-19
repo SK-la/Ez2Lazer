@@ -1,16 +1,17 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge;
@@ -220,6 +221,57 @@ namespace osu.Game.Rulesets.Mania.Tests
                 });
         }
 
+        // ==================== P2-B: Parity 扩到完整 Score ====================
+
+        [Test]
+        public void TestFullScoreParity_LazerTap()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new Note { StartTime = 1000, Column = 0 },
+                    new Note { StartTime = 2000, Column = 0 },
+                    new Note { StartTime = 3000, Column = 1 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(1000, ManiaAction.Key1),
+                    new ManiaReplayFrame(1100),
+                    new ManiaReplayFrame(2000, ManiaAction.Key1),
+                    new ManiaReplayFrame(2100),
+                    new ManiaReplayFrame(3000, ManiaAction.Key2),
+                    new ManiaReplayFrame(3100),
+                    new ManiaReplayFrame(4000, ManiaAction.Key2),
+                    new ManiaReplayFrame(4100),
+                });
+        }
+
+        [Test]
+        public void TestFullScoreParity_IidxHold()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
+
+            const double head = 1500;
+            const double tail = 4000;
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 5000, Column = 1 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(tail),
+                    new ManiaReplayFrame(5000, ManiaAction.Key2),
+                    new ManiaReplayFrame(5100),
+                });
+        }
+
         private void runDrawableParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames)
         {
             AddStep("configure environment", () => ReplayJudgeTestConfig.ApplyToGlobalConfig(parityEnvironment));
@@ -258,6 +310,95 @@ namespace osu.Game.Rulesets.Mania.Tests
 
                 throw new AssertionException(
                     $"drawable=[{ManiaReplayParityHelper.DescribeHitEvents(drawableHitEvents)}] session=[{ManiaReplayParityHelper.DescribeHitEvents(sessionEvents)}]");
+            });
+        }
+
+        // P2-B: 完整 Score parity 测试（accuracy/score/statistics）
+        private void runFullScoreParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames)
+        {
+            AddStep("configure environment", () => ReplayJudgeTestConfig.ApplyToGlobalConfig(parityEnvironment));
+
+            AddStep("load player", () =>
+            {
+                Beatmap.Value = CreateWorkingBeatmap(new ManiaBeatmap(new StageDefinition(4))
+                {
+                    HitObjects = hitObjects,
+                    BeatmapInfo =
+                    {
+                        Ruleset = new ManiaRuleset().RulesetInfo,
+                    },
+                });
+
+                Beatmap.Value.Beatmap.ControlPointInfo.Add(0, new EffectControlPoint { ScrollSpeed = 0.1f });
+
+                replayScore = new Score { Replay = new Replay { Frames = frames } };
+                LoadScreen(currentPlayer = new ScoreAccessibleReplayPlayer(replayScore));
+            });
+
+            AddUntilStep("wait for completion", () => currentPlayer?.ScoreProcessor?.HasCompleted.Value == true);
+
+            AddStep("capture drawable results", () =>
+            {
+                playableBeatmap = Beatmap.Value.GetPlayableBeatmap(new ManiaRuleset().RulesetInfo);
+            });
+
+            AddAssert("session accuracy matches drawable", () =>
+            {
+                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
+                double drawableAccuracy = currentPlayer.ScoreProcessor.Accuracy.Value;
+                double sessionAccuracy = sessionResult.ScoreInfo.Accuracy;
+
+                const double tolerance = 1e-6;
+                if (Math.Abs(drawableAccuracy - sessionAccuracy) < tolerance)
+                    return true;
+
+                throw new AssertionException(
+                    $"drawable accuracy={drawableAccuracy:F8} session accuracy={sessionAccuracy:F8}");
+            });
+
+            AddAssert("session total score matches drawable", () =>
+            {
+                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
+                long drawableScore = currentPlayer.ScoreProcessor.TotalScore.Value;
+                long sessionScore = sessionResult.ScoreInfo.TotalScore;
+
+                if (drawableScore == sessionScore)
+                    return true;
+
+                throw new AssertionException(
+                    $"drawable score={drawableScore} session score={sessionScore}");
+            });
+
+            AddAssert("session statistics match drawable", () =>
+            {
+                var sessionResult = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
+                var drawableStats = currentPlayer.ScoreProcessor.Statistics;
+                var sessionStats = sessionResult.ScoreInfo.Statistics;
+
+                // 比较所有 HitResult 的计数（排除 IgnoreHit，因为 Session 不产生此结果）
+                foreach (var kvp in drawableStats)
+                {
+                    if (kvp.Key == HitResult.IgnoreHit || kvp.Key == HitResult.IgnoreMiss)
+                        continue; // Session 路径不记录 IgnoreHit/IgnoreMiss
+
+                    if (!sessionStats.TryGetValue(kvp.Key, out int sessionCount) || sessionCount != kvp.Value)
+                    {
+                        throw new AssertionException(
+                            $"statistics mismatch for {kvp.Key}: drawable={kvp.Value} session={sessionStats.GetValueOrDefault(kvp.Key, 0)}");
+                    }
+                }
+
+                // 检查 session 是否有额外的统计项
+                foreach (var kvp in sessionStats)
+                {
+                    if (!drawableStats.ContainsKey(kvp.Key) && kvp.Value != 0)
+                    {
+                        throw new AssertionException(
+                            $"session has extra statistic {kvp.Key}={kvp.Value} not in drawable");
+                    }
+                }
+
+                return true;
             });
         }
 
