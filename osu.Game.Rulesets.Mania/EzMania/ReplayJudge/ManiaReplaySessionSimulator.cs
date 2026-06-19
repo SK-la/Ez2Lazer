@@ -15,6 +15,8 @@ using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Replays;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Scoring;
 using osu.Game.Utils;
 using static osu.Game.Rulesets.Mania.EzMania.ReplayJudge.ManiaColumnSimulator;
@@ -53,6 +55,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var judgementState = new ManiaReplayJudgementState();
             var headWasHit = new Dictionary<HeadNote, bool>();
             var keyHeldByColumn = new Dictionary<int, bool>();
+            var pressTimesByColumn = buildPressTimesByColumn(score.Replay);
             double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
 
             foreach (var input in ManiaReplayInputParser.Parse(score.Replay))
@@ -454,21 +457,65 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         internal static double computeStoredTimeOffset(double eventTime, HitObject target)
             => eventTime - target.GetEndTime();
 
-        internal static double estimateUnjudgedMissOffset(HitObject target, IBeatmap beatmap, EzEnumHitMode hitMode)
+        internal static Dictionary<int, List<double>> buildPressTimesByColumn(Replay replay)
         {
-            bool useTailReleaseLenience = target is TailNote && usesTailReleaseLenience(hitMode);
-            double lenienceFactor = useTailReleaseLenience ? TailNote.RELEASE_WINDOW_LENIENCE : 1;
+            var dict = new Dictionary<int, List<double>>();
 
-            var hitWindowHelper = new HitModeHelper(hitMode)
+            foreach (var input in ManiaReplayInputParser.Parse(replay))
             {
-                OverallDifficulty = beatmap.Difficulty.OverallDifficulty,
-                BPM = getBpmAtTime(beatmap, target.StartTime),
-            };
+                if (!input.IsPress)
+                    continue;
 
-            double missLate = hitWindowHelper.WindowFor(HitResult.Miss, false) * lenienceFactor;
+                if (!dict.TryGetValue(input.Column, out var list))
+                {
+                    list = new List<double>();
+                    dict[input.Column] = list;
+                }
 
-            // 保持在 miss 判定窗口内，避免后续按 offset 重算时被降级为更高判定或 None。
-            return Math.Max(0, missLate - 0.01);
+                list.Add(input.Time);
+            }
+
+            foreach (var list in dict.Values)
+                list.Sort();
+
+            return dict;
+        }
+
+        /// <summary>
+        /// Miss 存储偏移：优先该列 replay 最近邻 press；无输入则 0（Graph 侧 projectOffsetToY 压边）。
+        /// </summary>
+        internal static double resolveMissStoredOffset(
+            HitObject target,
+            IReadOnlyDictionary<int, List<double>> pressTimesByColumn,
+            double? beforeTimeInclusive = null)
+        {
+            double eventTime = resolveMissEventTime(target, pressTimesByColumn, beforeTimeInclusive);
+            return computeStoredTimeOffset(eventTime, target);
+        }
+
+        internal static double resolveMissEventTime(
+            HitObject target,
+            IReadOnlyDictionary<int, List<double>> pressTimesByColumn,
+            double? beforeTimeInclusive = null)
+        {
+            if (target is not IHasColumn hasColumn)
+                return target.GetEndTime();
+
+            if (!pressTimesByColumn.TryGetValue(hasColumn.Column, out var times) || times.Count == 0)
+                return target.GetEndTime();
+
+            IEnumerable<double> candidates = times;
+
+            if (beforeTimeInclusive.HasValue)
+                candidates = times.Where(t => t <= beforeTimeInclusive.Value);
+
+            var candidateList = candidates.ToList();
+
+            if (candidateList.Count == 0)
+                return beforeTimeInclusive ?? target.GetEndTime();
+
+            double reference = target.GetEndTime();
+            return candidateList.MinBy(t => Math.Abs(t - reference));
         }
     }
 }

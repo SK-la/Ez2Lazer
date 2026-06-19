@@ -291,7 +291,7 @@ namespace osu.Game.Rulesets.Mania.Tests
 
             AddAssert("session hit events match drawable replay path", () =>
             {
-                var sessionEvents = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
+                var sessionEvents = ManiaReplaySession.RunHitEvents(replayScore, playableBeatmap, parityEnvironment);
 
                 if (ManiaReplayParityHelper.AreHitEventsEquivalent(drawableHitEvents, sessionEvents))
                     return true;

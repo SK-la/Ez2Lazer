@@ -10,15 +10,18 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Framework.Graphics.Colour;
 using osu.Game.EzOsuGame.Extensions;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
+using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -28,9 +31,8 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 {
     /// <summary>
-    /// Mania判定偏移分布图的特定实现，扩展了BaseEzScoreGraph。
-    /// 按Mania的判定方式重新过滤、计算了每个HitEvent的结果，并将其与原始结果进行比较，以分析偏移分布和准确性。
-    /// 覆写判定区间计算以适应Mania的判定方式，并添加了对Classic模式下LN（长按键）判定的支持。
+    /// Mania 判定偏移分布图。Original 用 Realm 静态 <see cref="ScoreInfo"/>；
+    /// Now 暂经 <see cref="ManiaReplaySession"/>（FromLive，OffsetPlusMania=0）；offset 滑条仅展示层 fake 平移。
     /// </summary>
     public partial class EzScoreGraphMania : EzScoreGraphBase
     {
@@ -43,8 +45,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private EzEnumHealthMode currentHealthMode;
         private Bindable<double> offsetPlusMania = new Bindable<double>(0);
 
+        /// <summary>Now 行：Session 在 Score 副本上运行，避免污染 Original 快照。</summary>
+        private Score? nowScore;
+
+        private GameplayEnvironment? lastSessionEnvironment;
+
+        private readonly double originalAccuracy;
+        private readonly long originalTotalScore;
+
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
+        private ScoreManager scoreManager { get; set; } = null!;
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
@@ -54,19 +67,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         {
             hitWindowsV2.SetDifficulty(OD);
             hitWindowsV1.OverallDifficulty = OD;
+            originalAccuracy = score.Accuracy;
+            originalTotalScore = score.TotalScore;
         }
 
+        private IReadOnlyList<HitEvent> getNowSourceEvents()
+            => nowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents;
+
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
-        {
-            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
-            var filtered = Score.HitEvents.Where(e => validResults.Contains(e.Result));
-            return applyFakeOffset(filtered);
-        }
+            => filterForCurrentHitMode(getNowSourceEvents());
 
         protected override IReadOnlyList<HitEvent> GetV1HitEvents()
         {
             // Classic 路线固定使用原始基础事件，不受当前 hitmode 可见结果集合影响。
-            return applyFakeOffset(OriginalHitEvents.Where(e => e.Result.IsBasic()));
+            return applyFakeOffsetToEvents(OriginalHitEvents.Where(e => e.Result.IsBasic()));
         }
 
         [BackgroundDependencyLoader]
@@ -80,7 +94,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             {
                 currentHitMode = v.NewValue;
                 hitWindowsV2.SetHitMode(currentHitMode);
-                // 重新计算并重绘。
+                invalidateSessionCache();
                 Refresh();
             }, true);
 
@@ -88,12 +102,45 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             healthModeBindable.BindValueChanged(v =>
             {
                 currentHealthMode = v.NewValue;
+                invalidateSessionCache();
                 Refresh();
             }, true);
 
-            // 绑定 OffsetPlusMania，以便分析反映运行时校正并在更改时重绘。
+            ezConfig.GetBindable<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence)
+                     .BindValueChanged(_ =>
+                     {
+                         invalidateSessionCache();
+                         Refresh();
+                     }, true);
+
+            ezConfig.GetBindable<bool>(Ez2Setting.BmsPoorHitResultEnable)
+                     .BindValueChanged(_ =>
+                     {
+                         invalidateSessionCache();
+                         Refresh();
+                     }, true);
+
             offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             offsetPlusMania.BindValueChanged(_ => Refresh(), true);
+
+            Refresh();
+        }
+
+        protected override void CalculateV2Accuracy()
+        {
+            if (tryRunSessionForNow())
+            {
+                var info = nowScore!.ScoreInfo;
+                V2Accuracy = info.Accuracy;
+                V2Score = info.TotalScore;
+                V2Counts = extractDisplayCounts(info.Statistics);
+                return;
+            }
+
+            nowScore = null;
+            V2Accuracy = 0;
+            V2Score = 0;
+            V2Counts = new Dictionary<HitResult, int>();
         }
 
         protected override double UpdateBoundary(HitResult result, double? time = null)
@@ -106,21 +153,110 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override HitResult RecalculateV1Result(HitEvent hitEvent)
         {
-            // Classic 路线应独立于当前 hitmode 的结果标签，仅依据 offset 重算。
-            // 对于超窗返回 None 的情况，回落为 Miss（该事件本身已经是一个可判对象）。
             HitResult result = hitWindowsV1.ResultFor(hitEvent.TimeOffset);
             return result == HitResult.None ? HitResult.Miss : result;
         }
 
-        protected override HitResult RecalculateV2Result(HitEvent hitEvent)
+        /// <summary>Session 成功时 Now 判定已由 Session 产出。</summary>
+        protected override HitResult RecalculateV2Result(HitEvent hitEvent) => hitEvent.Result;
+
+        protected override HitResult GetDisplayResult(HitEvent hitEvent) => hitEvent.Result;
+
+        private GameplayEnvironment createSessionEnvironment()
         {
-            if (currentHitMode == EzEnumHitMode.O2Jam)
-                hitWindowsV2.UpdateO2JamBpmFromTime(hitEvent.HitObject.StartTime);
+            var live = GameplayEnvironment.FromLive(ezConfig);
 
-            if (hitEvent.Result is HitResult.Miss or HitResult.Poor)
-                return hitEvent.Result;
+            return new GameplayEnvironment
+            {
+                ManiaHitMode = live.ManiaHitMode,
+                ManiaHealthMode = live.ManiaHealthMode,
+                JudgePrecedence = live.JudgePrecedence,
+                OffsetPlusMania = 0,
+            };
+        }
 
-            return hitWindowsV2.ResultFor(hitEvent.TimeOffset);
+        private void invalidateSessionCache() => lastSessionEnvironment = null;
+
+        private bool tryRunSessionForNow()
+        {
+            var environment = createSessionEnvironment();
+
+            if (nowScore != null && lastSessionEnvironment != null && sessionEnvironmentEquals(lastSessionEnvironment, environment))
+                return true;
+
+            var input = resolveSessionInputScore();
+
+            if (input == null)
+            {
+                nowScore = null;
+                return false;
+            }
+
+            nowScore = ManiaReplaySession.Run(input.DeepClone(), Beatmap, environment);
+            lastSessionEnvironment = environment;
+            return true;
+        }
+
+        private Score? resolveSessionInputScore()
+        {
+            var databased = scoreManager.GetScore(Score);
+            return databased != null && hasValidReplay(databased) ? databased : null;
+        }
+
+        private static bool hasValidReplay(Score score)
+        {
+            var replay = score.Replay;
+
+            return replay != null
+                   && replay.Frames.Count > 0
+                   && replay.Frames.All(f => f is ManiaReplayFrame);
+        }
+
+        private static bool sessionEnvironmentEquals(GameplayEnvironment a, GameplayEnvironment b)
+            => a.ManiaHitMode == b.ManiaHitMode
+               && a.ManiaHealthMode == b.ManiaHealthMode
+               && a.JudgePrecedence == b.JudgePrecedence;
+
+        private Dictionary<HitResult, int> extractDisplayCounts(IReadOnlyDictionary<HitResult, int> statistics)
+            => ExtractDisplayCounts(statistics, currentHitMode);
+
+        internal static Dictionary<HitResult, int> ExtractDisplayCounts(IReadOnlyDictionary<HitResult, int> statistics, EzEnumHitMode hitMode)
+        {
+            var validResults = HitModeHelper.GetHitModeValidHitResults(hitMode).ToHashSet();
+            var counts = new Dictionary<HitResult, int>();
+
+            foreach (var (result, count) in statistics)
+            {
+                if (count == 0)
+                    continue;
+
+                if (!validResults.Contains(result) && result is not (HitResult.Miss or HitResult.Poor))
+                    continue;
+
+                counts[result] = count;
+            }
+
+            return counts;
+        }
+
+        /// <summary>Graph 展示层时间轴：Now 为空时回退 Original。</summary>
+        internal static double ComputeTimeRangeForTesting(IReadOnlyList<HitEvent> displayEvents, IReadOnlyList<HitEvent> fallbackEvents)
+        {
+            var eventsForExtent = displayEvents.Count > 0 ? displayEvents : fallbackEvents;
+
+            if (eventsForExtent.Count == 0)
+                return 0;
+
+            return eventsForExtent.Max(e => e.HitObject.StartTime) - eventsForExtent.Min(e => e.HitObject.StartTime);
+        }
+
+        private IReadOnlyList<HitEvent> filterForCurrentHitMode(IEnumerable<HitEvent> events)
+        {
+            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
+            var filtered = events.Where(e =>
+                validResults.Contains(e.Result) || e.Result is HitResult.Miss or HitResult.Poor);
+
+            return applyFakeOffsetToEvents(filtered);
         }
 
         protected override double GetDisplayHealthIncrease(HitEvent hitEvent, HitResult displayResult, double currentHealth)
@@ -180,7 +316,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return Math.Abs(scaled) < 1e-6 ? 0 : scaled;
         }
 
-        private IReadOnlyList<HitEvent> applyFakeOffset(IEnumerable<HitEvent> events)
+        /// <summary>展示层叠加 OffsetPlusMania；Session 统计用 offset=0 环境。</summary>
+        private IReadOnlyList<HitEvent> applyFakeOffsetToEvents(IEnumerable<HitEvent> events)
         {
             var list = events.ToList();
 
@@ -215,26 +352,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override void UpdateText()
         {
-            double scAcc = Score.Accuracy * 100;
-            long scScore = Score.TotalScore;
+            double scAcc = originalAccuracy * 100;
+            long scScore = originalTotalScore;
+
+            string nowAccText = nowScore != null ? (V2Accuracy * 100).ToString("F1") + "%" : "—";
+            string nowScoreText = nowScore != null ? (V2Score / 1000.0).ToString("F0") + "k" : "—";
 
             var items = new List<SimpleStatisticItem>
             {
-                // Accuracy 使用蓝色，保持统一视觉
                 makeSimpleStat(scAcc.ToString("F1") + "%", "Acc Original", colours.Blue1),
-                makeSimpleStat((V2Accuracy * 100).ToString("F1") + "%", "Acc Now Setting", colours.Blue1),
+                makeSimpleStat(nowAccText, "Acc Now Setting", colours.Blue1),
                 makeSimpleStat((V1Accuracy * 100).ToString("F1") + "%", "Acc v1 Algorithm", colours.Blue1),
 
-                // Score 使用橙色
                 makeSimpleStat((scScore / 1000.0).ToString("F0") + "k", "Score Original", colours.Orange1),
-                makeSimpleStat((V2Score / 1000.0).ToString("F0") + "k", "Score Now Setting", colours.Orange1),
+                makeSimpleStat(nowScoreText, "Score Now Setting", colours.Orange1),
                 makeSimpleStat((V1Score / 1000.0).ToString("F0") + "k", "Score v1 Algorithm", colours.Orange1),
 
                 makeSimpleStat(Score.Pauses.Count.ToString(), "Pauses"),
                 makeSimpleStat("Now | V1", "↓", colours.Gray8),
             };
 
-            // 判定计数行使用 V1/V2 的并集，避免当前 hitmode 的可见判定集合把 classic 行“隐藏掉”。
             List<HitResult> results = V2Counts.Keys
                                               .Concat(V1Counts.Keys)
                                               .Distinct()
@@ -247,7 +384,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 int v2Count = V2Counts.GetValueOrDefault(r, 0);
                 int v1Count = V1Counts.GetValueOrDefault(r, 0);
 
-                // 如果两个值都为0，跳过这个判定的显示
                 if (v2Count == 0 && v1Count == 0)
                     continue;
 
@@ -257,7 +393,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 items.Add(makeSimpleStat(display, name, c));
             }
 
-            // 左侧固定宽度容器，保持纵向单列排列。为判定标签预留一部分右侧宽度以避免重叠。
             const float label_area_width = 35f;
 
             var statsContent = new SimpleStatisticTable(1, items.ToArray())
@@ -284,11 +419,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 Child = contentHolder
             };
 
-            // 统计面板稍微低于顶端，以便标签的叠放顺序更可预测。
             leftContainer.Depth = float.MaxValue - 1;
             AddInternal(leftContainer);
 
-            // 在左侧边距右侧创建专用标签区域，用于显示判定边界标签
             var labelArea = new Container
             {
                 Anchor = Anchor.TopLeft,
@@ -299,10 +432,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 AutoSizeAxes = Axes.None
             };
 
-            labelArea.Depth = float.MaxValue; // 在统计面板之上
+            labelArea.Depth = float.MaxValue;
             AddInternal(labelArea);
 
-            // 将该标签区域暴露给基类绘制逻辑使用
             LeftLabelContainer = labelArea;
         }
 

@@ -92,7 +92,7 @@ namespace osu.Game.EzOsuGame.Statistics
         {
             Score = score;
             HitWindows = hitWindows;
-            OriginalHitEvents = score.HitEvents;
+            OriginalHitEvents = score.HitEvents.ToList();
             Beatmap = beatmap;
 
             HP = beatmap.Difficulty.DrainRate;
@@ -246,6 +246,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
             CalculateV1Accuracy();
             CalculateV2Accuracy();
+            updateTimeExtentsFromDisplayEvents();
             UpdateText();
 
             // 创建主图表专用容器，用于将绘图区域可靠地放在左侧固定宽度统计面板（LeftMarginConst）右侧。
@@ -331,6 +332,22 @@ namespace osu.Game.EzOsuGame.Statistics
         protected void Refresh()
         {
             Scheduler.AddOnce(UpdateDisplay);
+        }
+
+        private void updateTimeExtentsFromDisplayEvents()
+        {
+            var displayEvents = GetDisplayHitEvents();
+            var eventsForExtent = displayEvents.Count > 0 ? displayEvents : OriginalHitEvents;
+
+            if (eventsForExtent.Count == 0)
+                return;
+
+            binSize = Math.Ceiling(eventsForExtent.Max(e => e.HitObject.StartTime) / time_bins);
+            binSize = Math.Max(1, binSize);
+
+            maxTime = eventsForExtent.Max(e => e.HitObject.StartTime);
+            minTime = eventsForExtent.Min(e => e.HitObject.StartTime);
+            timeRange = maxTime - minTime;
         }
 
         private void drawHealthLine(List<HitEvent> sortedHitEvents)

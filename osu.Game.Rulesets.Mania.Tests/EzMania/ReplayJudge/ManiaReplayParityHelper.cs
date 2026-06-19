@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Utils;
@@ -80,5 +79,46 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public static bool AreScoresEquivalent(double expectedAccuracy, double actualAccuracy, long expectedTotalScore, long actualTotalScore)
             => Precision.AlmostEquals(expectedAccuracy, actualAccuracy)
                && expectedTotalScore == actualTotalScore;
+
+        /// <summary>
+        /// 从 HitEvents 聚合各档计数（忽略 Ignore*），应与 SP Statistics 一致。
+        /// </summary>
+        public static Dictionary<HitResult, int> AggregateHitEventResults(IEnumerable<HitEvent> hitEvents)
+        {
+            var counts = new Dictionary<HitResult, int>();
+
+            foreach (var e in hitEvents)
+            {
+                if (e.Result is HitResult.IgnoreHit or HitResult.IgnoreMiss)
+                    continue;
+
+                counts[e.Result] = counts.GetValueOrDefault(e.Result, 0) + 1;
+            }
+
+            return counts;
+        }
+
+        public static bool AreStatisticsEquivalent(IReadOnlyDictionary<HitResult, int> expected, IReadOnlyDictionary<HitResult, int> actual)
+        {
+            foreach (var (result, count) in expected)
+            {
+                if (actual.GetValueOrDefault(result) != count)
+                    return false;
+            }
+
+            foreach (var (result, count) in actual)
+            {
+                if (count == 0)
+                    continue;
+
+                if (expected.GetValueOrDefault(result) != count)
+                    return false;
+            }
+
+            return true;
+        }
+
+        public static string DescribeStatistics(IReadOnlyDictionary<HitResult, int> statistics)
+            => string.Join(", ", statistics.OrderBy(kvp => kvp.Key).Select(kvp => $"{kvp.Key}:{kvp.Value}"));
     }
 }
