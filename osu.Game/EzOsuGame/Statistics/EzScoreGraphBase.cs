@@ -50,7 +50,7 @@ namespace osu.Game.EzOsuGame.Statistics
         // 用于绘制主图表的容器（位于左侧统计宽度 LeftMarginConst 的右侧）。
         private Container graphContainer = null!;
 
-        // 边界线独立容器 — redrawScatterAndHealthWithOffset 只清 graphContainer，不碰边界线
+        // 边界线和标签的专用容器（整个生命周期保持不变，offset 拖动时不受影响）。
         private Container boundaryContainer = null!;
 
         // 左侧预留用于判定区间标签的容器。派生类可在 X = LeftMarginConst - labelAreaWidth 处创建并赋值给它以预留标签区域。
@@ -71,10 +71,6 @@ namespace osu.Game.EzOsuGame.Statistics
         private IGameplayEnvironment? committedEnvironment;
 #pragma warning restore IDE0051
         private double displayOffset;
-
-        // Fake offset 统计（拖动时显示）
-        private double fakeAccuracy;
-        private Dictionary<HitResult, int> fakeCounts = new Dictionary<HitResult, int>();
 
         // Debounce 控制 — offset 拖动时仅展示，落定后触发 Session
         private CancellationTokenSource? debounceCancellation;
@@ -210,6 +206,15 @@ namespace osu.Game.EzOsuGame.Statistics
         protected virtual HitResult GetDisplayResult(HitEvent hitEvent) => RecalculateV2Result(hitEvent);
 
         /// <summary>
+        /// 从当前 displayOffset 重新计算 V2 统计（用于 offset 拖动时的实时预览）。
+        /// 子类可覆盖以提供规则集特定的统计逻辑。
+        /// </summary>
+        protected virtual void RecalculateV2FromDisplayEvents()
+        {
+            // 默认实现：子类（Mania）会 override
+        }
+
+        /// <summary>
         /// 图表血量起始值。默认按游戏内从满血开始。
         /// </summary>
         protected virtual double GetInitialHealth() => 1.0;
@@ -258,50 +263,6 @@ namespace osu.Game.EzOsuGame.Statistics
             V2Counts = v2Counts;
         }
 
-        /// <summary>
-        /// 根据 fake offset 计算判定统计（用于拖动时的实时反馈）。
-        /// 基类提供通用实现：遍历 OriginalHitEvents，叠加 fake offset 到 TimeOffset，
-        /// 对每个事件调用 <see cref="GetDisplayResult"/> 获取 fake 判定结果。
-        /// 派生类可重写以提供 HitMode 过滤等额外逻辑。
-        /// </summary>
-        protected virtual void CalculateFakeOffsetStats()
-        {
-            int totalHit = 0;
-            int totalMiss = 0;
-            var counts = new Dictionary<HitResult, int>();
-
-            foreach (var e in OriginalHitEvents)
-            {
-                var fakeEvent = new HitEvent(
-                    e.TimeOffset + displayOffset,
-                    e.GameplayRate,
-                    e.Result,
-                    e.HitObject,
-                    e.LastHitObject,
-                    e.Position);
-
-                var result = GetDisplayResult(fakeEvent);
-
-                if (result == HitResult.Miss)
-                {
-                    totalMiss++;
-                    counts.TryGetValue(HitResult.Miss, out int mc);
-                    counts[HitResult.Miss] = mc + 1;
-                    continue;
-                }
-
-                totalHit++;
-                counts.TryGetValue(result, out int c);
-                counts[result] = c + 1;
-            }
-
-            fakeAccuracy = totalHit + totalMiss > 0
-                ? (double)totalHit / (totalHit + totalMiss)
-                : 0;
-
-            fakeCounts = counts;
-        }
-
         protected virtual void UpdateDisplay()
         {
             if (!IsAlive || IsDisposed)
@@ -320,21 +281,7 @@ namespace osu.Game.EzOsuGame.Statistics
             updateTimeExtentsFromDisplayEvents();
             UpdateText();
 
-            // 创建主图表专用容器，用于将绘图区域可靠地放在左侧固定宽度统计面板（LeftMarginConst）右侧。
-            graphContainer = new Container
-            {
-                Anchor = Anchor.TopLeft,
-                Origin = Anchor.TopLeft,
-                Position = new Vector2(LeftMarginConst, 0),
-                Size = new Vector2(DrawWidth - LeftMarginConst - RightMarginConst, DrawHeight),
-                RelativeSizeAxes = Axes.None,
-                AutoSizeAxes = Axes.None,
-                Masking = false
-            };
-
-            AddInternal(graphContainer);
-
-            // 边界线独立容器 — redrawScatterAndHealthWithOffset 只清 graphContainer，不碰边界线
+            // 创建边界线专用容器（仅含边界线和标签），在整个生命周期内保持不变
             boundaryContainer = new Container
             {
                 Anchor = Anchor.TopLeft,
@@ -345,7 +292,6 @@ namespace osu.Game.EzOsuGame.Statistics
                 AutoSizeAxes = Axes.None,
                 Masking = false
             };
-
             AddInternal(boundaryContainer);
 
             // 背景中心线（表示 0 ms）
@@ -368,6 +314,19 @@ namespace osu.Game.EzOsuGame.Statistics
                 drawBoundaryLine(result, isNegative: false);
                 drawBoundaryLine(result, isNegative: true);
             }
+
+            // 创建散点/血量专用容器（每次 offset 拖动时重建内容）
+            graphContainer = new Container
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopLeft,
+                Position = new Vector2(LeftMarginConst, 0),
+                Size = new Vector2(DrawWidth - LeftMarginConst - RightMarginConst, DrawHeight),
+                RelativeSizeAxes = Axes.None,
+                AutoSizeAxes = Axes.None,
+                Masking = false
+            };
+            AddInternal(graphContainer);
 
             var sortedHitEvents = GetDisplayHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
 
@@ -424,14 +383,20 @@ namespace osu.Game.EzOsuGame.Statistics
 
         /// <summary>
         /// 轻量重绘：仅应用 fake offset 到展示层，不触发 Session
-        /// Graph-UX: 用于拖动时的即时反馈，避免重建边界线
+        /// Graph-UX: 用于拖动时的即时反馈，实时更新统计和 scatter/health，不清边界线
         /// </summary>
         /// <param name="fakeOffset">展示的偏移量（毫秒）</param>
         protected void RefreshDisplayOnly(double fakeOffset)
         {
             displayOffset = fakeOffset;
 
-            // 仅重绘 scatter/health，不清空边界线，避免拖动卡顿
+            // 实时重算 V2 统计（无 committed score 时预览，有 committed score 时跳过）
+            RecalculateV2FromDisplayEvents();
+
+            // 重建左侧统计（只改数值）
+            UpdateText();
+
+            // 重绘 scatter 和 health（不清边界线）
             redrawScatterAndHealthWithOffset(fakeOffset);
         }
 

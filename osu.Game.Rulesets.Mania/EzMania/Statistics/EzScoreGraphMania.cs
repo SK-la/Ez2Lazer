@@ -150,6 +150,60 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// <summary>Session 成功时 Now 判定已由 Session 产出。</summary>
         protected override HitResult RecalculateV2Result(HitEvent hitEvent) => hitEvent.Result;
 
+        /// <summary>
+        /// 无 committed score 时，基于当前 displayOffset 实时重算 V2 统计。
+        /// 用于 offset 拖动时左侧 Now 数据的实时预览。
+        /// </summary>
+        protected override void RecalculateV2FromDisplayEvents()
+        {
+            // 有 committed score 时，CalculateV2Accuracy 已填好，无需重复
+            if (CommittedNowScore != null)
+                return;
+
+            // 基于 FilterHitEvents（含 displayOffset）重算 counts
+            var displayEvents = GetDisplayHitEvents();
+            V2Counts = extractDisplayCountsFromEvents(displayEvents);
+
+            // 重算准确率（基于 counts）
+            int total = V2Counts.Values.Sum();
+            if (total > 0)
+            {
+                int goods = V2Counts.GetValueOrDefault(HitResult.Good, 0)
+                           + V2Counts.GetValueOrDefault(HitResult.Great, 0)
+                           + V2Counts.GetValueOrDefault(HitResult.Perfect, 0);
+                int meh = V2Counts.GetValueOrDefault(HitResult.Meh, 0);
+                V2Accuracy = (goods + meh * 0.5) / total;
+                V2Score = (long)(originalTotalScore * V2Accuracy / originalAccuracy);
+            }
+            else
+            {
+                V2Accuracy = 0;
+                V2Score = 0;
+            }
+        }
+
+        /// <summary>
+        /// 从 HitEvent 列表提取统计 counts（不受 committed score 影响）。
+        /// </summary>
+        private Dictionary<HitResult, int> extractDisplayCountsFromEvents(IEnumerable<HitEvent> events)
+        {
+            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
+            var counts = new Dictionary<HitResult, int>();
+
+            foreach (var e in events)
+            {
+                var result = e.Result;
+                if (!validResults.Contains(result) && result != HitResult.Miss && result != HitResult.Poor)
+                    continue;
+
+                if (!counts.ContainsKey(result))
+                    counts[result] = 0;
+                counts[result]++;
+            }
+
+            return counts;
+        }
+
         protected override HitResult GetDisplayResult(HitEvent hitEvent) => hitEvent.Result;
 
         // P3-Rest 前过渡：通过 scoreManager 获取 databased score
