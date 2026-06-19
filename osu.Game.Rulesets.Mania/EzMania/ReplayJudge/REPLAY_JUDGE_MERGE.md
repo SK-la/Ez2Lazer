@@ -1,5 +1,28 @@
 # Mania ReplayJudge — ppy 合并 checklist
 
+## Session 黄金标准（#66）
+
+**验收标准（与旧 generator 无关）**：
+
+> 同一 score + 同一 environment 下，`ManiaReplaySession.Run` 产出的 **HitEvents + Score** 必须与「完整 Drawable 游玩或 ReplayPlayer 回放一遍，进入结算时 `ScoreProcessor` 已填充的结果」**字段级一致**。
+
+| 路径 | 是否绘制 | HitEvents 来源 |
+|------|---------|----------------|
+| 刚打完 / ReplayPlayer 回放 | 是 | `ScoreProcessor.PopulateScore` → 内存 HitEvents |
+| 排行榜 / 选歌重算 | **否** | `ManiaReplaySession.Run` → **必须等价于上表** |
+
+`ManiaScoreHitEventGenerator` 仅为 StatisticsPanel 薄壳委托 Session，**不是**参考实现；Drawable/Replay 游玩后的 `ScoreProcessor` 输出才是唯一黄金标准。
+
+**每条 HitEvent 须一致**：`Result`、`TimeOffset`（含 OffsetPlusMania 用于判定但存储 offset 与 Drawable 相同：`eventTime - GetEndTime()`）、`GameplayRate`、`HitObject` / `LastHitObject`。
+
+`ScoreInfo.HitEvents` 带 `[Ignored]` 不持久化；排行榜进结算只能 Session 重算——Session 不等价则拓展分析与「刚打完」必然分裂。
+
+**禁止**恢复 drawable 分析 fallback；Session 做到等价即可。
+
+Parity 测试：`TestSceneReplaySessionParity`（Drawable replay vs Session，完整 HitEvent 字段）。
+
+---
+
 ## 架构：HitMode 原生判定 + MapTo
 
 每个 Ez HitMode 在 `EzMania/ReplayJudge/Mappings/{Mode}HitModeJudgement.cs` **单文件**内包含：

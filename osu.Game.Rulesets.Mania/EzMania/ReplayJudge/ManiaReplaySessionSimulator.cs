@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -77,7 +78,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         input.Time,
                         environment.OffsetPlusMania,
                         hitWindowHelper,
-                        (target, result) => ApplyTransientResult(scoreProcessor, target, result, input.Time - target.StartTime + environment.OffsetPlusMania, input.Time, gameplayRate, timelineRecorder));
+                        (target, result) => ApplyTransientResult(
+                            scoreProcessor,
+                            target,
+                            result,
+                            computeStoredTimeOffset(input.Time, target),
+                            input.Time,
+                            gameplayRate,
+                            timelineRecorder));
                 }
 
                 if (candidates.Count == 0)
@@ -141,7 +149,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                     if (sessionOutcome.Kind == BmsHitModeJudgement.SessionPressKind.DispatchExtra)
                     {
-                        ApplyTransientResult(scoreProcessor, target, BmsHitModeJudgement.MapTo(sessionOutcome.Judge), timeOffsetForJudgement, input.Time, gameplayRate, timelineRecorder);
+                        ApplyTransientResult(
+                            scoreProcessor,
+                            target,
+                            BmsHitModeJudgement.MapTo(sessionOutcome.Judge),
+                            computeStoredTimeOffset(input.Time, target),
+                            input.Time,
+                            gameplayRate,
+                            timelineRecorder);
                         continue;
                     }
 
@@ -161,13 +176,27 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 {
                     forced.Judged = true;
                     forced.Result = HitResult.Miss;
-                    ApplyFinalResult(scoreProcessor, forced.Target, HitResult.Miss, input.Time, gameplayRate, timelineRecorder);
+                    ApplyFinalResult(
+                        scoreProcessor,
+                        forced.Target,
+                        HitResult.Miss,
+                        computeStoredTimeOffset(input.Time, forced.Target),
+                        input.Time,
+                        gameplayRate,
+                        timelineRecorder);
                 }
 
                 selected.Judged = true;
                 selected.Result = result;
 
-                ApplyFinalResult(scoreProcessor, target, result, input.Time, gameplayRate, timelineRecorder);
+                ApplyFinalResult(
+                    scoreProcessor,
+                    target,
+                    result,
+                    computeStoredTimeOffset(input.Time, target),
+                    input.Time,
+                    gameplayRate,
+                    timelineRecorder);
 
                 if (target is HeadNote head)
                     headWasHit[head] = result.IsHit();
@@ -378,7 +407,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return bpm;
         }
 
-        internal static void ApplyFinalResult(ScoreProcessor scoreProcessor, HitObject target, HitResult result, double eventTime, double gameplayRate,
+        internal static void ApplyFinalResult(
+            ScoreProcessor scoreProcessor,
+            HitObject target,
+            HitResult result,
+            double timeOffset,
+            double eventTime,
+            double gameplayRate,
             ManiaReplayTimelineRecorder? timelineRecorder = null)
         {
             var judgementResult = new JudgementResult(target, target.Judgement)
@@ -386,11 +421,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 Type = result,
             };
 
+            JudgementResultTimingHelper.ApplyTiming(judgementResult, timeOffset, gameplayRate);
+
+            if (result == HitResult.Meh || result == HitResult.Miss)
+                judgementResult.IsComboHit = false;
+
             scoreProcessor.ApplyResult(judgementResult);
             timelineRecorder?.Record(scoreProcessor, eventTime, result);
         }
 
-        internal static void ApplyTransientResult(ScoreProcessor scoreProcessor, HitObject target, HitResult result, double timeOffset, double eventTime, double gameplayRate,
+        internal static void ApplyTransientResult(
+            ScoreProcessor scoreProcessor,
+            HitObject target,
+            HitResult result,
+            double timeOffset,
+            double eventTime,
+            double gameplayRate,
             ManiaReplayTimelineRecorder? timelineRecorder = null)
         {
             var judgementResult = new JudgementResult(target, target.Judgement)
@@ -399,8 +445,30 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 IsFinal = false,
             };
 
+            JudgementResultTimingHelper.ApplyTiming(judgementResult, timeOffset, gameplayRate);
+
             scoreProcessor.ApplyResult(judgementResult);
             timelineRecorder?.Record(scoreProcessor, eventTime, result);
+        }
+
+        internal static double computeStoredTimeOffset(double eventTime, HitObject target)
+            => eventTime - target.GetEndTime();
+
+        internal static double estimateUnjudgedMissOffset(HitObject target, IBeatmap beatmap, EzEnumHitMode hitMode)
+        {
+            bool useTailReleaseLenience = target is TailNote && usesTailReleaseLenience(hitMode);
+            double lenienceFactor = useTailReleaseLenience ? TailNote.RELEASE_WINDOW_LENIENCE : 1;
+
+            var hitWindowHelper = new HitModeHelper(hitMode)
+            {
+                OverallDifficulty = beatmap.Difficulty.OverallDifficulty,
+                BPM = getBpmAtTime(beatmap, target.StartTime),
+            };
+
+            double missLate = hitWindowHelper.WindowFor(HitResult.Miss, false) * lenienceFactor;
+
+            // 保持在 miss 判定窗口内，避免后续按 offset 重算时被降级为更高判定或 None。
+            return Math.Max(0, missLate - 0.01);
         }
     }
 }

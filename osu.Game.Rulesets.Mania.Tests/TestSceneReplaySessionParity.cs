@@ -289,15 +289,15 @@ namespace osu.Game.Rulesets.Mania.Tests
                 playableBeatmap = Beatmap.Value.GetPlayableBeatmap(new ManiaRuleset().RulesetInfo);
             });
 
-            AddAssert("session judgements match drawable replay path", () =>
+            AddAssert("session hit events match drawable replay path", () =>
             {
                 var sessionEvents = ManiaReplaySession.Run(replayScore, playableBeatmap, parityEnvironment);
 
-                if (ManiaReplayParityHelper.AreJudgementsEquivalent(drawableHitEvents, sessionEvents))
+                if (ManiaReplayParityHelper.AreHitEventsEquivalent(drawableHitEvents, sessionEvents))
                     return true;
 
                 throw new AssertionException(
-                    $"drawable=[{ManiaReplayParityHelper.DescribeJudgements(drawableHitEvents)}] session=[{ManiaReplayParityHelper.DescribeJudgements(sessionEvents)}]");
+                    $"drawable=[{ManiaReplayParityHelper.DescribeHitEvents(drawableHitEvents)}] session=[{ManiaReplayParityHelper.DescribeHitEvents(sessionEvents)}]");
             });
         }
 

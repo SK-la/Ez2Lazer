@@ -126,10 +126,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                 state.Judged = true;
                 state.Result = HitResult.Miss;
-                ManiaReplaySessionSimulator.ApplyFinalResult(scoreProcessor, state.Target, HitResult.Miss, state.Target.GetEndTime(), gameplayRate, recorder);
+
+                double missOffset = ManiaReplaySessionSimulator.estimateUnjudgedMissOffset(state.Target, beatmap, environment.ManiaHitMode);
+                ManiaReplaySessionSimulator.ApplyFinalResult(
+                    scoreProcessor,
+                    state.Target,
+                    HitResult.Miss,
+                    missOffset,
+                    state.Target.GetEndTime(),
+                    gameplayRate,
+                    recorder);
             }
 
-            return new SessionRunResult(scoreProcessor.HitEvents.ToList(), recorder?.Build(), scoreProcessor.TotalScore.Value);
+            return new SessionRunResult(
+                scoreProcessor.HitEvents.ToList(),
+                recorder?.Build(),
+                scoreProcessor.TotalScore.Value);
         }
 
         private static void alignHitWindows(IBeatmap beatmap, IGameplayEnvironment environment)

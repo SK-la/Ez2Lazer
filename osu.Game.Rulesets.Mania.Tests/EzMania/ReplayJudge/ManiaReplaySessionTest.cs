@@ -39,6 +39,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(hitEvents.Count, Is.EqualTo(2));
             Assert.That(hitEvents.Single(e => e.HitObject.StartTime == 1000).Result.IsHit(), Is.True);
             Assert.That(hitEvents.Single(e => e.HitObject.StartTime == 2000).Result.IsHit(), Is.True);
+            Assert.That(hitEvents, Has.All.Matches<HitEvent>(e => e.GameplayRate != null));
         }
 
         [Test]
