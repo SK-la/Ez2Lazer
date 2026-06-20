@@ -30,7 +30,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         public static Score Run(Score score, IBeatmap beatmap, IGameplayEnvironment environment, CancellationToken cancellationToken = default)
         {
             var (scoreProcessor, _) = run(score, beatmap, environment, recordTimeline: false, cancellationToken);
+
+            // Always transfer HitEvents from scoreProcessor to ScoreInfo.
+            // Zero-frame scores have HitEvents generated via forced misses; non-zero scores
+            // have HitEvents from Simulate. In both cases we need them on ScoreInfo.
+            score.ScoreInfo.HitEvents = scoreProcessor.HitEvents.ToList();
+
+            // Populate Statistics and derived fields (MaximumStatistics etc.) via PopulateScore.
+            // Preserve the gameplay-recorded TotalScore and Accuracy so they are not zeroed
+            // when the score processor has no replay frames.
+            long preservedTotalScore = score.ScoreInfo.TotalScore;
+            double preservedAccuracy = score.ScoreInfo.Accuracy;
+
             scoreProcessor.PopulateScore(score.ScoreInfo);
+
+            score.ScoreInfo.TotalScore = preservedTotalScore;
+            score.ScoreInfo.Accuracy = preservedAccuracy;
+
             return score;
         }
 
@@ -59,7 +75,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             ArgumentNullException.ThrowIfNull(score);
             ArgumentNullException.ThrowIfNull(score.Replay);
             ArgumentNullException.ThrowIfNull(beatmap);
-            ArgumentNullException.ThrowIfNull(environment);
+            // environment may be null when called via IEzReplaySession; resolved upstream by ManiaReplaySessionService
 
             var ruleset = new ManiaRuleset();
             var scoreProcessor = ruleset.CreateScoreProcessor();
@@ -75,8 +91,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             foreach (var mod in score.ScoreInfo.Mods.OfType<IApplicableToScoreProcessor>())
                 mod.ApplyToScoreProcessor(scoreProcessor);
 
+            var recorder = recordTimeline ? new ManiaReplayTimelineRecorder() : null;
+            recorder?.RecordInitial(scoreProcessor);
+
+            var targets = buildTargets(beatmap);
+            alignHitWindows(beatmap, environment);
+
             if (score.Replay.Frames.Count == 0)
             {
+                // Zero frames: still need to generate all-miss HitEvents
+                // so that extended statistics can display. We skip score/timeline population
+                // to preserve the gameplay-recorded TotalScore/Accuracy/Statistics.
+                var emptyPressTimes = new Dictionary<int, List<double>>();
+                applyForcedMisses(scoreProcessor, targets, emptyPressTimes, CancellationToken.None, recorder);
+
                 return (scoreProcessor, recordTimeline ? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>()) : null);
             }
 
@@ -84,9 +112,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             var holdStrategy = ManiaJudgementRegistry.GetHoldStrategy(environment);
 
-            alignHitWindows(beatmap, environment);
-
-            var targets = buildTargets(beatmap);
             buildColumnMaps(targets, out var pressColumns, out var releaseColumns);
 
             var holdByHead = new Dictionary<HeadNote, HoldNote>();
@@ -102,8 +127,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             }
 
             double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
-            var recorder = recordTimeline ? new ManiaReplayTimelineRecorder() : null;
-            recorder?.RecordInitial(scoreProcessor);
 
             var pressTimesByColumn = ManiaReplaySessionSimulator.buildPressTimesByColumn(score.Replay);
 
@@ -121,6 +144,35 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 scoreProcessor,
                 recorder,
                 cancellationToken);
+
+            applyForcedMisses(scoreProcessor, targets, pressTimesByColumn, cancellationToken, recorder);
+
+            return (scoreProcessor, recorder?.Build());
+        }
+
+        private static void alignHitWindows(IBeatmap beatmap, IGameplayEnvironment environment)
+        {
+            foreach (var hitObject in beatmap.HitObjects)
+                alignHitWindowsRecursive(hitObject, environment);
+        }
+
+        private static void alignHitWindowsRecursive(HitObject hitObject, IGameplayEnvironment environment)
+        {
+            if (hitObject.HitWindows is ManiaHitWindows maniaHitWindows)
+                maniaHitWindows.SetHitMode(environment.ManiaHitMode);
+
+            foreach (var nested in hitObject.NestedHitObjects)
+                alignHitWindowsRecursive(nested, environment);
+        }
+
+        private static void applyForcedMisses(
+            ScoreProcessor scoreProcessor,
+            List<LaneTargetState> targets,
+            Dictionary<int, List<double>> pressTimesByColumn,
+            CancellationToken cancellationToken,
+            ManiaReplayTimelineRecorder? recorder)
+        {
+            double gameplayRate = 1.0; // ScoreProcessor internally uses ModUtils for rate; fixed for miss snapshots
 
             foreach (var state in targets)
             {
@@ -142,23 +194,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     gameplayRate,
                     recorder);
             }
-
-            return (scoreProcessor, recorder?.Build());
-        }
-
-        private static void alignHitWindows(IBeatmap beatmap, IGameplayEnvironment environment)
-        {
-            foreach (var hitObject in beatmap.HitObjects)
-                alignHitWindowsRecursive(hitObject, environment);
-        }
-
-        private static void alignHitWindowsRecursive(HitObject hitObject, IGameplayEnvironment environment)
-        {
-            if (hitObject.HitWindows is ManiaHitWindows maniaHitWindows)
-                maniaHitWindows.SetHitMode(environment.ManiaHitMode);
-
-            foreach (var nested in hitObject.NestedHitObjects)
-                alignHitWindowsRecursive(nested, environment);
         }
 
         private static List<LaneTargetState> buildTargets(IBeatmap beatmap)

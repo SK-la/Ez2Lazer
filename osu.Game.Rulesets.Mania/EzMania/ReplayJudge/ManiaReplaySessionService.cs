@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Scoring;
@@ -32,15 +33,37 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         public Task<ReplayRunResult> RunRequestAsync(ReplayRunRequest request, CancellationToken cancellationToken = default)
             => getOrCreate(combinedCache, buildCombinedCacheKey(request), () => runCombinedAsync(request, cancellationToken));
 
-        private static async Task<Score> runScoreAsync(Score score, IBeatmap beatmap, IGameplayEnvironment environment, CancellationToken cancellationToken)
+        private static async Task<Score> runScoreAsync(Score score, IBeatmap beatmap, IGameplayEnvironment? environment, CancellationToken cancellationToken)
         {
             var ruleset = new ManiaRuleset();
-            return await ruleset.RunReplayAsync(score, beatmap, environment, cancellationToken).ConfigureAwait(false);
+
+            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
+
+            // Clone to isolate Session mutations from the caller's Score/ScoreInfo reference.
+            var clone = score.DeepClone();
+            var result = await ruleset.RunReplayAsync(clone, beatmap, environment, cancellationToken).ConfigureAwait(false);
+
+            // Copy back HitEvents and Statistics so caller gets fresh results on their object.
+            score.ScoreInfo.HitEvents = result.ScoreInfo.HitEvents;
+            score.ScoreInfo.Statistics.Clear();
+            foreach (var kvp in result.ScoreInfo.Statistics)
+                score.ScoreInfo.Statistics[kvp.Key] = kvp.Value;
+
+            return score;
         }
 
-        private static async Task<EzScoreTimeline> runTimelineAsync(Score score, IBeatmap beatmap, IGameplayEnvironment environment, CancellationToken cancellationToken)
+        private static async Task<EzScoreTimeline> runTimelineAsync(Score score, IBeatmap beatmap, IGameplayEnvironment? environment, CancellationToken cancellationToken)
         {
-            return await Task.Run(() => ManiaReplaySession.RunTimeline(score, beatmap, environment, cancellationToken), cancellationToken).ConfigureAwait(false);
+            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
+
+            // Clone to isolate Session mutations.
+            var clone = score.DeepClone();
+            var timeline = await Task.Run(() => ManiaReplaySession.RunTimeline(clone, beatmap, environment, cancellationToken), cancellationToken).ConfigureAwait(false);
+
+            // Copy back HitEvents for consistency so caller sees fresh results.
+            score.ScoreInfo.HitEvents = clone.ScoreInfo.HitEvents;
+
+            return timeline;
         }
 
         private static async Task<ReplayRunResult> runCombinedAsync(ReplayRunRequest request, CancellationToken cancellationToken)
@@ -48,9 +71,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             try
             {
                 var ruleset = new ManiaRuleset();
-                var score = await ruleset.RunReplayAsync(request.Score, request.Beatmap, request.Environment, cancellationToken).ConfigureAwait(false);
-                var timeline = ManiaReplaySession.RunTimeline(request.Score, request.Beatmap, request.Environment, cancellationToken);
-                return new ReplayRunResult(score, timeline, hitCache: false, isValidReplay: true);
+                var resolvedEnv = request.Environment ?? ManiaRuleset.ResolveEnvironment(request.Score.ScoreInfo, GlobalConfigStore.EzConfig, request.Purpose);
+
+                // Clone to isolate Session mutations.
+                var clone = request.Score.DeepClone();
+                var sessionScore = await ruleset.RunReplayAsync(clone, request.Beatmap, resolvedEnv, cancellationToken).ConfigureAwait(false);
+                var timeline = ManiaReplaySession.RunTimeline(clone, request.Beatmap, resolvedEnv, cancellationToken);
+
+                // Copy back HitEvents so caller sees fresh results on their object.
+                request.Score.ScoreInfo.HitEvents = sessionScore.ScoreInfo.HitEvents;
+
+                return new ReplayRunResult(sessionScore, timeline, hitCache: false, isValidReplay: true);
             }
             catch (OperationCanceledException)
             {
@@ -77,14 +108,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         private static string buildCombinedCacheKey(ReplayRunRequest request)
             => buildCacheKey($"combined:{request.Purpose}", request.Score, request.Beatmap, request.Environment);
 
-        private static string buildCacheKey(string purpose, Score score, IBeatmap beatmap, IGameplayEnvironment environment)
+        private static string buildCacheKey(string purpose, Score score, IBeatmap beatmap, IGameplayEnvironment? environment)
         {
             string scoreKey = $"hash:{score.ScoreInfo.Hash}|id:{score.ScoreInfo.ID}";
             string beatmapKey = $"hash:{beatmap.BeatmapInfo.Hash}|id:{beatmap.BeatmapInfo.ID}";
-            string bmsPoorKey = environment is IManiaGameplayEnvironment maniaEnvironment ? maniaEnvironment.BmsPoorHitResultEnable.ToString() : "null";
-            string envKey = $"hm:{(int)environment.ManiaHitMode}|health:{(int)environment.ManiaHealthMode}|judge:{(int)environment.JudgePrecedence}|offset:{environment.OffsetPlusMania:F3}|bmsPoor:{bmsPoorKey}";
-            string raw = $"{purpose}|{scoreKey}|{beatmapKey}|{envKey}|rule:{score.ScoreInfo.Ruleset.OnlineID}";
 
+            string envKey;
+
+            if (environment == null)
+                envKey = "env:null";
+            else
+            {
+                string bmsPoorKey = environment is IManiaGameplayEnvironment maniaEnvironment ? maniaEnvironment.BmsPoorHitResultEnable.ToString() : "null";
+                envKey = $"hm:{(int)environment.ManiaHitMode}|health:{(int)environment.ManiaHealthMode}|judge:{(int)environment.JudgePrecedence}|offset:{environment.OffsetPlusMania:F3}|bmsPoor:{bmsPoorKey}";
+            }
+
+            string raw = $"{purpose}|{scoreKey}|{beatmapKey}|{envKey}|rule:{score.ScoreInfo.Ruleset.OnlineID}";
             return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(raw)));
         }
     }
