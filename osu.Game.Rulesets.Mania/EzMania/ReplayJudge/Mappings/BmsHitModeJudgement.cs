@@ -325,6 +325,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 
         public bool IsHoldBreak(double rawOffset, HitWindows hitWindows) => Replicas.LazerHoldJudgementReplica.Instance.IsHoldBreak(rawOffset, hitWindows);
 
+        public HitResult RejudgeHitEvent(HitEvent hitEvent, HitWindows hitWindows)
+        {
+            // TailNote 保留原始结果（尾判依赖 BmsRouteState / holdBreak 等上下文）
+            if (hitEvent.HitObject is TailNote)
+                return hitEvent.Result;
+
+            var outcome = EvaluatePress(hitEvent.TimeOffset, hitWindows);
+            // BMS KPoor（DispatchExtra）在重判场景无跨物体路由可用，视为 Miss
+            return outcome.Kind == ManiaNoteJudgementOutcomeKind.Apply ? outcome.Result : HitResult.Miss;
+        }
+
         private static bool shouldAutoMiss(ManiaHitWindows windows, double timeOffset, double badLate)
             => windows.ResultFor(timeOffset) == HitResult.None && IsLateOutsideBad(timeOffset, badLate);
 

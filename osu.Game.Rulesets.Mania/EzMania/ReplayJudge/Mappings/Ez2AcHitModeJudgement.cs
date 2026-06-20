@@ -101,5 +101,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         public bool CanBeginHoldAt(double time, TailNote tail) => LazerHoldJudgementReplica.Instance.CanBeginHoldAt(time, tail);
 
         public bool IsHoldBreak(double rawOffset, HitWindows hitWindows) => LazerHoldJudgementReplica.Instance.IsHoldBreak(rawOffset, hitWindows);
+
+        public HitResult RejudgeHitEvent(HitEvent hitEvent, HitWindows hitWindows)
+        {
+            // TailNote 保留原始结果（尾判依赖 headHit/holdBreak/holdBroken 上下文的 SoftenLnJudge + cap）
+            if (hitEvent.HitObject is TailNote)
+                return hitEvent.Result;
+
+            // HeadNote 应用 LN 头软化
+            var outcome = EvaluatePress(hitEvent.TimeOffset, hitWindows, hitEvent.HitObject is HeadNote);
+            return outcome.Kind == ManiaNoteJudgementOutcomeKind.Apply ? outcome.Result : HitResult.Miss;
+        }
     }
 }

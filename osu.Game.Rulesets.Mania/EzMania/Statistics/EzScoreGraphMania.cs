@@ -19,7 +19,7 @@ using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
-using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.Objects;
@@ -115,9 +115,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// <summary>
         /// 用当前 <see cref="hitWindowsNow"/> 对 <c>OriginalHitEvents</c> 的
         /// TimeOffset 重新判定，返回按当前 HitMode 有效结果过滤后的计数。
-        /// 对于 Ez hit mode，使用 <see cref="ManiaJudgementRegistry"/> 中的判定实现
-        /// （与现场游戏 <c>DrawableNote.CheckForResult</c>/<c>TryApplyEzNoteCheckForResult</c> 一致，
-        /// 包含 LN 头软化等额外逻辑），而非简单的窗口范围比较。
+        /// 所有判定逻辑委托给当前 HitMode 的 <see cref="IManiaNoteJudgementStrategy.RejudgeHitEvent"/>，
+        /// Graph 组件不处理任何类型分支。
         /// </summary>
         private Dictionary<HitResult, int> rejudgeOriginalHitEvents()
         {
@@ -125,9 +124,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             var counts = new Dictionary<HitResult, int>();
             bool isO2Jam = currentHitMode == EzEnumHitMode.O2Jam;
 
-            // 获取当前 HitMode 的判定实现：Ez 模式有专用的判定逻辑（LN 头软化、Pill Check 等），
-            // 与现场游戏 TryApplyEzNoteCheckForResult 路径一致。
-            var judgement = ManiaJudgementRegistry.GetHitModeJudgement(currentHitMode);
+            var strategy = ManiaJudgementRegistry.GetHitModeJudgement(currentHitMode)
+                           ?? (IManiaNoteJudgementStrategy)LazerNoteJudgementReplica.Instance;
 
             foreach (var e in OriginalHitEvents)
             {
@@ -135,42 +133,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 if (isO2Jam)
                     hitWindowsNow.UpdateO2JamBpmFromTime(e.HitObject.StartTime);
 
-                HitResult result;
-
-                // HoldNote 尾判：原始游戏使用 EvaluateTailJudge（含 LN 软化、头命中/断尾等上下文），
-                // 重判路径没有这些状态，无法准确还原。直接保留 HitEvent 原始结果。
-                if (e.HitObject is TailNote)
-                {
-                    result = e.Result;
-                    if (result == HitResult.None)
-                        result = HitResult.Miss;
-                }
-                else if (judgement != null)
-                {
-                    // Ez hit mode：使用与现场游戏一致的判定逻辑
-                    // 对 EZ2AC 特殊处理：LN 头需要 SoftenLnJudge 放松一档
-                    if (judgement is Ez2AcHitModeJudgement ez2Ac)
-                    {
-                        bool isHeadNote = e.HitObject is HeadNote;
-                        var outcome = ez2Ac.EvaluatePress(e.TimeOffset, hitWindowsNow, isHeadNote);
-                        result = outcome.Kind == ManiaNoteJudgementOutcomeKind.Apply
-                            ? outcome.Result
-                            : HitResult.None;
-                    }
-                    else
-                    {
-                        var outcome = judgement.EvaluatePress(e.TimeOffset, hitWindowsNow);
-                        result = outcome.Kind == ManiaNoteJudgementOutcomeKind.Apply
-                            ? outcome.Result
-                            : HitResult.None;
-                    }
-                }
-                else
-                {
-                    // Lazer/Classic：走标准 HitWindows.ResultFor（DrawableNote.CheckForResult 现场路径一致）
-                    result = hitWindowsNow.ResultFor(e.TimeOffset);
-                }
-
+                var result = strategy.RejudgeHitEvent(e, hitWindowsNow);
                 if (result == HitResult.None)
                     result = HitResult.Miss;
 
@@ -240,39 +203,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             long totalBase = 0;
             foreach (var (result, count) in counts)
-                totalBase += (long)getBaseScoreForResult(result, hitMode) * count;
+                totalBase += (long)HitModeHelper.GetBaseScoreForResult(hitMode, result) * count;
 
-            int maxBase = getMaxBaseScore(hitMode);
+            int maxBase = HitModeHelper.GetBaseScoreForResult(hitMode, HitResult.Perfect);
             long totalMax = (long)maxBase * total;
 
             double accuracy = totalMax > 0 ? (double)totalBase / totalMax : 0;
             long score = (long)(accuracy * 1_000_000);
             return (accuracy, score);
         }
-
-        /// <summary>单次判定的基分（对齐 ManiaScoreProcessor.GetBaseScoreForResult / HitModeHelper）。</summary>
-        private static int getBaseScoreForResult(HitResult result, EzEnumHitMode hitMode)
-        {
-            // Lazer 模式：ManiaScoreProcessor 对 Perfect 给 305；其余委托 base.GetBaseScoreForResult
-            if (hitMode == EzEnumHitMode.Lazer || hitMode == EzEnumHitMode.Classic)
-            {
-                return result switch
-                {
-                    HitResult.Perfect => 305,
-                    HitResult.Great => 300,
-                    HitResult.Good => 200,
-                    HitResult.Ok => 100,
-                    HitResult.Meh => 50,
-                    _ => 0,
-                };
-            }
-
-            return HitModeHelper.GetBaseScoreForResult(hitMode, result);
-        }
-
-        /// <summary>当前 HitMode 下 Perfect 的基分（用于计算满分分母）。</summary>
-        private static int getMaxBaseScore(EzEnumHitMode hitMode)
-            => getBaseScoreForResult(HitResult.Perfect, hitMode);
 
         /// <summary>
         /// 诊断日志：对比 Original（现场游玩 Realm 快照）与 Now（Session Simulator 重放）的判定计数差异。
@@ -419,7 +358,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         /// <summary>
-        /// 展示层判定结果。以下场景通过当前 <see cref="hitWindowsNow"/> 重新判定：
+        /// 展示层判定结果。以下场景通过当前 <see cref="IManiaNoteJudgementStrategy.RejudgeHitEvent"/> 重新判定：
         ///   1. offset 拖动（DisplayOffset != 0）：实时预览散点颜色变化
         ///   2. 无 Session（CommittedNowScore == null）：HitMode 变更后重判
         /// 有 Session 且 offset 归零时直接返回 Session 产出结果。
@@ -428,11 +367,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         {
             if (DisplayOffset != 0 || CommittedNowScore == null)
             {
-                // HoldNote 尾判保留原始结果（无法仅通过窗口重判准确还原）
-                if (hitEvent.HitObject is TailNote)
-                    return hitEvent.Result;
+                var strategy = ManiaJudgementRegistry.GetHitModeJudgement(currentHitMode)
+                               ?? (IManiaNoteJudgementStrategy)LazerNoteJudgementReplica.Instance;
 
-                var result = hitWindowsNow.ResultFor(hitEvent.TimeOffset);
+                var result = strategy.RejudgeHitEvent(hitEvent, hitWindowsNow);
                 return result == HitResult.None ? HitResult.Miss : result;
             }
 
