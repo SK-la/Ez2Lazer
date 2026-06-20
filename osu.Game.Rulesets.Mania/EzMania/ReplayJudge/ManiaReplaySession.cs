@@ -31,21 +31,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             var (scoreProcessor, _) = run(score, beatmap, environment, recordTimeline: false, cancellationToken);
 
-            // Always transfer HitEvents from scoreProcessor to ScoreInfo.
-            // Zero-frame scores have HitEvents generated via forced misses; non-zero scores
-            // have HitEvents from Simulate. In both cases we need them on ScoreInfo.
+            // Transfer HitEvents from scoreProcessor to ScoreInfo.
             score.ScoreInfo.HitEvents = scoreProcessor.HitEvents.ToList();
-
-            // Populate Statistics and derived fields (MaximumStatistics etc.) via PopulateScore.
-            // Preserve the gameplay-recorded TotalScore and Accuracy so they are not zeroed
-            // when the score processor has no replay frames.
-            long preservedTotalScore = score.ScoreInfo.TotalScore;
-            double preservedAccuracy = score.ScoreInfo.Accuracy;
-
             scoreProcessor.PopulateScore(score.ScoreInfo);
-
-            score.ScoreInfo.TotalScore = preservedTotalScore;
-            score.ScoreInfo.Accuracy = preservedAccuracy;
 
             return score;
         }
