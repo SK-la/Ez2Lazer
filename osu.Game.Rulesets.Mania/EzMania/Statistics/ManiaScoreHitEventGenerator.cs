@@ -25,17 +25,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         static ManiaScoreHitEventGenerator()
         {
-            // TODO(P3-Rest): 删除 EzScoreReloadBridge / EzScoreTimelineBridge 的 Mania 注册。
-            // Panel HitEvents → IEzReplaySession.RunAsync(ForStoredStatistics)
-            // Race Timeline → IEzReplaySession.RunTimelineAsync(ForRaceTimeline)
-            // 见 replayjudge_总体路线 §P3-Rest
             EzScoreReloadBridge.RegisterImplementation("mania", Instance);
             EzScoreReloadBridge.RegisterImplementation("3", Instance);
 
+            // Race Timeline: direct synchronous call (not via ManiaReplaySessionService)
+            // to avoid any async/caching issues for ghost score HUDs.
             EzScoreTimelineBridge.RegisterManiaTimelineBuilder((score, beatmap, cancellationToken) =>
             {
                 var environment = ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForRaceTimeline);
-                return replaySession.RunTimelineAsync(score, beatmap, environment, cancellationToken).GetAwaiter().GetResult();
+                return ManiaReplaySession.RunTimeline(score, beatmap, environment, cancellationToken);
             });
 
             // 注册到全局 Registry，使 Graph/Panel/Race 的 DI 消费者可获得实例
@@ -58,11 +56,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         public List<HitEvent> Generate(Score score, IBeatmap playableBeatmap, CancellationToken cancellationToken = default)
         {
             var environment = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
-            return replaySession.RunAsync(score, playableBeatmap, environment, cancellationToken)
-                                .GetAwaiter()
-                                .GetResult()
-                                .ScoreInfo.HitEvents
-                                .ToList();
+            return ManiaReplaySession.Run(score, playableBeatmap, environment, cancellationToken).ScoreInfo.HitEvents.ToList();
         }
     }
 }
