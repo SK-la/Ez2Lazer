@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         public static HitResult MapTo(O2Judge judge) => judge switch
         {
             O2Judge.Cool => HitResult.Perfect,
-            O2Judge.Good => HitResult.Great,
+            O2Judge.Good => HitResult.Good,
             O2Judge.Bad => HitResult.Meh,
             O2Judge.Miss => HitResult.Miss,
             _ => HitResult.None,
@@ -47,7 +47,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         public static O2Judge FromHitResult(HitResult result) => result switch
         {
             HitResult.Perfect => O2Judge.Cool,
-            HitResult.Great => O2Judge.Good,
             HitResult.Good => O2Judge.Good,
             HitResult.Meh => O2Judge.Bad,
             HitResult.Miss => O2Judge.Miss,
