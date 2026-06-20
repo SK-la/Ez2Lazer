@@ -178,6 +178,7 @@ namespace osu.Game.EzOsuGame.HUD
                 {
                     processor = new EzScoreRaceTimelineScoreProcessor();
                     AddInternal(processor);
+                    processor.SetGameplayClock(GameplayClock);
                     processor.SetTimeline(entry.Timeline);
                     processor.TotalScore.BindValueChanged(_ => sorting.Invalidate());
                     leaderboardScore = createGhostLeaderboardScore(entry, processor);
@@ -221,6 +222,7 @@ namespace osu.Game.EzOsuGame.HUD
                     continue;
 
                 state.Timeline = Session.Entries.FirstOrDefault(e => e.ScoreInfo.ID == state.ScoreInfoId)?.Timeline;
+                state.Processor?.SetGameplayClock(GameplayClock);
                 state.Processor?.SetTimeline(state.Timeline);
             }
         }

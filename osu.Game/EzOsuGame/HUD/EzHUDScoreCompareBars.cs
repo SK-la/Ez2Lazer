@@ -165,6 +165,8 @@ namespace osu.Game.EzOsuGame.HUD
             ghostProcessor2 = new EzScoreRaceTimelineScoreProcessor();
             AddInternal(ghostProcessor1);
             AddInternal(ghostProcessor2);
+            ghostProcessor1.SetGameplayClock(GameplayClock);
+            ghostProcessor2.SetGameplayClock(GameplayClock);
             ghostProcessor1.TotalScore.BindValueChanged(_ => updateGhostCompareBar(1));
             ghostProcessor2.TotalScore.BindValueChanged(_ => updateGhostCompareBar(2));
 

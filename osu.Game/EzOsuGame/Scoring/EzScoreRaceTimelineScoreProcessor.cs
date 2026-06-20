@@ -3,6 +3,7 @@
 
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.Scoring
 {
@@ -20,6 +21,16 @@ namespace osu.Game.EzOsuGame.Scoring
         public readonly BindableInt MissCount = new BindableInt();
 
         private EzScoreTimeline? timeline;
+
+        private GameplayClockContainer? gameplayClockContainer;
+
+        /// <summary>
+        /// 设置外部 <see cref="GameplayClockContainer"/> 引用，优先于 Component.Clock 查询当前时间。
+        /// </summary>
+        public void SetGameplayClock(GameplayClockContainer? container)
+        {
+            gameplayClockContainer = container;
+        }
 
         public void SetTimeline(EzScoreTimeline? timeline)
         {
@@ -46,10 +57,16 @@ namespace osu.Game.EzOsuGame.Scoring
                 return;
             }
 
-            if (Clock == null)
+            double currentTime;
+
+            if (gameplayClockContainer != null)
+                currentTime = gameplayClockContainer.CurrentTime;
+            else if (Clock != null)
+                currentTime = Clock.CurrentTime;
+            else
                 return;
 
-            var snapshot = timeline.QueryAtTime(Clock.CurrentTime);
+            var snapshot = timeline.QueryAtTime(currentTime);
 
             TotalScore.Value = snapshot.TotalScore;
             Accuracy.Value = snapshot.Accuracy;
