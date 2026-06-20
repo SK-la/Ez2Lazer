@@ -8,6 +8,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
@@ -83,8 +84,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             if (info != null)
             {
-                // 注意: info.Accuracy/TotalScore 在 ManiaReplaySession.Run 中被还原为原始值，
-                // 因此不能直接使用，改为从 info.Statistics（已按当前 HitMode 重新判定）计算。
+                // Session 重放路径：从 Statistics 提取判定计数（已按当前 HitMode 重新判定）
+                // 注意: 由于 replay 帧时间量化（60fps ~16.67ms 精度）与现场游玩精确 timing
+                // 之间的偏差，窄判定窗口（如 BMS Perfect ~15ms）下 Now 统计可能与 Original 不一致。
+                // 诊断日志会输出差异供排查。
                 NowCounts = extractDisplayCounts(info.Statistics);
 
                 int total = NowCounts.Values.Sum();
@@ -104,12 +107,75 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                     NowScore = 0;
                 }
 
+                logDiffIfMismatch(info);
                 return;
             }
 
-            NowAccuracy = 0;
-            NowScore = 0;
-            NowCounts = new Dictionary<HitResult, int>();
+            // 无 Session 结果（初始加载，offset=0 且 HitMode 未变）：
+            // 直接使用现场游玩 OriginalHitEvents 作为 Now 数据源。
+            // 这样避免了 replay 帧时间量化带来的偏差，确保 Now == Original。
+            NowCounts = extractDisplayCountsFromEvents(OriginalHitEvents);
+
+            int fallbackTotal = NowCounts.Values.Sum();
+
+            if (fallbackTotal > 0)
+            {
+                int goods = NowCounts.GetValueOrDefault(HitResult.Good, 0)
+                            + NowCounts.GetValueOrDefault(HitResult.Great, 0)
+                            + NowCounts.GetValueOrDefault(HitResult.Perfect, 0);
+                int meh = NowCounts.GetValueOrDefault(HitResult.Meh, 0);
+                NowAccuracy = (goods + meh * 0.5) / fallbackTotal;
+                NowScore = (long)(originalTotalScore * NowAccuracy / originalAccuracy);
+            }
+            else
+            {
+                NowAccuracy = 0;
+                NowScore = 0;
+            }
+        }
+
+        /// <summary>
+        /// 诊断日志：对比 Original（现场游玩 Realm 快照）与 Now（Session Simulator 重放）的判定计数差异。
+        /// </summary>
+        private void logDiffIfMismatch(ScoreInfo sessionInfo)
+        {
+            // Original: 直接从 OriginalHitEvents 按 HitResult 分组统计
+            var origCounts = OriginalHitEvents
+                             .GroupBy(e => e.Result)
+                             .ToDictionary(g => g.Key, g => g.Count());
+
+            // Now: 直接从 Session 产出的 Statistics 提取（与 NowCounts 同源）
+            var nowCounts = extractDisplayCounts(sessionInfo.Statistics);
+
+            // 收集所有出现的 HitResult
+            var allResults = origCounts.Keys.Concat(nowCounts.Keys).Distinct().OrderBy(r => r).ToList();
+
+            var diffs = new List<string>();
+            foreach (var r in allResults)
+            {
+                int o = origCounts.GetValueOrDefault(r, 0);
+                int n = nowCounts.GetValueOrDefault(r, 0);
+                if (o != n)
+                    diffs.Add($"{r}: Orig={o} Now={n} (diff={n - o})");
+            }
+
+            int origTotal = origCounts.Values.Sum();
+            int nowTotal = nowCounts.Values.Sum();
+
+            if (diffs.Count > 0 || origTotal != nowTotal)
+            {
+                Logger.Log(
+                    $"[EzScoreGraphMania DIFF] HitMode={currentHitMode} | "
+                    + $"Total: Orig={origTotal} Now={nowTotal} | "
+                    + string.Join(" | ", diffs),
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            }
+            else
+            {
+                Logger.Log(
+                    $"[EzScoreGraphMania MATCH] HitMode={currentHitMode} Total={origTotal} — all counts identical",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            }
         }
 
         protected override IReadOnlyList<HitEvent> GetV1HitEvents()
@@ -124,26 +190,34 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);
             O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
 
+            // 初始加载时设置当前值，不触发 Session 重放。
+            // Now 统计直接从 OriginalHitEvents 派生（CalculateNowAccuracy 的 fallback 路径），
+            // 避免了 replay 帧时间量化（60fps ~16.67ms 精度）带来的偏差。
+            currentHitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            currentHealthMode = ezConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
+            hitWindowsNow.SetHitMode(currentHitMode);
+
+            // 绑定配置变更回调（仅在用户主动修改时触发 Session 重放）
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             hitModeBindable.BindValueChanged(v =>
             {
                 currentHitMode = v.NewValue;
                 hitWindowsNow.SetHitMode(currentHitMode);
                 Schedule(() => RefreshFromService().ConfigureAwait(false));
-            }, true);
+            });
 
             healthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             healthModeBindable.BindValueChanged(__ =>
             {
                 currentHealthMode = healthModeBindable.Value;
                 Schedule(() => RefreshFromService().ConfigureAwait(false));
-            }, true);
+            });
 
             ezConfig.GetBindable<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence)
-                    .BindValueChanged(__ => Schedule(() => RefreshFromService().ConfigureAwait(false)), true);
+                    .BindValueChanged(__ => Schedule(() => RefreshFromService().ConfigureAwait(false)));
 
             ezConfig.GetBindable<bool>(Ez2Setting.BmsPoorHitResultEnable)
-                    .BindValueChanged(__ => Schedule(() => RefreshFromService().ConfigureAwait(false)), true);
+                    .BindValueChanged(__ => Schedule(() => RefreshFromService().ConfigureAwait(false)));
 
             offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             offsetPlusMania.BindValueChanged(v => OnOffsetChanged(v.NewValue), true);
