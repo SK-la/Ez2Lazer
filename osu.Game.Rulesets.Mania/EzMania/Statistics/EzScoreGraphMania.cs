@@ -151,27 +151,36 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         protected override HitResult RecalculateV2Result(HitEvent hitEvent) => hitEvent.Result;
 
         /// <summary>
-        /// 无 committed score 时，基于当前 displayOffset 实时重算 V2 统计。
-        /// 用于 offset 拖动时左侧 Now 数据的实时预览。
+        /// 基于当前 displayOffset 实时重算 V2 统计。
+        /// 每次 offset 拖动时由 <see cref="EzScoreGraphBase.RefreshDisplayOnly"/> 调用，
+        /// 通过 <see cref="GetDisplayResult"/> 重新判定每个事件的 HitResult。
         /// </summary>
         protected override void RecalculateV2FromDisplayEvents()
         {
-            // 有 committed score 时，CalculateV2Accuracy 已填好，无需重复
-            if (CommittedNowScore != null)
-                return;
-
-            // 基于 FilterHitEvents（含 displayOffset）重算 counts
             var displayEvents = GetDisplayHitEvents();
-            V2Counts = extractDisplayCountsFromEvents(displayEvents);
+            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
+            var counts = new Dictionary<HitResult, int>();
 
-            // 重算准确率（基于 counts）
-            int total = V2Counts.Values.Sum();
+            foreach (var e in displayEvents)
+            {
+                var result = GetDisplayResult(e);
+                if (!validResults.Contains(result) && result != HitResult.Miss && result != HitResult.Poor)
+                    continue;
+
+                counts.TryAdd(result, 0);
+                counts[result]++;
+            }
+
+            V2Counts = counts;
+
+            int total = counts.Values.Sum();
+
             if (total > 0)
             {
-                int goods = V2Counts.GetValueOrDefault(HitResult.Good, 0)
-                           + V2Counts.GetValueOrDefault(HitResult.Great, 0)
-                           + V2Counts.GetValueOrDefault(HitResult.Perfect, 0);
-                int meh = V2Counts.GetValueOrDefault(HitResult.Meh, 0);
+                int goods = counts.GetValueOrDefault(HitResult.Good, 0)
+                            + counts.GetValueOrDefault(HitResult.Great, 0)
+                            + counts.GetValueOrDefault(HitResult.Perfect, 0);
+                int meh = counts.GetValueOrDefault(HitResult.Meh, 0);
                 V2Accuracy = (goods + meh * 0.5) / total;
                 V2Score = (long)(originalTotalScore * V2Accuracy / originalAccuracy);
             }
@@ -196,15 +205,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 if (!validResults.Contains(result) && result != HitResult.Miss && result != HitResult.Poor)
                     continue;
 
-                if (!counts.ContainsKey(result))
-                    counts[result] = 0;
+                counts.TryAdd(result, 0);
                 counts[result]++;
             }
 
             return counts;
         }
 
-        protected override HitResult GetDisplayResult(HitEvent hitEvent) => hitEvent.Result;
+        /// <summary>
+        /// 展示层判定结果。display-only 预览时基于调整后的 TimeOffset 重算判定，
+        /// 使散点颜色和血线随 offset 实时变化。非预览时直接返回 Session/原始结果。
+        /// </summary>
+        protected override HitResult GetDisplayResult(HitEvent hitEvent)
+        {
+            // 仅 display-only 预览（displayOffset != 0）时重算判定结果
+            if (DisplayOffset == 0)
+                return hitEvent.Result;
+
+            var result = hitWindowsV2.ResultFor(hitEvent.TimeOffset);
+            return result == HitResult.None ? HitResult.Miss : result;
+        }
 
         // P3-Rest 前过渡：通过 scoreManager 获取 databased score
         // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLiveAnalysis)
@@ -366,28 +386,29 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             }
         }
 
-        protected override void UpdateText()
+        private SimpleStatisticItem<string>[]? statItems; // 缓存文本 item 引用，供 UpdateTextValues 只更新数值
+
+        protected override void CreateTextUI()
         {
             double scAcc = originalAccuracy * 100;
             long scScore = originalTotalScore;
 
-            string nowAccText = CommittedNowScore != null ? (V2Accuracy * 100).ToString("F1") + "%" : "—";
-            string nowScoreText = CommittedNowScore != null ? (V2Score / 1000.0).ToString("F0") + "k" : "—";
-
-            var items = new List<SimpleStatisticItem>
+            // 创建带默认占位值的 item 列表
+            var items = new List<SimpleStatisticItem<string>>
             {
-                makeSimpleStat(scAcc.ToString("F1") + "%", "Acc Original", colours.Blue1),
-                makeSimpleStat(nowAccText, "Acc Now Setting", colours.Blue1),
-                makeSimpleStat((V1Accuracy * 100).ToString("F1") + "%", "Acc v1 Algorithm", colours.Blue1),
+                makeSimpleStat("—", "Acc Original", colours.Blue1),
+                makeSimpleStat("—", "Acc Now Setting", colours.Blue1),
+                makeSimpleStat("—", "Acc v1 Algorithm", colours.Blue1),
 
-                makeSimpleStat((scScore / 1000.0).ToString("F0") + "k", "Score Original", colours.Orange1),
-                makeSimpleStat(nowScoreText, "Score Now Setting", colours.Orange1),
-                makeSimpleStat((V1Score / 1000.0).ToString("F0") + "k", "Score v1 Algorithm", colours.Orange1),
+                makeSimpleStat("—", "Score Original", colours.Orange1),
+                makeSimpleStat("—", "Score Now Setting", colours.Orange1),
+                makeSimpleStat("—", "Score v1 Algorithm", colours.Orange1),
 
                 makeSimpleStat(Score.Pauses.Count.ToString(), "Pauses"),
                 makeSimpleStat("Now | V1", "↓", colours.Gray8),
             };
 
+            // 从 V2+V1 判定集合构建每个判定行的 item
             List<HitResult> results = V2Counts.Keys
                                               .Concat(V1Counts.Keys)
                                               .Distinct()
@@ -397,21 +418,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             foreach (var r in results)
             {
-                int v2Count = V2Counts.GetValueOrDefault(r, 0);
-                int v1Count = V1Counts.GetValueOrDefault(r, 0);
-
-                if (v2Count == 0 && v1Count == 0)
-                    continue;
-
                 string name = r.GetHitModeDisplayName().ToString();
-                string display = $"{v2Count} | {v1Count}";
                 var c = colours.ForHitResult(r);
-                items.Add(makeSimpleStat(display, name, c));
+                items.Add(makeSimpleStat("—", name, c));
             }
+
+            // 缓存所有文本 item 引用
+            statItems = items.ToArray();
 
             const float label_area_width = 35f;
 
-            var statsContent = new SimpleStatisticTable(1, items.ToArray())
+            var statsContent = new SimpleStatisticTable(1, items)
             {
                 RelativeSizeAxes = Axes.X,
                 Scale = new Vector2(0.96f)
@@ -452,6 +469,50 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             AddInternal(labelArea);
 
             LeftLabelContainer = labelArea;
+
+            // 创建完 UI 后立即填入当前数值
+            UpdateTextValues();
+        }
+
+        protected override void UpdateTextValues()
+        {
+            if (statItems == null || statItems.Length == 0)
+                return;
+
+            double scAcc = originalAccuracy * 100;
+            long scScore = originalTotalScore;
+
+            string nowAccText = CommittedNowScore != null ? (V2Accuracy * 100).ToString("F1") + "%" : "—";
+            string nowScoreText = CommittedNowScore != null ? (V2Score / 1000.0).ToString("F0") + "k" : "—";
+
+            statItems[0].Value = scAcc.ToString("F1") + "%";
+            statItems[1].Value = nowAccText;
+            statItems[2].Value = (V1Accuracy * 100).ToString("F1") + "%";
+            statItems[3].Value = (scScore / 1000.0).ToString("F0") + "k";
+            statItems[4].Value = nowScoreText;
+            statItems[5].Value = (V1Score / 1000.0).ToString("F0") + "k";
+            // statItems[6] = Pauses（pauses 不随 offset 变化，无需更新）
+            // statItems[7] = "↓" 分隔线，不需更新
+
+            int idx = 8; // 静态行之后是动态判定行
+            List<HitResult> results = V2Counts.Keys
+                                              .Concat(V1Counts.Keys)
+                                              .Distinct()
+                                              .Where(r => r.IsBasic() || r == HitResult.Poor)
+                                              .OrderBy(r => r.GetIndexForOrderedDisplay())
+                                              .ToList();
+
+            foreach (var r in results)
+            {
+                int v2Count = V2Counts.GetValueOrDefault(r, 0);
+                int v1Count = V1Counts.GetValueOrDefault(r, 0);
+
+                if (idx < statItems.Length)
+                {
+                    statItems[idx].Value = $"{v2Count} | {v1Count}";
+                    idx++;
+                }
+            }
         }
 
         private SimpleStatisticItem<string> makeSimpleStat(string display, string name = "Count", ColourInfo? colour = null)

@@ -70,7 +70,7 @@ namespace osu.Game.EzOsuGame.Statistics
 #pragma warning disable IDE0051 // committedEnvironment 为 P3-Rest 阶段预留，当前暂未使用
         private IGameplayEnvironment? committedEnvironment;
 #pragma warning restore IDE0051
-        private double displayOffset;
+        protected double DisplayOffset;
 
         // Debounce 控制 — offset 拖动时仅展示，落定后触发 Session
         private CancellationTokenSource? debounceCancellation;
@@ -275,6 +275,7 @@ namespace osu.Game.EzOsuGame.Statistics
             }
 
             ClearInternal();
+            textInitialized = false; // 全量刷新后标记文本未初始化，下次 UpdateText 会重建 UI
 
             CalculateV1Accuracy();
             CalculateV2Accuracy();
@@ -344,11 +345,22 @@ namespace osu.Game.EzOsuGame.Statistics
             {
                 double time = e.HitObject.StartTime;
                 float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0;
-                var displayResult = GetDisplayResult(e);
+
+                // 与 drawHealthLine(applyOffset: true) 一致：创建临时事件以传递调整后的 TimeOffset
+                HitEvent displayEvent = applyOffset
+                    ? new HitEvent(
+                        e.TimeOffset + DisplayOffset,
+                        e.GameplayRate,
+                        e.Result,
+                        e.HitObject,
+                        e.LastHitObject,
+                        e.Position)
+                    : e;
+                var displayResult = GetDisplayResult(displayEvent);
 
                 float x = xPosition * availableWidth;
                 float y = projectOffsetToY(
-                    applyOffset ? e.TimeOffset + displayOffset : e.TimeOffset,
+                    applyOffset ? e.TimeOffset + DisplayOffset : e.TimeOffset,
                     time);
 
                 pointList.Add((new Vector2(x, y), colours.ForHitResult(displayResult)));
@@ -367,7 +379,38 @@ namespace osu.Game.EzOsuGame.Statistics
             }
         }
 
-        protected virtual void UpdateText()
+        private bool textInitialized;
+
+        /// <summary>
+        /// 更新文本显示。首次调用或 <see cref="UpdateDisplay"/> 全量刷新后调用 <see cref="CreateTextUI"/> 重建 UI，
+        /// 后续调用（如 offset 拖动时）仅调用 <see cref="UpdateTextValues"/> 更新数值。
+        /// </summary>
+        protected void UpdateText()
+        {
+            if (!textInitialized)
+            {
+                CreateTextUI();
+                textInitialized = true;
+            }
+            else
+            {
+                UpdateTextValues();
+            }
+        }
+
+        /// <summary>
+        /// 创建文本统计 UI 结构。由 <see cref="UpdateText"/> 在首次或全量刷新后调用。
+        /// 子类应在此方法中创建控件并缓存引用，供 <see cref="UpdateTextValues"/> 后续只更新数值。
+        /// </summary>
+        protected virtual void CreateTextUI()
+        {
+        }
+
+        /// <summary>
+        /// 更新文本统计数值。由 <see cref="UpdateText"/> 在非首次（如 offset 拖动）时调用。
+        /// 子类应在此方法中仅更新已缓存 <see cref="SimpleStatisticItem.Value"/>，不重建 UI。
+        /// </summary>
+        protected virtual void UpdateTextValues()
         {
         }
 
@@ -388,7 +431,7 @@ namespace osu.Game.EzOsuGame.Statistics
         /// <param name="fakeOffset">展示的偏移量（毫秒）</param>
         protected void RefreshDisplayOnly(double fakeOffset)
         {
-            displayOffset = fakeOffset;
+            DisplayOffset = fakeOffset;
 
             // 实时重算 V2 统计（无 committed score 时预览，有 committed score 时跳过）
             RecalculateV2FromDisplayEvents();
@@ -430,7 +473,7 @@ namespace osu.Game.EzOsuGame.Statistics
                     committedEnvironment = environment;
                 }
 
-                displayOffset = 0; // 重置展示 offset
+                DisplayOffset = 0; // 重置展示 offset
 
                 // 全量刷新（现在基于新的 committedNowScore）
                 Schedule(Refresh);
@@ -518,12 +561,12 @@ namespace osu.Game.EzOsuGame.Statistics
             var baseEvents = CommittedNowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents;
 
 #pragma warning disable IDE0046 // displayOffset == 0 的简化写法
-            if (displayOffset == 0)
+            if (DisplayOffset == 0)
                 return baseEvents;
 #pragma warning restore IDE0046
 
             return baseEvents.Select(e => new HitEvent(
-                e.TimeOffset + displayOffset,
+                e.TimeOffset + DisplayOffset,
                 e.GameplayRate,
                 e.Result,
                 e.HitObject,
@@ -615,7 +658,7 @@ namespace osu.Game.EzOsuGame.Statistics
                 // applyOffset 时需要创建带 offset 的临时 HitEvent 来获取 displayResult
                 HitEvent displayEvent = applyOffset
                     ? new HitEvent(
-                        e.TimeOffset + displayOffset,
+                        e.TimeOffset + DisplayOffset,
                         e.GameplayRate,
                         e.Result,
                         e.HitObject,

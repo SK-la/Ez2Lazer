@@ -100,10 +100,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (score.Replay.Frames.Count == 0)
             {
                 // Zero frames: still need to generate all-miss HitEvents
-                // so that extended statistics can display. We skip score/timeline population
-                // to preserve the gameplay-recorded TotalScore/Accuracy/Statistics.
+                // so that extended statistics can display.
                 var emptyPressTimes = new Dictionary<int, List<double>>();
                 applyForcedMisses(scoreProcessor, targets, emptyPressTimes, CancellationToken.None, recorder);
+                scoreProcessor.PopulateScore(score.ScoreInfo);
 
                 return (scoreProcessor, recordTimeline ? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>()) : null);
             }
