@@ -39,7 +39,6 @@ namespace osu.Game.EzOsuGame.Statistics
         protected float LeftMarginConst { get; set; } = 165;
         protected float RightMarginConst { get; set; } = 10;
 
-        private const int current_offset = 0;
         private const int time_bins = 50;
 
         private double binSize;
@@ -527,10 +526,10 @@ namespace osu.Game.EzOsuGame.Statistics
 
         /// <summary>
         /// 轻量重绘 scatter + health line（带 offset）
-        /// Graph-UX: 使用 OriginalHitEvents（无 fake offset）仅重建 scatter 和血量，
-        /// 不清空边界线，拖动时性能友好。
-        /// 注意：drawPointsGraph 内部会加 offset，避免与 FilterHitEvents 的
-        /// applyFakeOffsetToEvents 叠加导致双重 offset。
+        /// Graph-UX: 使用 <see cref="GetDisplayHitEvents"/>（已按 HitMode 过滤，含 fake offset）
+        /// 重建 scatter 和血量，不清空边界线，拖动时性能友好。
+        /// 注意：事件 TimeOffset 已经由 <see cref="FilterHitEvents"/> 链路的
+        /// applyFakeOffsetToEvents 叠加了 displayOffset，因此 drawPointsGraph 无需再 applyOffset。
         /// </summary>
         private void redrawScatterAndHealthWithOffset(double offset)
         {
@@ -545,12 +544,11 @@ namespace osu.Game.EzOsuGame.Statistics
             foreach (var child in toRemove)
                 graphContainer.Remove(child, true);
 
-            // 使用 OriginalHitEvents（不含 fake offset），offset 由 drawPointsGraph 单独加
-            var originalEvents = OriginalHitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
-            drawPointsGraph(originalEvents, applyOffset: true);
+            // 使用 GetDisplayHitEvents（已按 HitMode 过滤，已含 displayOffset）
+            var displayEvents = GetDisplayHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
+            drawPointsGraph(displayEvents, applyOffset: false);
 
-            // drawHealthLine 用原始 events + applyOffset: true，GetDisplayResult 内部会读到正确的 Result
-            drawHealthLine(originalEvents, applyOffset: true);
+            drawHealthLine(displayEvents, applyOffset: false);
         }
 
         /// <summary>
@@ -750,8 +748,13 @@ namespace osu.Game.EzOsuGame.Statistics
         private float projectOffsetToY(double offset, double? time)
         {
             double miss = Math.Max(1, UpdateBoundary(HitResult.Miss, time));
-            double normalized = (offset + current_offset) / miss;
-            float y = (float)((normalized + 1) * 0.5 * DrawHeight);
+            // 使用 tanh 渐进映射替代线性+硬截断：
+            //   offset=0        → y = 0.5*H(中心)
+            //   offset=±miss    → y ≈ 0.88*H 或 0.12*H
+            //   offset=±2*miss  → y ≈ 0.98*H 或 0.02*H
+            //   offset→±∞       → y → H 或 0(渐进，不硬截断)
+            // 这样超过 miss 窗口的事件仍可区分纵坐标，而不会全部归一化到边缘。
+            float y = (float)((Math.Tanh(offset / miss) + 1) * 0.5 * DrawHeight);
             return Math.Clamp(y, 0, DrawHeight);
         }
     }
