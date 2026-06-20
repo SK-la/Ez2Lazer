@@ -75,8 +75,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
-            => filterForCurrentHitMode(
-                CommittedNowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents);
+        {
+            // Session 产出时使用 Session HitEvents
+            if (CommittedNowScore?.ScoreInfo.HitEvents is { } sessionEvents)
+                return filterForCurrentHitMode(sessionEvents);
+
+            // 无 Session 时使用全部 OriginalHitEvents，不做结果有效性过滤。
+            // GetDisplayResult 会通过 hitWindowsNow 对每个事件重新判定，
+            // 确保散点颜色和血量线反映当前 HitMode 的判定结果。
+            return applyFakeOffsetToEvents(OriginalHitEvents);
+        }
 
         protected override void CalculateNowAccuracy()
         {
@@ -94,10 +102,36 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 return;
             }
 
-            // 无 Session 结果（初始加载，offset=0 且 HitMode 与游玩时一致）：
-            // 直接从 OriginalHitEvents 获取 Now 数据源，确保 Now == Original。
-            NowCounts = extractDisplayCountsFromEvents(OriginalHitEvents);
+            // 无 Session 结果（初始加载 或 HitMode 变更后）：
+            // 通过 hitWindowsNow 对 OriginalHitEvents.TimeOffset 重新判定，
+            // 保留现场游玩的精确 timing 并映射到当前 HitMode。
+            NowCounts = rejudgeOriginalHitEvents();
             (NowAccuracy, NowScore) = computeNowAccuracyAndScore(NowCounts, currentHitMode);
+        }
+
+        /// <summary>
+        /// 用当前 <see cref="hitWindowsNow"/> 对 <c>OriginalHitEvents</c> 的
+        /// TimeOffset 重新判定，返回按当前 HitMode 有效结果过滤后的计数。
+        /// </summary>
+        private Dictionary<HitResult, int> rejudgeOriginalHitEvents()
+        {
+            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
+            var counts = new Dictionary<HitResult, int>();
+
+            foreach (var e in OriginalHitEvents)
+            {
+                var result = hitWindowsNow.ResultFor(e.TimeOffset);
+                if (result == HitResult.None)
+                    result = HitResult.Miss;
+
+                if (!validResults.Contains(result) && result != HitResult.Miss && result != HitResult.Poor)
+                    continue;
+
+                counts.TryAdd(result, 0);
+                counts[result]++;
+            }
+
+            return counts;
         }
 
         /// <summary>
@@ -202,33 +236,43 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
 
             // 初始加载时设置当前值，不触发 Session 重放。
-            // Now 统计直接从 OriginalHitEvents 派生（CalculateNowAccuracy 的 fallback 路径），
-            // 避免了 replay 帧时间量化（60fps ~16.67ms 精度）带来的偏差。
             currentHitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             currentHealthMode = ezConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             hitWindowsNow.SetHitMode(currentHitMode);
 
-            // 绑定配置变更回调（仅在用户主动修改时触发 Session 重放）
+            // 非 offset 配置变更：清除 Session 缓存并使用 hitWindowsNow 对
+            // OriginalHitEvents.TimeOffset 重判（保留现场游玩的精确 timing）。
+            // Session 仅在 offset 拖动时使用（OnOffsetChanged 路径）。
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             hitModeBindable.BindValueChanged(v =>
             {
                 currentHitMode = v.NewValue;
                 hitWindowsNow.SetHitMode(currentHitMode);
-                Schedule(() => RefreshFromService().ConfigureAwait(false));
+                CommittedNowScore = null;
+                Refresh();
             });
 
             healthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             healthModeBindable.BindValueChanged(__ =>
             {
                 currentHealthMode = healthModeBindable.Value;
-                Schedule(() => RefreshFromService().ConfigureAwait(false));
+                CommittedNowScore = null;
+                Refresh();
             });
 
             ezConfig.GetBindable<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence)
-                    .BindValueChanged(__ => Schedule(() => RefreshFromService().ConfigureAwait(false)));
+                    .BindValueChanged(__ =>
+                    {
+                        CommittedNowScore = null;
+                        Refresh();
+                    });
 
             ezConfig.GetBindable<bool>(Ez2Setting.BmsPoorHitResultEnable)
-                    .BindValueChanged(__ => Schedule(() => RefreshFromService().ConfigureAwait(false)));
+                    .BindValueChanged(__ =>
+                    {
+                        CommittedNowScore = null;
+                        Refresh();
+                    });
 
             offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             offsetPlusMania.BindValueChanged(v => OnOffsetChanged(v.NewValue), true);
@@ -279,38 +323,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         /// <summary>
-        /// 从 HitEvent 列表提取统计 counts（不受 committed score 影响）。
-        /// </summary>
-        private Dictionary<HitResult, int> extractDisplayCountsFromEvents(IEnumerable<HitEvent> events)
-        {
-            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
-            var counts = new Dictionary<HitResult, int>();
-
-            foreach (var e in events)
-            {
-                var result = e.Result;
-                if (!validResults.Contains(result) && result != HitResult.Miss && result != HitResult.Poor)
-                    continue;
-
-                counts.TryAdd(result, 0);
-                counts[result]++;
-            }
-
-            return counts;
-        }
-
-        /// <summary>
-        /// 展示层判定结果。display-only 预览时基于调整后的 TimeOffset 重算判定，
-        /// 使散点颜色和血线随 offset 实时变化。非预览时直接返回 Session/原始结果。
+        /// 展示层判定结果。以下场景通过当前 <see cref="hitWindowsNow"/> 重新判定：
+        ///   1. offset 拖动（DisplayOffset != 0）：实时预览散点颜色变化
+        ///   2. 无 Session（CommittedNowScore == null）：HitMode 变更后重判
+        /// 有 Session 且 offset 归零时直接返回 Session 产出结果。
         /// </summary>
         protected override HitResult GetDisplayResult(HitEvent hitEvent)
         {
-            // 仅 display-only 预览（displayOffset != 0）时重算判定结果
-            if (DisplayOffset == 0)
-                return hitEvent.Result;
+            if (DisplayOffset != 0 || CommittedNowScore == null)
+            {
+                var result = hitWindowsNow.ResultFor(hitEvent.TimeOffset);
+                return result == HitResult.None ? HitResult.Miss : result;
+            }
 
-            var result = hitWindowsNow.ResultFor(hitEvent.TimeOffset);
-            return result == HitResult.None ? HitResult.Miss : result;
+            return hitEvent.Result;
         }
 
         // P3-Rest 前过渡：通过 scoreManager 获取 databased score
