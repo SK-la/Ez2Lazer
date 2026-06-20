@@ -244,7 +244,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
                         try
                         {
-                            IBeatmap? beatmapForBuild = EzLocalScoreQueries.ModsMatch(scoreInfo.Mods, currentMods)
+                            IBeatmap? beatmapForBuild = EzLocalScoreQueries.GameplayModsMatch(scoreInfo.Mods, currentMods)
                                 ? sharedPlayableBeatmap
                                 : null;
 
