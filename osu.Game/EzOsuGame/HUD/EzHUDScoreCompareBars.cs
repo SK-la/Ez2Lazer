@@ -3,6 +3,7 @@
 
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
@@ -12,10 +13,8 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
-using osu.Framework.Logging;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Acrylic;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
@@ -23,6 +22,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -167,19 +167,18 @@ namespace osu.Game.EzOsuGame.HUD
             ghostProcessor2 = new EzScoreRaceTimelineScoreProcessor();
             AddInternal(ghostProcessor1);
             AddInternal(ghostProcessor2);
-            ghostProcessor1.SetGameplayClock(GameplayClock);
-            ghostProcessor2.SetGameplayClock(GameplayClock);
-            ghostProcessor1.TotalScore.BindValueChanged(_ => updateGhostCompareBar(1));
-            ghostProcessor2.TotalScore.BindValueChanged(_ => updateGhostCompareBar(2));
-
-            Logger.Log(
-                "[EzScore] CompareBars.LoadComplete: ghost processors created",
-                level: LogLevel.Debug,
-                name: Ez2ConfigManager.LOGGER_NAME);
 
             EnsureLoadingOverlay();
 
             base.LoadComplete();
+
+            Debug.Assert(GameplayClock != null,
+                $"{nameof(EzHUDScoreCompareBars)} must be inside a {nameof(GameplayClockContainer)} subtree");
+
+            ghostProcessor1.SetGameplayClock(GameplayClock);
+            ghostProcessor2.SetGameplayClock(GameplayClock);
+            ghostProcessor1.TotalScore.BindValueChanged(_ => updateGhostCompareBar(1));
+            ghostProcessor2.TotalScore.BindValueChanged(_ => updateGhostCompareBar(2));
 
             BackgroundVisible.BindValueChanged(_ => updateBackgroundVisibility(), true);
             BackdropBlurEnabled.BindValueChanged(_ => SyncAcrylicCaptureState(), true);
@@ -244,20 +243,11 @@ namespace osu.Game.EzOsuGame.HUD
 
             if (Session == null || !Session.IsReady.Value || processor == null)
             {
-                Logger.Log(
-                    $"[EzScore] CompareBars.updateGhostCompareBar({conditionIndex}): skip (sessionReady={Session?.IsReady.Value} processorNull={processor == null})",
-                    level: LogLevel.Debug,
-                    name: Ez2ConfigManager.LOGGER_NAME);
-
                 bars[conditionIndex].UpdateValues(metric.GetLocalisableDescription(), string.Empty, 0, barScoreScale, getBarColour(metric));
                 return;
             }
 
             long barScore = processor.TotalScore.Value;
-            Logger.Log(
-                $"[EzScore] CompareBars.updateGhostCompareBar({conditionIndex}): score={barScore} timeline={(pickedEntry?.Timeline != null ? $"FinalTotalScore={pickedEntry.Timeline.FinalTotalScore}" : "null")}",
-                level: LogLevel.Debug,
-                name: Ez2ConfigManager.LOGGER_NAME);
             bars[conditionIndex].UpdateValues(
                 metric.GetLocalisableDescription(),
                 formatBarValue(barScore, pickedEntry),
@@ -322,11 +312,6 @@ namespace osu.Game.EzOsuGame.HUD
         {
             if (!SupportsGhostRace || Session == null || !Session.IsReady.Value)
             {
-                Logger.Log(
-                    $"[EzScore] CompareBars.refreshPickedEntries: skip (supports={SupportsGhostRace} sessionReady={Session?.IsReady.Value})",
-                    level: LogLevel.Debug,
-                    name: Ez2ConfigManager.LOGGER_NAME);
-
                 pickedEntryForCondition1 = null;
                 pickedEntryForCondition2 = null;
                 ghostProcessor1?.SetTimeline(null);
@@ -343,11 +328,6 @@ namespace osu.Game.EzOsuGame.HUD
 
             ghostProcessor1?.SetTimeline(pickedEntryForCondition1?.Timeline);
             ghostProcessor2?.SetTimeline(pickedEntryForCondition2?.Timeline);
-
-            Logger.Log(
-                $"[EzScore] CompareBars.refreshPickedEntries: cond1={(pickedEntryForCondition1 != null ? $"score {pickedEntryForCondition1.ScoreInfo.ID}" : "null")} cond2={(pickedEntryForCondition2 != null ? $"score {pickedEntryForCondition2.ScoreInfo.ID}" : "null")}",
-                level: LogLevel.Debug,
-                name: Ez2ConfigManager.LOGGER_NAME);
         }
 
         private static string formatScore(long score) => score.ToString("N0");
