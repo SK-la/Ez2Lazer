@@ -86,53 +86,64 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             {
                 // Session 重放路径：从 Statistics 提取判定计数（已按当前 HitMode 重新判定）
                 // 注意: 由于 replay 帧时间量化（60fps ~16.67ms 精度）与现场游玩精确 timing
-                // 之间的偏差，窄判定窗口（如 BMS Perfect ~15ms）下 Now 统计可能与 Original 不一致。
+                // 之间的偏差，窄判定窗口下 Now 统计可能与 Original 不一致。
                 // 诊断日志会输出差异供排查。
                 NowCounts = extractDisplayCounts(info.Statistics);
-
-                int total = NowCounts.Values.Sum();
-
-                if (total > 0)
-                {
-                    int goods = NowCounts.GetValueOrDefault(HitResult.Good, 0)
-                                + NowCounts.GetValueOrDefault(HitResult.Great, 0)
-                                + NowCounts.GetValueOrDefault(HitResult.Perfect, 0);
-                    int meh = NowCounts.GetValueOrDefault(HitResult.Meh, 0);
-                    NowAccuracy = (goods + meh * 0.5) / total;
-                    NowScore = (long)(originalTotalScore * NowAccuracy / originalAccuracy);
-                }
-                else
-                {
-                    NowAccuracy = 0;
-                    NowScore = 0;
-                }
-
+                (NowAccuracy, NowScore) = computeNowAccuracyAndScore(NowCounts, currentHitMode);
                 logDiffIfMismatch(info);
                 return;
             }
 
-            // 无 Session 结果（初始加载，offset=0 且 HitMode 未变）：
-            // 直接使用现场游玩 OriginalHitEvents 作为 Now 数据源。
-            // 这样避免了 replay 帧时间量化带来的偏差，确保 Now == Original。
+            // 无 Session 结果（初始加载，offset=0 且 HitMode 与游玩时一致）：
+            // 直接从 OriginalHitEvents 获取 Now 数据源，确保 Now == Original。
             NowCounts = extractDisplayCountsFromEvents(OriginalHitEvents);
-
-            int fallbackTotal = NowCounts.Values.Sum();
-
-            if (fallbackTotal > 0)
-            {
-                int goods = NowCounts.GetValueOrDefault(HitResult.Good, 0)
-                            + NowCounts.GetValueOrDefault(HitResult.Great, 0)
-                            + NowCounts.GetValueOrDefault(HitResult.Perfect, 0);
-                int meh = NowCounts.GetValueOrDefault(HitResult.Meh, 0);
-                NowAccuracy = (goods + meh * 0.5) / fallbackTotal;
-                NowScore = (long)(originalTotalScore * NowAccuracy / originalAccuracy);
-            }
-            else
-            {
-                NowAccuracy = 0;
-                NowScore = 0;
-            }
+            (NowAccuracy, NowScore) = computeNowAccuracyAndScore(NowCounts, currentHitMode);
         }
+
+        /// <summary>
+        /// 按当前 HitMode 的基分权重计算 NowAccuracy 和 NowScore。
+        /// 公式：NowAccuracy = Σ(countᵢ × baseScoreᵢ) / (totalCount × maxBaseScore)
+        ///       NowScore = NowAccuracy × 1_000_000
+        /// </summary>
+        private (double accuracy, long score) computeNowAccuracyAndScore(Dictionary<HitResult, int> counts, EzEnumHitMode hitMode)
+        {
+            int total = counts.Values.Sum();
+            if (total == 0)
+                return (0, 0);
+
+            long totalBase = 0;
+            foreach (var (result, count) in counts)
+                totalBase += (long)getBaseScoreForResult(result, hitMode) * count;
+
+            int maxBase = getMaxBaseScore(hitMode);
+            long totalMax = (long)maxBase * total;
+
+            double accuracy = totalMax > 0 ? (double)totalBase / totalMax : 0;
+            long score = (long)(accuracy * 1_000_000);
+            return (accuracy, score);
+        }
+
+        /// <summary>单次判定的基分（对齐 ManiaScoreProcessor.GetBaseScoreForResult / HitModeHelper）。</summary>
+        private static int getBaseScoreForResult(HitResult result, EzEnumHitMode hitMode)
+        {
+            // Lazer 模式：ManiaScoreProcessor 对 Perfect 给 305；其余委托 base.GetBaseScoreForResult
+            if (hitMode == EzEnumHitMode.Lazer || hitMode == EzEnumHitMode.Classic)
+                return result switch
+                {
+                    HitResult.Perfect => 305,
+                    HitResult.Great => 300,
+                    HitResult.Good => 200,
+                    HitResult.Ok => 100,
+                    HitResult.Meh => 50,
+                    _ => 0,
+                };
+
+            return HitModeHelper.GetBaseScoreForResult(hitMode, result);
+        }
+
+        /// <summary>当前 HitMode 下 Perfect 的基分（用于计算满分分母）。</summary>
+        private static int getMaxBaseScore(EzEnumHitMode hitMode)
+            => getBaseScoreForResult(HitResult.Perfect, hitMode);
 
         /// <summary>
         /// 诊断日志：对比 Original（现场游玩 Realm 快照）与 Now（Session Simulator 重放）的判定计数差异。
@@ -264,23 +275,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             }
 
             NowCounts = counts;
-
-            int total = counts.Values.Sum();
-
-            if (total > 0)
-            {
-                int goods = counts.GetValueOrDefault(HitResult.Good, 0)
-                            + counts.GetValueOrDefault(HitResult.Great, 0)
-                            + counts.GetValueOrDefault(HitResult.Perfect, 0);
-                int meh = counts.GetValueOrDefault(HitResult.Meh, 0);
-                NowAccuracy = (goods + meh * 0.5) / total;
-                NowScore = (long)(originalTotalScore * NowAccuracy / originalAccuracy);
-            }
-            else
-            {
-                NowAccuracy = 0;
-                NowScore = 0;
-            }
+            (NowAccuracy, NowScore) = computeNowAccuracyAndScore(counts, currentHitMode);
         }
 
         /// <summary>
@@ -574,8 +569,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             double scAcc = originalAccuracy * 100;
             long scScore = originalTotalScore;
 
-            string nowAccText = CommittedNowScore != null ? (NowAccuracy * 100).ToString("F1") + "%" : "—";
-            string nowScoreText = CommittedNowScore != null ? (NowScore / 1000.0).ToString("F0") + "k" : "—";
+            string nowAccText = (NowAccuracy * 100).ToString("F1") + "%";
+            string nowScoreText = (NowScore / 1000.0).ToString("F0") + "k";
 
             statItems[0].Value = scAcc.ToString("F1") + "%";
             statItems[1].Value = nowAccText;
