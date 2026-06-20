@@ -117,9 +117,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         {
             var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
             var counts = new Dictionary<HitResult, int>();
+            bool isO2Jam = currentHitMode == EzEnumHitMode.O2Jam;
 
             foreach (var e in OriginalHitEvents)
             {
+                // O2Jam 判定窗口依赖 BPM 缩放，必须按 hitObject 时间同步 BPM。
+                // 不设 BPM 则 hitWindowsNow 默认 BPM=0 → safeBpm=75 → 窗口加倍。
+                if (isO2Jam)
+                    hitWindowsNow.UpdateO2JamBpmFromTime(e.HitObject.StartTime);
+
                 var result = hitWindowsNow.ResultFor(e.TimeOffset);
                 if (result == HitResult.None)
                     result = HitResult.Miss;

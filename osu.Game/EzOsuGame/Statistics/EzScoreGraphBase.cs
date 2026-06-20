@@ -506,6 +506,10 @@ namespace osu.Game.EzOsuGame.Statistics
             // 立即应用 display-only（轻量重绘）
             RefreshDisplayOnly(newOffset);
 
+            // offset=0 时不调度 Session：无需重放 replay 帧（帧时间量化会引入偏差）
+            if (newOffset == 0)
+                return;
+
             // debounce 后触发 service（真实重算）
             // fire-and-forget：故意不等待，由 CancellationToken 控制生命周期
 #pragma warning disable CS4014
