@@ -46,8 +46,19 @@ namespace osu.Game.EzOsuGame.Scoring
 
             var timelineMode = EzScoreRaceRulesetSupport.GetGhostTimelineMode(scoreInfo.Ruleset);
 
+            Logger.Log(
+                $"[EzScore] tryBuild: score {scoreInfo.ID} ruleset={scoreInfo.Ruleset.ShortName}({scoreInfo.Ruleset.OnlineID}) mode={timelineMode} hash={scoreInfo.Hash ?? "null"}",
+                level: LogLevel.Debug,
+                name: Ez2ConfigManager.LOGGER_NAME);
+
             if (timelineMode == EzScoreRaceGhostTimelineMode.None)
+            {
+                Logger.Log(
+                    $"[EzScore] tryBuild EXIT timelineMode=None: score {scoreInfo.ID}",
+                    level: LogLevel.Debug,
+                    name: Ez2ConfigManager.LOGGER_NAME);
                 return null;
+            }
 
             string? cacheKey = getCacheKey(scoreInfo, timelineMode);
 
@@ -115,10 +126,21 @@ namespace osu.Game.EzOsuGame.Scoring
             }
 
             if (timeline == null)
+            {
+                Logger.Log(
+                    $"[EzScore] tryBuild EXIT timeline=null after switch: score {scoreInfo.ID} mode={timelineMode}",
+                    level: LogLevel.Debug,
+                    name: Ez2ConfigManager.LOGGER_NAME);
                 return null;
+            }
 
             if (!string.IsNullOrEmpty(cacheKey))
                 timeline_cache[cacheKey] = timeline;
+
+            Logger.Log(
+                $"[EzScore] tryBuild OK: score {scoreInfo.ID} FinalTotalScore={timeline.FinalTotalScore}",
+                level: LogLevel.Debug,
+                name: Ez2ConfigManager.LOGGER_NAME);
 
             return timeline;
         }
