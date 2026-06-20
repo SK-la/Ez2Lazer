@@ -10,7 +10,9 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Logging;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics.Containers;
@@ -167,6 +169,11 @@ namespace osu.Game.EzOsuGame.HUD
             if (Session == null)
                 return;
 
+            Logger.Log(
+                $"[EzScore] Leaderboard.rebuildRows: {Session.Entries.Count} entries",
+                level: LogLevel.Debug,
+                name: Ez2ConfigManager.LOGGER_NAME);
+
             foreach (var entry in Session.Entries)
             {
                 EzScoreRaceTimelineScoreProcessor? processor = null;
@@ -182,6 +189,11 @@ namespace osu.Game.EzOsuGame.HUD
                     processor.SetTimeline(entry.Timeline);
                     processor.TotalScore.BindValueChanged(_ => sorting.Invalidate());
                     leaderboardScore = createGhostLeaderboardScore(entry, processor);
+
+                    Logger.Log(
+                        $"[EzScore] Leaderboard.rebuildRows: ghost entry {entry.ScoreInfo.ID} has timeline={(entry.Timeline != null ? "yes" : "no")}",
+                        level: LogLevel.Debug,
+                        name: Ez2ConfigManager.LOGGER_NAME);
                 }
 
                 var drawable = new DrawableGameplayLeaderboardScore(leaderboardScore);
@@ -216,6 +228,11 @@ namespace osu.Game.EzOsuGame.HUD
             if (Session == null)
                 return;
 
+            Logger.Log(
+                "[EzScore] Leaderboard.refreshTimelineRefs: refreshing processor timelines",
+                level: LogLevel.Debug,
+                name: Ez2ConfigManager.LOGGER_NAME);
+
             foreach (var state in entryStates)
             {
                 if (state.Tracked)
@@ -224,6 +241,11 @@ namespace osu.Game.EzOsuGame.HUD
                 state.Timeline = Session.Entries.FirstOrDefault(e => e.ScoreInfo.ID == state.ScoreInfoId)?.Timeline;
                 state.Processor?.SetGameplayClock(GameplayClock);
                 state.Processor?.SetTimeline(state.Timeline);
+
+                Logger.Log(
+                    $"[EzScore] Leaderboard.refreshTimelineRefs: state {state.ScoreInfoId} timeline={(state.Timeline != null ? "yes" : "no")}",
+                    level: LogLevel.Debug,
+                    name: Ez2ConfigManager.LOGGER_NAME);
             }
         }
 

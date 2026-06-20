@@ -3,6 +3,8 @@
 
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Logging;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.Scoring
@@ -36,6 +38,21 @@ namespace osu.Game.EzOsuGame.Scoring
         {
             this.timeline = timeline;
 
+            if (timeline != null)
+            {
+                Logger.Log(
+                    $"[EzScore] SetTimeline: score has {timeline.FinalTotalScore} final total, snapshots count available",
+                    level: LogLevel.Debug,
+                    name: Ez2ConfigManager.LOGGER_NAME);
+            }
+            else
+            {
+                Logger.Log(
+                    "[EzScore] SetTimeline: timeline set to null",
+                    level: LogLevel.Debug,
+                    name: Ez2ConfigManager.LOGGER_NAME);
+            }
+
             if (IsLoaded)
                 UpdateScore();
         }
@@ -43,6 +60,10 @@ namespace osu.Game.EzOsuGame.Scoring
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            Logger.Log(
+                $"[EzScore] TimelineScoreProcessor.LoadComplete: clock={(gameplayClockContainer != null ? "GameplayClock" : Clock != null ? "Component.Clock" : "null")}",
+                level: LogLevel.Debug,
+                name: Ez2ConfigManager.LOGGER_NAME);
             UpdateScore();
         }
 
@@ -64,7 +85,13 @@ namespace osu.Game.EzOsuGame.Scoring
             else if (Clock != null)
                 currentTime = Clock.CurrentTime;
             else
+            {
+                Logger.Log(
+                    "[EzScore] UpdateScore: both GameplayClock and Component.Clock are null, cannot query timeline",
+                    level: LogLevel.Debug,
+                    name: Ez2ConfigManager.LOGGER_NAME);
                 return;
+            }
 
             var snapshot = timeline.QueryAtTime(currentTime);
 
