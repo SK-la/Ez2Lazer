@@ -52,12 +52,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return score;
         }
 
-        private static async Task<EzScoreTimeline> runTimelineAsync(Score score, IBeatmap beatmap, IGameplayEnvironment? environment, CancellationToken cancellationToken)
+        private static Task<EzScoreTimeline> runTimelineAsync(Score score, IBeatmap beatmap, IGameplayEnvironment? environment, CancellationToken cancellationToken)
         {
             environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
 
-            // RunTimeline() does not mutate score.ScoreInfo — no clone needed.
-            return await Task.Run(() => ManiaReplaySession.RunTimeline(score, beatmap, environment, cancellationToken), cancellationToken).ConfigureAwait(false);
+            // ManiaReplaySession.RunTimeline is synchronous — execute directly to avoid nesting Task.Run
+            // which can cause threadpool starvation when the caller is already on a pool thread (via ensureTimelinesLoaded).
+            return Task.FromResult(ManiaReplaySession.RunTimeline(score, beatmap, environment, cancellationToken));
         }
 
         private static async Task<ReplayRunResult> runCombinedAsync(ReplayRunRequest request, CancellationToken cancellationToken)

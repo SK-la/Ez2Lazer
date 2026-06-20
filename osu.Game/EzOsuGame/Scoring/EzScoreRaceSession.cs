@@ -101,11 +101,6 @@ namespace osu.Game.EzOsuGame.Scoring
             if (entry.Timeline == null)
                 ensureTimelinesLoaded(new[] { scoreInfo });
 
-            Logger.Log(
-                $"[EzScore] PickGhost({metric}): picked score {scoreInfo.ID} timeline={(entry.Timeline != null ? "ready" : "loading")}",
-                level: LogLevel.Debug,
-                name: Ez2ConfigManager.LOGGER_NAME);
-
             return entry;
         }
 
@@ -263,11 +258,6 @@ namespace osu.Game.EzOsuGame.Scoring
                                .Where(s => !hasTimeline(s) && timelineLoadsPending.Add(s.ID))
                                .ToList();
 
-            Logger.Log(
-                $"[EzScore] ensureTimelinesLoaded: received {scoreInfos.Count()} scores, toLoad={scoresToLoad.Count} pending={timelineLoadsPending.Count}",
-                level: LogLevel.Debug,
-                name: Ez2ConfigManager.LOGGER_NAME);
-
             if (scoresToLoad.Count == 0)
                 return;
 
@@ -302,18 +292,6 @@ namespace osu.Game.EzOsuGame.Scoring
                     }, cancellationToken)).ToArray();
 
                     var results = await Task.WhenAll(buildTasks).ConfigureAwait(false);
-
-                    int successCount = results.Count(r => r.Item2 != null);
-                    int failCount = results.Length - successCount;
-
-                    if (failCount > 0)
-                    {
-                        var failedIds = results.Where(r => r.Item2 == null).Select(r => r.Item1.ID).ToArray();
-                        Logger.Log(
-                            $"[EzScore] ensureTimelinesLoaded: {successCount}/{results.Length} OK, FAILED: [{string.Join(", ", failedIds)}]",
-                            level: LogLevel.Debug,
-                            name: Ez2ConfigManager.LOGGER_NAME);
-                    }
 
                     schedule(() =>
                     {

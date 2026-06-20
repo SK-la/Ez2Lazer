@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Statistics;
@@ -46,19 +45,8 @@ namespace osu.Game.EzOsuGame.Scoring
 
             var timelineMode = EzScoreRaceRulesetSupport.GetGhostTimelineMode(scoreInfo.Ruleset);
 
-            Logger.Log(
-                $"[EzScore] tryBuild: score {scoreInfo.ID} ruleset={scoreInfo.Ruleset.ShortName}({scoreInfo.Ruleset.OnlineID}) mode={timelineMode} hash={scoreInfo.Hash ?? "null"}",
-                level: LogLevel.Debug,
-                name: Ez2ConfigManager.LOGGER_NAME);
-
             if (timelineMode == EzScoreRaceGhostTimelineMode.None)
-            {
-                Logger.Log(
-                    $"[EzScore] tryBuild EXIT timelineMode=None: score {scoreInfo.ID}",
-                    level: LogLevel.Debug,
-                    name: Ez2ConfigManager.LOGGER_NAME);
                 return null;
-            }
 
             string? cacheKey = getCacheKey(scoreInfo, timelineMode);
 
@@ -71,17 +59,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
             // 唯一门槛：磁盘/库内是否有可读的 replay 帧（不依赖 ScoreInfo.Files 元数据）。
             if (databasedScore?.Replay == null || databasedScore.Replay.Frames.Count == 0)
-            {
-                Logger.Log(
-                    $"[EzScore] TryBuild FAIL: score {scoreInfo.ID} → "
-                    + $"databasedScore={(databasedScore != null ? "Score" : "null")} "
-                    + $"Replay={(databasedScore?.Replay != null ? "Replay" : "null")} "
-                    + $"Frames={(databasedScore?.Replay?.Frames.Count.ToString() ?? "-")} "
-                    + $"Info.Files.Count={scoreInfo.Files.Count}",
-                    level: LogLevel.Debug,
-                    name: Ez2ConfigManager.LOGGER_NAME);
                 return null;
-            }
 
             var ruleset = scoreInfo.Ruleset.CreateInstance();
             IBeatmap playableBeatmap;
@@ -126,21 +104,10 @@ namespace osu.Game.EzOsuGame.Scoring
             }
 
             if (timeline == null)
-            {
-                Logger.Log(
-                    $"[EzScore] tryBuild EXIT timeline=null after switch: score {scoreInfo.ID} mode={timelineMode}",
-                    level: LogLevel.Debug,
-                    name: Ez2ConfigManager.LOGGER_NAME);
                 return null;
-            }
 
             if (!string.IsNullOrEmpty(cacheKey))
                 timeline_cache[cacheKey] = timeline;
-
-            Logger.Log(
-                $"[EzScore] tryBuild OK: score {scoreInfo.ID} FinalTotalScore={timeline.FinalTotalScore}",
-                level: LogLevel.Debug,
-                name: Ez2ConfigManager.LOGGER_NAME);
 
             return timeline;
         }
