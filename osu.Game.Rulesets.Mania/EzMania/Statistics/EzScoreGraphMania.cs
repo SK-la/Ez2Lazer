@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         // TODO(P3-Rest): 删除静态服务实例，改用基类 ReplaySession（由 DI 注入）
         // private static readonly ManiaReplaySessionService replay_session = new ManiaReplaySessionService();
 
-        private readonly ManiaHitWindows hitWindowsV2 = new ManiaHitWindows();
+        private readonly ManiaHitWindows hitWindowsNow = new ManiaHitWindows();
         private readonly HitModeHelper hitWindowsV1 = new HitModeHelper(EzEnumHitMode.Classic);
 
         private Bindable<EzEnumHitMode> hitModeBindable = null!;
@@ -67,7 +67,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         public EzScoreGraphMania(ScoreInfo score, IBeatmap beatmap)
             : base(score, beatmap, new ManiaHitWindows())
         {
-            hitWindowsV2.SetDifficulty(OD);
+            hitWindowsNow.SetDifficulty(OD);
             hitWindowsV1.OverallDifficulty = OD;
             originalAccuracy = score.Accuracy;
             originalTotalScore = score.TotalScore;
@@ -77,21 +77,39 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             => filterForCurrentHitMode(
                 CommittedNowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents);
 
-        protected override void CalculateV2Accuracy()
+        protected override void CalculateNowAccuracy()
         {
             var info = CommittedNowScore?.ScoreInfo;
 
             if (info != null)
             {
-                V2Accuracy = info.Accuracy;
-                V2Score = info.TotalScore;
-                V2Counts = extractDisplayCounts(info.Statistics);
+                // 注意: info.Accuracy/TotalScore 在 ManiaReplaySession.Run 中被还原为原始值，
+                // 因此不能直接使用，改为从 info.Statistics（已按当前 HitMode 重新判定）计算。
+                NowCounts = extractDisplayCounts(info.Statistics);
+
+                int total = NowCounts.Values.Sum();
+
+                if (total > 0)
+                {
+                    int goods = NowCounts.GetValueOrDefault(HitResult.Good, 0)
+                                + NowCounts.GetValueOrDefault(HitResult.Great, 0)
+                                + NowCounts.GetValueOrDefault(HitResult.Perfect, 0);
+                    int meh = NowCounts.GetValueOrDefault(HitResult.Meh, 0);
+                    NowAccuracy = (goods + meh * 0.5) / total;
+                    NowScore = (long)(originalTotalScore * NowAccuracy / originalAccuracy);
+                }
+                else
+                {
+                    NowAccuracy = 0;
+                    NowScore = 0;
+                }
+
                 return;
             }
 
-            V2Accuracy = 0;
-            V2Score = 0;
-            V2Counts = new Dictionary<HitResult, int>();
+            NowAccuracy = 0;
+            NowScore = 0;
+            NowCounts = new Dictionary<HitResult, int>();
         }
 
         protected override IReadOnlyList<HitEvent> GetV1HitEvents()
@@ -110,7 +128,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             hitModeBindable.BindValueChanged(v =>
             {
                 currentHitMode = v.NewValue;
-                hitWindowsV2.SetHitMode(currentHitMode);
+                hitWindowsNow.SetHitMode(currentHitMode);
                 Schedule(() => RefreshFromService().ConfigureAwait(false));
             }, true);
 
@@ -136,9 +154,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         protected override double UpdateBoundary(HitResult result, double? time = null)
         {
             if (currentHitMode == EzEnumHitMode.O2Jam && time.HasValue)
-                hitWindowsV2.UpdateO2JamBpmFromTime(time.Value);
+                hitWindowsNow.UpdateO2JamBpmFromTime(time.Value);
 
-            return hitWindowsV2.WindowFor(result);
+            return hitWindowsNow.WindowFor(result);
         }
 
         protected override HitResult RecalculateV1Result(HitEvent hitEvent)
@@ -148,14 +166,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         /// <summary>Session 成功时 Now 判定已由 Session 产出。</summary>
-        protected override HitResult RecalculateV2Result(HitEvent hitEvent) => hitEvent.Result;
+        protected override HitResult RecalculateNowResult(HitEvent hitEvent) => hitEvent.Result;
 
         /// <summary>
-        /// 基于当前 displayOffset 实时重算 V2 统计。
+        /// 基于当前 displayOffset 实时重算 Now 统计。
         /// 每次 offset 拖动时由 <see cref="EzScoreGraphBase.RefreshDisplayOnly"/> 调用，
         /// 通过 <see cref="GetDisplayResult"/> 重新判定每个事件的 HitResult。
         /// </summary>
-        protected override void RecalculateV2FromDisplayEvents()
+        protected override void RecalculateNowFromDisplayEvents()
         {
             var displayEvents = GetDisplayHitEvents();
             var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
@@ -171,7 +189,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 counts[result]++;
             }
 
-            V2Counts = counts;
+            NowCounts = counts;
 
             int total = counts.Values.Sum();
 
@@ -181,13 +199,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                             + counts.GetValueOrDefault(HitResult.Great, 0)
                             + counts.GetValueOrDefault(HitResult.Perfect, 0);
                 int meh = counts.GetValueOrDefault(HitResult.Meh, 0);
-                V2Accuracy = (goods + meh * 0.5) / total;
-                V2Score = (long)(originalTotalScore * V2Accuracy / originalAccuracy);
+                NowAccuracy = (goods + meh * 0.5) / total;
+                NowScore = (long)(originalTotalScore * NowAccuracy / originalAccuracy);
             }
             else
             {
-                V2Accuracy = 0;
-                V2Score = 0;
+                NowAccuracy = 0;
+                NowScore = 0;
             }
         }
 
@@ -222,7 +240,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             if (DisplayOffset == 0)
                 return hitEvent.Result;
 
-            var result = hitWindowsV2.ResultFor(hitEvent.TimeOffset);
+            var result = hitWindowsNow.ResultFor(hitEvent.TimeOffset);
             return result == HitResult.None ? HitResult.Miss : result;
         }
 
@@ -408,8 +426,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 makeSimpleStat("Now | V1", "↓", colours.Gray8),
             };
 
-            // 从 V2+V1 判定集合构建每个判定行的 item
-            List<HitResult> results = V2Counts.Keys
+            // 从 Now+V1 判定集合构建每个判定行的 item
+            List<HitResult> results = NowCounts.Keys
                                               .Concat(V1Counts.Keys)
                                               .Distinct()
                                               .Where(r => r.IsBasic() || r == HitResult.Poor)
@@ -482,8 +500,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             double scAcc = originalAccuracy * 100;
             long scScore = originalTotalScore;
 
-            string nowAccText = CommittedNowScore != null ? (V2Accuracy * 100).ToString("F1") + "%" : "—";
-            string nowScoreText = CommittedNowScore != null ? (V2Score / 1000.0).ToString("F0") + "k" : "—";
+            string nowAccText = CommittedNowScore != null ? (NowAccuracy * 100).ToString("F1") + "%" : "—";
+            string nowScoreText = CommittedNowScore != null ? (NowScore / 1000.0).ToString("F0") + "k" : "—";
 
             statItems[0].Value = scAcc.ToString("F1") + "%";
             statItems[1].Value = nowAccText;
@@ -495,7 +513,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             // statItems[7] = "↓" 分隔线，不需更新
 
             int idx = 8; // 静态行之后是动态判定行
-            List<HitResult> results = V2Counts.Keys
+            List<HitResult> results = NowCounts.Keys
                                               .Concat(V1Counts.Keys)
                                               .Distinct()
                                               .Where(r => r.IsBasic() || r == HitResult.Poor)
@@ -504,7 +522,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             foreach (var r in results)
             {
-                int v2Count = V2Counts.GetValueOrDefault(r, 0);
+                int v2Count = NowCounts.GetValueOrDefault(r, 0);
                 int v1Count = V1Counts.GetValueOrDefault(r, 0);
 
                 if (idx < statItems.Length)

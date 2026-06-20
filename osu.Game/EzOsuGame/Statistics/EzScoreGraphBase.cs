@@ -79,9 +79,9 @@ namespace osu.Game.EzOsuGame.Statistics
         protected long V1Score { get; set; }
         protected Dictionary<HitResult, int> V1Counts { get; set; } = new Dictionary<HitResult, int>();
 
-        protected double V2Accuracy { get; set; }
-        protected long V2Score { get; set; }
-        protected Dictionary<HitResult, int> V2Counts { get; set; } = new Dictionary<HitResult, int>();
+        protected double NowAccuracy { get; set; }
+        protected long NowScore { get; set; }
+        protected Dictionary<HitResult, int> NowCounts { get; set; } = new Dictionary<HitResult, int>();
 
         protected IReadOnlyList<HitEvent> HitEvents => GetDisplayHitEvents();
         protected IReadOnlyList<HitEvent> OriginalHitEvents { get; }
@@ -106,9 +106,9 @@ namespace osu.Game.EzOsuGame.Statistics
         protected virtual IReadOnlyList<HitEvent> GetV1HitEvents() => GetDisplayHitEvents();
 
         /// <summary>
-        /// V2(Now) 重算使用的事件集合。默认与展示集合一致。
+        /// Now(Now) 重算使用的事件集合。默认与展示集合一致。
         /// </summary>
-        protected virtual IReadOnlyList<HitEvent> GetV2HitEvents() => GetDisplayHitEvents();
+        protected virtual IReadOnlyList<HitEvent> GetNowHitEvents() => GetDisplayHitEvents();
 
         protected EzScoreGraphBase(ScoreInfo score, IBeatmap beatmap, HitWindows hitWindows)
         {
@@ -188,7 +188,7 @@ namespace osu.Game.EzOsuGame.Statistics
             return HitWindows.ResultFor(hitEvent.TimeOffset);
         }
 
-        protected virtual HitResult RecalculateV2Result(HitEvent hitEvent)
+        protected virtual HitResult RecalculateNowResult(HitEvent hitEvent)
         {
             return HitWindows.ResultFor(hitEvent.TimeOffset);
         }
@@ -200,15 +200,15 @@ namespace osu.Game.EzOsuGame.Statistics
 
         /// <summary>
         /// 图表展示阶段用于着色和血量推演的判定结果。
-        /// 默认使用当前 V2 重算结果，保证图形与当前设置一致。
+        /// 默认使用当前 Now 重算结果，保证图形与当前设置一致。
         /// </summary>
-        protected virtual HitResult GetDisplayResult(HitEvent hitEvent) => RecalculateV2Result(hitEvent);
+        protected virtual HitResult GetDisplayResult(HitEvent hitEvent) => RecalculateNowResult(hitEvent);
 
         /// <summary>
-        /// 从当前 displayOffset 重新计算 V2 统计（用于 offset 拖动时的实时预览）。
+        /// 从当前 displayOffset 重新计算 Now 统计（用于 offset 拖动时的实时预览）。
         /// 子类可覆盖以提供规则集特定的统计逻辑。
         /// </summary>
-        protected virtual void RecalculateV2FromDisplayEvents()
+        protected virtual void RecalculateNowFromDisplayEvents()
         {
             // 默认实现：子类（Mania）会 override
         }
@@ -230,10 +230,10 @@ namespace osu.Game.EzOsuGame.Statistics
         }
 
         /// <summary>
-        /// 计算 V2 准确率。子类可覆写以定制计算逻辑。
-        /// 将结果设置到 V2Accuracy、V2Score 和 V2Counts 属性，而不是通过返回值提供。
+        /// 计算 Now 准确率。子类可覆写以定制计算逻辑。
+        /// 将结果设置到 NowAccuracy、NowScore 和 NowCounts 属性，而不是通过返回值提供。
         /// </summary>
-        protected virtual void CalculateV2Accuracy()
+        protected virtual void CalculateNowAccuracy()
         {
             var v2ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
             v2ScoreProcessor.ApplyBeatmap(Beatmap);
@@ -241,9 +241,9 @@ namespace osu.Game.EzOsuGame.Statistics
 
             var v2Counts = new Dictionary<HitResult, int>();
 
-            foreach (var hitEvent in GetV2HitEvents())
+            foreach (var hitEvent in GetNowHitEvents())
             {
-                var recalculated = RecalculateV2Result(hitEvent);
+                var recalculated = RecalculateNowResult(hitEvent);
                 v2Counts[recalculated] = v2Counts.GetValueOrDefault(recalculated, 0) + 1;
                 v2ScoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
                 {
@@ -255,11 +255,11 @@ namespace osu.Game.EzOsuGame.Statistics
             double accuracy = v2ScoreProcessor.Accuracy.Value;
             long totalScore = v2ScoreProcessor.TotalScore.Value;
 
-            // Logger.Log($"[V2 ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            // Logger.Log($"[Now ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
-            V2Accuracy = accuracy;
-            V2Score = totalScore;
-            V2Counts = v2Counts;
+            NowAccuracy = accuracy;
+            NowScore = totalScore;
+            NowCounts = v2Counts;
         }
 
         protected virtual void UpdateDisplay()
@@ -277,7 +277,7 @@ namespace osu.Game.EzOsuGame.Statistics
             textInitialized = false; // 全量刷新后标记文本未初始化，下次 UpdateText 会重建 UI
 
             CalculateV1Accuracy();
-            CalculateV2Accuracy();
+            CalculateNowAccuracy();
             updateTimeExtentsFromDisplayEvents();
             UpdateText();
 
@@ -432,8 +432,8 @@ namespace osu.Game.EzOsuGame.Statistics
         {
             DisplayOffset = fakeOffset;
 
-            // 实时重算 V2 统计（无 committed score 时预览，有 committed score 时跳过）
-            RecalculateV2FromDisplayEvents();
+            // 实时重算 Now 统计（无 committed score 时预览，有 committed score 时跳过）
+            RecalculateNowFromDisplayEvents();
 
             // 重建左侧统计（只改数值）
             UpdateText();
