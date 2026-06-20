@@ -107,6 +107,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             // 保留现场游玩的精确 timing 并映射到当前 HitMode。
             NowCounts = rejudgeOriginalHitEvents();
             (NowAccuracy, NowScore) = computeNowAccuracyAndScore(NowCounts, currentHitMode);
+
+            logRejudgeDiff(NowCounts);
         }
 
         /// <summary>
@@ -138,6 +140,48 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             }
 
             return counts;
+        }
+
+        /// <summary>
+        /// 诊断日志（重判路径）：对比 OriginalHitEvents 原始计数与 hitWindowsNow 重判后的
+        /// NowCounts/NowAccuracy/NowScore。仅在存在计数或精度差异时输出。
+        /// </summary>
+        private void logRejudgeDiff(Dictionary<HitResult, int> nowCounts)
+        {
+            var origCounts = OriginalHitEvents
+                             .GroupBy(e => e.Result)
+                             .ToDictionary(g => g.Key, g => g.Count());
+
+            var allResults = origCounts.Keys.Concat(nowCounts.Keys).Distinct().OrderBy(r => r).ToList();
+
+            var countDiffs = new List<string>();
+            foreach (var r in allResults)
+            {
+                int o = origCounts.GetValueOrDefault(r, 0);
+                int n = nowCounts.GetValueOrDefault(r, 0);
+                if (o != n)
+                    countDiffs.Add($"{r}: Orig={o} Now={n} (diff={n - o})");
+            }
+
+            int origTotal = origCounts.Values.Sum();
+            int nowTotal = nowCounts.Values.Sum();
+
+            bool countMatch = countDiffs.Count == 0 && origTotal == nowTotal;
+            double origAccPct = originalAccuracy * 100;
+            double nowAccPct = NowAccuracy * 100;
+            bool accMatch = Math.Abs(origAccPct - nowAccPct) < 0.01;
+            bool scoreMatch = Math.Abs(originalTotalScore - NowScore) < 1000;
+
+            if (!countMatch || !accMatch || !scoreMatch)
+            {
+                Logger.Log(
+                    $"[EzScoreGraphMania REJUDGE] HitMode={currentHitMode} | "
+                    + (countMatch ? "Counts=MATCH " : $"Counts: [{string.Join(" | ", countDiffs)}] ")
+                    + $"| Total: Orig={origTotal} Now={nowTotal} "
+                    + $"| ACC: Orig={origAccPct:F2}% Now={nowAccPct:F2}% "
+                    + $"| Score: Orig={originalTotalScore / 1000}k Now={NowScore / 1000}k",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            }
         }
 
         /// <summary>
