@@ -293,6 +293,18 @@ namespace osu.Game.EzOsuGame.Scoring
 
                     var results = await Task.WhenAll(buildTasks).ConfigureAwait(false);
 
+                    int successCount = results.Count(r => r.Item2 != null);
+                    int failCount = results.Length - successCount;
+
+                    if (failCount > 0)
+                    {
+                        var failedIds = results.Where(r => r.Item2 == null).Select(r => r.Item1.ID).ToArray();
+                        Logger.Log(
+                            $"[EzScore] ensureTimelinesLoaded: {successCount}/{results.Length} OK, FAILED: [{string.Join(", ", failedIds)}]",
+                            level: LogLevel.Debug,
+                            name: Ez2ConfigManager.LOGGER_NAME);
+                    }
+
                     schedule(() =>
                     {
                         if (cancellationToken.IsCancellationRequested)
