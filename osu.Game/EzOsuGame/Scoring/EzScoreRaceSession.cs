@@ -305,6 +305,11 @@ namespace osu.Game.EzOsuGame.Scoring
             {
                 try
                 {
+                    Logger.Log(
+                        "[EzScore] ensureTimelinesLoaded: inner Task.Run started",
+                        level: LogLevel.Debug,
+                        name: Ez2ConfigManager.LOGGER_NAME);
+
                     var buildTasks = scoresToLoad.Select(scoreInfo => Task.Run(() =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -315,10 +320,21 @@ namespace osu.Game.EzOsuGame.Scoring
                                 ? sharedPlayableBeatmap
                                 : null;
 
-                            return (scoreInfo, EzScoreTimelineBuilder.TryBuild(scoreManager, beatmaps, scoreInfo, beatmapForBuild, cancellationToken));
+                            var timeline = EzScoreTimelineBuilder.TryBuild(scoreManager, beatmaps, scoreInfo, beatmapForBuild, cancellationToken);
+
+                            Logger.Log(
+                                $"[EzScore] ensureTimelinesLoaded: TryBuild for score {scoreInfo.ID} returned {(timeline != null ? $"timeline(FinalTotal={timeline.FinalTotalScore})" : "null")}",
+                                level: LogLevel.Debug,
+                                name: Ez2ConfigManager.LOGGER_NAME);
+
+                            return (scoreInfo, timeline);
                         }
                         catch (OperationCanceledException)
                         {
+                            Logger.Log(
+                                $"[EzScore] ensureTimelinesLoaded: TryBuild cancelled for score {scoreInfo.ID}",
+                                level: LogLevel.Debug,
+                                name: Ez2ConfigManager.LOGGER_NAME);
                             throw;
                         }
                         catch (Exception ex)
@@ -327,6 +343,11 @@ namespace osu.Game.EzOsuGame.Scoring
                             return (scoreInfo, null);
                         }
                     }, cancellationToken)).ToArray();
+
+                    Logger.Log(
+                        $"[EzScore] ensureTimelinesLoaded: awaiting {buildTasks.Length} build tasks",
+                        level: LogLevel.Debug,
+                        name: Ez2ConfigManager.LOGGER_NAME);
 
                     var results = await Task.WhenAll(buildTasks).ConfigureAwait(false);
 
@@ -340,7 +361,18 @@ namespace osu.Game.EzOsuGame.Scoring
                     schedule(() =>
                     {
                         if (cancellationToken.IsCancellationRequested)
+                        {
+                            Logger.Log(
+                                "[EzScore] ensureTimelinesLoaded: schedule skipped (cancelled)",
+                                level: LogLevel.Debug,
+                                name: Ez2ConfigManager.LOGGER_NAME);
                             return;
+                        }
+
+                        Logger.Log(
+                            $"[EzScore] ensureTimelinesLoaded: schedule assigning {results.Count(r => r.Item2 != null)} timelines to {results.Length} entries",
+                            level: LogLevel.Debug,
+                            name: Ez2ConfigManager.LOGGER_NAME);
 
                         foreach (var (scoreInfo, timeline) in results)
                         {

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Statistics;
@@ -46,12 +47,24 @@ namespace osu.Game.EzOsuGame.Scoring
             var timelineMode = EzScoreRaceRulesetSupport.GetGhostTimelineMode(scoreInfo.Ruleset);
 
             if (timelineMode == EzScoreRaceGhostTimelineMode.None)
+            {
+                Logger.Log(
+                    "[EzScore] TryBuild: timelineMode=None for this ruleset",
+                    level: LogLevel.Debug,
+                    name: Ez2ConfigManager.LOGGER_NAME);
                 return null;
+            }
 
             string? cacheKey = getCacheKey(scoreInfo, timelineMode);
 
             if (!string.IsNullOrEmpty(cacheKey) && timeline_cache.TryGetValue(cacheKey, out var cached))
+            {
+                Logger.Log(
+                    "[EzScore] TryBuild: cache hit, returning cached timeline",
+                    level: LogLevel.Debug,
+                    name: Ez2ConfigManager.LOGGER_NAME);
                 return cached;
+            }
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -59,7 +72,13 @@ namespace osu.Game.EzOsuGame.Scoring
 
             // 唯一门槛：磁盘/库内是否有可读的 replay 帧（不依赖 ScoreInfo.Files 元数据）。
             if (databasedScore?.Replay == null || databasedScore.Replay.Frames.Count == 0)
+            {
+                Logger.Log(
+                    $"[EzScore] TryBuild: replay null or empty for score {scoreInfo.ID}",
+                    level: LogLevel.Debug,
+                    name: Ez2ConfigManager.LOGGER_NAME);
                 return null;
+            }
 
             var ruleset = scoreInfo.Ruleset.CreateInstance();
             IBeatmap playableBeatmap;
@@ -73,13 +92,25 @@ namespace osu.Game.EzOsuGame.Scoring
                 var workingBeatmap = beatmaps.GetWorkingBeatmap(scoreInfo.BeatmapInfo);
 
                 if (workingBeatmap is DummyWorkingBeatmap)
+                {
+                    Logger.Log(
+                        "[EzScore] TryBuild: dummy working beatmap",
+                        level: LogLevel.Debug,
+                        name: Ez2ConfigManager.LOGGER_NAME);
                     return null;
+                }
 
                 playableBeatmap = workingBeatmap.GetPlayableBeatmap(scoreInfo.Ruleset, scoreInfo.Mods);
             }
 
             if (playableBeatmap.HitObjects.Count == 0)
+            {
+                Logger.Log(
+                    "[EzScore] TryBuild: hit objects count = 0",
+                    level: LogLevel.Debug,
+                    name: Ez2ConfigManager.LOGGER_NAME);
                 return null;
+            }
 
             EzScoreTimeline? timeline;
 
@@ -94,17 +125,33 @@ namespace osu.Game.EzOsuGame.Scoring
                     var (hitEvents, offsetsRelativeToEnd) = resolveHitEvents(databasedScore, playableBeatmap, cancellationToken);
 
                     if (hitEvents == null || hitEvents.Count == 0)
+                    {
+                        Logger.Log(
+                            "[EzScore] TryBuild: hit events null or empty",
+                            level: LogLevel.Debug,
+                            name: Ez2ConfigManager.LOGGER_NAME);
                         return null;
+                    }
 
                     timeline = buildFromHitEvents(ruleset, playableBeatmap, scoreInfo, hitEvents, offsetsRelativeToEnd);
                     break;
 
                 default:
+                    Logger.Log(
+                        "[EzScore] TryBuild: unexpected timeline mode",
+                        level: LogLevel.Debug,
+                        name: Ez2ConfigManager.LOGGER_NAME);
                     return null;
             }
 
             if (timeline == null)
+            {
+                Logger.Log(
+                    "[EzScore] TryBuild: timeline builder returned null",
+                    level: LogLevel.Debug,
+                    name: Ez2ConfigManager.LOGGER_NAME);
                 return null;
+            }
 
             if (!string.IsNullOrEmpty(cacheKey))
                 timeline_cache[cacheKey] = timeline;
