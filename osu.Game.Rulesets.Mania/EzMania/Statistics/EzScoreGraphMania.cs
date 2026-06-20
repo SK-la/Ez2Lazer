@@ -197,13 +197,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// </summary>
         private (double accuracy, long score) computeNowAccuracyAndScore(Dictionary<HitResult, int> counts, EzEnumHitMode hitMode)
         {
-            int total = counts.Values.Sum();
+            int total = 0;
+            long totalBase = 0;
+
+            foreach (var (result, count) in counts)
+            {
+                // 对齐 ScoreProcessor：只累计影响准确度的判定（排除 IgnoreHit/ComboBreak/IgnoreMiss 等）
+                if (!result.AffectsAccuracy())
+                    continue;
+
+                total += count;
+                totalBase += (long)HitModeHelper.GetBaseScoreForResult(hitMode, result) * count;
+            }
+
             if (total == 0)
                 return (0, 0);
-
-            long totalBase = 0;
-            foreach (var (result, count) in counts)
-                totalBase += (long)HitModeHelper.GetBaseScoreForResult(hitMode, result) * count;
 
             int maxBase = HitModeHelper.GetBaseScoreForResult(hitMode, HitResult.Perfect);
             long totalMax = (long)maxBase * total;
@@ -312,7 +320,43 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             offsetPlusMania.BindValueChanged(v => OnOffsetChanged(v.NewValue), true);
 
+            // 一次性诊断：输出 hitWindowsNow 窗口值和 OD，用于对比现场游玩窗口
+            dumpWindowDiagnostics();
+
             Refresh();
+        }
+
+        private void dumpWindowDiagnostics()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"[EzScoreGraphMania WINDOW DIAG] Mode={currentHitMode} OD={OD:F2}");
+
+            // 检查 ManiaHitWindows 状态：窗口值、flags、multiplier
+            var w = hitWindowsNow;
+            sb.Append($" | Perfect={w.WindowFor(HitResult.Perfect):F2}");
+            sb.Append($" Great={w.WindowFor(HitResult.Great):F2}");
+            sb.Append($" Good={w.WindowFor(HitResult.Good):F2}");
+            sb.Append($" Ok={w.WindowFor(HitResult.Ok):F2}");
+            sb.Append($" Meh={w.WindowFor(HitResult.Meh):F2}");
+            sb.Append($" Miss={w.WindowFor(HitResult.Miss):F2}");
+            sb.Append($" | totalMultiplier={w.WindowFor(HitResult.Perfect) / w.WindowFor(HitResult.Miss) * 158:F4}"); // rough check
+
+            // 取前 3 个事件的对比
+            if (OriginalHitEvents.Count > 0)
+            {
+                sb.Append(" | Samples:");
+                var strategy = ManiaJudgementRegistry.GetHitModeJudgement(currentHitMode)
+                               ?? (IManiaNoteJudgementStrategy)LazerNoteJudgementReplica.Instance;
+
+                for (int i = 0; i < Math.Min(3, OriginalHitEvents.Count); i++)
+                {
+                    var e = OriginalHitEvents[i];
+                    var rejudged = strategy.RejudgeHitEvent(e, hitWindowsNow);
+                    sb.Append($" [{e.Result}→{rejudged} offset={e.TimeOffset:F2} obj={e.HitObject.GetType().Name}]");
+                }
+            }
+
+            Logger.Log(sb.ToString(), Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
         }
 
         protected override double UpdateBoundary(HitResult result, double? time = null)
