@@ -13,6 +13,7 @@ using osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas;
 using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
@@ -292,43 +293,15 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             var counts = new Dictionary<HitResult, int>();
             bool isO2Jam = hitMode == EzEnumHitMode.O2Jam;
 
+            var strategy = judgement
+                           ?? (IManiaNoteJudgementStrategy)LazerNoteJudgementReplica.Instance;
+
             foreach (var e in events)
             {
                 if (isO2Jam)
                     windows.UpdateO2JamBpmFromTime(e.HitObject.StartTime);
 
-                HitResult result;
-
-                // HoldNote 尾判保留原始结果（与 EzScoreGraphMania.rejudgeOriginalHitEvents 一致）
-                if (e.HitObject is TailNote)
-                {
-                    result = e.Result;
-                    if (result == HitResult.None)
-                        result = HitResult.Miss;
-                }
-                else if (judgement != null)
-                {
-                    if (judgement is Ez2AcHitModeJudgement ez2Ac)
-                    {
-                        bool isHeadNote = e.HitObject is HeadNote;
-                        var outcome = ez2Ac.EvaluatePress(e.TimeOffset, windows, isHeadNote);
-                        result = outcome.Kind == ManiaNoteJudgementOutcomeKind.Apply
-                            ? outcome.Result
-                            : HitResult.None;
-                    }
-                    else
-                    {
-                        var outcome = judgement.EvaluatePress(e.TimeOffset, windows);
-                        result = outcome.Kind == ManiaNoteJudgementOutcomeKind.Apply
-                            ? outcome.Result
-                            : HitResult.None;
-                    }
-                }
-                else
-                {
-                    result = windows.ResultFor(e.TimeOffset);
-                }
-
+                var result = strategy.RejudgeHitEvent(e, windows);
                 if (result == HitResult.None)
                     result = HitResult.Miss;
 

@@ -363,6 +363,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         {
             switch (hitMode)
             {
+                case EzEnumHitMode.Lazer:
+                    return getLazerBaseScore(result);
+
                 case EzEnumHitMode.Classic:
                     return getClassicBaseScore(result);
 
@@ -387,6 +390,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     return 0;
             }
         }
+
+        // Lazer 模式（对齐 ManiaScoreProcessor.GetBaseScoreForResult）
+        private static int getLazerBaseScore(HitResult result) => result switch
+        {
+            HitResult.Perfect => 305,
+            HitResult.Great => 300,
+            HitResult.Good => 200,
+            HitResult.Ok => 100,
+            HitResult.Meh => 50,
+            _ => 0,
+        };
 
         // Stable经典模式
         private static int getClassicBaseScore(HitResult result)
