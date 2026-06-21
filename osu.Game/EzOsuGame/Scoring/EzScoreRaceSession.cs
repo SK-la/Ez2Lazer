@@ -157,18 +157,42 @@ namespace osu.Game.EzOsuGame.Scoring
                     return;
 
                 ensureTrackedEntry();
-
-                if (SupportsGhostRace)
-                    ensureLeaderboardGhostPlaceholders();
-
-                isReady.Value = true;
-                notifyEntriesChanged();
             });
 
             if (!SupportsGhostRace)
-                return;
+            {
+                schedule(() =>
+                {
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        isReady.Value = true;
+                        notifyEntriesChanged();
+                    }
+                });
 
-            ensureTimelinesLoaded(queryLeaderboardGhostScores(), cancellationToken);
+                return;
+            }
+
+            // 在后台线程查询本地成绩，避免同步 Realm 查询阻塞主线程加载流程。
+            // 查询完成后回主线程创建 ghost 占位、标记 isReady、启动时间线构建。
+            Task.Run(() =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var ghostScores = queryLeaderboardGhostScores();
+
+                schedule(() =>
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                        return;
+
+                    ensureLeaderboardGhostPlaceholders(ghostScores);
+                    isReady.Value = true;
+                    notifyEntriesChanged();
+                });
+
+                ensureTimelinesLoaded(ghostScores, cancellationToken);
+            }, cancellationToken);
         }
 
         private void ensureTrackedEntry()
@@ -185,6 +209,12 @@ namespace osu.Game.EzOsuGame.Scoring
         private void ensureLeaderboardGhostPlaceholders()
         {
             foreach (var scoreInfo in queryLeaderboardGhostScores())
+                ensureGhostEntry(scoreInfo);
+        }
+
+        private void ensureLeaderboardGhostPlaceholders(IReadOnlyList<ScoreInfo> ghostScores)
+        {
+            foreach (var scoreInfo in ghostScores)
                 ensureGhostEntry(scoreInfo);
         }
 
@@ -244,7 +274,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
                         try
                         {
-                            IBeatmap? beatmapForBuild = EzLocalScoreQueries.ModsMatch(scoreInfo.Mods, currentMods)
+                            IBeatmap? beatmapForBuild = EzLocalScoreQueries.GameplayModsMatch(scoreInfo.Mods, currentMods)
                                 ? sharedPlayableBeatmap
                                 : null;
 

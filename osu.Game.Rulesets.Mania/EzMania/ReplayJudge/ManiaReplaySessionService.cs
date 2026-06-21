@@ -56,14 +56,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
 
-            // Clone to isolate Session mutations.
-            var clone = score.DeepClone();
-            var timeline = await Task.Run(() => ManiaReplaySession.RunTimeline(clone, beatmap, environment, cancellationToken), cancellationToken).ConfigureAwait(false);
-
-            // Copy back HitEvents for consistency so caller sees fresh results.
-            score.ScoreInfo.HitEvents = clone.ScoreInfo.HitEvents;
-
-            return timeline;
+            // RunTimeline() does not mutate score.ScoreInfo — no clone needed.
+            return await Task.Run(() => ManiaReplaySession.RunTimeline(score, beatmap, environment, cancellationToken), cancellationToken).ConfigureAwait(false);
         }
 
         private static async Task<ReplayRunResult> runCombinedAsync(ReplayRunRequest request, CancellationToken cancellationToken)
@@ -73,10 +67,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 var ruleset = new ManiaRuleset();
                 var resolvedEnv = request.Environment ?? ManiaRuleset.ResolveEnvironment(request.Score.ScoreInfo, GlobalConfigStore.EzConfig, request.Purpose);
 
-                // Clone to isolate Session mutations.
+                // Clone only for RunReplayAsync to isolate PopulateScore mutations.
                 var clone = request.Score.DeepClone();
                 var sessionScore = await ruleset.RunReplayAsync(clone, request.Beatmap, resolvedEnv, cancellationToken).ConfigureAwait(false);
-                var timeline = ManiaReplaySession.RunTimeline(clone, request.Beatmap, resolvedEnv, cancellationToken);
+
+                // RunTimeline reads only Replay.Frames, safe on original score.
+                var timeline = ManiaReplaySession.RunTimeline(request.Score, request.Beatmap, resolvedEnv, cancellationToken);
 
                 // Copy back HitEvents so caller sees fresh results on their object.
                 request.Score.ScoreInfo.HitEvents = sessionScore.ScoreInfo.HitEvents;

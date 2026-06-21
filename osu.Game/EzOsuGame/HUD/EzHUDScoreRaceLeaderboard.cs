@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Caching;
@@ -15,6 +16,7 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics.Containers;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.Leaderboards;
 using osu.Game.Skinning;
@@ -178,6 +180,9 @@ namespace osu.Game.EzOsuGame.HUD
                 {
                     processor = new EzScoreRaceTimelineScoreProcessor();
                     AddInternal(processor);
+                    Debug.Assert(GameplayClock != null,
+                        $"{nameof(EzHUDScoreRaceLeaderboard)} must be inside a {nameof(GameplayClockContainer)} subtree");
+                    processor.SetGameplayClock(GameplayClock);
                     processor.SetTimeline(entry.Timeline);
                     processor.TotalScore.BindValueChanged(_ => sorting.Invalidate());
                     leaderboardScore = createGhostLeaderboardScore(entry, processor);
@@ -220,7 +225,11 @@ namespace osu.Game.EzOsuGame.HUD
                 if (state.Tracked)
                     continue;
 
+                Debug.Assert(GameplayClock != null,
+                    $"{nameof(EzHUDScoreRaceLeaderboard)} must be inside a {nameof(GameplayClockContainer)} subtree");
+
                 state.Timeline = Session.Entries.FirstOrDefault(e => e.ScoreInfo.ID == state.ScoreInfoId)?.Timeline;
+                state.Processor?.SetGameplayClock(GameplayClock);
                 state.Processor?.SetTimeline(state.Timeline);
             }
         }

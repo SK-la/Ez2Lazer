@@ -3,6 +3,7 @@
 
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
@@ -21,6 +22,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -165,12 +167,17 @@ namespace osu.Game.EzOsuGame.HUD
             ghostProcessor2 = new EzScoreRaceTimelineScoreProcessor();
             AddInternal(ghostProcessor1);
             AddInternal(ghostProcessor2);
-            ghostProcessor1.TotalScore.BindValueChanged(_ => updateGhostCompareBar(1));
-            ghostProcessor2.TotalScore.BindValueChanged(_ => updateGhostCompareBar(2));
-
             EnsureLoadingOverlay();
 
             base.LoadComplete();
+
+            Debug.Assert(GameplayClock != null,
+                $"{nameof(EzHUDScoreCompareBars)} must be inside a {nameof(GameplayClockContainer)} subtree");
+
+            ghostProcessor1.SetGameplayClock(GameplayClock);
+            ghostProcessor2.SetGameplayClock(GameplayClock);
+            ghostProcessor1.TotalScore.BindValueChanged(_ => updateGhostCompareBar(1));
+            ghostProcessor2.TotalScore.BindValueChanged(_ => updateGhostCompareBar(2));
 
             BackgroundVisible.BindValueChanged(_ => updateBackgroundVisibility(), true);
             BackdropBlurEnabled.BindValueChanged(_ => SyncAcrylicCaptureState(), true);

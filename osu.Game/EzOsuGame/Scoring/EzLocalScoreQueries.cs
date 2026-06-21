@@ -16,6 +16,17 @@ namespace osu.Game.EzOsuGame.Scoring
     public static class EzLocalScoreQueries
     {
         /// <summary>
+        /// 不影响游玩/判定的 Mod 缩写白名单：角逐/HUD 取 ghost 时忽略这些 Mod，
+        /// 以免 PureScore / Classic / TouchDevice 等造成「相似 Mod」过滤过严，
+        /// 导致 ghost 候选池缩小到只剩与当前完全一致的成绩。
+        /// </summary>
+        public static readonly HashSet<string> COSMETIC_GHOST_MOD_ACRONYMS = new HashSet<string>
+        {
+            "TD",  // TouchDevice — 硬件输入标记，无游玩影响
+            "CL",  // Classic — 用户配置偏好，不影响 replay 判定结果
+        };
+
+        /// <summary>
         /// 返回当前谱面规则集下的本地成绩（含无 <c>.osr</c> 元数据但磁盘有 replay 的项）。
         /// 能否构建时间线由 EzScoreTimelineBuilder.TryBuild（GetScore().Replay 门槛）过滤。
         /// </summary>
@@ -45,10 +56,25 @@ namespace osu.Game.EzOsuGame.Scoring
             if (filter == EzScoreModFilter.Any)
                 return scores;
 
-            return scores.Where(s => ModsMatch(s.Mods, currentMods));
+            // SameAsCurrent: 忽略白名单 Mod，只比较影响游玩的 Mod 是否一致。
+            return scores.Where(s => GameplayModsMatch(s.Mods, currentMods));
         }
 
         public static bool ModsMatch(Mod[] left, Mod[] right) => modsMatch(left, right);
+
+        /// <summary>
+        /// 比较两侧 Mod 时忽略 <see cref="COSMETIC_GHOST_MOD_ACRONYMS"/> 白名单项。
+        /// 使 PureScore / Classic / TouchDevice 等非游玩 Mod 不影响 ghost 候选过滤与 beatmap 复用判定。
+        /// </summary>
+        public static bool GameplayModsMatch(Mod[] left, Mod[] right)
+        {
+            static IEnumerable<string> gameplayAcronyms(Mod[] mods) =>
+                mods.Where(m => !COSMETIC_GHOST_MOD_ACRONYMS.Contains(m.Acronym))
+                    .OrderBy(m => m.Acronym)
+                    .Select(m => m.Acronym);
+
+            return gameplayAcronyms(left).SequenceEqual(gameplayAcronyms(right));
+        }
 
         public static ScoreInfo? PickBest(IEnumerable<ScoreInfo> scores, EzScoreRaceMetric metric)
         {
