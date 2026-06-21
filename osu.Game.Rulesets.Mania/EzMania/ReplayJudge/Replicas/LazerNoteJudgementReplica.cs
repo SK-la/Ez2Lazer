@@ -3,6 +3,7 @@
 //
 // Replica of Objects.Drawables.DrawableNote.CheckForResult — sync when merging ppy/osu master.
 
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas
@@ -31,6 +32,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas
                 return ManiaNoteJudgementOutcome.Ignore;
 
             return ManiaNoteJudgementOutcome.ApplyResult(result);
+        }
+
+        public HitResult RejudgeHitEvent(HitEvent hitEvent, HitWindows hitWindows)
+        {
+            // TailNote 保留原始结果（尾判依赖 hold 上下文，Lazer 尾判有 RELEASE_WINDOW_LENIENCE/cap 逻辑）
+            if (hitEvent.HitObject is TailNote)
+                return hitEvent.Result;
+
+            var outcome = EvaluatePress(hitEvent.TimeOffset, hitWindows);
+            return outcome.Kind == ManiaNoteJudgementOutcomeKind.Apply ? outcome.Result : HitResult.Miss;
         }
     }
 }

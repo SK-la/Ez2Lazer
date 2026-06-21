@@ -18,6 +18,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 using osuTK.Graphics;
 
@@ -407,7 +408,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
         /// <summary>
         /// 更新文本统计数值。由 <see cref="UpdateText"/> 在非首次（如 offset 拖动）时调用。
-        /// 子类应在此方法中仅更新已缓存 <see cref="SimpleStatisticItem.Value"/>，不重建 UI。
+        /// 子类应在此方法中仅更新已缓存 <see cref="SimpleStatisticItem{TValue}"/>，不重建 UI。
         /// </summary>
         protected virtual void UpdateTextValues()
         {
@@ -505,6 +506,10 @@ namespace osu.Game.EzOsuGame.Statistics
 
             // 立即应用 display-only（轻量重绘）
             RefreshDisplayOnly(newOffset);
+
+            // offset=0 时不调度 Session：无需重放 replay 帧（帧时间量化会引入偏差）
+            if (newOffset == 0)
+                return;
 
             // debounce 后触发 service（真实重算）
             // fire-and-forget：故意不等待，由 CancellationToken 控制生命周期

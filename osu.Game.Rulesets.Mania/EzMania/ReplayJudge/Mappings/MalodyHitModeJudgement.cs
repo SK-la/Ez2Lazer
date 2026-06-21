@@ -43,6 +43,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 
         public bool IsHoldBreak(double rawOffset, HitWindows hitWindows) => false;
 
+        public HitResult RejudgeHitEvent(HitEvent hitEvent, HitWindows hitWindows)
+        {
+            // TailNote 不计入成绩（Malody LN tail 仅以 IgnoreHit 完成）
+            if (hitEvent.HitObject is TailNote)
+                return HitResult.IgnoreHit;
+
+            var outcome = lazerNote.EvaluatePress(hitEvent.TimeOffset, hitWindows);
+            return outcome.Kind == ManiaNoteJudgementOutcomeKind.Apply ? outcome.Result : HitResult.Miss;
+        }
+
         public static bool IsMalodyMode(EzEnumHitMode hitMode)
             => hitMode is EzEnumHitMode.Malody_E or EzEnumHitMode.Malody_B;
     }

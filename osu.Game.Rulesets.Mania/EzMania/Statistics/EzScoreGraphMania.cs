@@ -8,6 +8,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
@@ -18,6 +19,7 @@ using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.Objects;
@@ -74,8 +76,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
-            => filterForCurrentHitMode(
-                CommittedNowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents);
+        {
+            // Session 产出时使用 Session HitEvents
+            if (CommittedNowScore?.ScoreInfo.HitEvents is { } sessionEvents)
+                return filterForCurrentHitMode(sessionEvents);
+
+            // 无 Session 时使用全部 OriginalHitEvents，不做结果有效性过滤。
+            // GetDisplayResult 会通过 hitWindowsNow 对每个事件重新判定，
+            // 确保散点颜色和血量线反映当前 HitMode 的判定结果。
+            return applyFakeOffsetToEvents(OriginalHitEvents);
+        }
 
         protected override void CalculateNowAccuracy()
         {
@@ -83,33 +93,132 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             if (info != null)
             {
-                // 注意: info.Accuracy/TotalScore 在 ManiaReplaySession.Run 中被还原为原始值，
-                // 因此不能直接使用，改为从 info.Statistics（已按当前 HitMode 重新判定）计算。
+                // Session 重放路径：从 Statistics 提取判定计数（已按当前 HitMode 重新判定）
+                // 注意: 由于 replay 帧时间量化（60fps ~16.67ms 精度）与现场游玩精确 timing
+                // 之间的偏差，窄判定窗口下 Now 统计可能与 Original 不一致。
+                // 诊断日志会输出差异供排查。
                 NowCounts = extractDisplayCounts(info.Statistics);
-
-                int total = NowCounts.Values.Sum();
-
-                if (total > 0)
-                {
-                    int goods = NowCounts.GetValueOrDefault(HitResult.Good, 0)
-                                + NowCounts.GetValueOrDefault(HitResult.Great, 0)
-                                + NowCounts.GetValueOrDefault(HitResult.Perfect, 0);
-                    int meh = NowCounts.GetValueOrDefault(HitResult.Meh, 0);
-                    NowAccuracy = (goods + meh * 0.5) / total;
-                    NowScore = (long)(originalTotalScore * NowAccuracy / originalAccuracy);
-                }
-                else
-                {
-                    NowAccuracy = 0;
-                    NowScore = 0;
-                }
-
+                (NowAccuracy, NowScore) = computeNowAccuracyAndScore(NowCounts, currentHitMode);
+                logDiffIfMismatch(info);
                 return;
             }
 
-            NowAccuracy = 0;
-            NowScore = 0;
-            NowCounts = new Dictionary<HitResult, int>();
+            // 无 Session 结果（初始加载 或 HitMode 变更后）：
+            // 通过 hitWindowsNow 对 OriginalHitEvents.TimeOffset 重新判定，
+            // 保留现场游玩的精确 timing 并映射到当前 HitMode。
+            NowCounts = rejudgeOriginalHitEvents();
+            (NowAccuracy, NowScore) = computeNowAccuracyAndScore(NowCounts, currentHitMode);
+        }
+
+        /// <summary>
+        /// 用当前 <see cref="hitWindowsNow"/> 对 <c>OriginalHitEvents</c> 的
+        /// TimeOffset 重新判定，返回按当前 HitMode 有效结果过滤后的计数。
+        /// 所有判定逻辑委托给当前 HitMode 的 <see cref="IManiaNoteJudgementStrategy.RejudgeHitEvent"/>，
+        /// Graph 组件不处理任何类型分支。
+        /// </summary>
+        private Dictionary<HitResult, int> rejudgeOriginalHitEvents()
+        {
+            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
+            var counts = new Dictionary<HitResult, int>();
+            bool isO2Jam = currentHitMode == EzEnumHitMode.O2Jam;
+
+            var strategy = ManiaJudgementRegistry.GetHitModeJudgement(currentHitMode)
+                           ?? (IManiaNoteJudgementStrategy)LazerNoteJudgementReplica.Instance;
+
+            foreach (var e in OriginalHitEvents)
+            {
+                // O2Jam 判定窗口依赖 BPM 缩放，必须按 hitObject 时间同步 BPM。
+                if (isO2Jam)
+                    hitWindowsNow.UpdateO2JamBpmFromTime(e.HitObject.StartTime);
+
+                var result = strategy.RejudgeHitEvent(e, hitWindowsNow);
+                if (result == HitResult.None)
+                    result = HitResult.Miss;
+
+                if (!validResults.Contains(result) && result != HitResult.Miss && result != HitResult.Poor)
+                    continue;
+
+                counts.TryAdd(result, 0);
+                counts[result]++;
+            }
+
+            return counts;
+        }
+
+        /// <summary>
+        /// 按当前 HitMode 的基分权重计算 NowAccuracy 和 NowScore。
+        /// 公式：NowAccuracy = Σ(countᵢ × baseScoreᵢ) / (totalCount × maxBaseScore)
+        ///       NowScore = NowAccuracy × 1_000_000
+        /// </summary>
+        private (double accuracy, long score) computeNowAccuracyAndScore(Dictionary<HitResult, int> counts, EzEnumHitMode hitMode)
+        {
+            int total = 0;
+            long totalBase = 0;
+
+            foreach (var (result, count) in counts)
+            {
+                // 对齐 ScoreProcessor：只累计影响准确度的判定（排除 IgnoreHit/ComboBreak/IgnoreMiss 等）
+                if (!result.AffectsAccuracy())
+                    continue;
+
+                total += count;
+                totalBase += (long)HitModeHelper.GetBaseScoreForResult(hitMode, result) * count;
+            }
+
+            if (total == 0)
+                return (0, 0);
+
+            int maxBase = HitModeHelper.GetBaseScoreForResult(hitMode, HitResult.Perfect);
+            long totalMax = (long)maxBase * total;
+
+            double accuracy = totalMax > 0 ? (double)totalBase / totalMax : 0;
+            long score = (long)(accuracy * 1_000_000);
+            return (accuracy, score);
+        }
+
+        /// <summary>
+        /// 诊断日志：对比 Original（现场游玩 Realm 快照）与 Now（Session Simulator 重放）的判定计数差异。
+        /// </summary>
+        private void logDiffIfMismatch(ScoreInfo sessionInfo)
+        {
+            // Original: 直接从 OriginalHitEvents 按 HitResult 分组统计
+            var origCounts = OriginalHitEvents
+                             .GroupBy(e => e.Result)
+                             .ToDictionary(g => g.Key, g => g.Count());
+
+            // Now: 直接从 Session 产出的 Statistics 提取（与 NowCounts 同源）
+            var nowCounts = extractDisplayCounts(sessionInfo.Statistics);
+
+            // 收集所有出现的 HitResult
+            var allResults = origCounts.Keys.Concat(nowCounts.Keys).Distinct().OrderBy(r => r).ToList();
+
+            var diffs = new List<string>();
+
+            foreach (var r in allResults)
+            {
+                int o = origCounts.GetValueOrDefault(r, 0);
+                int n = nowCounts.GetValueOrDefault(r, 0);
+                if (o != n)
+                    diffs.Add($"{r}: Orig={o} Now={n} (diff={n - o})");
+            }
+
+            int origTotal = origCounts.Values.Sum();
+            int nowTotal = nowCounts.Values.Sum();
+
+            if (diffs.Count > 0 || origTotal != nowTotal)
+            {
+                Logger.Log(
+                    $"[EzScoreGraphMania DIFF] HitMode={currentHitMode} | "
+                    + $"Total: Orig={origTotal} Now={nowTotal} | "
+                    + string.Join(" | ", diffs),
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            }
+            else
+            {
+                Logger.Log(
+                    $"[EzScoreGraphMania MATCH] HitMode={currentHitMode} Total={origTotal} — all counts identical",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            }
         }
 
         protected override IReadOnlyList<HitEvent> GetV1HitEvents()
@@ -124,26 +233,44 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);
             O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
 
+            // 初始加载时设置当前值，不触发 Session 重放。
+            currentHitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            currentHealthMode = ezConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
+            hitWindowsNow.SetHitMode(currentHitMode);
+
+            // 非 offset 配置变更：清除 Session 缓存并使用 hitWindowsNow 对
+            // OriginalHitEvents.TimeOffset 重判（保留现场游玩的精确 timing）。
+            // Session 仅在 offset 拖动时使用（OnOffsetChanged 路径）。
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             hitModeBindable.BindValueChanged(v =>
             {
                 currentHitMode = v.NewValue;
                 hitWindowsNow.SetHitMode(currentHitMode);
-                Schedule(() => RefreshFromService().ConfigureAwait(false));
-            }, true);
+                CommittedNowScore = null;
+                Refresh();
+            });
 
             healthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             healthModeBindable.BindValueChanged(__ =>
             {
                 currentHealthMode = healthModeBindable.Value;
-                Schedule(() => RefreshFromService().ConfigureAwait(false));
-            }, true);
+                CommittedNowScore = null;
+                Refresh();
+            });
 
             ezConfig.GetBindable<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence)
-                    .BindValueChanged(__ => Schedule(() => RefreshFromService().ConfigureAwait(false)), true);
+                    .BindValueChanged(__ =>
+                    {
+                        CommittedNowScore = null;
+                        Refresh();
+                    });
 
             ezConfig.GetBindable<bool>(Ez2Setting.BmsPoorHitResultEnable)
-                    .BindValueChanged(__ => Schedule(() => RefreshFromService().ConfigureAwait(false)), true);
+                    .BindValueChanged(__ =>
+                    {
+                        CommittedNowScore = null;
+                        Refresh();
+                    });
 
             offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             offsetPlusMania.BindValueChanged(v => OnOffsetChanged(v.NewValue), true);
@@ -190,58 +317,27 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             }
 
             NowCounts = counts;
-
-            int total = counts.Values.Sum();
-
-            if (total > 0)
-            {
-                int goods = counts.GetValueOrDefault(HitResult.Good, 0)
-                            + counts.GetValueOrDefault(HitResult.Great, 0)
-                            + counts.GetValueOrDefault(HitResult.Perfect, 0);
-                int meh = counts.GetValueOrDefault(HitResult.Meh, 0);
-                NowAccuracy = (goods + meh * 0.5) / total;
-                NowScore = (long)(originalTotalScore * NowAccuracy / originalAccuracy);
-            }
-            else
-            {
-                NowAccuracy = 0;
-                NowScore = 0;
-            }
+            (NowAccuracy, NowScore) = computeNowAccuracyAndScore(counts, currentHitMode);
         }
 
         /// <summary>
-        /// 从 HitEvent 列表提取统计 counts（不受 committed score 影响）。
-        /// </summary>
-        private Dictionary<HitResult, int> extractDisplayCountsFromEvents(IEnumerable<HitEvent> events)
-        {
-            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
-            var counts = new Dictionary<HitResult, int>();
-
-            foreach (var e in events)
-            {
-                var result = e.Result;
-                if (!validResults.Contains(result) && result != HitResult.Miss && result != HitResult.Poor)
-                    continue;
-
-                counts.TryAdd(result, 0);
-                counts[result]++;
-            }
-
-            return counts;
-        }
-
-        /// <summary>
-        /// 展示层判定结果。display-only 预览时基于调整后的 TimeOffset 重算判定，
-        /// 使散点颜色和血线随 offset 实时变化。非预览时直接返回 Session/原始结果。
+        /// 展示层判定结果。以下场景通过当前 <see cref="IManiaNoteJudgementStrategy.RejudgeHitEvent"/> 重新判定：
+        ///   1. offset 拖动（DisplayOffset != 0）：实时预览散点颜色变化
+        ///   2. 无 Session（CommittedNowScore == null）：HitMode 变更后重判
+        /// 有 Session 且 offset 归零时直接返回 Session 产出结果。
         /// </summary>
         protected override HitResult GetDisplayResult(HitEvent hitEvent)
         {
-            // 仅 display-only 预览（displayOffset != 0）时重算判定结果
-            if (DisplayOffset == 0)
-                return hitEvent.Result;
+            if (DisplayOffset != 0 || CommittedNowScore == null)
+            {
+                var strategy = ManiaJudgementRegistry.GetHitModeJudgement(currentHitMode)
+                               ?? (IManiaNoteJudgementStrategy)LazerNoteJudgementReplica.Instance;
 
-            var result = hitWindowsNow.ResultFor(hitEvent.TimeOffset);
-            return result == HitResult.None ? HitResult.Miss : result;
+                var result = strategy.RejudgeHitEvent(hitEvent, hitWindowsNow);
+                return result == HitResult.None ? HitResult.Miss : result;
+            }
+
+            return hitEvent.Result;
         }
 
         // P3-Rest 前过渡：通过 scoreManager 获取 databased score
@@ -500,8 +596,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             double scAcc = originalAccuracy * 100;
             long scScore = originalTotalScore;
 
-            string nowAccText = CommittedNowScore != null ? (NowAccuracy * 100).ToString("F1") + "%" : "—";
-            string nowScoreText = CommittedNowScore != null ? (NowScore / 1000.0).ToString("F0") + "k" : "—";
+            string nowAccText = (NowAccuracy * 100).ToString("F1") + "%";
+            string nowScoreText = (NowScore / 1000.0).ToString("F0") + "k";
 
             statItems[0].Value = scAcc.ToString("F1") + "%";
             statItems[1].Value = nowAccText;

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -140,17 +141,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         private static void alignHitWindows(IBeatmap beatmap, IGameplayEnvironment environment)
         {
+            bool isO2Jam = environment.ManiaHitMode == EzEnumHitMode.O2Jam;
+
             foreach (var hitObject in beatmap.HitObjects)
-                alignHitWindowsRecursive(hitObject, environment);
+                alignHitWindowsRecursive(hitObject, beatmap, environment, isO2Jam);
         }
 
-        private static void alignHitWindowsRecursive(HitObject hitObject, IGameplayEnvironment environment)
+        private static void alignHitWindowsRecursive(HitObject hitObject, IBeatmap beatmap, IGameplayEnvironment environment, bool isO2Jam)
         {
             if (hitObject.HitWindows is ManiaHitWindows maniaHitWindows)
+            {
                 maniaHitWindows.SetHitMode(environment.ManiaHitMode);
 
+                // O2Jam 判定窗口依赖 BPM 缩放，必须按 hitObject 时间查谱面 BPM 写入。
+                // 不设 BPM 则 ManiaHitWindows 默认 BPM=0 → safeBpm=75 → 窗口加倍，误判严重。
+                if (isO2Jam)
+                    maniaHitWindows.UpdateO2JamBpmFromTime(hitObject.StartTime);
+            }
+
             foreach (var nested in hitObject.NestedHitObjects)
-                alignHitWindowsRecursive(nested, environment);
+                alignHitWindowsRecursive(nested, beatmap, environment, isO2Jam);
         }
 
         private static void applyForcedMisses(

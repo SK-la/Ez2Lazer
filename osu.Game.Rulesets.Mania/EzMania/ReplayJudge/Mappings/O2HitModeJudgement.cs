@@ -221,6 +221,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 
         public bool IsHoldBreak(double rawOffset, HitWindows hitWindows) => LazerHoldJudgementReplica.Instance.IsHoldBreak(rawOffset, hitWindows);
 
+        public HitResult RejudgeHitEvent(HitEvent hitEvent, HitWindows hitWindows)
+        {
+            // TailNote 保留原始结果（尾判依赖 Pill 状态和 headHit/holdBreak 等上下文）
+            if (hitEvent.HitObject is TailNote)
+                return hitEvent.Result;
+
+            var outcome = EvaluatePress(hitEvent.TimeOffset, hitWindows);
+            return outcome.Kind == ManiaNoteJudgementOutcomeKind.Apply ? outcome.Result : HitResult.Miss;
+        }
+
         internal static void ApplyPillLogic(double absOffset, double bpm, ManiaReplayJudgementState state, ref O2Judge judge)
         {
             double coolRange = O2HitModeExtension.BASE_COOL / bpm;
