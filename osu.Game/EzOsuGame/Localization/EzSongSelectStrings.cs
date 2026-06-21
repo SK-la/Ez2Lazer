@@ -77,5 +77,21 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString MOD_CLEAR_RESTORE_HINT_SUB = new EzLocalizationManager.EzLocalisableString(
             "切换",
             "Toggle");
+
+        public static readonly LocalisableString RECALCULATE_SCORE = new EzLocalizationManager.EzLocalisableString(
+            "重算成绩",
+            "Recalculate score");
+
+        public static readonly LocalisableString RENAME_PLAYER = new EzLocalizationManager.EzLocalisableString(
+            "玩家重命名",
+            "Rename player");
+
+        public static readonly LocalisableString RENAME_PLAYER_HEADER = new EzLocalizationManager.EzLocalisableString(
+            "修改玩家名称",
+            "Rename player");
+
+        public static readonly LocalisableString RENAME_PLAYER_PLACEHOLDER = new EzLocalizationManager.EzLocalisableString(
+            "输入新的玩家名称",
+            "Enter new player name");
     }
 }

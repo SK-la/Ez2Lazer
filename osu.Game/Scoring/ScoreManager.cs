@@ -15,6 +15,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.IO.Archives;
+using osu.Game.Models;
 using osu.Game.Online.API;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
@@ -243,5 +244,75 @@ namespace osu.Game.Scoring
         }
 
         #endregion
+
+        /// <summary>
+        /// Recalculates the accuracy, rank, and total score (from mod multipliers) of a stored score based on its saved statistics.
+        /// If the score is an online score (OnlineID > 0 or LegacyOnlineID > 0), it will be converted to a local score.
+        /// Other fields (Date, MaxCombo, Statistics, etc.) are not modified.
+        /// </summary>
+        public void Recalculate(ScoreInfo scoreInfo)
+        {
+            Realm.Write(realm =>
+            {
+                var managed = realm.Find<ScoreInfo>(scoreInfo.ID);
+                if (managed == null) return;
+
+                var stats = managed.Statistics;
+                var maxStats = managed.MaximumStatistics;
+
+                if (stats.Count == 0 || maxStats.Count == 0) return;
+
+                var ruleset = managed.Ruleset.CreateInstance();
+                var processor = ruleset.CreateScoreProcessor();
+
+                double accuracy = StandardisedScoreMigrationTools.ComputeAccuracy(stats, maxStats, processor);
+                managed.Accuracy = accuracy;
+                managed.Rank = StandardisedScoreMigrationTools.ComputeRank(accuracy, stats, managed.Mods, processor);
+
+                if (managed.TotalScoreWithoutMods > 0)
+                {
+                    var difficultyInfo = managed.BeatmapInfo?.Difficulty;
+                    if (difficultyInfo != null)
+                        StandardisedScoreMigrationTools.UpdateToLatestScoreMultipliers(managed, difficultyInfo);
+                }
+
+                managed.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
+
+                if (managed.OnlineID > 0 || managed.LegacyOnlineID > 0)
+                {
+                    managed.OnlineID = -1;
+                    managed.LegacyOnlineID = -1;
+                }
+            });
+        }
+
+        /// <summary>
+        /// Renames the player associated with a stored score.
+        /// If the score is an online score (OnlineID > 0 or LegacyOnlineID > 0), it will be converted to a local score.
+        /// Other fields (Date, MaxCombo, Statistics, etc.) are not modified.
+        /// </summary>
+        public void RenamePlayer(ScoreInfo scoreInfo, string newUsername)
+        {
+            if (string.IsNullOrWhiteSpace(newUsername)) return;
+
+            Realm.Write(realm =>
+            {
+                var managed = realm.Find<ScoreInfo>(scoreInfo.ID);
+                if (managed == null) return;
+
+                managed.RealmUser = new RealmUser
+                {
+                    OnlineID = managed.RealmUser.OnlineID,
+                    Username = newUsername,
+                    CountryCode = managed.RealmUser.CountryCode,
+                };
+
+                if (managed.OnlineID > 0 || managed.LegacyOnlineID > 0)
+                {
+                    managed.OnlineID = -1;
+                    managed.LegacyOnlineID = -1;
+                }
+            });
+        }
     }
 }

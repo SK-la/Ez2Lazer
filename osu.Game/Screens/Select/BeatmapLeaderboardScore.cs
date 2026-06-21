@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
@@ -31,7 +32,9 @@ using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Overlays.Dialog;
 using osu.Game.Scoring;
 using osu.Game.Users;
 using osu.Game.Users.Drawables;
@@ -628,6 +631,9 @@ namespace osu.Game.Screens.Select
                 if (Score.OnlineID > 0)
                     items.Add(new OsuMenuItem(CommonStrings.CopyLink, MenuItemType.Standard, () => game?.CopyToClipboard($@"{api.Endpoints.WebsiteUrl}/scores/{Score.OnlineID}")));
 
+                items.Add(new OsuMenuItem(EzSongSelectStrings.RECALCULATE_SCORE, MenuItemType.Standard, () => scoreManager.Recalculate(Score)));
+                items.Add(new OsuMenuItem(EzSongSelectStrings.RENAME_PLAYER, MenuItemType.Standard, () => dialogOverlay?.Push(new RenamePlayerDialog(Score, scoreManager))));
+
                 if (Score.Files.Count <= 0) return items.ToArray();
 
                 if (items.Count > 0)
@@ -745,6 +751,70 @@ namespace osu.Game.Screens.Select
         {
             Own,
             Friend,
+        }
+
+        private partial class RenamePlayerDialog : PopupDialog
+        {
+            private readonly ScoreInfo score;
+            private readonly ScoreManager scoreManager;
+            private readonly FocusedTextBox textBox;
+
+            public RenamePlayerDialog(ScoreInfo score, ScoreManager scoreManager)
+            {
+                this.score = score;
+                this.scoreManager = scoreManager;
+
+                HeaderText = EzSongSelectStrings.RENAME_PLAYER_HEADER;
+                BodyText = score.User.Username;
+                Icon = FontAwesome.Solid.User;
+
+                textBox = new FocusedTextBox
+                {
+                    PlaceholderText = EzSongSelectStrings.RENAME_PLAYER_PLACEHOLDER,
+                    RelativeSizeAxes = Axes.X,
+                    FontSize = OsuFont.DEFAULT_FONT_SIZE,
+                    SelectAllOnFocus = true,
+                    TabbableContentContainer = this,
+                };
+
+                MainContent.Child = new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(10),
+                    Padding = new MarginPadding { Horizontal = 15 },
+                    Children = new Drawable[]
+                    {
+                        textBox,
+                    }
+                };
+
+                Buttons = new PopupDialogButton[]
+                {
+                    new PopupDialogOkButton
+                    {
+                        Text = @"Save",
+                        Action = () =>
+                        {
+                            if (!string.IsNullOrWhiteSpace(textBox.Text))
+                                scoreManager.RenamePlayer(score, textBox.Text);
+                        }
+                    },
+                    new PopupDialogCancelButton
+                    {
+                        Text = @"Cancel",
+                    },
+                };
+
+                textBox.OnCommit += (_, _) => PerformOkAction();
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+                textBox.TakeFocus();
+            }
         }
     }
 }
