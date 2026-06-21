@@ -39,7 +39,6 @@ namespace osu.Game.EzOsuGame.Statistics
         protected float LeftMarginConst { get; set; } = 165;
         protected float RightMarginConst { get; set; } = 10;
 
-        private const int current_offset = 0;
         private const int time_bins = 50;
 
         private double binSize;
@@ -70,7 +69,7 @@ namespace osu.Game.EzOsuGame.Statistics
 #pragma warning disable IDE0051 // committedEnvironment 为 P3-Rest 阶段预留，当前暂未使用
         private IGameplayEnvironment? committedEnvironment;
 #pragma warning restore IDE0051
-        private double displayOffset;
+        protected double DisplayOffset;
 
         // Debounce 控制 — offset 拖动时仅展示，落定后触发 Session
         private CancellationTokenSource? debounceCancellation;
@@ -80,9 +79,9 @@ namespace osu.Game.EzOsuGame.Statistics
         protected long V1Score { get; set; }
         protected Dictionary<HitResult, int> V1Counts { get; set; } = new Dictionary<HitResult, int>();
 
-        protected double V2Accuracy { get; set; }
-        protected long V2Score { get; set; }
-        protected Dictionary<HitResult, int> V2Counts { get; set; } = new Dictionary<HitResult, int>();
+        protected double NowAccuracy { get; set; }
+        protected long NowScore { get; set; }
+        protected Dictionary<HitResult, int> NowCounts { get; set; } = new Dictionary<HitResult, int>();
 
         protected IReadOnlyList<HitEvent> HitEvents => GetDisplayHitEvents();
         protected IReadOnlyList<HitEvent> OriginalHitEvents { get; }
@@ -107,9 +106,9 @@ namespace osu.Game.EzOsuGame.Statistics
         protected virtual IReadOnlyList<HitEvent> GetV1HitEvents() => GetDisplayHitEvents();
 
         /// <summary>
-        /// V2(Now) 重算使用的事件集合。默认与展示集合一致。
+        /// Now(Now) 重算使用的事件集合。默认与展示集合一致。
         /// </summary>
-        protected virtual IReadOnlyList<HitEvent> GetV2HitEvents() => GetDisplayHitEvents();
+        protected virtual IReadOnlyList<HitEvent> GetNowHitEvents() => GetDisplayHitEvents();
 
         protected EzScoreGraphBase(ScoreInfo score, IBeatmap beatmap, HitWindows hitWindows)
         {
@@ -189,7 +188,7 @@ namespace osu.Game.EzOsuGame.Statistics
             return HitWindows.ResultFor(hitEvent.TimeOffset);
         }
 
-        protected virtual HitResult RecalculateV2Result(HitEvent hitEvent)
+        protected virtual HitResult RecalculateNowResult(HitEvent hitEvent)
         {
             return HitWindows.ResultFor(hitEvent.TimeOffset);
         }
@@ -201,15 +200,15 @@ namespace osu.Game.EzOsuGame.Statistics
 
         /// <summary>
         /// 图表展示阶段用于着色和血量推演的判定结果。
-        /// 默认使用当前 V2 重算结果，保证图形与当前设置一致。
+        /// 默认使用当前 Now 重算结果，保证图形与当前设置一致。
         /// </summary>
-        protected virtual HitResult GetDisplayResult(HitEvent hitEvent) => RecalculateV2Result(hitEvent);
+        protected virtual HitResult GetDisplayResult(HitEvent hitEvent) => RecalculateNowResult(hitEvent);
 
         /// <summary>
-        /// 从当前 displayOffset 重新计算 V2 统计（用于 offset 拖动时的实时预览）。
+        /// 从当前 displayOffset 重新计算 Now 统计（用于 offset 拖动时的实时预览）。
         /// 子类可覆盖以提供规则集特定的统计逻辑。
         /// </summary>
-        protected virtual void RecalculateV2FromDisplayEvents()
+        protected virtual void RecalculateNowFromDisplayEvents()
         {
             // 默认实现：子类（Mania）会 override
         }
@@ -231,10 +230,10 @@ namespace osu.Game.EzOsuGame.Statistics
         }
 
         /// <summary>
-        /// 计算 V2 准确率。子类可覆写以定制计算逻辑。
-        /// 将结果设置到 V2Accuracy、V2Score 和 V2Counts 属性，而不是通过返回值提供。
+        /// 计算 Now 准确率。子类可覆写以定制计算逻辑。
+        /// 将结果设置到 NowAccuracy、NowScore 和 NowCounts 属性，而不是通过返回值提供。
         /// </summary>
-        protected virtual void CalculateV2Accuracy()
+        protected virtual void CalculateNowAccuracy()
         {
             var v2ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
             v2ScoreProcessor.ApplyBeatmap(Beatmap);
@@ -242,9 +241,9 @@ namespace osu.Game.EzOsuGame.Statistics
 
             var v2Counts = new Dictionary<HitResult, int>();
 
-            foreach (var hitEvent in GetV2HitEvents())
+            foreach (var hitEvent in GetNowHitEvents())
             {
-                var recalculated = RecalculateV2Result(hitEvent);
+                var recalculated = RecalculateNowResult(hitEvent);
                 v2Counts[recalculated] = v2Counts.GetValueOrDefault(recalculated, 0) + 1;
                 v2ScoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
                 {
@@ -256,11 +255,11 @@ namespace osu.Game.EzOsuGame.Statistics
             double accuracy = v2ScoreProcessor.Accuracy.Value;
             long totalScore = v2ScoreProcessor.TotalScore.Value;
 
-            // Logger.Log($"[V2 ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            // Logger.Log($"[Now ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
-            V2Accuracy = accuracy;
-            V2Score = totalScore;
-            V2Counts = v2Counts;
+            NowAccuracy = accuracy;
+            NowScore = totalScore;
+            NowCounts = v2Counts;
         }
 
         protected virtual void UpdateDisplay()
@@ -275,9 +274,10 @@ namespace osu.Game.EzOsuGame.Statistics
             }
 
             ClearInternal();
+            textInitialized = false; // 全量刷新后标记文本未初始化，下次 UpdateText 会重建 UI
 
             CalculateV1Accuracy();
-            CalculateV2Accuracy();
+            CalculateNowAccuracy();
             updateTimeExtentsFromDisplayEvents();
             UpdateText();
 
@@ -344,11 +344,22 @@ namespace osu.Game.EzOsuGame.Statistics
             {
                 double time = e.HitObject.StartTime;
                 float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0;
-                var displayResult = GetDisplayResult(e);
+
+                // 与 drawHealthLine(applyOffset: true) 一致：创建临时事件以传递调整后的 TimeOffset
+                HitEvent displayEvent = applyOffset
+                    ? new HitEvent(
+                        e.TimeOffset + DisplayOffset,
+                        e.GameplayRate,
+                        e.Result,
+                        e.HitObject,
+                        e.LastHitObject,
+                        e.Position)
+                    : e;
+                var displayResult = GetDisplayResult(displayEvent);
 
                 float x = xPosition * availableWidth;
                 float y = projectOffsetToY(
-                    applyOffset ? e.TimeOffset + displayOffset : e.TimeOffset,
+                    applyOffset ? e.TimeOffset + DisplayOffset : e.TimeOffset,
                     time);
 
                 pointList.Add((new Vector2(x, y), colours.ForHitResult(displayResult)));
@@ -367,7 +378,38 @@ namespace osu.Game.EzOsuGame.Statistics
             }
         }
 
-        protected virtual void UpdateText()
+        private bool textInitialized;
+
+        /// <summary>
+        /// 更新文本显示。首次调用或 <see cref="UpdateDisplay"/> 全量刷新后调用 <see cref="CreateTextUI"/> 重建 UI，
+        /// 后续调用（如 offset 拖动时）仅调用 <see cref="UpdateTextValues"/> 更新数值。
+        /// </summary>
+        protected void UpdateText()
+        {
+            if (!textInitialized)
+            {
+                CreateTextUI();
+                textInitialized = true;
+            }
+            else
+            {
+                UpdateTextValues();
+            }
+        }
+
+        /// <summary>
+        /// 创建文本统计 UI 结构。由 <see cref="UpdateText"/> 在首次或全量刷新后调用。
+        /// 子类应在此方法中创建控件并缓存引用，供 <see cref="UpdateTextValues"/> 后续只更新数值。
+        /// </summary>
+        protected virtual void CreateTextUI()
+        {
+        }
+
+        /// <summary>
+        /// 更新文本统计数值。由 <see cref="UpdateText"/> 在非首次（如 offset 拖动）时调用。
+        /// 子类应在此方法中仅更新已缓存 <see cref="SimpleStatisticItem.Value"/>，不重建 UI。
+        /// </summary>
+        protected virtual void UpdateTextValues()
         {
         }
 
@@ -388,10 +430,10 @@ namespace osu.Game.EzOsuGame.Statistics
         /// <param name="fakeOffset">展示的偏移量（毫秒）</param>
         protected void RefreshDisplayOnly(double fakeOffset)
         {
-            displayOffset = fakeOffset;
+            DisplayOffset = fakeOffset;
 
-            // 实时重算 V2 统计（无 committed score 时预览，有 committed score 时跳过）
-            RecalculateV2FromDisplayEvents();
+            // 实时重算 Now 统计（无 committed score 时预览，有 committed score 时跳过）
+            RecalculateNowFromDisplayEvents();
 
             // 重建左侧统计（只改数值）
             UpdateText();
@@ -430,7 +472,7 @@ namespace osu.Game.EzOsuGame.Statistics
                     committedEnvironment = environment;
                 }
 
-                displayOffset = 0; // 重置展示 offset
+                DisplayOffset = 0; // 重置展示 offset
 
                 // 全量刷新（现在基于新的 committedNowScore）
                 Schedule(Refresh);
@@ -484,10 +526,10 @@ namespace osu.Game.EzOsuGame.Statistics
 
         /// <summary>
         /// 轻量重绘 scatter + health line（带 offset）
-        /// Graph-UX: 使用 OriginalHitEvents（无 fake offset）仅重建 scatter 和血量，
-        /// 不清空边界线，拖动时性能友好。
-        /// 注意：drawPointsGraph 内部会加 offset，避免与 FilterHitEvents 的
-        /// applyFakeOffsetToEvents 叠加导致双重 offset。
+        /// Graph-UX: 使用 <see cref="GetDisplayHitEvents"/>（已按 HitMode 过滤，含 fake offset）
+        /// 重建 scatter 和血量，不清空边界线，拖动时性能友好。
+        /// 注意：事件 TimeOffset 已经由 <see cref="FilterHitEvents"/> 链路的
+        /// applyFakeOffsetToEvents 叠加了 displayOffset，因此 drawPointsGraph 无需再 applyOffset。
         /// </summary>
         private void redrawScatterAndHealthWithOffset(double offset)
         {
@@ -502,12 +544,11 @@ namespace osu.Game.EzOsuGame.Statistics
             foreach (var child in toRemove)
                 graphContainer.Remove(child, true);
 
-            // 使用 OriginalHitEvents（不含 fake offset），offset 由 drawPointsGraph 单独加
-            var originalEvents = OriginalHitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
-            drawPointsGraph(originalEvents, applyOffset: true);
+            // 使用 GetDisplayHitEvents（已按 HitMode 过滤，已含 displayOffset）
+            var displayEvents = GetDisplayHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
+            drawPointsGraph(displayEvents, applyOffset: false);
 
-            // drawHealthLine 用原始 events + applyOffset: true，GetDisplayResult 内部会读到正确的 Result
-            drawHealthLine(originalEvents, applyOffset: true);
+            drawHealthLine(displayEvents, applyOffset: false);
         }
 
         /// <summary>
@@ -518,12 +559,12 @@ namespace osu.Game.EzOsuGame.Statistics
             var baseEvents = CommittedNowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents;
 
 #pragma warning disable IDE0046 // displayOffset == 0 的简化写法
-            if (displayOffset == 0)
+            if (DisplayOffset == 0)
                 return baseEvents;
 #pragma warning restore IDE0046
 
             return baseEvents.Select(e => new HitEvent(
-                e.TimeOffset + displayOffset,
+                e.TimeOffset + DisplayOffset,
                 e.GameplayRate,
                 e.Result,
                 e.HitObject,
@@ -615,7 +656,7 @@ namespace osu.Game.EzOsuGame.Statistics
                 // applyOffset 时需要创建带 offset 的临时 HitEvent 来获取 displayResult
                 HitEvent displayEvent = applyOffset
                     ? new HitEvent(
-                        e.TimeOffset + displayOffset,
+                        e.TimeOffset + DisplayOffset,
                         e.GameplayRate,
                         e.Result,
                         e.HitObject,
@@ -707,8 +748,13 @@ namespace osu.Game.EzOsuGame.Statistics
         private float projectOffsetToY(double offset, double? time)
         {
             double miss = Math.Max(1, UpdateBoundary(HitResult.Miss, time));
-            double normalized = (offset + current_offset) / miss;
-            float y = (float)((normalized + 1) * 0.5 * DrawHeight);
+            // 使用 tanh 渐进映射替代线性+硬截断：
+            //   offset=0        → y = 0.5*H(中心)
+            //   offset=±miss    → y ≈ 0.88*H 或 0.12*H
+            //   offset=±2*miss  → y ≈ 0.98*H 或 0.02*H
+            //   offset→±∞       → y → H 或 0(渐进，不硬截断)
+            // 这样超过 miss 窗口的事件仍可区分纵坐标，而不会全部归一化到边缘。
+            float y = (float)((Math.Tanh(offset / miss) + 1) * 0.5 * DrawHeight);
             return Math.Clamp(y, 0, DrawHeight);
         }
     }
