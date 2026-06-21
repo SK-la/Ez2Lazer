@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Rulesets.Objects;
@@ -98,7 +99,19 @@ namespace osu.Game.Screens.Edit.Compose.Components
 
             var range = selectionTimeRange.Value;
 
-            var timingPoint = beatmap.ControlPointInfo.TimingPointAt(range.start - visible_range);
+            TimingControlPoint timingPoint;
+            bool fixedMode = beatmap.FixedGridEnabled.Value;
+
+            if (fixedMode)
+            {
+                timingPoint = beatmap.ControlPointInfo.TimingPoints.Count > 0
+                    ? beatmap.ControlPointInfo.TimingPoints[0]
+                    : TimingControlPoint.DEFAULT;
+            }
+            else
+            {
+                timingPoint = beatmap.ControlPointInfo.TimingPointAt(range.start - visible_range);
+            }
 
             double time = timingPoint.Time;
             int beat = 0;
@@ -112,14 +125,17 @@ namespace osu.Game.Screens.Edit.Compose.Components
 
             while (time < range.end + visible_range)
             {
-                var nextTimingPoint = beatmap.ControlPointInfo.TimingPointAt(time);
-
-                // switch to the next timing point if we have reached it.
-                if (nextTimingPoint.Time > timingPoint.Time)
+                if (!fixedMode)
                 {
-                    beat = 0;
-                    time = nextTimingPoint.Time;
-                    timingPoint = nextTimingPoint;
+                    var nextTimingPoint = beatmap.ControlPointInfo.TimingPointAt(time);
+
+                    // switch to the next timing point if we have reached it.
+                    if (nextTimingPoint.Time > timingPoint.Time)
+                    {
+                        beat = 0;
+                        time = nextTimingPoint.Time;
+                        timingPoint = nextTimingPoint;
+                    }
                 }
 
                 Color4 colour = BindableBeatDivisor.GetColourFor(

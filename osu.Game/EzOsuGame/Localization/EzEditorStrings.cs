@@ -93,6 +93,14 @@ namespace osu.Game.EzOsuGame.Localization
             "清除谱面预览",
             "Clear beatmap preview");
 
+        public static readonly LocalisableString MENU_EZ_SETTINGS = new EzLocalizationManager.EzLocalisableString(
+            "Ez设置",
+            "Ez Settings");
+
+        public static readonly LocalisableString MENU_FIXED_NOTE_GRID = new EzLocalizationManager.EzLocalisableString(
+            "固定note网格",
+            "Fixed note grid");
+
         #endregion
 
         #region Notifications

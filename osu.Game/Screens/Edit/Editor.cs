@@ -32,6 +32,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Extensions;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
@@ -453,7 +454,17 @@ namespace osu.Game.Screens.Edit
                                             new EditorMenuItem(EditorStrings.SetPreviewPointToCurrent, MenuItemType.Standard, SetPreviewPointToCurrentTime),
                                             bookmarkController.Menu,
                                         }
-                                    }
+                                    },
+                                    new MenuItem(EzEditorStrings.MENU_EZ_SETTINGS)
+                                    {
+                                        Items = new OsuMenuItem[]
+                                        {
+                                            new ToggleMenuItem(EzEditorStrings.MENU_FIXED_NOTE_GRID)
+                                            {
+                                                State = { BindTarget = editorBeatmap.FixedGridEnabled }
+                                            },
+                                        }
+                                    },
                                 }
                             },
                             screenSwitcher = new EditorScreenSwitcherControl
@@ -1254,7 +1265,15 @@ namespace osu.Game.Screens.Edit
                 // generally users are not looking to perform tiny seeks when the track is playing.
                 // this multiplication undoes the division that will be applied in the underlying seek operation.
                 // scale by BPM to keep the seek amount constant across all BPMs.
-                var timingPoint = editorBeatmap.ControlPointInfo.TimingPointAt(clock.CurrentTimeAccurate);
+                TimingControlPoint timingPoint;
+
+                if (editorBeatmap.FixedGridEnabled.Value)
+                    timingPoint = editorBeatmap.ControlPointInfo.TimingPoints.Count > 0
+                        ? editorBeatmap.ControlPointInfo.TimingPoints[0]
+                        : TimingControlPoint.DEFAULT;
+                else
+                    timingPoint = editorBeatmap.ControlPointInfo.TimingPointAt(clock.CurrentTimeAccurate);
+
                 amount *= beatDivisor.Value * (timingPoint.BPM / 120);
             }
 

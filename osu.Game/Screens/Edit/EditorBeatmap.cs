@@ -70,6 +70,12 @@ namespace osu.Game.Screens.Edit
         /// </summary>
         public readonly Bindable<HitObject> PlacementObject = new Bindable<HitObject>();
 
+        /// <summary>
+        /// 当启用时，网格吸附始终使用第一条 TimingPoint（主 BPM），
+        /// 不受后续 BPM 红线影响。
+        /// </summary>
+        public readonly Bindable<bool> FixedGridEnabled = new Bindable<bool>();
+
         private readonly BeatmapInfo beatmapInfo;
         public readonly IBeatmap PlayableBeatmap;
 
@@ -529,9 +535,36 @@ namespace osu.Game.Screens.Edit
             return list.Count - 1;
         }
 
-        public double SnapTime(double time, double? referenceTime) => ControlPointInfo.GetClosestSnappedTime(time, BeatDivisor, referenceTime);
+        public double SnapTime(double time, double? referenceTime)
+        {
+            if (FixedGridEnabled.Value)
+            {
+                if (ControlPointInfo.TimingPoints.Count == 0)
+                    return time;
 
-        public double GetBeatLengthAtTime(double referenceTime) => ControlPointInfo.TimingPointAt(referenceTime).BeatLength / BeatDivisor;
+                var firstTp = ControlPointInfo.TimingPoints[0];
+                double beatLength = firstTp.BeatLength / BeatDivisor;
+                double beats = (Math.Max(time, 0) - firstTp.Time) / beatLength;
+                int roundedBeats = (int)Math.Round(beats, MidpointRounding.AwayFromZero);
+                double snappedTime = firstTp.Time + roundedBeats * beatLength;
+                return snappedTime >= 0 ? snappedTime : snappedTime + beatLength;
+            }
+
+            return ControlPointInfo.GetClosestSnappedTime(time, BeatDivisor, referenceTime);
+        }
+
+        public double GetBeatLengthAtTime(double referenceTime)
+        {
+            if (FixedGridEnabled.Value)
+            {
+                if (ControlPointInfo.TimingPoints.Count == 0)
+                    return TimingControlPoint.DEFAULT.BeatLength / BeatDivisor;
+
+                return ControlPointInfo.TimingPoints[0].BeatLength / BeatDivisor;
+            }
+
+            return ControlPointInfo.TimingPointAt(referenceTime).BeatLength / BeatDivisor;
+        }
 
         public int BeatDivisor => beatDivisor?.Value ?? 1;
 
