@@ -28,6 +28,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
@@ -529,6 +530,12 @@ namespace osu.Game.Screens.Ranking
         {
             if (base.OnExiting(e))
                 return true;
+
+            // [Ez Debug] 输出原始 Live HitEvents 日志（在 Clear 之前）
+            if (Score?.HitEvents.Count > 0)
+            {
+                HitEventsDebugLoggerRegistry.LogLiveHitEvents(Score);
+            }
 
             // This is a stop-gap safety against components holding references to gameplay after exiting the gameplay flow.
             // Right now, HitEvents are only used up to the results screen. If this changes in the future we need to remove

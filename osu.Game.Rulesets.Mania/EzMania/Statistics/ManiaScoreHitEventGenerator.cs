@@ -38,6 +38,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             // 注册到全局 Registry，使 Graph/Panel/Race 的 DI 消费者可获得实例
             EzReplaySessionRegistry.Register(replaySession);
+
+            // [Ez Debug] 注册 HitEvents 调试日志记录器
+            var debugEnv = ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
+            HitEventsDebugLoggerRegistry.Register(new HitEventsDebugLog(debugEnv));
         }
 
         public bool Validate(Score score)
@@ -56,7 +60,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         public List<HitEvent> Generate(Score score, IBeatmap playableBeatmap, CancellationToken cancellationToken = default)
         {
             var environment = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
-            return ManiaReplaySession.Run(score, playableBeatmap, environment, cancellationToken).ScoreInfo.HitEvents.ToList();
+            var result = ManiaReplaySession.Run(score, playableBeatmap, environment, cancellationToken);
+
+            // [Ez Debug] 输出 Session 重生成结果
+            HitEventsDebugLoggerRegistry.LogSessionHitEvents(result.ScoreInfo);
+
+            return result.ScoreInfo.HitEvents.ToList();
         }
     }
 }
