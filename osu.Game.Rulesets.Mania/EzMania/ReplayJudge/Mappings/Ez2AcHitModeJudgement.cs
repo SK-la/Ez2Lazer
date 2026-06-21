@@ -7,15 +7,18 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 {
+    /// <summary>
+    /// EZ2AC 判定等级（从好到差）：KOOL / COOL / GOOD / MISS / FAIL。
+    /// MapTo / FromHitResult 负责 EZ2AC ↔ osu! HitResult 互转。
+    /// </summary>
     public enum Ez2AcJudge
     {
         None,
-        Marvelous,
-        Perfect,
-        Great,
-        Good,
-        Bad,
-        Miss,
+        Kool,  // = KOOL（最佳）
+        Cool,    // = COOL
+        Good,     // = GOOD
+        Miss,     // = MISS（按歪了，次于 GOOD）
+        Fail,     // = FAIL（最差，完全没按到）
     }
 
     public sealed class Ez2AcHitModeJudgement : IManiaHitModeJudgement
@@ -24,37 +27,39 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 
         public static HitResult MapTo(Ez2AcJudge judge) => judge switch
         {
-            Ez2AcJudge.Marvelous => HitResult.Perfect,
-            Ez2AcJudge.Perfect => HitResult.Perfect,
-            Ez2AcJudge.Great => HitResult.Great,
+            Ez2AcJudge.Kool => HitResult.Perfect,
+            Ez2AcJudge.Cool => HitResult.Great,
             Ez2AcJudge.Good => HitResult.Good,
-            Ez2AcJudge.Bad => HitResult.Meh,
-            Ez2AcJudge.Miss => HitResult.Miss,
+            Ez2AcJudge.Miss => HitResult.Meh,
+            Ez2AcJudge.Fail => HitResult.Miss,
             _ => HitResult.None,
         };
 
         public static Ez2AcJudge FromHitResult(HitResult result) => result switch
         {
-            HitResult.Perfect => Ez2AcJudge.Perfect,
-            HitResult.Great => Ez2AcJudge.Great,
+            HitResult.Perfect => Ez2AcJudge.Kool,
+            HitResult.Great => Ez2AcJudge.Cool,
             HitResult.Good => Ez2AcJudge.Good,
-            HitResult.Meh => Ez2AcJudge.Bad,
-            HitResult.Miss => Ez2AcJudge.Miss,
+            HitResult.Meh => Ez2AcJudge.Miss,
+            HitResult.Miss => Ez2AcJudge.Fail,
             _ => Ez2AcJudge.None,
         };
 
+        /// <summary>
+        /// LN 尾判软化：因长条更难对准，将尾判结果放松一档。
+        /// </summary>
         public static Ez2AcJudge SoftenLnJudge(Ez2AcJudge judge) => judge switch
         {
-            Ez2AcJudge.Great => Ez2AcJudge.Perfect,
-            Ez2AcJudge.Good => Ez2AcJudge.Great,
-            Ez2AcJudge.Bad => Ez2AcJudge.Good,
+            Ez2AcJudge.Cool => Ez2AcJudge.Kool,
+            Ez2AcJudge.Good => Ez2AcJudge.Cool,
+            Ez2AcJudge.Miss => Ez2AcJudge.Good,
             _ => judge,
         };
 
         public ManiaNoteJudgementOutcome EvaluateAutoMiss(double timeOffset, HitWindows hitWindows)
         {
             if (!hitWindows.CanBeHit(timeOffset))
-                return ManiaNoteJudgementOutcome.ApplyResult(MapTo(Ez2AcJudge.Miss));
+                return ManiaNoteJudgementOutcome.ApplyResult(MapTo(Ez2AcJudge.Fail));
 
             return ManiaNoteJudgementOutcome.Ignore;
         }
@@ -87,7 +92,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 
             judge = SoftenLnJudge(judge);
 
-            if (judge > Ez2AcJudge.Bad && (!context.HeadHit || context.HoldBreak || context.HoldBroken))
+            if (judge > Ez2AcJudge.Miss && (!context.HeadHit || context.HoldBreak || context.HoldBroken))
                 judge = Ez2AcJudge.Good;
 
             return judge;
