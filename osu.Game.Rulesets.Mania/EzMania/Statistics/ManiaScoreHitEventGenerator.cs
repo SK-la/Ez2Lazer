@@ -9,7 +9,6 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
-using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -28,14 +27,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         {
             EzScoreReloadBridge.RegisterImplementation("mania", Instance);
             EzScoreReloadBridge.RegisterImplementation("3", Instance);
-
-            // 注册 HitObject 工厂，使 HitEventCache.Restore 能重建 Mania 类型的虚拟 HitObject
-            HitEventCache.HitObjectFactory = typeName => typeName switch
-            {
-                nameof(HeadNote) => new HeadNote(),
-                nameof(TailNote) => new TailNote(),
-                _ => new Note(),
-            };
 
             // Race Timeline: direct synchronous call (not via ManiaReplaySessionService)
             // to avoid any async/caching issues for ghost score HUDs.

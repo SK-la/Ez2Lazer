@@ -116,10 +116,6 @@ namespace osu.Game.Screens.Ranking.Statistics
 
             spinner.Show();
 
-            // 游戏现场（精确 HitEvents 尚在内存）→ 缓存到内存，供后续重入时直接恢复。
-            if (newScore.HitEvents.Count > 0)
-                HitEventCache.Store(newScore.ID, newScore.HitEvents);
-
             var localCancellationSource = loadCancellation = new CancellationTokenSource();
 
             var workingBeatmap = beatmapManager.GetWorkingBeatmap(newScore.BeatmapInfo);
@@ -134,28 +130,18 @@ namespace osu.Game.Screens.Ranking.Statistics
 
                 if (newScore.HitEvents.Count == 0)
                 {
-                    // 优先从 HitEventCache 恢复游戏现场的精确 HitEvents（TimeOffset 不受 replay 帧量子化）
-                    List<HitEvent> cachedHitEvents = HitEventCache.Restore(newScore.ID);
+                    // Only attempt generation when we have a local replay.
+                    var databasedScore = scoreManager.GetScore(newScore);
 
-                    if (cachedHitEvents.Count > 0)
+                    if (databasedScore != null)
                     {
-                        newScore.HitEvents = cachedHitEvents;
+                        // TODO(P3-Rest): 改为 ReplaySession.RunAsync(ForStoredStatistics)，删除 Bridge 调用
+                        EzScoreReloadBridge.InitializeAllGenerators();
+                        generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
                     }
-                    else
-                    {
-                        // Only attempt generation when we have a local replay.
-                        var databasedScore = scoreManager.GetScore(newScore);
 
-                        if (databasedScore != null)
-                        {
-                            // TODO(P3-Rest): 改为 ReplaySession.RunAsync(ForStoredStatistics)，删除 Bridge 调用
-                            EzScoreReloadBridge.InitializeAllGenerators();
-                            generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
-                        }
-
-                        if (generatedHitEvents != null)
-                            newScore.HitEvents = generatedHitEvents;
-                    }
+                    if (generatedHitEvents != null)
+                        newScore.HitEvents = generatedHitEvents;
                 }
 
                 return playable;
