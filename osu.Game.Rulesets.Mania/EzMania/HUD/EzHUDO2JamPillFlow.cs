@@ -228,7 +228,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     Size = new Vector2(pill_slot_size),
-                    Icon = pill_sprites[(int)SpriteDropdown.Value],
+                    Icon = pill_sprites[(int)SpriteDropdown.Value - 1],
                     Colour = Color4.White
                 };
             }
