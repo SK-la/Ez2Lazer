@@ -278,7 +278,7 @@ namespace osu.Game.EzOsuGame.Scoring
                                 ? sharedPlayableBeatmap
                                 : null;
 
-                            return (scoreInfo, EzScoreTimelineBuilder.TryBuild(scoreManager, beatmaps, scoreInfo, beatmapForBuild, cancellationToken));
+                            return (scoreInfo, EzScoreTimelineBuilder.TryBuild(scoreManager, beatmaps, scoreInfo, beatmapForBuild, null, null, cancellationToken));
                         }
                         catch (OperationCanceledException)
                         {

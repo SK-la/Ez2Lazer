@@ -8,6 +8,12 @@ namespace osu.Game.EzOsuGame.Scoring
 {
     public sealed class EzScoreTimeline
     {
+        /// <summary>
+        /// 空 timeline 哨兵。任何 <see cref="EzScoreTimelineSnapshot.Empty"/> 查询的稳定占位，
+        /// 避免上游缓存 "已尝试构建但失败" 的 ghost 时反复重试。
+        /// </summary>
+        public static readonly EzScoreTimeline EMPTY = new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>());
+
         private readonly EzScoreTimelineSnapshot[] snapshots;
 
         public long FinalTotalScore { get; }

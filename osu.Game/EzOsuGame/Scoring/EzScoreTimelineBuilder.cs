@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -22,20 +21,33 @@ namespace osu.Game.EzOsuGame.Scoring
 {
     /// <summary>
     /// 从本地 replay 构建分数时间线。Mania 走 Session 一遍 SP 快照；其他规则集暂用 HitEvents 重放（仅非 Mania）。
-    /// 进程内缓存；重启进程即清空，无磁盘持久化。
+    ///
+    /// 缓存策略：原进程级 <c>timeline_cache</c> 已废弃，改由调用方通过 <see cref="IEzScoreTimelineCache"/> 注入
+    /// Session 作用域缓存。这样可以避免不同上下文（HitMode / HealthMode / JudgePrecedence / Beatmap 难度）、
+    /// 不同 Player（皮肤编辑器嵌入 Player / 真实 Player）之间互相污染缓存。
+    /// 重启进程即清空所有 cache（无磁盘持久化）。
+    ///
+    /// 设计选择：timeline 与 <see cref="ScoreInfo.TotalScore"/> 解耦。调用方对同一条 ScoreInfo 调
+    /// <see cref="osu.Game.Scoring.ScoreManager.Recalculate"/> / <see cref="osu.Game.Scoring.ScoreManager.RenamePlayer"/>
+    /// 后，cache 仍命中，UI 上 ghost 终局分可能与 ScoreInfo 终局分不一致 — 视为可接受。
     /// </summary>
     // TODO(EZ-SR-TL-020): Osu Session 对齐后更新类注释，移除 HitEvents 重放描述。
     public static class EzScoreTimelineBuilder
     {
-        private static readonly ConcurrentDictionary<string, EzScoreTimeline> timeline_cache = new ConcurrentDictionary<string, EzScoreTimeline>();
         private static bool generatorsInitialised;
 
+        /// <summary>
+        /// 创建一个进程内 in-memory 缓存实例，绑定到调用方生命周期。
+        /// 通常由 <see cref="EzScoreRaceSession"/> 持有，Session Dispose 时调用 <see cref="IEzScoreTimelineCache.Clear"/>。
+        /// </summary>
+        public static IEzScoreTimelineCache CreateSessionCache() => new EzScoreTimelineCache();
+
         public static EzScoreTimeline? TryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap = null,
-            CancellationToken cancellationToken = default)
-            => tryBuild(scoreManager, beatmaps, scoreInfo, sharedPlayableBeatmap, cancellationToken);
+                                                IEzScoreTimelineCache? cache = null, IGameplayEnvironment? environment = null, CancellationToken cancellationToken = default)
+            => tryBuild(scoreManager, beatmaps, scoreInfo, sharedPlayableBeatmap, cache ?? NullEzScoreTimelineCache.INSTANCE, environment, cancellationToken);
 
         private static EzScoreTimeline? tryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap,
-            CancellationToken cancellationToken)
+                                                 IEzScoreTimelineCache cache, IGameplayEnvironment? environment, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(scoreManager);
             ArgumentNullException.ThrowIfNull(beatmaps);
@@ -48,10 +60,28 @@ namespace osu.Game.EzOsuGame.Scoring
             if (timelineMode == EzScoreRaceGhostTimelineMode.None)
                 return null;
 
-            string? cacheKey = getCacheKey(scoreInfo, timelineMode);
+            IBeatmap? beatmapForFingerprint;
 
-            if (!string.IsNullOrEmpty(cacheKey) && timeline_cache.TryGetValue(cacheKey, out var cached))
-                return cached;
+            if (sharedPlayableBeatmap != null)
+            {
+                beatmapForFingerprint = sharedPlayableBeatmap;
+            }
+            else
+            {
+                var workingBeatmap = beatmaps.GetWorkingBeatmap(scoreInfo.BeatmapInfo);
+
+                if (workingBeatmap is DummyWorkingBeatmap)
+                    beatmapForFingerprint = null;
+                else
+                    beatmapForFingerprint = workingBeatmap.GetPlayableBeatmap(scoreInfo.Ruleset, scoreInfo.Mods);
+            }
+
+            string? cacheKey = beatmapForFingerprint != null
+                ? getCacheKey(scoreInfo, timelineMode, environment ?? GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig), beatmapForFingerprint)
+                : null;
+
+            if (!string.IsNullOrEmpty(cacheKey) && cache.TryGet(cacheKey, out var cached))
+                return cached == EzScoreTimeline.EMPTY ? null : cached;
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -59,7 +89,12 @@ namespace osu.Game.EzOsuGame.Scoring
 
             // 唯一门槛：磁盘/库内是否有可读的 replay 帧（不依赖 ScoreInfo.Files 元数据）。
             if (databasedScore?.Replay == null || databasedScore.Replay.Frames.Count == 0)
+            {
+                // 显式缓存 null 结果（以 Empty sentinel 形式），避免后续每帧反复走这条路径。
+                if (!string.IsNullOrEmpty(cacheKey))
+                    cache.Store(cacheKey, EzScoreTimeline.EMPTY);
                 return null;
+            }
 
             var ruleset = scoreInfo.Ruleset.CreateInstance();
             IBeatmap playableBeatmap;
@@ -73,13 +108,21 @@ namespace osu.Game.EzOsuGame.Scoring
                 var workingBeatmap = beatmaps.GetWorkingBeatmap(scoreInfo.BeatmapInfo);
 
                 if (workingBeatmap is DummyWorkingBeatmap)
+                {
+                    if (!string.IsNullOrEmpty(cacheKey))
+                        cache.Store(cacheKey, EzScoreTimeline.EMPTY);
                     return null;
+                }
 
                 playableBeatmap = workingBeatmap.GetPlayableBeatmap(scoreInfo.Ruleset, scoreInfo.Mods);
             }
 
             if (playableBeatmap.HitObjects.Count == 0)
+            {
+                if (!string.IsNullOrEmpty(cacheKey))
+                    cache.Store(cacheKey, EzScoreTimeline.EMPTY);
                 return null;
+            }
 
             EzScoreTimeline? timeline;
 
@@ -94,20 +137,30 @@ namespace osu.Game.EzOsuGame.Scoring
                     var (hitEvents, offsetsRelativeToEnd) = resolveHitEvents(databasedScore, playableBeatmap, cancellationToken);
 
                     if (hitEvents == null || hitEvents.Count == 0)
+                    {
+                        if (!string.IsNullOrEmpty(cacheKey))
+                            cache.Store(cacheKey, EzScoreTimeline.EMPTY);
                         return null;
+                    }
 
                     timeline = buildFromHitEvents(ruleset, playableBeatmap, scoreInfo, hitEvents, offsetsRelativeToEnd);
                     break;
 
                 default:
+                    if (!string.IsNullOrEmpty(cacheKey))
+                        cache.Store(cacheKey, EzScoreTimeline.EMPTY);
                     return null;
             }
 
             if (timeline == null)
+            {
+                if (!string.IsNullOrEmpty(cacheKey))
+                    cache.Store(cacheKey, EzScoreTimeline.EMPTY);
                 return null;
+            }
 
             if (!string.IsNullOrEmpty(cacheKey))
-                timeline_cache[cacheKey] = timeline;
+                cache.Store(cacheKey, timeline);
 
             return timeline;
         }
@@ -124,7 +177,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
         // TODO(EZ-SR-TL-011): Osu Session 完成后删除 buildFromHitEvents 及 BuildFromHitEventsForTesting。
         internal static EzScoreTimeline BuildFromHitEventsForTesting(Ruleset ruleset, IBeatmap beatmap, ScoreInfo scoreInfo, IReadOnlyList<HitEvent> hitEvents,
-            bool offsetsRelativeToEnd = false)
+                                                                     bool offsetsRelativeToEnd = false)
             => buildFromHitEvents(ruleset, beatmap, scoreInfo, hitEvents, offsetsRelativeToEnd);
 
         private static EzScoreTimeline buildFromHitEvents(Ruleset ruleset, IBeatmap beatmap, ScoreInfo scoreInfo, IReadOnlyList<HitEvent> hitEvents, bool offsetsRelativeToEnd)
@@ -332,25 +385,29 @@ namespace osu.Game.EzOsuGame.Scoring
             };
         }
 
-        private static string? getCacheKey(ScoreInfo? scoreInfo, EzScoreRaceGhostTimelineMode timelineMode)
+        private static string? getCacheKey(ScoreInfo? scoreInfo, EzScoreRaceGhostTimelineMode timelineMode, IGameplayEnvironment environment, IBeatmap beatmap)
         {
             string? identity = getScoreIdentity(scoreInfo);
 
             if (identity == null || scoreInfo == null)
                 return null;
 
+            string modFp = getModFingerprint(scoreInfo.Mods);
+            string beatmapFp = beatmap.BeatmapInfo != null
+                ? $"b:{beatmap.BeatmapInfo.ID}:od{beatmap.BeatmapInfo.Difficulty.OverallDifficulty:F2}:hp{beatmap.BeatmapInfo.Difficulty.DrainRate:F2}"
+                : "b:?";
+
             switch (timelineMode)
             {
                 case EzScoreRaceGhostTimelineMode.ManiaSession:
                 {
-                    // 与角逐 HUD 一致：全局 HitMode/HealthMode，不读成绩嵌入字段。
-                    var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
-                    return $"{identity}:hm{(int)environment.ManiaHitMode}:hh{(int)environment.ManiaHealthMode}:jp{(int)environment.JudgePrecedence}";
+                    // 与角逐 HUD 一致：全局 HitMode/HealthMode/JudgePrecedence，不读成绩嵌入字段。
+                    return $"{identity}|m|{modFp}|{beatmapFp}|hm{(int)environment.ManiaHitMode}|hh{(int)environment.ManiaHealthMode}|jp{(int)environment.JudgePrecedence}";
                 }
 
                 case EzScoreRaceGhostTimelineMode.HitEvents:
                     // TODO(EZ-SR-TL-008): Osu Session 对齐后定义 Osu 缓存键策略（参照 ManiaSession 环境键）。
-                    return $"{identity}:mods:{getModFingerprint(scoreInfo.Mods)}";
+                    return $"{identity}|h|{modFp}|{beatmapFp}";
 
                 default:
                     return null;
