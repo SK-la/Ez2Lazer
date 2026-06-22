@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -28,6 +27,8 @@ namespace osu.Game.EzOsuGame.HUD
         private EzScoreRaceSessionHost? sessionHost { get; set; }
 
         protected EzScoreRaceSession? Session { get; private set; }
+
+        [Resolved(canBeNull: true)]
         protected GameplayClockContainer? GameplayClock { get; private set; }
 
         protected readonly Bindable<EzScoreModFilter> ModFilter = new Bindable<EzScoreModFilter>(EzScoreModFilter.Any);
@@ -47,15 +48,8 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
-            GameplayClock = this.FindClosestParent<GameplayClockContainer>();
-
-            Debug.Assert(GameplayClock != null,
-                $"{GetType().Name} must be inside a {nameof(GameplayClockContainer)} subtree");
-
-            if (GameplayState == null)
-                return;
-
-            bindSessionWhenAvailable();
+            if (GameplayState != null)
+                bindSessionWhenAvailable();
         }
 
         private void bindSessionWhenAvailable()

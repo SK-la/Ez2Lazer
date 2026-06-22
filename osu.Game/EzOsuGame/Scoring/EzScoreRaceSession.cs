@@ -28,6 +28,12 @@ namespace osu.Game.EzOsuGame.Scoring
         private readonly GameplayState gameplayState;
         private readonly Action<Action>? scheduleCallback;
 
+        /// <summary>
+        /// 本 Session 作用域的 timeline 缓存。Session Dispose 时调用 <see cref="IEzScoreTimelineCache.Clear"/>。
+        /// 任何 entry 的 timeline 都会写到这里；HUD/Processor 不直接读 cache，只通过 TimelineReady 事件订阅。
+        /// </summary>
+        public IEzScoreTimelineCache TimelineCache { get; }
+
         private readonly BindableBool isReady = new BindableBool();
         private readonly List<EzScoreRaceEntry> entries = new List<EzScoreRaceEntry>();
         private readonly HashSet<Guid> timelineLoadsPending = new HashSet<Guid>();
@@ -46,6 +52,12 @@ namespace osu.Game.EzOsuGame.Scoring
 
         public event Action? EntriesChanged;
 
+        /// <summary>
+        /// 某个 ScoreInfo 的 timeline 构建完成时 fire（HUD/Processor 订阅后直接拿到 timeline 引用）。
+        /// 注意 fire 时机：assignTimeline 已经写好 entry.Timeline，HUD 不需要再轮询。
+        /// </summary>
+        public event Action<ScoreInfo, EzScoreTimeline>? TimelineReady;
+
         public EzScoreRaceSession(RealmAccess realm, ScoreManager scoreManager, BeatmapManager beatmaps, GameplayState gameplayState, EzScoreRacePlayMode playMode,
                                   Action<Action>? scheduleCallback = null)
         {
@@ -56,6 +68,7 @@ namespace osu.Game.EzOsuGame.Scoring
             SupportsGhostRace = EzScoreRaceRulesetSupport.SupportsGhostRace(gameplayState.Ruleset.RulesetInfo)
                                 && playMode != EzScoreRacePlayMode.SpectatingLive;
             this.scheduleCallback = scheduleCallback;
+            TimelineCache = EzScoreTimelineBuilder.CreateSessionCache();
         }
 
         public void EnsureLoaded()
@@ -147,6 +160,7 @@ namespace osu.Game.EzOsuGame.Scoring
         public void Dispose()
         {
             cancelLoad();
+            TimelineCache.Clear();
         }
 
         private void beginLoad(CancellationToken cancellationToken)
@@ -241,7 +255,13 @@ namespace osu.Game.EzOsuGame.Scoring
             var entry = entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfo.ID);
 
             if (entry != null)
+            {
+                entry.IsTimelinePending = false;
                 entry.Timeline = timeline;
+            }
+
+            // 同步通知所有订阅者（HUD 角逐榜 / CompareBars），不依赖轮询 entry.Timeline。
+            TimelineReady?.Invoke(scoreInfo, timeline);
         }
 
         private void ensureTimelinesLoaded(IEnumerable<ScoreInfo> scoreInfos, CancellationToken cancellationToken = default)
@@ -261,8 +281,17 @@ namespace osu.Game.EzOsuGame.Scoring
             if (scoresToLoad.Count == 0)
                 return;
 
+            // 标记 entry 为 "构建中"，HUD 订阅 TimelineReady 即可拿到结果，无需轮询 Timeline 属性。
+            foreach (var s in scoresToLoad)
+            {
+                var e = entries.FirstOrDefault(en => en.ScoreInfo.ID == s.ID);
+                if (e != null)
+                    e.IsTimelinePending = true;
+            }
+
             var currentMods = gameplayState.Mods.ToArray();
             IBeatmap sharedPlayableBeatmap = gameplayState.Beatmap;
+            var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
 
             Task.Run(async () =>
             {
@@ -278,7 +307,7 @@ namespace osu.Game.EzOsuGame.Scoring
                                 ? sharedPlayableBeatmap
                                 : null;
 
-                            return (scoreInfo, EzScoreTimelineBuilder.TryBuild(scoreManager, beatmaps, scoreInfo, beatmapForBuild, null, null, cancellationToken));
+                            return (scoreInfo, EzScoreTimelineBuilder.TryBuild(scoreManager, beatmaps, scoreInfo, beatmapForBuild, TimelineCache, environment, cancellationToken));
                         }
                         catch (OperationCanceledException)
                         {
@@ -302,11 +331,17 @@ namespace osu.Game.EzOsuGame.Scoring
                         {
                             timelineLoadsPending.Remove(scoreInfo.ID);
 
-                            if (timeline == null)
-                                continue;
-
                             if (hasTimeline(scoreInfo))
                                 continue;
+
+                            if (timeline == null)
+                            {
+                                // 标记为 "已尝试且无结果" — HUD 仍可继续 poll 看到 null（不进入 pending 状态）。
+                                var pendingEntry = entries.FirstOrDefault(en => en.ScoreInfo.ID == scoreInfo.ID);
+                                if (pendingEntry != null)
+                                    pendingEntry.IsTimelinePending = false;
+                                continue;
+                            }
 
                             assignTimeline(scoreInfo, timeline);
                         }

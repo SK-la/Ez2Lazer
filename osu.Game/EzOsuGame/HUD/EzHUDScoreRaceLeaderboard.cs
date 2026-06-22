@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Caching;
@@ -16,7 +15,7 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics.Containers;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens.Play;
+using osu.Game.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.Leaderboards;
 using osu.Game.Skinning;
@@ -101,6 +100,33 @@ namespace osu.Game.EzOsuGame.HUD
         protected override void OnSessionReady()
         {
             Session?.IsReady.BindValueChanged(_ => rebuildRows(), true);
+
+            if (Session != null)
+                Session.TimelineReady += onTimelineReady;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing && Session != null)
+                Session.TimelineReady -= onTimelineReady;
+
+            base.Dispose(isDisposing);
+        }
+
+        private void onTimelineReady(ScoreInfo scoreInfo, EzScoreTimeline timeline)
+        {
+            // 来自后台构建线程的回调：抛到主线程执行更新，避免并发触碰 HUD 状态。
+            Schedule(() =>
+            {
+                var state = entryStates.FirstOrDefault(s => s.ScoreInfoId == scoreInfo.ID);
+
+                if (state?.Processor == null)
+                    return;
+
+                state.Timeline = timeline;
+                state.Processor.SetTimeline(timeline);
+                sorting.Invalidate();
+            });
         }
 
         protected override void Update()
@@ -180,8 +206,10 @@ namespace osu.Game.EzOsuGame.HUD
                 {
                     processor = new EzScoreRaceTimelineScoreProcessor();
                     AddInternal(processor);
-                    Debug.Assert(GameplayClock != null,
-                        $"{nameof(EzHUDScoreRaceLeaderboard)} must be inside a {nameof(GameplayClockContainer)} subtree");
+
+                    if (GameplayClock == null)
+                        continue;
+
                     processor.SetGameplayClock(GameplayClock);
                     processor.SetTimeline(entry.Timeline);
                     processor.TotalScore.BindValueChanged(_ => sorting.Invalidate());
@@ -225,8 +253,8 @@ namespace osu.Game.EzOsuGame.HUD
                 if (state.Tracked)
                     continue;
 
-                Debug.Assert(GameplayClock != null,
-                    $"{nameof(EzHUDScoreRaceLeaderboard)} must be inside a {nameof(GameplayClockContainer)} subtree");
+                if (GameplayClock == null)
+                    continue;
 
                 state.Timeline = Session.Entries.FirstOrDefault(e => e.ScoreInfo.ID == state.ScoreInfoId)?.Timeline;
                 state.Processor?.SetGameplayClock(GameplayClock);

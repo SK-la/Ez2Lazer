@@ -3,7 +3,6 @@
 
 using System;
 using System.ComponentModel;
-using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
@@ -22,7 +21,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens.Play;
+using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -171,11 +170,12 @@ namespace osu.Game.EzOsuGame.HUD
 
             base.LoadComplete();
 
-            Debug.Assert(GameplayClock != null,
-                $"{nameof(EzHUDScoreCompareBars)} must be inside a {nameof(GameplayClockContainer)} subtree");
+            if (GameplayClock != null)
+            {
+                ghostProcessor1.SetGameplayClock(GameplayClock);
+                ghostProcessor2.SetGameplayClock(GameplayClock);
+            }
 
-            ghostProcessor1.SetGameplayClock(GameplayClock);
-            ghostProcessor2.SetGameplayClock(GameplayClock);
             ghostProcessor1.TotalScore.BindValueChanged(_ => updateGhostCompareBar(1));
             ghostProcessor2.TotalScore.BindValueChanged(_ => updateGhostCompareBar(2));
 
@@ -206,6 +206,39 @@ namespace osu.Game.EzOsuGame.HUD
         protected override void OnSessionReady()
         {
             Session?.IsReady.BindValueChanged(_ => onCompareConditionChanged(), true);
+
+            if (Session != null)
+                Session.TimelineReady += onTimelineReady;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                if (Session != null)
+                    Session.TimelineReady -= onTimelineReady;
+                captureController?.Dispose();
+            }
+
+            base.Dispose(isDisposing);
+        }
+
+        private void onTimelineReady(ScoreInfo scoreInfo, EzScoreTimeline timeline)
+        {
+            Schedule(() =>
+            {
+                if (pickedEntryForCondition1?.ScoreInfo.ID == scoreInfo.ID)
+                {
+                    ghostProcessor1?.SetTimeline(timeline);
+                    updateGhostCompareBar(1);
+                }
+
+                if (pickedEntryForCondition2?.ScoreInfo.ID == scoreInfo.ID)
+                {
+                    ghostProcessor2?.SetTimeline(timeline);
+                    updateGhostCompareBar(2);
+                }
+            });
         }
 
         protected override void OnEntriesChangedScheduled()
@@ -273,14 +306,6 @@ namespace osu.Game.EzOsuGame.HUD
             bars[2].ResetVisualCache();
             updateGhostCompareBar(1);
             updateGhostCompareBar(2);
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-                captureController?.Dispose();
-
-            base.Dispose(isDisposing);
         }
 
         private void updateBackgroundVisibility()
