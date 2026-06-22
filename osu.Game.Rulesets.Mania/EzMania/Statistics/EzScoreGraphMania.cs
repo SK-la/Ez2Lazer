@@ -7,27 +7,27 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Sprites;
-using osu.Game.Screens.Ranking.Statistics;
-using osu.Framework.Graphics.Colour;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
+using osu.Game.EzOsuGame.Statistics;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas;
-using osu.Game.EzOsuGame.Statistics;
-using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 using osuTK.Graphics;
 
@@ -55,6 +55,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private readonly double originalAccuracy;
         private readonly long originalTotalScore;
 
+        // 帧量化检测后注入的精确 HitEvents（不写回 ScoreInfo）
+        private readonly IReadOnlyList<HitEvent>? originalHitEventsOverride;
+
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
@@ -73,7 +76,52 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             hitWindowsV1.OverallDifficulty = OD;
             originalAccuracy = score.Accuracy;
             originalTotalScore = score.TotalScore;
+
+            // 帧量化检测：若所有 HitEvent 的 TimeOffset 都是帧间隔（约 16.67ms）的整数倍，
+            // 说明 HitEvents 已被帧量化污染，需要用 EzScoreReloadBridge 重新生成精确版本。
+            originalHitEventsOverride = tryDetectAndRegenerateFrameQuantizedEvents(score, beatmap);
         }
+
+        /// <summary>
+        /// 检测 HitEvents 是否被帧量化污染，若污染则通过 <see cref="EzScoreReloadBridge"/>
+        /// 重新生成精确 HitEvents（不写回 <c>ScoreInfo</c>）。
+        /// </summary>
+        private static IReadOnlyList<HitEvent>? tryDetectAndRegenerateFrameQuantizedEvents(ScoreInfo score, IBeatmap beatmap)
+        {
+            var hitEvents = score.HitEvents;
+            if (hitEvents == null || hitEvents.Count == 0)
+                return null;
+
+            const double frame_interval_ms = 16.67;
+            const double tolerance = 0.5; // ms
+
+            // 检查是否所有 TimeOffset 都是帧间隔的整数倍
+            bool allFrameQuantized = hitEvents.All(e => Math.Abs(e.TimeOffset % frame_interval_ms) < tolerance);
+
+            if (!allFrameQuantized)
+                return null;
+
+            // 帧量化版本 → 尝试用 EzScoreReloadBridge 重新生成精确事件
+            try
+            {
+                var scoreForBridge = new Score { ScoreInfo = score };
+                var precise = EzScoreReloadBridge.TryGenerate(scoreForBridge, beatmap);
+                if (precise != null && precise.Count > 0)
+                    return precise;
+            }
+            catch
+            {
+                // 生成失败时静默回退到原始（已量化）事件
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 返回精确 HitEvents（帧量化检测后重新生成）或基类的 OriginalHitEvents。
+        /// </summary>
+        private IReadOnlyList<HitEvent> getEffectiveOriginalHitEvents()
+            => originalHitEventsOverride ?? OriginalHitEvents;
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
         {
@@ -84,65 +132,24 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             // 无 Session 时使用全部 OriginalHitEvents，不做结果有效性过滤。
             // GetDisplayResult 会通过 hitWindowsNow 对每个事件重新判定，
             // 确保散点颜色和血量线反映当前 HitMode 的判定结果。
-            return applyFakeOffsetToEvents(OriginalHitEvents);
+            return applyFakeOffsetToEvents(getEffectiveOriginalHitEvents());
         }
 
         protected override void CalculateNowAccuracy()
         {
             var info = CommittedNowScore?.ScoreInfo;
 
-            if (info != null)
+            if (info == null)
             {
-                // Session 重放路径：从 Statistics 提取判定计数（已按当前 HitMode 重新判定）
-                // 注意: 由于 replay 帧时间量化（60fps ~16.67ms 精度）与现场游玩精确 timing
-                // 之间的偏差，窄判定窗口下 Now 统计可能与 Original 不一致。
-                // 诊断日志会输出差异供排查。
-                NowCounts = extractDisplayCounts(info.Statistics);
-                (NowAccuracy, NowScore) = computeNowAccuracyAndScore(NowCounts, currentHitMode);
-                logDiffIfMismatch(info);
+                // CommittedNowScore 未就绪时：静默保持上一次有效 Now 数据，不走同步 fallback 分支。
+                // 异步 RefreshFromService 完成后更新 CommittedNowScore，届时自然触发本方法重算。
                 return;
             }
 
-            // 无 Session 结果（初始加载 或 HitMode 变更后）：
-            // 通过 hitWindowsNow 对 OriginalHitEvents.TimeOffset 重新判定，
-            // 保留现场游玩的精确 timing 并映射到当前 HitMode。
-            NowCounts = rejudgeOriginalHitEvents();
+            // Session 重放路径：从 Statistics 提取判定计数（已按当前 HitMode 重新判定）
+            NowCounts = extractDisplayCounts(info.Statistics);
             (NowAccuracy, NowScore) = computeNowAccuracyAndScore(NowCounts, currentHitMode);
-        }
-
-        /// <summary>
-        /// 用当前 <see cref="hitWindowsNow"/> 对 <c>OriginalHitEvents</c> 的
-        /// TimeOffset 重新判定，返回按当前 HitMode 有效结果过滤后的计数。
-        /// 所有判定逻辑委托给当前 HitMode 的 <see cref="IManiaNoteJudgementStrategy.RejudgeHitEvent"/>，
-        /// Graph 组件不处理任何类型分支。
-        /// </summary>
-        private Dictionary<HitResult, int> rejudgeOriginalHitEvents()
-        {
-            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
-            var counts = new Dictionary<HitResult, int>();
-            bool isO2Jam = currentHitMode == EzEnumHitMode.O2Jam;
-
-            var strategy = ManiaJudgementRegistry.GetHitModeJudgement(currentHitMode)
-                           ?? (IManiaNoteJudgementStrategy)LazerNoteJudgementReplica.Instance;
-
-            foreach (var e in OriginalHitEvents)
-            {
-                // O2Jam 判定窗口依赖 BPM 缩放，必须按 hitObject 时间同步 BPM。
-                if (isO2Jam)
-                    hitWindowsNow.UpdateO2JamBpmFromTime(e.HitObject.StartTime);
-
-                var result = strategy.RejudgeHitEvent(e, hitWindowsNow);
-                if (result == HitResult.None)
-                    result = HitResult.Miss;
-
-                if (!validResults.Contains(result) && result != HitResult.Miss && result != HitResult.Poor)
-                    continue;
-
-                counts.TryAdd(result, 0);
-                counts[result]++;
-            }
-
-            return counts;
+            logDiffIfMismatch(info);
         }
 
         /// <summary>
@@ -181,8 +188,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// </summary>
         private void logDiffIfMismatch(ScoreInfo sessionInfo)
         {
-            // Original: 直接从 OriginalHitEvents 按 HitResult 分组统计
-            var origCounts = OriginalHitEvents
+            // Original: 直接从精确 OriginalHitEvents 按 HitResult 分组统计
+            var origCounts = getEffectiveOriginalHitEvents()
                              .GroupBy(e => e.Result)
                              .ToDictionary(g => g.Key, g => g.Count());
 
@@ -224,7 +231,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         protected override IReadOnlyList<HitEvent> GetV1HitEvents()
         {
             // Classic 路线固定使用原始基础事件，不受当前 HitMode 可见结果集合影响。
-            return applyFakeOffsetToEvents(OriginalHitEvents.Where(e => e.Result.IsBasic()));
+            return applyFakeOffsetToEvents(getEffectiveOriginalHitEvents().Where(e => e.Result.IsBasic()));
         }
 
         [BackgroundDependencyLoader]
@@ -246,30 +253,31 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             {
                 currentHitMode = v.NewValue;
                 hitWindowsNow.SetHitMode(currentHitMode);
-                CommittedNowScore = null;
-                Refresh();
+                // 切换到 O2Jam 时立即同步 BPM，确保后续判定窗口正确
+                if (currentHitMode == EzEnumHitMode.O2Jam && Beatmap.HitObjects.Count > 0)
+                    hitWindowsNow.UpdateO2JamBpmFromTime(Beatmap.HitObjects[0].StartTime);
+                // 不清 CommittedNowScore，Now 数据静默保持上一次有效值。
+                // 异步 RefreshFromService 完成后自然刷新 Now 数据。
+                _ = RefreshFromService();
             });
 
             healthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             healthModeBindable.BindValueChanged(__ =>
             {
                 currentHealthMode = healthModeBindable.Value;
-                CommittedNowScore = null;
-                Refresh();
             });
 
             ezConfig.GetBindable<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence)
                     .BindValueChanged(__ =>
                     {
-                        CommittedNowScore = null;
-                        Refresh();
+                        // CommittedNowScore 由 RefreshFromService 完成后刷新
+                        _ = RefreshFromService();
                     });
 
             ezConfig.GetBindable<bool>(Ez2Setting.BmsPoorHitResultEnable)
                     .BindValueChanged(__ =>
                     {
-                        CommittedNowScore = null;
-                        Refresh();
+                        _ = RefreshFromService();
                     });
 
             offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
@@ -563,10 +571,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 Position = Vector2.Zero,
                 Width = LeftMarginConst,
                 AutoSizeAxes = Axes.Y,
-                Child = contentHolder
+                Child = contentHolder,
+                Depth = float.MaxValue - 1
             };
-
-            leftContainer.Depth = float.MaxValue - 1;
             AddInternal(leftContainer);
 
             var labelArea = new Container
@@ -576,10 +583,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 Position = new Vector2(LeftMarginConst - label_area_width, 0),
                 Size = new Vector2(label_area_width, DrawHeight),
                 RelativeSizeAxes = Axes.None,
-                AutoSizeAxes = Axes.None
+                AutoSizeAxes = Axes.None,
+                Depth = float.MaxValue
             };
-
-            labelArea.Depth = float.MaxValue;
             AddInternal(labelArea);
 
             LeftLabelContainer = labelArea;
@@ -631,8 +637,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         private SimpleStatisticItem<string> makeSimpleStat(string display, string name = "Count", ColourInfo? colour = null)
         {
-            var item = new SimpleStatisticItem<string>(name) { Value = display };
-            item.Colour = colour ?? Color4.White;
+            var item = new SimpleStatisticItem<string>(name)
+            {
+                Value = display,
+                Colour = colour ?? Color4.White
+            };
             return item;
         }
     }
