@@ -252,7 +252,10 @@ namespace osu.Game.EzOsuGame.Scoring
 
         private void assignTimeline(ScoreInfo scoreInfo, EzScoreTimeline timeline)
         {
-            var entry = entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfo.ID);
+            // 优先匹配非 tracked 的 ghost entry：回放模式下 tracked score 与 ghost 可能具有相同的 ScoreInfo.ID，
+            // 若 timeline 错误赋给 tracked entry，ghost HUD 无法获取数据。
+            var entry = entries.FirstOrDefault(e => !e.Tracked && e.ScoreInfo.ID == scoreInfo.ID)
+                        ?? entries.FirstOrDefault(e => e.ScoreInfo.ID == scoreInfo.ID);
 
             if (entry != null)
             {
@@ -385,6 +388,7 @@ namespace osu.Game.EzOsuGame.Scoring
             loadCancellation?.Dispose();
             loadCancellation = null;
             timelineLoadsPending.Clear();
+            TimelineCache.Clear();
         }
     }
 }

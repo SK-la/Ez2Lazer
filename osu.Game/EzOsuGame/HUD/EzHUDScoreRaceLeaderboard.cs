@@ -207,13 +207,12 @@ namespace osu.Game.EzOsuGame.HUD
                     processor = new EzScoreRaceTimelineScoreProcessor();
                     AddInternal(processor);
 
-                    if (GameplayClock == null)
-                        continue;
-
-                    processor.SetGameplayClock(GameplayClock);
                     processor.SetTimeline(entry.Timeline);
                     processor.TotalScore.BindValueChanged(_ => sorting.Invalidate());
                     leaderboardScore = createGhostLeaderboardScore(entry, processor);
+
+                    if (GameplayClock != null)
+                        processor.SetGameplayClock(GameplayClock);
                 }
 
                 var drawable = new DrawableGameplayLeaderboardScore(leaderboardScore);
