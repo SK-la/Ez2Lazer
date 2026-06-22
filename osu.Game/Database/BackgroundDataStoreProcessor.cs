@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.IO;
 using Newtonsoft.Json;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -294,39 +295,69 @@ namespace osu.Game.Database
         {
             Logger.Log($"Forcing Ez Realm metadata recalculation ({scope})...");
 
-            int beatmapCount = 0;
+            // Read phase: collect all eligible beatmap IDs (no write lock).
+            List<Guid> allIds = new List<Guid>();
 
-            realmAccess.Write(r =>
+            realmAccess.Run(r =>
             {
-                foreach (var beatmap in r.All<BeatmapInfo>())
-                {
-                    if (beatmap.BeatmapSet == null)
-                        continue;
-
-                    if (scope.HasFlag(EzRealmMetadataScope.Tags))
-                    {
-                        beatmap.HasVideo = null;
-                        beatmap.HasStoryboard = null;
-                    }
-
-                    // Third-party / unavailable rulesets: keep persisted xxy/pp until the assembly is loadable again.
-                    if (!EzXxyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
-                    {
-                        beatmapCount++;
-                        continue;
-                    }
-
-                    if (scope.HasFlag(EzRealmMetadataScope.Pp))
-                        beatmap.PerformancePoints = -1;
-
-                    if (scope.HasFlag(EzRealmMetadataScope.Xxy) && EzXxyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
-                        beatmap.XxyStarRating = -1;
-
-                    beatmapCount++;
-                }
+                allIds = r.All<BeatmapInfo>()
+                          .Where(b => b.BeatmapSet != null)
+                          .AsEnumerable()
+                          .Select(b => b.ID)
+                          .ToList();
             });
 
-            Logger.Log($"Marked {beatmapCount} beatmaps for Ez Realm metadata recalculation ({scope}).");
+            if (allIds.Count == 0)
+            {
+                Logger.Log("No beatmaps to clear.");
+                return;
+            }
+
+            const int batch_size = 500;
+            int totalProcessed = 0;
+
+            for (int i = 0; i < allIds.Count; i += batch_size)
+            {
+                var batchIds = allIds.Skip(i).Take(batch_size).ToList();
+
+                realmAccess.Write(r =>
+                {
+                    foreach (var id in batchIds)
+                    {
+                        var beatmap = r.Find<BeatmapInfo>(id);
+
+                        if (beatmap == null)
+                            continue;
+
+                        if (scope.HasFlag(EzRealmMetadataScope.Tags))
+                        {
+                            beatmap.HasVideo = null;
+                            beatmap.HasStoryboard = null;
+                        }
+
+                        // Third-party / unavailable rulesets: keep persisted xxy/pp until the assembly is loadable again.
+                        if (!EzXxyStarRatingSupport.IsRulesetAvailable(beatmap.Ruleset))
+                        {
+                            totalProcessed++;
+                            continue;
+                        }
+
+                        if (scope.HasFlag(EzRealmMetadataScope.Pp))
+                            beatmap.PerformancePoints = -1;
+
+                        if (scope.HasFlag(EzRealmMetadataScope.Xxy) && EzXxyStarRatingSupport.SupportsRuleset(beatmap.Ruleset))
+                            beatmap.XxyStarRating = -1;
+
+                        totalProcessed++;
+                    }
+                });
+
+                // Yield between batches so Realm change notifications can be processed on the update thread,
+                // preventing the UI from freezing during bulk clear operations.
+                sleepIfRequired();
+            }
+
+            Logger.Log($"Marked {totalProcessed} beatmaps for Ez Realm metadata recalculation ({scope}).");
         }
 
         private void forceEzRealmMetadataRecalculation()
@@ -497,78 +528,114 @@ namespace osu.Game.Database
         /// </summary>
         private void populateMissingBeatmapTagFlags()
         {
-            HashSet<Guid> beatmapIds = new HashSet<Guid>();
             Logger.Log("Querying for beatmaps requiring Ez Realm tag backfill...");
+
+            // Read phase: collect beatmaps by set (no write lock, lightweight Realm query).
+            // Grouping by BeatmapSetID allows us to reuse one WorkingBeatmap per set instead of creating
+            // one per difficulty, dramatically reducing GC pressure during forceAll recalculation.
+            Dictionary<Guid, (Guid firstBeatmapId, List<(Guid id, string? path)> difficulties)> bySet = null!;
 
             realmAccess.Run(r =>
             {
-                foreach (var beatmap in r.All<BeatmapInfo>())
-                {
-                    if (beatmap.BeatmapSet == null)
-                        continue;
-
-                    if (beatmap.HasVideo != null && beatmap.HasStoryboard != null)
-                        continue;
-
-                    beatmapIds.Add(beatmap.ID);
-                }
+                bySet = r.All<BeatmapInfo>()
+                         .AsEnumerable()
+                         .Where(b => b.BeatmapSet != null && (b.HasVideo == null || b.HasStoryboard == null))
+                         .GroupBy(b => b.BeatmapSet!.ID)
+                         .ToDictionary(
+                             g => g.Key,
+                             g =>
+                             {
+                                 var diffs = g.Select(b => (b.ID, b.Path)).ToList();
+                                 return (diffs[0].ID, diffs);
+                             });
             });
 
-            if (beatmapIds.Count == 0)
+            if (bySet == null || bySet.Count == 0)
                 return;
 
-            Logger.Log($"Found {beatmapIds.Count} beatmaps which require Ez Realm tag population.");
+            int totalBeatmaps = bySet.Sum(kv => kv.Value.difficulties.Count);
+            Logger.Log($"Found {totalBeatmaps} beatmaps across {bySet.Count} sets which require Ez Realm tag population.");
 
             var notification = showProgressNotification(
-                beatmapIds.Count,
+                totalBeatmaps,
                 "Populating Ez beatmap tags in Realm",
                 "beatmaps have been updated with Ez tags");
 
             int processedCount = 0;
             int failedCount = 0;
 
-            foreach (var id in beatmapIds)
+            foreach (var (setId, (firstBeatmapId, difficulties)) in bySet)
             {
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
 
-                updateNotificationProgress(notification, processedCount, beatmapIds.Count);
+                // Get one WorkingBeatmap per set and reuse its stream provider for all difficulties.
+                WorkingBeatmap? working;
 
-                sleepIfRequired();
+                var firstDetached = realmAccess.Run(r => r.Find<BeatmapInfo>(firstBeatmapId)?.Detach());
 
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
-
-                if (beatmap == null)
+                if (firstDetached == null)
                 {
-                    ++failedCount;
+                    failedCount += difficulties.Count;
                     continue;
                 }
 
                 try
                 {
-                    var working = beatmapManager.GetWorkingBeatmap(beatmap);
-                    var tagSummary = EzBeatmapTagParser.Parse(working);
-
-                    realmAccess.Write(r =>
-                    {
-                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo liveBeatmapInfo)
-                        {
-                            liveBeatmapInfo.HasVideo = tagSummary.HasVideo;
-                            liveBeatmapInfo.HasStoryboard = tagSummary.HasStoryboard;
-                        }
-                    });
-
-                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
-                    ++processedCount;
+                    working = beatmapManager.GetWorkingBeatmap(firstDetached);
                 }
                 catch (Exception e)
                 {
-                    Logger.Log($"Background tag processing failed on {beatmap}: {e}");
-                    ++failedCount;
+                    Logger.Log($"Failed to create working beatmap for set {setId}: {e}");
+                    failedCount += difficulties.Count;
+                    continue;
                 }
+
+                // Use the WorkingBeatmap's BeatmapSetInfo (includes populated Files list) and GetStream.
+                var beatmapSet = working.BeatmapSetInfo;
+                Func<string, Stream?> getStream = working.GetStream;
+
+                // Cache the parser results for batch write.
+                var results = new List<(Guid id, EzBeatmapTagSummary summary)>(
+                    difficulties.Count < 256 ? difficulties.Count : 256);
+
+                foreach (var (difficultyId, path) in difficulties)
+                {
+                    try
+                    {
+                        var tagSummary = EzBeatmapTagParser.Parse(beatmapSet, path, getStream);
+                        results.Add((difficultyId, tagSummary));
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log($"Tag parsing failed for beatmap {difficultyId}: {e}");
+                        ++failedCount;
+                    }
+                }
+
+                // Batch write all results for this set in a single transaction.
+                if (results.Count > 0)
+                {
+                    realmAccess.Write(r =>
+                    {
+                        foreach (var (difficultyId, tagSummary) in results)
+                        {
+                            if (r.Find<BeatmapInfo>(difficultyId) is BeatmapInfo liveBeatmapInfo)
+                            {
+                                liveBeatmapInfo.HasVideo = tagSummary.HasVideo;
+                                liveBeatmapInfo.HasStoryboard = tagSummary.HasStoryboard;
+                            }
+                        }
+                    });
+                }
+
+                processedCount += results.Count;
+
+                updateNotificationProgress(notification, processedCount, totalBeatmaps);
+                sleepIfRequired();
             }
 
-            completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
+            completeNotification(notification, processedCount, totalBeatmaps, failedCount);
         }
 
         private void populateMissingPerformancePoints()
