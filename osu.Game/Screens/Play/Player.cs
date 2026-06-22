@@ -250,7 +250,6 @@ namespace osu.Game.Screens.Play
         }
 
         private ScreenSuspensionHandler screenSuspension;
-        private EzScoreRaceSessionHost scoreRaceSessionHost;
 
         private DependencyContainer dependencies;
 
@@ -356,9 +355,6 @@ namespace osu.Game.Screens.Play
             Score.ScoreInfo.Mods = gameplayMods;
 
             dependencies.CacheAs(GameplayState = new GameplayState(playableBeatmap, ruleset, gameplayMods, Score, ScoreProcessor, HealthProcessor, Beatmap.Value.Storyboard, PlayingState));
-
-            AddInternal(scoreRaceSessionHost = new EzScoreRaceSessionHost());
-            dependencies.CacheAs(scoreRaceSessionHost);
 
             var rulesetSkinProvider = new RulesetSkinProvidingContainer(ruleset, playableBeatmap, Beatmap.Value.Skin);
             config.BindWith(OsuSetting.BeatmapSkins, rulesetSkinProvider.BeatmapSkins);
@@ -1156,7 +1152,7 @@ namespace osu.Game.Screens.Play
 
             // We do not want to import the score in cases where we don't show results
             bool canShowResults = Configuration.ShowResults && GameplayState.HasPassed
-                                  && (ScoreProcessor.HasCompleted.Value || ezForceResultsImport);
+                                                            && (ScoreProcessor.HasCompleted.Value || ezForceResultsImport);
 
             // [Ez] Trace the canShowResults decision to expose HasCompleted race conditions.
             EzOsuGame.Diagnostics.EzTimingTrace.Record(

@@ -24,13 +24,13 @@ namespace osu.Game.EzOsuGame.Scoring
         void Store(string key, EzScoreTimeline? timeline);
 
         /// <summary>
-        /// 清空缓存。Session Dispose 时调用，避免被复用导致跨局串味。
+        /// 清空缓存。
         /// </summary>
         void Clear();
     }
 
     /// <summary>
-    /// 进程内 in-memory 缓存实现。<see cref="EzScoreRaceSession"/> 持有其实例并随 Dispose 释放。
+    /// 进程内 in-memory 缓存实现。由各调用方持有。
     /// </summary>
     public sealed class EzScoreTimelineCache : IEzScoreTimelineCache
     {

@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Localization;
@@ -15,6 +14,12 @@ using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.HUD
 {
+    /// <summary>
+    /// 角逐 HUD 组件基类。对齐官方 Spectator HUD 模式：
+    /// - 数据由 <see cref="EzScoreRaceService"/> 通过 <c>States</c> 字典提供
+    /// - <see cref="EzScoreRaceTimelineScoreProcessor"/> 由各 HUD 组件自己创建/销毁，绑定 ghost state
+    /// - 基类只提供时钟解析和 <see cref="GameplayState"/> 引用，不持有 Session
+    /// </summary>
     public abstract partial class EzHUDScoreRaceComponent : CompositeDrawable
     {
         [Resolved(canBeNull: true)]
@@ -24,87 +29,47 @@ namespace osu.Game.EzOsuGame.HUD
         protected ScoreProcessor? ScoreProcessor { get; private set; }
 
         [Resolved(canBeNull: true)]
-        private EzScoreRaceSessionHost? sessionHost { get; set; }
-
-        protected EzScoreRaceSession? Session { get; private set; }
-
-        [Resolved(canBeNull: true)]
         protected GameplayClockContainer? GameplayClock { get; private set; }
 
-        protected readonly Bindable<EzScoreModFilter> ModFilter = new Bindable<EzScoreModFilter>(EzScoreModFilter.Any);
-        protected readonly BindableInt MaxEntries = new BindableInt(5) { MinValue = 1, MaxValue = 10 };
-
         /// <summary>
-        /// 为 false 时本组件不覆盖 Session 的 <see cref="EzScoreRaceSession.MaxEntryCount"/>（如 CompareBars）。
+        /// 用于派生类判断当前规则集是否支持 ghost 角逐。
         /// </summary>
-        protected virtual bool ContributesMaxEntryCount => true;
+        protected bool SupportsGhostRace => EzScoreRaceRulesetSupport.SupportsGhostRace(GameplayState?.Ruleset.RulesetInfo);
 
-        protected bool SupportsGhostRace =>
-            Session?.SupportsGhostRace ?? EzScoreRaceRulesetSupport.SupportsGhostRace(GameplayState?.Ruleset.RulesetInfo);
-
-        private OsuSpriteText? loadingText;
+        private protected OsuSpriteText? LoadingText;
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-
-            if (GameplayState != null)
-                bindSessionWhenAvailable();
-        }
-
-        private void bindSessionWhenAvailable()
-        {
-            if (Session != null)
-                return;
-
-            Session = sessionHost?.Session;
-
-            if (Session == null)
-            {
-                Schedule(bindSessionWhenAvailable);
-                return;
-            }
-
-            ConfigureSession();
-
-            ModFilter.BindValueChanged(_ => reloadSession(), true);
-            MaxEntries.BindValueChanged(_ => reloadSession(), true);
-            Session.IsReady.BindValueChanged(_ => updateLoadingState(), true);
-            Session.EntriesChanged += onEntriesChanged;
-            updateLoadingState();
+            GameplayClock ??= this.FindClosestParent<GameplayClockContainer>();
             OnSessionReady();
         }
 
         /// <summary>
-        /// <see cref="Session"/> 可用后调用（可能晚于 <see cref="LoadComplete"/>）。
+        /// 在 <see cref="LoadComplete"/> 完成后调用，组件可在此绑定 <see cref="EzScoreRaceService.States"/>。
         /// </summary>
         protected virtual void OnSessionReady()
         {
         }
 
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing && Session != null)
-                Session.EntriesChanged -= onEntriesChanged;
-
-            base.Dispose(isDisposing);
-        }
+        // protected override void Dispose(bool isDisposing)
+        // {
+        //     base.Dispose(isDisposing);
+        // }
 
         protected double GetCurrentClockTime()
         {
-            GameplayClock ??= this.FindClosestParent<GameplayClockContainer>();
             return GameplayClock?.CurrentTime ?? 0;
         }
 
-        protected long GetLiveDisplayScore(ScoringMode mode = ScoringMode.Standardised)
-            => ScoreProcessor?.GetDisplayScore(mode) ?? 0;
+        protected long GetLiveDisplayScore(ScoringMode mode = ScoringMode.Standardised) => ScoreProcessor?.GetDisplayScore(mode) ?? 0;
 
         protected void EnsureLoadingOverlay()
         {
-            if (loadingText != null)
+            if (LoadingText != null)
                 return;
 
-            loadingText = new OsuSpriteText
+            LoadingText = new OsuSpriteText
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
@@ -112,35 +77,8 @@ namespace osu.Game.EzOsuGame.HUD
                 Font = OsuFont.GetFont(size: 14),
             };
 
-            AddInternal(loadingText);
+            AddInternal(LoadingText);
         }
-
-        protected virtual void ConfigureSession()
-        {
-            Session?.ReloadIfNeeded(ModFilter.Value, getEffectiveMaxEntryCount());
-        }
-
-        private void reloadSession()
-            => ConfigureSession();
-
-        private int getEffectiveMaxEntryCount()
-            => ContributesMaxEntryCount ? MaxEntries.Value : Session?.MaxEntryCount ?? MaxEntries.Value;
-
-        private void updateLoadingState()
-        {
-            if (loadingText == null)
-                return;
-
-            if (!SupportsGhostRace)
-            {
-                loadingText.Alpha = 0;
-                return;
-            }
-
-            loadingText.Alpha = Session?.IsReady.Value == true ? 0 : 1;
-        }
-
-        private void onEntriesChanged() => Schedule(OnEntriesChangedScheduled);
 
         protected virtual void OnEntriesChangedScheduled()
         {

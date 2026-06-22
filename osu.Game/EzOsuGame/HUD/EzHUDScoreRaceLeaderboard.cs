@@ -10,12 +10,12 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Logging;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics.Containers;
-using osu.Game.Rulesets.Scoring;
-using osu.Game.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.Leaderboards;
 using osu.Game.Skinning;
@@ -25,7 +25,10 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.HUD
 {
     /// <summary>
-    /// 本地多成绩实时角逐排行榜。外观与 <see cref="DrawableGameplayLeaderboard"/> 一致。
+    /// 本地多成绩实时角逐排行榜。对齐官方 Leaderboard 架构：
+    /// - <see cref="EzScoreRaceService"/> 负责选歌界面预加载，提供 <see cref="IEzScoreRaceStateLookup.States"/> 字典
+    /// - 本组件订阅字典变化，按需创建/销毁 processor，每个 processor 绑定到一个 ghost state
+    /// - HUD 直接绑定 processor 的 bindable，不需要 Session/Entry 中间层
     /// </summary>
     public partial class EzHUDScoreRaceLeaderboard : EzHUDScoreRaceComponent, ISerialisableDrawable
     {
@@ -50,8 +53,10 @@ namespace osu.Game.EzOsuGame.HUD
         private readonly InputDisabledScrollContainer scroll;
         private DrawableGameplayLeaderboardScore? trackedScore;
         private readonly BindableBool expanded = new BindableBool(true);
-        private readonly List<RaceEntryState> entryStates = new List<RaceEntryState>();
+        private readonly List<LeaderboardEntryState> entryStates = new List<LeaderboardEntryState>();
         private readonly Cached sorting = new Cached();
+
+        private IBindableDictionary<string, EzScoreRaceState>? stateLookup;
 
         public EzHUDScoreRaceLeaderboard()
         {
@@ -82,8 +87,6 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void LoadComplete()
         {
-            ModFilter.BindTo(ModFilterSetting);
-            MaxEntries.BindTo(MaxEntriesSetting);
             SortCriterionSetting.BindValueChanged(_ =>
             {
                 sorting.Invalidate();
@@ -97,42 +100,60 @@ namespace osu.Game.EzOsuGame.HUD
             Scheduler.AddDelayed(sort, 1000, true);
         }
 
-        protected override void OnSessionReady()
+        private void bindStateLookupWhenAvailable()
         {
-            Session?.IsReady.BindValueChanged(_ => rebuildRows(), true);
+            if (stateLookup != null)
+                return;
 
-            if (Session != null)
-                Session.TimelineReady += onTimelineReady;
+            var service = (EzScoreRaceService?)Dependencies.Get(typeof(EzScoreRaceService));
+
+            if (service == null)
+            {
+                Schedule(bindStateLookupWhenAvailable);
+                return;
+            }
+
+            stateLookup = service.States;
+            stateLookup!.BindCollectionChanged(onStatesChanged, true);
+
+            updateLoadingState();
         }
 
-        protected override void Dispose(bool isDisposing)
+        private void onStatesChanged(object? sender, NotifyDictionaryChangedEventArgs<string, EzScoreRaceState> e)
         {
-            if (isDisposing && Session != null)
-                Session.TimelineReady -= onTimelineReady;
-
-            base.Dispose(isDisposing);
-        }
-
-        private void onTimelineReady(ScoreInfo scoreInfo, EzScoreTimeline timeline)
-        {
-            // 来自后台构建线程的回调：抛到主线程执行更新，避免并发触碰 HUD 状态。
             Schedule(() =>
             {
-                var state = entryStates.FirstOrDefault(s => s.ScoreInfoId == scoreInfo.ID);
-
-                if (state?.Processor == null)
-                    return;
-
-                state.Timeline = timeline;
-                state.Processor.SetTimeline(timeline);
-                sorting.Invalidate();
+                switch (e.Action)
+                {
+                    case NotifyDictionaryChangedAction.Add:
+                    case NotifyDictionaryChangedAction.Remove:
+                        rebuildRowsIfNeeded();
+                        break;
+                }
             });
+        }
+
+        private void updateLoadingState()
+        {
+            if (LoadingText == null)
+                return;
+
+            LoadingText.Alpha = SupportsGhostRace && stateLookup!.Count == 0 ? 1 : 0;
+        }
+
+        protected override void OnSessionReady()
+        {
+            bindStateLookupWhenAvailable();
         }
 
         protected override void Update()
         {
             base.Update();
+            updateScoreDisplay();
+        }
 
+        private void updateScoreDisplay()
+        {
             Width = Math.Max(Width, Flow.X + DrawableGameplayLeaderboardScore.MIN_WIDTH);
             Height = Math.Max(Height, DrawableGameplayLeaderboardScore.PANEL_HEIGHT);
 
@@ -185,122 +206,100 @@ namespace osu.Game.EzOsuGame.HUD
             }
         }
 
-        private void rebuildRows()
+        private void rebuildRowsIfNeeded()
         {
+            if (!needsStructuralRebuild())
+            {
+                refreshExistingRows();
+                return;
+            }
+
             Flow.Clear();
             entryStates.Clear();
             trackedScore = null;
             scroll.ScrollToStart(false);
 
-            if (Session == null)
-                return;
+            int i = 0;
 
-            foreach (var entry in Session.Entries)
+            foreach (var kvp in stateLookup!.OrderByDescending(kvp => kvp.Value.ScoreInfo.TotalScore))
             {
-                EzScoreRaceTimelineScoreProcessor? processor = null;
-                GameplayLeaderboardScore leaderboardScore;
+                if (i >= MaxEntriesSetting.Value)
+                    break;
 
-                if (entry.Tracked)
-                    leaderboardScore = createTrackedLeaderboardScore();
-                else
-                {
-                    processor = new EzScoreRaceTimelineScoreProcessor();
-                    AddInternal(processor);
-
-                    processor.SetTimeline(entry.Timeline);
-                    processor.TotalScore.BindValueChanged(_ => sorting.Invalidate());
-                    leaderboardScore = createGhostLeaderboardScore(entry, processor);
-
-                    if (GameplayClock != null)
-                        processor.SetGameplayClock(GameplayClock);
-                }
-
-                var drawable = new DrawableGameplayLeaderboardScore(leaderboardScore);
-                drawable.Expanded.BindTo(expanded);
-                drawable.DisplayOrder.BindValueChanged(_ => Scheduler.AddOnce(sort), true);
-
-                if (entry.Tracked)
-                    leaderboardScore.TotalScore.BindValueChanged(_ => sorting.Invalidate());
-
-                if (entry.Tracked)
-                    trackedScore = drawable;
-
-                var state = new RaceEntryState(entry, leaderboardScore, drawable, processor);
-                entryStates.Add(state);
+                var state = kvp.Value;
+                var drawable = createDrawableForState(state, out var entryState);
+                entryStates.Add(entryState);
                 Flow.Add(drawable);
+                Logger.Log($"[EzScoreRace] Leaderboard rebuild: state[{i}] {state.ScoreInfo.ID}, HasTimeline={state.Timeline != null}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                i++;
+            }
+
+            sorting.Invalidate();
+            sort();
+            updateLoadingState();
+            Logger.Log($"[EzScoreRace] Leaderboard rebuild done: {entryStates.Count} rows", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+        }
+
+        private void refreshExistingRows()
+        {
+            if (entryStates.Count != stateLookup!.Count)
+            {
+                rebuildRowsIfNeeded();
+                return;
             }
 
             sorting.Invalidate();
             sort();
         }
 
-        protected override void OnEntriesChangedScheduled()
+        private DrawableGameplayLeaderboardScore createDrawableForState(EzScoreRaceState state, out LeaderboardEntryState entryState)
         {
-            if (needsStructuralRebuild())
-                rebuildRows();
-            else
-                refreshTimelineRefs();
-        }
+            var processor = new EzScoreRaceTimelineScoreProcessor();
+            AddInternal(processor);
 
-        private void refreshTimelineRefs()
-        {
-            if (Session == null)
-                return;
+            processor.BindTo(state);
 
-            foreach (var state in entryStates)
-            {
-                if (state.Tracked)
-                    continue;
-
-                if (GameplayClock == null)
-                    continue;
-
-                state.Timeline = Session.Entries.FirstOrDefault(e => e.ScoreInfo.ID == state.ScoreInfoId)?.Timeline;
-                state.Processor?.SetGameplayClock(GameplayClock);
-                state.Processor?.SetTimeline(state.Timeline);
-            }
-        }
-
-        private bool needsStructuralRebuild()
-        {
-            if (Session == null)
-                return entryStates.Count > 0;
-
-            if (entryStates.Count != Session.Entries.Count)
-                return true;
-
-            var sessionIds = Session.Entries.Select(e => e.ScoreInfo.ID).OrderBy(id => id).ToArray();
-            var stateIds = entryStates.Select(s => s.ScoreInfoId).OrderBy(id => id).ToArray();
-
-            for (int i = 0; i < sessionIds.Length; i++)
-            {
-                if (sessionIds[i] != stateIds[i])
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static GameplayLeaderboardScore createGhostLeaderboardScore(EzScoreRaceEntry entry, EzScoreRaceTimelineScoreProcessor processor)
-        {
-            var leaderboardScore = new GameplayLeaderboardScore(entry.ScoreInfo, false, GameplayLeaderboardScore.ComboDisplayMode.Highest);
-            var scoreInfo = entry.ScoreInfo;
+            var leaderboardScore = new GameplayLeaderboardScore(state.ScoreInfo, false, GameplayLeaderboardScore.ComboDisplayMode.Highest);
+            var scoreInfo = state.ScoreInfo;
             leaderboardScore.TotalScore.BindTarget = processor.TotalScore;
             leaderboardScore.Accuracy.BindTarget = processor.Accuracy;
             leaderboardScore.Combo.BindTarget = processor.Combo;
             leaderboardScore.GetDisplayScore = mode => EzScoreRaceDisplayScore.ForLeaderboardScore(leaderboardScore, scoreInfo, mode);
-            return leaderboardScore;
+
+            var drawable = new DrawableGameplayLeaderboardScore(leaderboardScore);
+            drawable.Expanded.BindTo(expanded);
+            drawable.DisplayOrder.BindValueChanged(_ => Scheduler.AddOnce(sort), true);
+
+            processor.TotalScore.BindValueChanged(_ => sorting.Invalidate());
+
+            entryState = new LeaderboardEntryState(state, leaderboardScore, drawable, processor);
+
+            return drawable;
         }
 
-        private GameplayLeaderboardScore createTrackedLeaderboardScore()
+        protected override void OnEntriesChangedScheduled()
         {
-            if (GameplayState == null)
-                throw new InvalidOperationException("Tracked score requires GameplayState.");
+            rebuildRowsIfNeeded();
+        }
 
-            return new GameplayLeaderboardScore(GameplayState, tracked: true, GameplayLeaderboardScore.ComboDisplayMode.Highest)
+        private bool needsStructuralRebuild()
+        {
+            if (stateLookup!.Count == 0)
+                return entryStates.Count > 0;
+
+            string[] boundIds = stateLookup!.Keys.OrderBy(k => k).ToArray();
+            string[] stateIds = entryStates.Select(s => s.ScoreInfoId).OrderBy(id => id).ToArray();
+
+            if (boundIds.Length != stateIds.Length)
+                return true;
+
+            for (int i = 0; i < boundIds.Length; i++)
             {
-                TotalScoreTiebreaker = long.MaxValue,
-            };
+                if (boundIds[i] != stateIds[i])
+                    return true;
+            }
+
+            return false;
         }
 
         private void sort()
@@ -312,7 +311,7 @@ namespace osu.Game.EzOsuGame.HUD
             sorting.Validate();
         }
 
-        private List<RaceEntryState> getOrderedEntryStates()
+        private List<LeaderboardEntryState> getOrderedEntryStates()
         {
             var ordered = EzScoreRaceMetricOrdering.ApplyMetricOrdering(
                 entryStates,
@@ -322,10 +321,10 @@ namespace osu.Game.EzOsuGame.HUD
                 s => s.LeaderboardScore.Combo.Value,
                 getMissCount);
 
-            return ordered.ThenBy(s => s.Tracked ? long.MaxValue : s.Tiebreaker).ToList();
+            return ordered.ThenBy(s => s.Tiebreaker).ToList();
         }
 
-        private void applySortOrder(List<RaceEntryState> orderedList)
+        private void applySortOrder(List<LeaderboardEntryState> orderedList)
         {
             for (int i = 0; i < orderedList.Count; i++)
             {
@@ -337,31 +336,39 @@ namespace osu.Game.EzOsuGame.HUD
             }
         }
 
-        private int getMissCount(RaceEntryState state)
+        private int getMissCount(LeaderboardEntryState state)
         {
-            if (state.Tracked)
-                return ScoreProcessor?.Statistics.GetValueOrDefault(HitResult.Miss) ?? 0;
-
             return state.Processor?.MissCount.Value ?? 0;
         }
 
-        private sealed class RaceEntryState
+        protected override void Dispose(bool isDisposing)
         {
-            public Guid ScoreInfoId { get; }
-            public bool Tracked { get; }
+            if (isDisposing)
+            {
+                foreach (var entry in entryStates)
+                    entry.Processor?.Dispose();
+
+                entryStates.Clear();
+            }
+
+            base.Dispose(isDisposing);
+        }
+
+        private sealed class LeaderboardEntryState
+        {
+            public string ScoreInfoId { get; }
             public long Tiebreaker { get; }
-            public EzScoreTimeline? Timeline { get; set; }
             public EzScoreRaceTimelineScoreProcessor? Processor { get; }
             public GameplayLeaderboardScore LeaderboardScore { get; }
             public DrawableGameplayLeaderboardScore Drawable { get; }
 
-            public RaceEntryState(EzScoreRaceEntry entry, GameplayLeaderboardScore leaderboardScore, DrawableGameplayLeaderboardScore drawable,
-                                  EzScoreRaceTimelineScoreProcessor? processor)
+            public LeaderboardEntryState(EzScoreRaceState state,
+                                         GameplayLeaderboardScore leaderboardScore,
+                                         DrawableGameplayLeaderboardScore drawable,
+                                         EzScoreRaceTimelineScoreProcessor processor)
             {
-                ScoreInfoId = entry.ScoreInfo.ID;
-                Tracked = entry.Tracked;
-                Tiebreaker = entry.ScoreInfo.Date.ToUnixTimeSeconds();
-                Timeline = entry.Timeline;
+                ScoreInfoId = state.ScoreInfo.ID.ToString();
+                Tiebreaker = state.ScoreInfo.Date.ToUnixTimeSeconds();
                 Processor = processor;
                 LeaderboardScore = leaderboardScore;
                 Drawable = drawable;

@@ -42,7 +42,9 @@ using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
@@ -1265,7 +1267,8 @@ namespace osu.Game
 
             loadComponentSingleFile(new BackgroundDataStoreProcessor(), Add, true);
             loadComponentSingleFile(new EzAnalysisWarmupProcessor(), Add, true);
-            loadComponentSingleFile(new EzOsuGame.Background.Pixiv.PixivAutoDownloadProcessor(), Add, true);
+            loadComponentSingleFile(new EzScoreRaceService(), Add, true);
+            loadComponentSingleFile(new PixivAutoDownloadProcessor(), Add, true);
             loadComponentSingleFile<BeatmapStore>(detachedBeatmapStore = new RealmDetachedBeatmapStore(), Add, true);
             loadComponentSingleFile(new QueueController(), Add, true);
 

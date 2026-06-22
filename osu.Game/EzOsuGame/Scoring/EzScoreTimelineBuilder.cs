@@ -38,7 +38,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
         /// <summary>
         /// 创建一个进程内 in-memory 缓存实例，绑定到调用方生命周期。
-        /// 通常由 <see cref="EzScoreRaceSession"/> 持有，Session Dispose 时调用 <see cref="IEzScoreTimelineCache.Clear"/>。
+        /// 通常由调用方持有。
         /// </summary>
         public static IEzScoreTimelineCache CreateSessionCache() => new EzScoreTimelineCache();
 
