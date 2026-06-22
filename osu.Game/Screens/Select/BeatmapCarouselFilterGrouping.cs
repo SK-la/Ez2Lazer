@@ -532,6 +532,11 @@ namespace osu.Game.Screens.Select
                     "game"))
                 return new GroupDefinition(3, "ACG").Yield();
 
+            // Ez: group beatmaps with storyboard or video that didn't match any game-specific group above.
+            // Placed after game groups so that e.g. "vocaloid" beatmaps still go to VOCALOID group even if they also have media.
+            if (beatmap.HasStoryboard == true || beatmap.HasVideo == true)
+                return new GroupDefinition(5, "Has StoryBoard/Vedio").Yield();
+
             // If none of the special rules matched but the source field was provided, put into Others
             if (hasSource)
                 return new GroupDefinition(50, "Others").Yield();

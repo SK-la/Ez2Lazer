@@ -50,6 +50,18 @@ namespace osu.Game.Screens.Select
             IsUpperInclusive = true
         };
 
+        /// <summary>
+        /// Ez: Filter beatmaps by presence of video in the storyboard file.
+        /// Null = no filter (show all), true = has video, false = no video.
+        /// </summary>
+        public bool? HasVideo;
+
+        /// <summary>
+        /// Ez: Filter beatmaps by presence of storyboard (sprite/animation) in the storyboard file.
+        /// Null = no filter (show all), true = has storyboard, false = no storyboard.
+        /// </summary>
+        public bool? HasStoryboard;
+
         public OptionalTextFilter[] SearchTerms = Array.Empty<OptionalTextFilter>();
 
         public RulesetInfo? Ruleset;

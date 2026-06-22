@@ -128,6 +128,21 @@ namespace osu.Game.Screens.Select
                     criteria.UserTags.Add(tagFilter);
                     return true;
 
+                case "video":
+                    if (!tryParseBool(value, out bool hasVideo))
+                        return false;
+
+                    criteria.HasVideo = hasVideo ? true : false;
+                    return true;
+
+                case "storyboard":
+                case "sb":
+                    if (!tryParseBool(value, out bool hasStoryboard))
+                        return false;
+
+                    criteria.HasStoryboard = hasStoryboard ? true : false;
+                    return true;
+
                 default:
                     return criteria.RulesetCriteria?.TryParseCustomKeywordCriteria(key, op, value) ?? false;
             }

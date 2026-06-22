@@ -177,6 +177,12 @@ namespace osu.Game.Screens.Select
 
             match &= !criteria.UserStarDifficulty.HasFilter || criteria.UserStarDifficulty.IsInRange(starDifficultyForFilter);
 
+            // Ez: filter by HasVideo / HasStoryboard
+            if (criteria.HasVideo.HasValue)
+                match &= beatmap.HasVideo == criteria.HasVideo.Value;
+            if (criteria.HasStoryboard.HasValue)
+                match &= beatmap.HasStoryboard == criteria.HasStoryboard.Value;
+
             if (!match) return false;
 
             match &= criteria.CollectionBeatmapMD5Hashes?.Contains(beatmap.MD5Hash) ?? true;
