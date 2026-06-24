@@ -2,21 +2,21 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Bindables;
-using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics;
+using osu.Framework.Timing;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.Scoring
 {
     /// <summary>
     /// 单个 ghost 的分数处理器。对齐官方 <see cref="osu.Game.Online.Spectator.SpectatorScoreProcessor"/> 的模式：
     ///
-    /// - 在构造时"绑定"到一个 <see cref="EzScoreRaceState"/>（对应官方的一个 spectated user）
-    /// - 在 <see cref="Update()"/> 中使用 <see cref="Component.Clock"/> 查询当前时间，
-    ///   暂停时 <see cref="Component.Clock"/> 自动停止前进，无需额外检查
-    /// - 当 ghost state 被加入/移除字典时，由 HUD 层面创建/销毁此 processor
-    /// - 按时钟查询 <c>State.Timeline</c>，驱动 <see cref="TotalScore"/> 等 bindable
-    /// - HUD 组件直接订阅 processor bindable，不需要中间层
+    /// - 接收外部注入的 <see cref="IClock"/>（来自 <see cref="GameplayClockContainer"/>），
+    ///   暂停时该时钟停止前进，<see cref="UpdateScore"/> 自动得到旧值而不推进 ghost
+    /// - 由 HUD 在自己的 <c>Update()</c> 里统一驱动所有 processor 的 <see cref="UpdateScore"/>
+    ///   （对齐官方 <see cref="osu.Game.Screens.Play.Leaderboards.MultiSpectatorLeaderboardProvider"/> 的实现）
     /// </summary>
-    public partial class EzScoreRaceTimelineScoreProcessor : CompositeDrawable
+    public partial class EzScoreRaceTimelineScoreProcessor : Component
     {
         /// <summary>该 processor 绑定的 ghost 状态。</summary>
         public EzScoreRaceState? State { get; private set; }
@@ -27,16 +27,17 @@ namespace osu.Game.EzOsuGame.Scoring
         public readonly BindableInt MissCount = new BindableInt();
 
         /// <summary>
+        /// 暂停感知时钟。由 HUD 注入 <see cref="GameplayClockContainer"/>，
+        /// 暂停时 <c>CurrentTime</c> 不再前进，<see cref="UpdateScore"/> 自然停止推进 ghost。
+        /// </summary>
+        public IClock? ReferenceClock { get; set; }
+
+        /// <summary>
         /// 绑定到一个 ghost state。
         /// </summary>
         public void BindTo(EzScoreRaceState state)
         {
             State = state;
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
             UpdateScore();
         }
 
@@ -53,22 +54,19 @@ namespace osu.Game.EzOsuGame.Scoring
         {
             var state = State;
 
-            if (state == null)
+            if (state?.Timeline == null || ReferenceClock == null)
             {
                 zeroBindables();
                 return;
             }
 
-            if (state.Timeline == null)
-            {
-                zeroBindables();
-                return;
-            }
-
-            double currentTime = Clock?.CurrentTime ?? 0;
+            double currentTime = ReferenceClock.CurrentTime;
 
             if (double.IsNaN(currentTime))
+            {
+                zeroBindables();
                 return;
+            }
 
             var snapshot = state.Timeline.QueryAtTime(currentTime);
 
@@ -84,12 +82,6 @@ namespace osu.Game.EzOsuGame.Scoring
             Accuracy.Value = 0;
             Combo.Value = 0;
             MissCount.Value = 0;
-        }
-
-        protected override void Update()
-        {
-            base.Update();
-            UpdateScore();
         }
     }
 }

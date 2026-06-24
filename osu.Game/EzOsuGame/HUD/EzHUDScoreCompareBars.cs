@@ -23,6 +23,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -170,6 +171,13 @@ namespace osu.Game.EzOsuGame.HUD
 
             ghostProcessor1 = new EzScoreRaceTimelineScoreProcessor();
             ghostProcessor2 = new EzScoreRaceTimelineScoreProcessor();
+
+            if (GameplayClockContainer != null)
+            {
+                ghostProcessor1.ReferenceClock = GameplayClockContainer;
+                ghostProcessor2.ReferenceClock = GameplayClockContainer;
+            }
+
             AddInternal(ghostProcessor1);
             AddInternal(ghostProcessor2);
 
@@ -199,6 +207,20 @@ namespace osu.Game.EzOsuGame.HUD
 
             updateCurrentAndTheoreticalBars();
             base.CornerRadius = CornerRadius.Value * Math.Min(DrawWidth, DrawHeight);
+
+            // 对齐官方 MultiSpectatorLeaderboardProvider：HUD 统一驱动 processor.UpdateScore。
+            ghostProcessor1?.UpdateScore();
+            ghostProcessor2?.UpdateScore();
+        }
+
+        protected override void OnGameplayClockResolved(GameplayClockContainer clock)
+        {
+            base.OnGameplayClockResolved(clock);
+
+            if (ghostProcessor1 != null)
+                ghostProcessor1.ReferenceClock = clock;
+            if (ghostProcessor2 != null)
+                ghostProcessor2.ReferenceClock = clock;
         }
 
         private void bindStateLookupWhenAvailable()

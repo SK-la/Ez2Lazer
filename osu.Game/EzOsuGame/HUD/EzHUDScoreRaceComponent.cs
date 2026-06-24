@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Timing;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
@@ -18,7 +19,7 @@ namespace osu.Game.EzOsuGame.HUD
     /// 角逐 HUD 组件基类。对齐官方 Spectator HUD 模式：
     /// - 数据由 <see cref="EzScoreRaceService"/> 通过 <c>States</c> 字典提供
     /// - <see cref="EzScoreRaceTimelineScoreProcessor"/> 由各 HUD 组件自己创建/销毁，绑定 ghost state
-    /// - 基类只提供时钟解析和 <see cref="GameplayState"/> 引用，不持有 Session
+    /// - 基类负责解析 <see cref="Game.Screens.Play.GameplayClockContainer"/> 引用（用于 Processor 的 ReferenceClock）
     /// </summary>
     public abstract partial class EzHUDScoreRaceComponent : CompositeDrawable
     {
@@ -28,8 +29,13 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved(canBeNull: true)]
         protected ScoreProcessor? ScoreProcessor { get; private set; }
 
-        [Resolved(canBeNull: true)]
-        protected GameplayClockContainer? GameplayClock { get; private set; }
+        /// <summary>
+        /// 已就位的 <see cref="Game.Screens.Play.GameplayClockContainer"/>，可作为 processor 的 ReferenceClock。
+        /// 退出 / 重新进入 Player 时该引用会失效，调用方需重新解析。
+        /// </summary>
+        protected IClock? GameplayClock => GameplayClockContainer;
+
+        public GameplayClockContainer? GameplayClockContainer;
 
         /// <summary>
         /// 用于派生类判断当前规则集是否支持 ghost 角逐。
@@ -41,8 +47,26 @@ namespace osu.Game.EzOsuGame.HUD
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            GameplayClock ??= this.FindClosestParent<GameplayClockContainer>();
+
+            // 延迟查找父时钟：HUD 可能先于 GameplayClockContainer 完成加载。
+            Schedule(() =>
+            {
+                if (GameplayClockContainer == null)
+                {
+                    GameplayClockContainer = this.FindClosestParent<GameplayClockContainer>();
+                    if (GameplayClockContainer != null)
+                        OnGameplayClockResolved(GameplayClockContainer);
+                }
+            });
+
             OnSessionReady();
+        }
+
+        /// <summary>
+        /// 当 <see cref="Game.Screens.Play.GameplayClockContainer"/> 已就位时调用，派生类可在此将 clock 注入到自己的 processor。
+        /// </summary>
+        protected virtual void OnGameplayClockResolved(GameplayClockContainer clock)
+        {
         }
 
         /// <summary>
@@ -52,14 +76,9 @@ namespace osu.Game.EzOsuGame.HUD
         {
         }
 
-        // protected override void Dispose(bool isDisposing)
-        // {
-        //     base.Dispose(isDisposing);
-        // }
-
         protected double GetCurrentClockTime()
         {
-            return GameplayClock?.CurrentTime ?? 0;
+            return GameplayClockContainer?.CurrentTime ?? 0;
         }
 
         protected long GetLiveDisplayScore(ScoringMode mode = ScoringMode.Standardised) => ScoreProcessor?.GetDisplayScore(mode) ?? 0;

@@ -16,6 +16,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics.Containers;
+using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.Leaderboards;
 using osu.Game.Skinning;
@@ -146,9 +147,26 @@ namespace osu.Game.EzOsuGame.HUD
             bindStateLookupWhenAvailable();
         }
 
+        protected override void OnGameplayClockResolved(GameplayClockContainer clock)
+        {
+            base.OnGameplayClockResolved(clock);
+
+            foreach (var entry in entryStates)
+            {
+                if (entry.Processor != null)
+                    entry.Processor.ReferenceClock = clock;
+            }
+        }
+
         protected override void Update()
         {
             base.Update();
+
+            // 对齐官方 MultiSpectatorLeaderboardProvider：在 HUD 层统一驱动 processor 的 UpdateScore。
+            // Pause 时 GameplayClockContainer.CurrentTime 停止前进，processor 自然停止 ghost 推进。
+            foreach (var entry in entryStates)
+                entry.Processor?.UpdateScore();
+
             updateScoreDisplay();
         }
 
@@ -255,6 +273,8 @@ namespace osu.Game.EzOsuGame.HUD
         private DrawableGameplayLeaderboardScore createDrawableForState(EzScoreRaceState state, out LeaderboardEntryState entryState)
         {
             var processor = new EzScoreRaceTimelineScoreProcessor();
+            if (GameplayClockContainer != null)
+                processor.ReferenceClock = GameplayClockContainer;
             AddInternal(processor);
 
             processor.BindTo(state);
