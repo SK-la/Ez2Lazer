@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Timing;
+using osu.Game.EzOsuGame.Clocks;
 using osu.Game.Input.Handlers;
 using osu.Game.Screens.Play;
 
@@ -66,6 +67,11 @@ namespace osu.Game.Rulesets.UI
         [Resolved]
         private OsuGame? game { get; set; }
 
+        // [Ez] 谱面时基：由 MasterGameplayClockContainer 在「谱面时基」下注入。
+        // multiplayer / 音频时基 / 测试场景下为 null，FSC 仍走父 IGameplayClock。
+        [Resolved]
+        private IEzBeatmapTimeSource? ezBeatmapTimeSource { get; set; }
+
         private readonly Stopwatch stopwatch = new Stopwatch();
 
         /// <summary>
@@ -100,6 +106,12 @@ namespace osu.Game.Rulesets.UI
                 IsPaused.BindTo(ParentGameplayClock.IsPaused);
             }
 
+            // [Ez] 谱面时基：若 DI 注入了谱面时钟，优先把它作为 referenceClock。
+            // 这样 Time.Current 透传到谱面时钟，ruleset 内的 DHO 不需要任何改动。
+            // MasterGameplayClockContainer 在 multiplayer / 音频时基下不会注入谱面时钟（null）。
+            if (ezBeatmapTimeSource != null && ezBeatmapTimeSource.Enabled)
+                referenceClock = ezBeatmapTimeSource;
+            else
             referenceClock = gameplayClock ?? Clock;
             Clock = this;
         }

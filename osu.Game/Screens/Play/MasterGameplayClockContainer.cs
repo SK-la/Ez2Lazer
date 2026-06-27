@@ -11,6 +11,11 @@ using osu.Framework.Logging;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame.Clocks;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Online.Matchmaking;
+using osu.Game.Online.Multiplayer;
+using osu.Game.Online.Spectator;
 using osu.Game.Overlays;
 using osu.Game.Storyboards;
 
@@ -58,8 +63,27 @@ namespace osu.Game.Screens.Play
 
         private Track track;
 
+        /// <summary>
+        /// [Ez] 谱面时基：当前容器注入的 <see cref="EzBeatmapTimeSource"/>（可能为 null，即音频时基或 multiplayer 强制降级）。
+        /// 子容器（<see cref="FrameStabilityContainer"/>）通过 <see cref="IEzBeatmapTimeSource"/> DI 拿这个引用，
+        /// 并把它的 <see cref="IFrameBasedClock.ElapsedFrameTime"/> 用作 referenceClock。
+        /// </summary>
+        public IEzBeatmapTimeSource? BeatmapTimeSource { get; private set; }
+
         [Resolved]
         private MusicController musicController { get; set; } = null!;
+
+        [Resolved]
+        private Ez2ConfigManager? ezConfig { get; set; }
+
+        [Resolved]
+        private IMultiplayerClient? multiplayerClient { get; set; }
+
+        [Resolved]
+        private ISpectatorClient? spectatorClient { get; set; }
+
+        [Resolved]
+        private IMatchmakingClient? matchmakingClient { get; set; }
 
         /// <summary>
         /// Create a new master gameplay clock container.
@@ -74,6 +98,47 @@ namespace osu.Game.Screens.Play
 
             GameplayStartTime = gameplayStartTime;
             StartTime = findEarliestStartTime(gameplayStartTime, beatmap, working.Storyboard);
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            // [Ez] 谱面时基注入：multiplayer / spectate / matchmaking 上下文强制走音频时基。
+            bool isMultiplayer = multiplayerClient != null || spectatorClient != null || matchmakingClient != null;
+
+            EzBeatmapClockTimeBase? configured = null;
+
+            try
+            {
+                configured = ezConfig?.Get<EzBeatmapClockTimeBase>(Ez2Setting.BeatmapClockTimeBase);
+            }
+            catch
+            {
+                // 配置尚未加载（早期启动 / 测试）时按默认处理。
+            }
+
+            if (!isMultiplayer && configured == EzBeatmapClockTimeBase.Beatmap)
+            {
+                // 不传入 SourceClock：EzBeatmapTimeSource 用内部 wallClock 独立推进，
+                // 避免与 GameplayClock (FramedBeatmapClock) 形成循环依赖。
+                var beatmapSource = new EzBeatmapTimeSource();
+                BeatmapTimeSource = beatmapSource;
+
+                // 把谱面时钟作为 GameplayClock 的 source；FramedBeatmapClock 仍是 IGameplayClock 公开类型。
+                ChangeSource(beatmapSource);
+
+                // 同时通过 DI 暴露给下游（FrameStabilityContainer 等）。
+                AddInternal(new EzBeatmapTimeSourceHolder(beatmapSource));
+
+                Logger.Log("[Ez] EzBeatmapTimeSource enabled (BeatmapClockTimeBase = Beatmap).");
+            }
+            else
+            {
+                if (isMultiplayer)
+                    Logger.Log("[Ez] EzBeatmapTimeSource disabled (multiplayer context).");
+                else
+                    Logger.Log("[Ez] EzBeatmapTimeSource disabled (BeatmapClockTimeBase = Audio).");
+            }
         }
 
         private static double findEarliestStartTime(double gameplayStartTime, IBeatmap beatmap, Storyboard storyboard)

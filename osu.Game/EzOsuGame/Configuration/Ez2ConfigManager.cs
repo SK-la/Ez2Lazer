@@ -219,6 +219,12 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.EzTimingTraceEnabled, false);
 
             #endregion
+
+            #region 谱面时基（Experimental）
+
+            SetDefault(Ez2Setting.BeatmapClockTimeBase, EzBeatmapClockTimeBase.Audio);
+
+            #endregion
         }
 
         private void initializeManiaDefaults()
@@ -951,6 +957,29 @@ namespace osu.Game.EzOsuGame.Configuration
         EzJudgmentDiagEnabled,
         EzSubFrameCorrectionEnabled,
         EzTimingTraceEnabled,
+
+        /// <summary>
+        /// 谱面时钟时基。Audio = 现有行为；Beatmap = 解耦的谱面时钟，由 EzBeatmapTimeSource 提供。
+        /// Multiplayer / Spectate / Matchmaking 上下文会强制覆盖为 Audio（无论此处的值是什么）。
+        /// </summary>
+        BeatmapClockTimeBase,
+    }
+
+    /// <summary>
+    /// 谱面时钟时基选项。
+    /// </summary>
+    public enum EzBeatmapClockTimeBase
+    {
+        /// <summary>
+        /// 音频时基（默认）。沿用 lazer 现行行为，由音频 track 驱动时间。
+        /// </summary>
+        Audio = 0,
+
+        /// <summary>
+        /// 谱面时基。MasterGameplayClockContainer 注入 EzBeatmapTimeSource，
+        /// 时间推进与谱面时长绑定，开头 / 结尾分别 +3 秒缓冲。
+        /// </summary>
+        Beatmap = 1,
     }
 
     public enum EzColumnType : byte
