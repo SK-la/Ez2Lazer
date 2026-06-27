@@ -26,6 +26,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 new EzUISettings(),
                 new EzGameSettings(),
                 new ServerSettings(),
+                new EzSettingsBeatmapTimeBase(),
                 new EzExperimentalSettings(),
             };
         }

@@ -549,5 +549,27 @@ namespace osu.Game.EzOsuGame.Localization
             "Allows local account login without password. Skip all score submissions and online account checks.");
 
         #endregion
+
+        #region 谱面时基
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_CLOCK_TIME_BASE =
+            new EzLocalizationManager.EzLocalisableString("谱面时基（实验性）", "Beatmap time base (Experimental)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_CLOCK_TIME_BASE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "切换游戏内时间推进的时基。"
+            + "\n· Audio（默认）：与官方 lazer 一致，时间由音频 track 驱动。"
+            + "\n· Beatmap：注入解耦的谱面时钟，时间推进与谱面时长绑定，开头 / 结尾各 +3 秒缓冲。"
+            + "\n多人 / 旁观 / 撮合 上下文中此选项被强制固定为 Audio。",
+            "Choose the clock source for gameplay."
+            + "\n· Audio (default): same as official lazer; time is driven by the audio track."
+            + "\n· Beatmap: an independent beatmap clock is injected; time advances with the beatmap's own duration plus a 3-second lead-in and 3-second tail."
+            + "\nIn multiplayer / spectate / matchmaking contexts this option is force-locked to Audio.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_CLOCK_TIME_BASE_DISABLED_NOTE =
+            new EzLocalizationManager.EzLocalisableString(
+                "[Ez] data note: 多人模式禁用（multiplayer / spectate）",
+                "[Ez] data note: Disabled in multiplayer (multiplayer / spectate)");
+
+        #endregion
     }
 }
