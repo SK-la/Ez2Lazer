@@ -22,6 +22,31 @@ namespace osu.Game.EzOsuGame.Clocks
         bool Enabled { get; set; }
 
         /// <summary>
+        /// 暂停恢复时的虚拟 lead-in 窗口（毫秒）。
+        /// 恢复后，CurrentTime 在这个窗口内逐步推进（smooth catch-up），不写回 SourceClock。
+        /// 设为 0 或负值表示关闭虚拟 lead-in（直接 catch-up）。
+        /// </summary>
+        double ResumeLeadInWindowMs { get; set; }
+
+        /// <summary>
+        /// 当前是否处于「暂停恢复 lead-in」阶段。
+        /// </summary>
+        bool IsResuming { get; }
+
+        /// <summary>
+        /// 当 SourceClock != null 时，记录暂停位置（由 ProcessFrame 自动处理）。
+        /// 当 SourceClock == null 时，由容器在 GameplayClock.Stop() 时显式调用。
+        /// </summary>
+        /// <param name="pausePosition">SourceClock 在暂停瞬间的时间（毫秒）。</param>
+        void RecordPause(double pausePosition);
+
+        /// <summary>
+        /// 重置 lead-in 状态。SourceClock != null 时由 ProcessFrame 自动触发；
+        /// SourceClock == null 时由容器在 seek 等操作时显式调用。
+        /// </summary>
+        void ResetLeadIn();
+
+        /// <summary>
         /// 调试用：手动覆盖内部时钟当前时间。
         /// </summary>
         void SetCurrentTime(double time);

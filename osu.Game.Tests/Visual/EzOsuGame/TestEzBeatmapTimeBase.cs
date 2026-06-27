@@ -131,15 +131,15 @@ namespace osu.Game.Tests.Visual.EzOsuGame
 
             var algorithm = new SequentialScrollAlgorithm(new[] { toMultiplier(0, cp0), toMultiplier(3000, cp1) });
 
-            const double timeRange = 1500;
-            const float scrollLength = 1000;
+            const double time_range = 1500;
+            const float scroll_length = 1000;
 
-            double pos0 = Math.Abs(algorithm.PositionAt(0, 0, timeRange, scrollLength));
-            double pos1000 = Math.Abs(algorithm.PositionAt(0, 1000, timeRange, scrollLength));
-            double pos2500 = Math.Abs(algorithm.PositionAt(0, 2500, timeRange, scrollLength));
-            double pos2999 = Math.Abs(algorithm.PositionAt(0, 2999, timeRange, scrollLength));
-            double pos3000 = Math.Abs(algorithm.PositionAt(0, 3000, timeRange, scrollLength));
-            double pos4500 = Math.Abs(algorithm.PositionAt(0, 4500, timeRange, scrollLength));
+            double pos0 = Math.Abs(algorithm.PositionAt(0, 0, time_range, scroll_length));
+            double pos1000 = Math.Abs(algorithm.PositionAt(0, 1000, time_range, scroll_length));
+            double pos2500 = Math.Abs(algorithm.PositionAt(0, 2500, time_range, scroll_length));
+            double pos2999 = Math.Abs(algorithm.PositionAt(0, 2999, time_range, scroll_length));
+            double pos3000 = Math.Abs(algorithm.PositionAt(0, 3000, time_range, scroll_length));
+            double pos4500 = Math.Abs(algorithm.PositionAt(0, 4500, time_range, scroll_length));
 
             // 任意推进都意味着 |pos| 单调不递减。
             Assert.That(pos1000, Is.GreaterThan(pos0), "abs position should advance at 1000ms");
@@ -194,6 +194,62 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 "SliderVelocity=0 should be clamped to original minimum (0.1)");
         }
 
+        [Test]
+        public void EzBeatmapTimeSource_ResumeLeadIn_SmoothCatchUp()
+        {
+            // 使用可控的 wall-clock：手动推进 elapsed 时间，让测试变成确定性的。
+            var controlledClock = new ControlledClock();
+            var src = new EzBeatmapTimeSource { ResumeLeadInWindowMs = 3000 };
+            src.SourceClock = controlledClock;
+
+            // 先让时钟运行起来。
+            controlledClock.IsRunning = true;
+            src.ProcessFrame();
+
+            // 设置当前谱面时间 = lead-in 开始点。
+            src.SetCurrentTime(2000);
+
+            // 模拟在 t=5000ms 处暂停后恢复。
+            src.RecordPause(5000);
+            Assert.That(src.IsResuming, Is.True);
+
+            // 模拟多帧，每帧 16.67ms wall-clock elapsed。
+            for (int i = 0; i < 200; i++)
+            {
+                controlledClock.ElapsedMs = 16.67;
+                src.ProcessFrame();
+            }
+
+            // 经过 ~180 帧 * 16.67ms ≈ 3000ms，CurrentTime 应追上 5000ms。
+            Assert.That(src.CurrentTime, Is.EqualTo(5000).Within(0.1),
+                "CurrentTime should reach pause position after ~3000ms virtual time");
+            Assert.That(src.IsResuming, Is.False, "Lead-in should end when CurrentTime reaches pausePosition");
+        }
+
+        [Test]
+        public void EzBeatmapTimeSource_ResumeLeadIn_DisabledByDefault()
+        {
+            // ResumeLeadInWindowMs = 0 时，RecordPause 不应触发 lead-in。
+            var src = new EzBeatmapTimeSource(); // ResumeLeadInWindowMs 默认为 0
+            src.ProcessFrame();
+            src.SetCurrentTime(5000);
+
+            src.RecordPause(5000);
+            Assert.That(src.IsResuming, Is.False);
+        }
+
+        [Test]
+        public void EzBeatmapTimeSource_ResumeLeadIn_ResetClearsState()
+        {
+            var src = new EzBeatmapTimeSource { ResumeLeadInWindowMs = 3000 };
+            src.ProcessFrame();
+            src.RecordPause(5000);
+            Assert.That(src.IsResuming, Is.True);
+
+            src.ResetLeadIn();
+            Assert.That(src.IsResuming, Is.False);
+        }
+
         private static osu.Game.Rulesets.Timing.MultiplierControlPoint toMultiplier(double time, TimingControlPoint timingPoint)
         {
             return new osu.Game.Rulesets.Timing.MultiplierControlPoint(time)
@@ -206,17 +262,35 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         private sealed class TestHitObject : HitObject, IHasDuration
         {
             private readonly double startTime;
-            private double endTime;
 
             public TestHitObject(double start, double end)
             {
                 startTime = start;
-                endTime = end;
+                EndTime = end;
             }
 
             public override double StartTime => startTime;
-            public double EndTime => endTime;
-            public double Duration { get => endTime - startTime; set => endTime = startTime + value; }
+            public double EndTime { get; private set; }
+
+            public double Duration { get => EndTime - startTime; set => EndTime = startTime + value; }
+        }
+
+        /// <summary>
+        /// 可控测试时钟：手动设置 IsRunning 和 ElapsedMs。
+        /// </summary>
+        private sealed class ControlledClock : IFrameBasedClock
+        {
+            public double Rate { get; }
+            public bool IsRunning { get; set; }
+            public double ElapsedMs { get; set; }
+            public double CurrentTime { get; set; }
+
+            public double ElapsedFrameTime => ElapsedMs;
+            public double FramesPerSecond { get; }
+
+            public void ProcessFrame()
+            {
+            }
         }
     }
 }

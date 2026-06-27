@@ -70,6 +70,11 @@ namespace osu.Game.Screens.Play
         /// </summary>
         public IEzBeatmapTimeSource? BeatmapTimeSource { get; private set; }
 
+        /// <summary>
+        /// [Ez] 暂停恢复 lead-in 跟踪器。
+        /// </summary>
+        private PauseStateTracker? pauseStateTracker;
+
         [Resolved]
         private MusicController musicController { get; set; } = null!;
 
@@ -119,10 +124,14 @@ namespace osu.Game.Screens.Play
 
             if (!isMultiplayer && configured == EzBeatmapClockTimeBase.Beatmap)
             {
-                // 不传入 SourceClock：EzBeatmapTimeSource 用内部 wallClock 独立推进，
-                // 避免与 GameplayClock (FramedBeatmapClock) 形成循环依赖。
+                // EzBeatmapTimeSource（SourceClock=null）使用内部 wallClock 独立推进。
                 var beatmapSource = new EzBeatmapTimeSource();
                 BeatmapTimeSource = beatmapSource;
+
+                // [Ez] 恢复时的虚拟 lead-in 窗口 = EzBeatmapTimeRangeProvider.LEAD_IN_MS（默认 3000ms）。
+                // 暂停恢复后，谱面时钟在 3 秒内从虚拟位置推进到暂停点，使 DHO 看到
+                // 「音符从画面顶部下落」的效果，而非瞬移。
+                beatmapSource.ResumeLeadInWindowMs = EzBeatmapTimeRangeProvider.LEAD_IN_MS;
 
                 // 把谱面时钟作为 GameplayClock 的 source；FramedBeatmapClock 仍是 IGameplayClock 公开类型。
                 ChangeSource(beatmapSource);
@@ -130,7 +139,10 @@ namespace osu.Game.Screens.Play
                 // 同时通过 DI 暴露给下游（FrameStabilityContainer 等）。
                 AddInternal(new EzBeatmapTimeSourceHolder(beatmapSource));
 
-                Logger.Log("[Ez] EzBeatmapTimeSource enabled (BeatmapClockTimeBase = Beatmap).");
+                // 监听暂停状态，触发 lead-in。
+                pauseStateTracker = new PauseStateTracker(beatmapSource, IsPaused);
+
+                Logger.Log($"[Ez] EzBeatmapTimeSource enabled (BeatmapClockTimeBase = Beatmap, ResumeLeadIn={beatmapSource.ResumeLeadInWindowMs}ms).");
             }
             else
             {
@@ -292,6 +304,7 @@ namespace osu.Game.Screens.Play
         {
             base.Dispose(isDisposing);
             removeAdjustmentsFromTrack();
+            pauseStateTracker?.Dispose();
         }
 
         ControlPointInfo IBeatSyncProvider.ControlPoints => beatmap.ControlPointInfo;
