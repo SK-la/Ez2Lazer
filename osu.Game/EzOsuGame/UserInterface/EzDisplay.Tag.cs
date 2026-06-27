@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -100,8 +101,13 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             altHighlightActive = active;
 
-            foreach (var tag in tagFlow.Children.OfType<SimpleTag>())
-                tag.SetAltHighlight(altHighlightActive);
+            foreach (var tag in tagFlow.Children)
+            {
+                if (tag is SimpleTag simpleTag)
+                    simpleTag.SetAltHighlight(altHighlightActive);
+                else if (tag is IconTag iconTag)
+                    iconTag.SetAltHighlight(altHighlightActive);
+            }
         }
 
         private void updateTags()
@@ -114,10 +120,20 @@ namespace osu.Game.EzOsuGame.UserInterface
             var userTags = beatmap.Metadata.UserTags.Take(max_visible_tags);
 
             if (beatmap.HasVideo == true)
-                tagFlow.Add(new IconTag(FontAwesome.Solid.Film, BeatmapsetsStrings.ShowInfoVideo));
+            {
+                tagFlow.Add(new IconTag(FontAwesome.Solid.Film, BeatmapsetsStrings.ShowInfoVideo)
+                {
+                    Action = () => songSelect?.Search(@"video:true"),
+                });
+            }
 
             if (beatmap.HasStoryboard == true)
-                tagFlow.Add(new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard));
+            {
+                tagFlow.Add(new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard)
+                {
+                    Action = () => songSelect?.Search(@"storyboard:true"),
+                });
+            }
 
             foreach (string tag in userTags)
             {
@@ -145,8 +161,15 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         private partial class IconTag : CompositeDrawable, IHasTooltip
         {
+            public Action? Action { get; set; }
+
             private readonly IconUsage icon;
             public LocalisableString TooltipText { get; }
+
+            private OverlayColourProvider colourProvider = null!;
+            private Box background = null!;
+            private SpriteIcon spriteIcon = null!;
+            private bool altHighlightActive;
 
             public IconTag(IconUsage icon, LocalisableString tooltipText)
             {
@@ -158,20 +181,50 @@ namespace osu.Game.EzOsuGame.UserInterface
                 Masking = true;
             }
 
+            public void SetAltHighlight(bool active)
+            {
+                if (altHighlightActive == active)
+                    return;
+
+                altHighlightActive = active;
+                refreshColours();
+            }
+
+            protected override bool OnClick(ClickEvent e)
+            {
+                if (!e.CurrentState.Keyboard.Keys.IsPressed(Key.LAlt))
+                    return false;
+
+                Action?.Invoke();
+                return true;
+            }
+
+            protected override bool OnHover(HoverEvent e) => altHighlightActive && base.OnHover(e);
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                if (!altHighlightActive)
+                    refreshColours();
+
+                base.OnHoverLost(e);
+            }
+
             [BackgroundDependencyLoader]
             private void load(OverlayColourProvider colourProvider)
             {
+                this.colourProvider = colourProvider;
+
                 InternalChild = new Container
                 {
                     AutoSizeAxes = Axes.Both,
                     Children = new Drawable[]
                     {
-                        new Box
+                        background = new Box
                         {
                             RelativeSizeAxes = Axes.Both,
                             Colour = colourProvider.Background3,
                         },
-                        new SpriteIcon
+                        spriteIcon = new SpriteIcon
                         {
                             Icon = icon,
                             Size = new Vector2(10),
@@ -180,6 +233,15 @@ namespace osu.Game.EzOsuGame.UserInterface
                         }
                     }
                 };
+            }
+
+            private void refreshColours()
+            {
+                if (!IsLoaded)
+                    return;
+
+                background.FadeColour(altHighlightActive ? colourProvider.Highlight1 : colourProvider.Background3, 200, Easing.OutQuint);
+                spriteIcon.FadeColour(altHighlightActive ? colourProvider.Content1 : colourProvider.Content2, 200, Easing.OutQuint);
             }
         }
 
