@@ -302,8 +302,8 @@ namespace osu.Game.Screens.Select
 
             scheduledBackgroundRetrieval = Scheduler.AddDelayed(b => beatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(b), beatmap, 50);
 
-            titleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
-            artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
+            titleText.Text = new RomanisableString(beatmap.Metadata.TitleUnicode, beatmap.Metadata.Title);
+            artistText.Text = new RomanisableString(beatmap.Metadata.ArtistUnicode, beatmap.Metadata.Artist);
             updateButton.BeatmapSet = beatmapSet;
             statusPill.Status = beatmap.Status;
 
