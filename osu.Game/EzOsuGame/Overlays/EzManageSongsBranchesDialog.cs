@@ -1010,15 +1010,19 @@ namespace osu.Game.EzOsuGame.Overlays
                             sourceCollection.Value.BeatmapMd5Hashes.Count));
                     }
 
-                    List<BeatmapSetInfo> deletableBeatmapSets = localBeatmaps
-                                                                .Select(beatmap => beatmap.BeatmapSet)
-                                                                .Where(set => set != null)
-                                                                .DistinctBy(set => set!.ID)
-                                                                .Select(set => set!)
-                                                                .ToList();
+                    // Delete individual difficulties that match the collection, then clean up empty sets.
+                    var affectedSets = new HashSet<BeatmapSetInfo>();
 
-                    if (deletableBeatmapSets.Count > 0)
-                        beatmapManager.Delete(deletableBeatmapSets, silent: true);
+                    foreach (var beatmap in localBeatmaps)
+                    {
+                        beatmapManager.DeleteDifficultyImmediately(beatmap);
+                        if (beatmap.BeatmapSet != null)
+                            affectedSets.Add(beatmap.BeatmapSet);
+                    }
+
+                    var emptySets = affectedSets.Where(set => set.Beatmaps.Count == 0).ToList();
+                    if (emptySets.Count > 0)
+                        beatmapManager.Delete(emptySets, silent: true);
 
                     return (success: true, message: LocalisableString.Format(
                         EzManageSongsBranchesDialogStrings.COLLECTION_DELETE_COMPLETED,
