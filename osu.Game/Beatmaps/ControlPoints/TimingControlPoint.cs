@@ -64,8 +64,8 @@ namespace osu.Game.Beatmaps.ControlPoints
         /// </summary>
         public readonly BindableDouble BeatLengthBindable = new BindableDouble(DEFAULT_BEAT_LENGTH)
         {
-            MinValue = 6,
-            MaxValue = 60000
+            MinValue = 0.6, // [Ez] 支持 100k BPM
+            MaxValue = 600000 // [Ez] 支持 0.1 BPM
         };
 
         /// <summary>
