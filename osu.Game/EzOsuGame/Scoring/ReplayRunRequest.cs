@@ -16,7 +16,7 @@ namespace osu.Game.EzOsuGame.Scoring
         public IGameplayEnvironment? Environment { get; }
         public ReplayRunPurpose Purpose { get; }
 
-        public ReplayRunRequest(Score score, IBeatmap beatmap, IGameplayEnvironment? environment, ReplayRunPurpose purpose = ReplayRunPurpose.ForStoredStatistics)
+        public ReplayRunRequest(Score score, IBeatmap beatmap, IGameplayEnvironment? environment, ReplayRunPurpose purpose = ReplayRunPurpose.ForStored)
         {
             Score = score;
             Beatmap = beatmap;

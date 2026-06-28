@@ -9,10 +9,10 @@ namespace osu.Game.EzOsuGame.Scoring
     public enum ReplayRunPurpose
     {
         /// <summary>StatisticsPanel HitEvents 回填：嵌入 HitMode/HealthMode + 全局 JudgePrecedence/Offset/KPoor。</summary>
-        ForStoredStatistics,
+        ForStored,
 
         /// <summary>Graph Now / 拓展 what-if：全 FromLive，offset=0。</summary>
-        ForLiveAnalysis,
+        ForLive,
 
         /// <summary>角逐 ghost timeline：全 FromLive。</summary>
         ForRaceTimeline,

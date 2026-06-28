@@ -54,8 +54,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
 
-            var fromScore = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStoredStatistics));
-            var fromLive = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLiveAnalysis));
+            var fromScore = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStored));
+            var fromLive = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLive));
 
             Assert.That(ManiaReplayParityHelper.AreHitEventsEquivalent(fromScore.hitEvents, fromLive.hitEvents), Is.True);
             Assert.That(ManiaReplayParityHelper.AreStatisticsEquivalent(fromScore.statistics, fromLive.statistics), Is.True,
@@ -85,8 +85,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, iidxEnvironment);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(lazerEnvironment);
 
-            var fromScore = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStoredStatistics));
-            var fromLive = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLiveAnalysis));
+            var fromScore = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStored));
+            var fromLive = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLive));
 
             Assert.That(ManiaReplayParityHelper.AreHitEventsEquivalent(fromScore.hitEvents, fromLive.hitEvents), Is.False);
         }

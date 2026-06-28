@@ -30,7 +30,7 @@ namespace osu.Game.Rulesets.Mania
             var config = GlobalConfigStore.EzConfig;
             return purpose switch
             {
-                ReplayRunPurpose.ForStoredStatistics => resolveForStoredStatistics(score, config),
+                ReplayRunPurpose.ForStored => resolveForStoredStatistics(score, config),
                 _ => readLive(config),
             };
         }

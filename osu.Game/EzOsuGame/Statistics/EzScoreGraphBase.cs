@@ -64,7 +64,7 @@ namespace osu.Game.EzOsuGame.Statistics
         protected IEzReplaySession? ReplaySession => EzReplaySessionRegistry.Instance;
 
         // Graph-UX: 双轨刷新状态管理
-        // TODO(P3-Rest): CommittedNowScore/committedEnvironment 应由 IEzReplaySession.RunRequestAsync(ForLiveAnalysis) 填充
+        // TODO(P3-Rest): CommittedNowScore/committedEnvironment 应由 IEzReplaySession.RunRequestAsync(ForLive) 填充
         // displayOffset 由 RefreshDisplayOnly 管理（拖动时），RefreshFromService 成功后重置为 0
         protected Score? CommittedNowScore;
 #pragma warning disable IDE0051 // committedEnvironment 为 P3-Rest 阶段预留，当前暂未使用
@@ -445,7 +445,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
         /// <summary>
         /// 真实重算：调用 Session，更新 committed Now
-        /// Graph-UX: offset 落定后触发，使用 ForLiveAnalysis 目的
+        /// Graph-UX: offset 落定后触发，使用 ForLive 目的
         /// </summary>
         protected async Task RefreshFromService()
         {
@@ -460,7 +460,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
             try
             {
-                // TODO(P3-Rest): 应使用 ReplayRunRequest(ForLiveAnalysis) 统一入口
+                // TODO(P3-Rest): 应使用 ReplayRunRequest(ForLive) 统一入口
                 // 当前暂时直接调用 RunAsync，P3-Rest 阶段改为 RunRequestAsync
                 if (environment != null)
                 {
@@ -579,7 +579,7 @@ namespace osu.Game.EzOsuGame.Statistics
         }
 
         /// <summary>
-        /// 创建 ForLiveAnalysis 环境（offset=0）
+        /// 创建 ForLive 环境（offset=0）
         /// 子类应重写以提供规则集特定的环境解析
         /// </summary>
         protected virtual IGameplayEnvironment? CreateLiveAnalysisEnvironment()

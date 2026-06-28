@@ -54,7 +54,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         public List<HitEvent> Generate(Score score, IBeatmap playableBeatmap, CancellationToken cancellationToken = default)
         {
-            var environment = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStoredStatistics);
+            var environment = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStored);
             return ManiaReplaySession.Run(score, playableBeatmap, environment, cancellationToken).ScoreInfo.HitEvents.ToList();
         }
     }

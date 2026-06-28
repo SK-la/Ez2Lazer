@@ -135,7 +135,7 @@ namespace osu.Game.Screens.Ranking.Statistics
 
                     if (databasedScore != null)
                     {
-                        // TODO(P3-Rest): 改为 ReplaySession.RunAsync(ForStoredStatistics)，删除 Bridge 调用
+                        // TODO(P3-Rest): 改为 ReplaySession.RunAsync(ForStored)，删除 Bridge 调用
                         EzScoreReloadBridge.InitializeAllGenerators();
                         generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
                     }

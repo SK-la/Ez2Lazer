@@ -35,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             var ruleset = new ManiaRuleset();
 
-            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStoredStatistics);
+            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStored);
 
             // Clone to isolate Session mutations from the caller's Score/ScoreInfo reference.
             var clone = score.DeepClone();
@@ -52,7 +52,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         private static Task<EzScoreTimeline> runTimelineAsync(Score score, IBeatmap beatmap, IGameplayEnvironment? environment, CancellationToken cancellationToken)
         {
-            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStoredStatistics);
+            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStored);
 
             // ManiaReplaySession.RunTimeline is synchronous — execute directly to avoid nesting Task.Run
             // which can cause threadpool starvation when the caller is already on a pool thread (via ensureTimelinesLoaded).

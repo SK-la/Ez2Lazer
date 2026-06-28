@@ -34,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 {
     /// <summary>
     /// Mania 判定偏移分布图。Original 用 Realm 静态 <see cref="ScoreInfo"/>；
-    /// Now 经 <see cref="ManiaReplaySession"/>（ForLiveAnalysis，含 live config offset）；
+    /// Now 经 <see cref="ManiaReplaySession"/>（ForLive，含 live config offset）；
     /// offset 滑条同步控制展示层 fake 平移与 Session 真实 offset。
     /// </summary>
     public partial class EzScoreGraphMania : EzScoreGraphBase
@@ -60,7 +60,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        // TODO(P3-Rest): resolveSessionInputScore() 应移除，改为通过 IEzReplaySession.RunRequestAsync(ForLiveAnalysis)
+        // TODO(P3-Rest): resolveSessionInputScore() 应移除，改为通过 IEzReplaySession.RunRequestAsync(ForLive)
         // 当前临时方案：保留 scoreManager 用于获取 databased score
         [Resolved]
         private ScoreManager scoreManager { get; set; } = null!;
@@ -348,17 +348,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         // P3-Rest 前过渡：通过 scoreManager 获取 databased score
-        // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLiveAnalysis)
+        // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLive)
         protected override Score? ResolveInputScore() => resolveSessionInputScore();
 
-        // P3-Rest 前过渡：返回 ForLiveAnalysis 环境（读 live config offset）
-        // TODO(P3-Rest): createSessionEnvironment() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLiveAnalysis)
+        // P3-Rest 前过渡：返回 ForLive 环境（读 live config offset）
+        // TODO(P3-Rest): createSessionEnvironment() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLive)
         protected override IGameplayEnvironment? CreateLiveAnalysisEnvironment() => createSessionEnvironment();
 
         private GameplayEnvironment createSessionEnvironment()
-            => ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLiveAnalysis);
+            => ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLive);
 
-        // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLiveAnalysis)
+        // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLive)
         private Score? resolveSessionInputScore()
         {
             var databased = scoreManager.GetScore(Score);

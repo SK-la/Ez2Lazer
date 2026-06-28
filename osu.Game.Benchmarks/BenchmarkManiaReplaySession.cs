@@ -39,7 +39,7 @@ namespace osu.Game.Benchmarks
             // 创建测试用 score（带 replay frames）
             score = createTestScore(beatmap);
 
-            environment = ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForStoredStatistics);
+            environment = ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForStored);
         }
 
         [Benchmark]
