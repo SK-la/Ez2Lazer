@@ -16,14 +16,20 @@ namespace osu.Game.EzOsuGame.Scoring
     public static class EzLocalScoreQueries
     {
         /// <summary>
-        /// 不影响游玩/判定的 Mod 缩写白名单：角逐/HUD 取 ghost 时忽略这些 Mod，
+        /// 不影响游玩/判定的 Mod 类型白名单：角逐/HUD 取 ghost 时忽略这些 Mod，
         /// 以免 PureScore / Classic / TouchDevice 等造成「相似 Mod」过滤过严，
         /// 导致 ghost 候选池缩小到只剩与当前完全一致的成绩。
         /// </summary>
-        public static readonly HashSet<string> COSMETIC_GHOST_MOD_ACRONYMS = new HashSet<string>
+        public static readonly HashSet<Type> COSMETIC_GHOST_MOD_TYPES = new HashSet<Type>
         {
-            "TD",  // TouchDevice — 硬件输入标记，无游玩影响
-            "CL",  // Classic — 用户配置偏好，不影响 replay 判定结果
+            typeof(ModClassic),
+            typeof(ModScoreV2),
+            typeof(ModAccuracyChallenge),
+            typeof(ModDifficultyAdjust),
+            typeof(ModFailCondition),
+            typeof(ModMirror),
+            typeof(ModNoFail),
+            typeof(ModPerfect),
         };
 
         /// <summary>
@@ -63,13 +69,15 @@ namespace osu.Game.EzOsuGame.Scoring
         public static bool ModsMatch(Mod[] left, Mod[] right) => modsMatch(left, right);
 
         /// <summary>
-        /// 比较两侧 Mod 时忽略 <see cref="COSMETIC_GHOST_MOD_ACRONYMS"/> 白名单项。
-        /// 使 PureScore / Classic / TouchDevice 等非游玩 Mod 不影响 ghost 候选过滤与 beatmap 复用判定。
+        /// 比较两侧 Mod 时忽略 <see cref="COSMETIC_GHOST_MOD_TYPES"/> 白名单项。
+        /// 使非游玩 Mod 不影响 ghost 候选过滤与 beatmap 复用判定。
         /// </summary>
         public static bool GameplayModsMatch(Mod[] left, Mod[] right)
         {
+            static bool isCosmetic(Mod m) => COSMETIC_GHOST_MOD_TYPES.Any(t => t.IsInstanceOfType(m));
+
             static IEnumerable<string> gameplayAcronyms(Mod[] mods) =>
-                mods.Where(m => !COSMETIC_GHOST_MOD_ACRONYMS.Contains(m.Acronym))
+                mods.Where(m => !isCosmetic(m))
                     .OrderBy(m => m.Acronym)
                     .Select(m => m.Acronym);
 
