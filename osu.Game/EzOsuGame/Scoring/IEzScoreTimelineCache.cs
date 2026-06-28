@@ -16,7 +16,7 @@ namespace osu.Game.EzOsuGame.Scoring
         /// 命中且非空（null 视为 miss）。注意：null timeline 应使用 <see cref="EzScoreTimeline.EMPTY"/>
         /// 作为 sentinel 写入缓存，保证二次查询走"已缓存空"分支而非重建。
         /// </summary>
-        bool TryGet(string key, out EzScoreTimeline timeline);
+        bool TryGet(string key, out EzScoreTimeline? timeline);
 
         /// <summary>
         /// 写入一个 cache 条目；允许 <c>null</c>（哨兵用）。
@@ -36,7 +36,7 @@ namespace osu.Game.EzOsuGame.Scoring
     {
         private readonly ConcurrentDictionary<string, EzScoreTimeline> entries = new ConcurrentDictionary<string, EzScoreTimeline>();
 
-        public bool TryGet(string key, out EzScoreTimeline timeline)
+        public bool TryGet(string key, out EzScoreTimeline? timeline)
         {
             if (string.IsNullOrEmpty(key))
             {
@@ -66,7 +66,7 @@ namespace osu.Game.EzOsuGame.Scoring
     {
         public static readonly NullEzScoreTimelineCache INSTANCE = new NullEzScoreTimelineCache();
 
-        public bool TryGet(string key, out EzScoreTimeline timeline)
+        public bool TryGet(string key, out EzScoreTimeline? timeline)
         {
             timeline = null;
             return false;

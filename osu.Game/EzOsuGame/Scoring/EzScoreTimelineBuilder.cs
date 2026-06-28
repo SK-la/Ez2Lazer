@@ -316,9 +316,9 @@ namespace osu.Game.EzOsuGame.Scoring
         }
 
         // TODO(EZ-SR-TL-015): Osu Session 完成后删除 ensureHitWindows/resolveFallbackMissWindow 等 HitEvents 专用辅助。
-        private static void ensureHitWindows(IBeatmap beatmap, HitObject hitObject)
+        private static void ensureHitWindows(IBeatmap? beatmap, HitObject hitObject)
         {
-            if (beatmap.BeatmapInfo == null)
+            if (beatmap == null)
                 return;
 
             if (hitObject.HitWindows != null && hitObject.HitWindows != HitWindows.Empty)
@@ -330,17 +330,17 @@ namespace osu.Game.EzOsuGame.Scoring
             hitObject.ApplyDefaults(beatmap.ControlPointInfo, beatmap.BeatmapInfo.Difficulty);
         }
 
-        private static double resolveFallbackMissWindow(IBeatmap beatmap)
+        private static double resolveFallbackMissWindow(IBeatmap? beatmap)
         {
+            if (beatmap == null)
+                return 0;
+
             foreach (var hitObject in beatmap.HitObjects)
             {
                 var windows = findFirstNonEmptyHitWindows(hitObject);
                 if (windows != null)
                     return windows.WindowFor(HitResult.Miss);
             }
-
-            if (beatmap.BeatmapInfo == null)
-                return 0;
 
             foreach (var hitObject in beatmap.HitObjects)
             {
@@ -385,7 +385,7 @@ namespace osu.Game.EzOsuGame.Scoring
             };
         }
 
-        private static string? getCacheKey(ScoreInfo? scoreInfo, EzScoreRaceGhostTimelineMode timelineMode, IGameplayEnvironment environment, IBeatmap beatmap)
+        private static string? getCacheKey(ScoreInfo? scoreInfo, EzScoreRaceGhostTimelineMode timelineMode, IGameplayEnvironment environment, IBeatmap? beatmap)
         {
             string? identity = getScoreIdentity(scoreInfo);
 
@@ -393,7 +393,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 return null;
 
             string modFp = getModFingerprint(scoreInfo.Mods);
-            string beatmapFp = beatmap.BeatmapInfo != null
+            string beatmapFp = beatmap != null
                 ? $"b:{beatmap.BeatmapInfo.ID}:od{beatmap.BeatmapInfo.Difficulty.OverallDifficulty:F2}:hp{beatmap.BeatmapInfo.Difficulty.DrainRate:F2}"
                 : "b:?";
 
