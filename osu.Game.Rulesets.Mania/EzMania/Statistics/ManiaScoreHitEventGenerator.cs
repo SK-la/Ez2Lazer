@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             // to avoid any async/caching issues for ghost score HUDs.
             EzScoreTimelineBridge.RegisterManiaTimelineBuilder((score, beatmap, cancellationToken) =>
             {
-                var environment = ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForRaceTimeline);
+                var environment = ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLive);
                 return ManiaReplaySession.RunTimeline(score, beatmap, environment, cancellationToken);
             });
 

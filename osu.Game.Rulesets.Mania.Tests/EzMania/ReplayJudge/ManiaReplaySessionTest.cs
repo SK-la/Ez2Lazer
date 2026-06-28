@@ -77,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, iidxEnvironment);
 
-            var liveTimeline = ManiaReplaySession.RunTimeline(score, beatmap, ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForRaceTimeline));
+            var liveTimeline = ManiaReplaySession.RunTimeline(score, beatmap, ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLive));
             var lazerTimeline = ManiaReplaySession.RunTimeline(score, beatmap, lazerEnvironment);
             var iidxTimeline = ManiaReplaySession.RunTimeline(score, beatmap, iidxEnvironment);
 
