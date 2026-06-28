@@ -11,7 +11,6 @@ using NUnit.Framework.Legacy;
 using osu.Framework.Allocation;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.IO.Archives;
 using osu.Game.Online.API.Requests.Responses;
@@ -70,7 +69,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
                             timeline = EzScoreTimelineBuilder.TryBuild(scoreManager, beatmapManager, imported, sharedPlayableBeatmap: playableBeatmap);
                             var databasedScore = scoreManager.GetScore(imported);
-                            sessionTotal = ManiaReplaySession.RunTimeline(databasedScore!, playableBeatmap, ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForRaceTimeline))
+                            sessionTotal = ManiaReplaySession.RunTimeline(databasedScore!, playableBeatmap, ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForRaceTimeline))
                                 .FinalTotalScore;
                         }
                     }

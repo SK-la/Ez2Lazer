@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     internal static class BmsTapReplayFixtures
     {
-        public static (Score score, IBeatmap beatmap, ManiaGameplayEnvironment environment) CreateTwoNoteColumnTap()
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateTwoNoteColumnTap()
         {
             var ruleset = new ManiaRuleset();
             var beatmap = new TestBeatmap(ruleset.RulesetInfo)
@@ -50,18 +50,18 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return createWithEmbeddedModes(ruleset, beatmap, replay, createEnvironment());
         }
 
-        private static (Score score, IBeatmap beatmap, ManiaGameplayEnvironment environment) createWithEmbeddedModes(
+        private static (Score score, IBeatmap beatmap, GameplayEnvironment environment) createWithEmbeddedModes(
             ManiaRuleset ruleset,
             IBeatmap beatmap,
             Replay replay,
-            ManiaGameplayEnvironment environment)
+            GameplayEnvironment environment)
         {
             var score = createScore(ruleset, replay);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
             return (score, beatmap, environment);
         }
 
-        private static ManiaGameplayEnvironment createEnvironment() => ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
+        private static GameplayEnvironment createEnvironment() => ReplayJudgeTestConfig.Create(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
 
         private static Score createScore(ManiaRuleset ruleset, Replay replay) => new Score
         {

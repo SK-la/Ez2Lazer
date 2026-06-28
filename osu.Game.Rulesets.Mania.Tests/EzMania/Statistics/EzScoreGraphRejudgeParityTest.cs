@@ -8,13 +8,13 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Replays;
@@ -222,7 +222,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             Replay = replay,
         };
 
-        private static ManiaGameplayEnvironment createEnvironment(EzEnumHitMode hitMode)
+        private static GameplayEnvironment createEnvironment(EzEnumHitMode hitMode)
         {
             var healthMode = hitMode switch
             {

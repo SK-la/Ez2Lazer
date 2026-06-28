@@ -3,14 +3,13 @@
 
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     internal static class ReplayJudgeTestConfig
     {
-        public static void ApplyToGlobalConfig(ManiaGameplayEnvironment environment)
+        public static void ApplyToGlobalConfig(GameplayEnvironment environment)
         {
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHitMode, environment.ManiaHitMode);
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHealthMode, environment.ManiaHealthMode);
@@ -19,25 +18,25 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             GlobalConfigStore.EzConfig.SetValue(Ez2Setting.BmsPoorHitResultEnable, environment.BmsPoorHitResultEnable);
         }
 
-        public static ManiaGameplayEnvironment ApplyAndSnapshot(ManiaGameplayEnvironment environment)
+        public static GameplayEnvironment ApplyAndSnapshot(GameplayEnvironment environment)
         {
             ApplyToGlobalConfig(environment);
-            return ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForLiveAnalysis);
+            return ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLiveAnalysis);
         }
 
-        public static void ApplyEmbeddedModes(Score score, ManiaGameplayEnvironment environment)
+        public static void ApplyEmbeddedModes(Score score, GameplayEnvironment environment)
         {
             score.ScoreInfo.ManiaHitMode = (int)environment.ManiaHitMode;
             score.ScoreInfo.ManiaHealthMode = (int)environment.ManiaHealthMode;
         }
 
-        public static ManiaGameplayEnvironment Create(
+        public static GameplayEnvironment Create(
             EzEnumHitMode hitMode,
             EzEnumHealthMode healthMode,
             EzEnumJudgePrecedence judgePrecedence = EzEnumJudgePrecedence.Earliest,
             double offsetPlusMania = 0,
             bool bmsPoorHitResultEnable = false)
-            => new ManiaGameplayEnvironment
+            => new GameplayEnvironment
             {
                 ManiaHitMode = hitMode,
                 ManiaHealthMode = healthMode,

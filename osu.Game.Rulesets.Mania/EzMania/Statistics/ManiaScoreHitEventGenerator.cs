@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
@@ -21,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
     public sealed class ManiaScoreHitEventGenerator : IScoreHitEventGenerator
     {
         public static ManiaScoreHitEventGenerator Instance { get; } = new ManiaScoreHitEventGenerator();
-        private static readonly ManiaReplaySessionService replaySession = new ManiaReplaySessionService();
+        private static readonly ManiaReplaySessionService replay_session = new ManiaReplaySessionService();
 
         static ManiaScoreHitEventGenerator()
         {
@@ -32,12 +31,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             // to avoid any async/caching issues for ghost score HUDs.
             EzScoreTimelineBridge.RegisterManiaTimelineBuilder((score, beatmap, cancellationToken) =>
             {
-                var environment = ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForRaceTimeline);
+                var environment = ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForRaceTimeline);
                 return ManiaReplaySession.RunTimeline(score, beatmap, environment, cancellationToken);
             });
 
             // 注册到全局 Registry，使 Graph/Panel/Race 的 DI 消费者可获得实例
-            EzReplaySessionRegistry.Register(replaySession);
+            EzReplaySessionRegistry.Register(replay_session);
         }
 
         public bool Validate(Score score)
@@ -55,7 +54,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         public List<HitEvent> Generate(Score score, IBeatmap playableBeatmap, CancellationToken cancellationToken = default)
         {
-            var environment = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
+            var environment = ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStoredStatistics);
             return ManiaReplaySession.Run(score, playableBeatmap, environment, cancellationToken).ScoreInfo.HitEvents.ToList();
         }
     }

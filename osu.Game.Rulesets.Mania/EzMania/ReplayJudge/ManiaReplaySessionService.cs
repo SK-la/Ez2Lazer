@@ -7,9 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
@@ -37,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             var ruleset = new ManiaRuleset();
 
-            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
+            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStoredStatistics);
 
             // Clone to isolate Session mutations from the caller's Score/ScoreInfo reference.
             var clone = score.DeepClone();
@@ -54,7 +52,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         private static Task<EzScoreTimeline> runTimelineAsync(Score score, IBeatmap beatmap, IGameplayEnvironment? environment, CancellationToken cancellationToken)
         {
-            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
+            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStoredStatistics);
 
             // ManiaReplaySession.RunTimeline is synchronous — execute directly to avoid nesting Task.Run
             // which can cause threadpool starvation when the caller is already on a pool thread (via ensureTimelinesLoaded).
@@ -66,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             try
             {
                 var ruleset = new ManiaRuleset();
-                var resolvedEnv = request.Environment ?? ManiaRuleset.ResolveEnvironment(request.Score.ScoreInfo, GlobalConfigStore.EzConfig, request.Purpose);
+                var resolvedEnv = request.Environment ?? ManiaRuleset.ResolveEnvironment(request.Score.ScoreInfo, request.Purpose);
 
                 // Clone only for RunReplayAsync to isolate PopulateScore mutations.
                 var clone = request.Score.DeepClone();
@@ -116,7 +114,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 envKey = "env:null";
             else
             {
-                string bmsPoorKey = environment is IManiaGameplayEnvironment maniaEnvironment ? maniaEnvironment.BmsPoorHitResultEnable.ToString() : "null";
+                string bmsPoorKey = environment is IGameplayEnvironment maniaEnvironment ? maniaEnvironment.BmsPoorHitResultEnable.ToString() : "null";
                 envKey = $"hm:{(int)environment.ManiaHitMode}|health:{(int)environment.ManiaHealthMode}|judge:{(int)environment.JudgePrecedence}|offset:{environment.OffsetPlusMania:F3}|bmsPoor:{bmsPoorKey}";
             }
 

@@ -7,7 +7,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
@@ -59,14 +58,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return o2_judgement_states.GetValue(ruleset, _ => new ManiaReplayJudgementState());
         }
 
-        private static ManiaGameplayEnvironment getGameplayEnvironment(DrawableHitObject? drawable = null)
+        private static GameplayEnvironment getGameplayEnvironment(DrawableHitObject? drawable = null)
         {
             var ruleset = drawable?.FindClosestParent<DrawableRuleset>();
 
             if (ruleset?.ReplayScore?.ScoreInfo != null)
-                return ManiaRuleset.ResolveEnvironment(ruleset.ReplayScore.ScoreInfo, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForStoredStatistics);
+                return ManiaRuleset.ResolveEnvironment(ruleset.ReplayScore.ScoreInfo, ReplayRunPurpose.ForStoredStatistics);
 
-            return ManiaRuleset.ResolveEnvironment(null, GlobalConfigStore.EzConfig, ReplayRunPurpose.ForLiveAnalysis);
+            return ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLiveAnalysis);
         }
 
         internal static bool TryMalodyHoldOnReleased(DrawableHoldNote hold)

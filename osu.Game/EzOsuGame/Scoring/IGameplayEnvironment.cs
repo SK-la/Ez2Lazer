@@ -17,5 +17,7 @@ namespace osu.Game.EzOsuGame.Scoring
         EzEnumJudgePrecedence JudgePrecedence { get; }
 
         double OffsetPlusMania { get; }
+
+        bool BmsPoorHitResultEnable { get; }
     }
 }

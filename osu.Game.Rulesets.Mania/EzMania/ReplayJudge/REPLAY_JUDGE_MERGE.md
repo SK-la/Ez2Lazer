@@ -128,7 +128,7 @@ public static EzScoreTimeline RunTimeline(...);
 
 **Phase 1 刻意保留（Phase 2 再改）**：
 
-- Session 仍接受现有 `IGameplayEnvironment`（不新建 `IManiaGameplayEnvironment`）
+- Session 仍接受现有 `IGameplayEnvironment`（不新建 `IGameplayEnvironment`）
 - `ManiaReplaySessionSimulator` 内 `BmsPoorHitResultEnable` 读 `GlobalConfigStore` — 已知技术债
 - Generator / Graph 仍在调用侧 `FromScore` / `FromLive`（不经 Ruleset ResolveEnvironment）
 
@@ -185,7 +185,7 @@ flowchart LR
     P1C["跨源测试绿"]
   end
   subgraph phase2 [Phase 2 后续 - Mania 服务纯度]
-    P2A["IManiaGameplayEnvironment"]
+    P2A["IGameplayEnvironment"]
     P2B["Session 不读 GlobalConfig\nKPoor 等经 env 传入"]
     P2C["ManiaRuleset 环境转换入口"]
   end
@@ -203,7 +203,7 @@ flowchart LR
 | **Phase 2** | Mania 环境分层、Session 零全局读、Ruleset 统一 ResolveEnvironment |
 | **Phase 3** | `osu.Game` EzReplayServer 框架 + Osu/Taiko/Catch/Mania 各模式 Session |
 
-**Phase 2 预览**：新增 `IManiaGameplayEnvironment : IGameplayEnvironment`（含 `BmsPoorHitResultEnable` 等）；`ManiaRuleset.ResolveEnvironment` 在规则集边界转换；Session / Simulator 零 `GlobalConfigStore`。
+**Phase 2 预览**：新增 `IGameplayEnvironment : IGameplayEnvironment`（含 `BmsPoorHitResultEnable` 等）；`ManiaRuleset.ResolveEnvironment` 在规则集边界转换；Session / Simulator 零 `GlobalConfigStore`。
 
 **Phase 3 预览**：`osu.Game/EzOsuGame/Replay/`（或等价路径）统一 `RunReplay(Score, IBeatmap, IGameplayEnvironment) → Score`；规则集注册 `IReplaySession` / 环境转换器；Mania 为首个完整实现。
 

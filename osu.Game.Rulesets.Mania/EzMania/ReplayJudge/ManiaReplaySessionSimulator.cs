@@ -8,7 +8,6 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
@@ -41,9 +40,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             ManiaReplayTimelineRecorder? timelineRecorder,
             CancellationToken cancellationToken)
         {
-            bool poorEnabled = environment is IManiaGameplayEnvironment maniaEnvironment
-                               && HealthModeHelper.IsBMSHealthMode(environment.ManiaHealthMode)
-                               && maniaEnvironment.BmsPoorHitResultEnable;
+            bool poorEnabled = HealthModeHelper.IsBMSHealthMode(environment.ManiaHealthMode)
+                               && environment.BmsPoorHitResultEnable;
 
             bool pillModeEnabled = environment.ManiaHealthMode.ToString().Contains("O2Jam");
             var bms = noteStrategy as BmsHitModeJudgement;
@@ -57,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var judgementState = new ManiaReplayJudgementState();
             var headWasHit = new Dictionary<HeadNote, bool>();
             var keyHeldByColumn = new Dictionary<int, bool>();
-            var pressTimesByColumn = buildPressTimesByColumn(score.Replay);
+            var pressTimesByColumn = BuildPressTimesByColumn(score.Replay);
             double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
 
             foreach (var input in ManiaReplayInputParser.Parse(score.Replay))
@@ -87,7 +85,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             scoreProcessor,
                             target,
                             result,
-                            computeStoredTimeOffset(input.Time, target),
+                            ComputeStoredTimeOffset(input.Time, target),
                             input.Time,
                             gameplayRate,
                             timelineRecorder));
@@ -158,7 +156,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             scoreProcessor,
                             target,
                             BmsHitModeJudgement.MapTo(sessionOutcome.Judge),
-                            computeStoredTimeOffset(input.Time, target),
+                            ComputeStoredTimeOffset(input.Time, target),
                             input.Time,
                             gameplayRate,
                             timelineRecorder);
@@ -185,7 +183,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         scoreProcessor,
                         forced.Target,
                         HitResult.Miss,
-                        computeStoredTimeOffset(input.Time, forced.Target),
+                        ComputeStoredTimeOffset(input.Time, forced.Target),
                         input.Time,
                         gameplayRate,
                         timelineRecorder);
@@ -198,7 +196,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     scoreProcessor,
                     target,
                     result,
-                    computeStoredTimeOffset(input.Time, target),
+                    ComputeStoredTimeOffset(input.Time, target),
                     input.Time,
                     gameplayRate,
                     timelineRecorder);
@@ -304,62 +302,24 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             candidates.Sort((a, b) => a.Target.StartTime.CompareTo(b.Target.StartTime));
 
-            if (ManiaJudgementRegistry.IsBmsLikeMode(environment.ManiaHitMode))
+            return environment.JudgePrecedence switch
             {
-                return environment.JudgePrecedence switch
-                {
-                    EzEnumJudgePrecedence.Combo => OrderedHitPolicyHelper.SelectFold(
-                        candidates,
-                        s => s.Judged,
-                        s => s.Target.StartTime,
-                        s => s.Target.HitWindows as ManiaHitWindows,
-                        inputTime,
-                        comboAlgorithm: true),
-                    EzEnumJudgePrecedence.Duration => OrderedHitPolicyHelper.SelectFold(
-                        candidates,
-                        s => s.Judged,
-                        s => s.Target.StartTime,
-                        s => s.Target.HitWindows as ManiaHitWindows,
-                        inputTime,
-                        comboAlgorithm: false),
-                    _ => candidates[0]
-                } ?? candidates[0];
-            }
-
-            LaneTargetState selected = candidates[0];
-
-            for (int i = 1; i < candidates.Count; i++)
-            {
-                var candidate = candidates[i];
-                bool shouldReplace = environment.JudgePrecedence switch
-                {
-                    EzEnumJudgePrecedence.Combo => compareCombo(selected, candidate, beatmap, inputTime, hitWindowHelper),
-                    EzEnumJudgePrecedence.Duration => OrderedHitPolicyHelper.CompareDurationByPrecedence(
-                        selected.Target.StartTime,
-                        candidate.Target.StartTime,
-                        inputTime),
-                    _ => false
-                };
-
-                if (shouldReplace)
-                    selected = candidate;
-            }
-
-            return selected;
-        }
-
-        private static bool compareCombo(LaneTargetState t1, LaneTargetState t2, IBeatmap beatmap, double inputTime, HitModeHelper hitWindowHelper)
-        {
-            hitWindowHelper.BPM = getBpmAtTime(beatmap, inputTime);
-            double comboEarly = hitWindowHelper.WindowFor(HitResult.Good, true);
-            double comboLate = hitWindowHelper.WindowFor(HitResult.Good, false);
-
-            return OrderedHitPolicyHelper.CompareComboByPrecedence(
-                t1.Target.StartTime,
-                t2.Target.StartTime,
-                inputTime,
-                comboEarly,
-                comboLate);
+                EzEnumJudgePrecedence.Combo => OrderedHitPolicyHelper.SelectFold(
+                    candidates,
+                    s => s.Judged,
+                    s => s.Target.StartTime,
+                    s => s.Target.HitWindows as ManiaHitWindows,
+                    inputTime,
+                    comboAlgorithm: true),
+                EzEnumJudgePrecedence.Duration => OrderedHitPolicyHelper.SelectFold(
+                    candidates,
+                    s => s.Judged,
+                    s => s.Target.StartTime,
+                    s => s.Target.HitWindows as ManiaHitWindows,
+                    inputTime,
+                    comboAlgorithm: false),
+                _ => candidates[0]
+            } ?? candidates[0];
         }
 
         private static IEnumerable<LaneTargetState> collectCandidatesForInput(
@@ -456,10 +416,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             timelineRecorder?.Record(scoreProcessor, eventTime, result);
         }
 
-        internal static double computeStoredTimeOffset(double eventTime, HitObject target)
+        internal static double ComputeStoredTimeOffset(double eventTime, HitObject target)
             => eventTime - target.GetEndTime();
 
-        internal static Dictionary<int, List<double>> buildPressTimesByColumn(Replay replay)
+        internal static Dictionary<int, List<double>> BuildPressTimesByColumn(Replay replay)
         {
             var dict = new Dictionary<int, List<double>>();
 
@@ -486,16 +446,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// <summary>
         /// Miss 存储偏移：优先该列 replay 最近邻 press；无输入则 0（Graph 侧 projectOffsetToY 压边）。
         /// </summary>
-        internal static double resolveMissStoredOffset(
+        internal static double ResolveMissStoredOffset(
             HitObject target,
             IReadOnlyDictionary<int, List<double>> pressTimesByColumn,
             double? beforeTimeInclusive = null)
         {
-            double eventTime = resolveMissEventTime(target, pressTimesByColumn, beforeTimeInclusive);
-            return computeStoredTimeOffset(eventTime, target);
+            double eventTime = ResolveMissEventTime(target, pressTimesByColumn, beforeTimeInclusive);
+            return ComputeStoredTimeOffset(eventTime, target);
         }
 
-        internal static double resolveMissEventTime(
+        internal static double ResolveMissEventTime(
             HitObject target,
             IReadOnlyDictionary<int, List<double>> pressTimesByColumn,
             double? beforeTimeInclusive = null)

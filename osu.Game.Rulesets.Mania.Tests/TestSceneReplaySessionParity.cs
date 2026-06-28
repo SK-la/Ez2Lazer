@@ -8,10 +8,10 @@ using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge;
@@ -34,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         private IReadOnlyList<HitEvent> drawableHitEvents = null!;
         private IBeatmap playableBeatmap = null!;
         private Score replayScore = null!;
-        private ManiaGameplayEnvironment parityEnvironment = null!;
+        private GameplayEnvironment parityEnvironment = null!;
 
         [TearDown]
         public void TearDown()

@@ -5,7 +5,7 @@ using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.Statistics;
 using osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge;
@@ -72,6 +72,6 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
             Assert.That(lazerCounts, Is.Not.EqualTo(bmsCounts));
         }
 
-        private static ManiaGameplayEnvironment createSessionEnvironment(EzEnumHitMode hitMode) => ReplayJudgeTestConfig.Create(hitMode, EzEnumHealthMode.Lazer);
+        private static GameplayEnvironment createSessionEnvironment(EzEnumHitMode hitMode) => ReplayJudgeTestConfig.Create(hitMode, EzEnumHealthMode.Lazer);
     }
 }

@@ -3,7 +3,6 @@
 
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas;
 
@@ -41,8 +40,5 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         public static bool IsEzHitMode(EzEnumHitMode hitMode)
             => hitMode is not (EzEnumHitMode.Lazer or EzEnumHitMode.Classic);
-
-        public static bool IsBmsLikeMode(EzEnumHitMode hitMode)
-            => HitModeHelper.IsBMSHitMode(hitMode);
     }
 }

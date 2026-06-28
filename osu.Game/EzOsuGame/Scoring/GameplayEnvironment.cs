@@ -6,7 +6,7 @@ using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Scoring
 {
-    public sealed class GameplayEnvironment : IGameplayEnvironment
+    public sealed record GameplayEnvironment : IGameplayEnvironment
     {
         public EzEnumHitMode ManiaHitMode { get; init; }
 
@@ -16,12 +16,15 @@ namespace osu.Game.EzOsuGame.Scoring
 
         public double OffsetPlusMania { get; init; }
 
+        public bool BmsPoorHitResultEnable { get; init; }
+
         public static GameplayEnvironment FromLive(Ez2ConfigManager config) => new GameplayEnvironment
         {
             ManiaHitMode = config.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode),
             ManiaHealthMode = config.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
             JudgePrecedence = config.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
             OffsetPlusMania = config.Get<double>(Ez2Setting.OffsetPlusMania),
+            BmsPoorHitResultEnable = config.Get<bool>(Ez2Setting.BmsPoorHitResultEnable),
         };
 
         public static GameplayEnvironment FromScore(ScoreInfo score, Ez2ConfigManager configFallback)
@@ -37,6 +40,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 ManiaHealthMode = (EzEnumHealthMode)healthMode,
                 JudgePrecedence = live.JudgePrecedence,
                 OffsetPlusMania = live.OffsetPlusMania,
+                BmsPoorHitResultEnable = live.BmsPoorHitResultEnable,
             };
         }
     }

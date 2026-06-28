@@ -7,7 +7,6 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania
@@ -26,21 +25,19 @@ namespace osu.Game.Rulesets.Mania
         /// <summary>
         /// Mania replay 环境唯一解析入口（替代分散的 FromScore / FromLive）。
         /// </summary>
-        public static ManiaGameplayEnvironment ResolveEnvironment(ScoreInfo? score, Ez2ConfigManager config, ReplayRunPurpose purpose)
+        public static GameplayEnvironment ResolveEnvironment(ScoreInfo? score, ReplayRunPurpose purpose)
         {
-            bool bmsPoor = config.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
-
+            var config = GlobalConfigStore.EzConfig;
             return purpose switch
             {
-                ReplayRunPurpose.ForStoredStatistics => resolveForStoredStatistics(score, config, bmsPoor),
-                ReplayRunPurpose.ForLiveAnalysis or ReplayRunPurpose.ForRaceTimeline => readLive(config, bmsPoor),
-                _ => readLive(config, bmsPoor),
+                ReplayRunPurpose.ForStoredStatistics => resolveForStoredStatistics(score, config),
+                _ => readLive(config),
             };
         }
 
-        private static ManiaGameplayEnvironment resolveForStoredStatistics(ScoreInfo? score, Ez2ConfigManager config, bool bmsPoor)
+        private static GameplayEnvironment resolveForStoredStatistics(ScoreInfo? score, Ez2ConfigManager config)
         {
-            var live = readLive(config, bmsPoor);
+            var live = readLive(config);
 
             if (score == null || !score.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
                 return live;
@@ -52,13 +49,13 @@ namespace osu.Game.Rulesets.Mania
             };
         }
 
-        private static ManiaGameplayEnvironment readLive(Ez2ConfigManager config, bool bmsPoor) => new ManiaGameplayEnvironment
+        private static GameplayEnvironment readLive(Ez2ConfigManager config) => new GameplayEnvironment
         {
             ManiaHitMode = config.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode),
             ManiaHealthMode = config.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
             JudgePrecedence = config.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
             OffsetPlusMania = config.Get<double>(Ez2Setting.OffsetPlusMania),
-            BmsPoorHitResultEnable = bmsPoor,
+            BmsPoorHitResultEnable = config.Get<bool>(Ez2Setting.BmsPoorHitResultEnable),
         };
     }
 }

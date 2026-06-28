@@ -20,7 +20,6 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas;
-using osu.Game.Rulesets.Mania.EzMania.Scoring;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Replays;
@@ -356,8 +355,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         // TODO(P3-Rest): createSessionEnvironment() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLiveAnalysis)
         protected override IGameplayEnvironment? CreateLiveAnalysisEnvironment() => createSessionEnvironment();
 
-        private ManiaGameplayEnvironment createSessionEnvironment()
-            => ManiaRuleset.ResolveEnvironment(null, ezConfig, ReplayRunPurpose.ForLiveAnalysis);
+        private GameplayEnvironment createSessionEnvironment()
+            => ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLiveAnalysis);
 
         // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLiveAnalysis)
         private Score? resolveSessionInputScore()
