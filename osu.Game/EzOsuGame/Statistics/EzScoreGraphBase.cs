@@ -57,7 +57,7 @@ namespace osu.Game.EzOsuGame.Statistics
         protected Container? LeftLabelContainer;
 
         [Resolved]
-        private OsuColour colours { get; set; } = null!;
+        protected OsuColour Colours { get; private set; } = null!;
 
         // 通过 EzReplaySessionRegistry 访问，Generator 静态初始化后自动可用
         // TODO(P3-Rest): Registry 注册后 Graph/Panel/Race 可用；P3-Rest 阶段各 Ruleset 应通过 DI 注入替代
@@ -363,7 +363,7 @@ namespace osu.Game.EzOsuGame.Statistics
                     applyOffset ? e.TimeOffset + DisplayOffset : e.TimeOffset,
                     time);
 
-                pointList.Add((new Vector2(x, y), colours.ForHitResult(displayResult)));
+                pointList.Add((new Vector2(x, y), Colours.ForHitResult(displayResult)));
             }
 
             if (pointList.Count > 0)
@@ -717,7 +717,7 @@ namespace osu.Game.EzOsuGame.Statistics
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.TopLeft,
                 PathRadius = 1,
-                Colour = colours.ForHitResult(result),
+                Colour = Colours.ForHitResult(result),
                 Alpha = 0.1f,
                 Vertices = vertices.ToArray()
             });

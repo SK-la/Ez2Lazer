@@ -15,7 +15,6 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Statistics;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
@@ -42,20 +41,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         // TODO(P3-Rest): 删除静态服务实例，改用基类 ReplaySession（由 DI 注入）
         // private static readonly ManiaReplaySessionService replay_session = new ManiaReplaySessionService();
 
+        // 帧量化检测后注入的精确 HitEvents（不写回 ScoreInfo）
+        private readonly IReadOnlyList<HitEvent>? originalHitEventsOverride;
+
         private readonly ManiaHitWindows hitWindowsNow = new ManiaHitWindows();
         private readonly HitModeHelper hitWindowsV1 = new HitModeHelper(EzEnumHitMode.Classic);
 
         private Bindable<EzEnumHitMode> hitModeBindable = null!;
-        private EzEnumHitMode currentHitMode;
         private Bindable<EzEnumHealthMode> healthModeBindable = null!;
-        private EzEnumHealthMode currentHealthMode;
-        private Bindable<double> offsetPlusMania = new Bindable<double>(0);
+        private Bindable<double> offsetPlusMania = new Bindable<double>();
 
+        // offset ≠ 0 时显示提醒文本（CreateTextUI 中创建一次，UpdateDisplay 仅更新值/可见性）
+        private readonly OsuSpriteText offsetOverlayText = new OsuSpriteText();
+
+        private EzEnumHitMode currentHitMode;
+        private EzEnumHealthMode currentHealthMode;
         private readonly double originalAccuracy;
         private readonly long originalTotalScore;
-
-        // 帧量化检测后注入的精确 HitEvents（不写回 ScoreInfo）
-        private readonly IReadOnlyList<HitEvent>? originalHitEventsOverride;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -64,9 +66,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         // 当前临时方案：保留 scoreManager 用于获取 databased score
         [Resolved]
         private ScoreManager scoreManager { get; set; } = null!;
-
-        [Resolved]
-        private OsuColour colours { get; set; } = null!;
 
         public EzScoreGraphMania(ScoreInfo score, IBeatmap beatmap)
             : base(score, beatmap, new ManiaHitWindows())
@@ -247,7 +246,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             // 非 offset 配置变更：清除 Session 缓存并使用 hitWindowsNow 对
             // OriginalHitEvents.TimeOffset 重判（保留现场游玩的精确 timing）。
             // Session 仅在 offset 拖动时使用（OnOffsetChanged 路径）。
+            offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            healthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
             hitModeBindable.BindValueChanged(v =>
             {
                 currentHitMode = v.NewValue;
@@ -260,7 +267,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 _ = RefreshFromService();
             });
 
-            healthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             healthModeBindable.BindValueChanged(__ =>
             {
                 currentHealthMode = healthModeBindable.Value;
@@ -279,7 +285,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                         _ = RefreshFromService();
                     });
 
-            offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             offsetPlusMania.BindValueChanged(v => OnOffsetChanged(v.NewValue), true);
 
             Refresh();
@@ -494,17 +499,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         {
             base.UpdateDisplay();
 
-            if (offsetPlusMania.Value != 0)
-            {
-                AddInternal(new OsuSpriteText
-                {
-                    Text = $"Fake Offset Fixing: {offsetPlusMania.Value:+0;-0;0} ms",
-                    Font = OsuFont.GetFont(size: 14, weight: FontWeight.Bold),
-                    Colour = Color4.OrangeRed,
-                    Anchor = Anchor.TopCentre,
-                    Origin = Anchor.TopCentre,
-                });
-            }
+            bool show = offsetPlusMania.Value != 0;
+            offsetOverlayText.Text = show
+                ? $"Fake Offset Fixing: {offsetPlusMania.Value:+0;-0;0} ms"
+                : string.Empty;
+            offsetOverlayText.Alpha = show ? 1 : 0;
         }
 
         private SimpleStatisticItem<string>[]? statItems; // 缓存文本 item 引用，供 UpdateTextValues 只更新数值
@@ -517,16 +516,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             // 创建带默认占位值的 item 列表
             var items = new List<SimpleStatisticItem<string>>
             {
-                makeSimpleStat("—", "Acc Original", colours.Blue1),
-                makeSimpleStat("—", "Acc Now Setting", colours.Blue1),
-                makeSimpleStat("—", "Acc v1 Algorithm", colours.Blue1),
+                makeSimpleStat("—", "Acc Original", Colours.Blue1),
+                makeSimpleStat("—", "Acc Now Setting", Colours.Blue1),
+                makeSimpleStat("—", "Acc v1 Algorithm", Colours.Blue1),
 
-                makeSimpleStat("—", "Score Original", colours.Orange1),
-                makeSimpleStat("—", "Score Now Setting", colours.Orange1),
-                makeSimpleStat("—", "Score v1 Algorithm", colours.Orange1),
+                makeSimpleStat("—", "Score Original", Colours.Orange1),
+                makeSimpleStat("—", "Score Now Setting", Colours.Orange1),
+                makeSimpleStat("—", "Score v1 Algorithm", Colours.Orange1),
 
                 makeSimpleStat(Score.Pauses.Count.ToString(), "Pauses"),
-                makeSimpleStat("Now | V1", "↓", colours.Gray8),
+                makeSimpleStat("Now | V1", "↓", Colours.Gray8),
             };
 
             // 从 Now+V1 判定集合构建每个判定行的 item
@@ -540,7 +539,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             foreach (var r in results)
             {
                 string name = r.GetHitModeDisplayName().ToString();
-                var c = colours.ForHitResult(r);
+                var c = Colours.ForHitResult(r);
                 items.Add(makeSimpleStat("—", name, c));
             }
 
