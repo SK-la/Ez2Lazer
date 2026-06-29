@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -11,21 +12,37 @@ namespace osu.Game.EzOsuGame.Scoring
 {
     internal static class EzScoreRaceDisplayScore
     {
-        public static long ForLeaderboardScore(GameplayLeaderboardScore leaderboardScore, ScoreInfo scoreInfo, ScoringMode mode)
-            => forLiveTotal(scoreInfo, leaderboardScore.TotalScore.Value, mode);
+        /// <summary>
+        /// 缓存：ScoreInfo → maxBasicJudgements。该值在 scoreInfo 生命周期内不变，
+        /// 避免每次调用 forLiveTotal 时重复走 LINQ 查询。
+        /// </summary>
+        private static readonly Dictionary<ScoreInfo, int> max_basic_judgements_cache = new Dictionary<ScoreInfo, int>();
+
+        public static long ForLeaderboardScore(GameplayLeaderboardScore leaderboardScore, ScoreInfo scoreInfo, ScoringMode mode) => forLiveTotal(scoreInfo, leaderboardScore.TotalScore.Value, mode);
 
         private static long forLiveTotal(ScoreInfo scoreInfo, long liveTotalScore, ScoringMode mode)
         {
             if (mode == ScoringMode.Standardised)
                 return liveTotalScore;
 
-            int maxBasicJudgements = scoreInfo.MaximumStatistics
-                                     .Where(k => k.Key.IsBasic())
-                                     .Select(k => k.Value)
-                                     .DefaultIfEmpty(0)
-                                     .Sum();
+            int maxBasicJudgements = getMaxBasicJudgements(scoreInfo);
 
             return convertStandardisedToClassic(scoreInfo.Ruleset.OnlineID, liveTotalScore, maxBasicJudgements);
+        }
+
+        private static int getMaxBasicJudgements(ScoreInfo scoreInfo)
+        {
+            if (max_basic_judgements_cache.TryGetValue(scoreInfo, out int cached))
+                return cached;
+
+            int result = scoreInfo.MaximumStatistics
+                                  .Where(k => k.Key.IsBasic())
+                                  .Select(k => k.Value)
+                                  .DefaultIfEmpty(0)
+                                  .Sum();
+
+            max_basic_judgements_cache[scoreInfo] = result;
+            return result;
         }
 
         // Mirrors ScoreInfoExtensions private conversion; kept here to avoid touching non-Ez files.

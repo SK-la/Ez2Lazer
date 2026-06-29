@@ -70,6 +70,9 @@ namespace osu.Game.EzOsuGame.Scoring
 
             var snapshot = state.Timeline.QueryAtTime(currentTime);
 
+            // 对齐官方 SpectatorScoreProcessor：直接赋值。
+            // 框架 Bindable<T>.Value setter 内置 EqualityComparer 去重，
+            // 值不变时不会触发 ValueChanged 事件链，无需手动条件判断。
             TotalScore.Value = snapshot.TotalScore;
             Accuracy.Value = snapshot.Accuracy;
             Combo.Value = snapshot.HighestCombo;

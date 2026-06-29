@@ -27,9 +27,16 @@ namespace osu.Game.EzOsuGame.Scoring
                 return;
             }
 
-            this.snapshots = new EzScoreTimelineSnapshot[snapshots.Count];
-            for (int i = 0; i < snapshots.Count; i++)
-                this.snapshots[i] = snapshots[i];
+            // 直接引用传入数组，避免完整拷贝。调用方须保证传入后不再修改该数组。
+            // 所有生产路径（ManiaReplayTimelineRecorder.Build / buildFromHitEvents）构建后均不再修改。
+            if (snapshots is EzScoreTimelineSnapshot[] arr)
+                this.snapshots = arr;
+            else
+            {
+                this.snapshots = new EzScoreTimelineSnapshot[snapshots.Count];
+                for (int i = 0; i < snapshots.Count; i++)
+                    this.snapshots[i] = snapshots[i];
+            }
 
             FinalTotalScore = this.snapshots[^1].TotalScore;
         }

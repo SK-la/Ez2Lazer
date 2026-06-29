@@ -192,13 +192,16 @@ namespace osu.Game.EzOsuGame.Scoring
             foreach (var mod in scoreInfo.Mods.OfType<IApplicableToScoreProcessor>())
                 mod.ApplyToScoreProcessor(scoreProcessor);
 
+            // 构建 HitObject 引用字典，将 O(N×M) 的线性查找优化为 O(1) 字典查找。
+            var hitObjectMap = buildHitObjectReferenceMap(beatmap);
+
             var snapshots = new List<EzScoreTimelineSnapshot>();
             int missCount = 0;
             double lastClockTime = double.NegativeInfinity;
 
-            foreach (var hitEvent in hitEvents.OrderBy(e => getJudgementTime(e, offsetsRelativeToEnd, beatmap, fallbackMissWindow)))
+            foreach (var hitEvent in hitEvents.OrderBy(e => getJudgementTime(e, offsetsRelativeToEnd, beatmap, fallbackMissWindow, null, hitObjectMap)))
             {
-                var beatmapHitObject = findBeatmapHitObject(beatmap, hitEvent.HitObject);
+                var beatmapHitObject = findBeatmapHitObject(beatmap, hitEvent.HitObject, hitObjectMap);
                 ensureHitWindows(beatmap, beatmapHitObject);
 
                 scoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
@@ -210,7 +213,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 if (hitEvent.Result.IsMiss())
                     missCount++;
 
-                double clockTime = getJudgementTime(hitEvent, offsetsRelativeToEnd, beatmap, fallbackMissWindow, beatmapHitObject);
+                double clockTime = getJudgementTime(hitEvent, offsetsRelativeToEnd, beatmap, fallbackMissWindow, beatmapHitObject, hitObjectMap);
 
                 // 保持时间线严格单调，避免同一时刻多条快照导致查询抖动。
                 if (clockTime <= lastClockTime)
@@ -228,16 +231,42 @@ namespace osu.Game.EzOsuGame.Scoring
             return new EzScoreTimeline(snapshots);
         }
 
-        // TODO(EZ-SR-TL-012): Osu Session 完成后删除；仅 HitEvents 重放路径使用。
-        private static double getJudgementTime(HitEvent hitEvent, bool offsetsRelativeToEnd, IBeatmap beatmap, double fallbackMissWindow, HitObject? beatmapHitObject = null)
+        /// <summary>
+        /// 构建 beatmap 所有 HitObject（含嵌套）的引用字典，用于 O(1) 查找。
+        /// </summary>
+        private static Dictionary<HitObject, HitObject> buildHitObjectReferenceMap(IBeatmap beatmap)
         {
-            beatmapHitObject ??= findBeatmapHitObject(beatmap, hitEvent.HitObject);
+            var map = new Dictionary<HitObject, HitObject>(ReferenceEqualityComparer.Instance);
+
+            foreach (var ho in beatmap.HitObjects)
+                collectHitObjectReferences(ho, map);
+
+            return map;
+        }
+
+        private static void collectHitObjectReferences(HitObject hitObject, Dictionary<HitObject, HitObject> map)
+        {
+            map.TryAdd(hitObject, hitObject);
+
+            foreach (var nested in hitObject.NestedHitObjects)
+                collectHitObjectReferences(nested, map);
+        }
+
+        // TODO(EZ-SR-TL-012): Osu Session 完成后删除；仅 HitEvents 重放路径使用。
+        private static double getJudgementTime(HitEvent hitEvent, bool offsetsRelativeToEnd, IBeatmap beatmap, double fallbackMissWindow, HitObject? beatmapHitObject = null, Dictionary<HitObject, HitObject>? hitObjectMap = null)
+        {
+            beatmapHitObject ??= findBeatmapHitObject(beatmap, hitEvent.HitObject, hitObjectMap);
             return EzScoreTimelineJudgementTime.Get(hitEvent, offsetsRelativeToEnd, beatmapHitObject, fallbackMissWindow);
         }
 
         // TODO(EZ-SR-TL-013): Osu Session 完成后删除 HitObject 查找补丁（findBeatmapHitObject 等）。
-        private static HitObject findBeatmapHitObject(IBeatmap beatmap, HitObject hitObject)
+        private static HitObject findBeatmapHitObject(IBeatmap beatmap, HitObject hitObject, Dictionary<HitObject, HitObject>? hitObjectMap = null)
         {
+            // O(1) 字典查找：覆盖绝大多数情况（replay HitObject 与 beatmap 共享引用）。
+            if (hitObjectMap != null && hitObjectMap.TryGetValue(hitObject, out var mapped))
+                return mapped;
+
+            // 回退：线性扫描 + 属性匹配（仅在 replay 使用不同 HitObject 实例时触发）。
             foreach (var candidate in beatmap.HitObjects)
             {
                 if (ReferenceEquals(candidate, hitObject))

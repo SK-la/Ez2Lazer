@@ -59,7 +59,6 @@ namespace osu.Game.EzOsuGame.HUD
 
         private IBindableDictionary<string, EzScoreRaceState>? stateLookup;
 
-        private double lastProcessorUpdateTime;
         private LeaderboardEntryState? currentPlayerEntry;
         private double lastUpdateScoreDisplayScroll = double.MinValue;
         private bool rebuildScheduled;
@@ -170,16 +169,12 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.Update();
 
-            // 对齐官方 MultiSpectatorLeaderboardProvider：在 HUD 层统一驱动 processor 的 UpdateScore。
-            // Pause 时 GameplayClockContainer.CurrentTime 停止前进，processor 自然停止 ghost 推进。
-            // 节流到 ~10Hz：排行榜不需要每帧更新，大幅降低每帧开销。
-            if (Time.Current - lastProcessorUpdateTime >= 100)
-            {
-                foreach (var entry in entryStates)
-                    entry.Processor?.UpdateScore();
-
-                lastProcessorUpdateTime = Time.Current;
-            }
+            // 对齐官方 MultiSpectatorLeaderboardProvider：每帧驱动 processor 的 UpdateScore。
+            // Pause 时 GameplayClockContainer.CurrentTime 停止前进，processor 自然停止 ghost 推進。
+            // 不做节流：QueryAtTime 是 O(log n) 二分查找，开销可忽略；
+            // 框架 Bindable.Value setter 内置去重，值不变时不触发下游事件链。
+            foreach (var entry in entryStates)
+                entry.Processor?.UpdateScore();
 
             updateScoreDisplay();
         }

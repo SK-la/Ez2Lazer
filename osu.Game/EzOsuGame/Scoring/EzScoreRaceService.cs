@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
@@ -197,28 +198,33 @@ namespace osu.Game.EzOsuGame.Scoring
             token.ThrowIfCancellationRequested();
 
             var environment = GlobalConfigStore.EzConfig.GetGameplayEnvironment();
-            var sharedBeatmap = workingBeatmap.GetPlayableBeatmap(rulesetInfo, Array.Empty<Mod>());
 
-            var result = new List<EzScoreRaceState>();
+            // 并行构建所有 ghost 的 timeline。每个 ghost 的 timeline 构建完全独立，
+            // 可充分利用多核 CPU。预期加载时间 ÷ min(ghost数量, CPU核心数)。
+            var results = new EzScoreRaceState?[ghostScores.Count];
 
-            foreach (var scoreInfo in ghostScores)
+            Parallel.For(0, ghostScores.Count, new ParallelOptions { CancellationToken = token }, i =>
             {
-                token.ThrowIfCancellationRequested();
+                var scoreInfo = ghostScores[i];
+
+                // 每个任务加载自己的 playable beatmap，避免多线程共享同一 IBeatmap 实例
+                // （HitEvents 路径的 ensureHitWindows 会修改 HitObject 状态，非线程安全）。
+                var taskBeatmap = workingBeatmap.GetPlayableBeatmap(rulesetInfo, Array.Empty<Mod>());
 
                 var timeline = EzScoreTimelineBuilder.TryBuild(
                     scoreManager,
                     beatmaps,
                     scoreInfo,
-                    sharedBeatmap,
+                    taskBeatmap,
                     cache: null,
                     environment,
                     token
                 );
 
-                result.Add(new EzScoreRaceState(scoreInfo, timeline));
-            }
+                results[i] = new EzScoreRaceState(scoreInfo, timeline);
+            });
 
-            return result;
+            return results.Where(r => r != null).Select(r => r!).ToList();
         }
 
         /// <summary>
