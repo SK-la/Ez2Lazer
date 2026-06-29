@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.Statistics;
@@ -54,8 +55,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
 
-            var fromScore = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStored));
-            var fromLive = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLive));
+            var fromScore = snapshotRun(score, beatmap, GlobalConfigStore.EzConfig.ResolveForReplay(score.ScoreInfo, ReplayRunPurpose.ForStored));
+            var fromLive = snapshotRun(score, beatmap, GlobalConfigStore.EzConfig.ResolveForReplay(null, ReplayRunPurpose.ForLive));
 
             Assert.That(ManiaReplayParityHelper.AreHitEventsEquivalent(fromScore.hitEvents, fromLive.hitEvents), Is.True);
             Assert.That(ManiaReplayParityHelper.AreStatisticsEquivalent(fromScore.statistics, fromLive.statistics), Is.True,
@@ -85,8 +86,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, iidxEnvironment);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(lazerEnvironment);
 
-            var fromScore = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStored));
-            var fromLive = snapshotRun(score, beatmap, ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLive));
+            var fromScore = snapshotRun(score, beatmap, GlobalConfigStore.EzConfig.ResolveForReplay(score.ScoreInfo, ReplayRunPurpose.ForStored));
+            var fromLive = snapshotRun(score, beatmap, GlobalConfigStore.EzConfig.ResolveForReplay(null, ReplayRunPurpose.ForLive));
 
             Assert.That(ManiaReplayParityHelper.AreHitEventsEquivalent(fromScore.hitEvents, fromLive.hitEvents), Is.False);
         }

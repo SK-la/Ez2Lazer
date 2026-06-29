@@ -196,7 +196,7 @@ namespace osu.Game.EzOsuGame.Scoring
             var ghostScores = EzLocalScoreQueries.GetTopByTotalScore(allLocalScores, 10);
             token.ThrowIfCancellationRequested();
 
-            var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
+            var environment = GlobalConfigStore.EzConfig.GetGameplayEnvironment();
             var sharedBeatmap = workingBeatmap.GetPlayableBeatmap(rulesetInfo, Array.Empty<Mod>());
 
             var result = new List<EzScoreRaceState>();

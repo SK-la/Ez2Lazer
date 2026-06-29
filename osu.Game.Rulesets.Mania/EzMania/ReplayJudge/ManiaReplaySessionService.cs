@@ -5,6 +5,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Scoring;
 
@@ -20,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             var ruleset = new ManiaRuleset();
 
-            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStored);
+            environment ??= GlobalConfigStore.EzConfig.ResolveForReplay(score.ScoreInfo, ReplayRunPurpose.ForStored);
 
             // Clone to isolate Session mutations from the caller's Score/ScoreInfo reference.
             var clone = score.DeepClone();
@@ -37,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         protected override Task<EzScoreTimeline> RunTimelineAsyncFunc(Score score, IBeatmap beatmap, IGameplayEnvironment? environment, CancellationToken cancellationToken)
         {
-            environment ??= ManiaRuleset.ResolveEnvironment(score.ScoreInfo, ReplayRunPurpose.ForStored);
+            environment ??= GlobalConfigStore.EzConfig.ResolveForReplay(score.ScoreInfo, ReplayRunPurpose.ForStored);
 
             // ManiaReplaySession.RunTimeline is synchronous — execute directly to avoid nesting Task.Run
             // which can cause threadpool starvation when the caller is already on a pool thread (via ensureTimelinesLoaded).
@@ -49,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             try
             {
                 var ruleset = new ManiaRuleset();
-                var resolvedEnv = request.Environment ?? ManiaRuleset.ResolveEnvironment(request.Score.ScoreInfo, request.Purpose);
+                var resolvedEnv = request.Environment ?? GlobalConfigStore.EzConfig.ResolveForReplay(request.Score.ScoreInfo, request.Purpose);
 
                 // Clone only for RunReplayAsync to isolate PopulateScore mutations.
                 var clone = request.Score.DeepClone();

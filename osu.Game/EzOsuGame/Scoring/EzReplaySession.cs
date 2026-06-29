@@ -7,7 +7,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Scoring
@@ -66,43 +65,5 @@ namespace osu.Game.EzOsuGame.Scoring
             string raw = $"{purpose}|{scoreKey}|{beatmapKey}|{envKey}|rule:{score.ScoreInfo.Ruleset.OnlineID}";
             return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(raw)));
         }
-    }
-
-    public static class EzReplaySessionExtensions
-    {
-        /// <summary>
-        /// Replay 环境唯一解析入口（替代分散的 FromScore / FromLive）。
-        /// </summary>
-        public static GameplayEnvironment ResolveEnvironment(ScoreInfo? score, ReplayRunPurpose purpose)
-        {
-            var live = GlobalConfigStore.EzConfig.GetGameplayEnvironment();
-
-            switch (purpose)
-            {
-                case ReplayRunPurpose.ForStored:
-
-                    if (score == null || !score.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
-                        return live;
-
-                    return live with
-                    {
-                        ManiaHitMode = (EzEnumHitMode)hitMode,
-                        ManiaHealthMode = (EzEnumHealthMode)healthMode,
-                    };
-
-                default:
-                    return live;
-            }
-        }
-
-        public static GameplayEnvironment GetGameplayEnvironment(this Ez2ConfigManager config)
-            => new GameplayEnvironment
-            {
-                ManiaHitMode = config.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode),
-                ManiaHealthMode = config.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
-                JudgePrecedence = config.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
-                OffsetPlusMania = config.Get<double>(Ez2Setting.OffsetPlusMania),
-                BmsPoorHitResultEnable = config.Get<bool>(Ez2Setting.BmsPoorHitResultEnable),
-            };
     }
 }

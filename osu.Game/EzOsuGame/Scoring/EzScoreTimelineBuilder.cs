@@ -77,7 +77,7 @@ namespace osu.Game.EzOsuGame.Scoring
             }
 
             string? cacheKey = beatmapForFingerprint != null
-                ? getCacheKey(scoreInfo, timelineMode, environment ?? GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig), beatmapForFingerprint)
+                ? getCacheKey(scoreInfo, timelineMode, environment ?? GlobalConfigStore.EzConfig.GetGameplayEnvironment(), beatmapForFingerprint)
                 : null;
 
             if (!string.IsNullOrEmpty(cacheKey) && cache.TryGet(cacheKey, out var cached))
@@ -307,7 +307,7 @@ namespace osu.Game.EzOsuGame.Scoring
             if (scoreInfo.Ruleset.OnlineID != 3)
                 return;
 
-            var environment = GameplayEnvironment.FromLive(GlobalConfigStore.EzConfig);
+            var environment = GlobalConfigStore.EzConfig.GetGameplayEnvironment();
 
             PropertyInfo? overrideProperty = scoreProcessor.GetType().GetProperty("TimelineHitModeOverride", BindingFlags.Public | BindingFlags.Instance);
 

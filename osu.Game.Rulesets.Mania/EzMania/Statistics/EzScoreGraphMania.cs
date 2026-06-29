@@ -361,7 +361,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         protected override IGameplayEnvironment? CreateLiveAnalysisEnvironment() => createSessionEnvironment();
 
         private GameplayEnvironment createSessionEnvironment()
-            => ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLive);
+            => GlobalConfigStore.EzConfig.ResolveForReplay(null, ReplayRunPurpose.ForLive);
 
         // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLive)
         private Score? resolveSessionInputScore()

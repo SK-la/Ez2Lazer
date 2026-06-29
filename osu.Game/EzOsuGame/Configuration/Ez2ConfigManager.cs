@@ -14,6 +14,8 @@ using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Online;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Configuration
 {
@@ -273,6 +275,45 @@ namespace osu.Game.EzOsuGame.Configuration
         #endregion
 
         #region 公共方法
+
+        /// <summary>
+        /// 从当前配置读取实时游玩环境快照。
+        /// </summary>
+        public GameplayEnvironment GetGameplayEnvironment() => new GameplayEnvironment
+        {
+            ManiaHitMode = Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode),
+            ManiaHealthMode = Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
+            JudgePrecedence = Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
+            OffsetPlusMania = Get<double>(Ez2Setting.OffsetPlusMania),
+            BmsPoorHitResultEnable = Get<bool>(Ez2Setting.BmsPoorHitResultEnable),
+        };
+
+        /// <summary>
+        /// Replay 环境解析入口。
+        /// <para>ForLive: 直接读当前配置。</para>
+        /// <para>ForStored: 在配置基础上，用 ScoreInfo 中嵌入的 HitMode/HealthMode 覆盖。</para>
+        /// </summary>
+        public GameplayEnvironment ResolveForReplay(ScoreInfo? score, ReplayRunPurpose purpose)
+        {
+            var live = GetGameplayEnvironment();
+
+            switch (purpose)
+            {
+                case ReplayRunPurpose.ForStored:
+
+                    if (score == null || !score.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
+                        return live;
+
+                    return live with
+                    {
+                        ManiaHitMode = (EzEnumHitMode)hitMode,
+                        ManiaHealthMode = (EzEnumHealthMode)healthMode,
+                    };
+
+                default:
+                    return live;
+            }
+        }
 
         /// <summary>
         /// 获取列宽

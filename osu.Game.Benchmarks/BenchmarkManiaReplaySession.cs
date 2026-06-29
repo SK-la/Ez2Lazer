@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania;
@@ -39,7 +40,7 @@ namespace osu.Game.Benchmarks
             // 创建测试用 score（带 replay frames）
             score = createTestScore(beatmap);
 
-            environment = ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForStored);
+            environment = GlobalConfigStore.EzConfig.ResolveForReplay(null, ReplayRunPurpose.ForStored);
         }
 
         [Benchmark]
