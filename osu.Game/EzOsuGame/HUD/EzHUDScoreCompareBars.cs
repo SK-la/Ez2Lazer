@@ -111,6 +111,8 @@ namespace osu.Game.EzOsuGame.HUD
         private EzScoreRaceState? boundState1;
         private EzScoreRaceState? boundState2;
 
+        private double lastProcessorUpdateTime;
+
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
@@ -208,9 +210,13 @@ namespace osu.Game.EzOsuGame.HUD
             updateCurrentAndTheoreticalBars();
             base.CornerRadius = CornerRadius.Value * Math.Min(DrawWidth, DrawHeight);
 
-            // 对齐官方 MultiSpectatorLeaderboardProvider：HUD 统一驱动 processor.UpdateScore。
-            ghostProcessor1?.UpdateScore();
-            ghostProcessor2?.UpdateScore();
+            // 节流到 ~10Hz：与排行榜一致，降低每帧开销。
+            if (Time.Current - lastProcessorUpdateTime >= 100)
+            {
+                ghostProcessor1?.UpdateScore();
+                ghostProcessor2?.UpdateScore();
+                lastProcessorUpdateTime = Time.Current;
+            }
         }
 
         protected override void OnGameplayClockResolved(GameplayClockContainer clock)
