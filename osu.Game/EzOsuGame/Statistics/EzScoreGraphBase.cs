@@ -59,12 +59,10 @@ namespace osu.Game.EzOsuGame.Statistics
         [Resolved]
         protected OsuColour Colours { get; private set; } = null!;
 
-        // 通过 EzReplaySessionRegistry 访问，Generator 静态初始化后自动可用
-        // TODO(P3-Rest): Registry 注册后 Graph/Panel/Race 可用；P3-Rest 阶段各 Ruleset 应通过 DI 注入替代
-        protected IEzReplaySession? ReplaySession => EzReplaySessionRegistry.Instance;
+        [Resolved]
+        protected IEzReplaySession ReplaySession { get; private set; } = null!;
 
         // Graph-UX: 双轨刷新状态管理
-        // TODO(P3-Rest): CommittedNowScore/committedEnvironment 应由 IEzReplaySession.RunRequestAsync(ForLive) 填充
         // displayOffset 由 RefreshDisplayOnly 管理（拖动时），RefreshFromService 成功后重置为 0
         protected Score? CommittedNowScore;
 #pragma warning disable IDE0051 // committedEnvironment 为 P3-Rest 阶段预留，当前暂未使用

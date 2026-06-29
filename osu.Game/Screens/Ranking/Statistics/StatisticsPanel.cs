@@ -59,8 +59,8 @@ namespace osu.Game.Screens.Ranking.Statistics
         [Resolved]
         private IAPIProvider api { get; set; } = null!;
 
-        // TODO(P3-Rest): 改为 DI 注入（parent Cache）；当前通过 EzReplaySessionRegistry 访问
-        protected IEzReplaySession? ReplaySession => EzReplaySessionRegistry.Instance;
+        [Resolved]
+        protected IEzReplaySession ReplaySession { get; private set; } = null!;
 
         private readonly Container content;
         private readonly LoadingSpinner spinner;
@@ -135,7 +135,7 @@ namespace osu.Game.Screens.Ranking.Statistics
 
                     if (databasedScore != null)
                     {
-                        // TODO(P3-Rest): 改为 ReplaySession.RunAsync(ForStored)，删除 Bridge 调用
+                        // 非游戏结束立即进入结算的场景下，HitEvents 都是空的，需要定量补充。
                         EzScoreReloadBridge.InitializeAllGenerators();
                         generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
                     }

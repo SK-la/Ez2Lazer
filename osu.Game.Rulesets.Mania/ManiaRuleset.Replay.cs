@@ -28,25 +28,24 @@ namespace osu.Game.Rulesets.Mania
         public static GameplayEnvironment ResolveEnvironment(ScoreInfo? score, ReplayRunPurpose purpose)
         {
             var config = GlobalConfigStore.EzConfig;
-            return purpose switch
-            {
-                ReplayRunPurpose.ForStored => resolveForStoredStatistics(score, config),
-                _ => readLive(config),
-            };
-        }
-
-        private static GameplayEnvironment resolveForStoredStatistics(ScoreInfo? score, Ez2ConfigManager config)
-        {
             var live = readLive(config);
 
-            if (score == null || !score.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
-                return live;
-
-            return live with
+            switch (purpose)
             {
-                ManiaHitMode = (EzEnumHitMode)hitMode,
-                ManiaHealthMode = (EzEnumHealthMode)healthMode,
-            };
+                case ReplayRunPurpose.ForStored:
+
+                    if (score == null || !score.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
+                        return live;
+
+                    return live with
+                    {
+                        ManiaHitMode = (EzEnumHitMode)hitMode,
+                        ManiaHealthMode = (EzEnumHealthMode)healthMode,
+                    };
+
+                default:
+                    return live;
+            }
         }
 
         private static GameplayEnvironment readLive(Ez2ConfigManager config) => new GameplayEnvironment

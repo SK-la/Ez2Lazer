@@ -20,7 +20,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
     public sealed class ManiaScoreHitEventGenerator : IScoreHitEventGenerator
     {
         public static ManiaScoreHitEventGenerator Instance { get; } = new ManiaScoreHitEventGenerator();
-        private static readonly ManiaReplaySessionService replay_session = new ManiaReplaySessionService();
 
         static ManiaScoreHitEventGenerator()
         {
@@ -34,9 +33,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 var environment = ManiaRuleset.ResolveEnvironment(null, ReplayRunPurpose.ForLive);
                 return ManiaReplaySession.RunTimeline(score, beatmap, environment, cancellationToken);
             });
-
-            // 注册到全局 Registry，使 Graph/Panel/Race 的 DI 消费者可获得实例
-            EzReplaySessionRegistry.Register(replay_session);
         }
 
         public bool Validate(Score score)

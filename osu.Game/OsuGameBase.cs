@@ -51,6 +51,7 @@ using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Online;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API;
@@ -214,6 +215,8 @@ namespace osu.Game
 
         protected EzResourceStore EzResourceStore { get; private set; }
 
+        protected IEzReplaySession ReplaySession { get; private set; }
+
         private Bindable<FrameSync> ezUpdateFrameLimiter = null!;
         private Bindable<FrameSync> ezDrawFrameLimiter = null!;
         private Bindable<double> ezBaseFrameLimiter = null!;
@@ -350,6 +353,22 @@ namespace osu.Game
 
             dependencies.CacheAs<RulesetStore>(RulesetStore = new RealmRulesetStore(realm, Storage));
             dependencies.CacheAs<IRulesetStore>(RulesetStore);
+
+            // 通过 Ruleset 工厂获取正确的 IEzReplaySession 实现（类似 ScoreProcessor 模式）
+            foreach (var rulesetInfo in RulesetStore.AvailableRulesets)
+            {
+                var rulesetInstance = rulesetInfo.CreateInstance();
+                var session = rulesetInstance.CreateEzReplaySession();
+
+                if (session != null)
+                {
+                    ReplaySession = session;
+                    break;
+                }
+            }
+
+            if (ReplaySession != null)
+                dependencies.CacheAs(ReplaySession);
 
             Decoder.RegisterDependencies(RulesetStore);
 

@@ -64,9 +64,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             ArgumentNullException.ThrowIfNull(score);
             ArgumentNullException.ThrowIfNull(score.Replay);
             ArgumentNullException.ThrowIfNull(beatmap);
-            // environment may be null when called via IEzReplaySession; resolved upstream by ManiaReplaySessionService
 
-            var ruleset = new ManiaRuleset();
+            var ruleset = score.ScoreInfo.Ruleset.CreateInstance();
             var scoreProcessor = ruleset.CreateScoreProcessor();
             scoreProcessor.Mods.Value = score.ScoreInfo.Mods;
             scoreProcessor.ApplyBeatmap(beatmap);

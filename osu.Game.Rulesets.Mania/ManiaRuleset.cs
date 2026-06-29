@@ -15,6 +15,7 @@ using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
@@ -31,6 +32,7 @@ using osu.Game.Rulesets.Mania.EzMania.Analysis;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.Statistics;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Replays;
@@ -87,6 +89,8 @@ namespace osu.Game.Rulesets.Mania
         public override IBeatmapVerifier CreateBeatmapVerifier() => new ManiaBeatmapVerifier();
 
         public override IEzAnalysisProvider CreateEzAnalysisProvider() => new EzManiaAnalysisProvider();
+
+        public override IEzReplaySession CreateEzReplaySession() => new ManiaReplaySessionService();
 
         public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap)
         {
