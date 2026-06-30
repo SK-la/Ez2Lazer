@@ -4,12 +4,9 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
-using osu.Game.Database;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.Overlays
@@ -19,12 +16,7 @@ namespace osu.Game.EzOsuGame.Overlays
         protected override LocalisableString Header => EzSettingsStrings.EZ_UI_SETTINGS_HEADER;
 
         [BackgroundDependencyLoader]
-        private void load(
-            Ez2ConfigManager ezConfig,
-            BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
-            EzAnalysisWarmupProcessor? analysisWarmupProcessor,
-            IDialogOverlay? dialogOverlay,
-            INotificationOverlay? notifications)
+        private void load(Ez2ConfigManager ezConfig)
         {
             AddRange(new Drawable[]
             {
@@ -46,20 +38,11 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "analysis", "sqlite", "cache", "warmup", "persistent" }
                 },
-            });
-
-            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
-
-            var acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
-            var acrylicUiBlurStrength = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength);
-
-            AddRange(new Drawable[]
-            {
                 new SettingsItemV2(new FormCheckBox
                 {
                     Caption = EzSettingsStrings.ACRYLIC_UI_ENABLED,
                     HintText = EzSettingsStrings.ACRYLIC_UI_ENABLED_TOOLTIP,
-                    Current = acrylicUiEnabled,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled),
                 })
                 {
                     Keywords = new[] { "acrylic", "glass", "blur", "song select", "ui", "毛玻璃" }
@@ -68,24 +51,11 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Caption = EzSettingsStrings.ACRYLIC_UI_BLUR_STRENGTH,
                     HintText = EzSettingsStrings.ACRYLIC_UI_BLUR_STRENGTH_TOOLTIP,
-                    Current = acrylicUiBlurStrength,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength),
                     KeyboardStep = 1,
                 })
                 {
                     Keywords = new[] { "acrylic", "blur", "strength", "song select", "ui", "虚化" }
-                },
-            });
-
-            AddRange(new Drawable[]
-            {
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = EzSettingsStrings.HIDE_MAIN_MENU_ONLINE_BANNER,
-                    HintText = EzSettingsStrings.HIDE_MAIN_MENU_ONLINE_BANNER_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.HideMainMenuOnlineBanner),
-                })
-                {
-                    Keywords = new[] { "main menu", "banner", "news", "advertisement", "ui" }
                 },
                 new SettingsItemV2(new FormEnumDropdown<EzNotificationBehaviour>
                 {
@@ -106,6 +76,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
+                    Caption = EzSettingsStrings.HIDE_MAIN_MENU_ONLINE_BANNER,
+                    HintText = EzSettingsStrings.HIDE_MAIN_MENU_ONLINE_BANNER_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.HideMainMenuOnlineBanner),
+                })
+                {
+                    Keywords = new[] { "main menu", "banner", "news", "advertisement", "ui" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
                     Caption = EzSettingsStrings.STORYBOARD_VIDEO_AUTO_SIZE,
                     HintText = EzSettingsStrings.STORYBOARD_VIDEO_AUTO_SIZE_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.StoryboardAutoVideoSize),
@@ -115,21 +94,21 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
+                    Caption = EzSettingsStrings.SKIP_WITH_GAMEPLAY_KEYS,
+                    HintText = EzSettingsStrings.SKIP_WITH_GAMEPLAY_KEYS_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.SkipWithGameplayKeys),
+                })
+                {
+                    Keywords = new[] { "skip", "gameplay", "key", "mania", "std" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
                     Caption = EzSettingsStrings.HIT_OBJECT_LIFETIME_USES_OWN_TIME,
                     HintText = EzSettingsStrings.HIT_OBJECT_LIFETIME_USES_OWN_TIME_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.HitObjectLifetimeUsesOwnTime),
                 })
                 {
                     Keywords = new[] { "ez", "timing", "lifetime", "hitobject" }
-                },
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = EzSettingsStrings.SKIP_EMPTY_EDGE_COLUMNS,
-                    HintText = EzSettingsStrings.SKIP_EMPTY_EDGE_COLUMNS_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns),
-                })
-                {
-                    Keywords = new[] { "mania", "empty", "column" }
                 },
             });
         }
