@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -55,6 +56,9 @@ namespace osu.Game.EzOsuGame.Statistics
 
         // 左侧预留用于判定区间标签的容器。派生类可在 X = LeftMarginConst - labelAreaWidth 处创建并赋值给它以预留标签区域。
         protected Container? LeftLabelContainer;
+
+        // offset ≠ 0 时显示提醒文本（CreateTextUI 中创建一次，UpdateDisplay 仅更新值/可见性）
+        protected readonly OsuSpriteText OffsetOverlayText = new OsuSpriteText();
 
         [Resolved]
         protected OsuColour Colours { get; private set; } = null!;
@@ -108,6 +112,28 @@ namespace osu.Game.EzOsuGame.Statistics
         /// Now(Now) 重算使用的事件集合。默认与展示集合一致。
         /// </summary>
         protected virtual IReadOnlyList<HitEvent> GetNowHitEvents() => GetDisplayHitEvents();
+
+        /// <summary>
+        /// 获取用于展示的 HitEvents（应用 displayOffset）
+        /// </summary>
+        protected IReadOnlyList<HitEvent> GetDisplayEventsWithOffset()
+        {
+            var baseEvents = CommittedNowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents;
+
+#pragma warning disable IDE0046 // displayOffset == 0 的简化写法
+            if (DisplayOffset == 0)
+                return baseEvents;
+#pragma warning restore IDE0046
+
+            return baseEvents.Select(e => new HitEvent(
+                e.TimeOffset + DisplayOffset,
+                e.GameplayRate,
+                e.Result,
+                e.HitObject,
+                e.LastHitObject,
+                e.Position
+            )).ToList();
+        }
 
         protected EzScoreGraphBase(ScoreInfo score, IBeatmap beatmap, HitWindows hitWindows)
         {
@@ -447,10 +473,7 @@ namespace osu.Game.EzOsuGame.Statistics
         /// </summary>
         protected async Task RefreshFromService()
         {
-            if (ReplaySession == null || Beatmap == null)
-                return;
-
-            var environment = CreateLiveAnalysisEnvironment();
+            committedEnvironment = CreateLiveAnalysisEnvironment();
             var inputScore = ResolveInputScore();
 
             if (inputScore == null)
@@ -460,15 +483,13 @@ namespace osu.Game.EzOsuGame.Statistics
             {
                 // TODO(P3-Rest): 应使用 ReplayRunRequest(ForLive) 统一入口
                 // 当前暂时直接调用 RunAsync，P3-Rest 阶段改为 RunRequestAsync
-                if (environment != null)
+                if (committedEnvironment != null)
                 {
                     CommittedNowScore = await ReplaySession.RunAsync(
                         inputScore.DeepClone(),
                         Beatmap,
-                        environment
+                        committedEnvironment
                     ).ConfigureAwait(false);
-
-                    committedEnvironment = environment;
                 }
 
                 DisplayOffset = 0; // 重置展示 offset
@@ -488,6 +509,18 @@ namespace osu.Game.EzOsuGame.Statistics
                 Schedule(Refresh);
             }
         }
+
+        /// <summary>
+        /// 创建 ForLive 环境（offset=0）
+        /// 子类应重写以提供规则集特定的环境解析
+        /// </summary>
+        protected virtual IGameplayEnvironment CreateLiveAnalysisEnvironment() => GlobalConfigStore.EzConfig.ResolveForReplay(null, ReplayRunPurpose.ForLive);
+
+        /// <summary>
+        /// 解析输入 Score（用于 Session 运行）
+        /// 子类应重写以提供规则集特定的 Score 获取逻辑
+        /// </summary>
+        protected virtual Score? ResolveInputScore() => null;
 
         /// <summary>
         /// Offset 变化处理：debounce 逻辑
@@ -541,8 +574,8 @@ namespace osu.Game.EzOsuGame.Statistics
 
             // 移除旧的 scatter 和血量 path（保留边界线）
             var toRemove = graphContainer.Children
-                .Where(c => c is GirdPoints || c is Path)
-                .ToList();
+                                         .Where(c => c is GirdPoints || c is Path)
+                                         .ToList();
 
             foreach (var child in toRemove)
                 graphContainer.Remove(child, true);
@@ -552,99 +585,6 @@ namespace osu.Game.EzOsuGame.Statistics
             drawPointsGraph(displayEvents, applyOffset: false);
 
             drawHealthLine(displayEvents, applyOffset: false);
-        }
-
-        /// <summary>
-        /// 获取用于展示的 HitEvents（应用 displayOffset）
-        /// </summary>
-        protected IReadOnlyList<HitEvent> GetDisplayEventsWithOffset()
-        {
-            var baseEvents = CommittedNowScore?.ScoreInfo.HitEvents ?? OriginalHitEvents;
-
-#pragma warning disable IDE0046 // displayOffset == 0 的简化写法
-            if (DisplayOffset == 0)
-                return baseEvents;
-#pragma warning restore IDE0046
-
-            return baseEvents.Select(e => new HitEvent(
-                e.TimeOffset + DisplayOffset,
-                e.GameplayRate,
-                e.Result,
-                e.HitObject,
-                e.LastHitObject,
-                e.Position
-            )).ToList();
-        }
-
-        /// <summary>
-        /// 创建 ForLive 环境（offset=0）
-        /// 子类应重写以提供规则集特定的环境解析
-        /// </summary>
-        protected virtual IGameplayEnvironment? CreateLiveAnalysisEnvironment()
-        {
-            // 默认返回 null，子类必须重写
-            return null;
-        }
-
-        /// <summary>
-        /// 解析输入 Score（用于 Session 运行）
-        /// 子类应重写以提供规则集特定的 Score 获取逻辑
-        /// </summary>
-        protected virtual Score? ResolveInputScore()
-        {
-            // 默认返回 null，子类必须重写
-            return null;
-        }
-
-        private void updateTimeExtentsFromDisplayEvents()
-        {
-            var displayEvents = GetDisplayHitEvents();
-            var eventsForExtent = displayEvents.Count > 0 ? displayEvents : OriginalHitEvents;
-
-            if (eventsForExtent.Count == 0)
-                return;
-
-            binSize = Math.Ceiling(eventsForExtent.Max(e => e.HitObject.StartTime) / time_bins);
-            binSize = Math.Max(1, binSize);
-
-            maxTime = eventsForExtent.Max(e => e.HitObject.StartTime);
-            minTime = eventsForExtent.Min(e => e.HitObject.StartTime);
-            timeRange = maxTime - minTime;
-        }
-
-        private void drawHealthLine(List<HitEvent> sortedHitEvents)
-        {
-            List<Vector2> healthPoints = new List<Vector2>();
-            double currentHealth = GetInitialHealth();
-
-            float availableWidth = DrawWidth - LeftMarginConst - RightMarginConst;
-
-            foreach (var e in sortedHitEvents)
-            {
-                var displayResult = GetDisplayResult(e);
-                double healthIncrease = GetDisplayHealthIncrease(e, displayResult, currentHealth);
-                currentHealth = Math.Clamp(currentHealth + healthIncrease, 0, 1);
-
-                double time = e.HitObject.StartTime;
-                float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0;
-                float x = xPosition * availableWidth;
-                float y = (float)((1 - currentHealth) * DrawHeight);
-
-                healthPoints.Add(new Vector2(x, y));
-            }
-
-            if (healthPoints.Count > 1)
-            {
-                graphContainer.Add(new Path
-                {
-                    Anchor = Anchor.TopLeft,
-                    Origin = Anchor.TopLeft,
-                    PathRadius = 1,
-                    Colour = Color4.Red,
-                    Alpha = 0.3f,
-                    Vertices = healthPoints.ToArray()
-                });
-            }
         }
 
         private void drawHealthLine(List<HitEvent> sortedHitEvents, bool applyOffset)
@@ -759,6 +699,22 @@ namespace osu.Game.EzOsuGame.Statistics
             // 这样超过 miss 窗口的事件仍可区分纵坐标，而不会全部归一化到边缘。
             float y = (float)((Math.Tanh(offset / miss) + 1) * 0.5 * DrawHeight);
             return Math.Clamp(y, 0, DrawHeight);
+        }
+
+        private void updateTimeExtentsFromDisplayEvents()
+        {
+            var displayEvents = GetDisplayHitEvents();
+            var eventsForExtent = displayEvents.Count > 0 ? displayEvents : OriginalHitEvents;
+
+            if (eventsForExtent.Count == 0)
+                return;
+
+            binSize = Math.Ceiling(eventsForExtent.Max(e => e.HitObject.StartTime) / time_bins);
+            binSize = Math.Max(1, binSize);
+
+            maxTime = eventsForExtent.Max(e => e.HitObject.StartTime);
+            minTime = eventsForExtent.Min(e => e.HitObject.StartTime);
+            timeRange = maxTime - minTime;
         }
     }
 }

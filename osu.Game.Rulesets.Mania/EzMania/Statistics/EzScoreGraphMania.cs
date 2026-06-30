@@ -15,13 +15,11 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Statistics;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
-using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -38,9 +36,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
     /// </summary>
     public partial class EzScoreGraphMania : EzScoreGraphBase
     {
-        // TODO(P3-Rest): 删除静态服务实例，改用基类 ReplaySession（由 DI 注入）
-        // private static readonly ManiaReplaySessionService replay_session = new ManiaReplaySessionService();
-
         // 帧量化检测后注入的精确 HitEvents（不写回 ScoreInfo）
         private readonly IReadOnlyList<HitEvent>? originalHitEventsOverride;
 
@@ -50,9 +45,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private Bindable<EzEnumHitMode> hitModeBindable = null!;
         private Bindable<EzEnumHealthMode> healthModeBindable = null!;
         private Bindable<double> offsetPlusMania = new Bindable<double>();
-
-        // offset ≠ 0 时显示提醒文本（CreateTextUI 中创建一次，UpdateDisplay 仅更新值/可见性）
-        private readonly OsuSpriteText offsetOverlayText = new OsuSpriteText();
 
         private EzEnumHitMode currentHitMode;
         private EzEnumHealthMode currentHealthMode;
@@ -87,7 +79,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private static IReadOnlyList<HitEvent>? tryDetectAndRegenerateFrameQuantizedEvents(ScoreInfo score, IBeatmap beatmap)
         {
             var hitEvents = score.HitEvents;
-            if (hitEvents == null || hitEvents.Count == 0)
+            if (hitEvents.Count == 0)
                 return null;
 
             const double frame_interval_ms = 16.67;
@@ -118,8 +110,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         /// <summary>
         /// 返回精确 HitEvents（帧量化检测后重新生成）或基类的 OriginalHitEvents。
         /// </summary>
-        private IReadOnlyList<HitEvent> getEffectiveOriginalHitEvents()
-            => originalHitEventsOverride ?? OriginalHitEvents;
+        private IReadOnlyList<HitEvent> getEffectiveOriginalHitEvents() => originalHitEventsOverride ?? OriginalHitEvents;
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
         {
@@ -131,6 +122,31 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             // GetDisplayResult 会通过 hitWindowsNow 对每个事件重新判定，
             // 确保散点颜色和血量线反映当前 HitMode 的判定结果。
             return applyFakeOffsetToEvents(getEffectiveOriginalHitEvents());
+        }
+
+        private IReadOnlyList<HitEvent> filterForCurrentHitMode(IEnumerable<HitEvent> events)
+        {
+            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
+            var filtered = events.Where(e => validResults.Contains(e.Result) || e.Result is HitResult.Miss or HitResult.Poor);
+
+            return applyFakeOffsetToEvents(filtered);
+        }
+
+        /// <summary>展示层叠加 OffsetPlusMania；Session 统计用 offset=0 环境。</summary>
+        private IReadOnlyList<HitEvent> applyFakeOffsetToEvents(IEnumerable<HitEvent> events)
+        {
+            var list = events.ToList();
+
+            if (offsetPlusMania.Value == 0)
+                return list;
+
+            return list.Select(e => new HitEvent(
+                e.TimeOffset + offsetPlusMania.Value,
+                e.GameplayRate,
+                e.Result,
+                e.HitObject,
+                e.LastHitObject,
+                e.Position)).ToList();
         }
 
         protected override void CalculateNowAccuracy()
@@ -352,35 +368,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return hitEvent.Result;
         }
 
+        protected override IGameplayEnvironment CreateLiveAnalysisEnvironment() => GlobalConfigStore.EzConfig.ResolveForReplay(null, ReplayRunPurpose.ForLive);
+
         // P3-Rest 前过渡：通过 scoreManager 获取 databased score
-        // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLive)
+        // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession
         protected override Score? ResolveInputScore() => resolveSessionInputScore();
 
-        // P3-Rest 前过渡：返回 ForLive 环境（读 live config offset）
-        // TODO(P3-Rest): createSessionEnvironment() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLive)
-        protected override IGameplayEnvironment? CreateLiveAnalysisEnvironment() => createSessionEnvironment();
+        // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession
+        private Score? resolveSessionInputScore() => scoreManager.GetScore(Score);
 
-        private GameplayEnvironment createSessionEnvironment()
-            => GlobalConfigStore.EzConfig.ResolveForReplay(null, ReplayRunPurpose.ForLive);
-
-        // TODO(P3-Rest): resolveSessionInputScore() 移除，改为通过 IEzReplaySession.RunRequestAsync(ForLive)
-        private Score? resolveSessionInputScore()
-        {
-            var databased = scoreManager.GetScore(Score);
-            return databased != null && hasValidReplay(databased) ? databased : null;
-        }
-
-        private static bool hasValidReplay(Score score)
-        {
-            var replay = score.Replay;
-
-            return replay != null
-                   && replay.Frames.Count > 0
-                   && replay.Frames.All(f => f is ManiaReplayFrame);
-        }
-
-        private Dictionary<HitResult, int> extractDisplayCounts(IReadOnlyDictionary<HitResult, int> statistics)
-            => ExtractDisplayCounts(statistics, currentHitMode);
+        private Dictionary<HitResult, int> extractDisplayCounts(IReadOnlyDictionary<HitResult, int> statistics) => ExtractDisplayCounts(statistics, currentHitMode);
 
         internal static Dictionary<HitResult, int> ExtractDisplayCounts(IReadOnlyDictionary<HitResult, int> statistics, EzEnumHitMode hitMode)
         {
@@ -412,15 +409,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return eventsForExtent.Max(e => e.HitObject.StartTime) - eventsForExtent.Min(e => e.HitObject.StartTime);
         }
 
-        private IReadOnlyList<HitEvent> filterForCurrentHitMode(IEnumerable<HitEvent> events)
-        {
-            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
-            var filtered = events.Where(e =>
-                validResults.Contains(e.Result) || e.Result is HitResult.Miss or HitResult.Poor);
-
-            return applyFakeOffsetToEvents(filtered);
-        }
-
+        // TODO: 缺少血量计算工具
         protected override double GetDisplayHealthIncrease(HitEvent hitEvent, HitResult displayResult, double currentHealth)
         {
             if (currentHealthMode == EzEnumHealthMode.Lazer)
@@ -478,41 +467,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return Math.Abs(scaled) < 1e-6 ? 0 : scaled;
         }
 
-        /// <summary>展示层叠加 OffsetPlusMania；Session 统计用 offset=0 环境。</summary>
-        private IReadOnlyList<HitEvent> applyFakeOffsetToEvents(IEnumerable<HitEvent> events)
-        {
-            var list = events.ToList();
-
-            if (offsetPlusMania.Value == 0)
-                return list;
-
-            return list.Select(e => new HitEvent(
-                e.TimeOffset + offsetPlusMania.Value,
-                e.GameplayRate,
-                e.Result,
-                e.HitObject,
-                e.LastHitObject,
-                e.Position)).ToList();
-        }
-
         protected override void UpdateDisplay()
         {
             base.UpdateDisplay();
 
             bool show = offsetPlusMania.Value != 0;
-            offsetOverlayText.Text = show
+            OffsetOverlayText.Text = show
                 ? $"Fake Offset Fixing: {offsetPlusMania.Value:+0;-0;0} ms"
                 : string.Empty;
-            offsetOverlayText.Alpha = show ? 1 : 0;
+            OffsetOverlayText.Alpha = show ? 1 : 0;
         }
 
         private SimpleStatisticItem<string>[]? statItems; // 缓存文本 item 引用，供 UpdateTextValues 只更新数值
 
         protected override void CreateTextUI()
         {
-            double scAcc = originalAccuracy * 100;
-            long scScore = originalTotalScore;
-
             // 创建带默认占位值的 item 列表
             var items = new List<SimpleStatisticItem<string>>
             {
@@ -530,11 +499,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             // 从 Now+V1 判定集合构建每个判定行的 item
             List<HitResult> results = NowCounts.Keys
-                                              .Concat(V1Counts.Keys)
-                                              .Distinct()
-                                              .Where(r => r.IsBasic() || r == HitResult.Poor)
-                                              .OrderBy(r => r.GetIndexForOrderedDisplay())
-                                              .ToList();
+                                               .Concat(V1Counts.Keys)
+                                               .Distinct()
+                                               .Where(r => r.IsBasic() || r == HitResult.Poor)
+                                               .OrderBy(r => r.GetIndexForOrderedDisplay())
+                                               .ToList();
 
             foreach (var r in results)
             {
@@ -614,11 +583,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             int idx = 8; // 静态行之后是动态判定行
             List<HitResult> results = NowCounts.Keys
-                                              .Concat(V1Counts.Keys)
-                                              .Distinct()
-                                              .Where(r => r.IsBasic() || r == HitResult.Poor)
-                                              .OrderBy(r => r.GetIndexForOrderedDisplay())
-                                              .ToList();
+                                               .Concat(V1Counts.Keys)
+                                               .Distinct()
+                                               .Where(r => r.IsBasic() || r == HitResult.Poor)
+                                               .OrderBy(r => r.GetIndexForOrderedDisplay())
+                                               .ToList();
 
             foreach (var r in results)
             {
