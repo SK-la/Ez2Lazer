@@ -323,14 +323,55 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         private static IEnumerable<LaneTargetState> collectCandidatesForInput(
-            IEnumerable<LaneTargetState> laneStates,
+            List<LaneTargetState> laneStates,
             IBeatmap beatmap,
             double eventTime,
             HitModeHelper hitWindowHelper,
             EzEnumHitMode hitMode)
         {
-            foreach (var state in laneStates)
+            if (laneStates.Count == 0)
+                yield break;
+
+            // 使用基准判定（非 tail lenience）计算时间窗口边界。
+            // 对于 tail release，实际窗口更大，但二分查找只用于快速定位起始位置，
+            // 后续线性扫描会逐条检查实际窗口（含 lenience）。
+            hitWindowHelper.BPM = getBpmAtTime(beatmap, eventTime);
+
+            double baseEarlyWindow = hitWindowHelper.WindowFor(HitResult.Miss, true);
+            double baseLateWindow = hitWindowHelper.WindowFor(HitResult.Miss, false);
+
+            if (HitModeHelper.IsBMSHitMode(hitMode))
             {
+                double lenienceForBms = 1;
+                BmsHitModeJudgement.ExpandMissCollectionWindows(hitWindowHelper, lenienceForBms, ref baseEarlyWindow, ref baseLateWindow);
+            }
+
+            // 二分查找定位第一个 StartTime >= eventTime - missLateWindow 的位置。
+            // 对于 tail release，使用放大后的窗口确保不遗漏。
+            double maxTailLenience = usesTailReleaseLenience(hitMode) ? TailNote.RELEASE_WINDOW_LENIENCE : 1;
+            double searchLowerBound = eventTime - baseLateWindow * maxTailLenience;
+
+            int lo = 0, hi = laneStates.Count;
+
+            while (lo < hi)
+            {
+                int mid = lo + (hi - lo) / 2;
+                if (laneStates[mid].Target.StartTime < searchLowerBound)
+                    lo = mid + 1;
+                else
+                    hi = mid;
+            }
+
+            double searchUpperBound = eventTime + baseEarlyWindow * maxTailLenience;
+
+            for (int i = lo; i < laneStates.Count; i++)
+            {
+                var state = laneStates[i];
+
+                // 已超出时间窗口，提前终止。
+                if (state.Target.StartTime > searchUpperBound)
+                    break;
+
                 if (state.Judged)
                     continue;
 
@@ -339,8 +380,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                 bool useTailReleaseLenience = state.IsTail && usesTailReleaseLenience(hitMode);
                 double lenienceFactor = useTailReleaseLenience ? TailNote.RELEASE_WINDOW_LENIENCE : 1;
-
-                hitWindowHelper.BPM = getBpmAtTime(beatmap, eventTime);
 
                 double missEarlyWindow = hitWindowHelper.WindowFor(HitResult.Miss, true) * lenienceFactor;
                 double missLateWindow = hitWindowHelper.WindowFor(HitResult.Miss, false) * lenienceFactor;
