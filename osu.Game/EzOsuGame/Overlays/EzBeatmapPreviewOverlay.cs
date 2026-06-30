@@ -454,17 +454,19 @@ namespace osu.Game.EzOsuGame.Overlays
             if (!expanded)
                 return;
 
-            // 对于切换谱面（beatmap 改变）立即取消当前加载并立刻加载；仅 mods 更改仍使用去抖。
+            // 切歌 / mod 变化统一走去抖。快速切歌时中间歌曲的 scheduledSelectionLoad 被取消，
+            // 避免为每首过渡歌曲都启动昂贵的 DrawableRuleset 创建 + replay 模拟。
             if (!beatmapSame)
             {
                 cancelScheduledSelectionLoad();
                 cancelPendingLoad();
-                loadPendingSelection(selectionEventVersion);
+                // 立即释放旧预览资源，避免去抖期间显示旧谱面画面。
+                disposePreviewResources();
+                previewClock.Stop();
+                updateProgressDisplay(0);
             }
-            else
-            {
-                scheduleSelectionLoad();
-            }
+
+            scheduleSelectionLoad();
         }
 
         /// <summary>
@@ -538,7 +540,14 @@ namespace osu.Game.EzOsuGame.Overlays
             if (!expanded)
                 return;
 
-            beginLoadPendingSelectionIfRequired();
+            // 去抖：延迟 change_debounce 毫秒后再启动加载。
+            // 快速切歌时，中间歌曲的 ScheduledDelegate 被后续 cancelScheduledSelectionLoad 取消，
+            // 不会启动昂贵的 DrawableRuleset 创建 + replay 模拟。
+            scheduledSelectionLoad = Scheduler.AddDelayed(() =>
+            {
+                scheduledSelectionLoad = null;
+                beginLoadPendingSelectionIfRequired();
+            }, change_debounce);
         }
 
         private void cancelScheduledSelectionLoad()
