@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
@@ -26,46 +25,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     /// </summary>
     public static class ManiaReplaySession
     {
-        /// <summary>
-        /// 谱面级共享数据：targets、hold 映射。同一谱面的所有 ghost 只构建一次。
-        /// </summary>
-        private sealed class SharedBeatmapData
-        {
-            public IBeatmap? Beatmap;
-            public EzEnumHitMode HitMode;
-            public List<LaneTargetState> Targets = null!;
-            public Dictionary<HeadNote, HoldNote> HoldByHead = null!;
-            public Dictionary<TailNote, HeadNote> HeadByTail = null!;
-        }
-
-        /// <summary>
-        /// 缓存 ApplyBeatmap 后的最大分值状态，避免同一谱面重复 SimulateAutoplay（遍历 6000+ HitObject）。
-        /// </summary>
-        private struct ScoreProcessorMaxState
-        {
-            public double MaximumBaseScore;
-            public double MaximumComboPortion;
-            public int MaximumAccuracyJudgementCount;
-            public long MaximumTotalScore;
-            public int MaximumCombo;
-            public Dictionary<HitResult, int> MaximumResultCounts;
-        }
-
-        /// <summary>
-        /// 每线程缓存：共享的谱面数据 + ApplyBeatmap 后的最大分值状态。
-        /// 同一线程处理的所有 ghost 共享同一谱面，避免重复 buildTargets / SimulateAutoplay。
-        /// </summary>
-        [ThreadStatic]
-        private static SharedBeatmapData? sharedBeatmapData;
-
-        [ThreadStatic]
-        private static ScoreProcessorMaxState? cachedMaxState;
-
-        /// <summary>
-        /// 缓存反射字段查找，避免每次 ghost 重复反射开销。
-        /// </summary>
-        private static FieldInfo[]? maxStateFields;
-
         /// <summary>
         /// 一遍 Session 判定，经 <see cref="ScoreProcessor.PopulateScore"/> 写回 <paramref name="score"/> 并返回。
         /// </summary>
@@ -106,92 +65,54 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             ArgumentNullException.ThrowIfNull(score.Replay);
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            var hitMode = environment.ManiaHitMode;
             var ruleset = score.ScoreInfo.Ruleset.CreateInstance();
+            var scoreProcessor = ruleset.CreateScoreProcessor();
+            scoreProcessor.Mods.Value = score.ScoreInfo.Mods;
+            scoreProcessor.ApplyBeatmap(beatmap);
 
-            // 检查 / 填充 ThreadStatic 缓存：谱面共享数据 + ScoreProcessor 最大分值状态。
-            // 同一线程的所有 ghost 共享同一谱面引用，避免重复 SimulateAutoplay（遍历 6000+ HitObject）
-            // 和 buildTargets / alignHitWindows（遍历 + 排序）。
-            ScoreProcessor scoreProcessor;
+            if (scoreProcessor is ManiaScoreProcessor maniaScoreProcessor)
+                maniaScoreProcessor.TimelineHitModeOverride = environment.ManiaHitMode;
 
-            if (cachedMaxState != null
-                && sharedBeatmapData != null
-                && ReferenceEquals(sharedBeatmapData.Beatmap, beatmap)
-                && sharedBeatmapData.HitMode == hitMode)
-            {
-                // 缓存命中：创建新 processor + 反射写入 max state，跳过 SimulateAutoplay。
-                scoreProcessor = createScoreProcessorFromCachedMax(ruleset, beatmap, score);
-            }
-            else
-            {
-                // 缓存未命中：完整初始化 processor + 构建共享谱面数据。
-                scoreProcessor = ruleset.CreateScoreProcessor();
-                scoreProcessor.Mods.Value = score.ScoreInfo.Mods;
-                scoreProcessor.ApplyBeatmap(beatmap);
+            if (score.ScoreInfo.IsLegacyScore)
+                scoreProcessor.IsLegacyScore = true;
 
-                if (scoreProcessor is ManiaScoreProcessor maniaScoreProcessor)
-                    maniaScoreProcessor.TimelineHitModeOverride = hitMode;
-
-                if (score.ScoreInfo.IsLegacyScore)
-                    scoreProcessor.IsLegacyScore = true;
-
-                foreach (var mod in score.ScoreInfo.Mods.OfType<IApplicableToScoreProcessor>())
-                    mod.ApplyToScoreProcessor(scoreProcessor);
-
-                var shared = new SharedBeatmapData
-                {
-                    Beatmap = beatmap,
-                    HitMode = hitMode,
-                };
-
-                alignHitWindows(beatmap, environment);
-                shared.Targets = buildTargets(beatmap);
-
-                shared.HoldByHead = new Dictionary<HeadNote, HoldNote>();
-                shared.HeadByTail = new Dictionary<TailNote, HeadNote>();
-
-                foreach (var hitObject in beatmap.HitObjects)
-                {
-                    if (hitObject is HoldNote hold)
-                    {
-                        shared.HeadByTail[hold.Tail] = hold.Head;
-                        shared.HoldByHead[hold.Head] = hold;
-                    }
-                }
-
-                sharedBeatmapData = shared;
-
-                // 缓存最大分值状态，后续 ghost 跳过 SimulateAutoplay。
-                cachedMaxState = captureMaxState(scoreProcessor);
-            }
-
-            // 每 ghost 独立的 targets 副本：simulation 修改 Judged / Result / HoldBroken / BmsRoute。
-            // LaneTargetState.Target（HitObject 引用）为只读，可安全共享。
-            var sharedTargets = sharedBeatmapData.Targets;
-            var ghostTargets = new List<LaneTargetState>(sharedTargets.Count);
-
-            for (int i = 0; i < sharedTargets.Count; i++)
-                ghostTargets.Add(new LaneTargetState(sharedTargets[i].Target));
+            foreach (var mod in score.ScoreInfo.Mods.OfType<IApplicableToScoreProcessor>())
+                mod.ApplyToScoreProcessor(scoreProcessor);
 
             var recorder = recordTimeline ? new ManiaReplayTimelineRecorder() : null;
             recorder?.RecordInitial(scoreProcessor);
+
+            var targets = buildTargets(beatmap);
+            alignHitWindows(beatmap, environment);
 
             if (score.Replay.Frames.Count == 0)
             {
                 // Zero frames: still need to generate all-miss HitEvents
                 // so that extended statistics can display.
                 var emptyPressTimes = new Dictionary<int, List<double>>();
-                applyForcedMisses(scoreProcessor, ghostTargets, emptyPressTimes, CancellationToken.None, recorder);
+                applyForcedMisses(scoreProcessor, targets, emptyPressTimes, CancellationToken.None, recorder);
                 scoreProcessor.PopulateScore(score.ScoreInfo);
 
                 return (scoreProcessor, recordTimeline ? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>()) : null);
             }
 
             var noteStrategy = ManiaJudgementRegistry.GetNoteStrategy(environment);
+
             var holdStrategy = ManiaJudgementRegistry.GetHoldStrategy(environment);
 
-            // 列映射从每 ghost 的 targets 副本构建（轻量 O(N)）。
-            buildColumnMaps(ghostTargets, out var pressColumns, out var releaseColumns);
+            buildColumnMaps(targets, out var pressColumns, out var releaseColumns);
+
+            var holdByHead = new Dictionary<HeadNote, HoldNote>();
+            var headByTail = new Dictionary<TailNote, HeadNote>();
+
+            foreach (var hitObject in beatmap.HitObjects)
+            {
+                if (hitObject is HoldNote hold)
+                {
+                    headByTail[hold.Tail] = hold.Head;
+                    holdByHead[hold.Head] = hold;
+                }
+            }
 
             double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
 
@@ -201,110 +122,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 score,
                 beatmap,
                 environment,
-                ghostTargets,
+                targets,
                 pressColumns,
                 releaseColumns,
-                sharedBeatmapData.HoldByHead,
-                sharedBeatmapData.HeadByTail,
+                holdByHead,
+                headByTail,
                 noteStrategy,
                 holdStrategy,
                 scoreProcessor,
                 recorder,
                 cancellationToken);
 
-            applyForcedMisses(scoreProcessor, ghostTargets, pressTimesByColumn, cancellationToken, recorder);
+            applyForcedMisses(scoreProcessor, targets, pressTimesByColumn, cancellationToken, recorder);
 
             return (scoreProcessor, recorder?.Build());
         }
-
-        #region ScoreProcessor max state reflection helpers
-
-        private static ScoreProcessor createScoreProcessorFromCachedMax(Ruleset ruleset, IBeatmap beatmap, Score score)
-        {
-            var processor = ruleset.CreateScoreProcessor();
-            processor.Beatmap.Value = beatmap;
-            processor.Mods.Value = score.ScoreInfo.Mods;
-
-            foreach (var mod in score.ScoreInfo.Mods.OfType<IApplicableToScoreProcessor>())
-                mod.ApplyToScoreProcessor(processor);
-
-            if (score.ScoreInfo.IsLegacyScore)
-                processor.IsLegacyScore = true;
-
-            applyCachedMaxState(processor);
-            return processor;
-        }
-
-        private static ScoreProcessorMaxState captureMaxState(ScoreProcessor processor)
-        {
-            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
-
-            var maxResultCountsField = typeof(ScoreProcessor).GetField("MaximumResultCounts", flags);
-            var srcDict = (Dictionary<HitResult, int>?)maxResultCountsField?.GetValue(processor) ?? new Dictionary<HitResult, int>();
-
-            var maxTotalScoreField = typeof(ScoreProcessor).GetField("MaximumTotalScore", flags);
-            long maxTotalScore = maxTotalScoreField != null ? (long)maxTotalScoreField.GetValue(processor)! : 0;
-
-            var maxComboField = typeof(ScoreProcessor).GetField("MaximumCombo", flags);
-            int maxCombo = maxComboField != null ? (int)maxComboField.GetValue(processor)! : 0;
-
-            var maxBaseScoreField = typeof(ScoreProcessor).GetField("maximumBaseScore", flags);
-            double maxBaseScore = maxBaseScoreField != null ? (double)maxBaseScoreField.GetValue(processor)! : 0;
-
-            var maxComboPortionField = typeof(ScoreProcessor).GetField("maximumComboPortion", flags);
-            double maxComboPortion = maxComboPortionField != null ? (double)maxComboPortionField.GetValue(processor)! : 0;
-
-            var maxAccJudgementCountField = typeof(ScoreProcessor).GetField("maximumAccuracyJudgementCount", flags);
-            int maxAccJudgementCount = maxAccJudgementCountField != null ? (int)maxAccJudgementCountField.GetValue(processor)! : 0;
-
-            return new ScoreProcessorMaxState
-            {
-                MaximumBaseScore = maxBaseScore,
-                MaximumComboPortion = maxComboPortion,
-                MaximumAccuracyJudgementCount = maxAccJudgementCount,
-                MaximumTotalScore = maxTotalScore,
-                MaximumCombo = maxCombo,
-                MaximumResultCounts = new Dictionary<HitResult, int>(srcDict),
-            };
-        }
-
-        private static void applyCachedMaxState(ScoreProcessor processor)
-        {
-            if (!cachedMaxState.HasValue) return;
-
-            var state = cachedMaxState.Value;
-            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
-
-            if (maxStateFields == null)
-            {
-                var t = typeof(ScoreProcessor);
-                maxStateFields = new[]
-                {
-                    t.GetField("maximumBaseScore", flags)!,
-                    t.GetField("maximumComboPortion", flags)!,
-                    t.GetField("maximumAccuracyJudgementCount", flags)!,
-                    t.GetField("MaximumTotalScore", flags)!,
-                    t.GetField("MaximumCombo", flags)!,
-                    t.GetField("MaximumResultCounts", flags)!,
-                    t.GetField("beatmapApplied", flags)!,
-                };
-            }
-
-            maxStateFields[0].SetValue(processor, state.MaximumBaseScore);
-            maxStateFields[1].SetValue(processor, state.MaximumComboPortion);
-            maxStateFields[2].SetValue(processor, state.MaximumAccuracyJudgementCount);
-            maxStateFields[3].SetValue(processor, state.MaximumTotalScore);
-            maxStateFields[4].SetValue(processor, state.MaximumCombo);
-
-            var dict = (Dictionary<HitResult, int>)maxStateFields[5].GetValue(processor)!;
-            dict.Clear();
-            foreach (var kvp in state.MaximumResultCounts)
-                dict[kvp.Key] = kvp.Value;
-
-            maxStateFields[6].SetValue(processor, true);
-        }
-
-        #endregion
 
         private static void alignHitWindows(IBeatmap beatmap, IGameplayEnvironment environment)
         {
@@ -396,7 +228,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         private static void buildColumnMaps(
-            IReadOnlyList<LaneTargetState> targets,
+            List<LaneTargetState> targets,
             out Dictionary<int, List<LaneTargetState>> pressColumns,
             out Dictionary<int, List<LaneTargetState>> releaseColumns)
         {

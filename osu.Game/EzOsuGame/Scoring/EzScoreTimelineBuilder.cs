@@ -180,35 +180,17 @@ namespace osu.Game.EzOsuGame.Scoring
                                                                      bool offsetsRelativeToEnd = false)
             => buildFromHitEvents(ruleset, beatmap, scoreInfo, hitEvents, offsetsRelativeToEnd);
 
-        /// <summary>
-        /// 缓存 ApplyBeatmap 后的最大分值状态，避免同一谱面重复模拟 autoplay。
-        /// </summary>
-        private struct ScoreProcessorMaxState
-        {
-            public double MaximumBaseScore;
-            public double MaximumComboPortion;
-            public int MaximumAccuracyJudgementCount;
-            public long MaximumTotalScore;
-            public int MaximumCombo;
-            public Dictionary<HitResult, int> MaximumResultCounts;
-        }
-
-        /// <summary>
-        /// 每线程缓存一个已完成 ApplyBeatmap 的模板 processor。
-        /// 同一线程处理的所有 ghost 共享同一谱面，最大分值相同，
-        /// 避免每次 buildFromHitEvents 重复 SimulateAutoplay（遍历 6000+ HitObject）。
-        /// </summary>
-        [ThreadStatic]
-        private static ScoreProcessor? templateScoreProcessor;
-
-        [ThreadStatic]
-        private static ScoreProcessorMaxState? cachedMaxState;
-
         private static EzScoreTimeline buildFromHitEvents(Ruleset ruleset, IBeatmap beatmap, ScoreInfo scoreInfo, IReadOnlyList<HitEvent> hitEvents, bool offsetsRelativeToEnd)
         {
             double fallbackMissWindow = resolveFallbackMissWindow(beatmap);
 
-            var scoreProcessor = createOrReuseScoreProcessor(ruleset, beatmap, scoreInfo);
+            var scoreProcessor = ruleset.CreateScoreProcessor();
+            applyScoreProcessorContext(scoreProcessor, scoreInfo);
+            scoreProcessor.ApplyBeatmap(beatmap);
+            scoreProcessor.Mods.Value = scoreInfo.Mods;
+
+            foreach (var mod in scoreInfo.Mods.OfType<IApplicableToScoreProcessor>())
+                mod.ApplyToScoreProcessor(scoreProcessor);
 
             // 构建 HitObject 引用字典，将 O(N×M) 的线性查找优化为 O(1) 字典查找。
             var hitObjectMap = buildHitObjectReferenceMap(beatmap);
@@ -343,116 +325,6 @@ namespace osu.Game.EzOsuGame.Scoring
             }
 
             return true;
-        }
-
-        /// <summary>
-        /// 创建或复用模板 ScoreProcessor。首次调用时执行完整的 ApplyBeatmap（含 SimulateAutoplay），
-        /// 缓存最大分值状态。后续调用直接复用缓存，跳过昂贵的全谱面模拟。
-        /// </summary>
-        private static ScoreProcessor createOrReuseScoreProcessor(Ruleset ruleset, IBeatmap beatmap, ScoreInfo scoreInfo)
-        {
-            // 检查模板是否已为当前谱面初始化。
-            if (templateScoreProcessor != null
-                && ReferenceEquals(templateScoreProcessor.Beatmap.Value, beatmap)
-                && cachedMaxState.HasValue)
-            {
-                return createProcessorWithCachedMax(ruleset, beatmap, scoreInfo);
-            }
-
-            // 首次调用：完整初始化模板 processor。
-            var template = ruleset.CreateScoreProcessor();
-            applyScoreProcessorContext(template, scoreInfo);
-            template.ApplyBeatmap(beatmap);
-            template.Mods.Value = scoreInfo.Mods;
-
-            foreach (var mod in scoreInfo.Mods.OfType<IApplicableToScoreProcessor>())
-                mod.ApplyToScoreProcessor(template);
-
-            // 缓存最大分值状态（ApplyBeatmap 后 Reset(true) 已存储）。
-            cachedMaxState = captureMaxState(template);
-            templateScoreProcessor = template;
-
-            return createProcessorWithCachedMax(ruleset, beatmap, scoreInfo);
-        }
-
-        private static ScoreProcessorMaxState captureMaxState(ScoreProcessor processor)
-        {
-            var maxResultCountsField = typeof(ScoreProcessor).GetField("MaximumResultCounts", BindingFlags.NonPublic | BindingFlags.Instance);
-            var maxResultCounts = (Dictionary<HitResult, int>?)maxResultCountsField?.GetValue(processor) ?? new Dictionary<HitResult, int>();
-
-            var maxTotalScoreField = typeof(ScoreProcessor).GetField("MaximumTotalScore", BindingFlags.NonPublic | BindingFlags.Instance);
-            long maxTotalScore = maxTotalScoreField != null ? (long)maxTotalScoreField.GetValue(processor)! : 0;
-
-            var maxComboField = typeof(ScoreProcessor).GetField("MaximumCombo", BindingFlags.NonPublic | BindingFlags.Instance);
-            int maxCombo = maxComboField != null ? (int)maxComboField.GetValue(processor)! : 0;
-
-            var maxBaseScoreField = typeof(ScoreProcessor).GetField("maximumBaseScore", BindingFlags.NonPublic | BindingFlags.Instance);
-            double maxBaseScore = maxBaseScoreField != null ? (double)maxBaseScoreField.GetValue(processor)! : 0;
-
-            var maxComboPortionField = typeof(ScoreProcessor).GetField("maximumComboPortion", BindingFlags.NonPublic | BindingFlags.Instance);
-            double maxComboPortion = maxComboPortionField != null ? (double)maxComboPortionField.GetValue(processor)! : 0;
-
-            var maxAccJudgementCountField = typeof(ScoreProcessor).GetField("maximumAccuracyJudgementCount", BindingFlags.NonPublic | BindingFlags.Instance);
-            int maxAccJudgementCount = maxAccJudgementCountField != null ? (int)maxAccJudgementCountField.GetValue(processor)! : 0;
-
-            return new ScoreProcessorMaxState
-            {
-                MaximumBaseScore = maxBaseScore,
-                MaximumComboPortion = maxComboPortion,
-                MaximumAccuracyJudgementCount = maxAccJudgementCount,
-                MaximumTotalScore = maxTotalScore,
-                MaximumCombo = maxCombo,
-                MaximumResultCounts = new Dictionary<HitResult, int>(maxResultCounts),
-            };
-        }
-
-        /// <summary>
-        /// 快速创建 ScoreProcessor，跳过 ApplyBeatmap 的 SimulateAutoplay，
-        /// 通过反射直接写入缓存的最大分值。
-        /// </summary>
-        private static ScoreProcessor createProcessorWithCachedMax(Ruleset ruleset, IBeatmap beatmap, ScoreInfo scoreInfo)
-        {
-            var processor = ruleset.CreateScoreProcessor();
-            applyScoreProcessorContext(processor, scoreInfo);
-
-            // 设置 Beatmap 以触发 scoreMultiplier 计算（轻量，仅涉及难度值）。
-            processor.Beatmap.Value = beatmap;
-            processor.Mods.Value = scoreInfo.Mods;
-
-            foreach (var mod in scoreInfo.Mods.OfType<IApplicableToScoreProcessor>())
-                mod.ApplyToScoreProcessor(processor);
-
-            // 通过反射写入缓存的最大分值，跳过 SimulateAutoplay。
-            if (cachedMaxState.HasValue)
-                applyMaxState(processor, cachedMaxState.Value);
-
-            return processor;
-        }
-
-        private static void applyMaxState(ScoreProcessor processor, ScoreProcessorMaxState state)
-        {
-            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
-            var processorType = processor.GetType();
-
-            processorType.GetField("maximumBaseScore", flags)?.SetValue(processor, state.MaximumBaseScore);
-            processorType.GetField("maximumComboPortion", flags)?.SetValue(processor, state.MaximumComboPortion);
-            processorType.GetField("maximumAccuracyJudgementCount", flags)?.SetValue(processor, state.MaximumAccuracyJudgementCount);
-            processorType.GetField("MaximumTotalScore", flags)?.SetValue(processor, state.MaximumTotalScore);
-            processorType.GetField("MaximumCombo", flags)?.SetValue(processor, state.MaximumCombo);
-
-            var maxResultCountsField = processorType.GetField("MaximumResultCounts", flags);
-
-            if (maxResultCountsField != null)
-            {
-                var dict = (Dictionary<HitResult, int>)maxResultCountsField.GetValue(processor)!;
-                dict.Clear();
-                foreach (var kvp in state.MaximumResultCounts)
-                    dict[kvp.Key] = kvp.Value;
-            }
-
-            // 标记 beatmap 已应用，否则 MaximumStatistics 访问会抛异常。
-            var beatmapAppliedField = typeof(ScoreProcessor).GetField("beatmapApplied", BindingFlags.NonPublic | BindingFlags.Instance);
-            beatmapAppliedField?.SetValue(processor, true);
         }
 
         // TODO(EZ-SR-TL-014): Osu Session 完成后删除；Mania TimelineHitModeOverride 已在 ManiaReplaySession 内设置。
