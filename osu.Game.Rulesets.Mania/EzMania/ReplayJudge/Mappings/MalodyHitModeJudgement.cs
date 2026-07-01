@@ -11,7 +11,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
     public enum MalodyJudge
     {
         None,
-        Perfect,
+        Best,
+        Cool,
+        Good,
         Miss,
     }
 
@@ -19,18 +21,43 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
     {
         public static MalodyHitModeJudgement Instance { get; } = new MalodyHitModeJudgement();
 
-        private readonly LazerNoteJudgementReplica lazerNote = LazerNoteJudgementReplica.Instance;
+        public static HitResult MapTo(MalodyJudge judge)
+            => judge switch
+            {
+                MalodyJudge.Best => HitResult.Perfect,
+                MalodyJudge.Cool => HitResult.Great,
+                MalodyJudge.Good => HitResult.Good,
+                MalodyJudge.Miss => HitResult.Miss,
+                _ => HitResult.None,
+            };
 
-        public static HitResult MapTo(MalodyJudge judge) => judge switch
+        public static MalodyJudge FromHitResult(HitResult result)
+            => result switch
+            {
+                HitResult.Perfect => MalodyJudge.Best,
+                HitResult.Great => MalodyJudge.Cool,
+                HitResult.Good => MalodyJudge.Good,
+                HitResult.Miss => MalodyJudge.Miss,
+                _ => MalodyJudge.None,
+            };
+
+        public ManiaNoteJudgementOutcome EvaluateAutoMiss(double timeOffset, HitWindows hitWindows)
         {
-            MalodyJudge.Perfect => HitResult.Perfect,
-            MalodyJudge.Miss => HitResult.Miss,
-            _ => HitResult.None,
-        };
+            if (!hitWindows.CanBeHit(timeOffset))
+                return ManiaNoteJudgementOutcome.ApplyResult(MapTo(MalodyJudge.Miss));
 
-        public ManiaNoteJudgementOutcome EvaluateAutoMiss(double timeOffset, HitWindows hitWindows) => lazerNote.EvaluateAutoMiss(timeOffset, hitWindows);
+            return ManiaNoteJudgementOutcome.Ignore;
+        }
 
-        public ManiaNoteJudgementOutcome EvaluatePress(double timeOffset, HitWindows hitWindows) => lazerNote.EvaluatePress(timeOffset, hitWindows);
+        public ManiaNoteJudgementOutcome EvaluatePress(double timeOffset, HitWindows hitWindows)
+        {
+            var judge = FromHitResult(hitWindows.ResultFor(timeOffset));
+
+            if (judge == MalodyJudge.None)
+                return ManiaNoteJudgementOutcome.Ignore;
+
+            return ManiaNoteJudgementOutcome.ApplyResult(MapTo(judge));
+        }
 
         /// <summary>
         /// Malody LN：tail 仅以 <see cref="HitResult.IgnoreHit"/> 完成，不计入成绩。
@@ -49,7 +76,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
             if (hitEvent.HitObject is TailNote)
                 return HitResult.IgnoreHit;
 
-            var outcome = lazerNote.EvaluatePress(hitEvent.TimeOffset, hitWindows);
+            var outcome = EvaluatePress(hitEvent.TimeOffset, hitWindows);
             return outcome.Kind == ManiaNoteJudgementOutcomeKind.Apply ? outcome.Result : HitResult.Miss;
         }
 

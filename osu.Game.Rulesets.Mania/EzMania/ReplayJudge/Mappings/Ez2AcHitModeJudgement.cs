@@ -8,17 +8,17 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 {
     /// <summary>
-    /// EZ2AC 判定等级（从好到差）：KOOL / COOL / GOOD / MISS / FAIL。
-    /// MapTo / FromHitResult 负责 EZ2AC ↔ osu! HitResult 互转。
+    /// EZ2AC 判定 — Mode 原生名 + MapTo；
+    /// Session 与 Drawable 唯一源。
     /// </summary>
     public enum Ez2AcJudge
     {
         None,
-        Kool,  // = KOOL（最佳）
-        Cool,    // = COOL
-        Good,     // = GOOD
-        Miss,     // = MISS（按歪了，次于 GOOD）
-        Fail,     // = FAIL（最差，完全没按到）
+        Kool,
+        Cool,
+        Good,
+        Miss,
+        Fail,
     }
 
     public sealed class Ez2AcHitModeJudgement : IManiaHitModeJudgement

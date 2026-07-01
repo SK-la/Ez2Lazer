@@ -139,10 +139,10 @@ namespace osu.Game.EzOsuGame.Extensions
             switch (result)
             {
                 case HitResult.Perfect:
-                    return "Kool";
+                    return "Perfect";
 
                 case HitResult.Great:
-                    return "Cool";
+                    return "Great";
 
                 case HitResult.Good:
                     return "Good";

@@ -14,12 +14,13 @@ using static osu.Game.Rulesets.Mania.EzMania.ReplayJudge.ManiaColumnSimulator;
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 {
     /// <summary>
-    /// BMS 系（IIDX / LR2 / Raja）判定 — Mode 原生名 + MapTo；Session 与 Drawable 唯一源。
+    /// BMS 系（IIDX / LR2 / Raja）判定 — Mode 原生名 + MapTo；
+    /// Session 与 Drawable 唯一源。
     /// </summary>
     public enum BmsJudge
     {
         None,
-        PGreat,
+        Perfect,
         Great,
         Good,
         Bad,
@@ -34,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         public static HitResult MapTo(BmsJudge judge)
             => judge switch
             {
-                BmsJudge.PGreat => HitResult.Perfect,
+                BmsJudge.Perfect => HitResult.Perfect,
                 BmsJudge.Great => HitResult.Great,
                 BmsJudge.Good => HitResult.Good,
                 BmsJudge.Bad => HitResult.Meh,
@@ -46,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         public static BmsJudge FromHitResult(HitResult result)
             => result switch
             {
-                HitResult.Perfect => BmsJudge.PGreat,
+                HitResult.Perfect => BmsJudge.Perfect,
                 HitResult.Great => BmsJudge.Great,
                 HitResult.Good => BmsJudge.Good,
                 HitResult.Meh => BmsJudge.Bad,
