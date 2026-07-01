@@ -82,7 +82,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 mod.ApplyToScoreProcessor(scoreProcessor);
 
             var recorder = recordTimeline ? new ManiaReplayTimelineRecorder() : null;
-            recorder?.RecordInitial(scoreProcessor);
+
+            double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
+            recorder?.RecordInitial(scoreProcessor, gameplayRate);
 
             var targets = buildTargets(beatmap);
             alignHitWindows(beatmap, environment);
@@ -92,7 +94,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 // Zero frames: still need to generate all-miss HitEvents
                 // so that extended statistics can display.
                 var emptyPressTimes = new Dictionary<int, List<double>>();
-                applyForcedMisses(scoreProcessor, targets, emptyPressTimes, environment.ManiaHitMode, CancellationToken.None, recorder);
+                applyForcedMisses(scoreProcessor, targets, emptyPressTimes, environment.ManiaHitMode, gameplayRate, CancellationToken.None, recorder);
                 scoreProcessor.PopulateScore(score.ScoreInfo);
 
                 return (scoreProcessor, recordTimeline ? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>()) : null);
@@ -116,7 +118,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 }
             }
 
-            double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
             var inputData = parseReplay(score.Replay);
 
             ManiaReplaySessionSimulator.Simulate(
@@ -134,7 +135,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 recorder,
                 cancellationToken);
 
-            applyForcedMisses(scoreProcessor, targets, inputData.PressTimesByColumn, environment.ManiaHitMode, cancellationToken, recorder);
+            applyForcedMisses(scoreProcessor, targets, inputData.PressTimesByColumn, environment.ManiaHitMode, gameplayRate, cancellationToken, recorder);
 
             return (scoreProcessor, recorder?.Build());
         }
@@ -252,11 +253,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             List<LaneTargetState> targets,
             Dictionary<int, List<double>> pressTimesByColumn,
             EzEnumHitMode hitMode,
+            double gameplayRate,
             CancellationToken cancellationToken,
             ManiaReplayTimelineRecorder? recorder)
         {
-            double gameplayRate = 1.0; // ScoreProcessor internally uses ModUtils for rate; fixed for miss snapshots
-
             foreach (var state in targets)
             {
                 cancellationToken.ThrowIfCancellationRequested();

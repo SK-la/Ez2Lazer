@@ -196,7 +196,6 @@ namespace osu.Game.EzOsuGame.Scoring
             var hitObjectMap = buildHitObjectReferenceMap(beatmap);
 
             var snapshots = new List<EzScoreTimelineSnapshot>();
-            int missCount = 0;
             double lastClockTime = double.NegativeInfinity;
 
             foreach (var hitEvent in hitEvents.OrderBy(e => getJudgementTime(e, offsetsRelativeToEnd, beatmap, fallbackMissWindow, null, hitObjectMap)))
@@ -210,9 +209,6 @@ namespace osu.Game.EzOsuGame.Scoring
                     TimeOffset = hitEvent.TimeOffset,
                 });
 
-                if (hitEvent.Result.IsMiss())
-                    missCount++;
-
                 double clockTime = getJudgementTime(hitEvent, offsetsRelativeToEnd, beatmap, fallbackMissWindow, beatmapHitObject, hitObjectMap);
 
                 // 保持时间线严格单调，避免同一时刻多条快照导致查询抖动。
@@ -220,11 +216,11 @@ namespace osu.Game.EzOsuGame.Scoring
                     clockTime = lastClockTime + 0.001;
 
                 lastClockTime = clockTime;
-                snapshots.Add(createSnapshot(clockTime, scoreProcessor, missCount));
+                snapshots.Add(EzScoreTimelineSnapshot.Create(clockTime, scoreProcessor, hitEvent.GameplayRate ?? 1.0));
             }
 
             if (snapshots.Count == 0)
-                snapshots.Add(createSnapshot(0, scoreProcessor, 0));
+                snapshots.Add(EzScoreTimelineSnapshot.Create(0, scoreProcessor));
             else if (snapshots[0].ClockTime > 0)
                 snapshots.Insert(0, new EzScoreTimelineSnapshot { ClockTime = 0 });
 
@@ -398,20 +394,6 @@ namespace osu.Game.EzOsuGame.Scoring
             }
 
             return null;
-        }
-
-        // TODO(EZ-SR-TL-016): Osu Session 完成后删除；与 ManiaReplayTimelineRecorder 重复。
-        private static EzScoreTimelineSnapshot createSnapshot(double clockTime, ScoreProcessor scoreProcessor, int missCount)
-        {
-            return new EzScoreTimelineSnapshot
-            {
-                ClockTime = clockTime,
-                TotalScore = scoreProcessor.TotalScore.Value,
-                Accuracy = scoreProcessor.Accuracy.Value,
-                Combo = scoreProcessor.Combo.Value,
-                HighestCombo = scoreProcessor.HighestCombo.Value,
-                MissCount = missCount,
-            };
         }
 
         private static string? getCacheKey(ScoreInfo? scoreInfo, EzScoreRaceGhostTimelineMode timelineMode, IGameplayEnvironment environment, IBeatmap? beatmap)

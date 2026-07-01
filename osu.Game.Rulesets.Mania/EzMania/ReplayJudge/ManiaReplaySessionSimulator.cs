@@ -432,7 +432,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             }
 
             scoreProcessor.ApplyResult(judgementResult);
-            timelineRecorder?.Record(scoreProcessor, eventTime, result);
+            timelineRecorder?.Record(scoreProcessor, eventTime, gameplayRate);
         }
 
         internal static void ApplyTransientResult(
@@ -453,7 +453,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             JudgementResultTimingHelper.ApplyTiming(judgementResult, timeOffset, gameplayRate);
 
             scoreProcessor.ApplyResult(judgementResult);
-            timelineRecorder?.Record(scoreProcessor, eventTime, result);
+            timelineRecorder?.Record(scoreProcessor, eventTime, gameplayRate);
         }
 
         internal static double ComputeStoredTimeOffset(double eventTime, HitObject target)
