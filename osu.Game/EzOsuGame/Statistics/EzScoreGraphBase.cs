@@ -535,12 +535,17 @@ namespace osu.Game.EzOsuGame.Statistics
 
             var token = debounceCancellation.Token;
 
+            if (newOffset == 0)
+            {
+                // offset 归零：清除上次 Session 的残留结果，
+                // 让 FilterHitEvents 回退到 OriginalHitEvents，避免残留旧 offset 嵌入事件。
+                CommittedNowScore = null;
+                RefreshDisplayOnly(0);
+                return;
+            }
+
             // 立即应用 display-only（轻量重绘）
             RefreshDisplayOnly(newOffset);
-
-            // offset=0 时不调度 Session：无需重放 replay 帧（帧时间量化会引入偏差）
-            if (newOffset == 0)
-                return;
 
             // debounce 后触发 service（真实重算）
             // fire-and-forget：故意不等待，由 CancellationToken 控制生命周期
