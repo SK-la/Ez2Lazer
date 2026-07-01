@@ -503,6 +503,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         }
 
         /// <summary>
+        /// 在指定 HitMode 下，<see cref="HitResult.Meh"/> 是否打断 Combo。
+        /// BMS / O2Jam / EZ2AC 三种模式下 Meh 断 Combo，其余不断。
+        /// </summary>
+        public static bool MehBreaksCombo(EzEnumHitMode hitMode)
+        {
+            switch (hitMode)
+            {
+                case EzEnumHitMode.IIDX_HD:
+                case EzEnumHitMode.LR2_HD:
+                case EzEnumHitMode.Raja_NM:
+                case EzEnumHitMode.O2Jam:
+                case EzEnumHitMode.EZ2AC:
+                    return true;
+
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
         /// 早按侧 KPoor（空出し）：是否仍在机台规定的「note 判定时刻前可识别」范围内。
         /// osu 中 <paramref name="timeOffsetFromHit"/> = 当前时间 - 物件判定时刻，负值为提前按下。
         /// IIDX 无提前上限；LR2 为判定时刻前 1000ms 内；Raja 为前 500ms 内。

@@ -6,6 +6,7 @@
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Scoring;
 
@@ -86,7 +87,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         public override bool DisplayResult => !ManiaEzDrawableJudgement.ShouldHideTailDisplayResult() && base.DisplayResult;
 
-        internal new void EzApplyFinalResult(HitResult result) => ApplyResult(result);
+        internal override void EzApplyFinalResult(HitResult result, EzEnumHitMode hitMode) => ApplyResult(result);
 
         internal new void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);
 

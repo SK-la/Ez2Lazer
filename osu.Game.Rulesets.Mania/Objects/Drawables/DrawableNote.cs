@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -11,8 +11,10 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Skinning.Default;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -141,15 +143,18 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         public bool CanRouteToKPoor => ManiaEzDrawableJudgement.CanRouteToKPoor(this);
 
-        internal void EzApplyFinalResult(HitResult result)
+        internal virtual void EzApplyFinalResult(HitResult result, EzEnumHitMode hitMode)
         {
-            ApplyResult(static (r, state) =>
+            ApplyResult(static (r, data) =>
             {
-                r.Type = state;
+                r.Type = data.result;
 
-                if (state == HitResult.Meh || state == HitResult.Miss)
+                if (data.result == HitResult.Miss
+                    || (data.result == HitResult.Meh && HitModeHelper.MehBreaksCombo(data.hitMode)))
+                {
                     r.IsComboHit = false;
-            }, result);
+                }
+            }, (result, hitMode));
         }
 
         internal void EzDispatchExtraResult(HitResult result) => DispatchNewResult(result);

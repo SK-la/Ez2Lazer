@@ -90,7 +90,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 // Zero frames: still need to generate all-miss HitEvents
                 // so that extended statistics can display.
                 var emptyPressTimes = new Dictionary<int, List<double>>();
-                applyForcedMisses(scoreProcessor, targets, emptyPressTimes, CancellationToken.None, recorder);
+                applyForcedMisses(scoreProcessor, targets, emptyPressTimes, environment.ManiaHitMode, CancellationToken.None, recorder);
                 scoreProcessor.PopulateScore(score.ScoreInfo);
 
                 return (scoreProcessor, recordTimeline ? new EzScoreTimeline(Array.Empty<EzScoreTimelineSnapshot>()) : null);
@@ -133,7 +133,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 recorder,
                 cancellationToken);
 
-            applyForcedMisses(scoreProcessor, targets, pressTimesByColumn, cancellationToken, recorder);
+            applyForcedMisses(scoreProcessor, targets, pressTimesByColumn, environment.ManiaHitMode, cancellationToken, recorder);
 
             return (scoreProcessor, recorder?.Build());
         }
@@ -166,6 +166,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             ScoreProcessor scoreProcessor,
             List<LaneTargetState> targets,
             Dictionary<int, List<double>> pressTimesByColumn,
+            EzEnumHitMode hitMode,
             CancellationToken cancellationToken,
             ManiaReplayTimelineRecorder? recorder)
         {
@@ -189,6 +190,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     ManiaReplaySessionSimulator.ResolveMissStoredOffset(state.Target, pressTimesByColumn),
                     missEventTime,
                     gameplayRate,
+                    hitMode,
                     recorder);
             }
         }

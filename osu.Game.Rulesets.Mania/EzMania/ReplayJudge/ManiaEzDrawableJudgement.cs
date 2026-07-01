@@ -142,10 +142,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal static void ApplyNoteOutcome(DrawableNote drawable, ManiaNoteJudgementOutcome outcome)
         {
+            var environment = getGameplayEnvironment(drawable);
+
             switch (outcome.Kind)
             {
                 case ManiaNoteJudgementOutcomeKind.Apply:
-                    drawable.EzApplyFinalResult(outcome.Result);
+                    drawable.EzApplyFinalResult(outcome.Result, environment.ManiaHitMode);
                     break;
 
                 case ManiaNoteJudgementOutcomeKind.DispatchExtra:
@@ -155,10 +157,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         internal static void ApplyBmsAction(DrawableNote drawable, BmsHitModeJudgement.DrawableAction action, BmsHitModeJudgement.BmsRouteState state)
-            => applyBmsAction(drawable, drawable.EzApplyFinalResult, drawable.EzDispatchExtraResult, action, state);
+        {
+            var environment = getGameplayEnvironment(drawable);
+            applyBmsAction(drawable, r => drawable.EzApplyFinalResult(r, environment.ManiaHitMode), drawable.EzDispatchExtraResult, action, state);
+        }
 
         internal static void ApplyBmsAction(DrawableHoldNoteTail drawable, BmsHitModeJudgement.DrawableAction action, BmsHitModeJudgement.BmsRouteState state)
-            => applyBmsAction(drawable, drawable.EzApplyFinalResult, drawable.EzDispatchExtraResult, action, state);
+        {
+            var environment = getGameplayEnvironment(drawable);
+            applyBmsAction(drawable, r => drawable.EzApplyFinalResult(r, environment.ManiaHitMode), drawable.EzDispatchExtraResult, action, state);
+        }
 
         private static void applyBmsAction<T>(
             T _,
@@ -264,7 +272,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (hitMode is MalodyHitModeJudgement)
             {
                 if (!userTriggered && timeOffset >= 0)
-                    drawable.EzApplyFinalResult(HitResult.IgnoreHit);
+                {
+                    var env = getGameplayEnvironment(drawable);
+                    drawable.EzApplyFinalResult(HitResult.IgnoreHit, env.ManiaHitMode);
+                }
 
                 return true;
             }
@@ -296,7 +307,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         if (timeOffset < 0)
                             return true;
 
-                        drawable.EzApplyFinalResult(O2HitModeJudgement.MapTo(O2Judge.Miss));
+                        drawable.EzApplyFinalResult(O2HitModeJudgement.MapTo(O2Judge.Miss), environment.ManiaHitMode);
                         return true;
                     }
 
@@ -319,7 +330,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 }, getO2JudgementState(drawable));
 
                 if (result != null)
-                    drawable.EzApplyFinalResult(result.Value);
+                    drawable.EzApplyFinalResult(result.Value, environment.ManiaHitMode);
 
                 return true;
             }
@@ -361,7 +372,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     return true;
                 }
 
-                drawable.EzApplyFinalResult(Ez2AcHitModeJudgement.MapTo(tailJudge));
+                drawable.EzApplyFinalResult(Ez2AcHitModeJudgement.MapTo(tailJudge), environment.ManiaHitMode);
                 return true;
             }
 
@@ -382,7 +393,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (genericResult == HitResult.None)
                 return true;
 
-            drawable.EzApplyFinalResult(genericResult);
+            drawable.EzApplyFinalResult(genericResult, environment.ManiaHitMode);
             return true;
         }
     }

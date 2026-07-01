@@ -186,6 +186,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         ComputeStoredTimeOffset(input.Time, forced.Target),
                         input.Time,
                         gameplayRate,
+                        environment.ManiaHitMode,
                         timelineRecorder);
                 }
 
@@ -199,6 +200,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     ComputeStoredTimeOffset(input.Time, target),
                     input.Time,
                     gameplayRate,
+                    environment.ManiaHitMode,
                     timelineRecorder);
 
                 if (target is HeadNote head)
@@ -418,6 +420,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             double timeOffset,
             double eventTime,
             double gameplayRate,
+            EzEnumHitMode hitMode,
             ManiaReplayTimelineRecorder? timelineRecorder = null)
         {
             var judgementResult = new JudgementResult(target, target.Judgement)
@@ -427,9 +430,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             JudgementResultTimingHelper.ApplyTiming(judgementResult, timeOffset, gameplayRate);
 
-            // TODO: 这里遗漏了 只有特定 HitMode下，Meh才断Combo。应该从框架上重新考虑，而不是在这里直接修改。
-            if (result == HitResult.Meh || result == HitResult.Miss)
+            if (result == HitResult.Miss
+                || (result == HitResult.Meh && HitModeHelper.MehBreaksCombo(hitMode)))
+            {
                 judgementResult.IsComboHit = false;
+            }
 
             scoreProcessor.ApplyResult(judgementResult);
             timelineRecorder?.Record(scoreProcessor, eventTime, result);
