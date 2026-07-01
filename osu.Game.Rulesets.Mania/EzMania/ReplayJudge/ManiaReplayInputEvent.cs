@@ -3,6 +3,7 @@
 
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 {
+    // TODO: 需要重新审视Replay结构体，是否必须使用，有无现成的载体复用，而不是在此定义一个新的结构体。
     public readonly struct ManiaReplayInputEvent
     {
         public double Time { get; }

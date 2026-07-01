@@ -7,6 +7,7 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 {
+    // TODO: 时间线快照不稳健，也不利于框架化。
     /// <summary>
     /// 在 <see cref="ManiaReplaySession"/> 同一遍 SP 判定中采集分数时间线快照。
     /// </summary>

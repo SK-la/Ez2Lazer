@@ -3,6 +3,7 @@
 
 namespace osu.Game.EzOsuGame.Scoring
 {
+    // TODO: 考虑找地方增加实时速度倍率快照
     public readonly struct EzScoreTimelineSnapshot
     {
         public double ClockTime { get; init; }

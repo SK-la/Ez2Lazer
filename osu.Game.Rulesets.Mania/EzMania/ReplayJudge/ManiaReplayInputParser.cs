@@ -19,6 +19,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// </summary>
         public static List<ManiaReplayInputEvent> Parse(Replay replay)
         {
+            // TODO: 应提升架构，在osu.game中实现 replay 。mania层需定义 ManiaReplayInputEvent 结构体，避免在此重复定义。
+            // 检查 LegacyScoreDecoder 解析的 replay 是否可转换为 ManiaReplayInputEvent，或定义更流畅的转换方法。
             var frames = replay.Frames.OfType<ManiaReplayFrame>().OrderBy(f => f.Time).ToList();
             var inputEvents = new List<ManiaReplayInputEvent>(frames.Count * 2);
 

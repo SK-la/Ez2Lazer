@@ -427,6 +427,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             JudgementResultTimingHelper.ApplyTiming(judgementResult, timeOffset, gameplayRate);
 
+            // TODO: 这里遗漏了 只有特定 HitMode下，Meh才断Combo。应该从框架上重新考虑，而不是在这里直接修改。
             if (result == HitResult.Meh || result == HitResult.Miss)
                 judgementResult.IsComboHit = false;
 
