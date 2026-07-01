@@ -8,9 +8,12 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Replays;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
@@ -115,14 +118,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             }
 
             double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
-
-            var pressTimesByColumn = ManiaReplaySessionSimulator.BuildPressTimesByColumn(score.Replay);
+            var inputData = parseReplay(score.Replay);
 
             ManiaReplaySessionSimulator.Simulate(
-                score,
                 beatmap,
                 environment,
-                targets,
                 pressColumns,
                 releaseColumns,
                 holdByHead,
@@ -130,12 +130,98 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 noteStrategy,
                 holdStrategy,
                 scoreProcessor,
+                gameplayRate,
+                inputData,
                 recorder,
                 cancellationToken);
 
-            applyForcedMisses(scoreProcessor, targets, pressTimesByColumn, environment.ManiaHitMode, cancellationToken, recorder);
+            applyForcedMisses(scoreProcessor, targets, inputData.PressTimesByColumn, environment.ManiaHitMode, cancellationToken, recorder);
 
             return (scoreProcessor, recorder?.Build());
+        }
+
+        /// <summary>
+        /// 单次解析 replay 帧序列，同时产出有序输入事件流与每列 press 时间索引。
+        /// 替代原来 <c>ManiaReplayInputParser.Parse</c> + <c>BuildPressTimesByColumn</c> 的两次独立解析。
+        /// </summary>
+        private static ManiaReplayInputData parseReplay(Replay replay)
+        {
+            var frames = replay.Frames.OfType<ManiaReplayFrame>().OrderBy(f => f.Time).ToList();
+            var inputEvents = new List<ManiaReplayInputEvent>(frames.Count * 2);
+            var pressTimes = new Dictionary<int, List<double>>();
+
+            var lastActions = new List<ManiaAction>();
+
+            foreach (var frame in frames)
+            {
+                var current = frame.Actions.ToList();
+
+                // 检测新按下（current 有但 lastActions 无）
+                foreach (var action in current)
+                {
+                    if (lastActions.Contains(action))
+                        continue;
+
+                    int column = (int)action;
+
+                    if (column >= 0)
+                    {
+                        inputEvents.Add(new ManiaReplayInputEvent(frame.Time, column, true));
+
+                        if (!pressTimes.TryGetValue(column, out var list))
+                        {
+                            list = new List<double>();
+                            pressTimes[column] = list;
+                        }
+
+                        list.Add(frame.Time);
+                    }
+                }
+
+                // 检测释放（lastActions 有但 current 无）
+                foreach (var action in lastActions)
+                {
+                    if (current.Contains(action))
+                        continue;
+
+                    int column = (int)action;
+                    if (column >= 0)
+                        inputEvents.Add(new ManiaReplayInputEvent(frame.Time, column, false));
+                }
+
+                lastActions = current;
+            }
+
+            // 末尾未释放的键补 Release 事件
+            if (lastActions.Count > 0)
+            {
+                double endTime = frames[^1].Time;
+
+                foreach (var action in lastActions)
+                {
+                    int column = (int)action;
+                    if (column >= 0)
+                        inputEvents.Add(new ManiaReplayInputEvent(endTime, column, false));
+                }
+            }
+
+            // 排序：时间升序 → release 优先 → 列索引升序
+            inputEvents.Sort((a, b) =>
+            {
+                int timeComparison = a.Time.CompareTo(b.Time);
+                if (timeComparison != 0)
+                    return timeComparison;
+
+                if (a.IsPress != b.IsPress)
+                    return a.IsPress ? 1 : -1;
+
+                return a.Column.CompareTo(b.Column);
+            });
+
+            foreach (var list in pressTimes.Values)
+                list.Sort();
+
+            return new ManiaReplayInputData(inputEvents, pressTimes);
         }
 
         private static void alignHitWindows(IBeatmap beatmap, IGameplayEnvironment environment)

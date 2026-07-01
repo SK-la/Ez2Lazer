@@ -14,11 +14,8 @@ using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Scoring;
-using osu.Game.Replays;
 using osu.Game.Rulesets.Objects.Types;
-using osu.Game.Scoring;
-using osu.Game.Utils;
+using osu.Game.Rulesets.Scoring;
 using static osu.Game.Rulesets.Mania.EzMania.ReplayJudge.ManiaColumnSimulator;
 
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
@@ -26,10 +23,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     internal static class ManiaReplaySessionSimulator
     {
         internal static void Simulate(
-            Score score,
             IBeatmap beatmap,
             IGameplayEnvironment environment,
-            List<LaneTargetState> targets,
             Dictionary<int, List<LaneTargetState>> pressColumns,
             Dictionary<int, List<LaneTargetState>> releaseColumns,
             Dictionary<HeadNote, HoldNote> holdByHead,
@@ -37,6 +32,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             IManiaNoteJudgementStrategy noteStrategy,
             IManiaHoldJudgementStrategy holdStrategy,
             ScoreProcessor scoreProcessor,
+            double gameplayRate,
+            ManiaReplayInputData inputData,
             ManiaReplayTimelineRecorder? timelineRecorder,
             CancellationToken cancellationToken)
         {
@@ -55,10 +52,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var judgementState = new ManiaReplayJudgementState();
             var headWasHit = new Dictionary<HeadNote, bool>();
             var keyHeldByColumn = new Dictionary<int, bool>();
-            var pressTimesByColumn = BuildPressTimesByColumn(score.Replay);
-            double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
 
-            foreach (var input in ManiaReplayInputParser.Parse(score.Replay))
+            foreach (var input in inputData.SortedEvents)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -463,30 +458,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal static double ComputeStoredTimeOffset(double eventTime, HitObject target)
             => eventTime - target.GetEndTime();
-
-        internal static Dictionary<int, List<double>> BuildPressTimesByColumn(Replay replay)
-        {
-            var dict = new Dictionary<int, List<double>>();
-
-            foreach (var input in ManiaReplayInputParser.Parse(replay))
-            {
-                if (!input.IsPress)
-                    continue;
-
-                if (!dict.TryGetValue(input.Column, out var list))
-                {
-                    list = new List<double>();
-                    dict[input.Column] = list;
-                }
-
-                list.Add(input.Time);
-            }
-
-            foreach (var list in dict.Values)
-                list.Sort();
-
-            return dict;
-        }
 
         /// <summary>
         /// Miss 存储偏移：优先该列 replay 最近邻 press；无输入则 0（Graph 侧 projectOffsetToY 压边）。
