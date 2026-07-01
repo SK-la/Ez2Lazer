@@ -13,14 +13,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     internal sealed class ManiaReplayTimelineRecorder
     {
         private readonly List<EzScoreTimelineSnapshot> snapshots = new List<EzScoreTimelineSnapshot>();
-        private int missCount;
         private double lastClockTime = double.NegativeInfinity;
 
-        public void RecordInitial(ScoreProcessor scoreProcessor)
-            => appendSnapshot(0, scoreProcessor, HitResult.None);
+        public void RecordInitial(ScoreProcessor scoreProcessor, double gameplayRate)
+            => appendSnapshot(0, scoreProcessor, gameplayRate);
 
-        public void Record(ScoreProcessor scoreProcessor, double clockTime, HitResult result)
-            => appendSnapshot(clockTime, scoreProcessor, result);
+        public void Record(ScoreProcessor scoreProcessor, double clockTime, double gameplayRate)
+            => appendSnapshot(clockTime, scoreProcessor, gameplayRate);
 
         public EzScoreTimeline Build()
         {
@@ -32,25 +31,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return new EzScoreTimeline(snapshots);
         }
 
-        private void appendSnapshot(double clockTime, ScoreProcessor scoreProcessor, HitResult result)
+        private void appendSnapshot(double clockTime, ScoreProcessor scoreProcessor, double gameplayRate)
         {
-            if (result.IsMiss())
-                missCount++;
-
             if (clockTime <= lastClockTime)
                 clockTime = lastClockTime + 0.001;
 
             lastClockTime = clockTime;
 
-            snapshots.Add(new EzScoreTimelineSnapshot
-            {
-                ClockTime = clockTime,
-                TotalScore = scoreProcessor.TotalScore.Value,
-                Accuracy = scoreProcessor.Accuracy.Value,
-                Combo = scoreProcessor.Combo.Value,
-                HighestCombo = scoreProcessor.HighestCombo.Value,
-                MissCount = missCount,
-            });
+            snapshots.Add(EzScoreTimelineSnapshot.Create(clockTime, scoreProcessor, gameplayRate));
         }
     }
 }
