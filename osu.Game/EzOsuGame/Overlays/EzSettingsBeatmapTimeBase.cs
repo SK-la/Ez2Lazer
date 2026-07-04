@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
@@ -11,6 +12,8 @@ using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Online.Matchmaking;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Spectator;
+using osu.Game.Overlays;
+using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.Overlays
@@ -29,6 +32,12 @@ namespace osu.Game.EzOsuGame.Overlays
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
+        private OsuGameBase game { get; set; } = null!;
+
+        [Resolved(CanBeNull = true)]
+        private IDialogOverlay? dialogOverlay { get; set; }
+
+        [Resolved]
         private IMultiplayerClient? multiplayerClient { get; set; }
 
         [Resolved]
@@ -37,6 +46,8 @@ namespace osu.Game.EzOsuGame.Overlays
         [Resolved]
         private IMatchmakingClient? matchmakingClient { get; set; }
 
+        private Bindable<EzBeatmapClockTimeBase> timeBaseBindable = null!;
+
         [BackgroundDependencyLoader]
         private void load()
         {
@@ -44,7 +55,7 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 Caption = EzSettingsStrings.BEATMAP_CLOCK_TIME_BASE,
                 HintText = EzSettingsStrings.BEATMAP_CLOCK_TIME_BASE_TOOLTIP,
-                Current = ezConfig.GetBindable<EzBeatmapClockTimeBase>(Ez2Setting.BeatmapClockTimeBase),
+                Current = timeBaseBindable = ezConfig.GetBindable<EzBeatmapClockTimeBase>(Ez2Setting.BeatmapClockTimeBase),
             };
 
             Add(new SettingsItemV2(dropdown)
@@ -65,6 +76,20 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 Add(new EzMultiplayerDisableNote());
             }
+            else
+            {
+                timeBaseBindable.BindValueChanged(onTimeBaseChanged);
+            }
+        }
+
+        private void onTimeBaseChanged(ValueChangedEvent<EzBeatmapClockTimeBase> e)
+        {
+            dialogOverlay?.Push(new ConfirmDialog(EzSettingsStrings.BEATMAP_CLOCK_TIME_BASE_RESTART_PROMPT, () => game.Exit(), () =>
+            {
+                timeBaseBindable.ValueChanged -= onTimeBaseChanged;
+                timeBaseBindable.Value = e.OldValue;
+                timeBaseBindable.ValueChanged += onTimeBaseChanged;
+            }));
         }
 
         /// <summary>
