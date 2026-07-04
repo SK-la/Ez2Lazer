@@ -75,6 +75,13 @@ namespace osu.Game.Screens.Play
         /// </summary>
         private PauseStateTracker? pauseStateTracker;
 
+        /// <summary>
+        /// [Ez] 谱面时基下，恢复 lead-in 期间延迟启动音频 track。
+        /// </summary>
+        private bool suppressTrackDuringLeadIn;
+
+        private EzBeatmapTimeSource? beatmapTimeSource;
+
         [Resolved]
         private MusicController musicController { get; set; } = null!;
 
@@ -125,13 +132,12 @@ namespace osu.Game.Screens.Play
             if (!isMultiplayer && configured == EzBeatmapClockTimeBase.Beatmap)
             {
                 // EzBeatmapTimeSource（SourceClock=null）使用内部 wallClock 独立推进。
-                var beatmapSource = new EzBeatmapTimeSource();
+                var beatmapSource = beatmapTimeSource = new EzBeatmapTimeSource();
                 BeatmapTimeSource = beatmapSource;
 
                 // [Ez] 恢复时的虚拟 lead-in 窗口 = EzBeatmapTimeRangeProvider.LEAD_IN_MS（默认 3000ms）。
-                // 暂停恢复后，谱面时钟在 3 秒内从虚拟位置推进到暂停点，使 DHO 看到
-                // 「音符从画面顶部下落」的效果，而非瞬移。
                 beatmapSource.ResumeLeadInWindowMs = EzBeatmapTimeRangeProvider.LEAD_IN_MS;
+                beatmapSource.ResumeLeadInCompleted += onResumeLeadInCompleted;
 
                 // 把谱面时钟作为 GameplayClock 的 source；FramedBeatmapClock 仍是 IGameplayClock 公开类型。
                 ChangeSource(beatmapSource);
@@ -181,12 +187,45 @@ namespace osu.Game.Screens.Play
             elapsedValidationTime = null;
 
             base.Seek(time);
+
+            if (BeatmapTimeSource != null && !BeatmapTimeSource.IsInResumeLeadIn)
+                track.Seek(CurrentTime);
         }
 
         protected override void StartGameplayClock()
         {
             addAdjustmentsToTrack();
             base.StartGameplayClock();
+
+            if (BeatmapTimeSource != null)
+            {
+                if (BeatmapTimeSource.IsInResumeLeadIn)
+                    suppressTrackDuringLeadIn = true;
+                else
+                    startTrackAtCurrentTime();
+            }
+        }
+
+        protected override void StopGameplayClock()
+        {
+            if (BeatmapTimeSource != null)
+                track.Stop();
+
+            base.StopGameplayClock();
+        }
+
+        private void startTrackAtCurrentTime()
+        {
+            track.Seek(CurrentTime);
+            track.Start();
+        }
+
+        private void onResumeLeadInCompleted()
+        {
+            suppressTrackDuringLeadIn = false;
+
+            if (IsRunning && BeatmapTimeSource != null)
+                startTrackAtCurrentTime();
         }
 
         /// <summary>
@@ -226,6 +265,15 @@ namespace osu.Game.Screens.Play
         protected override void Update()
         {
             base.Update();
+
+            if (suppressTrackDuringLeadIn && BeatmapTimeSource != null && !BeatmapTimeSource.IsInResumeLeadIn)
+            {
+                suppressTrackDuringLeadIn = false;
+
+                if (IsRunning)
+                    startTrackAtCurrentTime();
+            }
+
             checkPlaybackValidity();
         }
 
@@ -302,6 +350,9 @@ namespace osu.Game.Screens.Play
 
         protected override void Dispose(bool isDisposing)
         {
+            if (beatmapTimeSource != null)
+                beatmapTimeSource.ResumeLeadInCompleted -= onResumeLeadInCompleted;
+
             base.Dispose(isDisposing);
             removeAdjustmentsFromTrack();
             pauseStateTracker?.Dispose();

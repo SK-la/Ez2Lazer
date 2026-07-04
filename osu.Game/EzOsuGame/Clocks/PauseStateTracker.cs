@@ -7,10 +7,8 @@ using osu.Framework.Bindables;
 namespace osu.Game.EzOsuGame.Clocks
 {
     /// <summary>
-    /// [Ez] 暂停状态跟踪器：监听暂停 Bindable 的 paused → resumed 转换，
-    /// 并向 <see cref="EzBeatmapTimeSource"/> 报告暂停位置，触发虚拟 lead-in 窗口。
-    ///
-    /// 用于 <see cref="EzBeatmapTimeSource"/> 的 <see cref="EzBeatmapTimeSource.SourceClock"/> == null 的场景。
+    /// [Ez] 暂停状态跟踪器：监听暂停 Bindable 的 paused ↔ resumed 转换，
+    /// 并向 <see cref="EzBeatmapTimeSource"/> 报告暂停位置 / 触发恢复 lead-in。
     /// </summary>
     internal sealed class PauseStateTracker : IDisposable
     {
@@ -27,10 +25,11 @@ namespace osu.Game.EzOsuGame.Clocks
             this.isPaused = isPaused;
             isPaused.BindValueChanged(e =>
             {
-                // paused → resumed：记录暂停位置，触发 lead-in。
-                // pausePosition 由 EzBeatmapTimeSource.CurrentTime 提供（暂停时的谱面时间）。
+                if (!wasPaused && e.NewValue)
+                    owner.OnGameplayPaused(owner.CurrentTime);
+
                 if (wasPaused && !e.NewValue)
-                    owner.RecordPause(owner.CurrentTime);
+                    owner.BeginResumeLeadIn();
 
                 wasPaused = e.NewValue;
             }, true);
