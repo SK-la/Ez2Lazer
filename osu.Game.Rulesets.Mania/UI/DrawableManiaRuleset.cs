@@ -20,6 +20,7 @@ using osu.Game.Database;
 using osu.Game.Input.Bindings;
 using osu.Game.Input.Handlers;
 using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.Clocks;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -87,6 +88,11 @@ namespace osu.Game.Rulesets.Mania.UI
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
+        private IEzBeatmapTimeSource? ezBeatmapTimeSource { get; set; }
+
+        private bool hideNotesDuringLeadIn;
 
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
@@ -318,6 +324,24 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.Update();
             updateTimeRange();
+            updateResumeLeadInNoteVisibility();
+        }
+
+        private void updateResumeLeadInNoteVisibility()
+        {
+            bool inLeadIn = ezBeatmapTimeSource?.IsInResumeLeadIn == true;
+
+            if (inLeadIn == hideNotesDuringLeadIn)
+                return;
+
+            hideNotesDuringLeadIn = inLeadIn;
+            float alpha = inLeadIn ? 0 : 1;
+
+            foreach (var stage in Playfield.Stages)
+            {
+                foreach (var column in stage.Columns)
+                    column.HitObjectArea.Alpha = alpha;
+            }
         }
 
         private ScheduledDelegate? pendingSkinChange;

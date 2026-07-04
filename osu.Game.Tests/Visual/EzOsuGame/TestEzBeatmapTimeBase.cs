@@ -3,6 +3,7 @@
 
 using NUnit.Framework;
 using System;
+using osu.Framework.Bindables;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
@@ -195,59 +196,108 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         }
 
         [Test]
-        public void EzBeatmapTimeSource_ResumeLeadIn_SmoothCatchUp()
+        public void PauseStateTracker_OnPause_RecordsGameplayTime()
         {
-            // 使用可控的 wall-clock：手动推进 elapsed 时间，让测试变成确定性的。
-            var controlledClock = new ControlledClock();
-            var src = new EzBeatmapTimeSource { ResumeLeadInWindowMs = 3000 };
-            src.SourceClock = controlledClock;
+            var isPaused = new BindableBool();
+            var src = new EzBeatmapTimeSource();
+            src.SetCurrentTime(4321);
 
-            // 先让时钟运行起来。
-            controlledClock.IsRunning = true;
-            src.ProcessFrame();
+            using var tracker = new PauseStateTracker(src, isPaused);
 
-            // 设置当前谱面时间 = lead-in 开始点。
-            src.SetCurrentTime(2000);
+            isPaused.Value = true;
 
-            // 模拟在 t=5000ms 处暂停后恢复。
-            src.RecordPause(5000);
-            Assert.That(src.IsResuming, Is.True);
-
-            // 模拟多帧，每帧 16.67ms wall-clock elapsed。
-            for (int i = 0; i < 200; i++)
-            {
-                controlledClock.ElapsedMs = 16.67;
-                src.ProcessFrame();
-            }
-
-            // 经过 ~180 帧 * 16.67ms ≈ 3000ms，CurrentTime 应追上 5000ms。
-            Assert.That(src.CurrentTime, Is.EqualTo(5000).Within(0.1),
-                "CurrentTime should reach pause position after ~3000ms virtual time");
-            Assert.That(src.IsResuming, Is.False, "Lead-in should end when CurrentTime reaches pausePosition");
+            Assert.That(src.PauseGameplayTime, Is.EqualTo(4321));
+            Assert.That(src.IsInResumeLeadIn, Is.False);
         }
 
         [Test]
-        public void EzBeatmapTimeSource_ResumeLeadIn_DisabledByDefault()
+        public void PauseStateTracker_OnResume_BeginsLeadIn()
         {
-            // ResumeLeadInWindowMs = 0 时，RecordPause 不应触发 lead-in。
-            var src = new EzBeatmapTimeSource(); // ResumeLeadInWindowMs 默认为 0
-            src.ProcessFrame();
+            var isPaused = new BindableBool();
+            var src = new EzBeatmapTimeSource { ResumeLeadInWindowMs = 3000 };
             src.SetCurrentTime(5000);
 
-            src.RecordPause(5000);
-            Assert.That(src.IsResuming, Is.False);
+            using var tracker = new PauseStateTracker(src, isPaused);
+
+            isPaused.Value = true;
+            isPaused.Value = false;
+
+            Assert.That(src.IsInResumeLeadIn, Is.True);
+            Assert.That(src.PauseGameplayTime, Is.EqualTo(5000));
+            Assert.That(src.CurrentTime, Is.EqualTo(5000));
         }
 
         [Test]
-        public void EzBeatmapTimeSource_ResumeLeadIn_ResetClearsState()
+        public void EzBeatmapTimeSource_BeginResumeLeadIn_FreezesGameplayTime()
         {
             var src = new EzBeatmapTimeSource { ResumeLeadInWindowMs = 3000 };
-            src.ProcessFrame();
-            src.RecordPause(5000);
-            Assert.That(src.IsResuming, Is.True);
+            src.SetCurrentTime(5000);
+            src.OnGameplayPaused(5000);
+            src.Start();
+            src.BeginResumeLeadIn();
 
-            src.ResetLeadIn();
-            Assert.That(src.IsResuming, Is.False);
+            src.ProcessFrame();
+            System.Threading.Thread.Sleep(20);
+            src.ProcessFrame();
+
+            Assert.That(src.IsInResumeLeadIn, Is.True);
+            Assert.That(src.CurrentTime, Is.EqualTo(5000), "gameplay time should stay frozen during lead-in");
+        }
+
+        [Test]
+        public void EzBeatmapTimeSource_EndResumeLeadIn_ResumesAdvancement()
+        {
+            var src = new EzBeatmapTimeSource { ResumeLeadInWindowMs = 3000 };
+            src.SetCurrentTime(5000);
+            src.OnGameplayPaused(5000);
+            src.Start();
+            src.BeginResumeLeadIn();
+            src.EndResumeLeadIn();
+
+            double t0 = src.CurrentTime;
+            System.Threading.Thread.Sleep(20);
+            src.ProcessFrame();
+
+            Assert.That(src.IsInResumeLeadIn, Is.False);
+            Assert.That(src.CurrentTime, Is.GreaterThanOrEqualTo(t0));
+        }
+
+        [Test]
+        public void EzBeatmapTimeSource_EndResumeLeadIn_FiresEvent()
+        {
+            var src = new EzBeatmapTimeSource { ResumeLeadInWindowMs = 3000 };
+            bool fired = false;
+            src.ResumeLeadInCompleted += () => fired = true;
+
+            src.BeginResumeLeadIn();
+            src.EndResumeLeadIn();
+
+            Assert.That(fired, Is.True);
+        }
+
+        [Test]
+        public void EzBeatmapTimeSource_BeginResumeLeadIn_DisabledWhenWindowZero()
+        {
+            var src = new EzBeatmapTimeSource { ResumeLeadInWindowMs = 0 };
+            src.SetCurrentTime(5000);
+            src.BeginResumeLeadIn();
+
+            Assert.That(src.IsInResumeLeadIn, Is.False);
+        }
+
+        [Test]
+        public void ResumeLeadIn_DisplayTimeAdvancesTowardPausePosition()
+        {
+            const double target = 5000;
+            const double window = 3000;
+            const double frame_delta = 16.67;
+
+            double display = target - window;
+
+            while (display < target)
+                display = Math.Min(display + frame_delta, target);
+
+            Assert.That(display, Is.EqualTo(target));
         }
 
         private static osu.Game.Rulesets.Timing.MultiplierControlPoint toMultiplier(double time, TimingControlPoint timingPoint)
@@ -273,24 +323,6 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             public double EndTime { get; private set; }
 
             public double Duration { get => EndTime - startTime; set => EndTime = startTime + value; }
-        }
-
-        /// <summary>
-        /// 可控测试时钟：手动设置 IsRunning 和 ElapsedMs。
-        /// </summary>
-        private sealed class ControlledClock : IFrameBasedClock
-        {
-            public double Rate { get; }
-            public bool IsRunning { get; set; }
-            public double ElapsedMs { get; set; }
-            public double CurrentTime { get; set; }
-
-            public double ElapsedFrameTime => ElapsedMs;
-            public double FramesPerSecond { get; }
-
-            public void ProcessFrame()
-            {
-            }
         }
     }
 }

@@ -88,6 +88,11 @@ namespace osu.Game.Rulesets.UI
 
         private bool firstConsumption = true;
 
+        /// <summary>
+        /// [Ez] 恢复 lead-in 首帧是否已将 displayTime 对齐到 T - window。
+        /// </summary>
+        private bool resumeLeadInDisplaySnapped;
+
         public FrameStabilityContainer(double gameplayStartTime = double.MinValue)
         {
             RelativeSizeAxes = Axes.Both;
@@ -107,12 +112,10 @@ namespace osu.Game.Rulesets.UI
             }
 
             // [Ez] 谱面时基：若 DI 注入了谱面时钟，优先把它作为 referenceClock。
-            // 这样 Time.Current 透传到谱面时钟，ruleset 内的 DHO 不需要任何改动。
-            // MasterGameplayClockContainer 在 multiplayer / 音频时基下不会注入谱面时钟（null）。
-            if (ezBeatmapTimeSource != null && ezBeatmapTimeSource.Enabled)
+            if (ezBeatmapTimeSource != null)
                 referenceClock = ezBeatmapTimeSource;
             else
-            referenceClock = gameplayClock ?? Clock;
+                referenceClock = gameplayClock ?? Clock;
             Clock = this;
         }
 
@@ -154,6 +157,15 @@ namespace osu.Game.Rulesets.UI
                 state = PlaybackState.Valid;
             }
 
+            // [Ez] 恢复暂停后的空白下落：displayTime 从 T-window 追到 T，不写回谱面时钟。
+            if (ezBeatmapTimeSource is { IsInResumeLeadIn: true } && ezBeatmapTimeSource.ResumeLeadInWindowMs > 0 && !hasReplayAttached)
+            {
+                updateResumeLeadInDisplayClock();
+                return;
+            }
+
+            resumeLeadInDisplaySnapped = false;
+
             double proposedTime = referenceClock.CurrentTime;
 
             if (FrameStablePlayback)
@@ -178,7 +190,9 @@ namespace osu.Game.Rulesets.UI
             // A difference of more than 500 ms seems like a sane number we should never exceed.
             //
             // Double-checking against the parent clock ensures we don't accidentally freeze time when the game stutters due to a long running frame.
-            if (!allowReferenceClockSeeks && Math.Abs(proposedTime - referenceClock.CurrentTime) > 500 && game?.Clock.ElapsedFrameTime <= 500)
+            bool inResumeLeadIn = ezBeatmapTimeSource?.IsInResumeLeadIn == true;
+
+            if (!allowReferenceClockSeeks && !inResumeLeadIn && Math.Abs(proposedTime - referenceClock.CurrentTime) > 500 && game?.Clock.ElapsedFrameTime <= 500)
             {
                 if (invalidBassTimeLogCount < 10)
                 {
@@ -221,6 +235,49 @@ namespace osu.Game.Rulesets.UI
 
             if (framedClock.ElapsedFrameTime != 0)
                 IsRewinding = framedClock.ElapsedFrameTime < 0;
+        }
+
+        /// <summary>
+        /// [Ez] 恢复 lead-in：仅推进 FSC display 时间，谱面时钟 gameplay 时间保持冻结。
+        /// </summary>
+        private void updateResumeLeadInDisplayClock()
+        {
+            double target = ezBeatmapTimeSource!.PauseGameplayTime;
+            double leadInStart = target - ezBeatmapTimeSource.ResumeLeadInWindowMs;
+
+            if (!resumeLeadInDisplaySnapped)
+            {
+                manualClock.CurrentTime = leadInStart;
+                resumeLeadInDisplaySnapped = true;
+                firstConsumption = false;
+            }
+
+            double proposedTime = Math.Min(manualClock.CurrentTime + (game?.Clock.ElapsedFrameTime ?? 16.67), target);
+
+            if (FrameStablePlayback)
+                applyFrameStability(ref proposedTime);
+
+            if (proposedTime >= target - 0.001)
+            {
+                proposedTime = target;
+                ezBeatmapTimeSource.EndResumeLeadIn();
+                resumeLeadInDisplaySnapped = false;
+            }
+
+            direction = 1;
+            manualClock.CurrentTime = proposedTime;
+            manualClock.Rate = Math.Abs(referenceClock.Rate);
+            manualClock.IsRunning = true;
+
+            EzOsuGame.Timing.EzSubFrameCorrection.RecordFscUpdate();
+            framedClock.ProcessFrame();
+
+            if (framedClock.ElapsedFrameTime != 0)
+                IsRewinding = framedClock.ElapsedFrameTime < 0;
+
+            isCatchingUp.Value = Math.Abs(proposedTime - target) > 200;
+            waitingOnFrames.Value = false;
+            state = PlaybackState.Valid;
         }
 
         /// <summary>
