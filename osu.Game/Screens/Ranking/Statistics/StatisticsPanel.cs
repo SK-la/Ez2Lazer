@@ -142,6 +142,9 @@ namespace osu.Game.Screens.Ranking.Statistics
                 return playable;
             }, loadCancellation.Token).ContinueWith(task => Schedule(() =>
             {
+                if (task.IsCanceled)
+                    return;
+
                 bool hitEventsAvailable = newScore.HitEvents.Count != 0;
                 Container<Drawable> container;
 
