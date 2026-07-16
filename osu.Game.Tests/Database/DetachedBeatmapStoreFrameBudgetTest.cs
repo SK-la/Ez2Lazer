@@ -14,8 +14,8 @@ namespace osu.Game.Tests.Database
         [Test]
         public void MaxOpsPerFrameIsBounded()
         {
-            Assert.That(DetachedBeatmapStoreFrameBudget.MaxOpsPerFrame, Is.EqualTo(24));
-            Assert.That(DetachedBeatmapStoreFrameBudget.MaxOpsPerFrame, Is.LessThanOrEqualTo(64));
+            Assert.That(DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME, Is.EqualTo(24));
+            Assert.That(DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME, Is.LessThanOrEqualTo(64));
         }
 
         [Test]
@@ -26,22 +26,22 @@ namespace osu.Game.Tests.Database
                 queue.Enqueue(i);
 
             var seen = new List<int>();
-            int processed = DetachedBeatmapStoreFrameBudget.Drain(queue, DetachedBeatmapStoreFrameBudget.MaxOpsPerFrame, seen.Add);
+            int processed = DetachedBeatmapStoreFrameBudget.Drain(queue, DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME, seen.Add);
 
-            Assert.That(processed, Is.EqualTo(DetachedBeatmapStoreFrameBudget.MaxOpsPerFrame));
-            Assert.That(seen, Has.Count.EqualTo(DetachedBeatmapStoreFrameBudget.MaxOpsPerFrame));
-            Assert.That(queue.Count, Is.EqualTo(100 - DetachedBeatmapStoreFrameBudget.MaxOpsPerFrame));
+            Assert.That(processed, Is.EqualTo(DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME));
+            Assert.That(seen, Has.Count.EqualTo(DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME));
+            Assert.That(queue.Count, Is.EqualTo(100 - DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME));
 
-            processed = DetachedBeatmapStoreFrameBudget.Drain(queue, DetachedBeatmapStoreFrameBudget.MaxOpsPerFrame, seen.Add);
-            Assert.That(processed, Is.EqualTo(DetachedBeatmapStoreFrameBudget.MaxOpsPerFrame));
-            Assert.That(queue.Count, Is.EqualTo(100 - 2 * DetachedBeatmapStoreFrameBudget.MaxOpsPerFrame));
+            processed = DetachedBeatmapStoreFrameBudget.Drain(queue, DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME, seen.Add);
+            Assert.That(processed, Is.EqualTo(DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME));
+            Assert.That(queue.Count, Is.EqualTo(100 - 2 * DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME));
         }
 
         [Test]
         public void DrainDoesNotExceedQueue()
         {
             var queue = new Queue<int>(new[] { 1, 2, 3 });
-            int n = DetachedBeatmapStoreFrameBudget.Drain(queue, DetachedBeatmapStoreFrameBudget.MaxOpsPerFrame, _ => { });
+            int n = DetachedBeatmapStoreFrameBudget.Drain(queue, DetachedBeatmapStoreFrameBudget.MAX_OPS_PER_FRAME, _ => { });
             Assert.That(n, Is.EqualTo(3));
             Assert.That(queue.Count, Is.EqualTo(0));
         }

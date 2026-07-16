@@ -8,7 +8,6 @@ using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
-using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Tests.Beatmaps;
 

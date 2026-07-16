@@ -137,8 +137,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double ok;
         private double meh;
         private double miss;
-        private double missEarly;
-        private double missLate;
 
         private double bpm;
 
@@ -243,10 +241,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
         }
 
         /// <summary>不对称 miss 早窗（ms）；AutoMissGate / ShouldDefer 热路径用，勿每帧调 helper。</summary>
-        public double MissEarlyWindow => missEarly;
+        public double MissEarlyWindow { get; private set; }
 
         /// <summary>不对称 miss 晚窗（ms）。</summary>
-        public double MissLateWindow => missLate;
+        public double MissLateWindow { get; private set; }
 
         private void updateWindows()
         {
@@ -301,8 +299,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private void refreshMissDirectionWindows()
         {
             // 与 WindowFor(Miss, isEarly) 语义一致，但在 update 时烘焙，避免每帧进 helper。
-            missEarly = helper.WindowFor(HitResult.Miss, true);
-            missLate = helper.WindowFor(HitResult.Miss, false);
+            MissEarlyWindow = helper.WindowFor(HitResult.Miss, true);
+            MissLateWindow = helper.WindowFor(HitResult.Miss, false);
         }
 
         public override double WindowFor(HitResult result)
@@ -356,7 +354,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         public double WindowFor(HitResult result, bool isEarly)
         {
             if (result == HitResult.Miss)
-                return isEarly ? missEarly : missLate;
+                return isEarly ? MissEarlyWindow : MissLateWindow;
 
             return helper.WindowFor(result, isEarly);
         }

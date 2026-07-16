@@ -11,7 +11,7 @@ namespace osu.Game.Database
     /// </summary>
     public static class DetachedBeatmapStoreFrameBudget
     {
-        public const int MaxOpsPerFrame = 24;
+        public const int MAX_OPS_PER_FRAME = 24;
 
         /// <summary>
         /// 至多处理 <paramref name="maxOps"/> 项；队列剩余留到后续帧。

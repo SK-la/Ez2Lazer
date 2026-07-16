@@ -349,7 +349,7 @@ namespace osu.Game.Rulesets.Mania.UI
             maniaObject.CheckHittable = (d, time) =>
             {
                 LaneController.RegisterIfNeeded(d, drawableRuleset?.ColumnRoutesInput == true);
-                resolvePressRouting(out var precedence, out var bms, out var poorEnabled);
+                resolvePressRouting(out var precedence, out bool bms, out bool poorEnabled);
                 return isHittable(d, time, precedence, bms, poorEnabled);
             };
             maniaObject.ShouldSkipColumnRoutedPress = _ => columnRoutedPressTarget != null;
@@ -464,7 +464,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 if (drawableRuleset.JudgementRound is { IsO2Jam: true } round)
                     round.NotifyO2InputAt(Time.Current);
 
-                resolvePressRouting(out var precedence, out var bms, out var poorEnabled);
+                resolvePressRouting(out var precedence, out bool bms, out bool poorEnabled);
 
                 var entry = LaneController.SelectPressEntry(Time.Current, precedence, bms, poorEnabled);
 

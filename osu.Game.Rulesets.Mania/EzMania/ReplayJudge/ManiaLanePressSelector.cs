@@ -186,7 +186,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return true;
         }
 
-        private static T? selectByPrecedence<T>(
+        private static T selectByPrecedence<T>(
             IReadOnlyList<T> candidates,
             double time,
             EzEnumJudgePrecedence precedence,

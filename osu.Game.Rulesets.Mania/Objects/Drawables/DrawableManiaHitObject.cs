@@ -45,9 +45,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         internal DrawableManiaRuleset EzDrawableManiaRuleset => drawableManiaRuleset;
 
-        private bool usesEzJudgement;
-
-        protected bool UsesEzJudgement => usesEzJudgement;
+        protected bool UsesEzJudgement { get; private set; }
 
         /// <summary>
         /// 本地完整规则集由 Column 到期队列统一驱动 automiss；detached / 预览场景仍沿用 Drawable 自身更新。
@@ -102,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             base.LoadComplete();
 
             drawableManiaRuleset ??= this.FindClosestParent<DrawableManiaRuleset>();
-            usesEzJudgement = drawableManiaRuleset?.JudgementRound?.IsEzHitMode
+            UsesEzJudgement = drawableManiaRuleset?.JudgementRound?.IsEzHitMode
                               ?? (HitObject.HitWindows is ManiaHitWindows windows
                                   && windows.ActiveHitMode is not (EzEnumHitMode.Lazer or EzEnumHitMode.Classic));
             ColumnSchedulesAutoMiss = drawableManiaRuleset?.ColumnRoutesInput == true;
