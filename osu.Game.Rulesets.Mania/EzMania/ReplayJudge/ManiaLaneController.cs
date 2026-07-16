@@ -30,11 +30,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         private double lastSelectPressTime = double.NaN;
         private EzEnumJudgePrecedence lastSelectPrecedence;
-        private bool lastSelectBmsMode;
-        private bool lastSelectPoorEnabled;
         private ManiaLaneEntry? lastSelectResult;
 
-        private bool expandBmsMissWindows;
         private HitModeHelper? missWindowHelper;
         private double cachedMaxMissEarly;
         private double cachedMaxMissLate;
@@ -50,6 +47,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             isHittableEarliestIndexFunc = IsHittableEarliestIndex;
             isWithinMissWindowFunc = isWithinMissWindow;
         }
+
+        /// <summary>当前列是否处于 BMS hit mode（由 <see cref="ConfigureMissCollection"/> 自动设置）。</summary>
+        internal bool IsBmsMode { get; private set; }
+
+        /// <summary>是否允许 KPoor（post-Bad Poor）路由。通过 <see cref="SetPoorEnabled"/> 从 <see cref="ManiaJudgementRound"/> 同步。</summary>
+        internal bool PoorEnabled { get; private set; }
+
+        /// <summary>设置 <see cref="PoorEnabled"/>。由 <see cref="Column.resolvePressRouting"/> 在获取 round 时调用。</summary>
+        internal void SetPoorEnabled(bool value) => PoorEnabled = value;
 
         public IReadOnlyList<ManiaLaneEntry> Entries => entries;
 
@@ -277,7 +283,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         public void ConfigureMissCollection(EzEnumHitMode hitMode, double overallDifficulty, double bpm = 180)
         {
-            expandBmsMissWindows = HitModeHelper.IsBMSHitMode(hitMode);
+            IsBmsMode = HitModeHelper.IsBMSHitMode(hitMode);
 
             missWindowHelper = new HitModeHelper(hitMode)
             {
@@ -289,12 +295,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             invalidateSelectPressCache();
         }
 
-        public bool IsHittable(DrawableHitObject drawable, double time, EzEnumJudgePrecedence precedence, bool bmsMode, bool poorEnabled)
+        public bool IsHittable(DrawableHitObject drawable, double time, EzEnumJudgePrecedence precedence)
         {
             if (precedence == EzEnumJudgePrecedence.Earliest)
                 return IsHittableEarliest(drawable, time);
 
-            var entry = selectPressEntry(time, precedence, bmsMode, poorEnabled);
+            var entry = selectPressEntry(time, precedence);
 
             if (entry == null)
                 return true;
@@ -404,7 +410,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 cachedMaxMissEarly = missWindowHelper.WindowFor(HitResult.Miss, true);
                 cachedMaxMissLate = missWindowHelper.WindowFor(HitResult.Miss, false);
 
-                if (expandBmsMissWindows)
+                if (IsBmsMode)
                     BmsHitModeJudgement.ExpandMissCollectionWindows(missWindowHelper, 1, ref cachedMaxMissEarly, ref cachedMaxMissLate);
             }
             else
@@ -428,29 +434,24 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// <summary>
         /// 按 JudgePrecedence 选择本列 press 目标（含 BMS post-Bad KPoor）。
         /// </summary>
-        public ManiaLaneEntry? SelectPressEntry(double time, EzEnumJudgePrecedence precedence, bool allowBmsFallbackToEarliest, bool poorEnabled)
-            => selectPressEntry(time, precedence, allowBmsFallbackToEarliest, poorEnabled);
+        public ManiaLaneEntry? SelectPressEntry(double time, EzEnumJudgePrecedence precedence)
+            => selectPressEntry(time, precedence);
 
-        private ManiaLaneEntry? selectPressEntry(double time, EzEnumJudgePrecedence precedence, bool allowBmsFallbackToEarliest, bool poorEnabled)
+        private ManiaLaneEntry? selectPressEntry(double time, EzEnumJudgePrecedence precedence)
         {
-            if (time == lastSelectPressTime
-                && precedence == lastSelectPrecedence
-                && allowBmsFallbackToEarliest == lastSelectBmsMode
-                && poorEnabled == lastSelectPoorEnabled)
-            {
+            if (time == lastSelectPressTime && precedence == lastSelectPrecedence)
                 return lastSelectResult;
-            }
 
             lastSelectPressTime = time;
             lastSelectPrecedence = precedence;
-            lastSelectBmsMode = allowBmsFallbackToEarliest;
-            lastSelectPoorEnabled = poorEnabled;
-            lastSelectResult = selectPressEntryCore(time, precedence, allowBmsFallbackToEarliest, poorEnabled);
+            lastSelectResult = selectPressEntryCore(time, precedence);
             return lastSelectResult;
         }
 
-        private ManiaLaneEntry? selectPressEntryCore(double time, EzEnumJudgePrecedence precedence, bool allowBmsFallbackToEarliest, bool poorEnabled)
+        private ManiaLaneEntry? selectPressEntryCore(double time, EzEnumJudgePrecedence precedence)
         {
+            bool tryPostBadRoute = IsBmsMode && PoorEnabled;
+
             if (precedence == EzEnumJudgePrecedence.Earliest)
             {
                 return ManiaLanePressSelector.SelectDrawablePressEntry(
@@ -458,8 +459,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     cursor,
                     time,
                     precedence,
-                    allowBmsFallbackToEarliest,
-                    poorEnabled,
+                    tryPostBadRoute,
                     Array.Empty<ManiaLaneEntry>(),
                     isHittableEarliestIndexFunc,
                     isWithinMissWindowFunc,
@@ -474,8 +474,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 cursor,
                 time,
                 precedence,
-                allowBmsFallbackToEarliest,
-                poorEnabled,
+                tryPostBadRoute,
                 overlapScratch,
                 isHittableEarliestIndexFunc,
                 isWithinMissWindowFunc,
@@ -497,7 +496,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             early = entry.PressWindows!.WindowFor(HitResult.Miss, true);
             late = entry.PressWindows.WindowFor(HitResult.Miss, false);
 
-            if (expandBmsMissWindows && missWindowHelper != null)
+            if (IsBmsMode && missWindowHelper != null)
                 BmsHitModeJudgement.ExpandMissCollectionWindows(missWindowHelper, 1, ref early, ref late);
         }
 

@@ -33,27 +33,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             ezConfig = GlobalConfigStore.EzConfig;
         }
 
-        /// <summary>
-        /// 判断一个 <see cref="DrawableHitObject"/> 在某个时间点是否可以被击中，
-        /// 考虑判定优先级设置。
-        /// </summary>
-        /// <param name="hitObject">要检查的 <see cref="DrawableHitObject"/>。</param>
-        /// <param name="time">要检查的时间点。</param>
-        /// <returns><paramref name="hitObject"/> 是否可以在给定的 <paramref name="time"/> 被击中。</returns>
-        public bool IsHittableWithPrecedence(DrawableHitObject hitObject, double time, EzEnumJudgePrecedence judgePrecedence, bool bmsMode, bool poorEnabled)
+        public bool IsHittableWithPrecedence(DrawableHitObject hitObject, double time, EzEnumJudgePrecedence? precedenceOverride = null)
         {
-            if (laneController != null && hitObject is not DrawableHoldNoteTail)
-                return laneController.IsHittable(hitObject, time, judgePrecedence, bmsMode, poorEnabled);
-
-            return IsHittableWithPrecedence(hitObject, time);
-        }
-
-        public bool IsHittableWithPrecedence(DrawableHitObject hitObject, double time)
-        {
-            var judgePrecedence = ezConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
+            var judgePrecedence = precedenceOverride ?? ezConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
 
             if (laneController != null && hitObject is not DrawableHoldNoteTail)
-                return laneController.IsHittable(hitObject, time, judgePrecedence, isBMS(), isKPoorEnabled());
+                return laneController.IsHittable(hitObject, time, judgePrecedence);
 
             if (isBMS())
             {
@@ -295,11 +280,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         private bool isBMS()
             => HitModeHelper.IsBMSHitMode(ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode));
-
-        private bool isKPoorEnabled()
-            => HealthModeHelper.ComputeKPoorEnabled(
-                ezConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
-                ezConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable));
 
         public static DrawableHitObject? SelectFoldDrawable(IReadOnlyList<DrawableHitObject> sortedByStartTime, double pressTime, bool comboAlgorithm)
         {

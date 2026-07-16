@@ -22,15 +22,13 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly OrderedHitPolicyHelper helper;
         private readonly EzEnumJudgePrecedence judgePrecedence;
         private readonly ManiaLaneController laneController;
-        private readonly bool bmsMode;
         private DrawableHitObject? columnRoutedPressTarget;
 
-        public OrderedHitPolicy(HitObjectContainer hitObjectContainer, EzEnumJudgePrecedence judgePrecedence, ManiaLaneController laneController, bool bmsMode)
+        public OrderedHitPolicy(HitObjectContainer hitObjectContainer, EzEnumJudgePrecedence judgePrecedence, ManiaLaneController laneController)
         {
             this.hitObjectContainer = hitObjectContainer;
             this.judgePrecedence = judgePrecedence;
             this.laneController = laneController;
-            this.bmsMode = bmsMode;
             helper = new OrderedHitPolicyHelper(hitObjectContainer, laneController);
         }
 
@@ -50,12 +48,12 @@ namespace osu.Game.Rulesets.Mania.UI
         /// <summary>
         /// 列级按键路由：选出本列唯一 press 目标（Combo / Duration / Earliest + BMS post-Bad）。
         /// </summary>
-        public bool TryRoutePress(double time, EzEnumJudgePrecedence precedence, bool bmsMode, bool poorEnabled, out DrawableHitObject? target)
+        public bool TryRoutePress(double time, EzEnumJudgePrecedence precedence, out DrawableHitObject? target)
         {
             columnRoutedPressTarget = null;
             target = null;
 
-            var entry = laneController.SelectPressEntry(time, precedence, bmsMode, poorEnabled);
+            var entry = laneController.SelectPressEntry(time, precedence);
 
             if (entry == null)
                 return false;
@@ -95,15 +93,15 @@ namespace osu.Game.Rulesets.Mania.UI
             }
         }
 
-        public bool IsHittable(DrawableHitObject hitObject, double time, EzEnumJudgePrecedence precedence, bool bmsMode, bool poorEnabled)
+        public bool IsHittable(DrawableHitObject hitObject, double time, EzEnumJudgePrecedence precedence)
         {
             ManiaJudgeHotPathTrace.RecordIsHittable();
 
             if (hitObject is DrawableHoldNoteTail)
-                return helper.IsHittableWithPrecedence(hitObject, time, precedence, bmsMode, poorEnabled);
+                return helper.IsHittableWithPrecedence(hitObject, time, precedence);
 
             if (precedence != EzEnumJudgePrecedence.Earliest)
-                return helper.IsHittableWithPrecedence(hitObject, time, precedence, bmsMode, poorEnabled);
+                return helper.IsHittableWithPrecedence(hitObject, time, precedence);
 
             return laneController.IsHittableEarliest(hitObject, time);
         }

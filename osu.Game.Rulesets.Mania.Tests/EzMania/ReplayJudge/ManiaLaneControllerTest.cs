@@ -67,7 +67,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 pressTime,
                 comboAlgorithm: true);
 
-            var selected = controller.SelectPressEntry(pressTime, EzEnumJudgePrecedence.Combo, allowBmsFallbackToEarliest: false, poorEnabled: false);
+            var selected = controller.SelectPressEntry(pressTime, EzEnumJudgePrecedence.Combo);
 
             Assert.That(selected, Is.SameAs(expected));
         }
@@ -92,7 +92,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 pressTime,
                 comboAlgorithm: false);
 
-            var selected = controller.SelectPressEntry(pressTime, EzEnumJudgePrecedence.Duration, allowBmsFallbackToEarliest: false, poorEnabled: false);
+            var selected = controller.SelectPressEntry(pressTime, EzEnumJudgePrecedence.Duration);
 
             Assert.That(selected, Is.SameAs(expected));
         }

@@ -61,7 +61,6 @@ namespace osu.Game.Rulesets.Mania.UI
         private OrderedHitPolicyHelper hitPolicyHelper = null!;
         private DrawableHitObject? columnRoutedPressTarget;
         private EzEnumJudgePrecedence judgePrecedence;
-        private bool bmsMode;
         private EzEnumHitMode? configuredMissCollectionHitMode;
 
         public Container UnderlayElements => HitObjectArea.UnderlayElements;
@@ -195,8 +194,6 @@ namespace osu.Game.Rulesets.Mania.UI
             // JudgePrecedence 来自全局配置（与 ManiaJudgementRound.Create 一致）；勿 [Resolved] DrawableManiaRuleset——
             // 皮肤预览等场景会单独构造 Column，且 JudgementRound 在 ruleset LoadComplete 才冻结。
             judgePrecedence = ezConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
-            var hitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            bmsMode = HitModeHelper.IsBMSHitMode(hitMode);
 
             LaneController = new ManiaLaneController();
             hitPolicyHelper = new OrderedHitPolicyHelper(HitObjectContainer, LaneController);
@@ -349,8 +346,8 @@ namespace osu.Game.Rulesets.Mania.UI
             maniaObject.CheckHittable = (d, time) =>
             {
                 LaneController.RegisterIfNeeded(d, drawableRuleset?.ColumnRoutesInput == true);
-                resolvePressRouting(out var precedence, out bool bms, out bool poorEnabled);
-                return isHittable(d, time, precedence, bms, poorEnabled);
+                resolvePressRouting(out var precedence);
+                return isHittable(d, time, precedence);
             };
             maniaObject.ShouldSkipColumnRoutedPress = _ => columnRoutedPressTarget != null;
         }
@@ -390,14 +387,14 @@ namespace osu.Game.Rulesets.Mania.UI
             HitObjectArea.Explosions.Add(hitExplosionPool.Get(e => e.Apply(result)));
         }
 
-        private bool isHittable(DrawableHitObject drawable, double time, EzEnumJudgePrecedence precedence, bool bms, bool poorEnabled)
+        private bool isHittable(DrawableHitObject drawable, double time, EzEnumJudgePrecedence precedence)
         {
             ManiaJudgeHotPathTrace.RecordIsHittable();
 
             if (drawable is DrawableHoldNoteTail)
-                return hitPolicyHelper.IsHittableWithPrecedence(drawable, time, precedence, bms, poorEnabled);
+                return hitPolicyHelper.IsHittableWithPrecedence(drawable, time, precedence);
 
-            return LaneController.IsHittable(drawable, time, precedence, bms, poorEnabled);
+            return LaneController.IsHittable(drawable, time, precedence);
         }
 
         private bool applyRoutedPress(DrawableHitObject target, double time, KeyBindingPressEvent<ManiaAction> e)
@@ -464,9 +461,9 @@ namespace osu.Game.Rulesets.Mania.UI
                 if (drawableRuleset.JudgementRound is { IsO2Jam: true } round)
                     round.NotifyO2InputAt(Time.Current);
 
-                resolvePressRouting(out var precedence, out bool bms, out bool poorEnabled);
+                resolvePressRouting(out var precedence);
 
-                var entry = LaneController.SelectPressEntry(Time.Current, precedence, bms, poorEnabled);
+                var entry = LaneController.SelectPressEntry(Time.Current, precedence);
 
                 if (entry != null)
                     routed = applyRoutedPress(entry.RoutedObject, Time.Current, e);
@@ -499,22 +496,19 @@ namespace osu.Game.Rulesets.Mania.UI
             LaneController.SetActiveHold(null);
         }
 
-        private void resolvePressRouting(out EzEnumJudgePrecedence precedence, out bool bms, out bool poorEnabled)
+        private void resolvePressRouting(out EzEnumJudgePrecedence precedence)
         {
             var round = drawableRuleset?.JudgementRound;
 
             if (round != null)
             {
                 precedence = round.JudgePrecedence;
-                bms = HitModeHelper.IsBMSHitMode(round.Environment.ManiaHitMode);
-                poorEnabled = round.PoorEnabled;
+                LaneController.SetPoorEnabled(round.PoorEnabled);
                 ensureLaneConfigured(round);
                 return;
             }
 
             precedence = judgePrecedence;
-            bms = bmsMode;
-            poorEnabled = false;
         }
 
         private void ensureLaneConfigured(ManiaJudgementRound round)

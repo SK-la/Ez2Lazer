@@ -59,6 +59,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
             {
                 var lane = new ManiaLaneController();
                 lane.ConfigureMissCollection(HitMode, overallDifficulty: 8);
+                lane.SetPoorEnabled(PoorEnabled);
                 pressHistories[col] = new List<double>(PeakKps);
 
                 for (int i = 0; i < ConcurrentAlivePerColumn; i++)
@@ -98,7 +99,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
                 {
                     for (int col = 0; col < Keys; col++)
                     {
-                        lanes[col].SelectPressEntry(t, Precedence, AllowBmsFallbackToEarliest, PoorEnabled);
+                        lanes[col].SelectPressEntry(t, Precedence);
                         selectCalls++;
                         presses++;
 

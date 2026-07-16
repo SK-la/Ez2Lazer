@@ -65,15 +65,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             int cursor,
             double time,
             EzEnumJudgePrecedence precedence,
-            bool allowBmsFallbackToEarliest,
-            bool poorEnabled,
+            bool tryPostBadRoute,
             IReadOnlyList<ManiaLaneEntry> overlapping,
             Func<int, double, bool> isHittableEarliestIndex,
             Func<ManiaLaneEntry, double, bool> isWithinMissWindow,
             Func<ManiaLaneEntry, bool> isPostBadKPoorRoutable,
             Func<DrawableHitObject, double, double> distanceToNonBadWindow)
         {
-            if (allowBmsFallbackToEarliest && poorEnabled
+            if (tryPostBadRoute
                 && trySelectPostBadDrawableEntry(entries, time, isWithinMissWindow, isPostBadKPoorRoutable, distanceToNonBadWindow, out var postBad))
             {
                 return postBad;
