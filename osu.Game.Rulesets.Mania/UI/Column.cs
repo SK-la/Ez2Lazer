@@ -452,8 +452,6 @@ namespace osu.Game.Rulesets.Mania.UI
             if (e.Action == Action.Value)
                 RecordPressTime(Time.Current);
 
-            bool routed = false;
-
             if (drawableRuleset?.ColumnRoutesInput == true)
             {
                 columnRoutedPressTarget = null;
@@ -466,13 +464,13 @@ namespace osu.Game.Rulesets.Mania.UI
                 var entry = LaneController.SelectPressEntry(Time.Current, precedence);
 
                 if (entry != null)
-                    routed = applyRoutedPress(entry.RoutedObject, Time.Current, e);
+                    applyRoutedPress(entry.RoutedObject, Time.Current, e);
             }
 
             if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
                 sampleTriggerSource.Play();
 
-            return routed;
+            return false;
         }
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
