@@ -394,7 +394,16 @@ namespace osu.Game.Rulesets.Mania.UI
             if (drawable is DrawableHoldNoteTail)
                 return hitPolicyHelper.IsHittableWithPrecedence(drawable, time, precedence);
 
-            return LaneController.IsHittable(drawable, time, precedence);
+            if (LaneController.IsHittable(drawable, time, precedence))
+                return true;
+
+            // HoldNote fallback: when the Head has been auto-missed, TryCreateEntry rejects the HoldNote
+            // from LaneController entries. Without an entry, LaneController.IsHittable returns false.
+            // Fall through to hitPolicyHelper which checks hit windows via the HitObjectContainer directly.
+            if (drawable is DrawableHoldNote)
+                return hitPolicyHelper.IsHittableWithPrecedence(drawable, time, precedence);
+
+            return false;
         }
 
         private bool applyRoutedPress(DrawableHitObject target, double time, KeyBindingPressEvent<ManiaAction> e)

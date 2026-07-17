@@ -269,13 +269,40 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (!drawableIndices.TryGetValue(drawable, out int index))
                 return false;
 
-            if (index != cursor)
+            // Scan forward from cursor to find the first entry that can actually be hit.
+            // This handles the case where the cursor note is past its hit window (IsHittableEarliestIndex
+            // returns false because a later note has already started) but hasn't been auto-missed yet.
+            int effectiveIndex = findEffectiveEarliestIndex(time);
+
+            if (index != effectiveIndex)
                 return false;
 
             if (entries[index].IsPressJudged)
                 return false;
 
             return IsHittableEarliestIndex(index, time);
+        }
+
+        /// <summary>
+        /// Find the first entry from cursor that is within its miss window and not blocked by a later note.
+        /// </summary>
+        private int findEffectiveEarliestIndex(double time)
+        {
+            for (int i = cursor; i < entries.Count; i++)
+            {
+                if (entries[i].IsPressJudged)
+                    continue;
+
+                if (!isWithinMissWindow(entries[i], time))
+                    continue;
+
+                if (!IsHittableEarliestIndex(i, time))
+                    continue;
+
+                return i;
+            }
+
+            return -1;
         }
 
         public bool IsHittableEarliestIndex(int index, double time)

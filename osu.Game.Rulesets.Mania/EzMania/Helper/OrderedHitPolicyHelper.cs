@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         {
             var judgePrecedence = precedenceOverride ?? ezConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
 
-            if (laneController != null && hitObject is not DrawableHoldNoteTail)
+            if (laneController != null && hitObject is not (DrawableHoldNoteTail or DrawableHoldNote))
                 return laneController.IsHittable(hitObject, time, judgePrecedence);
 
             if (isBMS())

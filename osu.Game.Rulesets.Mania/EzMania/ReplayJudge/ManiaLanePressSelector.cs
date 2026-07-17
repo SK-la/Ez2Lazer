@@ -124,18 +124,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             Func<ManiaLaneEntry, double, bool> isWithinMissWindow,
             Func<int, double, bool> isHittableEarliestIndex)
         {
-            if (cursor >= entries.Count)
-                return null;
+            // Scan forward from cursor to find the first hittable entry.
+            // The cursor note may not be hittable yet (blocked by a later note that has started,
+            // see IsHittableEarliest), so we try each subsequent entry in order.
+            for (int i = cursor; i < entries.Count; i++)
+            {
+                var entry = entries[i];
 
-            var entry = entries[cursor];
+                if (entry.IsPressJudged || !isWithinMissWindow(entry, time))
+                    continue;
 
-            if (entry.IsPressJudged || !isWithinMissWindow(entry, time))
-                return null;
+                if (!isHittableEarliestIndex(i, time))
+                    continue;
 
-            if (!isHittableEarliestIndex(cursor, time))
-                return null;
+                return entry;
+            }
 
-            return entry;
+            return null;
         }
 
         private static bool trySelectPostBadDrawableEntry(
