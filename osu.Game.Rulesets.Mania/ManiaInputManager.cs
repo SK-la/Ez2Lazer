@@ -15,9 +15,12 @@ namespace osu.Game.Rulesets.Mania
     [Cached] // Used for touch input, see Column.OnTouchDown/OnTouchUp.
     public partial class ManiaInputManager : RulesetInputManager<ManiaAction>
     {
+        private readonly int variant;
+
         public ManiaInputManager(RulesetInfo ruleset, int variant)
             : base(ruleset, variant, SimultaneousBindingMode.Unique)
         {
+            this.variant = variant;
         }
 
         protected override KeyBindingContainer<ManiaAction> CreateKeyBindingContainer(RulesetInfo ruleset, int variant, SimultaneousBindingMode unique)

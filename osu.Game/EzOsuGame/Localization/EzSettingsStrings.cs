@@ -241,6 +241,50 @@ namespace osu.Game.EzOsuGame.Localization
             "When enabled, 14K beatmaps display as 13K (last column hidden) for Ez2Ac arcade maps with an empty last column."
             + "\nDisable this if the last column contains notes.");
 
+        public static readonly LocalisableString MANIA_SCRATCH_AXIS_ENABLED = new EzLocalizationManager.EzLocalisableString(
+            "启用转盘轴模板（L/R Scratch）",
+            "Enable turntable axis template (L/R Scratch)");
+
+        public static readonly LocalisableString MANIA_SCRATCH_AXIS_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后，按键数模板将 L/R 转盘轴运行时注入首尾列（不改写键位配置）："
+            + "\n12K：列 0 / 11；16K：列 0 / 15；"
+            + "\n14K：列 0 / 13；开启 10k2s1p 时为列 0 / 12。"
+            + "\n转动=按下，停止转动=松开。请勿把同一轴再绑到其它 Mania 键。",
+            "When enabled, L/R turntable axes are injected into edge columns at runtime (key bindings are not rewritten):"
+            + "\n12K: cols 0 / 11; 16K: cols 0 / 15;"
+            + "\n14K: cols 0 / 13; with 10k2s1p: cols 0 / 12."
+            + "\nSpinning = pressed, stop = released. Do not also bind the same axis to other Mania keys.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_L = new EzLocalizationManager.EzLocalisableString("L-Scratch 轴", "L-Scratch Axis");
+
+        public static readonly LocalisableString SCRATCH_AXIS_R = new EzLocalizationManager.EzLocalisableString("R-Scratch 轴", "R-Scratch Axis");
+
+        public static readonly LocalisableString SCRATCH_AXIS_BIND_HINT = new EzLocalizationManager.EzLocalisableString(
+            "点击后转动目标轴以绑定",
+            "Click, then move the target axis to bind");
+
+        public static readonly LocalisableString SCRATCH_AXIS_DEADZONE = new EzLocalizationManager.EzLocalisableString(
+            "转盘轴死区",
+            "Turntable axis deadzone");
+
+        public static readonly LocalisableString SCRATCH_AXIS_DEADZONE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "忽略小于此阈值的轴位移，减少转盘/摇杆抖动误触。",
+            "Ignore axis deltas below this threshold to reduce turntable/stick jitter.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_STOP_THRESHOLD = new EzLocalizationManager.EzLocalisableString(
+            "停转判定（帧）",
+            "Stop threshold (frames)");
+
+        public static readonly LocalisableString SCRATCH_AXIS_STOP_THRESHOLD_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "连续多少帧没有有效转动后视为松开。",
+            "Release after this many frames without significant spin.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_STATUS_IDLE = new EzLocalizationManager.EzLocalisableString("状态：空闲", "Status: Idle");
+
+        public static readonly LocalisableString SCRATCH_AXIS_STATUS_CW = new EzLocalizationManager.EzLocalisableString("状态：顺时针（按下）", "Status: Clockwise (pressed)");
+
+        public static readonly LocalisableString SCRATCH_AXIS_STATUS_CCW = new EzLocalizationManager.EzLocalisableString("状态：逆时针（按下）", "Status: Counter-clockwise (pressed)");
+
         public static readonly LocalisableString SKIP_WITH_GAMEPLAY_KEYS = new EzLocalizationManager.EzLocalisableString(
             "跳过可由游戏按键触发",
             "Allow gameplay keys to trigger skip");
