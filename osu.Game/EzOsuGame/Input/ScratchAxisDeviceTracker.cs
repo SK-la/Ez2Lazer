@@ -78,11 +78,12 @@ namespace osu.Game.EzOsuGame.Input
 
         private void onDeviceAxisChanged(JoystickDeviceAxis axis)
         {
-            if (!string.IsNullOrEmpty(axis.Guid))
-            {
-                valuesByGuid[(axis.Guid, axis.AxisIndex)] = axis.Value;
-                namesByGuid[axis.Guid] = axis.Name;
-            }
+            string deviceKey = !string.IsNullOrEmpty(axis.Guid)
+                ? axis.Guid
+                : $"id:{axis.InstanceId}";
+
+            valuesByGuid[(deviceKey, axis.AxisIndex)] = axis.Value;
+            namesByGuid[deviceKey] = string.IsNullOrEmpty(axis.Name) ? deviceKey : axis.Name;
 
             var captured = axis;
             scheduler?.Add(() => AxisMoved?.Invoke(captured), false);

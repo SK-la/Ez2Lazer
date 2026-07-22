@@ -260,8 +260,16 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SCRATCH_AXIS_R = new EzLocalizationManager.EzLocalisableString("R-Scratch 轴", "R-Scratch Axis");
 
         public static readonly LocalisableString SCRATCH_AXIS_BIND_HINT = new EzLocalizationManager.EzLocalisableString(
-            "点击后转动目标转盘以绑定（按设备区分，同轴多设备可分别绑定）",
-            "Click, then spin the target turntable to bind (per-device; same axis on different devices can bind separately)");
+            "转动转盘以绑定…（再点取消 / Esc）",
+            "Spin turntable to bind… (click again / Esc to cancel)");
+
+        public static readonly LocalisableString SCRATCH_AXIS_BIND_IDLE_HINT = new EzLocalizationManager.EzLocalisableString(
+            "点击 L/R 后转动对应转盘；仅累计位移，停靠位置不会触发绑定。",
+            "Click L/R then spin the turntable; only movement is counted, resting position does not bind.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_BIND_LISTENING_HINT = new EzLocalizationManager.EzLocalisableString(
+            "正在听轴… 累计位移 {0} / {1}",
+            "Listening… travel {0} / {1}");
 
         public static readonly LocalisableString SCRATCH_AXIS_DEADZONE = new EzLocalizationManager.EzLocalisableString(
             "转盘轴死区",

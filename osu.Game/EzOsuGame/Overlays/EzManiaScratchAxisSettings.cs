@@ -15,10 +15,14 @@ using osu.Game.EzOsuGame.Input;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 using osuTK;
+using osuTK.Input;
+using CommonStrings = osu.Game.Resources.Localisation.Web.CommonStrings;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
@@ -27,9 +31,13 @@ namespace osu.Game.EzOsuGame.Overlays
     /// </summary>
     public partial class EzManiaScratchAxisSettings : FillFlowContainer
     {
+        /// <summary>绑定捕获用的累计位移阈值（与游玩死区独立，避免绑不上）。</summary>
+        private const float bind_travel_threshold = 0.03f;
+
         private readonly ScratchAxisProcessor leftMonitor = new ScratchAxisProcessor();
         private readonly ScratchAxisProcessor rightMonitor = new ScratchAxisProcessor();
-        private readonly Dictionary<(string guid, int axis), float> bindSampleLast = new Dictionary<(string, int), float>();
+        private readonly Dictionary<(string device, int axis), float> bindLastValue = new Dictionary<(string, int), float>();
+        private readonly Dictionary<(string device, int axis), float> bindTravel = new Dictionary<(string, int), float>();
 
         private Bindable<bool> enabled = null!;
         private Bindable<string> leftBinding = null!;
@@ -43,9 +51,11 @@ namespace osu.Game.EzOsuGame.Overlays
         private SettingsButtonV2 rightBindButton = null!;
         private OsuSpriteText leftStatusText = null!;
         private OsuSpriteText rightStatusText = null!;
+        private OsuSpriteText bindHintText = null!;
+        private FillFlowContainer cancelAndClearButtons = null!;
 
         private BindTarget? bindTarget;
-        private (string guid, int axis, string name, float score)? bestBindCandidate;
+        private (string device, int axis, string name, float travel)? bestBindCandidate;
 
         public EzManiaScratchAxisSettings()
         {
@@ -71,7 +81,7 @@ namespace osu.Game.EzOsuGame.Overlays
             leftMonitor.StopThreshold.BindTo(stopThreshold);
             rightMonitor.StopThreshold.BindTo(stopThreshold);
 
-            Children = new Drawable[]
+            Children = new[]
             {
                 new SettingsItemV2(new FormCheckBox
                 {
@@ -85,15 +95,46 @@ namespace osu.Game.EzOsuGame.Overlays
                 leftBindButton = new SettingsButtonV2
                 {
                     Keywords = new[] { "ez", "mania", "scratch", "l", "axis" },
-                    Action = () => beginBind(BindTarget.Left),
+                    Action = () => toggleBind(BindTarget.Left),
                 },
                 createStatusRow(out leftStatusText),
                 rightBindButton = new SettingsButtonV2
                 {
                     Keywords = new[] { "ez", "mania", "scratch", "r", "axis" },
-                    Action = () => beginBind(BindTarget.Right),
+                    Action = () => toggleBind(BindTarget.Right),
                 },
                 createStatusRow(out rightStatusText),
+                createHintRow(out bindHintText),
+                cancelAndClearButtons = new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Full,
+                    Anchor = Anchor.TopRight,
+                    Origin = Anchor.TopRight,
+                    Spacing = new Vector2(5),
+                    Padding = SettingsPanel.CONTENT_PADDING,
+                    Alpha = 0,
+                    Children = new Drawable[]
+                    {
+                        new RoundedButton
+                        {
+                            Anchor = Anchor.TopRight,
+                            Origin = Anchor.TopRight,
+                            Text = CommonStrings.ButtonsCancel,
+                            Size = new Vector2(120, 30),
+                            Action = cancelBind,
+                        },
+                        new DangerousRoundedButton
+                        {
+                            Anchor = Anchor.TopRight,
+                            Origin = Anchor.TopRight,
+                            Text = InputSettingsStrings.ClearBindingButton,
+                            Size = new Vector2(120, 30),
+                            Action = clearBinding,
+                        },
+                    },
+                },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
                     Caption = EzSettingsStrings.SCRATCH_AXIS_DEADZONE,
@@ -127,23 +168,26 @@ namespace osu.Game.EzOsuGame.Overlays
             rightMonitor.Direction.BindValueChanged(_ => refreshStatus(rightMonitor, rightStatusText));
 
             tracker.AxisMoved += onAxisMoved;
+            refreshBindHint();
         }
 
         protected override void Dispose(bool isDisposing)
         {
-            if (tracker != null)
-                tracker.AxisMoved -= onAxisMoved;
-
             base.Dispose(isDisposing);
+
+            if (isDisposing && tracker != null)
+                tracker.AxisMoved -= onAxisMoved;
         }
 
-        public override bool AcceptsFocus => bindTarget != null;
-
-        protected override void OnFocusLost(FocusLostEvent e)
+        protected override bool OnKeyDown(KeyDownEvent e)
         {
-            commitBindIfPossible();
-            endBind();
-            base.OnFocusLost(e);
+            if (bindTarget != null && e.Key == Key.Escape)
+            {
+                cancelBind();
+                return true;
+            }
+
+            return base.OnKeyDown(e);
         }
 
         protected override void Update()
@@ -163,55 +207,89 @@ namespace osu.Game.EzOsuGame.Overlays
                 rightMonitor.UpdateMissing(t);
         }
 
-        protected override bool OnClick(ClickEvent e)
-        {
-            if (bindTarget != null && !leftBindButton.ReceivePositionalInputAt(e.ScreenSpaceMousePosition)
-                                   && !rightBindButton.ReceivePositionalInputAt(e.ScreenSpaceMousePosition))
-            {
-                commitBindIfPossible();
-                endBind();
-                return true;
-            }
-
-            return base.OnClick(e);
-        }
-
         private void onAxisMoved(JoystickDeviceAxis axis)
         {
-            if (string.IsNullOrEmpty(axis.Guid))
-                return;
+            string deviceKey = !string.IsNullOrEmpty(axis.Guid) ? axis.Guid : $"id:{axis.InstanceId}";
+            var key = (deviceKey, axis.AxisIndex);
 
-            var key = (axis.Guid, axis.AxisIndex);
-            float last = bindSampleLast.GetValueOrDefault(key, axis.Value);
-            float delta = Math.Abs(ScratchAxisProcessor.ShortestDelta(last, axis.Value));
-            bindSampleLast[key] = axis.Value;
-
-            float threshold = (float)Math.Max(0.02, deadzone.Value);
-
+            // 始终更新 tracker 侧已有逻辑；绑定窗口内累计位移
             if (bindTarget == null)
                 return;
 
-            if (delta < threshold)
+            if (!bindLastValue.TryGetValue(key, out float last))
+            {
+                // 首帧只记停靠点，不算位移（避免把绝对值当转动）
+                bindLastValue[key] = axis.Value;
+                bindTravel[key] = 0;
+                refreshBindHint();
+                return;
+            }
+
+            float delta = Math.Abs(ScratchAxisProcessor.ShortestDelta(last, axis.Value));
+            bindLastValue[key] = axis.Value;
+
+            if (delta < 0.001f)
                 return;
 
-            if (bestBindCandidate == null || delta > bestBindCandidate.Value.score)
-                bestBindCandidate = (axis.Guid, axis.AxisIndex, axis.Name, delta);
+            float travel = bindTravel.GetValueOrDefault(key) + delta;
+            bindTravel[key] = travel;
 
-            // 累计足够位移后立即确认，避免必须失焦才生效
-            if (bestBindCandidate.Value.score >= threshold * 2)
+            if (bestBindCandidate == null || travel > bestBindCandidate.Value.travel)
+                bestBindCandidate = (deviceKey, axis.AxisIndex, axis.Name, travel);
+
+            refreshBindHint();
+
+            if (travel >= bind_travel_threshold)
             {
                 commitBindIfPossible();
                 endBind();
             }
+        }
+
+        private void toggleBind(BindTarget target)
+        {
+            if (bindTarget == target)
+            {
+                cancelBind();
+                return;
+            }
+
+            beginBind(target);
         }
 
         private void beginBind(BindTarget target)
         {
             bindTarget = target;
             bestBindCandidate = null;
-            bindSampleLast.Clear();
+            bindLastValue.Clear();
+            bindTravel.Clear();
             refreshBindLabels();
-            GetContainingFocusManager()?.ChangeFocus(this);
+            refreshBindHint();
+            showClearButtons(true);
+        }
+
+        private void cancelBind()
+        {
+            bindTarget = null;
+            bestBindCandidate = null;
+            bindLastValue.Clear();
+            bindTravel.Clear();
+            refreshBindLabels();
+            refreshBindHint();
+            showClearButtons(false);
+        }
+
+        private void clearBinding()
+        {
+            if (bindTarget == null)
+                return;
+
+            if (bindTarget == BindTarget.Left)
+                leftBinding.Value = string.Empty;
+            else
+                rightBinding.Value = string.Empty;
+
+            endBind();
         }
 
         private void commitBindIfPossible()
@@ -219,7 +297,10 @@ namespace osu.Game.EzOsuGame.Overlays
             if (bindTarget == null || bestBindCandidate == null)
                 return;
 
-            var binding = new ScratchAxisBinding(bestBindCandidate.Value.guid, bestBindCandidate.Value.axis, bestBindCandidate.Value.name);
+            var binding = new ScratchAxisBinding(
+                bestBindCandidate.Value.device,
+                bestBindCandidate.Value.axis,
+                bestBindCandidate.Value.name);
 
             if (bindTarget == BindTarget.Left)
                 leftBinding.Value = binding.ToString();
@@ -231,13 +312,37 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             bindTarget = null;
             bestBindCandidate = null;
+            bindLastValue.Clear();
+            bindTravel.Clear();
             refreshBindLabels();
+            refreshBindHint();
+            showClearButtons(false);
+        }
+
+        private void showClearButtons(bool show)
+        {
+            if (show)
+                cancelAndClearButtons.FadeIn(200, Easing.OutQuint);
+            else
+                cancelAndClearButtons.FadeOut(200, Easing.OutQuint);
         }
 
         private void refreshBindLabels()
         {
             leftBindButton.Text = formatBindLabel("L-Scratch", decorate(leftBinding.Value), bindTarget == BindTarget.Left);
             rightBindButton.Text = formatBindLabel("R-Scratch", decorate(rightBinding.Value), bindTarget == BindTarget.Right);
+        }
+
+        private void refreshBindHint()
+        {
+            if (bindTarget == null)
+            {
+                bindHintText.Text = EzSettingsStrings.SCRATCH_AXIS_BIND_IDLE_HINT;
+                return;
+            }
+
+            float travel = bestBindCandidate?.travel ?? 0;
+            bindHintText.Text = $"Listening… travel {travel:0.###} / {bind_travel_threshold:0.###}  |  Move {travel:0.###} / {bind_travel_threshold:0.###}";
         }
 
         private ScratchAxisBinding decorate(string stored)
@@ -287,6 +392,23 @@ namespace osu.Game.EzOsuGame.Overlays
                 AutoSizeAxes = Axes.Y,
                 Padding = SettingsPanel.CONTENT_PADDING,
                 Child = statusText,
+            };
+        }
+
+        private static Drawable createHintRow(out OsuSpriteText hintText)
+        {
+            hintText = new OsuSpriteText
+            {
+                Font = OsuFont.GetFont(size: 12),
+                Colour = Colour4.Gray,
+            };
+
+            return new Container
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Padding = SettingsPanel.CONTENT_PADDING,
+                Child = hintText,
             };
         }
 
