@@ -10,7 +10,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Configuration;
 using osu.Framework.Development;
 using osu.Framework.Graphics;
-using osu.Framework.Input;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.HUD;
@@ -101,11 +100,11 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
             SetDefault(Ez2Setting.ManiaScratchAxisEnabled, false);
-            // BindableInt 无 precision 参数；多传会误匹配 BindableFloat 重载。
-            SetDefault(Ez2Setting.ScratchAxisL, (int)JoystickAxisSource.GamePadLeftStickX, 0, (int)JoystickAxisSource.Axis16);
-            SetDefault(Ez2Setting.ScratchAxisR, (int)JoystickAxisSource.GamePadLeftStickY, 0, (int)JoystickAxisSource.Axis16);
-            SetDefault(Ez2Setting.ScratchAxisDeadzone, 0.02, 0.0, 0.2, 0.005);
-            SetDefault(Ez2Setting.ScratchAxisStopThreshold, 100, 10, 500);
+            // 格式：guid|axisIndex（多设备）；兼容旧版纯数字轴下标
+            SetDefault(Ez2Setting.ScratchAxisL, string.Empty);
+            SetDefault(Ez2Setting.ScratchAxisR, string.Empty);
+            SetDefault(Ez2Setting.ScratchAxisDeadzone, 0.04, 0.0, 0.2, 0.005);
+            SetDefault(Ez2Setting.ScratchAxisStopThreshold, 80, 10, 1000);
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
@@ -871,13 +870,12 @@ namespace osu.Game.EzOsuGame.Configuration
         ManiaScratchAxisEnabled,
 
         /// <summary>
-        /// L 转盘绑定的 <see cref="JoystickAxisSource"/> 索引（0–15）。
-        /// 规则集无关；Mania 作 scratch，未来 Catch 等可复用。
+        /// L 转盘绑定（<c>guid|axisIndex</c>）。规则集无关。
         /// </summary>
         ScratchAxisL,
 
         /// <summary>
-        /// R 转盘绑定的 <see cref="JoystickAxisSource"/> 索引（0–15）。
+        /// R 转盘绑定（<c>guid|axisIndex</c>）。
         /// </summary>
         ScratchAxisR,
 
@@ -887,7 +885,7 @@ namespace osu.Game.EzOsuGame.Configuration
         ScratchAxisDeadzone,
 
         /// <summary>
-        /// 停转判定：连续多少帧无有效位移后视为松开（对齐 beatoraja AnalogScratch 轮询计数）。
+        /// 停转判定：距上次有效转动超过多少毫秒后松开。
         /// </summary>
         ScratchAxisStopThreshold,
 

@@ -260,24 +260,24 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SCRATCH_AXIS_R = new EzLocalizationManager.EzLocalisableString("R-Scratch 轴", "R-Scratch Axis");
 
         public static readonly LocalisableString SCRATCH_AXIS_BIND_HINT = new EzLocalizationManager.EzLocalisableString(
-            "点击后转动目标轴以绑定",
-            "Click, then move the target axis to bind");
+            "点击后转动目标转盘以绑定（按设备区分，同轴多设备可分别绑定）",
+            "Click, then spin the target turntable to bind (per-device; same axis on different devices can bind separately)");
 
         public static readonly LocalisableString SCRATCH_AXIS_DEADZONE = new EzLocalizationManager.EzLocalisableString(
             "转盘轴死区",
             "Turntable axis deadzone");
 
-        public static readonly LocalisableString SCRATCH_AXIS_DEADZONE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "忽略小于此阈值的轴位移，减少转盘/摇杆抖动误触。",
-            "Ignore axis deltas below this threshold to reduce turntable/stick jitter.");
-
         public static readonly LocalisableString SCRATCH_AXIS_STOP_THRESHOLD = new EzLocalizationManager.EzLocalisableString(
-            "停转判定（帧）",
-            "Stop threshold (frames)");
+            "停转判定（毫秒）",
+            "Stop threshold (ms)");
 
         public static readonly LocalisableString SCRATCH_AXIS_STOP_THRESHOLD_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "连续多少帧没有有效转动后视为松开。",
-            "Release after this many frames without significant spin.");
+            "距上次有效转动超过此时长后视为松开。停靠在任意轴位置都不是按下，只有转动位移才算。",
+            "Release after this many milliseconds without significant spin. Resting at any axis position is idle; only movement counts.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_DEADZONE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "忽略小于此阈值的轴位移（不是离中心的距离）。转盘可停在任意位置，只有转动才触发。",
+            "Ignore axis deltas below this threshold (not distance from center). The turntable may rest anywhere; only spinning triggers.");
 
         public static readonly LocalisableString SCRATCH_AXIS_STATUS_IDLE = new EzLocalizationManager.EzLocalisableString("状态：空闲", "Status: Idle");
 

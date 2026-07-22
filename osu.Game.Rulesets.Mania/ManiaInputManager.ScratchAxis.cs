@@ -13,10 +13,12 @@ namespace osu.Game.Rulesets.Mania
     {
         private readonly ScratchAxisPair scratchAxes = new ScratchAxisPair();
 
+        private ScratchAxisDeviceTracker scratchTracker = null!;
+
         private Bindable<bool> scratchEnabled = null!;
         private Bindable<bool> skipEmptyEdge = null!;
-        private Bindable<int> leftAxisIndex = null!;
-        private Bindable<int> rightAxisIndex = null!;
+        private Bindable<string> leftBinding = null!;
+        private Bindable<string> rightBinding = null!;
         private Bindable<double> deadzone = null!;
         private Bindable<int> stopThreshold = null!;
 
@@ -26,17 +28,19 @@ namespace osu.Game.Rulesets.Mania
         private ManiaAction rightInjectedAction;
 
         [BackgroundDependencyLoader]
-        private void loadScratchAxis(Ez2ConfigManager ezConfig)
+        private void loadScratchAxis(Ez2ConfigManager ezConfig, ScratchAxisDeviceTracker tracker)
         {
+            scratchTracker = tracker;
+
             scratchEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ManiaScratchAxisEnabled);
             skipEmptyEdge = ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
-            leftAxisIndex = ezConfig.GetBindable<int>(Ez2Setting.ScratchAxisL);
-            rightAxisIndex = ezConfig.GetBindable<int>(Ez2Setting.ScratchAxisR);
+            leftBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisL);
+            rightBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisR);
             deadzone = ezConfig.GetBindable<double>(Ez2Setting.ScratchAxisDeadzone);
             stopThreshold = ezConfig.GetBindable<int>(Ez2Setting.ScratchAxisStopThreshold);
 
-            scratchAxes.LeftAxisIndex.BindTo(leftAxisIndex);
-            scratchAxes.RightAxisIndex.BindTo(rightAxisIndex);
+            scratchAxes.LeftBinding.BindTo(leftBinding);
+            scratchAxes.RightBinding.BindTo(rightBinding);
             scratchAxes.BindTuning(deadzone, stopThreshold);
 
             scratchEnabled.BindValueChanged(_ => releaseInjected(), true);
@@ -68,7 +72,7 @@ namespace osu.Game.Rulesets.Mania
             bool leftWas = scratchAxes.Left.IsPressed.Value;
             bool rightWas = scratchAxes.Right.IsPressed.Value;
 
-            scratchAxes.UpdateFrom(CurrentState.Joystick);
+            scratchAxes.UpdateFrom(scratchTracker, Time.Current);
 
             syncInjection(scratchAxes.Left.IsPressed.Value, leftWas, ManiaAction.Key1 + leftCol, ref leftInjected, ref leftInjectedAction);
             syncInjection(scratchAxes.Right.IsPressed.Value, rightWas, ManiaAction.Key1 + rightCol, ref rightInjected, ref rightInjectedAction);

@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -22,18 +23,21 @@ using osuTK;
 namespace osu.Game.EzOsuGame.Overlays
 {
     /// <summary>
-    /// Mania L/R 转盘轴设置：开关、轴绑定、死区、实时顺逆状态。
+    /// Mania L/R 转盘轴设置：按设备 GUID+轴绑定，支持多设备/同设备多轴。
     /// </summary>
     public partial class EzManiaScratchAxisSettings : FillFlowContainer
     {
         private readonly ScratchAxisProcessor leftMonitor = new ScratchAxisProcessor();
         private readonly ScratchAxisProcessor rightMonitor = new ScratchAxisProcessor();
+        private readonly Dictionary<(string guid, int axis), float> bindSampleLast = new Dictionary<(string, int), float>();
 
         private Bindable<bool> enabled = null!;
-        private Bindable<int> leftAxis = null!;
-        private Bindable<int> rightAxis = null!;
+        private Bindable<string> leftBinding = null!;
+        private Bindable<string> rightBinding = null!;
         private Bindable<double> deadzone = null!;
         private Bindable<int> stopThreshold = null!;
+
+        private ScratchAxisDeviceTracker tracker = null!;
 
         private SettingsButtonV2 leftBindButton = null!;
         private SettingsButtonV2 rightBindButton = null!;
@@ -41,6 +45,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private OsuSpriteText rightStatusText = null!;
 
         private BindTarget? bindTarget;
+        private (string guid, int axis, string name, float score)? bestBindCandidate;
 
         public EzManiaScratchAxisSettings()
         {
@@ -51,11 +56,13 @@ namespace osu.Game.EzOsuGame.Overlays
         }
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezConfig)
+        private void load(Ez2ConfigManager ezConfig, ScratchAxisDeviceTracker scratchTracker)
         {
+            tracker = scratchTracker;
+
             enabled = ezConfig.GetBindable<bool>(Ez2Setting.ManiaScratchAxisEnabled);
-            leftAxis = ezConfig.GetBindable<int>(Ez2Setting.ScratchAxisL);
-            rightAxis = ezConfig.GetBindable<int>(Ez2Setting.ScratchAxisR);
+            leftBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisL);
+            rightBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisR);
             deadzone = ezConfig.GetBindable<double>(Ez2Setting.ScratchAxisDeadzone);
             stopThreshold = ezConfig.GetBindable<int>(Ez2Setting.ScratchAxisStopThreshold);
 
@@ -111,19 +118,30 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
             };
 
-            leftAxis.BindValueChanged(_ => refreshBindLabels(), true);
-            rightAxis.BindValueChanged(_ => refreshBindLabels(), true);
+            leftBinding.BindValueChanged(_ => refreshBindLabels(), true);
+            rightBinding.BindValueChanged(_ => refreshBindLabels(), true);
 
             leftMonitor.IsPressed.BindValueChanged(_ => refreshStatus(leftMonitor, leftStatusText), true);
             leftMonitor.Direction.BindValueChanged(_ => refreshStatus(leftMonitor, leftStatusText));
             rightMonitor.IsPressed.BindValueChanged(_ => refreshStatus(rightMonitor, rightStatusText), true);
             rightMonitor.Direction.BindValueChanged(_ => refreshStatus(rightMonitor, rightStatusText));
+
+            tracker.AxisMoved += onAxisMoved;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (tracker != null)
+                tracker.AxisMoved -= onAxisMoved;
+
+            base.Dispose(isDisposing);
         }
 
         public override bool AcceptsFocus => bindTarget != null;
 
         protected override void OnFocusLost(FocusLostEvent e)
         {
+            commitBindIfPossible();
             endBind();
             base.OnFocusLost(e);
         }
@@ -132,38 +150,25 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             base.Update();
 
-            var joystick = GetContainingInputManager()?.CurrentState.Joystick;
-            if (joystick == null)
-                return;
+            double t = Time.Current;
 
-            leftMonitor.Update(readAxis(joystick.AxesValues, leftAxis.Value));
-            rightMonitor.Update(readAxis(joystick.AxesValues, rightAxis.Value));
-        }
-
-        protected override bool OnJoystickAxisMove(JoystickAxisMoveEvent e)
-        {
-            if (bindTarget == null)
-                return false;
-
-            if (Math.Abs(e.Delta) < Math.Max(0.05, deadzone.Value))
-                return false;
-
-            int axisIndex = (int)e.Axis.Source;
-            if (bindTarget == BindTarget.Left)
-                leftAxis.Value = axisIndex;
+            if (tracker.TryGetValue(decorate(leftBinding.Value), out float leftValue))
+                leftMonitor.Update(leftValue, t);
             else
-                rightAxis.Value = axisIndex;
+                leftMonitor.UpdateMissing(t);
 
-            endBind();
-            return true;
+            if (tracker.TryGetValue(decorate(rightBinding.Value), out float rightValue))
+                rightMonitor.Update(rightValue, t);
+            else
+                rightMonitor.UpdateMissing(t);
         }
 
         protected override bool OnClick(ClickEvent e)
         {
-            // 点击空白处取消绑定等待
             if (bindTarget != null && !leftBindButton.ReceivePositionalInputAt(e.ScreenSpaceMousePosition)
                                    && !rightBindButton.ReceivePositionalInputAt(e.ScreenSpaceMousePosition))
             {
+                commitBindIfPossible();
                 endBind();
                 return true;
             }
@@ -171,33 +176,88 @@ namespace osu.Game.EzOsuGame.Overlays
             return base.OnClick(e);
         }
 
+        private void onAxisMoved(JoystickDeviceAxis axis)
+        {
+            if (string.IsNullOrEmpty(axis.Guid))
+                return;
+
+            var key = (axis.Guid, axis.AxisIndex);
+            float last = bindSampleLast.GetValueOrDefault(key, axis.Value);
+            float delta = Math.Abs(ScratchAxisProcessor.ShortestDelta(last, axis.Value));
+            bindSampleLast[key] = axis.Value;
+
+            float threshold = (float)Math.Max(0.02, deadzone.Value);
+
+            if (bindTarget == null)
+                return;
+
+            if (delta < threshold)
+                return;
+
+            if (bestBindCandidate == null || delta > bestBindCandidate.Value.score)
+                bestBindCandidate = (axis.Guid, axis.AxisIndex, axis.Name, delta);
+
+            // 累计足够位移后立即确认，避免必须失焦才生效
+            if (bestBindCandidate.Value.score >= threshold * 2)
+            {
+                commitBindIfPossible();
+                endBind();
+            }
+        }
+
         private void beginBind(BindTarget target)
         {
             bindTarget = target;
+            bestBindCandidate = null;
+            bindSampleLast.Clear();
             refreshBindLabels();
             GetContainingFocusManager()?.ChangeFocus(this);
+        }
+
+        private void commitBindIfPossible()
+        {
+            if (bindTarget == null || bestBindCandidate == null)
+                return;
+
+            var binding = new ScratchAxisBinding(bestBindCandidate.Value.guid, bestBindCandidate.Value.axis, bestBindCandidate.Value.name);
+
+            if (bindTarget == BindTarget.Left)
+                leftBinding.Value = binding.ToString();
+            else
+                rightBinding.Value = binding.ToString();
         }
 
         private void endBind()
         {
             bindTarget = null;
+            bestBindCandidate = null;
             refreshBindLabels();
         }
 
         private void refreshBindLabels()
         {
-            leftBindButton.Text = formatBindLabel("L-Scratch", leftAxis.Value, bindTarget == BindTarget.Left);
-            rightBindButton.Text = formatBindLabel("R-Scratch", rightAxis.Value, bindTarget == BindTarget.Right);
+            leftBindButton.Text = formatBindLabel("L-Scratch", decorate(leftBinding.Value), bindTarget == BindTarget.Left);
+            rightBindButton.Text = formatBindLabel("R-Scratch", decorate(rightBinding.Value), bindTarget == BindTarget.Right);
         }
 
-        private static LocalisableString formatBindLabel(string caption, int axisIndex, bool waiting)
+        private ScratchAxisBinding decorate(string stored)
         {
-            string axisName = ((JoystickAxisSource)axisIndex).ToString();
+            var binding = ScratchAxisBinding.Parse(stored);
+            if (binding.IsEmpty || !string.IsNullOrEmpty(binding.DeviceName))
+                return binding;
 
+            string? name = tracker.GetDeviceName(binding.DeviceGuid);
+            return string.IsNullOrEmpty(name)
+                ? binding
+                : new ScratchAxisBinding(binding.DeviceGuid, binding.AxisIndex, name);
+        }
+
+        private static LocalisableString formatBindLabel(string caption, ScratchAxisBinding binding, bool waiting)
+        {
             if (waiting)
                 return $"{caption}: [{EzSettingsStrings.SCRATCH_AXIS_BIND_HINT}]";
 
-            return $"{caption}: {axisName}";
+            return $"{caption}: {binding.ToDisplayString()}";
         }
 
         private static void refreshStatus(ScratchAxisProcessor processor, OsuSpriteText text)
@@ -228,14 +288,6 @@ namespace osu.Game.EzOsuGame.Overlays
                 Padding = SettingsPanel.CONTENT_PADDING,
                 Child = statusText,
             };
-        }
-
-        private static float readAxis(float[] values, int index)
-        {
-            if (index < 0 || index >= values.Length)
-                return 0;
-
-            return values[index];
         }
 
         private enum BindTarget

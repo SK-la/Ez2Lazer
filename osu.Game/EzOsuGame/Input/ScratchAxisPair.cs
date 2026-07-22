@@ -2,46 +2,32 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Bindables;
-using osu.Framework.Input;
-using osu.Framework.Input.States;
 
 namespace osu.Game.EzOsuGame.Input
 {
     /// <summary>
-    /// L/R 双转盘状态对，从 <see cref="JoystickState"/> 按配置轴索引取样。
+    /// L/R 双转盘状态对，从 <see cref="ScratchAxisDeviceTracker"/> 按设备绑定取样。
     /// </summary>
     public class ScratchAxisPair
     {
         public ScratchAxisProcessor Left { get; } = new ScratchAxisProcessor();
         public ScratchAxisProcessor Right { get; } = new ScratchAxisProcessor();
 
-        public BindableInt LeftAxisIndex { get; } = new BindableInt((int)JoystickAxisSource.GamePadLeftStickX)
-        {
-            MinValue = 0,
-            MaxValue = (int)JoystickAxisSource.Axis16,
-        };
+        public Bindable<string> LeftBinding { get; } = new Bindable<string>(string.Empty);
+        public Bindable<string> RightBinding { get; } = new Bindable<string>(string.Empty);
 
-        public BindableInt RightAxisIndex { get; } = new BindableInt((int)JoystickAxisSource.GamePadLeftStickY)
-        {
-            MinValue = 0,
-            MaxValue = (int)JoystickAxisSource.Axis16,
-        };
-
-        /// <summary>
-        /// 将死区/停转阈值同步到左右处理器。
-        /// </summary>
-        public void BindTuning(Bindable<double> deadzone, Bindable<int> stopThreshold)
+        public void BindTuning(Bindable<double> deadzone, Bindable<int> stopThresholdMs)
         {
             Left.Deadzone.BindTo(deadzone);
             Right.Deadzone.BindTo(deadzone);
-            Left.StopThreshold.BindTo(stopThreshold);
-            Right.StopThreshold.BindTo(stopThreshold);
+            Left.StopThresholdMs.BindTo(stopThresholdMs);
+            Right.StopThresholdMs.BindTo(stopThresholdMs);
         }
 
-        public void UpdateFrom(JoystickState joystick)
+        public void UpdateFrom(ScratchAxisDeviceTracker tracker, double currentTime)
         {
-            Left.Update(readAxis(joystick, LeftAxisIndex.Value));
-            Right.Update(readAxis(joystick, RightAxisIndex.Value));
+            updateOne(Left, ScratchAxisBinding.Parse(LeftBinding.Value), tracker, currentTime);
+            updateOne(Right, ScratchAxisBinding.Parse(RightBinding.Value), tracker, currentTime);
         }
 
         public void Reset()
@@ -50,12 +36,12 @@ namespace osu.Game.EzOsuGame.Input
             Right.Reset();
         }
 
-        private static float readAxis(JoystickState joystick, int index)
+        private static void updateOne(ScratchAxisProcessor processor, ScratchAxisBinding binding, ScratchAxisDeviceTracker tracker, double currentTime)
         {
-            if (index < 0 || index >= joystick.AxesValues.Length)
-                return 0;
-
-            return joystick.AxesValues[index];
+            if (tracker.TryGetValue(binding, out float value))
+                processor.Update(value, currentTime);
+            else
+                processor.UpdateMissing(currentTime);
         }
     }
 }
