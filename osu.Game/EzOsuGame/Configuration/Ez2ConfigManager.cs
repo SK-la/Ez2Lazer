@@ -104,7 +104,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ScratchAxisL, string.Empty);
             SetDefault(Ez2Setting.ScratchAxisR, string.Empty);
             SetDefault(Ez2Setting.ScratchAxisDeadzone, 0.04, 0.0, 0.2, 0.005);
-            SetDefault(Ez2Setting.ScratchAxisStopThreshold, 80, 10, 1000);
+            SetDefault(Ez2Setting.ScratchAxisStopThreshold, 150, 10, 1000);
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);

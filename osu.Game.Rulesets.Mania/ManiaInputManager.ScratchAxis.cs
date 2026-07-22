@@ -3,6 +3,7 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Input;
 using osu.Game.Rulesets.Mania.EzMania.Input;
@@ -14,6 +15,7 @@ namespace osu.Game.Rulesets.Mania
         private readonly ScratchAxisPair scratchAxes = new ScratchAxisPair();
 
         private ScratchAxisDeviceTracker scratchTracker = null!;
+        private GameHost host = null!;
 
         private Bindable<bool> scratchEnabled = null!;
         private Bindable<bool> skipEmptyEdge = null!;
@@ -28,9 +30,10 @@ namespace osu.Game.Rulesets.Mania
         private ManiaAction rightInjectedAction;
 
         [BackgroundDependencyLoader]
-        private void loadScratchAxis(Ez2ConfigManager ezConfig, ScratchAxisDeviceTracker tracker)
+        private void loadScratchAxis(Ez2ConfigManager ezConfig, ScratchAxisDeviceTracker tracker, GameHost gameHost)
         {
             scratchTracker = tracker;
+            host = gameHost;
 
             scratchEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ManiaScratchAxisEnabled);
             skipEmptyEdge = ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
@@ -69,25 +72,30 @@ namespace osu.Game.Rulesets.Mania
                 return;
             }
 
-            bool leftWas = scratchAxes.Left.IsPressed.Value;
-            bool rightWas = scratchAxes.Right.IsPressed.Value;
+            // FrameStable 的 Time.Current 在追帧/进图停表时可能长时间不变，停转阈值永远到不了 → 列一直按住。
+            double wallTime = host.UpdateThread.Clock.CurrentTime;
+            scratchAxes.UpdateFrom(scratchTracker, wallTime);
 
-            scratchAxes.UpdateFrom(scratchTracker, Time.Current);
-
-            syncInjection(scratchAxes.Left.IsPressed.Value, leftWas, ManiaAction.Key1 + leftCol, ref leftInjected, ref leftInjectedAction);
-            syncInjection(scratchAxes.Right.IsPressed.Value, rightWas, ManiaAction.Key1 + rightCol, ref rightInjected, ref rightInjectedAction);
+            syncInjection(scratchAxes.Left.IsPressed.Value, ManiaAction.Key1 + leftCol, ref leftInjected, ref leftInjectedAction);
+            syncInjection(scratchAxes.Right.IsPressed.Value, ManiaAction.Key1 + rightCol, ref rightInjected, ref rightInjectedAction);
         }
 
-        private void syncInjection(bool nowPressed, bool wasPressed, ManiaAction action, ref bool injected, ref ManiaAction injectedAction)
+        private void syncInjection(bool nowPressed, ManiaAction action, ref bool injected, ref ManiaAction injectedAction)
         {
-            if (nowPressed == wasPressed)
-                return;
-
             if (nowPressed)
             {
-                KeyBindingContainer.TriggerPressed(action);
-                injected = true;
-                injectedAction = action;
+                if (!injected)
+                {
+                    KeyBindingContainer.TriggerPressed(action);
+                    injected = true;
+                    injectedAction = action;
+                }
+                else if (injectedAction != action)
+                {
+                    KeyBindingContainer.TriggerReleased(injectedAction);
+                    KeyBindingContainer.TriggerPressed(action);
+                    injectedAction = action;
+                }
             }
             else if (injected)
             {

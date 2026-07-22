@@ -8,15 +8,17 @@ namespace osu.Game.EzOsuGame.Input
 {
     /// <summary>
     /// 规则集无关的模拟转盘轴处理器：只认位移，不认停靠绝对值。
-    /// 轴可停在 [-1,1] 任意位置；有有效 |Δ|→按下，停止超过阈值→松开。
+    /// 轴可停在 [-1,1] 任意位置；连续同向有效位移→按下并保持；转向清空后需重新激活；停止超过阈值→松开。
     /// </summary>
     /// <remarks>
+    /// 对齐 beatoraja Analog Scratch V2（死区 + 墙钟时间阈值；无 tick 量化）：
+    /// 两次同向过死区才激活；转向清空视为另一次打击；顺逆在 Mania 仍注入同一列。
     /// 供 Mania scratch、未来 Catch 左右移动、选歌滚动等复用。
     /// </remarks>
     public class ScratchAxisProcessor
     {
         /// <summary>
-        /// 位移死区：环绕最短弧 |Δ| 低于此值视为静止/抖动（不是“离中心多远”）。
+        /// 激活死区：环绕最短弧 |Δ| 低于此值不视为开始转动（不是“离中心多远”）。
         /// </summary>
         public BindableDouble Deadzone { get; } = new BindableDouble(0.04)
         {
@@ -27,7 +29,7 @@ namespace osu.Game.EzOsuGame.Input
         /// <summary>
         /// 停转判定：距上次有效位移超过多少毫秒后松开。
         /// </summary>
-        public BindableInt StopThresholdMs { get; } = new BindableInt(80)
+        public BindableInt StopThresholdMs { get; } = new BindableInt(150)
         {
             MinValue = 10,
             MaxValue = 1000,
@@ -44,9 +46,13 @@ namespace osu.Game.EzOsuGame.Input
         private bool hasSample;
         private double lastMotionTime = double.NegativeInfinity;
 
+        /// <summary>激活前连续同向有效位移次数（替代 beatoraja V2 的 2-tick，无量化步进）。</summary>
+        private int pendingTicks;
+
+        private ScratchAxisDirection pendingDirection = ScratchAxisDirection.None;
+
         /// <summary>
-        /// 喂入当前轴绝对值与当前时间（通常为 <c>Time.Current</c>）。
-        /// 仅位移超过死区视为转动；停靠在任意绝对值都不是按下。
+        /// 喂入当前轴绝对值与<strong>墙钟时间</strong>（勿用 gameplay / FrameStable 的 <c>Time.Current</c>，暂停或追帧时会卡住导致永不松开）。
         /// </summary>
         public bool Update(float axisValue, double currentTime)
         {
@@ -58,6 +64,7 @@ namespace osu.Game.EzOsuGame.Input
                 lastValue = axisValue;
                 hasSample = true;
                 lastMotionTime = double.NegativeInfinity;
+                clearPending();
                 return false;
             }
 
@@ -68,18 +75,49 @@ namespace osu.Game.EzOsuGame.Input
             {
                 lastValue = axisValue;
                 lastMotionTime = currentTime;
-                Direction.Value = delta > 0 ? ScratchAxisDirection.Clockwise : ScratchAxisDirection.CounterClockwise;
-                IsPressed.Value = true;
+
+                var dir = delta > 0 ? ScratchAxisDirection.Clockwise : ScratchAxisDirection.CounterClockwise;
+
+                if (IsPressed.Value)
+                {
+                    if (Direction.Value != ScratchAxisDirection.None && Direction.Value != dir)
+                    {
+                        // V2：转向清空，本帧反向位移只记 pending=1，不立刻再激活
+                        IsPressed.Value = false;
+                        Direction.Value = ScratchAxisDirection.None;
+                        pendingTicks = 1;
+                        pendingDirection = dir;
+                    }
+                    else
+                    {
+                        Direction.Value = dir;
+                    }
+                }
+                else
+                {
+                    accumulatePending(dir);
+                }
+            }
+            else if (IsPressed.Value && absDelta > 1e-5f)
+            {
+                // 已按下：亚死区同向慢移续按住（不改方向语义）
+                lastValue = axisValue;
+                lastMotionTime = currentTime;
             }
             else
             {
-                // 微抖动跟随，避免慢漂移一次越过死区；不刷新 lastMotionTime
+                // 微抖动跟随；不刷新 lastMotionTime
                 lastValue = axisValue;
 
-                if (IsPressed.Value && currentTime - lastMotionTime >= StopThresholdMs.Value)
+                if (currentTime - lastMotionTime >= StopThresholdMs.Value)
                 {
-                    IsPressed.Value = false;
-                    Direction.Value = ScratchAxisDirection.None;
+                    clearPending();
+
+                    if (IsPressed.Value)
+                    {
+                        IsPressed.Value = false;
+                        Direction.Value = ScratchAxisDirection.None;
+                    }
                 }
             }
 
@@ -91,19 +129,19 @@ namespace osu.Game.EzOsuGame.Input
         /// </summary>
         public bool UpdateMissing(double currentTime)
         {
-            if (!IsPressed.Value)
+            if (!IsPressed.Value && pendingTicks == 0)
                 return false;
-
-            bool wasPressed = true;
 
             if (currentTime - lastMotionTime >= StopThresholdMs.Value)
             {
+                bool wasPressed = IsPressed.Value;
+                clearPending();
                 IsPressed.Value = false;
                 Direction.Value = ScratchAxisDirection.None;
-                return true;
+                return wasPressed;
             }
 
-            return wasPressed != IsPressed.Value;
+            return false;
         }
 
         public void Reset()
@@ -111,8 +149,33 @@ namespace osu.Game.EzOsuGame.Input
             hasSample = false;
             lastValue = 0;
             lastMotionTime = double.NegativeInfinity;
+            clearPending();
             IsPressed.Value = false;
             Direction.Value = ScratchAxisDirection.None;
+        }
+
+        private void accumulatePending(ScratchAxisDirection dir)
+        {
+            if (pendingDirection == dir)
+                pendingTicks++;
+            else
+            {
+                pendingTicks = 1;
+                pendingDirection = dir;
+            }
+
+            if (pendingTicks >= 2)
+            {
+                IsPressed.Value = true;
+                Direction.Value = dir;
+                clearPending();
+            }
+        }
+
+        private void clearPending()
+        {
+            pendingTicks = 0;
+            pendingDirection = ScratchAxisDirection.None;
         }
 
         public static float ShortestDelta(float from, float to) => shortestDelta(from, to);

@@ -13,9 +13,17 @@ namespace osu.Game.Tests.NonVisual
         [Test]
         public void RestAtNonZeroPositionIsIdle()
         {
-            var processor = new ScratchAxisProcessor();
-            processor.Deadzone.Value = 0.04;
-            processor.StopThresholdMs.Value = 50;
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone =
+                {
+                    Value = 0.04
+                },
+                StopThresholdMs =
+                {
+                    Value = 50
+                }
+            };
 
             // 停靠在 60%，不是按下
             processor.Update(0.6f, 0);
@@ -29,26 +37,134 @@ namespace osu.Game.Tests.NonVisual
         }
 
         [Test]
-        public void SpinAboveDeadzonePressesAndSetsDirection()
+        public void TwoSameDirectionDeltasRequiredToPress()
         {
-            var processor = new ScratchAxisProcessor();
-            processor.Deadzone.Value = 0.02;
-            processor.StopThresholdMs.Value = 50;
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone =
+                {
+                    Value = 0.02
+                },
+                StopThresholdMs =
+                {
+                    Value = 50
+                }
+            };
 
             processor.Update(0f, 0);
             Assert.That(processor.IsPressed.Value, Is.False);
 
             processor.Update(0.1f, 16);
+            Assert.That(processor.IsPressed.Value, Is.False);
+
+            processor.Update(0.2f, 32);
             Assert.That(processor.IsPressed.Value, Is.True);
             Assert.That(processor.Direction.Value, Is.EqualTo(ScratchAxisDirection.Clockwise));
         }
 
         [Test]
+        public void SingleSpikeDoesNotPress()
+        {
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone =
+                {
+                    Value = 0.02
+                },
+                StopThresholdMs =
+                {
+                    Value = 50
+                }
+            };
+
+            processor.Update(0f, 0);
+            processor.Update(0.1f, 16);
+            Assert.That(processor.IsPressed.Value, Is.False);
+
+            processor.Update(0.1f, 80);
+            Assert.That(processor.IsPressed.Value, Is.False);
+        }
+
+        [Test]
+        public void ContinuousSameDirectionStaysPressed()
+        {
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone =
+                {
+                    Value = 0.04
+                },
+                StopThresholdMs =
+                {
+                    Value = 100
+                }
+            };
+
+            processor.Update(0f, 0);
+            processor.Update(0.1f, 10);
+            processor.Update(0.2f, 20);
+            Assert.That(processor.IsPressed.Value, Is.True);
+
+            processor.Update(0.3f, 40);
+            Assert.That(processor.IsPressed.Value, Is.True);
+
+            // 亚死区慢移续按住
+            processor.Update(0.31f, 60);
+            Assert.That(processor.IsPressed.Value, Is.True);
+
+            // 采样空隙未超阈值
+            processor.Update(0.31f, 120);
+            Assert.That(processor.IsPressed.Value, Is.True);
+
+            processor.Update(0.31f, 180);
+            Assert.That(processor.IsPressed.Value, Is.False);
+        }
+
+        [Test]
+        public void DirectionReverseClearsAndRequiresReactivation()
+        {
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone =
+                {
+                    Value = 0.02
+                },
+                StopThresholdMs =
+                {
+                    Value = 200
+                }
+            };
+
+            processor.Update(0f, 0);
+            processor.Update(0.1f, 10);
+            processor.Update(0.2f, 20);
+            Assert.That(processor.IsPressed.Value, Is.True);
+
+            // 转向：清空；反向位移记 pending=1，本帧不激活
+            processor.Update(0.05f, 30);
+            Assert.That(processor.IsPressed.Value, Is.False);
+            Assert.That(processor.Direction.Value, Is.EqualTo(ScratchAxisDirection.None));
+
+            // 再一次同向（逆时针）→ 第二次有效位移，重新按下
+            processor.Update(-0.05f, 40);
+            Assert.That(processor.IsPressed.Value, Is.True);
+            Assert.That(processor.Direction.Value, Is.EqualTo(ScratchAxisDirection.CounterClockwise));
+        }
+
+        [Test]
         public void JitterBelowDeadzoneDoesNotPress()
         {
-            var processor = new ScratchAxisProcessor();
-            processor.Deadzone.Value = 0.05;
-            processor.StopThresholdMs.Value = 50;
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone =
+                {
+                    Value = 0.05
+                },
+                StopThresholdMs =
+                {
+                    Value = 50
+                }
+            };
 
             processor.Update(0.5f, 0);
             processor.Update(0.51f, 16);
@@ -62,28 +178,71 @@ namespace osu.Game.Tests.NonVisual
         [Test]
         public void StopAfterIdleMsReleases()
         {
-            var processor = new ScratchAxisProcessor();
-            processor.Deadzone.Value = 0.02;
-            processor.StopThresholdMs.Value = 50;
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone =
+                {
+                    Value = 0.02
+                },
+                StopThresholdMs =
+                {
+                    Value = 50
+                }
+            };
 
             processor.Update(0f, 0);
             processor.Update(0.1f, 10);
+            processor.Update(0.2f, 20);
             Assert.That(processor.IsPressed.Value, Is.True);
 
-            processor.Update(0.1f, 40);
+            processor.Update(0.2f, 40);
             Assert.That(processor.IsPressed.Value, Is.True);
 
-            processor.Update(0.1f, 70);
+            processor.Update(0.2f, 80);
             Assert.That(processor.IsPressed.Value, Is.False);
             Assert.That(processor.Direction.Value, Is.EqualTo(ScratchAxisDirection.None));
         }
 
         [Test]
+        public void FrozenClockDoesNotReleaseWhilePressed()
+        {
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone =
+                {
+                    Value = 0.02
+                },
+                StopThresholdMs =
+                {
+                    Value = 50
+                }
+            };
+
+            processor.Update(0f, 100);
+            processor.Update(0.1f, 100);
+            processor.Update(0.2f, 100);
+            Assert.That(processor.IsPressed.Value, Is.True);
+
+            for (int i = 0; i < 20; i++)
+                processor.Update(0.2f, 100);
+
+            Assert.That(processor.IsPressed.Value, Is.True);
+        }
+
+        [Test]
         public void MissingSampleDoesNotTreatAsZero()
         {
-            var processor = new ScratchAxisProcessor();
-            processor.Deadzone.Value = 0.02;
-            processor.StopThresholdMs.Value = 50;
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone =
+                {
+                    Value = 0.02
+                },
+                StopThresholdMs =
+                {
+                    Value = 50
+                }
+            };
 
             processor.Update(0.7f, 0);
             processor.UpdateMissing(100);
@@ -97,12 +256,19 @@ namespace osu.Game.Tests.NonVisual
         [Test]
         public void WrapAroundUsesShortestArc()
         {
-            var processor = new ScratchAxisProcessor();
-            processor.Deadzone.Value = 0.02;
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone =
+                {
+                    Value = 0.02
+                }
+            };
 
             processor.Update(0.95f, 0);
             processor.Update(-0.95f, 16);
+            Assert.That(processor.IsPressed.Value, Is.False);
 
+            processor.Update(-0.85f, 32);
             Assert.That(processor.IsPressed.Value, Is.True);
             Assert.That(processor.Direction.Value, Is.EqualTo(ScratchAxisDirection.Clockwise));
         }
@@ -110,11 +276,17 @@ namespace osu.Game.Tests.NonVisual
         [Test]
         public void CounterClockwiseDirection()
         {
-            var processor = new ScratchAxisProcessor();
-            processor.Deadzone.Value = 0.02;
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone =
+                {
+                    Value = 0.02
+                }
+            };
 
             processor.Update(0f, 0);
             processor.Update(-0.1f, 16);
+            processor.Update(-0.2f, 32);
 
             Assert.That(processor.IsPressed.Value, Is.True);
             Assert.That(processor.Direction.Value, Is.EqualTo(ScratchAxisDirection.CounterClockwise));
