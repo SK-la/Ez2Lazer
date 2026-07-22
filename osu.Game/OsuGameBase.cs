@@ -50,6 +50,7 @@ using osu.Game.IO;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Input;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Localisation;
@@ -507,6 +508,10 @@ namespace osu.Game
 
             base.Content.Add(new TouchInputInterceptor());
             base.Content.Add(hitErrorTracker);
+
+            var scratchAxisTracker = new ScratchAxisDeviceTracker();
+            dependencies.Cache(scratchAxisTracker);
+            base.Content.Add(scratchAxisTracker);
 
             KeyBindingStore = new RealmKeyBindingStore(realm, keyCombinationProvider);
             KeyBindingStore.Register(globalBindings, RulesetStore.AvailableRulesets);

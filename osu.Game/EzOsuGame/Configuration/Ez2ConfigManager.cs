@@ -99,6 +99,12 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ScreenshotAction, EzScreenshotAction.SaveAndCopy);
             SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
+            SetDefault(Ez2Setting.ManiaScratchAxisEnabled, false);
+            // 格式：guid|axisIndex（多设备）；兼容旧版纯数字轴下标
+            SetDefault(Ez2Setting.ScratchAxisL, string.Empty);
+            SetDefault(Ez2Setting.ScratchAxisR, string.Empty);
+            SetDefault(Ez2Setting.ScratchAxisDeadzone, 0.04, 0.0, 0.2, 0.005);
+            SetDefault(Ez2Setting.ScratchAxisStopThreshold, 150, 10, 1000);
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
@@ -857,6 +863,32 @@ namespace osu.Game.EzOsuGame.Configuration
         NotificationBehaviour,
         ScreenshotAction,
         ManiaSkipEmptyEdgeColumns,
+
+        /// <summary>
+        /// 开启后按 12/14/16K 模板将 L/R 转盘轴运行时注入首尾列（不改写 Realm 键位）。
+        /// </summary>
+        ManiaScratchAxisEnabled,
+
+        /// <summary>
+        /// L 转盘绑定（<c>guid|axisIndex</c>）。规则集无关。
+        /// </summary>
+        ScratchAxisL,
+
+        /// <summary>
+        /// R 转盘绑定（<c>guid|axisIndex</c>）。
+        /// </summary>
+        ScratchAxisR,
+
+        /// <summary>
+        /// 转盘轴位移死区：|Δ| 低于此值视为抖动，不触发按下。
+        /// </summary>
+        ScratchAxisDeadzone,
+
+        /// <summary>
+        /// 停转判定：距上次有效转动超过多少毫秒后松开。
+        /// </summary>
+        ScratchAxisStopThreshold,
+
         SkipWithGameplayKeys,
         StoryboardAutoVideoSize,
         AcrylicUiEnabled,
