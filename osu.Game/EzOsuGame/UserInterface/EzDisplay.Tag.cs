@@ -123,7 +123,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Film, BeatmapsetsStrings.ShowInfoVideo)
                 {
-                    Action = () => songSelect?.Search(@"video:true"),
+                    Action = () => songSelect?.AddToSearch(@"video:true"),
                 });
             }
 
@@ -131,7 +131,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard)
                 {
-                    Action = () => songSelect?.Search(@"storyboard:true"),
+                    Action = () => songSelect?.AddToSearch(@"storyboard:true"),
                 });
             }
 
@@ -139,7 +139,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 var simpleTag = new SimpleTag(tag)
                 {
-                    Action = () => songSelect?.Search($@"tag=""{tag}""!"),
+                    Action = () => songSelect?.AddToSearch($@"tag=""{tag}""!"),
                 };
                 tagFlow.Add(simpleTag);
                 simpleTag.SetAltHighlight(altHighlightActive);

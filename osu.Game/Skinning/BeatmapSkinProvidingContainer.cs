@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Game.Audio;
 using osu.Game.Rulesets.Objects.Legacy;
+using osu.Game.Storyboards;
 
 namespace osu.Game.Skinning
 {
@@ -25,7 +26,7 @@ namespace osu.Game.Skinning
 
         protected override bool AllowTextureLookup(string componentName) => BeatmapSkins.Value;
 
-        protected override bool AllowSampleLookup(ISampleInfo sampleInfo) => BeatmapHitsounds.Value;
+        protected override bool AllowSampleLookup(ISampleInfo sampleInfo) => sampleInfo is StoryboardSampleInfo || BeatmapHitsounds.Value;
 
         /// <summary>
         /// When set, beatmap-tied samples that miss on the beatmap skin will not fall back to parent skins.
