@@ -20,16 +20,16 @@ namespace osu.Game.EzOsuGame.Input
     /// </remarks>
     public class ScratchAxisProcessor
     {
-        public BindableDouble Deadzone { get; } = new BindableDouble(0.04)
+        public BindableDouble Deadzone { get; } = new BindableDouble(0.005)
         {
             MinValue = 0,
-            MaxValue = 0.5,
+            MaxValue = 0.05,
         };
 
-        public BindableInt StopThresholdMs { get; } = new BindableInt(150)
+        public BindableInt StopThresholdMs { get; } = new BindableInt(30)
         {
             MinValue = 10,
-            MaxValue = 1000,
+            MaxValue = 300,
         };
 
         public BindableInt StopThreshold => StopThresholdMs;

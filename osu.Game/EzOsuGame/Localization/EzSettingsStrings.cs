@@ -272,8 +272,8 @@ namespace osu.Game.EzOsuGame.Localization
             "Listening… travel {0} / {1}");
 
         public static readonly LocalisableString SCRATCH_AXIS_DEADZONE = new EzLocalizationManager.EzLocalisableString(
-            "转盘轴死区",
-            "Turntable axis deadzone");
+            "最小位移阈值",
+            "Min movement delta");
 
         public static readonly LocalisableString SCRATCH_AXIS_STOP_THRESHOLD = new EzLocalizationManager.EzLocalisableString(
             "停转判定（毫秒）",
@@ -284,8 +284,12 @@ namespace osu.Game.EzOsuGame.Localization
             "Release after this many milliseconds without significant spin. Resting at any axis position is idle; only movement counts.");
 
         public static readonly LocalisableString SCRATCH_AXIS_DEADZONE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "忽略小于此阈值的轴位移（不是离中心的距离）。转盘可停在任意位置，只有转动才触发。",
-            "Ignore axis deltas below this threshold (not distance from center). The turntable may rest anywhere; only spinning triggers.");
+            "相邻两次采样之间的最小 |Δ|（轴约 [-1,1]，对应 0–100 归一化后）。"
+            + "\n不是摇杆「离中心」死区。beatoraja tick≈0.009；推荐 0.001–0.01。"
+            + "\n过大（如 0.02+）会导致转盘无响应；过小（0）易被噪声连打。",
+            "Minimum |Δ| between consecutive samples (axis ≈ [-1,1], i.e. normalised 0–100)."
+            + "\nNot stick-from-centre deadzone. beatoraja tick ≈ 0.009; try 0.001–0.01."
+            + "\nToo large (e.g. 0.02+) ignores real spins; 0 lets noise spam presses.");
 
         public static readonly LocalisableString SCRATCH_AXIS_STATUS_IDLE = new EzLocalizationManager.EzLocalisableString("状态：空闲", "Status: Idle");
 

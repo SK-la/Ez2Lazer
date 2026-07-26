@@ -103,8 +103,8 @@ namespace osu.Game.EzOsuGame.Configuration
             // 格式：guid|axisIndex（多设备）；兼容旧版纯数字轴下标
             SetDefault(Ez2Setting.ScratchAxisL, string.Empty);
             SetDefault(Ez2Setting.ScratchAxisR, string.Empty);
-            SetDefault(Ez2Setting.ScratchAxisDeadzone, 0.04, 0.0, 0.2, 0.005);
-            SetDefault(Ez2Setting.ScratchAxisStopThreshold, 150, 10, 1000);
+            SetDefault(Ez2Setting.ScratchAxisDeadzone, 0.005, 0.001, 0.01, 0.001);
+            SetDefault(Ez2Setting.ScratchAxisStopThreshold, 30, 10, 150);
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
