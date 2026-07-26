@@ -349,7 +349,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         }
 
         /// <summary>
-        /// 列级路由已选中本 hold，跳过重复的 <see cref="CheckHittable"/>。
+        /// 列级路由已选中本 hold，跳过重复的 <see cref="DrawableManiaHitObject.CheckHittable"/>。
         /// </summary>
         internal bool TryBeginHoldPressFromColumn(double currentTime)
         {

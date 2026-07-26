@@ -10,6 +10,7 @@ using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Input.Bindings;
 using osu.Framework.Timing;
 using osu.Game.Audio;
 using osu.Game.EzOsuGame.Configuration;
@@ -74,7 +75,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         public Func<DrawableHitObject, double, bool> CheckHittable;
 
         /// <summary>
-        /// 列级按键已路由到其它 drawable 时跳过本物件的 <see cref="IKeyBindingHandler.OnPressed"/>。
+        /// 列级按键已路由到其它 drawable 时跳过本物件的 <see cref="IKeyBindingHandler{T}.OnPressed"/>。
         /// </summary>
         public Func<DrawableHitObject, bool> ShouldSkipColumnRoutedPress;
 

@@ -8,7 +8,7 @@ using osu.Game.Database;
 namespace osu.Game.Tests.Database
 {
     [TestFixture]
-    public class BackgroundDataStoreStartupDelayTest
+    public partial class BackgroundDataStoreStartupDelayTest
     {
         [Test]
         public void ProductionStartupBackfillDelayIsFiveSeconds()

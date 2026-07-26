@@ -24,7 +24,7 @@ namespace osu.Game.EzOsuGame.Scoring
     /// 全局 ghost 角逐服务。
     ///
     /// - 默认仅在有角逐 HUD 消费者（interest &gt; 0）时查询元数据 / 构建 timeline
-    /// - 进局前在 <see cref="Screens.Play.PlayerLoader"/> 全速构建 timeline，就绪后才开始游戏
+    /// - 进局前在 <see cref="PlayerLoader"/> 全速构建 timeline，就绪后才开始游戏
     /// - 可通过实验性开关 <see cref="Ez2Setting.EzScoreRaceServiceEnabled"/> 整服务 no-op
     /// </summary>
     public partial class EzScoreRaceService : Component, IEzScoreRaceStateLookup, IEzScoreRacePlayerStartGate

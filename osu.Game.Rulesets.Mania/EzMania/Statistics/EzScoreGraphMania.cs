@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         /// <summary>
-        /// 检测 HitEvents 是否被帧量化污染，若污染则通过 <see cref="ManiaReplaySessionService.RunHitEventsAsync"/>
+        /// 检测 HitEvents 是否被帧量化污染，若污染则通过 <see cref="EzReplaySession.RunHitEventsAsync"/>
         /// 重新生成精确 HitEvents（不写回 <c>ScoreInfo</c>）。
         /// </summary>
         private static IReadOnlyList<HitEvent>? tryDetectAndRegenerateFrameQuantizedEvents(ScoreInfo score, IBeatmap beatmap)
