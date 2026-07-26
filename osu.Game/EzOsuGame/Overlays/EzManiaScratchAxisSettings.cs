@@ -241,8 +241,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (travel >= bind_travel_threshold)
             {
+                // 写入绑定，但不退出监听——否则一转就「已绑定」并关掉 hint，看不到后续轴值
                 commitBindIfPossible();
-                endBind();
             }
         }
 
