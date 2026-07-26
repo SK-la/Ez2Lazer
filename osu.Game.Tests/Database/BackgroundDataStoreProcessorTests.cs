@@ -310,6 +310,8 @@ INSERT INTO schema_version (number) VALUES (3);";
         {
             protected override int TimeToSleepDuringGameplay => 10;
 
+            protected override bool SkipProcessing => false;
+
             protected override TimeSpan StartupBackfillDelay => TimeSpan.Zero;
 
             public bool Completed => ProcessingTask.IsCompleted;
