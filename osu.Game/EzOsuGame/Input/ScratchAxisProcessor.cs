@@ -7,12 +7,16 @@ using osu.Framework.Bindables;
 namespace osu.Game.EzOsuGame.Input
 {
     /// <summary>
-    /// 规则集无关的模拟转盘轴处理器：只认位移，不认停靠绝对值。
+    /// 模拟转盘轴：只认位移（含 0→1→0 环绕），不认停靠绝对值。
     /// </summary>
     /// <remarks>
-    /// 对齐 beatoraja Analog Scratch V2（死区 + 墙钟时间；无 tick 量化）：
-    /// 两次同向过死区才激活；同向转动中保持按住；反向需累计位移达阈值才清空（另一次打击）；
-    /// 停转超时松开。顺逆在 Mania 仍注入同一列。
+    /// 对齐 beatoraja Analog Scratch V2 语义（时间停转 + 死区；无 tick 量化）：
+    /// <list type="bullet">
+    /// <item>每帧读当前位置；与上次不同且 |最短弧 Δ|≥死区 → 运动</item>
+    /// <item>同向连续转动（含绕回 1→0）保持按下；仅停转超时或确认反向才松开</item>
+    /// <item>激活需连续两次同向有效位移；反向累计达 2×死区视为另一次打击</item>
+    /// </list>
+    /// beatoraja 原始轴多为 [-1,1]（用户侧常说 0–100 再映射）；绕回用最短弧，与 computeAnalogDiff 同类。
     /// </remarks>
     public class ScratchAxisProcessor
     {
@@ -41,7 +45,6 @@ namespace osu.Game.EzOsuGame.Input
         private int pendingTicks;
         private ScratchAxisDirection pendingDirection = ScratchAxisDirection.None;
 
-        /// <summary>已按下后反向累计弧长；达到 <see cref="reverseClearThreshold"/> 才清空。</summary>
         private float reverseTravel;
 
         private float reverseClearThreshold => (float)(Deadzone.Value * 2);
@@ -78,14 +81,10 @@ namespace osu.Game.EzOsuGame.Input
                     accumulatePending(dir);
                 }
             }
-            else if (IsPressed.Value && absDelta > 1e-5f)
-            {
-                lastValue = axisValue;
-                lastMotionTime = currentTime;
-                // 亚死区位移不累计反向，避免噪声抬高 reverseTravel
-            }
             else
             {
+                // 亚死区：只跟随停靠点，绝不刷新 lastMotionTime。
+                // 否则静止噪声会让停转永远到不了 → 轨道灯常亮。
                 lastValue = axisValue;
 
                 if (currentTime - lastMotionTime >= StopThresholdMs.Value)
@@ -141,7 +140,6 @@ namespace osu.Game.EzOsuGame.Input
 
                 if (reverseTravel >= reverseClearThreshold)
                 {
-                    // V2：确认转向（累计反向足够）→ 清空；本帧记 pending=1
                     IsPressed.Value = false;
                     Direction.Value = ScratchAxisDirection.None;
                     reverseTravel = 0;
@@ -149,7 +147,6 @@ namespace osu.Game.EzOsuGame.Input
                     pendingDirection = dir;
                 }
 
-                // 反向尚未达标：保持按住，不改 Direction
                 return;
             }
 
@@ -184,6 +181,9 @@ namespace osu.Game.EzOsuGame.Input
 
         public static float ShortestDelta(float from, float to) => shortestDelta(from, to);
 
+        /// <summary>
+        /// [-1,1] 环上最短弧。对应 0→100→0 单调绕回：例如 0.95→-0.95 视为小步前进而非大步后退。
+        /// </summary>
         private static float shortestDelta(float from, float to)
         {
             float delta = to - from;
