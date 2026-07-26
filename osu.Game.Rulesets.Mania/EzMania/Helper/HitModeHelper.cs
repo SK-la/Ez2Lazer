@@ -507,7 +507,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         /// <summary>
         /// 在指定 HitMode 下，<see cref="HitResult.Meh"/> 是否打断 Combo。
-        /// BMS / O2Jam / EZ2AC 三种模式下 Meh 断 Combo，其余不断。
+        /// BMS / O2Jam 模式下 Meh 断 Combo，其余不断。
         /// </summary>
         public static bool MehBreaksCombo(EzEnumHitMode hitMode)
         {
@@ -517,7 +517,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 case EzEnumHitMode.LR2_HD:
                 case EzEnumHitMode.Raja_NM:
                 case EzEnumHitMode.O2Jam:
-                case EzEnumHitMode.EZ2AC:
                     return true;
 
                 default:
