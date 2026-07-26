@@ -121,18 +121,12 @@ namespace osu.Game.Tests.NonVisual
         }
 
         [Test]
-        public void DirectionReverseClearsAndRequiresReactivation()
+        public void SmallReverseNoiseDoesNotReleaseHold()
         {
             var processor = new ScratchAxisProcessor
             {
-                Deadzone =
-                {
-                    Value = 0.02
-                },
-                StopThresholdMs =
-                {
-                    Value = 200
-                }
+                Deadzone = { Value = 0.05 },
+                StopThresholdMs = { Value = 200 }
             };
 
             processor.Update(0f, 0);
@@ -140,13 +134,35 @@ namespace osu.Game.Tests.NonVisual
             processor.Update(0.2f, 20);
             Assert.That(processor.IsPressed.Value, Is.True);
 
-            // 转向：清空；反向位移记 pending=1，本帧不激活
-            processor.Update(0.05f, 30);
+            // 单次反向 = deadzone：累计未达 2*deadzone，保持按住
+            processor.Update(0.15f, 30);
+            Assert.That(processor.IsPressed.Value, Is.True);
+            Assert.That(processor.Direction.Value, Is.EqualTo(ScratchAxisDirection.Clockwise));
+
+            processor.Update(0.25f, 40);
+            Assert.That(processor.IsPressed.Value, Is.True);
+        }
+
+        [Test]
+        public void AccumulatedReverseClearsAndRequiresReactivation()
+        {
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone = { Value = 0.05 },
+                StopThresholdMs = { Value = 200 }
+            };
+
+            processor.Update(0f, 0);
+            processor.Update(0.1f, 10);
+            processor.Update(0.2f, 20);
+            Assert.That(processor.IsPressed.Value, Is.True);
+
+            // 一次大幅反向（>= 2*deadzone）即确认转向
+            processor.Update(0.0f, 30);
             Assert.That(processor.IsPressed.Value, Is.False);
             Assert.That(processor.Direction.Value, Is.EqualTo(ScratchAxisDirection.None));
 
-            // 再一次同向（逆时针）→ 第二次有效位移，重新按下
-            processor.Update(-0.05f, 40);
+            processor.Update(-0.1f, 40);
             Assert.That(processor.IsPressed.Value, Is.True);
             Assert.That(processor.Direction.Value, Is.EqualTo(ScratchAxisDirection.CounterClockwise));
         }

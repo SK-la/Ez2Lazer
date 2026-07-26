@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
+using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Localisation.Mania;
 using osu.Game.Rulesets.Mania.UI;
@@ -24,19 +25,34 @@ namespace osu.Game.Rulesets.Mania
         }
 
         protected override KeyBindingContainer<ManiaAction> CreateKeyBindingContainer(RulesetInfo ruleset, int variant, SimultaneousBindingMode unique)
-            => new ManiaKeyBindingContainer(ruleset, variant, unique);
+            => new ManiaKeyBindingContainer(this, ruleset, variant, unique);
 
         /// <summary>
         /// COLUMN-INPUT：列级 <see cref="Column.OnPressed"/> 优先于列内 drawable，避免每键 N 路冒泡。
         /// </summary>
         private partial class ManiaKeyBindingContainer : RulesetKeyBindingContainer
         {
+            private readonly ManiaInputManager maniaInputManager;
             private readonly List<Drawable> columnFirstQueue = new List<Drawable>();
             private readonly List<Drawable> nonColumnQueue = new List<Drawable>();
 
-            public ManiaKeyBindingContainer(RulesetInfo ruleset, int variant, SimultaneousBindingMode unique)
+            public ManiaKeyBindingContainer(ManiaInputManager maniaInputManager, RulesetInfo ruleset, int variant, SimultaneousBindingMode unique)
                 : base(ruleset, variant, unique)
             {
+                this.maniaInputManager = maniaInputManager;
+            }
+
+            protected override bool Handle(UIEvent e)
+            {
+                // 转盘轴启用时：屏蔽「轴正负虚拟键」进键位，改由 ScratchAxis 算法注入（对齐 beatoraja）
+                switch (e)
+                {
+                    case JoystickPressEvent joystickPress when maniaInputManager.ShouldSuppressJoystickAxisButton(joystickPress.Button):
+                    case JoystickReleaseEvent joystickRelease when maniaInputManager.ShouldSuppressJoystickAxisButton(joystickRelease.Button):
+                        return false;
+                }
+
+                return base.Handle(e);
             }
 
             protected override IEnumerable<Drawable> KeyBindingInputQueue

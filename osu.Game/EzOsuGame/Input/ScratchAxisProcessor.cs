@@ -8,34 +8,26 @@ namespace osu.Game.EzOsuGame.Input
 {
     /// <summary>
     /// 规则集无关的模拟转盘轴处理器：只认位移，不认停靠绝对值。
-    /// 轴可停在 [-1,1] 任意位置；连续同向有效位移→按下并保持；转向清空后需重新激活；停止超过阈值→松开。
     /// </summary>
     /// <remarks>
-    /// 对齐 beatoraja Analog Scratch V2（死区 + 墙钟时间阈值；无 tick 量化）：
-    /// 两次同向过死区才激活；转向清空视为另一次打击；顺逆在 Mania 仍注入同一列。
-    /// 供 Mania scratch、未来 Catch 左右移动、选歌滚动等复用。
+    /// 对齐 beatoraja Analog Scratch V2（死区 + 墙钟时间；无 tick 量化）：
+    /// 两次同向过死区才激活；同向转动中保持按住；反向需累计位移达阈值才清空（另一次打击）；
+    /// 停转超时松开。顺逆在 Mania 仍注入同一列。
     /// </remarks>
     public class ScratchAxisProcessor
     {
-        /// <summary>
-        /// 激活死区：环绕最短弧 |Δ| 低于此值不视为开始转动（不是“离中心多远”）。
-        /// </summary>
         public BindableDouble Deadzone { get; } = new BindableDouble(0.04)
         {
             MinValue = 0,
             MaxValue = 0.5,
         };
 
-        /// <summary>
-        /// 停转判定：距上次有效位移超过多少毫秒后松开。
-        /// </summary>
         public BindableInt StopThresholdMs { get; } = new BindableInt(150)
         {
             MinValue = 10,
             MaxValue = 1000,
         };
 
-        /// <summary>兼容旧绑定名，等同 <see cref="StopThresholdMs"/>。</summary>
         public BindableInt StopThreshold => StopThresholdMs;
 
         public BindableBool IsPressed { get; } = new BindableBool();
@@ -46,25 +38,25 @@ namespace osu.Game.EzOsuGame.Input
         private bool hasSample;
         private double lastMotionTime = double.NegativeInfinity;
 
-        /// <summary>激活前连续同向有效位移次数（替代 beatoraja V2 的 2-tick，无量化步进）。</summary>
         private int pendingTicks;
-
         private ScratchAxisDirection pendingDirection = ScratchAxisDirection.None;
 
-        /// <summary>
-        /// 喂入当前轴绝对值与<strong>墙钟时间</strong>（勿用 gameplay / FrameStable 的 <c>Time.Current</c>，暂停或追帧时会卡住导致永不松开）。
-        /// </summary>
+        /// <summary>已按下后反向累计弧长；达到 <see cref="reverseClearThreshold"/> 才清空。</summary>
+        private float reverseTravel;
+
+        private float reverseClearThreshold => (float)(Deadzone.Value * 2);
+
         public bool Update(float axisValue, double currentTime)
         {
             bool wasPressed = IsPressed.Value;
 
             if (!hasSample)
             {
-                // 记录静止停靠点，绝不把「当前位置相对 0」当成转动
                 lastValue = axisValue;
                 hasSample = true;
                 lastMotionTime = double.NegativeInfinity;
                 clearPending();
+                reverseTravel = 0;
                 return false;
             }
 
@@ -79,39 +71,27 @@ namespace osu.Game.EzOsuGame.Input
                 var dir = delta > 0 ? ScratchAxisDirection.Clockwise : ScratchAxisDirection.CounterClockwise;
 
                 if (IsPressed.Value)
-                {
-                    if (Direction.Value != ScratchAxisDirection.None && Direction.Value != dir)
-                    {
-                        // V2：转向清空，本帧反向位移只记 pending=1，不立刻再激活
-                        IsPressed.Value = false;
-                        Direction.Value = ScratchAxisDirection.None;
-                        pendingTicks = 1;
-                        pendingDirection = dir;
-                    }
-                    else
-                    {
-                        Direction.Value = dir;
-                    }
-                }
+                    handlePressedMotion(dir, absDelta);
                 else
                 {
+                    reverseTravel = 0;
                     accumulatePending(dir);
                 }
             }
             else if (IsPressed.Value && absDelta > 1e-5f)
             {
-                // 已按下：亚死区同向慢移续按住（不改方向语义）
                 lastValue = axisValue;
                 lastMotionTime = currentTime;
+                // 亚死区位移不累计反向，避免噪声抬高 reverseTravel
             }
             else
             {
-                // 微抖动跟随；不刷新 lastMotionTime
                 lastValue = axisValue;
 
                 if (currentTime - lastMotionTime >= StopThresholdMs.Value)
                 {
                     clearPending();
+                    reverseTravel = 0;
 
                     if (IsPressed.Value)
                     {
@@ -124,9 +104,6 @@ namespace osu.Game.EzOsuGame.Input
             return wasPressed != IsPressed.Value;
         }
 
-        /// <summary>
-        /// 本帧没有有效采样（设备未上报）时调用：仅推进停转计时，不把缺失当成回到 0。
-        /// </summary>
         public bool UpdateMissing(double currentTime)
         {
             if (!IsPressed.Value && pendingTicks == 0)
@@ -136,6 +113,7 @@ namespace osu.Game.EzOsuGame.Input
             {
                 bool wasPressed = IsPressed.Value;
                 clearPending();
+                reverseTravel = 0;
                 IsPressed.Value = false;
                 Direction.Value = ScratchAxisDirection.None;
                 return wasPressed;
@@ -150,8 +128,33 @@ namespace osu.Game.EzOsuGame.Input
             lastValue = 0;
             lastMotionTime = double.NegativeInfinity;
             clearPending();
+            reverseTravel = 0;
             IsPressed.Value = false;
             Direction.Value = ScratchAxisDirection.None;
+        }
+
+        private void handlePressedMotion(ScratchAxisDirection dir, float absDelta)
+        {
+            if (Direction.Value != ScratchAxisDirection.None && Direction.Value != dir)
+            {
+                reverseTravel += absDelta;
+
+                if (reverseTravel >= reverseClearThreshold)
+                {
+                    // V2：确认转向（累计反向足够）→ 清空；本帧记 pending=1
+                    IsPressed.Value = false;
+                    Direction.Value = ScratchAxisDirection.None;
+                    reverseTravel = 0;
+                    pendingTicks = 1;
+                    pendingDirection = dir;
+                }
+
+                // 反向尚未达标：保持按住，不改 Direction
+                return;
+            }
+
+            reverseTravel = 0;
+            Direction.Value = dir;
         }
 
         private void accumulatePending(ScratchAxisDirection dir)
@@ -169,6 +172,7 @@ namespace osu.Game.EzOsuGame.Input
                 IsPressed.Value = true;
                 Direction.Value = dir;
                 clearPending();
+                reverseTravel = 0;
             }
         }
 
