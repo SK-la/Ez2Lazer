@@ -36,6 +36,9 @@ namespace osu.Game.Rulesets.UI
         [Resolved]
         private IGameplayClock? gameplayClock { get; set; }
 
+        [Resolved]
+        private GameplayState? gameplayState { get; set; }
+
         private bool isAutoPlay => GlobalConfigStore.EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode)
                                    == KeySoundPreviewMode.AutoPlayPlus;
 
@@ -92,6 +95,7 @@ namespace osu.Game.Rulesets.UI
             var hitSound = GetNextSample();
             ApplySampleInfo(hitSound, samples);
             hitSound.Play();
+            gameplayState?.ApplySamples(samples);
         });
 
         protected virtual void ApplySampleInfo(SkinnableSound hitSound, ISampleInfo[] samples)

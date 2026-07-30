@@ -161,6 +161,10 @@ namespace osu.Game.Rulesets.Objects.Drawables
         private IPooledHitObjectProvider pooledObjectProvider { get; set; }
 
         [Resolved(CanBeNull = true)]
+        [CanBeNull]
+        private GameplayState gameplayState { get; set; }
+
+        [Resolved(CanBeNull = true)]
         private DrawableRuleset drawableRuleset { get; set; }
 
         [Resolved(CanBeNull = true)]
@@ -651,6 +655,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
             {
                 Samples.Balance.Value = CalculateSamplePlaybackBalance(SamplePlaybackPosition);
                 Samples.Play();
+                gameplayState?.ApplySamples(Samples.Samples);
             }
         }
 
