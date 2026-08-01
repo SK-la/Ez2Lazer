@@ -215,6 +215,16 @@ namespace osu.Game.Rulesets.Scoring
 
         // 标记后，用于分数算法切换。
         public bool IsLegacyScore = false;
+
+        /// <summary>
+        /// [Ez] gameplay 入口调用：将当前全局 Ez 游玩环境（如 mania HitMode）冻结注入本处理器。
+        /// 必须在 <see cref="ApplyBeatmap"/> 之前调用。
+        /// 无头/转换路径（legacy 转换、后台升级、重算等）不得调用，以保持 ppy 上游官方行为。
+        /// </summary>
+        public virtual void ApplyEzGameplayEnvironment()
+        {
+        }
+
         private static double accS = accuracy_cutoff_s;
 
         private static double accA = accuracy_cutoff_a;

@@ -84,6 +84,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 dependencies.CacheAs(scrollingRuleset.ScrollingInfo);
 
             scoreProcessor = ruleset.CreateScoreProcessor();
+            // [Ez] 预览与 gameplay 一致：冻结当前全局游玩环境，须先于 ApplyBeatmap。
+            scoreProcessor.ApplyEzGameplayEnvironment();
             scoreProcessor.Mods.Value = mods;
             scoreProcessor.ApplyBeatmap(playableBeatmap);
 

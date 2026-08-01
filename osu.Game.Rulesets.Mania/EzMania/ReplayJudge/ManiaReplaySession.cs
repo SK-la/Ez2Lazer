@@ -84,7 +84,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             scoreProcessor.Mods.Value = score.ScoreInfo.Mods;
 
             if (scoreProcessor is ManiaScoreProcessor maniaScoreProcessor)
-                maniaScoreProcessor.TimelineHitModeOverride = environment.ManiaHitMode;
+                maniaScoreProcessor.HitModeOverride = environment.ManiaHitMode;
 
             scoreProcessor.ApplyBeatmap(beatmap);
 

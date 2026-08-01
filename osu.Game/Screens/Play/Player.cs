@@ -314,6 +314,8 @@ namespace osu.Game.Screens.Play
                 dependencies.CacheAs(scrollingRuleset.ScrollingInfo);
 
             ScoreProcessor = ruleset.CreateScoreProcessor();
+            // [Ez] 冻结当前全局游玩环境（HitMode 等）；必须先于 ApplyBeatmap 的全谱模拟。
+            ScoreProcessor.ApplyEzGameplayEnvironment();
             ScoreProcessor.Mods.Value = gameplayMods;
             ScoreProcessor.ApplyBeatmap(playableBeatmap);
 

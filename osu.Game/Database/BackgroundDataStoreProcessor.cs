@@ -21,6 +21,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Database;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Extensions;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
@@ -195,6 +196,9 @@ namespace osu.Game.Database
                     // Note that the previous method will also update these on a fresh run.
                     processBeatmapsWithMissingObjectCounts();
                     processScoresWithMissingStatistics();
+                    // [Ez] Must run before all official score upgrade passes: scores judged under an Ez
+                    // gameplay mode must never be rewritten by official conversion algorithms.
+                    stampEzGameplayModeScores();
                     // ordering significant, `upgradeModMultipliers()` should run first as it will handle all scores
                     // (rather than only lazer scores, if it was called after `convertLegacyTotalScoreToStandardised()`)
                     upgradeModMultipliers();
@@ -957,6 +961,51 @@ namespace osu.Game.Database
             completeNotification(notification, processedCount, scoreIds.Count, failedCount);
         }
 
+        /// <summary>
+        /// [Ez] 带 Ez 游玩模式（ManiaHitMode / ManiaHealthMode 嵌入）的成绩不参与官方分数升级：
+        /// 官方 legacy 转换 / rank 重算 / mod 倍率升级都不理解 Ez 判定与计分语义（曾把此类成绩错转为 D + 超低分）。
+        /// 这里直接把 TotalScoreVersion 盖到最新，避免每次启动重查；此类成绩仅能通过 Ez Session 重算刷新。
+        /// </summary>
+        private void stampEzGameplayModeScores()
+        {
+            Logger.Log("Querying for Ez gameplay-mode scores to exempt from official score upgrades...");
+
+            HashSet<Guid> scoreIds = realmAccess.Run(r => new HashSet<Guid>(
+                r.All<ScoreInfo>()
+                 .Where(s => s.TotalScoreVersion < LegacyScoreEncoder.LATEST_VERSION
+                             && (s.ManiaHitMode != EzManiaScoreModeExtensions.UNSET_MODE
+                                 || s.ManiaHealthMode != EzManiaScoreModeExtensions.UNSET_MODE))
+                 .AsEnumerable()
+                 .Select(s => s.ID)));
+
+            if (scoreIds.Count == 0)
+                return;
+
+            Logger.Log($"Found {scoreIds.Count} Ez gameplay-mode scores; stamping TotalScoreVersion without official conversion.");
+
+            const int batch_size = 500;
+            var idList = scoreIds.ToList();
+
+            for (int i = 0; i < idList.Count; i += batch_size)
+            {
+                var batch = idList.Skip(i).Take(batch_size).ToList();
+
+                sleepIfRequired();
+
+                realmAccess.Write(r =>
+                {
+                    foreach (var id in batch)
+                    {
+                        var s = r.Find<ScoreInfo>(id);
+                        if (s != null)
+                            s.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
+                    }
+                });
+            }
+
+            Logger.Log($"Finished stamping {scoreIds.Count} Ez gameplay-mode scores.");
+        }
+
         private void upgradeModMultipliers()
         {
             Logger.Log("Querying for scores that need mod multiplier upgrade...");
@@ -966,7 +1015,10 @@ namespace osu.Game.Database
                  .Where(s => !s.BackgroundReprocessingFailed
                              && s.BeatmapInfo != null
                              && s.TotalScoreVersion < 30000017 // version number represents version with latest mod multiplier change
-                             && s.TotalScoreWithoutMods > 0)
+                             && s.TotalScoreWithoutMods > 0
+                             // [Ez] gameplay-mode scores are exempt from official upgrades (see stampEzGameplayModeScores).
+                             && s.ManiaHitMode == EzManiaScoreModeExtensions.UNSET_MODE
+                             && s.ManiaHealthMode == EzManiaScoreModeExtensions.UNSET_MODE)
                  .AsEnumerable()
                  // must be done after materialisation, as realm doesn't want to support
                  // nested property predicates
@@ -1032,7 +1084,10 @@ namespace osu.Game.Database
                  .Where(s => !s.BackgroundReprocessingFailed
                              && s.BeatmapInfo != null
                              && s.IsLegacyScore
-                             && s.TotalScoreVersion < LegacyScoreEncoder.LATEST_VERSION)
+                             && s.TotalScoreVersion < LegacyScoreEncoder.LATEST_VERSION
+                             // [Ez] gameplay-mode scores are exempt from official upgrades (see stampEzGameplayModeScores).
+                             && s.ManiaHitMode == EzManiaScoreModeExtensions.UNSET_MODE
+                             && s.ManiaHealthMode == EzManiaScoreModeExtensions.UNSET_MODE)
                  .AsEnumerable()
                  // must be done after materialisation, as realm doesn't want to support
                  // nested property predicates
@@ -1117,7 +1172,11 @@ namespace osu.Game.Database
 
             HashSet<Guid> scoreIds = realmAccess.Run(r => new HashSet<Guid>(
                 r.All<ScoreInfo>()
-                 .Where(s => s.TotalScoreVersion < 30000013 && !s.BackgroundReprocessingFailed) // last total score version with a significant change to ranks
+                 .Where(s => s.TotalScoreVersion < 30000013 // last total score version with a significant change to ranks
+                             && !s.BackgroundReprocessingFailed
+                             // [Ez] gameplay-mode scores are exempt from official upgrades (see stampEzGameplayModeScores).
+                             && s.ManiaHitMode == EzManiaScoreModeExtensions.UNSET_MODE
+                             && s.ManiaHealthMode == EzManiaScoreModeExtensions.UNSET_MODE)
                  .AsEnumerable()
                  // must be done after materialisation, as realm doesn't support
                  // filtering on nested property predicates or projection via `.Select()`

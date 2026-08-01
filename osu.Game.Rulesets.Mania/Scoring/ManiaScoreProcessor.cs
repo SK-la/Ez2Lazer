@@ -22,11 +22,26 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double calOD = 8;
 
         /// <summary>
-        /// Ghost 时间线重放时覆盖 HitMode，使用成绩自带环境而非当前玩家全局配置。
+        /// 显式注入的 HitMode（gameplay 开局冻结 / Session / Ghost 时间线）。
+        /// 为空时按 <see cref="EzEnumHitMode.Lazer"/> 官方语义计算。
         /// </summary>
-        public EzEnumHitMode? TimelineHitModeOverride { get; set; }
+        /// <remarks>
+        /// 禁止在此回读全局配置：无头路径（官方 legacy 转换、后台升级、重算、PP/难度缓存等）
+        /// 必须保持 ppy 上游行为，否则会被玩家当前 HitMode 污染（曾导致 stable 导入成绩被错转为 D + 超低分）。
+        /// gameplay 侧由 <see cref="ApplyEzGameplayEnvironment"/> 在 <see cref="ScoreProcessor.ApplyBeatmap"/> 前冻结注入。
+        /// </remarks>
+        public EzEnumHitMode? HitModeOverride { get; set; }
 
-        private EzEnumHitMode hitMode => TimelineHitModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+        private EzEnumHitMode hitMode => HitModeOverride ?? EzEnumHitMode.Lazer;
+
+        /// <summary>
+        /// gameplay 入口（Player / 皮肤编辑器预览）冻结当前全局 HitMode。
+        /// 必须在 <see cref="ScoreProcessor.ApplyBeatmap"/> 之前调用，否则全谱模拟与实际判定权重不一致。
+        /// </summary>
+        public override void ApplyEzGameplayEnvironment()
+        {
+            HitModeOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+        }
 
         public ManiaScoreProcessor()
             : base(new ManiaRuleset())
