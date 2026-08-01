@@ -271,11 +271,28 @@ namespace osu.Game.Database
 
             if (score.Ruleset.OnlineID == 3 && hasReplay && ezReplaySession != null)
             {
-                // 与选歌右键「原始环境重算」一致：Session ForStored（嵌入 HM/HM；无嵌入按双 Lazer）。
-                // 后台线程串行执行，同步阻塞等待即可。
-                EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmapManager, ezReplaySession, score, ReplayRunPurpose.ForStored)
-                                           .GetAwaiter().GetResult();
-                return true;
+                try
+                {
+                    // 与选歌右键「原始环境重算」一致：Session ForStored（嵌入 HM/HM；无嵌入按双 Lazer）。
+                    // 后台线程串行执行，同步阻塞等待即可。
+                    EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmapManager, ezReplaySession, score, ReplayRunPurpose.ForStored)
+                                               .GetAwaiter().GetResult();
+                    return true;
+                }
+                catch (LegacyScoreDecoder.BeatmapNotFoundException)
+                {
+                    // replay 头引用的谱面 MD5 不在本地（谱面被删/更新过版本），Session 无法重放。
+                    // 退回下方无 replay 的官方路径（legacy 转换 / Recalculate）尽量修复。
+                    Logger.Log($"Score {id}: replay references a beatmap not present locally, falling back to non-replay recalculation.");
+                }
+                catch (TimeoutException)
+                {
+                    // 批量后台负载下的偶发谱面加载超时（WorkingBeatmap 10s），谱面已进缓存后重试一次通常可过。
+                    Logger.Log($"Score {id}: beatmap load timed out, retrying once...");
+                    EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmapManager, ezReplaySession, score, ReplayRunPurpose.ForStored)
+                                               .GetAwaiter().GetResult();
+                    return true;
+                }
             }
 
             if (score.ManiaHitMode > (int)EzEnumHitMode.Lazer)
