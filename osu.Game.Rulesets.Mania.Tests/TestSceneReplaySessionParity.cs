@@ -323,6 +323,61 @@ namespace osu.Game.Rulesets.Mania.Tests
                 });
         }
 
+        /// <summary>
+        /// [Ez] 断连 LN（提早松手、尾判 miss）：用户报告 EZ2AC 下游戏结束统计比 Session 重算少若干判定，
+        /// 缺失数量与 ComboBreak 数一致。全量比较 Statistics（含 ComboBreak / Miss）。
+        /// </summary>
+        [Test]
+        public void TestFullScoreParity_Ez2AcBrokenHold()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(1500), // 提早松手 → hold break，尾判 miss
+                    new ManiaReplayFrame(4000, ManiaAction.Key2),
+                    new ManiaReplayFrame(4100),
+                });
+        }
+
+        /// <summary>
+        /// [Ez] 断连后重按到尾判：EZ2AC 断连 LN 的另一常见形态。
+        /// </summary>
+        [Test]
+        public void TestFullScoreParity_Ez2AcBrokenHoldRepress()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(1500), // 中途断连
+                    new ManiaReplayFrame(2000, ManiaAction.Key1), // 重按
+                    new ManiaReplayFrame(tail), // 到尾判才松手
+                    new ManiaReplayFrame(4000, ManiaAction.Key2),
+                    new ManiaReplayFrame(4100),
+                });
+        }
+
         [Test]
         public void TestReplayAfterRecalcEz2AcMatchesNow()
         {

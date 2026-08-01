@@ -264,4 +264,5 @@ flowchart TD
 | ✎ \| 2026-07-12 | ✎ \| 重算写回统一将双 Lazer HM/HM 归一为空；非 Lazer ForLive 环境仍持久化 |
 | ✎ \| 2026-07-12 | ✎ \| 引入 **M/N** 标定；记录 EZ2AC/Malody −1P、O2 −4P 残留与 BMS Lazer HM 异常 |
 | ✎ \| 2026-07-12 | ✎ \| BMS Session：KPoor 门控 + Earliest note-lock parity；扩 Lazer HM 小谱/叠键测试 |
+| ✎ \| 2026-08-01 | ✎ \| Session 断连 LN parity：持有中提早松手且未判定尾键时，模拟器在**断连时刻**立即产出 Body ComboBreak（对齐局内 `EzTriggerBodyAfterTailRelease`，不受候选窗口限制；`LaneTargetState.BodyJudged` 防尾判/结算重复补判；Malody 例外走 IgnoreHit）。修复「断连后重按到尾」场景 N 比 M 少 ComboBreak |
 | ✎ \| 2026-08-01 | ✎ \| `ManiaScoreProcessor` 无头默认 **Lazer 官方语义**（不再回读全局 HitMode；gameplay 经 `ApplyEzGameplayEnvironment` 开局冻结注入，Session 经 `HitModeOverride`）；官方分数升级批次（legacy 转换 / rank / mod 倍率）豁免带 Ez 模式嵌入的成绩（`stampEzGameplayModeScores` 仅盖版本号）。背景：30000019 全量重转换曾用被全局 EZ2AC 污染的处理器错转 stable 成绩为 D + 超低分 |

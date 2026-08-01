@@ -219,8 +219,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 {
                     double storedOffset = ManiaReplaySessionSimulator.ResolveMissStoredOffset(state.Target, pressTimesByColumn);
 
-                    if (hold.Body != null)
+                    // 断连时刻已产出 Body ComboBreak 的（BodyJudged），对齐局内不重复补判。
+                    if (hold.Body != null && !state.BodyJudged)
+                    {
+                        state.BodyJudged = true;
                         ManiaReplaySessionSimulator.ApplyAuxiliaryResult(scoreProcessor, hold.Body, HitResult.ComboBreak, storedOffset, missEventTime, gameplayRate, recorder);
+                    }
 
                     ManiaReplaySessionSimulator.ApplyAuxiliaryResult(scoreProcessor, hold, HitResult.IgnoreMiss, storedOffset, missEventTime, gameplayRate, recorder);
                 }

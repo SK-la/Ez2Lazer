@@ -90,13 +90,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 }
 
                 if (candidates.Count == 0)
+                {
+                    // [parity] 松手落在候选窗口外也可能断连（局内断连不受窗口限制）。
+                    if (!input.IsPress)
+                        tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
                     continue;
+                }
 
                 var selected = selectCandidate(
                     candidates, laneStates, input.Time, environment);
 
                 if (selected == null || selected.Judged)
+                {
+                    if (!input.IsPress)
+                        tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
                     continue;
+                }
 
                 var target = selected.Target;
                 bool isTail = selected.IsTail;
@@ -145,7 +154,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         });
 
                         if (!tryMapTailEvaluation(tailEval, out result))
+                        {
+                            // [parity] 本次松手未判定尾键 → 检查是否构成断连（Body ComboBreak）。
+                            if (!input.IsPress)
+                                tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
                             continue;
+                        }
                     }
                     else
                     {
@@ -165,7 +179,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         });
 
                         if (environment.ManiaHitMode == EzEnumHitMode.Lazer && result == HitResult.None)
+                        {
+                            // [parity] 本次松手未判定尾键 → 检查是否构成断连（Body ComboBreak）。
+                            if (!input.IsPress)
+                                tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
                             continue;
+                        }
                     }
                 }
                 else if (bms != null && target.HitWindows is ManiaHitWindows bmsWindows)
@@ -260,10 +279,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 {
                     // HoldNoteBody: IgnoreHit on hit, ComboBreak on miss
                     // (matches DrawableHoldNoteBody.TriggerResult → ApplyMaxResult/ApplyMinResult)
+                    // 断连时刻已产出 Body ComboBreak 的（BodyJudged），对齐局内不重复补判。
                     double tailStoredOffset = ComputeStoredTimeOffset(input.Time, judgedTail);
 
-                    if (tailHold.Body != null)
+                    if (tailHold.Body != null && !selected.BodyJudged)
                     {
+                        selected.BodyJudged = true;
                         HitResult bodyResult = result.IsHit() ? HitResult.IgnoreHit : HitResult.ComboBreak;
                         ApplyAuxiliaryResult(scoreProcessor, tailHold.Body, bodyResult, tailStoredOffset, input.Time, gameplayRate, timelineRecorder);
                     }
@@ -523,6 +544,58 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// matching live play behaviour where these produce IgnoreHit/ComboBreak/IgnoreMiss entries
         /// in ScoreResultCounts despite having no effect on score, accuracy, or combo.
         /// </summary>
+        /// <summary>
+        /// [parity] 持有中提早松手且本次松手未判定尾键 → 断连时刻立即产出 Body ComboBreak，
+        /// 对齐局内 <c>DrawableHoldNote.EzTriggerBodyAfterTailRelease</c>（isEarlyHoldRelease → <c>Body.TriggerResult(false)</c>）。
+        /// 局内断连不受候选/判定窗口限制，因此在此按列扫描当前活动 LN。
+        /// Malody 例外：局内走 <c>TryMalodyHoldOnReleased</c>（Body 记 IgnoreHit），不在此处理。
+        /// </summary>
+        private static void tryApplyEarlyHoldBreakBody(
+            List<LaneTargetState> laneStates,
+            double eventTime,
+            bool wasHoldingBeforeEvent,
+            IGameplayEnvironment environment,
+            Dictionary<TailNote, HeadNote> headByTail,
+            Dictionary<HeadNote, HoldNote> holdByHead,
+            Dictionary<HeadNote, bool> headWasHit,
+            ScoreProcessor scoreProcessor,
+            double gameplayRate,
+            ManiaReplayTimelineRecorder? timelineRecorder)
+        {
+            if (!wasHoldingBeforeEvent)
+                return;
+
+            if (MalodyHitModeJudgement.IsMalodyMode(environment.ManiaHitMode))
+                return;
+
+            foreach (var state in laneStates)
+            {
+                if (state.Judged || state.BodyJudged)
+                    continue;
+
+                if (state.Target is not TailNote tail
+                    || !headByTail.TryGetValue(tail, out var head)
+                    || !holdByHead.TryGetValue(head, out var hold)
+                    || hold.Body == null)
+                {
+                    continue;
+                }
+
+                // 仅限已按到头判、且尚未到尾判时刻的活动 LN。
+                if (!headWasHit.TryGetValue(head, out bool headHit) || !headHit)
+                    continue;
+
+                if (eventTime - tail.StartTime + environment.OffsetPlusMania >= 0)
+                    continue;
+
+                state.HoldBroken = true;
+                state.BodyJudged = true;
+                ApplyAuxiliaryResult(scoreProcessor, hold.Body, HitResult.ComboBreak,
+                    ComputeStoredTimeOffset(eventTime, hold.Body), eventTime, gameplayRate, timelineRecorder);
+                return; // 一次松手最多断一条 LN
+            }
+        }
+
         internal static void ApplyAuxiliaryResult(
             ScoreProcessor scoreProcessor,
             HitObject target,

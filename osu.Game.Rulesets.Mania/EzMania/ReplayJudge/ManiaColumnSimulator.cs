@@ -23,6 +23,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         public bool HoldBroken { get; set; }
 
+        /// <summary>
+        /// [仅尾键状态] HoldNoteBody 辅助判定是否已产出。
+        /// 对齐局内：断连时刻 Body 立即记 ComboBreak，之后尾判/结算不得重复补判。
+        /// </summary>
+        public bool BodyJudged { get; set; }
+
         public HitResult Result { get; set; }
 
         public LaneTargetState(HitObject target) => Target = target;
