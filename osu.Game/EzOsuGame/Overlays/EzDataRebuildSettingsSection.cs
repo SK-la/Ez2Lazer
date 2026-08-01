@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 Text = EzSettingsStrings.DATA_REBUILD_EXECUTE,
                 TooltipText = EzSettingsStrings.DATA_REBUILD_EXECUTE_TOOLTIP,
-                Keywords = new[] { "realm", "tag", "xxy", "pp", "metadata", "backfill", "force", "recalculate", "sqlite", "rebuild", "maintenance", "execute" },
+                Keywords = new[] { "realm", "tag", "xxy", "pp", "metadata", "backfill", "force", "recalculate", "sqlite", "rebuild", "maintenance", "execute", "score", "成绩" },
             };
 
             void updateExecuteButtonState()
@@ -45,7 +45,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 Current = rebuildTarget,
             })
             {
-                Keywords = new[] { "realm", "tag", "xxy", "pp", "metadata", "backfill", "force", "recalculate", "sqlite", "rebuild", "maintenance" }
+                Keywords = new[] { "realm", "tag", "xxy", "pp", "metadata", "backfill", "force", "recalculate", "sqlite", "rebuild", "maintenance", "score", "成绩" }
             });
 
             subsection.Add(executeButton);

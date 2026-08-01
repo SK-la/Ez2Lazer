@@ -39,6 +39,45 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         [Test]
+        public void TestRealmScoresDispatchPropagatesForceAll()
+        {
+            bool? capturedForceAll = null;
+
+            var dispatcher = new EzDataRebuildDispatcher(
+                null,
+                null,
+                null,
+                forceAll =>
+                {
+                    capturedForceAll = forceAll;
+                    return EzDataRebuildDispatchResult.Queued;
+                });
+
+            Assert.That(dispatcher.Execute(EzDataRebuildTarget.RealmScores, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(capturedForceAll, Is.False);
+
+            Assert.That(dispatcher.Execute(EzDataRebuildTarget.RealmScores, forceAll: true), Is.EqualTo(EzDataRebuildDispatchResult.Queued));
+            Assert.That(capturedForceAll, Is.True);
+        }
+
+        [Test]
+        public void TestRealmScoresUnavailableWhenProcessorMissing()
+        {
+            var dispatcher = new EzDataRebuildDispatcher(null, null);
+
+            Assert.That(dispatcher.CanDispatch(EzDataRebuildTarget.RealmScores), Is.False);
+            Assert.That(dispatcher.Execute(EzDataRebuildTarget.RealmScores, forceAll: false), Is.EqualTo(EzDataRebuildDispatchResult.UnavailableProcessor));
+        }
+
+        [Test]
+        public void TestRealmScoresCanDispatch()
+        {
+            var dispatcher = new EzDataRebuildDispatcher(null, null, null, _ => EzDataRebuildDispatchResult.Queued);
+
+            Assert.That(dispatcher.CanDispatch(EzDataRebuildTarget.RealmScores), Is.True);
+        }
+
+        [Test]
         public void TestSqliteMainDispatchPropagatesForceAll()
         {
             bool? capturedForceAll = null;

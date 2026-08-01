@@ -69,6 +69,12 @@ namespace osu.Game.Database
         [Resolved]
         private INotificationOverlay? notificationOverlay { get; set; }
 
+        /// <summary>
+        /// [Ez] 全量成绩重算的 Session 入口（选歌右键同款）。
+        /// </summary>
+        [Resolved]
+        private IEzReplaySession? ezReplaySession { get; set; }
+
         [Resolved]
         private IAPIProvider api { get; set; } = null!;
 
@@ -149,6 +155,155 @@ namespace osu.Game.Database
         {
             lock (ezRealmMetadataBackfillLock)
                 ezRealmMetadataBackfillQueued = false;
+        }
+
+        private readonly object ezScoreRecalculationLock = new object();
+        private bool ezScoreRecalculationQueued;
+
+        /// <summary>
+        /// [Ez] Realm 维护：全量成绩重算（修复被错误后台转换破坏的本地成绩）。
+        /// <list type="bullet">
+        /// <item>mania 且有 replay：Session ForStored 重算（与选歌右键「原始环境重算」同款路径）。</item>
+        /// <item>stable legacy 且无 replay：重走干净的官方 <see cref="StandardisedScoreMigrationTools.UpdateFromLegacy(ScoreInfo, WorkingBeatmap)"/>（从 LegacyTotalScore 重转，修复被写坏的 Total/Acc/Rank）。</item>
+        /// <item>嵌入 Ez 模式但无 replay：跳过（官方算法不理解 Ez 判定语义，重算只会二次破坏）。</item>
+        /// <item>其余：官方 <see cref="ScoreManager.Recalculate"/>。</item>
+        /// </list>
+        /// </summary>
+        /// <param name="includeAllRulesets">false 仅处理 mania 成绩（对应设置「尝试补算」）；true 处理全部游戏模式（「完全重算」）。</param>
+        public EzDataRebuildDispatchResult QueueEzScoreFullRecalculation(bool includeAllRulesets)
+        {
+            lock (ezScoreRecalculationLock)
+            {
+                if (ezScoreRecalculationQueued)
+                {
+                    Logger.Log("Ez full score recalculation is already running; ignoring duplicate request.");
+                    return EzDataRebuildDispatchResult.AlreadyRunning;
+                }
+
+                ezScoreRecalculationQueued = true;
+            }
+
+            Task.Factory.StartNew(() =>
+            {
+                try
+                {
+                    runEzScoreFullRecalculation(includeAllRulesets);
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Ez full score recalculation failed: {e}");
+                }
+                finally
+                {
+                    lock (ezScoreRecalculationLock)
+                        ezScoreRecalculationQueued = false;
+                }
+            }, TaskCreationOptions.LongRunning);
+
+            return EzDataRebuildDispatchResult.Queued;
+        }
+
+        private void runEzScoreFullRecalculation(bool includeAllRulesets)
+        {
+            Logger.Log($"Querying local scores for full recalculation (all rulesets: {includeAllRulesets})...");
+
+            List<Guid> scoreIds = realmAccess.Run(r => r.All<ScoreInfo>()
+                                                        .Where(s => !s.DeletePending)
+                                                        .AsEnumerable()
+                                                        .Where(s => includeAllRulesets || s.Ruleset.OnlineID == 3)
+                                                        .Select(s => s.ID)
+                                                        .ToList());
+
+            Logger.Log($"Found {scoreIds.Count} local scores for full recalculation.");
+
+            if (scoreIds.Count == 0)
+                return;
+
+            var notification = showProgressNotification(scoreIds.Count, "Recalculating local scores", "local scores have been recalculated");
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            foreach (var id in scoreIds)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                updateNotificationProgress(notification, processedCount, scoreIds.Count);
+
+                sleepIfRequired();
+
+                try
+                {
+                    if (recalculateSingleScore(id))
+                        ++processedCount;
+                    else
+                        ++failedCount;
+                }
+                catch (ObjectDisposedException)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Failed to recalculate score {id}: {e}");
+                    ++failedCount;
+                }
+            }
+
+            completeNotification(notification, processedCount, scoreIds.Count, failedCount);
+        }
+
+        private bool recalculateSingleScore(Guid id)
+        {
+            (ScoreInfo? score, bool hasReplay) = realmAccess.Run(r =>
+            {
+                var s = r.Find<ScoreInfo>(id);
+                return s == null ? (null, false) : (s.Detach(), s.Files.Count > 0);
+            });
+
+            if (score == null)
+            {
+                Logger.Log($"Score {id} no longer exists, skipping.");
+                return false;
+            }
+
+            if (score.Ruleset.OnlineID == 3 && hasReplay && ezReplaySession != null)
+            {
+                // 与选歌右键「原始环境重算」一致：Session ForStored（嵌入 HM/HM；无嵌入按双 Lazer）。
+                // 后台线程串行执行，同步阻塞等待即可。
+                EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmapManager, ezReplaySession, score, ReplayRunPurpose.ForStored)
+                                           .GetAwaiter().GetResult();
+                return true;
+            }
+
+            if (score.HasManiaGameplayModes())
+            {
+                // Ez 语义成绩无 replay：官方算法不理解 Ez 判定权重，重算只会破坏，保持原值。
+                Logger.Log($"Skipping Ez gameplay-mode score {id} without replay (official recalculation not applicable).");
+                return true;
+            }
+
+            if (score.IsLegacyScore && score.Ruleset.IsLegacyRuleset())
+            {
+                // stable 成绩无 replay：重新走干净的官方 legacy 转换（从 LegacyTotalScore），
+                // 普通 Recalculate 修不了被污染转换写坏的 TotalScoreWithoutMods。
+                return realmAccess.Write(r =>
+                {
+                    var s = r.Find<ScoreInfo>(id);
+
+                    if (s == null)
+                        return false;
+
+                    StandardisedScoreMigrationTools.UpdateFromLegacy(s, beatmapManager.GetWorkingBeatmap(s.BeatmapInfo));
+                    s.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
+                    s.BackgroundReprocessingFailed = false;
+                    return true;
+                });
+            }
+
+            scoreManager.Recalculate(score);
+            return true;
         }
 
         protected override void LoadComplete()

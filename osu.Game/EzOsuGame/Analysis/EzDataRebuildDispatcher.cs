@@ -16,6 +16,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly Func<EzRealmMetadataScope, bool, EzDataRebuildDispatchResult>? queueRealm;
         private readonly Func<bool, EzDataRebuildDispatchResult>? queueSqliteMain;
         private readonly Func<bool, EzDataRebuildDispatchResult>? queueSqliteSongsBranches;
+        private readonly Func<bool, EzDataRebuildDispatchResult>? queueRealmScores;
 
         public EzDataRebuildDispatcher(
             BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
@@ -23,7 +24,8 @@ namespace osu.Game.EzOsuGame.Analysis
             : this(
                 backgroundDataStoreProcessor == null ? null : backgroundDataStoreProcessor.QueueEzRealmMetadataRebuild,
                 warmupProcessor == null ? null : warmupProcessor.QueueSqliteMainRebuild,
-                warmupProcessor == null ? null : warmupProcessor.QueueSqliteSongsBranchesRebuild)
+                warmupProcessor == null ? null : warmupProcessor.QueueSqliteSongsBranchesRebuild,
+                backgroundDataStoreProcessor == null ? null : backgroundDataStoreProcessor.QueueEzScoreFullRecalculation)
         {
             this.backgroundDataStoreProcessor = backgroundDataStoreProcessor;
             this.warmupProcessor = warmupProcessor;
@@ -32,11 +34,13 @@ namespace osu.Game.EzOsuGame.Analysis
         internal EzDataRebuildDispatcher(
             Func<EzRealmMetadataScope, bool, EzDataRebuildDispatchResult>? queueRealm,
             Func<bool, EzDataRebuildDispatchResult>? queueSqliteMain,
-            Func<bool, EzDataRebuildDispatchResult>? queueSqliteSongsBranches)
+            Func<bool, EzDataRebuildDispatchResult>? queueSqliteSongsBranches,
+            Func<bool, EzDataRebuildDispatchResult>? queueRealmScores = null)
         {
             this.queueRealm = queueRealm;
             this.queueSqliteMain = queueSqliteMain;
             this.queueSqliteSongsBranches = queueSqliteSongsBranches;
+            this.queueRealmScores = queueRealmScores;
         }
 
         public bool CanDispatch(EzDataRebuildTarget target)
@@ -48,6 +52,9 @@ namespace osu.Game.EzOsuGame.Analysis
                 case EzDataRebuildTarget.RealmPp:
                 case EzDataRebuildTarget.RealmAll:
                     return queueRealm != null;
+
+                case EzDataRebuildTarget.RealmScores:
+                    return queueRealmScores != null;
 
                 case EzDataRebuildTarget.SqliteMain:
                     return queueSqliteMain != null;
@@ -76,6 +83,9 @@ namespace osu.Game.EzOsuGame.Analysis
                 case EzDataRebuildTarget.RealmAll:
                     return dispatchRealm(EzRealmMetadataScope.All, forceAll);
 
+                case EzDataRebuildTarget.RealmScores:
+                    return dispatchRealmScores(forceAll);
+
                 case EzDataRebuildTarget.SqliteMain:
                     return dispatchSqliteMain(forceAll);
 
@@ -98,6 +108,18 @@ namespace osu.Game.EzOsuGame.Analysis
             }
 
             return queueRealm(scope, forceAll);
+        }
+
+        private EzDataRebuildDispatchResult dispatchRealmScores(bool forceAll)
+        {
+            if (queueRealmScores == null)
+            {
+                Logger.Log("Cannot queue full score recalculation: background data store processor is unavailable.",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return EzDataRebuildDispatchResult.UnavailableProcessor;
+            }
+
+            return queueRealmScores(forceAll);
         }
 
         private EzDataRebuildDispatchResult dispatchSqliteMain(bool forceAll)

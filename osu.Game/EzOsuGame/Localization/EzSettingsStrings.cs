@@ -137,8 +137,12 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("数据维护目标", "Data maintenance target");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_TARGET_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "选择要维护的数据范围。SQLite 在已有匹配的最新版文件时不会自动预热；Realm 缺失项仍会在启动时自动补算。",
-            "Choose which data to maintain. SQLite is not auto-warmed when a matching current database exists; Realm missing values are still filled at startup.");
+            "选择要维护的数据范围。SQLite 在已有匹配的最新版文件时不会自动预热；Realm 缺失项仍会在启动时自动补算。"
+            + "\n成绩全量重算：有 replay 的 mania 成绩走 Session 原始环境重算（与选歌右键一致）；stable 旧成绩无 replay 时重走官方转换。"
+            + "\n「尝试补算」仅处理 mania 成绩；「完全重算」处理全部游戏模式。",
+            "Choose which data to maintain. SQLite is not auto-warmed when a matching current database exists; Realm missing values are still filled at startup."
+            + "\nFull score recalculation: mania scores with replays are recalculated via Session in their stored environment (same as the song select context menu); legacy scores without replays are re-converted officially."
+            + "\n\"Backfill\" processes mania scores only; \"Force rebuild\" processes all rulesets.");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_EXECUTE =
             new EzLocalizationManager.EzLocalisableString("执行", "Execute");
