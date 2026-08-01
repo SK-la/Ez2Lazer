@@ -20,6 +20,7 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Extensions;
@@ -277,9 +278,10 @@ namespace osu.Game.Database
                 return true;
             }
 
-            if (score.HasManiaGameplayModes())
+            if (score.ManiaHitMode > (int)EzEnumHitMode.Lazer)
             {
-                // Ez 语义成绩无 replay：官方算法不理解 Ez 判定权重，重算只会破坏，保持原值。
+                // 非官方判定语义成绩且无 replay：官方算法不理解 Ez 判定权重，重算只会破坏，保持原值。
+                // 双 Lazer（HitMode=0）是官方语义，继续走下方官方路径。
                 Logger.Log($"Skipping Ez gameplay-mode score {id} without replay (official recalculation not applicable).");
                 return true;
             }
@@ -1117,9 +1119,12 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// [Ez] 带 Ez 游玩模式（ManiaHitMode / ManiaHealthMode 嵌入）的成绩不参与官方分数升级：
-        /// 官方 legacy 转换 / rank 重算 / mod 倍率升级都不理解 Ez 判定与计分语义（曾把此类成绩错转为 D + 超低分）。
-        /// 这里直接把 TotalScoreVersion 盖到最新，避免每次启动重查；此类成绩仅能通过 Ez Session 重算刷新。
+        /// [Ez] 带非官方判定语义（ManiaHitMode &gt; Lazer，即 EZ2AC / O2Jam / IIDX / … / Classic）的成绩
+        /// 不参与官方分数升级：官方 legacy 转换 / rank 重算 / mod 倍率升级都不理解 Ez 判定与计分语义
+        /// （曾把成绩错转为 D + 超低分）。这里直接把 TotalScoreVersion 盖到最新，避免每次启动重查；
+        /// 此类成绩仅能通过 Ez Session 重算刷新。
+        /// 注意：局内双 Lazer 成绩落库为 ManiaHitMode=0（未归一），它们是官方语义，必须跟随 ppy 上游升级，
+        /// 因此判据只看 HitMode &gt; 0；HealthMode 只影响血量、与计分无关，不参与判断。
         /// </summary>
         private void stampEzGameplayModeScores()
         {
@@ -1128,8 +1133,7 @@ namespace osu.Game.Database
             HashSet<Guid> scoreIds = realmAccess.Run(r => new HashSet<Guid>(
                 r.All<ScoreInfo>()
                  .Where(s => s.TotalScoreVersion < LegacyScoreEncoder.LATEST_VERSION
-                             && (s.ManiaHitMode != EzManiaScoreModeExtensions.UNSET_MODE
-                                 || s.ManiaHealthMode != EzManiaScoreModeExtensions.UNSET_MODE))
+                             && s.ManiaHitMode > (int)EzEnumHitMode.Lazer)
                  .AsEnumerable()
                  .Select(s => s.ID)));
 
@@ -1171,9 +1175,9 @@ namespace osu.Game.Database
                              && s.BeatmapInfo != null
                              && s.TotalScoreVersion < 30000017 // version number represents version with latest mod multiplier change
                              && s.TotalScoreWithoutMods > 0
-                             // [Ez] gameplay-mode scores are exempt from official upgrades (see stampEzGameplayModeScores).
-                             && s.ManiaHitMode == EzManiaScoreModeExtensions.UNSET_MODE
-                             && s.ManiaHealthMode == EzManiaScoreModeExtensions.UNSET_MODE)
+                             // [Ez] non-official judge semantics are exempt from official upgrades (see stampEzGameplayModeScores).
+                             // Lazer (0) and unset (-1) both follow ppy upstream behaviour.
+                             && s.ManiaHitMode <= (int)EzEnumHitMode.Lazer)
                  .AsEnumerable()
                  // must be done after materialisation, as realm doesn't want to support
                  // nested property predicates
@@ -1240,9 +1244,9 @@ namespace osu.Game.Database
                              && s.BeatmapInfo != null
                              && s.IsLegacyScore
                              && s.TotalScoreVersion < LegacyScoreEncoder.LATEST_VERSION
-                             // [Ez] gameplay-mode scores are exempt from official upgrades (see stampEzGameplayModeScores).
-                             && s.ManiaHitMode == EzManiaScoreModeExtensions.UNSET_MODE
-                             && s.ManiaHealthMode == EzManiaScoreModeExtensions.UNSET_MODE)
+                             // [Ez] non-official judge semantics are exempt from official upgrades (see stampEzGameplayModeScores).
+                             // Lazer (0) and unset (-1) both follow ppy upstream behaviour.
+                             && s.ManiaHitMode <= (int)EzEnumHitMode.Lazer)
                  .AsEnumerable()
                  // must be done after materialisation, as realm doesn't want to support
                  // nested property predicates
@@ -1329,9 +1333,9 @@ namespace osu.Game.Database
                 r.All<ScoreInfo>()
                  .Where(s => s.TotalScoreVersion < 30000013 // last total score version with a significant change to ranks
                              && !s.BackgroundReprocessingFailed
-                             // [Ez] gameplay-mode scores are exempt from official upgrades (see stampEzGameplayModeScores).
-                             && s.ManiaHitMode == EzManiaScoreModeExtensions.UNSET_MODE
-                             && s.ManiaHealthMode == EzManiaScoreModeExtensions.UNSET_MODE)
+                             // [Ez] non-official judge semantics are exempt from official upgrades (see stampEzGameplayModeScores).
+                             // Lazer (0) and unset (-1) both follow ppy upstream behaviour.
+                             && s.ManiaHitMode <= (int)EzEnumHitMode.Lazer)
                  .AsEnumerable()
                  // must be done after materialisation, as realm doesn't support
                  // filtering on nested property predicates or projection via `.Select()`
