@@ -11,6 +11,15 @@
   <PropertyGroup>
     <ApplicationManifest>$(MSBuildThisFileDirectory)app.manifest</ApplicationManifest>
   </PropertyGroup>
+  <PropertyGroup Label="Build Hygiene">
+    <!-- Make reproducibility settings explicit instead of relying on SDK defaults. -->
+    <Deterministic>true</Deterministic>
+    <!-- Use compiler-invocation isolation to avoid stale compiler server state. -->
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <!-- Keep output folder partitioning explicit for multi-target and RID builds. -->
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>true</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
   <ItemGroup Label="License">
     <None Include="$(MSBuildThisFileDirectory)osu.licenseheader">
       <Link>osu.licenseheader</Link>
