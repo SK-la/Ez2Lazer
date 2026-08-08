@@ -3,13 +3,17 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input;
 using osu.Framework.Input.Handlers.Joystick;
+using osu.Framework.Input.States;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
+using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Input
 {
@@ -36,14 +40,35 @@ namespace osu.Game.EzOsuGame.Input
         private JoystickHandler? joystickHandler;
         private Scheduler? scheduler;
 
+        private Bindable<string> scratchAxisL = null!;
+        private Bindable<string> scratchAxisR = null!;
+
         [BackgroundDependencyLoader]
-        private void load(GameHost host)
+        private void load(GameHost host, Ez2ConfigManager config)
         {
             scheduler = host.UpdateThread.Scheduler;
             joystickHandler = host.AvailableInputHandlers.OfType<JoystickHandler>().FirstOrDefault();
 
             if (joystickHandler != null)
                 joystickHandler.DeviceAxisChanged += onDeviceAxisChanged;
+
+            scratchAxisL = config.GetBindable<string>(Ez2Setting.ScratchAxisL);
+            scratchAxisR = config.GetBindable<string>(Ez2Setting.ScratchAxisR);
+
+            scratchAxisL.BindValueChanged(_ => updateContinuousAxes());
+            scratchAxisR.BindValueChanged(_ => updateContinuousAxes(), true);
+        }
+
+        /// <summary>
+        /// 告知框架哪些轴是转盘：转盘停在何处便留在何处，框架据轴值合成的方向按键会一直处于按下态，
+        /// 从而让所有 Exact 匹配的键位组合整局失效。
+        /// </summary>
+        private void updateContinuousAxes()
+        {
+            joystickHandler?.SetContinuousAxes(new[] { scratchAxisL.Value, scratchAxisR.Value }
+                                               .Select(ScratchAxisBinding.Parse)
+                                               .Where(b => !b.IsEmpty && b.AxisIndex >= 0 && b.AxisIndex < JoystickState.MAX_AXES)
+                                               .Select(b => (JoystickAxisSource)b.AxisIndex));
         }
 
         protected override void Dispose(bool isDisposing)
@@ -74,7 +99,7 @@ namespace osu.Game.EzOsuGame.Input
             TryGetValue(binding, out float value) ? value : 0;
 
         public string? GetDeviceName(string guid) =>
-            namesByGuid.TryGetValue(guid, out string? name) ? name : null;
+            namesByGuid.GetValueOrDefault(guid);
 
         private void onDeviceAxisChanged(JoystickDeviceAxis axis)
         {
