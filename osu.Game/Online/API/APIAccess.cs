@@ -21,6 +21,7 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Online;
 using osu.Game.Localisation;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
@@ -112,14 +113,12 @@ namespace osu.Game.Online.API
 
             if (!DebugUtils.IsNUnitRunning && isPersistedLocalSession(ProvidedUsername, configuredToken))
             {
+                // Restore the local account session without any network activity.
                 password = local_token_marker;
-                IsLocalOnly = true;
-                state.Value = APIState.Online;
+                state.Value = APIState.LocalOnline;
                 localUserState.SetPlaceholderLocalUser(ProvidedUsername, true);
-                return;
             }
-
-            if (HasLogin)
+            else if (HasLogin)
             {
                 // Early call to ensure the local user / "logged in" state is correct immediately.
                 localUserState.SetPlaceholderLocalUser(ProvidedUsername);
@@ -158,8 +157,7 @@ namespace osu.Game.Online.API
                         break;
 
                     case @"logout":
-                        // 在本地-only 模式下忽略来自服务器的 logout 事件，避免远程推送导致本地实验性登录被撤销。
-                        if (state.Value == APIState.Online && !IsLocalOnly)
+                        if (state.Value == APIState.Online)
                             Logout();
 
                         break;
@@ -214,6 +212,13 @@ namespace osu.Game.Online.API
 
                 Debug.Assert(HasLogin);
 
+                // 本地账号不需要连接、access token 或存活探测，请求已在 Queue() 中就地应答。
+                if (state.Value == APIState.LocalOnline)
+                {
+                    Thread.Sleep(50);
+                    continue;
+                }
+
                 // Ensure that we are in an online state. If not, attempt to connect.
                 if (state.Value != APIState.Online)
                 {
@@ -226,15 +231,11 @@ namespace osu.Game.Online.API
                     }
                 }
 
-                // 如果无法获取有效的 access token，则通常会强制登出。
-                // 对于本地-only 模式不需要 access token，因此在该模式下应避免登出操作。
+                // Ensure that we have a valid access token. If not, force a logout to require user interaction.
                 if (authentication.RequestAccessToken() == null)
                 {
-                    if (!IsLocalOnly)
-                    {
-                        Logout();
-                        continue;
-                    }
+                    Logout();
+                    continue;
                 }
 
                 if (livenessStopwatch.Elapsed.TotalMinutes >= 1)
@@ -480,10 +481,14 @@ namespace osu.Game.Online.API
         {
             try
             {
-                if (IsLocalOnly)
-                    return;
-
                 request.AttachAPI(this);
+
+                if (state.Value == APIState.LocalOnline)
+                {
+                    handleLocally(request);
+                    return;
+                }
+
                 request.Perform();
             }
             catch (Exception e)
@@ -502,7 +507,6 @@ namespace osu.Game.Online.API
 
             ProvidedUsername = username;
             this.password = password;
-            IsLocalOnly = false;
         }
 
         public void LoginLocal(string username)
@@ -511,7 +515,6 @@ namespace osu.Game.Online.API
 
             ProvidedUsername = username;
             password = local_token_marker;
-            IsLocalOnly = true;
 
             // Persist local account session so restart can directly restore local login state.
             config.SetValue(OsuSetting.Username, ProvidedUsername);
@@ -519,7 +522,7 @@ namespace osu.Game.Online.API
 
             Schedule(() => localUserState.SetPlaceholderLocalUser(ProvidedUsername, true));
             LastLoginError = null;
-            state.Value = APIState.Online;
+            state.Value = APIState.LocalOnline;
         }
 
         public void AuthenticateSecondFactor(string code)
@@ -691,7 +694,18 @@ namespace osu.Game.Online.API
 
         public bool IsLoggedIn => State.Value > APIState.Offline;
 
-        public bool IsLocalOnly { get; private set; }
+        public bool IsLocalOnly => State.Value == APIState.LocalOnline;
+
+        /// <summary>
+        /// Responds to requests locally while in <see cref="APIState.LocalOnline"/>.
+        /// </summary>
+        public ILocalOnlyRequestHandler LocalRequestHandler { get; set; } = new LocalOnlyRequestHandler();
+
+        private void handleLocally(APIRequest request)
+        {
+            if (!LocalRequestHandler.Handle(request))
+                request.Fail(new LocalOnlyUnavailableException(request));
+        }
 
         public void Queue(APIRequest request)
         {
@@ -699,8 +713,12 @@ namespace osu.Game.Online.API
             {
                 request.AttachAPI(this);
 
-                if (IsLocalOnly)
+                if (state.Value == APIState.LocalOnline)
+                {
+                    // Schedule to avoid running completion callbacks from within the caller's stack.
+                    Schedule(() => handleLocally(request));
                     return;
+                }
 
                 if (state.Value == APIState.Offline)
                 {
@@ -735,7 +753,6 @@ namespace osu.Game.Online.API
             authentication.Clear();
 
             localUserState.ClearLocalUser();
-            IsLocalOnly = false;
 
             state.Value = APIState.Offline;
             flushQueue();
@@ -806,6 +823,13 @@ namespace osu.Game.Online.API
         /// <summary>
         /// We are online.
         /// </summary>
-        Online
+        Online,
+
+        /// <summary>
+        /// 已登录到本机（未来的局域网 / P2P）账号，不与 osu! 服务器通信。
+        /// 视作「已登录」（排在 <see cref="Offline"/> 之后使 <see cref="IAPIProvider.IsLoggedIn"/> 成立），
+        /// 但任何 <c>== <see cref="Online"/></c> 的判断都不会成立，因此需要真实网络的功能会自动被排除。
+        /// </summary>
+        LocalOnline
     }
 }

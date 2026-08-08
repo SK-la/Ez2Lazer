@@ -73,8 +73,8 @@ namespace osu.Game.Online.API
 
         public IBindable<string?> UserFacingOutageMessage { get; } = new Bindable<string?>();
 
-        // Match IAPIProvider.IsLocalOnly
-        public bool IsLocalOnly { get; private set; }
+        /// <seealso cref="APIAccess.IsLocalOnly"/>
+        public bool IsLocalOnly => State.Value == APIState.LocalOnline;
 
         public virtual void Queue(APIRequest request)
         {
@@ -144,8 +144,6 @@ namespace osu.Game.Online.API
                 Id = DUMMY_USER_ID,
             };
 
-            IsLocalOnly = false;
-
             if (SessionVerificationMethod != null)
             {
                 state.Value = APIState.RequiresSecondFactorAuth;
@@ -167,9 +165,7 @@ namespace osu.Game.Online.API
             };
 
             LastLoginError = null;
-            state.Value = APIState.Online;
-
-            IsLocalOnly = true;
+            state.Value = APIState.LocalOnline;
         }
 
         public void AuthenticateSecondFactor(string code)
@@ -215,8 +211,6 @@ namespace osu.Game.Online.API
             // must happen after `state.Value` is changed such that subscribers to that bindable's value changes see the correct user.
             // compare: `APIAccess.Logout()`.
             LocalUser.Value = new GuestUser();
-
-            IsLocalOnly = false;
         }
 
         public void UpdateLocalFriends()
