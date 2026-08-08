@@ -161,12 +161,12 @@ namespace osu.Game.Rulesets.BMS.Tests
             try
             {
                 string dbPath = Path.Combine(tempDir, BmsStoragePaths.INDEX_DATABASE_FILE);
-                const string folderPath = @"D:\BMS\song";
-                string chartPath = Path.Combine(folderPath, "chart.bms");
+                const string folder_path = @"D:\BMS\song";
+                string chartPath = Path.Combine(folder_path, "chart.bms");
                 Guid beatmapId = Guid.NewGuid();
-                const string pathKey = "existing-path-key";
+                const string path_key = "existing-path-key";
 
-                createVersion1Database(dbPath, chartPath, folderPath, beatmapId, pathKey);
+                createVersion1Database(dbPath, chartPath, folder_path, beatmapId, path_key);
 
                 var repository = new BmsLibraryIndexRepository(dbPath);
                 Assert.That(repository.ChartCount, Is.EqualTo(1));
@@ -176,8 +176,8 @@ namespace osu.Game.Rulesets.BMS.Tests
                 Assert.Multiple(() =>
                 {
                     Assert.That(chart.Identity.BeatmapId, Is.EqualTo(beatmapId));
-                    Assert.That(chart.Identity.PathKey, Is.EqualTo(pathKey));
-                    Assert.That(chart.Identity.SetId, Is.EqualTo(BmsChartIdentity.CreateSetId(folderPath)));
+                    Assert.That(chart.Identity.PathKey, Is.EqualTo(path_key));
+                    Assert.That(chart.Identity.SetId, Is.EqualTo(BmsChartIdentity.CreateSetId(folder_path)));
                     Assert.That(chart.SyncState, Is.EqualTo(BmsLibraryIndexRepository.SyncState.Pending));
                     Assert.That(chart.ParseVersion, Is.EqualTo(1));
                 });
@@ -185,7 +185,7 @@ namespace osu.Game.Rulesets.BMS.Tests
                 var changes = repository.GetPendingSyncChanges(10);
                 Assert.That(changes, Has.Count.EqualTo(1));
                 Assert.That(changes[0].BeatmapId, Is.EqualTo(beatmapId));
-                Assert.That(changes[0].SetId, Is.EqualTo(BmsChartIdentity.CreateSetId(folderPath)));
+                Assert.That(changes[0].SetId, Is.EqualTo(BmsChartIdentity.CreateSetId(folder_path)));
                 Assert.That(changes[0].Kind, Is.EqualTo(BmsLibraryIndexRepository.SyncChangeKind.Upsert));
 
                 using var connection = new SqliteConnection($"Data Source={dbPath}");
@@ -334,6 +334,103 @@ namespace osu.Game.Rulesets.BMS.Tests
             finally
             {
                 cleanupTempDirectory(tempDir);
+            }
+        }
+
+        [Test]
+        public void TestHundredThousandChartKeysetPagesStayBoundedAndStable()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), $"bms-index-keyset-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempDir);
+
+            try
+            {
+                string dbPath = Path.Combine(tempDir, BmsStoragePaths.INDEX_DATABASE_FILE);
+                var repository = new BmsLibraryIndexRepository(dbPath);
+                Assert.That(repository.ChartCount, Is.Zero);
+
+                using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+                {
+                    connection.Open();
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = @"
+WITH RECURSIVE charts_to_add(value) AS (
+    SELECT 1
+    UNION ALL
+    SELECT value + 1 FROM charts_to_add WHERE value < 100000
+)
+INSERT INTO charts (
+    chart_path, folder_path, file_name, file_size, last_modified_ticks,
+    beatmap_id, set_id, path_key, title, sub_title, artist, sub_artist, genre,
+    play_level, rank, ln_type, key_count, total_notes, bpm, min_bpm, max_bpm,
+    duration, total_gauge, preview_time, audio_file, preview_file,
+    has_scratch, has_ln, has_stop, has_scroll, has_bga, keysound_files_json)
+SELECT
+    'E:\bms\bulk\' || printf('%06d.bms', value),
+    'E:\bms\bulk',
+    printf('%06d.bms', value),
+    1, 0,
+    printf('00000000-0000-0000-0000-%012d', value),
+    '10000000-0000-0000-0000-000000000000',
+    printf('%064d', value),
+    CASE WHEN value % 1000 = 0 THEN 'needle ' ELSE 'title ' END || printf('%06d', value),
+    '', 'artist', '', '',
+    value % 20, 0, 0, CASE WHEN value % 2 = 0 THEN 7 ELSE 14 END,
+    100, 140, 140, 140, 0, 0, -1, NULL, NULL, 0, 0, 0, 0, 0, '[]'
+FROM charts_to_add;";
+                    cmd.ExecuteNonQuery();
+                    cmd.CommandText = @"
+INSERT INTO songs (folder_path, title, artist, genre, last_modified_ticks) VALUES
+('E:\bms\bulk\a', 'a', '', '', 0),
+('E:\bms\bulk\b', 'b', '', '', 0),
+('E:\bms\bulk\c\nested', 'c', '', '', 0);";
+                    cmd.ExecuteNonQuery();
+                }
+
+                var query = new BmsChartQuery(FolderPath: @"E:\bms\bulk", Sort: BmsChartSort.Title);
+                BmsChartSummaryPage first = repository.GetChartSummaries(query, null, 150);
+                BmsChartSummaryPage second = repository.GetChartSummaries(query, first.NextCursor, 150);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(repository.ChartCount, Is.EqualTo(100000));
+                    Assert.That(first.Items, Has.Count.EqualTo(150));
+                    Assert.That(second.Items, Has.Count.EqualTo(150));
+                    Assert.That(first.Items.Select(item => item.BeatmapId).Intersect(second.Items.Select(item => item.BeatmapId)), Is.Empty);
+                    Assert.That(first.Items[^1].Title, Is.LessThan(second.Items[0].Title));
+                });
+
+                BmsChartSummaryPage filtered = repository.GetChartSummaries(
+                    new BmsChartQuery(SearchText: "needle", KeyCounts: new[] { 7 }, Sort: BmsChartSort.Title),
+                    null,
+                    25);
+                BmsChartSummary? wrappedRandom = repository.GetRandomChartSummary(
+                    new BmsChartQuery(SearchText: "needle", KeyCounts: new[] { 7 }),
+                    ulong.MaxValue);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(filtered.Items, Has.Count.EqualTo(25));
+                    Assert.That(filtered.Items, Has.All.Matches<BmsChartSummary>(item => item.Title.Contains("needle", StringComparison.OrdinalIgnoreCase)));
+                    Assert.That(filtered.Items, Has.All.Matches<BmsChartSummary>(item => item.KeyCount == 7));
+                    Assert.That(repository.GetChildFolders(@"E:\bms\bulk", null, 2), Has.Count.EqualTo(2));
+                    Assert.That(wrappedRandom, Is.Not.Null);
+                    Assert.That(wrappedRandom!.FileName, Is.EqualTo("001000.bms"));
+                    Assert.That(wrappedRandom.Title, Does.Contain("needle"));
+                    Assert.That(wrappedRandom.KeyCount, Is.EqualTo(7));
+                    Assert.That(() => repository.GetChartSummaries(query, null, 201), Throws.TypeOf<ArgumentOutOfRangeException>());
+                });
+            }
+            finally
+            {
+                try
+                {
+                    Directory.Delete(tempDir, true);
+                }
+                catch
+                {
+                    // Ignore cleanup failures on CI.
+                }
             }
         }
 

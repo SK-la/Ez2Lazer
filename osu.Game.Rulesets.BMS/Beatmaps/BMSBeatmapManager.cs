@@ -465,11 +465,17 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return indexRepository.GetCharts(offset, limit).Select(indexed => indexed.Chart).ToList();
         }
 
-        public IReadOnlyList<BMSSongCache> GetSongSummaryPage(int offset, int limit)
-            => indexRepository.GetSongs(offset, limit);
+        public BmsChartSummaryPage GetChartSummaryPage(BmsChartQuery query, BmsChartPageCursor? after, int limit)
+            => indexRepository.GetChartSummaries(query, after, limit);
 
-        public IReadOnlyList<BMSChartCache> GetChartsByFolder(string folderPath)
-            => indexRepository.GetChartsByFolder(folderPath).Select(indexed => indexed.Chart).ToList();
+        public BmsChartSummary? GetRandomChartSummary(BmsChartQuery query)
+            => indexRepository.GetRandomChartSummary(query);
+
+        public bool TryGetChartSummaryByPathKey(string pathKey, out BmsChartSummary summary)
+            => indexRepository.TryGetChartSummaryByPathKey(pathKey, out summary);
+
+        public IReadOnlyList<BmsFolderSummary> GetChildFolderPage(string parentPath, string? afterFolderPath, int limit)
+            => indexRepository.GetChildFolders(parentPath, afterFolderPath, limit);
 
         public bool TryGetSourceReference(Guid beatmapId, out BMSSourceReference sourceReference)
             => indexRepository.TryGetSourceReference(beatmapId, out sourceReference);

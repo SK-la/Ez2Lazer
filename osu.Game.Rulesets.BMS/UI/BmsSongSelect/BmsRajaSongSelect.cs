@@ -41,6 +41,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         private BMSBeatmapManager beatmapManager = null!;
         private BmsBarManager barManager = null!;
         private BmsBarContext barContext = null!;
+        private BmsBarRenderer barRenderer = null!;
         private BmsChartPreviewPlayer previewPlayer = null!;
         private TextBox searchTextBox = null!;
         private RulesetInfo bmsRulesetInfo = null!;
@@ -123,7 +124,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 RelativeSizeAxes = Axes.Both,
                 Children = new Drawable[]
                 {
-                    new BmsBarRenderer(barManager, barContext)
+                    barRenderer = new BmsBarRenderer(barManager, barContext)
                     {
                         RelativeSizeAxes = Axes.Both,
                     },
@@ -238,8 +239,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
             try
             {
-                var working = new BMSWorkingBeatmap(song.Chart.FullPath, audioManager, renderer, song.Chart);
-                int previewTime = song.Chart.PreviewTime;
+                if (!beatmapManager.TryGetChart(song.BeatmapId, out BMSChartCache chart))
+                    return;
+
+                var working = new BMSWorkingBeatmap(chart.FullPath, audioManager, renderer, chart);
+                int previewTime = chart.PreviewTime;
                 previewPlayer.OverridePreviewStartTime = previewTime >= 0 ? previewTime : 0;
                 previewPlayer.StartPreview(working);
             }
@@ -260,7 +264,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             }
 
             previewPlayer.StopPreview();
-            BmsSongSelectPlayHelper.TryLaunchFromChart(this, song.Chart.FullPath, song.Chart, null, audioManager, renderer, musicController, notifications);
+
+            if (beatmapManager.TryGetChart(song.BeatmapId, out BMSChartCache chart))
+                BmsSongSelectPlayHelper.TryLaunchFromChart(this, chart.FullPath, chart, null, audioManager, renderer, musicController, notifications);
         }
 
         private void refreshLibrary()
@@ -275,9 +281,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 notifications,
                 () =>
                 {
+                    barManager.Changed -= onBarSelectionChanged;
                     rebuildBarContext();
                     barManager = new BmsBarManager(barContext);
                     barManager.Changed += onBarSelectionChanged;
+                    barRenderer.Rebind(barManager, barContext);
                     refreshFilterDatabase();
                     barManager.ResetToRoot();
                 });
@@ -323,7 +331,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             var roots = BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value);
             beatmapManager.SetRootPaths(roots);
 
-            var folderTree = BmsFolderTree.Build(roots, enumerateSongs());
+            var folderTree = BmsFolderTree.Build(roots);
             string filterPath = BmsStoragePaths.GetFilterDatabasePath(storage);
 
             barContext = new BmsBarContext
@@ -336,22 +344,6 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 LampStore = lampStore,
                 Realm = realm,
             };
-        }
-
-        private IEnumerable<BMSSongCache> enumerateSongs()
-        {
-            const int page_size = 128;
-
-            for (int offset = 0; ; offset += page_size)
-            {
-                IReadOnlyList<BMSSongCache> songs = beatmapManager.GetSongSummaryPage(offset, page_size);
-
-                foreach (BMSSongCache song in songs)
-                    yield return song;
-
-                if (songs.Count < page_size)
-                    yield break;
-            }
         }
 
         private void syncConfiguredPaths() => beatmapManager.SetRootPaths(BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value));

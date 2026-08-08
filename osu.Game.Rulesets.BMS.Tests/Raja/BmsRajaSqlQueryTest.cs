@@ -2,7 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using NUnit.Framework;
 using osu.Game.Rulesets.BMS.Beatmaps;
@@ -74,6 +76,21 @@ VALUES ($sha, 90, 10, 0, 0, 100, 12, 18, 10, 140);";
                 Assert.That(query.Execute("peakdensity >= 15 AND peakdensity < 20"), Has.Count.EqualTo(1));
                 Assert.That(query.Execute("density >= 10 AND density < 15"), Has.Count.EqualTo(1));
                 Assert.That(query.Execute("playcount = 0"), Is.Empty);
+
+                using JsonDocument filterJson = JsonDocument.Parse("5");
+                BmsChartSummary? wrappedRandom = query.GetRandom(
+                    "peakdensity >= $minimumDensity",
+                    new[] { 7 },
+                    new Dictionary<string, JsonElement> { ["clear"] = filterJson.RootElement },
+                    new Dictionary<string, object?> { ["$minimumDensity"] = 15 },
+                    ulong.MaxValue);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(wrappedRandom, Is.Not.Null);
+                    Assert.That(wrappedRandom!.Title, Is.EqualTo("Test"));
+                    Assert.That(wrappedRandom.KeyCount, Is.EqualTo(7));
+                });
             }
             finally
             {

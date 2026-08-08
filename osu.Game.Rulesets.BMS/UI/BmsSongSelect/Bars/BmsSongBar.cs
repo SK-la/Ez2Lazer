@@ -7,17 +7,17 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
 {
     public sealed class BmsSongBar : BmsSelectableBar
     {
-        public BMSChartCache Chart { get; }
+        public BmsChartSummary Summary { get; }
 
-        public string PathKey => string.IsNullOrEmpty(Chart.Md5Hash)
-            ? BmsPathKeys.ComputeChartPathKey(Chart.FullPath)
-            : Chart.Md5Hash;
+        public Guid BeatmapId => Summary.BeatmapId;
 
-        public BmsSongBar(BMSChartCache chart)
+        public string PathKey => Summary.PathKey;
+
+        public BmsSongBar(BmsChartSummary summary)
         {
-            Chart = chart;
-            Title = string.IsNullOrWhiteSpace(chart.Title) ? chart.FileName : chart.Title;
-            Subtitle = $"{chart.Artist} / Lv.{chart.PlayLevel} / {chart.KeyCount}K";
+            Summary = summary;
+            Title = string.IsNullOrWhiteSpace(summary.Title) ? summary.FileName : summary.Title;
+            Subtitle = $"{summary.Artist} / Lv.{summary.PlayLevel} / {summary.KeyCount}K";
         }
 
         public override string Title { get; }

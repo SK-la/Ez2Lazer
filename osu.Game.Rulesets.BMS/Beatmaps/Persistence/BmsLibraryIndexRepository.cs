@@ -309,49 +309,157 @@ LIMIT $limit OFFSET $offset;";
             return result;
         }
 
-        public IReadOnlyList<BMSSongCache> GetSongs(int offset, int limit)
+        public BmsChartSummaryPage GetChartSummaries(BmsChartQuery query, BmsChartPageCursor? after, int limit)
         {
-            ArgumentOutOfRangeException.ThrowIfNegative(offset);
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
-            ensureInitialized();
-            var result = new List<BMSSongCache>(limit);
 
+            if (limit > 200)
+                throw new ArgumentOutOfRangeException(nameof(limit), "Chart summary pages are limited to 200 rows.");
+
+            ensureInitialized();
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
+            string sortExpression = getSortExpression(query.Sort);
+            var where = new List<string>();
+            appendChartSummaryFilters(cmd, query, where);
+
+            if (after != null)
+            {
+                cmd.Parameters.AddWithValue("$afterKey", after.Value.SortKey);
+                cmd.Parameters.AddWithValue("$afterId", after.Value.BeatmapId.ToString());
+            }
+
             cmd.CommandText = $@"
-SELECT folder_path, title, artist, genre, banner_path, stage_path, last_modified_ticks
-FROM {table_songs}
-ORDER BY folder_path
-LIMIT $limit OFFSET $offset;";
+WITH filtered AS (
+    SELECT beatmap_id, set_id, path_key, chart_path, folder_path, file_name,
+           title, artist, play_level, key_count, bpm, total_notes, preview_time,
+           {sortExpression} AS sort_key
+    FROM {table_charts}
+    {buildWhereClause(where)}
+)
+SELECT beatmap_id, set_id, path_key, chart_path, folder_path, file_name,
+       title, artist, play_level, key_count, bpm, total_notes, preview_time, sort_key
+FROM filtered
+{(after == null ? string.Empty : "WHERE (sort_key > $afterKey COLLATE NOCASE OR (sort_key = $afterKey COLLATE NOCASE AND beatmap_id > $afterId))")}
+ORDER BY sort_key COLLATE NOCASE, beatmap_id
+LIMIT $limit;";
             cmd.Parameters.AddWithValue("$limit", limit);
-            cmd.Parameters.AddWithValue("$offset", offset);
+
+            var items = new List<BmsChartSummary>(limit);
+            BmsChartPageCursor? next = null;
 
             using var reader = cmd.ExecuteReader();
 
             while (reader.Read())
-                result.Add(readSong(reader));
+            {
+                Guid beatmapId = Guid.Parse(reader.GetString(0));
+                items.Add(readChartSummary(reader, beatmapId));
+                next = new BmsChartPageCursor(reader.GetString(13), beatmapId);
+            }
 
-            return result;
+            return new BmsChartSummaryPage(items, items.Count == limit ? next : null);
         }
 
-        public IReadOnlyList<IndexedChart> GetChartsByFolder(string folderPath)
+        public bool TryGetChartSummaryByPathKey(string pathKey, out BmsChartSummary summary)
         {
+            summary = null!;
             ensureInitialized();
-            var result = new List<IndexedChart>();
 
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = $@"
-SELECT *
+SELECT beatmap_id, set_id, path_key, chart_path, folder_path, file_name,
+       title, artist, play_level, key_count, bpm, total_notes, preview_time
 FROM {table_charts}
-WHERE folder_path = $folder
-ORDER BY play_level, file_name;";
-            cmd.Parameters.AddWithValue("$folder", folderPath);
+WHERE path_key = $pathKey
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("$pathKey", pathKey);
 
             using var reader = cmd.ExecuteReader();
 
+            if (!reader.Read())
+                return false;
+
+            summary = readChartSummary(reader, Guid.Parse(reader.GetString(0)));
+            return true;
+        }
+
+        public BmsChartSummary? GetRandomChartSummary(BmsChartQuery query, ulong? randomValue = null)
+        {
+            ensureInitialized();
+            using var connection = openConnection();
+            string randomKey = BmsPathKeys.CreateRandomStartKey(randomValue);
+            return tryGetChartSummaryAtOrAfter(connection, query, randomKey)
+                   ?? tryGetChartSummaryAtOrAfter(connection, query, null);
+        }
+
+        private static BmsChartSummary? tryGetChartSummaryAtOrAfter(SqliteConnection connection, BmsChartQuery query, string? startKey)
+        {
+            using var cmd = connection.CreateCommand();
+            var where = new List<string>();
+            appendChartSummaryFilters(cmd, query, where);
+
+            if (startKey != null)
+            {
+                where.Add("path_key >= $startKey");
+                cmd.Parameters.AddWithValue("$startKey", startKey);
+            }
+
+            cmd.CommandText = $@"
+SELECT beatmap_id, set_id, path_key, chart_path, folder_path, file_name,
+       title, artist, play_level, key_count, bpm, total_notes, preview_time
+FROM {table_charts}
+{buildWhereClause(where)}
+ORDER BY path_key
+LIMIT 1;";
+
+            using var reader = cmd.ExecuteReader();
+            return reader.Read() ? readChartSummary(reader, Guid.Parse(reader.GetString(0))) : null;
+        }
+
+        public IReadOnlyList<BmsFolderSummary> GetChildFolders(string parentPath, string? afterFolderPath, int limit)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+            ensureInitialized();
+            string normalisedParent = parentPath.Replace('\\', '/').TrimEnd('/');
+            string prefix = normalisedParent + "/";
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+WITH normalised AS (
+    SELECT DISTINCT replace(folder_path, '\', '/') AS folder_path
+    FROM {table_songs}
+    WHERE replace(folder_path, '\', '/') LIKE $prefix ESCAPE '\'
+),
+children AS (
+    SELECT DISTINCT
+        CASE
+            WHEN instr(substr(folder_path, $prefixLength + 1), '/') = 0 THEN folder_path
+            ELSE substr(folder_path, 1, $prefixLength + instr(substr(folder_path, $prefixLength + 1), '/') - 1)
+        END AS folder_path
+    FROM normalised
+)
+SELECT folder_path
+FROM children
+WHERE folder_path <> $parent
+  AND ($after IS NULL OR folder_path > $after COLLATE NOCASE)
+ORDER BY folder_path COLLATE NOCASE
+LIMIT $limit;";
+            cmd.Parameters.AddWithValue("$prefix", escapeLike(prefix) + "%");
+            cmd.Parameters.AddWithValue("$prefixLength", prefix.Length);
+            cmd.Parameters.AddWithValue("$parent", normalisedParent);
+            cmd.Parameters.AddWithValue("$after", (object?)afterFolderPath?.Replace('\\', '/') ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$limit", Math.Min(limit, 200));
+
+            var result = new List<BmsFolderSummary>();
+            using var reader = cmd.ExecuteReader();
+
             while (reader.Read())
-                result.Add(readIndexedChart(reader));
+            {
+                string folderPath = reader.GetString(0).Replace('/', Path.DirectorySeparatorChar);
+                result.Add(new BmsFolderSummary(folderPath, Path.GetFileName(folderPath)));
+            }
 
             return result;
         }
@@ -944,6 +1052,71 @@ ON CONFLICT(chart_path) DO UPDATE SET
                 reader.GetInt32(reader.GetOrdinal("parse_version")));
         }
 
+        private static BmsChartSummary readChartSummary(SqliteDataReader reader, Guid beatmapId)
+        {
+            return new BmsChartSummary(
+                beatmapId,
+                Guid.Parse(reader.GetString(1)),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                reader.GetString(6),
+                reader.GetString(7),
+                reader.GetInt32(8),
+                reader.GetInt32(9),
+                reader.GetDouble(10),
+                reader.GetInt32(11),
+                reader.GetInt32(12));
+        }
+
+        private static string getSortExpression(BmsChartSort sort)
+        {
+            return sort switch
+            {
+                BmsChartSort.Level => "printf('%010d', play_level) || char(31) || lower(title)",
+                BmsChartSort.Artist => "lower(artist) || char(31) || lower(title)",
+                BmsChartSort.Folder => "lower(folder_path) || char(31) || lower(file_name)",
+                _ => "lower(title) || char(31) || lower(file_name)",
+            };
+        }
+
+        private static void appendChartSummaryFilters(SqliteCommand command, BmsChartQuery query, List<string> where)
+        {
+            if (!string.IsNullOrEmpty(query.FolderPath))
+            {
+                where.Add("folder_path = $folderPath");
+                command.Parameters.AddWithValue("$folderPath", query.FolderPath);
+            }
+
+            if (!string.IsNullOrWhiteSpace(query.SearchText))
+            {
+                where.Add("(title LIKE $search ESCAPE '\\' OR sub_title LIKE $search ESCAPE '\\' OR artist LIKE $search ESCAPE '\\' OR sub_artist LIKE $search ESCAPE '\\' OR genre LIKE $search ESCAPE '\\' OR file_name LIKE $search ESCAPE '\\')");
+                command.Parameters.AddWithValue("$search", $"%{escapeLike(query.SearchText)}%");
+            }
+
+            if (query.KeyCounts is { Count: > 0 })
+            {
+                var parameterNames = new List<string>(query.KeyCounts.Count);
+                int index = 0;
+
+                foreach (int keyCount in query.KeyCounts)
+                {
+                    string parameterName = $"$keyCount{index++}";
+                    parameterNames.Add(parameterName);
+                    command.Parameters.AddWithValue(parameterName, keyCount);
+                }
+
+                where.Add($"key_count IN ({string.Join(", ", parameterNames)})");
+            }
+        }
+
+        private static string buildWhereClause(IReadOnlyCollection<string> conditions)
+            => conditions.Count == 0 ? string.Empty : $"WHERE {string.Join(" AND ", conditions)}";
+
+        private static string escapeLike(string value)
+            => value.Replace(@"\", @"\\").Replace("%", @"\%").Replace("_", @"\_");
+
         private static BMSChartCache readChart(SqliteDataReader reader)
         {
             return new BMSChartCache
@@ -1122,7 +1295,13 @@ CREATE TABLE IF NOT EXISTS {table_sync_changes} (
 CREATE INDEX IF NOT EXISTS idx_charts_folder ON {table_charts}(folder_path);
 CREATE INDEX IF NOT EXISTS idx_charts_path_key ON {table_charts}(path_key);
 CREATE INDEX IF NOT EXISTS idx_charts_beatmap_id ON {table_charts}(beatmap_id);
-CREATE INDEX IF NOT EXISTS idx_charts_set_id ON {table_charts}(set_id);";
+CREATE INDEX IF NOT EXISTS idx_charts_set_id ON {table_charts}(set_id);
+CREATE INDEX IF NOT EXISTS idx_charts_key_path ON {table_charts}(key_count, path_key);
+CREATE INDEX IF NOT EXISTS idx_charts_folder_path_key ON {table_charts}(folder_path, path_key, key_count);
+CREATE INDEX IF NOT EXISTS idx_charts_summary_title ON {table_charts}((lower(title) || char(31) || lower(file_name)) COLLATE NOCASE, beatmap_id);
+CREATE INDEX IF NOT EXISTS idx_charts_summary_level ON {table_charts}((printf('%010d', play_level) || char(31) || lower(title)) COLLATE NOCASE, beatmap_id);
+CREATE INDEX IF NOT EXISTS idx_charts_summary_artist ON {table_charts}((lower(artist) || char(31) || lower(title)) COLLATE NOCASE, beatmap_id);
+CREATE INDEX IF NOT EXISTS idx_charts_summary_folder ON {table_charts}((lower(folder_path) || char(31) || lower(file_name)) COLLATE NOCASE, beatmap_id);";
             cmd.ExecuteNonQuery();
         }
 
@@ -1151,7 +1330,13 @@ CREATE TABLE {table_sync_changes} (
 CREATE INDEX IF NOT EXISTS idx_charts_folder ON {table_charts}(folder_path);
 CREATE INDEX IF NOT EXISTS idx_charts_path_key ON {table_charts}(path_key);
 CREATE INDEX IF NOT EXISTS idx_charts_beatmap_id ON {table_charts}(beatmap_id);
-CREATE INDEX IF NOT EXISTS idx_charts_set_id ON {table_charts}(set_id);";
+CREATE INDEX IF NOT EXISTS idx_charts_set_id ON {table_charts}(set_id);
+CREATE INDEX IF NOT EXISTS idx_charts_key_path ON {table_charts}(key_count, path_key);
+CREATE INDEX IF NOT EXISTS idx_charts_folder_path_key ON {table_charts}(folder_path, path_key, key_count);
+CREATE INDEX IF NOT EXISTS idx_charts_summary_title ON {table_charts}((lower(title) || char(31) || lower(file_name)) COLLATE NOCASE, beatmap_id);
+CREATE INDEX IF NOT EXISTS idx_charts_summary_level ON {table_charts}((printf('%010d', play_level) || char(31) || lower(title)) COLLATE NOCASE, beatmap_id);
+CREATE INDEX IF NOT EXISTS idx_charts_summary_artist ON {table_charts}((lower(artist) || char(31) || lower(title)) COLLATE NOCASE, beatmap_id);
+CREATE INDEX IF NOT EXISTS idx_charts_summary_folder ON {table_charts}((lower(folder_path) || char(31) || lower(file_name)) COLLATE NOCASE, beatmap_id);";
                 alter.ExecuteNonQuery();
             }
 

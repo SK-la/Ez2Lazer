@@ -8,6 +8,7 @@ using osu.Framework.Input.Events;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars;
@@ -22,8 +23,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         private const int visible_rows = 28;
         private const float row_height = 24;
 
-        private readonly BmsBarManager manager;
-        private readonly BmsBarContext context;
+        private BmsBarManager manager;
+        private BmsBarContext context;
         private readonly FillFlowContainer listFlow;
         private readonly OsuSpriteText breadcrumbText;
         private readonly OsuSpriteText statusText;
@@ -157,6 +158,15 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             manager.Changed += refresh;
         }
 
+        public void Rebind(BmsBarManager newManager, BmsBarContext newContext)
+        {
+            manager.Changed -= refresh;
+            manager = newManager;
+            context = newContext;
+            manager.Changed += refresh;
+            refresh();
+        }
+
         private void refresh()
         {
             breadcrumbText.Text = manager.Breadcrumb;
@@ -202,7 +212,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
             if (bar is BmsSongBar song)
             {
-                var c = song.Chart;
+                BmsChartSummary c = song.Summary;
                 string analyticsLine = BmsStrings.RAJA_ANALYTICS_NONE.ToString();
 
                 if (context.Analytics.TryGet(song.PathKey, out BmsAnalyticsRecord record))
@@ -280,6 +290,12 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                     manager.MoveSelection(1);
                     return true;
 
+                case Key.PageDown:
+                    return manager.MoveToNextPage();
+
+                case Key.PageUp:
+                    return manager.MoveToPreviousPage();
+
                 case Key.Enter:
                     manager.OpenSelected();
                     return true;
@@ -291,6 +307,14 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             }
 
             return base.OnKeyDown(e);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+                manager.Changed -= refresh;
+
+            base.Dispose(isDisposing);
         }
     }
 

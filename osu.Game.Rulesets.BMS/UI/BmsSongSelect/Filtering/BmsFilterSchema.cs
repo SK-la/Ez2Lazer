@@ -31,7 +31,8 @@ CREATE TABLE song (
     length INTEGER,
     date INTEGER,
     adddate INTEGER
-);";
+);
+CREATE INDEX IF NOT EXISTS idx_song_mode_sha256 ON song(mode, sha256);";
 
         public const string CREATE_SCORE = @"
 CREATE TABLE score (
@@ -57,7 +58,9 @@ CREATE TABLE score (
     minbp INTEGER,
     avgjudge INTEGER,
     date INTEGER
-);";
+);
+CREATE INDEX IF NOT EXISTS idx_score_clear_sha256 ON score(clear, sha256);
+CREATE INDEX IF NOT EXISTS idx_score_playcount_sha256 ON score(playcount, sha256);";
 
         public const string CREATE_SCORELOG = @"
 CREATE TABLE scorelog (
