@@ -14,6 +14,15 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     public static class BMSOsuLibrarySynchronizer
     {
         public static void Synchronize(BMSBeatmapManager manager, Storage storage, RealmAccess realm, RulesetInfo bmsRulesetInfo)
+            => Synchronize(manager, storage, realm, bmsRulesetInfo, CancellationToken.None);
+
+        public static void Synchronize(
+            BMSBeatmapManager manager,
+            Storage storage,
+            RealmAccess realm,
+            RulesetInfo bmsRulesetInfo,
+            CancellationToken cancellationToken,
+            Action<double>? reportProgress = null)
         {
             if (manager.LibraryCache == null)
                 return;
@@ -21,129 +30,146 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             if (!manager.NeedsRealmSynchronization)
                 return;
 
-            IReadOnlyList<BeatmapSetInfo> virtualSets = manager.BuildVirtualBeatmapCatalog(bmsRulesetInfo);
+            manager.PrepareRealmSynchronization();
+            var realmFileStore = new RealmFileStore(realm, storage);
+            int updatedSets = 0;
+            int updatedBeatmaps = 0;
+            int removedSets = 0;
+            int processedSets = 0;
+            int totalSets = manager.PendingRealmSyncSetCount;
 
-            if (virtualSets.Count == 0)
+            while (true)
             {
-                Logger.Log("[BMS] Library index has no charts; skipping Realm sync to avoid clearing the carousel.", LoggingTarget.Database);
-                return;
+                cancellationToken.ThrowIfCancellationRequested();
+                IReadOnlyList<BmsRealmSyncChange> changes = manager.GetPendingRealmSyncChanges(200);
+
+                if (changes.Count == 0)
+                    break;
+
+                List<IGrouping<Guid, BmsRealmSyncChange>> changesBySet = changes.GroupBy(change => change.SetId).ToList();
+
+                realm.Write(r =>
+                {
+                    RulesetInfo? managedRuleset = r.All<RulesetInfo>().FirstOrDefault(info => info.ShortName == bmsRulesetInfo.ShortName);
+
+                    if (managedRuleset == null)
+                        throw new InvalidOperationException("BMS ruleset is not available in realm.");
+
+                    foreach (IGrouping<Guid, BmsRealmSyncChange> setChanges in changesBySet)
+                    {
+                        BeatmapSetInfo? existingSet = r.Find<BeatmapSetInfo>(setChanges.Key);
+
+                        if (!manager.TryGetRealmSyncSet(setChanges.Key, out BmsRealmSyncSet syncSet))
+                        {
+                            if (existingSet != null && setChanges.Any(change => change.Kind == BmsRealmSyncChangeKind.Delete))
+                            {
+                                removeSet(r, existingSet);
+                                removedSets++;
+                            }
+
+                            continue;
+                        }
+
+                        BeatmapSetInfo targetSet = manager.BuildRealmSyncTarget(syncSet, managedRuleset);
+                        applySetDelta(realmFileStore, r, existingSet, targetSet, syncSet, setChanges, ref updatedBeatmaps);
+                        updatedSets++;
+                    }
+                });
+
+                manager.AcknowledgeRealmSyncChanges(changes.Select(change => change.Revision).ToList());
+                processedSets += changesBySet.Count;
+                reportProgress?.Invoke(totalSets == 0 ? 1 : Math.Min(1, (double)processedSets / totalSets));
             }
 
-            Dictionary<Guid, BMSSourceReference> sourceMap = manager.GetCurrentSourceMap();
-
-            var realmFileStore = new RealmFileStore(realm, storage);
-            int importedSets = 0;
-            int importedBeatmaps = 0;
-            int removedSets = 0;
-            int skippedSets = 0;
-
-            realm.Write(r =>
-            {
-                RulesetInfo? managedRuleset = r.All<RulesetInfo>().FirstOrDefault(info => info.ShortName == bmsRulesetInfo.ShortName);
-
-                if (managedRuleset == null)
-                    throw new InvalidOperationException("BMS ruleset is not available in realm.");
-
-                // Realm cannot translate HostingKind enum or custom helpers; query persisted HostingKindInt + hash prefixes only.
-                const int external_hosting_kind = (int)BeatmapSetHostingKind.External;
-
-                List<BeatmapSetInfo> candidateSets = r.All<BeatmapSetInfo>()
-                                                      .Where(set => set.HostingKindInt == external_hosting_kind
-                                                                    || set.Hash.StartsWith(BMSExternalPath.LEGACY_HASH_PREFIX)
-                                                                    || set.Hash.StartsWith(ExternalBeatmapPathEncoding.HASH_PREFIX))
-                                                      .ToList();
-
-                Dictionary<Guid, BeatmapSetInfo> existingSets = candidateSets
-                                                                .Where(set => isManagedExternalBmsSet(set, bmsRulesetInfo.ShortName))
-                                                                .ToDictionary(set => set.ID);
-                HashSet<Guid> targetSetIds = virtualSets.Select(set => set.ID).ToHashSet();
-
-                foreach ((Guid setId, BeatmapSetInfo oldSet) in existingSets)
-                {
-                    if (!targetSetIds.Contains(setId))
-                    {
-                        removeSet(r, oldSet);
-                        removedSets++;
-                    }
-                }
-
-                foreach (BeatmapSetInfo virtualSet in virtualSets)
-                {
-                    if (existingSets.TryGetValue(virtualSet.ID, out BeatmapSetInfo? existingSet)
-                        && setMatches(existingSet, virtualSet, sourceMap))
-                    {
-                        Logger.Log($"[BMS] Skipping unchanged external set {virtualSet.ID} (setMatches).", LoggingTarget.Database, LogLevel.Debug);
-                        skippedSets++;
-                        continue;
-                    }
-
-                    Dictionary<Guid, PersistedSongSelectBaseline>? preservedBaseline = null;
-
-                    if (existingSet != null)
-                    {
-                        preservedBaseline = capturePersistedSongSelectBaseline(existingSet);
-                        removeSet(r, existingSet);
-                        removedSets++;
-                    }
-
-                    string contentRoot = virtualSet.Hash;
-
-                    var newSet = new BeatmapSetInfo
-                    {
-                        ID = virtualSet.ID,
-                        DateAdded = virtualSet.DateAdded,
-                        Hash = ExternalBeatmapPathEncoding.Encode(contentRoot),
-                        ExternalContentRoot = Path.GetFullPath(contentRoot),
-                        HostingKind = BeatmapSetHostingKind.External,
-                        Status = BeatmapOnlineStatus.LocallyModified,
-                    };
-
-                    foreach (BeatmapInfo virtualBeatmap in virtualSet.Beatmaps)
-                    {
-                        if (!sourceMap.TryGetValue(virtualBeatmap.ID, out BMSSourceReference sourceRef))
-                            continue;
-
-                        if (!File.Exists(sourceRef.ChartPath))
-                            continue;
-
-                        string relativeChartPath = registerExternalChartFile(realmFileStore, r, newSet, sourceRef.ChartPath, contentRoot);
-
-                        if (string.IsNullOrEmpty(relativeChartPath))
-                            continue;
-
-                        RealmNamedFileUsage? chartFileUsage = newSet.GetFile(relativeChartPath);
-
-                        if (chartFileUsage is null)
-                            continue;
-
-                        var beatmap = new BeatmapInfo(managedRuleset, virtualBeatmap.Difficulty.Clone(), virtualBeatmap.Metadata.DeepClone())
-                        {
-                            ID = virtualBeatmap.ID,
-                            DifficultyName = virtualBeatmap.DifficultyName,
-                            Hash = chartFileUsage.File.Hash,
-                            MD5Hash = virtualBeatmap.MD5Hash,
-                            Status = BeatmapOnlineStatus.LocallyModified,
-                            BeatmapSet = newSet,
-                        };
-
-                        applyVirtualBeatmapToRealm(beatmap, virtualBeatmap);
-                        applyPersistedSongSelectBaseline(beatmap, preservedBaseline);
-
-                        newSet.Beatmaps.Add(beatmap);
-                        importedBeatmaps++;
-                    }
-
-                    if (newSet.Beatmaps.Count > 0)
-                    {
-                        r.Add(newSet, update: true);
-                        importedSets++;
-                    }
-                }
-            });
-
             manager.MarkRealmSynchronized();
+            reportProgress?.Invoke(1);
 
-            Logger.Log($"[BMS] External library sync finished: imported {importedSets} sets/{importedBeatmaps} beatmaps, removed {removedSets} sets, skipped {skippedSets} unchanged sets.");
+            Logger.Log($"[BMS] External library delta sync finished: updated {updatedSets} sets/{updatedBeatmaps} beatmaps, removed {removedSets} sets.");
+        }
+
+        private static void applySetDelta(
+            RealmFileStore realmFileStore,
+            Realm realm,
+            BeatmapSetInfo? existingSet,
+            BeatmapSetInfo targetSet,
+            BmsRealmSyncSet syncSet,
+            IEnumerable<BmsRealmSyncChange> changes,
+            ref int updatedBeatmaps)
+        {
+            bool isNewSet = existingSet == null;
+            BeatmapSetInfo destinationSet = existingSet ?? new BeatmapSetInfo { ID = targetSet.ID };
+            string contentRoot = syncSet.Song.FolderPath;
+
+            destinationSet.DateAdded = targetSet.DateAdded;
+            destinationSet.Hash = ExternalBeatmapPathEncoding.Encode(contentRoot);
+            destinationSet.ExternalContentRoot = Path.GetFullPath(contentRoot);
+            destinationSet.HostingKind = BeatmapSetHostingKind.External;
+            destinationSet.Status = BeatmapOnlineStatus.LocallyModified;
+
+            var targetBeatmaps = targetSet.Beatmaps.ToDictionary(beatmap => beatmap.ID);
+            var chartsByBeatmapId = syncSet.Charts.ToDictionary(chart => chart.Identity.BeatmapId);
+
+            foreach ((Guid beatmapId, BeatmapInfo targetBeatmap) in targetBeatmaps)
+            {
+                BmsRealmSyncChart indexed = chartsByBeatmapId[beatmapId];
+                string chartPath = indexed.Chart.FullPath;
+
+                if (!File.Exists(chartPath))
+                    throw new FileNotFoundException("BMS chart disappeared during Realm synchronization.", chartPath);
+
+                string expectedRelative = ComputeRelativeChartFilename(chartPath, contentRoot);
+                BeatmapInfo? destinationBeatmap = destinationSet.Beatmaps.FirstOrDefault(beatmap => beatmap.ID == beatmapId);
+
+                if (destinationBeatmap?.Path is string previousPath
+                    && !string.Equals(previousPath, expectedRelative, StringComparison.OrdinalIgnoreCase))
+                {
+                    RealmNamedFileUsage? previousUsage = destinationSet.GetFile(previousPath);
+
+                    if (previousUsage != null)
+                        destinationSet.Files.Remove(previousUsage);
+                }
+
+                string relativeChartPath = registerExternalChartFile(realmFileStore, realm, destinationSet, chartPath, contentRoot);
+                RealmNamedFileUsage chartFileUsage = destinationSet.GetFile(relativeChartPath)
+                                                     ?? throw new InvalidOperationException($"Failed to register external BMS chart '{chartPath}'.");
+
+                if (destinationBeatmap == null)
+                {
+                    destinationBeatmap = new BeatmapInfo(targetBeatmap.Ruleset, new BeatmapDifficulty(), new BeatmapMetadata())
+                    {
+                        ID = beatmapId,
+                        BeatmapSet = destinationSet,
+                    };
+                    destinationSet.Beatmaps.Add(destinationBeatmap);
+                }
+
+                destinationBeatmap.DifficultyName = targetBeatmap.DifficultyName;
+                destinationBeatmap.Ruleset = targetBeatmap.Ruleset;
+                destinationBeatmap.Hash = chartFileUsage.File.Hash;
+                destinationBeatmap.MD5Hash = targetBeatmap.MD5Hash;
+                destinationBeatmap.Status = BeatmapOnlineStatus.LocallyModified;
+                destinationBeatmap.BeatmapSet = destinationSet;
+                applyVirtualBeatmapToRealm(destinationBeatmap, targetBeatmap);
+                updatedBeatmaps++;
+            }
+
+            HashSet<Guid> deletedBeatmapIds = changes.Where(change => change.Kind == BmsRealmSyncChangeKind.Delete)
+                                                    .Select(change => change.BeatmapId)
+                                                    .Where(id => !targetBeatmaps.ContainsKey(id))
+                                                    .ToHashSet();
+
+            foreach (BeatmapInfo deletedBeatmap in destinationSet.Beatmaps.Where(beatmap => deletedBeatmapIds.Contains(beatmap.ID)).ToList())
+            {
+                RealmNamedFileUsage? fileUsage = deletedBeatmap.File;
+                realm.Remove(deletedBeatmap.Metadata);
+                realm.Remove(deletedBeatmap);
+
+                if (fileUsage != null && destinationSet.Beatmaps.All(beatmap => !string.Equals(beatmap.Hash, fileUsage.File.Hash, StringComparison.Ordinal)))
+                    destinationSet.Files.Remove(fileUsage);
+            }
+
+            if (isNewSet)
+                realm.Add(destinationSet, update: true);
         }
 
         /// <summary>
@@ -162,6 +188,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// </summary>
         public static void ApplyPersistedSongSelectBaselineForTesting(BeatmapInfo beatmap, IReadOnlyDictionary<Guid, PersistedSongSelectBaseline>? preservedBaseline)
             => applyPersistedSongSelectBaseline(beatmap, preservedBaseline);
+
+        public static void ApplyVirtualBeatmapFieldsForTesting(BeatmapInfo beatmap, BeatmapInfo virtualBeatmap)
+            => applyVirtualBeatmapToRealm(beatmap, virtualBeatmap);
 
         private static Dictionary<Guid, PersistedSongSelectBaseline> capturePersistedSongSelectBaseline(BeatmapSetInfo existingSet)
         {
@@ -211,14 +240,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             beatmap.Metadata.AudioFile = virtualBeatmap.Metadata.AudioFile;
             beatmap.Metadata.BackgroundFile = virtualBeatmap.Metadata.BackgroundFile;
             beatmap.Metadata.PreviewTime = virtualBeatmap.Metadata.PreviewTime;
-        }
-
-        private static bool isManagedExternalBmsSet(BeatmapSetInfo set, string bmsShortName)
-        {
-            if (!set.IsExternallyHosted)
-                return BMSExternalPath.TryDecodeLegacyHash(set.Hash, out _);
-
-            return set.Beatmaps.Any(b => string.Equals(b.Ruleset.ShortName, bmsShortName, StringComparison.Ordinal));
         }
 
         /// <summary>

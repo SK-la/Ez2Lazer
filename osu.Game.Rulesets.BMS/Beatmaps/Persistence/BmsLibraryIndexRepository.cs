@@ -34,6 +34,21 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
 
         public int SongCount => readCount(table_songs);
 
+        public long SyncCursor => readLongMeta("sync_cursor");
+
+        public int PendingSyncSetCount
+        {
+            get
+            {
+                ensureInitialized();
+
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"SELECT COUNT(DISTINCT set_id) FROM {table_sync_changes};";
+                return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+            }
+        }
+
         public void WriteRealmFileMappingVersion(int version)
         {
             lock (writeLock)
@@ -307,6 +322,217 @@ LIMIT $limit;";
             }
 
             return result;
+        }
+
+        public IReadOnlyList<SyncChange> GetPendingSyncChangesForSets(int maxSetCount)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxSetCount);
+            ensureInitialized();
+
+            var result = new List<SyncChange>();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+WITH pending_sets AS (
+    SELECT set_id, MIN(revision) AS first_revision
+    FROM {table_sync_changes}
+    GROUP BY set_id
+    ORDER BY first_revision
+    LIMIT $maxSetCount
+)
+SELECT changes.revision, changes.beatmap_id, changes.set_id, changes.chart_path, changes.change_kind
+FROM {table_sync_changes} changes
+INNER JOIN pending_sets ON pending_sets.set_id = changes.set_id
+ORDER BY changes.revision;";
+            cmd.Parameters.AddWithValue("$maxSetCount", maxSetCount);
+
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                result.Add(new SyncChange(
+                    reader.GetInt64(0),
+                    Guid.Parse(reader.GetString(1)),
+                    Guid.Parse(reader.GetString(2)),
+                    reader.GetString(3),
+                    (SyncChangeKind)reader.GetInt32(4)));
+            }
+
+            return result;
+        }
+
+        public void AcknowledgeSyncChanges(IReadOnlyCollection<long> revisions)
+        {
+            if (revisions.Count == 0)
+                return;
+
+            lock (writeLock)
+            {
+                ensureInitialized();
+
+                using var connection = openConnection();
+                using var transaction = connection.BeginTransaction();
+                var affectedBeatmapIds = new HashSet<string>(StringComparer.Ordinal);
+
+                using var select = connection.CreateCommand();
+                select.Transaction = transaction;
+                select.CommandText = $"SELECT beatmap_id FROM {table_sync_changes} WHERE revision = $revision;";
+                select.Parameters.Add("$revision", SqliteType.Integer);
+
+                using var delete = connection.CreateCommand();
+                delete.Transaction = transaction;
+                delete.CommandText = $"DELETE FROM {table_sync_changes} WHERE revision = $revision;";
+                delete.Parameters.Add("$revision", SqliteType.Integer);
+
+                foreach (long revision in revisions.Distinct())
+                {
+                    select.Parameters["$revision"].Value = revision;
+                    object? beatmapId = select.ExecuteScalar();
+
+                    if (beatmapId != null && beatmapId != DBNull.Value)
+                        affectedBeatmapIds.Add((string)beatmapId);
+
+                    delete.Parameters["$revision"].Value = revision;
+                    delete.ExecuteNonQuery();
+                }
+
+                foreach (string beatmapId in affectedBeatmapIds)
+                {
+                    using var update = connection.CreateCommand();
+                    update.Transaction = transaction;
+                    update.CommandText = $@"
+UPDATE {table_charts}
+SET sync_state = $synchronized
+WHERE beatmap_id = $beatmapId
+  AND NOT EXISTS (
+      SELECT 1
+      FROM {table_sync_changes}
+      WHERE beatmap_id = $beatmapId
+  );";
+                    update.Parameters.AddWithValue("$synchronized", (int)SyncState.Synchronized);
+                    update.Parameters.AddWithValue("$beatmapId", beatmapId);
+                    update.ExecuteNonQuery();
+                }
+
+                using var minPending = connection.CreateCommand();
+                minPending.Transaction = transaction;
+                minPending.CommandText = $"SELECT MIN(revision) FROM {table_sync_changes};";
+                object? nextPending = minPending.ExecuteScalar();
+                long cursor;
+
+                if (nextPending == null || nextPending == DBNull.Value)
+                {
+                    using var latestRevision = connection.CreateCommand();
+                    latestRevision.Transaction = transaction;
+                    latestRevision.CommandText = "SELECT seq FROM sqlite_sequence WHERE name = $table;";
+                    latestRevision.Parameters.AddWithValue("$table", table_sync_changes);
+                    object? sequence = latestRevision.ExecuteScalar();
+                    long highestIssuedRevision = sequence == null || sequence == DBNull.Value
+                        ? revisions.Max()
+                        : Convert.ToInt64(sequence, CultureInfo.InvariantCulture);
+                    cursor = Math.Max(readLongMeta(connection, transaction, "sync_cursor"), highestIssuedRevision);
+                }
+                else
+                {
+                    cursor = Convert.ToInt64(nextPending, CultureInfo.InvariantCulture) - 1;
+                }
+
+                writeMeta(connection, transaction, "sync_cursor", cursor.ToString(CultureInfo.InvariantCulture));
+                transaction.Commit();
+            }
+        }
+
+        public void EnqueueAllChartsForSync()
+        {
+            lock (writeLock)
+            {
+                ensureInitialized();
+
+                using var connection = openConnection();
+                using var transaction = connection.BeginTransaction();
+
+                using (var pending = connection.CreateCommand())
+                {
+                    pending.Transaction = transaction;
+                    pending.CommandText = $"SELECT 1 FROM {table_sync_changes} LIMIT 1;";
+
+                    if (pending.ExecuteScalar() != null)
+                        return;
+                }
+
+                var charts = new List<(string ChartPath, Guid BeatmapId, Guid SetId)>();
+
+                using (var select = connection.CreateCommand())
+                {
+                    select.Transaction = transaction;
+                    select.CommandText = $"SELECT chart_path, beatmap_id, set_id FROM {table_charts};";
+
+                    using var reader = select.ExecuteReader();
+
+                    while (reader.Read())
+                        charts.Add((reader.GetString(0), Guid.Parse(reader.GetString(1)), Guid.Parse(reader.GetString(2))));
+                }
+
+                foreach ((string chartPath, Guid beatmapId, Guid setId) in charts)
+                    enqueueSyncChange(connection, transaction, beatmapId, setId, chartPath, SyncChangeKind.Upsert);
+
+                transaction.Commit();
+            }
+        }
+
+        public IReadOnlyList<IndexedChart> GetChartsBySetId(Guid setId)
+        {
+            ensureInitialized();
+            var result = new List<IndexedChart>();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+SELECT *
+FROM {table_charts}
+WHERE set_id = $setId
+ORDER BY play_level, file_name;";
+            cmd.Parameters.AddWithValue("$setId", setId.ToString());
+
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+                result.Add(readIndexedChart(reader));
+
+            return result;
+        }
+
+        public bool TryGetSong(string folderPath, out BMSSongCache song)
+        {
+            song = null!;
+            ensureInitialized();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+SELECT folder_path, title, artist, genre, banner_path, stage_path, last_modified_ticks
+FROM {table_songs}
+WHERE folder_path = $folder
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("$folder", folderPath);
+
+            using var reader = cmd.ExecuteReader();
+
+            if (!reader.Read())
+                return false;
+
+            song = new BMSSongCache
+            {
+                FolderPath = reader.GetString(0),
+                Title = reader.GetString(1),
+                Artist = reader.GetString(2),
+                Genre = reader.GetString(3),
+                BannerPath = reader.IsDBNull(4) ? null : reader.GetString(4),
+                StageFilePath = reader.IsDBNull(5) ? null : reader.GetString(5),
+                LastModified = new DateTime(reader.GetInt64(6), DateTimeKind.Utc).ToLocalTime(),
+            };
+            return true;
         }
 
         public bool TryGetSourceReference(Guid beatmapId, out BMSSourceReference reference)

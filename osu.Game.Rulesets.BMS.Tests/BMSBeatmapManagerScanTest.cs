@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -37,6 +38,12 @@ namespace osu.Game.Rulesets.BMS.Tests
                 Assert.That(repository.ScanRevision, Is.EqualTo(1));
                 Assert.That(repository.ChartCount, Is.EqualTo(2));
                 Assert.That(repository.GetPendingSyncChanges(20), Has.Count.EqualTo(2));
+
+                BmsRealmSyncChange firstChange = manager.GetPendingRealmSyncChanges(10).Single(change => change.ChartPath == firstChart);
+                Assert.That(manager.TryGetRealmSyncSet(firstChange.SetId, out BmsRealmSyncSet syncSet), Is.True);
+                var targetSet = manager.BuildRealmSyncTarget(syncSet, new BMSRuleset().RulesetInfo);
+                Assert.That(targetSet.ID, Is.EqualTo(BmsChartIdentity.CreateSetId(Path.GetDirectoryName(firstChart)!)));
+                Assert.That(targetSet.Beatmaps.Single().ID, Is.EqualTo(BmsChartIdentity.CreateBeatmapId(firstChart)));
 
                 await manager.ScanLibraryAsync(new[] { firstRoot, secondRoot }).ConfigureAwait(false);
                 Assert.That(repository.ScanRevision, Is.EqualTo(2));

@@ -12,6 +12,23 @@ using osu.Game.Rulesets.BMS.Localization;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
 {
+    public enum BmsRealmSyncChangeKind
+    {
+        Upsert,
+        Delete,
+    }
+
+    public readonly record struct BmsRealmSyncChange(
+        long Revision,
+        Guid BeatmapId,
+        Guid SetId,
+        string ChartPath,
+        BmsRealmSyncChangeKind Kind);
+
+    public readonly record struct BmsRealmSyncChart(BMSChartCache Chart, BmsChartIdentity Identity);
+
+    public sealed record BmsRealmSyncSet(Guid SetId, BMSSongCache Song, IReadOnlyList<BmsRealmSyncChart> Charts);
+
     /// <summary>
     ///     Manages BMS library scanning, SQLite indexing, and loading.
     /// </summary>
@@ -127,6 +144,116 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         }
 
         public void RequireRealmSynchronization() => realmSyncRequired = true;
+
+        public long RealmSyncCursor => indexRepository.SyncCursor;
+
+        public int PendingRealmSyncSetCount => indexRepository.PendingSyncSetCount;
+
+        public void PrepareRealmSynchronization()
+        {
+            if (LastSynchronizedRealmFileMappingVersion != BmsRealmSyncConstants.FILE_MAPPING_SCHEMA_VERSION)
+                indexRepository.EnqueueAllChartsForSync();
+        }
+
+        public IReadOnlyList<BmsRealmSyncChange> GetPendingRealmSyncChanges(int maxSetCount)
+        {
+            return indexRepository.GetPendingSyncChangesForSets(maxSetCount)
+                                  .Select(change => new BmsRealmSyncChange(
+                                      change.Revision,
+                                      change.BeatmapId,
+                                      change.SetId,
+                                      change.ChartPath,
+                                      (BmsRealmSyncChangeKind)change.Kind))
+                                  .ToList();
+        }
+
+        public bool TryGetRealmSyncSet(Guid setId, out BmsRealmSyncSet set)
+        {
+            IReadOnlyList<BmsLibraryIndexRepository.IndexedChart> indexedCharts = indexRepository.GetChartsBySetId(setId);
+
+            if (indexedCharts.Count == 0)
+            {
+                set = null!;
+                return false;
+            }
+
+            string folderPath = indexedCharts[0].Chart.FolderPath;
+
+            if (!indexRepository.TryGetSong(folderPath, out BMSSongCache song))
+            {
+                BMSChartCache firstChart = indexedCharts[0].Chart;
+                song = new BMSSongCache
+                {
+                    FolderPath = folderPath,
+                    Title = firstChart.Title,
+                    Artist = firstChart.Artist,
+                    Genre = firstChart.Genre,
+                    LastModified = firstChart.LastModified,
+                };
+            }
+
+            set = new BmsRealmSyncSet(
+                setId,
+                song,
+                indexedCharts.Select(indexed => new BmsRealmSyncChart(indexed.Chart, indexed.Identity)).ToList());
+            return true;
+        }
+
+        public void AcknowledgeRealmSyncChanges(IReadOnlyCollection<long> revisions)
+        {
+            indexRepository.AcknowledgeSyncChanges(revisions);
+        }
+
+        public BeatmapSetInfo BuildRealmSyncTarget(BmsRealmSyncSet syncSet, RulesetInfo bmsRulesetInfo)
+        {
+            BMSSongCache song = syncSet.Song;
+            var beatmapSet = new BeatmapSetInfo
+            {
+                ID = syncSet.SetId,
+                DateAdded = song.LastModified,
+                Hash = song.FolderPath,
+            };
+
+            foreach (BmsRealmSyncChart indexed in syncSet.Charts)
+            {
+                BMSChartCache chart = indexed.Chart;
+                var metadata = new BeatmapMetadata
+                {
+                    Title = string.IsNullOrWhiteSpace(chart.Title) ? song.Title : chart.Title,
+                    TitleUnicode = string.IsNullOrWhiteSpace(chart.Title) ? song.Title : chart.Title,
+                    Artist = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
+                    ArtistUnicode = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
+                    Source = "BMS",
+                    Tags = buildTags(chart),
+                    AudioFile = string.Empty,
+                    BackgroundFile = song.StageFilePath ?? string.Empty,
+                    PreviewTime = chart.PreviewTime,
+                };
+
+                var beatmapInfo = new BeatmapInfo(bmsRulesetInfo, new BeatmapDifficulty(), metadata)
+                {
+                    ID = indexed.Identity.BeatmapId,
+                    DifficultyName = formatDifficultyName(chart),
+                    BPM = chart.Bpm,
+                    Length = chart.Duration,
+                    Hash = BmsPathKeys.ComputeRealmFileHash(chart.FullPath),
+                    MD5Hash = indexed.Identity.PathKey,
+                    TotalObjectCount = chart.TotalNotes,
+                    EndTimeObjectCount = chart.LongNoteCount,
+                    BeatmapSet = beatmapSet,
+                    Difficulty =
+                    {
+                        CircleSize = chart.KeyCount,
+                        OverallDifficulty = mapRankToOD(chart.Rank),
+                        DrainRate = 7
+                    }
+                };
+
+                beatmapSet.Beatmaps.Add(beatmapInfo);
+            }
+
+            return beatmapSet;
+        }
 
         public void CancelScan() => scanCts?.Cancel();
 

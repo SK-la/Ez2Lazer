@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
     /// 关键不同：
     /// 1. 进入时强制 <c>Ruleset.Value</c> = BMS，借助 <see cref="BeatmapInfoExtensions.AllowGameplayWithRuleset"/>
     ///    对外部托管谱面集的限制，让 carousel 只显示 BMS 谱面（其他 ruleset 的曲在 BMS 下不显示）。
-    /// 2. 进入时刷一次 <see cref="BMSOsuLibrarySynchronizer.Synchronize"/>，把外部 BMS 文件夹 sync 到 osu Realm，
+    /// 2. 进入时通过 <see cref="BMSOsuLibrarySynchronizer"/> 刷一次，把外部 BMS 文件夹 sync 到 osu Realm，
     ///    让官方 <c>BeatmapStore</c> / <c>BeatmapCarousel</c> 能查询到。
     /// 3. 重写 <see cref="OnStart"/>：不走 <c>SoloSongSelect</c> 的标准 <c>PlayerLoader</c>，从选中 BeatmapInfo 反查
     ///    <see cref="BMSSourceReference"/> → 构造 <see cref="BMSWorkingBeatmap"/> → push <see cref="BMSPlayerLoader"/>。

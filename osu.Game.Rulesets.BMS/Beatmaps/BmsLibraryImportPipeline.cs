@@ -54,11 +54,20 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             reportProgress?.Invoke(new ImportProgress(0, BmsStrings.IMPORT_INDEXING.ToString()));
 
             await manager.ScanLibraryAsync(paths, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
 
             reportProgress?.Invoke(new ImportProgress(SCAN_PROGRESS_PORTION, BmsStrings.IMPORT_WRITING_CATALOG.ToString()));
 
             await Task.Run(
-                () => BMSOsuLibrarySynchronizer.Synchronize(manager, storage, realm, bmsRulesetInfo),
+                () => BMSOsuLibrarySynchronizer.Synchronize(
+                    manager,
+                    storage,
+                    realm,
+                    bmsRulesetInfo,
+                    cancellationToken,
+                    progress => reportProgress?.Invoke(new ImportProgress(
+                        SCAN_PROGRESS_PORTION + progress * (1 - SCAN_PROGRESS_PORTION),
+                        BmsStrings.IMPORT_WRITING_CATALOG.ToString()))),
                 cancellationToken).ConfigureAwait(false);
 
             int songs = manager.LibraryCache?.Songs.Count ?? 0;

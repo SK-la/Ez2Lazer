@@ -100,6 +100,46 @@ namespace osu.Game.Rulesets.BMS.Tests
         }
 
         [Test]
+        public void TestApplyVirtualFieldsUpdatesInPlaceAndPreservesBaseline()
+        {
+            var ruleset = new RulesetInfo { ShortName = "bms", Name = "BMS" };
+            var existing = new BeatmapInfo(ruleset, new BeatmapDifficulty(), new BeatmapMetadata())
+            {
+                StarRating = 4.56,
+                XxyStarRating = 6.21,
+                PerformancePoints = 123.45,
+                BPM = 120,
+            };
+            BeatmapMetadata metadata = existing.Metadata;
+            BeatmapDifficulty difficulty = existing.Difficulty;
+            var target = new BeatmapInfo(ruleset, new BeatmapDifficulty(), new BeatmapMetadata())
+            {
+                BPM = 180,
+                Length = 90,
+                TotalObjectCount = 500,
+                EndTimeObjectCount = 20,
+            };
+            target.Metadata.Title = "Updated";
+            target.Metadata.Artist = "Artist";
+            target.Difficulty.CircleSize = 7;
+            target.Difficulty.OverallDifficulty = 8;
+
+            BMSOsuLibrarySynchronizer.ApplyVirtualBeatmapFieldsForTesting(existing, target);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(existing.Metadata, Is.SameAs(metadata));
+                Assert.That(existing.Difficulty, Is.SameAs(difficulty));
+                Assert.That(existing.Metadata.Title, Is.EqualTo("Updated"));
+                Assert.That(existing.BPM, Is.EqualTo(180));
+                Assert.That(existing.Difficulty.CircleSize, Is.EqualTo(7));
+                Assert.That(existing.StarRating, Is.EqualTo(4.56));
+                Assert.That(existing.XxyStarRating, Is.EqualTo(6.21));
+                Assert.That(existing.PerformancePoints, Is.EqualTo(123.45));
+            });
+        }
+
+        [Test]
         public void TestSetMatches_false_when_hash_is_legacy_prefix()
         {
             var ruleset = new RulesetInfo { ShortName = "bms", Name = "BMS" };
