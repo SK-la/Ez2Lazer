@@ -15,6 +15,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
         public double? StarRating { get; init; }
         public string? ColumnCountsJson { get; init; }
         public string? KpsListJson { get; init; }
+        public long FileSize { get; init; }
+        public long LastModifiedTicks { get; init; }
     }
 
     public sealed class BmsAnalyticsSqliteRepository
@@ -63,8 +65,8 @@ ON CONFLICT(path_key) DO UPDATE SET
                 cmd.Parameters.AddWithValue("$star_rating", (object?)record.StarRating ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$column_counts_json", (object?)record.ColumnCountsJson ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$kps_list_json", (object?)record.KpsListJson ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("$file_size", 0L);
-                cmd.Parameters.AddWithValue("$last_modified_ticks", 0L);
+                cmd.Parameters.AddWithValue("$file_size", record.FileSize);
+                cmd.Parameters.AddWithValue("$last_modified_ticks", record.LastModifiedTicks);
                 cmd.Parameters.AddWithValue("$scanned_at", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
                 cmd.ExecuteNonQuery();
             }
@@ -77,7 +79,11 @@ ON CONFLICT(path_key) DO UPDATE SET
 
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT path_key, pp, xxy_sr, avg_kps, max_kps, star_rating, column_counts_json, kps_list_json FROM chart_analytics WHERE path_key = $path_key LIMIT 1;";
+            cmd.CommandText = @"
+SELECT path_key, pp, xxy_sr, avg_kps, max_kps, star_rating, column_counts_json, kps_list_json, file_size, last_modified_ticks
+FROM chart_analytics
+WHERE path_key = $path_key
+LIMIT 1;";
             cmd.Parameters.AddWithValue("$path_key", pathKey);
 
             using var reader = cmd.ExecuteReader();
@@ -88,6 +94,25 @@ ON CONFLICT(path_key) DO UPDATE SET
             return true;
         }
 
+        public bool IsUpToDate(string pathKey, long fileSize, long lastModifiedTicks)
+        {
+            ensureInitialized();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+SELECT 1
+FROM chart_analytics
+WHERE path_key = $path_key
+  AND file_size = $file_size
+  AND last_modified_ticks = $last_modified_ticks
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("$path_key", pathKey);
+            cmd.Parameters.AddWithValue("$file_size", fileSize);
+            cmd.Parameters.AddWithValue("$last_modified_ticks", lastModifiedTicks);
+            return cmd.ExecuteScalar() != null;
+        }
+
         public IReadOnlyDictionary<string, BmsAnalyticsRecord> LoadAll()
         {
             ensureInitialized();
@@ -95,7 +120,9 @@ ON CONFLICT(path_key) DO UPDATE SET
 
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT path_key, pp, xxy_sr, avg_kps, max_kps, star_rating, column_counts_json, kps_list_json FROM chart_analytics;";
+            cmd.CommandText = @"
+SELECT path_key, pp, xxy_sr, avg_kps, max_kps, star_rating, column_counts_json, kps_list_json, file_size, last_modified_ticks
+FROM chart_analytics;";
 
             using var reader = cmd.ExecuteReader();
 
@@ -120,6 +147,8 @@ ON CONFLICT(path_key) DO UPDATE SET
                 StarRating = reader.IsDBNull(5) ? null : reader.GetDouble(5),
                 ColumnCountsJson = reader.IsDBNull(6) ? null : reader.GetString(6),
                 KpsListJson = reader.FieldCount > 7 && !reader.IsDBNull(7) ? reader.GetString(7) : null,
+                FileSize = reader.FieldCount > 8 && !reader.IsDBNull(8) ? reader.GetInt64(8) : 0,
+                LastModifiedTicks = reader.FieldCount > 9 && !reader.IsDBNull(9) ? reader.GetInt64(9) : 0,
             };
         }
 

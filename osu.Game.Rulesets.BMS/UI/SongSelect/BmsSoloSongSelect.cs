@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
     /// 关键不同：
     /// 1. 进入时强制 <c>Ruleset.Value</c> = BMS，借助 <see cref="BeatmapInfoExtensions.AllowGameplayWithRuleset"/>
     ///    对外部托管谱面集的限制，让 carousel 只显示 BMS 谱面（其他 ruleset 的曲在 BMS 下不显示）。
-    /// 2. 进入时刷一次 <see cref="BMSOsuLibrarySynchronizer.Synchronize"/>，把外部 BMS 文件夹 sync 到 osu Realm，
+    /// 2. 进入时通过 <see cref="BMSOsuLibrarySynchronizer"/> 刷一次，把外部 BMS 文件夹 sync 到 osu Realm，
     ///    让官方 <c>BeatmapStore</c> / <c>BeatmapCarousel</c> 能查询到。
     /// 3. 重写 <see cref="OnStart"/>：不走 <c>SoloSongSelect</c> 的标准 <c>PlayerLoader</c>，从选中 BeatmapInfo 反查
     ///    <see cref="BMSSourceReference"/> → 构造 <see cref="BMSWorkingBeatmap"/> → push <see cref="BMSPlayerLoader"/>。
@@ -66,6 +66,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         // access to the resolved Storage. osu.Game's Realm is intentionally untouched — that
         // would force a schema-version bump and break clients without the BMS ruleset installed.
         private BmsLampSqliteRepository? lampRepository;
+        private CancellationTokenSource? screenWorkCts;
 
         // Snapshot of the global MusicController state at entry; restored on exit so the main-menu music
         // resumes naturally after the user backs out of song select.
@@ -256,12 +257,14 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         public override void OnSuspending(ScreenTransitionEvent e)
         {
+            cancelBackgroundWork();
             previewPlayer.StopPreview();
             base.OnSuspending(e);
         }
 
         public override bool OnExiting(ScreenExitEvent e)
         {
+            cancelBackgroundWork();
             previewPlayer.StopPreview();
             restoreGlobalMusicController();
             return base.OnExiting(e);
@@ -282,6 +285,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }
 
             previewPlayer.StopPreview();
+            cancelBackgroundWork();
             BmsSongSelectPlayHelper.TryLaunchFromBeatmapInfo(this, beatmapInfo, beatmapManager, audioManager, renderer, musicController, notifications);
         }
 
@@ -366,78 +370,33 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private void refreshLibrary()
         {
             syncConfiguredPaths();
+            screenWorkCts?.Cancel();
+            screenWorkCts?.Dispose();
+            screenWorkCts = new CancellationTokenSource();
 
-            if (beatmapManager.RootPaths.Count == 0)
-            {
-                notifications?.Post(new SimpleNotification
+            BmsSongSelectLibraryOperations.RunLibraryRefresh(
+                Scheduler,
+                beatmapManager,
+                storage,
+                realm,
+                bmsRulesetInfo,
+                notifications,
+                operationId =>
                 {
-                    Text = BmsStrings.SONG_SELECT_ADD_LIBRARY_PATH_FIRST,
-                    Icon = FontAwesome.Solid.ExclamationTriangle,
-                });
-                return;
-            }
+                    if (!this.IsCurrentScreen())
+                        return;
 
-            var notification = new ProgressNotification
-            {
-                Text = BmsStrings.SONG_SELECT_SCANNING_LIBRARY,
-                Progress = 0,
-            };
+                    ensureBeatmapInfoExistsInRealm();
+                    requestCarouselCriteriaRefresh();
+                },
+                screenWorkCts.Token);
+        }
 
-            notifications?.Post(notification);
-
-            void onScanProgress(ValueChangedEvent<double> e) => Schedule(() => notification.Progress = (float)BmsLibraryImportPipeline.MapScanProgress(e.NewValue));
-
-            void onScanStatus(ValueChangedEvent<string> e) => Schedule(() => notification.Text = e.NewValue);
-
-            beatmapManager.ScanProgress.BindValueChanged(onScanProgress, true);
-            beatmapManager.StatusMessage.BindValueChanged(onScanStatus, true);
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await BmsLibraryImportPipeline.RunAsync(
-                        beatmapManager,
-                        storage,
-                        realm,
-                        bmsRulesetInfo,
-                        beatmapManager.RootPaths,
-                        p => Schedule(() =>
-                        {
-                            notification.Progress = (float)p.Progress;
-                            notification.Text = p.StatusMessage;
-                        })).ConfigureAwait(false);
-
-                    Schedule(() =>
-                    {
-                        ensureBeatmapInfoExistsInRealm();
-                        requestCarouselCriteriaRefresh();
-                        notification.Progress = 1f;
-                        notification.State = ProgressNotificationState.Completed;
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Schedule(() =>
-                    {
-                        Logger.Error(ex, "[BMS] library import failed");
-                        notification.State = ProgressNotificationState.Cancelled;
-                        notifications?.Post(new SimpleNotification
-                        {
-                            Text = BmsStrings.SongSelect_RefreshFailed(ex.Message),
-                            Icon = FontAwesome.Solid.ExclamationTriangle,
-                        });
-                    });
-                }
-                finally
-                {
-                    Schedule(() =>
-                    {
-                        beatmapManager.ScanProgress.ValueChanged -= onScanProgress;
-                        beatmapManager.StatusMessage.ValueChanged -= onScanStatus;
-                    });
-                }
-            });
+        private void cancelBackgroundWork()
+        {
+            screenWorkCts?.Cancel();
+            beatmapManager.CancelScan();
+            BmsLibraryOperationGate.Shared.CancelCurrent();
         }
 
         private void suspendGlobalMusicController()

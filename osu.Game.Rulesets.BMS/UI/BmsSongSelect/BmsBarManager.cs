@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering;
 
@@ -8,12 +9,18 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 {
     public sealed class BmsBarManager
     {
+        public const int WINDOW_SIZE = 150;
+
         private readonly BmsBarContext context;
         private readonly IBmsDifficultyTableProvider tableProvider;
         private readonly IReadOnlyList<BmsRajaRandomDefinition> randomDefinitions;
         private readonly Stack<BmsDirectoryBar> directoryStack = new Stack<BmsDirectoryBar>();
         private readonly Stack<BmsBar> sourceBars = new Stack<BmsBar>();
         private readonly List<BmsRajaSearchEntry> searchHistory = new List<BmsRajaSearchEntry>();
+        private readonly Stack<BmsBarPageCursor?> previousPageCursors = new Stack<BmsBarPageCursor?>();
+        private BmsDirectoryBar? pagedSource;
+        private BmsBarPageCursor? currentPageCursor;
+        private BmsBarPageCursor? nextPageCursor;
 
         public IReadOnlyList<BmsBar> CurrentBars { get; private set; } = Array.Empty<BmsBar>();
         public int SelectedIndex { get; private set; }
@@ -36,6 +43,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             {
                 directoryStack.Clear();
                 sourceBars.Clear();
+                clearPaging();
                 CurrentBars = buildRootBars();
             }
             else
@@ -54,10 +62,26 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                     directoryStack.Push(bar);
                 }
 
-                CurrentBars = bar.GetChildren(context);
+                BmsBarPage? page = bar.GetPage(context, null, WINDOW_SIZE);
+
+                if (page != null)
+                {
+                    pagedSource = bar;
+                    currentPageCursor = null;
+                    nextPageCursor = page.NextCursor;
+                    previousPageCursors.Clear();
+                    CurrentBars = prependRandomBars(page.Bars.ToList());
+                }
+                else
+                {
+                    clearPaging();
+                    CurrentBars = applyPipeline(bar.GetChildren(context));
+                }
             }
 
-            CurrentBars = applyPipeline(CurrentBars);
+            if (pagedSource == null)
+                CurrentBars = applyPipeline(CurrentBars);
+
             SelectedIndex = findNearestSelectableIndex(SelectedIndex);
             updateBreadcrumb();
             Changed?.Invoke();
@@ -123,6 +147,25 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             Changed?.Invoke();
         }
 
+        public bool MoveToNextPage()
+        {
+            if (pagedSource == null || nextPageCursor == null)
+                return false;
+
+            previousPageCursors.Push(currentPageCursor);
+            loadPage(nextPageCursor);
+            return true;
+        }
+
+        public bool MoveToPreviousPage()
+        {
+            if (pagedSource == null || previousPageCursors.Count == 0)
+                return false;
+
+            loadPage(previousPageCursors.Pop());
+            return true;
+        }
+
         public BmsBar? GetSelectedBar() => CurrentBars.Count == 0 ? null : CurrentBars[SelectedIndex];
 
         public void OpenSelected()
@@ -140,12 +183,21 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
             if (bar is BmsRandomExecutableBar randomBar)
             {
-                var songs = CurrentBars.OfType<BmsSongBar>().Where(s => BmsRandomFilterEvaluator.Matches(s, randomBar.Filter, context)).ToList();
-                if (songs.Count == 0)
+                BmsChartSummary? picked = pagedSource?.GetRandom(context, randomBar.Filter);
+
+                if (picked == null)
                     return;
 
-                var pick = songs[Random.Shared.Next(songs.Count)];
-                SelectedIndex = Math.Max(0, CurrentBars.ToList().IndexOf(pick));
+                var pick = new BmsSongBar(picked);
+                var bars = CurrentBars.ToList();
+                int replaceIndex = bars.FindIndex(item => item is BmsSongBar);
+
+                if (replaceIndex < 0)
+                    return;
+
+                bars[replaceIndex] = pick;
+                CurrentBars = bars;
+                SelectedIndex = replaceIndex;
                 Changed?.Invoke();
             }
         }
@@ -155,7 +207,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             if (GetSelectedBar() is not BmsSongBar song)
                 return;
 
-            var sameFolder = new BmsSameFolderBar(song.Chart.FolderPath);
+            var sameFolder = new BmsSameFolderBar(song.Summary.FolderPath);
             sourceBars.Push(sameFolder);
             UpdateBar(sameFolder);
         }
@@ -251,29 +303,44 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 return true;
 
             if (bar is BmsSongBar song)
-                return context.KeyModeFilter.Matches(song.Chart.KeyCount);
+                return context.KeyModeFilter.Matches(song.Summary.KeyCount);
 
             return true;
         }
 
         private List<BmsBar> prependRandomBars(List<BmsBar> bars)
         {
-            var songs = bars.OfType<BmsSongBar>().ToList();
+            bool hasSongs = bars.Any(bar => bar is BmsSongBar);
             var randomBars = new List<BmsBar>();
 
-            foreach (var def in randomDefinitions)
+            if (hasSongs)
             {
-                int matchCount = string.IsNullOrEmpty(def.Name) || def.Name == "RANDOM SELECT"
-                    ? songs.Count
-                    : songs.Count(s => BmsRandomFilterEvaluator.Matches(s, def.Filter, context));
-
-                int required = def.Filter == null || def.Filter.Count == 0 ? 2 : 1;
-                if (matchCount >= required)
+                foreach (var def in randomDefinitions)
                     randomBars.Add(new BmsRandomExecutableBar(def.Name, def.Filter));
             }
 
             randomBars.AddRange(bars);
             return randomBars;
+        }
+
+        private void loadPage(BmsBarPageCursor? cursor)
+        {
+            if (pagedSource?.GetPage(context, cursor, WINDOW_SIZE) is not BmsBarPage page)
+                return;
+
+            currentPageCursor = cursor;
+            nextPageCursor = page.NextCursor;
+            CurrentBars = prependRandomBars(page.Bars.ToList());
+            SelectedIndex = findNearestSelectableIndex(0);
+            Changed?.Invoke();
+        }
+
+        private void clearPaging()
+        {
+            pagedSource = null;
+            currentPageCursor = null;
+            nextPageCursor = null;
+            previousPageCursors.Clear();
         }
 
         public void SetSelectedIndex(int index)

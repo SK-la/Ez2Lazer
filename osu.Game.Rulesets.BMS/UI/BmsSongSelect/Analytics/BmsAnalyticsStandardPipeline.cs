@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
             IReadOnlyList<BMSChartCache> charts,
             BmsAnalyticsSqliteRepository repository)
         {
-            var records = repository.LoadAll();
+            var batch = new List<(BMSChartCache Chart, string PathKey, BmsChartAnalyticsResult Result)>();
 
             foreach (var chart in charts)
             {
@@ -47,14 +47,29 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
                     ? BmsPathKeys.ComputeChartPathKey(chart.FullPath)
                     : chart.Md5Hash;
 
-                if (!records.TryGetValue(pathKey, out var record))
+                if (!repository.TryGet(pathKey, out var record))
                     continue;
 
-                Guid beatmapId = BmsAnalyticsRealmWriteback.GetDeterministicBeatmapId(chart.FullPath);
-                var payload = createPayload(record);
-
-                analysisDatabase.TryCommitExternalOfflineAnalysis(realm, beatmapId, payload);
+                batch.Add((chart, pathKey, new BmsChartAnalyticsResult(
+                    record.Pp,
+                    record.XxySr,
+                    record.AvgKps,
+                    record.MaxKps,
+                    record.StarRating,
+                    record.ColumnCountsJson,
+                    record.KpsListJson)));
             }
+
+            BulkCommitResults(realm, analysisDatabase, batch);
+        }
+
+        public static void BulkCommitResults(
+            RealmAccess realm,
+            EzAnalysisDatabase analysisDatabase,
+            IReadOnlyList<(BMSChartCache Chart, string PathKey, BmsChartAnalyticsResult Result)> batch)
+        {
+            foreach ((BMSChartCache chart, string pathKey, BmsChartAnalyticsResult analyticsResult) in batch)
+                TryCommitChart(realm, analysisDatabase, chart, pathKey, analyticsResult);
         }
 
         private static EzExternalBeatmapAnalysisPayload createPayload(string pathKey, BmsChartAnalyticsResult analyticsResult)

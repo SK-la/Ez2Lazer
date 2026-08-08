@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars;
 
 namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
@@ -13,7 +12,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
         public IReadOnlyList<BmsRajaFolderRoot> Roots => roots;
 
-        public static BmsFolderTree Build(IReadOnlyList<string> libraryRoots, IEnumerable<BMSSongCache> songs)
+        public static BmsFolderTree Build(IReadOnlyList<string> libraryRoots)
         {
             var tree = new BmsFolderTree();
             var rootEntries = libraryRoots.Where(Directory.Exists).ToList();
@@ -23,34 +22,6 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 string rootCrc = BmsPathCrc.Compute(root);
                 var rootNode = tree.getOrCreateNode(rootCrc, null, Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)), root);
                 tree.roots.Add(new BmsRajaFolderRoot(root, rootCrc, rootNode));
-            }
-
-            foreach (var song in songs)
-            {
-                string? matchedRoot = rootEntries.FirstOrDefault(r => song.FolderPath.StartsWith(r, StringComparison.OrdinalIgnoreCase));
-                if (matchedRoot == null)
-                    continue;
-
-                string relative = Path.GetRelativePath(matchedRoot, song.FolderPath);
-                string parentPath = matchedRoot;
-                string parentCrc = BmsPathCrc.Compute(matchedRoot);
-
-                if (!string.IsNullOrEmpty(relative) && relative != ".")
-                {
-                    foreach (string segment in relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
-                    {
-                        if (string.IsNullOrEmpty(segment))
-                            continue;
-
-                        parentPath = Path.Combine(parentPath, segment);
-                        string crc = BmsPathCrc.Compute(parentPath);
-                        tree.getOrCreateNode(crc, parentCrc, segment, parentPath);
-                        parentCrc = crc;
-                    }
-                }
-
-                if (tree.nodesByCrc.TryGetValue(parentCrc, out var leaf))
-                    leaf.Songs.Add(song);
             }
 
             return tree;
@@ -63,7 +34,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             var bars = new List<BmsBar>();
 
             foreach (var root in roots)
-                bars.Add(new BmsFolderBar(root.Crc, root.DisplayName, root.Path, root.Node));
+                bars.Add(new BmsFolderBar(root.Crc, root.DisplayName, root.Path));
 
             return bars;
         }
@@ -76,13 +47,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             var result = new List<BmsBar>();
 
             foreach (var child in node.Children.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase))
-                result.Add(new BmsFolderBar(child.Crc, child.Name, child.FullPath, child));
-
-            foreach (var song in node.Songs.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
-            {
-                foreach (var chart in song.Charts.OrderBy(c => c.PlayLevel).ThenBy(c => c.FileName, StringComparer.OrdinalIgnoreCase))
-                    result.Add(new BmsSongBar(chart));
-            }
+                result.Add(new BmsFolderBar(child.Crc, child.Name, child.FullPath));
 
             return result;
         }
@@ -127,6 +92,5 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         public string Name { get; } = name;
         public string FullPath { get; } = fullPath;
         public List<BmsFolderNode> Children { get; } = new List<BmsFolderNode>();
-        public List<BMSSongCache> Songs { get; } = new List<BMSSongCache>();
     }
 }

@@ -1,8 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Security.Cryptography;
-using System.Text;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Rendering;
@@ -121,7 +119,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             var beatmapInfo = new BeatmapInfo(new BMSRuleset().RulesetInfo)
             {
-                ID = createDeterministicBeatmapId(bmsFilePath),
+                ID = BmsChartIdentity.CreateBeatmapId(bmsFilePath),
                 Metadata = new BeatmapMetadata
                 {
                     Title = title,
@@ -153,12 +151,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
 
             return beatmapInfo;
-        }
-
-        private static Guid createDeterministicBeatmapId(string chartPath)
-        {
-            byte[] bytes = MD5.HashData(Encoding.UTF8.GetBytes($"bms:chart:{chartPath}"));
-            return new Guid(bytes);
         }
 
         private static string? sanitiseAudioReference(string? raw, string? baseFolder)

@@ -19,6 +19,16 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public static string ComputeRealmFileHash(string chartPath) => ComputeChartPathKey(chartPath);
 
+        public static string CreateRandomStartKey(ulong? value = null)
+        {
+            if (value != null)
+                return value.Value.ToString("x16").PadRight(64, '0');
+
+            Span<byte> randomBytes = stackalloc byte[8];
+            Random.Shared.NextBytes(randomBytes);
+            return Convert.ToHexString(randomBytes).ToLowerInvariant().PadRight(64, '0');
+        }
+
         private static string normalisePath(string chartPath)
         {
             try

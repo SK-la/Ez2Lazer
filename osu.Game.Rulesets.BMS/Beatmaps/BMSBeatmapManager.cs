@@ -1,9 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Collections.Concurrent;
-using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Channels;
 using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
@@ -13,6 +12,23 @@ using osu.Game.Rulesets.BMS.Localization;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
 {
+    public enum BmsRealmSyncChangeKind
+    {
+        Upsert,
+        Delete,
+    }
+
+    public readonly record struct BmsRealmSyncChange(
+        long Revision,
+        Guid BeatmapId,
+        Guid SetId,
+        string ChartPath,
+        BmsRealmSyncChangeKind Kind);
+
+    public readonly record struct BmsRealmSyncChart(BMSChartCache Chart, BmsChartIdentity Identity);
+
+    public sealed record BmsRealmSyncSet(Guid SetId, BMSSongCache Song, IReadOnlyList<BmsRealmSyncChart> Charts);
+
     /// <summary>
     ///     Manages BMS library scanning, SQLite indexing, and loading.
     /// </summary>
@@ -32,8 +48,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public BindableBool IsScanning { get; } = new BindableBool();
 
-        public BMSLibraryCache? LibraryCache { get; private set; }
-
         public long LastScanRevision { get; private set; }
 
         public long LastSynchronizedScanRevision { get; private set; }
@@ -47,18 +61,19 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private bool realmSyncRequired;
 
         public bool NeedsRealmSynchronization => realmSyncRequired
-                                                 || LastScanRevision != LastSynchronizedScanRevision
+                                                 || PendingRealmSyncSetCount > 0
                                                  || LastSynchronizedRealmFileMappingVersion != BmsRealmSyncConstants.FILE_MAPPING_SCHEMA_VERSION;
 
-        public bool HasIndexedCharts => LibraryCache?.TotalCharts > 0;
+        public bool HasIndexedCharts => ChartCount > 0;
+
+        public int ChartCount => indexRepository.ChartCount;
+
+        public int SongCount => indexRepository.SongCount;
 
         private static readonly string[] bms_extensions = { ".bms", ".bme", ".bml", ".pms" };
 
-        private readonly string storageDirectory;
         private readonly BmsLibraryIndexRepository indexRepository;
         private readonly List<string> rootPaths = new List<string>();
-        private readonly Dictionary<Guid, BMSSourceReference> beatmapSourceMap = new Dictionary<Guid, BMSSourceReference>();
-        private readonly object sourceMapLock = new object();
 
         private CancellationTokenSource? scanCts;
 
@@ -81,7 +96,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public BMSBeatmapManager(string storageDirectory)
         {
-            this.storageDirectory = storageDirectory;
             Directory.CreateDirectory(storageDirectory);
             indexRepository = new BmsLibraryIndexRepository(Path.Combine(storageDirectory, BmsStoragePaths.INDEX_DATABASE_FILE));
         }
@@ -90,25 +104,15 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         {
             try
             {
-                LibraryCache = indexRepository.LoadLibraryCache();
                 LastScanRevision = indexRepository.ScanRevision;
                 LastSynchronizedRealmFileMappingVersion = indexRepository.RealmFileMappingVersion;
-                rebuildSourceMapFromIndex();
-
-                if (LibraryCache.RootPaths.Count > 0)
-                    SetRootPaths(LibraryCache.RootPaths);
-                else if (!string.IsNullOrEmpty(LibraryCache.RootPath))
-                    SetRootPaths(new[] { LibraryCache.RootPath });
-
-                StatusMessage.Value = BmsStrings.Scan_LoadedFromIndex(LibraryCache.Songs.Count, LibraryCache.TotalCharts);
-
-                if (LibraryCache.TotalCharts > 0)
-                    realmSyncRequired = true;
+                SetRootPaths(indexRepository.GetRootPaths());
+                StatusMessage.Value = BmsStrings.Scan_LoadedFromIndex(SongCount, ChartCount);
+                realmSyncRequired = PendingRealmSyncSetCount > 0;
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "[BMS] Failed to load library index");
-                LibraryCache = new BMSLibraryCache();
             }
         }
 
@@ -129,20 +133,171 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public void RequireRealmSynchronization() => realmSyncRequired = true;
 
+        public long RealmSyncCursor => indexRepository.SyncCursor;
+
+        public int PendingRealmSyncSetCount => indexRepository.PendingSyncSetCount;
+
+        public void PrepareRealmSynchronization()
+        {
+            if (LastSynchronizedRealmFileMappingVersion != BmsRealmSyncConstants.FILE_MAPPING_SCHEMA_VERSION)
+                indexRepository.EnqueueAllChartsForSync();
+        }
+
+        public IReadOnlyList<BmsRealmSyncChange> GetPendingRealmSyncChanges(int maxSetCount)
+        {
+            return indexRepository.GetPendingSyncChangesForSets(maxSetCount)
+                                  .Select(change => new BmsRealmSyncChange(
+                                      change.Revision,
+                                      change.BeatmapId,
+                                      change.SetId,
+                                      change.ChartPath,
+                                      (BmsRealmSyncChangeKind)change.Kind))
+                                  .ToList();
+        }
+
+        public bool TryGetRealmSyncSet(Guid setId, out BmsRealmSyncSet set)
+        {
+            IReadOnlyList<BmsLibraryIndexRepository.IndexedChart> indexedCharts = indexRepository.GetChartsBySetId(setId);
+
+            if (indexedCharts.Count == 0)
+            {
+                set = null!;
+                return false;
+            }
+
+            string folderPath = indexedCharts[0].Chart.FolderPath;
+
+            if (!indexRepository.TryGetSong(folderPath, out BMSSongCache song))
+            {
+                BMSChartCache firstChart = indexedCharts[0].Chart;
+                song = new BMSSongCache
+                {
+                    FolderPath = folderPath,
+                    Title = firstChart.Title,
+                    Artist = firstChart.Artist,
+                    Genre = firstChart.Genre,
+                    LastModified = firstChart.LastModified,
+                };
+            }
+
+            set = new BmsRealmSyncSet(
+                setId,
+                song,
+                indexedCharts.Select(indexed => new BmsRealmSyncChart(indexed.Chart, indexed.Identity)).ToList());
+            return true;
+        }
+
+        public void AcknowledgeRealmSyncChanges(IReadOnlyCollection<long> revisions)
+        {
+            indexRepository.AcknowledgeSyncChanges(revisions);
+        }
+
+        public long FilterSyncCursor => indexRepository.FilterCursor;
+
+        public int PendingFilterSyncChangeCount => indexRepository.PendingFilterChangeCount;
+
+        public IReadOnlyList<BmsRealmSyncChange> GetPendingFilterSyncChanges(int limit)
+        {
+            return indexRepository.GetPendingFilterSyncChanges(limit)
+                                  .Select(change => new BmsRealmSyncChange(
+                                      change.Revision,
+                                      change.BeatmapId,
+                                      change.SetId,
+                                      change.ChartPath,
+                                      (BmsRealmSyncChangeKind)change.Kind))
+                                  .ToList();
+        }
+
+        public void AcknowledgeFilterSyncChanges(IReadOnlyCollection<long> revisions)
+            => indexRepository.AcknowledgeFilterSyncChanges(revisions);
+
+        public void MarkFilterSynchronizedToCurrent()
+            => indexRepository.MarkFilterSynchronizedToCurrent();
+
+        public BeatmapSetInfo BuildRealmSyncTarget(BmsRealmSyncSet syncSet, RulesetInfo bmsRulesetInfo)
+        {
+            BMSSongCache song = syncSet.Song;
+            var beatmapSet = new BeatmapSetInfo
+            {
+                ID = syncSet.SetId,
+                DateAdded = song.LastModified,
+                Hash = song.FolderPath,
+            };
+
+            foreach (BmsRealmSyncChart indexed in syncSet.Charts)
+            {
+                BMSChartCache chart = indexed.Chart;
+                var metadata = new BeatmapMetadata
+                {
+                    Title = string.IsNullOrWhiteSpace(chart.Title) ? song.Title : chart.Title,
+                    TitleUnicode = string.IsNullOrWhiteSpace(chart.Title) ? song.Title : chart.Title,
+                    Artist = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
+                    ArtistUnicode = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
+                    Source = "BMS",
+                    Tags = buildTags(chart),
+                    AudioFile = string.Empty,
+                    BackgroundFile = song.StageFilePath ?? string.Empty,
+                    PreviewTime = chart.PreviewTime,
+                };
+
+                var beatmapInfo = new BeatmapInfo(bmsRulesetInfo, new BeatmapDifficulty(), metadata)
+                {
+                    ID = indexed.Identity.BeatmapId,
+                    DifficultyName = formatDifficultyName(chart),
+                    BPM = chart.Bpm,
+                    Length = chart.Duration,
+                    Hash = BmsPathKeys.ComputeRealmFileHash(chart.FullPath),
+                    MD5Hash = indexed.Identity.PathKey,
+                    TotalObjectCount = chart.TotalNotes,
+                    EndTimeObjectCount = chart.LongNoteCount,
+                    BeatmapSet = beatmapSet,
+                    Difficulty =
+                    {
+                        CircleSize = chart.KeyCount,
+                        OverallDifficulty = mapRankToOD(chart.Rank),
+                        DrainRate = 7
+                    }
+                };
+
+                beatmapSet.Beatmaps.Add(beatmapInfo);
+            }
+
+            return beatmapSet;
+        }
+
         public void CancelScan() => scanCts?.Cancel();
 
         public Task ScanLibraryAsync(string rootPath, CancellationToken cancellationToken = default) => ScanLibraryAsync(new[] { rootPath }, cancellationToken);
 
         public async Task ScanLibraryAsync(IEnumerable<string> scanPaths, CancellationToken cancellationToken = default)
         {
-            if (IsScanning.Value)
+            CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            CancellationTokenSource? previous;
+
+            lock (this)
             {
-                CancelScan();
-                await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+                previous = scanCts;
+                scanCts = linked;
             }
 
-            scanCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var token = scanCts.Token;
+            if (previous != null)
+            {
+                previous.Cancel();
+
+                try
+                {
+                    // Allow the previous scan pipeline to unwind before replacing shared progress state.
+                    await Task.Delay(50, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // ignored
+                }
+
+                previous.Dispose();
+            }
+
+            var token = linked.Token;
 
             IsScanning.Value = true;
             ScanProgress.Value = 0;
@@ -151,96 +306,182 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             try
             {
                 List<string> configuredPaths = normaliseRootPaths(scanPaths);
-                List<string> existingPaths = configuredPaths.Where(Directory.Exists).ToList();
 
-                if (existingPaths.Count == 0)
+                if (configuredPaths.Count == 0)
+                {
+                    // Empty path list is an explicit clear: drop the SQLite index and queue Realm deletes.
+                    StatusMessage.Value = BmsStrings.SCAN_CLEARING_LIBRARY.ToString();
+                    ScanProgress.Value = 0.25;
+
+                    long clearGeneration = indexRepository.BeginScanGeneration();
+                    LastScanRevision = indexRepository.CompleteScanGeneration(clearGeneration, configuredPaths);
+                    SetRootPaths(configuredPaths);
+                    realmSyncRequired = true;
+
+                    StatusMessage.Value = BmsStrings.Scan_Complete(SongCount, ChartCount);
+                    return;
+                }
+
+                if (configuredPaths.Any(path => !Directory.Exists(path)))
                 {
                     StatusMessage.Value = BmsStrings.SCAN_NO_VALID_PATHS.ToString();
                     return;
                 }
 
-                var bmsFiles = enumerateBmsFiles(existingPaths).ToList();
-
-                if (bmsFiles.Count == 0)
+                long generation = indexRepository.BeginScanGeneration();
+                using var pipelineCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                CancellationToken pipelineToken = pipelineCts.Token;
+                var files = Channel.CreateBounded<string>(new BoundedChannelOptions(512)
                 {
-                    StatusMessage.Value = BmsStrings.SCAN_NO_BMS_FILES.ToString();
-                    return;
-                }
-
-                StatusMessage.Value = BmsStrings.Scan_FoundFiles(bmsFiles.Count);
-
-                var folderGroups = bmsFiles
-                                   .GroupBy(f => Path.GetDirectoryName(f) ?? string.Empty)
-                                   .ToList();
-
-                var snapshots = indexRepository.GetChartSnapshots();
-                var seenChartPaths = new ConcurrentBag<string>();
-                int processedFolders = 0;
-                int totalFolders = folderGroups.Count;
+                    FullMode = BoundedChannelFullMode.Wait,
+                    SingleReader = false,
+                    SingleWriter = true,
+                });
+                var writes = Channel.CreateBounded<BmsLibraryIndexRepository.ScanWriteItem>(new BoundedChannelOptions(256)
+                {
+                    FullMode = BoundedChannelFullMode.Wait,
+                    SingleReader = true,
+                    SingleWriter = false,
+                });
+                int discoveredFiles = 0;
+                int processedFiles = 0;
                 object progressLock = new object();
 
-                await Task.Run(() =>
+                Task producer = Task.Run(async () =>
                 {
-                    Parallel.ForEach(
-                        folderGroups,
-                        new ParallelOptions
+                    try
+                    {
+                        var extensions = new HashSet<string>(bms_extensions, StringComparer.OrdinalIgnoreCase);
+
+                        foreach (string rootPath in configuredPaths)
                         {
-                            MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 2, 8),
-                            CancellationToken = token,
-                        },
-                        group =>
-                        {
-                            token.ThrowIfCancellationRequested();
+                            pipelineToken.ThrowIfCancellationRequested();
 
-                            string folderPath = group.Key;
-                            var songCache = scanSongFolder(folderPath, group.ToList(), snapshots, token);
-
-                            if (songCache == null || songCache.Charts.Count == 0)
-                                return;
-
-                            indexRepository.UpsertSong(songCache);
-
-                            foreach (BMSChartCache chart in songCache.Charts)
+                            try
                             {
-                                string chartPath = chart.FullPath;
-                                seenChartPaths.Add(chartPath);
-
-                                string pathKey = BmsPathKeys.ComputeChartPathKey(chartPath);
-                                chart.Md5Hash = pathKey;
-                                Guid beatmapId = createDeterministicGuid($"bms:chart:{chartPath}");
-
-                                indexRepository.UpsertChart(chart, beatmapId, pathKey);
-
-                                lock (sourceMapLock)
+                                foreach (string file in Directory.EnumerateFiles(rootPath, "*.*", SearchOption.AllDirectories))
                                 {
-                                    beatmapSourceMap[beatmapId] = new BMSSourceReference
+                                    pipelineToken.ThrowIfCancellationRequested();
+
+                                    if (!extensions.Contains(Path.GetExtension(file)))
+                                        continue;
+
+                                    int found = Interlocked.Increment(ref discoveredFiles);
+
+                                    // Discovery can run for a long time before the first write batch;
+                                    // surface a count so notifications are not stuck on a spinner with no text change.
+                                    if (found == 1 || found % 256 == 0)
                                     {
-                                        BeatmapId = beatmapId,
-                                        FolderPath = chart.FolderPath,
-                                        ChartPath = chartPath,
-                                        Md5Hash = pathKey,
-                                    };
+                                        lock (progressLock)
+                                        {
+                                            if (Volatile.Read(ref processedFiles) == 0)
+                                                StatusMessage.Value = BmsStrings.Scan_FoundFiles(found);
+                                        }
+                                    }
+
+                                    await files.Writer.WriteAsync(file, pipelineToken).ConfigureAwait(false);
                                 }
                             }
-
-                            int done = Interlocked.Increment(ref processedFolders);
-
-                            lock (progressLock)
+                            catch (OperationCanceledException)
                             {
-                                ScanProgress.Value = (double)done / totalFolders;
-                                StatusMessage.Value = BmsStrings.Scan_ParsingFolders(done, totalFolders);
+                                throw;
                             }
-                        });
-                }, token).ConfigureAwait(false);
+                            catch (Exception ex)
+                            {
+                                Logger.Log($"[BMS] Failed to enumerate '{rootPath}': {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
+                                throw;
+                            }
+                        }
 
-                indexRepository.DeleteChartsNotIn(seenChartPaths.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
-                LastScanRevision = indexRepository.MarkScanComplete(existingPaths);
-                LibraryCache = indexRepository.LoadLibraryCache();
-                SetRootPaths(existingPaths);
-                rebuildSourceMapFromIndex();
+                        files.Writer.TryComplete();
+                    }
+                    catch (Exception ex)
+                    {
+                        files.Writer.TryComplete(ex);
+                        throw;
+                    }
+                }, pipelineToken);
+
+                int workerCount = Math.Clamp(Environment.ProcessorCount, 2, 8);
+                Task[] parsers = Enumerable.Range(0, workerCount).Select(_ => Task.Run(async () =>
+                {
+                    await foreach (string filePath in files.Reader.ReadAllAsync(pipelineToken).ConfigureAwait(false))
+                    {
+                        BmsLibraryIndexRepository.ScanWriteItem? item = createScanWriteItem(filePath, pipelineToken);
+
+                        if (item != null)
+                            await writes.Writer.WriteAsync(item, pipelineToken).ConfigureAwait(false);
+                    }
+                }, pipelineToken)).ToArray();
+
+                Task completeWrites = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.WhenAll(parsers).ConfigureAwait(false);
+                        writes.Writer.TryComplete();
+                    }
+                    catch (Exception ex)
+                    {
+                        writes.Writer.TryComplete(ex);
+                        throw;
+                    }
+                }, pipelineToken);
+
+                Task writer = Task.Run(async () =>
+                {
+                    using BmsLibraryIndexRepository.ScanWriter scanWriter = indexRepository.OpenScanWriter(generation);
+                    var batch = new List<BmsLibraryIndexRepository.ScanWriteItem>(128);
+
+                    await foreach (BmsLibraryIndexRepository.ScanWriteItem item in writes.Reader.ReadAllAsync(pipelineToken).ConfigureAwait(false))
+                    {
+                        batch.Add(item);
+
+                        if (batch.Count < 128)
+                            continue;
+
+                        scanWriter.WriteBatch(batch);
+                        batch.Clear();
+
+                        int done = Interlocked.Add(ref processedFiles, 128);
+
+                        lock (progressLock)
+                        {
+                            int total = Math.Max(done, Volatile.Read(ref discoveredFiles));
+                            ScanProgress.Value = total == 0 ? 0 : (double)done / total;
+                            StatusMessage.Value = BmsStrings.Scan_ParsingFolders(done, total);
+                        }
+                    }
+
+                    if (batch.Count > 0)
+                    {
+                        int count = batch.Count;
+                        scanWriter.WriteBatch(batch);
+                        int done = Interlocked.Add(ref processedFiles, count);
+
+                        lock (progressLock)
+                        {
+                            int total = Math.Max(done, Volatile.Read(ref discoveredFiles));
+                            ScanProgress.Value = total == 0 ? 0 : (double)done / total;
+                            StatusMessage.Value = BmsStrings.Scan_ParsingFolders(done, total);
+                        }
+                    }
+                }, pipelineToken);
+
+                const TaskContinuationOptions cancel_on_failure = TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously;
+
+                _ = producer.ContinueWith(_ => pipelineCts.Cancel(), CancellationToken.None, cancel_on_failure, TaskScheduler.Default);
+                _ = completeWrites.ContinueWith(_ => pipelineCts.Cancel(), CancellationToken.None, cancel_on_failure, TaskScheduler.Default);
+                _ = writer.ContinueWith(_ => pipelineCts.Cancel(), CancellationToken.None, cancel_on_failure, TaskScheduler.Default);
+
+                await Task.WhenAll(producer, completeWrites, writer).ConfigureAwait(false);
+                pipelineToken.ThrowIfCancellationRequested();
+
+                LastScanRevision = indexRepository.CompleteScanGeneration(generation, configuredPaths);
+                SetRootPaths(configuredPaths);
                 realmSyncRequired = true;
 
-                StatusMessage.Value = BmsStrings.Scan_Complete(LibraryCache.Songs.Count, LibraryCache.TotalCharts);
+                StatusMessage.Value = BmsStrings.Scan_Complete(SongCount, ChartCount);
             }
             catch (OperationCanceledException)
             {
@@ -255,314 +496,119 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             {
                 IsScanning.Value = false;
                 ScanProgress.Value = 1;
+
+                lock (this)
+                {
+                    if (ReferenceEquals(scanCts, linked))
+                        scanCts = null;
+                }
+
+                linked.Dispose();
             }
         }
 
         public BMSChartCache? GetChartByHash(string pathKey)
         {
-            if (indexRepository.TryGetSourceReferenceByPathKey(pathKey, out BMSSourceReference reference)
-                && indexRepository.TryLoadChart(reference.ChartPath, out BMSChartCache chart))
-                return chart;
-
-            if (LibraryCache == null)
-                return null;
-
-            foreach (var song in LibraryCache.Songs)
-            {
-                foreach (var cached in song.Charts)
-                {
-                    if (cached.Md5Hash.Equals(pathKey, StringComparison.OrdinalIgnoreCase))
-                        return cached;
-                }
-            }
-
-            return null;
+            return TryGetChartByPathKey(pathKey, out BMSChartCache chart) ? chart : null;
         }
 
-        public IEnumerable<BMSSongCache> GetAllSongs() => LibraryCache?.Songs ?? Enumerable.Empty<BMSSongCache>();
-
-        public IEnumerable<BMSChartCache> GetAllCharts()
+        public bool TryGetChart(Guid beatmapId, out BMSChartCache chart)
         {
-            if (LibraryCache == null)
-                yield break;
-
-            foreach (var song in LibraryCache.Songs)
+            if (indexRepository.TryGetChart(beatmapId, out BmsLibraryIndexRepository.IndexedChart indexed))
             {
-                foreach (var chart in song.Charts)
-                    yield return chart;
+                chart = indexed.Chart;
+                return true;
             }
+
+            chart = null!;
+            return false;
         }
 
-        public IReadOnlyList<BeatmapSetInfo> BuildVirtualBeatmapCatalog(RulesetInfo bmsRulesetInfo)
+        public bool TryGetChartByPathKey(string pathKey, out BMSChartCache chart)
         {
-            List<BeatmapSetInfo> result = new List<BeatmapSetInfo>();
-
-            if (LibraryCache == null)
-                return result;
-
-            foreach (BMSSongCache song in LibraryCache.Songs)
+            if (indexRepository.TryGetChartByPathKey(pathKey, out BmsLibraryIndexRepository.IndexedChart indexed))
             {
-                if (song.Charts.Count == 0)
-                    continue;
-
-                var beatmapSet = new BeatmapSetInfo
-                {
-                    ID = createDeterministicGuid($"bms:set:{song.FolderPath}"),
-                    DateAdded = song.LastModified,
-                    Hash = song.FolderPath,
-                };
-
-                foreach (BMSChartCache chart in song.Charts.OrderBy(c => c.PlayLevel).ThenBy(c => c.FileName, StringComparer.OrdinalIgnoreCase))
-                {
-                    string chartPath = chart.FullPath;
-                    string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
-                        ? BmsPathKeys.ComputeChartPathKey(chartPath)
-                        : chart.Md5Hash;
-                    string realmHash = BmsPathKeys.ComputeRealmFileHash(chartPath);
-
-                    var metadata = new BeatmapMetadata
-                    {
-                        Title = string.IsNullOrWhiteSpace(chart.Title) ? song.Title : chart.Title,
-                        TitleUnicode = string.IsNullOrWhiteSpace(chart.Title) ? song.Title : chart.Title,
-                        Artist = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
-                        ArtistUnicode = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
-                        Source = "BMS",
-                        Tags = buildTags(chart),
-                        AudioFile = string.Empty,
-                        BackgroundFile = song.StageFilePath ?? string.Empty,
-                        PreviewTime = chart.PreviewTime,
-                    };
-
-                    var beatmapInfo = new BeatmapInfo(bmsRulesetInfo, new BeatmapDifficulty(), metadata)
-                    {
-                        ID = createDeterministicGuid($"bms:chart:{chartPath}"),
-                        DifficultyName = formatDifficultyName(chart),
-                        BPM = chart.Bpm,
-                        Length = chart.Duration,
-                        Hash = realmHash,
-                        MD5Hash = pathKey,
-                        TotalObjectCount = chart.TotalNotes,
-                        EndTimeObjectCount = chart.LongNoteCount,
-                        BeatmapSet = beatmapSet,
-                        Difficulty =
-                        {
-                            CircleSize = chart.KeyCount,
-                            OverallDifficulty = mapRankToOD(chart.Rank),
-                            DrainRate = 7
-                        }
-                    };
-
-                    beatmapSet.Beatmaps.Add(beatmapInfo);
-                }
-
-                result.Add(beatmapSet);
+                chart = indexed.Chart;
+                return true;
             }
 
-            return result;
+            chart = null!;
+            return false;
         }
+
+        public IReadOnlyList<BMSChartCache> GetChartPage(int offset, int limit)
+        {
+            return indexRepository.GetCharts(offset, limit).Select(indexed => indexed.Chart).ToList();
+        }
+
+        public BmsChartSummaryPage GetChartSummaryPage(BmsChartQuery query, BmsChartPageCursor? after, int limit)
+            => indexRepository.GetChartSummaries(query, after, limit);
+
+        public BmsChartSummary? GetRandomChartSummary(BmsChartQuery query)
+            => indexRepository.GetRandomChartSummary(query);
+
+        public bool TryGetChartSummaryByPathKey(string pathKey, out BmsChartSummary summary)
+            => indexRepository.TryGetChartSummaryByPathKey(pathKey, out summary);
+
+        public IReadOnlyList<BmsFolderSummary> GetChildFolderPage(string parentPath, string? afterFolderPath, int limit)
+            => indexRepository.GetChildFolders(parentPath, afterFolderPath, limit);
 
         public bool TryGetSourceReference(Guid beatmapId, out BMSSourceReference sourceReference)
-        {
-            if (tryGetSourceReferenceCore(beatmapId, out sourceReference))
-                return true;
-
-            if (indexRepository.TryGetSourceReference(beatmapId, out sourceReference))
-            {
-                cacheSourceReference(sourceReference);
-                return true;
-            }
-
-            sourceReference = default;
-            return false;
-        }
+            => indexRepository.TryGetSourceReference(beatmapId, out sourceReference);
 
         public bool TryGetSourceReferenceByHash(string pathKey, out BMSSourceReference sourceReference)
+            => indexRepository.TryGetSourceReferenceByPathKey(pathKey, out sourceReference);
+
+        private BmsLibraryIndexRepository.ScanWriteItem? createScanWriteItem(string filePath, CancellationToken token)
         {
-            if (tryGetSourceReferenceByHashCore(pathKey, out sourceReference))
-                return true;
+            token.ThrowIfCancellationRequested();
 
-            if (indexRepository.TryGetSourceReferenceByPathKey(pathKey, out sourceReference))
-            {
-                cacheSourceReference(sourceReference);
-                return true;
-            }
-
-            sourceReference = default;
-            return false;
-        }
-
-        public Dictionary<Guid, BMSSourceReference> GetCurrentSourceMap()
-        {
-            lock (sourceMapLock)
-                return new Dictionary<Guid, BMSSourceReference>(beatmapSourceMap);
-        }
-
-        private void rebuildSourceMapFromIndex()
-        {
-            var map = new Dictionary<Guid, BMSSourceReference>();
-
-            if (LibraryCache == null)
-            {
-                replaceSourceMap(map);
-                return;
-            }
-
-            foreach (var song in LibraryCache.Songs)
-            {
-                foreach (var chart in song.Charts)
-                {
-                    string chartPath = chart.FullPath;
-                    string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
-                        ? BmsPathKeys.ComputeChartPathKey(chartPath)
-                        : chart.Md5Hash;
-                    Guid beatmapId = createDeterministicGuid($"bms:chart:{chartPath}");
-
-                    map[beatmapId] = new BMSSourceReference
-                    {
-                        BeatmapId = beatmapId,
-                        FolderPath = chart.FolderPath,
-                        ChartPath = chartPath,
-                        Md5Hash = pathKey,
-                    };
-                }
-            }
-
-            replaceSourceMap(map);
-        }
-
-        private void cacheSourceReference(BMSSourceReference reference)
-        {
-            if (reference.BeatmapId == Guid.Empty)
-                return;
-
-            lock (sourceMapLock)
-                beatmapSourceMap[reference.BeatmapId] = reference;
-        }
-
-        private void replaceSourceMap(Dictionary<Guid, BMSSourceReference> newMap)
-        {
-            lock (sourceMapLock)
-            {
-                beatmapSourceMap.Clear();
-
-                foreach ((Guid key, BMSSourceReference value) in newMap)
-                    beatmapSourceMap[key] = value;
-            }
-        }
-
-        private bool tryGetSourceReferenceCore(Guid beatmapId, out BMSSourceReference sourceReference)
-        {
-            lock (sourceMapLock)
-                return beatmapSourceMap.TryGetValue(beatmapId, out sourceReference);
-        }
-
-        private bool tryGetSourceReferenceByHashCore(string pathKey, out BMSSourceReference sourceReference)
-        {
-            lock (sourceMapLock)
-            {
-                foreach (BMSSourceReference reference in beatmapSourceMap.Values)
-                {
-                    if (string.Equals(reference.Md5Hash, pathKey, StringComparison.OrdinalIgnoreCase))
-                    {
-                        sourceReference = reference;
-                        return true;
-                    }
-                }
-            }
-
-            sourceReference = default;
-            return false;
-        }
-
-        private static IEnumerable<string> enumerateBmsFiles(IEnumerable<string> rootPaths)
-        {
-            var extensions = new HashSet<string>(bms_extensions, StringComparer.OrdinalIgnoreCase);
-
-            foreach (string rootPath in rootPaths)
-            {
-                IEnumerable<string> files;
-
-                try
-                {
-                    files = Directory.EnumerateFiles(rootPath, "*.*", SearchOption.AllDirectories);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"[BMS] Failed to enumerate '{rootPath}': {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
-                    continue;
-                }
-
-                foreach (string file in files)
-                {
-                    if (extensions.Contains(Path.GetExtension(file)))
-                        yield return file;
-                }
-            }
-        }
-
-        private BMSSongCache? scanSongFolder(
-            string folderPath,
-            List<string> bmsFiles,
-            Dictionary<string, BmsLibraryIndexRepository.ChartFileSnapshot> snapshots,
-            CancellationToken token)
-        {
-            var songCache = new BMSSongCache
-            {
-                FolderPath = folderPath,
-                LastModified = Directory.GetLastWriteTime(folderPath)
-            };
-
-            bool firstChart = true;
-
-            foreach (string bmsFile in bmsFiles)
-            {
-                token.ThrowIfCancellationRequested();
-
-                try
-                {
-                    var chartCache = parseOrLoadChart(bmsFile, snapshots, token);
-
-                    if (chartCache == null)
-                        continue;
-
-                    songCache.Charts.Add(chartCache);
-
-                    if (firstChart)
-                    {
-                        songCache.Title = chartCache.Title;
-                        songCache.Artist = chartCache.Artist;
-                        songCache.Genre = chartCache.Genre;
-                        firstChart = false;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Failed to parse BMS file: {bmsFile} - {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
-                }
-            }
-
-            songCache.BannerPath = findImageFile(folderPath, "banner", "bn");
-            songCache.StageFilePath = findImageFile(folderPath, "stagefile", "stage", "bg");
-
-            return songCache;
-        }
-
-        private BMSChartCache? parseOrLoadChart(string filePath, Dictionary<string, BmsLibraryIndexRepository.ChartFileSnapshot> snapshots, CancellationToken token)
-        {
             var fileInfo = new FileInfo(filePath);
 
             if (!fileInfo.Exists)
                 return null;
 
-            long ticks = fileInfo.LastWriteTimeUtc.Ticks;
+            long fileSize = fileInfo.Length;
+            long modifiedTicks = fileInfo.LastWriteTimeUtc.Ticks;
 
-            if (snapshots.TryGetValue(filePath, out var snapshot)
-                && snapshot.FileSize == fileInfo.Length
-                && snapshot.LastModifiedTicks == ticks
-                && indexRepository.TryLoadChart(filePath, out BMSChartCache? cached))
-                return cached;
+            bool hadSnapshot = indexRepository.TryGetChartSnapshot(filePath, out BmsLibraryIndexRepository.ChartFileSnapshot snapshot);
 
-            return parseBmsFileForCache(filePath, token);
+            if (hadSnapshot
+                && snapshot.FileSize == fileSize
+                && snapshot.LastModifiedTicks == modifiedTicks)
+            {
+                return new BmsLibraryIndexRepository.ScanWriteItem(filePath, fileSize, modifiedTicks, null, null);
+            }
+
+            try
+            {
+                BMSChartCache? chart = parseBmsFileForCache(filePath, token);
+
+                if (chart == null)
+                    return hadSnapshot ? new BmsLibraryIndexRepository.ScanWriteItem(filePath, fileSize, modifiedTicks, null, null) : null;
+
+                var song = new BMSSongCache
+                {
+                    FolderPath = chart.FolderPath,
+                    Title = chart.Title,
+                    Artist = chart.Artist,
+                    Genre = chart.Genre,
+                    BannerPath = findImageFile(chart.FolderPath, "banner", "bn"),
+                    StageFilePath = findImageFile(chart.FolderPath, "stagefile", "stage", "bg"),
+                    LastModified = Directory.GetLastWriteTime(chart.FolderPath),
+                };
+
+                return new BmsLibraryIndexRepository.ScanWriteItem(filePath, fileSize, modifiedTicks, chart, song);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to parse BMS file: {filePath} - {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
+                return hadSnapshot ? new BmsLibraryIndexRepository.ScanWriteItem(filePath, fileSize, modifiedTicks, null, null) : null;
+            }
         }
 
         private static string formatDifficultyName(BMSChartCache chart)
@@ -627,12 +673,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             if (chart.HasBgaLayer) tags.Add("bga");
 
             return string.Join(' ', tags);
-        }
-
-        private static Guid createDeterministicGuid(string input)
-        {
-            byte[] bytes = MD5.HashData(Encoding.UTF8.GetBytes(input));
-            return new Guid(bytes);
         }
 
         private static bool isNoteChannel(string channel)

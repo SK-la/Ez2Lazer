@@ -8,27 +8,40 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
     /// </summary>
     internal static class BmsAnalyticsScanContext
     {
-        public static bool IsRunning { get; private set; }
+        private static int activeCount;
+
+        public static bool IsRunning => Volatile.Read(ref activeCount) > 0;
 
         public static bool SuppressDecoderVerboseLogging { get; private set; }
 
         public static CancellationToken ActiveCancellation { get; private set; }
 
-        public static IDisposable Enter(CancellationToken cancellationToken)
+        public static bool TryEnter(CancellationToken cancellationToken, out IDisposable? scope)
         {
-            IsRunning = true;
+            if (Interlocked.CompareExchange(ref activeCount, 1, 0) != 0)
+            {
+                scope = null;
+                return false;
+            }
+
             SuppressDecoderVerboseLogging = true;
             ActiveCancellation = cancellationToken;
-            return new Scope();
+            scope = new Scope();
+            return true;
         }
 
         private sealed class Scope : IDisposable
         {
+            private int disposed;
+
             public void Dispose()
             {
-                IsRunning = false;
+                if (Interlocked.Exchange(ref disposed, 1) != 0)
+                    return;
+
                 SuppressDecoderVerboseLogging = false;
                 ActiveCancellation = CancellationToken.None;
+                Volatile.Write(ref activeCount, 0);
             }
         }
     }

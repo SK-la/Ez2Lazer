@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Text.Json;
+using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering;
 
@@ -41,15 +42,21 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
         public override bool IsSortable => true;
 
         public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context)
+            => GetPage(context, null, 150)!.Bars;
+
+        public override BmsBarPage? GetPage(BmsBarContext context, BmsBarPageCursor? after, int limit)
         {
-            var charts = context.SqlQuery.Execute(sql);
-            var bars = charts.Select(c => new BmsSongBar(c)).Cast<BmsBar>().ToList();
-
-            if (!showInvisible)
-                bars = bars.Where(b => b is not BmsSongBar song || context.KeyModeFilter.Matches(song.Chart.KeyCount)).ToList();
-
-            return bars;
+            IReadOnlyCollection<int>? keyCounts = showInvisible ? null : context.KeyModeFilter.ToKeyCounts();
+            IReadOnlyList<BmsChartSummary> summaries = context.SqlQuery.ExecutePage(sql, after?.FilterCursor, limit, keyCounts);
+            var bars = summaries.Select(summary => (BmsBar)new BmsSongBar(summary)).ToList();
+            BmsBarPageCursor? next = summaries.Count == limit
+                ? new BmsBarPageCursor(null, summaries[^1].PathKey)
+                : null;
+            return new BmsBarPage(bars, next);
         }
+
+        public override BmsChartSummary? GetRandom(BmsBarContext context, IReadOnlyDictionary<string, JsonElement>? filter)
+            => context.SqlQuery.GetRandom(sql, showInvisible ? null : context.KeyModeFilter.ToKeyCounts(), filter);
     }
 
     public sealed class BmsSearchBar : BmsDirectoryBar
@@ -66,16 +73,48 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
 
         public override bool IsSortable => true;
 
-        public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context) => context.SqlQuery.SearchByText(Query).Select(c => new BmsSongBar(c)).Cast<BmsBar>().ToList();
+        public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context)
+            => GetPage(context, null, 150)!.Bars;
+
+        public override BmsBarPage? GetPage(BmsBarContext context, BmsBarPageCursor? after, int limit)
+        {
+            BmsChartSummaryPage page = context.SqlQuery.SearchByText(
+                Query,
+                after?.IndexCursor,
+                limit,
+                context.SortPolicy.IndexSort,
+                context.KeyModeFilter.ToKeyCounts());
+            return new BmsBarPage(
+                page.Items.Select(summary => (BmsBar)new BmsSongBar(summary)).ToList(),
+                page.NextCursor == null ? null : new BmsBarPageCursor(page.NextCursor, null));
+        }
+
+        public override BmsChartSummary? GetRandom(BmsBarContext context, IReadOnlyDictionary<string, JsonElement>? filter)
+        {
+            if (filter is { Count: > 0 })
+            {
+                const string where = "rtrim(song.title||' '||song.subtitle||' '||song.artist||' '||song.subartist||' '||song.genre) LIKE $search";
+                return context.SqlQuery.GetRandom(
+                    where,
+                    context.KeyModeFilter.ToKeyCounts(),
+                    filter,
+                    new Dictionary<string, object?> { ["$search"] = $"%{Query}%" });
+            }
+
+            return context.BeatmapManager.GetRandomChartSummary(new BmsChartQuery(
+                SearchText: Query,
+                KeyCounts: context.KeyModeFilter.ToKeyCounts(),
+                Sort: context.SortPolicy.IndexSort));
+        }
     }
 
     public sealed class BmsSameFolderBar : BmsDirectoryBar
     {
-        private readonly string folderCrc;
+        private readonly string folderPath;
 
         public BmsSameFolderBar(string folderPath)
         {
-            folderCrc = BmsPathCrc.Compute(folderPath);
+            this.folderPath = folderPath;
             Title = BmsStrings.RAJA_SAME_FOLDER_FILTER_TITLE.ToString();
         }
 
@@ -83,7 +122,37 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
 
         public override bool IsSortable => true;
 
-        public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context) => context.FolderTree.GetChildren(folderCrc);
+        public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context)
+            => GetPage(context, null, 150)!.Bars;
+
+        public override BmsBarPage? GetPage(BmsBarContext context, BmsBarPageCursor? after, int limit)
+        {
+            var query = new BmsChartQuery(
+                FolderPath: folderPath,
+                KeyCounts: context.KeyModeFilter.ToKeyCounts(),
+                Sort: context.SortPolicy.IndexSort);
+            BmsChartSummaryPage page = context.BeatmapManager.GetChartSummaryPage(query, after?.IndexCursor, limit);
+            return new BmsBarPage(
+                page.Items.Select(summary => (BmsBar)new BmsSongBar(summary)).ToList(),
+                page.NextCursor == null ? null : new BmsBarPageCursor(page.NextCursor, null));
+        }
+
+        public override BmsChartSummary? GetRandom(BmsBarContext context, IReadOnlyDictionary<string, JsonElement>? filter)
+        {
+            if (filter is { Count: > 0 })
+            {
+                return context.SqlQuery.GetRandom(
+                    "song.folder = $folder",
+                    context.KeyModeFilter.ToKeyCounts(),
+                    filter,
+                    new Dictionary<string, object?> { ["$folder"] = folderPath });
+            }
+
+            return context.BeatmapManager.GetRandomChartSummary(new BmsChartQuery(
+                FolderPath: folderPath,
+                KeyCounts: context.KeyModeFilter.ToKeyCounts(),
+                Sort: context.SortPolicy.IndexSort));
+        }
     }
 
     public sealed class BmsRandomExecutableBar : BmsSelectableBar

@@ -43,5 +43,17 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 _ => true,
             };
         }
+
+        public IReadOnlyCollection<int>? ToKeyCounts()
+        {
+            return Current switch
+            {
+                BmsKeyMode.Keys5 => new[] { 5, 8 },
+                BmsKeyMode.Keys7 => new[] { 7, 9 },
+                BmsKeyMode.Keys10 => new[] { 10 },
+                BmsKeyMode.Keys14 => new[] { 14 },
+                _ => null,
+            };
+        }
     }
 }

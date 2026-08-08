@@ -84,23 +84,53 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             chartPath = string.Empty;
             chartCache = null;
 
-            if (beatmapManager.TryGetSourceReference(info.ID, out BMSSourceReference byId))
+            if (tryResolveRealmExternalPath(info, out string realmPath))
+                chartPath = realmPath;
+            else if (beatmapManager.TryGetSourceReference(info.ID, out BMSSourceReference byId))
                 chartPath = byId.ChartPath;
             else if (!string.IsNullOrEmpty(info.MD5Hash) && beatmapManager.TryGetSourceReferenceByHash(info.MD5Hash, out BMSSourceReference byHash))
                 chartPath = byHash.ChartPath;
             else
                 return false;
 
-            if (beatmapManager.LibraryCache != null)
-            {
-                string resolvedPath = chartPath;
-                chartCache = beatmapManager.LibraryCache.Songs
-                                           .SelectMany(s => s.Charts)
-                                           .FirstOrDefault(c => string.Equals(c.Md5Hash, info.MD5Hash, StringComparison.OrdinalIgnoreCase)
-                                                                || string.Equals(c.FullPath, resolvedPath, StringComparison.OrdinalIgnoreCase));
-            }
+            if (!beatmapManager.TryGetChart(info.ID, out chartCache)
+                && !string.IsNullOrEmpty(info.MD5Hash))
+                beatmapManager.TryGetChartByPathKey(info.MD5Hash, out chartCache);
 
             return !string.IsNullOrEmpty(chartPath);
+        }
+
+        private static bool tryResolveRealmExternalPath(BeatmapInfo info, out string chartPath)
+        {
+            chartPath = string.Empty;
+            string? contentRoot = info.BeatmapSet?.GetEffectiveExternalContentRoot();
+            string? relativePath = info.Path;
+
+            if (string.IsNullOrWhiteSpace(contentRoot)
+                || string.IsNullOrWhiteSpace(relativePath)
+                || Path.IsPathRooted(relativePath))
+                return false;
+
+            try
+            {
+                string fullRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(contentRoot));
+                string candidate = Path.GetFullPath(Path.Combine(fullRoot, relativePath));
+                string relative = Path.GetRelativePath(fullRoot, candidate);
+
+                if (relative.Equals("..", StringComparison.Ordinal)
+                    || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                    || relative.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal)
+                    || Path.IsPathRooted(relative)
+                    || !File.Exists(candidate))
+                    return false;
+
+                chartPath = candidate;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }
