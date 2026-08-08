@@ -34,6 +34,8 @@ namespace osu.Game.Tests.Skins
     {
         private static readonly string[] available_skins =
         {
+            // Covers Ez HUD components (EzOsuGame.HUD)
+            "Archives/modified-ezSkin.osk",
             // Covers song progress before namespace changes, and most other components.
             "Archives/modified-default-20220723.osk",
             "Archives/modified-classic-20220723.osk",
@@ -83,8 +85,8 @@ namespace osu.Game.Tests.Skins
             "Archives/modified-classic-20250827.osk",
             // Covers "Argon" judgement counter
             "Archives/modified-argon-20250308.osk",
-            // Covers Ez HUD components (EzOsuGame.HUD)
-            "Archives/modified-ezSkin.osk",
+            // Covers legacy bar hit error meter
+            "Archives/modified-classic-20260806.osk",
         };
 
         /// <summary>

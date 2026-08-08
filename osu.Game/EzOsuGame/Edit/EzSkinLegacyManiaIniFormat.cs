@@ -19,11 +19,11 @@ namespace osu.Game.EzOsuGame.Edit
         private const float max_legacy_hit_position = 480f;
 
         public static string FormatScaledValue(float ezValue) =>
-            (ezValue / LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR).ToString(CultureInfo.InvariantCulture);
+            (ezValue / LegacySkin.STABLE_MAGIC_SCALE_FACTOR).ToString(CultureInfo.InvariantCulture);
 
         public static string FormatHitPosition(float ezHitPosition)
         {
-            float legacy = max_legacy_hit_position - ezHitPosition / LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR;
+            float legacy = max_legacy_hit_position - ezHitPosition / LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
             legacy = Math.Clamp(legacy, min_legacy_hit_position, max_legacy_hit_position);
             return legacy.ToString(CultureInfo.InvariantCulture);
         }

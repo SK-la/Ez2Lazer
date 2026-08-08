@@ -28,8 +28,8 @@ namespace osu.Game.Tests.NonVisual
             float[] parts = formatted.Split(',').Select(v => float.Parse(v, CultureInfo.InvariantCulture)).ToArray();
 
             Assert.That(parts, Has.Length.EqualTo(key_mode));
-            Assert.That(parts[0], Is.EqualTo(40 / LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR).Within(0.001));
-            Assert.That(parts[1], Is.EqualTo(80 / LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR).Within(0.001));
+            Assert.That(parts[0], Is.EqualTo(40 / LegacySkin.STABLE_MAGIC_SCALE_FACTOR).Within(0.001));
+            Assert.That(parts[1], Is.EqualTo(80 / LegacySkin.STABLE_MAGIC_SCALE_FACTOR).Within(0.001));
 
             host.Exit();
         }
@@ -41,7 +41,7 @@ namespace osu.Game.Tests.NonVisual
             string legacy = EzSkinLegacyManiaIniFormat.FormatHitPosition(ez_hit_position);
 
             float parsedLegacy = float.Parse(legacy, CultureInfo.InvariantCulture);
-            float roundTripEz = (480 - parsedLegacy) * LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR;
+            float roundTripEz = (480 - parsedLegacy) * LegacySkin.STABLE_MAGIC_SCALE_FACTOR;
 
             Assert.That(roundTripEz, Is.EqualTo(ez_hit_position).Within(0.01));
         }
@@ -61,7 +61,7 @@ namespace osu.Game.Tests.NonVisual
             string formatted = EzSkinLegacyManiaIniFormat.FormatWidthForNoteHeightScale(key_mode, config);
 
             Assert.That(float.Parse(formatted, CultureInfo.InvariantCulture),
-                Is.EqualTo(expectedEzHeight / LegacyManiaSkinConfiguration.POSITION_SCALE_FACTOR).Within(0.001));
+                Is.EqualTo(expectedEzHeight / LegacySkin.STABLE_MAGIC_SCALE_FACTOR).Within(0.001));
 
             host.Exit();
         }
