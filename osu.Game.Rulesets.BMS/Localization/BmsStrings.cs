@@ -47,7 +47,11 @@ namespace osu.Game.Rulesets.BMS.Localization
 
         public static readonly LocalisableString SETTINGS_SCANNING_LIBRARY = new BmsLocalizationManager.BmsLocalisableString("正在扫描 BMS 歌曲库...", "Scanning BMS library...");
 
+        public static readonly LocalisableString SETTINGS_CLEARING_LIBRARY = new BmsLocalizationManager.BmsLocalisableString("正在清空 BMS 歌曲库...", "Clearing BMS library...");
+
         public static readonly LocalisableString SETTINGS_SCAN_COMPLETE = new BmsLocalizationManager.BmsLocalisableString("BMS 歌曲库扫描完成!", "BMS library scan complete!");
+
+        public static readonly LocalisableString SETTINGS_LIBRARY_CLEARED = new BmsLocalizationManager.BmsLocalisableString("BMS 歌曲库已清空", "BMS library cleared");
 
         public static readonly LocalisableString SETTINGS_DEFAULT_COLLECTION_NAME = new BmsLocalizationManager.BmsLocalisableString("BMS Collection", "BMS Collection");
 
@@ -57,7 +61,7 @@ namespace osu.Game.Rulesets.BMS.Localization
 
         public static string Settings_ScanFailedStatus(string message) => settings_scan_failed_status_template.Format(message);
 
-        public static string Settings_CollectionsCreated(int pathCount, int chartCount) => settings_collections_created_template.Format(pathCount, chartCount);
+        public static string Settings_CollectionsSynced(int pathCount, int chartCount) => settings_collections_synced_template.Format(pathCount, chartCount);
 
         private static readonly BmsLocalizationManager.BmsLocalisableString settings_cached_status_template =
             new BmsLocalizationManager.BmsLocalisableString("已缓存 {0} 首歌曲, {1} 张谱面", "Cached {0} songs, {1} charts");
@@ -67,8 +71,8 @@ namespace osu.Game.Rulesets.BMS.Localization
 
         private static readonly BmsLocalizationManager.BmsLocalisableString settings_scan_failed_status_template = new BmsLocalizationManager.BmsLocalisableString("扫描失败: {0}", "Scan failed: {0}");
 
-        private static readonly BmsLocalizationManager.BmsLocalisableString settings_collections_created_template = new BmsLocalizationManager.BmsLocalisableString("已为 {0} 个路径创建收藏夹，共收藏 {1} 张谱面",
-            "Created collections for {0} path(s), {1} chart(s) added.");
+        private static readonly BmsLocalizationManager.BmsLocalisableString settings_collections_synced_template = new BmsLocalizationManager.BmsLocalisableString("已同步 {0} 个路径收藏夹，共 {1} 张谱面",
+            "Synced collections for {0} path(s), {1} chart(s).");
 
         #endregion
 
@@ -79,8 +83,8 @@ namespace osu.Game.Rulesets.BMS.Localization
         public static readonly LocalisableString PATH_WIZARD_TOOLTIP = new BmsLocalizationManager.BmsLocalisableString("BMS 曲库路径设置向导 - 用于配置 BMS 文件的扫描目录", "Configure folders scanned for BMS charts.");
 
         public static readonly LocalisableString PATH_WIZARD_INTRO = new BmsLocalizationManager.BmsLocalisableString(
-            "先添加任意数量的文件夹路径。应用会立即保存并重建扫描，确定只关闭当前向导。",
-            "Add one or more folder paths. Changes are saved and rescanned immediately; OK only closes this wizard.");
+            "先添加任意数量的文件夹路径。应用会立即保存并重建扫描；清空全部路径后再应用可清空曲库。确定只关闭当前向导。",
+            "Add folder paths, then Apply to save and rescan. Apply with an empty list clears the library. OK only closes this wizard.");
 
         public static readonly LocalisableString PATH_WIZARD_INTRO_TOOLTIP = new BmsLocalizationManager.BmsLocalisableString(
             "在此处选择包含 BMS 文件的文件夹，然后点击'添加当前路径'按钮将其添加到曲库列表中。您可以添加多个文件夹，每个文件夹都会被扫描以查找 BMS 文件。",
@@ -239,6 +243,8 @@ namespace osu.Game.Rulesets.BMS.Localization
         #region Library scan / import
 
         public static readonly LocalisableString SCAN_SCANNING_FOLDERS = new BmsLocalizationManager.BmsLocalisableString("正在扫描文件夹...", "Scanning folders...");
+
+        public static readonly LocalisableString SCAN_CLEARING_LIBRARY = new BmsLocalizationManager.BmsLocalisableString("正在清空 BMS 曲库...", "Clearing BMS library...");
 
         public static readonly LocalisableString SCAN_NO_VALID_PATHS = new BmsLocalizationManager.BmsLocalisableString("错误: 没有可用的路径", "Error: no valid paths");
 

@@ -165,9 +165,7 @@ LIMIT 1;";
         public long CompleteScanGeneration(long generation, IReadOnlyCollection<string> rootPaths)
         {
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(generation);
-
-            if (rootPaths.Count == 0)
-                throw new ArgumentException("At least one successfully scanned root is required.", nameof(rootPaths));
+            ArgumentNullException.ThrowIfNull(rootPaths);
 
             lock (writeLock)
             {
@@ -179,6 +177,8 @@ LIMIT 1;";
                 if (readLongMeta(connection, transaction, "scan_generation") != generation)
                     throw new InvalidOperationException($"Scan generation {generation} is no longer current.");
 
+                // Delete every chart not re-seen in this generation. Empty rootPaths means a full clear:
+                // nothing is marked seen, so the entire index is removed and roots are wiped.
                 var staleCharts = new List<(string ChartPath, Guid BeatmapId, Guid SetId)>();
 
                 using (var select = connection.CreateCommand())
@@ -193,12 +193,7 @@ WHERE seen_generation <> $generation;";
                     using var reader = select.ExecuteReader();
 
                     while (reader.Read())
-                    {
-                        string chartPath = reader.GetString(0);
-
-                        if (rootPaths.Any(root => isPathWithinRoot(chartPath, root)))
-                            staleCharts.Add((chartPath, Guid.Parse(reader.GetString(1)), Guid.Parse(reader.GetString(2))));
-                    }
+                        staleCharts.Add((reader.GetString(0), Guid.Parse(reader.GetString(1)), Guid.Parse(reader.GetString(2))));
                 }
 
                 foreach ((string chartPath, Guid beatmapId, Guid setId) in staleCharts)
@@ -1543,22 +1538,6 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;";
                 insert.CommandText = $"INSERT INTO {table_roots} (path) VALUES ($path);";
                 insert.Parameters.AddWithValue("$path", rootPath);
                 insert.ExecuteNonQuery();
-            }
-        }
-
-        private static bool isPathWithinRoot(string path, string rootPath)
-        {
-            try
-            {
-                string fullPath = Path.GetFullPath(path);
-                string fullRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rootPath));
-
-                return fullPath.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-                       || fullPath.StartsWith(fullRoot + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-            }
-            catch
-            {
-                return false;
             }
         }
 

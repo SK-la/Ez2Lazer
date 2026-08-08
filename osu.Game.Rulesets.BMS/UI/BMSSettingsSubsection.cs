@@ -294,7 +294,8 @@ namespace osu.Game.Rulesets.BMS.UI
             IReadOnlyList<string> paths = configuredPaths ?? getConfiguredPaths();
             beatmapManager.SetRootPaths(paths);
 
-            if (paths.Count == 0 || !paths.Any(Directory.Exists))
+            // Empty list clears the library. Non-empty lists still require at least one existing folder.
+            if (paths.Count > 0 && !paths.Any(Directory.Exists))
             {
                 notificationOverlay?.Post(new SimpleErrorNotification
                 {
@@ -303,12 +304,19 @@ namespace osu.Game.Rulesets.BMS.UI
                 return;
             }
 
-            cacheStatusNote.Current.Value = new SettingsNote.Data(BmsStrings.SETTINGS_SCANNING_NOTE, SettingsNote.Type.Informational);
+            bool clearing = paths.Count == 0;
+
+            if (IsLoaded)
+            {
+                cacheStatusNote.Current.Value = new SettingsNote.Data(
+                    clearing ? BmsStrings.SETTINGS_CLEARING_LIBRARY : BmsStrings.SETTINGS_SCANNING_NOTE,
+                    SettingsNote.Type.Informational);
+            }
 
             var notification = new ProgressNotification
             {
-                Text = BmsStrings.SETTINGS_SCANNING_LIBRARY,
-                CompletionText = BmsStrings.SETTINGS_SCAN_COMPLETE,
+                Text = clearing ? BmsStrings.SETTINGS_CLEARING_LIBRARY : BmsStrings.SETTINGS_SCANNING_LIBRARY,
+                CompletionText = clearing ? BmsStrings.SETTINGS_LIBRARY_CLEARED : BmsStrings.SETTINGS_SCAN_COMPLETE,
                 State = ProgressNotificationState.Active,
                 Progress = 0 // 初始化进度为 0,显示进度条而不是转圈
             };
@@ -317,9 +325,24 @@ namespace osu.Game.Rulesets.BMS.UI
 
             BmsLibraryOperationGate.Shared.CancelCurrent();
 
-            void onScanProgress(ValueChangedEvent<double> e) => Schedule(() => notification.Progress = (float)BmsLibraryImportPipeline.MapScanProgress(e.NewValue));
+            // Update the notification directly: Apply runs from the path wizard after settings leave the
+            // screen stack, so SettingsSubsection.Schedule may not flush until the overlay is reopened.
+            void onScanProgress(ValueChangedEvent<double> e)
+            {
+                if (notification.State is ProgressNotificationState.Cancelled or ProgressNotificationState.Completed)
+                    return;
 
-            void onScanStatus(ValueChangedEvent<string> e) => Schedule(() => notification.Text = e.NewValue);
+                notification.Progress = (float)BmsLibraryImportPipeline.MapScanProgress(e.NewValue);
+            }
+
+            void onScanStatus(ValueChangedEvent<string> e)
+            {
+                if (notification.State is ProgressNotificationState.Cancelled or ProgressNotificationState.Completed)
+                    return;
+
+                if (!string.IsNullOrEmpty(e.NewValue))
+                    notification.Text = e.NewValue;
+            }
 
             beatmapManager.ScanProgress.BindValueChanged(onScanProgress, true);
             beatmapManager.StatusMessage.BindValueChanged(onScanStatus, true);
@@ -334,65 +357,68 @@ namespace osu.Game.Rulesets.BMS.UI
                         realm,
                         new BMSRuleset().RulesetInfo,
                         paths,
-                        p => Schedule(() =>
+                        p =>
                         {
                             if (notification.State is ProgressNotificationState.Cancelled or ProgressNotificationState.Completed)
                                 return;
 
                             notification.Progress = (float)p.Progress;
                             notification.Text = p.StatusMessage;
-                        }),
+                        },
                         notification.CancellationToken).ConfigureAwait(false);
 
-                    Schedule(() =>
-                    {
-                        notification.Progress = 1f;
-                        notification.State = ProgressNotificationState.Completed;
-                        cacheStatusNote.Current.Value = new SettingsNote.Data(
-                            BmsStrings.Settings_ScanCompleteStatus(result.SongCount, result.ChartCount),
-                            SettingsNote.Type.Informational);
+                    notification.Progress = 1f;
+                    notification.State = ProgressNotificationState.Completed;
 
-                        // 扫描完成后，为每个路径创建独立的收藏夹
-                        createCollectionsFromPaths(paths);
-                    });
+                    if (IsLoaded)
+                    {
+                        Schedule(() =>
+                        {
+                            cacheStatusNote.Current.Value = new SettingsNote.Data(
+                                BmsStrings.Settings_ScanCompleteStatus(result.SongCount, result.ChartCount),
+                                SettingsNote.Type.Informational);
+                        });
+                    }
+
+                    if (!clearing)
+                        syncCollectionsFromPaths(paths);
                 }
                 catch (Exception ex)
                 {
-                    Schedule(() =>
+                    notification.State = ProgressNotificationState.Cancelled;
+
+                    if (IsLoaded)
                     {
-                        notification.State = ProgressNotificationState.Cancelled;
-                        cacheStatusNote.Current.Value = new SettingsNote.Data(BmsStrings.Settings_ScanFailedStatus(ex.Message), SettingsNote.Type.Critical);
-                    });
+                        Schedule(() =>
+                        {
+                            cacheStatusNote.Current.Value = new SettingsNote.Data(BmsStrings.Settings_ScanFailedStatus(ex.Message), SettingsNote.Type.Critical);
+                        });
+                    }
                 }
                 finally
                 {
-                    Schedule(() =>
-                    {
-                        beatmapManager.ScanProgress.ValueChanged -= onScanProgress;
-                        beatmapManager.StatusMessage.ValueChanged -= onScanStatus;
-                    });
+                    beatmapManager.ScanProgress.ValueChanged -= onScanProgress;
+                    beatmapManager.StatusMessage.ValueChanged -= onScanStatus;
                 }
             });
         }
 
-        private void createCollectionsFromPaths(IReadOnlyList<string> paths)
+        private void syncCollectionsFromPaths(IReadOnlyList<string> paths)
         {
             if (paths.Count == 0 || beatmapManager == null)
                 return;
 
-            int createdCount = 0;
+            int syncedCount = 0;
             int totalCharts = 0;
-            // 用于跟踪已使用的收藏夹名称，避免重复
-            var usedCollectionNames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            // Merge hashes for paths that share a folder name within this apply.
+            var hashesByCollectionName = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
             foreach (string path in paths)
             {
                 if (!Directory.Exists(path))
                     continue;
 
-                // 获取该路径下的所有谱面哈希值
                 var beatmapHashes = new List<string>();
-
                 const int page_size = 256;
 
                 for (int offset = 0; ; offset += page_size)
@@ -417,42 +443,51 @@ namespace osu.Game.Rulesets.BMS.UI
                 if (beatmapHashes.Count == 0)
                     continue;
 
-                // 使用路径的文件夹名称作为收藏夹名称
                 string collectionName = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                 if (string.IsNullOrEmpty(collectionName))
-                    collectionName = Path.GetFileName(path); // 尝试再次获取
+                    collectionName = Path.GetFileName(path);
                 if (string.IsNullOrEmpty(collectionName))
-                    collectionName = BmsStrings.SETTINGS_DEFAULT_COLLECTION_NAME.ToString(); // 最后的默认值
+                    collectionName = BmsStrings.SETTINGS_DEFAULT_COLLECTION_NAME.ToString();
 
-                // 检查名称是否已使用，如果已使用则追加序号
-                if (usedCollectionNames.TryGetValue(collectionName, out int value))
-                {
-                    // 增加该名称的计数器
-                    usedCollectionNames[collectionName] = ++value;
-                    collectionName = $"{collectionName} ({value})";
-                }
+                if (hashesByCollectionName.TryGetValue(collectionName, out List<string>? existingHashes))
+                    existingHashes.AddRange(beatmapHashes);
                 else
-                {
-                    // 首次使用该名称，计数器设为0
-                    usedCollectionNames[collectionName] = 0;
-                }
-
-                // 创建收藏夹
-                realm.Write(r =>
-                {
-                    var collection = new BeatmapCollection(collectionName, beatmapHashes);
-                    r.Add(collection);
-                });
-
-                createdCount++;
-                totalCharts += beatmapHashes.Count;
+                    hashesByCollectionName[collectionName] = beatmapHashes;
             }
 
-            if (createdCount > 0)
+            foreach ((string collectionName, List<string> beatmapHashes) in hashesByCollectionName)
+            {
+                List<string> distinctHashes = beatmapHashes.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+                realm.Write(r =>
+                {
+                    BeatmapCollection? existing = r.All<BeatmapCollection>()
+                        .FirstOrDefault(c => c.Name == collectionName);
+
+                    if (existing != null)
+                    {
+                        existing.BeatmapMD5Hashes.Clear();
+
+                        foreach (string hash in distinctHashes)
+                            existing.BeatmapMD5Hashes.Add(hash);
+
+                        existing.LastModified = DateTimeOffset.UtcNow;
+                    }
+                    else
+                    {
+                        r.Add(new BeatmapCollection(collectionName, distinctHashes));
+                    }
+                });
+
+                syncedCount++;
+                totalCharts += distinctHashes.Count;
+            }
+
+            if (syncedCount > 0)
             {
                 notificationOverlay?.Post(new SimpleNotification
                 {
-                    Text = BmsStrings.Settings_CollectionsCreated(createdCount, totalCharts),
+                    Text = BmsStrings.Settings_CollectionsSynced(syncedCount, totalCharts),
                 });
             }
         }

@@ -301,6 +301,43 @@ namespace osu.Game.Rulesets.BMS.Tests
         }
 
         [Test]
+        public void TestEmptyRootPathsClearsEntireIndex()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), $"bms-index-clear-{Guid.NewGuid():N}");
+            string rootPath = Path.Combine(tempDir, "library");
+            string songPath = Path.Combine(rootPath, "song");
+            Directory.CreateDirectory(songPath);
+
+            try
+            {
+                var repository = new BmsLibraryIndexRepository(Path.Combine(tempDir, BmsStoragePaths.INDEX_DATABASE_FILE));
+                BMSChartCache chart = createChart(songPath, "a.bms", 100);
+
+                long generation = repository.BeginScanGeneration();
+
+                using (BmsLibraryIndexRepository.ScanWriter writer = repository.OpenScanWriter(generation))
+                    writer.WriteBatch(new[] { createChangedItem(chart) });
+
+                Assert.That(repository.CompleteScanGeneration(generation, new[] { rootPath }), Is.EqualTo(1));
+                Assert.That(repository.ChartCount, Is.EqualTo(1));
+                Assert.That(repository.GetRootPaths(), Has.Count.EqualTo(1));
+
+                long clearGeneration = repository.BeginScanGeneration();
+                Assert.That(repository.CompleteScanGeneration(clearGeneration, Array.Empty<string>()), Is.EqualTo(2));
+                Assert.That(repository.ChartCount, Is.EqualTo(0));
+                Assert.That(repository.SongCount, Is.EqualTo(0));
+                Assert.That(repository.GetRootPaths(), Is.Empty);
+
+                IReadOnlyList<BmsLibraryIndexRepository.SyncChange> changes = repository.GetPendingSyncChanges(20);
+                Assert.That(changes.Any(change => change.Kind == BmsLibraryIndexRepository.SyncChangeKind.Delete), Is.True);
+            }
+            finally
+            {
+                cleanupTempDirectory(tempDir);
+            }
+        }
+
+        [Test]
         public void TestAcknowledgeSyncChangesIsExactAndIdempotent()
         {
             string tempDir = Path.Combine(Path.GetTempPath(), $"bms-index-ack-{Guid.NewGuid():N}");

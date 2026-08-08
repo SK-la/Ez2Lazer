@@ -307,7 +307,22 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             {
                 List<string> configuredPaths = normaliseRootPaths(scanPaths);
 
-                if (configuredPaths.Count == 0 || configuredPaths.Any(path => !Directory.Exists(path)))
+                if (configuredPaths.Count == 0)
+                {
+                    // Empty path list is an explicit clear: drop the SQLite index and queue Realm deletes.
+                    StatusMessage.Value = BmsStrings.SCAN_CLEARING_LIBRARY.ToString();
+                    ScanProgress.Value = 0.25;
+
+                    long clearGeneration = indexRepository.BeginScanGeneration();
+                    LastScanRevision = indexRepository.CompleteScanGeneration(clearGeneration, configuredPaths);
+                    SetRootPaths(configuredPaths);
+                    realmSyncRequired = true;
+
+                    StatusMessage.Value = BmsStrings.Scan_Complete(SongCount, ChartCount);
+                    return;
+                }
+
+                if (configuredPaths.Any(path => !Directory.Exists(path)))
                 {
                     StatusMessage.Value = BmsStrings.SCAN_NO_VALID_PATHS.ToString();
                     return;
