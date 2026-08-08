@@ -37,7 +37,7 @@ jobs:
     steps:
       - name: Checkout for tag resolution
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -220,13 +220,13 @@ jobs:
     runs-on: ${{ matrix.platform == 'windows' && matrix.arch == 'arm64' && 'windows-11-arm' || matrix.platform == 'windows' && 'windows-latest' || matrix.platform == 'linux' && matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'macos' && matrix.arch == 'arm64' && 'macos-26' || 'macos-26-intel' }}
     steps:
       - name: Checkout main repo into osu/
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           path: osu
 
       - name: Checkout osu-resources (resources) as sibling
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: SK-la/osu-resources
           path: osu-resources
@@ -242,12 +242,12 @@ jobs:
           }
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('osu/**/packages.lock.json', 'osu/**/*.csproj', 'osu/**/*.props', 'osu/**/*.targets', 'osu/global.json', 'osu/NuGet.config') }}
@@ -256,12 +256,12 @@ jobs:
             nuget-${{ runner.os }}-
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
 
       - name: Cache vpk tool
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: osu/.vpk-tools
           key: vpk-${{ runner.os }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('osu/publish.py') }}
@@ -439,7 +439,7 @@ jobs:
           Write-Output "asset_dir=$uploadDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ format('release-{0}-{1}', matrix.platform, matrix.arch) }}
           path: ${{ steps.prepare_asset.outputs.asset_dir }}
@@ -452,7 +452,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout main repo into osu/
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           path: osu
@@ -481,7 +481,7 @@ jobs:
           git -C osu push $authRemote refs/tags/$tag
 
       - name: Download built assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: release-assets
           pattern: release-*

@@ -37,7 +37,6 @@ dotnet pack osu.Game/osu.Game.csproj -c Release `
     /p:OfficialEz2Build=true `
     /p:ReleaseVersion=$publishVersion `
     /p:UseEz2LazerNuGetPackages=true `
-    /p:NoWarn=NU5104 `
     /p:IncludeSymbols=false `
     -o $OutDir
 

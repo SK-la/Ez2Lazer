@@ -11,6 +11,8 @@
     <Version>0.0.0</Version>
     <PackageIcon>icon.png</PackageIcon>
     <IsPackable>true</IsPackable>
+    <!-- Ez2Lazer 的 framework/resources 依赖恒为预发布版本，打包时无需提示。 -->
+    <NoWarn>$(NoWarn);NU5104</NoWarn>
   </PropertyGroup>
   <ItemGroup Label="Icon">
     <None Include="..\assets\lazer-nuget.png">
