@@ -1,8 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Security.Cryptography;
-using System.Text;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
@@ -52,8 +50,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
 
         internal static Guid GetDeterministicBeatmapId(string chartPath)
         {
-            byte[] hash = MD5.HashData(Encoding.UTF8.GetBytes($"bms:chart:{chartPath}"));
-            return new Guid(hash);
+            return BmsChartIdentity.CreateBeatmapId(chartPath);
         }
     }
 }

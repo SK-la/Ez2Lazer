@@ -1,8 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Security.Cryptography;
-using System.Text;
 using osu.Game.Database;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Scoring.Lamp;
@@ -126,7 +124,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                     clearcount = 1;
             }
 
-            Guid beatmapId = createDeterministicGuid($"bms:chart:{chart.FullPath}");
+            Guid beatmapId = BmsChartIdentity.CreateBeatmapId(chart.FullPath);
 
             if (lampsByBeatmapId.TryGetValue(beatmapId, out var lamp))
             {
@@ -143,12 +141,6 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
             }
 
             return new BmsScoreRow(pathKey, chart.KeyCount, clear, playcount, clearcount, epg, lpg, egr, lgr, notes, combo, minbp);
-        }
-
-        private static Guid createDeterministicGuid(string seed)
-        {
-            byte[] hash = MD5.HashData(Encoding.UTF8.GetBytes(seed));
-            return new Guid(hash);
         }
     }
 }

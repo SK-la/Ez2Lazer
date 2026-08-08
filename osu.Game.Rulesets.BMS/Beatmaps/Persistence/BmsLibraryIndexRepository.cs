@@ -2,8 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
@@ -11,12 +9,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
 {
     public sealed class BmsLibraryIndexRepository
     {
-        private const int schema_version = 1;
+        private const int schema_version = 2;
 
         private const string table_meta = "meta";
         private const string table_roots = "roots";
         private const string table_songs = "songs";
         private const string table_charts = "charts";
+        private const string table_sync_changes = "sync_changes";
 
         private readonly string databasePath;
         private readonly object writeLock = new object();
@@ -30,6 +29,10 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
         public long ScanRevision => readLongMeta("scan_revision");
 
         public int RealmFileMappingVersion => (int)readLongMeta(BmsRealmSyncConstants.REALM_FILE_MAPPING_META_KEY);
+
+        public int ChartCount => readCount(table_charts);
+
+        public int SongCount => readCount(table_songs);
 
         public void WriteRealmFileMappingVersion(int version)
         {
@@ -56,6 +59,33 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
         /// ChartPath is included for data integrity even though the dictionary key already contains the path.
         /// </summary>
         public record ChartFileSnapshot(string ChartPath, long FileSize, long LastModifiedTicks);
+
+        public enum SyncState
+        {
+            Synchronized,
+            Pending,
+        }
+
+        public enum SyncChangeKind
+        {
+            Upsert,
+            Delete,
+        }
+
+        public record IndexedChart(
+            BMSChartCache Chart,
+            BmsChartIdentity Identity,
+            long SeenGeneration,
+            long SyncRevision,
+            SyncState SyncState,
+            int ParseVersion);
+
+        public record SyncChange(
+            long Revision,
+            Guid BeatmapId,
+            Guid SetId,
+            string ChartPath,
+            SyncChangeKind Kind);
 
         public Dictionary<string, ChartFileSnapshot> GetChartSnapshots()
         {
@@ -97,6 +127,75 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
 
             chart = readChart(reader);
             return true;
+        }
+
+        public bool TryGetChart(Guid beatmapId, out IndexedChart chart)
+        {
+            return tryGetIndexedChart("beatmap_id", beatmapId.ToString(), out chart);
+        }
+
+        public bool TryGetChartByPathKey(string pathKey, out IndexedChart chart)
+        {
+            return tryGetIndexedChart("path_key", pathKey, out chart);
+        }
+
+        public IReadOnlyList<IndexedChart> GetCharts(int offset, int limit)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(offset);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+
+            ensureInitialized();
+
+            var result = new List<IndexedChart>(limit);
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+SELECT *
+FROM {table_charts}
+ORDER BY chart_path
+LIMIT $limit OFFSET $offset;";
+            cmd.Parameters.AddWithValue("$limit", limit);
+            cmd.Parameters.AddWithValue("$offset", offset);
+
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+                result.Add(readIndexedChart(reader));
+
+            return result;
+        }
+
+        public IReadOnlyList<SyncChange> GetPendingSyncChanges(int limit)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+
+            ensureInitialized();
+
+            var result = new List<SyncChange>(limit);
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+SELECT revision, beatmap_id, set_id, chart_path, change_kind
+FROM {table_sync_changes}
+ORDER BY revision
+LIMIT $limit;";
+            cmd.Parameters.AddWithValue("$limit", limit);
+
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                result.Add(new SyncChange(
+                    reader.GetInt64(0),
+                    Guid.Parse(reader.GetString(1)),
+                    Guid.Parse(reader.GetString(2)),
+                    reader.GetString(3),
+                    (SyncChangeKind)reader.GetInt32(4)));
+            }
+
+            return result;
         }
 
         public bool TryGetSourceReference(Guid beatmapId, out BMSSourceReference reference)
@@ -229,11 +328,14 @@ ON CONFLICT(folder_path) DO UPDATE SET
                 ensureInitialized();
 
                 using var connection = openConnection();
+                using var transaction = connection.BeginTransaction();
                 using var cmd = connection.CreateCommand();
+                cmd.Transaction = transaction;
                 cmd.CommandText = $@"
 INSERT INTO {table_charts} (
     chart_path, folder_path, file_name, file_size, last_modified_ticks,
-    beatmap_id, path_key, title, sub_title, artist, sub_artist, genre,
+    beatmap_id, set_id, path_key, seen_generation, sync_revision, sync_state, parse_version,
+    title, sub_title, artist, sub_artist, genre,
     play_level, rank, ln_type, key_count, total_notes,
     bpm, min_bpm, max_bpm, duration, total_gauge,
     preview_time, audio_file, preview_file,
@@ -241,7 +343,8 @@ INSERT INTO {table_charts} (
     keysound_files_json
 ) VALUES (
     $chartPath, $folder, $fileName, $size, $modified,
-    $beatmapId, $pathKey, $title, $subTitle, $artist, $subArtist, $genre,
+    $beatmapId, $setId, $pathKey, $seenGeneration, 0, 0, $parseVersion,
+    $title, $subTitle, $artist, $subArtist, $genre,
     $playLevel, $rank, $lnType, $keyCount, $totalNotes,
     $bpm, $minBpm, $maxBpm, $duration, $totalGauge,
     $previewTime, $audio, $preview,
@@ -254,7 +357,10 @@ ON CONFLICT(chart_path) DO UPDATE SET
     file_size = excluded.file_size,
     last_modified_ticks = excluded.last_modified_ticks,
     beatmap_id = excluded.beatmap_id,
+    set_id = excluded.set_id,
     path_key = excluded.path_key,
+    seen_generation = excluded.seen_generation,
+    parse_version = excluded.parse_version,
     title = excluded.title,
     sub_title = excluded.sub_title,
     artist = excluded.artist,
@@ -287,7 +393,10 @@ ON CONFLICT(chart_path) DO UPDATE SET
                 cmd.Parameters.AddWithValue("$size", chart.FileSize);
                 cmd.Parameters.AddWithValue("$modified", chart.LastModified.ToUniversalTime().Ticks);
                 cmd.Parameters.AddWithValue("$beatmapId", beatmapId.ToString());
+                cmd.Parameters.AddWithValue("$setId", BmsChartIdentity.CreateSetId(chart.FolderPath).ToString());
                 cmd.Parameters.AddWithValue("$pathKey", pathKey);
+                cmd.Parameters.AddWithValue("$seenGeneration", ScanRevision + 1);
+                cmd.Parameters.AddWithValue("$parseVersion", 1);
                 cmd.Parameters.AddWithValue("$title", chart.Title ?? string.Empty);
                 cmd.Parameters.AddWithValue("$subTitle", chart.SubTitle ?? string.Empty);
                 cmd.Parameters.AddWithValue("$artist", chart.Artist ?? string.Empty);
@@ -313,6 +422,9 @@ ON CONFLICT(chart_path) DO UPDATE SET
                 cmd.Parameters.AddWithValue("$bga", chart.HasBgaLayer ? 1 : 0);
                 cmd.Parameters.AddWithValue("$keysounds", JsonSerializer.Serialize(chart.KeysoundFiles));
                 cmd.ExecuteNonQuery();
+
+                enqueueSyncChange(connection, transaction, beatmapId, BmsChartIdentity.CreateSetId(chart.FolderPath), chartPath, SyncChangeKind.Upsert);
+                transaction.Commit();
             }
         }
 
@@ -322,37 +434,31 @@ ON CONFLICT(chart_path) DO UPDATE SET
             {
                 ensureInitialized();
 
-                if (chartPaths.Count == 0)
-                {
-                    using var connection = openConnection();
-                    using var wipe = connection.CreateCommand();
-                    wipe.CommandText = $"DELETE FROM {table_charts};";
-                    return wipe.ExecuteNonQuery();
-                }
-
                 using var conn = openConnection();
                 using var transaction = conn.BeginTransaction();
 
-                var existing = new List<string>();
+                var existing = new List<(string ChartPath, Guid BeatmapId, Guid SetId)>();
 
                 using (var select = conn.CreateCommand())
                 {
                     select.Transaction = transaction;
-                    select.CommandText = "SELECT chart_path FROM charts;";
+                    select.CommandText = $"SELECT chart_path, beatmap_id, set_id FROM {table_charts};";
 
                     using var reader = select.ExecuteReader();
 
                     while (reader.Read())
-                        existing.Add(reader.GetString(0));
+                        existing.Add((reader.GetString(0), Guid.Parse(reader.GetString(1)), Guid.Parse(reader.GetString(2))));
                 }
 
                 var keep = new HashSet<string>(chartPaths, StringComparer.OrdinalIgnoreCase);
                 int deleted = 0;
 
-                foreach (string path in existing)
+                foreach ((string path, Guid beatmapId, Guid setId) in existing)
                 {
                     if (keep.Contains(path))
                         continue;
+
+                    enqueueSyncChange(conn, transaction, beatmapId, setId, path, SyncChangeKind.Delete);
 
                     using var delete = conn.CreateCommand();
                     delete.Transaction = transaction;
@@ -481,7 +587,7 @@ ON CONFLICT(chart_path) DO UPDATE SET
                         string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
                             ? BmsPathKeys.ComputeChartPathKey(chartPath)
                             : chart.Md5Hash;
-                        Guid beatmapId = createDeterministicGuid($"bms:chart:{chartPath}");
+                        Guid beatmapId = BmsChartIdentity.CreateBeatmapId(chartPath);
                         UpsertChart(chart, beatmapId, pathKey);
                     }
                 }
@@ -490,10 +596,39 @@ ON CONFLICT(chart_path) DO UPDATE SET
             }
         }
 
-        private static Guid createDeterministicGuid(string input)
+        private bool tryGetIndexedChart(string column, string value, out IndexedChart chart)
         {
-            byte[] bytes = MD5.HashData(Encoding.UTF8.GetBytes(input));
-            return new Guid(bytes);
+            chart = null!;
+            ensureInitialized();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"SELECT * FROM {table_charts} WHERE {column} = $value LIMIT 1;";
+            cmd.Parameters.AddWithValue("$value", value);
+
+            using var reader = cmd.ExecuteReader();
+
+            if (!reader.Read())
+                return false;
+
+            chart = readIndexedChart(reader);
+            return true;
+        }
+
+        private static IndexedChart readIndexedChart(SqliteDataReader reader)
+        {
+            var identity = new BmsChartIdentity(
+                Guid.Parse(reader.GetString(reader.GetOrdinal("beatmap_id"))),
+                Guid.Parse(reader.GetString(reader.GetOrdinal("set_id"))),
+                reader.GetString(reader.GetOrdinal("path_key")));
+
+            return new IndexedChart(
+                readChart(reader),
+                identity,
+                reader.GetInt64(reader.GetOrdinal("seen_generation")),
+                reader.GetInt64(reader.GetOrdinal("sync_revision")),
+                (SyncState)reader.GetInt32(reader.GetOrdinal("sync_state")),
+                reader.GetInt32(reader.GetOrdinal("parse_version")));
         }
 
         private static BMSChartCache readChart(SqliteDataReader reader)
@@ -585,8 +720,31 @@ CREATE TABLE IF NOT EXISTS {table_songs} (
     banner_path TEXT,
     stage_path TEXT,
     last_modified_ticks INTEGER NOT NULL
-);
+);";
+                    cmd.ExecuteNonQuery();
+                }
 
+                int existingVersion = (int)readLongMeta(connection, "schema_version");
+
+                if (existingVersion > schema_version)
+                    throw new InvalidOperationException($"BMS library index schema {existingVersion} is newer than supported schema {schema_version}.");
+
+                if (existingVersion == 0)
+                    createVersion2Schema(connection);
+                else if (existingVersion == 1)
+                    migrateVersion1To2(connection);
+                else
+                    createVersion2Schema(connection);
+
+                writeMeta(connection, "schema_version", schema_version.ToString(CultureInfo.InvariantCulture));
+                initialized = true;
+            }
+        }
+
+        private static void createVersion2Schema(SqliteConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
 CREATE TABLE IF NOT EXISTS {table_charts} (
     chart_path TEXT PRIMARY KEY,
     folder_path TEXT NOT NULL,
@@ -594,7 +752,12 @@ CREATE TABLE IF NOT EXISTS {table_charts} (
     file_size INTEGER NOT NULL,
     last_modified_ticks INTEGER NOT NULL,
     beatmap_id TEXT NOT NULL,
+    set_id TEXT NOT NULL,
     path_key TEXT NOT NULL,
+    seen_generation INTEGER NOT NULL DEFAULT 0,
+    sync_revision INTEGER NOT NULL DEFAULT 0,
+    sync_state INTEGER NOT NULL DEFAULT 0,
+    parse_version INTEGER NOT NULL DEFAULT 1,
     title TEXT NOT NULL,
     sub_title TEXT NOT NULL,
     artist TEXT NOT NULL,
@@ -621,15 +784,80 @@ CREATE TABLE IF NOT EXISTS {table_charts} (
     keysound_files_json TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS {table_sync_changes} (
+    revision INTEGER PRIMARY KEY AUTOINCREMENT,
+    beatmap_id TEXT NOT NULL,
+    set_id TEXT NOT NULL,
+    chart_path TEXT NOT NULL,
+    change_kind INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_charts_folder ON {table_charts}(folder_path);
 CREATE INDEX IF NOT EXISTS idx_charts_path_key ON {table_charts}(path_key);
-CREATE INDEX IF NOT EXISTS idx_charts_beatmap_id ON {table_charts}(beatmap_id);";
-                    cmd.ExecuteNonQuery();
+CREATE INDEX IF NOT EXISTS idx_charts_beatmap_id ON {table_charts}(beatmap_id);
+CREATE INDEX IF NOT EXISTS idx_charts_set_id ON {table_charts}(set_id);";
+            cmd.ExecuteNonQuery();
+        }
+
+        private static void migrateVersion1To2(SqliteConnection connection)
+        {
+            using var transaction = connection.BeginTransaction();
+
+            using (var alter = connection.CreateCommand())
+            {
+                alter.Transaction = transaction;
+                alter.CommandText = $@"
+ALTER TABLE {table_charts} ADD COLUMN set_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE {table_charts} ADD COLUMN seen_generation INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE {table_charts} ADD COLUMN sync_revision INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE {table_charts} ADD COLUMN sync_state INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE {table_charts} ADD COLUMN parse_version INTEGER NOT NULL DEFAULT 1;
+
+CREATE TABLE {table_sync_changes} (
+    revision INTEGER PRIMARY KEY AUTOINCREMENT,
+    beatmap_id TEXT NOT NULL,
+    set_id TEXT NOT NULL,
+    chart_path TEXT NOT NULL,
+    change_kind INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_charts_folder ON {table_charts}(folder_path);
+CREATE INDEX IF NOT EXISTS idx_charts_path_key ON {table_charts}(path_key);
+CREATE INDEX IF NOT EXISTS idx_charts_beatmap_id ON {table_charts}(beatmap_id);
+CREATE INDEX IF NOT EXISTS idx_charts_set_id ON {table_charts}(set_id);";
+                alter.ExecuteNonQuery();
+            }
+
+            var charts = new List<(string ChartPath, string FolderPath, Guid BeatmapId)>();
+
+            using (var select = connection.CreateCommand())
+            {
+                select.Transaction = transaction;
+                select.CommandText = $"SELECT chart_path, folder_path, beatmap_id FROM {table_charts};";
+
+                using var reader = select.ExecuteReader();
+
+                while (reader.Read())
+                    charts.Add((reader.GetString(0), reader.GetString(1), Guid.Parse(reader.GetString(2))));
+            }
+
+            foreach ((string chartPath, string folderPath, Guid beatmapId) in charts)
+            {
+                Guid setId = BmsChartIdentity.CreateSetId(folderPath);
+
+                using (var update = connection.CreateCommand())
+                {
+                    update.Transaction = transaction;
+                    update.CommandText = $"UPDATE {table_charts} SET set_id = $setId WHERE chart_path = $chartPath;";
+                    update.Parameters.AddWithValue("$setId", setId.ToString());
+                    update.Parameters.AddWithValue("$chartPath", chartPath);
+                    update.ExecuteNonQuery();
                 }
 
-                writeMeta(connection, "schema_version", schema_version.ToString(CultureInfo.InvariantCulture));
-                initialized = true;
+                enqueueSyncChange(connection, transaction, beatmapId, setId, chartPath, SyncChangeKind.Upsert);
             }
+
+            transaction.Commit();
         }
 
         private long readLongMeta(string key)
@@ -646,6 +874,66 @@ CREATE INDEX IF NOT EXISTS idx_charts_beatmap_id ON {table_charts}(beatmap_id);"
                 return 0;
 
             return long.TryParse(result.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long value) ? value : 0;
+        }
+
+        private int readCount(string table)
+        {
+            ensureInitialized();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"SELECT COUNT(*) FROM {table};";
+            return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+
+        private static long readLongMeta(SqliteConnection connection, string key)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"SELECT value FROM {table_meta} WHERE key = $key;";
+            cmd.Parameters.AddWithValue("$key", key);
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+                return 0;
+
+            return long.TryParse(result.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long value) ? value : 0;
+        }
+
+        private static void enqueueSyncChange(
+            SqliteConnection connection,
+            SqliteTransaction transaction,
+            Guid beatmapId,
+            Guid setId,
+            string chartPath,
+            SyncChangeKind kind)
+        {
+            long revision;
+
+            using (var insert = connection.CreateCommand())
+            {
+                insert.Transaction = transaction;
+                insert.CommandText = $@"
+INSERT INTO {table_sync_changes} (beatmap_id, set_id, chart_path, change_kind)
+VALUES ($beatmapId, $setId, $chartPath, $kind);
+SELECT last_insert_rowid();";
+                insert.Parameters.AddWithValue("$beatmapId", beatmapId.ToString());
+                insert.Parameters.AddWithValue("$setId", setId.ToString());
+                insert.Parameters.AddWithValue("$chartPath", chartPath);
+                insert.Parameters.AddWithValue("$kind", (int)kind);
+                revision = Convert.ToInt64(insert.ExecuteScalar(), CultureInfo.InvariantCulture);
+            }
+
+            using var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = $@"
+UPDATE {table_charts}
+SET sync_revision = $revision,
+    sync_state = $syncState
+WHERE beatmap_id = $beatmapId;";
+            update.Parameters.AddWithValue("$revision", revision);
+            update.Parameters.AddWithValue("$syncState", (int)SyncState.Pending);
+            update.Parameters.AddWithValue("$beatmapId", beatmapId.ToString());
+            update.ExecuteNonQuery();
         }
 
         private static void writeMeta(SqliteConnection connection, string key, string value)

@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Concurrent;
-using System.Security.Cryptography;
 using System.Text;
 using osu.Framework.Bindables;
 using osu.Framework.Logging;
@@ -207,7 +206,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                                 string pathKey = BmsPathKeys.ComputeChartPathKey(chartPath);
                                 chart.Md5Hash = pathKey;
-                                Guid beatmapId = createDeterministicGuid($"bms:chart:{chartPath}");
+                                Guid beatmapId = BmsChartIdentity.CreateBeatmapId(chartPath);
 
                                 indexRepository.UpsertChart(chart, beatmapId, pathKey);
 
@@ -307,7 +306,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                 var beatmapSet = new BeatmapSetInfo
                 {
-                    ID = createDeterministicGuid($"bms:set:{song.FolderPath}"),
+                    ID = BmsChartIdentity.CreateSetId(song.FolderPath),
                     DateAdded = song.LastModified,
                     Hash = song.FolderPath,
                 };
@@ -335,7 +334,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                     var beatmapInfo = new BeatmapInfo(bmsRulesetInfo, new BeatmapDifficulty(), metadata)
                     {
-                        ID = createDeterministicGuid($"bms:chart:{chartPath}"),
+                        ID = BmsChartIdentity.CreateBeatmapId(chartPath),
                         DifficultyName = formatDifficultyName(chart),
                         BPM = chart.Bpm,
                         Length = chart.Duration,
@@ -415,7 +414,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
                         ? BmsPathKeys.ComputeChartPathKey(chartPath)
                         : chart.Md5Hash;
-                    Guid beatmapId = createDeterministicGuid($"bms:chart:{chartPath}");
+                    Guid beatmapId = BmsChartIdentity.CreateBeatmapId(chartPath);
 
                     map[beatmapId] = new BMSSourceReference
                     {
@@ -627,12 +626,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             if (chart.HasBgaLayer) tags.Add("bga");
 
             return string.Join(' ', tags);
-        }
-
-        private static Guid createDeterministicGuid(string input)
-        {
-            byte[] bytes = MD5.HashData(Encoding.UTF8.GetBytes(input));
-            return new Guid(bytes);
         }
 
         private static bool isNoteChannel(string channel)
