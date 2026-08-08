@@ -14,7 +14,7 @@ namespace osu.Game.EzOsuGame.Scoring
     /// <summary>
     /// 从本地 replay 构建分数时间线。
     /// Mania / Osu：<see cref="IEzReplaySession.RunTimelineDirectAsync"/>（replay 一遍 SP 快照）。
-    /// 架构详见 <see cref="EZ_SR_TL_REGISTRY"/>（同目录 EZ-SR-TL-REGISTRY.md）。
+    /// 架构详见 <see cref="EZ_SR_TL_REGISTRY"/>（仓库 docs/EZ-SR-TL-REGISTRY.md）。
     /// </summary>
     public static class EzScoreTimelineBuilder
     {
@@ -24,7 +24,7 @@ namespace osu.Game.EzOsuGame.Scoring
         public static IEzScoreTimelineCache CreateSessionCache() => new EzScoreTimelineCache();
 
         /// <summary>架构注册表 markdown 文件名（文档用）。</summary>
-        public const string EZ_SR_TL_REGISTRY = "EZ-SR-TL-REGISTRY.md";
+        public const string EZ_SR_TL_REGISTRY = "docs/EZ-SR-TL-REGISTRY.md";
 
         public static EzScoreTimeline? TryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap = null,
                                                 IEzScoreTimelineCache? cache = null, CancellationToken cancellationToken = default)

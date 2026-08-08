@@ -11,9 +11,9 @@
 
 | 文档                            | 路径                                                                                                      | 本次是否完整读过        |
 |-------------------------------|---------------------------------------------------------------------------------------------------------|-----------------|
-| ✎ \| Mania Session 黄金标准       | ✎ \| [`REPLAY_JUDGE_MERGE.md`](../../osu.Game.Rulesets.Mania/EzMania/ReplayJudge/REPLAY_JUDGE_MERGE.md) | ✎ \| **是**（本对话） |
+| ✎ \| Mania Session 黄金标准       | ✎ \| [`REPLAY_JUDGE_MERGE.md`](./REPLAY_JUDGE_MERGE-Mania.md) | ✎ \| **是**（本对话） |
 | ✎ \| Osu / Catch / Taiko 影子判定 | ✎ \| [`REPLAY_JUDGE_SHADOW.md`](./REPLAY_JUDGE_SHADOW.md)                                               | ✎ \| **是**（本对话） |
-| ✎ \| Osu Session              | ✎ \| [`Osu REPLAY_JUDGE_MERGE.md`](../../osu.Game.Rulesets.Osu/EzOsu/ReplayJudge/REPLAY_JUDGE_MERGE.md) | ✎ \| **是**（本对话） |
+| ✎ \| Osu Session              | ✎ \| [`Osu REPLAY_JUDGE_MERGE.md`](./REPLAY_JUDGE_MERGE-Osu.md) | ✎ \| **是**（本对话） |
 | ✎ \| Session/Timeline 注册表     | ✎ \| [`EZ-SR-TL-REGISTRY.md`](./EZ-SR-TL-REGISTRY.md)                                                   | ✎ \| **是**（本对话） |
 | ✎ \| [`MANIA-JUDGEMENT-RUNTIME.md`](./MANIA-JUDGEMENT-RUNTIME.md)                                       | ✎ \| **是**（2026-07-13 Arch-A） |
 | ✎ \| [`MANIA-JUDGEMENT-TOPOLOGY.md`](./MANIA-JUDGEMENT-TOPOLOGY.md)                                     | ✎ \| **是**（2026-07-13 总拓扑活文档） |

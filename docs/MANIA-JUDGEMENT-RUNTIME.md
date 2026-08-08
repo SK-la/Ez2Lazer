@@ -225,9 +225,10 @@ M/N 边界、P0 疑点、反模式 ID 的细表见 git 历史 `40e9e6d60d` 初�
 
 - **总拓扑与批次**：[`MANIA-JUDGEMENT-TOPOLOGY.md`](./MANIA-JUDGEMENT-TOPOLOGY.md)  
 - 数据面：[`MANIA-SCORE-DATA-SOURCE-REGISTRY.md`](./MANIA-SCORE-DATA-SOURCE-REGISTRY.md)  
-- Session 字段 parity：[`REPLAY_JUDGE_MERGE.md`](../../osu.Game.Rulesets.Mania/EzMania/ReplayJudge/REPLAY_JUDGE_MERGE.md)  
+- Session 字段 parity：[`REPLAY_JUDGE_MERGE.md`](./REPLAY_JUDGE_MERGE-Mania.md)  
 - Timeline/Race：[`EZ-SR-TL-REGISTRY.md`](./EZ-SR-TL-REGISTRY.md)  
-- 性能 backlog：[`HIGH_KPS_JUDGE_BACKLOG.md`](../../osu.Game.Rulesets.Mania/EzMania/ReplayJudge/HIGH_KPS_JUDGE_BACKLOG.md)
+- 性能 backlog：[`HIGH_KPS_JUDGE_BACKLOG.md`](./HIGH_KPS_JUDGE_BACKLOG.md)
+- FPS / 性能汇总：[`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)
 
 ---
 

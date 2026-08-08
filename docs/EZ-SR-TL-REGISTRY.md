@@ -4,9 +4,9 @@ Score Race Timeline 架构的**唯一权威文档**。代码中 `TODO(EZ-SR-TL-*
 
 相关深文档：
 
-- Mania Session 黄金标准：[REPLAY_JUDGE_MERGE.md](../../../osu.Game.Rulesets.Mania/EzMania/ReplayJudge/REPLAY_JUDGE_MERGE.md)
+- Mania Session 黄金标准：[REPLAY_JUDGE_MERGE.md](./REPLAY_JUDGE_MERGE-Mania.md)
 - **Osu / Catch / Taiko 影子判定（统一思路）**：[REPLAY_JUDGE_SHADOW.md](./REPLAY_JUDGE_SHADOW.md)
-- Osu Session：[REPLAY_JUDGE_MERGE.md](../../../osu.Game.Rulesets.Osu/EzOsu/ReplayJudge/REPLAY_JUDGE_MERGE.md)
+- Osu Session：[REPLAY_JUDGE_MERGE.md](./REPLAY_JUDGE_MERGE-Osu.md)
 - Wiki：[时间线服务](https://github.com/SK-la/Ez2Lazer/wiki/时间线服务-中文) · [角逐服务](https://github.com/SK-la/Ez2Lazer/wiki/角逐服务-中文)
 
 ---
@@ -165,7 +165,7 @@ Cache key 对**已解析** env 建键。
 
 ### KPoor
 
-Mania KPoor **仅 BMS HealthMode 下**启用，详见 [REPLAY_JUDGE_MERGE §KPoor](../../../osu.Game.Rulesets.Mania/EzMania/ReplayJudge/REPLAY_JUDGE_MERGE.md)。
+Mania KPoor **仅 BMS HealthMode 下**启用，详见 [REPLAY_JUDGE_MERGE §KPoor](./REPLAY_JUDGE_MERGE-Mania.md)。
 
 ```csharp
 bool poorEnabled = IsBMSHealthMode(HealthMode) && BmsPoorHitResultEnable;

@@ -5,8 +5,8 @@ Ez2Lazer 在 **Mania 以外** 的三模式（Osu、Catch、Taiko）共用本设�
 相关：
 
 - 框架注册表：[EZ-SR-TL-REGISTRY.md](./EZ-SR-TL-REGISTRY.md)
-- Mania（独立路径）：[`REPLAY_JUDGE_MERGE.md`](../../osu.Game.Rulesets.Mania/EzMania/ReplayJudge/REPLAY_JUDGE_MERGE.md)
-- Osu 落地：[REPLAY_JUDGE_MERGE.md](../../osu.Game.Rulesets.Osu/EzOsu/ReplayJudge/REPLAY_JUDGE_MERGE.md) · **OSL-010**
+- Mania（独立路径）：[`REPLAY_JUDGE_MERGE.md`](./REPLAY_JUDGE_MERGE-Mania.md)
+- Osu 落地：[REPLAY_JUDGE_MERGE.md](./REPLAY_JUDGE_MERGE-Osu.md) · **OSL-010**
 
 ---
 

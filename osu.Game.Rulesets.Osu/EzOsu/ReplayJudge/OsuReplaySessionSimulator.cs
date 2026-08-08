@@ -15,7 +15,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
     /// Osu Session 仿真入口；委托 <see cref="OsuReplayShadowEngine"/>（OSL-010 影子判定）。
     /// </summary>
     /// <remarks>
-    /// 设计见 <c>REPLAY_JUDGE_SHADOW.md</c> · <c>REPLAY_JUDGE_MERGE.md</c> · <c>TODO(EZ-SR-OSL-010)</c>。
+    /// 设计见 <c>docs/REPLAY_JUDGE_SHADOW.md</c> · <c>docs/REPLAY_JUDGE_MERGE-Osu.md</c> · <c>TODO(EZ-SR-OSL-010)</c>。
     /// </remarks>
     internal static class OsuReplaySessionSimulator
     {

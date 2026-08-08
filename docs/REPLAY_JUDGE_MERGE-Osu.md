@@ -1,6 +1,6 @@
 # Osu ReplayJudge — Session 与 Shadow 判定
 
-Osu 采用 **Shadow Judgement**（影子判定），与 Mania 的 HitMode/Mapping 路径分离。三模式统一设计见 [REPLAY_JUDGE_SHADOW.md](../../../EzOsuGame/Scoring/REPLAY_JUDGE_SHADOW.md)。
+Osu 采用 **Shadow Judgement**（影子判定），与 Mania 的 HitMode/Mapping 路径分离。三模式统一设计见 [REPLAY_JUDGE_SHADOW.md](./REPLAY_JUDGE_SHADOW.md)。
 
 ---
 

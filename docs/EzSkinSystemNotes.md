@@ -17,7 +17,7 @@
 ## 基本情况（常见现象与原因归类）
 
 - 颜色/尺寸不同步：可能是预览容器（EzSkinEditor系列）对共享 bindable 的污染、或 pooled drawable 未被完整重置。
-- 性能下降：在热路径创建绑定副本、频繁 BindTo/Unbind 或大量临时分配会导致帧率与 GC 问题。
+- 性能下降：在热路径创建绑定副本、频繁 BindTo/Unbind 或大量临时分配会导致帧率与 GC 问题。掉帧现象的观测口径与历史结论见 [`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)。
   - 注意 new 构建时，load()加载时，LoadComplete()加载完成时，负担是不同的。
   - 事件绑定、纹理刷新优先加载时。
   - 与刷新有关的绑定回调，优先在加载完成时。

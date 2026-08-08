@@ -3,6 +3,7 @@
 > **定位**：高密度谱面 / 高按键吞吐（社区口径可达 ~90 KPS 量级）下的**全 HitMode**热路径优化清单。  
 > **与主题关系**：依附「局内冻结判定平面」主线（`ManiaJudgementRound` → `ManiaLaneController` → `ManiaJudgementKernel`），**不**替代架构重构；本文件只记录性能专项。  
 > **黄金标准不变**：任何优化不得破坏 `TestSceneReplaySessionParity` / `ManiaCrossSourceInvariantTest` / `ManiaJudgePrecedenceParityTest`。
+> **FPS 现象 / 观测口径 / bench 索引**：统一见 [`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)；本文件只列判定热路径的优化项。
 
 ---
 
@@ -63,7 +64,7 @@
 - 游戏中禁止改 HitMode/HealthMode 的 **UX**
 - Lazer/Classic `Lazer*Replica` 与 ppy inline 合并
 - `OffsetPlusMania` Realm 持久化
-- **POLICY-PARITY** — 已落地测试，见 `REPLAY_JUDGE_MERGE.md` §4
+- **POLICY-PARITY** — 已落地测试，见 [`REPLAY_JUDGE_MERGE-Mania.md`](./REPLAY_JUDGE_MERGE-Mania.md) §4
 
 ---
 

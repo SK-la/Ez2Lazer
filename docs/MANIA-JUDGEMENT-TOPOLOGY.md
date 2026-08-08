@@ -195,14 +195,17 @@ flowchart TB
 | **关 Race 冷启仍 ~500（历史 ~1300）** | 月度判定拓扑膨胀回归；已收敛 O2 双状态、每 Drawable automiss、`OrderedHitPolicy` 包装层；待实机对照 `702be7` |
 | 选歌 3–5s 掉帧 | `BackgroundDataStoreProcessor` 回填 + `RealmDetachedBeatmapStore` Replace（已限流/延迟；与局内 500 分轨） |
 
+FPS 观测口径、跨模块掉帧结论与复现步骤统一见 [`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)。
+
 ---
 
 ## 8. 相关文档
 
 - 叙事：[`MANIA-JUDGEMENT-RUNTIME.md`](./MANIA-JUDGEMENT-RUNTIME.md)
 - 数据：[`MANIA-SCORE-DATA-SOURCE-REGISTRY.md`](./MANIA-SCORE-DATA-SOURCE-REGISTRY.md)
-- Parity：[`REPLAY_JUDGE_MERGE.md`](../../osu.Game.Rulesets.Mania/EzMania/ReplayJudge/REPLAY_JUDGE_MERGE.md)
-- 性能 backlog：[`HIGH_KPS_JUDGE_BACKLOG.md`](../../osu.Game.Rulesets.Mania/EzMania/ReplayJudge/HIGH_KPS_JUDGE_BACKLOG.md)
+- Parity：[`REPLAY_JUDGE_MERGE.md`](./REPLAY_JUDGE_MERGE-Mania.md)
+- 性能 backlog：[`HIGH_KPS_JUDGE_BACKLOG.md`](./HIGH_KPS_JUDGE_BACKLOG.md)
+- FPS / 性能汇总：[`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)
 
 ---
 
