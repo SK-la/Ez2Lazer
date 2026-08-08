@@ -1063,7 +1063,8 @@ namespace osu.Game
                 { FrameworkSetting.VolumeUniversal, 0.6 },
                 { FrameworkSetting.VolumeMusic, 0.6 },
                 { FrameworkSetting.VolumeEffect, 0.6 },
-                { FrameworkSetting.AudioUseExperimentalWasapi, true },
+                // Ez2Lazer defaults to the legacy audio engine (ASIO / BASS device handling is tuned against it).
+                { FrameworkSetting.AudioUseExperimentalWasapi, false },
             };
         }
 
@@ -1408,9 +1409,10 @@ namespace osu.Game
                 if (wasAlreadyUsing)
                     LocalConfig.SetValue(OsuSetting.AudioOffset, LocalConfig.Get<double>(OsuSetting.AudioOffset) - FramedBeatmapClock.WINDOWS_EXPERIMENTAL_AUDIO_OFFSET);
 
-                Audio.UseExperimentalWasapi.Value = true;
-
-                dialogOverlay.Push(new MigrateNewAudioDialog(wasAlreadyUsing));
+                // 屏蔽这些，不需要删除
+                // Audio.UseExperimentalWasapi.Value = true;
+                //
+                // dialogOverlay.Push(new MigrateNewAudioDialog(wasAlreadyUsing));
             }
 
             if (combined < 20260728)
