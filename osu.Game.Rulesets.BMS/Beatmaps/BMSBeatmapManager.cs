@@ -192,6 +192,28 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             indexRepository.AcknowledgeSyncChanges(revisions);
         }
 
+        public long FilterSyncCursor => indexRepository.FilterCursor;
+
+        public int PendingFilterSyncChangeCount => indexRepository.PendingFilterChangeCount;
+
+        public IReadOnlyList<BmsRealmSyncChange> GetPendingFilterSyncChanges(int limit)
+        {
+            return indexRepository.GetPendingFilterSyncChanges(limit)
+                                  .Select(change => new BmsRealmSyncChange(
+                                      change.Revision,
+                                      change.BeatmapId,
+                                      change.SetId,
+                                      change.ChartPath,
+                                      (BmsRealmSyncChangeKind)change.Kind))
+                                  .ToList();
+        }
+
+        public void AcknowledgeFilterSyncChanges(IReadOnlyCollection<long> revisions)
+            => indexRepository.AcknowledgeFilterSyncChanges(revisions);
+
+        public void MarkFilterSynchronizedToCurrent()
+            => indexRepository.MarkFilterSynchronizedToCurrent();
+
         public BeatmapSetInfo BuildRealmSyncTarget(BmsRealmSyncSet syncSet, RulesetInfo bmsRulesetInfo)
         {
             BMSSongCache song = syncSet.Song;
@@ -249,14 +271,33 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public async Task ScanLibraryAsync(IEnumerable<string> scanPaths, CancellationToken cancellationToken = default)
         {
-            if (IsScanning.Value)
+            CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            CancellationTokenSource? previous;
+
+            lock (this)
             {
-                CancelScan();
-                await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+                previous = scanCts;
+                scanCts = linked;
             }
 
-            scanCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var token = scanCts.Token;
+            if (previous != null)
+            {
+                previous.Cancel();
+
+                try
+                {
+                    // Allow the previous scan pipeline to unwind before replacing shared progress state.
+                    await Task.Delay(50, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // ignored
+                }
+
+                previous.Dispose();
+            }
+
+            var token = linked.Token;
 
             IsScanning.Value = true;
             ScanProgress.Value = 0;
@@ -428,6 +469,14 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             {
                 IsScanning.Value = false;
                 ScanProgress.Value = 1;
+
+                lock (this)
+                {
+                    if (ReferenceEquals(scanCts, linked))
+                        scanCts = null;
+                }
+
+                linked.Dispose();
             }
         }
 

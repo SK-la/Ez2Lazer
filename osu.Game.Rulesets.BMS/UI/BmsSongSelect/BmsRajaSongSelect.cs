@@ -52,6 +52,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         private BmsLampSqliteRepository? lampRepository;
         private BmsAnalyticsSqliteRepository? analyticsRepository;
         private BmsFilterDatabaseSync? filterSync;
+        private CancellationTokenSource? screenWorkCts;
 
         [Cached(typeof(IBmsLampScheme))]
         private readonly IBmsLampScheme lampScheme = new BeatorajaLampScheme();
@@ -176,6 +177,20 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             musicController?.Stop();
         }
 
+        public override void OnSuspending(ScreenTransitionEvent e)
+        {
+            cancelBackgroundWork();
+            previewPlayer.StopPreview();
+            base.OnSuspending(e);
+        }
+
+        public override bool OnExiting(ScreenExitEvent e)
+        {
+            cancelBackgroundWork();
+            previewPlayer.StopPreview();
+            return base.OnExiting(e);
+        }
+
         protected override bool OnKeyDown(KeyDownEvent e)
         {
             if (e.Key == Key.F5 && e.ControlPressed)
@@ -264,6 +279,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             }
 
             previewPlayer.StopPreview();
+            cancelBackgroundWork();
 
             if (beatmapManager.TryGetChart(song.BeatmapId, out BMSChartCache chart))
                 BmsSongSelectPlayHelper.TryLaunchFromChart(this, chart.FullPath, chart, null, audioManager, renderer, musicController, notifications);
@@ -272,6 +288,10 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         private void refreshLibrary()
         {
             syncConfiguredPaths();
+            screenWorkCts?.Cancel();
+            screenWorkCts?.Dispose();
+            screenWorkCts = new CancellationTokenSource();
+
             BmsSongSelectLibraryOperations.RunLibraryRefresh(
                 Scheduler,
                 beatmapManager,
@@ -279,8 +299,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 realm,
                 bmsRulesetInfo,
                 notifications,
-                () =>
+                operationId =>
                 {
+                    if (!this.IsCurrentScreen())
+                        return;
+
                     barManager.Changed -= onBarSelectionChanged;
                     rebuildBarContext();
                     barManager = new BmsBarManager(barContext);
@@ -288,13 +311,18 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                     barRenderer.Rebind(barManager, barContext);
                     refreshFilterDatabase();
                     barManager.ResetToRoot();
-                });
+                },
+                screenWorkCts.Token);
         }
 
         private void buildAnalytics()
         {
             if (analyticsRepository == null)
                 return;
+
+            screenWorkCts?.Cancel();
+            screenWorkCts?.Dispose();
+            screenWorkCts = new CancellationTokenSource();
 
             BmsSongSelectAnalyticsOperations.RunAnalyticsBuild(
                 Scheduler,
@@ -304,7 +332,12 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 realm,
                 notifications,
                 analysisDatabase,
-                onComplete: () => Schedule(() => barManager.ResetToRoot()));
+                onComplete: () => Schedule(() =>
+                {
+                    if (this.IsCurrentScreen())
+                        barManager.ResetToRoot();
+                }),
+                cancellationToken: screenWorkCts.Token);
         }
 
         private void refreshFilterDatabase()
@@ -312,18 +345,50 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             if (filterSync == null || lampRepository == null)
                 return;
 
+            screenWorkCts ??= new CancellationTokenSource();
+            CancellationToken token = screenWorkCts.Token;
+
             Task.Run(() =>
             {
                 try
                 {
-                    filterSync.Rebuild(beatmapManager, lampRepository, realm, analyticsRepository);
-                    Schedule(() => barManager.ResetToRoot());
+                    filterSync.ApplyPendingDelta(beatmapManager, lampRepository, realm, analyticsRepository, token);
+                    Schedule(() =>
+                    {
+                        if (token.IsCancellationRequested || !this.IsCurrentScreen())
+                            return;
+
+                        barManager.ResetToRoot();
+                    });
+                }
+                catch (OperationCanceledException)
+                {
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "[BMS] filter database rebuild failed");
+                    Logger.Error(ex, "[BMS] filter database sync failed");
                 }
-            });
+            }, token);
+        }
+
+        private void cancelBackgroundWork()
+        {
+            screenWorkCts?.Cancel();
+            beatmapManager.CancelScan();
+            BmsLibraryOperationGate.Shared.CancelCurrent();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                cancelBackgroundWork();
+                screenWorkCts?.Dispose();
+                screenWorkCts = null;
+                barManager.Changed -= onBarSelectionChanged;
+            }
+
+            base.Dispose(isDisposing);
         }
 
         private void rebuildBarContext()

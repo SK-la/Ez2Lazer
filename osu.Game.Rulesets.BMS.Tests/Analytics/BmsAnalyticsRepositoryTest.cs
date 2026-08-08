@@ -33,12 +33,18 @@ namespace osu.Game.Rulesets.BMS.Tests.Analytics
                     MaxKps = 12.3,
                     StarRating = 4.5,
                     ColumnCountsJson = "{\"0\":10}",
+                    FileSize = 42,
+                    LastModifiedTicks = 100,
                 });
 
                 Assert.That(repository.TryGet(path_key, out var record), Is.True);
                 Assert.That(record.Pp, Is.EqualTo(123.4).Within(0.01));
                 Assert.That(record.XxySr, Is.EqualTo(5.67).Within(0.01));
                 Assert.That(record.AvgKps, Is.EqualTo(8.1).Within(0.01));
+                Assert.That(record.FileSize, Is.EqualTo(42));
+                Assert.That(record.LastModifiedTicks, Is.EqualTo(100));
+                Assert.That(repository.IsUpToDate(path_key, 42, 100), Is.True);
+                Assert.That(repository.IsUpToDate(path_key, 43, 100), Is.False);
 
                 var all = repository.LoadAll();
                 Assert.That(all.ContainsKey(path_key), Is.True);

@@ -29,18 +29,20 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public readonly struct ImportResult
         {
-            public ImportResult(int songCount, int chartCount)
+            public ImportResult(int songCount, int chartCount, long operationId)
             {
                 SongCount = songCount;
                 ChartCount = chartCount;
+                OperationId = operationId;
             }
 
             public int SongCount { get; }
             public int ChartCount { get; }
+            public long OperationId { get; }
         }
 
         /// <summary>
-        /// Run scan then Realm sync. Safe to call from a background thread.
+        /// Run scan then Realm sync under the shared single-flight gate. Safe to call from a background thread.
         /// </summary>
         public static async Task<ImportResult> RunAsync(
             BMSBeatmapManager manager,
@@ -51,10 +53,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             Action<ImportProgress>? reportProgress = null,
             CancellationToken cancellationToken = default)
         {
+            using BmsLibraryOperationGate.OperationHandle operation = BmsLibraryOperationGate.Shared.Begin(cancellationToken);
+            CancellationToken token = operation.Token;
+
             reportProgress?.Invoke(new ImportProgress(0, BmsStrings.IMPORT_INDEXING.ToString()));
 
-            await manager.ScanLibraryAsync(paths, cancellationToken).ConfigureAwait(false);
-            cancellationToken.ThrowIfCancellationRequested();
+            await manager.ScanLibraryAsync(paths, token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
 
             reportProgress?.Invoke(new ImportProgress(SCAN_PROGRESS_PORTION, BmsStrings.IMPORT_WRITING_CATALOG.ToString()));
 
@@ -64,18 +69,22 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     storage,
                     realm,
                     bmsRulesetInfo,
-                    cancellationToken,
+                    token,
                     progress => reportProgress?.Invoke(new ImportProgress(
                         SCAN_PROGRESS_PORTION + progress * (1 - SCAN_PROGRESS_PORTION),
                         BmsStrings.IMPORT_WRITING_CATALOG.ToString()))),
-                cancellationToken).ConfigureAwait(false);
+                token).ConfigureAwait(false);
+
+            // When Raja filter DB is absent, advance filter cursor so sync_changes can prune after Realm ack.
+            if (!File.Exists(BmsStoragePaths.GetFilterDatabasePath(storage)))
+                manager.MarkFilterSynchronizedToCurrent();
 
             int songs = manager.SongCount;
             int charts = manager.ChartCount;
 
             reportProgress?.Invoke(new ImportProgress(1, BmsStrings.Import_Complete(songs, charts)));
 
-            return new ImportResult(songs, charts);
+            return new ImportResult(songs, charts, operation.Id);
         }
 
         /// <summary>

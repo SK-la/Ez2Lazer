@@ -36,18 +36,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
 
         public long SyncCursor => readLongMeta("sync_cursor");
 
-        public int PendingSyncSetCount
-        {
-            get
-            {
-                ensureInitialized();
+        public long FilterCursor => readLongMeta("filter_cursor");
 
-                using var connection = openConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = $"SELECT COUNT(DISTINCT set_id) FROM {table_sync_changes};";
-                return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
-            }
-        }
+        public int PendingSyncSetCount => countPendingSetsAboveCursor(SyncCursor);
+
+        public int PendingFilterChangeCount => countPendingChangesAboveCursor(FilterCursor);
 
         public IReadOnlyList<string> GetRootPaths()
         {
@@ -465,41 +458,16 @@ LIMIT $limit;";
         }
 
         public IReadOnlyList<SyncChange> GetPendingSyncChanges(int limit)
-        {
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+            => getChangesAboveCursor(SyncCursor, limit);
 
-            ensureInitialized();
-
-            var result = new List<SyncChange>(limit);
-
-            using var connection = openConnection();
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = $@"
-SELECT revision, beatmap_id, set_id, chart_path, change_kind
-FROM {table_sync_changes}
-ORDER BY revision
-LIMIT $limit;";
-            cmd.Parameters.AddWithValue("$limit", limit);
-
-            using var reader = cmd.ExecuteReader();
-
-            while (reader.Read())
-            {
-                result.Add(new SyncChange(
-                    reader.GetInt64(0),
-                    Guid.Parse(reader.GetString(1)),
-                    Guid.Parse(reader.GetString(2)),
-                    reader.GetString(3),
-                    (SyncChangeKind)reader.GetInt32(4)));
-            }
-
-            return result;
-        }
+        public IReadOnlyList<SyncChange> GetPendingFilterSyncChanges(int limit)
+            => getChangesAboveCursor(FilterCursor, limit);
 
         public IReadOnlyList<SyncChange> GetPendingSyncChangesForSets(int maxSetCount)
         {
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxSetCount);
             ensureInitialized();
+            long cursor = SyncCursor;
 
             var result = new List<SyncChange>();
 
@@ -509,6 +477,7 @@ LIMIT $limit;";
 WITH pending_sets AS (
     SELECT set_id, MIN(revision) AS first_revision
     FROM {table_sync_changes}
+    WHERE revision > $cursor
     GROUP BY set_id
     ORDER BY first_revision
     LIMIT $maxSetCount
@@ -516,7 +485,9 @@ WITH pending_sets AS (
 SELECT changes.revision, changes.beatmap_id, changes.set_id, changes.chart_path, changes.change_kind
 FROM {table_sync_changes} changes
 INNER JOIN pending_sets ON pending_sets.set_id = changes.set_id
+WHERE changes.revision > $cursor
 ORDER BY changes.revision;";
+            cmd.Parameters.AddWithValue("$cursor", cursor);
             cmd.Parameters.AddWithValue("$maxSetCount", maxSetCount);
 
             using var reader = cmd.ExecuteReader();
@@ -535,82 +506,22 @@ ORDER BY changes.revision;";
         }
 
         public void AcknowledgeSyncChanges(IReadOnlyCollection<long> revisions)
-        {
-            if (revisions.Count == 0)
-                return;
+            => acknowledgeCursor("sync_cursor", revisions, updateChartSyncState: true);
 
+        public void AcknowledgeFilterSyncChanges(IReadOnlyCollection<long> revisions)
+            => acknowledgeCursor("filter_cursor", revisions, updateChartSyncState: false);
+
+        public void MarkFilterSynchronizedToCurrent()
+        {
             lock (writeLock)
             {
                 ensureInitialized();
 
                 using var connection = openConnection();
                 using var transaction = connection.BeginTransaction();
-                var affectedBeatmapIds = new HashSet<string>(StringComparer.Ordinal);
-
-                using var select = connection.CreateCommand();
-                select.Transaction = transaction;
-                select.CommandText = $"SELECT beatmap_id FROM {table_sync_changes} WHERE revision = $revision;";
-                select.Parameters.Add("$revision", SqliteType.Integer);
-
-                using var delete = connection.CreateCommand();
-                delete.Transaction = transaction;
-                delete.CommandText = $"DELETE FROM {table_sync_changes} WHERE revision = $revision;";
-                delete.Parameters.Add("$revision", SqliteType.Integer);
-
-                foreach (long revision in revisions.Distinct())
-                {
-                    select.Parameters["$revision"].Value = revision;
-                    object? beatmapId = select.ExecuteScalar();
-
-                    if (beatmapId != null && beatmapId != DBNull.Value)
-                        affectedBeatmapIds.Add((string)beatmapId);
-
-                    delete.Parameters["$revision"].Value = revision;
-                    delete.ExecuteNonQuery();
-                }
-
-                foreach (string beatmapId in affectedBeatmapIds)
-                {
-                    using var update = connection.CreateCommand();
-                    update.Transaction = transaction;
-                    update.CommandText = $@"
-UPDATE {table_charts}
-SET sync_state = $synchronized
-WHERE beatmap_id = $beatmapId
-  AND NOT EXISTS (
-      SELECT 1
-      FROM {table_sync_changes}
-      WHERE beatmap_id = $beatmapId
-  );";
-                    update.Parameters.AddWithValue("$synchronized", (int)SyncState.Synchronized);
-                    update.Parameters.AddWithValue("$beatmapId", beatmapId);
-                    update.ExecuteNonQuery();
-                }
-
-                using var minPending = connection.CreateCommand();
-                minPending.Transaction = transaction;
-                minPending.CommandText = $"SELECT MIN(revision) FROM {table_sync_changes};";
-                object? nextPending = minPending.ExecuteScalar();
-                long cursor;
-
-                if (nextPending == null || nextPending == DBNull.Value)
-                {
-                    using var latestRevision = connection.CreateCommand();
-                    latestRevision.Transaction = transaction;
-                    latestRevision.CommandText = "SELECT seq FROM sqlite_sequence WHERE name = $table;";
-                    latestRevision.Parameters.AddWithValue("$table", table_sync_changes);
-                    object? sequence = latestRevision.ExecuteScalar();
-                    long highestIssuedRevision = sequence == null || sequence == DBNull.Value
-                        ? revisions.Max()
-                        : Convert.ToInt64(sequence, CultureInfo.InvariantCulture);
-                    cursor = Math.Max(readLongMeta(connection, transaction, "sync_cursor"), highestIssuedRevision);
-                }
-                else
-                {
-                    cursor = Convert.ToInt64(nextPending, CultureInfo.InvariantCulture) - 1;
-                }
-
-                writeMeta(connection, transaction, "sync_cursor", cursor.ToString(CultureInfo.InvariantCulture));
+                long highest = readHighestIssuedSyncRevision(connection, transaction);
+                writeMeta(connection, transaction, "filter_cursor", highest.ToString(CultureInfo.InvariantCulture));
+                pruneConsumedSyncChanges(connection, transaction);
                 transaction.Commit();
             }
         }
@@ -627,7 +538,8 @@ WHERE beatmap_id = $beatmapId
                 using (var pending = connection.CreateCommand())
                 {
                     pending.Transaction = transaction;
-                    pending.CommandText = $"SELECT 1 FROM {table_sync_changes} LIMIT 1;";
+                    pending.CommandText = $"SELECT 1 FROM {table_sync_changes} WHERE revision > $cursor LIMIT 1;";
+                    pending.Parameters.AddWithValue("$cursor", readLongMeta(connection, transaction, "sync_cursor"));
 
                     if (pending.ExecuteScalar() != null)
                         return;
@@ -1460,6 +1372,136 @@ WHERE beatmap_id = $beatmapId;";
             update.Parameters.AddWithValue("$syncState", (int)SyncState.Pending);
             update.Parameters.AddWithValue("$beatmapId", beatmapId.ToString());
             update.ExecuteNonQuery();
+        }
+
+        private void acknowledgeCursor(string cursorKey, IReadOnlyCollection<long> revisions, bool updateChartSyncState)
+        {
+            if (revisions.Count == 0)
+                return;
+
+            lock (writeLock)
+            {
+                ensureInitialized();
+
+                using var connection = openConnection();
+                using var transaction = connection.BeginTransaction();
+                long highestAcked = revisions.Max();
+                long current = readLongMeta(connection, transaction, cursorKey);
+                long nextCursor = Math.Max(current, highestAcked);
+                writeMeta(connection, transaction, cursorKey, nextCursor.ToString(CultureInfo.InvariantCulture));
+
+                if (updateChartSyncState)
+                {
+                    using var update = connection.CreateCommand();
+                    update.Transaction = transaction;
+                    update.CommandText = $@"
+UPDATE {table_charts}
+SET sync_state = $synchronized
+WHERE beatmap_id IN (
+    SELECT beatmap_id
+    FROM {table_sync_changes}
+    WHERE revision <= $cursor
+)
+AND NOT EXISTS (
+    SELECT 1
+    FROM {table_sync_changes} pending
+    WHERE pending.beatmap_id = {table_charts}.beatmap_id
+      AND pending.revision > $cursor
+);";
+                    update.Parameters.AddWithValue("$synchronized", (int)SyncState.Synchronized);
+                    update.Parameters.AddWithValue("$cursor", nextCursor);
+                    update.ExecuteNonQuery();
+                }
+
+                pruneConsumedSyncChanges(connection, transaction);
+                transaction.Commit();
+            }
+        }
+
+        private static void pruneConsumedSyncChanges(SqliteConnection connection, SqliteTransaction transaction)
+        {
+            long syncCursor = readLongMeta(connection, transaction, "sync_cursor");
+            long filterCursor = readLongMeta(connection, transaction, "filter_cursor");
+            long pruneThrough = Math.Min(syncCursor, filterCursor);
+
+            using var delete = connection.CreateCommand();
+            delete.Transaction = transaction;
+            delete.CommandText = $"DELETE FROM {table_sync_changes} WHERE revision <= $cursor;";
+            delete.Parameters.AddWithValue("$cursor", pruneThrough);
+            delete.ExecuteNonQuery();
+        }
+
+        private IReadOnlyList<SyncChange> getChangesAboveCursor(long cursor, int limit)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+            ensureInitialized();
+
+            var result = new List<SyncChange>(limit);
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+SELECT revision, beatmap_id, set_id, chart_path, change_kind
+FROM {table_sync_changes}
+WHERE revision > $cursor
+ORDER BY revision
+LIMIT $limit;";
+            cmd.Parameters.AddWithValue("$cursor", cursor);
+            cmd.Parameters.AddWithValue("$limit", limit);
+
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                result.Add(new SyncChange(
+                    reader.GetInt64(0),
+                    Guid.Parse(reader.GetString(1)),
+                    Guid.Parse(reader.GetString(2)),
+                    reader.GetString(3),
+                    (SyncChangeKind)reader.GetInt32(4)));
+            }
+
+            return result;
+        }
+
+        private int countPendingSetsAboveCursor(long cursor)
+        {
+            ensureInitialized();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"SELECT COUNT(DISTINCT set_id) FROM {table_sync_changes} WHERE revision > $cursor;";
+            cmd.Parameters.AddWithValue("$cursor", cursor);
+            return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+
+        private int countPendingChangesAboveCursor(long cursor)
+        {
+            ensureInitialized();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"SELECT COUNT(*) FROM {table_sync_changes} WHERE revision > $cursor;";
+            cmd.Parameters.AddWithValue("$cursor", cursor);
+            return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+
+        private static long readHighestIssuedSyncRevision(SqliteConnection connection, SqliteTransaction transaction)
+        {
+            using var latestRevision = connection.CreateCommand();
+            latestRevision.Transaction = transaction;
+            latestRevision.CommandText = "SELECT seq FROM sqlite_sequence WHERE name = $table;";
+            latestRevision.Parameters.AddWithValue("$table", table_sync_changes);
+            object? sequence = latestRevision.ExecuteScalar();
+
+            if (sequence != null && sequence != DBNull.Value)
+                return Convert.ToInt64(sequence, CultureInfo.InvariantCulture);
+
+            using var maxRevision = connection.CreateCommand();
+            maxRevision.Transaction = transaction;
+            maxRevision.CommandText = $"SELECT MAX(revision) FROM {table_sync_changes};";
+            object? max = maxRevision.ExecuteScalar();
+            return max == null || max == DBNull.Value ? 0 : Convert.ToInt64(max, CultureInfo.InvariantCulture);
         }
 
         private static void writeMeta(SqliteConnection connection, string key, string value)

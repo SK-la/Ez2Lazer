@@ -10,7 +10,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
     internal static class BmsFilterSchema
     {
         public const string CREATE_SONG = @"
-CREATE TABLE song (
+CREATE TABLE IF NOT EXISTS song (
     md5 TEXT,
     sha256 TEXT PRIMARY KEY,
     title TEXT,
@@ -35,7 +35,7 @@ CREATE TABLE song (
 CREATE INDEX IF NOT EXISTS idx_song_mode_sha256 ON song(mode, sha256);";
 
         public const string CREATE_SCORE = @"
-CREATE TABLE score (
+CREATE TABLE IF NOT EXISTS score (
     sha256 TEXT PRIMARY KEY,
     mode INTEGER,
     clear INTEGER,
@@ -63,7 +63,7 @@ CREATE INDEX IF NOT EXISTS idx_score_clear_sha256 ON score(clear, sha256);
 CREATE INDEX IF NOT EXISTS idx_score_playcount_sha256 ON score(playcount, sha256);";
 
         public const string CREATE_SCORELOG = @"
-CREATE TABLE scorelog (
+CREATE TABLE IF NOT EXISTS scorelog (
     sha256 TEXT,
     mode INTEGER,
     clear INTEGER,
@@ -80,7 +80,7 @@ CREATE TABLE scorelog (
 );";
 
         public const string CREATE_INFORMATION = @"
-CREATE TABLE information (
+CREATE TABLE IF NOT EXISTS information (
     sha256 TEXT PRIMARY KEY,
     n INTEGER,
     ln INTEGER,

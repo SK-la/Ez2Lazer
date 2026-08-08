@@ -315,6 +315,8 @@ namespace osu.Game.Rulesets.BMS.UI
 
             notificationOverlay?.Post(notification);
 
+            BmsLibraryOperationGate.Shared.CancelCurrent();
+
             void onScanProgress(ValueChangedEvent<double> e) => Schedule(() => notification.Progress = (float)BmsLibraryImportPipeline.MapScanProgress(e.NewValue));
 
             void onScanStatus(ValueChangedEvent<string> e) => Schedule(() => notification.Text = e.NewValue);
@@ -334,9 +336,13 @@ namespace osu.Game.Rulesets.BMS.UI
                         paths,
                         p => Schedule(() =>
                         {
+                            if (notification.State is ProgressNotificationState.Cancelled or ProgressNotificationState.Completed)
+                                return;
+
                             notification.Progress = (float)p.Progress;
                             notification.Text = p.StatusMessage;
-                        })).ConfigureAwait(false);
+                        }),
+                        notification.CancellationToken).ConfigureAwait(false);
 
                     Schedule(() =>
                     {

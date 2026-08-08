@@ -309,27 +309,37 @@ namespace osu.Game.Rulesets.BMS.Tests
             try
             {
                 var repository = new BmsLibraryIndexRepository(Path.Combine(tempDir, BmsStoragePaths.INDEX_DATABASE_FILE));
-                BMSChartCache first = createChart(tempDir, "a.bms", 100);
-                BMSChartCache second = createChart(tempDir, "b.bms", 200);
+                BMSChartCache first = createChart(Path.Combine(tempDir, "song-a"), "a.bms", 100);
+                BMSChartCache second = createChart(Path.Combine(tempDir, "song-b"), "b.bms", 200);
+                Directory.CreateDirectory(first.FolderPath);
+                Directory.CreateDirectory(second.FolderPath);
                 repository.UpsertChart(first, BmsChartIdentity.CreateBeatmapId(first.FullPath), BmsPathKeys.ComputeChartPathKey(first.FullPath));
                 repository.UpsertChart(second, BmsChartIdentity.CreateBeatmapId(second.FullPath), BmsPathKeys.ComputeChartPathKey(second.FullPath));
 
-                IReadOnlyList<BmsLibraryIndexRepository.SyncChange> changes = repository.GetPendingSyncChangesForSets(10);
+                IReadOnlyList<BmsLibraryIndexRepository.SyncChange> changes = repository.GetPendingSyncChanges(10);
                 Assert.That(changes, Has.Count.EqualTo(2));
+                Assert.That(changes[0].SetId, Is.Not.EqualTo(changes[1].SetId));
 
-                repository.AcknowledgeSyncChanges(new[] { changes[1].Revision });
-                Assert.That(repository.GetPendingSyncChanges(10).Single().Revision, Is.EqualTo(changes[0].Revision));
-                Assert.That(repository.SyncCursor, Is.EqualTo(changes[0].Revision - 1));
-                Assert.That(repository.TryGetChart(BmsChartIdentity.CreateBeatmapId(second.FullPath), out var acknowledged), Is.True);
+                repository.AcknowledgeSyncChanges(new[] { changes[0].Revision });
+                Assert.That(repository.GetPendingSyncChanges(10).Single().Revision, Is.EqualTo(changes[1].Revision));
+                Assert.That(repository.SyncCursor, Is.EqualTo(changes[0].Revision));
+                Assert.That(repository.PendingFilterChangeCount, Is.EqualTo(2));
+                Assert.That(repository.TryGetChart(BmsChartIdentity.CreateBeatmapId(first.FullPath), out var acknowledged), Is.True);
                 Assert.That(acknowledged.SyncState, Is.EqualTo(BmsLibraryIndexRepository.SyncState.Synchronized));
 
-                repository.AcknowledgeSyncChanges(new[] { changes[0].Revision });
-                repository.AcknowledgeSyncChanges(new[] { changes[0].Revision });
+                repository.AcknowledgeSyncChanges(new[] { changes[1].Revision });
+                repository.AcknowledgeSyncChanges(new[] { changes[1].Revision });
 
                 Assert.That(repository.GetPendingSyncChanges(10), Is.Empty);
                 Assert.That(repository.SyncCursor, Is.EqualTo(changes[1].Revision));
-                Assert.That(repository.TryGetChart(BmsChartIdentity.CreateBeatmapId(first.FullPath), out acknowledged), Is.True);
+                Assert.That(repository.PendingFilterChangeCount, Is.EqualTo(2));
+                Assert.That(repository.TryGetChart(BmsChartIdentity.CreateBeatmapId(second.FullPath), out acknowledged), Is.True);
                 Assert.That(acknowledged.SyncState, Is.EqualTo(BmsLibraryIndexRepository.SyncState.Synchronized));
+
+                repository.AcknowledgeFilterSyncChanges(new[] { changes[0].Revision, changes[1].Revision });
+                Assert.That(repository.PendingFilterChangeCount, Is.EqualTo(0));
+                Assert.That(repository.FilterCursor, Is.EqualTo(changes[1].Revision));
+                Assert.That(repository.GetPendingFilterSyncChanges(10), Is.Empty);
             }
             finally
             {

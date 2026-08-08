@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 {
     public static class BmsSongSelectAnalyticsOperations
     {
-        public static void RunAnalyticsBuild(
+        public static BmsUiBackgroundOperation RunAnalyticsBuild(
             Scheduler scheduler,
             BMSBeatmapManager beatmapManager,
             BmsAnalyticsSqliteRepository repository,
@@ -30,7 +30,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             if (!beatmapManager.HasIndexedCharts)
             {
                 notifications?.Post(new SimpleNotification { Text = BmsStrings.ANALYTICS_LIBRARY_EMPTY });
-                return;
+                return new BmsUiBackgroundOperation(new CancellationToken(canceled: true));
+            }
+
+            if (BmsAnalyticsScanService.IsRunning)
+            {
+                notifications?.Post(new SimpleNotification { Text = BmsStrings.ANALYTICS_BUILDING });
+                return new BmsUiBackgroundOperation(new CancellationToken(canceled: true));
             }
 
             var notification = new ProgressNotification
@@ -41,13 +47,19 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             notifications?.Post(notification);
 
-            var progress = new Progress<BmsAnalyticsScanProgress>(p => postProgress(notification, p));
+            var operation = new BmsUiBackgroundOperation(cancellationToken);
+            var linked = CancellationTokenSource.CreateLinkedTokenSource(operation.Token, notification.CancellationToken);
+            CancellationToken token = linked.Token;
+            var progress = new Progress<BmsAnalyticsScanProgress>(p =>
+            {
+                if (operation.IsCancelled)
+                    return;
+
+                postProgress(notification, p);
+            });
 
             _ = Task.Run(async () =>
             {
-                using var scanCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, notification.CancellationToken);
-                var token = scanCancellation.Token;
-
                 try
                 {
                     await BmsAnalyticsScanService.RunAsync(
@@ -59,7 +71,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                         realm,
                         analysisDatabase).ConfigureAwait(false);
 
-                    if (token.IsCancellationRequested)
+                    if (token.IsCancellationRequested || operation.IsCancelled)
                     {
                         scheduler.Add(() => markCancelled(notification));
                         return;
@@ -67,6 +79,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
                     scheduler.Add(() =>
                     {
+                        if (operation.IsCancelled)
+                            return;
+
                         notification.Progress = 1f;
                         notification.Text = BmsStrings.ANALYTICS_BUILD_COMPLETE;
                         notification.State = ProgressNotificationState.Completed;
@@ -82,12 +97,21 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 {
                     scheduler.Add(() =>
                     {
+                        if (operation.IsCancelled)
+                            return;
+
                         Logger.Error(ex, "[BMS] analytics build failed");
                         notification.State = ProgressNotificationState.Cancelled;
                         notifications?.Post(new SimpleNotification { Text = BmsStrings.Analytics_BuildFailed(ex.Message) });
                     });
                 }
-            }, cancellationToken);
+                finally
+                {
+                    linked.Dispose();
+                }
+            }, CancellationToken.None);
+
+            return operation;
         }
 
         private static void postProgress(ProgressNotification notification, BmsAnalyticsScanProgress p)
