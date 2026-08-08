@@ -19,6 +19,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
+using osu.Game.EzOsuGame.Online;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input;
@@ -211,7 +212,8 @@ namespace osu.Game.Screens.Menu
 
         private void onMultiplayer(MainMenuButton mainMenuButton, UIEvent uiEvent)
         {
-            if (api.State.Value != APIState.Online)
+            // 本地账号视为已登录（面向局域网 / P2P 对战），不要求真实网络。
+            if (!api.State.Value.IsSessionActive())
             {
                 loginOverlay?.Show();
                 return;

@@ -136,6 +136,7 @@ namespace osu.Game.Online.Leaderboards
                     {
                         case APIState.Online:
                         case APIState.Offline:
+                        case APIState.LocalOnline:
                             if (IsOnlineScope)
                                 RefetchScores();
 

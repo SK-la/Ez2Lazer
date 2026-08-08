@@ -121,6 +121,7 @@ namespace osu.Game.Overlays
                     break;
 
                 case APIState.Online:
+                case APIState.LocalOnline:
                     scheduledHide?.Cancel();
                     scheduledHide = Schedule(Hide);
                     break;

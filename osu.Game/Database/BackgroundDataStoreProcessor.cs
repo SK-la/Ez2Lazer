@@ -92,6 +92,11 @@ namespace osu.Game.Database
 
         protected virtual int TimeToSleepDuringGameplay => 30000;
 
+        /// <summary>
+        /// How long to wait for the API to finish connecting before giving up on online metadata lookups for this run.
+        /// </summary>
+        protected virtual int APISettleTimeout => 30000;
+
         protected virtual bool SkipProcessing => DebugUtils.IsNUnitRunning;
 
         /// <summary>
@@ -912,23 +917,47 @@ namespace osu.Game.Database
 
         private void processOnlineBeatmapSetsWithNoUpdate()
         {
+            // BeatmapProcessor is responsible for both online and local processing, so a set queued here pays for a
+            // full difficulty recalculation whether or not the online lookup ends up resolving. A lookup that cannot
+            // resolve also leaves LastOnlineUpdate null, which re-queues the very same sets on the next startup.
+            //
+            // Deciding this up front rather than per set is therefore what keeps the redundant work from recurring.
+            // Note that no login is required: the local cache is downloaded from assets.ppy.sh anonymously, same as
+            // the user tag backpopulation below.
+            bool apiAvailable = waitForAPIToSettle();
+            bool cacheAvailable = localMetadataSource.Available;
+
+            // the cache is the only source that works without a login, so it's worth fetching when the API can't
+            // serve lookups by itself. Otherwise leave the (sizeable) download alone.
+            if (!cacheAvailable && !apiAvailable)
+                cacheAvailable = fetchLocalMetadataCache();
+
+            if (!apiAvailable && !cacheAvailable)
+            {
+                Logger.Log("Skipping online beatmap updates because no metadata source is available.");
+                return;
+            }
+
             HashSet<Guid> beatmapSetIds = new HashSet<Guid>();
 
             Logger.Log("Querying for beatmap sets to reprocess...");
 
             realmAccess.Run(r =>
             {
-                // BeatmapProcessor is responsible for both online and local processing.
-                // In the case a user isn't logged in, it won't update LastOnlineUpdate and therefore re-queue,
-                // causing overhead from the non-online processing to redundantly run every startup.
-                //
-                // We may eventually consider making the Process call more specific (or avoid this in any number
-                // of other possible ways), but for now avoid queueing if the user isn't logged in at startup.
-                if (api.IsLoggedIn)
+                var candidates = r.All<BeatmapInfo>().Where(b => b.OnlineID > 0 && b.LastOnlineUpdate == null && b.BeatmapSet != null);
+
+                // The local cache only holds ranked/approved/loved beatmaps, so with no API to give a definitive
+                // answer, nothing else can ever resolve. Queueing those anyway would repeat a full difficulty
+                // recalculation on every startup for no possible gain.
+                if (!apiAvailable)
                 {
-                    foreach (var b in r.All<BeatmapInfo>().Where(b => b.OnlineID > 0 && b.LastOnlineUpdate == null && b.BeatmapSet != null))
-                        beatmapSetIds.Add(b.BeatmapSet!.ID);
+                    candidates = candidates.Where(b => b.StatusInt == (int)BeatmapOnlineStatus.Ranked
+                                                       || b.StatusInt == (int)BeatmapOnlineStatus.Approved
+                                                       || b.StatusInt == (int)BeatmapOnlineStatus.Loved);
                 }
+
+                foreach (var b in candidates)
+                    beatmapSetIds.Add(b.BeatmapSet!.ID);
             });
 
             if (beatmapSetIds.Count == 0)
@@ -968,9 +997,51 @@ namespace osu.Game.Database
                         }
                     }
                 });
+
+                updateNotificationProgress(notification, processedCount, beatmapSetIds.Count);
             }
 
             completeNotification(notification, processedCount, beatmapSetIds.Count, failedCount);
+        }
+
+        /// <summary>
+        /// Blocks until the API has settled into a state which tells us whether online lookups can be performed.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="IAPIProvider.IsLoggedIn"/> is not usable for this, as it becomes <see langword="true"/> at
+        /// <see cref="APIState.Connecting"/>, while <see cref="APIBeatmapMetadataSource"/> requires
+        /// <see cref="APIState.Online"/>. Acting on the former during startup means every lookup fails inconclusively.
+        /// </remarks>
+        /// <returns>Whether the API can serve lookups.</returns>
+        private bool waitForAPIToSettle()
+        {
+            var timeout = Stopwatch.StartNew();
+
+            while (api.State.Value == APIState.Connecting && timeout.ElapsedMilliseconds < APISettleTimeout)
+                Thread.Sleep(500);
+
+            // matches APIBeatmapMetadataSource.Available.
+            if (api.State.Value == APIState.Online)
+                return true;
+
+            Logger.Log($"API is unavailable for online metadata lookups (state: {api.State.Value}).");
+            return false;
+        }
+
+        /// <summary>
+        /// Fetches the local metadata cache. Requires no login, as it is downloaded anonymously.
+        /// </summary>
+        /// <returns>Whether the local cache can serve lookups.</returns>
+        private bool fetchLocalMetadataCache()
+        {
+            Logger.Log("Local metadata cache doesn't exist, attempting refetch...");
+            localMetadataSource.FetchCache().WaitSafely();
+
+            if (localMetadataSource.Available)
+                return true;
+
+            Logger.Log("Local metadata cache refetch failed.");
+            return false;
         }
 
         private void processBeatmapsWithMissingObjectCounts()
@@ -1666,9 +1737,13 @@ namespace osu.Game.Database
             if (notification == null)
                 return;
 
+            // a fixed interval means batches smaller than it never report anything between the initial 0 and
+            // completion, which reads as a permanently stuck progress bar.
+            int updateInterval = Math.Max(1, Math.Min(notification_progress_update_interval, totalCount / 20));
+
             bool shouldUpdate = processedCount == 0 ||
                                 processedCount >= totalCount ||
-                                processedCount - lastNotificationProgressReported >= notification_progress_update_interval;
+                                processedCount - lastNotificationProgressReported >= updateInterval;
 
             if (!shouldUpdate)
                 return;

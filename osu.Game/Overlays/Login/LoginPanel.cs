@@ -150,6 +150,7 @@ namespace osu.Game.Overlays.Login
                     break;
 
                 case APIState.Online:
+                case APIState.LocalOnline:
                     Child = new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.X,

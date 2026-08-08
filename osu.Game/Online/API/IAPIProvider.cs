@@ -53,7 +53,7 @@ namespace osu.Game.Online.API
         bool IsLoggedIn { get; }
 
         /// <summary>
-        /// 本地模式，启用后不提交成绩
+        /// 本地账号模式（<see cref="APIState.LocalOnline"/>）：已登录但不与 osu! 服务器通信，也不提交成绩。
         /// </summary>
         bool IsLocalOnly { get; }
 
