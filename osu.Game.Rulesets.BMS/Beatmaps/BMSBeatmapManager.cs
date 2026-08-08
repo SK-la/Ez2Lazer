@@ -351,7 +351,19 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                                     if (!extensions.Contains(Path.GetExtension(file)))
                                         continue;
 
-                                    Interlocked.Increment(ref discoveredFiles);
+                                    int found = Interlocked.Increment(ref discoveredFiles);
+
+                                    // Discovery can run for a long time before the first write batch;
+                                    // surface a count so notifications are not stuck on a spinner with no text change.
+                                    if (found == 1 || found % 256 == 0)
+                                    {
+                                        lock (progressLock)
+                                        {
+                                            if (Volatile.Read(ref processedFiles) == 0)
+                                                StatusMessage.Value = BmsStrings.Scan_FoundFiles(found);
+                                        }
+                                    }
+
                                     await files.Writer.WriteAsync(file, pipelineToken).ConfigureAwait(false);
                                 }
                             }

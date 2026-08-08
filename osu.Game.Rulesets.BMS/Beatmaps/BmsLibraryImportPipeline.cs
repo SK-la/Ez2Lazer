@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Bindables;
 using osu.Framework.Platform;
 using osu.Game.Database;
 using osu.Game.Rulesets.BMS.Localization;
@@ -58,7 +59,39 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             reportProgress?.Invoke(new ImportProgress(0, BmsStrings.IMPORT_INDEXING.ToString()));
 
-            await manager.ScanLibraryAsync(paths, token).ConfigureAwait(false);
+            void forwardScanProgress(ValueChangedEvent<double> e)
+            {
+                if (reportProgress == null)
+                    return;
+
+                string status = manager.StatusMessage.Value;
+                if (string.IsNullOrEmpty(status))
+                    status = BmsStrings.IMPORT_INDEXING.ToString();
+
+                reportProgress(new ImportProgress(MapScanProgress(e.NewValue), status));
+            }
+
+            void forwardScanStatus(ValueChangedEvent<string> e)
+            {
+                if (reportProgress == null || string.IsNullOrEmpty(e.NewValue))
+                    return;
+
+                reportProgress(new ImportProgress(MapScanProgress(manager.ScanProgress.Value), e.NewValue));
+            }
+
+            manager.ScanProgress.BindValueChanged(forwardScanProgress);
+            manager.StatusMessage.BindValueChanged(forwardScanStatus);
+
+            try
+            {
+                await manager.ScanLibraryAsync(paths, token).ConfigureAwait(false);
+            }
+            finally
+            {
+                manager.ScanProgress.ValueChanged -= forwardScanProgress;
+                manager.StatusMessage.ValueChanged -= forwardScanStatus;
+            }
+
             token.ThrowIfCancellationRequested();
 
             reportProgress?.Invoke(new ImportProgress(SCAN_PROGRESS_PORTION, BmsStrings.IMPORT_WRITING_CATALOG.ToString()));

@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
@@ -33,6 +34,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             var notification = new ProgressNotification
             {
                 Text = BmsStrings.SONG_SELECT_SCANNING_LIBRARY,
+                // Active + Progress=0 shows a determinate bar; Queued alone stays as a spinner.
+                State = ProgressNotificationState.Active,
                 Progress = 0,
             };
 
@@ -41,6 +44,32 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             var operation = new BmsUiBackgroundOperation(cancellationToken);
             var linked = CancellationTokenSource.CreateLinkedTokenSource(operation.Token, notification.CancellationToken);
             CancellationToken token = linked.Token;
+
+            void onScanProgress(ValueChangedEvent<double> e) => scheduler.Add(() =>
+            {
+                if (token.IsCancellationRequested || operation.IsCancelled)
+                    return;
+
+                if (notification.State is ProgressNotificationState.Cancelled or ProgressNotificationState.Completed)
+                    return;
+
+                notification.Progress = (float)BmsLibraryImportPipeline.MapScanProgress(e.NewValue);
+            });
+
+            void onScanStatus(ValueChangedEvent<string> e) => scheduler.Add(() =>
+            {
+                if (token.IsCancellationRequested || operation.IsCancelled)
+                    return;
+
+                if (notification.State is ProgressNotificationState.Cancelled or ProgressNotificationState.Completed)
+                    return;
+
+                if (!string.IsNullOrEmpty(e.NewValue))
+                    notification.Text = e.NewValue;
+            });
+
+            beatmapManager.ScanProgress.BindValueChanged(onScanProgress, true);
+            beatmapManager.StatusMessage.BindValueChanged(onScanStatus, true);
 
             _ = Task.Run(async () =>
             {
@@ -60,6 +89,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                             scheduler.Add(() =>
                             {
                                 if (token.IsCancellationRequested || operation.IsCancelled)
+                                    return;
+
+                                if (notification.State is ProgressNotificationState.Cancelled or ProgressNotificationState.Completed)
                                     return;
 
                                 notification.Progress = (float)p.Progress;
@@ -100,6 +132,11 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 }
                 finally
                 {
+                    scheduler.Add(() =>
+                    {
+                        beatmapManager.ScanProgress.ValueChanged -= onScanProgress;
+                        beatmapManager.StatusMessage.ValueChanged -= onScanStatus;
+                    });
                     linked.Dispose();
                 }
             }, CancellationToken.None);
