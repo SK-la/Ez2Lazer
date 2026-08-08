@@ -199,6 +199,138 @@ namespace osu.Game.Rulesets.BMS.Tests
             }
         }
 
+        [Test]
+        public void TestGenerationWritesOnlyDeltasAndCompletesRevision()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), $"bms-index-generation-{Guid.NewGuid():N}");
+            string rootPath = Path.Combine(tempDir, "library");
+            string songPath = Path.Combine(rootPath, "song");
+            Directory.CreateDirectory(songPath);
+
+            try
+            {
+                var repository = new BmsLibraryIndexRepository(Path.Combine(tempDir, BmsStoragePaths.INDEX_DATABASE_FILE));
+                BMSChartCache first = createChart(songPath, "a.bms", 100);
+
+                long firstGeneration = repository.BeginScanGeneration();
+
+                using (BmsLibraryIndexRepository.ScanWriter writer = repository.OpenScanWriter(firstGeneration))
+                {
+                    writer.WriteBatch(new[]
+                    {
+                        createChangedItem(first),
+                    });
+                }
+
+                Assert.That(repository.CompleteScanGeneration(firstGeneration, new[] { rootPath }), Is.EqualTo(1));
+                Assert.That(repository.GetPendingSyncChanges(20), Has.Count.EqualTo(1));
+
+                long unchangedGeneration = repository.BeginScanGeneration();
+
+                using (BmsLibraryIndexRepository.ScanWriter writer = repository.OpenScanWriter(unchangedGeneration))
+                {
+                    writer.WriteBatch(new[]
+                    {
+                        new BmsLibraryIndexRepository.ScanWriteItem(
+                            first.FullPath,
+                            first.FileSize,
+                            first.LastModified.ToUniversalTime().Ticks,
+                            null,
+                            null),
+                    });
+                }
+
+                Assert.That(repository.CompleteScanGeneration(unchangedGeneration, new[] { rootPath }), Is.EqualTo(2));
+                Assert.That(repository.GetPendingSyncChanges(20), Has.Count.EqualTo(1));
+                Assert.That(repository.TryGetChart(BmsChartIdentity.CreateBeatmapId(first.FullPath), out var unchanged), Is.True);
+                Assert.That(unchanged.SeenGeneration, Is.EqualTo(unchangedGeneration));
+
+                first.FileSize = 101;
+                var added = createChart(songPath, "b.bms", 200);
+                long deltaGeneration = repository.BeginScanGeneration();
+
+                using (BmsLibraryIndexRepository.ScanWriter writer = repository.OpenScanWriter(deltaGeneration))
+                {
+                    writer.WriteBatch(new[]
+                    {
+                        createChangedItem(first),
+                        createChangedItem(added),
+                    });
+                }
+
+                Assert.That(repository.CompleteScanGeneration(deltaGeneration, new[] { rootPath }), Is.EqualTo(3));
+                Assert.That(repository.ChartCount, Is.EqualTo(2));
+                Assert.That(repository.GetPendingSyncChanges(20), Has.Count.EqualTo(3));
+
+                long deleteGeneration = repository.BeginScanGeneration();
+
+                using (BmsLibraryIndexRepository.ScanWriter writer = repository.OpenScanWriter(deleteGeneration))
+                {
+                    writer.WriteBatch(new[]
+                    {
+                        new BmsLibraryIndexRepository.ScanWriteItem(
+                            first.FullPath,
+                            first.FileSize,
+                            first.LastModified.ToUniversalTime().Ticks,
+                            null,
+                            null),
+                    });
+                }
+
+                Assert.That(repository.CompleteScanGeneration(deleteGeneration, new[] { rootPath }), Is.EqualTo(4));
+                Assert.That(repository.ChartCount, Is.EqualTo(1));
+                var changes = repository.GetPendingSyncChanges(20);
+                Assert.That(changes, Has.Count.EqualTo(4));
+                Assert.That(changes[^1].Kind, Is.EqualTo(BmsLibraryIndexRepository.SyncChangeKind.Delete));
+
+                long incompleteGeneration = repository.BeginScanGeneration();
+                BMSChartCache partial = createChart(songPath, "partial.bms", 300);
+
+                using (BmsLibraryIndexRepository.ScanWriter writer = repository.OpenScanWriter(incompleteGeneration))
+                    writer.WriteBatch(new[] { createChangedItem(partial) });
+
+                Assert.That(repository.ScanRevision, Is.EqualTo(4));
+                Assert.That(repository.ChartCount, Is.EqualTo(2));
+                Assert.That(repository.TryGetChart(BmsChartIdentity.CreateBeatmapId(first.FullPath), out _), Is.True);
+            }
+            finally
+            {
+                cleanupTempDirectory(tempDir);
+            }
+        }
+
+        private static BMSChartCache createChart(string folderPath, string fileName, long fileSize)
+        {
+            return new BMSChartCache
+            {
+                FolderPath = folderPath,
+                FileName = fileName,
+                FileSize = fileSize,
+                LastModified = DateTime.UtcNow,
+                Title = fileName,
+                Artist = "Artist",
+                KeyCount = 7,
+                TotalNotes = 10,
+                Bpm = 140,
+            };
+        }
+
+        private static BmsLibraryIndexRepository.ScanWriteItem createChangedItem(BMSChartCache chart)
+        {
+            return new BmsLibraryIndexRepository.ScanWriteItem(
+                chart.FullPath,
+                chart.FileSize,
+                chart.LastModified.ToUniversalTime().Ticks,
+                chart,
+                new BMSSongCache
+                {
+                    FolderPath = chart.FolderPath,
+                    Title = chart.Title,
+                    Artist = chart.Artist,
+                    LastModified = chart.LastModified,
+                });
+        }
+
         private static void createVersion1Database(string dbPath, string chartPath, string folderPath, Guid beatmapId, string pathKey)
         {
             using var connection = new SqliteConnection($"Data Source={dbPath}");

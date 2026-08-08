@@ -87,6 +87,117 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
             string ChartPath,
             SyncChangeKind Kind);
 
+        public record ScanWriteItem(
+            string ChartPath,
+            long FileSize,
+            long LastModifiedTicks,
+            BMSChartCache? Chart,
+            BMSSongCache? Song);
+
+        public long BeginScanGeneration()
+        {
+            lock (writeLock)
+            {
+                ensureInitialized();
+
+                using var connection = openConnection();
+                long generation = readLongMeta(connection, "scan_generation") + 1;
+                writeMeta(connection, "scan_generation", generation.ToString(CultureInfo.InvariantCulture));
+                return generation;
+            }
+        }
+
+        public bool TryGetChartSnapshot(string chartPath, out ChartFileSnapshot snapshot)
+        {
+            snapshot = null!;
+            ensureInitialized();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+SELECT file_size, last_modified_ticks
+FROM {table_charts}
+WHERE chart_path = $path
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("$path", chartPath);
+
+            using var reader = cmd.ExecuteReader();
+
+            if (!reader.Read())
+                return false;
+
+            snapshot = new ChartFileSnapshot(chartPath, reader.GetInt64(0), reader.GetInt64(1));
+            return true;
+        }
+
+        public ScanWriter OpenScanWriter(long generation)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(generation);
+            ensureInitialized();
+            return new ScanWriter(this, generation);
+        }
+
+        public long CompleteScanGeneration(long generation, IReadOnlyCollection<string> rootPaths)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(generation);
+
+            if (rootPaths.Count == 0)
+                throw new ArgumentException("At least one successfully scanned root is required.", nameof(rootPaths));
+
+            lock (writeLock)
+            {
+                ensureInitialized();
+
+                using var connection = openConnection();
+                using var transaction = connection.BeginTransaction();
+
+                if (readLongMeta(connection, transaction, "scan_generation") != generation)
+                    throw new InvalidOperationException($"Scan generation {generation} is no longer current.");
+
+                var staleCharts = new List<(string ChartPath, Guid BeatmapId, Guid SetId)>();
+
+                using (var select = connection.CreateCommand())
+                {
+                    select.Transaction = transaction;
+                    select.CommandText = $@"
+SELECT chart_path, beatmap_id, set_id
+FROM {table_charts}
+WHERE seen_generation <> $generation;";
+                    select.Parameters.AddWithValue("$generation", generation);
+
+                    using var reader = select.ExecuteReader();
+
+                    while (reader.Read())
+                    {
+                        string chartPath = reader.GetString(0);
+
+                        if (rootPaths.Any(root => isPathWithinRoot(chartPath, root)))
+                            staleCharts.Add((chartPath, Guid.Parse(reader.GetString(1)), Guid.Parse(reader.GetString(2))));
+                    }
+                }
+
+                foreach ((string chartPath, Guid beatmapId, Guid setId) in staleCharts)
+                {
+                    enqueueSyncChange(connection, transaction, beatmapId, setId, chartPath, SyncChangeKind.Delete);
+
+                    using var delete = connection.CreateCommand();
+                    delete.Transaction = transaction;
+                    delete.CommandText = $"DELETE FROM {table_charts} WHERE chart_path = $path;";
+                    delete.Parameters.AddWithValue("$path", chartPath);
+                    delete.ExecuteNonQuery();
+                }
+
+                pruneOrphanSongs(connection, transaction);
+                replaceRoots(connection, transaction, rootPaths);
+
+                long revision = readLongMeta(connection, transaction, "scan_revision") + 1;
+                writeMeta(connection, transaction, "scan_revision", revision.ToString(CultureInfo.InvariantCulture));
+                writeMeta(connection, transaction, "last_scan_ticks", DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture));
+                transaction.Commit();
+                return revision;
+            }
+        }
+
         public Dictionary<string, ChartFileSnapshot> GetChartSnapshots()
         {
             ensureInitialized();
@@ -899,6 +1010,20 @@ CREATE INDEX IF NOT EXISTS idx_charts_set_id ON {table_charts}(set_id);";
             return long.TryParse(result.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long value) ? value : 0;
         }
 
+        private static long readLongMeta(SqliteConnection connection, SqliteTransaction transaction, string key)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = $"SELECT value FROM {table_meta} WHERE key = $key;";
+            cmd.Parameters.AddWithValue("$key", key);
+            object? result = cmd.ExecuteScalar();
+
+            if (result == null || result == DBNull.Value)
+                return 0;
+
+            return long.TryParse(result.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long value) ? value : 0;
+        }
+
         private static void enqueueSyncChange(
             SqliteConnection connection,
             SqliteTransaction transaction,
@@ -945,6 +1070,314 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;";
             cmd.Parameters.AddWithValue("$key", key);
             cmd.Parameters.AddWithValue("$value", value);
             cmd.ExecuteNonQuery();
+        }
+
+        private static void writeMeta(SqliteConnection connection, SqliteTransaction transaction, string key, string value)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = $@"
+INSERT INTO {table_meta} (key, value) VALUES ($key, $value)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value;";
+            cmd.Parameters.AddWithValue("$key", key);
+            cmd.Parameters.AddWithValue("$value", value);
+            cmd.ExecuteNonQuery();
+        }
+
+        private static void replaceRoots(SqliteConnection connection, SqliteTransaction transaction, IEnumerable<string> rootPaths)
+        {
+            using (var delete = connection.CreateCommand())
+            {
+                delete.Transaction = transaction;
+                delete.CommandText = $"DELETE FROM {table_roots};";
+                delete.ExecuteNonQuery();
+            }
+
+            foreach (string rootPath in rootPaths)
+            {
+                using var insert = connection.CreateCommand();
+                insert.Transaction = transaction;
+                insert.CommandText = $"INSERT INTO {table_roots} (path) VALUES ($path);";
+                insert.Parameters.AddWithValue("$path", rootPath);
+                insert.ExecuteNonQuery();
+            }
+        }
+
+        private static bool isPathWithinRoot(string path, string rootPath)
+        {
+            try
+            {
+                string fullPath = Path.GetFullPath(path);
+                string fullRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(rootPath));
+
+                return fullPath.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                       || fullPath.StartsWith(fullRoot + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public sealed class ScanWriter : IDisposable
+        {
+            private readonly BmsLibraryIndexRepository repository;
+            private readonly long generation;
+            private readonly SqliteConnection connection;
+            private readonly SqliteCommand markSeen;
+            private readonly SqliteCommand upsertSong;
+            private readonly SqliteCommand upsertChart;
+            private readonly SqliteCommand insertChange;
+            private readonly SqliteCommand updateSyncState;
+            private bool disposed;
+
+            internal ScanWriter(BmsLibraryIndexRepository repository, long generation)
+            {
+                this.repository = repository;
+                this.generation = generation;
+                connection = repository.openConnection();
+
+                markSeen = createCommand($@"
+UPDATE {table_charts}
+SET seen_generation = $generation
+WHERE chart_path = $chartPath;", "$generation", "$chartPath");
+
+                upsertSong = createCommand($@"
+INSERT INTO {table_songs} (
+    folder_path, title, artist, genre, banner_path, stage_path, last_modified_ticks
+) VALUES (
+    $folder, $title, $artist, $genre, $banner, $stage, $modified
+)
+ON CONFLICT(folder_path) DO UPDATE SET
+    title = excluded.title,
+    artist = excluded.artist,
+    genre = excluded.genre,
+    banner_path = excluded.banner_path,
+    stage_path = excluded.stage_path,
+    last_modified_ticks = excluded.last_modified_ticks;",
+                    "$folder", "$title", "$artist", "$genre", "$banner", "$stage", "$modified");
+
+                upsertChart = createCommand($@"
+INSERT INTO {table_charts} (
+    chart_path, folder_path, file_name, file_size, last_modified_ticks,
+    beatmap_id, set_id, path_key, seen_generation, sync_revision, sync_state, parse_version,
+    title, sub_title, artist, sub_artist, genre,
+    play_level, rank, ln_type, key_count, total_notes,
+    bpm, min_bpm, max_bpm, duration, total_gauge,
+    preview_time, audio_file, preview_file,
+    has_scratch, has_ln, has_stop, has_scroll, has_bga,
+    keysound_files_json
+) VALUES (
+    $chartPath, $folder, $fileName, $size, $modified,
+    $beatmapId, $setId, $pathKey, $generation, 0, 0, $parseVersion,
+    $title, $subTitle, $artist, $subArtist, $genre,
+    $playLevel, $rank, $lnType, $keyCount, $totalNotes,
+    $bpm, $minBpm, $maxBpm, $duration, $totalGauge,
+    $previewTime, $audio, $preview,
+    $scratch, $ln, $stop, $scroll, $bga,
+    $keysounds
+)
+ON CONFLICT(chart_path) DO UPDATE SET
+    folder_path = excluded.folder_path,
+    file_name = excluded.file_name,
+    file_size = excluded.file_size,
+    last_modified_ticks = excluded.last_modified_ticks,
+    beatmap_id = excluded.beatmap_id,
+    set_id = excluded.set_id,
+    path_key = excluded.path_key,
+    seen_generation = excluded.seen_generation,
+    parse_version = excluded.parse_version,
+    title = excluded.title,
+    sub_title = excluded.sub_title,
+    artist = excluded.artist,
+    sub_artist = excluded.sub_artist,
+    genre = excluded.genre,
+    play_level = excluded.play_level,
+    rank = excluded.rank,
+    ln_type = excluded.ln_type,
+    key_count = excluded.key_count,
+    total_notes = excluded.total_notes,
+    bpm = excluded.bpm,
+    min_bpm = excluded.min_bpm,
+    max_bpm = excluded.max_bpm,
+    duration = excluded.duration,
+    total_gauge = excluded.total_gauge,
+    preview_time = excluded.preview_time,
+    audio_file = excluded.audio_file,
+    preview_file = excluded.preview_file,
+    has_scratch = excluded.has_scratch,
+    has_ln = excluded.has_ln,
+    has_stop = excluded.has_stop,
+    has_scroll = excluded.has_scroll,
+    has_bga = excluded.has_bga,
+    keysound_files_json = excluded.keysound_files_json;",
+                    "$chartPath", "$folder", "$fileName", "$size", "$modified",
+                    "$beatmapId", "$setId", "$pathKey", "$generation", "$parseVersion",
+                    "$title", "$subTitle", "$artist", "$subArtist", "$genre",
+                    "$playLevel", "$rank", "$lnType", "$keyCount", "$totalNotes",
+                    "$bpm", "$minBpm", "$maxBpm", "$duration", "$totalGauge",
+                    "$previewTime", "$audio", "$preview",
+                    "$scratch", "$ln", "$stop", "$scroll", "$bga", "$keysounds");
+
+                insertChange = createCommand($@"
+INSERT INTO {table_sync_changes} (beatmap_id, set_id, chart_path, change_kind)
+VALUES ($beatmapId, $setId, $chartPath, $kind);
+SELECT last_insert_rowid();", "$beatmapId", "$setId", "$chartPath", "$kind");
+
+                updateSyncState = createCommand($@"
+UPDATE {table_charts}
+SET sync_revision = $revision,
+    sync_state = $syncState
+WHERE beatmap_id = $beatmapId;", "$revision", "$syncState", "$beatmapId");
+            }
+
+            public void WriteBatch(IReadOnlyList<ScanWriteItem> items)
+            {
+                ObjectDisposedException.ThrowIf(disposed, this);
+
+                if (items.Count == 0)
+                    return;
+
+                lock (repository.writeLock)
+                {
+                    using var transaction = connection.BeginTransaction();
+                    setTransaction(transaction);
+
+                    foreach (ScanWriteItem item in items)
+                    {
+                        if (item.Chart == null)
+                        {
+                            set(markSeen, "$generation", generation);
+                            set(markSeen, "$chartPath", item.ChartPath);
+                            markSeen.ExecuteNonQuery();
+                            continue;
+                        }
+
+                        BMSChartCache chart = item.Chart;
+                        BMSSongCache song = item.Song ?? createSong(chart);
+                        BmsChartIdentity identity = BmsChartIdentity.Create(item.ChartPath, chart.FolderPath);
+
+                        bindSong(song);
+                        upsertSong.ExecuteNonQuery();
+                        bindChart(chart, identity);
+                        upsertChart.ExecuteNonQuery();
+
+                        set(insertChange, "$beatmapId", identity.BeatmapId.ToString());
+                        set(insertChange, "$setId", identity.SetId.ToString());
+                        set(insertChange, "$chartPath", item.ChartPath);
+                        set(insertChange, "$kind", (int)SyncChangeKind.Upsert);
+                        long revision = Convert.ToInt64(insertChange.ExecuteScalar(), CultureInfo.InvariantCulture);
+
+                        set(updateSyncState, "$revision", revision);
+                        set(updateSyncState, "$syncState", (int)SyncState.Pending);
+                        set(updateSyncState, "$beatmapId", identity.BeatmapId.ToString());
+                        updateSyncState.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
+                }
+            }
+
+            public void Dispose()
+            {
+                if (disposed)
+                    return;
+
+                disposed = true;
+                markSeen.Dispose();
+                upsertSong.Dispose();
+                upsertChart.Dispose();
+                insertChange.Dispose();
+                updateSyncState.Dispose();
+                connection.Dispose();
+            }
+
+            private SqliteCommand createCommand(string commandText, params string[] parameterNames)
+            {
+                SqliteCommand command = connection.CreateCommand();
+                command.CommandText = commandText;
+
+                foreach (string parameterName in parameterNames)
+                    command.Parameters.Add(new SqliteParameter(parameterName, null));
+
+                command.Prepare();
+                return command;
+            }
+
+            private void setTransaction(SqliteTransaction transaction)
+            {
+                markSeen.Transaction = transaction;
+                upsertSong.Transaction = transaction;
+                upsertChart.Transaction = transaction;
+                insertChange.Transaction = transaction;
+                updateSyncState.Transaction = transaction;
+            }
+
+            private void bindSong(BMSSongCache song)
+            {
+                set(upsertSong, "$folder", song.FolderPath);
+                set(upsertSong, "$title", song.Title ?? string.Empty);
+                set(upsertSong, "$artist", song.Artist ?? string.Empty);
+                set(upsertSong, "$genre", song.Genre ?? string.Empty);
+                set(upsertSong, "$banner", (object?)song.BannerPath ?? DBNull.Value);
+                set(upsertSong, "$stage", (object?)song.StageFilePath ?? DBNull.Value);
+                set(upsertSong, "$modified", song.LastModified.ToUniversalTime().Ticks);
+            }
+
+            private void bindChart(BMSChartCache chart, BmsChartIdentity identity)
+            {
+                set(upsertChart, "$chartPath", chart.FullPath);
+                set(upsertChart, "$folder", chart.FolderPath);
+                set(upsertChart, "$fileName", chart.FileName);
+                set(upsertChart, "$size", chart.FileSize);
+                set(upsertChart, "$modified", chart.LastModified.ToUniversalTime().Ticks);
+                set(upsertChart, "$beatmapId", identity.BeatmapId.ToString());
+                set(upsertChart, "$setId", identity.SetId.ToString());
+                set(upsertChart, "$pathKey", identity.PathKey);
+                set(upsertChart, "$generation", generation);
+                set(upsertChart, "$parseVersion", 1);
+                set(upsertChart, "$title", chart.Title ?? string.Empty);
+                set(upsertChart, "$subTitle", chart.SubTitle ?? string.Empty);
+                set(upsertChart, "$artist", chart.Artist ?? string.Empty);
+                set(upsertChart, "$subArtist", chart.SubArtist ?? string.Empty);
+                set(upsertChart, "$genre", chart.Genre ?? string.Empty);
+                set(upsertChart, "$playLevel", chart.PlayLevel);
+                set(upsertChart, "$rank", chart.Rank);
+                set(upsertChart, "$lnType", chart.LnType);
+                set(upsertChart, "$keyCount", chart.KeyCount);
+                set(upsertChart, "$totalNotes", chart.TotalNotes);
+                set(upsertChart, "$bpm", chart.Bpm);
+                set(upsertChart, "$minBpm", chart.MinBpm);
+                set(upsertChart, "$maxBpm", chart.MaxBpm);
+                set(upsertChart, "$duration", chart.Duration);
+                set(upsertChart, "$totalGauge", chart.Total);
+                set(upsertChart, "$previewTime", chart.PreviewTime);
+                set(upsertChart, "$audio", (object?)chart.AudioFile ?? DBNull.Value);
+                set(upsertChart, "$preview", (object?)chart.PreviewFile ?? DBNull.Value);
+                set(upsertChart, "$scratch", chart.HasScratch ? 1 : 0);
+                set(upsertChart, "$ln", chart.HasLongNotes ? 1 : 0);
+                set(upsertChart, "$stop", chart.HasStopSequence ? 1 : 0);
+                set(upsertChart, "$scroll", chart.HasScrollChanges ? 1 : 0);
+                set(upsertChart, "$bga", chart.HasBgaLayer ? 1 : 0);
+                set(upsertChart, "$keysounds", JsonSerializer.Serialize(chart.KeysoundFiles));
+            }
+
+            private static BMSSongCache createSong(BMSChartCache chart)
+            {
+                return new BMSSongCache
+                {
+                    FolderPath = chart.FolderPath,
+                    Title = chart.Title,
+                    Artist = chart.Artist,
+                    Genre = chart.Genre,
+                    LastModified = chart.LastModified,
+                };
+            }
+
+            private static void set(SqliteCommand command, string parameterName, object value)
+            {
+                command.Parameters[parameterName].Value = value;
+            }
         }
 
         private SqliteConnection openConnection()
