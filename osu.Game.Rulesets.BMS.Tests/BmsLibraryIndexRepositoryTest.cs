@@ -142,9 +142,9 @@ namespace osu.Game.Rulesets.BMS.Tests
 
                 repository.ImportFromLibraryCache(cache);
 
-                var loaded = repository.LoadLibraryCache();
-                Assert.That(loaded.TotalCharts, Is.EqualTo(1));
-                Assert.That(loaded.RootPaths, Contains.Item(@"D:\BMS"));
+                Assert.That(repository.ChartCount, Is.EqualTo(1));
+                Assert.That(repository.GetRootPaths(), Contains.Item(@"D:\BMS"));
+                Assert.That(repository.TryGetChartByPathKey("legacy-md5", out _), Is.True);
             }
             finally
             {

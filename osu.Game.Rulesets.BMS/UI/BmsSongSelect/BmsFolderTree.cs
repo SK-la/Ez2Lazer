@@ -48,9 +48,6 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                         parentCrc = crc;
                     }
                 }
-
-                if (tree.nodesByCrc.TryGetValue(parentCrc, out var leaf))
-                    leaf.Songs.Add(song);
             }
 
             return tree;
@@ -63,7 +60,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             var bars = new List<BmsBar>();
 
             foreach (var root in roots)
-                bars.Add(new BmsFolderBar(root.Crc, root.DisplayName, root.Path, root.Node));
+                bars.Add(new BmsFolderBar(root.Crc, root.DisplayName, root.Path));
 
             return bars;
         }
@@ -76,13 +73,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             var result = new List<BmsBar>();
 
             foreach (var child in node.Children.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase))
-                result.Add(new BmsFolderBar(child.Crc, child.Name, child.FullPath, child));
-
-            foreach (var song in node.Songs.OrderBy(s => s.Title, StringComparer.OrdinalIgnoreCase))
-            {
-                foreach (var chart in song.Charts.OrderBy(c => c.PlayLevel).ThenBy(c => c.FileName, StringComparer.OrdinalIgnoreCase))
-                    result.Add(new BmsSongBar(chart));
-            }
+                result.Add(new BmsFolderBar(child.Crc, child.Name, child.FullPath));
 
             return result;
         }
@@ -127,6 +118,5 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         public string Name { get; } = name;
         public string FullPath { get; } = fullPath;
         public List<BmsFolderNode> Children { get; } = new List<BmsFolderNode>();
-        public List<BMSSongCache> Songs { get; } = new List<BMSSongCache>();
     }
 }

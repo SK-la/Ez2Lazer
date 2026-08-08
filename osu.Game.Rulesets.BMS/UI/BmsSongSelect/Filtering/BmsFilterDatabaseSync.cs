@@ -26,10 +26,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
             RealmAccess realm,
             BmsAnalyticsSqliteRepository? analytics = null)
         {
-            var charts = beatmapManager.GetAllCharts().ToList();
             var lamps = lampRepository.LoadAll().ToDictionary(r => r.BeatmapId, r => r);
-
-            var (songs, scores, informations) = BmsScoreSchemaBuilder.Build(charts, lamps, realm, analytics);
+            int songCount = 0;
 
             lock (writeLock)
             {
@@ -46,15 +44,30 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                 executeNonQuery(connection, BmsFilterSchema.CREATE_SCORELOG);
                 executeNonQuery(connection, BmsFilterSchema.CREATE_INFORMATION);
 
-                insertSongs(connection, songs);
-                insertScores(connection, scores);
-                insertScoreLogs(connection, scores);
-                insertInformation(connection, informations);
+                const int page_size = 256;
+
+                for (int offset = 0; ; offset += page_size)
+                {
+                    IReadOnlyList<BMSChartCache> charts = beatmapManager.GetChartPage(offset, page_size);
+
+                    if (charts.Count == 0)
+                        break;
+
+                    var (songs, scores, informations) = BmsScoreSchemaBuilder.Build(charts, lamps, realm, analytics);
+                    insertSongs(connection, songs);
+                    insertScores(connection, scores);
+                    insertScoreLogs(connection, scores);
+                    insertInformation(connection, informations);
+                    songCount += songs.Count;
+
+                    if (charts.Count < page_size)
+                        break;
+                }
 
                 transaction.Commit();
             }
 
-            Logger.Log($"[BMS] Raja filter DB rebuilt: {songs.Count} songs.", LoggingTarget.Database);
+            Logger.Log($"[BMS] Raja filter DB rebuilt: {songCount} songs.", LoggingTarget.Database);
         }
 
         private static void insertSongs(SqliteConnection connection, IReadOnlyList<BmsSongRow> songs)

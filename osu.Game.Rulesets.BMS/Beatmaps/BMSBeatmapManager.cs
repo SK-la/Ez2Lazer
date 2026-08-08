@@ -48,8 +48,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public BindableBool IsScanning { get; } = new BindableBool();
 
-        public BMSLibraryCache? LibraryCache { get; private set; }
-
         public long LastScanRevision { get; private set; }
 
         public long LastSynchronizedScanRevision { get; private set; }
@@ -63,18 +61,19 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private bool realmSyncRequired;
 
         public bool NeedsRealmSynchronization => realmSyncRequired
-                                                 || LastScanRevision != LastSynchronizedScanRevision
+                                                 || PendingRealmSyncSetCount > 0
                                                  || LastSynchronizedRealmFileMappingVersion != BmsRealmSyncConstants.FILE_MAPPING_SCHEMA_VERSION;
 
-        public bool HasIndexedCharts => LibraryCache?.TotalCharts > 0;
+        public bool HasIndexedCharts => ChartCount > 0;
+
+        public int ChartCount => indexRepository.ChartCount;
+
+        public int SongCount => indexRepository.SongCount;
 
         private static readonly string[] bms_extensions = { ".bms", ".bme", ".bml", ".pms" };
 
-        private readonly string storageDirectory;
         private readonly BmsLibraryIndexRepository indexRepository;
         private readonly List<string> rootPaths = new List<string>();
-        private readonly Dictionary<Guid, BMSSourceReference> beatmapSourceMap = new Dictionary<Guid, BMSSourceReference>();
-        private readonly object sourceMapLock = new object();
 
         private CancellationTokenSource? scanCts;
 
@@ -97,7 +96,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public BMSBeatmapManager(string storageDirectory)
         {
-            this.storageDirectory = storageDirectory;
             Directory.CreateDirectory(storageDirectory);
             indexRepository = new BmsLibraryIndexRepository(Path.Combine(storageDirectory, BmsStoragePaths.INDEX_DATABASE_FILE));
         }
@@ -106,25 +104,15 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         {
             try
             {
-                LibraryCache = indexRepository.LoadLibraryCache();
                 LastScanRevision = indexRepository.ScanRevision;
                 LastSynchronizedRealmFileMappingVersion = indexRepository.RealmFileMappingVersion;
-                rebuildSourceMapFromIndex();
-
-                if (LibraryCache.RootPaths.Count > 0)
-                    SetRootPaths(LibraryCache.RootPaths);
-                else if (!string.IsNullOrEmpty(LibraryCache.RootPath))
-                    SetRootPaths(new[] { LibraryCache.RootPath });
-
-                StatusMessage.Value = BmsStrings.Scan_LoadedFromIndex(LibraryCache.Songs.Count, LibraryCache.TotalCharts);
-
-                if (LibraryCache.TotalCharts > 0)
-                    realmSyncRequired = true;
+                SetRootPaths(indexRepository.GetRootPaths());
+                StatusMessage.Value = BmsStrings.Scan_LoadedFromIndex(SongCount, ChartCount);
+                realmSyncRequired = PendingRealmSyncSetCount > 0;
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "[BMS] Failed to load library index");
-                LibraryCache = new BMSLibraryCache();
             }
         }
 
@@ -422,12 +410,10 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 pipelineToken.ThrowIfCancellationRequested();
 
                 LastScanRevision = indexRepository.CompleteScanGeneration(generation, configuredPaths);
-                LibraryCache = indexRepository.LoadLibraryCache();
                 SetRootPaths(configuredPaths);
-                rebuildSourceMapFromIndex();
                 realmSyncRequired = true;
 
-                StatusMessage.Value = BmsStrings.Scan_Complete(LibraryCache.Songs.Count, LibraryCache.TotalCharts);
+                StatusMessage.Value = BmsStrings.Scan_Complete(SongCount, ChartCount);
             }
             catch (OperationCanceledException)
             {
@@ -447,219 +433,49 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public BMSChartCache? GetChartByHash(string pathKey)
         {
-            if (indexRepository.TryGetSourceReferenceByPathKey(pathKey, out BMSSourceReference reference)
-                && indexRepository.TryLoadChart(reference.ChartPath, out BMSChartCache chart))
-                return chart;
-
-            if (LibraryCache == null)
-                return null;
-
-            foreach (var song in LibraryCache.Songs)
-            {
-                foreach (var cached in song.Charts)
-                {
-                    if (cached.Md5Hash.Equals(pathKey, StringComparison.OrdinalIgnoreCase))
-                        return cached;
-                }
-            }
-
-            return null;
+            return TryGetChartByPathKey(pathKey, out BMSChartCache chart) ? chart : null;
         }
 
-        public IEnumerable<BMSSongCache> GetAllSongs() => LibraryCache?.Songs ?? Enumerable.Empty<BMSSongCache>();
-
-        public IEnumerable<BMSChartCache> GetAllCharts()
+        public bool TryGetChart(Guid beatmapId, out BMSChartCache chart)
         {
-            if (LibraryCache == null)
-                yield break;
-
-            foreach (var song in LibraryCache.Songs)
+            if (indexRepository.TryGetChart(beatmapId, out BmsLibraryIndexRepository.IndexedChart indexed))
             {
-                foreach (var chart in song.Charts)
-                    yield return chart;
+                chart = indexed.Chart;
+                return true;
             }
+
+            chart = null!;
+            return false;
         }
 
-        public IReadOnlyList<BeatmapSetInfo> BuildVirtualBeatmapCatalog(RulesetInfo bmsRulesetInfo)
+        public bool TryGetChartByPathKey(string pathKey, out BMSChartCache chart)
         {
-            List<BeatmapSetInfo> result = new List<BeatmapSetInfo>();
-
-            if (LibraryCache == null)
-                return result;
-
-            foreach (BMSSongCache song in LibraryCache.Songs)
+            if (indexRepository.TryGetChartByPathKey(pathKey, out BmsLibraryIndexRepository.IndexedChart indexed))
             {
-                if (song.Charts.Count == 0)
-                    continue;
-
-                var beatmapSet = new BeatmapSetInfo
-                {
-                    ID = BmsChartIdentity.CreateSetId(song.FolderPath),
-                    DateAdded = song.LastModified,
-                    Hash = song.FolderPath,
-                };
-
-                foreach (BMSChartCache chart in song.Charts.OrderBy(c => c.PlayLevel).ThenBy(c => c.FileName, StringComparer.OrdinalIgnoreCase))
-                {
-                    string chartPath = chart.FullPath;
-                    string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
-                        ? BmsPathKeys.ComputeChartPathKey(chartPath)
-                        : chart.Md5Hash;
-                    string realmHash = BmsPathKeys.ComputeRealmFileHash(chartPath);
-
-                    var metadata = new BeatmapMetadata
-                    {
-                        Title = string.IsNullOrWhiteSpace(chart.Title) ? song.Title : chart.Title,
-                        TitleUnicode = string.IsNullOrWhiteSpace(chart.Title) ? song.Title : chart.Title,
-                        Artist = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
-                        ArtistUnicode = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
-                        Source = "BMS",
-                        Tags = buildTags(chart),
-                        AudioFile = string.Empty,
-                        BackgroundFile = song.StageFilePath ?? string.Empty,
-                        PreviewTime = chart.PreviewTime,
-                    };
-
-                    var beatmapInfo = new BeatmapInfo(bmsRulesetInfo, new BeatmapDifficulty(), metadata)
-                    {
-                        ID = BmsChartIdentity.CreateBeatmapId(chartPath),
-                        DifficultyName = formatDifficultyName(chart),
-                        BPM = chart.Bpm,
-                        Length = chart.Duration,
-                        Hash = realmHash,
-                        MD5Hash = pathKey,
-                        TotalObjectCount = chart.TotalNotes,
-                        EndTimeObjectCount = chart.LongNoteCount,
-                        BeatmapSet = beatmapSet,
-                        Difficulty =
-                        {
-                            CircleSize = chart.KeyCount,
-                            OverallDifficulty = mapRankToOD(chart.Rank),
-                            DrainRate = 7
-                        }
-                    };
-
-                    beatmapSet.Beatmaps.Add(beatmapInfo);
-                }
-
-                result.Add(beatmapSet);
+                chart = indexed.Chart;
+                return true;
             }
 
-            return result;
+            chart = null!;
+            return false;
         }
+
+        public IReadOnlyList<BMSChartCache> GetChartPage(int offset, int limit)
+        {
+            return indexRepository.GetCharts(offset, limit).Select(indexed => indexed.Chart).ToList();
+        }
+
+        public IReadOnlyList<BMSSongCache> GetSongSummaryPage(int offset, int limit)
+            => indexRepository.GetSongs(offset, limit);
+
+        public IReadOnlyList<BMSChartCache> GetChartsByFolder(string folderPath)
+            => indexRepository.GetChartsByFolder(folderPath).Select(indexed => indexed.Chart).ToList();
 
         public bool TryGetSourceReference(Guid beatmapId, out BMSSourceReference sourceReference)
-        {
-            if (tryGetSourceReferenceCore(beatmapId, out sourceReference))
-                return true;
-
-            if (indexRepository.TryGetSourceReference(beatmapId, out sourceReference))
-            {
-                cacheSourceReference(sourceReference);
-                return true;
-            }
-
-            sourceReference = default;
-            return false;
-        }
+            => indexRepository.TryGetSourceReference(beatmapId, out sourceReference);
 
         public bool TryGetSourceReferenceByHash(string pathKey, out BMSSourceReference sourceReference)
-        {
-            if (tryGetSourceReferenceByHashCore(pathKey, out sourceReference))
-                return true;
-
-            if (indexRepository.TryGetSourceReferenceByPathKey(pathKey, out sourceReference))
-            {
-                cacheSourceReference(sourceReference);
-                return true;
-            }
-
-            sourceReference = default;
-            return false;
-        }
-
-        public Dictionary<Guid, BMSSourceReference> GetCurrentSourceMap()
-        {
-            lock (sourceMapLock)
-                return new Dictionary<Guid, BMSSourceReference>(beatmapSourceMap);
-        }
-
-        private void rebuildSourceMapFromIndex()
-        {
-            var map = new Dictionary<Guid, BMSSourceReference>();
-
-            if (LibraryCache == null)
-            {
-                replaceSourceMap(map);
-                return;
-            }
-
-            foreach (var song in LibraryCache.Songs)
-            {
-                foreach (var chart in song.Charts)
-                {
-                    string chartPath = chart.FullPath;
-                    string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
-                        ? BmsPathKeys.ComputeChartPathKey(chartPath)
-                        : chart.Md5Hash;
-                    Guid beatmapId = BmsChartIdentity.CreateBeatmapId(chartPath);
-
-                    map[beatmapId] = new BMSSourceReference
-                    {
-                        BeatmapId = beatmapId,
-                        FolderPath = chart.FolderPath,
-                        ChartPath = chartPath,
-                        Md5Hash = pathKey,
-                    };
-                }
-            }
-
-            replaceSourceMap(map);
-        }
-
-        private void cacheSourceReference(BMSSourceReference reference)
-        {
-            if (reference.BeatmapId == Guid.Empty)
-                return;
-
-            lock (sourceMapLock)
-                beatmapSourceMap[reference.BeatmapId] = reference;
-        }
-
-        private void replaceSourceMap(Dictionary<Guid, BMSSourceReference> newMap)
-        {
-            lock (sourceMapLock)
-            {
-                beatmapSourceMap.Clear();
-
-                foreach ((Guid key, BMSSourceReference value) in newMap)
-                    beatmapSourceMap[key] = value;
-            }
-        }
-
-        private bool tryGetSourceReferenceCore(Guid beatmapId, out BMSSourceReference sourceReference)
-        {
-            lock (sourceMapLock)
-                return beatmapSourceMap.TryGetValue(beatmapId, out sourceReference);
-        }
-
-        private bool tryGetSourceReferenceByHashCore(string pathKey, out BMSSourceReference sourceReference)
-        {
-            lock (sourceMapLock)
-            {
-                foreach (BMSSourceReference reference in beatmapSourceMap.Values)
-                {
-                    if (string.Equals(reference.Md5Hash, pathKey, StringComparison.OrdinalIgnoreCase))
-                    {
-                        sourceReference = reference;
-                        return true;
-                    }
-                }
-            }
-
-            sourceReference = default;
-            return false;
-        }
+            => indexRepository.TryGetSourceReferenceByPathKey(pathKey, out sourceReference);
 
         private BmsLibraryIndexRepository.ScanWriteItem? createScanWriteItem(string filePath, CancellationToken token)
         {

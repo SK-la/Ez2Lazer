@@ -65,38 +65,13 @@ GROUP BY sha256;";
             return resolveCharts(keys);
         }
 
-        public IReadOnlyList<BMSChartCache> GetByFolderCrc(string folderCrc)
-        {
-            var keys = new List<string>();
-
-            using var connection = new SqliteConnection($"Data Source={databasePath}");
-            connection.Open();
-
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT sha256 FROM song WHERE parent = $parent GROUP BY sha256;";
-            cmd.Parameters.AddWithValue("$parent", folderCrc);
-
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-                keys.Add(reader.GetString(0));
-
-            return resolveCharts(keys);
-        }
-
         private List<BMSChartCache> resolveCharts(IReadOnlyList<string> pathKeys)
         {
             var result = new List<BMSChartCache>();
-            var cache = beatmapManager.LibraryCache;
-            if (cache == null)
-                return result;
-
-            var byKey = cache.Songs
-                             .SelectMany(s => s.Charts)
-                             .ToDictionary(c => string.IsNullOrEmpty(c.Md5Hash) ? BmsPathKeys.ComputeChartPathKey(c.FullPath) : c.Md5Hash, c => c, StringComparer.OrdinalIgnoreCase);
 
             foreach (string key in pathKeys)
             {
-                if (byKey.TryGetValue(key, out var chart))
+                if (beatmapManager.TryGetChartByPathKey(key, out BMSChartCache chart))
                     result.Add(chart);
             }
 

@@ -24,9 +24,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             CancellationToken cancellationToken,
             Action<double>? reportProgress = null)
         {
-            if (manager.LibraryCache == null)
-                return;
-
             if (!manager.NeedsRealmSynchronization)
                 return;
 

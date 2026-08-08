@@ -210,10 +210,10 @@ namespace osu.Game.Rulesets.BMS.UI
             speedNote.Current.Value = new SettingsNote.Data(BmsStrings.SETTINGS_MANIA_SCROLL_NOTE, SettingsNote.Type.Informational);
 
             // Show initial cache status
-            if (beatmapManager?.LibraryCache != null)
+            if (beatmapManager != null)
             {
                 cacheStatusNote.Current.Value = new SettingsNote.Data(
-                    BmsStrings.Settings_CachedStatus(beatmapManager.LibraryCache.Songs.Count, beatmapManager.LibraryCache.TotalCharts),
+                    BmsStrings.Settings_CachedStatus(beatmapManager.SongCount, beatmapManager.ChartCount),
                     SettingsNote.Type.Informational);
             }
         }
@@ -371,7 +371,7 @@ namespace osu.Game.Rulesets.BMS.UI
 
         private void createCollectionsFromPaths(IReadOnlyList<string> paths)
         {
-            if (paths.Count == 0 || beatmapManager?.LibraryCache == null)
+            if (paths.Count == 0 || beatmapManager == null)
                 return;
 
             int createdCount = 0;
@@ -387,18 +387,25 @@ namespace osu.Game.Rulesets.BMS.UI
                 // 获取该路径下的所有谱面哈希值
                 var beatmapHashes = new List<string>();
 
-                // 从 LibraryCache 中查找属于该路径的谱面
-                foreach (var song in beatmapManager.LibraryCache.Songs)
+                const int page_size = 256;
+
+                for (int offset = 0; ; offset += page_size)
                 {
-                    // 检查歌曲是否在该路径下
-                    if (song.FolderPath.StartsWith(path, StringComparison.OrdinalIgnoreCase))
+                    IReadOnlyList<BMSChartCache> charts = beatmapManager.GetChartPage(offset, page_size);
+
+                    foreach (BMSChartCache chart in charts)
                     {
-                        foreach (var chart in song.Charts)
-                        {
-                            string md5Hash = BmsPathKeys.ComputeChartPathKey(chart.FullPath);
-                            beatmapHashes.Add(md5Hash);
-                        }
+                        if (!chart.FolderPath.StartsWith(path, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        string md5Hash = string.IsNullOrEmpty(chart.Md5Hash)
+                            ? BmsPathKeys.ComputeChartPathKey(chart.FullPath)
+                            : chart.Md5Hash;
+                        beatmapHashes.Add(md5Hash);
                     }
+
+                    if (charts.Count < page_size)
+                        break;
                 }
 
                 if (beatmapHashes.Count == 0)

@@ -49,6 +49,23 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
             }
         }
 
+        public IReadOnlyList<string> GetRootPaths()
+        {
+            ensureInitialized();
+            var result = new List<string>();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"SELECT path FROM {table_roots} ORDER BY path;";
+
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+                result.Add(reader.GetString(0));
+
+            return result;
+        }
+
         public void WriteRealmFileMappingVersion(int version)
         {
             lock (writeLock)
@@ -292,6 +309,53 @@ LIMIT $limit OFFSET $offset;";
             return result;
         }
 
+        public IReadOnlyList<BMSSongCache> GetSongs(int offset, int limit)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(offset);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+            ensureInitialized();
+            var result = new List<BMSSongCache>(limit);
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+SELECT folder_path, title, artist, genre, banner_path, stage_path, last_modified_ticks
+FROM {table_songs}
+ORDER BY folder_path
+LIMIT $limit OFFSET $offset;";
+            cmd.Parameters.AddWithValue("$limit", limit);
+            cmd.Parameters.AddWithValue("$offset", offset);
+
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+                result.Add(readSong(reader));
+
+            return result;
+        }
+
+        public IReadOnlyList<IndexedChart> GetChartsByFolder(string folderPath)
+        {
+            ensureInitialized();
+            var result = new List<IndexedChart>();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+SELECT *
+FROM {table_charts}
+WHERE folder_path = $folder
+ORDER BY play_level, file_name;";
+            cmd.Parameters.AddWithValue("$folder", folderPath);
+
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+                result.Add(readIndexedChart(reader));
+
+            return result;
+        }
+
         public IReadOnlyList<SyncChange> GetPendingSyncChanges(int limit)
         {
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
@@ -522,16 +586,7 @@ LIMIT 1;";
             if (!reader.Read())
                 return false;
 
-            song = new BMSSongCache
-            {
-                FolderPath = reader.GetString(0),
-                Title = reader.GetString(1),
-                Artist = reader.GetString(2),
-                Genre = reader.GetString(3),
-                BannerPath = reader.IsDBNull(4) ? null : reader.GetString(4),
-                StageFilePath = reader.IsDBNull(5) ? null : reader.GetString(5),
-                LastModified = new DateTime(reader.GetInt64(6), DateTimeKind.Utc).ToLocalTime(),
-            };
+            song = readSong(reader);
             return true;
         }
 
@@ -828,85 +883,6 @@ ON CONFLICT(chart_path) DO UPDATE SET
             }
         }
 
-        public BMSLibraryCache LoadLibraryCache()
-        {
-            ensureInitialized();
-
-            var cache = new BMSLibraryCache
-            {
-                Version = schema_version,
-                LastScanTime = LastScanTime.ToLocalTime(),
-            };
-
-            using var connection = openConnection();
-
-            using (var rootsCmd = connection.CreateCommand())
-            {
-                rootsCmd.CommandText = $"SELECT path FROM {table_roots} ORDER BY path;";
-                using var reader = rootsCmd.ExecuteReader();
-
-                while (reader.Read())
-                    cache.RootPaths.Add(reader.GetString(0));
-            }
-
-            cache.RootPath = cache.RootPaths.FirstOrDefault() ?? string.Empty;
-
-            var songsByFolder = new Dictionary<string, BMSSongCache>(StringComparer.OrdinalIgnoreCase);
-
-            using (var songsCmd = connection.CreateCommand())
-            {
-                songsCmd.CommandText = $"SELECT folder_path, title, artist, genre, banner_path, stage_path, last_modified_ticks FROM {table_songs};";
-                using var reader = songsCmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    var song = new BMSSongCache
-                    {
-                        FolderPath = reader.GetString(0),
-                        Title = reader.GetString(1),
-                        Artist = reader.GetString(2),
-                        Genre = reader.GetString(3),
-                        BannerPath = reader.IsDBNull(4) ? null : reader.GetString(4),
-                        StageFilePath = reader.IsDBNull(5) ? null : reader.GetString(5),
-                        LastModified = new DateTime(reader.GetInt64(6), DateTimeKind.Utc).ToLocalTime(),
-                    };
-
-                    songsByFolder[song.FolderPath] = song;
-                    cache.Songs.Add(song);
-                }
-            }
-
-            using (var chartsCmd = connection.CreateCommand())
-            {
-                chartsCmd.CommandText = "SELECT * FROM charts ORDER BY folder_path, file_name;";
-                using var reader = chartsCmd.ExecuteReader();
-
-                while (reader.Read())
-                {
-                    var chart = readChart(reader);
-
-                    if (!songsByFolder.TryGetValue(chart.FolderPath, out var song))
-                    {
-                        song = new BMSSongCache
-                        {
-                            FolderPath = chart.FolderPath,
-                            Title = chart.Title,
-                            Artist = chart.Artist,
-                            Genre = chart.Genre,
-                            LastModified = chart.LastModified,
-                        };
-                        songsByFolder[song.FolderPath] = song;
-                        cache.Songs.Add(song);
-                    }
-
-                    chart.Md5Hash = reader.GetString(reader.GetOrdinal("path_key"));
-                    song.Charts.Add(chart);
-                }
-            }
-
-            return cache;
-        }
-
         public void ImportFromLibraryCache(BMSLibraryCache cache)
         {
             lock (writeLock)
@@ -1001,6 +977,20 @@ ON CONFLICT(chart_path) DO UPDATE SET
                 HasBgaLayer = reader.GetInt32(reader.GetOrdinal("has_bga")) != 0,
                 KeysoundFiles = JsonSerializer.Deserialize<List<string>>(reader.GetString(reader.GetOrdinal("keysound_files_json"))) ?? new List<string>(),
                 Md5Hash = reader.GetString(reader.GetOrdinal("path_key")),
+            };
+        }
+
+        private static BMSSongCache readSong(SqliteDataReader reader)
+        {
+            return new BMSSongCache
+            {
+                FolderPath = reader.GetString(0),
+                Title = reader.GetString(1),
+                Artist = reader.GetString(2),
+                Genre = reader.GetString(3),
+                BannerPath = reader.IsDBNull(4) ? null : reader.GetString(4),
+                StageFilePath = reader.IsDBNull(5) ? null : reader.GetString(5),
+                LastModified = new DateTime(reader.GetInt64(6), DateTimeKind.Utc).ToLocalTime(),
             };
         }
 

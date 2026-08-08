@@ -72,9 +72,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
     public sealed class BmsSameFolderBar : BmsDirectoryBar
     {
         private readonly string folderCrc;
+        private readonly string folderPath;
 
         public BmsSameFolderBar(string folderPath)
         {
+            this.folderPath = folderPath;
             folderCrc = BmsPathCrc.Compute(folderPath);
             Title = BmsStrings.RAJA_SAME_FOLDER_FILTER_TITLE.ToString();
         }
@@ -83,7 +85,12 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
 
         public override bool IsSortable => true;
 
-        public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context) => context.FolderTree.GetChildren(folderCrc);
+        public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context)
+        {
+            var result = context.FolderTree.GetChildren(folderCrc).ToList();
+            result.AddRange(context.BeatmapManager.GetChartsByFolder(folderPath).Select(chart => new BmsSongBar(chart)));
+            return result;
+        }
     }
 
     public sealed class BmsRandomExecutableBar : BmsSelectableBar

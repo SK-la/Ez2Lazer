@@ -323,7 +323,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             var roots = BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value);
             beatmapManager.SetRootPaths(roots);
 
-            var folderTree = BmsFolderTree.Build(roots, beatmapManager.LibraryCache?.Songs ?? Enumerable.Empty<BMSSongCache>());
+            var folderTree = BmsFolderTree.Build(roots, enumerateSongs());
             string filterPath = BmsStoragePaths.GetFilterDatabasePath(storage);
 
             barContext = new BmsBarContext
@@ -336,6 +336,22 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 LampStore = lampStore,
                 Realm = realm,
             };
+        }
+
+        private IEnumerable<BMSSongCache> enumerateSongs()
+        {
+            const int page_size = 128;
+
+            for (int offset = 0; ; offset += page_size)
+            {
+                IReadOnlyList<BMSSongCache> songs = beatmapManager.GetSongSummaryPage(offset, page_size);
+
+                foreach (BMSSongCache song in songs)
+                    yield return song;
+
+                if (songs.Count < page_size)
+                    yield break;
+            }
         }
 
         private void syncConfiguredPaths() => beatmapManager.SetRootPaths(BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value));

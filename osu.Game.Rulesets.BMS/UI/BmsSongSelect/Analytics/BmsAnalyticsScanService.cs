@@ -29,15 +29,14 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
             RealmAccess? realm = null,
             EzAnalysisDatabase? analysisDatabase = null)
         {
-            var charts = beatmapManager.GetAllCharts().ToList();
-            if (charts.Count == 0)
+            if (beatmapManager.ChartCount == 0)
                 return Task.CompletedTask;
 
-            return Task.Run(() => runOnBackgroundThread(charts, repository, audioManager, realm, analysisDatabase, progress, cancellationToken), cancellationToken);
+            return Task.Run(() => runOnBackgroundThread(beatmapManager, repository, audioManager, realm, analysisDatabase, progress, cancellationToken), cancellationToken);
         }
 
         private static void runOnBackgroundThread(
-            IReadOnlyList<BMSChartCache> charts,
+            BMSBeatmapManager beatmapManager,
             BmsAnalyticsSqliteRepository repository,
             AudioManager audioManager,
             RealmAccess? realm,
@@ -47,66 +46,79 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
         {
             using var scope = BmsAnalyticsScanContext.Enter(cancellationToken);
 
-            int total = charts.Count;
+            int total = beatmapManager.ChartCount;
 
             report(progress, 0, total, BmsStrings.ANALYTICS_PREPARING.ToString());
 
             try
             {
-                for (int index = 0; index < total; index++)
+                const int page_size = 128;
+                int completed = 0;
+
+                for (int offset = 0; ; offset += page_size)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    IReadOnlyList<BMSChartCache> charts = beatmapManager.GetChartPage(offset, page_size);
 
-                    var chart = charts[index];
-                    int displayIndex = index + 1;
+                    if (charts.Count == 0)
+                        break;
 
-                    report(progress, index, total, BmsStrings.Analytics_ChartStarted(displayIndex, total, chart.Title));
-
-                    string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
-                        ? BmsPathKeys.ComputeChartPathKey(chart.FullPath)
-                        : chart.Md5Hash;
-
-                    try
+                    foreach (BMSChartCache chart in charts)
                     {
-                        using var heartbeat = startHeartbeat(progress, index, total, chart.Title, cancellationToken);
-                        var result = BmsChartAnalyticsProcessor.TryAnalyze(chart, audioManager, cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        int displayIndex = completed + 1;
 
-                        if (result != null)
+                        report(progress, completed, total, BmsStrings.Analytics_ChartStarted(displayIndex, total, chart.Title));
+
+                        string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
+                            ? BmsPathKeys.ComputeChartPathKey(chart.FullPath)
+                            : chart.Md5Hash;
+
+                        try
                         {
-                            var analyticsResult = result.Value;
+                            using var heartbeat = startHeartbeat(progress, completed, total, chart.Title, cancellationToken);
+                            var result = BmsChartAnalyticsProcessor.TryAnalyze(chart, audioManager, cancellationToken);
 
-                            repository.Upsert(new BmsAnalyticsRecord
+                            if (result != null)
                             {
-                                PathKey = pathKey,
-                                Pp = analyticsResult.Pp,
-                                XxySr = analyticsResult.XxySr,
-                                AvgKps = analyticsResult.AvgKps,
-                                MaxKps = analyticsResult.MaxKps,
-                                StarRating = analyticsResult.StarRating,
-                                ColumnCountsJson = analyticsResult.ColumnCountsJson,
-                                KpsListJson = analyticsResult.KpsListJson,
-                            });
+                                var analyticsResult = result.Value;
 
-                            if (realm != null && analysisDatabase != null)
-                                BmsAnalyticsStandardPipeline.TryCommitChart(realm, analysisDatabase, chart, pathKey, analyticsResult);
-                            else if (realm != null)
-                                BmsAnalyticsRealmWriteback.TryApply(realm, chart, analyticsResult);
+                                repository.Upsert(new BmsAnalyticsRecord
+                                {
+                                    PathKey = pathKey,
+                                    Pp = analyticsResult.Pp,
+                                    XxySr = analyticsResult.XxySr,
+                                    AvgKps = analyticsResult.AvgKps,
+                                    MaxKps = analyticsResult.MaxKps,
+                                    StarRating = analyticsResult.StarRating,
+                                    ColumnCountsJson = analyticsResult.ColumnCountsJson,
+                                    KpsListJson = analyticsResult.KpsListJson,
+                                });
+
+                                if (realm != null && analysisDatabase != null)
+                                    BmsAnalyticsStandardPipeline.TryCommitChart(realm, analysisDatabase, chart, pathKey, analyticsResult);
+                                else if (realm != null)
+                                    BmsAnalyticsRealmWriteback.TryApply(realm, chart, analyticsResult);
+                            }
                         }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"[BMS] Analytics scan failed for {chart.FullPath}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"[BMS] Analytics scan failed for {chart.FullPath}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
+                        }
+
+                        completed++;
+                        report(progress, completed, total, BmsStrings.Analytics_ChartFinished(completed, total, chart.Title));
                     }
 
-                    report(progress, displayIndex, total, BmsStrings.Analytics_ChartFinished(displayIndex, total, chart.Title));
+                    if (realm != null && analysisDatabase != null)
+                        BmsAnalyticsStandardPipeline.BulkCommitFromRepository(realm, analysisDatabase, charts, repository);
+
+                    if (charts.Count < page_size)
+                        break;
                 }
-
-                if (realm != null && analysisDatabase != null)
-                    BmsAnalyticsStandardPipeline.BulkCommitFromRepository(realm, analysisDatabase, charts, repository);
 
                 report(progress, total, total, BmsStrings.ANALYTICS_COMPLETE.ToString());
             }

@@ -8,13 +8,10 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
         public string Crc { get; }
         public string FullPath { get; }
 
-        private readonly BmsFolderNode? node;
-
-        public BmsFolderBar(string crc, string name, string fullPath, BmsFolderNode? node = null)
+        public BmsFolderBar(string crc, string name, string fullPath)
         {
             Crc = crc;
             FullPath = fullPath;
-            this.node = node;
             Title = string.IsNullOrEmpty(name) ? Path.GetFileName(fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) : name;
         }
 
@@ -22,6 +19,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
 
         public override bool IsSortable => true;
 
-        public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context) => context.FolderTree.GetChildren(Crc);
+        public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context)
+        {
+            var result = context.FolderTree.GetChildren(Crc).ToList();
+            result.AddRange(context.BeatmapManager.GetChartsByFolder(FullPath).Select(chart => new BmsSongBar(chart)));
+            return result;
+        }
     }
 }

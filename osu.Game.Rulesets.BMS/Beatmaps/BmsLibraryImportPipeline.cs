@@ -70,8 +70,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         BmsStrings.IMPORT_WRITING_CATALOG.ToString()))),
                 cancellationToken).ConfigureAwait(false);
 
-            int songs = manager.LibraryCache?.Songs.Count ?? 0;
-            int charts = manager.LibraryCache?.TotalCharts ?? 0;
+            int songs = manager.SongCount;
+            int charts = manager.ChartCount;
 
             reportProgress?.Invoke(new ImportProgress(1, BmsStrings.Import_Complete(songs, charts)));
 
