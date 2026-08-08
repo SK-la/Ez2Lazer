@@ -98,7 +98,7 @@ namespace osu.Game.Database
         /// 进主循环前等待，避免选歌刚出现就遭遇 Ez/官方 backfill 的 Invalidate/Replace 风暴。
         /// 测试覆写为 <see cref="TimeSpan.Zero"/>。
         /// </summary>
-        protected virtual TimeSpan StartupBackfillDelay => TimeSpan.FromSeconds(5);
+        protected virtual TimeSpan StartupBackfillDelay => TimeSpan.FromSeconds(2);
 
         /// <summary>
         /// Queue Ez Realm metadata backfill (Tag / XxySR / PP) on a background thread.

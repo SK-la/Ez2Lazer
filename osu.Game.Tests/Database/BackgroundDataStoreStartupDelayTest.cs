@@ -14,7 +14,7 @@ namespace osu.Game.Tests.Database
         public void ProductionStartupBackfillDelayIsFiveSeconds()
         {
             var probe = new ProbeBackgroundDataStoreProcessor();
-            Assert.That(probe.ExposedStartupBackfillDelay, Is.EqualTo(TimeSpan.FromSeconds(5)));
+            Assert.That(probe.ExposedStartupBackfillDelay, Is.EqualTo(TimeSpan.FromSeconds(2)));
         }
 
         private partial class ProbeBackgroundDataStoreProcessor : BackgroundDataStoreProcessor
