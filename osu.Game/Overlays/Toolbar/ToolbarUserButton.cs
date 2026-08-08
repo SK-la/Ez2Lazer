@@ -135,6 +135,7 @@ namespace osu.Game.Overlays.Toolbar
 
                 case APIState.Offline:
                 case APIState.Online:
+                case APIState.LocalOnline:
                     TooltipText = string.Empty;
                     spinner.Hide();
                     break;

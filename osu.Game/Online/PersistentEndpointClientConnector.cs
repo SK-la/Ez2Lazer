@@ -56,10 +56,6 @@ namespace osu.Game.Online
             if (started)
                 return;
 
-            // 在本地-only 模式下不要自动启动连接器（统一门控，避免子类重复检查）。
-            if (API.IsLocalOnly)
-                return;
-
             apiState.BindValueChanged(_ => Task.Run(connectIfPossible), true);
             started = true;
         }
@@ -72,17 +68,12 @@ namespace osu.Game.Online
 
         private async Task connectIfPossible()
         {
-            // 在本地-only 模式下避免任何网络活动（实验性本地账户）。
-            if (API.IsLocalOnly)
-            {
-                await disconnect(true).ConfigureAwait(true);
-                return;
-            }
-
             switch (apiState.Value)
             {
                 case APIState.Failing:
                 case APIState.Offline:
+                // 本地账号不与 osu! 服务器通信，未来的本地多人客户端不走这条通路。
+                case APIState.LocalOnline:
                     await disconnect(true).ConfigureAwait(true);
                     break;
 
