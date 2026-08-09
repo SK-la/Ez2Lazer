@@ -40,6 +40,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
+                    Caption = EzSettingsStrings.TURBO_MODE,
+                    HintText = EzSettingsStrings.TURBO_MODE_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.TurboMode),
+                })
+                {
+                    Keywords = new[] { "turbo", "performance", "fps", "frame rate", "low spec", "极速", "帧数" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
                     Caption = EzSettingsStrings.ACRYLIC_UI_ENABLED,
                     HintText = EzSettingsStrings.ACRYLIC_UI_ENABLED_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled),

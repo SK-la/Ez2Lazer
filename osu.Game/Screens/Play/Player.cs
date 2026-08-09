@@ -29,6 +29,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.IO.Archives;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Performance;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Screens.Play;
 using osu.Game.Online.API;
@@ -509,22 +510,27 @@ namespace osu.Game.Screens.Play
 
         private Drawable createUnderlayComponents(WorkingBeatmap working)
         {
+            DimmableStoryboard = new DimmableStoryboard(GameplayState.Storyboard, GameplayState.Mods)
+            {
+                RelativeSizeAxes = Axes.Both
+            };
+
+            letterboxOverlay = new LetterboxOverlay
+            {
+                BreakTracker = breakTracker,
+                Alpha = working.Beatmap.LetterboxInBreaks ? 1 : 0,
+            };
+
+            var children = new List<Drawable> { DimmableStoryboard, letterboxOverlay };
+
+            // [Ez] 喷泉没有对应的用户设置，只能在极速模式下直接不构造。
+            if (!EzTurboMode.Active)
+                children.Add(new KiaiGameplayFountains());
+
             var container = new Container
             {
                 RelativeSizeAxes = Axes.Both,
-                Children = new Drawable[]
-                {
-                    DimmableStoryboard = new DimmableStoryboard(GameplayState.Storyboard, GameplayState.Mods)
-                    {
-                        RelativeSizeAxes = Axes.Both
-                    },
-                    letterboxOverlay = new LetterboxOverlay
-                    {
-                        BreakTracker = breakTracker,
-                        Alpha = working.Beatmap.LetterboxInBreaks ? 1 : 0,
-                    },
-                    new KiaiGameplayFountains(),
-                },
+                Children = children,
             };
 
             // Provide a stable background capture source for rulesets that require backdrop effects.

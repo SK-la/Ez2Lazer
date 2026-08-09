@@ -57,6 +57,27 @@ namespace osu.Game.EzOsuGame.Localization
             "开启后将隐藏主界面底部的在线新闻/广告轮播图。",
             "When enabled, the online news/advertisement banner at the bottom of the main menu will be hidden.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString TURBO_MODE =
+            new EzLocalizationManager.EzLocalisableString("极速模式", "Turbo mode");
+
+        public static readonly EzLocalizationManager.EzLocalisableString TURBO_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "压制皮肤以外的每帧开销以提高帧数：关闭故事板与视频、背景不再绘制、关闭背景与列模糊、"
+            + "毛玻璃 UI、打击闪光、星星喷泉、按键显示、游戏内排行榜、季节背景与选歌背景虚化，并让角逐服务空转。"
+            + "\n不会降低任何线程频率，也不会锁帧——提高帧数的目的是降低延迟。"
+            + "\n开启后全程生效，不随进出游玩切换。被压制的设置项会在设置里变灰，关闭本项后自动还原成你原来的值。"
+            + "\n注意：列模糊属于舞台外观，是本模式唯一会改变皮肤观感的一项。",
+            "Suppresses per-frame cost outside the skin to raise frame rate: disables storyboard and video, stops drawing the background, "
+            + "turns off background and column blur, acrylic UI, hit lighting, star fountains, key overlay, the gameplay leaderboard, "
+            + "seasonal backgrounds and song select background blur, and makes the score race service inert."
+            + "\nDoes not lower any thread rate and does not cap frames — the point of more frames is lower latency."
+            + "\nStays active everywhere rather than toggling as you enter and leave gameplay. Suppressed settings appear greyed out, "
+            + "and your original values are restored when this is turned off."
+            + "\nNote: column blur is part of the stage look, and is the only item here that changes skin appearance.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString TURBO_MODE_MANAGED_NOTE = new EzLocalizationManager.EzLocalisableString(
+            "由极速模式接管。关闭极速模式后会还原成你原来的值。",
+            "Managed by turbo mode. Your original value is restored when turbo mode is turned off.");
+
         public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_ENABLED =
             new EzLocalizationManager.EzLocalisableString("毛玻璃 UI", "Acrylic UI");
 
