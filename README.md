@@ -72,9 +72,9 @@ git clone https://github.com/SK-la/osu-resources
 
 默认使用 NuGet：`ez2lazer.Framework`、`ez2lazer.Game.Resources`（版本在 [Ez2Lazer.Dependencies.props](Ez2Lazer.Dependencies.props) 中维护）。
 
-本地联调 framework / resources：编辑该文件，按注释切换 `UseEz2LazerNuGetPackages`（`true` = NuGet，`false` = 同级工程引用）。
+本地联调 framework / resources：在该文件中声明 `<UseEz2LazerLocalProjects>true</UseEz2LazerLocalProjects>`（或临时 `-p:UseEz2LazerLocalProjects=true`）改用同级工程引用；不声明即走 NuGet。
 
-Default: NuGet. Toggle `UseEz2LazerNuGetPackages` in `Ez2Lazer.Dependencies.props` for local sibling projects.
+Default: NuGet, no declaration needed. Set `UseEz2LazerLocalProjects` to `true` in `Ez2Lazer.Dependencies.props` to build against local sibling projects.
 
 自编译版本不会显示游戏内更新选项，也不会从 SK-la/Ez2Lazer Releases 拉取更新。  
 Self-built copies hide in-game update settings and do not check SK-la/Ez2Lazer Releases for updates.

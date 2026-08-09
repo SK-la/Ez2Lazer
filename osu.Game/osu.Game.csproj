@@ -43,8 +43,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Realm" Version="20.1.0" />
-    <PackageReference Include="ez2lazer.Framework" Version="[$(Ez2LazerFrameworkVersion)]" Condition="'$(UseEz2LazerNuGetPackages)' == 'true'" />
-    <PackageReference Include="ez2lazer.Game.Resources" Version="[$(Ez2LazerGameResourcesVersion)]" Condition="'$(UseEz2LazerNuGetPackages)' == 'true'" />
+    <PackageReference Include="ez2lazer.Framework" Version="[$(Ez2LazerFrameworkVersion)]" Condition="'$(UseEz2LazerLocalProjects)' != 'true'" />
+    <PackageReference Include="ez2lazer.Game.Resources" Version="[$(Ez2LazerGameResourcesVersion)]" Condition="'$(UseEz2LazerLocalProjects)' != 'true'" />
     <PackageReference Include="Sentry" Version="6.6.0" />
     <PackageReference Include="SharpCompress" Version="0.49.1" />
     <PackageReference Include="NUnit" Version="4.5.1" />
@@ -57,14 +57,14 @@
     <PackageReference Include="System.Runtime.InteropServices" Version="4.3.0" />
     <PackageReference Include="System.Runtime.Handles" Version="4.3.0" />
   </ItemGroup>
-  <ItemGroup Condition="'$(UseEz2LazerNuGetPackages)' != 'true'">
+  <ItemGroup Condition="'$(UseEz2LazerLocalProjects)' == 'true'">
     <ProjectReference Include="$(Ez2LazerFrameworkProjectPath)" />
     <ProjectReference Include="$(Ez2LazerResourcesProjectPath)" />
   </ItemGroup>
-  <Target Name="ValidateEz2LazerSiblingProjects" BeforeTargets="BeforeBuild" Condition="'$(UseEz2LazerNuGetPackages)' != 'true'">
+  <Target Name="ValidateEz2LazerSiblingProjects" BeforeTargets="BeforeBuild" Condition="'$(UseEz2LazerLocalProjects)' == 'true'">
     <Error Condition="!Exists('$(Ez2LazerFrameworkProjectPath)')"
-           Text="Missing sibling directory osu-framework. Please clone https://github.com/SK-la/osu-framework into $(MSBuildThisFileDirectory)..\..\osu-framework, or use -p:UseEz2LazerNuGetPackages=true locally to rely on NuGet." />
+           Text="Missing sibling directory osu-framework. Please clone https://github.com/SK-la/osu-framework into $(MSBuildThisFileDirectory)..\..\osu-framework, or drop UseEz2LazerLocalProjects to rely on NuGet." />
     <Error Condition="!Exists('$(Ez2LazerResourcesProjectPath)')"
-           Text="Missing sibling directory osu-resources. Please clone https://github.com/SK-la/osu-resources into $(MSBuildThisFileDirectory)..\..\osu-resources, or use -p:UseEz2LazerNuGetPackages=true locally to rely on NuGet." />
+           Text="Missing sibling directory osu-resources. Please clone https://github.com/SK-la/osu-resources into $(MSBuildThisFileDirectory)..\..\osu-resources, or drop UseEz2LazerLocalProjects to rely on NuGet." />
   </Target>
 </Project>
