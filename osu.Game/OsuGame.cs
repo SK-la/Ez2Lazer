@@ -467,7 +467,7 @@ namespace osu.Game
                 ScoreManager.PauseImports = p.NewValue != LocalUserPlayingState.NotPlaying;
             }, true);
 
-            turboMode = new EzTurboMode(LocalConfig, Ez2ConfigManager, UserPlayingState);
+            turboMode = new EzTurboMode(LocalConfig, Ez2ConfigManager);
 
             IsActive.BindValueChanged(active => updateActiveState(active.NewValue), true);
 

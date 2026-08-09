@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Performance;
 using osu.Game.Rulesets.Judgements;
 using osu.Framework.Logging;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -74,6 +75,7 @@ namespace osu.Game.Rulesets.Mania.UI
         // private Bindable<double> osuConfigDim = null!;
         private Bindable<double> columnDim = null!;
         private Bindable<double> columnBlur = null!;
+        private Bindable<bool> turboMode = null!;
         private bool blurEnabledByConfig;
 
         private readonly Box dimBox;
@@ -218,17 +220,12 @@ namespace osu.Game.Rulesets.Mania.UI
             }, true);
 
             columnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
-            columnBlur.BindValueChanged(v =>
-            {
-                float sigma = (float)v.NewValue * 50;
-                blurEnabledByConfig = sigma > 0.01f;
+            columnBlur.BindValueChanged(_ => updateColumnBlur(), true);
 
-                if (stageBackdropBlur != null)
-                {
-                    stageBackdropBlur.BlurSigma = new Vector2(sigma);
-                    updateBackdropBlurState();
-                }
-            }, true);
+            // [Ez] 列模糊在极速模式下不走配置压制：它是皮肤 JSON 的一部分，换皮肤会经 EzSkinJsonBridge
+            // 写回配置，压制值会被覆盖、还原时又会反过来污染皮肤设置。所以只在这个唯一的消费点跳过。
+            turboMode = ezSkinConfig.GetBindable<bool>(Ez2Setting.TurboMode);
+            turboMode.BindValueChanged(_ => updateColumnBlur());
 
             var stagePanelEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.StagePanelEnabled);
             stagePanelEnabled.BindValueChanged(e =>
@@ -238,6 +235,18 @@ namespace osu.Game.Rulesets.Mania.UI
                 else
                     stageForeground.Hide();
             }, true);
+        }
+
+        private void updateColumnBlur()
+        {
+            float sigma = EzTurboMode.Active ? 0 : (float)columnBlur.Value * 50;
+            blurEnabledByConfig = sigma > 0.01f;
+
+            if (stageBackdropBlur != null)
+            {
+                stageBackdropBlur.BlurSigma = new Vector2(sigma);
+                updateBackdropBlurState();
+            }
         }
 
         private void onSkinChanged()

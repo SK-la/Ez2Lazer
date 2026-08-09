@@ -3,12 +3,10 @@
 
 using System;
 using NUnit.Framework;
-using osu.Framework.Bindables;
 using osu.Framework.Testing;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Performance;
-using osu.Game.Screens.Play;
 
 namespace osu.Game.Tests.EzOsuGame.Performance
 {
@@ -16,25 +14,23 @@ namespace osu.Game.Tests.EzOsuGame.Performance
     public class EzTurboModeTest
     {
         [Test]
-        public void TestGlobalModeOverridesAndRestores()
+        public void TestOverridesAndRestores()
         {
             using var storage = new TemporaryNativeStorage($"ez-turbo-{Guid.NewGuid()}");
             var osuConfig = new OsuConfigManager(storage);
             var ezConfig = new Ez2ConfigManager(storage);
-            var playingState = new Bindable<LocalUserPlayingState>();
 
             osuConfig.SetValue(OsuSetting.DimLevel, 0.7);
             osuConfig.SetValue(OsuSetting.ShowStoryboard, true);
-            ezConfig.SetValue(Ez2Setting.TurboModeGameplayOnly, false);
 
-            using (new EzTurboMode(osuConfig, ezConfig, playingState))
+            using (new EzTurboMode(osuConfig, ezConfig))
             {
                 ezConfig.SetValue(Ez2Setting.TurboMode, true);
 
                 Assert.That(EzTurboMode.Active, Is.True);
                 Assert.That(osuConfig.Get<double>(OsuSetting.DimLevel), Is.EqualTo(1.0));
                 Assert.That(osuConfig.Get<bool>(OsuSetting.ShowStoryboard), Is.False);
-                // 仅全局模式的项也应生效。
+                // 压制全程生效，选歌与主菜单的项也一并改写。
                 Assert.That(osuConfig.Get<SeasonalBackgroundMode>(OsuSetting.SeasonalBackgroundMode), Is.EqualTo(SeasonalBackgroundMode.Never));
 
                 ezConfig.SetValue(Ez2Setting.TurboMode, false);
@@ -42,44 +38,89 @@ namespace osu.Game.Tests.EzOsuGame.Performance
                 Assert.That(EzTurboMode.Active, Is.False);
                 Assert.That(osuConfig.Get<double>(OsuSetting.DimLevel), Is.EqualTo(0.7));
                 Assert.That(osuConfig.Get<bool>(OsuSetting.ShowStoryboard), Is.True);
+                Assert.That(osuConfig.Get<SeasonalBackgroundMode>(OsuSetting.SeasonalBackgroundMode), Is.EqualTo(SeasonalBackgroundMode.Sometimes));
                 Assert.That(ezConfig.Get<string>(Ez2Setting.TurboModeSnapshot), Is.Empty);
             }
         }
 
+        /// <summary>
+        /// 被接管的项在生效期间应置灰，使设置面板显示为不可改，并挡住外部写入。
+        /// </summary>
         [Test]
-        public void TestGameplayOnlyModeFollowsPlayingState()
+        public void TestManagedSettingsAreLockedWhileActive()
         {
             using var storage = new TemporaryNativeStorage($"ez-turbo-{Guid.NewGuid()}");
             var osuConfig = new OsuConfigManager(storage);
             var ezConfig = new Ez2ConfigManager(storage);
-            var playingState = new Bindable<LocalUserPlayingState>();
 
             osuConfig.SetValue(OsuSetting.DimLevel, 0.7);
-            ezConfig.SetValue(Ez2Setting.TurboModeGameplayOnly, true);
 
-            using (new EzTurboMode(osuConfig, ezConfig, playingState))
+            using (new EzTurboMode(osuConfig, ezConfig))
             {
                 ezConfig.SetValue(Ez2Setting.TurboMode, true);
 
-                // 总开关已开，但还没进入游玩，不应压制。
-                Assert.That(EzTurboMode.Active, Is.False);
+                Assert.That(osuConfig.GetBindable<double>(OsuSetting.DimLevel).Disabled, Is.True);
+                Assert.Throws<InvalidOperationException>(() => osuConfig.SetValue(OsuSetting.DimLevel, 0.2));
+
+                ezConfig.SetValue(Ez2Setting.TurboMode, false);
+
+                // 解锁必须发生在写回之前，否则还原本身就会抛。
+                Assert.That(osuConfig.GetBindable<double>(OsuSetting.DimLevel).Disabled, Is.False);
                 Assert.That(osuConfig.Get<double>(OsuSetting.DimLevel), Is.EqualTo(0.7));
+                Assert.DoesNotThrow(() => osuConfig.SetValue(OsuSetting.DimLevel, 0.2));
+            }
+        }
 
-                playingState.Value = LocalUserPlayingState.Playing;
+        /// <summary>
+        /// 有运行时写入方的项只压值、不置灰：<see cref="OsuSetting.GameplayLeaderboard"/> 有游玩中可按的快捷键
+        /// （<c>HUDOverlay</c> 直接写 bindable），<see cref="OsuSetting.MenuParallaxScale"/> 有一次性配置迁移会写。
+        /// 锁上它们会让那些写入抛异常。
+        /// </summary>
+        [Test]
+        public void TestSettingsWithRuntimeWritersStayWritable()
+        {
+            using var storage = new TemporaryNativeStorage($"ez-turbo-{Guid.NewGuid()}");
+            var osuConfig = new OsuConfigManager(storage);
+            var ezConfig = new Ez2ConfigManager(storage);
 
-                Assert.That(EzTurboMode.Active, Is.True);
-                Assert.That(osuConfig.Get<double>(OsuSetting.DimLevel), Is.EqualTo(1.0));
-                // 仅全局模式的项不应在游玩压制中被改写。
-                Assert.That(osuConfig.Get<SeasonalBackgroundMode>(OsuSetting.SeasonalBackgroundMode), Is.EqualTo(SeasonalBackgroundMode.Sometimes));
+            using (new EzTurboMode(osuConfig, ezConfig))
+            {
+                ezConfig.SetValue(Ez2Setting.TurboMode, true);
 
-                // 休息段仍算游玩，不应来回还原造成抖动。
-                playingState.Value = LocalUserPlayingState.Break;
-                Assert.That(EzTurboMode.Active, Is.True);
+                Assert.That(osuConfig.Get<bool>(OsuSetting.GameplayLeaderboard), Is.False);
+                Assert.That(osuConfig.GetBindable<bool>(OsuSetting.GameplayLeaderboard).Disabled, Is.False);
+                Assert.DoesNotThrow(() => osuConfig.SetValue(OsuSetting.GameplayLeaderboard, true));
 
-                playingState.Value = LocalUserPlayingState.NotPlaying;
+                Assert.That(osuConfig.GetBindable<float>(OsuSetting.MenuParallaxScale).Disabled, Is.False);
+                Assert.DoesNotThrow(() => osuConfig.SetValue(OsuSetting.MenuParallaxScale, 1f));
 
-                Assert.That(EzTurboMode.Active, Is.False);
-                Assert.That(osuConfig.Get<double>(OsuSetting.DimLevel), Is.EqualTo(0.7));
+                ezConfig.SetValue(Ez2Setting.TurboMode, false);
+            }
+        }
+
+        /// <summary>
+        /// 列模糊与 Ez 分析都不再走配置压制：前者是皮肤 JSON 的一部分（换皮肤会写回，改成消费点 gate），
+        /// 后者只影响选歌流畅度，不值得用功能数据换。
+        /// </summary>
+        [Test]
+        public void TestSettingsOutsideOverrideListAreUntouched()
+        {
+            using var storage = new TemporaryNativeStorage($"ez-turbo-{Guid.NewGuid()}");
+            var osuConfig = new OsuConfigManager(storage);
+            var ezConfig = new Ez2ConfigManager(storage);
+
+            ezConfig.SetValue(Ez2Setting.ColumnBlur, 0.3);
+
+            using (new EzTurboMode(osuConfig, ezConfig))
+            {
+                ezConfig.SetValue(Ez2Setting.TurboMode, true);
+
+                Assert.That(ezConfig.Get<double>(Ez2Setting.ColumnBlur), Is.EqualTo(0.3));
+                Assert.That(ezConfig.GetBindable<double>(Ez2Setting.ColumnBlur).Disabled, Is.False);
+                Assert.That(ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled), Is.True);
+                Assert.That(ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled), Is.True);
+
+                ezConfig.SetValue(Ez2Setting.TurboMode, false);
             }
         }
 
@@ -89,11 +130,8 @@ namespace osu.Game.Tests.EzOsuGame.Performance
             using var storage = new TemporaryNativeStorage($"ez-turbo-{Guid.NewGuid()}");
             var osuConfig = new OsuConfigManager(storage);
             var ezConfig = new Ez2ConfigManager(storage);
-            var playingState = new Bindable<LocalUserPlayingState>();
 
-            ezConfig.SetValue(Ez2Setting.TurboModeGameplayOnly, false);
-
-            using (new EzTurboMode(osuConfig, ezConfig, playingState))
+            using (new EzTurboMode(osuConfig, ezConfig))
             {
                 ezConfig.SetValue(Ez2Setting.TurboMode, true);
 
@@ -112,7 +150,6 @@ namespace osu.Game.Tests.EzOsuGame.Performance
             using var storage = new TemporaryNativeStorage($"ez-turbo-{Guid.NewGuid()}");
             var osuConfig = new OsuConfigManager(storage);
             var ezConfig = new Ez2ConfigManager(storage);
-            var playingState = new Bindable<LocalUserPlayingState>();
 
             // 模拟上次在压制生效期间异常退出：磁盘上留着压制值与一份原值快照。
             osuConfig.SetValue(OsuSetting.DimLevel, 1.0);
@@ -120,7 +157,7 @@ namespace osu.Game.Tests.EzOsuGame.Performance
             ezConfig.SetValue(Ez2Setting.TurboModeSnapshot,
                 $"{{\"{nameof(OsuSetting)}.{nameof(OsuSetting.DimLevel)}\":\"0.55\",\"{nameof(OsuSetting)}.{nameof(OsuSetting.ShowStoryboard)}\":\"True\"}}");
 
-            using (new EzTurboMode(osuConfig, ezConfig, playingState))
+            using (new EzTurboMode(osuConfig, ezConfig))
             {
                 Assert.That(osuConfig.Get<double>(OsuSetting.DimLevel), Is.EqualTo(0.55));
                 Assert.That(osuConfig.Get<bool>(OsuSetting.ShowStoryboard), Is.True);
@@ -135,14 +172,13 @@ namespace osu.Game.Tests.EzOsuGame.Performance
             using var storage = new TemporaryNativeStorage($"ez-turbo-{Guid.NewGuid()}");
             var osuConfig = new OsuConfigManager(storage);
             var ezConfig = new Ez2ConfigManager(storage);
-            var playingState = new Bindable<LocalUserPlayingState>();
 
             osuConfig.SetValue(OsuSetting.DimLevel, 1.0);
             ezConfig.SetValue(Ez2Setting.TurboModeSnapshot, "not json at all");
 
             Assert.DoesNotThrow(() =>
             {
-                using (new EzTurboMode(osuConfig, ezConfig, playingState))
+                using (new EzTurboMode(osuConfig, ezConfig))
                 {
                 }
             });
@@ -151,40 +187,15 @@ namespace osu.Game.Tests.EzOsuGame.Performance
         }
 
         [Test]
-        public void TestSwitchingToGameplayOnlyWhileActiveRestoresGlobalOverrides()
-        {
-            using var storage = new TemporaryNativeStorage($"ez-turbo-{Guid.NewGuid()}");
-            var osuConfig = new OsuConfigManager(storage);
-            var ezConfig = new Ez2ConfigManager(storage);
-            var playingState = new Bindable<LocalUserPlayingState>();
-
-            ezConfig.SetValue(Ez2Setting.TurboModeGameplayOnly, false);
-
-            using (new EzTurboMode(osuConfig, ezConfig, playingState))
-            {
-                ezConfig.SetValue(Ez2Setting.TurboMode, true);
-                Assert.That(osuConfig.Get<SeasonalBackgroundMode>(OsuSetting.SeasonalBackgroundMode), Is.EqualTo(SeasonalBackgroundMode.Never));
-
-                // 切成仅游玩中生效、且当前不在游玩：压制应整体撤销，含仅全局那一组。
-                ezConfig.SetValue(Ez2Setting.TurboModeGameplayOnly, true);
-
-                Assert.That(EzTurboMode.Active, Is.False);
-                Assert.That(osuConfig.Get<SeasonalBackgroundMode>(OsuSetting.SeasonalBackgroundMode), Is.EqualTo(SeasonalBackgroundMode.Sometimes));
-            }
-        }
-
-        [Test]
         public void TestDisposeRestoresWhileActive()
         {
             using var storage = new TemporaryNativeStorage($"ez-turbo-{Guid.NewGuid()}");
             var osuConfig = new OsuConfigManager(storage);
             var ezConfig = new Ez2ConfigManager(storage);
-            var playingState = new Bindable<LocalUserPlayingState>();
 
             osuConfig.SetValue(OsuSetting.DimLevel, 0.4);
-            ezConfig.SetValue(Ez2Setting.TurboModeGameplayOnly, false);
 
-            var turboMode = new EzTurboMode(osuConfig, ezConfig, playingState);
+            var turboMode = new EzTurboMode(osuConfig, ezConfig);
             ezConfig.SetValue(Ez2Setting.TurboMode, true);
             Assert.That(osuConfig.Get<double>(OsuSetting.DimLevel), Is.EqualTo(1.0));
 
@@ -192,6 +203,7 @@ namespace osu.Game.Tests.EzOsuGame.Performance
 
             Assert.That(EzTurboMode.Active, Is.False);
             Assert.That(osuConfig.Get<double>(OsuSetting.DimLevel), Is.EqualTo(0.4));
+            Assert.That(osuConfig.GetBindable<double>(OsuSetting.DimLevel).Disabled, Is.False);
         }
     }
 }

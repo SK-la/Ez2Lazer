@@ -10,16 +10,20 @@ using osu.Framework.Configuration;
 using osu.Framework.Logging;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.Performance
 {
     /// <summary>
-    /// 极速模式：压制非皮肤相关的每帧开销（背景、故事板、模糊、HUD 特效、后台分析等）以提高游戏内帧数。
+    /// 极速模式：压制非皮肤相关的每帧开销（背景、故事板、模糊、HUD 特效等）以提高游戏内帧数。
     /// </summary>
     /// <remarks>
     /// 做法是把一组已有的官方与 Ez 设置改写为低开销值，改写前先把原值快照落盘，关闭时按快照还原。
-    /// 少数没有对应设置的开销（背景整棵子树的绘制、Kiai 喷泉、视差）由各自的调用点查询 <see cref="Active"/> 跳过。
+    /// 少数没有对应设置的开销（背景整棵子树的绘制、Kiai 喷泉、列模糊）由各自的调用点查询 <see cref="Active"/> 跳过。
+    /// <para>
+    /// 压制全程生效，不随进出游玩切换。按局切换会让 <see cref="OsuSetting.GameplayLeaderboard"/> 这类
+    /// 被 <c>OnScreenDisplay</c> 追踪的项每张图弹两次提示，而游玩期间 <c>OverlayActivationMode</c> 本来就挡住了
+    /// 设置面板，按局切换换不到任何收益。
+    /// </para>
     /// <para>
     /// 刻意不做的事：不降低任何线程频率（update / draw / audio），也不把 <c>FrameSync</c> 改成 VSync。
     /// 提高帧数的目的是降低延迟，而降频与锁帧都与该目的相反；音频线程更是判定时间的锚点
@@ -35,28 +39,18 @@ namespace osu.Game.EzOsuGame.Performance
         /// </summary>
         public static bool Active => active;
 
-        /// <summary>
-        /// 压制是否会在接下来的一局游玩中生效。
-        /// </summary>
-        /// <remarks>
-        /// 「仅游玩中生效」模式下 <see cref="Active"/> 要等 <c>UserPlayingState</c> 转入游玩才置位，
-        /// 而那晚于 <c>Player</c> 建树。因此建树期决定要不要构造某个组件时必须直接看总开关。
-        /// </remarks>
-        public static bool ActiveForGameplay => active || GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.TurboMode);
-
         private readonly OsuConfigManager osuConfig;
         private readonly Ez2ConfigManager ezConfig;
 
         private readonly Bindable<bool> enabled;
-        private readonly Bindable<bool> gameplayOnly;
-        private readonly IBindable<LocalUserPlayingState> playingState;
 
         /// <summary>
-        /// 当前生效的压制是否包含「仅全局模式」那一组；用于在子开关变化时判断需不需要重建压制。
+        /// 生效期间持有已应用的覆盖项，让它们持有的 bindable 副本不被回收——
+        /// <see cref="Bindable{T}"/> 的绑定表是弱引用的。
         /// </summary>
-        private bool appliedGlobalOverrides;
+        private IReadOnlyList<SettingOverride>? appliedOverrides;
 
-        public EzTurboMode(OsuConfigManager osuConfig, Ez2ConfigManager ezConfig, IBindable<LocalUserPlayingState> playingState)
+        public EzTurboMode(OsuConfigManager osuConfig, Ez2ConfigManager ezConfig)
         {
             this.osuConfig = osuConfig;
             this.ezConfig = ezConfig;
@@ -65,37 +59,37 @@ namespace osu.Game.EzOsuGame.Performance
             restoreFromSnapshot(recovery: true);
 
             enabled = ezConfig.GetBindable<bool>(Ez2Setting.TurboMode);
-            gameplayOnly = ezConfig.GetBindable<bool>(Ez2Setting.TurboModeGameplayOnly);
-            this.playingState = playingState.GetBoundCopy();
-
-            enabled.BindValueChanged(_ => updateState());
-            gameplayOnly.BindValueChanged(_ => updateState());
-            this.playingState.BindValueChanged(_ => updateState(), true);
+            enabled.BindValueChanged(_ => updateState(), true);
         }
 
         private void updateState()
         {
-            bool globalMode = enabled.Value && !gameplayOnly.Value;
-            bool shouldBeActive = enabled.Value && (globalMode || playingState.Value != LocalUserPlayingState.NotPlaying);
-
-            if (shouldBeActive == active && globalMode == appliedGlobalOverrides)
+            if (enabled.Value == active)
                 return;
 
             if (active)
                 restore();
-
-            if (shouldBeActive)
-                apply(globalMode);
+            else
+                apply();
         }
 
-        private void apply(bool includeGlobalOverrides)
+        private void apply()
         {
-            var overrides = buildOverrides(includeGlobalOverrides);
-
             var snapshot = new Dictionary<string, string>();
+            var applicable = new List<SettingOverride>();
 
-            foreach (var setting in overrides)
-                snapshot[setting.Key] = setting.CaptureCurrent();
+            foreach (var setting in buildOverrides())
+            {
+                // 已被别处锁住（例如某个 BeginLease）的项写不进去，整项跳过而不是让它抛。
+                if (!setting.TryCaptureCurrent(out string captured))
+                {
+                    Logger.Log($"[Ez] 极速模式跳过 {setting.Key}：该设置当前被其它逻辑锁定。", level: LogLevel.Debug);
+                    continue;
+                }
+
+                snapshot[setting.Key] = captured;
+                applicable.Add(setting);
+            }
 
             // 原值必须先落盘再改写：否则进程在改写后崩溃就再也找不回用户设置。
             ezConfig.SetValue(Ez2Setting.TurboModeSnapshot, JsonConvert.SerializeObject(snapshot));
@@ -103,9 +97,9 @@ namespace osu.Game.EzOsuGame.Performance
 
             // 先置位再改写，让 DimLevel 等改写触发的 UpdateVisuals 能看到已生效的状态。
             active = true;
-            appliedGlobalOverrides = includeGlobalOverrides;
+            appliedOverrides = applicable;
 
-            foreach (var setting in overrides)
+            foreach (var setting in applicable)
                 setting.ApplyTurboValue();
         }
 
@@ -113,7 +107,7 @@ namespace osu.Game.EzOsuGame.Performance
         {
             // 先复位再写回，理由同 apply()。
             active = false;
-            appliedGlobalOverrides = false;
+            appliedOverrides = null;
 
             restoreFromSnapshot(recovery: false);
         }
@@ -144,7 +138,7 @@ namespace osu.Game.EzOsuGame.Performance
             {
                 var byKey = new Dictionary<string, SettingOverride>();
 
-                foreach (var setting in buildOverrides(includeGlobalOverrides: true))
+                foreach (var setting in buildOverrides())
                     byKey[setting.Key] = setting;
 
                 int restored = 0;
@@ -164,56 +158,42 @@ namespace osu.Game.EzOsuGame.Performance
         }
 
         /// <summary>
-        /// 压制清单。<paramref name="includeGlobalOverrides"/> 为 false 时只保留游玩中真正会生效的项，
-        /// 避免为了一局游戏去动选歌与主菜单的外观。
+        /// 压制清单。<c>lockWhileActive</c> 为 true 的项在生效期间会被 <see cref="Bindable{T}.Disabled"/> 置灰，
+        /// 使设置面板显示为不可改；只有确认除设置面板外没有运行时写入方的项才能置灰，
+        /// 否则那些写入会撞上 <see cref="Bindable{T}.Value"/> 的 disabled 检查而抛异常。
         /// </summary>
-        private IReadOnlyList<SettingOverride> buildOverrides(bool includeGlobalOverrides)
+        private IReadOnlyList<SettingOverride> buildOverrides() => new List<SettingOverride>
         {
-            var overrides = new List<SettingOverride>
-            {
-                // 直接跳过 GameplayDrawableStoryboard 与视频层的创建，不只是隐藏。
-                osu(OsuSetting.ShowStoryboard, false),
-                // 关掉背景的模糊 pass；配合 DimLevel = 1 让 UserDimContainer 整棵子树不参与绘制。
-                osu(OsuSetting.BlurLevel, 0.0),
-                osu(OsuSetting.DimLevel, 1.0),
-                osu(OsuSetting.LightenDuringBreaks, false),
-                osu(OsuSetting.HitLighting, false),
-                osu(OsuSetting.StarFountains, false),
-                osu(OsuSetting.GameplayLeaderboard, false),
-                osu(OsuSetting.KeyOverlay, false),
-                osu(OsuSetting.FloatingComments, false),
-                // 0 同时让 ParallaxContainer 不再产生位移。
-                osu(OsuSetting.MenuParallaxScale, 0f),
+            // 直接跳过 GameplayDrawableStoryboard 与视频层的创建，不只是隐藏。
+            osu(OsuSetting.ShowStoryboard, false),
+            // 关掉背景的模糊 pass；配合 DimLevel = 1 让 UserDimContainer 整棵子树不参与绘制。
+            osu(OsuSetting.BlurLevel, 0.0),
+            osu(OsuSetting.DimLevel, 1.0),
+            osu(OsuSetting.LightenDuringBreaks, false),
+            osu(OsuSetting.HitLighting, false),
+            osu(OsuSetting.StarFountains, false),
+            osu(OsuSetting.KeyOverlay, false),
+            osu(OsuSetting.FloatingComments, false),
+            osu(OsuSetting.SeasonalBackgroundMode, SeasonalBackgroundMode.Never),
+            osu(OsuSetting.SongSelectBackgroundBlur, false),
+            osu(OsuSetting.MenuBackgroundSource, BackgroundSource.Skin),
 
-                // 每帧一次全屏毛玻璃 pass。
-                ez(Ez2Setting.AcrylicUiEnabled, false),
-                ez(Ez2Setting.ColumnBlur, 0.0),
-                // 服务实例仍在，但会 no-op，不再做元数据查询与 timeline 构建。
-                ez(Ez2Setting.EzScoreRaceServiceEnabled, false),
-            };
+            // HUDOverlay 的 ToggleInGameLeaderboard 快捷键直接写这个 bindable，置灰会让游玩中按下时抛异常。
+            osu(OsuSetting.GameplayLeaderboard, false, lockWhileActive: false),
+            // 0 同时让 ParallaxContainer 不再产生位移。OsuGame 的一次性配置迁移会写它，同样不能置灰。
+            osu(OsuSetting.MenuParallaxScale, 0f, lockWhileActive: false),
 
-            if (includeGlobalOverrides)
-            {
-                overrides.AddRange(new[]
-                {
-                    osu(OsuSetting.SeasonalBackgroundMode, SeasonalBackgroundMode.Never),
-                    osu(OsuSetting.SongSelectBackgroundBlur, false),
-                    osu(OsuSetting.MenuBackgroundSource, BackgroundSource.Skin),
+            // 每帧一次全屏毛玻璃 pass。
+            ez(Ez2Setting.AcrylicUiEnabled, false),
+            // 服务实例仍在，但会 no-op，不再做元数据查询与 timeline 构建。
+            ez(Ez2Setting.EzScoreRaceServiceEnabled, false),
+        };
 
-                    // 选歌时的即时计算与 SQLite 读写；游玩中本来就不跑，只有全局模式才有意义。
-                    ez(Ez2Setting.EzAnalysisRecEnabled, false),
-                    ez(Ez2Setting.EzAnalysisSqliteEnabled, false),
-                });
-            }
+        private SettingOverride osu<TValue>(OsuSetting lookup, TValue turboValue, bool lockWhileActive = true) =>
+            new SettingOverride<OsuSetting, TValue>(osuConfig, lookup, turboValue, lockWhileActive);
 
-            return overrides;
-        }
-
-        private SettingOverride osu<TValue>(OsuSetting lookup, TValue turboValue) =>
-            new SettingOverride<OsuSetting, TValue>(osuConfig, lookup, turboValue);
-
-        private SettingOverride ez<TValue>(Ez2Setting lookup, TValue turboValue) =>
-            new SettingOverride<Ez2Setting, TValue>(ezConfig, lookup, turboValue);
+        private SettingOverride ez<TValue>(Ez2Setting lookup, TValue turboValue, bool lockWhileActive = true) =>
+            new SettingOverride<Ez2Setting, TValue>(ezConfig, lookup, turboValue, lockWhileActive);
 
         public void Dispose()
         {
@@ -225,7 +205,8 @@ namespace osu.Game.EzOsuGame.Performance
         {
             public abstract string Key { get; }
 
-            public abstract string CaptureCurrent();
+            /// <returns>是否取到原值；该设置已被别处锁定时为 false。</returns>
+            public abstract bool TryCaptureCurrent(out string value);
 
             public abstract void ApplyTurboValue();
 
@@ -236,32 +217,54 @@ namespace osu.Game.EzOsuGame.Performance
         private sealed class SettingOverride<TLookup, TValue> : SettingOverride
             where TLookup : struct, Enum
         {
-            private readonly ConfigManager<TLookup> config;
+            private readonly Bindable<TValue> bindable;
             private readonly TLookup lookup;
             private readonly TValue turboValue;
+            private readonly bool lockWhileActive;
 
-            public SettingOverride(ConfigManager<TLookup> config, TLookup lookup, TValue turboValue)
+            public SettingOverride(ConfigManager<TLookup> config, TLookup lookup, TValue turboValue, bool lockWhileActive)
             {
-                this.config = config;
+                bindable = config.GetBindable<TValue>(lookup);
                 this.lookup = lookup;
                 this.turboValue = turboValue;
+                this.lockWhileActive = lockWhileActive;
             }
 
             public override string Key => $"{typeof(TLookup).Name}.{lookup}";
 
-            public override string CaptureCurrent() => serialise(config.Get<TValue>(lookup));
+            public override bool TryCaptureCurrent(out string value)
+            {
+                if (bindable.Disabled)
+                {
+                    value = string.Empty;
+                    return false;
+                }
 
-            public override void ApplyTurboValue() => config.SetValue(lookup, turboValue);
+                value = serialise(bindable.Value);
+                return true;
+            }
+
+            public override void ApplyTurboValue()
+            {
+                // 顺序不能颠倒：置灰后 Bindable.Value 的 setter 会抛异常。
+                bindable.Value = turboValue;
+
+                if (lockWhileActive)
+                    bindable.Disabled = true;
+            }
 
             public override bool RestoreFrom(string serialised)
             {
+                // 同样不能颠倒：先解锁才写得回去。异常退出后重开时本来就没锁，这里是空操作。
+                bindable.Disabled = false;
+
                 if (!tryDeserialise(serialised, out TValue value))
                 {
                     Logger.Log($"[Ez] 极速模式无法还原 {Key}（快照值 \"{serialised}\"）。", level: LogLevel.Important);
                     return false;
                 }
 
-                config.SetValue(lookup, value);
+                bindable.Value = value;
                 return true;
             }
 
