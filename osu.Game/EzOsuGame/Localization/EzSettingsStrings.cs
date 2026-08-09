@@ -57,6 +57,34 @@ namespace osu.Game.EzOsuGame.Localization
             "开启后将隐藏主界面底部的在线新闻/广告轮播图。",
             "When enabled, the online news/advertisement banner at the bottom of the main menu will be hidden.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString TURBO_MODE =
+            new EzLocalizationManager.EzLocalisableString("极速模式", "Turbo mode");
+
+        public static readonly EzLocalizationManager.EzLocalisableString TURBO_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "压制皮肤以外的每帧开销以提高帧数：关闭故事板与视频、背景不再绘制、关闭背景与列模糊、"
+            + "毛玻璃 UI、打击闪光、星星喷泉、连击特效、按键显示与游戏内排行榜，并让角逐服务空转。"
+            + "\n不会降低任何线程频率，也不会锁帧——提高帧数的目的是降低延迟。"
+            + "\n开启期间上述设置项会被改写成低开销值，关闭后自动还原；因此不要在开启期间手动改这些项，否则改动会在还原时被覆盖。"
+            + "\n注意：列模糊属于舞台外观，是本模式唯一会改变皮肤观感的一项。",
+            "Suppresses per-frame cost outside the skin to raise frame rate: disables storyboard and video, stops drawing the background, "
+            + "turns off background and column blur, acrylic UI, hit lighting, star fountains, combo effects, key overlay and the gameplay leaderboard, "
+            + "and makes the score race service inert."
+            + "\nDoes not lower any thread rate and does not cap frames — the point of more frames is lower latency."
+            + "\nThe listed settings are rewritten to low-cost values while active and restored when turned off, so avoid editing them by hand in the meantime."
+            + "\nNote: column blur is part of the stage look, and is the only item here that changes skin appearance.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString TURBO_MODE_GAMEPLAY_ONLY =
+            new EzLocalizationManager.EzLocalisableString("极速模式仅在游玩中生效", "Turbo mode during gameplay only");
+
+        public static readonly EzLocalizationManager.EzLocalisableString TURBO_MODE_GAMEPLAY_ONLY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后只在游玩期间压制，退出后立刻还原，选歌与主菜单保持原样。"
+            + "\n关闭则全程压制，并额外关掉季节背景、选歌背景虚化与 Ez 分析的即时计算与 SQLite 读写。"
+            + "\n观看回放不算游玩，仅游玩中生效时不会压制；需要压制回放请关掉本项。",
+            "When enabled, suppression only applies during gameplay and is reverted on exit, leaving song select and the main menu untouched."
+            + "\nWhen disabled, suppression stays on everywhere and additionally disables seasonal backgrounds, song select background blur, "
+            + "and Ez analysis on-the-fly calculation and SQLite access."
+            + "\nWatching a replay does not count as gameplay, so it is not suppressed in this mode; turn this off if you want replays suppressed too.");
+
         public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_ENABLED =
             new EzLocalizationManager.EzLocalisableString("毛玻璃 UI", "Acrylic UI");
 

@@ -10,6 +10,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Performance;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Containers;
 using osu.Game.Screens.Play;
@@ -194,6 +195,19 @@ namespace osu.Game.Screens.Backgrounds
                         return 1;
 
                     return base.DimLevel;
+                }
+            }
+
+            protected override bool ShowDimContent
+            {
+                get
+                {
+                    // [Ez] 极速模式把 DimLevel 压到 1，此时背景已无可见内容。让整棵子树退出绘制，
+                    // 而不是照旧画成全黑——后者仍要跑一次全屏贴图与模糊目标。
+                    if (EzTurboMode.Active && !IgnoreUserSettings.Value && DimLevel >= 1)
+                        return false;
+
+                    return base.ShowDimContent;
                 }
             }
 
