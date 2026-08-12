@@ -10,7 +10,7 @@ using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     /// <summary>
-    /// 验证 <see cref="ManiaReplaySessionService.RunAsync"/> 与直接调用
+    /// 验证 <see cref="ManiaReplaySessionService"/> 与直接调用
     /// <see cref="ManiaReplaySession.RunHitEvents"/> 的结果一致性。
     /// P2-B 验收测试。
     /// </summary>
