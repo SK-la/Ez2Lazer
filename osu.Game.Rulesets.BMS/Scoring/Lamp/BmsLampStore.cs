@@ -90,6 +90,12 @@ namespace osu.Game.Rulesets.BMS.Scoring.Lamp
             return bestByBeatmap.TryGetValue(beatmap.ID, out var record) ? record.Lamp : BmsClearLamp.NoPlay;
         }
 
+        public BmsClearLamp GetLamp(Guid beatmapId)
+            => bestByBeatmap.TryGetValue(beatmapId, out var record) ? record.Lamp : BmsClearLamp.NoPlay;
+
+        public bool TryGetRecord(Guid beatmapId, out BmsLampRecord record)
+            => bestByBeatmap.TryGetValue(beatmapId, out record!);
+
         /// <summary>
         /// Record a finished play for <paramref name="beatmap"/>. The store keeps the
         /// best (highest-ranked) lamp seen for the beatmap so far. When the new play sets

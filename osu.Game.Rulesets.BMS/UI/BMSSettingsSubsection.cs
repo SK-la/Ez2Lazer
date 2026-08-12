@@ -42,6 +42,7 @@ namespace osu.Game.Rulesets.BMS.UI
 
         // private OsuTextFlowContainer pathDisplay = null!;
         private SettingsNote cacheStatusNote = null!;
+        private SettingsNote tablesHintNote = null!;
         private SettingsNote speedNote = null!;
         private Bindable<double>? maniaScrollSpeed;
         private Bindable<double>? maniaBaseSpeed;
@@ -100,6 +101,21 @@ namespace osu.Game.Rulesets.BMS.UI
                 {
                     Text = BmsStrings.SETTINGS_OPEN_RAJA_SONG_SELECT,
                     Action = openRajaBmsSongSelect,
+                },
+                new SettingsButtonV2
+                {
+                    Text = BmsStrings.SETTINGS_OPEN_TABLES_FOLDER,
+                    Action = openTablesFolder,
+                },
+                new Container
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Padding = SettingsPanel.CONTENT_PADDING,
+                    Child = tablesHintNote = new SettingsNote
+                    {
+                        RelativeSizeAxes = Axes.X,
+                    },
                 },
                 new SettingsButtonV2
                 {
@@ -208,6 +224,7 @@ namespace osu.Game.Rulesets.BMS.UI
             legacyRootPathBindable.BindValueChanged(_ => updatePathDisplay());
 
             speedNote.Current.Value = new SettingsNote.Data(BmsStrings.SETTINGS_MANIA_SCROLL_NOTE, SettingsNote.Type.Informational);
+            tablesHintNote.Current.Value = new SettingsNote.Data(BmsStrings.SETTINGS_TABLES_HINT, SettingsNote.Type.Informational);
 
             // Show initial cache status
             if (beatmapManager != null)
@@ -233,6 +250,25 @@ namespace osu.Game.Rulesets.BMS.UI
         private void openStandardBmsSongSelect() => openSongSelectScreen(new BmsUiSongSelect.BmsSoloSongSelect());
 
         private void openRajaBmsSongSelect() => openSongSelectScreen(new BmsBmsSongSelect());
+
+        private void openTablesFolder()
+        {
+            try
+            {
+                BmsStoragePaths.EnsureInitialized(storage);
+                string path = BmsStoragePaths.GetTablesDirectoryPath(storage);
+                Directory.CreateDirectory(path);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true,
+                });
+            }
+            catch (Exception ex)
+            {
+                notificationOverlay?.Post(new SimpleErrorNotification { Text = ex.Message });
+            }
+        }
 
         private void openSongSelectScreen(IScreen screen)
         {

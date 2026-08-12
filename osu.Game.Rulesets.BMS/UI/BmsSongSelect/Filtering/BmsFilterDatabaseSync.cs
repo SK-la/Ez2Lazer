@@ -132,7 +132,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                 if (change.Kind == BmsRealmSyncChangeKind.Delete)
                 {
                     if (beatmapManager.TryGetSourceReference(change.BeatmapId, out BMSSourceReference reference))
+                    {
+                        if (!string.IsNullOrEmpty(reference.ContentSha256))
+                            deleteKeys.Add(reference.ContentSha256);
                         deleteKeys.Add(reference.Md5Hash);
+                    }
                     else if (!string.IsNullOrEmpty(change.ChartPath))
                         deleteKeys.Add(BmsPathKeys.ComputeChartPathKey(change.ChartPath));
                     continue;
@@ -143,9 +147,14 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
 
                 upsertCharts.Add(chart);
                 lampIds.Add(change.BeatmapId);
-                deleteKeys.Remove(string.IsNullOrEmpty(chart.Md5Hash)
+
+                string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
                     ? BmsPathKeys.ComputeChartPathKey(chart.FullPath)
-                    : chart.Md5Hash);
+                    : chart.Md5Hash;
+                deleteKeys.Remove(pathKey);
+
+                if (!string.IsNullOrEmpty(chart.ContentSha256))
+                    deleteKeys.Remove(chart.ContentSha256);
             }
 
             var lamps = lampIds.Count == 0
@@ -198,14 +207,19 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                         string pathKey = string.IsNullOrEmpty(chart.Md5Hash)
                             ? BmsPathKeys.ComputeChartPathKey(chart.FullPath)
                             : chart.Md5Hash;
-                        deleteSong.Parameters["$sha"].Value = pathKey;
-                        deleteScore.Parameters["$sha"].Value = pathKey;
-                        deleteScoreLog.Parameters["$sha"].Value = pathKey;
-                        deleteInfo.Parameters["$sha"].Value = pathKey;
-                        deleteSong.ExecuteNonQuery();
-                        deleteScore.ExecuteNonQuery();
-                        deleteScoreLog.ExecuteNonQuery();
-                        deleteInfo.ExecuteNonQuery();
+                        string contentSha = string.IsNullOrEmpty(chart.ContentSha256) ? pathKey : chart.ContentSha256;
+
+                        foreach (string key in new[] { contentSha, pathKey }.Distinct(StringComparer.OrdinalIgnoreCase))
+                        {
+                            deleteSong.Parameters["$sha"].Value = key;
+                            deleteScore.Parameters["$sha"].Value = key;
+                            deleteScoreLog.Parameters["$sha"].Value = key;
+                            deleteInfo.Parameters["$sha"].Value = key;
+                            deleteSong.ExecuteNonQuery();
+                            deleteScore.ExecuteNonQuery();
+                            deleteScoreLog.ExecuteNonQuery();
+                            deleteInfo.ExecuteNonQuery();
+                        }
                     }
 
                     var (songs, scores, informations) = BmsScoreSchemaBuilder.Build(upsertCharts, lamps, realm, analytics);

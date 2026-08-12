@@ -13,12 +13,15 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     public static class BmsStoragePaths
     {
         public const string STORAGE_ROOT = "EzBMS";
+        public const string TABLES_DIRECTORY = "tables";
         public const string INDEX_DATABASE_FILE = "index.sqlite";
         public const string LAMP_DATABASE_FILE = "lamps.sqlite";
         public const string FILTER_DATABASE_FILE = "filter.sqlite";
         public const string ANALYTICS_DATABASE_FILE = "analytics.sqlite";
 
         public static string GetStorageRootPath(Storage storage) => storage.GetFullPath(STORAGE_ROOT);
+
+        public static string GetTablesDirectoryPath(Storage storage) => Path.Combine(GetStorageRootPath(storage), TABLES_DIRECTORY);
 
         public static string GetIndexDatabasePath(Storage storage) => Path.Combine(GetStorageRootPath(storage), INDEX_DATABASE_FILE);
 
@@ -35,6 +38,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         {
             string root = GetStorageRootPath(storage);
             Directory.CreateDirectory(root);
+            Directory.CreateDirectory(Path.Combine(root, TABLES_DIRECTORY));
 
             BmsLibraryMigration.MigrateIfNeeded(storage, root);
             return root;

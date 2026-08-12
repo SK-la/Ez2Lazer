@@ -65,8 +65,12 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                     ? BmsPathKeys.ComputeChartPathKey(chart.FullPath)
                     : chart.Md5Hash;
 
-                string sha256 = pathKey;
-                string md5 = pathKey.Length >= 32 ? pathKey[..32] : pathKey;
+                string sha256 = !string.IsNullOrEmpty(chart.ContentSha256)
+                    ? chart.ContentSha256
+                    : pathKey;
+                string md5 = !string.IsNullOrEmpty(chart.ContentMd5)
+                    ? chart.ContentMd5
+                    : (pathKey.Length >= 32 ? pathKey[..32] : pathKey);
 
                 songs.Add(new BmsSongRow(
                     md5,
@@ -87,8 +91,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                     (int)Math.Round(chart.MinBpm),
                     (int)Math.Round(chart.Duration)));
 
-                scores.Add(buildScoreRow(chart, pathKey, lampsByBeatmapId, realm));
-                informations.Add(BmsInformationBuilder.Build(chart, pathKey, realm, analytics));
+                scores.Add(buildScoreRow(chart, sha256, pathKey, lampsByBeatmapId, realm));
+                informations.Add(BmsInformationBuilder.Build(chart, sha256, realm, analytics));
             }
 
             return (songs, scores, informations);
@@ -96,6 +100,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
 
         private static BmsScoreRow buildScoreRow(
             BMSChartCache chart,
+            string contentSha256,
             string pathKey,
             IReadOnlyDictionary<Guid, BmsLampRecord> lampsByBeatmapId,
             RealmAccess realm)
@@ -140,7 +145,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                     clearcount = 1;
             }
 
-            return new BmsScoreRow(pathKey, chart.KeyCount, clear, playcount, clearcount, epg, lpg, egr, lgr, notes, combo, minbp);
+            return new BmsScoreRow(contentSha256, chart.KeyCount, clear, playcount, clearcount, epg, lpg, egr, lgr, notes, combo, minbp);
         }
     }
 }

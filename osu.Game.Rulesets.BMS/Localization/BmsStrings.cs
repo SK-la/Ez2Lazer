@@ -11,7 +11,13 @@ namespace osu.Game.Rulesets.BMS.Localization
 
         public static readonly LocalisableString SETTINGS_OPEN_CAROUSEL_SONG_SELECT = new BmsLocalizationManager.BmsLocalisableString("标准 BMS 选歌（Carousel）", "Standard BMS song select (Carousel)");
 
-        public static readonly LocalisableString SETTINGS_OPEN_RAJA_SONG_SELECT = new BmsLocalizationManager.BmsLocalisableString("Raja 风格 BMS 选歌", "Raja-style BMS song select");
+        public static readonly LocalisableString SETTINGS_OPEN_RAJA_SONG_SELECT = new BmsLocalizationManager.BmsLocalisableString("BMS 专用选歌（表 / Qwilight 布局）", "BMS song select (tables / Qwilight layout)");
+
+        public static readonly LocalisableString SETTINGS_OPEN_TABLES_FOLDER = new BmsLocalizationManager.BmsLocalisableString("打开难度表目录 (EzBMS/tables)", "Open difficulty tables folder (EzBMS/tables)");
+
+        public static readonly LocalisableString SETTINGS_TABLES_HINT = new BmsLocalizationManager.BmsLocalisableString(
+            "难度表与收藏夹独立：将 .bmt/.json 放入 EzBMS/tables，或在专用选歌页用「添加表 URL」。刷新曲库后才会写入真实 MD5/SHA256 供表匹配。",
+            "Difficulty tables are independent of favorites. Put .bmt/.json into EzBMS/tables, or use Add table URL in song select. Refresh library so content MD5/SHA256 hashes are written for matching.");
 
         public static readonly LocalisableString SETTINGS_BUILD_ANALYTICS_DATABASE = new BmsLocalizationManager.BmsLocalisableString("构建 BMS 分析库", "Build BMS analytics database");
 
@@ -137,9 +143,30 @@ namespace osu.Game.Rulesets.BMS.Localization
         public static readonly LocalisableString SONG_SELECT_SOURCE_FILE_NOT_FOUND =
             new BmsLocalizationManager.BmsLocalisableString("未能定位 BMS 源文件，请刷新曲库", "Could not locate BMS source file. Refresh library.");
 
+        public static readonly LocalisableString SONG_SELECT_ADD_TABLE_URL =
+            new BmsLocalizationManager.BmsLocalisableString("添加表 URL", "Add table URL");
+
+        public static readonly LocalisableString SONG_SELECT_OPEN_TABLES_FOLDER =
+            new BmsLocalizationManager.BmsLocalisableString("打开表目录", "Open tables folder");
+
+        public static readonly LocalisableString SONG_SELECT_TABLE_URL_HINT = new BmsLocalizationManager.BmsLocalisableString(
+            "在右上角搜索框粘贴难度表 URL（http…）后再点「添加表 URL」。也可把 .bmt/.json 直接放入 EzBMS/tables。",
+            "Paste a difficulty table URL (http…) into the search box, then tap Add table URL. Or drop .bmt/.json into EzBMS/tables.");
+
+        public static readonly LocalisableString SONG_SELECT_TABLE_IMPORTING =
+            new BmsLocalizationManager.BmsLocalisableString("正在导入难度表…", "Importing difficulty table…");
+
+        public static readonly LocalisableString SONG_SELECT_TABLE_IMPORT_FAILED =
+            new BmsLocalizationManager.BmsLocalisableString("难度表导入失败，请检查 URL 或网络。", "Difficulty table import failed. Check the URL or network.");
+
+        public static string SongSelect_TableImported(string name) => song_select_table_imported_template.Format(name);
+
         public static string SongSelect_RefreshFailed(string message) => song_select_refresh_failed_template.Format(message);
 
         public static string SongSelect_LoadBeatmapFailed(string message) => song_select_load_beatmap_failed_template.Format(message);
+
+        private static readonly BmsLocalizationManager.BmsLocalisableString song_select_table_imported_template =
+            new BmsLocalizationManager.BmsLocalisableString("已导入难度表：{0}", "Imported difficulty table: {0}");
 
         private static readonly BmsLocalizationManager.BmsLocalisableString song_select_refresh_failed_template = new BmsLocalizationManager.BmsLocalisableString("刷新失败：{0}", "Refresh failed: {0}");
 

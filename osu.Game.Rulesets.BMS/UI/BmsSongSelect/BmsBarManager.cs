@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         public BmsBarManager(BmsBarContext context, IBmsDifficultyTableProvider? tableProvider = null)
         {
             this.context = context;
-            this.tableProvider = tableProvider ?? new BmsDifficultyTableRegistry();
+            this.tableProvider = tableProvider ?? new BmsEmptyDifficultyTableProvider();
             randomDefinitions = BmsFolderConfigLoader.LoadRandomDefinitions();
         }
 
@@ -263,7 +263,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
             if (tables.Count > 0)
             {
-                bars.Add(new BmsSectionLabelBar("── 难度表 (TODO) ──"));
+                bars.Add(new BmsSectionLabelBar("── 难度表 ──"));
                 bars.AddRange(tables);
             }
 

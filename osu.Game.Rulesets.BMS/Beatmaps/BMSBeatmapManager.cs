@@ -550,6 +550,12 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public bool TryGetChartSummaryByPathKey(string pathKey, out BmsChartSummary summary)
             => indexRepository.TryGetChartSummaryByPathKey(pathKey, out summary);
 
+        public bool TryGetChartSummaryByContentHash(string hash, out BmsChartSummary summary)
+            => indexRepository.TryGetChartSummaryByContentHash(hash, out summary);
+
+        public bool TryLookupChartByContentHash(string hash, out BMSChartCache chart)
+            => indexRepository.TryGetChartByContentHash(hash, out chart);
+
         public IReadOnlyList<BmsFolderSummary> GetChildFolderPage(string parentPath, string? afterFolderPath, int limit)
             => indexRepository.GetChildFolders(parentPath, afterFolderPath, limit);
 
@@ -575,7 +581,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             if (hadSnapshot
                 && snapshot.FileSize == fileSize
-                && snapshot.LastModifiedTicks == modifiedTicks)
+                && snapshot.LastModifiedTicks == modifiedTicks
+                && snapshot.HasContentHash)
             {
                 return new BmsLibraryIndexRepository.ScanWriteItem(filePath, fileSize, modifiedTicks, null, null);
             }
@@ -830,6 +837,17 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 Md5Hash = BmsPathKeys.ComputeChartPathKey(filePath),
             };
 
+            try
+            {
+                BmsContentHashes hashes = BmsContentHash.ComputeFile(filePath);
+                cache.ContentMd5 = hashes.Md5;
+                cache.ContentSha256 = hashes.Sha256;
+            }
+            catch
+            {
+                // Content hash is required for difficulty tables; leave empty and continue metadata parse.
+            }
+
             string[] lines = readBmsLines(filePath);
             var keysoundFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var wavDefinitions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -1004,6 +1022,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public Guid BeatmapId { get; set; }
         public string FolderPath { get; set; }
         public string ChartPath { get; set; }
+
+        /// <summary>Path-derived key (legacy name).</summary>
         public string Md5Hash { get; set; }
+
+        public string ContentMd5 { get; set; }
+        public string ContentSha256 { get; set; }
     }
 }

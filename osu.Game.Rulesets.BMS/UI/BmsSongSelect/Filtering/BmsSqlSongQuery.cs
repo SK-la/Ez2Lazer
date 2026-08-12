@@ -172,14 +172,21 @@ LIMIT 1;";
             return cmd.ExecuteScalar() as string;
         }
 
-        private List<BmsChartSummary> resolveSummaries(IReadOnlyList<string> pathKeys)
+        private List<BmsChartSummary> resolveSummaries(IReadOnlyList<string> hashes)
         {
-            var result = new List<BmsChartSummary>(pathKeys.Count);
+            var result = new List<BmsChartSummary>(hashes.Count);
 
-            foreach (string key in pathKeys)
+            foreach (string hash in hashes)
             {
-                if (beatmapManager.TryGetChartSummaryByPathKey(key, out BmsChartSummary summary))
-                    result.Add(summary);
+                if (beatmapManager.TryGetChartSummaryByContentHash(hash, out BmsChartSummary byContent))
+                {
+                    result.Add(byContent);
+                    continue;
+                }
+
+                // Legacy filter DBs may still store path keys in sha256.
+                if (beatmapManager.TryGetChartSummaryByPathKey(hash, out BmsChartSummary byPath))
+                    result.Add(byPath);
             }
 
             return result;

@@ -208,6 +208,16 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public string Md5Hash { get; set; } = string.Empty;
 
         /// <summary>
+        /// Content MD5 of the BMS file bytes (lowercase hex). Used by difficulty tables.
+        /// </summary>
+        public string ContentMd5 { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Content SHA-256 of the BMS file bytes (lowercase hex). Used by difficulty tables.
+        /// </summary>
+        public string ContentSha256 { get; set; } = string.Empty;
+
+        /// <summary>
         /// File size for quick change detection.
         /// </summary>
         public long FileSize { get; set; }

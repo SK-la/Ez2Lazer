@@ -192,7 +192,7 @@ namespace osu.Game.Rulesets.BMS.Tests
                 connection.Open();
                 using var command = connection.CreateCommand();
                 command.CommandText = "SELECT value FROM meta WHERE key = 'schema_version';";
-                Assert.That(command.ExecuteScalar(), Is.EqualTo("2"));
+                Assert.That(command.ExecuteScalar(), Is.EqualTo("3"));
             }
             finally
             {

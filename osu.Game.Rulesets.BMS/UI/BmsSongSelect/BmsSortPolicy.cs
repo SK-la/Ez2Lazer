@@ -28,13 +28,13 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         public IReadOnlyList<BmsBar> Sort(IReadOnlyList<BmsBar> bars)
         {
             IEnumerable<BmsBar> folders = bars.Where(b => b.IsDirectory);
-            IEnumerable<BmsBar> songs = bars.Where(b => b is BmsSongBar);
+            IEnumerable<BmsBar> songs = bars.Where(b => b is BmsSongBar or BmsMissingChartBar);
 
             songs = Mode switch
             {
-                BmsSortMode.Level => songs.OrderBy(b => ((BmsSongBar)b).Summary.PlayLevel).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
-                BmsSortMode.Artist => songs.OrderBy(b => ((BmsSongBar)b).Summary.Artist, StringComparer.OrdinalIgnoreCase).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
-                BmsSortMode.Folder => songs.OrderBy(b => ((BmsSongBar)b).Summary.FolderPath, StringComparer.OrdinalIgnoreCase).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
+                BmsSortMode.Level => songs.OrderBy(b => b is BmsSongBar song ? song.Summary.PlayLevel : 0).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
+                BmsSortMode.Artist => songs.OrderBy(b => b is BmsSongBar song ? song.Summary.Artist : b.Subtitle, StringComparer.OrdinalIgnoreCase).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
+                BmsSortMode.Folder => songs.OrderBy(b => b is BmsSongBar song ? song.Summary.FolderPath : string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
                 _ => songs.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
             };
 

@@ -9,7 +9,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
 {
     public sealed class BmsLibraryIndexRepository
     {
-        private const int schema_version = 2;
+        private const int schema_version = 3;
+        private const int chart_parse_version = 2;
 
         private const string table_meta = "meta";
         private const string table_roots = "roots";
@@ -83,7 +84,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
         /// Represents a snapshot of a chart file for change detection.
         /// ChartPath is included for data integrity even though the dictionary key already contains the path.
         /// </summary>
-        public record ChartFileSnapshot(string ChartPath, long FileSize, long LastModifiedTicks);
+        public record ChartFileSnapshot(string ChartPath, long FileSize, long LastModifiedTicks, bool HasContentHash);
 
         public enum SyncState
         {
@@ -140,7 +141,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = $@"
-SELECT file_size, last_modified_ticks
+SELECT file_size, last_modified_ticks, content_sha256
 FROM {table_charts}
 WHERE chart_path = $path
 LIMIT 1;";
@@ -151,7 +152,8 @@ LIMIT 1;";
             if (!reader.Read())
                 return false;
 
-            snapshot = new ChartFileSnapshot(chartPath, reader.GetInt64(0), reader.GetInt64(1));
+            string contentSha = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
+            snapshot = new ChartFileSnapshot(chartPath, reader.GetInt64(0), reader.GetInt64(1), BmsContentHash.LooksLikeSha256(contentSha));
             return true;
         }
 
@@ -225,16 +227,18 @@ WHERE seen_generation <> $generation;";
 
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT chart_path, file_size, last_modified_ticks FROM charts;";
+            cmd.CommandText = "SELECT chart_path, file_size, last_modified_ticks, content_sha256 FROM charts;";
 
             using var reader = cmd.ExecuteReader();
 
             while (reader.Read())
             {
+                string contentSha = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
                 result[reader.GetString(0)] = new ChartFileSnapshot(
                     reader.GetString(0),
                     reader.GetInt64(1),
-                    reader.GetInt64(2));
+                    reader.GetInt64(2),
+                    BmsContentHash.LooksLikeSha256(contentSha));
             }
 
             return result;
@@ -370,6 +374,60 @@ LIMIT 1;";
 
             summary = readChartSummary(reader, Guid.Parse(reader.GetString(0)));
             return true;
+        }
+
+        public bool TryGetChartSummaryByContentHash(string hash, out BmsChartSummary summary)
+        {
+            summary = null!;
+
+            if (string.IsNullOrWhiteSpace(hash))
+                return false;
+
+            ensureInitialized();
+            string normalised = hash.Trim().ToLowerInvariant();
+
+            using var connection = openConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+SELECT beatmap_id, set_id, path_key, chart_path, folder_path, file_name,
+       title, artist, play_level, key_count, bpm, total_notes, preview_time
+FROM {table_charts}
+WHERE content_sha256 = $hash OR content_md5 = $hash
+LIMIT 1;";
+            cmd.Parameters.AddWithValue("$hash", normalised);
+
+            using var reader = cmd.ExecuteReader();
+
+            if (!reader.Read())
+                return false;
+
+            summary = readChartSummary(reader, Guid.Parse(reader.GetString(0)));
+            return true;
+        }
+
+        public bool TryGetChartByContentHash(string hash, out BMSChartCache chart)
+        {
+            chart = null!;
+
+            if (string.IsNullOrWhiteSpace(hash))
+                return false;
+
+            ensureInitialized();
+            string normalised = hash.Trim().ToLowerInvariant();
+
+            if (tryGetIndexedChart("content_sha256", normalised, out IndexedChart bySha))
+            {
+                chart = bySha.Chart;
+                return true;
+            }
+
+            if (tryGetIndexedChart("content_md5", normalised, out IndexedChart byMd5))
+            {
+                chart = byMd5.Chart;
+                return true;
+            }
+
+            return false;
         }
 
         public BmsChartSummary? GetRandomChartSummary(BmsChartQuery query, ulong? randomValue = null)
@@ -613,7 +671,7 @@ LIMIT 1;";
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
-SELECT beatmap_id, folder_path, chart_path, path_key
+SELECT beatmap_id, folder_path, chart_path, path_key, content_md5, content_sha256
 FROM charts
 WHERE beatmap_id = $id
 LIMIT 1;";
@@ -630,6 +688,8 @@ LIMIT 1;";
                 FolderPath = reader.GetString(1),
                 ChartPath = reader.GetString(2),
                 Md5Hash = reader.GetString(3),
+                ContentMd5 = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                ContentSha256 = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
             };
 
             return true;
@@ -643,7 +703,7 @@ LIMIT 1;";
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
-SELECT beatmap_id, folder_path, chart_path, path_key
+SELECT beatmap_id, folder_path, chart_path, path_key, content_md5, content_sha256
 FROM charts
 WHERE path_key = $key
 LIMIT 1;";
@@ -660,6 +720,8 @@ LIMIT 1;";
                 FolderPath = reader.GetString(1),
                 ChartPath = reader.GetString(2),
                 Md5Hash = reader.GetString(3),
+                ContentMd5 = reader.IsDBNull(4) ? string.Empty : reader.GetString(4),
+                ContentSha256 = reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
             };
 
             return true;
@@ -741,7 +803,7 @@ ON CONFLICT(folder_path) DO UPDATE SET
                 cmd.CommandText = $@"
 INSERT INTO {table_charts} (
     chart_path, folder_path, file_name, file_size, last_modified_ticks,
-    beatmap_id, set_id, path_key, seen_generation, sync_revision, sync_state, parse_version,
+    beatmap_id, set_id, path_key, content_md5, content_sha256, seen_generation, sync_revision, sync_state, parse_version,
     title, sub_title, artist, sub_artist, genre,
     play_level, rank, ln_type, key_count, total_notes,
     bpm, min_bpm, max_bpm, duration, total_gauge,
@@ -750,7 +812,7 @@ INSERT INTO {table_charts} (
     keysound_files_json
 ) VALUES (
     $chartPath, $folder, $fileName, $size, $modified,
-    $beatmapId, $setId, $pathKey, $seenGeneration, 0, 0, $parseVersion,
+    $beatmapId, $setId, $pathKey, $contentMd5, $contentSha256, $seenGeneration, 0, 0, $parseVersion,
     $title, $subTitle, $artist, $subArtist, $genre,
     $playLevel, $rank, $lnType, $keyCount, $totalNotes,
     $bpm, $minBpm, $maxBpm, $duration, $totalGauge,
@@ -766,6 +828,8 @@ ON CONFLICT(chart_path) DO UPDATE SET
     beatmap_id = excluded.beatmap_id,
     set_id = excluded.set_id,
     path_key = excluded.path_key,
+    content_md5 = excluded.content_md5,
+    content_sha256 = excluded.content_sha256,
     seen_generation = excluded.seen_generation,
     parse_version = excluded.parse_version,
     title = excluded.title,
@@ -802,8 +866,10 @@ ON CONFLICT(chart_path) DO UPDATE SET
                 cmd.Parameters.AddWithValue("$beatmapId", beatmapId.ToString());
                 cmd.Parameters.AddWithValue("$setId", BmsChartIdentity.CreateSetId(chart.FolderPath).ToString());
                 cmd.Parameters.AddWithValue("$pathKey", pathKey);
+                cmd.Parameters.AddWithValue("$contentMd5", chart.ContentMd5 ?? string.Empty);
+                cmd.Parameters.AddWithValue("$contentSha256", chart.ContentSha256 ?? string.Empty);
                 cmd.Parameters.AddWithValue("$seenGeneration", ScanRevision + 1);
-                cmd.Parameters.AddWithValue("$parseVersion", 1);
+                cmd.Parameters.AddWithValue("$parseVersion", chart_parse_version);
                 cmd.Parameters.AddWithValue("$title", chart.Title ?? string.Empty);
                 cmd.Parameters.AddWithValue("$subTitle", chart.SubTitle ?? string.Empty);
                 cmd.Parameters.AddWithValue("$artist", chart.Artist ?? string.Empty);
@@ -1057,7 +1123,25 @@ ON CONFLICT(chart_path) DO UPDATE SET
                 HasBgaLayer = reader.GetInt32(reader.GetOrdinal("has_bga")) != 0,
                 KeysoundFiles = JsonSerializer.Deserialize<List<string>>(reader.GetString(reader.GetOrdinal("keysound_files_json"))) ?? new List<string>(),
                 Md5Hash = reader.GetString(reader.GetOrdinal("path_key")),
+                ContentMd5 = tryGetOptionalString(reader, "content_md5"),
+                ContentSha256 = tryGetOptionalString(reader, "content_sha256"),
             };
+        }
+
+        private static string tryGetOptionalString(SqliteDataReader reader, string column)
+        {
+            int ordinal;
+
+            try
+            {
+                ordinal = reader.GetOrdinal(column);
+            }
+            catch (IndexOutOfRangeException)
+            {
+                return string.Empty;
+            }
+
+            return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
         }
 
         private static BMSSongCache readSong(SqliteDataReader reader)
@@ -1137,18 +1221,23 @@ CREATE TABLE IF NOT EXISTS {table_songs} (
                     throw new InvalidOperationException($"BMS library index schema {existingVersion} is newer than supported schema {schema_version}.");
 
                 if (existingVersion == 0)
-                    createVersion2Schema(connection);
+                    createVersion3Schema(connection);
                 else if (existingVersion == 1)
+                {
                     migrateVersion1To2(connection);
+                    migrateVersion2To3(connection);
+                }
+                else if (existingVersion == 2)
+                    migrateVersion2To3(connection);
                 else
-                    createVersion2Schema(connection);
+                    createVersion3Schema(connection);
 
                 writeMeta(connection, "schema_version", schema_version.ToString(CultureInfo.InvariantCulture));
                 initialized = true;
             }
         }
 
-        private static void createVersion2Schema(SqliteConnection connection)
+        private static void createVersion3Schema(SqliteConnection connection)
         {
             using var cmd = connection.CreateCommand();
             cmd.CommandText = $@"
@@ -1161,6 +1250,8 @@ CREATE TABLE IF NOT EXISTS {table_charts} (
     beatmap_id TEXT NOT NULL,
     set_id TEXT NOT NULL,
     path_key TEXT NOT NULL,
+    content_md5 TEXT NOT NULL DEFAULT '',
+    content_sha256 TEXT NOT NULL DEFAULT '',
     seen_generation INTEGER NOT NULL DEFAULT 0,
     sync_revision INTEGER NOT NULL DEFAULT 0,
     sync_state INTEGER NOT NULL DEFAULT 0,
@@ -1201,6 +1292,8 @@ CREATE TABLE IF NOT EXISTS {table_sync_changes} (
 
 CREATE INDEX IF NOT EXISTS idx_charts_folder ON {table_charts}(folder_path);
 CREATE INDEX IF NOT EXISTS idx_charts_path_key ON {table_charts}(path_key);
+CREATE INDEX IF NOT EXISTS idx_charts_content_md5 ON {table_charts}(content_md5);
+CREATE INDEX IF NOT EXISTS idx_charts_content_sha256 ON {table_charts}(content_sha256);
 CREATE INDEX IF NOT EXISTS idx_charts_beatmap_id ON {table_charts}(beatmap_id);
 CREATE INDEX IF NOT EXISTS idx_charts_set_id ON {table_charts}(set_id);
 CREATE INDEX IF NOT EXISTS idx_charts_key_path ON {table_charts}(key_count, path_key);
@@ -1210,6 +1303,37 @@ CREATE INDEX IF NOT EXISTS idx_charts_summary_level ON {table_charts}((printf('%
 CREATE INDEX IF NOT EXISTS idx_charts_summary_artist ON {table_charts}((lower(artist) || char(31) || lower(title)) COLLATE NOCASE, beatmap_id);
 CREATE INDEX IF NOT EXISTS idx_charts_summary_folder ON {table_charts}((lower(folder_path) || char(31) || lower(file_name)) COLLATE NOCASE, beatmap_id);";
             cmd.ExecuteNonQuery();
+        }
+
+        private static void migrateVersion2To3(SqliteConnection connection)
+        {
+            using var transaction = connection.BeginTransaction();
+
+            using (var alter = connection.CreateCommand())
+            {
+                alter.Transaction = transaction;
+                alter.CommandText = $@"
+ALTER TABLE {table_charts} ADD COLUMN content_md5 TEXT NOT NULL DEFAULT '';
+ALTER TABLE {table_charts} ADD COLUMN content_sha256 TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_charts_content_md5 ON {table_charts}(content_md5);
+CREATE INDEX IF NOT EXISTS idx_charts_content_sha256 ON {table_charts}(content_sha256);";
+
+                try
+                {
+                    alter.ExecuteNonQuery();
+                }
+                catch (SqliteException)
+                {
+                    // Columns may already exist from a partial migration.
+                }
+            }
+
+            transaction.Commit();
+        }
+
+        private static void createVersion2Schema(SqliteConnection connection)
+        {
+            createVersion3Schema(connection);
         }
 
         private static void migrateVersion1To2(SqliteConnection connection)
@@ -1582,7 +1706,7 @@ ON CONFLICT(folder_path) DO UPDATE SET
                 upsertChart = createCommand($@"
 INSERT INTO {table_charts} (
     chart_path, folder_path, file_name, file_size, last_modified_ticks,
-    beatmap_id, set_id, path_key, seen_generation, sync_revision, sync_state, parse_version,
+    beatmap_id, set_id, path_key, content_md5, content_sha256, seen_generation, sync_revision, sync_state, parse_version,
     title, sub_title, artist, sub_artist, genre,
     play_level, rank, ln_type, key_count, total_notes,
     bpm, min_bpm, max_bpm, duration, total_gauge,
@@ -1591,7 +1715,7 @@ INSERT INTO {table_charts} (
     keysound_files_json
 ) VALUES (
     $chartPath, $folder, $fileName, $size, $modified,
-    $beatmapId, $setId, $pathKey, $generation, 0, 0, $parseVersion,
+    $beatmapId, $setId, $pathKey, $contentMd5, $contentSha256, $generation, 0, 0, $parseVersion,
     $title, $subTitle, $artist, $subArtist, $genre,
     $playLevel, $rank, $lnType, $keyCount, $totalNotes,
     $bpm, $minBpm, $maxBpm, $duration, $totalGauge,
@@ -1607,6 +1731,8 @@ ON CONFLICT(chart_path) DO UPDATE SET
     beatmap_id = excluded.beatmap_id,
     set_id = excluded.set_id,
     path_key = excluded.path_key,
+    content_md5 = excluded.content_md5,
+    content_sha256 = excluded.content_sha256,
     seen_generation = excluded.seen_generation,
     parse_version = excluded.parse_version,
     title = excluded.title,
@@ -1634,7 +1760,7 @@ ON CONFLICT(chart_path) DO UPDATE SET
     has_bga = excluded.has_bga,
     keysound_files_json = excluded.keysound_files_json;",
                     "$chartPath", "$folder", "$fileName", "$size", "$modified",
-                    "$beatmapId", "$setId", "$pathKey", "$generation", "$parseVersion",
+                    "$beatmapId", "$setId", "$pathKey", "$contentMd5", "$contentSha256", "$generation", "$parseVersion",
                     "$title", "$subTitle", "$artist", "$subArtist", "$genre",
                     "$playLevel", "$rank", "$lnType", "$keyCount", "$totalNotes",
                     "$bpm", "$minBpm", "$maxBpm", "$duration", "$totalGauge",
@@ -1756,8 +1882,10 @@ WHERE beatmap_id = $beatmapId;", "$revision", "$syncState", "$beatmapId");
                 set(upsertChart, "$beatmapId", identity.BeatmapId.ToString());
                 set(upsertChart, "$setId", identity.SetId.ToString());
                 set(upsertChart, "$pathKey", identity.PathKey);
+                set(upsertChart, "$contentMd5", chart.ContentMd5 ?? string.Empty);
+                set(upsertChart, "$contentSha256", chart.ContentSha256 ?? string.Empty);
                 set(upsertChart, "$generation", generation);
-                set(upsertChart, "$parseVersion", 1);
+                set(upsertChart, "$parseVersion", chart_parse_version);
                 set(upsertChart, "$title", chart.Title ?? string.Empty);
                 set(upsertChart, "$subTitle", chart.SubTitle ?? string.Empty);
                 set(upsertChart, "$artist", chart.Artist ?? string.Empty);
