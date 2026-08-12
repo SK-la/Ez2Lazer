@@ -90,102 +90,171 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
             try
             {
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
-                string headerJson = await http.GetStringAsync(url, cancellationToken).ConfigureAwait(false);
-
-                // Direct TableData JSON (already expanded)
-                if (headerJson.Contains("\"folder\"", StringComparison.OrdinalIgnoreCase)
-                    && headerJson.Contains("\"name\"", StringComparison.OrdinalIgnoreCase)
-                    && !headerJson.Contains("\"data_url\"", StringComparison.OrdinalIgnoreCase)
-                    && !headerJson.Contains("\"dataUrl\"", StringComparison.OrdinalIgnoreCase))
-                {
-                    var direct = BmsDifficultyTableParser.ParseTableDataJson(headerJson, url);
-
-                    if (direct == null)
-                        return null;
-
-                    string directPath = Path.Combine(tablesDirectory, fileNameForUrl(url) + ".bmt");
-                    BmsDifficultyTableParser.WriteBmt(directPath, headerJson);
-                    Invalidate();
-                    return BmsDifficultyTableParser.TryLoadFile(directPath);
-                }
-
-                var header = JsonSerializer.Deserialize<DifficultyTableHeaderDto>(headerJson, json_options);
-
-                if (header == null || string.IsNullOrWhiteSpace(header.Name))
-                {
-                    Logger.Log($"[BMS] Difficulty table header missing name: {url}", LoggingTarget.Network, LogLevel.Important);
-                    return null;
-                }
-
-                string dataUrl = header.ResolveDataUrl();
-
-                if (string.IsNullOrWhiteSpace(dataUrl))
-                {
-                    // Header URL itself may point at body when ends with .json body list
-                    if (url.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var elementsOnly = JsonSerializer.Deserialize<List<DifficultyTableElementDto>>(headerJson, json_options);
-
-                        if (elementsOnly is { Count: > 0 })
-                        {
-                            var levels = elementsOnly
-                                .Select(e => e.Level ?? string.Empty)
-                                .Where(l => !string.IsNullOrEmpty(l))
-                                .Distinct(StringComparer.Ordinal)
-                                .ToList();
-                            string built = BmsDifficultyTableParser.BuildTableDataJson(
-                                header.Name ?? "Table",
-                                url,
-                                header.Symbol ?? string.Empty,
-                                elementsOnly,
-                                levels);
-                            string path = Path.Combine(tablesDirectory, fileNameForUrl(url) + ".bmt");
-                            BmsDifficultyTableParser.WriteBmt(path, built);
-                            Invalidate();
-                            return BmsDifficultyTableParser.TryLoadFile(path);
-                        }
-                    }
-
-                    Logger.Log($"[BMS] Difficulty table header missing data_url: {url}", LoggingTarget.Network, LogLevel.Important);
-                    return null;
-                }
-
-                if (!Uri.TryCreate(dataUrl, UriKind.Absolute, out _))
-                {
-                    if (Uri.TryCreate(url, UriKind.Absolute, out var baseUri))
-                        dataUrl = new Uri(baseUri, dataUrl).ToString();
-                }
-
-                string bodyJson = await http.GetStringAsync(dataUrl, cancellationToken).ConfigureAwait(false);
-                var elements = JsonSerializer.Deserialize<List<DifficultyTableElementDto>>(bodyJson, json_options) ?? new List<DifficultyTableElementDto>();
-                var levelOrder = header.ResolveLevelOrder().ToList();
-
-                if (levelOrder.Count == 0)
-                {
-                    levelOrder = elements
-                        .Select(e => e.Level ?? string.Empty)
-                        .Where(l => !string.IsNullOrEmpty(l))
-                        .Distinct(StringComparer.Ordinal)
-                        .ToList();
-                }
-
-                string tableJson = BmsDifficultyTableParser.BuildTableDataJson(
-                    header.Name,
-                    url,
-                    header.Symbol ?? string.Empty,
-                    elements,
-                    levelOrder);
-
-                string destPath = Path.Combine(tablesDirectory, fileNameForUrl(url) + ".bmt");
-                BmsDifficultyTableParser.WriteBmt(destPath, tableJson);
-                Invalidate();
-                return BmsDifficultyTableParser.TryLoadFile(destPath);
+                return await importFromUrlAsync(http, url, skipIfCached: false, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
                 Logger.Log($"[BMS] Difficulty table URL import failed ({url}): {ex.Message}", LoggingTarget.Network, LogLevel.Important);
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Downloads every URL in the embedded builtin catalog into <see cref="TablesDirectory"/>.
+        /// Already-cached tables (matching hashed filename) are skipped unless <paramref name="force"/> is true.
+        /// </summary>
+        public async Task<BmsBuiltinTableSyncResult> SyncBuiltinCatalogAsync(bool force = false, CancellationToken cancellationToken = default, IProgress<(int Done, int Total, string Name)>? progress = null)
+        {
+            var catalog = BmsBuiltinTableCatalog.Load();
+            int succeeded = 0;
+            int failed = 0;
+            int skipped = 0;
+            int total = catalog.Count;
+            int done = 0;
+
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
+
+            foreach (var entry in catalog)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                done++;
+                progress?.Report((done, total, entry.Name));
+
+                if (string.IsNullOrWhiteSpace(entry.Url))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                string destPath = Path.Combine(tablesDirectory, fileNameForUrl(entry.Url.Trim()) + ".bmt");
+
+                if (!force && File.Exists(destPath))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                try
+                {
+                    var imported = await importFromUrlAsync(http, entry.Url.Trim(), skipIfCached: false, cancellationToken).ConfigureAwait(false);
+
+                    if (imported != null)
+                        succeeded++;
+                    else
+                        failed++;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    Logger.Log($"[BMS] Builtin table sync failed ({entry.Name}): {ex.Message}", LoggingTarget.Network, LogLevel.Important);
+                }
+            }
+
+            Invalidate();
+            return new BmsBuiltinTableSyncResult(succeeded, failed, skipped);
+        }
+
+        private async Task<BmsDifficultyTable?> importFromUrlAsync(HttpClient http, string url, bool skipIfCached, CancellationToken cancellationToken)
+        {
+            string destPath = Path.Combine(tablesDirectory, fileNameForUrl(url) + ".bmt");
+
+            if (skipIfCached && File.Exists(destPath))
+            {
+                Invalidate();
+                return BmsDifficultyTableParser.TryLoadFile(destPath);
+            }
+
+            string headerJson = await http.GetStringAsync(url, cancellationToken).ConfigureAwait(false);
+
+            // Direct TableData JSON (already expanded)
+            if (headerJson.Contains("\"folder\"", StringComparison.OrdinalIgnoreCase)
+                && headerJson.Contains("\"name\"", StringComparison.OrdinalIgnoreCase)
+                && !headerJson.Contains("\"data_url\"", StringComparison.OrdinalIgnoreCase)
+                && !headerJson.Contains("\"dataUrl\"", StringComparison.OrdinalIgnoreCase))
+            {
+                var direct = BmsDifficultyTableParser.ParseTableDataJson(headerJson, url);
+
+                if (direct == null)
+                    return null;
+
+                BmsDifficultyTableParser.WriteBmt(destPath, headerJson);
+                Invalidate();
+                return BmsDifficultyTableParser.TryLoadFile(destPath);
+            }
+
+            var header = JsonSerializer.Deserialize<DifficultyTableHeaderDto>(headerJson, json_options);
+
+            if (header == null || string.IsNullOrWhiteSpace(header.Name))
+            {
+                Logger.Log($"[BMS] Difficulty table header missing name: {url}", LoggingTarget.Network, LogLevel.Important);
+                return null;
+            }
+
+            string dataUrl = header.ResolveDataUrl();
+
+            if (string.IsNullOrWhiteSpace(dataUrl))
+            {
+                // Header URL itself may point at body when ends with .json body list
+                if (url.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    var elementsOnly = JsonSerializer.Deserialize<List<DifficultyTableElementDto>>(headerJson, json_options);
+
+                    if (elementsOnly is { Count: > 0 })
+                    {
+                        var levels = elementsOnly
+                            .Select(e => e.Level ?? string.Empty)
+                            .Where(l => !string.IsNullOrEmpty(l))
+                            .Distinct(StringComparer.Ordinal)
+                            .ToList();
+                        string built = BmsDifficultyTableParser.BuildTableDataJson(
+                            header.Name ?? "Table",
+                            url,
+                            header.Symbol ?? string.Empty,
+                            elementsOnly,
+                            levels);
+                        BmsDifficultyTableParser.WriteBmt(destPath, built);
+                        Invalidate();
+                        return BmsDifficultyTableParser.TryLoadFile(destPath);
+                    }
+                }
+
+                Logger.Log($"[BMS] Difficulty table header missing data_url: {url}", LoggingTarget.Network, LogLevel.Important);
+                return null;
+            }
+
+            if (!Uri.TryCreate(dataUrl, UriKind.Absolute, out _))
+            {
+                if (Uri.TryCreate(url, UriKind.Absolute, out var baseUri))
+                    dataUrl = new Uri(baseUri, dataUrl).ToString();
+            }
+
+            string bodyJson = await http.GetStringAsync(dataUrl, cancellationToken).ConfigureAwait(false);
+            var elements = JsonSerializer.Deserialize<List<DifficultyTableElementDto>>(bodyJson, json_options) ?? new List<DifficultyTableElementDto>();
+            var levelOrder = header.ResolveLevelOrder().ToList();
+
+            if (levelOrder.Count == 0)
+            {
+                levelOrder = elements
+                    .Select(e => e.Level ?? string.Empty)
+                    .Where(l => !string.IsNullOrEmpty(l))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+            }
+
+            string tableJson = BmsDifficultyTableParser.BuildTableDataJson(
+                header.Name,
+                url,
+                header.Symbol ?? string.Empty,
+                elements,
+                levelOrder);
+
+            BmsDifficultyTableParser.WriteBmt(destPath, tableJson);
+            Invalidate();
+            return BmsDifficultyTableParser.TryLoadFile(destPath);
         }
 
         private static string fileNameForUrl(string url)

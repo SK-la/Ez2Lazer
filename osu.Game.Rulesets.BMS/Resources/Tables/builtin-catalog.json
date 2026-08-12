@@ -1,0 +1,16 @@
+[
+  { "name": "Normal 2", "url": "https://rattoto10.jounin.jp/table.html", "group": "SP" },
+  { "name": "Insane 2", "url": "https://rattoto10.jounin.jp/table_insane.html", "group": "SP" },
+  { "name": "Overjoy (NEW GENERATION)", "url": "https://rattoto10.jounin.jp/table_overjoy.html", "group": "SP" },
+  { "name": "Normal 1 (archive)", "url": "https://miraiscarlet.github.io/bms/table/genocide_normal/normal_bms.html", "group": "SP" },
+  { "name": "Insane 1 (archive)", "url": "https://miraiscarlet.github.io/bms/table/genocide_insane/insane_bms.html", "group": "SP" },
+  { "name": "Satellite", "url": "https://stellabms.xyz/sl/table.html", "group": "SP" },
+  { "name": "Stella", "url": "https://stellabms.xyz/st/table.html", "group": "SP" },
+  { "name": "LN", "url": "https://mocha-repository.info/table/ln_header.json", "group": "SP" },
+  { "name": "DP Normal (Mocha)", "url": "https://mocha-repository.info/table/dpn_header.json", "group": "DP" },
+  { "name": "DP Insane (Mocha)", "url": "https://mocha-repository.info/table/dpi_header.json", "group": "DP" },
+  { "name": "DP Satellite", "url": "https://stellabms.xyz/dp/table.html", "group": "DP" },
+  { "name": "DP Stella", "url": "https://stellabms.xyz/dpst/table.html", "group": "DP" },
+  { "name": "PMS Insane (Pastoral)", "url": "https://pmsdifficulty.xxxxxxxx.jp/_pastoral_insane_table.html", "group": "PMS" },
+  { "name": "24K", "url": "https://excln.github.io/table24k/table.html", "group": "Other" }
+]

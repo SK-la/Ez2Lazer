@@ -22,6 +22,7 @@ using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
+using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.UI;
@@ -106,6 +107,11 @@ namespace osu.Game.Rulesets.BMS.UI
                 {
                     Text = BmsStrings.SETTINGS_OPEN_TABLES_FOLDER,
                     Action = openTablesFolder,
+                },
+                new SettingsButtonV2
+                {
+                    Text = BmsStrings.SETTINGS_SYNC_BUILTIN_TABLES,
+                    Action = syncBuiltinTables,
                 },
                 new Container
                 {
@@ -268,6 +274,28 @@ namespace osu.Game.Rulesets.BMS.UI
             {
                 notificationOverlay?.Post(new SimpleErrorNotification { Text = ex.Message });
             }
+        }
+
+        private void syncBuiltinTables()
+        {
+            notificationOverlay?.Post(new SimpleNotification { Text = BmsStrings.SONG_SELECT_TABLE_SYNCING });
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var store = new BmsDifficultyTableStore(storage);
+                    var result = await store.SyncBuiltinCatalogAsync().ConfigureAwait(false);
+                    Schedule(() => notificationOverlay?.Post(new SimpleNotification
+                    {
+                        Text = BmsStrings.SongSelect_TableSyncComplete(result.Succeeded, result.Failed, result.Skipped),
+                    }));
+                }
+                catch (Exception ex)
+                {
+                    Schedule(() => notificationOverlay?.Post(new SimpleErrorNotification { Text = ex.Message }));
+                }
+            });
         }
 
         private void openSongSelectScreen(IScreen screen)

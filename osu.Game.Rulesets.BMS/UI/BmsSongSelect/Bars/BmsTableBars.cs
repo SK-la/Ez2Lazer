@@ -110,7 +110,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
             Entry = entry;
             TableLevel = tableLevel;
             Title = string.IsNullOrWhiteSpace(entry.Title) ? entry.PreferredHash : entry.Title;
-            Subtitle = string.IsNullOrWhiteSpace(entry.Artist) ? "未导入" : $"{entry.Artist} / 未导入";
+
+            string status = entry.HasDownloadUrl ? "未导入 · 可下载" : "未导入";
+            Subtitle = string.IsNullOrWhiteSpace(entry.Artist) ? status : $"{entry.Artist} / {status}";
         }
 
         public override string Title { get; }

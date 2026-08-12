@@ -28,8 +28,8 @@ namespace osu.Game.Rulesets.BMS.Tests.Tables
                                     {
                                       "name": "★1",
                                       "song": [
-                                        { "md5": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "sha256": "", "title": "Song A", "artist": "Artist A" },
-                                        { "md5": "", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "title": "Song B", "artist": "Artist B" }
+                                        { "md5": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "sha256": "", "title": "Song A", "artist": "Artist A", "url": "https://example.com/a.zip" },
+                                        { "md5": "", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "title": "Song B", "artist": "Artist B", "appendurl": "https://example.com/b.zip" }
                                       ]
                                     },
                                     {
@@ -48,7 +48,19 @@ namespace osu.Game.Rulesets.BMS.Tests.Tables
             Assert.That(table!.Name, Is.EqualTo("Demo Table"));
             Assert.That(table.Levels, Has.Count.EqualTo(2));
             Assert.That(table.Levels[0].Entries, Has.Count.EqualTo(2));
+            Assert.That(table.Levels[0].Entries[0].PreferredDownloadUrl, Is.EqualTo("https://example.com/a.zip"));
+            Assert.That(table.Levels[0].Entries[1].PreferredDownloadUrl, Is.EqualTo("https://example.com/b.zip"));
+            Assert.That(table.Levels[1].Entries[0].HasDownloadUrl, Is.False);
             Assert.That(table.Levels[1].Entries[0].PreferredHash, Is.EqualTo("cccccccccccccccccccccccccccccccc"));
+        }
+
+        [Test]
+        public void BuiltinCatalog_LoadsEmbeddedEntries()
+        {
+            var catalog = BmsBuiltinTableCatalog.Load();
+            Assert.That(catalog, Is.Not.Empty);
+            Assert.That(catalog.All(e => e.Url.StartsWith("http", StringComparison.OrdinalIgnoreCase)), Is.True);
+            Assert.That(catalog.Any(e => e.Name.Contains("Satellite", StringComparison.OrdinalIgnoreCase)), Is.True);
         }
 
         [Test]

@@ -233,6 +233,14 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             return null;
         }
 
+        public BmsMissingChartBar? GetSelectedMissingChart()
+        {
+            if (GetSelectedListBar() is BmsMissingChartBar missing)
+                return missing;
+
+            return null;
+        }
+
         public BmsBar? GetDetailBar()
         {
             if (FocusPane == BmsSongSelectFocusPane.List)

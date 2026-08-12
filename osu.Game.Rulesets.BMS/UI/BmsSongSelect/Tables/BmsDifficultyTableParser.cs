@@ -63,6 +63,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
                             Title = s.Title ?? string.Empty,
                             Artist = s.Artist ?? string.Empty,
                             Level = folder.Name,
+                            Url = s.Url ?? string.Empty,
+                            AppendUrl = s.AppendUrl ?? string.Empty,
                         })
                         .Where(e => !string.IsNullOrEmpty(e.PreferredHash))
                         .ToList();
@@ -104,6 +106,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
                         sha256 = (e.Sha256 ?? string.Empty).ToLowerInvariant(),
                         title = e.Title ?? string.Empty,
                         artist = e.Artist ?? string.Empty,
+                        url = e.Url ?? string.Empty,
+                        appendurl = e.AppendUrl ?? string.Empty,
                     })
                     .Where(s => !string.IsNullOrEmpty(s.md5) || !string.IsNullOrEmpty(s.sha256))
                     .ToList();
@@ -185,6 +189,10 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
             public string? Sha256 { get; set; }
             public string? Title { get; set; }
             public string? Artist { get; set; }
+            public string? Url { get; set; }
+
+            [JsonPropertyName("appendurl")]
+            public string? AppendUrl { get; set; }
         }
     }
 
@@ -215,5 +223,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
         public string? Title { get; set; }
         public string? Artist { get; set; }
         public string? Level { get; set; }
+        public string? Url { get; set; }
+
+        [JsonPropertyName("appendurl")]
+        public string? AppendUrl { get; set; }
     }
 }

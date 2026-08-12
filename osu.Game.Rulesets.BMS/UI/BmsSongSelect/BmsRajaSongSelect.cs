@@ -87,6 +87,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         [Resolved]
         private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
 
+        [Resolved]
+        private GameHost host { get; set; } = null!;
+
         public BmsBmsSongSelect()
         {
             lampStore = new BmsLampStore(lampScheme);
@@ -153,6 +156,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             };
 
             shell.RequestPlay += tryStartSelectedChart;
+            shell.RequestOpenDownload += openSelectedChartDownload;
             navigator.Changed += onSelectionChanged;
             searchTextBox.Current.ValueChanged += e => navigator.SetListFilter(e.NewValue);
         }
@@ -244,7 +248,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_BACK, Action = this.Exit },
                 new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_REFRESH_LIBRARY, Action = refreshLibrary },
                 new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_BUILD_ANALYTICS_SHORT, Action = buildAnalytics },
+                new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_SYNC_BUILTIN_TABLES, Action = syncBuiltinTables },
                 new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_ADD_TABLE_URL, Action = promptAddTableUrl },
+                new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_OPEN_CHART_DOWNLOAD, Action = openSelectedChartDownload },
                 new ScreenFooterButton { Text = BmsStrings.SONG_SELECT_OPEN_TABLES_FOLDER, Action = openTablesFolder },
             };
         }
@@ -365,6 +371,51 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             searchTextBox.Text = string.Empty;
         }
 
+        private void syncBuiltinTables()
+        {
+            screenWorkCts ??= new CancellationTokenSource();
+            CancellationToken token = screenWorkCts.Token;
+            notifications?.Post(new SimpleNotification { Text = BmsStrings.SONG_SELECT_TABLE_SYNCING });
+
+            Task.Run(async () =>
+            {
+                BmsBuiltinTableSyncResult result = await tableStore.SyncBuiltinCatalogAsync(force: false, token).ConfigureAwait(false);
+
+                Schedule(() =>
+                {
+                    if (token.IsCancellationRequested || !this.IsCurrentScreen())
+                        return;
+
+                    notifications?.Post(new SimpleNotification
+                    {
+                        Text = BmsStrings.SongSelect_TableSyncComplete(result.Succeeded, result.Failed, result.Skipped),
+                    });
+                    tableStore.Invalidate();
+                    navigator.Reset();
+                });
+            }, token);
+        }
+
+        private void openSelectedChartDownload()
+        {
+            var missing = navigator.GetSelectedMissingChart();
+
+            if (missing == null || !missing.Entry.HasDownloadUrl)
+            {
+                notifications?.Post(new SimpleNotification { Text = BmsStrings.SONG_SELECT_NO_DOWNLOAD_URL });
+                return;
+            }
+
+            try
+            {
+                host.OpenUrlExternally(missing.Entry.PreferredDownloadUrl);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "[BMS] Open chart download URL failed");
+            }
+        }
+
         private void importTableUrl(string url)
         {
             screenWorkCts ??= new CancellationTokenSource();
@@ -461,7 +512,10 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                     navigator.Changed -= onSelectionChanged;
 
                 if (shell != null)
+                {
                     shell.RequestPlay -= tryStartSelectedChart;
+                    shell.RequestOpenDownload -= openSelectedChartDownload;
+                }
             }
 
             base.Dispose(isDisposing);

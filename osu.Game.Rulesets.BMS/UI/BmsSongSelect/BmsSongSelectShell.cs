@@ -81,7 +81,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                                 Origin = Anchor.BottomLeft,
                                 Font = OsuFont.Default.With(size: 11),
                                 Colour = Colour4.Gray,
-                                Text = "↑↓ 选择  ←→ 切换栏  Enter 打开/游玩  Esc 返回  1 键数  2 排序",
+                                Text = "↑↓ 选择  ←→ 切换栏  Enter 打开/游玩/下载  D 打开下载  Esc 返回  1 键数  2 排序",
                             },
                         },
                     },
@@ -223,7 +223,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                     navigator.SelectListIndex(index);
                     navigator.FocusList();
                     navigator.ActivateList();
-                    RequestPlay?.Invoke();
+
+                    if (navigator.GetSelectedSong() != null)
+                        RequestPlay?.Invoke();
+                    else if (navigator.GetSelectedMissingChart()?.Entry.HasDownloadUrl == true)
+                        RequestOpenDownload?.Invoke();
                 }));
             }
 
@@ -231,6 +235,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         }
 
         public event Action? RequestPlay;
+
+        public event Action? RequestOpenDownload;
 
         private void updateDetail(BmsBar? bar)
         {
@@ -275,7 +281,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                     BmsStrings.Raja_DetailArtist(missing.Entry.Artist),
                     $"MD5: {missing.Entry.Md5}",
                     $"SHA256: {missing.Entry.Sha256}",
-                    "状态: 未导入（本地曲库无匹配）");
+                    missing.Entry.HasDownloadUrl
+                        ? $"下载: {missing.Entry.PreferredDownloadUrl}\n状态: 未导入（Enter / D 打开下载页）"
+                        : "状态: 未导入（表条目无下载链接）");
             }
             else if (bar is BmsTableBar table)
             {
@@ -401,9 +409,20 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
                         if (navigator.GetSelectedSong() != null)
                             RequestPlay?.Invoke();
+                        else if (navigator.GetSelectedMissingChart()?.Entry.HasDownloadUrl == true)
+                            RequestOpenDownload?.Invoke();
                     }
 
                     return true;
+
+                case Key.D:
+                    if (navigator.GetSelectedMissingChart()?.Entry.HasDownloadUrl == true)
+                    {
+                        RequestOpenDownload?.Invoke();
+                        return true;
+                    }
+
+                    break;
 
                 case Key.Escape:
                     navigator.GoBack();
