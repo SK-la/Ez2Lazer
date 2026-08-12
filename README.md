@@ -70,11 +70,15 @@ git clone https://github.com/SK-la/osu-framework
 git clone https://github.com/SK-la/osu-resources
 ```
 
-默认使用 NuGet：`ez2lazer.Framework`、`ez2lazer.Game.Resources`（版本在 [Ez2Lazer.Dependencies.props](Ez2Lazer.Dependencies.props) 中维护）。
+`ez2lazer.Framework`、`ez2lazer.Game.Resources` 的版本在 [Ez2Lazer.Dependencies.props](Ez2Lazer.Dependencies.props) 中维护。
 
-本地联调 framework / resources：在该文件中声明 `<UseEz2LazerLocalProjects>true</UseEz2LazerLocalProjects>`（或临时 `-p:UseEz2LazerLocalProjects=true`）改用同级工程引用；不声明即走 NuGet。
+如果要改用同级工程联调，可分别控制两个开关：
+- `<UseEz2LazerLocalFrameworkProject>true</UseEz2LazerLocalFrameworkProject>` / `-p:UseEz2LazerLocalFrameworkProject=true`
+- `<UseEz2LazerLocalResourcesProject>true</UseEz2LazerLocalResourcesProject>` / `-p:UseEz2LazerLocalResourcesProject=true`
 
-Default: NuGet, no declaration needed. Set `UseEz2LazerLocalProjects` to `true` in `Ez2Lazer.Dependencies.props` to build against local sibling projects.
+需要回到 NuGet 引用时，把对应开关设为 `false` 即可。
+
+To use local sibling projects during development, toggle the two switches independently in `Ez2Lazer.Dependencies.props` or via `-p:` overrides.
 
 自编译版本不会显示游戏内更新选项，也不会从 SK-la/Ez2Lazer Releases 拉取更新。  
 Self-built copies hide in-game update settings and do not check SK-la/Ez2Lazer Releases for updates.
