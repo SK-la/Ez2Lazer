@@ -18,6 +18,7 @@ using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.IO;
 using osu.Game.IO.Archives;
+using osu.Game.Models;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Objects.Types;
@@ -168,6 +169,10 @@ namespace osu.Game.Beatmaps
         {
             if (archive != null)
                 beatmapSet.Beatmaps.AddRange(createBeatmapDifficulties(beatmapSet, realm));
+
+            // Zip entry names may have been decoded with the wrong encoding (e.g. UTF-8 bytes forced through CP932).
+            // .osu metadata keeps the original Unicode paths — rename Realm file entries to match when possible.
+            reconcileReferencedFilenames(beatmapSet);
 
             beatmapSet.DateAdded = getDateAdded(archive);
 
@@ -454,6 +459,50 @@ namespace osu.Game.Beatmaps
                 throw new ArgumentException("No valid beatmap files found in the beatmap archive.");
 
             return beatmaps;
+        }
+
+        /// <summary>
+        /// When an <c>.osu</c> references audio/background paths that are missing from <see cref="BeatmapSetInfo.Files"/>,
+        /// attempt to recover by renaming a mis-decoded archive entry (or the unique same-extension candidate).
+        /// </summary>
+        private void reconcileReferencedFilenames(BeatmapSetInfo beatmapSet)
+        {
+            var references = beatmapSet.Beatmaps
+                                       .SelectMany(static b => new[] { b.Metadata.AudioFile, b.Metadata.BackgroundFile })
+                                       .Where(static f => !string.IsNullOrEmpty(f))
+                                       .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string reference in references)
+            {
+                if (beatmapSet.GetFile(reference) != null)
+                    continue;
+
+                var match = findUniqueExtensionMatch(beatmapSet, reference);
+
+                if (match == null)
+                    continue;
+
+                if (beatmapSet.Files.Any(f => !ReferenceEquals(f, match)
+                                              && string.Equals(f.Filename, reference, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                LogForModel(beatmapSet, $"Renamed archive file \"{match.Filename}\" to match .osu reference \"{reference}\".");
+                match.Filename = reference;
+            }
+        }
+
+        private static RealmNamedFileUsage? findUniqueExtensionMatch(BeatmapSetInfo beatmapSet, string reference)
+        {
+            string extension = Path.GetExtension(reference);
+
+            if (string.IsNullOrEmpty(extension))
+                return null;
+
+            var candidates = beatmapSet.Files
+                                       .Where(f => string.Equals(Path.GetExtension(f.Filename), extension, StringComparison.OrdinalIgnoreCase))
+                                       .ToList();
+
+            return candidates.Count == 1 ? candidates[0] : null;
         }
     }
 }
