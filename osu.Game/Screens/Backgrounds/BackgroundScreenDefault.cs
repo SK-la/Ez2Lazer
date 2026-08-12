@@ -375,8 +375,8 @@ namespace osu.Game.Screens.Backgrounds
         {
             switch (introSequence.Value)
             {
-                case IntroSequence.Welcome:
-                    return @"Intro/Welcome/menu-background";
+                // case IntroSequence.Welcome:
+                //     return @"Intro/Welcome/menu-background";
 
                 default:
                     return $@"Menu/menu-background-{currentDisplay % background_count + 1}";
