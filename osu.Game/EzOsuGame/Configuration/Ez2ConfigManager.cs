@@ -95,6 +95,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
             SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
+            SetDefault(Ez2Setting.MenuLogoPath, @"Menu/logo");
             SetDefault(Ez2Setting.NotificationBehaviour, EzNotificationBehaviour.Normal);
             SetDefault(Ez2Setting.ScreenshotAction, EzScreenshotAction.SaveAndCopy);
             SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
@@ -863,6 +864,11 @@ namespace osu.Game.EzOsuGame.Configuration
         EzAnalysisSqliteEnabled,
 
         HideMainMenuOnlineBanner,
+
+        /// <summary>
+        /// 主菜单 logo 贴图路径，默认 Menu/logo，可切换到 Menu/logo2 等同级资源。
+        /// </summary>
+        MenuLogoPath,
         NotificationBehaviour,
         ScreenshotAction,
         ManiaSkipEmptyEdgeColumns,

@@ -17,10 +17,12 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
+using osu.Framework.Logging;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Containers;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Overlays;
 using osuTK;
 using osuTK.Graphics;
@@ -53,6 +55,9 @@ namespace osu.Game.Screens.Menu
 
         private Sample sampleClick;
         private SampleChannel sampleClickChannel;
+
+        [Resolved(canBeNull: true)]
+        private Ez2ConfigManager ezConfig { get; set; }
 
         protected virtual MenuLogoVisualisation CreateMenuLogoVisualisation() => new MenuLogoVisualisation();
 
@@ -282,8 +287,37 @@ namespace osu.Game.Screens.Menu
             SampleBeat = audio.Samples.Get(@"Menu/osu-logo-heartbeat");
             SampleDownbeat = audio.Samples.Get(@"Menu/osu-logo-downbeat");
 
-            logo.Texture = textures.Get(@"Menu/logo");
-            ripple.Texture = textures.Get(@"Menu/logo");
+            if (ezConfig != null)
+            {
+                var menuLogoPath = ezConfig.GetBindable<string>(Ez2Setting.MenuLogoPath);
+                menuLogoPath.BindValueChanged(v => applyMenuLogoTexture(textures, v.NewValue), true);
+            }
+            else
+            {
+                applyMenuLogoTexture(textures, @"Menu/logo");
+            }
+        }
+
+        private void applyMenuLogoTexture(TextureStore textures, string logoPath)
+        {
+            string resolvedPath = string.IsNullOrWhiteSpace(logoPath) ? @"Menu/logo" : logoPath;
+
+            try
+            {
+                var texture = textures.Get(resolvedPath);
+                logo.Texture = texture;
+                ripple.Texture = texture;
+            }
+            catch (Exception ex)
+            {
+                if (resolvedPath == @"Menu/logo")
+                    throw;
+
+                Logger.Error(ex, $"Failed to load menu logo texture '{resolvedPath}', falling back to 'Menu/logo'.");
+                var texture = textures.Get(@"Menu/logo");
+                logo.Texture = texture;
+                ripple.Texture = texture;
+            }
         }
 
         private int lastBeatIndex;
