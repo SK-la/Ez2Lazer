@@ -61,11 +61,27 @@ namespace osu.Game.Tests.Visual.Fonts
                     {
                         new OsuSpriteText
                         {
-                            Text = "Static emoji glyphs:",
+                            Text = "Static emoji glyphs (BMFont Noto-Emoji):",
                             Font = OsuFont.GetFont(size: 20, weight: FontWeight.Bold),
                         },
                     }.Concat(staticEmojiTexts).Concat(new Drawable[]
                     {
+                        new Box
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Height = 2,
+                            Colour = Color4.DimGray,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = "OT-SVG NotoColorEmoji-Regular (when plutosvgft hooks available):",
+                            Font = OsuFont.GetFont(size: 20, weight: FontWeight.Bold),
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = emojis,
+                            Font = new FontUsage("NotoColorEmoji-Regular", 48),
+                        },
                         new Box
                         {
                             RelativeSizeAxes = Axes.X,

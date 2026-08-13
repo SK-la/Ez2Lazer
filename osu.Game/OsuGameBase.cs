@@ -360,6 +360,7 @@ namespace osu.Game
             dependencies.CacheAs<IGameplaySettings>(LocalConfig);
 
             InitialiseFonts();
+            EzOsuGame.Fonts.EzUiFontBootstrap.Apply(this, Ez2ConfigManager);
 
             addFilesWarning();
 
@@ -577,6 +578,9 @@ namespace osu.Game
             AddFont(Resources, @"Fonts/Inter/Inter-Bold");
             AddFont(Resources, @"Fonts/Inter/Inter-BoldItalic");
 
+            // Localized system outline faces must precede Noto CJK so empty-name scans prefer them.
+            EzOsuGame.Fonts.EzUiFontBootstrap.RegisterLocalizedFallbacks(this, Ez2ConfigManager);
+
             AddFont(Resources, @"Fonts/Noto/Noto-Basic");
             AddFont(Resources, @"Fonts/Noto/Noto-Bopomofo");
             AddFont(Resources, @"Fonts/Noto/Noto-CJK-Basic");
@@ -584,14 +588,60 @@ namespace osu.Game
             AddFont(Resources, @"Fonts/Noto/Noto-Hangul");
             AddFont(Resources, @"Fonts/Noto/Noto-Thai");
 
-            // 加载内置emoji字体
+            // Emoji glyph fallback order (empty FontName scan): system colour emoji → packaged
+            // Twemoji / NotoColorEmoji → BMFont Noto-Emoji → mono outline.
+            EzOsuGame.Fonts.EzUiFontBootstrap.RegisterSystemEmojiFallback(this, Ez2ConfigManager);
+
+            const string twemoji = @"Fonts/Twemoji/Twemoji.Mozilla";
+
+            if (resourcesContainFont(twemoji))
+            {
+                try
+                {
+                    AddOutlineFont(Resources, twemoji);
+                }
+                catch
+                {
+                    // Optional packaged colour emoji (CC BY 4.0 Twemoji / Mozilla COLR).
+                }
+            }
+
+            const string color_emoji = @"Fonts/Emoji/NotoColorEmoji-Regular";
+
+            if (resourcesContainFont(color_emoji))
+            {
+                try
+                {
+                    AddOutlineFont(Resources, color_emoji);
+                }
+                catch
+                {
+                    // Optional extra outline fallback after system / Twemoji.
+                }
+            }
+
             try
             {
                 Fonts.AddTextureSource(new GlyphStore(Resources, @"Fonts/Emoji/Noto-Emoji", Host.CreateTextureLoaderStore(Resources)));
             }
             catch
             {
-                // It's fine if a candidate is not provided in resources.
+                // Silent BMFont hole-fill when system / outline colour sources miss a codepoint.
+            }
+
+            // Outline (monochrome) Noto Emoji covers codepoints missing from colour sources.
+            const string mono_emoji = @"Fonts/Noto_Emoji/static/NotoEmoji-Regular";
+
+            if (resourcesContainFont(mono_emoji))
+            {
+                try
+                {
+                    AddOutlineFont(Resources, mono_emoji);
+                }
+                catch
+                {
+                    // Optional wider emoji coverage; safe to skip.
+                }
             }
 
             AddFont(Resources, @"Fonts/Venera/Venera-Light");
@@ -599,6 +649,20 @@ namespace osu.Game
             AddFont(Resources, @"Fonts/Venera/Venera-Black");
 
             Fonts.AddStore(new OsuIcon.OsuIconStore(Textures));
+        }
+
+        private bool resourcesContainFont(string assetName)
+        {
+            // OutlineFont ResourceStore probes these extensions.
+            foreach (string ext in new[] { ".ttf", ".otf", ".ttc", ".woff", string.Empty })
+            {
+                using var stream = Resources.GetStream(assetName + ext);
+
+                if (stream != null)
+                    return true;
+            }
+
+            return false;
         }
 
         protected override void LoadComplete()

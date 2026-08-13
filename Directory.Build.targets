@@ -9,4 +9,28 @@
     <AssemblyVersion>$(ReleaseVersion)</AssemblyVersion>
     <InformationalVersion>$(ReleaseVersion)-ez2lazer</InformationalVersion>
   </PropertyGroup>
+
+  <!--
+    Local Framework ProjectReference does not flow packed RID natives into the app output
+    (CopyToOutputDirectory on Framework natives breaks iOS mtouch). Copy plutosvgft next to
+    FreeTypeSharp's freetype.dll so OT-SVG hooks can load.
+  -->
+  <Target Name="CopyEzPlutoSvgFtNatives"
+          AfterTargets="Build"
+          Condition="'$(UseEz2LazerLocalFrameworkProject)' == 'true'
+                     and ('$(OutputType)' == 'Exe' or '$(OutputType)' == 'WinExe')
+                     and !$([System.String]::Copy('$(TargetFramework)').Contains('ios'))
+                     and !$([System.String]::Copy('$(TargetFramework)').Contains('android'))
+                     and '$(Ez2LazerFrameworkProjectPath)' != ''">
+    <PropertyGroup>
+      <_EzFwDir>$([System.IO.Path]::GetDirectoryName('$(Ez2LazerFrameworkProjectPath)'))</_EzFwDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_EzPlutoSvgFtNative Include="$(_EzFwDir)\runtimes\**\native\*" Condition="Exists('$(_EzFwDir)\runtimes')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_EzPlutoSvgFtNative)"
+          DestinationFiles="@(_EzPlutoSvgFtNative->'$(OutputPath)runtimes\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Condition="'@(_EzPlutoSvgFtNative)' != ''" />
+  </Target>
 </Project>
