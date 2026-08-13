@@ -15,6 +15,9 @@ namespace osu.Game.EzOsuGame.Overlays
     {
         protected override LocalisableString Header => EzSettingsStrings.EZ_UI_SETTINGS_HEADER;
 
+        [Resolved(CanBeNull = true)]
+        private EzFontSettingsOverlay? fontOverlay { get; set; }
+
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
@@ -55,6 +58,13 @@ namespace osu.Game.EzOsuGame.Overlays
                 })
                 {
                     Keywords = new[] { "acrylic", "glass", "blur", "song select", "ui", "毛玻璃" }
+                },
+                new SettingsButtonV2
+                {
+                    Text = EzSettingsStrings.UI_FONT_MODIFY,
+                    TooltipText = EzSettingsStrings.UI_FONT_MODIFY_TOOLTIP,
+                    Action = () => fontOverlay?.ShowFromSettings(),
+                    Keywords = new[] { "font", "typeface", "ui", "system", "字体" }
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
