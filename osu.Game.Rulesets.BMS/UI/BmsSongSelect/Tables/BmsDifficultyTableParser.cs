@@ -21,6 +21,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
             AllowTrailingCommas = true,
         };
 
+        private static readonly JsonSerializerOptions indented_json_options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+        };
+
         public static BmsDifficultyTable? TryLoadFile(string path)
         {
             try
@@ -130,7 +135,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
                 folder = folders,
             };
 
-            return JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+            return JsonSerializer.Serialize(payload, indented_json_options);
         }
 
         public static void WriteBmt(string path, string tableDataJson)
@@ -213,7 +218,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
         public string ResolveDataUrl() => DataUrl ?? DataUrlSnake ?? string.Empty;
 
         public IReadOnlyList<string> ResolveLevelOrder()
-            => (IReadOnlyList<string>)(LevelOrder ?? LevelOrderSnake ?? (IReadOnlyList<string>)Array.Empty<string>());
+            => LevelOrder ?? LevelOrderSnake ?? (IReadOnlyList<string>)Array.Empty<string>();
     }
 
     public sealed class DifficultyTableElementDto

@@ -502,24 +502,22 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                                     Colour = textColour.Opacity(0.85f),
                                     Text = level,
                                 },
-                                new OsuSpriteText
+                                new TruncatingSpriteText
                                 {
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
                                     Font = OsuFont.Default.With(size: 13),
                                     Colour = textColour,
                                     Text = title,
-                                    Truncate = true,
                                     RelativeSizeAxes = Axes.X,
                                 },
-                                new OsuSpriteText
+                                new TruncatingSpriteText
                                 {
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
                                     Font = OsuFont.Default.With(size: 12),
                                     Colour = textColour.Opacity(0.7f),
                                     Text = artist,
-                                    Truncate = true,
                                     RelativeSizeAxes = Axes.X,
                                 },
                             },
