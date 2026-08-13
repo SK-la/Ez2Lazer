@@ -9,5 +9,8 @@
     <!-- 依赖来源：默认使用本地同级工程；如需改回 NuGet，可分别关闭下面两个开关。 -->
 <!--    <UseEz2LazerLocalFrameworkProject>true</UseEz2LazerLocalFrameworkProject>-->
 <!--    <UseEz2LazerLocalResourcesProject>true</UseEz2LazerLocalResourcesProject>-->
+
+    <!-- Resources 包含 Crowdin 的 tg-TJ；SDK 会规范为 tg-Cyrl-TJ 并告警，忽略即可。 -->
+    <NoWarn>$(NoWarn);NETSDK1187</NoWarn>
   </PropertyGroup>
 </Project>
