@@ -70,6 +70,26 @@ namespace osu.Game.Rulesets.BMS.Tests
             }
         }
 
+        [Test]
+        public void TestResolveBackgroundFilePrefersDeclaredThenFallbackName()
+        {
+            string tempDir = createTempDir();
+
+            try
+            {
+                File.WriteAllText(Path.Combine(tempDir, "title.png"), "x");
+                File.WriteAllText(Path.Combine(tempDir, "bg.jpg"), "y");
+
+                Assert.That(BMSWorkingBeatmap.ResolveBackgroundFile(tempDir, "title.png"), Is.EqualTo("title.png"));
+                Assert.That(BMSWorkingBeatmap.ResolveBackgroundFile(tempDir, "missing.bmp"), Is.EqualTo("bg.jpg"));
+                Assert.That(BMSWorkingBeatmap.ResolveBackgroundFile(tempDir, null), Is.EqualTo("bg.jpg"));
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+
         private static string? resolveAudioPath(string folderPath, string? relativePath) =>
             (string?)typeof(BMSWorkingBeatmap).GetMethod("ResolveAudioPath", BindingFlags.Static | BindingFlags.NonPublic)!
                                               .Invoke(null, new object?[] { folderPath, relativePath });

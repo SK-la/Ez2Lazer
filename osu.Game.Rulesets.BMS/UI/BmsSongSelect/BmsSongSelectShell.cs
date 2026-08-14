@@ -13,7 +13,6 @@ using osu.Game.Rulesets.BMS.Localization;
 using osu.Game.Rulesets.BMS.Scoring.Lamp;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars;
-using osuTK.Graphics;
 using osuTK.Input;
 
 namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
@@ -56,7 +55,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                     new Box
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = new Color4(10, 12, 18, 255),
+                        Colour = Colour4.Black.Opacity(0.45f),
                     },
                     new Container
                     {

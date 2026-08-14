@@ -184,6 +184,42 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return Path.GetFileName(trimmed);
         }
 
+        internal static string? ResolveBackgroundFile(string folderPath, string? declaredFile)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+                return null;
+
+            if (!string.IsNullOrWhiteSpace(declaredFile))
+            {
+                string trimmed = declaredFile.Trim().Replace('\\', '/');
+                string combined = Path.Combine(folderPath, trimmed);
+
+                if (File.Exists(combined))
+                    return trimmed;
+
+                string fileName = Path.GetFileName(trimmed);
+
+                if (!string.IsNullOrEmpty(fileName) && File.Exists(Path.Combine(folderPath, fileName)))
+                    return fileName;
+            }
+
+            string[] stems = { "stagefile", "stage", "bg", "backbmp", "back" };
+            string[] extensions = { ".png", ".jpg", ".jpeg", ".bmp" };
+
+            foreach (string stem in stems)
+            {
+                foreach (string extension in extensions)
+                {
+                    string[] files = Directory.GetFiles(folderPath, $"*{stem}*{extension}", SearchOption.TopDirectoryOnly);
+
+                    if (files.Length > 0)
+                        return Path.GetFileName(files[0]);
+                }
+            }
+
+            return null;
+        }
+
         protected override IBeatmap GetBeatmap()
         {
             if (cachedBeatmap != null)
@@ -239,6 +275,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 _ = GetBeatmap();
                 backgroundFile = BeatmapInfo.Metadata.BackgroundFile;
             }
+
+            backgroundFile = ResolveBackgroundFile(FolderPath, backgroundFile);
 
             if (string.IsNullOrEmpty(backgroundFile))
                 return null;

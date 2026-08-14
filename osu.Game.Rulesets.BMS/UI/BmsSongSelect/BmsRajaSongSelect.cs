@@ -44,6 +44,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         private BmsSongSelectNavigator navigator = null!;
         private BmsBarContext barContext = null!;
         private BmsSongSelectShell shell = null!;
+        private BmsSongSelectBackgroundLayer chartBackground = null!;
         private BmsChartPreviewPlayer previewPlayer = null!;
         private TextBox searchTextBox = null!;
         private RulesetInfo bmsRulesetInfo = null!;
@@ -133,6 +134,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 Padding = new MarginPadding { Bottom = ScreenFooter.HEIGHT },
                 Children = new Drawable[]
                 {
+                    chartBackground = new BmsSongSelectBackgroundLayer(),
                     shell = new BmsSongSelectShell(navigator, barContext)
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -280,20 +282,28 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             previewPlayer.StopPreview();
 
             if (navigator.GetSelectedSong() is not BmsSongBar song)
+            {
+                chartBackground.ClearChart();
                 return;
+            }
 
             try
             {
                 if (!beatmapManager.TryGetChart(song.BeatmapId, out BMSChartCache chart))
+                {
+                    chartBackground.ClearChart();
                     return;
+                }
 
                 var working = new BMSWorkingBeatmap(chart.FullPath, audioManager, renderer, chart);
+                chartBackground.SetFromWorking(working);
                 int previewTime = chart.PreviewTime;
                 previewPlayer.OverridePreviewStartTime = previewTime >= 0 ? previewTime : 0;
                 previewPlayer.StartPreview(working);
             }
             catch (Exception ex)
             {
+                chartBackground.ClearChart();
                 Logger.Error(ex, "[BMS] Raja preview failed");
             }
         }

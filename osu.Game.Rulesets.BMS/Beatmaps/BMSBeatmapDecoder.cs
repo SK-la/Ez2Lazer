@@ -245,6 +245,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     stageFile = value;
                     break;
 
+                case "BACKBMP":
+                    if (string.IsNullOrEmpty(stageFile))
+                        stageFile = value;
+                    break;
+
                 case "BANNER":
                     banner = value;
                     break;

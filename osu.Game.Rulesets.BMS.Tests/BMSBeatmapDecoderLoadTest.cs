@@ -46,6 +46,36 @@ namespace osu.Game.Rulesets.BMS.Tests
         }
 
         [Test]
+        public void TestDecodeStageFileAndBackBmpBecomeBackgroundFile()
+        {
+            const string with_stage = """
+                                      #TITLE Stage
+                                      #STAGEFILE title.png
+                                      #BACKBMP ignored.bmp
+                                      #WAV01 kick.wav
+                                      #00111:01
+                                      """;
+
+            const string back_only = """
+                                     #TITLE Back
+                                     #BACKBMP bg.bmp
+                                     #WAV01 kick.wav
+                                     #00111:01
+                                     """;
+
+            Assert.That(decode(with_stage).BeatmapInfo.Metadata.BackgroundFile, Is.EqualTo("title.png"));
+            Assert.That(decode(back_only).BeatmapInfo.Metadata.BackgroundFile, Is.EqualTo("bg.bmp"));
+        }
+
+        private static Beatmap decode(string bms)
+        {
+            var decoder = new BMSBeatmapDecoder();
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(bms));
+            using var reader = new LineBufferedReader(stream);
+            return decoder.Decode(reader);
+        }
+
+        [Test]
         public void TestDecodeTenPlusTwoChartCompactsToTwelveColumns()
         {
             const string bms = """
