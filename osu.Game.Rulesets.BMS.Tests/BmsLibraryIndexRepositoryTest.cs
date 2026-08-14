@@ -481,6 +481,72 @@ INSERT INTO songs (folder_path, title, artist, genre, last_modified_ticks) VALUE
             }
         }
 
+        [Test]
+        public void TestFolderQueryNormalizesSeparatorsAndIncludesNestedCharts()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), $"bms-index-folder-query-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempDir);
+
+            try
+            {
+                var repository = new BmsLibraryIndexRepository(Path.Combine(tempDir, BmsStoragePaths.INDEX_DATABASE_FILE));
+                var nested = new BMSChartCache
+                {
+                    FolderPath = @"E:\bms\pack\nested",
+                    FileName = "hyper.bms",
+                    FileSize = 10,
+                    LastModified = DateTime.UtcNow,
+                    Title = "Pack Song",
+                    Artist = "Artist",
+                    PlayLevel = 12,
+                    KeyCount = 7,
+                    TotalNotes = 100,
+                    Bpm = 150,
+                };
+                var sibling = new BMSChartCache
+                {
+                    FolderPath = @"E:\bms\pack",
+                    FileName = "normal.bms",
+                    FileSize = 10,
+                    LastModified = DateTime.UtcNow,
+                    Title = "Pack Song",
+                    Artist = "Artist",
+                    PlayLevel = 5,
+                    KeyCount = 7,
+                    TotalNotes = 80,
+                    Bpm = 150,
+                };
+
+                repository.UpsertChart(nested, BmsChartIdentity.CreateBeatmapId(nested.FullPath), BmsPathKeys.ComputeChartPathKey(nested.FullPath));
+                repository.UpsertChart(sibling, BmsChartIdentity.CreateBeatmapId(sibling.FullPath), BmsPathKeys.ComputeChartPathKey(sibling.FullPath));
+
+                BmsChartSummaryPage slashMismatch = repository.GetChartSummaries(
+                    new BmsChartQuery(FolderPath: "E:/bms/pack"),
+                    null,
+                    10);
+                BmsChartSummaryPage recursive = repository.GetChartSummaries(
+                    new BmsChartQuery(FolderPath: @"E:\bms\pack", FolderRecursive: true, Sort: BmsChartSort.Level),
+                    null,
+                    10);
+                IReadOnlyList<BmsFolderSummary> children = repository.GetChildFolders(@"E:\bms", null, 10);
+                IReadOnlyList<BmsFolderSummary> chartOnlyNested = repository.GetChildFolders(@"E:\bms\pack", null, 10);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(slashMismatch.Items, Has.Count.EqualTo(1));
+                    Assert.That(slashMismatch.Items[0].FileName, Is.EqualTo("normal.bms"));
+                    Assert.That(recursive.Items.Select(item => item.FileName), Is.EquivalentTo(new[] { "normal.bms", "hyper.bms" }));
+                    Assert.That(recursive.Items[0].PlayLevel, Is.EqualTo(5));
+                    Assert.That(children.Select(folder => folder.Name), Does.Contain("pack"));
+                    Assert.That(chartOnlyNested.Select(folder => folder.Name), Does.Contain("nested"));
+                });
+            }
+            finally
+            {
+                cleanupTempDirectory(tempDir);
+            }
+        }
+
         private static BMSChartCache createChart(string folderPath, string fileName, long fileSize)
         {
             return new BMSChartCache

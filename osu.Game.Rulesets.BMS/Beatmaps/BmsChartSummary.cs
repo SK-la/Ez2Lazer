@@ -17,7 +17,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         string? FolderPath = null,
         string? SearchText = null,
         IReadOnlyCollection<int>? KeyCounts = null,
-        BmsChartSort Sort = BmsChartSort.Title);
+        BmsChartSort Sort = BmsChartSort.Title,
+        bool FolderRecursive = false);
 
     public sealed record BmsChartSummary(
         Guid BeatmapId,

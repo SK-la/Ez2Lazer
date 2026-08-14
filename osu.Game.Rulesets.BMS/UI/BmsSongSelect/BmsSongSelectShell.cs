@@ -33,9 +33,10 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         private readonly OsuSpriteText breadcrumbText;
         private readonly OsuSpriteText statusText;
         private readonly OsuSpriteText detailTitle;
-        private readonly OsuSpriteText detailBody;
+        private readonly OsuSpriteText detailMeta;
         private readonly FillFlowContainer sourceFlow;
         private readonly FillFlowContainer listFlow;
+        private readonly FillFlowContainer difficultyFlow;
         private readonly Container sourcePanel;
         private readonly Container listPanel;
         private readonly Container detailPanel;
@@ -81,7 +82,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                                 Origin = Anchor.BottomLeft,
                                 Font = OsuFont.Default.With(size: 11),
                                 Colour = Colour4.Gray,
-                                Text = "↑↓ 选择  ←→ 切换栏  Enter 打开/游玩/下载  D 打开下载  Esc 返回  1 键数  2 排序",
+                                Text = "↑↓ 选择  ←→ 源/曲目/难度  Enter 打开/游玩  D 下载  Esc 返回  1 键数  2 排序",
                             },
                         },
                     },
@@ -99,6 +100,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                                 Anchor = Anchor.TopRight,
                                 Origin = Anchor.TopRight,
                                 Width = 1f - source_width - list_width - 0.02f,
+                                Masking = true,
                                 Children = new Drawable[]
                                 {
                                     new Box
@@ -106,23 +108,58 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                                         RelativeSizeAxes = Axes.Both,
                                         Colour = Colour4.Black.Opacity(0.3f),
                                     },
-                                    new FillFlowContainer
+                                    new GridContainer
                                     {
                                         RelativeSizeAxes = Axes.Both,
-                                        Direction = FillDirection.Vertical,
-                                        Padding = new MarginPadding(14),
-                                        Spacing = new osuTK.Vector2(0, 8),
-                                        Children = new Drawable[]
+                                        Padding = new MarginPadding(12),
+                                        RowDimensions = new[]
                                         {
-                                            detailTitle = new OsuSpriteText
+                                            new Dimension(GridSizeMode.AutoSize),
+                                            new Dimension(GridSizeMode.AutoSize),
+                                            new Dimension(GridSizeMode.AutoSize),
+                                            new Dimension(),
+                                        },
+                                        Content = new[]
+                                        {
+                                            new Drawable[]
                                             {
-                                                Font = OsuFont.GetFont(size: 20, weight: FontWeight.Bold),
-                                                RelativeSizeAxes = Axes.X,
+                                                detailTitle = new OsuSpriteText
+                                                {
+                                                    Font = OsuFont.GetFont(size: 18, weight: FontWeight.Bold),
+                                                    RelativeSizeAxes = Axes.X,
+                                                },
                                             },
-                                            detailBody = new OsuSpriteText
+                                            new Drawable[]
                                             {
-                                                Font = OsuFont.Default.With(size: 13),
-                                                RelativeSizeAxes = Axes.X,
+                                                detailMeta = new OsuSpriteText
+                                                {
+                                                    Font = OsuFont.Default.With(size: 12),
+                                                    Colour = Colour4.Gray,
+                                                    RelativeSizeAxes = Axes.X,
+                                                },
+                                            },
+                                            new Drawable[]
+                                            {
+                                                new OsuSpriteText
+                                                {
+                                                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
+                                                    Colour = Colour4.Gray,
+                                                    Text = BmsStrings.RAJA_DIFFICULTY_LIST_HEADER,
+                                                    Margin = new MarginPadding { Top = 8, Bottom = 4 },
+                                                },
+                                            },
+                                            new Drawable[]
+                                            {
+                                                new OsuScrollContainer
+                                                {
+                                                    RelativeSizeAxes = Axes.Both,
+                                                    Child = difficultyFlow = new FillFlowContainer
+                                                    {
+                                                        RelativeSizeAxes = Axes.X,
+                                                        AutoSizeAxes = Axes.Y,
+                                                        Direction = FillDirection.Vertical,
+                                                    },
+                                                },
                                             },
                                         },
                                     },
@@ -187,10 +224,14 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             statusText.Text = $"KEY: {context.KeyModeFilter.Current} | 排序: {context.SortPolicy.Mode}";
 
             bool sourceFocused = navigator.FocusPane == BmsSongSelectFocusPane.Source;
+            bool listFocused = navigator.FocusPane == BmsSongSelectFocusPane.List;
+            bool difficultyFocused = navigator.FocusPane == BmsSongSelectFocusPane.Difficulty;
             sourcePanel.BorderThickness = sourceFocused ? 2 : 0;
             sourcePanel.BorderColour = Colour4.SkyBlue;
-            listPanel.BorderThickness = sourceFocused ? 0 : 2;
+            listPanel.BorderThickness = listFocused ? 2 : 0;
             listPanel.BorderColour = Colour4.SkyBlue;
+            detailPanel.BorderThickness = difficultyFocused ? 2 : 0;
+            detailPanel.BorderColour = Colour4.SkyBlue;
 
             sourceFlow.Clear();
 
@@ -231,6 +272,38 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 }));
             }
 
+            difficultyFlow.Clear();
+
+            if (navigator.DifficultyBars.Count == 0)
+            {
+                difficultyFlow.Add(new OsuSpriteText
+                {
+                    Font = OsuFont.Default.With(size: 12),
+                    Colour = Colour4.Gray,
+                    Text = BmsStrings.RAJA_EMPTY_LIST,
+                    Padding = new MarginPadding { Vertical = 4 },
+                });
+            }
+            else
+            {
+                for (int i = 0; i < navigator.DifficultyBars.Count; i++)
+                {
+                    int index = i;
+                    BmsSongBar diff = navigator.DifficultyBars[i];
+                    bool selected = index == navigator.DifficultyIndex;
+                    difficultyFlow.Add(createDifficultyRow(diff, selected, () =>
+                    {
+                        navigator.SelectDifficultyIndex(index);
+                        navigator.FocusDifficulty();
+                    }, doubleActivate: () =>
+                    {
+                        navigator.SelectDifficultyIndex(index);
+                        navigator.FocusDifficulty();
+                        RequestPlay?.Invoke();
+                    }));
+                }
+            }
+
             updateDetail(navigator.GetDetailBar());
         }
 
@@ -243,18 +316,19 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             if (bar == null)
             {
                 detailTitle.Text = BmsStrings.RAJA_PLACEHOLDER_DASH;
-                detailBody.Text = string.Empty;
+                detailMeta.Text = string.Empty;
                 return;
             }
 
+            BmsSongBar? selectedDiff = navigator.GetSelectedDifficulty();
             detailTitle.Text = bar.Title;
 
-            if (bar is BmsSongBar song)
+            if (selectedDiff != null)
             {
-                BmsChartSummary c = song.Summary;
+                BmsChartSummary c = selectedDiff.Summary;
                 string analyticsLine = BmsStrings.RAJA_ANALYTICS_NONE.ToString();
 
-                if (context.Analytics.TryGet(song.PathKey, out BmsAnalyticsRecord record))
+                if (context.Analytics.TryGet(selectedDiff.PathKey, out BmsAnalyticsRecord record))
                 {
                     analyticsLine = BmsStrings.Raja_DetailAnalytics(
                         record.Pp ?? 0,
@@ -264,42 +338,43 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                         record.StarRating ?? 0);
                 }
 
-                string lampLine = $"Lamp: {context.LampStore.GetLamp(song.BeatmapId)}";
-
-                detailBody.Text = string.Join("\n",
-                    BmsStrings.Raja_DetailArtist(c.Artist),
-                    BmsStrings.Raja_DetailLevel(c.PlayLevel, c.KeyCount, c.FileName),
-                    BmsStrings.Raja_DetailBpm(c.Bpm, c.TotalNotes),
-                    lampLine,
-                    BmsStrings.Raja_DetailPath(c.FolderPath),
+                detailMeta.Text = string.Join("  ·  ",
+                    c.Artist,
+                    $"Lv.{c.PlayLevel} {c.KeyCount}K",
+                    $"BPM {c.Bpm:0.#}",
+                    $"Lamp {context.LampStore.GetLamp(selectedDiff.BeatmapId)}",
                     analyticsLine);
+                return;
             }
-            else if (bar is BmsMissingChartBar missing)
+
+            if (bar is BmsMissingChartBar missing)
             {
-                detailBody.Text = string.Join("\n",
-                    $"表等级: {missing.TableLevel}",
-                    BmsStrings.Raja_DetailArtist(missing.Entry.Artist),
-                    $"MD5: {missing.Entry.Md5}",
-                    $"SHA256: {missing.Entry.Sha256}",
-                    missing.Entry.HasDownloadUrl
-                        ? $"下载: {missing.Entry.PreferredDownloadUrl}\n状态: 未导入（Enter / D 打开下载页）"
-                        : "状态: 未导入（表条目无下载链接）");
+                detailMeta.Text = string.Join("  ·  ",
+                    missing.Entry.Artist,
+                    missing.TableLevel,
+                    missing.Entry.HasDownloadUrl ? "未导入（Enter / D 打开下载页）" : "未导入");
+                return;
             }
-            else if (bar is BmsTableBar table)
+
+            if (bar is BmsTableBar table)
             {
-                detailBody.Text = string.Join("\n",
-                    $"等级数: {table.Table.Levels.Count}",
-                    string.IsNullOrEmpty(table.Table.Tag) ? "-" : $"Tag: {table.Table.Tag}",
-                    string.IsNullOrEmpty(table.Table.Url) ? "-" : table.Table.Url);
+                detailMeta.Text = $"{table.Table.Levels.Count} levels";
+                return;
             }
-            else if (bar is BmsDirectoryBar)
+
+            if (bar is BmsDirectoryBar)
             {
-                detailBody.Text = BmsStrings.RAJA_DIRECTORY_ENTER_HINT;
+                detailMeta.Text = BmsStrings.RAJA_DIRECTORY_ENTER_HINT.ToString();
+                return;
             }
-            else
+
+            if (bar is BmsSongPackBar pack)
             {
-                detailBody.Text = bar.Subtitle;
+                detailMeta.Text = pack.Subtitle;
+                return;
             }
+
+            detailMeta.Text = bar.Subtitle;
         }
 
         private Drawable createRow(BmsBar bar, bool selected, Action onActivate, Action? doubleActivate = null)
@@ -341,12 +416,41 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 title = missing.Title;
                 lamp = "×";
             }
+            else if (bar is BmsSongPackBar pack)
+            {
+                level = pack.Difficulties.Count.ToString();
+                artist = pack.Difficulties[0].Artist;
+                title = pack.Title;
+                lamp = "♪";
+            }
             else if (bar.IsDirectory)
             {
                 title = "▶ " + title;
             }
 
             return new BmsDenseListRow(selected, lamp, level, title, artist, textColour, onActivate, doubleActivate)
+            {
+                Height = row_height,
+            };
+        }
+
+        private Drawable createDifficultyRow(BmsSongBar song, bool selected, Action onActivate, Action? doubleActivate)
+        {
+            BmsChartSummary c = song.Summary;
+            string title = string.IsNullOrWhiteSpace(c.FileName) ? c.Title : c.FileName;
+            string extra = string.IsNullOrWhiteSpace(c.Title) || string.Equals(c.Title, c.FileName, StringComparison.OrdinalIgnoreCase)
+                ? $"{c.KeyCount}K"
+                : $"{c.KeyCount}K · {c.Title}";
+
+            return new BmsDenseListRow(
+                selected,
+                lampGlyph(context.LampStore.GetLamp(song.BeatmapId)),
+                c.PlayLevel.ToString(),
+                title,
+                extra,
+                Colour4.White,
+                onActivate,
+                doubleActivate)
             {
                 Height = row_height,
             };
@@ -367,33 +471,72 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             switch (e.Key)
             {
                 case Key.Up:
-                    if (navigator.FocusPane == BmsSongSelectFocusPane.Source)
-                        navigator.MoveSource(-1);
-                    else
-                        navigator.MoveList(-1);
+                    switch (navigator.FocusPane)
+                    {
+                        case BmsSongSelectFocusPane.Source:
+                            navigator.MoveSource(-1);
+                            break;
+
+                        case BmsSongSelectFocusPane.Difficulty:
+                            navigator.MoveDifficulty(-1);
+                            break;
+
+                        default:
+                            navigator.MoveList(-1);
+                            break;
+                    }
+
                     return true;
 
                 case Key.Down:
-                    if (navigator.FocusPane == BmsSongSelectFocusPane.Source)
-                        navigator.MoveSource(1);
-                    else
-                        navigator.MoveList(1);
+                    switch (navigator.FocusPane)
+                    {
+                        case BmsSongSelectFocusPane.Source:
+                            navigator.MoveSource(1);
+                            break;
+
+                        case BmsSongSelectFocusPane.Difficulty:
+                            navigator.MoveDifficulty(1);
+                            break;
+
+                        default:
+                            navigator.MoveList(1);
+                            break;
+                    }
+
                     return true;
 
                 case Key.Left:
-                    if (navigator.FocusPane == BmsSongSelectFocusPane.List)
-                        navigator.FocusSource();
-                    else
-                        navigator.GoBack();
+                    switch (navigator.FocusPane)
+                    {
+                        case BmsSongSelectFocusPane.Difficulty:
+                            navigator.FocusList();
+                            break;
+
+                        case BmsSongSelectFocusPane.List:
+                            navigator.FocusSource();
+                            break;
+
+                        default:
+                            navigator.GoBack();
+                            break;
+                    }
+
                     return true;
 
                 case Key.Right:
-                    if (navigator.FocusPane == BmsSongSelectFocusPane.Source)
+                    switch (navigator.FocusPane)
                     {
-                        if (navigator.GetSelectedSourceBar() is BmsDirectoryBar)
-                            navigator.ActivateSource();
-                        else
-                            navigator.FocusList();
+                        case BmsSongSelectFocusPane.Source:
+                            if (navigator.GetSelectedSourceBar() is BmsDirectoryBar)
+                                navigator.ActivateSource();
+                            else
+                                navigator.FocusList();
+                            break;
+
+                        case BmsSongSelectFocusPane.List:
+                            navigator.FocusDifficulty();
+                            break;
                     }
 
                     return true;
@@ -403,9 +546,24 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                     {
                         navigator.ActivateSource();
                     }
+                    else if (navigator.FocusPane == BmsSongSelectFocusPane.Difficulty)
+                    {
+                        if (navigator.GetSelectedSong() != null)
+                            RequestPlay?.Invoke();
+                    }
                     else
                     {
-                        navigator.ActivateList();
+                        if (navigator.GetSelectedListBar() is BmsDirectoryBar)
+                        {
+                            navigator.ActivateList();
+                            return true;
+                        }
+
+                        if (navigator.DifficultyBars.Count > 1)
+                        {
+                            navigator.FocusDifficulty();
+                            return true;
+                        }
 
                         if (navigator.GetSelectedSong() != null)
                             RequestPlay?.Invoke();

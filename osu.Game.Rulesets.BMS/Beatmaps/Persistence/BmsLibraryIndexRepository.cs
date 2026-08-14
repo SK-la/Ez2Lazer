@@ -475,8 +475,12 @@ LIMIT 1;";
             cmd.CommandText = $@"
 WITH normalised AS (
     SELECT DISTINCT replace(folder_path, '\', '/') AS folder_path
-    FROM {table_songs}
-    WHERE replace(folder_path, '\', '/') LIKE $prefix ESCAPE '\'
+    FROM (
+        SELECT folder_path FROM {table_songs}
+        UNION
+        SELECT folder_path FROM {table_charts}
+    )
+    WHERE replace(folder_path, '\', '/') LIKE $prefix ESCAPE '\' COLLATE NOCASE
 ),
 children AS (
     SELECT DISTINCT
@@ -488,7 +492,7 @@ children AS (
 )
 SELECT folder_path
 FROM children
-WHERE folder_path <> $parent
+WHERE folder_path COLLATE NOCASE <> $parent COLLATE NOCASE
   AND ($after IS NULL OR folder_path > $after COLLATE NOCASE)
 ORDER BY folder_path COLLATE NOCASE
 LIMIT $limit;";
@@ -1058,8 +1062,16 @@ ON CONFLICT(chart_path) DO UPDATE SET
         {
             if (!string.IsNullOrEmpty(query.FolderPath))
             {
-                where.Add("folder_path = $folderPath");
-                command.Parameters.AddWithValue("$folderPath", query.FolderPath);
+                string normalisedFolder = query.FolderPath.Replace('\\', '/').TrimEnd('/');
+                command.Parameters.AddWithValue("$folderPath", normalisedFolder);
+
+                if (query.FolderRecursive)
+                {
+                    where.Add("(replace(folder_path, '\\', '/') = $folderPath COLLATE NOCASE OR replace(folder_path, '\\', '/') LIKE $folderPrefix ESCAPE '\\' COLLATE NOCASE)");
+                    command.Parameters.AddWithValue("$folderPrefix", $"{escapeLike(normalisedFolder)}/%");
+                }
+                else
+                    where.Add("replace(folder_path, '\\', '/') = $folderPath COLLATE NOCASE");
             }
 
             if (!string.IsNullOrWhiteSpace(query.SearchText))

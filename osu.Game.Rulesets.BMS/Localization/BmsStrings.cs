@@ -216,6 +216,8 @@ namespace osu.Game.Rulesets.BMS.Localization
 
         public static readonly LocalisableString RAJA_DIRECTORY_ENTER_HINT = new BmsLocalizationManager.BmsLocalisableString("目录 — 按 Enter 进入", "Folder — press Enter to open");
 
+        public static readonly LocalisableString RAJA_DIFFICULTY_LIST_HEADER = new BmsLocalizationManager.BmsLocalisableString("难度（滚动选择）", "Difficulties (scroll)");
+
         public static readonly LocalisableString RAJA_ANALYTICS_NONE = new BmsLocalizationManager.BmsLocalisableString("分析: —", "Analytics: —");
 
         public static readonly LocalisableString RAJA_SAME_FOLDER_FILTER_TITLE = new BmsLocalizationManager.BmsLocalisableString("SAME FOLDER", "SAME FOLDER");

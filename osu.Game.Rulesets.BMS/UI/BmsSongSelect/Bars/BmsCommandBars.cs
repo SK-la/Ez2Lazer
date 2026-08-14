@@ -130,7 +130,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
             var query = new BmsChartQuery(
                 FolderPath: folderPath,
                 KeyCounts: context.KeyModeFilter.ToKeyCounts(),
-                Sort: context.SortPolicy.IndexSort);
+                Sort: context.SortPolicy.IndexSort,
+                FolderRecursive: true);
             BmsChartSummaryPage page = context.BeatmapManager.GetChartSummaryPage(query, after?.IndexCursor, limit);
             return new BmsBarPage(
                 page.Items.Select(summary => (BmsBar)new BmsSongBar(summary)).ToList(),
@@ -151,7 +152,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
             return context.BeatmapManager.GetRandomChartSummary(new BmsChartQuery(
                 FolderPath: folderPath,
                 KeyCounts: context.KeyModeFilter.ToKeyCounts(),
-                Sort: context.SortPolicy.IndexSort));
+                Sort: context.SortPolicy.IndexSort,
+                FolderRecursive: true));
         }
     }
 

@@ -30,21 +30,26 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
 
             if (after == null)
             {
-                int folderLimit = Math.Min(50, limit);
+                foreach (BmsFolderSummary folder in context.BeatmapManager.GetChildFolderPage(FullPath, null, limit))
+                {
+                    BmsBar? child = createChildBar(context, folder);
+                    if (child != null)
+                        result.Add(child);
+                }
 
-                foreach (BmsFolderSummary folder in context.BeatmapManager.GetChildFolderPage(FullPath, null, folderLimit))
-                    result.Add(new BmsFolderBar(BmsPathCrc.Compute(folder.FolderPath), folder.Name, folder.FolderPath));
+                BmsChartSummaryPage loose = context.BeatmapManager.GetChartSummaryPage(
+                    new BmsChartQuery(
+                        FolderPath: FullPath,
+                        KeyCounts: context.KeyModeFilter.ToKeyCounts(),
+                        Sort: context.SortPolicy.IndexSort),
+                    null,
+                    Math.Max(1, limit - result.Count));
+
+                if (loose.Items.Count > 0)
+                    result.Add(new BmsSongPackBar(FullPath, Title, loose.Items));
             }
 
-            int chartLimit = Math.Max(1, limit - result.Count);
-            var query = new BmsChartQuery(
-                FolderPath: FullPath,
-                KeyCounts: context.KeyModeFilter.ToKeyCounts(),
-                Sort: context.SortPolicy.IndexSort);
-            BmsChartSummaryPage page = context.BeatmapManager.GetChartSummaryPage(query, after?.IndexCursor, chartLimit);
-            result.AddRange(page.Items.Select(summary => new BmsSongBar(summary)));
-            BmsBarPageCursor? next = page.NextCursor == null ? null : new BmsBarPageCursor(page.NextCursor, null);
-            return new BmsBarPage(result, next);
+            return new BmsBarPage(result, null);
         }
 
         public override BmsChartSummary? GetRandom(BmsBarContext context, IReadOnlyDictionary<string, System.Text.Json.JsonElement>? filter)
@@ -61,7 +66,44 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
             return context.BeatmapManager.GetRandomChartSummary(new BmsChartQuery(
                 FolderPath: FullPath,
                 KeyCounts: context.KeyModeFilter.ToKeyCounts(),
-                Sort: context.SortPolicy.IndexSort));
+                Sort: context.SortPolicy.IndexSort,
+                FolderRecursive: true));
+        }
+
+        /// <summary>
+        /// Packs (folders with charts, or leaf folders whose charts live in nested paths) become song rows.
+        /// Intermediate grouping folders stay directories.
+        /// </summary>
+        private static BmsBar? createChildBar(BmsBarContext context, BmsFolderSummary folder)
+        {
+            var keyCounts = context.KeyModeFilter.ToKeyCounts();
+            BmsChartSort sort = context.SortPolicy.IndexSort;
+
+            BmsChartSummaryPage exact = context.BeatmapManager.GetChartSummaryPage(
+                new BmsChartQuery(FolderPath: folder.FolderPath, KeyCounts: keyCounts, Sort: sort),
+                null,
+                1);
+            bool hasChildFolders = context.BeatmapManager.GetChildFolderPage(folder.FolderPath, null, 1).Count > 0;
+            bool treatAsPack = exact.Items.Count > 0 || !hasChildFolders;
+
+            if (!treatAsPack)
+                return new BmsFolderBar(BmsPathCrc.Compute(folder.FolderPath), folder.Name, folder.FolderPath);
+
+            BmsChartSummaryPage charts = context.BeatmapManager.GetChartSummaryPage(
+                new BmsChartQuery(
+                    FolderPath: folder.FolderPath,
+                    KeyCounts: keyCounts,
+                    Sort: BmsChartSort.Level,
+                    FolderRecursive: true),
+                null,
+                200);
+
+            if (charts.Items.Count == 0)
+                return hasChildFolders
+                    ? new BmsFolderBar(BmsPathCrc.Compute(folder.FolderPath), folder.Name, folder.FolderPath)
+                    : null;
+
+            return new BmsSongPackBar(folder.FolderPath, folder.Name, charts.Items);
         }
     }
 }

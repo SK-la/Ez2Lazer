@@ -28,13 +28,28 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         public IReadOnlyList<BmsBar> Sort(IReadOnlyList<BmsBar> bars)
         {
             IEnumerable<BmsBar> folders = bars.Where(b => b.IsDirectory);
-            IEnumerable<BmsBar> songs = bars.Where(b => b is BmsSongBar or BmsMissingChartBar);
+            IEnumerable<BmsBar> songs = bars.Where(b => b is BmsSongBar or BmsMissingChartBar or BmsSongPackBar);
 
             songs = Mode switch
             {
-                BmsSortMode.Level => songs.OrderBy(b => b is BmsSongBar song ? song.Summary.PlayLevel : 0).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
-                BmsSortMode.Artist => songs.OrderBy(b => b is BmsSongBar song ? song.Summary.Artist : b.Subtitle, StringComparer.OrdinalIgnoreCase).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
-                BmsSortMode.Folder => songs.OrderBy(b => b is BmsSongBar song ? song.Summary.FolderPath : string.Empty, StringComparer.OrdinalIgnoreCase).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
+                BmsSortMode.Level => songs.OrderBy(b => b switch
+                {
+                    BmsSongBar song => song.Summary.PlayLevel,
+                    BmsSongPackBar pack => pack.Difficulties[0].PlayLevel,
+                    _ => 0,
+                }).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
+                BmsSortMode.Artist => songs.OrderBy(b => b switch
+                {
+                    BmsSongBar song => song.Summary.Artist,
+                    BmsSongPackBar pack => pack.Difficulties[0].Artist,
+                    _ => b.Subtitle,
+                }, StringComparer.OrdinalIgnoreCase).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
+                BmsSortMode.Folder => songs.OrderBy(b => b switch
+                {
+                    BmsSongBar song => song.Summary.FolderPath,
+                    BmsSongPackBar pack => pack.FolderPath,
+                    _ => string.Empty,
+                }, StringComparer.OrdinalIgnoreCase).ThenBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
                 _ => songs.OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase),
             };
 

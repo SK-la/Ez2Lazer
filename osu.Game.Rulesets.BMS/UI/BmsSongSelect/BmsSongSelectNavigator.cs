@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables;
@@ -11,6 +12,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
     {
         Source,
         List,
+        Difficulty,
     }
 
     public enum BmsSongSelectSourceKind
@@ -44,9 +46,13 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
         public IReadOnlyList<BmsBar> ListBars { get; private set; } = Array.Empty<BmsBar>();
 
+        public IReadOnlyList<BmsSongBar> DifficultyBars { get; private set; } = Array.Empty<BmsSongBar>();
+
         public int SourceIndex { get; private set; }
 
         public int ListIndex { get; private set; }
+
+        public int DifficultyIndex { get; private set; }
 
         public string Breadcrumb { get; private set; } = string.Empty;
 
@@ -75,6 +81,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             rebuildSourceRoot();
             ListBars = Array.Empty<BmsBar>();
             ListIndex = 0;
+            DifficultyBars = Array.Empty<BmsSongBar>();
+            DifficultyIndex = 0;
             SourceIndex = findNearestSelectable(SourceBars, 0);
             updateBreadcrumb();
             Changed?.Invoke();
@@ -131,6 +139,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 return;
 
             ListIndex = stepIndex(ListBars, ListIndex, delta);
+            rebuildDifficulties();
             Changed?.Invoke();
         }
 
@@ -140,6 +149,25 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 return;
 
             ListIndex = findNearestSelectable(ListBars, index);
+            rebuildDifficulties();
+            Changed?.Invoke();
+        }
+
+        public void MoveDifficulty(int delta)
+        {
+            if (DifficultyBars.Count == 0)
+                return;
+
+            DifficultyIndex = stepIndex(DifficultyBars, DifficultyIndex, delta);
+            Changed?.Invoke();
+        }
+
+        public void SelectDifficultyIndex(int index)
+        {
+            if (DifficultyBars.Count == 0)
+                return;
+
+            DifficultyIndex = Math.Clamp(index, 0, DifficultyBars.Count - 1);
             Changed?.Invoke();
         }
 
@@ -151,6 +179,14 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 return;
 
             setFocus(BmsSongSelectFocusPane.List);
+        }
+
+        public void FocusDifficulty()
+        {
+            if (DifficultyBars.Count == 0)
+                return;
+
+            setFocus(BmsSongSelectFocusPane.Difficulty);
         }
 
         public void ActivateSource()
@@ -189,11 +225,14 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 return;
             }
 
-            // Song bars are played by the screen, not opened here.
+            if (bar is BmsSongPackBar && DifficultyBars.Count > 1)
+                FocusDifficulty();
+
+            // Song / pack bars are played by the screen from the selected difficulty.
         }
 
         public bool CanNavigateBack =>
-            FocusPane == BmsSongSelectFocusPane.List
+            FocusPane is BmsSongSelectFocusPane.List or BmsSongSelectFocusPane.Difficulty
             || ActiveLevel != null
             || ActiveTable != null
             || currentDirectory != null;
@@ -209,6 +248,12 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
         public void GoBack()
         {
+            if (FocusPane == BmsSongSelectFocusPane.Difficulty)
+            {
+                FocusList();
+                return;
+            }
+
             if (FocusPane == BmsSongSelectFocusPane.List)
             {
                 FocusSource();
@@ -236,14 +281,17 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
         public BmsSongBar? GetSelectedSong()
         {
-            if (FocusPane == BmsSongSelectFocusPane.List && GetSelectedListBar() is BmsSongBar song)
-                return song;
+            if (DifficultyBars.Count > 0)
+                return DifficultyBars[Math.Clamp(DifficultyIndex, 0, DifficultyBars.Count - 1)];
 
-            if (GetSelectedListBar() is BmsSongBar fallback)
-                return fallback;
+            if (GetSelectedListBar() is BmsSongBar song)
+                return song;
 
             return null;
         }
+
+        public BmsSongBar? GetSelectedDifficulty()
+            => DifficultyBars.Count == 0 ? null : DifficultyBars[Math.Clamp(DifficultyIndex, 0, DifficultyBars.Count - 1)];
 
         public BmsMissingChartBar? GetSelectedMissingChart()
         {
@@ -255,7 +303,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
         public BmsBar? GetDetailBar()
         {
-            if (FocusPane == BmsSongSelectFocusPane.List)
+            if (FocusPane is BmsSongSelectFocusPane.List or BmsSongSelectFocusPane.Difficulty)
                 return GetSelectedListBar() ?? GetSelectedSourceBar();
 
             return GetSelectedSourceBar() ?? GetSelectedListBar();
@@ -271,6 +319,8 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             SourceIndex = findNearestSelectable(SourceBars, 0);
             ListBars = Array.Empty<BmsBar>();
             ListIndex = 0;
+            DifficultyBars = Array.Empty<BmsSongBar>();
+            DifficultyIndex = 0;
             FocusPane = BmsSongSelectFocusPane.Source;
             updateBreadcrumb();
             Changed?.Invoke();
@@ -308,7 +358,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 SourceBars = dir.GetChildren(context).ToList();
                 SourceIndex = findNearestSelectable(SourceBars, 0);
                 refreshListFromDirectory(dir);
-                FocusPane = ListBars.Any(b => b is BmsSongBar or BmsMissingChartBar)
+                FocusPane = ListBars.Any(b => b is BmsSongBar or BmsMissingChartBar or BmsSongPackBar)
                     ? BmsSongSelectFocusPane.List
                     : BmsSongSelectFocusPane.Source;
             }
@@ -345,13 +395,14 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 filtered = children.Where(bar => barMatchesFilter(bar, listFilterText));
             }
 
-            var list = filtered.Where(b => b is BmsSongBar or BmsMissingChartBar or BmsDirectoryBar).ToList();
+            var list = filtered.Where(b => b is BmsSongBar or BmsMissingChartBar or BmsDirectoryBar or BmsSongPackBar).ToList();
 
             if (dir.IsSortable)
                 list = context.SortPolicy.Sort(list).ToList();
 
             ListBars = list;
             ListIndex = findNearestSelectable(ListBars, ListIndex);
+            rebuildDifficulties();
         }
 
         private void rebuildSourceRoot()
@@ -445,7 +496,57 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                            || song.Summary.FileName.Contains(filter, StringComparison.OrdinalIgnoreCase)))
                    || (bar is BmsMissingChartBar missing
                        && (missing.Entry.Artist.Contains(filter, StringComparison.OrdinalIgnoreCase)
-                           || missing.Entry.PreferredHash.Contains(filter, StringComparison.OrdinalIgnoreCase)));
+                           || missing.Entry.PreferredHash.Contains(filter, StringComparison.OrdinalIgnoreCase)))
+                   || (bar is BmsSongPackBar pack
+                       && (pack.FolderPath.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                           || pack.Difficulties.Any(d =>
+                               d.Title.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                               || d.Artist.Contains(filter, StringComparison.OrdinalIgnoreCase)
+                               || d.FileName.Contains(filter, StringComparison.OrdinalIgnoreCase))));
+        }
+
+        private void rebuildDifficulties()
+        {
+            Guid? previousId = DifficultyBars.Count > 0
+                ? DifficultyBars[Math.Clamp(DifficultyIndex, 0, DifficultyBars.Count - 1)].BeatmapId
+                : null;
+
+            IReadOnlyList<BmsSongBar> diffs = GetSelectedListBar() switch
+            {
+                BmsSongPackBar pack => pack.Difficulties.Select(summary => new BmsSongBar(summary)).ToList(),
+                BmsSongBar song => loadSiblingDifficulties(song),
+                _ => Array.Empty<BmsSongBar>(),
+            };
+
+            DifficultyBars = diffs;
+
+            int kept = previousId == null ? -1 : diffs.ToList().FindIndex(d => d.BeatmapId == previousId);
+            DifficultyIndex = kept >= 0 ? kept : 0;
+        }
+
+        private IReadOnlyList<BmsSongBar> loadSiblingDifficulties(BmsSongBar song)
+        {
+            if (string.IsNullOrEmpty(song.Summary.FolderPath))
+                return new[] { song };
+
+            BmsChartSummaryPage page = context.BeatmapManager.GetChartSummaryPage(
+                new BmsChartQuery(
+                    FolderPath: song.Summary.FolderPath,
+                    KeyCounts: context.KeyModeFilter.ToKeyCounts(),
+                    Sort: BmsChartSort.Level,
+                    FolderRecursive: true),
+                null,
+                200);
+
+            if (page.Items.Count == 0)
+                return new[] { song };
+
+            var bars = page.Items.Select(summary => new BmsSongBar(summary)).ToList();
+
+            if (bars.All(bar => bar.BeatmapId != song.BeatmapId))
+                bars.Insert(0, song);
+
+            return bars;
         }
 
         private static int stepIndex(IReadOnlyList<BmsBar> bars, int start, int delta)
