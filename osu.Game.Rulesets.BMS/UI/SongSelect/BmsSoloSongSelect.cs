@@ -43,8 +43,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
     {
         private BMSBeatmapManager beatmapManager = null!;
         private BmsChartPreviewPlayer previewPlayer = null!;
-        private Bindable<string> libraryPathsBindable = null!;
-        private Bindable<string> legacyRootPathBindable = null!;
+        private BMSRulesetConfigManager? bmsConfig;
         private RulesetInfo bmsRulesetInfo = null!;
 
         // Lamp template wiring: scheme picks lamp-from-context rules, store keeps the best lamp per
@@ -112,19 +111,15 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             bmsRulesetInfo = bmsRuleset.RulesetInfo;
             var config = configCache.GetConfigFor(bmsRuleset);
 
-            if (config is BMSRulesetConfigManager bmsConfig)
+            if (config is BMSRulesetConfigManager loadedConfig)
             {
-                libraryPathsBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsLibraryPaths);
-                legacyRootPathBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsRootPath);
+                bmsConfig = loadedConfig;
+                bmsConfig.ApplyResolvedLibraryPaths(beatmapManager = BMSBeatmapManager.GetShared(storage));
             }
             else
             {
-                libraryPathsBindable = new Bindable<string>(string.Empty);
-                legacyRootPathBindable = new Bindable<string>(string.Empty);
+                beatmapManager = BMSBeatmapManager.GetShared(storage);
             }
-
-            beatmapManager = BMSBeatmapManager.GetShared(storage);
-            syncConfiguredPaths();
 
             // Lamp DB lives under EzBMS next to the chart index. Repository init is internally try/catch so
             // a corrupt sqlite file degrades to "no lamps" rather than blocking song-select from opening.
@@ -226,6 +221,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         public override void OnResuming(ScreenTransitionEvent e)
         {
+            previewPlayer.StopPreview();
+
             // ManiaCompatibility gameplay pushes ManiaConvertedWorkingBeatmap into the global Beatmap bindable and
             // switches Ruleset to mania. Song select HUD (EzHUDRadarPanel, difficulty cache, …) may call
             // GetPlayableBeatmap from background threads on that shared wrapper → concurrent ApplyDefaults on the
@@ -236,7 +233,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             base.OnResuming(e);
             suspendGlobalMusicController();
-            updatePreview();
+            Scheduler.AddOnce(updatePreview);
         }
 
         /// <summary>
@@ -355,7 +352,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private bool tryResolveBmsSource(BeatmapInfo info, out string chartPath, out BMSChartCache? chartCache) =>
             BmsSongSelectPlayHelper.TryResolveSource(beatmapManager, info, out chartPath, out chartCache);
 
-        private void syncConfiguredPaths() => beatmapManager.SetRootPaths(BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value));
+        private void syncConfiguredPaths() => bmsConfig?.ApplyResolvedLibraryPaths(beatmapManager);
 
         /// <summary>
         /// Re-run carousel filtering after Realm catalog changes without adding APIs to <see cref="FilterControl"/>.
@@ -411,6 +408,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }
 
             // Stop without flipping UserPauseRequested — we want main-menu auto-resume after exit.
+            musicController.ResetTrackAdjustments();
             musicController.Stop();
             musicController.AllowTrackControl.Value = false;
         }

@@ -425,8 +425,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                     break;
 
                 case Key.Escape:
-                    navigator.GoBack();
-                    return true;
+                    return navigator.TryGoBack();
             }
 
             return base.OnKeyDown(e);

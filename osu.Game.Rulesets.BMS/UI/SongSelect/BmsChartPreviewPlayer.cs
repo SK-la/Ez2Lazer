@@ -6,7 +6,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
-using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BMS.Audio;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics;
@@ -149,17 +148,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 }
             }
 
-            // 2) Note key-sounds — pull file lookups from each hit object's FileHitSampleInfo.
-            //    We use the playable beatmap (post-conversion) to align with what gameplay would actually play.
-            try
-            {
-                IBeatmap playable = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
-                addHitObjectSamples(playable.HitObjects);
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[BMS] BmsChartPreviewPlayer: failed to read playable hit objects for keysound preview: {ex.Message}", LoggingTarget.Runtime, LogLevel.Important);
-            }
+            // 2) Note key-sounds from the same decoded BMSBeatmap as BGM events, so both
+            //    streams share one time base. GetPlayableBeatmap conversion can shift note times.
+            addHitObjectSamples(beatmap.Beatmap.HitObjects);
 
             timeline.Sort((a, b) => a.Time.CompareTo(b.Time));
         }

@@ -36,8 +36,10 @@ namespace osu.Game.Rulesets.BMS.Scoring
 
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
-            // BMS-style EX SCORE calculation
-            return 1000000 * accuracyProgress;
+            // EX SCORE: PG=2 / GR=1 via GetBaseScoreForResult. MinimumAccuracy is
+            // currentBaseScore / maximumBaseScore, so misses actually lower the total.
+            // accuracyProgress is "judgements completed" and is always 1 at the end of a chart.
+            return 1_000_000 * MinimumAccuracy.Value;
         }
 
         public override int GetBaseScoreForResult(HitResult result)

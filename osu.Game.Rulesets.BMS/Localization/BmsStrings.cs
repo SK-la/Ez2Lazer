@@ -128,7 +128,7 @@ namespace osu.Game.Rulesets.BMS.Localization
 
         public static readonly LocalisableString SONG_SELECT_BUILD_ANALYTICS_SHORT = new BmsLocalizationManager.BmsLocalisableString("构建分析库", "Build analytics");
 
-        public static readonly LocalisableString SONG_SELECT_BACK = new BmsLocalizationManager.BmsLocalisableString("返回", "Back");
+        public static readonly LocalisableString SONG_SELECT_BACK = new BmsLocalizationManager.BmsLocalisableString("退出", "Exit");
 
         public static readonly LocalisableString SONG_SELECT_ADD_LIBRARY_PATH_FIRST =
             new BmsLocalizationManager.BmsLocalisableString("请先在 BMS 设置中添加曲库路径", "Add BMS library paths in Settings -> BMS first.");

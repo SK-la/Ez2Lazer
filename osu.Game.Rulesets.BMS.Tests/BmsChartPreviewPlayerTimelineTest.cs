@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.BMS.Tests
     /// <see cref="osu.Game.Rulesets.BMS.UI.SongSelect.BmsChartPreviewPlayer"/> walks the decoded chart and
     /// builds its preview timeline from two sources: <see cref="BMSBeatmap.BackgroundSoundEvents"/>
     /// (BMS background channels) and the <see cref="ConvertHitObjectParser.FileHitSampleInfo"/> samples
-    /// attached to playable note objects.
+    /// attached to decoded note objects on the same <see cref="BMSBeatmap"/>.
     ///
     /// These tests guard the contracts the player relies on, so refactors of the decoder/converter can't
     /// silently break preview-time keysound playback again. They don't exercise the audio pipeline itself

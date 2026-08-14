@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
@@ -27,8 +26,7 @@ namespace osu.Game.Rulesets.BMS.UI
     /// </summary>
     public partial class BMSDirectorySelectScreen : OsuScreen
     {
-        private readonly Bindable<string> libraryPathsBindable;
-        private readonly Bindable<string> legacyRootPathBindable;
+        private readonly BMSRulesetConfigManager config;
         private readonly List<string> stagedPaths;
         private readonly Action<IReadOnlyList<string>>? applyAction;
         private OsuDirectorySelector directorySelector = null!;
@@ -40,12 +38,11 @@ namespace osu.Game.Rulesets.BMS.UI
         [Resolved(canBeNull: true)]
         private IDialogOverlay? dialogOverlay { get; set; }
 
-        public BMSDirectorySelectScreen(Bindable<string> libraryPathsBindable, Bindable<string> legacyRootPathBindable, Action<IReadOnlyList<string>>? applyAction = null)
+        public BMSDirectorySelectScreen(BMSRulesetConfigManager config, Action<IReadOnlyList<string>>? applyAction = null)
         {
-            this.libraryPathsBindable = libraryPathsBindable;
-            this.legacyRootPathBindable = legacyRootPathBindable;
+            this.config = config;
             this.applyAction = applyAction;
-            stagedPaths = BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value).ToList();
+            stagedPaths = config.GetLibraryPaths().ToList();
         }
 
         [BackgroundDependencyLoader]
@@ -235,8 +232,7 @@ namespace osu.Game.Rulesets.BMS.UI
 
         private void applyPaths()
         {
-            libraryPathsBindable.Value = BMSRulesetConfigManager.SerialiseLibraryPaths(stagedPaths);
-            legacyRootPathBindable.Value = stagedPaths.FirstOrDefault() ?? string.Empty;
+            config.PersistLibraryPaths(stagedPaths);
             applyAction?.Invoke(stagedPaths.ToArray());
         }
 

@@ -89,7 +89,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
 
             try
             {
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+                using var http = createHttpClient(TimeSpan.FromSeconds(60));
                 return await importFromUrlAsync(http, url, skipIfCached: false, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -112,7 +112,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
             int total = catalog.Count;
             int done = 0;
 
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
+            using var http = createHttpClient(TimeSpan.FromSeconds(90));
 
             foreach (var entry in catalog)
             {
@@ -255,6 +255,15 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
             BmsDifficultyTableParser.WriteBmt(destPath, tableJson);
             Invalidate();
             return BmsDifficultyTableParser.TryLoadFile(destPath);
+        }
+
+        private static HttpClient createHttpClient(TimeSpan timeout)
+        {
+            var http = new HttpClient { Timeout = timeout };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            http.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/json;q=0.9,*/*;q=0.8");
+            return http;
         }
 
         private static string fileNameForUrl(string url)

@@ -3,6 +3,7 @@
 
 using System.Text.Json;
 using osu.Game.Configuration;
+using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.Configuration;
 
 namespace osu.Game.Rulesets.BMS.Configuration
@@ -62,6 +63,36 @@ namespace osu.Game.Rulesets.BMS.Configuration
         }
 
         public static string SerialiseLibraryPaths(IEnumerable<string> paths) => JsonSerializer.Serialize(normalisePaths(paths));
+
+        public IReadOnlyList<string> GetLibraryPaths()
+            => ParseLibraryPaths(Get<string>(BMSRulesetSetting.BmsLibraryPaths), Get<string>(BMSRulesetSetting.BmsRootPath));
+
+        public void PersistLibraryPaths(IReadOnlyList<string> paths)
+        {
+            IReadOnlyList<string> normalised = ParseLibraryPaths(SerialiseLibraryPaths(paths));
+            SetValue(BMSRulesetSetting.BmsLibraryPaths, SerialiseLibraryPaths(normalised));
+            SetValue(BMSRulesetSetting.BmsRootPath, normalised.Count > 0 ? normalised[0] : string.Empty);
+        }
+
+        /// <summary>
+        /// Prefer persisted settings; if they were lost (unbound settings bindable), recover from the index file.
+        /// </summary>
+        public void ApplyResolvedLibraryPaths(BMSBeatmapManager beatmapManager)
+        {
+            IReadOnlyList<string> configured = GetLibraryPaths();
+
+            if (configured.Count > 0)
+            {
+                beatmapManager.SetRootPaths(configured);
+                return;
+            }
+
+            IReadOnlyList<string> indexed = beatmapManager.GetIndexedRootPaths();
+            beatmapManager.SetRootPaths(indexed);
+
+            if (indexed.Count > 0)
+                PersistLibraryPaths(indexed);
+        }
 
         private static List<string> normalisePaths(IEnumerable<string> paths)
         {

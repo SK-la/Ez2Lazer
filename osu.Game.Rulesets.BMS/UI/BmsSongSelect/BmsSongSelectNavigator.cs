@@ -192,6 +192,21 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
             // Song bars are played by the screen, not opened here.
         }
 
+        public bool CanNavigateBack =>
+            FocusPane == BmsSongSelectFocusPane.List
+            || ActiveLevel != null
+            || ActiveTable != null
+            || currentDirectory != null;
+
+        public bool TryGoBack()
+        {
+            if (!CanNavigateBack)
+                return false;
+
+            GoBack();
+            return true;
+        }
+
         public void GoBack()
         {
             if (FocusPane == BmsSongSelectFocusPane.List)
@@ -211,9 +226,6 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 Reset();
                 return;
             }
-
-            context.SortPolicy.CycleNext();
-            Reset();
         }
 
         public BmsBar? GetSelectedSourceBar()

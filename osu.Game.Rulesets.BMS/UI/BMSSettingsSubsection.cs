@@ -88,7 +88,7 @@ namespace osu.Game.Rulesets.BMS.UI
             legacyRootPathBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsRootPath);
 
             beatmapManager = BMSBeatmapManager.GetShared(storage);
-            beatmapManager.SetRootPaths(getConfiguredPaths());
+            bmsConfig.ApplyResolvedLibraryPaths(beatmapManager);
             bindManiaScrollSettings();
 
             Children = new Drawable[]
@@ -241,7 +241,7 @@ namespace osu.Game.Rulesets.BMS.UI
             }
         }
 
-        private IReadOnlyList<string> getConfiguredPaths() => BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value);
+        private IReadOnlyList<string> getConfiguredPaths() => bmsConfig.GetLibraryPaths();
 
         private void updatePathDisplay()
         {
@@ -340,14 +340,13 @@ namespace osu.Game.Rulesets.BMS.UI
 
             runner.PerformFromScreen(screen =>
             {
-                screen.Push(new BMSDirectorySelectScreen(libraryPathsBindable, legacyRootPathBindable, applyPathsAndScan));
+                screen.Push(new BMSDirectorySelectScreen(bmsConfig, applyPathsAndScan));
             }, new[] { typeof(MainMenu), typeof(OsuSongSelect) });
         }
 
         private void applyPathsAndScan(IReadOnlyList<string> paths)
         {
-            libraryPathsBindable.Value = BMSRulesetConfigManager.SerialiseLibraryPaths(paths);
-            legacyRootPathBindable.Value = paths.FirstOrDefault() ?? string.Empty;
+            bmsConfig.PersistLibraryPaths(paths);
             startScan(paths);
         }
 

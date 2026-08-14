@@ -53,6 +53,29 @@ namespace osu.Game.Rulesets.BMS.Tests
         }
 
         [Test]
+        public void TestPersistLibraryPathsWritesOriginalBindable()
+        {
+            var ruleset = new BMSRuleset();
+
+            using var manager = new BMSRulesetConfigManager(null, ruleset.RulesetInfo);
+
+            manager.PersistLibraryPaths(new[] { @"E:\bms\root" });
+
+            Assert.That(manager.GetLibraryPaths(), Is.EquivalentTo(new[] { @"E:\bms\root" }));
+            Assert.That(manager.Get<string>(BMSRulesetSetting.BmsRootPath), Is.EqualTo(@"E:\bms\root"));
+
+            Bindable<string> copy = manager.GetBindable<string>(BMSRulesetSetting.BmsLibraryPaths);
+            copy.UnbindAll();
+            copy.Value = "[]";
+
+            Assert.That(manager.GetLibraryPaths(), Is.EquivalentTo(new[] { @"E:\bms\root" }),
+                "Unbinding a GetBindable copy must not wipe the original config.");
+
+            manager.PersistLibraryPaths(new[] { @"D:\charts" });
+            Assert.That(manager.GetLibraryPaths(), Is.EquivalentTo(new[] { @"D:\charts" }));
+        }
+
+        [Test]
         public void TestSettingEnumContainsGameplayRoute()
         {
             // Once added, the setting key is part of stored data; renaming would orphan existing values.

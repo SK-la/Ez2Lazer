@@ -116,6 +116,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
         }
 
+        public IReadOnlyList<string> GetIndexedRootPaths() => indexRepository.GetRootPaths();
+
         public void SetRootPaths(IEnumerable<string> paths)
         {
             rootPaths.Clear();
