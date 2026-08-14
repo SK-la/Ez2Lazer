@@ -3,7 +3,6 @@
 
 using System.Globalization;
 using System.Text.RegularExpressions;
-using osu.Framework.Logging;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
@@ -326,7 +325,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private void buildBeatmap(Beatmap beatmap)
         {
             // Log for debugging
-            Logger.Log($"[BMS] Loaded {wavDefinitions.Count} WAV definitions, {bmpDefinitions.Count} BMP definitions", LoggingTarget.Runtime, LogLevel.Debug);
+            // Logger.Log($"[BMS] Loaded {wavDefinitions.Count} WAV definitions, {bmpDefinitions.Count} BMP definitions", LoggingTarget.Runtime, LogLevel.Debug);
 
             // Set metadata
             beatmap.BeatmapInfo.Metadata.Title = title;
@@ -369,7 +368,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     beatmap.BeatmapInfo.Metadata.AudioFile = wavDefinitions.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value).First();
                 }
 
-                Logger.Log($"[BMS] Background sound events: {backgroundEvents.Count}", LoggingTarget.Runtime, LogLevel.Debug);
+                // Logger.Log($"[BMS] Background sound events: {backgroundEvents.Count}", LoggingTarget.Runtime, LogLevel.Debug);
             }
 
             // Set difficulty
@@ -544,7 +543,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                              .ThenBy(e => e.Position)
                              .ToList();
 
-            Logger.Log($"{bms_log_prefix} Found {noteEvents.Count} note events", LoggingTarget.Runtime, LogLevel.Debug);
+            // Logger.Log($"{bms_log_prefix} Found {noteEvents.Count} note events", LoggingTarget.Runtime, LogLevel.Debug);
 
             bool longNotesFromVisibleWithLnObj = lnObjectKeys.Count > 0 && (lnType == 2 || lnType == 3);
 
@@ -607,11 +606,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 totalKeys = result.Max(h => h.Column) + 1;
 
                 // Log first note's samples for debugging
-                var firstNote = result.First();
-                string sampleInfo = firstNote.Samples.Count > 0
-                    ? string.Join(", ", firstNote.Samples.Select(s => s is ConvertHitObjectParser.FileHitSampleInfo fs ? fs.Filename : s.Name))
-                    : "(no samples)";
-                Logger.Log($"[BMS] Created {result.Count} hit objects, first note samples: {sampleInfo}", LoggingTarget.Runtime, LogLevel.Debug);
+                // var firstNote = result.First();
+                // string sampleInfo = firstNote.Samples.Count > 0
+                //     ? string.Join(", ", firstNote.Samples.Select(s => s is ConvertHitObjectParser.FileHitSampleInfo fs ? fs.Filename : s.Name))
+                //     : "(no samples)";
+                // Logger.Log($"[BMS] Created {result.Count} hit objects, first note samples: {sampleInfo}", LoggingTarget.Runtime, LogLevel.Debug);
             }
 
             return result;

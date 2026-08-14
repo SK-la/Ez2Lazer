@@ -72,23 +72,23 @@ namespace osu.Game.Rulesets.BMS.Audio
                 }
             }
 
-            int loaded = 0;
-            int missing = 0;
+            // int loaded = 0;
+            // int missing = 0;
 
-            foreach (string filename in keysoundFiles)
-            {
-                if (loadIntoCache(filename) != null)
-                    loaded++;
-                else
-                    missing++;
-            }
+            // foreach (string filename in keysoundFiles)
+            // {
+            //     if (loadIntoCache(filename) != null)
+            //         loaded++;
+            //     else
+            //         missing++;
+            // }
 
             if (backgroundEvents != null && backgroundEvents.Count > 0)
                 SetBackgroundSoundEvents(backgroundEvents);
 
             IsPrepared = true;
 
-            Logger.Log($"{bms_log_prefix} Prepare complete: {loaded} loaded, {missing} missing, folder={bmsFolder}", LoggingTarget.Runtime, LogLevel.Debug);
+            // Logger.Log($"{bms_log_prefix} Prepare complete: {loaded} loaded, {missing} missing, folder={bmsFolder}", LoggingTarget.Runtime, LogLevel.Debug);
         }
 
         /// <summary>
