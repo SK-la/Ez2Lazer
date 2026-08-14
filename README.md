@@ -93,8 +93,8 @@ Use the helper script to generate a bilingual release draft. By default it compa
 
 ## Licence
 
-*osu!* code and framework are licensed under the [MIT licence](https://opensource.org/licenses/MIT).  
-See [LICENCE](LICENCE) for details.
+Ez2Lazer is based on [osu!](https://github.com/ppy/osu), licensed under the [MIT licence](https://opensource.org/licenses/MIT).  
+See [LICENCE](LICENCE) for details. Upstream copyright remains with ppy Pty Ltd; Ez2Lazer modifications are by SK-la.
 
 This does not cover usage of "osu!" or "ppy" branding, which is protected by trademark law.  
 Game resources are covered by a separate licence in [ppy/osu-resources](https://github.com/ppy/osu-resources).

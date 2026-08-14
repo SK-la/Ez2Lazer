@@ -54,13 +54,13 @@
   <Import Project="$(MSBuildThisFileDirectory)Ez2Lazer.Dependencies.props" />
   <PropertyGroup Label="Nuget">
     <IsPackable>false</IsPackable>
-    <Authors>ppy Pty Ltd</Authors>
+    <Authors>SK-la</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/ppy/osu</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/ppy/osu</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/SK-la/osu</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/SK-la/osu</RepositoryUrl>
     <PackageReleaseNotes>Automated release.</PackageReleaseNotes>
-    <Company>ppy Pty Ltd</Company>
-    <Copyright>Copyright (c) 2025 ppy Pty Ltd</Copyright>
-    <PackageTags>osu game</PackageTags>
+    <Company>SK-la</Company>
+    <Copyright>Copyright (c) 2025 ppy Pty Ltd. Ez2Lazer modifications by SK-la.</Copyright>
+    <PackageTags>ez2lazer game</PackageTags>
   </PropertyGroup>
 </Project>
