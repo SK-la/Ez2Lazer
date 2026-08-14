@@ -26,8 +26,8 @@ namespace osu.Desktop
         public const int MAX_PHYSICAL_GPUS = 64;
         public const int UNICODE_STRING_MAX = 2048;
 
-        public const string APPLICATION_NAME = @"osu!";
-        public const string PROFILE_NAME = @"osu!";
+        public const string APPLICATION_NAME = @"Ez2Lazer";
+        public const string PROFILE_NAME = @"Ez2Lazer";
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate NvStatus EnumPhysicalGPUsDelegate([Out] IntPtr[] gpuHandles, out int gpuCount);

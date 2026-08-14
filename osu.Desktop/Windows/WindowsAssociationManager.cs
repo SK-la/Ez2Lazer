@@ -37,11 +37,11 @@ namespace osu.Desktop.Windows
         /// Program ID prefix used for file associations. Should be relatively short since the full program ID has a 39 character limit,
         /// see https://learn.microsoft.com/en-us/windows/win32/com/-progid--key.
         /// </summary>
-        private const string program_id_file_prefix = "osu.File";
+        private const string program_id_file_prefix = "ez2lazer.File";
 
-        private const string program_id_protocol_prefix = "osu.Uri";
+        private const string program_id_protocol_prefix = "ez2lazer.Uri";
 
-        private static readonly ApplicationCapability application_capability = new ApplicationCapability(@"osu", @"Software\ppy\osu\Capabilities", "osu!(lazer)");
+        private static readonly ApplicationCapability application_capability = new ApplicationCapability(@"ez2lazer", @"Software\SK-la\Ez2Lazer\Capabilities", "Ez2Lazer");
 
         private static readonly FileAssociation[] file_associations =
         {
