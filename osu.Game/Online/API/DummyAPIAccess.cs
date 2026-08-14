@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Online;
 using osu.Game.Localisation;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
@@ -59,6 +60,8 @@ namespace osu.Game.Online.API
         /// </summary>
         public Func<APIRequest, bool>? HandleRequest;
 
+        private readonly ILocalOnlyRequestHandler localRequestHandler = new LocalOnlyRequestHandler();
+
         private readonly Bindable<APIState> state = new Bindable<APIState>(APIState.Online);
 
         private bool shouldFailNextLogin;
@@ -81,7 +84,10 @@ namespace osu.Game.Online.API
             request.AttachAPI(this);
 
             if (IsLocalOnly)
+            {
+                Schedule(() => handleLocally(request));
                 return;
+            }
 
             Schedule(() =>
             {
@@ -106,7 +112,10 @@ namespace osu.Game.Online.API
             request.AttachAPI(this);
 
             if (IsLocalOnly)
+            {
+                handleLocally(request);
                 return;
+            }
 
             HandleRequest?.Invoke(request);
         }
@@ -114,6 +123,13 @@ namespace osu.Game.Online.API
         public Task PerformAsync(APIRequest request)
         {
             request.AttachAPI(this);
+
+            if (IsLocalOnly)
+            {
+                handleLocally(request);
+                return Task.CompletedTask;
+            }
+
             HandleRequest?.Invoke(request);
             return Task.CompletedTask;
         }
@@ -157,15 +173,15 @@ namespace osu.Game.Online.API
 
         public void LoginLocal(string username)
         {
-            // Simulate an immediate local login for tests.
+            // Match APIAccess: enter LocalOnline before notifying LocalUser subscribers,
+            // so UI that checks IsLocalOnly in the user-changed callback sees the right state.
+            LastLoginError = null;
+            state.Value = APIState.LocalOnline;
             LocalUser.Value = new APIUser
             {
                 Username = username,
                 Id = DUMMY_USER_ID,
             };
-
-            LastLoginError = null;
-            state.Value = APIState.LocalOnline;
         }
 
         public void AuthenticateSecondFactor(string code)
@@ -232,6 +248,12 @@ namespace osu.Game.Online.API
         }
 
         public void SetState(APIState newState) => state.Value = newState;
+
+        private void handleLocally(APIRequest request)
+        {
+            if (!localRequestHandler.Handle(request))
+                request.TriggerFailure(new LocalOnlyUnavailableException(request));
+        }
 
         /// <summary>
         /// Skip 2FA requirement for next login.

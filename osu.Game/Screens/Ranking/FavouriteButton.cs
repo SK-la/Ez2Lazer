@@ -7,6 +7,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables.Cards;
+using osu.Game.EzOsuGame.Online;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.API;
@@ -81,7 +82,8 @@ namespace osu.Game.Screens.Ranking
             };
             beatmapSetRequest.Failure += e =>
             {
-                Logger.Log($"Favourite button failed to fetch beatmap info: {e}", LoggingTarget.Network);
+                if (e is not LocalOnlyUnavailableException)
+                    Logger.Log($"Favourite button failed to fetch beatmap info: {e}", LoggingTarget.Network);
 
                 Schedule(() =>
                 {
@@ -136,6 +138,15 @@ namespace osu.Game.Screens.Ranking
 
         private void updateUser()
         {
+            if (api.IsLocalOnly)
+            {
+                Enabled.Value = false;
+                current.Value = new BeatmapSetFavouriteState(false, 0);
+                updateState();
+                TooltipText = "this beatmap cannot be favourited";
+                return;
+            }
+
             if (!(localUser.Value is GuestUser) && BeatmapSetInfo.OnlineID > 0)
                 getBeatmapSet();
             else

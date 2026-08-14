@@ -74,6 +74,13 @@ namespace osu.Game.Tests.Visual.Ranking
             checkEnabled(false);
         }
 
+        [Test]
+        public void TestLocalAccount()
+        {
+            AddStep("log in locally", () => dummyAPI.LoginLocal("test"));
+            checkEnabled(false);
+        }
+
         private void checkEnabled(bool expected)
         {
             AddAssert("is " + (expected ? "enabled" : "disabled"), () => favourite!.Enabled.Value == expected);

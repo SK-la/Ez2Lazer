@@ -704,7 +704,10 @@ namespace osu.Game.Online.API
         private void handleLocally(APIRequest request)
         {
             if (!LocalRequestHandler.Handle(request))
-                request.Fail(new LocalOnlyUnavailableException(request));
+            {
+                // 本地账号无法访问的请求是预期短路，不要走 Fail() 的 "Failing request" 网络日志。
+                request.TriggerFailure(new LocalOnlyUnavailableException(request));
+            }
         }
 
         public void Queue(APIRequest request)

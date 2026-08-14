@@ -12,7 +12,7 @@ namespace osu.Game.EzOsuGame.Online
 {
     /// <summary>
     /// 本地账号模式的默认请求应答器。
-    /// 只应答那些不应答就会让 UI 无限等待的请求，其余交由调用方失败。
+    /// 只对 UI 依赖的请求返回空成功；其余以预期失败完成，且不走 <see cref="APIRequest.Fail"/> 的网络失败日志。
     /// </summary>
     public class LocalOnlyRequestHandler : ILocalOnlyRequestHandler
     {
@@ -39,7 +39,10 @@ namespace osu.Game.EzOsuGame.Online
                     return true;
 
                 default:
-                    return false;
+                    // 结算页标签/收藏等会在已登录时自动排队。本地账号无法访问 osu! 服务器是预期行为，
+                    // 用 TriggerFailure 完成请求，避免 APIRequest.Fail 把每次打开结果屏都打成网络失败。
+                    request.TriggerFailure(new LocalOnlyUnavailableException(request));
+                    return true;
             }
         }
     }
