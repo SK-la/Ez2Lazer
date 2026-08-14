@@ -110,7 +110,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private bool initialised;
         private string dbPath = string.Empty;
 
-        private record PendingWrite(BeatmapInfo Beatmap, EzAnalysisResult Analysis, long Timestamp);
+        private record PendingWrite(Guid Id, string Hash, string Md5, int RulesetOnlineId, EzAnalysisResult Analysis, long Timestamp);
 
         private readonly ConcurrentDictionary<Guid, PendingWrite> pendingWrites = new ConcurrentDictionary<Guid, PendingWrite>();
         private CancellationTokenSource? writeCts;
@@ -229,7 +229,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 if (!tryGetRawData(connection, beatmap, out var storedAnalysis))
                 {
-                    if (pending is not null && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
+                    if (pending is not null && string.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal))
                     {
                         result = pending.Analysis;
                         return true;
@@ -238,7 +238,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     return false;
                 }
 
-                result = pending is not null && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal)
+                result = pending is not null && string.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal)
                     ? mergeAnalysisResult(storedAnalysis, pending.Analysis)
                     : storedAnalysis;
 
@@ -369,7 +369,7 @@ LIMIT 1;
 
                     if (!reader.Read())
                     {
-                        if (pending is not null && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
+                        if (pending is not null && string.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal))
                         {
                             result = pending.Analysis;
                             return true;
@@ -414,7 +414,7 @@ LIMIT 1;
 
                     result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), pp: null, maniaSummary);
 
-                    if (pending is not null && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
+                    if (pending is not null && string.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal))
                         result = mergeAnalysisResult(result, pending.Analysis);
 
                     return true;
@@ -505,8 +505,8 @@ LIMIT 1;
             {
                 Initialise();
 
-                var pending = new PendingWrite(beatmap, analysis, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-                pendingWrites[beatmap.ID] = pending;
+                var pending = snapshotPendingWrite(beatmap, analysis);
+                pendingWrites[pending.Id] = pending;
             }
             catch (Exception e)
             {
@@ -518,7 +518,7 @@ LIMIT 1;
                     // synchronous fallback
                     Initialise();
                     using var connection = openConnection();
-                    writePendingEntryToConnection(connection, beatmap, analysis);
+                    writePendingEntryToConnection(connection, snapshotPendingWrite(beatmap, analysis));
                 }
                 catch (Exception ex)
                 {
@@ -2314,6 +2314,8 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
                         using var connection = openConnection();
                         using var transaction = connection.BeginTransaction();
 
+                        int errorsLogged = 0;
+
                         foreach (var kv in batch)
                         {
                             token.ThrowIfCancellationRequested();
@@ -2323,7 +2325,7 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
 
                             try
                             {
-                                writePendingEntryToConnection(connection, pw.Beatmap, pw.Analysis, transaction);
+                                writePendingEntryToConnection(connection, pw, transaction);
 
                                 // Only remove if the pending entry we wrote is still the latest.
                                 if (pendingWrites.TryGetValue(id, out var latest) && latest.Timestamp == pw.Timestamp)
@@ -2331,7 +2333,13 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
                             }
                             catch (Exception e)
                             {
-                                Logger.Error(e, "EzManiaAnalysisPersistentStore background write failed for entry.");
+                                if (e is Realms.Exceptions.RealmClosedException)
+                                    pendingWrites.TryRemove(id, out _);
+
+                                if (errorsLogged == 0)
+                                    Logger.Error(e, "EzManiaAnalysisPersistentStore background write failed for entry.");
+
+                                errorsLogged++;
                             }
                         }
 
@@ -2384,10 +2392,19 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
             pendingWrites.Clear();
         }
 
-        private void writePendingEntryToConnection(SqliteConnection connection, BeatmapInfo beatmap, EzAnalysisResult analysis, SqliteTransaction? transaction = null)
+        private static PendingWrite snapshotPendingWrite(BeatmapInfo beatmap, EzAnalysisResult analysis)
+            => new PendingWrite(
+                beatmap.ID,
+                beatmap.Hash ?? string.Empty,
+                beatmap.MD5Hash ?? string.Empty,
+                beatmap.Ruleset.OnlineID,
+                analysis,
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+
+        private void writePendingEntryToConnection(SqliteConnection connection, PendingWrite pending, SqliteTransaction? transaction = null)
         {
-            var commonSummary = analysis.CommonSummary;
-            var maniaSummary = analysis.ManiaSummary;
+            var commonSummary = pending.Analysis.CommonSummary;
+            var maniaSummary = pending.Analysis.ManiaSummary;
 
             if (commonSummary == null)
                 return;
@@ -2428,13 +2445,13 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
     {EzAnalysisSchemaManager.COL_MAX_KPS} = excluded.{EzAnalysisSchemaManager.COL_MAX_KPS},
     {EzAnalysisSchemaManager.COL_KPS_LIST_JSON} = excluded.{EzAnalysisSchemaManager.COL_KPS_LIST_JSON};
 ";
-                entry.Parameters.AddWithValue("$id", beatmap.ID.ToString());
-                entry.Parameters.AddWithValue("$hash", beatmap.Hash);
-                entry.Parameters.AddWithValue("$md5", beatmap.MD5Hash);
-                entry.Parameters.AddWithValue("$ruleset", beatmap.Ruleset.OnlineID);
+                entry.Parameters.AddWithValue("$id", pending.Id.ToString());
+                entry.Parameters.AddWithValue("$hash", pending.Hash);
+                entry.Parameters.AddWithValue("$md5", pending.Md5);
+                entry.Parameters.AddWithValue("$ruleset", pending.RulesetOnlineId);
                 entry.Parameters.AddWithValue("$common_updated_at", now);
-                entry.Parameters.AddWithValue("$avg", analysis.AverageKps);
-                entry.Parameters.AddWithValue("$max", analysis.MaxKps);
+                entry.Parameters.AddWithValue("$avg", pending.Analysis.AverageKps);
+                entry.Parameters.AddWithValue("$max", pending.Analysis.MaxKps);
                 entry.Parameters.AddWithValue("$kps", kpsListJson);
                 entry.ExecuteNonQuery();
             }
@@ -2449,7 +2466,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
 DELETE FROM {EzAnalysisSchemaManager.TABLE_MANIA}
 WHERE {EzAnalysisSchemaManager.COL_BEATMAP_ID} = $id;
 ";
-                    mania.Parameters.AddWithValue("$id", beatmap.ID.ToString());
+                    mania.Parameters.AddWithValue("$id", pending.Id.ToString());
                     mania.ExecuteNonQuery();
                     return;
                 }
@@ -2477,7 +2494,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
     {EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON} = excluded.{EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON},
     {EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON} = excluded.{EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON};
 ";
-                mania.Parameters.AddWithValue("$id", beatmap.ID.ToString());
+                mania.Parameters.AddWithValue("$id", pending.Id.ToString());
                 mania.Parameters.AddWithValue("$updated_at", now);
                 mania.Parameters.AddWithValue("$column_counts_json", columnCountsJson);
                 mania.Parameters.AddWithValue("$hold_note_counts_json", holdNoteCountsJson);
