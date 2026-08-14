@@ -169,6 +169,19 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
             }
 
             string headerJson = await http.GetStringAsync(url, cancellationToken).ConfigureAwait(false);
+            string headerSourceUrl = url;
+
+            if (BmsDifficultyTableParser.LooksLikeHtml(headerJson))
+            {
+                if (!BmsDifficultyTableParser.TryGetBmstableHeaderUrl(headerJson, url, out string headerUrl))
+                {
+                    Logger.Log($"[BMS] Difficulty table HTML is missing bmstable meta: {url}", LoggingTarget.Network, LogLevel.Important);
+                    return null;
+                }
+
+                headerSourceUrl = headerUrl;
+                headerJson = await http.GetStringAsync(headerUrl, cancellationToken).ConfigureAwait(false);
+            }
 
             // Direct TableData JSON (already expanded)
             if (headerJson.Contains("\"folder\"", StringComparison.OrdinalIgnoreCase)
@@ -176,7 +189,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
                 && !headerJson.Contains("\"data_url\"", StringComparison.OrdinalIgnoreCase)
                 && !headerJson.Contains("\"dataUrl\"", StringComparison.OrdinalIgnoreCase))
             {
-                var direct = BmsDifficultyTableParser.ParseTableDataJson(headerJson, url);
+                var direct = BmsDifficultyTableParser.ParseTableDataJson(headerJson, headerSourceUrl);
 
                 if (direct == null)
                     return null;
@@ -190,7 +203,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
 
             if (header == null || string.IsNullOrWhiteSpace(header.Name))
             {
-                Logger.Log($"[BMS] Difficulty table header missing name: {url}", LoggingTarget.Network, LogLevel.Important);
+                Logger.Log($"[BMS] Difficulty table header missing name: {headerSourceUrl}", LoggingTarget.Network, LogLevel.Important);
                 return null;
             }
 
@@ -199,7 +212,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
             if (string.IsNullOrWhiteSpace(dataUrl))
             {
                 // Header URL itself may point at body when ends with .json body list
-                if (url.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                if (headerSourceUrl.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                 {
                     var elementsOnly = JsonSerializer.Deserialize<List<DifficultyTableElementDto>>(headerJson, json_options);
 
@@ -212,7 +225,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
                             .ToList();
                         string built = BmsDifficultyTableParser.BuildTableDataJson(
                             header.Name ?? "Table",
-                            url,
+                            headerSourceUrl,
                             header.Symbol ?? string.Empty,
                             elementsOnly,
                             levels);
@@ -222,13 +235,13 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
                     }
                 }
 
-                Logger.Log($"[BMS] Difficulty table header missing data_url: {url}", LoggingTarget.Network, LogLevel.Important);
+                Logger.Log($"[BMS] Difficulty table header missing data_url: {headerSourceUrl}", LoggingTarget.Network, LogLevel.Important);
                 return null;
             }
 
             if (!Uri.TryCreate(dataUrl, UriKind.Absolute, out _))
             {
-                if (Uri.TryCreate(url, UriKind.Absolute, out var baseUri))
+                if (Uri.TryCreate(headerSourceUrl, UriKind.Absolute, out var baseUri))
                     dataUrl = new Uri(baseUri, dataUrl).ToString();
             }
 

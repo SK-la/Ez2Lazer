@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using osu.Framework.Logging;
 
 namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
@@ -26,6 +27,14 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
             WriteIndented = true,
         };
 
+        private static readonly Regex name_then_content = new Regex(
+            """<meta\s+[^>]*name\s*=\s*["']bmstable["'][^>]*content\s*=\s*["']([^"']+)["'][^>]*/?>""",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        private static readonly Regex content_then_name = new Regex(
+            """<meta\s+[^>]*content\s*=\s*["']([^"']+)["'][^>]*name\s*=\s*["']bmstable["'][^>]*/?>""",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
         public static BmsDifficultyTable? TryLoadFile(string path)
         {
             try
@@ -40,6 +49,60 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
                 Logger.Log($"[BMS] Failed to load difficulty table '{path}': {ex.Message}", LoggingTarget.Runtime, LogLevel.Important);
                 return null;
             }
+        }
+
+        public static bool LooksLikeHtml(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            foreach (char c in text)
+            {
+                if (char.IsWhiteSpace(c))
+                    continue;
+
+                return c == '<';
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// beatoraja / BMS table pages advertise the JSON header via
+        /// <c>&lt;meta name="bmstable" content="header.json"&gt;</c>.
+        /// </summary>
+        public static bool TryGetBmstableHeaderUrl(string html, string pageUrl, out string headerUrl)
+        {
+            headerUrl = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(html) || string.IsNullOrWhiteSpace(pageUrl))
+                return false;
+
+            var match = name_then_content.Match(html);
+            if (!match.Success)
+                match = content_then_name.Match(html);
+
+            if (!match.Success)
+                return false;
+
+            string content = match.Groups[1].Value.Trim();
+            if (string.IsNullOrEmpty(content))
+                return false;
+
+            if (Uri.TryCreate(content, UriKind.Absolute, out var absolute))
+            {
+                headerUrl = absolute.ToString();
+                return true;
+            }
+
+            if (Uri.TryCreate(pageUrl, UriKind.Absolute, out var page)
+                && Uri.TryCreate(page, content, out var resolved))
+            {
+                headerUrl = resolved.ToString();
+                return true;
+            }
+
+            return false;
         }
 
         public static BmsDifficultyTable? ParseTableDataJson(string json, string sourcePath = "")

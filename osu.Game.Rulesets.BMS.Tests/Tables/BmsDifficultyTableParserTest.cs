@@ -154,6 +154,32 @@ namespace osu.Game.Rulesets.BMS.Tests.Tables
             Assert.That(json.Contains("difficulty table", StringComparison.OrdinalIgnoreCase), Is.False);
         }
 
+        [Test]
+        public void TryGetBmstableHeaderUrl_ResolvesRelativeContent()
+        {
+            const string html = """
+                                <html>
+                                  <head>
+                                    <meta name="bmstable" content="header.json">
+                                    <title>Satellite</title>
+                                  </head>
+                                </html>
+                                """;
+
+            Assert.That(BmsDifficultyTableParser.LooksLikeHtml(html), Is.True);
+            Assert.That(BmsDifficultyTableParser.TryGetBmstableHeaderUrl(html, "https://stellabms.xyz/sl/table.html", out string headerUrl), Is.True);
+            Assert.That(headerUrl, Is.EqualTo("https://stellabms.xyz/sl/header.json"));
+        }
+
+        [Test]
+        public void TryGetBmstableHeaderUrl_AcceptsContentBeforeName()
+        {
+            const string html = """<meta content='score.json' name="bmstable">""";
+
+            Assert.That(BmsDifficultyTableParser.TryGetBmstableHeaderUrl(html, "https://example.com/table.html", out string headerUrl), Is.True);
+            Assert.That(headerUrl, Is.EqualTo("https://example.com/score.json"));
+        }
+
         private static string readEmbedded(string name)
         {
             using var stream = typeof(BMSRuleset).Assembly.GetManifestResourceStream(name);

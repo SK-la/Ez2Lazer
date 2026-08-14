@@ -89,6 +89,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         [Resolved]
         private GameHost host { get; set; } = null!;
 
+        [Cached]
+        private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
+
         public BmsBmsSongSelect()
         {
             lampStore = new BmsLampStore(lampScheme);
