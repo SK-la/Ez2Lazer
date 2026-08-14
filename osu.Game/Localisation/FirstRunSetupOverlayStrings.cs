@@ -26,9 +26,9 @@ namespace osu.Game.Localisation
         public static LocalisableString FirstRunSetupTitle => new TranslatableString(getKey(@"first_run_setup_title"), @"First-run setup");
 
         /// <summary>
-        /// "Set up osu! to suit you"
+        /// "Set up Ez2Lazer to suit you"
         /// </summary>
-        public static LocalisableString FirstRunSetupDescription => new TranslatableString(getKey(@"first_run_setup_description"), @"Set up osu! to suit you");
+        public static LocalisableString FirstRunSetupDescription => new TranslatableString(getKey(@"first_run_setup_description"), @"Set up Ez2Lazer to suit you");
 
         /// <summary>
         /// "Welcome"
@@ -38,16 +38,16 @@ namespace osu.Game.Localisation
         /// <summary>
         /// "Welcome to the first-run setup guide!
         ///
-        /// osu! is a very configurable game, and diving straight into the settings can sometimes be overwhelming. This guide will help you get the important choices out of the way to ensure a great first experience!"
+        /// Ez2Lazer is a very configurable game, and diving straight into the settings can sometimes be overwhelming. This guide will help you get the important choices out of the way to ensure a great first experience!"
         /// </summary>
         public static LocalisableString WelcomeDescription => new TranslatableString(getKey(@"welcome_description"), @"Welcome to the first-run setup guide!
 
-osu! is a very configurable game, and diving straight into the settings can sometimes be overwhelming. This guide will help you get the important choices out of the way to ensure a great first experience!");
+Ez2Lazer is a very configurable game, and diving straight into the settings can sometimes be overwhelming. This guide will help you get the important choices out of the way to ensure a great first experience!");
 
         /// <summary>
-        /// "The size of the osu! user interface can be adjusted to your liking."
+        /// "The size of the Ez2Lazer user interface can be adjusted to your liking."
         /// </summary>
-        public static LocalisableString UIScaleDescription => new TranslatableString(getKey(@"ui_scale_description"), @"The size of the osu! user interface can be adjusted to your liking.");
+        public static LocalisableString UIScaleDescription => new TranslatableString(getKey(@"ui_scale_description"), @"The size of the Ez2Lazer user interface can be adjusted to your liking.");
 
         /// <summary>
         /// "Behaviour"

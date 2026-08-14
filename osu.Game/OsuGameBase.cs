@@ -797,7 +797,7 @@ namespace osu.Game
         /// <exception cref="TimeoutException"></exception>
         public bool MigrateUserData(string path)
         {
-            Logger.Log($@"Migrating osu! data from ""{Storage.GetFullPath(string.Empty)}"" to ""{path}""...");
+            Logger.Log($@"Migrating Ez2Lazer data from ""{Storage.GetFullPath(string.Empty)}"" to ""{path}""...");
 
             IDisposable realmBlocker = null;
 

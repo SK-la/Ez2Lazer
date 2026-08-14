@@ -66,7 +66,7 @@ namespace osu.Game.Screens.Edit.Components.Menus
                 },
             });
 
-            text.AddText(@"osu!", t => t.Font = OsuFont.TorusAlternate);
+            text.AddText(@"Ez2Lazer", t => t.Font = OsuFont.TorusAlternate);
             text.AddText(@"editor", t =>
             {
                 t.Font = OsuFont.TorusAlternate;

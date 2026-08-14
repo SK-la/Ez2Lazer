@@ -155,9 +155,9 @@ namespace osu.Game.Localisation
         public static LocalisableString ChangeRendererConfirmation => new TranslatableString(getKey(@"change_renderer_configuration"), @"In order to change the renderer, the game will close. Please open it again.");
 
         /// <summary>
-        /// "Minimise osu! when switching to another app"
+        /// "Minimise Ez2Lazer when switching to another app"
         /// </summary>
-        public static LocalisableString MinimiseOnFocusLoss => new TranslatableString(getKey(@"minimise_on_focus_loss"), @"Minimise osu! when switching to another app");
+        public static LocalisableString MinimiseOnFocusLoss => new TranslatableString(getKey(@"minimise_on_focus_loss"), @"Minimise Ez2Lazer when switching to another app");
 
         /// <summary>
         /// "Shrink game to avoid cameras and notches"
