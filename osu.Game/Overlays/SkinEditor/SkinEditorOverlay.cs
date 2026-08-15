@@ -45,7 +45,7 @@ namespace osu.Game.Overlays.SkinEditor
 
         protected override bool BlockNonPositionalInput => true;
 
-        private SkinEditor? skinEditor;
+        protected SkinEditor? Editor;
 
         [Resolved]
         private IPerformFromScreenRunner? performer { get; set; }
@@ -74,7 +74,7 @@ namespace osu.Game.Overlays.SkinEditor
         [Resolved]
         private IBindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
-        private OsuScreen? lastTargetScreen;
+        protected OsuScreen? LastTargetScreen;
         private InvokeOnDisposal? nestedInputManagerDisable;
         private IDisposable? externalEditOverlayRegistration;
 
@@ -107,7 +107,7 @@ namespace osu.Game.Overlays.SkinEditor
             switch (e.Action)
             {
                 case GlobalAction.Back:
-                    if (skinEditor?.State.Value != Visibility.Visible)
+                    if (Editor?.State.Value != Visibility.Visible)
                         break;
 
                     Hide();
@@ -117,47 +117,56 @@ namespace osu.Game.Overlays.SkinEditor
             return false;
         }
 
+        protected virtual bool PresentsGameplayFromMainMenu => true;
+
+        protected virtual SkinEditor CreateEditor() => new SkinEditor();
+
         protected override void PopIn()
         {
+            OnEditorOpening();
             overrideSkinEditorRelevantSettings();
 
-            if (skinEditor != null)
+            if (Editor != null)
             {
                 disableNestedInputManagers();
-                skinEditor.Show();
+                Editor.Show();
 
-                if (lastTargetScreen is MainMenu)
+                if (PresentsGameplayFromMainMenu && LastTargetScreen is MainMenu)
                     PresentGameplay();
 
                 return;
             }
 
-            var editor = new SkinEditor();
+            var editor = CreateEditor();
 
             editor.State.BindValueChanged(_ => updateComponentVisibility());
 
-            skinEditor = editor;
+            Editor = editor;
 
             LoadComponentAsync(editor, _ =>
             {
-                if (editor != skinEditor)
+                if (editor != Editor)
                     return;
 
                 AddInternal(editor);
 
-                if (lastTargetScreen is MainMenu)
+                if (PresentsGameplayFromMainMenu && LastTargetScreen is MainMenu)
                     PresentGameplay();
 
-                Debug.Assert(lastTargetScreen != null);
+                Debug.Assert(LastTargetScreen != null);
 
-                SetTarget(lastTargetScreen);
+                SetTarget(LastTargetScreen);
             });
+        }
+
+        protected virtual void OnEditorOpening()
+        {
         }
 
         protected override void PopOut()
         {
-            skinEditor?.Save(false);
-            skinEditor?.Hide();
+            Editor?.Save(false);
+            Editor?.Hide();
             nestedInputManagerDisable?.Dispose();
             nestedInputManagerDisable = null;
 
@@ -240,7 +249,7 @@ namespace osu.Game.Overlays.SkinEditor
 
         private void updateScreenSizing()
         {
-            if (skinEditor?.State.Value != Visibility.Visible) return;
+            if (Editor?.State.Value != Visibility.Visible) return;
 
             const float padding = 10;
 
@@ -279,9 +288,9 @@ namespace osu.Game.Overlays.SkinEditor
 
         private void updateComponentVisibility()
         {
-            Debug.Assert(skinEditor != null);
+            Debug.Assert(Editor != null);
 
-            if (skinEditor.State.Value == Visibility.Visible)
+            if (Editor.State.Value == Visibility.Visible)
             {
                 Scheduler.AddOnce(updateScreenSizing);
 
@@ -293,7 +302,7 @@ namespace osu.Game.Overlays.SkinEditor
             {
                 scalingContainer.SetCustomRect(null);
 
-                if (lastTargetScreen?.HideOverlaysOnEnter != true)
+                if (LastTargetScreen?.HideOverlaysOnEnter != true)
                     game.Toolbar.Show();
             }
         }
@@ -305,7 +314,7 @@ namespace osu.Game.Overlays.SkinEditor
         /// <summary>
         /// Set a new target screen which will be used to find skinnable components.
         /// </summary>
-        public void SetTarget(OsuScreen screen)
+        public virtual void SetTarget(OsuScreen screen)
         {
             if (screen is EzSkinEditorScreen)
                 return;
@@ -313,9 +322,9 @@ namespace osu.Game.Overlays.SkinEditor
             nestedInputManagerDisable?.Dispose();
             nestedInputManagerDisable = null;
 
-            lastTargetScreen = screen;
+            LastTargetScreen = screen;
 
-            if (skinEditor == null) return;
+            if (Editor == null) return;
 
             // ensure the toolbar is re-hidden even if a new screen decides to try and show it.
             updateComponentVisibility();
@@ -324,40 +333,42 @@ namespace osu.Game.Overlays.SkinEditor
             Scheduler.AddOnce(setTarget, screen);
         }
 
+        protected virtual Drawable GetEditorTarget(OsuScreen screen) => screen;
+
         private void setTarget(OsuScreen? target)
         {
             if (target == null)
                 return;
 
-            Debug.Assert(skinEditor != null);
+            Debug.Assert(Editor != null);
 
-            if (!target.IsLoaded || !skinEditor.IsLoaded)
+            if (!target.IsLoaded || !Editor.IsLoaded)
             {
                 Scheduler.AddOnce(setTarget, target);
                 return;
             }
 
-            if (skinEditor.State.Value == Visibility.Visible)
+            if (Editor.State.Value == Visibility.Visible)
             {
                 if (externalEditOverlay.State.Value != Visibility.Visible)
-                    skinEditor.Save(false);
-                skinEditor.UpdateTargetScreen(target);
+                    Editor.Save(false);
+                Editor.UpdateTargetScreen(GetEditorTarget(target));
                 disableNestedInputManagers();
             }
             else
             {
-                skinEditor.Hide();
-                skinEditor.Expire();
-                skinEditor = null;
+                Editor.Hide();
+                Editor.Expire();
+                Editor = null;
             }
         }
 
         private void disableNestedInputManagers()
         {
-            if (lastTargetScreen == null)
+            if (LastTargetScreen == null)
                 return;
 
-            var nestedInputManagers = lastTargetScreen.ChildrenOfType<PassThroughInputManager>().Where(manager => manager.UseParentInput).ToArray();
+            var nestedInputManagers = LastTargetScreen.ChildrenOfType<PassThroughInputManager>().Where(manager => manager.UseParentInput).ToArray();
             foreach (var inputManager in nestedInputManagers)
                 inputManager.UseParentInput = false;
             nestedInputManagerDisable = new InvokeOnDisposal(() =>
@@ -401,7 +412,7 @@ namespace osu.Game.Overlays.SkinEditor
 
         public new void ToggleVisibility()
         {
-            if (skinEditor?.ExternalEditInProgress == true)
+            if (Editor?.ExternalEditInProgress == true)
                 return;
 
             base.ToggleVisibility();
