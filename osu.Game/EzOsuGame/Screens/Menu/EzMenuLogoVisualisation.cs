@@ -231,14 +231,16 @@ namespace osu.Game.EzOsuGame.Screens.Menu
 
             private void fillSpectrumEnvelope()
             {
+                float height = size / 5f;
+
                 for (int i = 0; i < band_count; i++)
                 {
                     float mag = barAmplitudes[i];
                     bands[i] = mag;
                     Vector2 dir = unit_circle[i];
-                    float outer = radius + bar_length * mag;
-                    roundPoints[i] = centre + dir * outer;
-                    rotatedPoints[i] = centre + new Vector2(-dir.Y, dir.X) * outer;
+                    float bulge = height * mag;
+                    roundPoints[i] = centre + dir * (radius + bulge);
+                    rotatedPoints[i] = centre + dir * (radius + height - bulge);
                     innerPoints[i] = centre + dir * radius;
                 }
             }
@@ -252,10 +254,10 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                     float angle = i / (float)wave_control_count * MathF.Tau - MathF.PI / 2;
                     var dir = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
                     float mag = waveControl[i];
-                    float outer = radius + maxEffectHeight * mag;
+                    float bulge = maxEffectHeight * mag;
 
-                    waveOuterControl[i] = centre + dir * outer;
-                    waveInnerControl[i] = centre + new Vector2(-dir.Y, dir.X) * outer;
+                    waveOuterControl[i] = centre + dir * (radius + bulge);
+                    waveInnerControl[i] = centre + dir * (radius + maxEffectHeight - bulge);
                 }
 
                 fillCatmullClosed(waveOuterControl, wavePoints, 0, wave_catmull_steps);
