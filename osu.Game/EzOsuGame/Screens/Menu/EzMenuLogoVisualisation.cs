@@ -26,13 +26,15 @@ namespace osu.Game.EzOsuGame.Screens.Menu
     {
         private const float bar_length = 600;
         private const int bars_per_visualiser = 200;
-        private const int visualiser_rounds = 5;
+        private const int visualiser_rounds = 2;
         private const float amplitude_dead_zone = 1f / bar_length;
         private const int band_count = 200;
+
         /// <summary>
         /// miller198 WaveStroke: Android capture 512, averagePool(5). We have 256 interleaved frames → 128 mono → 25 controls.
         /// </summary>
         private const int wave_pool_size = 5;
+
         private const int wave_control_count = 25;
         private const int wave_catmull_steps = 10;
         private const int wave_draw_count = wave_control_count * wave_catmull_steps + 1;
@@ -200,10 +202,9 @@ namespace osu.Game.EzOsuGame.Screens.Menu
             private float radius;
 
             private readonly float[] barAmplitudes = new float[256];
-            private readonly float[] bands = new float[band_count];
             private readonly float[] waveControl = new float[wave_control_count];
-            private readonly Vector2[] roundPoints = new Vector2[band_count];
-            private readonly Vector2[] innerPoints = new Vector2[band_count];
+            private readonly Vector2[] roundPoints = new Vector2[visualiser_rounds * band_count];
+            private readonly Vector2[] innerPoints = new Vector2[visualiser_rounds * band_count];
             private readonly Vector2[] rotatedPoints = new Vector2[band_count];
             private readonly Vector2[] waveOuterControl = new Vector2[wave_control_count];
             private readonly Vector2[] waveInnerControl = new Vector2[wave_control_count];
@@ -235,9 +236,12 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                 switch (style)
                 {
                     case EzLogoVisualisationStyle.CircularPolyline:
+                        fillSpectrumEnvelope(ring2Offset);
+                        break;
+
                     case EzLogoVisualisationStyle.CircularDots:
                     case EzLogoVisualisationStyle.CircularNet:
-                        fillSpectrumEnvelope(ring2Offset);
+                        fillSpectrumRing();
                         break;
 
                     case EzLogoVisualisationStyle.CircularWave:
@@ -254,13 +258,22 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                 for (int i = 0; i < band_count; i++)
                 {
                     float mag = barAmplitudes[i];
-                    bands[i] = mag;
                     Vector2 dir = unit_circle[i];
                     float bulge = height * mag;
                     roundPoints[i] = centre + dir * (radius + bulge);
 
                     float mag2 = barAmplitudes[(i + ring2Offset) % band_count];
                     rotatedPoints[i] = centre + dir * (radius + height - height * mag2);
+                    innerPoints[i] = centre + dir * radius;
+                }
+            }
+
+            private void fillSpectrumRing()
+            {
+                for (int i = 0; i < band_count; i++)
+                {
+                    Vector2 dir = unit_circle[i];
+                    roundPoints[i] = centre + dir * (radius + bar_length * barAmplitudes[i]);
                     innerPoints[i] = centre + dir * radius;
                 }
             }
@@ -412,10 +425,10 @@ namespace osu.Game.EzOsuGame.Screens.Menu
 
                 for (int i = 0; i < band_count; i++)
                 {
-                    if (bands[i] < amplitude_dead_zone)
+                    if (barAmplitudes[i] < amplitude_dead_zone)
                         continue;
 
-                    float dot = baseDot * (0.55f + 0.7f * bands[i]);
+                    float dot = baseDot * (0.55f + 0.7f * barAmplitudes[i]);
                     drawDot(renderer, colourInfo, inflation, roundPoints[i], dot);
                 }
             }
