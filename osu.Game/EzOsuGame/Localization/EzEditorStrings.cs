@@ -23,6 +23,26 @@ namespace osu.Game.EzOsuGame.Localization
             + "\n2. Full Ez skin settings with skin.ini export"
             + "\n3. In-game image export (including gradient animations)");
 
+        public static readonly LocalisableString SETTINGS_LAYOUT_EDITOR_BUTTON = new EzLocalizationManager.EzLocalisableString(
+            "Ez 布局编辑器",
+            "Ez layout editor");
+
+        public static readonly LocalisableString SETTINGS_LAYOUT_EDITOR_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "编辑与皮肤无关的客户端布局（存于 EzResources/Config/layout）",
+            "Edit the client layout stored in EzResources/Config/layout, independent of skins");
+
+        public static readonly LocalisableString LAYOUT_EDITOR_TITLE = new EzLocalizationManager.EzLocalisableString(
+            "Ez 布局编辑器",
+            "Ez layout editor");
+
+        public static readonly LocalisableString LAYOUT_EDITOR_SUBTITLE = new EzLocalizationManager.EzLocalisableString(
+            "客户端布局（不写入皮肤）",
+            "Client layout (not saved to skin)");
+
+        public static readonly LocalisableString LAYOUT_SAVED = new EzLocalizationManager.EzLocalisableString(
+            "布局已保存",
+            "Layout saved");
+
         public static readonly LocalisableString SETTINGS_AUTO_APPLY_SKIN_JSON = new EzLocalizationManager.EzLocalisableString(
             "自动切换皮肤配置",
             "Auto-apply skin configuration");

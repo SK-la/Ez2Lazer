@@ -44,6 +44,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Background.Pixiv;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Performance;
 using osu.Game.EzOsuGame.Scoring;
@@ -155,6 +156,10 @@ namespace osu.Game
 
         private SkinEditorOverlay skinEditor;
 
+        private EzLayoutLayer ezLayoutLayer;
+
+        private EzLayoutEditorOverlay ezLayoutEditor;
+
         private Container overlayContent;
 
         private Container rightFloatingOverlayContent;
@@ -248,6 +253,7 @@ namespace osu.Game
         private ScreenStackFooter screenStackFooter;
 
         private AcrylicCaptureScope acrylicCaptureScope;
+        private Container screenCaptureContent;
 
         private readonly string[] args;
 
@@ -1145,7 +1151,11 @@ namespace osu.Game
                             Children = new Drawable[]
                             {
                                 backReceptor = new ScreenFooter.BackReceptor(),
-                                acrylicCaptureScope = new AcrylicCaptureScope(ScreenStack = new OsuScreenStack { RelativeSizeAxes = Axes.Both }),
+                                acrylicCaptureScope = new AcrylicCaptureScope(screenCaptureContent = new Container
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Child = ScreenStack = new OsuScreenStack { RelativeSizeAxes = Axes.Both },
+                                }),
                                 logoContainer = new Container { RelativeSizeAxes = Axes.Both },
                                 // TODO: what is this? why is this?
                                 // TODO: this is being screen scaled even though it's probably AN OVERLAY.
@@ -1264,7 +1274,21 @@ namespace osu.Game
             loadComponentSingleFile(userProfile = new UserProfileOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(beatmapSetOverlay = new BeatmapSetOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(wikiOverlay = new WikiOverlay(), overlayContent.Add, true);
+            loadComponentSingleFile(ezLayoutLayer = new EzLayoutLayer(), screenCaptureContent.Add, true);
             loadComponentSingleFile(skinEditor = new SkinEditorOverlay(ScreenContainer), overlayContent.Add, true);
+            loadComponentSingleFile(ezLayoutEditor = new EzLayoutEditorOverlay(ScreenContainer, ezLayoutLayer), topMostOverlayContent.Add, true);
+
+            skinEditor.State.ValueChanged += state =>
+            {
+                if (state.NewValue == Visibility.Visible)
+                    ezLayoutEditor.Hide();
+            };
+
+            ezLayoutEditor.State.ValueChanged += state =>
+            {
+                if (state.NewValue == Visibility.Visible)
+                    skinEditor.Hide();
+            };
 
             loadComponentSingleFile(loginOverlay = new LoginOverlay
             {
@@ -1889,6 +1913,7 @@ namespace osu.Game
                     Toolbar.Show();
 
                 skinEditor.SetTarget(newOsuScreen);
+                ezLayoutEditor.SetTarget(newOsuScreen);
             }
         }
 
