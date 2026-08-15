@@ -31,6 +31,7 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         private const int band_count = 64;
         private const int wave_catmull_detail = 3;
         private const int wave_rounds = 4;
+        private const float wave_amplitude = bar_length * 0.72f;
 
         private Bindable<EzLogoVisualisationStyle> style = new Bindable<EzLogoVisualisationStyle>(EzLogoVisualisationStyle.RadialBars);
 
@@ -123,6 +124,7 @@ namespace osu.Game.EzOsuGame.Screens.Menu
             private EzLogoVisualisationStyle style;
 
             private static readonly Color4 transparent_white = Color4.White.Opacity(0.2f);
+            private static readonly Color4 dots_white = Color4.White.Opacity(0.38f);
 
             private readonly float[] barAmplitudes = new float[256];
             private readonly float[] bands = new float[band_count];
@@ -186,7 +188,7 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                 Vector2 inflation = DrawInfo.MatrixInverse.ExtractScale().Xy;
 
                 ColourInfo colourInfo = DrawColourInfo.Colour;
-                colourInfo.ApplyChild(transparent_white);
+                colourInfo.ApplyChild(style == EzLogoVisualisationStyle.CircularDots ? dots_white : transparent_white);
 
                 switch (style)
                 {
@@ -275,7 +277,7 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                     for (int i = 0; i < band_count; i++)
                     {
                         float angle = i / (float)band_count * MathF.Tau + offset;
-                        float r = radius + channel[i] * bar_length;
+                        float r = radius + channel[i] * wave_amplitude;
                         controlPoints[i] = centre + new Vector2(MathF.Cos(angle) * r, MathF.Sin(angle) * r);
                     }
 
