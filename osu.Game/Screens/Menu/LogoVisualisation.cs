@@ -60,7 +60,7 @@ namespace osu.Game.Screens.Menu
         /// </summary>
         private const float amplitude_dead_zone = 1f / bar_length;
 
-        private int indexOffset;
+        protected int SpectrumIndexOffset { get; private set; }
 
         /// <summary>
         /// The relative movement of bars based on input amplification. Defaults to 1.
@@ -110,13 +110,13 @@ namespace osu.Game.Screens.Menu
 
             for (int i = 0; i < bars_per_visualiser; i++)
             {
-                float targetAmplitude = (temporalAmplitudes[(i + indexOffset) % bars_per_visualiser]) * kiaiMultiplier;
+                float targetAmplitude = (temporalAmplitudes[(i + SpectrumIndexOffset) % bars_per_visualiser]) * kiaiMultiplier;
 
                 if (targetAmplitude > FrequencyAmplitudes[i])
                     FrequencyAmplitudes[i] = targetAmplitude;
             }
 
-            indexOffset = (indexOffset + SpectrumIndexChange) % bars_per_visualiser;
+            SpectrumIndexOffset = (SpectrumIndexOffset + SpectrumIndexChange) % bars_per_visualiser;
         }
 
         protected override void LoadComplete()
