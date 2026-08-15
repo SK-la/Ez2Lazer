@@ -9,6 +9,7 @@ using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
@@ -73,6 +74,12 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                     Caption = "Menu Logo",
                     Current = menuLogoPath,
                     Items = menu_logo_items,
+                }),
+                new SettingsItemV2(new FormEnumDropdown<EzLogoVisualisationStyle>
+                {
+                    Caption = EzSettingsStrings.LOGO_VISUALISATION,
+                    HintText = EzSettingsStrings.LOGO_VISUALISATION_TOOLTIP,
+                    Current = ezConfig.GetBindable<EzLogoVisualisationStyle>(Ez2Setting.MenuLogoVisualisationStyle),
                 }),
                 new EzPixivBackgroundSettings(ezConfig, pixivBackgroundCoordinator, notifications, backgroundSource),
                 new SettingsItemV2(new FormEnumDropdown<SeasonalBackgroundMode>

@@ -23,6 +23,7 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Screens.Menu;
 using osu.Game.Overlays;
 using osuTK;
 using osuTK.Graphics;
@@ -59,7 +60,7 @@ namespace osu.Game.Screens.Menu
         [Resolved(canBeNull: true)]
         private Ez2ConfigManager ezConfig { get; set; }
 
-        protected virtual MenuLogoVisualisation CreateMenuLogoVisualisation() => new MenuLogoVisualisation();
+        protected virtual MenuLogoVisualisation CreateMenuLogoVisualisation() => new EzMenuLogoVisualisation();
 
         protected virtual double BeatSampleVariance => 0.1;
 

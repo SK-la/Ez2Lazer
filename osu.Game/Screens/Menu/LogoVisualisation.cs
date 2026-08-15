@@ -28,7 +28,7 @@ namespace osu.Game.Screens.Menu
         /// <summary>
         /// The number of bars to jump each update iteration.
         /// </summary>
-        private const int index_change = 5;
+        protected virtual int SpectrumIndexChange => 5;
 
         /// <summary>
         /// The maximum length of each bar in the visualiser. Will be reduced when kiai is not activated.
@@ -60,17 +60,17 @@ namespace osu.Game.Screens.Menu
         /// </summary>
         private const float amplitude_dead_zone = 1f / bar_length;
 
-        private int indexOffset;
+        protected int SpectrumIndexOffset { get; private set; }
 
         /// <summary>
         /// The relative movement of bars based on input amplification. Defaults to 1.
         /// </summary>
         public float Magnitude { get; set; } = 1;
 
-        private readonly float[] frequencyAmplitudes = new float[256];
+        protected readonly float[] FrequencyAmplitudes = new float[256];
 
-        private IShader shader = null!;
-        private Texture texture = null!;
+        protected IShader Shader = null!;
+        protected Texture Texture = null!;
 
         public LogoVisualisation()
         {
@@ -87,36 +87,36 @@ namespace osu.Game.Screens.Menu
         [BackgroundDependencyLoader]
         private void load(IRenderer renderer, ShaderManager shaders)
         {
-            texture = renderer.WhitePixel;
-            shader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.TEXTURE);
+            Texture = renderer.WhitePixel;
+            Shader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.TEXTURE);
         }
 
         private readonly float[] temporalAmplitudes = new float[ChannelAmplitudes.AMPLITUDES_SIZE];
 
         [Resolved]
-        private IBeatSyncProvider beatSyncProvider { get; set; } = null!;
+        protected IBeatSyncProvider BeatSyncProvider { get; private set; } = null!;
 
         private void updateAmplitudes()
         {
             for (int i = 0; i < temporalAmplitudes.Length; i++)
                 temporalAmplitudes[i] = 0;
 
-            addAmplitudesFromSource(beatSyncProvider);
+            addAmplitudesFromSource(BeatSyncProvider);
 
             foreach (var source in amplitudeSources)
                 addAmplitudesFromSource(source);
 
-            float kiaiMultiplier = beatSyncProvider.CheckIsKiaiTime() ? 1 : 0.5f;
+            float kiaiMultiplier = BeatSyncProvider.CheckIsKiaiTime() ? 1 : 0.5f;
 
             for (int i = 0; i < bars_per_visualiser; i++)
             {
-                float targetAmplitude = (temporalAmplitudes[(i + indexOffset) % bars_per_visualiser]) * kiaiMultiplier;
+                float targetAmplitude = (temporalAmplitudes[(i + SpectrumIndexOffset) % bars_per_visualiser]) * kiaiMultiplier;
 
-                if (targetAmplitude > frequencyAmplitudes[i])
-                    frequencyAmplitudes[i] = targetAmplitude;
+                if (targetAmplitude > FrequencyAmplitudes[i])
+                    FrequencyAmplitudes[i] = targetAmplitude;
             }
 
-            indexOffset = (indexOffset + index_change) % bars_per_visualiser;
+            SpectrumIndexOffset = (SpectrumIndexOffset + SpectrumIndexChange) % bars_per_visualiser;
         }
 
         protected override void LoadComplete()
@@ -136,9 +136,9 @@ namespace osu.Game.Screens.Menu
             for (int i = 0; i < bars_per_visualiser; i++)
             {
                 //3% of extra bar length to make it a little faster when bar is almost at it's minimum
-                frequencyAmplitudes[i] -= decayFactor * (frequencyAmplitudes[i] + 0.03f);
-                if (frequencyAmplitudes[i] < 0)
-                    frequencyAmplitudes[i] = 0;
+                FrequencyAmplitudes[i] -= decayFactor * (FrequencyAmplitudes[i] + 0.03f);
+                if (FrequencyAmplitudes[i] < 0)
+                    FrequencyAmplitudes[i] = 0;
             }
 
             Invalidate(Invalidation.DrawNode);
@@ -184,11 +184,11 @@ namespace osu.Game.Screens.Menu
             {
                 base.ApplyState();
 
-                shader = Source.shader;
-                texture = Source.texture;
+                shader = Source.Shader;
+                texture = Source.Texture;
                 size = Source.DrawSize.X;
 
-                Source.frequencyAmplitudes.AsSpan().CopyTo(audioData);
+                Source.FrequencyAmplitudes.AsSpan().CopyTo(audioData);
             }
 
             protected override void Draw(IRenderer renderer)

@@ -69,4 +69,25 @@ namespace osu.Game.EzOsuGame.Configuration
 
         Catch,
     }
+
+    public enum EzLogoVisualisationStyle
+    {
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.LOGO_VIS_BARS))]
+        RadialBars,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.LOGO_VIS_POLYLINE))]
+        CircularPolyline,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.LOGO_VIS_WAVE))]
+        CircularWave,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.LOGO_VIS_DOTS))]
+        CircularDots,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.LOGO_VIS_NET))]
+        CircularNet,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.LOGO_VIS_OFF))]
+        Off,
+    }
 }
