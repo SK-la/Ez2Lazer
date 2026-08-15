@@ -75,6 +75,13 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                     Current = menuLogoPath,
                     Items = menu_logo_items,
                 }),
+                new SettingsItemV2(new FormTextBox
+                {
+                    Caption = EzSettingsStrings.LOGO_CENTRE_TEXT,
+                    HintText = EzSettingsStrings.LOGO_CENTRE_TEXT_TOOLTIP,
+                    PlaceholderText = EzSettingsStrings.LOGO_CENTRE_TEXT_PLACEHOLDER,
+                    Current = ezConfig.GetBindable<string>(Ez2Setting.MenuLogoText),
+                }),
                 new SettingsItemV2(new FormEnumDropdown<EzLogoVisualisationStyle>
                 {
                     Caption = EzSettingsStrings.LOGO_VISUALISATION,

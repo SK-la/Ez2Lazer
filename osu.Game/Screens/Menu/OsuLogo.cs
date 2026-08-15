@@ -292,6 +292,7 @@ namespace osu.Game.Screens.Menu
             {
                 var menuLogoPath = ezConfig.GetBindable<string>(Ez2Setting.MenuLogoPath);
                 menuLogoPath.BindValueChanged(v => applyMenuLogoTexture(textures, v.NewValue), true);
+                LogoElements.Add(new EzMenuLogoCentreText());
             }
             else
             {

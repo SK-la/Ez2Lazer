@@ -50,6 +50,16 @@ namespace osu.Game.EzOsuGame.Localization
             "限制游戏逻辑更新（Update）线程的最高帧率。Draw 帧率仍由图形设置中的「帧率限制」控制。",
             "Limits the maximum update rate of the game logic thread. Draw frame rate is still controlled by the \"Frame limiter\" setting in Graphics.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_CENTRE_TEXT =
+            new EzLocalizationManager.EzLocalisableString("Logo 中心文字", "Logo centre text");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_CENTRE_TEXT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "叠在 logo 正中。格式：文本,字号，例如 123,12 显示「123」、字号 12。支持颜文字；可用中文逗号。省略字号时默认 80。留空则不显示。字号是 logo 贴图坐标系下的像素（中间约 80–160 较合适）。",
+            "Drawn in the centre of the logo. Format: text,size — e.g. 123,12 shows \"123\" at size 12. Kaomoji are supported; a Chinese comma also works. Size defaults to 80 if omitted. Leave empty to hide. Size is in logo-texture pixels (about 80–160 looks right in the hole).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOGO_CENTRE_TEXT_PLACEHOLDER =
+            new EzLocalizationManager.EzLocalisableString("123,12 或 (´・ω・｀),80", "123,12 or (´・ω・｀),80");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOGO_VISUALISATION =
             new EzLocalizationManager.EzLocalisableString("Logo 可视化", "Logo Visualiser");
 
