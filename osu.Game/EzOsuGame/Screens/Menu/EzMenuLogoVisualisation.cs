@@ -29,9 +29,14 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         private const int visualiser_rounds = 5;
         private const float amplitude_dead_zone = 1f / bar_length;
         private const int band_count = 200;
-        private const int wave_control_count = 40;
+        /// <summary>
+        /// miller198 WaveStroke: Android capture 512, averagePool(5). We have 256 interleaved frames → 128 mono → 25 controls.
+        /// </summary>
+        private const int wave_pool_size = 5;
+        private const int wave_control_count = 25;
         private const int wave_catmull_steps = 10;
         private const int wave_draw_count = wave_control_count * wave_catmull_steps + 1;
+        private const float wave_anim_tau = 0.04f;
 
         private static readonly Vector2[] unit_circle = createUnitCircle(band_count);
 
@@ -39,11 +44,114 @@ namespace osu.Game.EzOsuGame.Screens.Menu
 
         protected override int SpectrumIndexChange => style.Value == EzLogoVisualisationStyle.Off ? 0 : 5;
 
+        private readonly float[] waveControl = new float[wave_control_count];
+        private readonly float[] waveWork = new float[wave_control_count];
+
         [BackgroundDependencyLoader(permitNulls: true)]
         private void load(Ez2ConfigManager? ezConfig)
         {
             if (ezConfig != null)
                 style = ezConfig.GetBindable<EzLogoVisualisationStyle>(Ez2Setting.MenuLogoVisualisationStyle);
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (style.Value == EzLogoVisualisationStyle.CircularWave)
+                updateMillerWave();
+        }
+
+        /// <summary>
+        /// miller198 WaveStroke: mix to mono, unsigned 0–255, averagePool(5), z-score, min-max, 120ms tween.
+        /// https://github.com/miller198/ComposeCircleAudioVisualizer
+        /// </summary>
+        private void updateMillerWave()
+        {
+            var samples = BeatSyncProvider.CurrentAmplitudes.WaveformSamples.Span;
+
+            if (samples.Length < wave_pool_size * 2)
+                return;
+
+            int frames = samples.Length / 2;
+
+            for (int i = 0; i < wave_control_count; i++)
+            {
+                int start = i * wave_pool_size;
+                float sum = 0;
+
+                for (int k = 0; k < wave_pool_size; k++)
+                {
+                    int frame = start + k;
+                    if (frame >= frames)
+                        break;
+
+                    float mixed = 0.5f * (samples[frame * 2] + samples[frame * 2 + 1]);
+                    sum += (mixed + 1f) * 127.5f;
+                }
+
+                waveWork[i] = sum / wave_pool_size;
+            }
+
+            applyZScore(waveWork);
+            applyMinMax(waveWork);
+
+            float blend = 1 - MathF.Exp(-(float)Time.Elapsed / 1000f / wave_anim_tau);
+
+            for (int i = 0; i < wave_control_count; i++)
+                waveControl[i] += (waveWork[i] - waveControl[i]) * blend;
+        }
+
+        private static void applyZScore(float[] data)
+        {
+            float mean = 0;
+
+            for (int i = 0; i < data.Length; i++)
+                mean += data[i];
+
+            mean /= data.Length;
+
+            float variance = 0;
+
+            for (int i = 0; i < data.Length; i++)
+            {
+                float d = data[i] - mean;
+                variance += d * d;
+            }
+
+            float stdDev = MathF.Sqrt(variance / data.Length);
+
+            if (stdDev <= 0.0001f || float.IsNaN(stdDev))
+            {
+                Array.Clear(data);
+                return;
+            }
+
+            for (int i = 0; i < data.Length; i++)
+                data[i] = (data[i] - mean) / stdDev;
+        }
+
+        private static void applyMinMax(float[] data)
+        {
+            float min = data[0];
+            float max = data[0];
+
+            for (int i = 1; i < data.Length; i++)
+            {
+                min = Math.Min(min, data[i]);
+                max = Math.Max(max, data[i]);
+            }
+
+            float range = max - min;
+
+            if (range <= 1f)
+            {
+                Array.Clear(data);
+                return;
+            }
+
+            for (int i = 0; i < data.Length; i++)
+                data[i] = (data[i] - min) / range;
         }
 
         private static Vector2[] createUnitCircle(int count)
@@ -127,7 +235,7 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                         break;
 
                     case EzLogoVisualisationStyle.CircularWave:
-                        fillWaveBands();
+                        Source.waveControl.AsSpan().CopyTo(waveControl);
                         fillWaveRing();
                         break;
                 }
@@ -157,28 +265,15 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                 }
             }
 
-            private void fillWaveBands()
-            {
-                int binsPerControl = band_count / wave_control_count;
-
-                for (int i = 0; i < wave_control_count; i++)
-                {
-                    float sum = 0;
-                    int start = i * binsPerControl;
-
-                    for (int k = 0; k < binsPerControl; k++)
-                        sum += compressAmplitude(barAmplitudes[start + k]);
-
-                    waveControl[i] = sum / binsPerControl;
-                }
-            }
-
             private void fillWaveRing()
             {
+                // miller198: innerRadius = FullClip (logo edge), maxEffectHeight = min(w,h) / 5
+                float maxEffectHeight = size / 5f;
+
                 for (int i = 0; i < wave_control_count; i++)
                 {
-                    float angle = i / (float)wave_control_count * MathF.Tau;
-                    float r = radius + bar_length * waveControl[i];
+                    float angle = i / (float)wave_control_count * MathF.Tau - MathF.PI / 2;
+                    float r = radius + maxEffectHeight * waveControl[i];
                     waveControlPoints[i] = centre + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * r;
                 }
 
@@ -304,7 +399,7 @@ namespace osu.Game.EzOsuGame.Screens.Menu
 
             private void drawWaveform(IRenderer renderer, ColourInfo colourInfo, Vector2 inflation)
             {
-                float thickness = Math.Max(size * 0.012f, 3.5f);
+                float thickness = Math.Max(size * 0.006f, 3f);
                 drawOpenLine(renderer, colourInfo, inflation, wavePoints, 0, wave_draw_count, thickness);
             }
 
