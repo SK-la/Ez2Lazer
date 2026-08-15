@@ -3,7 +3,6 @@
 
 using System;
 using osu.Framework.Allocation;
-using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
@@ -31,16 +30,85 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         private const float amplitude_dead_zone = 1f / bar_length;
         private const int band_count = 64;
         private const int wave_catmull_detail = 3;
+        private const int wave_rounds = 4;
 
         private Bindable<EzLogoVisualisationStyle> style = new Bindable<EzLogoVisualisationStyle>(EzLogoVisualisationStyle.RadialBars);
 
         protected override int SpectrumIndexChange => style.Value == EzLogoVisualisationStyle.RadialBars ? 5 : 0;
+
+        private readonly float[] smoothedWaveformLeft = new float[band_count];
+        private readonly float[] smoothedWaveformRight = new float[band_count];
+        private readonly float[] waveScratchLeft = new float[band_count];
+        private readonly float[] waveScratchRight = new float[band_count];
 
         [BackgroundDependencyLoader(permitNulls: true)]
         private void load(Ez2ConfigManager? ezConfig)
         {
             if (ezConfig != null)
                 style = ezConfig.GetBindable<EzLogoVisualisationStyle>(Ez2Setting.MenuLogoVisualisationStyle);
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (style.Value == EzLogoVisualisationStyle.CircularWave)
+                updateSmoothedWaveform();
+        }
+
+        private void updateSmoothedWaveform()
+        {
+            var samples = BeatSyncProvider.CurrentAmplitudes.WaveformSamples.Span;
+
+            if (samples.Length < 2)
+                return;
+
+            downsampleChannel(samples, 0, waveScratchLeft);
+            downsampleChannel(samples, 1, waveScratchRight);
+
+            float blend = 1 - MathF.Exp(-(float)Time.Elapsed * 0.006f);
+            smoothChannel(waveScratchLeft, smoothedWaveformLeft, blend);
+            smoothChannel(waveScratchRight, smoothedWaveformRight, blend);
+        }
+
+        private static void downsampleChannel(ReadOnlySpan<float> samples, int channel, float[] destination)
+        {
+            int frames = samples.Length / 2;
+            int perBand = Math.Max(1, frames / band_count);
+
+            for (int i = 0; i < band_count; i++)
+            {
+                float sum = 0;
+                int count = 0;
+                int startFrame = i * perBand;
+
+                for (int k = 0; k < perBand; k++)
+                {
+                    int src = (startFrame + k) * 2 + channel;
+
+                    if (src >= samples.Length)
+                        break;
+
+                    sum += samples[src];
+                    count++;
+                }
+
+                destination[i] = count > 0 ? sum / count : 0;
+            }
+        }
+
+        private static void smoothChannel(float[] scratch, float[] smoothed, float blend)
+        {
+            for (int i = 0; i < band_count; i++)
+            {
+                float prev = scratch[(i - 1 + band_count) % band_count];
+                float next = scratch[(i + 1) % band_count];
+                float target = prev * 0.25f + scratch[i] * 0.5f + next * 0.25f;
+
+                float current = smoothed[i];
+                float factor = Math.Abs(target) > Math.Abs(current) ? Math.Min(1, blend * 2.5f) : blend;
+                smoothed[i] = current + (target - current) * factor;
+            }
         }
 
         protected override DrawNode CreateDrawNode() => new EzVisualisationDrawNode(this);
@@ -56,14 +124,13 @@ namespace osu.Game.EzOsuGame.Screens.Menu
 
             private static readonly Color4 transparent_white = Color4.White.Opacity(0.2f);
 
-            // Bars stack 5 additive rounds at 0.2; a single stroke needs near-opaque vertices to match.
-            private static readonly Color4 contour_white = Color4.White.Opacity(0.85f);
-
             private readonly float[] barAmplitudes = new float[256];
             private readonly float[] bands = new float[band_count];
-            private readonly float[] waveform = new float[ChannelAmplitudes.WAVEFORM_SIZE];
-            private readonly Vector2[] controlPoints = new Vector2[ChannelAmplitudes.WAVEFORM_SIZE];
-            private readonly Vector2[] contourPoints = new Vector2[ChannelAmplitudes.WAVEFORM_SIZE * wave_catmull_detail];
+            private readonly float[] waveformLeft = new float[band_count];
+            private readonly float[] waveformRight = new float[band_count];
+            private readonly Vector2[] controlPoints = new Vector2[band_count];
+            private readonly Vector2[] innerPoints = new Vector2[band_count];
+            private readonly Vector2[] contourPoints = new Vector2[band_count * wave_catmull_detail];
 
             private IVertexBatch<TexturedVertex2D>? vertexBatch;
 
@@ -83,7 +150,8 @@ namespace osu.Game.EzOsuGame.Screens.Menu
 
                 Source.FrequencyAmplitudes.AsSpan().CopyTo(barAmplitudes);
                 fillBandsFromPeakHold();
-                Source.BeatSyncProvider.CurrentAmplitudes.WaveformSamples.Span.CopyTo(waveform);
+                Source.smoothedWaveformLeft.AsSpan().CopyTo(waveformLeft);
+                Source.smoothedWaveformRight.AsSpan().CopyTo(waveformRight);
             }
 
             private void fillBandsFromPeakHold()
@@ -118,7 +186,7 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                 Vector2 inflation = DrawInfo.MatrixInverse.ExtractScale().Xy;
 
                 ColourInfo colourInfo = DrawColourInfo.Colour;
-                colourInfo.ApplyChild(style == EzLogoVisualisationStyle.RadialBars ? transparent_white : contour_white);
+                colourInfo.ApplyChild(transparent_white);
 
                 switch (style)
                 {
@@ -184,41 +252,55 @@ namespace osu.Game.EzOsuGame.Screens.Menu
 
             private void drawPolyline(IRenderer renderer, ColourInfo colourInfo, Vector2 inflation)
             {
-                int count = fillSpectrumPoints(controlPoints, band_count);
-                drawClosedLine(renderer, colourInfo, inflation, controlPoints, count, Math.Max(size * 0.012f, 3.5f));
+                float thickness = Math.Max(size * 0.012f, 3.5f);
+
+                for (int j = 0; j < visualiser_rounds; j++)
+                {
+                    fillSpectrumPoints(controlPoints, band_count, j * MathF.Tau / visualiser_rounds);
+                    drawClosedLine(renderer, colourInfo, inflation, controlPoints, band_count, thickness);
+                }
             }
 
             private void drawWaveform(IRenderer renderer, ColourInfo colourInfo, Vector2 inflation)
             {
                 float radius = size / 2;
                 var centre = new Vector2(radius);
-                const float scale = bar_length;
-                int sampleCount = waveform.Length;
+                float thickness = Math.Max(size * 0.007f, 2.2f);
 
-                for (int i = 0; i < sampleCount; i++)
+                for (int j = 0; j < wave_rounds; j++)
                 {
-                    float angle = i / (float)sampleCount * MathF.Tau;
-                    float r = radius + waveform[i] * scale;
-                    controlPoints[i] = centre + new Vector2(MathF.Cos(angle) * r, MathF.Sin(angle) * r);
-                }
+                    float offset = j * MathF.Tau / wave_rounds;
+                    float[] channel = j % 2 == 0 ? waveformLeft : waveformRight;
 
-                int count = fillClosedCatmull(controlPoints, sampleCount, contourPoints, wave_catmull_detail);
-                drawClosedLine(renderer, colourInfo, inflation, contourPoints, count, Math.Max(size * 0.007f, 2.2f));
+                    for (int i = 0; i < band_count; i++)
+                    {
+                        float angle = i / (float)band_count * MathF.Tau + offset;
+                        float r = radius + channel[i] * bar_length;
+                        controlPoints[i] = centre + new Vector2(MathF.Cos(angle) * r, MathF.Sin(angle) * r);
+                    }
+
+                    int count = fillClosedCatmull(controlPoints, band_count, contourPoints, wave_catmull_detail);
+                    drawClosedLine(renderer, colourInfo, inflation, contourPoints, count, thickness);
+                }
             }
 
             private void drawDots(IRenderer renderer, ColourInfo colourInfo, Vector2 inflation)
             {
                 float radius = size / 2;
                 var centre = new Vector2(radius);
-                const float scale = bar_length;
 
-                for (int i = 0; i < band_count; i++)
+                for (int j = 0; j < visualiser_rounds; j++)
                 {
-                    float angle = i / (float)band_count * MathF.Tau;
-                    float r = radius + scale * bands[i];
-                    Vector2 pos = centre + new Vector2(MathF.Cos(angle) * r, MathF.Sin(angle) * r);
-                    float dot = Math.Max(size * 0.018f, 4.5f) * (0.55f + 0.7f * bands[i]);
-                    drawDot(renderer, colourInfo, inflation, pos, dot);
+                    float offset = j * MathF.Tau / visualiser_rounds;
+
+                    for (int i = 0; i < band_count; i++)
+                    {
+                        float angle = i / (float)band_count * MathF.Tau + offset;
+                        float r = radius + bar_length * bands[i];
+                        Vector2 pos = centre + new Vector2(MathF.Cos(angle) * r, MathF.Sin(angle) * r);
+                        float dot = Math.Max(size * 0.018f, 4.5f) * (0.55f + 0.7f * bands[i]);
+                        drawDot(renderer, colourInfo, inflation, pos, dot);
+                    }
                 }
             }
 
@@ -226,37 +308,38 @@ namespace osu.Game.EzOsuGame.Screens.Menu
             {
                 float radius = size / 2;
                 var centre = new Vector2(radius);
-                const float scale = bar_length;
                 float thickness = Math.Max(size * 0.006f, 2f);
 
-                for (int i = 0; i < band_count; i++)
+                for (int j = 0; j < visualiser_rounds; j++)
                 {
-                    float angle = i / (float)band_count * MathF.Tau;
-                    var dir = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
-                    controlPoints[i] = centre + dir * (radius + scale * bands[i]);
-                    contourPoints[i] = centre + dir * radius;
+                    float offset = j * MathF.Tau / visualiser_rounds;
+
+                    for (int i = 0; i < band_count; i++)
+                    {
+                        float angle = i / (float)band_count * MathF.Tau + offset;
+                        var dir = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+                        controlPoints[i] = centre + dir * (radius + bar_length * bands[i]);
+                        innerPoints[i] = centre + dir * radius;
+                    }
+
+                    drawClosedLine(renderer, colourInfo, inflation, controlPoints, band_count, thickness);
+
+                    for (int i = 0; i < band_count; i += 2)
+                        drawSegment(renderer, colourInfo, inflation, controlPoints[i], innerPoints[i], thickness);
                 }
-
-                drawClosedLine(renderer, colourInfo, inflation, controlPoints, band_count, thickness);
-
-                for (int i = 0; i < band_count; i += 2)
-                    drawSegment(renderer, colourInfo, inflation, controlPoints[i], contourPoints[i], thickness);
             }
 
-            private int fillSpectrumPoints(Vector2[] destination, int count)
+            private void fillSpectrumPoints(Vector2[] destination, int count, float angleOffset)
             {
                 float radius = size / 2;
                 var centre = new Vector2(radius);
-                const float scale = bar_length;
 
                 for (int i = 0; i < count; i++)
                 {
-                    float angle = i / (float)count * MathF.Tau;
-                    float r = radius + scale * bands[i];
+                    float angle = i / (float)count * MathF.Tau + angleOffset;
+                    float r = radius + bar_length * bands[i];
                     destination[i] = centre + new Vector2(MathF.Cos(angle) * r, MathF.Sin(angle) * r);
                 }
-
-                return count;
             }
 
             private static int fillClosedCatmull(Vector2[] source, int sourceCount, Vector2[] destination, int detail)
