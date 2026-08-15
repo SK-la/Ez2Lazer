@@ -37,6 +37,8 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         private const int wave_catmull_steps = 10;
         private const int wave_draw_count = wave_control_count * wave_catmull_steps + 1;
         private const float wave_anim_tau = 0.04f;
+        private const int ring2_index_change = -3;
+        private const float ring_update_ms = 50;
 
         private static readonly Vector2[] unit_circle = createUnitCircle(band_count);
 
@@ -46,6 +48,8 @@ namespace osu.Game.EzOsuGame.Screens.Menu
 
         private readonly float[] waveControl = new float[wave_control_count];
         private readonly float[] waveWork = new float[wave_control_count];
+        private int ring2IndexOffset;
+        private double ring2Timer;
 
         [BackgroundDependencyLoader(permitNulls: true)]
         private void load(Ez2ConfigManager? ezConfig)
@@ -57,6 +61,17 @@ namespace osu.Game.EzOsuGame.Screens.Menu
         protected override void Update()
         {
             base.Update();
+
+            if (style.Value != EzLogoVisualisationStyle.Off && style.Value != EzLogoVisualisationStyle.RadialBars)
+            {
+                ring2Timer += Time.Elapsed;
+
+                while (ring2Timer >= ring_update_ms)
+                {
+                    ring2Timer -= ring_update_ms;
+                    ring2IndexOffset = (ring2IndexOffset + ring2_index_change + band_count) % band_count;
+                }
+            }
 
             if (style.Value == EzLogoVisualisationStyle.CircularWave)
                 updateMillerWave();
@@ -213,23 +228,26 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                 centre = new Vector2(radius);
 
                 Source.FrequencyAmplitudes.AsSpan().CopyTo(barAmplitudes);
+                int ring2Offset = Source.ring2IndexOffset;
+                float ring1Spin = Source.SpectrumIndexOffset / (float)bars_per_visualiser * MathF.Tau;
+                float ring2Spin = ring2Offset / (float)band_count * MathF.Tau;
 
                 switch (style)
                 {
                     case EzLogoVisualisationStyle.CircularPolyline:
                     case EzLogoVisualisationStyle.CircularDots:
                     case EzLogoVisualisationStyle.CircularNet:
-                        fillSpectrumEnvelope();
+                        fillSpectrumEnvelope(ring2Offset);
                         break;
 
                     case EzLogoVisualisationStyle.CircularWave:
                         Source.waveControl.AsSpan().CopyTo(waveControl);
-                        fillWaveRing();
+                        fillWaveRing(ring1Spin, ring2Spin);
                         break;
                 }
             }
 
-            private void fillSpectrumEnvelope()
+            private void fillSpectrumEnvelope(int ring2Offset)
             {
                 float height = size / 5f;
 
@@ -240,24 +258,28 @@ namespace osu.Game.EzOsuGame.Screens.Menu
                     Vector2 dir = unit_circle[i];
                     float bulge = height * mag;
                     roundPoints[i] = centre + dir * (radius + bulge);
-                    rotatedPoints[i] = centre + dir * (radius + height - bulge);
+
+                    float mag2 = barAmplitudes[(i + ring2Offset) % band_count];
+                    rotatedPoints[i] = centre + dir * (radius + height - height * mag2);
                     innerPoints[i] = centre + dir * radius;
                 }
             }
 
-            private void fillWaveRing()
+            private void fillWaveRing(float ring1Spin, float ring2Spin)
             {
                 float maxEffectHeight = size / 5f;
 
                 for (int i = 0; i < wave_control_count; i++)
                 {
-                    float angle = i / (float)wave_control_count * MathF.Tau - MathF.PI / 2;
-                    var dir = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+                    float baseAngle = i / (float)wave_control_count * MathF.Tau - MathF.PI / 2;
                     float mag = waveControl[i];
                     float bulge = maxEffectHeight * mag;
 
-                    waveOuterControl[i] = centre + dir * (radius + bulge);
-                    waveInnerControl[i] = centre + dir * (radius + maxEffectHeight - bulge);
+                    float a1 = baseAngle + ring1Spin;
+                    waveOuterControl[i] = centre + new Vector2(MathF.Cos(a1), MathF.Sin(a1)) * (radius + bulge);
+
+                    float a2 = baseAngle + ring2Spin;
+                    waveInnerControl[i] = centre + new Vector2(MathF.Cos(a2), MathF.Sin(a2)) * (radius + maxEffectHeight - bulge);
                 }
 
                 fillCatmullClosed(waveOuterControl, wavePoints, 0, wave_catmull_steps);
