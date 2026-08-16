@@ -41,6 +41,24 @@ namespace osu.Game.Tests.EzOsuGame.Pets
         }
 
         [Test]
+        public void TestParseRuleActions()
+        {
+            var pack = EzPetPackDefinition.Parse("""
+                {
+                  "rules": [
+                    { "when": "gameplayEnter", "action": "hide" },
+                    { "when": "combo", "at": 200, "action": "show", "goto": "combo200" },
+                    { "when": "click", "goto": "poke" }
+                  ]
+                }
+                """);
+
+            Assert.That(pack.Rules[0].ResolveAction(), Is.EqualTo(EzPetVisibilityAction.Hide));
+            Assert.That(pack.Rules[1].ResolveAction(), Is.EqualTo(EzPetVisibilityAction.Show));
+            Assert.That(pack.Rules[2].ResolveAction(), Is.EqualTo(EzPetVisibilityAction.Play));
+        }
+
+        [Test]
         public void TestCollectIndexedFramesIgnoresPrefix()
         {
             string[] files = new[] { "guga_02.png", "foo_00.png", "bar_01.jpg", "readme.txt", "idle.png" };

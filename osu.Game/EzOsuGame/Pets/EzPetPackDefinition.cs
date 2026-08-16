@@ -100,6 +100,13 @@ namespace osu.Game.EzOsuGame.Pets
         public bool Interrupt { get; set; }
 
         /// <summary>
+        /// <c>play</c> (default) switches clip via <see cref="Goto"/>;
+        /// <c>show</c> makes the pet visible (optional <see cref="Goto"/>);
+        /// <c>hide</c> hides the pet until a later <c>show</c> or leaving gameplay.
+        /// </summary>
+        public string Action { get; set; } = string.Empty;
+
+        /// <summary>
         /// Combo threshold (inclusive). Used when <see cref="When"/> is combo.
         /// </summary>
         public int? At { get; set; }
@@ -113,5 +120,23 @@ namespace osu.Game.EzOsuGame.Pets
         /// Idle seconds before this rule can fire. Used when <see cref="When"/> is idle.
         /// </summary>
         public double? AfterSeconds { get; set; }
+
+        public EzPetVisibilityAction ResolveAction()
+        {
+            if (string.Equals(Action, "hide", StringComparison.OrdinalIgnoreCase))
+                return EzPetVisibilityAction.Hide;
+
+            if (string.Equals(Action, "show", StringComparison.OrdinalIgnoreCase))
+                return EzPetVisibilityAction.Show;
+
+            return EzPetVisibilityAction.Play;
+        }
+    }
+
+    public enum EzPetVisibilityAction
+    {
+        Play,
+        Show,
+        Hide,
     }
 }

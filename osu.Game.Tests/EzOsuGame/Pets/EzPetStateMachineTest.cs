@@ -142,11 +142,59 @@ namespace osu.Game.Tests.EzOsuGame.Pets
         }
 
         [Test]
-        public void TestGameplayEnterInterrupts()
+        public void TestGameplayEnterHideDoesNotNeedClip()
         {
-            machine.HandleHover();
+            var definition = EzPetPackDefinition.Parse("""
+                {
+                  "defaultState": "idle",
+                  "clips": { "idle": { "fps": 12, "loop": true } },
+                  "states": { "idle": { "clip": "idle" } },
+                  "rules": [ { "when": "gameplayEnter", "action": "hide" } ]
+                }
+                """);
+
+            var actions = new List<EzPetVisibilityAction>();
+            machine.VisibilityAction += actions.Add;
+            machine.ApplyPack(definition, definition.Clips.Keys);
+            actions.Clear();
+
             Assert.That(machine.HandleGameplayEnter(), Is.True);
-            Assert.That(machine.CurrentState, Is.EqualTo("enter"));
+            Assert.That(actions, Is.EqualTo(new[] { EzPetVisibilityAction.Hide }));
+            Assert.That(machine.CurrentState, Is.EqualTo("idle"));
+        }
+
+        [Test]
+        public void TestComboShowThenHide()
+        {
+            var definition = EzPetPackDefinition.Parse("""
+                {
+                  "defaultState": "idle",
+                  "clips": {
+                    "idle": { "fps": 12, "loop": true },
+                    "combo200": { "fps": 12, "loop": false }
+                  },
+                  "states": {
+                    "idle": { "clip": "idle" },
+                    "combo200": { "clip": "combo200", "next": "idle" }
+                  },
+                  "rules": [
+                    { "when": "combo", "at": 200, "action": "show", "goto": "combo200", "interrupt": true },
+                    { "when": "combo", "at": 500, "action": "hide" }
+                  ]
+                }
+                """);
+
+            var actions = new List<EzPetVisibilityAction>();
+            machine.VisibilityAction += actions.Add;
+            machine.ApplyPack(definition, definition.Clips.Keys);
+            actions.Clear();
+
+            Assert.That(machine.HandleCombo(200), Is.True);
+            Assert.That(machine.CurrentState, Is.EqualTo("combo200"));
+            Assert.That(actions, Is.EqualTo(new[] { EzPetVisibilityAction.Show }));
+
+            Assert.That(machine.HandleCombo(500), Is.True);
+            Assert.That(actions, Is.EqualTo(new[] { EzPetVisibilityAction.Show, EzPetVisibilityAction.Hide }));
         }
     }
 }

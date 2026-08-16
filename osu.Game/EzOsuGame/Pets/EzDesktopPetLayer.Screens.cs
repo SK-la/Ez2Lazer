@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Screens;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Select;
 
@@ -21,6 +22,18 @@ namespace osu.Game.EzOsuGame.Pets
 
             inGameplay = screen is Player;
 
+            if (screen is MainMenu)
+                currentScene = PetScene.Menu;
+            else if (screen is ISongSelect)
+                currentScene = PetScene.SongSelect;
+            else if (screen is Player)
+                currentScene = PetScene.Gameplay;
+            else
+                currentScene = PetScene.Other;
+
+            if (wasGameplay && !inGameplay)
+                eventHidden = false;
+
             if (screen is Player player)
             {
                 bindPlayer(player);
@@ -33,6 +46,8 @@ namespace osu.Game.EzOsuGame.Pets
 
             if (screen is ISongSelect)
                 tryHandleStarRating();
+
+            updateVisibility();
         }
 
         private void onBeatmapChanged()

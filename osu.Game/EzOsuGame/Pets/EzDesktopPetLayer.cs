@@ -23,10 +23,19 @@ namespace osu.Game.EzOsuGame.Pets
 {
     /// <summary>
     /// Independent desktop-pet layer. Not a skin component, not an Ez layout component,
-    /// and not an <c>OsuFocusedOverlayContainer</c>. Visibility is the settings toggle only.
+    /// and not an <c>OsuFocusedOverlayContainer</c>. Visibility is the master toggle,
+    /// per-scene checkboxes, and optional pet.json hide/show rules.
     /// </summary>
     public partial class EzDesktopPetLayer : VisibilityContainer
     {
+        private enum PetScene
+        {
+            Other,
+            Menu,
+            SongSelect,
+            Gameplay,
+        }
+
         private const float placeholder_size = 128;
         private const int placeholder_frames = 4;
 
@@ -38,6 +47,9 @@ namespace osu.Game.EzOsuGame.Pets
         private Bindable<double> scale = null!;
         private Bindable<float> posX = null!;
         private Bindable<float> posY = null!;
+        private Bindable<bool> showOnMenu = null!;
+        private Bindable<bool> showOnSongSelect = null!;
+        private Bindable<bool> showOnGameplay = null!;
 
         private IBindable<WorkingBeatmap> beatmap = null!;
 
@@ -52,6 +64,8 @@ namespace osu.Game.EzOsuGame.Pets
 
         private EzPetPack? currentPack;
         private bool inGameplay;
+        private bool eventHidden;
+        private PetScene currentScene;
         private bool hovered;
         private bool dragging;
         private Guid lastStarBeatmapId;
@@ -83,6 +97,9 @@ namespace osu.Game.EzOsuGame.Pets
             scale = ezConfig.GetBindable<double>(Ez2Setting.DesktopPetScale);
             posX = ezConfig.GetBindable<float>(Ez2Setting.DesktopPetPositionX);
             posY = ezConfig.GetBindable<float>(Ez2Setting.DesktopPetPositionY);
+            showOnMenu = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnMenu);
+            showOnSongSelect = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnSongSelect);
+            showOnGameplay = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnGameplay);
 
             loader = new EzPetPackLoader(storage);
             loader.EnsureDefaultPack();
@@ -116,16 +133,19 @@ namespace osu.Game.EzOsuGame.Pets
             base.LoadComplete();
 
             stateMachine.ClipChanged += onClipChanged;
+            stateMachine.VisibilityAction += onVisibilityAction;
 
             enabled.BindValueChanged(_ => updateVisibility(), false);
+            showOnMenu.BindValueChanged(_ => updateVisibility(), false);
+            showOnSongSelect.BindValueChanged(_ => updateVisibility(), false);
+            showOnGameplay.BindValueChanged(_ => updateVisibility(), false);
             packName.BindValueChanged(_ => reloadPack(), true);
             scale.BindValueChanged(_ => applyScale(), true);
             posX.BindValueChanged(_ => applyPosition(), true);
             posY.BindValueChanged(_ => applyPosition(), true);
             beatmap.BindValueChanged(_ => onBeatmapChanged(), true);
 
-            if (game == null)
-                game = this.FindClosestParent<OsuGame>();
+            game ??= this.FindClosestParent<OsuGame>();
 
             if (game != null)
             {
@@ -164,7 +184,7 @@ namespace osu.Game.EzOsuGame.Pets
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
         {
-            if (!enabled.Value || !IsPresent)
+            if (!enabled.Value || State.Value != Visibility.Visible)
                 return false;
 
             if (!petBox.ReceivePositionalInputAt(screenSpacePos))
@@ -190,9 +210,10 @@ namespace osu.Game.EzOsuGame.Pets
 
             unbindPlayer();
             stateMachine.ClipChanged -= onClipChanged;
-            animation?.ClearFrames();
+            stateMachine.VisibilityAction -= onVisibilityAction;
+            animation.ClearFrames();
             clipTextures.Clear();
-            petTextures?.Dispose();
+            petTextures.Dispose();
 
             base.Dispose(isDisposing);
         }
@@ -201,6 +222,7 @@ namespace osu.Game.EzOsuGame.Pets
         {
             clipTextures.Clear();
             currentPack = null;
+            eventHidden = false;
 
             try
             {
@@ -393,15 +415,31 @@ namespace osu.Game.EzOsuGame.Pets
 
         private void updateVisibility()
         {
-            if (enabled.Value)
+            bool show = enabled.Value && !eventHidden && sceneAllowsDisplay();
+
+            if (show)
                 Show();
             else
                 Hide();
         }
 
+        private bool sceneAllowsDisplay() => currentScene switch
+        {
+            PetScene.Menu => showOnMenu.Value,
+            PetScene.SongSelect => showOnSongSelect.Value,
+            PetScene.Gameplay => showOnGameplay.Value,
+            _ => false,
+        };
+
+        private void onVisibilityAction(EzPetVisibilityAction action)
+        {
+            eventHidden = action == EzPetVisibilityAction.Hide;
+            updateVisibility();
+        }
+
         private void pollHover()
         {
-            if (dragging)
+            if (dragging || State.Value != Visibility.Visible)
                 return;
 
             var input = GetContainingInputManager();

@@ -33,6 +33,8 @@ namespace osu.Game.EzOsuGame.Pets
 
         public event Action<string, string>? ClipChanged;
 
+        public event Action<EzPetVisibilityAction>? VisibilityAction;
+
         public void ApplyPack(EzPetPackDefinition pack, IReadOnlyCollection<string> clips)
         {
             definition = pack;
@@ -108,7 +110,7 @@ namespace osu.Game.EzOsuGame.Pets
             if (chosen == null)
                 return;
 
-            if (tryGoto(chosen.Goto, chosen.Interrupt, restartIfSame: true))
+            if (tryApplyRule(chosen, resetIdle: false, restartIfSame: true))
                 firedIdleAfter.Add(chosen.AfterSeconds!.Value);
         }
 
@@ -181,11 +183,10 @@ namespace osu.Game.EzOsuGame.Pets
             if (chosen == null)
                 return false;
 
-            if (!tryGoto(chosen.Goto, chosen.Interrupt, restartIfSame: true))
+            if (!tryApplyRule(chosen, resetIdle: true, restartIfSame: true))
                 return false;
 
             firedComboAts.Add(chosen.At!.Value);
-            ResetIdleTimer();
             return true;
         }
 
@@ -211,11 +212,7 @@ namespace osu.Game.EzOsuGame.Pets
             if (chosen == null)
                 return false;
 
-            if (!tryGoto(chosen.Goto, chosen.Interrupt, restartIfSame: true))
-                return false;
-
-            ResetIdleTimer();
-            return true;
+            return tryApplyRule(chosen, resetIdle: true, restartIfSame: true);
         }
 
         public void NotifyNonMissJudgement() => missStreak = 0;
@@ -225,6 +222,34 @@ namespace osu.Game.EzOsuGame.Pets
             var rule = findRule(when);
             if (rule == null)
                 return false;
+
+            return tryApplyRule(rule, resetIdle, restartIfSame);
+        }
+
+        private bool tryApplyRule(EzPetRule rule, bool resetIdle, bool restartIfSame)
+        {
+            var action = rule.ResolveAction();
+
+            if (action == EzPetVisibilityAction.Hide)
+            {
+                VisibilityAction?.Invoke(EzPetVisibilityAction.Hide);
+                if (resetIdle)
+                    ResetIdleTimer();
+                return true;
+            }
+
+            if (action == EzPetVisibilityAction.Show)
+            {
+                VisibilityAction?.Invoke(EzPetVisibilityAction.Show);
+
+                if (!string.IsNullOrEmpty(rule.Goto))
+                    tryGoto(rule.Goto, rule.Interrupt, restartIfSame);
+
+                if (resetIdle)
+                    ResetIdleTimer();
+
+                return true;
+            }
 
             if (!tryGoto(rule.Goto, rule.Interrupt, restartIfSame))
                 return false;

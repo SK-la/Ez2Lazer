@@ -42,6 +42,33 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "pet", "desktop", "mascot", "桌宠" }
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.DESKTOP_PET_SHOW_ON_MENU,
+                    HintText = EzSettingsStrings.DESKTOP_PET_SHOW_ON_MENU_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnMenu),
+                })
+                {
+                    Keywords = new[] { "pet", "menu", "桌宠", "主菜单" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.DESKTOP_PET_SHOW_ON_SONG_SELECT,
+                    HintText = EzSettingsStrings.DESKTOP_PET_SHOW_ON_SONG_SELECT_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnSongSelect),
+                })
+                {
+                    Keywords = new[] { "pet", "song select", "桌宠", "选歌" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.DESKTOP_PET_SHOW_ON_GAMEPLAY,
+                    HintText = EzSettingsStrings.DESKTOP_PET_SHOW_ON_GAMEPLAY_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnGameplay),
+                })
+                {
+                    Keywords = new[] { "pet", "gameplay", "桌宠", "游玩" }
+                },
                 new SettingsItemV2(new FormDropdown<string>
                 {
                     Caption = EzSettingsStrings.DESKTOP_PET_PACK,

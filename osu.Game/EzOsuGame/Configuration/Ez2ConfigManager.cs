@@ -127,6 +127,9 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.DesktopPetScale, 1.0, 0.25, 3.0, 0.05);
             SetDefault(Ez2Setting.DesktopPetPositionX, 0.90f);
             SetDefault(Ez2Setting.DesktopPetPositionY, 0.82f);
+            SetDefault(Ez2Setting.DesktopPetShowOnMenu, true);
+            SetDefault(Ez2Setting.DesktopPetShowOnSongSelect, true);
+            SetDefault(Ez2Setting.DesktopPetShowOnGameplay, true);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
             SetDefault(Ez2Setting.BeatmapPreviewMode, EzBeatmapPreviewMode.Static);
             SetDefault(Ez2Setting.BeatmapPreviewModeMania, EzBeatmapPreviewMode.StaticFullMap);
@@ -970,6 +973,12 @@ namespace osu.Game.EzOsuGame.Configuration
 
         /// <summary>Normalised pet centre Y in [0, 1].</summary>
         DesktopPetPositionY,
+
+        DesktopPetShowOnMenu,
+
+        DesktopPetShowOnSongSelect,
+
+        DesktopPetShowOnGameplay,
 
         // 界面功能
         KeySoundPreviewMode,
