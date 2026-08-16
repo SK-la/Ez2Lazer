@@ -13,7 +13,7 @@ namespace osu.Game.EzOsuGame.Pets
     /// </summary>
     public class EzPetPackDefinition
     {
-        public static readonly JsonSerializerSettings JsonSettings = new JsonSerializerSettings
+        public static readonly JsonSerializerSettings JSON_SETTINGS = new JsonSerializerSettings
         {
             ContractResolver = new CamelCasePropertyNamesContractResolver(),
             MissingMemberHandling = MissingMemberHandling.Ignore,
@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame.Pets
 
         public static EzPetPackDefinition Parse(string json)
         {
-            var parsed = JsonConvert.DeserializeObject<EzPetPackDefinition>(json, JsonSettings);
+            var parsed = JsonConvert.DeserializeObject<EzPetPackDefinition>(json, JSON_SETTINGS);
             return parsed ?? new EzPetPackDefinition();
         }
 
@@ -54,7 +54,13 @@ namespace osu.Game.EzOsuGame.Pets
     public class EzPetClipDefinition
     {
         /// <summary>
-        /// Frame path template relative to the pack folder, e.g. <c>idle_{00}</c>.
+        /// Optional action folder. Default is the clip id (<c>idle</c>, <c>starEasy</c>, …).
+        /// Also accepts the clip id in snake_case (<c>star_easy</c>).
+        /// </summary>
+        public string Folder { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Legacy alias for <see cref="Folder"/>. Ignored when it still contains a <c>{00}</c> template.
         /// </summary>
         public string Frames { get; set; } = string.Empty;
 

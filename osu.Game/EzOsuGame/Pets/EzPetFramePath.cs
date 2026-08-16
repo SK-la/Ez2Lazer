@@ -4,61 +4,88 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace osu.Game.EzOsuGame.Pets
 {
     public static class EzPetFramePath
     {
-        public const int MAX_FRAMES = 60;
+        public const int MAX_FRAMES = 120;
 
-        private static readonly Regex index_placeholder = new Regex(@"\{(0+)\}", RegexOptions.Compiled);
+        /// <summary>
+        /// Matches <c>_0</c>, <c>_00</c>, <c>_12</c> immediately before the extension.
+        /// </summary>
+        private static readonly Regex suffix_index = new Regex(@"_(\d+)\.(png|jpg|jpeg)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        public static bool HasIndexPlaceholder(string template)
-            => !string.IsNullOrEmpty(template) && index_placeholder.IsMatch(template);
-
-        public static string Format(string template, int frameIndex)
+        public static bool TryGetFrameIndex(string fileName, out int index)
         {
-            if (string.IsNullOrEmpty(template))
-                return string.Empty;
+            index = -1;
 
-            return index_placeholder.Replace(template, m =>
-            {
-                int width = Math.Clamp(m.Groups[1].Value.Length, 1, 9);
-                return frameIndex.ToString($"D{width}", CultureInfo.InvariantCulture);
-            });
+            if (string.IsNullOrEmpty(fileName))
+                return false;
+
+            var match = suffix_index.Match(Path.GetFileName(fileName));
+            if (!match.Success)
+                return false;
+
+            return int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out index);
         }
 
         /// <summary>
-        /// Enumerates frame names (no extension) until <paramref name="exists"/> fails or <see cref="MAX_FRAMES"/> is reached.
-        /// A template without an index placeholder is treated as a single frame.
+        /// Picks one file per index (lowest name wins), then returns names without extension in index order.
         /// </summary>
-        public static IReadOnlyList<string> Enumerate(string template, Func<string, bool> exists)
+        public static IReadOnlyList<string> CollectIndexedFrameNames(IEnumerable<string> fileNames)
         {
-            var names = new List<string>();
+            var byIndex = new SortedDictionary<int, string>();
 
-            if (string.IsNullOrWhiteSpace(template))
-                return names;
-
-            if (!HasIndexPlaceholder(template))
+            foreach (string fileName in fileNames)
             {
-                if (exists(template))
-                    names.Add(template);
+                if (!TryGetFrameIndex(fileName, out int index))
+                    continue;
 
-                return names;
+                if (index < 0)
+                    continue;
+
+                string withoutExtension = Path.GetFileNameWithoutExtension(fileName);
+                if (string.IsNullOrEmpty(withoutExtension))
+                    continue;
+
+                if (!byIndex.TryGetValue(index, out string? existing) || string.CompareOrdinal(withoutExtension, existing) < 0)
+                    byIndex[index] = withoutExtension;
             }
 
-            for (int i = 0; i < MAX_FRAMES; i++)
+            var names = new List<string>(Math.Min(byIndex.Count, MAX_FRAMES));
+
+            foreach ((_, string name) in byIndex)
             {
-                string name = Format(template, i);
-
-                if (!exists(name))
-                    break;
-
                 names.Add(name);
+                if (names.Count >= MAX_FRAMES)
+                    break;
             }
 
             return names;
+        }
+
+        public static string ToSnakeCase(string clipName)
+        {
+            if (string.IsNullOrEmpty(clipName))
+                return string.Empty;
+
+            var builder = new StringBuilder(clipName.Length + 4);
+
+            for (int i = 0; i < clipName.Length; i++)
+            {
+                char c = clipName[i];
+
+                if (i > 0 && char.IsUpper(c) && !char.IsUpper(clipName[i - 1]))
+                    builder.Append('_');
+
+                builder.Append(char.ToLowerInvariant(c));
+            }
+
+            return builder.ToString();
         }
     }
 }

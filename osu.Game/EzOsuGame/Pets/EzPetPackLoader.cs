@@ -33,8 +33,6 @@ namespace osu.Game.EzOsuGame.Pets
     {
         public const string MANIFEST_FILE = "pet.json";
 
-        private static readonly string[] texture_extensions = { ".png", ".jpg", ".jpeg" };
-
         private readonly Storage petsStorage;
 
         public EzPetPackLoader(Storage gameStorage)
@@ -128,9 +126,32 @@ namespace osu.Game.EzOsuGame.Pets
             }
         }
 
-        public IReadOnlyList<string> GetClipFrameNames(string packName, EzPetClipDefinition clip)
+        public IReadOnlyList<string> GetClipFrameNames(string packName, string clipName, EzPetClipDefinition clip)
         {
-            return EzPetFramePath.Enumerate(clip.Frames, name => frameExists(packName, name));
+            string? folder = resolveClipFolder(packName, clipName, clip);
+            if (folder == null)
+                return [];
+
+            string directory = Path.Combine(packName, folder);
+
+            IEnumerable<string> files;
+
+            try
+            {
+                files = petsStorage.GetFiles(directory);
+            }
+            catch (Exception)
+            {
+                return [];
+            }
+
+            var indexed = EzPetFramePath.CollectIndexedFrameNames(files);
+            var relative = new List<string>(indexed.Count);
+
+            foreach (string fileName in indexed)
+                relative.Add($"{folder}/{fileName}");
+
+            return relative;
         }
 
         private HashSet<string> resolveAvailableClips(string packName, EzPetPackDefinition definition, bool allowPlaceholders)
@@ -139,22 +160,66 @@ namespace osu.Game.EzOsuGame.Pets
 
             foreach ((string clipName, var clip) in definition.Clips)
             {
-                if (allowPlaceholders || GetClipFrameNames(packName, clip).Count > 0)
+                if (allowPlaceholders || GetClipFrameNames(packName, clipName, clip).Count > 0)
                     available.Add(clipName);
             }
 
             return available;
         }
 
-        private bool frameExists(string packName, string frameNameWithoutExtension)
+        private string? resolveClipFolder(string packName, string clipName, EzPetClipDefinition clip)
         {
-            foreach (string ext in texture_extensions)
+            foreach (string candidate in enumerateFolderCandidates(clipName, clip))
             {
-                if (petsStorage.Exists(Path.Combine(packName, frameNameWithoutExtension + ext)))
-                    return true;
+                string? actual = findExistingDirectory(packName, candidate);
+                if (actual != null)
+                    return actual;
             }
 
-            return petsStorage.Exists(Path.Combine(packName, frameNameWithoutExtension));
+            return null;
+        }
+
+        private static IEnumerable<string> enumerateFolderCandidates(string clipName, EzPetClipDefinition clip)
+        {
+            if (!string.IsNullOrWhiteSpace(clip.Folder))
+                yield return clip.Folder.Trim();
+
+            if (!string.IsNullOrWhiteSpace(clip.Frames) && clip.Frames.IndexOf('{') < 0)
+                yield return clip.Frames.Trim();
+
+            if (string.IsNullOrWhiteSpace(clipName))
+                yield break;
+
+            yield return clipName;
+
+            string snake = EzPetFramePath.ToSnakeCase(clipName);
+            if (!string.Equals(snake, clipName, StringComparison.OrdinalIgnoreCase))
+                yield return snake;
+        }
+
+        private string? findExistingDirectory(string packName, string folderName)
+        {
+            string direct = Path.Combine(packName, folderName);
+            if (petsStorage.ExistsDirectory(direct))
+                return folderName;
+
+            if (!petsStorage.ExistsDirectory(packName))
+                return null;
+
+            try
+            {
+                foreach (string dir in petsStorage.GetDirectories(packName))
+                {
+                    string name = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                    if (string.Equals(name, folderName, StringComparison.OrdinalIgnoreCase))
+                        return name;
+                }
+            }
+            catch (Exception)
+            {
+            }
+
+            return null;
         }
 
         private static bool isDefaultName(string packName)

@@ -218,7 +218,7 @@ namespace osu.Game.EzOsuGame.Pets
 
         private Texture[] loadClipFrames(EzPetPack pack, string clipName, EzPetClipDefinition clip)
         {
-            var names = loader.GetClipFrameNames(pack.Name, clip);
+            var names = loader.GetClipFrameNames(pack.Name, clipName, clip);
             var textures = new List<Texture>(names.Count);
 
             foreach (string frameName in names)
@@ -316,6 +316,7 @@ namespace osu.Game.EzOsuGame.Pets
             if (animation.FrameCount > 0)
             {
                 var size = animation.CurrentFrame.DisplaySize;
+
                 if (size.X > 0 && size.Y > 0)
                 {
                     width = size.X * s;

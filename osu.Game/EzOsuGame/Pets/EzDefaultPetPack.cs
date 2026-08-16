@@ -11,18 +11,18 @@ namespace osu.Game.EzOsuGame.Pets
             {
               "defaultState": "idle",
               "clips": {
-                "idle": { "frames": "idle_{00}", "fps": 12, "loop": true },
-                "hover": { "frames": "hover_{00}", "fps": 12, "loop": true },
-                "poke": { "frames": "poke_{00}", "fps": 15, "loop": false },
-                "starEasy": { "frames": "star_easy_{00}", "fps": 12, "loop": false },
-                "starHard": { "frames": "star_hard_{00}", "fps": 12, "loop": false },
-                "enter": { "frames": "enter_{00}", "fps": 12, "loop": false },
-                "combo50": { "frames": "combo50_{00}", "fps": 12, "loop": false },
-                "combo300": { "frames": "combo300_{00}", "fps": 12, "loop": false },
-                "miss": { "frames": "miss_{00}", "fps": 12, "loop": false },
-                "idlePlay": { "frames": "idle_play_{00}", "fps": 10, "loop": false },
-                "idleYawn": { "frames": "idle_yawn_{00}", "fps": 8, "loop": false },
-                "idleSleep": { "frames": "idle_sleep_{00}", "fps": 6, "loop": true }
+                "idle": { "fps": 12, "loop": true },
+                "hover": { "fps": 12, "loop": true },
+                "poke": { "fps": 15, "loop": false },
+                "starEasy": { "fps": 12, "loop": false },
+                "starHard": { "fps": 12, "loop": false },
+                "enter": { "fps": 12, "loop": false },
+                "combo50": { "fps": 12, "loop": false },
+                "combo300": { "fps": 12, "loop": false },
+                "miss": { "fps": 12, "loop": false },
+                "idlePlay": { "fps": 10, "loop": false },
+                "idleYawn": { "fps": 8, "loop": false },
+                "idleSleep": { "fps": 6, "loop": true }
               },
               "states": {
                 "idle": { "clip": "idle" },

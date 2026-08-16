@@ -41,26 +41,29 @@ namespace osu.Game.Tests.EzOsuGame.Pets
         }
 
         [Test]
-        public void TestFramePathEnumerate()
+        public void TestCollectIndexedFramesIgnoresPrefix()
         {
-            var existing = new[] { "idle_00", "idle_01", "idle_02" };
-            var names = EzPetFramePath.Enumerate("idle_{00}", n => Array.IndexOf(existing, n) >= 0);
+            string[] files = new[] { "guga_02.png", "foo_00.png", "bar_01.jpg", "readme.txt", "idle.png" };
+            var names = EzPetFramePath.CollectIndexedFrameNames(files);
 
-            Assert.That(names, Is.EqualTo(existing));
+            Assert.That(names, Is.EqualTo(new[] { "foo_00", "bar_01", "guga_02" }));
         }
 
         [Test]
-        public void TestFramePathStopsAtGap()
+        public void TestCollectIndexedFramesSortsNumerically()
         {
-            var names = EzPetFramePath.Enumerate("idle_{00}", n => n is "idle_00" or "idle_02");
-            Assert.That(names, Is.EqualTo(new[] { "idle_00" }));
+            string[] files = new[] { "a_10.png", "a_2.png", "a_00.png" };
+            var names = EzPetFramePath.CollectIndexedFrameNames(files);
+
+            Assert.That(names, Is.EqualTo(new[] { "a_00", "a_2", "a_10" }));
         }
 
         [Test]
-        public void TestFramePathSingleFile()
+        public void TestSnakeCaseAliases()
         {
-            var names = EzPetFramePath.Enumerate("idle", n => n == "idle");
-            Assert.That(names, Is.EqualTo(new[] { "idle" }));
+            Assert.That(EzPetFramePath.ToSnakeCase("starEasy"), Is.EqualTo("star_easy"));
+            Assert.That(EzPetFramePath.ToSnakeCase("idlePlay"), Is.EqualTo("idle_play"));
+            Assert.That(EzPetFramePath.ToSnakeCase("idle"), Is.EqualTo("idle"));
         }
 
         [Test]
@@ -115,6 +118,54 @@ namespace osu.Game.Tests.EzOsuGame.Pets
 
                 Assert.That(pack, Is.Not.Null);
                 Assert.That(pack!.AvailableClips, Is.Empty);
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(path))
+                        Directory.Delete(path, true);
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        [Test]
+        public void TestLoaderReadsArbitraryNamesInActionFolder()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "ez-pet-test-" + Guid.NewGuid().ToString("N"));
+            var storage = new NativeStorage(path);
+
+            try
+            {
+                var pets = storage.GetStorageForDirectory(osu.Game.EzOsuGame.EzModifyPath.PETS_PATH);
+                var custom = pets.GetStorageForDirectory("Custom");
+                var idle = custom.GetStorageForDirectory("idle");
+                var star = custom.GetStorageForDirectory("star_easy");
+
+                using (var stream = custom.CreateFileSafely("pet.json"))
+                using (var writer = new StreamWriter(stream))
+                    writer.Write(EzDefaultPetPack.PET_JSON);
+
+                File.WriteAllBytes(idle.GetFullPath("random_00.png"), [0]);
+                File.WriteAllBytes(idle.GetFullPath("zzz_01.png"), [0]);
+                File.WriteAllBytes(star.GetFullPath("guga_00.png"), [0]);
+
+                var loader = new EzPetPackLoader(storage);
+                var pack = loader.Load("Custom");
+
+                Assert.That(pack, Is.Not.Null);
+                Assert.That(pack!.AvailableClips.Contains("idle"), Is.True);
+                Assert.That(pack.AvailableClips.Contains("starEasy"), Is.True);
+                Assert.That(pack.AvailableClips.Contains("hover"), Is.False);
+
+                var idleFrames = loader.GetClipFrameNames("Custom", "idle", pack.Definition.Clips["idle"]);
+                Assert.That(idleFrames, Is.EqualTo(new[] { "idle/random_00", "idle/zzz_01" }));
+
+                var starFrames = loader.GetClipFrameNames("Custom", "starEasy", pack.Definition.Clips["starEasy"]);
+                Assert.That(starFrames, Is.EqualTo(new[] { "star_easy/guga_00" }));
             }
             finally
             {
