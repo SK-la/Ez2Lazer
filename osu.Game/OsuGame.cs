@@ -47,6 +47,7 @@ using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Performance;
+using osu.Game.EzOsuGame.Pets;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -1207,6 +1208,8 @@ namespace osu.Game
                 Origin = Anchor.BottomRight,
                 Margin = new MarginPadding(5),
             }, topMostOverlayContent.Add);
+
+            loadComponentSingleFile(new EzDesktopPetLayer(), topMostOverlayContent.Add);
 
             if (!IsDeployedBuild)
                 loadComponentSingleFile(devBuildBanner = new DevBuildBanner(), ScreenContainer.Add);

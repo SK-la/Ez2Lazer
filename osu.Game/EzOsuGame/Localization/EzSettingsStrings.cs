@@ -36,6 +36,28 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString("Ez游玩设置", "Ez Gameplay");
         public static readonly EzLocalizationManager.EzLocalisableString EZ_UI_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez 界面设置", "Ez UI Settings");
 
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("桌宠", "Desktop pet");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_ENABLED = new EzLocalizationManager.EzLocalisableString("启用桌宠", "Enable desktop pet");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "在选歌和游玩界面显示独立桌宠。不写入皮肤，换皮或重置 HUD 不会丢失。"
+            + "\n按住 Left Alt 拖动可改位置。游玩时普通点击会穿透，避免抢准星。",
+            "Show an independent desktop pet on song select and gameplay. It is not part of the skin, so changing or resetting HUD will not remove it."
+            + "\nHold Left Alt and drag to move it. Ordinary clicks pass through during gameplay so the playfield keeps the cursor.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK = new EzLocalizationManager.EzLocalisableString("桌宠包", "Pet pack");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "扫描 EzResources/Pets 下带 pet.json 的文件夹。复制整个目录即可换包。",
+            "Scans folders with pet.json under EzResources/Pets. Copy a folder to switch packs.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SCALE = new EzLocalizationManager.EzLocalisableString("桌宠缩放", "Pet scale");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SCALE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "桌宠立绘缩放。位置请用 Left Alt 拖动，不在此修改。",
+            "Scale of the pet sprite. Move it with Left Alt + drag; position is not edited here.");
+
         public static readonly EzLocalizationManager.EzLocalisableString FRAME_LIMITER_BASE =
             new EzLocalizationManager.EzLocalisableString("帧率基数", "Frame limiter");
 
