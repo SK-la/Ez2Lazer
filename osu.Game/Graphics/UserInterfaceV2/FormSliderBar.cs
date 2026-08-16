@@ -167,7 +167,7 @@ namespace osu.Game.Graphics.UserInterfaceV2
             slider = new InnerSlider
             {
                 Current = currentNumberInstantaneous,
-                OnCommit = () => current.Value = currentNumberInstantaneous.Value,
+                OnCommit = transferInstantaneousToCurrent,
                 TooltipFormat = s => TooltipFormat(s),
                 DisplayAsPercentage = DisplayAsPercentage,
                 PlaySamplesOnAdjust = PlaySamplesOnAdjust,
@@ -307,7 +307,7 @@ namespace osu.Game.Graphics.UserInterfaceV2
             currentNumberInstantaneous.BindValueChanged(e =>
             {
                 if (!TransferValueOnCommit)
-                    current.Value = e.NewValue;
+                    transferInstantaneousToCurrent();
 
                 updateState();
                 updateValueDisplay();
@@ -315,6 +315,14 @@ namespace osu.Game.Graphics.UserInterfaceV2
         }
 
         private bool updatingFromTextBox;
+
+        private void transferInstantaneousToCurrent()
+        {
+            if (current.Disabled)
+                return;
+
+            current.Value = currentNumberInstantaneous.Value;
+        }
 
         private void textChanged(ValueChangedEvent<string> change)
         {
@@ -326,7 +334,7 @@ namespace osu.Game.Graphics.UserInterfaceV2
             tryUpdateSliderFromTextBox();
             // If the attempted update above failed, restore text box to match the slider.
             currentNumberInstantaneous.TriggerChange();
-            current.Value = currentNumberInstantaneous.Value;
+            transferInstantaneousToCurrent();
 
             background.FlashOnCommit();
         }

@@ -350,5 +350,32 @@ namespace osu.Game.Tests.Visual.UserInterface
             });
             AddAssert("slider is at ~50", () => slider.Current.Value, () => Is.EqualTo(50).Within(1));
         }
+
+        [Test]
+        public void TestDisabledCurrentDoesNotThrowOnLoad()
+        {
+            AddStep("create slider with disabled current", () =>
+            {
+                var bindable = new BindableDouble(1)
+                {
+                    MinValue = 0,
+                    MaxValue = 1,
+                    Precision = 0.01,
+                };
+                bindable.Disabled = true;
+
+                Child = new FormSliderBar<double>
+                {
+                    Width = 400,
+                    Caption = "Disabled dim",
+                    Current = bindable,
+                    DisplayAsPercentage = true,
+                };
+            });
+
+            AddUntilStep("loaded", () => Child.IsLoaded);
+            AddAssert("value unchanged", () => ((FormSliderBar<double>)Child).Current.Value, () => Is.EqualTo(1));
+            AddAssert("still disabled", () => ((FormSliderBar<double>)Child).Current.Disabled);
+        }
     }
 }
