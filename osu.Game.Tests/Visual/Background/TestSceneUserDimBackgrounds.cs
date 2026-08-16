@@ -422,7 +422,7 @@ namespace osu.Game.Tests.Visual.Background
             public bool BlockLoad;
 
             public Bindable<bool> StoryboardEnabled;
-            public readonly Bindable<bool> StoryboardReplacesBackground = new Bindable<bool>();
+            public new readonly Bindable<bool> StoryboardReplacesBackground = new Bindable<bool>();
             public readonly Bindable<bool> IsPaused = new Bindable<bool>();
 
             public LoadBlockingTestPlayer(bool allowPause = true)

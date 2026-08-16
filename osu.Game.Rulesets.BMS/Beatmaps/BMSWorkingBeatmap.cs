@@ -184,7 +184,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return Path.GetFileName(trimmed);
         }
 
-        internal static string? ResolveBackgroundFile(string folderPath, string? declaredFile)
+        public static string? ResolveBackgroundFile(string folderPath, string? declaredFile)
         {
             if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
                 return null;
@@ -268,7 +268,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             // GetBackground() may run before GetBeatmap() has populated Metadata.BackgroundFile from the parsed
             // chart, so eagerly trigger one chart parse to learn the actual filename.
-            string backgroundFile = BeatmapInfo.Metadata.BackgroundFile;
+            string? backgroundFile = BeatmapInfo.Metadata.BackgroundFile;
 
             if (string.IsNullOrEmpty(backgroundFile))
             {
