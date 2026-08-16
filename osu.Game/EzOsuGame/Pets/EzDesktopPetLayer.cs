@@ -10,6 +10,7 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
@@ -21,7 +22,8 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.Pets
 {
     /// <summary>
-    /// Independent desktop-pet layer. Not a skin component and not an <c>OsuFocusedOverlayContainer</c>.
+    /// Independent desktop-pet layer. Not a skin component, not an Ez layout component,
+    /// and not an <c>OsuFocusedOverlayContainer</c>. Visibility is the settings toggle only.
     /// </summary>
     public partial class EzDesktopPetLayer : VisibilityContainer
     {
@@ -42,6 +44,7 @@ namespace osu.Game.EzOsuGame.Pets
         private EzPetPackLoader loader = null!;
         private EzResourceStore resources = null!;
         private IRenderer renderer = null!;
+        private TextureStore petTextures = null!;
         private OsuGame? game;
 
         private Container petBox = null!;
@@ -49,7 +52,6 @@ namespace osu.Game.EzOsuGame.Pets
 
         private EzPetPack? currentPack;
         private bool inGameplay;
-        private bool onAllowedScreen;
         private bool hovered;
         private bool dragging;
         private Guid lastStarBeatmapId;
@@ -57,13 +59,15 @@ namespace osu.Game.EzOsuGame.Pets
         private ScoreProcessor? boundScoreProcessor;
         private Player? boundPlayer;
 
-        protected override bool StartHidden => true;
+        protected override bool StartHidden => false;
 
         public EzDesktopPetLayer()
         {
             RelativeSizeAxes = Axes.Both;
             Anchor = Anchor.TopLeft;
             Origin = Anchor.TopLeft;
+            // Hidden VisibilityContainers skip Scheduler/Update. Screen changes then never unhide the pet.
+            AlwaysPresent = true;
         }
 
         [BackgroundDependencyLoader]
@@ -71,7 +75,7 @@ namespace osu.Game.EzOsuGame.Pets
         {
             resources = resourceStore;
             renderer = resourceStore.Renderer;
-            game = osuGame;
+            game = osuGame ?? this.FindClosestParent<OsuGame>();
             beatmap = workingBeatmap.GetBoundCopy();
 
             enabled = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetEnabled);
@@ -82,6 +86,15 @@ namespace osu.Game.EzOsuGame.Pets
 
             loader = new EzPetPackLoader(storage);
             loader.EnsureDefaultPack();
+
+            // TextureAnimation/Sprite disposes the previous frame on each switch.
+            // LargeTextureStore's TextureWithRefCount then purges the native texture and crashes
+            // on the next loop. A non-atlas TextureStore keeps frames alive (Dispose is a no-op).
+            petTextures = new TextureStore(
+                renderer,
+                resources.CreateTextureLoaderStore(resources.Files),
+                useAtlas: false,
+                scaleAdjust: 1);
 
             InternalChild = petBox = new Container
             {
@@ -111,6 +124,9 @@ namespace osu.Game.EzOsuGame.Pets
             posY.BindValueChanged(_ => applyPosition(), true);
             beatmap.BindValueChanged(_ => onBeatmapChanged(), true);
 
+            if (game == null)
+                game = this.FindClosestParent<OsuGame>();
+
             if (game != null)
             {
                 game.ScreenStack.ScreenPushed += onScreenChanged;
@@ -119,6 +135,7 @@ namespace osu.Game.EzOsuGame.Pets
             }
 
             updateVisibility();
+            applyPosition();
         }
 
         protected override void PopIn() => this.FadeIn(120, Easing.OutQuad);
@@ -137,9 +154,6 @@ namespace osu.Game.EzOsuGame.Pets
 
             base.Update();
 
-            if (!onAllowedScreen)
-                return;
-
             if (!dragging)
                 applyPosition();
 
@@ -150,7 +164,7 @@ namespace osu.Game.EzOsuGame.Pets
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
         {
-            if (!enabled.Value || !onAllowedScreen || !IsPresent)
+            if (!enabled.Value || !IsPresent)
                 return false;
 
             if (!petBox.ReceivePositionalInputAt(screenSpacePos))
@@ -176,6 +190,9 @@ namespace osu.Game.EzOsuGame.Pets
 
             unbindPlayer();
             stateMachine.ClipChanged -= onClipChanged;
+            animation?.ClearFrames();
+            clipTextures.Clear();
+            petTextures?.Dispose();
 
             base.Dispose(isDisposing);
         }
@@ -183,9 +200,18 @@ namespace osu.Game.EzOsuGame.Pets
         private void reloadPack()
         {
             clipTextures.Clear();
+            currentPack = null;
 
-            string name = string.IsNullOrWhiteSpace(packName.Value) ? EzDefaultPetPack.NAME : packName.Value;
-            currentPack = loader.Load(name) ?? loader.Load(EzDefaultPetPack.NAME);
+            try
+            {
+                string name = string.IsNullOrWhiteSpace(packName.Value) ? EzDefaultPetPack.NAME : packName.Value;
+                currentPack = loader.Load(name) ?? loader.Load(EzDefaultPetPack.NAME);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"Failed to load Ez pet pack '{packName.Value}'");
+                currentPack = null;
+            }
 
             if (currentPack == null)
             {
@@ -198,7 +224,15 @@ namespace osu.Game.EzOsuGame.Pets
                 };
             }
 
-            preloadClips(currentPack);
+            try
+            {
+                preloadClips(currentPack);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"Failed to preload Ez pet pack '{currentPack.Name}'");
+            }
+
             stateMachine.ApplyPack(currentPack.Definition, currentPack.AvailableClips);
             applyScale();
         }
@@ -211,8 +245,10 @@ namespace osu.Game.EzOsuGame.Pets
                     continue;
 
                 var frames = loadClipFrames(pack, clipName, clip);
-                if (frames.Length > 0)
-                    clipTextures[clipName] = frames;
+                if (frames.Length == 0)
+                    frames = createPlaceholderFrames(clipName);
+
+                clipTextures[clipName] = frames;
             }
         }
 
@@ -223,18 +259,27 @@ namespace osu.Game.EzOsuGame.Pets
 
             foreach (string frameName in names)
             {
-                var texture = resources.Get($"Pets/{pack.Name}/{frameName}");
-                if (texture != null)
-                    textures.Add(texture);
+                try
+                {
+                    var texture = petTextures.Get($"Pets/{pack.Name}/{frameName}");
+                    if (texture != null)
+                        textures.Add(texture);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, $"Failed to decode Ez pet frame '{pack.Name}/{frameName}'");
+                }
             }
 
-            if (textures.Count > 0)
-                return textures.ToArray();
+            if (names.Count > 0 && textures.Count == 0)
+            {
+                Logger.Log(
+                    $"Ez pet pack '{pack.Name}' clip '{clipName}' has {names.Count} frame files but none could be decoded.",
+                    LoggingTarget.Runtime,
+                    LogLevel.Error);
+            }
 
-            if (pack.IsDefault)
-                return createPlaceholderFrames(clipName);
-
-            return [];
+            return textures.Count > 0 ? textures.ToArray() : [];
         }
 
         private Texture[] createPlaceholderFrames(string clipName)
@@ -315,12 +360,12 @@ namespace osu.Game.EzOsuGame.Pets
 
             if (animation.FrameCount > 0)
             {
-                var size = animation.CurrentFrame.DisplaySize;
+                var frame = animation.CurrentFrame;
 
-                if (size.X > 0 && size.Y > 0)
+                if (frame != null && frame.Available && frame.Width > 0 && frame.Height > 0)
                 {
-                    width = size.X * s;
-                    height = size.Y * s;
+                    width = frame.Width * s;
+                    height = frame.Height * s;
                 }
             }
 
@@ -348,9 +393,7 @@ namespace osu.Game.EzOsuGame.Pets
 
         private void updateVisibility()
         {
-            bool show = enabled.Value && onAllowedScreen;
-
-            if (show)
+            if (enabled.Value)
                 Show();
             else
                 Hide();

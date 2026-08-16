@@ -41,9 +41,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_ENABLED = new EzLocalizationManager.EzLocalisableString("启用桌宠", "Enable desktop pet");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "在选歌和游玩界面显示独立桌宠。不写入皮肤，换皮或重置 HUD 不会丢失。"
-            + "\n按住 Left Alt 拖动可改位置。游玩时普通点击会穿透，避免抢准星。",
-            "Show an independent desktop pet on song select and gameplay. It is not part of the skin, so changing or resetting HUD will not remove it."
+            "打开即显示独立桌宠，不用在皮肤编辑器或 Ez 布局编辑器里添加。"
+            + "\n位置用 Left Alt 拖动。游玩时普通点击会穿透，避免抢准星。",
+            "Toggle to show the independent desktop pet. Do not add it in the skin editor or the Ez layout editor."
             + "\nHold Left Alt and drag to move it. Ordinary clicks pass through during gameplay so the playfield keeps the cursor.");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK = new EzLocalizationManager.EzLocalisableString("桌宠包", "Pet pack");

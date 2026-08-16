@@ -59,6 +59,15 @@ namespace osu.Game.Tests.EzOsuGame.Pets
         }
 
         [Test]
+        public void TestCollectIndexedFramesAcceptsThreeDigitSuffix()
+        {
+            string[] files = new[] { "idle_001.png", "idle_000.png", "idle_095.png", "idle.png" };
+            var names = EzPetFramePath.CollectIndexedFrameNames(files);
+
+            Assert.That(names, Is.EqualTo(new[] { "idle_000", "idle_001", "idle_095" }));
+        }
+
+        [Test]
         public void TestSnakeCaseAliases()
         {
             Assert.That(EzPetFramePath.ToSnakeCase("starEasy"), Is.EqualTo("star_easy"));

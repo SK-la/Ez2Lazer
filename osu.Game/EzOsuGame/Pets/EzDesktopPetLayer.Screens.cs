@@ -13,14 +13,13 @@ namespace osu.Game.EzOsuGame.Pets
 {
     public partial class EzDesktopPetLayer
     {
-        private void onScreenChanged(IScreen lastScreen, IScreen newScreen) => Schedule(() => applyCurrentScreen(newScreen));
+        private void onScreenChanged(IScreen lastScreen, IScreen newScreen) => applyCurrentScreen(newScreen);
 
         private void applyCurrentScreen(IScreen? screen)
         {
             bool wasGameplay = inGameplay;
 
             inGameplay = screen is Player;
-            onAllowedScreen = screen is SongSelect || screen is Player;
 
             if (screen is Player player)
             {
@@ -32,17 +31,15 @@ namespace osu.Game.EzOsuGame.Pets
             else
                 unbindPlayer();
 
-            if (screen is SongSelect)
+            if (screen is ISongSelect)
                 tryHandleStarRating();
-
-            updateVisibility();
         }
 
         private void onBeatmapChanged()
         {
             stateMachine.ResetIdleTimer();
 
-            if (game?.ScreenStack.CurrentScreen is SongSelect)
+            if (game?.ScreenStack.CurrentScreen is ISongSelect)
                 tryHandleStarRating();
         }
 

@@ -15,7 +15,8 @@ namespace osu.Game.EzOsuGame.Pets
         public const int MAX_FRAMES = 120;
 
         /// <summary>
-        /// Matches <c>_0</c>, <c>_00</c>, <c>_12</c> immediately before the extension.
+        /// Matches <c>_000</c>, <c>_00</c>, <c>_12</c> immediately before the extension.
+        /// Preferred on-disk suffix is three digits: <c>_000</c> … <c>_095</c>.
         /// </summary>
         private static readonly Regex suffix_index = new Regex(@"_(\d+)\.(png|jpg|jpeg)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
