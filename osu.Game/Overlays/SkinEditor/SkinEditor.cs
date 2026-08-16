@@ -54,9 +54,9 @@ namespace osu.Game.Overlays.SkinEditor
 
         protected override bool StartHidden => true;
 
-        private Drawable? targetScreen;
+        protected Drawable? TargetScreen;
 
-        private OsuTextFlowContainer headerText = null!;
+        protected OsuTextFlowContainer HeaderText = null!;
 
         private Bindable<Skin> currentSkin = null!;
         private Bindable<string> clipboardContent = null!;
@@ -79,9 +79,9 @@ namespace osu.Game.Overlays.SkinEditor
         [Cached]
         private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
 
-        private readonly Bindable<GlobalSkinnableContainerLookup?> selectedTarget = new Bindable<GlobalSkinnableContainerLookup?>();
+        protected readonly Bindable<GlobalSkinnableContainerLookup?> SelectedTarget = new Bindable<GlobalSkinnableContainerLookup?>();
 
-        private bool hasBegunMutating;
+        protected bool HasBegunMutating;
 
         private Container? content;
 
@@ -174,9 +174,9 @@ namespace osu.Game.Overlays.SkinEditor
                                                         editExternallyMenuItem = new EditorMenuItem(EditorStrings.EditExternally, MenuItemType.Standard, () => _ = editExternally()) { Action = { Disabled = !RuntimeInfo.IsDesktop } },
                                                         openScriptFolderMenuItem = new EditorMenuItem("Open script folder", MenuItemType.Standard, () => _ = openScriptedSkinFolder()) { Action = { Disabled = !RuntimeInfo.IsDesktop } },
                                                         new OsuMenuItemSpacer(),
-                                                        new EditorMenuItem(CommonStrings.RevertToDefault, MenuItemType.Destructive, () => dialogOverlay?.Push(new RevertConfirmDialog(revert))),
+                                                        new EditorMenuItem(CommonStrings.RevertToDefault, MenuItemType.Destructive, () => dialogOverlay?.Push(new RevertConfirmDialog(RevertToDefault))),
                                                         new OsuMenuItemSpacer(),
-                                                        new EditorMenuItem(CommonStrings.Exit, MenuItemType.Standard, () => skinEditorOverlay?.Hide()),
+                                                        new EditorMenuItem(CommonStrings.Exit, MenuItemType.Standard, RequestClose),
                                                     },
                                                 },
                                                 new MenuItem(CommonStrings.MenuBarEdit)
@@ -195,7 +195,7 @@ namespace osu.Game.Overlays.SkinEditor
                                                 createEzSettingsMenu(),
                                             }
                                         },
-                                        headerText = new OsuTextFlowContainer
+                                        HeaderText = new OsuTextFlowContainer
                                         {
                                             TextAnchor = Anchor.TopRight,
                                             Padding = new MarginPadding(5),
@@ -279,16 +279,16 @@ namespace osu.Game.Overlays.SkinEditor
             // probably something which will be factored out in a future database refactor so not too concerning for now.
             currentSkin.BindValueChanged(val =>
             {
-                if (val.OldValue != null && hasBegunMutating)
-                    save(val.OldValue);
+                if (val.OldValue != null && HasBegunMutating)
+                    SaveLayout(val.OldValue);
 
-                hasBegunMutating = false;
-                Scheduler.AddOnce(skinChanged);
+                HasBegunMutating = false;
+                Scheduler.AddOnce(OnSkinChanged);
             }, true);
 
             SelectedComponents.BindCollectionChanged((_, _) => Scheduler.AddOnce(populateSettings), true);
 
-            selectedTarget.BindValueChanged(targetChanged, true);
+            SelectedTarget.BindValueChanged(targetChanged, true);
         }
 
         private async Task editExternally()
@@ -320,9 +320,6 @@ namespace osu.Game.Overlays.SkinEditor
 
         private void updateExternalEditMenuState()
         {
-            if (editExternallyMenuItem == null || openScriptFolderMenuItem == null)
-                return;
-
             bool isScripted = ScriptedSkinSupport.IsScriptedSkin(currentSkin.Value.SkinInfo);
             bool canRealmEdit = ScriptedSkinSupport.CanUseRealmExternalEdit(currentSkin.Value.SkinInfo);
 
@@ -388,9 +385,11 @@ namespace osu.Game.Overlays.SkinEditor
         {
         }
 
+        protected virtual void RequestClose() => skinEditorOverlay?.Hide();
+
         public void UpdateTargetScreen(Drawable targetScreen)
         {
-            this.targetScreen = targetScreen;
+            TargetScreen = targetScreen;
 
             changeHandler?.Dispose();
 
@@ -403,10 +402,10 @@ namespace osu.Game.Overlays.SkinEditor
 
             void loadBlueprintContainer()
             {
-                selectedTarget.Default = getFirstTarget()?.Lookup;
+                SelectedTarget.Default = GetFirstTarget()?.Lookup;
 
-                if (!availableTargets.Any(t => t.Lookup.Equals(selectedTarget.Value)))
-                    selectedTarget.SetDefault();
+                if (!AvailableTargets.Any(t => t.Lookup.Equals(SelectedTarget.Value)))
+                    SelectedTarget.SetDefault();
             }
         }
 
@@ -420,7 +419,7 @@ namespace osu.Game.Overlays.SkinEditor
 
             Debug.Assert(content != null);
 
-            var skinComponentsContainer = getTarget(target.NewValue);
+            var skinComponentsContainer = GetTarget(target.NewValue);
 
             if (target.NewValue == null || skinComponentsContainer == null)
             {
@@ -443,8 +442,8 @@ namespace osu.Game.Overlays.SkinEditor
                     {
                         new SettingsDropdown<GlobalSkinnableContainerLookup?>
                         {
-                            Items = availableTargets.Select(t => t.Lookup).Distinct(),
-                            Current = selectedTarget,
+                            Items = AvailableTargets.Select(t => t.Lookup).Distinct(),
+                            Current = SelectedTarget,
                         }
                     }
                 }
@@ -491,23 +490,23 @@ namespace osu.Game.Overlays.SkinEditor
             }
         }
 
-        private void skinChanged()
+        protected virtual void OnSkinChanged()
         {
             if (skins.EnsureMutableSkin())
                 // Another skin changed event will arrive which will complete the process.
                 return;
 
-            headerText.Clear();
+            HeaderText.Clear();
 
-            headerText.AddText(SkinEditorStrings.SkinEditor, cp => cp.Font = OsuFont.Default.With(size: 16));
-            headerText.NewLine();
-            headerText.AddText(SkinEditorStrings.CurrentlyEditing, cp =>
+            HeaderText.AddText(SkinEditorStrings.SkinEditor, cp => cp.Font = OsuFont.Default.With(size: 16));
+            HeaderText.NewLine();
+            HeaderText.AddText(SkinEditorStrings.CurrentlyEditing, cp =>
             {
                 cp.Font = OsuFont.Default.With(size: 12);
                 cp.Colour = colours.Yellow;
             });
 
-            headerText.AddText($" {currentSkin.Value.SkinInfo}", cp =>
+            HeaderText.AddText($" {currentSkin.Value.SkinInfo}", cp =>
             {
                 cp.Font = OsuFont.Default.With(size: 12, weight: FontWeight.Bold);
                 cp.Colour = colours.Yellow;
@@ -524,15 +523,15 @@ namespace osu.Game.Overlays.SkinEditor
             // See https://github.com/ppy/osu/blob/8e6a4559e3ae8c9892866cf9cf8d4e8d1b72afd0/osu.Game/Skinning/SkinReloadableDrawable.cs#L76.
             Schedule(() =>
             {
-                var targetContainer = getTarget(selectedTarget.Value);
+                var targetContainer = GetTarget(SelectedTarget.Value);
 
                 if (targetContainer != null)
                     changeHandler = new SkinEditorChangeHandler(targetContainer);
 
-                hasBegunMutating = true;
+                HasBegunMutating = true;
 
                 // Reload sidebar components.
-                selectedTarget.TriggerChange();
+                SelectedTarget.TriggerChange();
             });
         }
 
@@ -544,7 +543,7 @@ namespace osu.Game.Overlays.SkinEditor
         /// <returns>Whether placement succeeded. Could fail if no target is available, or if the current target has missing dependency requirements for the component.</returns>
         private bool placeComponent(ISerialisableDrawable component, bool applyDefaults = true)
         {
-            var targetContainer = getTarget(selectedTarget.Value);
+            var targetContainer = GetTarget(SelectedTarget.Value);
 
             if (targetContainer == null)
                 return false;
@@ -586,25 +585,26 @@ namespace osu.Game.Overlays.SkinEditor
             });
         }
 
-        private IEnumerable<SkinnableContainer> availableTargets => targetScreen.ChildrenOfType<SkinnableContainer>();
+        protected virtual IEnumerable<SkinnableContainer> AvailableTargets =>
+            TargetScreen?.ChildrenOfType<SkinnableContainer>() ?? Enumerable.Empty<SkinnableContainer>();
 
-        private SkinnableContainer? getFirstTarget() => availableTargets.FirstOrDefault();
+        protected SkinnableContainer? GetFirstTarget() => AvailableTargets.FirstOrDefault();
 
-        private SkinnableContainer? getTarget(GlobalSkinnableContainerLookup? target)
+        protected virtual SkinnableContainer? GetTarget(GlobalSkinnableContainerLookup? target)
         {
-            return availableTargets.FirstOrDefault(c => c.Lookup.Equals(target));
+            return AvailableTargets.FirstOrDefault(c => c.Lookup.Equals(target));
         }
 
-        private void revert()
+        protected virtual void RevertToDefault()
         {
-            SkinnableContainer[] targetContainers = availableTargets.ToArray();
+            SkinnableContainer[] targetContainers = AvailableTargets.ToArray();
 
             foreach (var t in targetContainers)
             {
                 currentSkin.Value.ResetDrawableTarget(t);
 
                 // add back default components
-                getTarget(t.Lookup)?.Reload();
+                GetTarget(t.Lookup)?.Reload();
             }
         }
 
@@ -659,17 +659,17 @@ namespace osu.Game.Overlays.SkinEditor
 
         void IEditorChangeHandler.RestoreState(int direction) => changeHandler?.RestoreState(direction);
 
-        public void Save(bool userTriggered = true) => save(currentSkin.Value, userTriggered);
+        public void Save(bool userTriggered = true) => SaveLayout(currentSkin.Value, userTriggered);
 
-        private void save(Skin skin, bool userTriggered = true)
+        protected virtual void SaveLayout(Skin skin, bool userTriggered = true)
         {
-            if (!hasBegunMutating)
+            if (!HasBegunMutating)
                 return;
 
-            if (targetScreen?.IsLoaded != true)
+            if (TargetScreen?.IsLoaded != true)
                 return;
 
-            SkinnableContainer[] targetContainers = availableTargets.ToArray();
+            SkinnableContainer[] targetContainers = AvailableTargets.ToArray();
 
             if (!targetContainers.All(c => c.ComponentsLoaded))
                 return;
@@ -707,14 +707,14 @@ namespace osu.Game.Overlays.SkinEditor
             changeHandler?.BeginChange();
 
             foreach (var item in items)
-                availableTargets.FirstOrDefault(t => t.Components.Contains(item))?.Remove(item, true);
+                AvailableTargets.FirstOrDefault(t => t.Components.Contains(item))?.Remove(item, true);
 
             changeHandler?.EndChange();
         }
 
         public void BringSelectionToFront()
         {
-            if (getTarget(selectedTarget.Value) is not SkinnableContainer target)
+            if (GetTarget(SelectedTarget.Value) is not SkinnableContainer target)
                 return;
 
             changeHandler?.BeginChange();
@@ -738,7 +738,7 @@ namespace osu.Game.Overlays.SkinEditor
 
         public void SendSelectionToBack()
         {
-            if (getTarget(selectedTarget.Value) is not SkinnableContainer target)
+            if (GetTarget(SelectedTarget.Value) is not SkinnableContainer target)
                 return;
 
             changeHandler?.BeginChange();
@@ -775,7 +775,7 @@ namespace osu.Game.Overlays.SkinEditor
                 // This is the best we can do for now.
                 realm.Run(r => r.Refresh());
 
-                var skinnableTarget = getFirstTarget();
+                var skinnableTarget = GetFirstTarget();
 
                 // Import still should happen for now, even if not placeable (as it allows a user to import skin resources that would apply to legacy gameplay skins).
                 if (skinnableTarget == null)
@@ -809,7 +809,7 @@ namespace osu.Game.Overlays.SkinEditor
             game?.UnregisterImportHandler(this);
         }
 
-        private partial class SkinEditorToast : Toast
+        protected partial class SkinEditorToast : Toast
         {
             public SkinEditorToast(LocalisableString value, string skinDisplayName)
                 : base(SkinSettingsStrings.SkinLayoutEditor, value)

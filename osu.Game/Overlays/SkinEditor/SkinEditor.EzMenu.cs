@@ -59,6 +59,6 @@ namespace osu.Game.Overlays.SkinEditor
             };
         }
 
-        internal GlobalSkinnableContainerLookup? CurrentTarget => selectedTarget.Value;
+        internal GlobalSkinnableContainerLookup? CurrentTarget => SelectedTarget.Value;
     }
 }

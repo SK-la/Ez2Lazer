@@ -20,6 +20,15 @@ using osuTK;
 
 namespace osu.Game.Overlays.SkinEditor
 {
+    /// <summary>
+    /// Optional filter applied when listing components in <see cref="SkinComponentToolbox"/>.
+    /// Official skin editor does not cache this, so it has no effect there.
+    /// </summary>
+    public interface ISkinComponentToolboxFilter
+    {
+        bool IsExcluded(Type type);
+    }
+
     public partial class SkinComponentToolbox : EditorSidebarSection
     {
         public Action<Type>? RequestPlacement;
@@ -29,6 +38,9 @@ namespace osu.Game.Overlays.SkinEditor
         private readonly RulesetInfo? ruleset;
 
         private FillFlowContainer fill = null!;
+
+        [Resolved(canBeNull: true)]
+        private ISkinComponentToolboxFilter? typeFilter { get; set; }
 
         /// <summary>
         /// Create a new component toolbox for the specified taget.
@@ -67,6 +79,9 @@ namespace osu.Game.Overlays.SkinEditor
 
         private void attemptAddComponent(Type type)
         {
+            if (typeFilter?.IsExcluded(type) == true)
+                return;
+
             try
             {
                 Drawable instance = (Drawable)Activator.CreateInstance(type)!;

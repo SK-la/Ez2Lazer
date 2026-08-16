@@ -20,6 +20,7 @@ using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
@@ -61,7 +62,7 @@ namespace osu.Game.Overlays.Settings.Sections
         private IDisposable realmSubscription;
 
         [BackgroundDependencyLoader(permitNulls: true)]
-        private void load([CanBeNull] SkinEditorOverlay skinEditor)
+        private void load([CanBeNull] SkinEditorOverlay skinEditor, [CanBeNull] EzLayoutEditorOverlay ezLayoutEditor)
         {
             Children = new Drawable[]
             {
@@ -90,6 +91,12 @@ namespace osu.Game.Overlays.Settings.Sections
                 {
                     Text = SkinSettingsStrings.SkinLayoutEditor,
                     Action = () => skinEditor?.ToggleVisibility(),
+                },
+                new SettingsButtonV2
+                {
+                    Text = EzEditorStrings.SETTINGS_LAYOUT_EDITOR_BUTTON,
+                    TooltipText = EzEditorStrings.SETTINGS_LAYOUT_EDITOR_BUTTON_TOOLTIP,
+                    Action = () => ezLayoutEditor?.ToggleVisibility(),
                 },
                 new SettingsButtonV2
                 {
