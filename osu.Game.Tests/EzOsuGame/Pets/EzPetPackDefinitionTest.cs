@@ -41,6 +41,31 @@ namespace osu.Game.Tests.EzOsuGame.Pets
         }
 
         [Test]
+        public void TestParseBlendModes()
+        {
+            var pack = EzPetPackDefinition.Parse("""
+                {
+                  "blendMode": "blackKey",
+                  "clips": {
+                    "idle": { "blendMode": "additive" },
+                    "poke": { "fps": 12 }
+                  }
+                }
+                """);
+
+            Assert.That(pack.BlendMode, Is.EqualTo("blackKey"));
+            Assert.That(pack.Clips["idle"].BlendMode, Is.EqualTo("additive"));
+            Assert.That(pack.Clips["poke"].BlendMode, Is.Empty);
+
+            Assert.That(EzPetBlendModeExtensions.Parse("blackKey"), Is.EqualTo(EzPetBlendMode.BlackKey));
+            Assert.That(EzPetBlendModeExtensions.Parse("black_key"), Is.EqualTo(EzPetBlendMode.BlackKey));
+            Assert.That(EzPetBlendModeExtensions.Parse("additive"), Is.EqualTo(EzPetBlendMode.Additive));
+            Assert.That(EzPetBlendModeExtensions.Resolve("blackKey", "additive"), Is.EqualTo(EzPetBlendMode.Additive));
+            Assert.That(EzPetBlendModeExtensions.Resolve("blackKey", null), Is.EqualTo(EzPetBlendMode.BlackKey));
+            Assert.That(EzPetBlendModeExtensions.Resolve(null, null), Is.EqualTo(EzPetBlendMode.Normal));
+        }
+
+        [Test]
         public void TestParseRuleActions()
         {
             var pack = EzPetPackDefinition.Parse("""

@@ -256,6 +256,7 @@ namespace osu.Game.EzOsuGame.Pets
             }
 
             stateMachine.ApplyPack(currentPack.Definition, currentPack.AvailableClips);
+            applyBlendMode(null);
             applyScale();
         }
 
@@ -362,7 +363,15 @@ namespace osu.Game.EzOsuGame.Pets
 
             animation.Seek(0);
             animation.IsPlaying = true;
+            applyBlendMode(clipDef);
             applyScale();
+        }
+
+        private void applyBlendMode(EzPetClipDefinition? clipDef)
+        {
+            string? packMode = currentPack?.Definition.BlendMode;
+            string? clipMode = clipDef?.BlendMode;
+            animation.Blending = EzPetBlendModeExtensions.Resolve(packMode, clipMode).ToBlendingParameters();
         }
 
         private void checkClipFinished()

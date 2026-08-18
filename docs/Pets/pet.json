@@ -1,5 +1,6 @@
 {
   "defaultState": "idle",
+  "blendMode": "normal",
   "clips": {
     "idle": { "fps": 24, "loop": true },
     "hover": { "fps": 12, "loop": true },

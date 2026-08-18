@@ -22,6 +22,11 @@ namespace osu.Game.EzOsuGame.Pets
 
         public string DefaultState { get; set; } = "idle";
 
+        /// <summary>
+        /// Pack-wide frame blend mode: <c>normal</c> (default), <c>additive</c>, or <c>blackKey</c> for pure-black backgrounds.
+        /// </summary>
+        public string BlendMode { get; set; } = string.Empty;
+
         public Dictionary<string, EzPetClipDefinition> Clips { get; set; } = new Dictionary<string, EzPetClipDefinition>(StringComparer.Ordinal);
 
         public Dictionary<string, EzPetStateDefinition> States { get; set; } = new Dictionary<string, EzPetStateDefinition>(StringComparer.Ordinal);
@@ -67,6 +72,11 @@ namespace osu.Game.EzOsuGame.Pets
         public double Fps { get; set; } = 12;
 
         public bool Loop { get; set; }
+
+        /// <summary>
+        /// Optional per-clip blend override. Same values as pack <see cref="EzPetPackDefinition.BlendMode"/>.
+        /// </summary>
+        public string BlendMode { get; set; } = string.Empty;
     }
 
     public class EzPetStateDefinition
