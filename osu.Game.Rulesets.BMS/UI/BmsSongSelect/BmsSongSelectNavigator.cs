@@ -4,7 +4,6 @@
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars;
 using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering;
-using osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables;
 
 namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 {
