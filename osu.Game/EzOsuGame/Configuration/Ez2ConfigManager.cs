@@ -122,9 +122,9 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.UiFontTitleAlternateLocalized, string.Empty);
             SetDefault(Ez2Setting.UiFontNumeric, string.Empty);
             SetDefault(Ez2Setting.UiFontEmoji, string.Empty);
-            SetDefault(Ez2Setting.DesktopPetEnabled, true);
+            SetDefault(Ez2Setting.DesktopPetEnabled, false);
             SetDefault(Ez2Setting.DesktopPetPack, "Default");
-            SetDefault(Ez2Setting.DesktopPetScale, 1.0, 0.25, 3.0, 0.05);
+            SetDefault(Ez2Setting.DesktopPetScale, 0.4, 0.25, 3.0, 0.05);
             SetDefault(Ez2Setting.DesktopPetPositionX, 0.90f);
             SetDefault(Ez2Setting.DesktopPetPositionY, 0.82f);
             SetDefault(Ez2Setting.DesktopPetShowOnMenu, true);
