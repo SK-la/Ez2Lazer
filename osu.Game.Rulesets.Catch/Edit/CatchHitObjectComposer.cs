@@ -27,9 +27,11 @@ using osuTK;
 namespace osu.Game.Rulesets.Catch.Edit
 {
     [Cached]
-    public partial class CatchHitObjectComposer : ScrollingHitObjectComposer<CatchHitObject>, IKeyBindingHandler<GlobalAction>
+    public partial class CatchHitObjectComposer : ScrollingHitObjectComposer<CatchHitObject, CatchAction>, IKeyBindingHandler<GlobalAction>
     {
         public const float DISTANCE_SNAP_RADIUS = 50;
+
+        public override Bindable<TernaryState>? SelectionNewComboState { get; } = new Bindable<TernaryState>();
 
         private CatchDistanceSnapGrid distanceSnapGrid = null!;
 
@@ -106,7 +108,7 @@ namespace osu.Game.Rulesets.Catch.Edit
 
         protected override BeatSnapGrid CreateBeatSnapGrid() => new CatchBeatSnapGrid();
 
-        protected override IReadOnlyList<CompositionTool> CompositionTools => new CompositionTool[]
+        protected override IReadOnlyList<CompositionTool<CatchAction>> CompositionTools => new CompositionTool<CatchAction>[]
         {
             new FruitCompositionTool(),
             new JuiceStreamCompositionTool(),

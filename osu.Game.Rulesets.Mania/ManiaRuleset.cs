@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
@@ -55,6 +56,7 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Edit.Setup;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania
 {
@@ -419,7 +421,7 @@ namespace osu.Game.Rulesets.Mania
 
         public override LocalisableString VariantDescription => ManiaRulesetStrings.VariantDescription;
 
-        public override IEnumerable<int> AvailableVariants
+        public override IEnumerable<int> GameplayVariants
         {
             get
             {
@@ -430,6 +432,15 @@ namespace osu.Game.Rulesets.Mania
 
         public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0)
         {
+            if (variant == EDITOR_VARIANT)
+            {
+                return
+                [
+                    new KeyBinding(InputKey.Number2, ManiaAction.EditorNoteTool),
+                    new KeyBinding(InputKey.Number3, ManiaAction.EditorHoldNoteTool),
+                ];
+            }
+
             switch (getPlayfieldType(variant))
             {
                 case PlayfieldType.Single:
@@ -441,6 +452,9 @@ namespace osu.Game.Rulesets.Mania
 
         public override LocalisableString GetVariantName(int variant)
         {
+            if (variant == EDITOR_VARIANT)
+                return base.GetVariantName(variant);
+
             switch (getPlayfieldType(variant))
             {
                 default:
@@ -475,7 +489,7 @@ namespace osu.Game.Rulesets.Mania
 
         public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) => new[]
         {
-            new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score, playableBeatmap)
+            new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score)
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y
@@ -485,10 +499,24 @@ namespace osu.Game.Rulesets.Mania
                 RelativeSizeAxes = Axes.X,
                 Height = 200
             }, true),
-            new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
+            new StatisticItem("Timing Distribution", () => new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
-                Height = 120
+                AutoSizeAxes = Axes.Y,
+                Spacing = new Vector2(15),
+                Children = new Drawable[]
+                {
+                    new HitEventTimingDistributionGraph(score.HitEvents)
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Height = 150
+                    },
+                    new SimpleStatisticTable(1, new SimpleStatisticItem[]
+                    {
+                        new AverageHitError(score.HitEvents),
+                        new UnstableRate(score.HitEvents)
+                    })
+                }
             }, true),
             new StatisticItem("Every Column Timing Graphs", () => new EzScoreEveryColumnTimingGraphs(score)
             {
@@ -498,12 +526,7 @@ namespace osu.Game.Rulesets.Mania
             new StatisticItem("HitResult Count", () => new EzManiaScoreHitResultCountGraph(score)
             {
                 RelativeSizeAxes = Axes.X
-            }, true),
-            new StatisticItem("Statistics", () => new SimpleStatisticTable(2, new SimpleStatisticItem[]
-            {
-                new AverageHitError(score.HitEvents),
-                new UnstableRate(score.HitEvents)
-            }), true)
+            }, true)
         };
 
         /// <seealso cref="ManiaHitWindows"/>

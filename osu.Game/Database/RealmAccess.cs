@@ -102,9 +102,10 @@ namespace osu.Game.Database
         /// 49   2025-06-10    Reset the LegacyOnlineID to -1 for all scores that have it set to 0 (which is semantically the same) for consistency of handling with OnlineID.
         /// 50   2025-07-11    Add UserTags to BeatmapMetadata.
         /// 51   2025-07-22    Add ScoreInfo.Pauses.
+        /// 52   2026-07-28    Add RealmOnlineAsset.
         ///
         /// Ez2Lazer-only revisions are tracked separately via <see cref="EZ_REALM_SCHEMA_VERSION"/>.
-        /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 51007).
+        /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 52007).
         /// Ez v1: Add ScoreInfo.ManiaHitMode and ManiaHealthMode.
         /// Ez v2: Add BeatmapInfo.HasVideo and HasStoryboard.
         /// Ez v3: Add BeatmapInfo.XxyStarRating.
@@ -112,7 +113,7 @@ namespace osu.Game.Database
         /// Ez v5: Change BeatmapInfo.HasVideo/HasStoryboard to nullable (null = unknown).
         /// Ez v6: Add RulesetInfo.LastAppliedXxySrVersion.
         /// </summary>
-        private const int schema_version = 51;
+        private const int schema_version = 52;
         public const int UpstreamSchemaVersion = schema_version;
 
         /// <summary>
@@ -137,6 +138,13 @@ namespace osu.Game.Database
         /// Lock object which is held during <see cref="BlockAllOperations"/> sections, blocking realm retrieval during blocking periods.
         /// </summary>
         private readonly SemaphoreSlim realmRetrievalLock = new SemaphoreSlim(1);
+
+        /// <summary>
+        /// This <see cref="CancellationTokenSource"/> is cancelled on disposal
+        /// so that all callers of <see cref="getRealmInstance"/> who are blocked on <see cref="realmRetrievalLock"/>
+        /// can hard-fail the retrieval rather than spin on the semaphore forever.
+        /// </summary>
+        private readonly CancellationTokenSource realmRetrievalCancellation = new CancellationTokenSource();
 
         private readonly CountdownEvent pendingAsyncOperations = new CountdownEvent(0);
 
@@ -521,6 +529,12 @@ namespace osu.Game.Database
                     foreach (var s in pendingDeletePresets)
                         realm.Remove(s);
 
+                    var onlineAssetAccessCutoff = DateTimeOffset.Now.AddMonths(-1);
+                    var pendingDeleteOnlineAssets = realm.All<RealmOnlineAsset>().Where(a => a.LastAccessed < onlineAssetAccessCutoff);
+
+                    foreach (var a in pendingDeleteOnlineAssets)
+                        realm.Remove(a);
+
                     transaction.Commit();
                 }
 
@@ -882,7 +896,7 @@ namespace osu.Game.Database
                 // Ensure that the thread that currently has the `realmRetrievalLock` can retrieve nested contexts and not deadlock on itself.
                 if (!currentThreadHasRealmRetrievalLock.Value)
                 {
-                    realmRetrievalLock.Wait();
+                    realmRetrievalLock.Wait(realmRetrievalCancellation.Token);
                     currentThreadHasRealmRetrievalLock.Value = true;
                     tookSemaphoreLock = true;
                 }
@@ -1741,9 +1755,14 @@ namespace osu.Game.Database
 
             updateRealm?.Dispose();
 
-            // Intentionally block realm retrieval indefinitely. This ensures that nothing can start consuming a new instance after disposal.
-            realmRetrievalLock.Wait();
-            realmRetrievalLock.Dispose();
+            if (!isDisposed)
+            {
+                // intentionally block realm retrieval indefinitely. this ensures that nothing can start consuming a new instance after disposal.
+                realmRetrievalLock.Wait();
+                realmRetrievalLock.Dispose();
+                // also unblock all readers who may be spinning on realm retrieval.
+                realmRetrievalCancellation.Cancel();
+            }
 
             isDisposed = true;
         }

@@ -61,15 +61,30 @@ namespace osu.Game.Rulesets.Catch
 
         public override string RulesetAPIVersionSupported => CURRENT_RULESET_API_VERSION;
 
-        public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0) => new[]
+        public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0)
         {
-            new KeyBinding(InputKey.Z, CatchAction.MoveLeft),
-            new KeyBinding(InputKey.Left, CatchAction.MoveLeft),
-            new KeyBinding(InputKey.X, CatchAction.MoveRight),
-            new KeyBinding(InputKey.Right, CatchAction.MoveRight),
-            new KeyBinding(InputKey.Shift, CatchAction.Dash),
-            new KeyBinding(InputKey.MouseLeft, CatchAction.Dash),
-        };
+            switch (variant)
+            {
+                default:
+                    return new[]
+                    {
+                        new KeyBinding(InputKey.Z, CatchAction.MoveLeft),
+                        new KeyBinding(InputKey.Left, CatchAction.MoveLeft),
+                        new KeyBinding(InputKey.X, CatchAction.MoveRight),
+                        new KeyBinding(InputKey.Right, CatchAction.MoveRight),
+                        new KeyBinding(InputKey.Shift, CatchAction.Dash),
+                        new KeyBinding(InputKey.MouseLeft, CatchAction.Dash),
+                    };
+
+                case EDITOR_VARIANT:
+                    return
+                    [
+                        new KeyBinding(InputKey.Number2, CatchAction.EditorFruitTool),
+                        new KeyBinding(InputKey.Number3, CatchAction.EditorJuiceStreamTool),
+                        new KeyBinding(InputKey.Number4, CatchAction.EditorBananaShowerTool),
+                    ];
+            }
+        }
 
         public override IEnumerable<Mod> ConvertFromLegacyMods(LegacyMods mods)
         {
@@ -291,7 +306,7 @@ namespace osu.Game.Rulesets.Catch
         {
             return new[]
             {
-                new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score, playableBeatmap)
+                new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score)
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y

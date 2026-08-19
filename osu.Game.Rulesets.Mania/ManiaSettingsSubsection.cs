@@ -7,7 +7,6 @@ using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Localisation;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Localisation;
@@ -21,7 +20,6 @@ namespace osu.Game.Rulesets.Mania
 {
     public partial class ManiaSettingsSubsection : RulesetSettingsSubsection
     {
-        protected override LocalisableString Header => "osu!mania";
         protected Bindable<double> BaseSpeedBindable = null!;
         protected Bindable<double> TimePerSpeedBindable = null!;
         protected Bindable<double> SpeedBindable = null!;

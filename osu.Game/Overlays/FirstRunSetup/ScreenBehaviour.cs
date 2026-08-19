@@ -85,7 +85,6 @@ namespace osu.Game.Overlays.FirstRunSetup
                         new UserInterfaceSection(),
                         new EzGameSection(),
                         new GameplaySection(),
-                        new RulesetSection(),
                         new AudioSection(),
                         new GraphicsSection(),
                         new OnlineSection(),

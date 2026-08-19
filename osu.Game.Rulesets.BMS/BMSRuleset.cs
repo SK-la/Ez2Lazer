@@ -213,7 +213,7 @@ namespace osu.Game.Rulesets.BMS
 
         public override LocalisableString VariantDescription => "Keys";
 
-        public override IEnumerable<int> AvailableVariants => Enumerable.Range(1, 18);
+        public override IEnumerable<int> GameplayVariants => Enumerable.Range(1, 18);
 
         public override int GetVariantForBeatmap(IBeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null) => (int)getDisplayKeyCount(beatmapInfo, mods);
 
@@ -239,7 +239,7 @@ namespace osu.Game.Rulesets.BMS
 
         public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) => new[]
         {
-            new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score, playableBeatmap)
+            new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score)
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y

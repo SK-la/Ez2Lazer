@@ -35,7 +35,6 @@ namespace osu.Game.Rulesets.BMS.UI
 {
     public partial class BMSSettingsSubsection : RulesetSettingsSubsection
     {
-        protected override LocalisableString Header => "BMS";
 
         private BMSRulesetConfigManager bmsConfig = null!;
         private Bindable<string> libraryPathsBindable = null!;

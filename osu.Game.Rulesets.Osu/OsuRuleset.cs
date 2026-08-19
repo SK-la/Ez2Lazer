@@ -73,14 +73,30 @@ namespace osu.Game.Rulesets.Osu
 
         public override string RulesetAPIVersionSupported => CURRENT_RULESET_API_VERSION;
 
-        public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0) => new[]
+        public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0)
         {
-            new KeyBinding(InputKey.Z, OsuAction.LeftButton),
-            new KeyBinding(InputKey.X, OsuAction.RightButton),
-            new KeyBinding(InputKey.C, OsuAction.Smoke),
-            new KeyBinding(InputKey.MouseLeft, OsuAction.LeftButton),
-            new KeyBinding(InputKey.MouseRight, OsuAction.RightButton),
-        };
+            switch (variant)
+            {
+                default:
+                    return new[]
+                    {
+                        new KeyBinding(InputKey.Z, OsuAction.LeftButton),
+                        new KeyBinding(InputKey.X, OsuAction.RightButton),
+                        new KeyBinding(InputKey.C, OsuAction.Smoke),
+                        new KeyBinding(InputKey.MouseLeft, OsuAction.LeftButton),
+                        new KeyBinding(InputKey.MouseRight, OsuAction.RightButton),
+                    };
+
+                case EDITOR_VARIANT:
+                    return
+                    [
+                        new KeyBinding(InputKey.Number2, OsuAction.EditorHitCircleTool),
+                        new KeyBinding(InputKey.Number3, OsuAction.EditorSliderTool),
+                        new KeyBinding(InputKey.Number4, OsuAction.EditorSpinnerTool),
+                        new KeyBinding(InputKey.Number5, OsuAction.EditorGridFromPointsTool),
+                    ];
+            }
+        }
 
         public override IEnumerable<Mod> ConvertFromLegacyMods(LegacyMods mods)
         {
@@ -356,26 +372,35 @@ namespace osu.Game.Rulesets.Osu
 
             return new[]
             {
-                new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score, playableBeatmap)
+                new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score)
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y
                 }),
-                new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(timedHitEvents)
+                new StatisticItem("Timing Distribution", () => new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,
-                    Height = 250
-                }, true),
+                    AutoSizeAxes = Axes.Y,
+                    Spacing = new Vector2(15),
+                    Children = new Drawable[]
+                    {
+                        new HitEventTimingDistributionGraph(timedHitEvents)
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Height = 150
+                        },
+                        new SimpleStatisticTable(1, new SimpleStatisticItem[]
+                        {
+                            new AverageHitError(timedHitEvents),
+                            new UnstableRate(timedHitEvents)
+                        })
+                    }
+                }, requiresHitEvents: true, fullWidth: false),
                 new StatisticItem("Accuracy Heatmap", () => new AccuracyHeatmap(score, playableBeatmap)
                 {
                     RelativeSizeAxes = Axes.X,
-                    Height = 250
-                }, true),
-                new StatisticItem("Statistics", () => new SimpleStatisticTable(2, new SimpleStatisticItem[]
-                {
-                    new AverageHitError(timedHitEvents),
-                    new UnstableRate(timedHitEvents)
-                }), true),
+                    Height = 150 + 15 + StatisticItem.FONT_SIZE * 2,
+                }, requiresHitEvents: true, fullWidth: false),
                 new StatisticItem("HitResult Count", () => new EzScoreHitResultCountGraph(score)
                 {
                     RelativeSizeAxes = Axes.X
@@ -441,7 +466,8 @@ namespace osu.Game.Rulesets.Osu
                 Description = OsuRulesetStrings.CircleSizeDescription,
                 AdditionalMetrics =
                 [
-                    new RulesetBeatmapAttribute.AdditionalMetric(OsuRulesetStrings.HitCircleRadius, (OsuHitObject.OBJECT_RADIUS * LegacyRulesetExtensions.CalculateScaleFromCircleSize(effectiveDifficulty.CircleSize, applyFudge: true)).ToLocalisableString("0.#"))
+                    new RulesetBeatmapAttribute.AdditionalMetric(OsuRulesetStrings.HitCircleRadius,
+                        (OsuHitObject.OBJECT_RADIUS * LegacyRulesetExtensions.CalculateScaleFromCircleSize(effectiveDifficulty.CircleSize, applyFudge: true)).ToLocalisableString("0.#"))
                 ]
             };
 
@@ -475,8 +501,12 @@ namespace osu.Game.Rulesets.Osu
                                                   LocalisableString.Interpolate($@"±{hitWindows.WindowFor(window.result) / rate:0.##} ms"),
                                                   colours.ForHitResult(window.result)
                                               )).Concat([
-                                                  new RulesetBeatmapAttribute.AdditionalMetric(OsuRulesetStrings.RpmRequiredToClearSpinners, LocalisableString.Interpolate($@"{IBeatmapDifficultyInfo.DifficultyRange(modAdjustedDifficulty.OverallDifficulty, Spinner.CLEAR_RPM_RANGE):N0} RPM")),
-                                                  new RulesetBeatmapAttribute.AdditionalMetric(OsuRulesetStrings.RpmRequiredToGetFullSpinnerBonus, LocalisableString.Interpolate($@"{IBeatmapDifficultyInfo.DifficultyRange(modAdjustedDifficulty.OverallDifficulty, Spinner.COMPLETE_RPM_RANGE):N0} RPM")),
+                                                  new RulesetBeatmapAttribute.AdditionalMetric(OsuRulesetStrings.RpmRequiredToClearSpinners,
+                                                      LocalisableString.Interpolate(
+                                                          $@"{IBeatmapDifficultyInfo.DifficultyRange(modAdjustedDifficulty.OverallDifficulty, Spinner.CLEAR_RPM_RANGE):N0} RPM")),
+                                                  new RulesetBeatmapAttribute.AdditionalMetric(OsuRulesetStrings.RpmRequiredToGetFullSpinnerBonus,
+                                                      LocalisableString.Interpolate(
+                                                          $@"{IBeatmapDifficultyInfo.DifficultyRange(modAdjustedDifficulty.OverallDifficulty, Spinner.COMPLETE_RPM_RANGE):N0} RPM")),
                                               ]).ToArray()
             };
 
