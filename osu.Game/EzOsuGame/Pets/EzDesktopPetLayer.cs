@@ -68,6 +68,7 @@ namespace osu.Game.EzOsuGame.Pets
         private PetScene currentScene;
         private bool hovered;
         private bool dragging;
+        private bool suppressPositionApply;
         private Guid lastStarBeatmapId;
         private double lastStarRating = double.NaN;
         private ScoreProcessor? boundScoreProcessor;
@@ -141,8 +142,8 @@ namespace osu.Game.EzOsuGame.Pets
             showOnGameplay.BindValueChanged(_ => updateVisibility(), false);
             packName.BindValueChanged(_ => reloadPack(), true);
             scale.BindValueChanged(_ => applyScale(), true);
-            posX.BindValueChanged(_ => applyPosition(), true);
-            posY.BindValueChanged(_ => applyPosition(), true);
+            posX.BindValueChanged(_ => onPositionBindableChanged(), true);
+            posY.BindValueChanged(_ => onPositionBindableChanged(), false);
             beatmap.BindValueChanged(_ => onBeatmapChanged(), true);
 
             game ??= this.FindClosestParent<OsuGame>();
@@ -403,6 +404,12 @@ namespace osu.Game.EzOsuGame.Pets
             petBox.Size = new Vector2(width, height);
         }
 
+        private void onPositionBindableChanged()
+        {
+            if (!suppressPositionApply)
+                applyPosition();
+        }
+
         private void applyPosition()
         {
             if (DrawSize.X <= 0 || DrawSize.Y <= 0)
@@ -418,8 +425,16 @@ namespace osu.Game.EzOsuGame.Pets
             if (DrawSize.X <= 0 || DrawSize.Y <= 0)
                 return;
 
-            posX.Value = Math.Clamp(petBox.Position.X / DrawSize.X, 0f, 1f);
-            posY.Value = Math.Clamp(petBox.Position.Y / DrawSize.Y, 0f, 1f);
+            // Read both axes before writing bindables. Setting posX first would fire
+            // applyPosition with the old posY and clobber the dragged Y before we save it.
+            float newX = Math.Clamp(petBox.Position.X / DrawSize.X, 0f, 1f);
+            float newY = Math.Clamp(petBox.Position.Y / DrawSize.Y, 0f, 1f);
+
+            suppressPositionApply = true;
+            posX.Value = newX;
+            posY.Value = newY;
+            suppressPositionApply = false;
+            applyPosition();
         }
 
         private void updateVisibility()
