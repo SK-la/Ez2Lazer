@@ -12,13 +12,13 @@ namespace osu.Game.Tests.Database
         [Test]
         public void Ez_file_schema_version_matches_RealmAccess_constants()
         {
-            Assert.That(RealmAccess.EzFileSchemaVersion, Is.EqualTo(RealmAccess.UpstreamSchemaVersion * 1000 + RealmAccess.EZ_REALM_SCHEMA_VERSION));
+            Assert.That(RealmAccess.EzFileSchemaVersion, Is.EqualTo(RealmAccess.UPSTREAM_SCHEMA_VERSION * 1000 + RealmAccess.EZ_REALM_SCHEMA_VERSION));
         }
 
         [Test]
         public void Official_mode_uses_raw_upstream_version()
         {
-            Assert.That(RealmAccess.UpstreamSchemaVersion, Is.GreaterThan(0));
+            Assert.That(RealmAccess.UPSTREAM_SCHEMA_VERSION, Is.GreaterThan(0));
         }
     }
 }

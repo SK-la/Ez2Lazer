@@ -114,18 +114,17 @@ namespace osu.Game.Database
         /// Ez v6: Add RulesetInfo.LastAppliedXxySrVersion.
         /// </summary>
         private const int schema_version = 52;
-        public const int UpstreamSchemaVersion = schema_version;
+
+        public const int UPSTREAM_SCHEMA_VERSION = schema_version;
 
         /// <summary>
         /// Ez2Lazer schema revision. Bump when adding Ez-persisted fields; do not change <see cref="schema_version"/> for Ez-only work.
         /// </summary>
         public const int EZ_REALM_SCHEMA_VERSION = 7;
 
-        public static int EzFileSchemaVersion => UpstreamSchemaVersion * 1000 + EZ_REALM_SCHEMA_VERSION;
+        public static int EzFileSchemaVersion => UPSTREAM_SCHEMA_VERSION * 1000 + EZ_REALM_SCHEMA_VERSION;
 
         private readonly RealmSchemaMode schemaMode;
-
-        private readonly bool useDevelopmentVersionedFilenames;
 
         private readonly bool allowDestructiveRecoveryOnSchemaMismatch;
 
@@ -272,7 +271,7 @@ namespace osu.Game.Database
         {
             this.storage = storage;
             this.schemaMode = schemaMode;
-            this.useDevelopmentVersionedFilenames = useDevelopmentVersionedFilenames ?? schemaMode == RealmSchemaMode.Ez;
+            bool useDevelopmentVersionedFilenames1 = useDevelopmentVersionedFilenames ?? schemaMode == RealmSchemaMode.Ez;
             this.allowDestructiveRecoveryOnSchemaMismatch = allowDestructiveRecoveryOnSchemaMismatch;
             this.performSchemaMigration = performSchemaMigration;
             this.pinnedDiskSchemaVersion = pinnedDiskSchemaVersion;
@@ -288,7 +287,7 @@ namespace osu.Game.Database
                 Filename += realm_extension;
 
 // #if DEBUG
-            if (this.useDevelopmentVersionedFilenames && !DebugUtils.IsNUnitRunning)
+            if (useDevelopmentVersionedFilenames1 && !DebugUtils.IsNUnitRunning)
                 applyFilenameSchemaSuffix(ref Filename);
 // #endif
 
@@ -349,16 +348,29 @@ namespace osu.Game.Database
         {
             if (schemaMode == RealmSchemaMode.Ez)
             {
-                int baseVersion = UpstreamSchemaVersion * 1000;
+                // Current upstream: older Ez revisions only (target file itself is already checked by caller).
+                const int current_base = UPSTREAM_SCHEMA_VERSION * 1000;
 
                 for (int ez = EZ_REALM_SCHEMA_VERSION - 1; ez >= 1; ez--)
-                    yield return GetVersionedRealmFilename(originalFilename, baseVersion + ez);
+                    yield return GetVersionedRealmFilename(originalFilename, current_base + ez);
 
-                yield return GetVersionedRealmFilename(originalFilename, UpstreamSchemaVersion);
+                yield return GetVersionedRealmFilename(originalFilename, UPSTREAM_SCHEMA_VERSION);
+
+                // Previous upstream tags (e.g. 51007 when bumping to 52007). Include full EZ revision —
+                // that is the usual DEBUG sidecar left behind after an upstream schema bump.
+                for (int upstream = UPSTREAM_SCHEMA_VERSION - 1; upstream >= 0; upstream--)
+                {
+                    int baseVersion = upstream * 1000;
+
+                    for (int ez = EZ_REALM_SCHEMA_VERSION; ez >= 1; ez--)
+                        yield return GetVersionedRealmFilename(originalFilename, baseVersion + ez);
+
+                    yield return GetVersionedRealmFilename(originalFilename, upstream);
+                }
             }
             else
             {
-                for (int version = UpstreamSchemaVersion - 1; version >= 0; version--)
+                for (int version = UPSTREAM_SCHEMA_VERSION - 1; version >= 0; version--)
                     yield return GetVersionedRealmFilename(originalFilename, version);
             }
 
@@ -939,28 +951,44 @@ namespace osu.Game.Database
 
         private void onMigration(Migration migration, ulong lastSchemaVersion)
         {
-            int upstreamVersion = UpstreamSchemaVersion;
+            decodeDiskSchemaVersion(lastSchemaVersion, out int lastUpstream, out int lastEz);
 
-            if (lastSchemaVersion < (ulong)upstreamVersion)
-            {
-                for (ulong i = lastSchemaVersion + 1; i <= (ulong)upstreamVersion; i++)
-                    applyMigrationsForVersion(migration, i);
-            }
+            for (ulong i = (ulong)lastUpstream + 1; i <= UPSTREAM_SCHEMA_VERSION; i++)
+                applyMigrationsForVersion(migration, i);
 
             if (ezRealmSchemaVersionForMode <= 0)
                 return;
 
-            int startingEzVersion = lastSchemaVersion >= (ulong)fileSchemaVersionForMode - (ulong)ezRealmSchemaVersionForMode
-                ? (int)(lastSchemaVersion - (ulong)upstreamVersion * 1000)
-                : 0;
-
-            for (int ez = startingEzVersion + 1; ez <= ezRealmSchemaVersionForMode; ez++)
+            // Ez fields persist across upstream bumps; only run migrations after the last applied Ez revision.
+            for (int ez = lastEz + 1; ez <= ezRealmSchemaVersionForMode; ez++)
                 applyEzMigrationsForVersion(migration, ez);
+        }
+
+        /// <summary>
+        /// Decodes an on-disk Realm schema version into upstream + Ez components.
+        /// Ez file versions are <c>upstream * 1000 + ez</c> (e.g. 51007 → upstream 51, ez 7).
+        /// Plain upstream versions (&lt; 1000) decode as ez 0.
+        /// </summary>
+        internal static void DecodeDiskSchemaVersion(ulong diskSchemaVersion, out int upstreamVersion, out int ezVersion)
+            => decodeDiskSchemaVersion(diskSchemaVersion, out upstreamVersion, out ezVersion);
+
+        private static void decodeDiskSchemaVersion(ulong diskSchemaVersion, out int upstreamVersion, out int ezVersion)
+        {
+            if (diskSchemaVersion >= 1000)
+            {
+                upstreamVersion = (int)(diskSchemaVersion / 1000);
+                ezVersion = (int)(diskSchemaVersion % 1000);
+            }
+            else
+            {
+                upstreamVersion = (int)diskSchemaVersion;
+                ezVersion = 0;
+            }
         }
 
         private int ezRealmSchemaVersionForMode => schemaMode == RealmSchemaMode.Ez ? EZ_REALM_SCHEMA_VERSION : 0;
 
-        private int fileSchemaVersionForMode => schemaMode == RealmSchemaMode.Ez ? EzFileSchemaVersion : UpstreamSchemaVersion;
+        private int fileSchemaVersionForMode => schemaMode == RealmSchemaMode.Ez ? EzFileSchemaVersion : UPSTREAM_SCHEMA_VERSION;
 
         private void applyMigrationsForVersion(Migration migration, ulong targetVersion)
         {
@@ -1457,7 +1485,7 @@ namespace osu.Game.Database
 
         private void applyEzMigrationsForVersion(Migration migration, int targetEzVersion)
         {
-            Logger.Log($"Running Ez realm migration to ez version {targetEzVersion} (file schema {UpstreamSchemaVersion * 1000 + targetEzVersion})...");
+            Logger.Log($"Running Ez realm migration to ez version {targetEzVersion} (file schema {UPSTREAM_SCHEMA_VERSION * 1000 + targetEzVersion})...");
             Stopwatch stopwatch = Stopwatch.StartNew();
 
             switch (targetEzVersion)

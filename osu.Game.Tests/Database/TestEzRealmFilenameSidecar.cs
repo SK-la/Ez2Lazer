@@ -23,12 +23,25 @@ namespace osu.Game.Tests.Database
         {
             var predecessors = RealmAccess.EnumerateSidecarPredecessorFilenames("client.realm", RealmSchemaMode.Ez).ToList();
 
-            int baseVersion = RealmAccess.UpstreamSchemaVersion * 1000;
+            int currentUpstream = RealmAccess.UPSTREAM_SCHEMA_VERSION;
+            int currentBase = currentUpstream * 1000;
+            int previousUpstream = currentUpstream - 1;
+            int previousBase = previousUpstream * 1000;
 
             for (int ez = RealmAccess.EZ_REALM_SCHEMA_VERSION - 1; ez >= 1; ez--)
-                Assert.That(predecessors, Does.Contain($"client_{baseVersion + ez}.realm"));
+                Assert.That(predecessors, Does.Contain($"client_{currentBase + ez}.realm"));
 
-            Assert.That(predecessors, Does.Contain($"client_{RealmAccess.UpstreamSchemaVersion}.realm"));
+            Assert.That(predecessors, Does.Contain($"client_{currentUpstream}.realm"));
+
+            // Cross-upstream bump must find the previous DEBUG sidecar (e.g. 51007 → 52007).
+            Assert.That(predecessors, Does.Contain($"client_{previousBase + RealmAccess.EZ_REALM_SCHEMA_VERSION}.realm"));
+            Assert.That(predecessors, Does.Contain($"client_{previousUpstream}.realm"));
+
+            int previousFullEzIndex = predecessors.IndexOf($"client_{previousBase + RealmAccess.EZ_REALM_SCHEMA_VERSION}.realm");
+            int previousPlainIndex = predecessors.IndexOf($"client_{previousUpstream}.realm");
+            Assert.That(previousFullEzIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(previousFullEzIndex, Is.LessThan(previousPlainIndex));
+
             Assert.That(predecessors[^1], Is.EqualTo("client.realm"));
         }
 
@@ -37,10 +50,26 @@ namespace osu.Game.Tests.Database
         {
             var predecessors = RealmAccess.EnumerateSidecarPredecessorFilenames("client.realm", RealmSchemaMode.Official).ToList();
 
-            Assert.That(predecessors, Does.Contain($"client_{RealmAccess.UpstreamSchemaVersion - 1}.realm"));
+            Assert.That(predecessors, Does.Contain($"client_{RealmAccess.UPSTREAM_SCHEMA_VERSION - 1}.realm"));
             Assert.That(predecessors, Does.Contain("client_0.realm"));
             Assert.That(predecessors[^1], Is.EqualTo("client.realm"));
             Assert.That(predecessors.Any(f => f.Contains("510")), Is.False);
+        }
+
+        [Test]
+        public void DecodeDiskSchemaVersion_splits_ez_encoded_and_plain_upstream()
+        {
+            RealmAccess.DecodeDiskSchemaVersion(51007, out int upstream, out int ez);
+            Assert.That(upstream, Is.EqualTo(51));
+            Assert.That(ez, Is.EqualTo(7));
+
+            RealmAccess.DecodeDiskSchemaVersion(52, out upstream, out ez);
+            Assert.That(upstream, Is.EqualTo(52));
+            Assert.That(ez, Is.EqualTo(0));
+
+            RealmAccess.DecodeDiskSchemaVersion(52007, out upstream, out ez);
+            Assert.That(upstream, Is.EqualTo(52));
+            Assert.That(ez, Is.EqualTo(7));
         }
     }
 }
