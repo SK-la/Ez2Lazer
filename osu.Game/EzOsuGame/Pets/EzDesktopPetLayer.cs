@@ -8,16 +8,17 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Pets
 {
@@ -36,8 +37,8 @@ namespace osu.Game.EzOsuGame.Pets
             Gameplay,
         }
 
-        private const float placeholder_size = 128;
-        private const int placeholder_frames = 4;
+        private const float missing_pack_width = 320;
+        private const float missing_pack_height = 88;
 
         private readonly EzPetStateMachine stateMachine = new EzPetStateMachine();
         private readonly Dictionary<string, Texture[]> clipTextures = new Dictionary<string, Texture[]>(StringComparer.Ordinal);
@@ -55,12 +56,13 @@ namespace osu.Game.EzOsuGame.Pets
 
         private EzPetPackLoader loader = null!;
         private EzResourceStore resources = null!;
-        private IRenderer renderer = null!;
         private TextureStore petTextures = null!;
         private OsuGame? game;
 
         private Container petBox = null!;
         private TextureAnimation animation = null!;
+        private Container missingPackPanel = null!;
+        private bool showingMissingPack;
 
         private EzPetPack? currentPack;
         private bool inGameplay;
@@ -89,7 +91,6 @@ namespace osu.Game.EzOsuGame.Pets
         private void load(Ez2ConfigManager ezConfig, Storage storage, EzResourceStore resourceStore, IBindable<WorkingBeatmap> workingBeatmap, OsuGame? osuGame)
         {
             resources = resourceStore;
-            renderer = resourceStore.Renderer;
             game = osuGame ?? this.FindClosestParent<OsuGame>();
             beatmap = workingBeatmap.GetBoundCopy();
 
@@ -109,7 +110,7 @@ namespace osu.Game.EzOsuGame.Pets
             // LargeTextureStore's TextureWithRefCount then purges the native texture and crashes
             // on the next loop. A non-atlas TextureStore keeps frames alive (Dispose is a no-op).
             petTextures = new TextureStore(
-                renderer,
+                resources.Renderer,
                 resources.CreateTextureLoaderStore(resources.Files),
                 useAtlas: false,
                 scaleAdjust: 1);
@@ -119,15 +120,64 @@ namespace osu.Game.EzOsuGame.Pets
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.Centre,
                 AutoSizeAxes = Axes.None,
-                Child = animation = new TextureAnimation(startAtCurrentTime: true)
+                Children = new Drawable[]
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    FillMode = FillMode.Fit,
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
+                    animation = new TextureAnimation(startAtCurrentTime: true)
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        FillMode = FillMode.Fit,
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                    },
+                    missingPackPanel = createMissingPackPanel(),
                 },
             };
         }
+
+        private static Container createMissingPackPanel() => new Container
+        {
+            RelativeSizeAxes = Axes.Both,
+            Anchor = Anchor.Centre,
+            Origin = Anchor.Centre,
+            Children = new Drawable[]
+            {
+                new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = Colour4.FromHex("1a1a1f"),
+                    Alpha = 0.92f,
+                },
+                new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(0, 6),
+                    Padding = new MarginPadding(12),
+                    Children = new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Anchor = Anchor.TopCentre,
+                            Origin = Anchor.TopCentre,
+                            Text = "当前没有可用的宠物包",
+                            Font = OsuFont.GetFont(size: 18, weight: FontWeight.SemiBold),
+                            Colour = Colour4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Anchor = Anchor.TopCentre,
+                            Origin = Anchor.TopCentre,
+                            Text = "No pet pack available",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Colour4.FromHex("b0b0b8"),
+                        },
+                    },
+                },
+            },
+        };
 
         protected override void LoadComplete()
         {
@@ -243,7 +293,7 @@ namespace osu.Game.EzOsuGame.Pets
                 {
                     Name = EzDefaultPetPack.NAME,
                     Definition = definition,
-                    AvailableClips = new HashSet<string>(definition.Clips.Keys, StringComparer.Ordinal),
+                    AvailableClips = new HashSet<string>(StringComparer.Ordinal),
                 };
             }
 
@@ -256,7 +306,20 @@ namespace osu.Game.EzOsuGame.Pets
                 Logger.Error(ex, $"Failed to preload Ez pet pack '{currentPack.Name}'");
             }
 
-            stateMachine.ApplyPack(currentPack.Definition, currentPack.AvailableClips);
+            showingMissingPack = clipTextures.Count == 0;
+            setMissingPackVisible(showingMissingPack);
+
+            // Only drive the state machine when real frames exist; otherwise keep the fixed notice.
+            if (showingMissingPack)
+            {
+                animation.ClearFrames();
+                animation.IsPlaying = false;
+            }
+            else
+            {
+                stateMachine.ApplyPack(currentPack.Definition, currentPack.AvailableClips);
+            }
+
             applyBlendMode(null);
             applyScale();
         }
@@ -269,10 +332,8 @@ namespace osu.Game.EzOsuGame.Pets
                     continue;
 
                 var frames = loadClipFrames(pack, clipName, clip);
-                if (frames.Length == 0)
-                    frames = createPlaceholderFrames(clipName);
-
-                clipTextures[clipName] = frames;
+                if (frames.Length > 0)
+                    clipTextures[clipName] = frames;
             }
         }
 
@@ -306,49 +367,33 @@ namespace osu.Game.EzOsuGame.Pets
             return textures.Count > 0 ? textures.ToArray() : [];
         }
 
-        private Texture[] createPlaceholderFrames(string clipName)
+        private void setMissingPackVisible(bool visible)
         {
-            var baseColour = placeholderColour(clipName);
-            var frames = new Texture[placeholder_frames];
-
-            for (int i = 0; i < placeholder_frames; i++)
-            {
-                float pulse = 0.82f + 0.12f * MathF.Sin(i / (float)placeholder_frames * MathF.PI * 2);
-                frames[i] = renderer.CreateTexture(
-                    (int)placeholder_size,
-                    (int)placeholder_size,
-                    initialisationColour: new Color4(baseColour.R * pulse, baseColour.G * pulse, baseColour.B * pulse, 1f));
-            }
-
-            return frames;
+            missingPackPanel.Alpha = visible ? 1 : 0;
+            animation.Alpha = visible ? 0 : 1;
         }
-
-        private static Color4 placeholderColour(string clipName) => clipName switch
-        {
-            "hover" => new Color4(1f, 0.86f, 0.3f, 1f),
-            "poke" => new Color4(1f, 0.55f, 0.16f, 1f),
-            "starEasy" => new Color4(0.3f, 0.8f, 0.45f, 1f),
-            "starHard" => new Color4(0.86f, 0.27f, 0.27f, 1f),
-            "enter" => new Color4(0.3f, 0.78f, 0.86f, 1f),
-            "combo50" => new Color4(0.3f, 0.55f, 1f, 1f),
-            "combo300" => new Color4(0.7f, 0.3f, 1f, 1f),
-            "miss" => new Color4(0.63f, 0.16f, 0.16f, 1f),
-            "idlePlay" => new Color4(0.78f, 0.78f, 0.63f, 1f),
-            "idleYawn" => new Color4(0.55f, 0.55f, 0.7f, 1f),
-            "idleSleep" => new Color4(0.27f, 0.27f, 0.43f, 1f),
-            _ => new Color4(0.7f, 0.7f, 0.75f, 1f),
-        };
 
         private void onClipChanged(string _, string clip)
         {
+            if (showingMissingPack)
+                return;
+
             animation.ClearFrames();
 
             if (!clipTextures.TryGetValue(clip, out var frames) || frames.Length == 0)
             {
                 string idleClip = currentPack?.Definition.DefaultState ?? "idle";
+
                 if (!clipTextures.TryGetValue(idleClip, out frames) || frames.Length == 0)
+                {
+                    showingMissingPack = true;
+                    setMissingPackVisible(true);
+                    applyScale();
                     return;
+                }
             }
+
+            setMissingPackVisible(false);
 
             EzPetClipDefinition? clipDef = null;
             currentPack?.Definition.Clips.TryGetValue(clip, out clipDef);
@@ -377,7 +422,7 @@ namespace osu.Game.EzOsuGame.Pets
 
         private void checkClipFinished()
         {
-            if (animation.Loop || animation.FrameCount == 0 || animation.Duration <= 0)
+            if (showingMissingPack || animation.Loop || animation.FrameCount == 0 || animation.Duration <= 0)
                 return;
 
             if (animation.PlaybackPosition >= animation.Duration)
@@ -387,8 +432,15 @@ namespace osu.Game.EzOsuGame.Pets
         private void applyScale()
         {
             float s = (float)Math.Clamp(scale.Value, 0.25, 3.0);
-            float width = placeholder_size * s;
-            float height = placeholder_size * s;
+
+            if (showingMissingPack)
+            {
+                petBox.Size = new Vector2(missing_pack_width * s, missing_pack_height * s);
+                return;
+            }
+
+            float width = missing_pack_width * s;
+            float height = missing_pack_height * s;
 
             if (animation.FrameCount > 0)
             {

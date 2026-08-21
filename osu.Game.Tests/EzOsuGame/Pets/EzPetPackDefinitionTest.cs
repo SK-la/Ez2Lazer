@@ -134,8 +134,7 @@ namespace osu.Game.Tests.EzOsuGame.Pets
                 var pack = loader.Load(EzDefaultPetPack.NAME);
                 Assert.That(pack, Is.Not.Null);
                 Assert.That(pack!.IsDefault, Is.True);
-                Assert.That(pack.AvailableClips.Contains("idle"), Is.True);
-                Assert.That(pack.AvailableClips.Contains("miss"), Is.True);
+                Assert.That(pack.AvailableClips, Is.Empty);
             }
             finally
             {

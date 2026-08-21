@@ -19,7 +19,6 @@ namespace osu.Game.EzOsuGame.Pets
 
         /// <summary>
         /// Clip ids that have at least one frame file on disk.
-        /// Default pack may treat all defined clips as available (runtime placeholders).
         /// </summary>
         public required IReadOnlySet<string> AvailableClips { get; init; }
 
@@ -90,7 +89,7 @@ namespace osu.Game.EzOsuGame.Pets
 
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 var definition = EzPetPackDefinition.Parse(reader.ReadToEnd());
-                var available = resolveAvailableClips(packName, definition, allowPlaceholders: isDefaultName(packName));
+                var available = resolveAvailableClips(packName, definition);
                 return new EzPetPack
                 {
                     Name = packName,
@@ -154,13 +153,13 @@ namespace osu.Game.EzOsuGame.Pets
             return relative;
         }
 
-        private HashSet<string> resolveAvailableClips(string packName, EzPetPackDefinition definition, bool allowPlaceholders)
+        private HashSet<string> resolveAvailableClips(string packName, EzPetPackDefinition definition)
         {
             var available = new HashSet<string>(StringComparer.Ordinal);
 
             foreach ((string clipName, var clip) in definition.Clips)
             {
-                if (allowPlaceholders || GetClipFrameNames(packName, clipName, clip).Count > 0)
+                if (GetClipFrameNames(packName, clipName, clip).Count > 0)
                     available.Add(clipName);
             }
 
@@ -222,9 +221,6 @@ namespace osu.Game.EzOsuGame.Pets
             return null;
         }
 
-        private static bool isDefaultName(string packName)
-            => string.Equals(packName, EzDefaultPetPack.NAME, StringComparison.OrdinalIgnoreCase);
-
         private static EzPetPack createDefaultPackInMemory()
         {
             var definition = EzPetPackDefinition.Parse(EzDefaultPetPack.PET_JSON);
@@ -232,7 +228,7 @@ namespace osu.Game.EzOsuGame.Pets
             {
                 Name = EzDefaultPetPack.NAME,
                 Definition = definition,
-                AvailableClips = new HashSet<string>(definition.Clips.Keys, StringComparer.Ordinal),
+                AvailableClips = new HashSet<string>(StringComparer.Ordinal),
             };
         }
     }
