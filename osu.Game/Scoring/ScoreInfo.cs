@@ -401,9 +401,10 @@ namespace osu.Game.Scoring
 
                 var apiModList = APIMods;
                 if (apiModList.Length == 0)
-                    return Array.Empty<Mod>();
+                    return mods = Array.Empty<Mod>();
 
                 List<Mod> parsedMods = new List<Mod>();
+                List<string>? strippedUnknown = null;
 
                 try
                 {
@@ -413,7 +414,19 @@ namespace osu.Game.Scoring
                     {
                         try
                         {
-                            parsedMods.Add(apiMod.ToMod(ruleset));
+                            var parsed = apiMod.ToMod(ruleset);
+
+                            // [Ez] Deleted/obsolete mods resolve as UnknownMod. Strip them so leaderboards,
+                            // difficulty cache, Player, and race paths do not abort or re-log on every access.
+                            // ModsJson is left unchanged (no realm write-back).
+                            if (parsed is UnknownMod unknown)
+                            {
+                                strippedUnknown ??= new List<string>();
+                                strippedUnknown.Add(unknown.OriginalAcronym);
+                                continue;
+                            }
+
+                            parsedMods.Add(parsed);
                         }
                         catch (Exception ex)
                         {
@@ -426,7 +439,14 @@ namespace osu.Game.Scoring
                     Logger.Log($"Failed to load ruleset for score mods (ruleset: {Ruleset.ShortName}): {ex.Message}");
                 }
 
-                return parsedMods.ToArray();
+                if (strippedUnknown != null)
+                {
+                    Logger.Log(
+                        $"Score mods contained unresolved acronyms and were stripped: {string.Join(", ", strippedUnknown.Distinct())}",
+                        level: LogLevel.Important);
+                }
+
+                return mods = parsedMods.ToArray();
             }
             set
             {

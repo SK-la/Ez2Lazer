@@ -365,13 +365,28 @@ namespace osu.Game.EzOsuGame.Scoring
                         if (results[i] != null)
                             continue;
 
-                        results[i] = EzScoreTimelineBuilder.TryBuild(
-                            scoreManager,
-                            beatmaps,
-                            scoreInfos[i],
-                            sharedPlayable,
-                            timelineCache,
-                            token);
+                        try
+                        {
+                            results[i] = EzScoreTimelineBuilder.TryBuild(
+                                scoreManager,
+                                beatmaps,
+                                scoreInfos[i],
+                                sharedPlayable,
+                                timelineCache,
+                                token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            // One bad ghost (e.g. leftover deleted-mod edge case) must not abort the whole batch.
+                            results[i] = null;
+                            Logger.Error(ex,
+                                $"[EzScoreRaceService] Timeline build failed for score {scoreInfos[i].ID}",
+                                Ez2ConfigManager.LOGGER_NAME);
+                        }
                     }
                 }, token).ConfigureAwait(false);
 

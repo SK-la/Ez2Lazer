@@ -65,7 +65,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
 
             var ruleset = score.ScoreInfo.Ruleset.CreateInstance();
             var scoreProcessor = ruleset.CreateScoreProcessor();
-            scoreProcessor.Mods.Value = score.ScoreInfo.Mods;
+            // [Ez] Defence in depth: ScoreInfo.Mods already strips UnknownMod; keep Session free of unresolved mods.
+            var resolvedMods = EzModCompatibility.StripUnknown(score.ScoreInfo.Mods);
+            scoreProcessor.Mods.Value = resolvedMods;
 
             var beatmapProcessor = ruleset.CreateBeatmapProcessor(beatmap);
             beatmapProcessor?.PreProcess();
@@ -80,11 +82,11 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
             if (score.ScoreInfo.IsLegacyScore)
                 scoreProcessor.IsLegacyScore = true;
 
-            foreach (var mod in score.ScoreInfo.Mods.OfType<IApplicableToScoreProcessor>())
+            foreach (var mod in resolvedMods.OfType<IApplicableToScoreProcessor>())
                 mod.ApplyToScoreProcessor(scoreProcessor);
 
             var recorder = recordTimeline ? new OsuReplayTimelineRecorder() : null;
-            double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
+            double gameplayRate = ModUtils.CalculateRateWithMods(resolvedMods);
 
             if (score.Replay.Frames.Count == 0)
             {

@@ -74,10 +74,11 @@ namespace osu.Game.EzOsuGame.Scoring
         /// </summary>
         public static bool GameplayModsMatch(Mod[] left, Mod[] right)
         {
-            static bool isCosmetic(Mod m) => COSMETIC_GHOST_MOD_TYPES.Any(t => t.IsInstanceOfType(m));
+            static bool isIgnored(Mod m) =>
+                m is UnknownMod || COSMETIC_GHOST_MOD_TYPES.Any(t => t.IsInstanceOfType(m));
 
             static IEnumerable<string> gameplayAcronyms(Mod[] mods) =>
-                mods.Where(m => !isCosmetic(m))
+                mods.Where(m => !isIgnored(m))
                     .OrderBy(m => m.Acronym)
                     .Select(m => m.Acronym);
 

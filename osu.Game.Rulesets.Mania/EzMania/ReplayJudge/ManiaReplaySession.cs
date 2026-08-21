@@ -81,7 +81,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             var ruleset = score.ScoreInfo.Ruleset.CreateInstance();
             var scoreProcessor = ruleset.CreateScoreProcessor();
-            scoreProcessor.Mods.Value = score.ScoreInfo.Mods;
+            // [Ez] Defence in depth: ScoreInfo.Mods already strips UnknownMod; keep Session free of unresolved mods.
+            var resolvedMods = EzModCompatibility.StripUnknown(score.ScoreInfo.Mods);
+            scoreProcessor.Mods.Value = resolvedMods;
 
             if (scoreProcessor is ManiaScoreProcessor maniaScoreProcessor)
                 maniaScoreProcessor.HitModeOverride = environment.ManiaHitMode;
@@ -91,12 +93,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (score.ScoreInfo.IsLegacyScore)
                 scoreProcessor.IsLegacyScore = true;
 
-            foreach (var mod in score.ScoreInfo.Mods.OfType<IApplicableToScoreProcessor>())
+            foreach (var mod in resolvedMods.OfType<IApplicableToScoreProcessor>())
                 mod.ApplyToScoreProcessor(scoreProcessor);
 
             var recorder = recordTimeline ? new ManiaReplayTimelineRecorder() : null;
 
-            double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
+            double gameplayRate = ModUtils.CalculateRateWithMods(resolvedMods);
             recorder?.RecordInitial(scoreProcessor, gameplayRate);
 
             var simulationEnvironment = createSimulationEnvironment(environment);

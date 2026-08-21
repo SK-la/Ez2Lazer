@@ -55,6 +55,12 @@ namespace osu.Game.Online.Spectator
         private bool isPlaying { get; set; }
 
         /// <summary>
+        /// [Ez] Whether we already logged an out-of-scope frame for the current non-playing stretch.
+        /// Reset when <see cref="setStateForScore"/> starts a new play session.
+        /// </summary>
+        private bool loggedOutOfScopeFrame;
+
+        /// <summary>
         /// Called whenever new frames arrive from the server.
         /// </summary>
         [UsedImplicitly] // Marked virtual due to mock use in testing
@@ -243,8 +249,13 @@ namespace osu.Game.Online.Spectator
         {
             if (!isPlaying)
             {
-                if (IsConnected.Value)
+                // [Ez] Throttle: one log per non-playing stretch (was one line per frame).
+                if (IsConnected.Value && !loggedOutOfScopeFrame)
+                {
+                    loggedOutOfScopeFrame = true;
                     Logger.Log($"Frames arrived at {nameof(SpectatorClient)} outside of gameplay scope and will be ignored.");
+                }
+
                 return;
             }
 
@@ -297,6 +308,7 @@ namespace osu.Game.Online.Spectator
         private void setStateForScore(long? scoreToken, GameplayState state, Score score)
         {
             isPlaying = true;
+            loggedOutOfScopeFrame = false;
 
             currentBeatmap = state.Beatmap;
             currentScore = score;
