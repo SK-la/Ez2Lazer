@@ -64,11 +64,17 @@ namespace osu.Game.EzOsuGame.Localization
             "游玩时是否允许显示。仍可被 pet.json 的 hide/show 临时关掉或再打开，例如进图隐藏、combo 200 再出现。",
             "Allow the pet during gameplay. pet.json hide/show rules can still hide it on enter and show it again at a combo threshold.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SHOW_ON_RESULTS = new EzLocalizationManager.EzLocalisableString("结算显示", "Show on results");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SHOW_ON_RESULTS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "结算界面是否显示桌宠。可用 pet.json 的 resultsRank 规则配合舞台 motion 走到分数旁。",
+            "Show the pet on the results screen. Use pet.json resultsRank rules with stage motions to walk toward the rank.");
+
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK = new EzLocalizationManager.EzLocalisableString("桌宠包", "Pet pack");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "扫描 EzResources/Pets 下带 pet.json 的文件夹。复制整个目录即可换包。",
-            "Scans folders with pet.json under EzResources/Pets. Copy a folder to switch packs.");
+            "扫描 EzResources/Pets 下带 pet.json 的文件夹。复制整个目录即可换包（PNG 序列帧）。",
+            "Scans folders with pet.json under EzResources/Pets. Copy a folder to switch packs (PNG frame clips).");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SCALE = new EzLocalizationManager.EzLocalisableString("桌宠缩放", "Pet scale");
 

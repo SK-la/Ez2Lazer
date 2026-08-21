@@ -36,6 +36,7 @@ namespace osu.Game.EzOsuGame.Pets
             Menu,
             SongSelect,
             Gameplay,
+            Results,
         }
 
         private const float missing_pack_width = 320;
@@ -43,6 +44,9 @@ namespace osu.Game.EzOsuGame.Pets
 
         private readonly EzPetStateMachine stateMachine = new EzPetStateMachine();
         private readonly Dictionary<string, Texture[]> clipTextures = new Dictionary<string, Texture[]>(StringComparer.Ordinal);
+        private readonly EzPetMotionDriver motionDriver = new EzPetMotionDriver();
+        private string? motionOwnerState;
+        private string? activeMotionMode;
 
         private Bindable<bool> enabled = null!;
         private Bindable<string> packName = null!;
@@ -52,6 +56,7 @@ namespace osu.Game.EzOsuGame.Pets
         private Bindable<bool> showOnMenu = null!;
         private Bindable<bool> showOnSongSelect = null!;
         private Bindable<bool> showOnGameplay = null!;
+        private Bindable<bool> showOnResults = null!;
 
         private IBindable<WorkingBeatmap> beatmap = null!;
 
@@ -106,6 +111,7 @@ namespace osu.Game.EzOsuGame.Pets
             showOnMenu = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnMenu);
             showOnSongSelect = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnSongSelect);
             showOnGameplay = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnGameplay);
+            showOnResults = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnResults);
 
             loader = new EzPetPackLoader(storage);
             loader.EnsureDefaultPack();
@@ -189,11 +195,13 @@ namespace osu.Game.EzOsuGame.Pets
 
             stateMachine.ClipChanged += onClipChanged;
             stateMachine.VisibilityAction += onVisibilityAction;
+            stateMachine.MotionRequested += onMotionRequested;
 
             enabled.BindValueChanged(_ => updateVisibility(), false);
             showOnMenu.BindValueChanged(_ => updateVisibility(), false);
             showOnSongSelect.BindValueChanged(_ => updateVisibility(), false);
             showOnGameplay.BindValueChanged(_ => updateVisibility(), false);
+            showOnResults.BindValueChanged(_ => updateVisibility(), false);
             packName.BindValueChanged(_ => reloadPack(), true);
             scale.BindValueChanged(_ => applyScale(), true);
             posX.BindValueChanged(_ => onPositionBindableChanged(), true);
@@ -230,7 +238,12 @@ namespace osu.Game.EzOsuGame.Pets
             base.Update();
 
             if (!dragging)
-                applyPosition();
+            {
+                if (motionDriver.IsActive)
+                    updateMotion(Time.Elapsed);
+                else
+                    applyPosition();
+            }
 
             pollHover();
 
@@ -272,6 +285,8 @@ namespace osu.Game.EzOsuGame.Pets
             unbindPlayer();
             stateMachine.ClipChanged -= onClipChanged;
             stateMachine.VisibilityAction -= onVisibilityAction;
+            stateMachine.MotionRequested -= onMotionRequested;
+            motionDriver.Stop();
             animation.ClearFrames();
             clipTextures.Clear();
             petTextures.Dispose();
@@ -282,6 +297,7 @@ namespace osu.Game.EzOsuGame.Pets
         private void reloadPack()
         {
             clipTextures.Clear();
+            motionDriver.Stop();
             currentPack = null;
             eventHidden = false;
 
@@ -307,16 +323,7 @@ namespace osu.Game.EzOsuGame.Pets
                 };
             }
 
-            try
-            {
-                preloadClips(currentPack);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, $"Failed to preload Ez pet pack '{currentPack.Name}'");
-            }
-
-            showingMissingPack = clipTextures.Count == 0;
+            showingMissingPack = currentPack.AvailableClips.Count == 0;
             setMissingPackVisible(showingMissingPack);
 
             // Only drive the state machine when real frames exist; otherwise keep the fixed notice.
@@ -334,17 +341,50 @@ namespace osu.Game.EzOsuGame.Pets
             applyScale();
         }
 
-        private void preloadClips(EzPetPack pack)
+        private bool ensureClipLoaded(string clipName)
         {
-            foreach ((string clipName, var clip) in pack.Definition.Clips)
+            if (clipTextures.ContainsKey(clipName))
+                return true;
+
+            if (currentPack == null || !currentPack.AvailableClips.Contains(clipName))
+                return false;
+
+            if (!currentPack.Definition.Clips.TryGetValue(clipName, out var clip))
+                return false;
+
+            try
             {
-                if (!pack.AvailableClips.Contains(clipName))
+                var frames = loadClipFrames(currentPack, clipName, clip);
+                if (frames.Length == 0)
+                    return false;
+
+                clipTextures[clipName] = frames;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"Failed to load Ez pet clip '{currentPack.Name}/{clipName}'");
+                return false;
+            }
+        }
+
+        private void unloadUnusedClips(string keepClip)
+        {
+            string idleClip = currentPack?.Definition.DefaultState ?? "idle";
+            var remove = new List<string>();
+
+            foreach (string key in clipTextures.Keys)
+            {
+                if (string.Equals(key, keepClip, StringComparison.Ordinal))
+                    continue;
+                if (string.Equals(key, idleClip, StringComparison.Ordinal))
                     continue;
 
-                var frames = loadClipFrames(pack, clipName, clip);
-                if (frames.Length > 0)
-                    clipTextures[clipName] = frames;
+                remove.Add(key);
             }
+
+            foreach (string key in remove)
+                clipTextures.Remove(key);
         }
 
         private Texture[] loadClipFrames(EzPetPack pack, string clipName, EzPetClipDefinition clip)
@@ -390,19 +430,22 @@ namespace osu.Game.EzOsuGame.Pets
 
             animation.ClearFrames();
 
-            if (!clipTextures.TryGetValue(clip, out var frames) || frames.Length == 0)
+            if (!ensureClipLoaded(clip) || !clipTextures.TryGetValue(clip, out var frames) || frames.Length == 0)
             {
                 string idleClip = currentPack?.Definition.DefaultState ?? "idle";
 
-                if (!clipTextures.TryGetValue(idleClip, out frames) || frames.Length == 0)
+                if (!ensureClipLoaded(idleClip) || !clipTextures.TryGetValue(idleClip, out frames) || frames.Length == 0)
                 {
                     showingMissingPack = true;
                     setMissingPackVisible(true);
                     applyScale();
                     return;
                 }
+
+                clip = idleClip;
             }
 
+            unloadUnusedClips(clip);
             setMissingPackVisible(false);
 
             EzPetClipDefinition? clipDef = null;
@@ -421,6 +464,81 @@ namespace osu.Game.EzOsuGame.Pets
             animation.IsPlaying = true;
             applyBlendMode(clipDef);
             applyScale();
+            stopOrphanedWanderMotion();
+        }
+
+        private void stopOrphanedWanderMotion()
+        {
+            if (!motionDriver.IsActive)
+                return;
+
+            if (!string.Equals(activeMotionMode, "wander", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            if (string.Equals(stateMachine.CurrentState, motionOwnerState, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            motionDriver.Stop();
+            motionOwnerState = null;
+            activeMotionMode = null;
+            persistPosition();
+        }
+
+        private void onMotionRequested(string? motionId)
+        {
+            if (string.IsNullOrWhiteSpace(motionId)
+                || currentPack == null
+                || !currentPack.Definition.Motions.TryGetValue(motionId, out var motion))
+            {
+                motionDriver.Stop();
+                motionOwnerState = null;
+                activeMotionMode = null;
+                return;
+            }
+
+            motionOwnerState = stateMachine.CurrentState;
+            activeMotionMode = motion.Mode;
+            motionDriver.Start(motion, getNormalisedPosition(), resolveMotionAnchor);
+        }
+
+        private void updateMotion(double elapsedMs)
+        {
+            if (DrawSize.X <= 0 || DrawSize.Y <= 0)
+                return;
+
+            var next = motionDriver.Update(elapsedMs, getNormalisedPosition());
+
+            if (next == null)
+            {
+                persistPosition();
+                return;
+            }
+
+            petBox.Position = new Vector2(next.Value.X * DrawSize.X, next.Value.Y * DrawSize.Y);
+
+            if (!motionDriver.IsActive)
+                persistPosition();
+        }
+
+        private Vector2 getNormalisedPosition()
+        {
+            if (DrawSize.X <= 0 || DrawSize.Y <= 0)
+                return new Vector2(Math.Clamp(posX.Value, 0f, 1f), Math.Clamp(posY.Value, 0f, 1f));
+
+            return new Vector2(
+                Math.Clamp(petBox.Position.X / DrawSize.X, 0f, 1f),
+                Math.Clamp(petBox.Position.Y / DrawSize.Y, 0f, 1f));
+        }
+
+        private Vector2? resolveMotionAnchor(string anchor)
+        {
+            if (string.Equals(anchor, "results.rank", StringComparison.OrdinalIgnoreCase))
+            {
+                // Heuristic: expanded results panel rank sits near upper-centre. Exact HUD query can come later.
+                return new Vector2(0.50f, 0.38f);
+            }
+
+            return null;
         }
 
         private void applyBlendMode(EzPetClipDefinition? clipDef)
@@ -514,6 +632,7 @@ namespace osu.Game.EzOsuGame.Pets
             PetScene.Menu => showOnMenu.Value,
             PetScene.SongSelect => showOnSongSelect.Value,
             PetScene.Gameplay => showOnGameplay.Value,
+            PetScene.Results => showOnResults.Value,
             _ => false,
         };
 

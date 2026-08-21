@@ -23,7 +23,9 @@ namespace osu.Game.Tests.EzOsuGame.Pets
             Assert.That(pack.Clips["poke"].Loop, Is.False);
             Assert.That(pack.States["poke"].Next, Is.EqualTo("idle"));
             Assert.That(pack.StarBands, Has.Count.EqualTo(2));
-            Assert.That(pack.Rules, Has.Count.EqualTo(10));
+            Assert.That(pack.Rules, Has.Count.EqualTo(12));
+            Assert.That(pack.Motions.ContainsKey("wander"), Is.True);
+            Assert.That(pack.Motions["toRank"].Anchor, Is.EqualTo("results.rank"));
         }
 
         [Test]

@@ -130,6 +130,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.DesktopPetShowOnMenu, true);
             SetDefault(Ez2Setting.DesktopPetShowOnSongSelect, true);
             SetDefault(Ez2Setting.DesktopPetShowOnGameplay, true);
+            SetDefault(Ez2Setting.DesktopPetShowOnResults, true);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
             SetDefault(Ez2Setting.BeatmapPreviewMode, EzBeatmapPreviewMode.Static);
             SetDefault(Ez2Setting.BeatmapPreviewModeMania, EzBeatmapPreviewMode.StaticFullMap);
@@ -979,6 +980,8 @@ namespace osu.Game.EzOsuGame.Configuration
         DesktopPetShowOnSongSelect,
 
         DesktopPetShowOnGameplay,
+
+        DesktopPetShowOnResults,
 
         // 界面功能
         KeySoundPreviewMode,

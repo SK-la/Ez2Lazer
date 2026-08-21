@@ -21,6 +21,7 @@ namespace osu.Game.EzOsuGame.Pets
                 "combo50": { "fps": 12, "loop": false },
                 "combo300": { "fps": 12, "loop": false },
                 "miss": { "fps": 12, "loop": false },
+                "grabbed": { "fps": 12, "loop": true },
                 "idlePlay": { "fps": 10, "loop": false },
                 "idleYawn": { "fps": 8, "loop": false },
                 "idleSleep": { "fps": 6, "loop": true }
@@ -36,9 +37,14 @@ namespace osu.Game.EzOsuGame.Pets
                 "combo50": { "clip": "combo50", "next": "gameplay" },
                 "combo300": { "clip": "combo300", "next": "gameplay" },
                 "miss": { "clip": "miss", "next": "gameplay" },
+                "grabbed": { "clip": "grabbed" },
                 "idlePlay": { "clip": "idlePlay", "next": "idle" },
                 "idleYawn": { "clip": "idleYawn", "next": "idle" },
                 "idleSleep": { "clip": "idleSleep" }
+              },
+              "motions": {
+                "wander": { "mode": "wander", "speed": 0.05, "bounds": [0.12, 0.22, 0.88, 0.82] },
+                "toRank": { "mode": "moveTo", "anchor": "results.rank", "durationMs": 450, "easing": "OutQuad" }
               },
               "starBands": [
                 { "min": 0, "max": 2, "goto": "starEasy" },
@@ -48,13 +54,15 @@ namespace osu.Game.EzOsuGame.Pets
                 { "when": "hover", "goto": "hover", "interrupt": true },
                 { "when": "hoverEnd", "goto": "idle" },
                 { "when": "click", "goto": "poke", "interrupt": true },
+                { "when": "drag", "goto": "grabbed", "interrupt": true },
                 { "when": "gameplayEnter", "goto": "enter", "interrupt": true },
                 { "when": "combo", "at": 50, "goto": "combo50" },
                 { "when": "combo", "at": 300, "goto": "combo300" },
                 { "when": "miss", "goto": "miss", "interrupt": true },
-                { "when": "idle", "afterSeconds": 300, "goto": "idlePlay" },
+                { "when": "idle", "afterSeconds": 300, "goto": "idlePlay", "motion": "wander" },
                 { "when": "idle", "afterSeconds": 600, "goto": "idleYawn" },
-                { "when": "idle", "afterSeconds": 900, "goto": "idleSleep" }
+                { "when": "idle", "afterSeconds": 900, "goto": "idleSleep" },
+                { "when": "resultsRank", "goto": "idle", "motion": "toRank", "interrupt": true }
               ]
             }
             """;

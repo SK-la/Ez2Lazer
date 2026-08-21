@@ -8,6 +8,7 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
+using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Select;
 
 namespace osu.Game.EzOsuGame.Pets
@@ -19,6 +20,7 @@ namespace osu.Game.EzOsuGame.Pets
         private void applyCurrentScreen(IScreen? screen)
         {
             bool wasGameplay = inGameplay;
+            bool wasResults = currentScene == PetScene.Results;
 
             inGameplay = screen is Player;
 
@@ -28,6 +30,8 @@ namespace osu.Game.EzOsuGame.Pets
                 currentScene = PetScene.SongSelect;
             else if (screen is Player)
                 currentScene = PetScene.Gameplay;
+            else if (screen is ResultsScreen)
+                currentScene = PetScene.Results;
             else
                 currentScene = PetScene.Other;
 
@@ -46,6 +50,16 @@ namespace osu.Game.EzOsuGame.Pets
             }
             else
                 unbindPlayer();
+
+            if (screen is ResultsScreen results)
+            {
+                if (!wasResults)
+                {
+                    eventHidden = false;
+                    string? rankName = results.Score?.Rank.ToString();
+                    stateMachine.HandleResultsRank(rankName);
+                }
+            }
 
             if (screen is ISongSelect)
                 tryHandleStarRating();

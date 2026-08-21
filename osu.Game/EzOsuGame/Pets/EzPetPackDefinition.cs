@@ -31,6 +31,8 @@ namespace osu.Game.EzOsuGame.Pets
 
         public Dictionary<string, EzPetStateDefinition> States { get; set; } = new Dictionary<string, EzPetStateDefinition>(StringComparer.Ordinal);
 
+        public Dictionary<string, EzPetMotionDefinition> Motions { get; set; } = new Dictionary<string, EzPetMotionDefinition>(StringComparer.Ordinal);
+
         public List<EzPetStarBand> StarBands { get; set; } = new List<EzPetStarBand>();
 
         public List<EzPetRule> Rules { get; set; } = new List<EzPetRule>();
@@ -131,6 +133,16 @@ namespace osu.Game.EzOsuGame.Pets
         /// Idle seconds before this rule can fire. Used when <see cref="When"/> is idle.
         /// </summary>
         public double? AfterSeconds { get; set; }
+
+        /// <summary>
+        /// Optional motion id from <see cref="EzPetPackDefinition.Motions"/> (stage move, not baked frames).
+        /// </summary>
+        public string? Motion { get; set; }
+
+        /// <summary>
+        /// Optional rank filter for <c>when: resultsRank</c> (e.g. <c>S</c>, <c>SH</c>, <c>X</c>). Empty = any rank.
+        /// </summary>
+        public string? Rank { get; set; }
 
         public EzPetVisibilityAction ResolveAction()
         {

@@ -35,6 +35,11 @@ namespace osu.Game.EzOsuGame.Pets
 
         public event Action<EzPetVisibilityAction>? VisibilityAction;
 
+        /// <summary>
+        /// Fired when a rule requests a stage motion id (or null/empty to stop scripted motion).
+        /// </summary>
+        public event Action<string?>? MotionRequested;
+
         public void ApplyPack(EzPetPackDefinition pack, IReadOnlyCollection<string> clips)
         {
             definition = pack;
@@ -47,6 +52,8 @@ namespace osu.Game.EzOsuGame.Pets
             IdleSeconds = 0;
             pendingNext = null;
             clipFinished = true;
+
+            MotionRequested?.Invoke(null);
 
             if (!tryGoto(definition.DefaultState, interrupt: true, restartIfSame: true))
                 tryGoto(FALLBACK_STATE, interrupt: true, restartIfSame: true);
@@ -161,7 +168,55 @@ namespace osu.Game.EzOsuGame.Pets
 
         public bool HandleClick() => handleNamed("click", resetIdle: true, restartIfSame: true);
 
+        public bool HandleDrag() => handleNamed("drag", resetIdle: true, restartIfSame: true);
+
+        public bool HandleDragEnd()
+        {
+            var rule = findRule("dragEnd");
+            if (rule != null)
+                return tryApplyRule(rule, resetIdle: true, restartIfSame: true);
+
+            // Default: leave grabbed / drag state back to pack default.
+            if (string.Equals(CurrentState, "grabbed", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(CurrentState, findGoto("drag"), StringComparison.OrdinalIgnoreCase))
+            {
+                MotionRequested?.Invoke(null);
+                return tryGoto(definition.DefaultState, interrupt: true, restartIfSame: false)
+                       || tryGoto(FALLBACK_STATE, interrupt: true, restartIfSame: false);
+            }
+
+            return false;
+        }
+
         public bool HandleGameplayEnter() => handleNamed("gameplayEnter", resetIdle: true, restartIfSame: true);
+
+        /// <summary>
+        /// Results screen: optional rank-filtered rule (<c>when: resultsRank</c>).
+        /// </summary>
+        public bool HandleResultsRank(string? rankName)
+        {
+            EzPetRule? any = null;
+            EzPetRule? matched = null;
+
+            foreach (var rule in definition.Rules)
+            {
+                if (!isWhen(rule, "resultsRank"))
+                    continue;
+
+                if (string.IsNullOrWhiteSpace(rule.Rank))
+                {
+                    any = rule;
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(rankName)
+                    && string.Equals(rule.Rank, rankName, StringComparison.OrdinalIgnoreCase))
+                    matched = rule;
+            }
+
+            var chosen = matched ?? any;
+            return chosen != null && tryApplyRule(chosen, resetIdle: true, restartIfSame: true);
+        }
 
         /// <summary>
         /// Leave Player: return to default idle and clear play-session combo flags.
@@ -257,6 +312,7 @@ namespace osu.Game.EzOsuGame.Pets
             if (action == EzPetVisibilityAction.Hide)
             {
                 VisibilityAction?.Invoke(EzPetVisibilityAction.Hide);
+                requestMotion(rule.Motion);
                 if (resetIdle)
                     ResetIdleTimer();
                 return true;
@@ -269,6 +325,8 @@ namespace osu.Game.EzOsuGame.Pets
                 if (!string.IsNullOrEmpty(rule.Goto))
                     tryGoto(rule.Goto, rule.Interrupt, restartIfSame);
 
+                requestMotion(rule.Motion);
+
                 if (resetIdle)
                     ResetIdleTimer();
 
@@ -278,11 +336,15 @@ namespace osu.Game.EzOsuGame.Pets
             if (!tryGoto(rule.Goto, rule.Interrupt, restartIfSame))
                 return false;
 
+            requestMotion(rule.Motion);
+
             if (resetIdle)
                 ResetIdleTimer();
 
             return true;
         }
+
+        private void requestMotion(string? motionId) => MotionRequested?.Invoke(motionId);
 
         private bool tryGoto(string? stateName, bool interrupt, bool restartIfSame)
         {

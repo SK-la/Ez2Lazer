@@ -28,6 +28,8 @@ namespace osu.Game.EzOsuGame.Pets
                 return false;
 
             dragging = true;
+            motionDriver.Stop();
+            stateMachine.HandleDrag();
             return true;
         }
 
@@ -46,6 +48,7 @@ namespace osu.Game.EzOsuGame.Pets
 
             dragging = false;
             persistPosition();
+            stateMachine.HandleDragEnd();
         }
 
         protected override void OnMouseUp(MouseUpEvent e)
@@ -54,6 +57,7 @@ namespace osu.Game.EzOsuGame.Pets
             {
                 dragging = false;
                 persistPosition();
+                stateMachine.HandleDragEnd();
             }
 
             base.OnMouseUp(e);

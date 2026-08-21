@@ -69,6 +69,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "pet", "gameplay", "桌宠", "游玩" }
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.DESKTOP_PET_SHOW_ON_RESULTS,
+                    HintText = EzSettingsStrings.DESKTOP_PET_SHOW_ON_RESULTS_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnResults),
+                })
+                {
+                    Keywords = new[] { "pet", "results", "桌宠", "结算" }
+                },
                 new SettingsItemV2(new FormDropdown<string>
                 {
                     Caption = EzSettingsStrings.DESKTOP_PET_PACK,
