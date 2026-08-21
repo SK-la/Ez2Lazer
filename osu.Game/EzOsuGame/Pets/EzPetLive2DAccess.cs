@@ -21,7 +21,7 @@ namespace osu.Game.EzOsuGame.Pets
     /// Official Live2D preset gate. Scan still lists any folder with pet.json, but Cubism
     /// (and <see cref="EzPetPack.Live2DAuthorized"/>) only applies when pack id + entry hash match.
     /// </summary>
-    public static class EzPetLive2DAccess
+    public static partial class EzPetLive2DAccess
     {
         /// <summary>
         /// Pack folder name (case-insensitive) → SHA-256 hex of the canonical model entry

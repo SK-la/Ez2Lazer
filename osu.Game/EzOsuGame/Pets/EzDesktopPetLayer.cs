@@ -69,8 +69,10 @@ namespace osu.Game.EzOsuGame.Pets
         private Container petBox = null!;
         private TextureAnimation animation = null!;
         private EzPetLive2DHost live2dHost = null!;
+        private EzPetCubismSession? cubismSession;
         private Container missingPackPanel = null!;
         private bool showingMissingPack;
+        private bool preferLive2DHost;
 
         [Resolved(canBeNull: true)]
         private IdleTracker? idleTracker { get; set; }
@@ -261,6 +263,12 @@ namespace osu.Game.EzOsuGame.Pets
                 stateMachine.UpdateIdle(Time.Elapsed / 1000.0);
 
             checkClipFinished();
+
+            if (preferLive2DHost && cubismSession?.IsReady == true)
+            {
+                cubismSession.Update(Time.Elapsed / 1000.0);
+                live2dHost.ApplyBreath(cubismSession.BreathValue);
+            }
         }
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
@@ -296,6 +304,8 @@ namespace osu.Game.EzOsuGame.Pets
             motionDriver.Stop();
             animation.ClearFrames();
             clipTextures.Clear();
+            cubismSession?.Dispose();
+            cubismSession = null;
             petTextures.Dispose();
 
             base.Dispose(isDisposing);
@@ -305,8 +315,11 @@ namespace osu.Game.EzOsuGame.Pets
         {
             clipTextures.Clear();
             motionDriver.Stop();
+            cubismSession?.Dispose();
+            cubismSession = null;
             currentPack = null;
             eventHidden = false;
+            preferLive2DHost = false;
 
             try
             {
@@ -330,18 +343,24 @@ namespace osu.Game.EzOsuGame.Pets
                 };
             }
 
-            showingMissingPack = currentPack.AvailableClips.Count == 0 && !currentPack.Live2DAuthorized;
-            setMissingPackVisible(showingMissingPack);
+            string? cubismError = null;
 
             if (currentPack.Live2DAuthorized)
             {
-                live2dHost.BindPack(currentPack, currentPack.Live2DModelEntryPath);
+                if (EzPetCubismSession.TryCreate(loader.PetsStorage, currentPack.Live2DModelEntryPath, out var session, out cubismError))
+                    cubismSession = session;
+
+                // Prefer Cubism host when Core works; else PNG frames if present; else setup placeholder.
+                preferLive2DHost = cubismSession?.IsReady == true || !currentPack.HasRasterFrames;
+                live2dHost.BindPack(currentPack, currentPack.Live2DModelEntryPath, cubismSession, cubismError);
                 Logger.Log(
-                    $"Ez pet pack '{currentPack.Name}' Live2D authorised (Cubism runtime pending).",
+                    $"Ez pet pack '{currentPack.Name}' Live2D authorised; cubism={(cubismSession?.IsReady == true ? "ready" : cubismError ?? "unavailable")}.",
                     LoggingTarget.Runtime);
             }
 
-            // Only drive the state machine when real frames or authorised Live2D exist.
+            showingMissingPack = currentPack.AvailableClips.Count == 0 && !currentPack.Live2DAuthorized;
+            setMissingPackVisible(showingMissingPack);
+
             if (showingMissingPack)
             {
                 animation.ClearFrames();
@@ -432,13 +451,13 @@ namespace osu.Game.EzOsuGame.Pets
             return textures.Count > 0 ? textures.ToArray() : [];
         }
 
-        private bool usingLive2D => currentPack?.Live2DAuthorized == true;
+        private bool usingLive2DHost => preferLive2DHost && currentPack?.Live2DAuthorized == true;
 
         private void setMissingPackVisible(bool visible)
         {
             missingPackPanel.Alpha = visible ? 1 : 0;
 
-            if (usingLive2D && !visible)
+            if (usingLive2DHost && !visible)
             {
                 live2dHost.Alpha = 1;
                 animation.Alpha = 0;
@@ -456,12 +475,12 @@ namespace osu.Game.EzOsuGame.Pets
             if (showingMissingPack)
                 return;
 
-            if (usingLive2D)
+            if (usingLive2DHost)
             {
                 animation.ClearFrames();
                 animation.IsPlaying = false;
                 live2dClipStartTime = Time.Current;
-                live2dHost.NotifyState(state, clip);
+                live2dHost.NotifyState(state, clip, cubismSession);
                 setMissingPackVisible(false);
                 applyScale();
                 stopOrphanedWanderMotion();
@@ -593,7 +612,7 @@ namespace osu.Game.EzOsuGame.Pets
             if (showingMissingPack)
                 return;
 
-            if (usingLive2D)
+            if (usingLive2DHost)
             {
                 if (currentPack?.Definition.Clips.TryGetValue(stateMachine.CurrentClip, out var clip) == true
                     && clip is { Loop: false }
@@ -623,7 +642,7 @@ namespace osu.Game.EzOsuGame.Pets
                 return;
             }
 
-            if (usingLive2D)
+            if (usingLive2DHost)
             {
                 const float live2d_base = 256;
                 petBox.Size = new Vector2(live2d_base * s, live2d_base * s);

@@ -33,6 +33,11 @@ namespace osu.Game.EzOsuGame.Pets
         /// Relative path under pets storage to the authorised model entry, when <see cref="Live2DAuthorized"/>.
         /// </summary>
         public string? Live2DModelEntryPath { get; init; }
+
+        /// <summary>
+        /// True when at least one PNG/JPG clip folder has indexed frames on disk.
+        /// </summary>
+        public bool HasRasterFrames { get; init; }
     }
 
     /// <summary>
@@ -44,9 +49,15 @@ namespace osu.Game.EzOsuGame.Pets
 
         private readonly Storage petsStorage;
 
+        /// <summary>
+        /// Storage root for <see cref="EzModifyPath.PETS_PATH"/> (pack folders + Cubism Core).
+        /// </summary>
+        public Storage PetsStorage => petsStorage;
+
         public EzPetPackLoader(Storage gameStorage)
         {
             petsStorage = gameStorage.GetStorageForDirectory(EzModifyPath.PETS_PATH);
+            EzPetLive2DAccess.LoadPresetsFromStorage(petsStorage);
         }
 
         public IReadOnlyList<string> ListPackNames()
@@ -99,18 +110,21 @@ namespace osu.Game.EzOsuGame.Pets
 
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 var definition = EzPetPackDefinition.Parse(reader.ReadToEnd());
-                var available = resolveAvailableClips(packName, definition);
+                var rasterClips = resolveAvailableClips(packName, definition);
                 bool live2dOk = EzPetLive2DAccess.TryAuthorize(packName, definition, petsStorage, out _);
                 string? live2dEntry = live2dOk
                     ? EzPetLive2DAccess.FindCanonicalEntryRelativePath(petsStorage, packName, definition)
                     : null;
 
+                IReadOnlySet<string> available = rasterClips;
+
                 // Authorised Live2D packs may ship without PNG clips; expose clip ids for the state machine.
-                if (live2dOk && available.Count == 0)
+                if (live2dOk && rasterClips.Count == 0)
                 {
-                    available = new HashSet<string>(definition.Clips.Keys, StringComparer.Ordinal);
-                    if (available.Count == 0 && !string.IsNullOrEmpty(definition.DefaultState))
-                        available.Add(definition.DefaultState);
+                    var synthetic = new HashSet<string>(definition.Clips.Keys, StringComparer.Ordinal);
+                    if (synthetic.Count == 0 && !string.IsNullOrEmpty(definition.DefaultState))
+                        synthetic.Add(definition.DefaultState);
+                    available = synthetic;
                 }
 
                 return new EzPetPack
@@ -120,6 +134,7 @@ namespace osu.Game.EzOsuGame.Pets
                     AvailableClips = available,
                     Live2DAuthorized = live2dOk,
                     Live2DModelEntryPath = live2dEntry,
+                    HasRasterFrames = rasterClips.Count > 0,
                 };
             }
             catch (Exception ex)
