@@ -52,7 +52,20 @@ namespace osu.Game.Online.Spectator
         /// <summary>
         /// Whether the local user is playing.
         /// </summary>
-        private bool isPlaying { get; set; }
+        private bool isPlaying
+        {
+            get => isStreaming.Value;
+            set => isStreaming.Value = value;
+        }
+
+        /// <summary>
+        /// [Ez] Whether the local session is accepting spectator frames (same as internal play state).
+        /// Synced by <see cref="setStateForScore"/> / <see cref="clearScoreState"/>.
+        /// <see cref="osu.Game.Rulesets.UI.ReplayRecorder"/> should only call <see cref="HandleFrame"/> when this is true.
+        /// </summary>
+        public IBindable<bool> IsStreaming => isStreaming;
+
+        private readonly BindableBool isStreaming = new BindableBool();
 
         /// <summary>
         /// [Ez] Whether we already logged an out-of-scope frame for the current non-playing stretch.
