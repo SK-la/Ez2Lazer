@@ -73,8 +73,8 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK = new EzLocalizationManager.EzLocalisableString("桌宠包", "Pet pack");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "扫描 EzResources/Pets 下带 pet.json 的文件夹。复制整个目录即可换包（PNG 序列帧）。",
-            "Scans folders with pet.json under EzResources/Pets. Copy a folder to switch packs (PNG frame clips).");
+            "扫描 EzResources/Pets 下带 pet.json 的文件夹。PNG 社区包直接可用；Live2D 仅官方预设白名单。",
+            "Scans folders with pet.json under EzResources/Pets. PNG community packs work freely; Live2D is official presets only.");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SCALE = new EzLocalizationManager.EzLocalisableString("桌宠缩放", "Pet scale");
 

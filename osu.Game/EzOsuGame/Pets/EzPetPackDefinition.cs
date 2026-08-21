@@ -27,6 +27,16 @@ namespace osu.Game.EzOsuGame.Pets
         /// </summary>
         public string BlendMode { get; set; } = string.Empty;
 
+        /// <summary>
+        /// <c>frames</c> (default) or <c>live2d</c>. Live2D only runs when the pack passes <see cref="EzPetLive2DAccess"/>.
+        /// </summary>
+        public string Renderer { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Optional Live2D entry paths when <see cref="Renderer"/> is live2d.
+        /// </summary>
+        public EzPetLive2DDefinition? Live2D { get; set; }
+
         public Dictionary<string, EzPetClipDefinition> Clips { get; set; } = new Dictionary<string, EzPetClipDefinition>(StringComparer.Ordinal);
 
         public Dictionary<string, EzPetStateDefinition> States { get; set; } = new Dictionary<string, EzPetStateDefinition>(StringComparer.Ordinal);

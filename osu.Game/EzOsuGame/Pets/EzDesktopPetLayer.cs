@@ -47,6 +47,7 @@ namespace osu.Game.EzOsuGame.Pets
         private readonly EzPetMotionDriver motionDriver = new EzPetMotionDriver();
         private string? motionOwnerState;
         private string? activeMotionMode;
+        private double live2dClipStartTime = double.MaxValue;
 
         private Bindable<bool> enabled = null!;
         private Bindable<string> packName = null!;
@@ -67,6 +68,7 @@ namespace osu.Game.EzOsuGame.Pets
 
         private Container petBox = null!;
         private TextureAnimation animation = null!;
+        private EzPetLive2DHost live2dHost = null!;
         private Container missingPackPanel = null!;
         private bool showingMissingPack;
 
@@ -138,6 +140,11 @@ namespace osu.Game.EzOsuGame.Pets
                         FillMode = FillMode.Fit,
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
+                    },
+                    live2dHost = new EzPetLive2DHost
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Alpha = 0,
                     },
                     missingPackPanel = createMissingPackPanel(),
                 },
@@ -323,10 +330,18 @@ namespace osu.Game.EzOsuGame.Pets
                 };
             }
 
-            showingMissingPack = currentPack.AvailableClips.Count == 0;
+            showingMissingPack = currentPack.AvailableClips.Count == 0 && !currentPack.Live2DAuthorized;
             setMissingPackVisible(showingMissingPack);
 
-            // Only drive the state machine when real frames exist; otherwise keep the fixed notice.
+            if (currentPack.Live2DAuthorized)
+            {
+                live2dHost.BindPack(currentPack, currentPack.Live2DModelEntryPath);
+                Logger.Log(
+                    $"Ez pet pack '{currentPack.Name}' Live2D authorised (Cubism runtime pending).",
+                    LoggingTarget.Runtime);
+            }
+
+            // Only drive the state machine when real frames or authorised Live2D exist.
             if (showingMissingPack)
             {
                 animation.ClearFrames();
@@ -417,16 +432,41 @@ namespace osu.Game.EzOsuGame.Pets
             return textures.Count > 0 ? textures.ToArray() : [];
         }
 
+        private bool usingLive2D => currentPack?.Live2DAuthorized == true;
+
         private void setMissingPackVisible(bool visible)
         {
             missingPackPanel.Alpha = visible ? 1 : 0;
-            animation.Alpha = visible ? 0 : 1;
+
+            if (usingLive2D && !visible)
+            {
+                live2dHost.Alpha = 1;
+                animation.Alpha = 0;
+                animation.IsPlaying = false;
+            }
+            else
+            {
+                live2dHost.Alpha = 0;
+                animation.Alpha = visible ? 0 : 1;
+            }
         }
 
-        private void onClipChanged(string _, string clip)
+        private void onClipChanged(string state, string clip)
         {
             if (showingMissingPack)
                 return;
+
+            if (usingLive2D)
+            {
+                animation.ClearFrames();
+                animation.IsPlaying = false;
+                live2dClipStartTime = Time.Current;
+                live2dHost.NotifyState(state, clip);
+                setMissingPackVisible(false);
+                applyScale();
+                stopOrphanedWanderMotion();
+                return;
+            }
 
             animation.ClearFrames();
 
@@ -550,7 +590,23 @@ namespace osu.Game.EzOsuGame.Pets
 
         private void checkClipFinished()
         {
-            if (showingMissingPack || animation.Loop || animation.FrameCount == 0 || animation.Duration <= 0)
+            if (showingMissingPack)
+                return;
+
+            if (usingLive2D)
+            {
+                if (currentPack?.Definition.Clips.TryGetValue(stateMachine.CurrentClip, out var clip) == true
+                    && clip is { Loop: false }
+                    && Time.Current - live2dClipStartTime >= 800)
+                {
+                    live2dClipStartTime = double.MaxValue;
+                    stateMachine.NotifyClipFinished();
+                }
+
+                return;
+            }
+
+            if (animation.Loop || animation.FrameCount == 0 || animation.Duration <= 0)
                 return;
 
             if (animation.PlaybackPosition >= animation.Duration)
@@ -564,6 +620,13 @@ namespace osu.Game.EzOsuGame.Pets
             if (showingMissingPack)
             {
                 petBox.Size = new Vector2(missing_pack_width * s, missing_pack_height * s);
+                return;
+            }
+
+            if (usingLive2D)
+            {
+                const float live2d_base = 256;
+                petBox.Size = new Vector2(live2d_base * s, live2d_base * s);
                 return;
             }
 

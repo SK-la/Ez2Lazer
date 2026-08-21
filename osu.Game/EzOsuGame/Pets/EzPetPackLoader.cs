@@ -23,6 +23,16 @@ namespace osu.Game.EzOsuGame.Pets
         public required IReadOnlySet<string> AvailableClips { get; init; }
 
         public bool IsDefault => string.Equals(Name, EzDefaultPetPack.NAME, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// True when <c>renderer: live2d</c> and the pack passed <see cref="EzPetLive2DAccess"/>.
+        /// </summary>
+        public bool Live2DAuthorized { get; init; }
+
+        /// <summary>
+        /// Relative path under pets storage to the authorised model entry, when <see cref="Live2DAuthorized"/>.
+        /// </summary>
+        public string? Live2DModelEntryPath { get; init; }
     }
 
     /// <summary>
@@ -90,11 +100,26 @@ namespace osu.Game.EzOsuGame.Pets
                 using var reader = new StreamReader(stream, Encoding.UTF8);
                 var definition = EzPetPackDefinition.Parse(reader.ReadToEnd());
                 var available = resolveAvailableClips(packName, definition);
+                bool live2dOk = EzPetLive2DAccess.TryAuthorize(packName, definition, petsStorage, out _);
+                string? live2dEntry = live2dOk
+                    ? EzPetLive2DAccess.FindCanonicalEntryRelativePath(petsStorage, packName, definition)
+                    : null;
+
+                // Authorised Live2D packs may ship without PNG clips; expose clip ids for the state machine.
+                if (live2dOk && available.Count == 0)
+                {
+                    available = new HashSet<string>(definition.Clips.Keys, StringComparer.Ordinal);
+                    if (available.Count == 0 && !string.IsNullOrEmpty(definition.DefaultState))
+                        available.Add(definition.DefaultState);
+                }
+
                 return new EzPetPack
                 {
                     Name = packName,
                     Definition = definition,
                     AvailableClips = available,
+                    Live2DAuthorized = live2dOk,
+                    Live2DModelEntryPath = live2dEntry,
                 };
             }
             catch (Exception ex)
