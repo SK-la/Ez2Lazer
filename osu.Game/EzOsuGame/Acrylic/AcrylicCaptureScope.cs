@@ -101,20 +101,11 @@ namespace osu.Game.EzOsuGame.Acrylic
         {
             if (isDisposing)
             {
+                // Dispose may run off the update thread (e.g. app shutdown). Do not reparent
+                // children here — CompositeDrawable will cascade-dispose InternalChildren.
                 mutationGeneration++;
                 captureRefCount = 0;
-
-                if (activeBuffer != null)
-                {
-                    if (capturedContent.Parent == activeBuffer)
-                        activeBuffer.Remove(capturedContent, false);
-
-                    RemoveInternal(activeBuffer, true);
-                    activeBuffer = null;
-
-                    if (capturedContent.Parent != this && !IsDisposed)
-                        AddInternal(capturedContent);
-                }
+                activeBuffer = null;
             }
 
             base.Dispose(isDisposing);
