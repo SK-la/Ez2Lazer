@@ -55,9 +55,8 @@ namespace osu.Game.Screens.Select
         private SongSelectSearchTextBox searchTextBox = null!;
         private ShearedToggleButton showConvertedBeatmapsButton = null!;
         private DifficultyRangeSlider difficultyRangeSlider = null!;
-        private SortModeDropdown sortDropdown = null!;
+        private SortModeDropdown sortDropdown = null!; // Ez功能
         private ShearedDropdown<GroupModeDropdownItem> groupDropdown = null!;
-        private CollectionDropdown collectionDropdown = null!;
         private EzKeyModeSelector csSelector = null!;
         private ShearedKSPreviewButton ksPreviewButton = null!;
         private ShearedToggleButton ezAnalysisFilterButton = null!;
