@@ -16,6 +16,7 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Input;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
 using osuTK;
@@ -63,6 +64,9 @@ namespace osu.Game.EzOsuGame.Pets
         private TextureAnimation animation = null!;
         private Container missingPackPanel = null!;
         private bool showingMissingPack;
+
+        [Resolved(canBeNull: true)]
+        private IdleTracker? idleTracker { get; set; }
 
         private EzPetPack? currentPack;
         private bool inGameplay;
@@ -229,7 +233,13 @@ namespace osu.Game.EzOsuGame.Pets
                 applyPosition();
 
             pollHover();
-            stateMachine.UpdateIdle(Time.Elapsed / 1000.0);
+
+            // Hardware idle (IdleTracker): only accumulate AFK idle clips outside gameplay.
+            if (idleTracker != null && !idleTracker.IsIdle.Value)
+                stateMachine.NotifyUserActivity();
+            else if (!inGameplay)
+                stateMachine.UpdateIdle(Time.Elapsed / 1000.0);
+
             checkClipFinished();
         }
 

@@ -16,7 +16,6 @@ namespace osu.Game.EzOsuGame.Pets
             if (isLeftAlt(e))
             {
                 dragging = true;
-                stateMachine.ResetIdleTimer();
                 return true;
             }
 
@@ -29,7 +28,6 @@ namespace osu.Game.EzOsuGame.Pets
                 return false;
 
             dragging = true;
-            stateMachine.ResetIdleTimer();
             return true;
         }
 
@@ -48,7 +46,6 @@ namespace osu.Game.EzOsuGame.Pets
 
             dragging = false;
             persistPosition();
-            stateMachine.ResetIdleTimer();
         }
 
         protected override void OnMouseUp(MouseUpEvent e)

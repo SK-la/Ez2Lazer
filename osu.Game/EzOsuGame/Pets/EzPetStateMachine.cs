@@ -59,12 +59,26 @@ namespace osu.Game.EzOsuGame.Pets
         }
 
         /// <summary>
-        /// Hover, click, drag, beatmap change, enter, combo, miss. Not idle auto-clips.
+        /// Clears the AFK idle timer. Prefer <see cref="NotifyUserActivity"/> when hardware input should also leave idle* states.
         /// </summary>
         public void ResetIdleTimer()
         {
             IdleSeconds = 0;
             firedIdleAfter.Clear();
+        }
+
+        /// <summary>
+        /// Hardware / user activity: reset idle timer and leave idlePlay / idleYawn / idleSleep.
+        /// </summary>
+        public void NotifyUserActivity()
+        {
+            ResetIdleTimer();
+
+            if (!isAfkIdleState(CurrentState))
+                return;
+
+            if (!tryGoto(definition.DefaultState, interrupt: true, restartIfSame: false))
+                tryGoto(FALLBACK_STATE, interrupt: true, restartIfSame: false);
         }
 
         public void NotifyClipFinished()
@@ -126,7 +140,7 @@ namespace osu.Game.EzOsuGame.Pets
             if (!tryGoto(rule.Goto, rule.Interrupt, restartIfSame: false))
                 return false;
 
-            ResetIdleTimer();
+            NotifyUserActivity();
             return true;
         }
 
@@ -141,7 +155,7 @@ namespace osu.Game.EzOsuGame.Pets
             if (!tryGoto(target, interrupt: true, restartIfSame: false))
                 return false;
 
-            ResetIdleTimer();
+            NotifyUserActivity();
             return true;
         }
 
@@ -149,17 +163,27 @@ namespace osu.Game.EzOsuGame.Pets
 
         public bool HandleGameplayEnter() => handleNamed("gameplayEnter", resetIdle: true, restartIfSame: true);
 
+        /// <summary>
+        /// Leave Player: return to default idle and clear play-session combo flags.
+        /// </summary>
+        public bool HandleGameplayLeave()
+        {
+            ResetPlaySession();
+            ResetIdleTimer();
+
+            if (tryGoto(definition.DefaultState, interrupt: true, restartIfSame: true))
+                return true;
+
+            return tryGoto(FALLBACK_STATE, interrupt: true, restartIfSame: true);
+        }
+
         public bool HandleStarRating(double starRating)
         {
             string? state = definition.MatchStarBand(starRating);
             if (state == null)
                 return false;
 
-            if (!tryGoto(state, interrupt: false, restartIfSame: true))
-                return false;
-
-            ResetIdleTimer();
-            return true;
+            return tryGoto(state, interrupt: false, restartIfSame: true);
         }
 
         public bool HandleCombo(int combo)
@@ -314,5 +338,10 @@ namespace osu.Game.EzOsuGame.Pets
 
         private static bool isWhen(EzPetRule rule, string when)
             => string.Equals(rule.When, when, StringComparison.OrdinalIgnoreCase);
+
+        private static bool isAfkIdleState(string state) =>
+            string.Equals(state, "idlePlay", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(state, "idleYawn", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(state, "idleSleep", StringComparison.OrdinalIgnoreCase);
     }
 }

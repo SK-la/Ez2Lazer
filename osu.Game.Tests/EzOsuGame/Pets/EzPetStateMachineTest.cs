@@ -142,6 +142,44 @@ namespace osu.Game.Tests.EzOsuGame.Pets
         }
 
         [Test]
+        public void TestNotifyUserActivityLeavesIdleSleep()
+        {
+            machine.UpdateIdle(900);
+            Assert.That(machine.CurrentState, Is.EqualTo("idleSleep"));
+
+            machine.NotifyUserActivity();
+            Assert.That(machine.CurrentState, Is.EqualTo("idle"));
+            Assert.That(machine.IdleSeconds, Is.EqualTo(0).Within(0.001));
+        }
+
+        [Test]
+        public void TestEnterThenGameplayThenLeave()
+        {
+            Assert.That(machine.HandleGameplayEnter(), Is.True);
+            Assert.That(machine.CurrentState, Is.EqualTo("enter"));
+
+            machine.NotifyClipFinished();
+            Assert.That(machine.CurrentState, Is.EqualTo("gameplay"));
+
+            Assert.That(machine.HandleGameplayLeave(), Is.True);
+            Assert.That(machine.CurrentState, Is.EqualTo("idle"));
+        }
+
+        [Test]
+        public void TestComboReturnsToGameplay()
+        {
+            machine.HandleGameplayEnter();
+            machine.NotifyClipFinished();
+            Assert.That(machine.CurrentState, Is.EqualTo("gameplay"));
+
+            Assert.That(machine.HandleCombo(50), Is.True);
+            Assert.That(machine.CurrentState, Is.EqualTo("combo50"));
+
+            machine.NotifyClipFinished();
+            Assert.That(machine.CurrentState, Is.EqualTo("gameplay"));
+        }
+
+        [Test]
         public void TestGameplayEnterHideDoesNotNeedClip()
         {
             var definition = EzPetPackDefinition.Parse("""

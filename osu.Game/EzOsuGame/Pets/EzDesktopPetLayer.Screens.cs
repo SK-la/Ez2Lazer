@@ -32,7 +32,10 @@ namespace osu.Game.EzOsuGame.Pets
                 currentScene = PetScene.Other;
 
             if (wasGameplay && !inGameplay)
+            {
                 eventHidden = false;
+                stateMachine.HandleGameplayLeave();
+            }
 
             if (screen is Player player)
             {
@@ -52,14 +55,16 @@ namespace osu.Game.EzOsuGame.Pets
 
         private void onBeatmapChanged()
         {
-            stateMachine.ResetIdleTimer();
-
             if (game?.ScreenStack.CurrentScreen is ISongSelect)
                 tryHandleStarRating();
         }
 
         private void tryHandleStarRating()
         {
+            // AFK carousel / auto beatmap changes must not flip star clips.
+            if (idleTracker != null && idleTracker.IsIdle.Value)
+                return;
+
             var info = beatmap.Value?.BeatmapInfo;
             if (info == null)
                 return;
