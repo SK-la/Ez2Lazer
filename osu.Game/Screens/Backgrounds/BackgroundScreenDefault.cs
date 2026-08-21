@@ -4,7 +4,6 @@
 #nullable disable
 
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -86,9 +85,6 @@ namespace osu.Game.Screens.Backgrounds
 
         public override void OnSuspending(ScreenTransitionEvent e)
         {
-            var backgroundScreenStack = Parent as BackgroundScreenStack;
-            Debug.Assert(backgroundScreenStack != null);
-
             if (background is BeatmapBackgroundWithStoryboard storyboardBackground)
                 storyboardUnloadDelegate = gameHost.UpdateThread.Scheduler.AddDelayed(storyboardBackground.UnloadStoryboard, TRANSITION_LENGTH);
 

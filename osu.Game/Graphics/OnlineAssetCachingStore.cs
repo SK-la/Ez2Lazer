@@ -2,16 +2,11 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Linq;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
-using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Database;
-using osu.Game.Extensions;
-using osu.Game.Models;
 using osu.Game.Online;
-using Realms;
 
 namespace osu.Game.Graphics
 {
@@ -29,8 +24,9 @@ namespace osu.Game.Graphics
     /// as it both makes the caching ineffective <b>AND</b> trashes the cache with entries that will never be used again.
     /// </para>
     /// </summary>
-    public class OnlineAssetCachingStore
+    public class OnlineAssetCachingStore : IDisposable
     {
+        // ReSharper disable NotAccessedField.Local
         private readonly RealmAccess realmAccess;
         private readonly OnlineStore onlineStore;
         private readonly RealmFileStore fileStore;
@@ -41,41 +37,48 @@ namespace osu.Game.Graphics
             this.realmAccess = realmAccess;
             onlineStore = new TrustedDomainOnlineStore();
             fileStore = new RealmFileStore(realmAccess, host.Storage);
-            largeTextureStore = new LargeTextureStore(host.Renderer, host.CreateTextureLoaderStore(new StorageBackedResourceStore(fileStore.Storage)));
+            // largeTextureStore = new LargeTextureStore(host.Renderer, host.CreateTextureLoaderStore(new StorageBackedResourceStore(fileStore.Storage)));
+            largeTextureStore = new LargeTextureStore(host.Renderer, host.CreateTextureLoaderStore(onlineStore));
         }
 
         public Texture? Get(string url)
         {
-            var existingAsset = realmAccess.Write(r =>
-            {
-                var a = r.All<RealmOnlineAsset>().Filter($@"{nameof(RealmOnlineAsset.File)}.{nameof(RealmNamedFileUsage.Filename)} == $0", url).FirstOrDefault();
-                if (a != null)
-                    a.LastAccessed = DateTimeOffset.Now;
-                return a?.Detach();
-            });
+            if (string.IsNullOrWhiteSpace(url))
+                return null;
 
-            if (existingAsset == null)
-            {
-                var onlineStream = onlineStore.GetStream(url);
+            return largeTextureStore.Get(url);
 
-                if (onlineStream == null)
-                    return null;
+            // TODO: logic below temporarily disabled as it causes unacceptable performance on devices with slow I/O due to realm abuse
+            // see https://github.com/ppy/osu/issues/38651#issuecomment-5356443643 for details
 
-                existingAsset = realmAccess.Write(r =>
-                {
-                    var file = fileStore.Add(onlineStream, r);
-                    var newAsset = new RealmOnlineAsset(file, url);
-                    r.Add(newAsset);
-                    return newAsset.Detach();
-                });
-            }
-            else
-            {
-                Logger.Log($"Online asset {url} retrieved from {nameof(OnlineAssetCachingStore)}.", LoggingTarget.Network);
-            }
+            // string? path = realmAccess.Write(r =>
+            // {
+            //     var a = r.All<RealmOnlineAsset>().Filter($@"{nameof(RealmOnlineAsset.File)}.{nameof(RealmNamedFileUsage.Filename)} == $0", url).FirstOrDefault();
+            //     if (a != null)
+            //         a.LastAccessed = DateTimeOffset.Now;
+            //     return a?.File.File.GetStoragePath();
+            // });
 
-            string path = existingAsset.File.File.GetStoragePath();
-            return largeTextureStore.Get(path);
+            // if (path == null)
+            // {
+            //     var onlineStream = onlineStore.GetStream(url);
+
+            //     if (onlineStream == null)
+            //         return null;
+
+            //     path = realmAccess.Write(r =>
+            //     {
+            //         var file = fileStore.Add(onlineStream, r);
+            //         r.Add(new RealmOnlineAsset(file, url));
+            //         return file.GetStoragePath();
+            //     });
+            // }
+            // else
+            // {
+            //     Logger.Log($"Online asset {url} retrieved from {nameof(OnlineAssetCachingStore)}.", LoggingTarget.Network);
+            // }
+
+            // return largeTextureStore.Get(path);
         }
 
         public void Dispose()
