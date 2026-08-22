@@ -25,6 +25,15 @@ namespace osu.Game.Database
             return new OfficialRealmAccess(storage, filename, updateThread, allowDestructiveRecoveryOnSchemaMismatch: false, performSchemaMigration: false, pinnedDiskSchemaVersion: (ulong)pinnedDiskSchemaVersion);
         }
 
+        /// <summary>
+        /// 供 EzRealmSync 修复页显式升级：执行官方 schema migration，禁止降级删库重建。
+        /// 仅应在已备份的工作副本上调用。
+        /// </summary>
+        public new static OfficialRealmAccess OpenWithMigrationForTool(Storage storage, string filename, GameThread? updateThread = null)
+        {
+            return new OfficialRealmAccess(storage, filename, updateThread, allowDestructiveRecoveryOnSchemaMismatch: false, performSchemaMigration: true, pinnedDiskSchemaVersion: null);
+        }
+
         private OfficialRealmAccess(
             Storage storage,
             string filename,

@@ -16,7 +16,7 @@ namespace osu.Game.Database
 
         /// <summary>
         /// Official osu!lazer client realm: upstream migrations only.
-        /// Disk schema is <see cref="RealmAccess.UPSTREAM_SCHEMA_VERSION"/>.
+        /// Disk schema is <see cref="RealmAccess.UpstreamSchemaVersion"/>.
         /// </summary>
         Official,
     }

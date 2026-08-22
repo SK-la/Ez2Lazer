@@ -23,7 +23,7 @@ namespace osu.Game.Tests.Database
         {
             var predecessors = RealmAccess.EnumerateSidecarPredecessorFilenames("client.realm", RealmSchemaMode.Ez).ToList();
 
-            int currentUpstream = RealmAccess.UPSTREAM_SCHEMA_VERSION;
+            int currentUpstream = RealmAccess.UpstreamSchemaVersion;
             int currentBase = currentUpstream * 1000;
             int previousUpstream = currentUpstream - 1;
             int previousBase = previousUpstream * 1000;
@@ -50,7 +50,7 @@ namespace osu.Game.Tests.Database
         {
             var predecessors = RealmAccess.EnumerateSidecarPredecessorFilenames("client.realm", RealmSchemaMode.Official).ToList();
 
-            Assert.That(predecessors, Does.Contain($"client_{RealmAccess.UPSTREAM_SCHEMA_VERSION - 1}.realm"));
+            Assert.That(predecessors, Does.Contain($"client_{RealmAccess.UpstreamSchemaVersion - 1}.realm"));
             Assert.That(predecessors, Does.Contain("client_0.realm"));
             Assert.That(predecessors[^1], Is.EqualTo("client.realm"));
             Assert.That(predecessors.Any(f => f.Contains("510")), Is.False);
