@@ -307,6 +307,21 @@ namespace osu.Game.Database
                 if (performSchemaMigration)
                     cleanupPendingDeletions(realm);
             }
+
+            // 文件存储清理会在同一路径上再打开一个写事务。
+            // 如果第一个实例仍然存活（或短生命周期工具打开时与终结器竞争），就可能触发 realm-core 的断言 `!realm.is_in_transaction()`。
+            // 工具在打开时不需要做未使用文件的垃圾回收。主要避免EzRealmSync工具在升级时的误报、误清理。
+            if (performSchemaMigration && allowDestructiveRecoveryOnSchemaMismatch)
+            {
+                try
+                {
+                    new RealmFileStore(this, storage).Cleanup();
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to clean up unused files. This is not critical but please report if it happens regularly.");
+                }
+            }
         }
 
         /// <summary>
@@ -559,14 +574,10 @@ namespace osu.Game.Database
 
                     transaction.Commit();
                 }
-
-                // clean up files after dropping any pending deletions.
-                // in the future we may want to only do this when the game is idle, rather than on every startup.
-                new RealmFileStore(this, storage).Cleanup();
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Failed to clean up unused files. This is not critical but please report if it happens regularly.");
+                Logger.Error(e, "Failed to clean up pending deletions. This is not critical but please report if it happens regularly.");
             }
         }
 
