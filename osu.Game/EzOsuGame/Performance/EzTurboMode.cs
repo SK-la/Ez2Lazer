@@ -159,16 +159,19 @@ namespace osu.Game.EzOsuGame.Performance
 
         /// <summary>
         /// 压制清单。<c>lockWhileActive</c> 为 true 的项在生效期间会被 <see cref="Bindable{T}.Disabled"/> 置灰，
-        /// 使设置面板显示为不可改；只有确认除设置面板外没有运行时写入方的项才能置灰，
-        /// 否则那些写入会撞上 <see cref="Bindable{T}.Value"/> 的 disabled 检查而抛异常。
+        /// 使设置面板显示为不可改。只有确认压制生效后没有运行时写入方、也没有后建 SliderBar 等会把
+        /// 已 Disabled 的源赋给 <c>Current</c> 的路径时才能置灰，否则会撞上 Value/Default 的 disabled 检查而抛异常。
         /// </summary>
         private IReadOnlyList<SettingOverride> buildOverrides() => new List<SettingOverride>
         {
             // 直接跳过 GameplayDrawableStoryboard 与视频层的创建，不只是隐藏。
             osu(OsuSetting.ShowStoryboard, false),
             // 关掉背景的模糊 pass；配合 DimLevel = 1 让 UserDimContainer 整棵子树不参与绘制。
-            osu(OsuSetting.BlurLevel, 0.0),
-            osu(OsuSetting.DimLevel, 1.0),
+            // PlayerLoader / Replay 侧栏每次新建 VisualSettings，经 framework SliderBar 赋 Current；
+            // 源若 Disabled，SliderBar 写瞬时 bindable 的 Default 会抛。设置页 FormSliderBar 虽能容忍
+            // Disabled，但同一份配置源不能只为设置页加锁——与下方 Leaderboard 同类，只压值不置灰。
+            osu(OsuSetting.BlurLevel, 0.0, lockWhileActive: false),
+            osu(OsuSetting.DimLevel, 1.0, lockWhileActive: false),
             osu(OsuSetting.LightenDuringBreaks, false),
             osu(OsuSetting.HitLighting, false),
             osu(OsuSetting.StarFountains, false),

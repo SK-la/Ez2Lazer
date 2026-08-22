@@ -44,7 +44,7 @@ namespace osu.Game.Tests.EzOsuGame.Performance
         }
 
         /// <summary>
-        /// 被接管的项在生效期间应置灰，使设置面板显示为不可改，并挡住外部写入。
+        /// 可安全置灰的项在生效期间应 Disabled；存在后建 SliderBar 绑定或运行时写入方的项只压值、不置灰。
         /// </summary>
         [Test]
         public void TestManagedSettingsAreLockedWhileActive()
@@ -54,27 +54,44 @@ namespace osu.Game.Tests.EzOsuGame.Performance
             var ezConfig = new Ez2ConfigManager(storage);
 
             osuConfig.SetValue(OsuSetting.DimLevel, 0.7);
+            osuConfig.SetValue(OsuSetting.BlurLevel, 0.4);
+            osuConfig.SetValue(OsuSetting.ShowStoryboard, true);
 
             using (new EzTurboMode(osuConfig, ezConfig))
             {
                 ezConfig.SetValue(Ez2Setting.TurboMode, true);
 
-                Assert.That(osuConfig.GetBindable<double>(OsuSetting.DimLevel).Disabled, Is.True);
-                Assert.Throws<InvalidOperationException>(() => osuConfig.SetValue(OsuSetting.DimLevel, 0.2));
+                // Checkbox 等只 BindTo、不写 Default 的项可以置灰。
+                Assert.That(osuConfig.GetBindable<bool>(OsuSetting.ShowStoryboard).Disabled, Is.True);
+                Assert.That(osuConfig.Get<bool>(OsuSetting.ShowStoryboard), Is.False);
+                Assert.Throws<InvalidOperationException>(() => osuConfig.SetValue(OsuSetting.ShowStoryboard, true));
+
+                // Dim/Blur 经 PlayerLoader VisualSettings → framework SliderBar 赋 Current；
+                // 源若 Disabled 会在写 Default 时崩，故只压值不置灰。
+                Assert.That(osuConfig.Get<double>(OsuSetting.DimLevel), Is.EqualTo(1.0));
+                Assert.That(osuConfig.GetBindable<double>(OsuSetting.DimLevel).Disabled, Is.False);
+                Assert.DoesNotThrow(() => osuConfig.SetValue(OsuSetting.DimLevel, 0.2));
+                Assert.That(osuConfig.GetBindable<double>(OsuSetting.DimLevel).Default, Is.EqualTo(0.7).Within(1e-6));
+
+                Assert.That(osuConfig.Get<double>(OsuSetting.BlurLevel), Is.EqualTo(0.0));
+                Assert.That(osuConfig.GetBindable<double>(OsuSetting.BlurLevel).Disabled, Is.False);
+                Assert.DoesNotThrow(() => osuConfig.SetValue(OsuSetting.BlurLevel, 0.3));
 
                 ezConfig.SetValue(Ez2Setting.TurboMode, false);
 
-                // 解锁必须发生在写回之前，否则还原本身就会抛。
-                Assert.That(osuConfig.GetBindable<double>(OsuSetting.DimLevel).Disabled, Is.False);
+                Assert.That(osuConfig.GetBindable<bool>(OsuSetting.ShowStoryboard).Disabled, Is.False);
+                Assert.That(osuConfig.Get<bool>(OsuSetting.ShowStoryboard), Is.True);
+                // 生效期间用户改过的滑条值按快照还原，不保留手动改动。
                 Assert.That(osuConfig.Get<double>(OsuSetting.DimLevel), Is.EqualTo(0.7));
-                Assert.DoesNotThrow(() => osuConfig.SetValue(OsuSetting.DimLevel, 0.2));
+                Assert.That(osuConfig.Get<double>(OsuSetting.BlurLevel), Is.EqualTo(0.4));
             }
         }
 
         /// <summary>
-        /// 有运行时写入方的项只压值、不置灰：<see cref="OsuSetting.GameplayLeaderboard"/> 有游玩中可按的快捷键
-        /// （<c>HUDOverlay</c> 直接写 bindable），<see cref="OsuSetting.MenuParallaxScale"/> 有一次性配置迁移会写。
-        /// 锁上它们会让那些写入抛异常。
+        /// 有运行时写入方或后建 SliderBar 绑定方的项只压值、不置灰：
+        /// <see cref="OsuSetting.GameplayLeaderboard"/> 有游玩中快捷键，
+        /// <see cref="OsuSetting.MenuParallaxScale"/> 有一次性配置迁移，
+        /// <see cref="OsuSetting.DimLevel"/> / <see cref="OsuSetting.BlurLevel"/> 见 <see cref="TestManagedSettingsAreLockedWhileActive"/>。
         /// </summary>
         [Test]
         public void TestSettingsWithRuntimeWritersStayWritable()
