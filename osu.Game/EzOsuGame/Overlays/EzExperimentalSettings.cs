@@ -2,16 +2,23 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
+using osu.Game.Rulesets;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
@@ -24,9 +31,28 @@ namespace osu.Game.EzOsuGame.Overlays
                           BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
                           EzAnalysisWarmupProcessor? analysisWarmupProcessor,
                           IDialogOverlay? dialogOverlay,
-                          INotificationOverlay? notifications)
+                          INotificationOverlay? notifications,
+                          EzLocalProfileService? localProfileService,
+                          EzLocalProfileOnlinePullService? onlinePullService,
+                          RulesetStore? rulesetStore)
         {
             EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
+
+            Add(new SettingsButtonV2
+            {
+                Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE,
+                TooltipText = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_TOOLTIP,
+                Keywords = new[] { "local", "profile", "stats", "kps", "个人", "本地", "统计", "成绩" },
+                Action = () => requestComputeLocalProfile(localProfileService, dialogOverlay, notifications),
+            });
+
+            Add(new SettingsButtonV2
+            {
+                Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL,
+                TooltipText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_TOOLTIP,
+                Keywords = new[] { "online", "bp", "most played", "osr", "下载", "拉取", "线上", "成绩", "谱面", "回放" },
+                Action = () => requestOnlinePull(onlinePullService, localProfileService, rulesetStore, dialogOverlay, notifications),
+            });
 
             AddRange(new Drawable[]
             {
@@ -77,6 +103,239 @@ namespace osu.Game.EzOsuGame.Overlays
                     Keywords = new[] { "race", "feed", "batch", "stream", "角逐", "预建" }
                 },
             });
+        }
+
+        private void requestComputeLocalProfile(
+            EzLocalProfileService? localProfileService,
+            IDialogOverlay? dialogOverlay,
+            INotificationOverlay? notifications)
+        {
+            if (localProfileService == null || dialogOverlay == null)
+            {
+                notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_FAILED });
+                return;
+            }
+
+            if (localProfileService.IsComputing.Value)
+            {
+                notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_STARTED });
+                return;
+            }
+
+            var counts = localProfileService.ScanUsernameCounts();
+
+            if (counts.Count == 0)
+            {
+                if (!localProfileService.HasOnlineScoreContributions())
+                {
+                    notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_NO_SCORES });
+                    return;
+                }
+
+                runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), replaceIncludedUsernames: false, notifications);
+                return;
+            }
+
+            dialogOverlay.Push(new EzLocalProfileImportDialog(
+                counts,
+                localProfileService.GetPreviouslyIncludedUsernames(),
+                (selected, replaceMode) =>
+                {
+                    if (selected.Count == 0 && !localProfileService.HasOnlineScoreContributions()
+                                            && (replaceMode || localProfileService.GetPreviouslyIncludedUsernames().Count == 0))
+                    {
+                        notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_NONE_SELECTED });
+                        return;
+                    }
+
+                    runCompute(localProfileService, selected, replaceMode, notifications);
+                }));
+        }
+
+        private void runCompute(
+            EzLocalProfileService localProfileService,
+            IReadOnlyCollection<string> selected,
+            bool replaceIncludedUsernames,
+            INotificationOverlay? notifications)
+        {
+            if (notifications == null)
+            {
+                localProfileService.ComputeAsync(selected, replaceIncludedUsernames).ContinueWith(t => Schedule(() =>
+                {
+                    if (!t.IsFaulted && !t.IsCanceled)
+                        localProfileService.ReloadFromDisk();
+                }));
+                return;
+            }
+
+            var notification = new ProgressNotification
+            {
+                Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_STARTED,
+                CompletionText = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_DONE,
+                State = ProgressNotificationState.Active,
+            };
+
+            notifications.Post(notification);
+
+            // Do not use Progress<T> (SyncContext flood). Update the notification directly —
+            // its Text/Progress/State setters marshal via the notification's own Scheduler,
+            // which keeps running even if the settings panel is closed.
+            var progress = new DirectLocalProfileComputeProgress(notification);
+
+            localProfileService.ComputeAsync(selected, replaceIncludedUsernames, progress, notification.CancellationToken)
+                              .ContinueWith(t => finishComputeNotification(t, localProfileService, notification, notifications));
+        }
+
+        /// <summary>
+        /// Forwards compute progress to a <see cref="ProgressNotification"/> from any thread.
+        /// </summary>
+        private sealed class DirectLocalProfileComputeProgress : IProgress<EzLocalProfileComputeProgress>
+        {
+            private readonly ProgressNotification notification;
+
+            public DirectLocalProfileComputeProgress(ProgressNotification notification)
+            {
+                this.notification = notification;
+            }
+
+            public void Report(EzLocalProfileComputeProgress value)
+            {
+                if (notification.State is ProgressNotificationState.Cancelled or ProgressNotificationState.Completed)
+                    return;
+
+                if (value.Saving)
+                {
+                    notification.Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_SAVING;
+                    notification.Progress = 0.99f;
+                    return;
+                }
+
+                int total = Math.Max(1, value.Total);
+                int processed = Math.Clamp(value.Processed, 0, total);
+
+                // Keep bar under 100% until we explicitly Complete — avoids a stuck spinner at 1.0 Active.
+                notification.Text = LocalisableString.Format(
+                    EzSettingsStrings.LOCAL_PROFILE_COMPUTE_PROGRESS.ToString(),
+                    processed,
+                    total);
+                notification.Progress = Math.Min(0.99f, (float)processed / total);
+            }
+        }
+
+        private static void finishComputeNotification(
+            Task computeTask,
+            EzLocalProfileService localProfileService,
+            ProgressNotification notification,
+            INotificationOverlay notifications)
+        {
+            if (notification.State == ProgressNotificationState.Cancelled)
+                return;
+
+            if (computeTask.IsFaulted)
+            {
+                notification.State = ProgressNotificationState.Cancelled;
+                notifications.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_FAILED });
+                return;
+            }
+
+            if (computeTask.IsCanceled)
+            {
+                notification.State = ProgressNotificationState.Cancelled;
+                return;
+            }
+
+            localProfileService.ReloadFromDisk();
+            notification.Progress = 1f;
+            notification.CompletionText = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_DONE;
+            notification.State = ProgressNotificationState.Completed;
+        }
+
+        private void requestOnlinePull(
+            EzLocalProfileOnlinePullService? onlinePullService,
+            EzLocalProfileService? localProfileService,
+            RulesetStore? rulesetStore,
+            IDialogOverlay? dialogOverlay,
+            INotificationOverlay? notifications)
+        {
+            if (onlinePullService == null || rulesetStore == null || dialogOverlay == null)
+            {
+                notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_FAILED });
+                return;
+            }
+
+            if (onlinePullService.IsPulling.Value)
+            {
+                notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+                return;
+            }
+
+            dialogOverlay.Push(new EzLocalProfileOnlinePullDialog(
+                rulesetStore,
+                onlinePullService.PeekPullOffset,
+                request =>
+                {
+                    if (onlinePullService.IsPulling.Value)
+                    {
+                        notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+                        return;
+                    }
+
+                    notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+
+                    onlinePullService.PullAsync(request).ContinueWith(t => Schedule(() =>
+                    {
+                        if (t.IsFaulted)
+                        {
+                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_FAILED });
+                            return;
+                        }
+
+                        if (t.IsCanceled)
+                            return;
+
+                        var result = t.GetResultSafely();
+
+                        if (result.ErrorMessage == "need_online")
+                        {
+                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_NEED_ONLINE });
+                            return;
+                        }
+
+                        if (result.ErrorMessage == "already_pulling")
+                        {
+                            notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+                            return;
+                        }
+
+                        if (!string.IsNullOrEmpty(result.ErrorMessage) && result.ErrorMessage != "cancelled")
+                        {
+                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_FAILED });
+                            return;
+                        }
+
+                        if (result.ErrorMessage == "cancelled")
+                            return;
+
+                        notifications?.Post(new SimpleNotification
+                        {
+                            Text = string.Format(
+                                EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_DONE.ToString(),
+                                result.Candidates,
+                                result.Imported,
+                                result.AlreadyOwned,
+                                result.NoReplay,
+                                result.MissingBeatmap,
+                                result.Failed,
+                                result.StatsRecorded,
+                                result.MapsDownloaded,
+                                result.MapsAlreadyLocal,
+                                result.CollectionAdds),
+                        });
+
+                        if (result.StatsRecorded > 0 && localProfileService is not null && !localProfileService.IsComputing.Value)
+                            runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), replaceIncludedUsernames: false, notifications);
+                    }));
+                }));
         }
 
         internal static readonly LocalisableString EZ_EXPERIMENTAL_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString(
