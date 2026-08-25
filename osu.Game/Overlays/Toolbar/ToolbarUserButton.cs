@@ -9,6 +9,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Sprites;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -35,14 +36,22 @@ namespace osu.Game.Overlays.Toolbar
 
         private OsuSpriteText usernameText = null!;
 
+        private IAPIProvider api = null!;
+        private LoginOverlay? loginOverlay;
+        private EzLocalProfileOverlay? localProfileOverlay;
+
         public ToolbarUserButton()
         {
             ButtonContent.AutoSizeAxes = Axes.X;
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuColour colours, IAPIProvider api, LoginOverlay? login)
+        private void load(OsuColour colours, IAPIProvider api, LoginOverlay? login, EzLocalProfileOverlay? localProfile)
         {
+            this.api = api;
+            loginOverlay = login;
+            localProfileOverlay = localProfile;
+
             Flow.AddRange(new Drawable[]
             {
                 usernameText = new OsuSpriteText
@@ -101,7 +110,15 @@ namespace osu.Game.Overlays.Toolbar
             localUser = api.LocalUser.GetBoundCopy();
             localUser.BindValueChanged(userChanged, true);
 
-            StateContainer = login;
+            updateOverlayTarget();
+        }
+
+        private void updateOverlayTarget()
+        {
+            if (api.IsLocalOnly && localProfileOverlay != null)
+                StateContainer = localProfileOverlay;
+            else if (loginOverlay != null)
+                StateContainer = loginOverlay;
         }
 
         private void userChanged(ValueChangedEvent<APIUser> user) => Schedule(() =>
@@ -143,6 +160,8 @@ namespace osu.Game.Overlays.Toolbar
                 default:
                     throw new ArgumentOutOfRangeException(nameof(state.NewValue));
             }
+
+            updateOverlayTarget();
         });
     }
 }

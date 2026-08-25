@@ -1,0 +1,86 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.UserInterface;
+using osu.Game.Overlays.Dialog;
+using osuTK;
+
+namespace osu.Game.EzOsuGame.LocalProfile
+{
+    public partial class EzLocalProfileImportDialog : PopupDialog
+    {
+        private readonly Dictionary<string, BindableBool> selections = new Dictionary<string, BindableBool>(StringComparer.Ordinal);
+
+        public EzLocalProfileImportDialog(
+            IReadOnlyList<EzLocalProfileUsernameCount> usernameCounts,
+            IReadOnlyCollection<string> previouslyIncluded,
+            Action<IReadOnlyList<string>> onConfirm)
+        {
+            HeaderText = EzSettingsStrings.LOCAL_PROFILE_IMPORT_HEADER;
+            BodyText = EzSettingsStrings.LOCAL_PROFILE_IMPORT_BODY;
+            Icon = FontAwesome.Solid.User;
+
+            var previous = new HashSet<string>(previouslyIncluded, StringComparer.Ordinal);
+            bool usePrevious = previous.Count > 0 && usernameCounts.Any(c => previous.Contains(c.Username));
+
+            var flow = new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(4),
+            };
+
+            foreach (var entry in usernameCounts)
+            {
+                bool selected = !usePrevious || previous.Contains(entry.Username);
+                var bindable = new BindableBool(selected);
+                selections[entry.Username] = bindable;
+
+                flow.Add(new OsuCheckbox
+                {
+                    LabelText = $"{entry.Username}  ({entry.ScoreCount})",
+                    Current = { BindTarget = bindable },
+                });
+            }
+
+            MainContent.Child = new Container
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = 280,
+                Margin = new MarginPadding { Top = 16 },
+                Child = new OsuScrollContainer
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Child = flow,
+                }
+            };
+
+            Buttons = new PopupDialogButton[]
+            {
+                new PopupDialogOkButton
+                {
+                    Text = EzSettingsStrings.LOCAL_PROFILE_IMPORT_CONFIRM,
+                    Action = () =>
+                    {
+                        var chosen = selections.Where(kv => kv.Value.Value).Select(kv => kv.Key).ToList();
+                        onConfirm(chosen);
+                    }
+                },
+                new PopupDialogCancelButton
+                {
+                    Text = EzSettingsStrings.LOCAL_PROFILE_IMPORT_CANCEL,
+                }
+            };
+        }
+    }
+}

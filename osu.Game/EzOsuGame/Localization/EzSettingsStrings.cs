@@ -753,6 +753,104 @@ namespace osu.Game.EzOsuGame.Localization
             "允许无密码登录本地账户。跳过一切成绩上传、网络账户检查。",
             "Allows local account login without password. Skip all score submissions and online account checks.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE =
+            new EzLocalizationManager.EzLocalisableString("计算本地个人数据", "Compute Local Profile Stats");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "扫描本地成绩，按玩家名勾选导入后写入共享个人统计存档（与当前登录名无关）。",
+            "Scan local scores, pick player names to include, then write into the shared local profile archive (independent of the logged-in name).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_HEADER =
+            new EzLocalizationManager.EzLocalisableString("选择要导入的玩家名", "Select player names to import");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_BODY = new EzLocalizationManager.EzLocalisableString(
+            "勾选成绩所属的玩家名。统计会合并进同一份本地个人存档。",
+            "Tick player names whose scores should be included. Stats merge into one shared local profile.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_CONFIRM =
+            new EzLocalizationManager.EzLocalisableString("开始计算", "Compute");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_CANCEL =
+            new EzLocalizationManager.EzLocalisableString("取消", "Cancel");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_STARTED =
+            new EzLocalizationManager.EzLocalisableString("正在计算本地个人数据…", "Computing local profile stats…");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_DONE =
+            new EzLocalizationManager.EzLocalisableString("本地个人数据已更新。", "Local profile stats updated.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_FAILED =
+            new EzLocalizationManager.EzLocalisableString("本地个人数据计算失败。", "Failed to compute local profile stats.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_NO_SCORES =
+            new EzLocalizationManager.EzLocalisableString("未找到可导入的本地成绩。", "No local scores found to import.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_NONE_SELECTED =
+            new EzLocalizationManager.EzLocalisableString("请至少勾选一个玩家名。", "Select at least one player name.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TITLE =
+            new EzLocalizationManager.EzLocalisableString("本地个人主页", "Local Profile");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("共享本地游玩统计", "Shared local play statistics");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SHARED_HINT =
+            new EzLocalizationManager.EzLocalisableString("本地统计（共享存档）", "Local stats (shared archive)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BADGE =
+            new EzLocalizationManager.EzLocalisableString("本地", "Local");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ACCOUNT_BUTTON =
+            new EzLocalizationManager.EzLocalisableString("账号", "Account");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_EMPTY_HINT =
+            new EzLocalizationManager.EzLocalisableString("暂无统计。请到 设置 → Ez → 实验性功能 中点击「计算本地个人数据」。", "No stats yet. Open Settings → Ez → Experimental and run “Compute Local Profile Stats”.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_KEYS =
+            new EzLocalizationManager.EzLocalisableString("按键与 KPS", "Keys & KPS");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_MANIA =
+            new EzLocalizationManager.EzLocalisableString("Mania 键数 / 列", "Mania Keys / Columns");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_STD =
+            new EzLocalizationManager.EzLocalisableString("最擅长 AR / CS", "Best AR / CS");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_GRADES =
+            new EzLocalizationManager.EzLocalisableString("成绩评级", "Grades");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_STARS =
+            new EzLocalizationManager.EzLocalisableString("难度游玩次数", "Plays by difficulty");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TOTAL_KEYS =
+            new EzLocalizationManager.EzLocalisableString("按键总数", "Total keys");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_AVG_KPS =
+            new EzLocalizationManager.EzLocalisableString("平均 KPS", "Avg KPS");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_MAX_KPS =
+            new EzLocalizationManager.EzLocalisableString("最大 KPS", "Max KPS");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SCORE_COUNT =
+            new EzLocalizationManager.EzLocalisableString("成绩数", "Scores");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BEST_AR =
+            new EzLocalizationManager.EzLocalisableString("最擅长 AR", "Best AR");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BEST_CS =
+            new EzLocalizationManager.EzLocalisableString("最擅长 CS", "Best CS");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_NO_RULESET_DATA =
+            new EzLocalizationManager.EzLocalisableString("此模式暂无数据。", "No data for this ruleset.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COL_HEADER =
+            new EzLocalizationManager.EzLocalisableString("列", "Col");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_MANIA_PLAYS_BY_KEY =
+            new EzLocalizationManager.EzLocalisableString("各键数游玩次数", "Plays by key count");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_MANIA_AVG_KPS_LINE =
+            new EzLocalizationManager.EzLocalisableString("各键数平均 KPS", "Avg KPS by key count");
+
         #endregion
     }
 }

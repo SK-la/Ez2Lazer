@@ -8,9 +8,11 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.Overlays
@@ -24,9 +26,18 @@ namespace osu.Game.EzOsuGame.Overlays
                           BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
                           EzAnalysisWarmupProcessor? analysisWarmupProcessor,
                           IDialogOverlay? dialogOverlay,
-                          INotificationOverlay? notifications)
+                          INotificationOverlay? notifications,
+                          EzLocalProfileService? localProfileService)
         {
             EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
+
+            Add(new SettingsButtonV2
+            {
+                Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE,
+                TooltipText = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_TOOLTIP,
+                Keywords = new[] { "local", "profile", "stats", "kps", "个人", "本地", "统计", "成绩" },
+                Action = () => requestComputeLocalProfile(localProfileService, dialogOverlay, notifications),
+            });
 
             AddRange(new Drawable[]
             {
@@ -77,6 +88,61 @@ namespace osu.Game.EzOsuGame.Overlays
                     Keywords = new[] { "race", "feed", "batch", "stream", "角逐", "预建" }
                 },
             });
+        }
+
+        private void requestComputeLocalProfile(
+            EzLocalProfileService? localProfileService,
+            IDialogOverlay? dialogOverlay,
+            INotificationOverlay? notifications)
+        {
+            if (localProfileService == null || dialogOverlay == null)
+            {
+                notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_FAILED });
+                return;
+            }
+
+            if (localProfileService.IsComputing.Value)
+            {
+                notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_STARTED });
+                return;
+            }
+
+            var counts = localProfileService.ScanUsernameCounts();
+
+            if (counts.Count == 0)
+            {
+                notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_NO_SCORES });
+                return;
+            }
+
+            dialogOverlay.Push(new EzLocalProfileImportDialog(
+                counts,
+                localProfileService.GetPreviouslyIncludedUsernames(),
+                selected =>
+                {
+                    if (selected.Count == 0)
+                    {
+                        notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_NONE_SELECTED });
+                        return;
+                    }
+
+                    notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_STARTED });
+
+                    localProfileService.ComputeAsync(selected).ContinueWith(t => Schedule(() =>
+                    {
+                        if (t.IsFaulted)
+                        {
+                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_FAILED });
+                            return;
+                        }
+
+                        if (t.IsCanceled)
+                            return;
+
+                        localProfileService.ReloadFromDisk();
+                        notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_DONE });
+                    }));
+                }));
         }
 
         internal static readonly LocalisableString EZ_EXPERIMENTAL_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString(

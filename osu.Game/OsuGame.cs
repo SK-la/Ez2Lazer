@@ -45,6 +45,7 @@ using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Layout;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Performance;
 using osu.Game.EzOsuGame.Pets;
@@ -146,6 +147,8 @@ namespace osu.Game
         private NewsOverlay news;
 
         private UserProfileOverlay userProfile;
+
+        private EzLocalProfileOverlay ezLocalProfile;
 
         private LoginOverlay loginOverlay;
 
@@ -620,7 +623,16 @@ namespace osu.Game
         /// Show a user's profile as an overlay.
         /// </summary>
         /// <param name="user">The user to display.</param>
-        public void ShowUser(IUser user) => waitForReady(() => userProfile, _ => userProfile.ShowUser(user));
+        public void ShowUser(IUser user) => waitForReady(() => userProfile, _ =>
+        {
+            if (API.IsLocalOnly && ReferenceEquals(user, API.LocalUser.Value))
+            {
+                ezLocalProfile.Show();
+                return;
+            }
+
+            userProfile.ShowUser(user);
+        });
 
         /// <summary>
         /// Show a beatmap's set as an overlay, displaying the given beatmap.
@@ -1277,6 +1289,7 @@ namespace osu.Game
             loadComponentSingleFile(Settings = new SettingsOverlay(), leftFloatingOverlayContent.Add, true);
             loadComponentSingleFile(changelogOverlay = new ChangelogOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(userProfile = new UserProfileOverlay(), overlayContent.Add, true);
+            loadComponentSingleFile(ezLocalProfile = new EzLocalProfileOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(beatmapSetOverlay = new BeatmapSetOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(wikiOverlay = new WikiOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(ezLayoutLayer = new EzLayoutLayer(), screenCaptureContent.Add, true);
@@ -1347,7 +1360,7 @@ namespace osu.Game
             }
 
             // eventually informational overlays should be displayed in a stack, but for now let's only allow one to stay open at a time.
-            var informationalOverlays = new OverlayContainer[] { beatmapSetOverlay, userProfile };
+            var informationalOverlays = new OverlayContainer[] { beatmapSetOverlay, userProfile, ezLocalProfile };
 
             foreach (var overlay in informationalOverlays)
             {
@@ -1730,10 +1743,18 @@ namespace osu.Game
                     return true;
 
                 case GlobalAction.ToggleProfile:
-                    if (userProfile.State.Value == Visibility.Visible)
+                    if (API.IsLocalOnly)
+                    {
+                        if (ezLocalProfile.State.Value == Visibility.Visible)
+                            ezLocalProfile.Hide();
+                        else
+                            ezLocalProfile.Show();
+                    }
+                    else if (userProfile.State.Value == Visibility.Visible)
                         userProfile.Hide();
                     else
                         ShowUser(API.LocalUser.Value);
+
                     return true;
 
                 case GlobalAction.RandomSkin:
