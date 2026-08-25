@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.Beatmaps;
+using osu.Game.Collections;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Online.API;
@@ -27,12 +29,20 @@ namespace osu.Game.EzOsuGame.LocalProfile
     /// </summary>
     public class EzLocalProfileOnlinePullService : IDisposable
     {
-        public const int BEST_LIMIT = 100;
-        public const int DEFAULT_MOST_PLAYED_BATCH = 50;
+        public const int BATCH_SIZE = 50;
+        public const int BEST_TOTAL = 100;
+        public const string COLLECTION_BP = "BP";
+        public const string COLLECTION_MOST_PLAYED = "玩过的图";
+
+        /// <summary>Legacy alias used by dialog copy.</summary>
+        public const int DEFAULT_MOST_PLAYED_BATCH = BATCH_SIZE;
+
         private static readonly TimeSpan request_delay = TimeSpan.FromSeconds(1);
 
         private readonly IAPIProvider api;
         private readonly ScoreManager scoreManager;
+        private readonly BeatmapManager beatmapManager;
+        private readonly RealmAccess realm;
         private readonly EzLocalProfileStore store;
         private readonly object pullLock = new object();
         private CancellationTokenSource? pullCts;
@@ -40,14 +50,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public BindableBool IsPulling { get; } = new BindableBool();
 
-        public EzLocalProfileOnlinePullService(IAPIProvider api, ScoreManager scoreManager, Storage storage)
+        public EzLocalProfileOnlinePullService(
+            IAPIProvider api,
+            ScoreManager scoreManager,
+            BeatmapManager beatmapManager,
+            RealmAccess realm,
+            Storage storage)
         {
             this.api = api;
             this.scoreManager = scoreManager;
+            this.beatmapManager = beatmapManager;
+            this.realm = realm;
             store = new EzLocalProfileStore(storage);
         }
 
-        public int PeekMostPlayedOffset(int rulesetId) => store.GetMostPlayedOffset(rulesetId);
+        public int PeekPullOffset(EzLocalProfileOnlinePullKind kind, int rulesetId) =>
+            store.GetPullOffset(kind, rulesetId);
 
         public Task<EzLocalProfileOnlinePullResult> PullAsync(EzLocalProfileOnlinePullRequest request, CancellationToken cancellationToken = default)
         {
@@ -104,37 +122,34 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             var ruleset = request.Ruleset ?? throw new ArgumentNullException(nameof(request.Ruleset));
             int rulesetId = ruleset.OnlineID;
-            int batchSize = request.MostPlayedBatchSize > 0 ? request.MostPlayedBatchSize : DEFAULT_MOST_PLAYED_BATCH;
+            int batchSize = request.BatchSize > 0 ? request.BatchSize : BATCH_SIZE;
+            int offset = Math.Max(0, request.StartOffset);
 
-            List<SoloScoreInfo> candidates;
-
-            switch (request.Kind)
+            List<SoloScoreInfo> candidates = request.Kind switch
             {
-                case EzLocalProfileOnlinePullKind.Best:
-                    candidates = await fetchBestAsync(userId, ruleset, token).ConfigureAwait(false);
-                    result.MostPlayedOffsetAfter = store.GetMostPlayedOffset(rulesetId);
-                    break;
+                EzLocalProfileOnlinePullKind.Best => await fetchBestBatchAsync(userId, ruleset, offset, batchSize, token).ConfigureAwait(false),
+                EzLocalProfileOnlinePullKind.MostPlayed => await fetchMostPlayedScoresAsync(userId, ruleset, offset, batchSize, token).ConfigureAwait(false),
+                _ => throw new InvalidOperationException("unknown_kind"),
+            };
 
-                case EzLocalProfileOnlinePullKind.MostPlayed:
-                {
-                    int offset = Math.Max(0, request.MostPlayedStartOffset);
-                    candidates = await fetchMostPlayedScoresAsync(userId, ruleset, offset, batchSize, token).ConfigureAwait(false);
-                    int nextOffset = offset + batchSize;
-                    store.SetMostPlayedOffset(rulesetId, nextOffset);
-                    result.MostPlayedOffsetAfter = nextOffset;
-                    break;
-                }
-
-                default:
-                    result.ErrorMessage = "unknown_kind";
-                    return result;
-            }
-
+            int nextOffset = offset + batchSize;
+            store.SetPullOffset(request.Kind, rulesetId, nextOffset);
+            result.OffsetAfter = nextOffset;
             result.Candidates = candidates.Count;
+
+            string? collectionName = request.DownloadMissingBeatmaps
+                ? (request.Kind == EzLocalProfileOnlinePullKind.Best ? COLLECTION_BP : COLLECTION_MOST_PLAYED)
+                : null;
+
+            var downloadedSetIds = new HashSet<int>();
 
             foreach (var solo in candidates)
             {
                 token.ThrowIfCancellationRequested();
+
+                if (request.DownloadMissingBeatmaps)
+                    await ensureBeatmapAndCollectionAsync(solo, collectionName!, downloadedSetIds, result, token).ConfigureAwait(false);
+
                 await processCandidateAsync(solo, request.IncludeInStatsWithoutImport, result, token).ConfigureAwait(false);
                 await Task.Delay(request_delay, token).ConfigureAwait(false);
             }
@@ -142,11 +157,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return result;
         }
 
-        private async Task<List<SoloScoreInfo>> fetchBestAsync(int userId, RulesetInfo ruleset, CancellationToken token)
+        private async Task<List<SoloScoreInfo>> fetchBestBatchAsync(
+            int userId,
+            RulesetInfo ruleset,
+            int offset,
+            int batchSize,
+            CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
 
-            var req = new GetUserScoresRequest(userId, ScoreType.Best, new PaginationParameters(BEST_LIMIT), ruleset);
+            // BP is capped around 100 online; still honour requested offset/limit for two×50 batches.
+            var req = new GetUserScoresRequest(userId, ScoreType.Best, new PaginationParameters(offset, batchSize), ruleset);
             await api.PerformAsync(req).ConfigureAwait(false);
 
             if (req.CompletionState != APIRequestCompletionState.Completed || req.Response == null)
@@ -183,7 +204,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
                 catch
                 {
-                    // Beatmap metadata may be incomplete; still try the score request with mode filter.
+                    // incomplete metadata — still try with mode filter
                 }
 
                 await Task.Delay(request_delay, token).ConfigureAwait(false);
@@ -201,6 +222,131 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             return scores;
+        }
+
+        private async Task ensureBeatmapAndCollectionAsync(
+            SoloScoreInfo solo,
+            string collectionName,
+            HashSet<int> downloadedSetIds,
+            EzLocalProfileOnlinePullResult result,
+            CancellationToken token)
+        {
+            int beatmapOnlineId = solo.BeatmapID > 0 ? solo.BeatmapID : solo.Beatmap?.OnlineID ?? 0;
+            int setOnlineId = solo.Beatmap?.OnlineBeatmapSetID
+                              ?? solo.Beatmap?.BeatmapSet?.OnlineID
+                              ?? 0;
+
+            if (beatmapOnlineId <= 0 && setOnlineId <= 0)
+                return;
+
+            var local = beatmapOnlineId > 0
+                ? beatmapManager.QueryBeatmap(b => b.OnlineID == beatmapOnlineId)
+                : null;
+
+            if (local == null && setOnlineId > 0)
+            {
+                if (downloadedSetIds.Add(setOnlineId))
+                {
+                    try
+                    {
+                        bool ok = await downloadBeatmapSetAsync(setOnlineId, token).ConfigureAwait(false);
+                        if (ok)
+                            result.MapsDownloaded++;
+                        else
+                            result.Failed++;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"[EzLocalProfile] Beatmapset {setOnlineId} download failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
+                        result.Failed++;
+                    }
+
+                    await Task.Delay(request_delay, token).ConfigureAwait(false);
+                }
+
+                local = beatmapOnlineId > 0
+                    ? beatmapManager.QueryBeatmap(b => b.OnlineID == beatmapOnlineId)
+                    : null;
+            }
+            else if (local != null)
+            {
+                int localSetId = local.BeatmapSet?.OnlineID ?? setOnlineId;
+                if (localSetId > 0 && downloadedSetIds.Add(localSetId))
+                    result.MapsAlreadyLocal++;
+                else if (localSetId <= 0)
+                    result.MapsAlreadyLocal++;
+            }
+
+            string? hash = local?.MD5Hash;
+            if (string.IsNullOrEmpty(hash))
+                hash = solo.Beatmap?.Checksum;
+
+            if (!string.IsNullOrEmpty(hash) && tryAddHashToCollection(collectionName, hash))
+                result.CollectionAdds++;
+        }
+
+        private async Task<bool> downloadBeatmapSetAsync(int setOnlineId, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+
+            var set = new APIBeatmapSet { OnlineID = setOnlineId };
+            var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var download = new DownloadBeatmapSetRequest(set, noVideo: true);
+
+            download.Success += path => tcs.TrySetResult(path);
+            download.Failure += ex => tcs.TrySetException(ex);
+
+            await api.PerformAsync(download).ConfigureAwait(false);
+
+            if (download.CompletionState == APIRequestCompletionState.Failed && !tcs.Task.IsCompleted)
+                tcs.TrySetException(new InvalidOperationException("Beatmap download failed."));
+
+            string path;
+
+            using (token.Register(() => tcs.TrySetCanceled(token)))
+                path = await tcs.Task.ConfigureAwait(false);
+
+            try
+            {
+                var notification = new ProgressNotification
+                {
+                    State = ProgressNotificationState.Active,
+                    Text = $"Importing beatmapset {setOnlineId}…",
+                };
+
+                var imported = (await beatmapManager.Import(notification, new[] { new ImportTask(path) }, new ImportParameters { Batch = true }).ConfigureAwait(false)).ToList();
+                return imported.Count > 0;
+            }
+            finally
+            {
+                try
+                {
+                    File.Delete(path);
+                }
+                catch
+                {
+                    // ignored
+                }
+            }
+        }
+
+        private bool tryAddHashToCollection(string collectionName, string md5Hash)
+        {
+            return realm.Write(r =>
+            {
+                var collection = r.All<BeatmapCollection>().FirstOrDefault(c => c.Name == collectionName) ?? r.Add(new BeatmapCollection(collectionName));
+
+                if (collection.BeatmapMD5Hashes.Contains(md5Hash))
+                    return false;
+
+                collection.BeatmapMD5Hashes.Add(md5Hash);
+                collection.LastModified = DateTimeOffset.UtcNow;
+                return true;
+            });
         }
 
         private async Task processCandidateAsync(

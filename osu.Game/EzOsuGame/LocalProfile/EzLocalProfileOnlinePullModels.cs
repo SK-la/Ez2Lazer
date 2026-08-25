@@ -12,17 +12,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public RulesetInfo Ruleset { get; init; }
 
         /// <summary>
-        /// Starting pagination offset for <see cref="EzLocalProfileOnlinePullKind.MostPlayed"/> (0 = from the beginning).
-        /// After a successful batch the store advances to this value + batch size.
+        /// Starting pagination offset (0 = from the beginning). Applies to both BP and most-played batches of <see cref="EzLocalProfileOnlinePullService.BATCH_SIZE"/>.
         /// </summary>
-        public int MostPlayedStartOffset { get; init; }
+        public int StartOffset { get; init; }
 
         /// <summary>
         /// When true, write API score metadata into the local profile contribution table even if .osr cannot be imported.
         /// </summary>
         public bool IncludeInStatsWithoutImport { get; init; }
 
-        public int MostPlayedBatchSize { get; init; }
+        /// <summary>
+        /// When true, download missing beatmapsets (throttled) and add each map into the BP / most-played collection.
+        /// </summary>
+        public bool DownloadMissingBeatmaps { get; init; }
+
+        public int BatchSize { get; init; }
     }
 
     public sealed class EzLocalProfileOnlinePullResult
@@ -34,7 +38,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public int MissingBeatmap { get; set; }
         public int Failed { get; set; }
         public int StatsRecorded { get; set; }
-        public int MostPlayedOffsetAfter { get; set; }
+        public int MapsDownloaded { get; set; }
+        public int MapsAlreadyLocal { get; set; }
+        public int CollectionAdds { get; set; }
+        public int OffsetAfter { get; set; }
         public string? ErrorMessage { get; set; }
     }
 }

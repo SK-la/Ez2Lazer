@@ -193,7 +193,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             dialogOverlay.Push(new EzLocalProfileOnlinePullDialog(
                 rulesetStore,
-                onlinePullService.PeekMostPlayedOffset,
+                onlinePullService.PeekPullOffset,
                 request =>
                 {
                     if (onlinePullService.IsPulling.Value)
@@ -248,7 +248,10 @@ namespace osu.Game.EzOsuGame.Overlays
                                 result.NoReplay,
                                 result.MissingBeatmap,
                                 result.Failed,
-                                result.StatsRecorded),
+                                result.StatsRecorded,
+                                result.MapsDownloaded,
+                                result.MapsAlreadyLocal,
+                                result.CollectionAdds),
                         });
 
                         if (result.StatsRecorded > 0 && localProfileService is not null && !localProfileService.IsComputing.Value)

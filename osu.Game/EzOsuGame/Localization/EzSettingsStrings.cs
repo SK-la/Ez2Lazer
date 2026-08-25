@@ -855,15 +855,15 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("从线上拉取成绩（实验）", "Pull Online Scores (Experimental)");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "需 Online 登录。下拉所选模式用于 BP100 / 玩过的图过滤。可分批拉取并尝试导入 .osr；缺图时可只写统计。",
-            "Requires Online login. The selected ruleset filters BP100 / most-played. Batch pull and try .osr import; optionally write stats without a local map.");
+            "需 Online 登录。下拉模式过滤 BP / 玩过的图；每批 50（BP100=两次）。可选下载缺图并加入「BP」或「玩过的图」收藏夹。",
+            "Requires Online login. Ruleset filters BP / most-played; batch size 50 (BP100 = two runs). Optionally download missing maps into the BP or most-played collection.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_HEADER =
             new EzLocalizationManager.EzLocalisableString("从线上拉取成绩", "Pull Online Scores");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_BODY = new EzLocalizationManager.EzLocalisableString(
-            "模式对 BP100 与「玩过的图」同样生效。BP100 一次拉满；玩过的图按下方起始 offset 分批推进（改数字即改起点，填 0 从头拉）。",
-            "Ruleset applies to both BP100 and most-played. BP100 is one shot; most-played uses the start offset below (edit to change; 0 = from the start).");
+            "模式对两种来源都生效。每批 50：BP 用 offset 0 与 50 各拉一次即可凑满约 100。玩过的图同样按起始 offset 推进。勾选下载缺图时，边下边加入对应收藏夹（仅「BP」「玩过的图」两个，不重复创建）。",
+            "Ruleset applies to both sources. Batch size 50: run BP at offset 0 then 50 for ~100. Most-played advances the same way. With download enabled, maps are added to the matching collection as they finish (only “BP” / “玩过的图”, no duplicates).");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_RULESET =
             new EzLocalizationManager.EzLocalisableString("模式（过滤）", "Ruleset (filter)");
@@ -873,8 +873,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_OFFSET_HINT =
             new EzLocalizationManager.EzLocalisableString(
-                "所选模式已存进度 offset = {0}（每批 {1}）。下方可改本次起始值。",
-                "Stored offset for selected ruleset = {0} (batch {1}). Edit the start value below.");
+                "当前来源+模式已存进度 offset = {0}（每批 {1}）。下方可改本次起始值。",
+                "Stored offset for current source+ruleset = {0} (batch {1}). Edit the start value below.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_OFFSET_INPUT =
             new EzLocalizationManager.EzLocalisableString("起始 offset（填 0 重置）", "Start offset (0 = reset)");
@@ -883,6 +883,11 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString(
                 "缺图也写入个人统计（用 API 元数据，无 KPS；默认开）",
                 "Also write profile stats without local map (API metadata, no KPS; on by default)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_DOWNLOAD_MAPS =
+            new EzLocalizationManager.EzLocalisableString(
+                "下载缺失谱面并加入收藏夹（BP→「BP」/ 玩过的图→「玩过的图」，节流）",
+                "Download missing maps into collection (BP→“BP” / most-played→“玩过的图”, throttled)");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_CONFIRM =
             new EzLocalizationManager.EzLocalisableString("开始拉取", "Start Pull");
@@ -895,8 +900,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_DONE =
             new EzLocalizationManager.EzLocalisableString(
-                "线上拉取完成：候选 {0}，导入 {1}，已有 {2}，无回放 {3}，缺图 {4}，失败 {5}，统计写入 {6}。可用「计算本地个人数据」更新档案。",
-                "Online pull done: candidates {0}, imported {1}, owned {2}, no replay {3}, missing map {4}, failed {5}, stats recorded {6}. Use “Compute Local Profile Stats” to refresh the archive.");
+                "线上拉取完成：候选 {0}，成绩导入 {1}，已有成绩 {2}，无回放 {3}，缺图成绩 {4}，失败 {5}，统计写入 {6}，下图 {7}，本地已有图 {8}，收藏夹新增 {9}。",
+                "Online pull done: candidates {0}, scores imported {1}, owned {2}, no replay {3}, missing map scores {4}, failed {5}, stats {6}, maps downloaded {7}, maps already local {8}, collection adds {9}.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_FAILED =
             new EzLocalizationManager.EzLocalisableString("线上成绩拉取失败。", "Failed to pull online scores.");

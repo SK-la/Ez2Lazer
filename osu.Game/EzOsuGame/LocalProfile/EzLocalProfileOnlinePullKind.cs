@@ -7,10 +7,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
 {
     public enum EzLocalProfileOnlinePullKind
     {
-        [Description("BP100")]
+        [Description("BP（每批50）")]
         Best,
 
-        [Description("Most played")]
+        [Description("玩过的图（每批50）")]
         MostPlayed,
     }
 }

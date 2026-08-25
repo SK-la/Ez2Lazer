@@ -83,13 +83,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        public int GetMostPlayedOffset(int rulesetId)
+        public int GetMostPlayedOffset(int rulesetId) => GetPullOffset(EzLocalProfileOnlinePullKind.MostPlayed, rulesetId);
+
+        public void SetMostPlayedOffset(int rulesetId, int offset) =>
+            SetPullOffset(EzLocalProfileOnlinePullKind.MostPlayed, rulesetId, offset);
+
+        public int GetPullOffset(EzLocalProfileOnlinePullKind kind, int rulesetId)
         {
             lock (sync)
             {
                 ensureInitialised();
                 using var connection = openConnection();
-                string? raw = tryGetMeta(connection, mostPlayedOffsetKey(rulesetId));
+                string? raw = tryGetMeta(connection, pullOffsetKey(kind, rulesetId));
                 if (string.IsNullOrEmpty(raw) || !int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int offset))
                     return 0;
 
@@ -97,13 +102,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        public void SetMostPlayedOffset(int rulesetId, int offset)
+        public void SetPullOffset(EzLocalProfileOnlinePullKind kind, int rulesetId, int offset)
         {
             lock (sync)
             {
                 ensureInitialised();
                 using var connection = openConnection();
-                setMeta(connection, mostPlayedOffsetKey(rulesetId), Math.Max(0, offset).ToString(CultureInfo.InvariantCulture));
+                setMeta(connection, pullOffsetKey(kind, rulesetId), Math.Max(0, offset).ToString(CultureInfo.InvariantCulture));
             }
         }
 
@@ -564,7 +569,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return list;
         }
 
-        private static string mostPlayedOffsetKey(int rulesetId) => $"online_mp_offset_{rulesetId}";
+        private static string pullOffsetKey(EzLocalProfileOnlinePullKind kind, int rulesetId) =>
+            kind == EzLocalProfileOnlinePullKind.Best
+                ? $"online_bp_offset_{rulesetId}"
+                : $"online_mp_offset_{rulesetId}";
 
         private static void setMeta(SqliteConnection connection, string key, string value)
         {

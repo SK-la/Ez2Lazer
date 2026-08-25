@@ -24,12 +24,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly Bindable<EzLocalProfileOnlinePullKind> kind = new Bindable<EzLocalProfileOnlinePullKind>(EzLocalProfileOnlinePullKind.Best);
         private readonly Bindable<EzLocalProfileOnlinePullRulesetChoice> rulesetChoice = new Bindable<EzLocalProfileOnlinePullRulesetChoice>(EzLocalProfileOnlinePullRulesetChoice.Osu);
         private readonly BindableBool includeStatsWithoutImport = new BindableBool(true);
+        private readonly BindableBool downloadMissingBeatmaps = new BindableBool();
         private readonly OsuSpriteText offsetStoredHint;
         private readonly OsuNumberBox offsetInput;
 
         public EzLocalProfileOnlinePullDialog(
             RulesetStore rulesetStore,
-            Func<int, int> getMostPlayedOffset,
+            Func<EzLocalProfileOnlinePullKind, int, int> getPullOffset,
             Action<EzLocalProfileOnlinePullRequest> onConfirm)
         {
             HeaderText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_HEADER;
@@ -51,17 +52,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             void syncOffsetFromStore()
             {
-                int stored = getMostPlayedOffset((int)rulesetChoice.Value);
+                int stored = getPullOffset(kind.Value, (int)rulesetChoice.Value);
                 offsetStoredHint.Text = string.Format(
                     EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_OFFSET_HINT.ToString(),
                     stored,
-                    EzLocalProfileOnlinePullService.DEFAULT_MOST_PLAYED_BATCH);
+                    EzLocalProfileOnlinePullService.BATCH_SIZE);
                 offsetInput.Text = stored.ToString(CultureInfo.InvariantCulture);
             }
 
             rulesetChoice.BindValueChanged(_ => syncOffsetFromStore(), true);
+            kind.BindValueChanged(_ => syncOffsetFromStore(), true);
 
-            var mostPlayedOffsetSection1 = new FillFlowContainer
+            var offsetSection = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
@@ -79,26 +81,26 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
             };
 
-            kind.BindValueChanged(k =>
-            {
-                mostPlayedOffsetSection1.Alpha = k.NewValue == EzLocalProfileOnlinePullKind.MostPlayed ? 1 : 0.35f;
-            }, true);
-
             var flow = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
                 Direction = FillDirection.Vertical,
                 Spacing = new Vector2(8),
-                Children = new[]
+                Children = new Drawable[]
                 {
                     createLabeledDropdown(EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_RULESET.ToString(), rulesetChoice),
                     createLabeledDropdown(EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_KIND.ToString(), kind),
-                    mostPlayedOffsetSection1,
+                    offsetSection,
                     new OsuCheckbox
                     {
                         LabelText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_INCLUDE_STATS,
                         Current = { BindTarget = includeStatsWithoutImport },
+                    },
+                    new OsuCheckbox
+                    {
+                        LabelText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_DOWNLOAD_MAPS,
+                        Current = { BindTarget = downloadMissingBeatmaps },
                     },
                 }
             };
@@ -106,7 +108,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             MainContent.Child = new Container
             {
                 RelativeSizeAxes = Axes.X,
-                Height = 320,
+                Height = 360,
                 Margin = new MarginPadding { Top = 16 },
                 Child = flow,
             };
@@ -124,7 +126,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         if (ruleset == null)
                             return;
 
-                        int startOffset = getMostPlayedOffset((int)rulesetChoice.Value);
+                        int startOffset = getPullOffset(kind.Value, (int)rulesetChoice.Value);
 
                         if (int.TryParse(offsetInput.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int typed)
                             && typed >= 0)
@@ -136,9 +138,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         {
                             Kind = kind.Value,
                             Ruleset = ruleset,
-                            MostPlayedStartOffset = startOffset,
+                            StartOffset = startOffset,
                             IncludeInStatsWithoutImport = includeStatsWithoutImport.Value,
-                            MostPlayedBatchSize = EzLocalProfileOnlinePullService.DEFAULT_MOST_PLAYED_BATCH,
+                            DownloadMissingBeatmaps = downloadMissingBeatmaps.Value,
+                            BatchSize = EzLocalProfileOnlinePullService.BATCH_SIZE,
                         });
                     }
                 },
@@ -177,16 +180,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
     public enum EzLocalProfileOnlinePullRulesetChoice
     {
-        [Description("osu!")]
+        [DescriptionAttribute("osu!")]
         Osu = 0,
 
-        [Description("osu!taiko")]
+        [DescriptionAttribute("osu!taiko")]
         Taiko = 1,
 
-        [Description("osu!catch")]
+        [DescriptionAttribute("osu!catch")]
         Catch = 2,
 
-        [Description("osu!mania")]
+        [DescriptionAttribute("osu!mania")]
         Mania = 3,
     }
 }
