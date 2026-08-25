@@ -48,7 +48,7 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL,
                 TooltipText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_TOOLTIP,
-                Keywords = new[] { "online", "bp", "most played", "osr", "拉取", "线上", "成绩", "回放" },
+                Keywords = new[] { "online", "bp", "most played", "osr", "下载", "拉取", "线上", "成绩", "谱面", "回放" },
                 Action = () => requestOnlinePull(onlinePullService, localProfileService, rulesetStore, dialogOverlay, notifications),
             });
 

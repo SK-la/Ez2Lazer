@@ -754,7 +754,7 @@ namespace osu.Game.EzOsuGame.Localization
             "Allows local account login without password. Skip all score submissions and online account checks.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE =
-            new EzLocalizationManager.EzLocalisableString("计算本地个人数据", "Compute Local Profile Stats");
+            new EzLocalizationManager.EzLocalisableString("计算本地个人成绩", "Compute Local Profile Stats");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "扫描本地成绩，按玩家名勾选导入后写入共享个人统计存档（与当前登录名无关）。",
@@ -774,13 +774,13 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("取消", "Cancel");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_STARTED =
-            new EzLocalizationManager.EzLocalisableString("正在计算本地个人数据…", "Computing local profile stats…");
+            new EzLocalizationManager.EzLocalisableString("正在计算本地个人成绩…", "Computing local profile stats…");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_DONE =
-            new EzLocalizationManager.EzLocalisableString("本地个人数据已更新。", "Local profile stats updated.");
+            new EzLocalizationManager.EzLocalisableString("本地个人成绩已更新。", "Local profile stats updated.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_FAILED =
-            new EzLocalizationManager.EzLocalisableString("本地个人数据计算失败。", "Failed to compute local profile stats.");
+            new EzLocalizationManager.EzLocalisableString("本地个人成绩计算失败。", "Failed to compute local profile stats.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_NO_SCORES =
             new EzLocalizationManager.EzLocalisableString("未找到可导入的本地成绩。", "No local scores found to import.");
@@ -804,7 +804,7 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("账号", "Account");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_EMPTY_HINT =
-            new EzLocalizationManager.EzLocalisableString("暂无统计。请到 设置 → Ez → 实验性功能 中点击「计算本地个人数据」。", "No stats yet. Open Settings → Ez → Experimental and run “Compute Local Profile Stats”.");
+            new EzLocalizationManager.EzLocalisableString("暂无统计。请到 设置 → Ez → 实验性功能 中点击「计算本地个人成绩」。", "No stats yet. Open Settings → Ez → Experimental and run “Compute Local Profile Stats”.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_KEYS =
             new EzLocalizationManager.EzLocalisableString("按键与 KPS", "Keys & KPS");
@@ -852,17 +852,17 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("各键数平均 KPS", "Avg KPS by key count");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL =
-            new EzLocalizationManager.EzLocalisableString("从线上拉取成绩（实验）", "Pull Online Scores (Experimental)");
+            new EzLocalizationManager.EzLocalisableString("从线上下载成绩或谱面（实验）", "Download Online Scores or Beatmaps (Experimental)");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "需 Online 登录。下拉模式过滤 BP / 玩过的图；每批 50（BP100=两次）。可选下载缺图并加入「BP」或「玩过的图」收藏夹。",
             "Requires Online login. Ruleset filters BP / most-played; batch size 50 (BP100 = two runs). Optionally download missing maps into the BP or most-played collection.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_HEADER =
-            new EzLocalizationManager.EzLocalisableString("从线上拉取成绩", "Pull Online Scores");
+            new EzLocalizationManager.EzLocalisableString("从线上下载成绩或谱面", "Download Online Scores or Beatmaps");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_BODY = new EzLocalizationManager.EzLocalisableString(
-            "模式对两种来源都生效。每批 50：BP 用 offset 0 与 50 各拉一次即可凑满约 100。玩过的图同样按起始 offset 推进。勾选下载缺图时，边下边加入对应收藏夹（仅「BP」「玩过的图」两个，不重复创建）。",
+            "模式对两种来源都生效。每批 50：BP 用 offset 0 与 50 各下载一次即可凑满约 100。玩过的图同样按起始 offset 推进。勾选下载缺图时，边下边加入对应收藏夹（仅「BP」「玩过的图」两个，不重复创建）。",
             "Ruleset applies to both sources. Batch size 50: run BP at offset 0 then 50 for ~100. Most-played advances the same way. With download enabled, maps are added to the matching collection as they finish (only “BP” / “玩过的图”, no duplicates).");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_RULESET =
@@ -890,22 +890,21 @@ namespace osu.Game.EzOsuGame.Localization
                 "Download missing maps into collection (BP→“BP” / most-played→“玩过的图”, throttled)");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_CONFIRM =
-            new EzLocalizationManager.EzLocalisableString("开始拉取", "Start Pull");
+            new EzLocalizationManager.EzLocalisableString("开始下载", "Start Download");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_NEED_ONLINE =
             new EzLocalizationManager.EzLocalisableString("请先 Online 登录自己的账号（不能用本地账号模式）。", "Online login as yourself is required (not local-only mode).");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_BUSY =
-            new EzLocalizationManager.EzLocalisableString("正在拉取线上成绩…", "Pulling online scores…");
+            new EzLocalizationManager.EzLocalisableString("正在下载线上成绩…", "Downloading online scores…");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_DONE =
             new EzLocalizationManager.EzLocalisableString(
-                "线上拉取完成：候选 {0}，成绩导入 {1}，已有成绩 {2}，无回放 {3}，缺图成绩 {4}，失败 {5}，统计写入 {6}，下图 {7}，本地已有图 {8}，收藏夹新增 {9}。",
-                "Online pull done: candidates {0}, scores imported {1}, owned {2}, no replay {3}, missing map scores {4}, failed {5}, stats {6}, maps downloaded {7}, maps already local {8}, collection adds {9}.");
+                "线上下载完成：候选 {0}，成绩导入 {1}，已有成绩 {2}，无回放 {3}，缺图成绩 {4}，失败 {5}，统计写入 {6}，下图 {7}，本地已有图 {8}，收藏夹新增 {9}。",
+                "Online download done: candidates {0}, scores imported {1}, owned {2}, no replay {3}, missing map scores {4}, failed {5}, stats {6}, maps downloaded {7}, maps already local {8}, collection adds {9}.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_FAILED =
-            new EzLocalizationManager.EzLocalisableString("线上成绩拉取失败。", "Failed to pull online scores.");
-
+            new EzLocalizationManager.EzLocalisableString("线上成绩下载失败。", "Failed to download online scores.");
         #endregion
     }
 }

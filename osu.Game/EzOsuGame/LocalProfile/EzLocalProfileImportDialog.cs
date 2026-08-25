@@ -18,6 +18,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
 {
     public partial class EzLocalProfileImportDialog : PopupDialog
     {
+        private const float content_width = 420;
+        private const float row_height = 36;
+        private const float list_max_height = 200;
+
         private readonly Dictionary<string, BindableBool> selections = new Dictionary<string, BindableBool>(StringComparer.Ordinal);
 
         public EzLocalProfileImportDialog(
@@ -53,11 +57,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 });
             }
 
+            float listHeight = Math.Clamp(
+                usernameCounts.Count * row_height + Math.Max(0, usernameCounts.Count - 1) * 4,
+                row_height,
+                list_max_height);
+
             MainContent.Child = new Container
             {
-                RelativeSizeAxes = Axes.X,
-                Height = 280,
-                Margin = new MarginPadding { Top = 16 },
+                Margin = new MarginPadding { Top = 12 },
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Width = content_width,
+                Height = listHeight,
                 Child = new OsuScrollContainer
                 {
                     RelativeSizeAxes = Axes.Both,

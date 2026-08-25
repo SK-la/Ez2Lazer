@@ -21,6 +21,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 {
     public partial class EzLocalProfileOnlinePullDialog : PopupDialog
     {
+        private const float content_width = 420;
+
         private readonly Bindable<EzLocalProfileOnlinePullKind> kind = new Bindable<EzLocalProfileOnlinePullKind>(EzLocalProfileOnlinePullKind.Best);
         private readonly Bindable<EzLocalProfileOnlinePullRulesetChoice> rulesetChoice = new Bindable<EzLocalProfileOnlinePullRulesetChoice>(EzLocalProfileOnlinePullRulesetChoice.Osu);
         private readonly BindableBool includeStatsWithoutImport = new BindableBool(true);
@@ -40,13 +42,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
             offsetStoredHint = new OsuSpriteText
             {
                 RelativeSizeAxes = Axes.X,
-                Font = OsuFont.GetFont(size: 14),
+                Font = OsuFont.GetFont(size: 13),
             };
 
             offsetInput = new OsuNumberBox
             {
                 RelativeSizeAxes = Axes.X,
-                Height = 40,
+                Height = 36,
                 PlaceholderText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_OFFSET_INPUT,
             };
 
@@ -75,18 +77,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     new OsuSpriteText
                     {
                         Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_OFFSET_INPUT,
-                        Font = OsuFont.GetFont(size: 14, weight: FontWeight.Bold),
+                        Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
                     },
                     offsetInput,
                 }
             };
 
-            var flow = new FillFlowContainer
+            MainContent.Child = new FillFlowContainer
             {
-                RelativeSizeAxes = Axes.X,
+                Margin = new MarginPadding { Top = 12 },
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Width = content_width,
                 AutoSizeAxes = Axes.Y,
                 Direction = FillDirection.Vertical,
-                Spacing = new Vector2(8),
+                Spacing = new Vector2(6),
                 Children = new Drawable[]
                 {
                     createLabeledDropdown(EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_RULESET.ToString(), rulesetChoice),
@@ -103,14 +108,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         Current = { BindTarget = downloadMissingBeatmaps },
                     },
                 }
-            };
-
-            MainContent.Child = new Container
-            {
-                RelativeSizeAxes = Axes.X,
-                Height = 360,
-                Margin = new MarginPadding { Top = 16 },
-                Child = flow,
             };
 
             Buttons = new PopupDialogButton[]
@@ -166,7 +163,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     new OsuSpriteText
                     {
                         Text = caption,
-                        Font = OsuFont.GetFont(size: 14, weight: FontWeight.Bold),
+                        Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
                     },
                     new OsuEnumDropdown<T>
                     {
