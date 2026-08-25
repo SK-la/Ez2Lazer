@@ -851,6 +851,51 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_MANIA_AVG_KPS_LINE =
             new EzLocalizationManager.EzLocalisableString("各键数平均 KPS", "Avg KPS by key count");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL =
+            new EzLocalizationManager.EzLocalisableString("从线上拉取成绩（实验）", "Pull Online Scores (Experimental)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "需 Online 登录自己的账号。可选指定模式 BP100，或分批拉取玩过的图成绩并下载有回放的 .osr。不自动重算本地档案。",
+            "Requires Online login as yourself. Pull BP100 for a ruleset, or batch most-played map scores and download replays when available. Does not recompute the local profile archive.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_HEADER =
+            new EzLocalizationManager.EzLocalisableString("从线上拉取成绩", "Pull Online Scores");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_BODY = new EzLocalizationManager.EzLocalisableString(
+            "选择模式与来源。BP100 一次拉满；玩过的图按批次推进 offset，可多次慢慢拉。仅导入本地尚无、且有回放的成绩；缺图会跳过。",
+            "Pick ruleset and source. BP100 is one shot; most-played advances an offset in batches. Only imports missing scores that have replays; missing beatmaps are skipped.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_RULESET =
+            new EzLocalizationManager.EzLocalisableString("模式", "Ruleset");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_KIND =
+            new EzLocalizationManager.EzLocalisableString("来源", "Source");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_OFFSET_HINT =
+            new EzLocalizationManager.EzLocalisableString(
+                "玩过的图下次从 offset {1} 开始（{0}，每批 {2}）",
+                "Most-played next offset {1} ({0}, batch {2})");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_RESET_OFFSET =
+            new EzLocalizationManager.EzLocalisableString("重置玩过的图进度（offset→0）", "Reset most-played progress (offset→0)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_CONFIRM =
+            new EzLocalizationManager.EzLocalisableString("开始拉取", "Start Pull");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_NEED_ONLINE =
+            new EzLocalizationManager.EzLocalisableString("请先 Online 登录自己的账号（不能用本地账号模式）。", "Online login as yourself is required (not local-only mode).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_BUSY =
+            new EzLocalizationManager.EzLocalisableString("正在拉取线上成绩…", "Pulling online scores…");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_DONE =
+            new EzLocalizationManager.EzLocalisableString(
+                "线上拉取完成：候选 {0}，导入 {1}，已有 {2}，无回放 {3}，缺图 {4}，失败 {5}。可用「计算本地个人数据」更新档案。",
+                "Online pull done: candidates {0}, imported {1}, owned {2}, no replay {3}, missing map {4}, failed {5}. Use “Compute Local Profile Stats” to refresh the archive.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_FAILED =
+            new EzLocalizationManager.EzLocalisableString("线上成绩拉取失败。", "Failed to pull online scores.");
+
         #endregion
     }
 }

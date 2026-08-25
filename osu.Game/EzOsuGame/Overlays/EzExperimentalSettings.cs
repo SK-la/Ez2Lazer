@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Database;
@@ -14,6 +15,7 @@ using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
+using osu.Game.Rulesets;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
@@ -27,7 +29,9 @@ namespace osu.Game.EzOsuGame.Overlays
                           EzAnalysisWarmupProcessor? analysisWarmupProcessor,
                           IDialogOverlay? dialogOverlay,
                           INotificationOverlay? notifications,
-                          EzLocalProfileService? localProfileService)
+                          EzLocalProfileService? localProfileService,
+                          EzLocalProfileOnlinePullService? onlinePullService,
+                          RulesetStore? rulesetStore)
         {
             EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
 
@@ -37,6 +41,14 @@ namespace osu.Game.EzOsuGame.Overlays
                 TooltipText = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_TOOLTIP,
                 Keywords = new[] { "local", "profile", "stats", "kps", "个人", "本地", "统计", "成绩" },
                 Action = () => requestComputeLocalProfile(localProfileService, dialogOverlay, notifications),
+            });
+
+            Add(new SettingsButtonV2
+            {
+                Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL,
+                TooltipText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_TOOLTIP,
+                Keywords = new[] { "online", "bp", "most played", "osr", "拉取", "线上", "成绩", "回放" },
+                Action = () => requestOnlinePull(onlinePullService, rulesetStore, dialogOverlay, notifications),
             });
 
             AddRange(new Drawable[]
@@ -141,6 +153,86 @@ namespace osu.Game.EzOsuGame.Overlays
 
                         localProfileService.ReloadFromDisk();
                         notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_DONE });
+                    }));
+                }));
+        }
+
+        private void requestOnlinePull(
+            EzLocalProfileOnlinePullService? onlinePullService,
+            RulesetStore? rulesetStore,
+            IDialogOverlay? dialogOverlay,
+            INotificationOverlay? notifications)
+        {
+            if (onlinePullService == null || rulesetStore == null || dialogOverlay == null)
+            {
+                notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_FAILED });
+                return;
+            }
+
+            if (onlinePullService.IsPulling.Value)
+            {
+                notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+                return;
+            }
+
+            dialogOverlay.Push(new EzLocalProfileOnlinePullDialog(
+                rulesetStore,
+                onlinePullService.PeekMostPlayedOffset,
+                request =>
+                {
+                    if (onlinePullService.IsPulling.Value)
+                    {
+                        notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+                        return;
+                    }
+
+                    notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+
+                    onlinePullService.PullAsync(request).ContinueWith(t => Schedule(() =>
+                    {
+                        if (t.IsFaulted)
+                        {
+                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_FAILED });
+                            return;
+                        }
+
+                        if (t.IsCanceled)
+                            return;
+
+                        var result = t.GetResultSafely();
+
+                        if (result.ErrorMessage == "need_online")
+                        {
+                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_NEED_ONLINE });
+                            return;
+                        }
+
+                        if (result.ErrorMessage == "already_pulling")
+                        {
+                            notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+                            return;
+                        }
+
+                        if (!string.IsNullOrEmpty(result.ErrorMessage) && result.ErrorMessage != "cancelled")
+                        {
+                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_FAILED });
+                            return;
+                        }
+
+                        if (result.ErrorMessage == "cancelled")
+                            return;
+
+                        notifications?.Post(new SimpleNotification
+                        {
+                            Text = string.Format(
+                                EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_DONE.ToString(),
+                                result.Candidates,
+                                result.Imported,
+                                result.AlreadyOwned,
+                                result.NoReplay,
+                                result.MissingBeatmap,
+                                result.Failed),
+                        });
                     }));
                 }));
         }

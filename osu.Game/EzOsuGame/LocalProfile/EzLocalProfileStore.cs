@@ -83,6 +83,30 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
+        public int GetMostPlayedOffset(int rulesetId)
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                string? raw = tryGetMeta(connection, mostPlayedOffsetKey(rulesetId));
+                if (string.IsNullOrEmpty(raw) || !int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int offset))
+                    return 0;
+
+                return Math.Max(0, offset);
+            }
+        }
+
+        public void SetMostPlayedOffset(int rulesetId, int offset)
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                setMeta(connection, mostPlayedOffsetKey(rulesetId), Math.Max(0, offset).ToString(CultureInfo.InvariantCulture));
+            }
+        }
+
         public void ReplaceAll(EzLocalProfileAggregationResult result)
         {
             lock (sync)
@@ -469,6 +493,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             return list;
         }
+
+        private static string mostPlayedOffsetKey(int rulesetId) => $"online_mp_offset_{rulesetId}";
 
         private static void setMeta(SqliteConnection connection, string key, string value)
         {
