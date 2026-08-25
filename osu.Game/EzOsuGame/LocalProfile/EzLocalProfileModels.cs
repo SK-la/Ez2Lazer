@@ -16,6 +16,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
     public readonly record struct EzLocalProfileUsernameCount(string Username, int ScoreCount);
 
+    /// <summary>
+    /// Progress payload for local profile compute (scores processed / total, then save).
+    /// </summary>
+    public readonly record struct EzLocalProfileComputeProgress(int Processed, int Total, bool Saving);
+
     public sealed class EzLocalProfileSnapshot
     {
         public bool HasData { get; init; }
@@ -35,7 +40,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         double AvgKps,
         double MaxKps,
         int ScoreCount,
-        int KpsSampleCount);
+        int KpsSampleCount,
+        double TotalPp,
+        long TotalDurationMs);
 
     public readonly record struct EzLocalProfileManiaKeyStats(
         int KeyCount,
@@ -43,7 +50,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         double AvgKps,
         double MaxKps,
         int ScoreCount,
-        int KpsSampleCount);
+        int KpsSampleCount,
+        double TotalPp,
+        long TotalDurationMs);
 
     public readonly record struct EzLocalProfileManiaColumnStats(
         int KeyCount,
@@ -80,15 +89,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
         double StarRating,
         float CircleSize,
         float ApproachRate,
-        long KeyCount);
+        long KeyCount,
+        double Pp,
+        long DurationMs);
 
     /// <summary>
     /// In-memory aggregation buffer written atomically to SQLite.
     /// </summary>
     public sealed class EzLocalProfileAggregationResult
     {
-        public IReadOnlyList<string> IncludedUsernames { get; init; } = Array.Empty<string>();
-        public DateTimeOffset ComputedAt { get; init; } = DateTimeOffset.UtcNow;
+        public IReadOnlyList<string> IncludedUsernames { get; set; } = Array.Empty<string>();
+        public DateTimeOffset ComputedAt { get; set; } = DateTimeOffset.UtcNow;
         public Dictionary<int, MutableRulesetStats> RulesetStats { get; } = new Dictionary<int, MutableRulesetStats>();
         public Dictionary<int, MutableManiaKeyStats> ManiaKeyStats { get; } = new Dictionary<int, MutableManiaKeyStats>();
         public Dictionary<(int KeyCount, int Column), MutableManiaColumnStats> ManiaColumnStats { get; } = new Dictionary<(int KeyCount, int Column), MutableManiaColumnStats>();
@@ -103,6 +114,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             public int KpsSampleCount;
             public double MaxKps;
             public int ScoreCount;
+            public double TotalPp;
+            public long TotalDurationMs;
         }
 
         public sealed class MutableManiaKeyStats
@@ -112,6 +125,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             public int KpsSampleCount;
             public double MaxKps;
             public int ScoreCount;
+            public double TotalPp;
+            public long TotalDurationMs;
         }
 
         public sealed class MutableManiaColumnStats

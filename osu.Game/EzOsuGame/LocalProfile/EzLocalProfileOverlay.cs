@@ -159,6 +159,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             int rulesetId = ruleset.Value?.OnlineID ?? 0;
             var rulesetStats = snapshot.RulesetStats.FirstOrDefault(s => s.RulesetId == rulesetId);
 
+            contentFlow.Add(new EzLocalProfileSection(EzSettingsStrings.LOCAL_PROFILE_SECTION_PERFORMANCE, new EzLocalProfilePerformanceRow(rulesetStats)));
             contentFlow.Add(new EzLocalProfileSection(EzSettingsStrings.LOCAL_PROFILE_SECTION_KEYS, new EzLocalProfileMetricRow(rulesetStats)));
 
             if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)

@@ -407,7 +407,7 @@ namespace osu.Game
             dependencies.Cache(ezAnalysisPersistentStore);
             dependencies.Cache(ezAnalysisDatabase);
             dependencies.Cache(ezAnalysisCache = new EzAnalysisCache());
-            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore));
+            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager));
             dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
 
             ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets);

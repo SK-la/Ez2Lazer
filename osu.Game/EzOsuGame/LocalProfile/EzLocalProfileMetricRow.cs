@@ -41,41 +41,69 @@ namespace osu.Game.EzOsuGame.LocalProfile
             Add(createChip(EzSettingsStrings.LOCAL_PROFILE_SCORE_COUNT, stats.ScoreCount.ToString("N0")));
         }
 
-        private static Drawable createChip(LocalisableString title, string value)
+        private static Drawable createChip(LocalisableString title, string value) => EzLocalProfileMetricChip.Create(title, value);
+
+        private static string formatKps(double value) => value.ToString("0.00", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// PP + play-duration chips shown for every ruleset.
+    /// </summary>
+    public partial class EzLocalProfilePerformanceRow : FillFlowContainer
+    {
+        public EzLocalProfilePerformanceRow(EzLocalProfileRulesetStats stats)
+        {
+            RelativeSizeAxes = Axes.X;
+            AutoSizeAxes = Axes.Y;
+            Direction = FillDirection.Full;
+            Spacing = new Vector2(10);
+
+            if (stats.ScoreCount == 0 && stats.TotalPp <= 0 && stats.TotalDurationMs <= 0)
+            {
+                Add(new OsuSpriteText
+                {
+                    Text = EzSettingsStrings.LOCAL_PROFILE_NO_RULESET_DATA,
+                    Font = OsuFont.GetFont(size: 14),
+                });
+                return;
+            }
+
+            Add(EzLocalProfileMetricChip.Create(EzSettingsStrings.LOCAL_PROFILE_TOTAL_PP, EzLocalProfileFormat.FormatPp(stats.TotalPp)));
+            Add(EzLocalProfileMetricChip.Create(EzSettingsStrings.LOCAL_PROFILE_TOTAL_DURATION, EzLocalProfileFormat.FormatDuration(stats.TotalDurationMs)));
+        }
+    }
+
+    internal partial class EzLocalProfileMetricChip : Container
+    {
+        public static Drawable Create(LocalisableString title, string value)
         {
             var display = new ProfileValueDisplay { Title = title };
             display.Content.Text = value;
-
-            return new MetricChip(display);
+            return new EzLocalProfileMetricChip(display);
         }
 
-        private static string formatKps(double value) => value.ToString("0.00", CultureInfo.InvariantCulture);
-
-        private partial class MetricChip : Container
+        private EzLocalProfileMetricChip(Drawable content)
         {
-            public MetricChip(Drawable content)
+            AutoSizeAxes = Axes.Both;
+            Masking = true;
+            CornerRadius = 8;
+            Child = new Container
             {
-                AutoSizeAxes = Axes.Both;
-                Masking = true;
-                CornerRadius = 8;
-                Child = new Container
-                {
-                    AutoSizeAxes = Axes.Both,
-                    Padding = new MarginPadding { Horizontal = 14, Vertical = 10 },
-                    Child = content,
-                };
-            }
+                AutoSizeAxes = Axes.Both,
+                Padding = new MarginPadding { Horizontal = 14, Vertical = 10 },
+                Child = content,
+            };
+        }
 
-            [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider colours)
+        [BackgroundDependencyLoader]
+        private void load(OverlayColourProvider colours)
+        {
+            AddInternal(new Box
             {
-                AddInternal(new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = colours.Background5,
-                    Depth = float.MaxValue,
-                });
-            }
+                RelativeSizeAxes = Axes.Both,
+                Colour = colours.Background5,
+                Depth = float.MaxValue,
+            });
         }
     }
 }

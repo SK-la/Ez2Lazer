@@ -764,8 +764,13 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("选择要导入的玩家名", "Select player names to import");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_BODY = new EzLocalizationManager.EzLocalisableString(
-            "勾选成绩所属的玩家名。统计会合并进同一份本地个人存档。",
-            "Tick player names whose scores should be included. Stats merge into one shared local profile.");
+            "勾选要【重新计算】的玩家名：只覆盖这些名称对应的统计切片，其它已计算名称不受影响。打开「替换模式」会删除未勾选名称的旧切片。",
+            "Check names to recompute: only those players’ stat slices are overwritten; other computed names stay. Enable replace mode to drop unchecked names’ old slices.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_REPLACE =
+            new EzLocalizationManager.EzLocalisableString(
+                "替换模式：删除未勾选名称的旧统计（不保留）",
+                "Replace mode: delete old stats for unchecked names");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_CONFIRM =
             new EzLocalizationManager.EzLocalisableString("开始计算", "Compute");
@@ -775,6 +780,12 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_STARTED =
             new EzLocalizationManager.EzLocalisableString("正在计算本地个人成绩…", "Computing local profile stats…");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_PROGRESS =
+            new EzLocalizationManager.EzLocalisableString("正在计算个人成绩 PP… {0}/{1}", "Computing profile PP… {0}/{1}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_SAVING =
+            new EzLocalizationManager.EzLocalisableString("正在写入本地个人成绩…", "Saving local profile stats…");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_DONE =
             new EzLocalizationManager.EzLocalisableString("本地个人成绩已更新。", "Local profile stats updated.");
@@ -809,6 +820,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_KEYS =
             new EzLocalizationManager.EzLocalisableString("按键与 KPS", "Keys & KPS");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_PERFORMANCE =
+            new EzLocalizationManager.EzLocalisableString("成绩表现", "Performance");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_MANIA =
             new EzLocalizationManager.EzLocalisableString("Mania 键数 / 列", "Mania Keys / Columns");
 
@@ -832,6 +846,12 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SCORE_COUNT =
             new EzLocalizationManager.EzLocalisableString("成绩数", "Scores");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TOTAL_PP =
+            new EzLocalizationManager.EzLocalisableString("PP 合计", "Total PP");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TOTAL_DURATION =
+            new EzLocalizationManager.EzLocalisableString("游戏时长", "Play Time");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BEST_AR =
             new EzLocalizationManager.EzLocalisableString("最擅长 AR", "Best AR");
@@ -905,6 +925,7 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_FAILED =
             new EzLocalizationManager.EzLocalisableString("线上成绩下载失败。", "Failed to download online scores.");
+
         #endregion
     }
 }

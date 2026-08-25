@@ -20,7 +20,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     public class EzLocalProfileStore : IDisposable
     {
         public const string DATABASE_FILENAME = "ez-local-profile.sqlite";
-        public const int SCHEMA_VERSION = 1;
+        public const int SCHEMA_VERSION = 3;
 
         private readonly Storage storage;
         private readonly object sync = new object();
@@ -121,16 +121,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = """
                                   INSERT INTO online_score_contributions
-                                      (online_id, ruleset_id, rank, star_rating, circle_size, approach_rate, key_count)
+                                      (online_id, ruleset_id, rank, star_rating, circle_size, approach_rate, key_count, pp, duration_ms)
                                   VALUES
-                                      ($online_id, $ruleset_id, $rank, $star_rating, $circle_size, $approach_rate, $key_count)
+                                      ($online_id, $ruleset_id, $rank, $star_rating, $circle_size, $approach_rate, $key_count, $pp, $duration_ms)
                                   ON CONFLICT(online_id) DO UPDATE SET
                                       ruleset_id = excluded.ruleset_id,
                                       rank = excluded.rank,
                                       star_rating = excluded.star_rating,
                                       circle_size = excluded.circle_size,
                                       approach_rate = excluded.approach_rate,
-                                      key_count = excluded.key_count;
+                                      key_count = excluded.key_count,
+                                      pp = excluded.pp,
+                                      duration_ms = excluded.duration_ms;
                                   """;
                 cmd.Parameters.AddWithValue("$online_id", contribution.OnlineId);
                 cmd.Parameters.AddWithValue("$ruleset_id", contribution.RulesetId);
@@ -139,6 +141,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 cmd.Parameters.AddWithValue("$circle_size", contribution.CircleSize);
                 cmd.Parameters.AddWithValue("$approach_rate", contribution.ApproachRate);
                 cmd.Parameters.AddWithValue("$key_count", contribution.KeyCount);
+                cmd.Parameters.AddWithValue("$pp", contribution.Pp);
+                cmd.Parameters.AddWithValue("$duration_ms", contribution.DurationMs);
                 cmd.ExecuteNonQuery();
             }
         }
@@ -152,7 +156,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 var list = new List<EzLocalProfileOnlineScoreContribution>();
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = """
-                                  SELECT online_id, ruleset_id, rank, star_rating, circle_size, approach_rate, key_count
+                                  SELECT online_id, ruleset_id, rank, star_rating, circle_size, approach_rate, key_count, pp, duration_ms
                                   FROM online_score_contributions;
                                   """;
                 using var reader = cmd.ExecuteReader();
@@ -166,7 +170,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         reader.GetDouble(3),
                         (float)reader.GetDouble(4),
                         (float)reader.GetDouble(5),
-                        reader.GetInt64(6)));
+                        reader.GetInt64(6),
+                        reader.GetDouble(7),
+                        reader.GetInt64(8)));
                 }
 
                 return list;
@@ -194,8 +200,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 {
                     using var cmd = connection.CreateCommand();
                     cmd.CommandText = """
-                                      INSERT INTO ruleset_stats (ruleset_id, total_keys, avg_kps, max_kps, score_count, kps_sample_count)
-                                      VALUES ($ruleset_id, $total_keys, $avg_kps, $max_kps, $score_count, $kps_sample_count);
+                                      INSERT INTO ruleset_stats (ruleset_id, total_keys, avg_kps, max_kps, score_count, kps_sample_count, total_pp, total_duration_ms)
+                                      VALUES ($ruleset_id, $total_keys, $avg_kps, $max_kps, $score_count, $kps_sample_count, $total_pp, $total_duration_ms);
                                       """;
                     cmd.Parameters.AddWithValue("$ruleset_id", rulesetId);
                     cmd.Parameters.AddWithValue("$total_keys", stats.TotalKeys);
@@ -203,6 +209,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     cmd.Parameters.AddWithValue("$max_kps", stats.MaxKps);
                     cmd.Parameters.AddWithValue("$score_count", stats.ScoreCount);
                     cmd.Parameters.AddWithValue("$kps_sample_count", stats.KpsSampleCount);
+                    cmd.Parameters.AddWithValue("$total_pp", stats.TotalPp);
+                    cmd.Parameters.AddWithValue("$total_duration_ms", stats.TotalDurationMs);
                     cmd.ExecuteNonQuery();
                 }
 
@@ -210,8 +218,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 {
                     using var cmd = connection.CreateCommand();
                     cmd.CommandText = """
-                                      INSERT INTO mania_key_stats (key_count, total_keys, avg_kps, max_kps, score_count, kps_sample_count)
-                                      VALUES ($key_count, $total_keys, $avg_kps, $max_kps, $score_count, $kps_sample_count);
+                                      INSERT INTO mania_key_stats (key_count, total_keys, avg_kps, max_kps, score_count, kps_sample_count, total_pp, total_duration_ms)
+                                      VALUES ($key_count, $total_keys, $avg_kps, $max_kps, $score_count, $kps_sample_count, $total_pp, $total_duration_ms);
                                       """;
                     cmd.Parameters.AddWithValue("$key_count", keyCount);
                     cmd.Parameters.AddWithValue("$total_keys", stats.TotalKeys);
@@ -219,6 +227,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     cmd.Parameters.AddWithValue("$max_kps", stats.MaxKps);
                     cmd.Parameters.AddWithValue("$score_count", stats.ScoreCount);
                     cmd.Parameters.AddWithValue("$kps_sample_count", stats.KpsSampleCount);
+                    cmd.Parameters.AddWithValue("$total_pp", stats.TotalPp);
+                    cmd.Parameters.AddWithValue("$total_duration_ms", stats.TotalDurationMs);
                     cmd.ExecuteNonQuery();
                 }
 
@@ -283,6 +293,210 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
+        /// <summary>
+        /// Overwrite partitions for recomputed usernames, optionally drop other partitions, then rebuild display totals.
+        /// </summary>
+        public void ApplyUsernamePartitions(
+            IReadOnlyDictionary<string, EzLocalProfileAggregationResult> recomputedByUsername,
+            bool replaceOtherUsernames,
+            IReadOnlyList<EzLocalProfileOnlineScoreContribution> onlineContributions,
+            HashSet<long> localOnlineScoreIds)
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+
+                using var connection = openConnection();
+                using var transaction = connection.BeginTransaction();
+
+                if (replaceOtherUsernames)
+                {
+                    var keep = new HashSet<string>(recomputedByUsername.Keys, StringComparer.Ordinal);
+                    using var listCmd = connection.CreateCommand();
+                    listCmd.CommandText = "SELECT username FROM username_partitions;";
+                    var toDelete = new List<string>();
+
+                    using (var reader = listCmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string name = reader.GetString(0);
+                            if (!keep.Contains(name))
+                                toDelete.Add(name);
+                        }
+                    }
+
+                    foreach (string name in toDelete)
+                    {
+                        using var del = connection.CreateCommand();
+                        del.CommandText = "DELETE FROM username_partitions WHERE username = $username;";
+                        del.Parameters.AddWithValue("$username", name);
+                        del.ExecuteNonQuery();
+                    }
+                }
+
+                long updatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+                foreach (var (username, result) in recomputedByUsername)
+                {
+                    var payload = EzLocalProfilePartitionPayload.FromAggregation(result);
+                    string json = JsonSerializer.Serialize(payload);
+
+                    using var upsert = connection.CreateCommand();
+                    upsert.CommandText = """
+                                         INSERT INTO username_partitions (username, payload_json, updated_at)
+                                         VALUES ($username, $payload_json, $updated_at)
+                                         ON CONFLICT(username) DO UPDATE SET
+                                             payload_json = excluded.payload_json,
+                                             updated_at = excluded.updated_at;
+                                         """;
+                    upsert.Parameters.AddWithValue("$username", username);
+                    upsert.Parameters.AddWithValue("$payload_json", json);
+                    upsert.Parameters.AddWithValue("$updated_at", updatedAt);
+                    upsert.ExecuteNonQuery();
+                }
+
+                var merged = new EzLocalProfileAggregationResult
+                {
+                    ComputedAt = DateTimeOffset.UtcNow,
+                };
+
+                var included = new List<string>();
+
+                using (var read = connection.CreateCommand())
+                {
+                    read.CommandText = "SELECT username, payload_json FROM username_partitions ORDER BY username;";
+                    using var reader = read.ExecuteReader();
+
+                    while (reader.Read())
+                    {
+                        string username = reader.GetString(0);
+                        string json = reader.GetString(1);
+                        included.Add(username);
+
+                        try
+                        {
+                            var payload = JsonSerializer.Deserialize<EzLocalProfilePartitionPayload>(json);
+                            payload?.MergeInto(merged);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"[EzLocalProfile] Bad partition for {username}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
+                        }
+                    }
+                }
+
+                merged.IncludedUsernames = included;
+                EzLocalProfileAggregator.MergeOnlineContributions(merged, onlineContributions, localOnlineScoreIds);
+
+                clearTables(connection);
+                recreateManiaColumnTable(connection);
+                writeAggregationTables(connection, merged);
+
+                setMeta(connection, "schema_version", SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
+                setMeta(connection, "last_computed_at", merged.ComputedAt.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture));
+                setMeta(connection, "included_usernames_json", JsonSerializer.Serialize(included));
+
+                transaction.Commit();
+            }
+        }
+
+        private static void writeAggregationTables(SqliteConnection connection, EzLocalProfileAggregationResult result)
+        {
+            foreach (var (rulesetId, stats) in result.RulesetStats)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  INSERT INTO ruleset_stats (ruleset_id, total_keys, avg_kps, max_kps, score_count, kps_sample_count, total_pp, total_duration_ms)
+                                  VALUES ($ruleset_id, $total_keys, $avg_kps, $max_kps, $score_count, $kps_sample_count, $total_pp, $total_duration_ms);
+                                  """;
+                cmd.Parameters.AddWithValue("$ruleset_id", rulesetId);
+                cmd.Parameters.AddWithValue("$total_keys", stats.TotalKeys);
+                cmd.Parameters.AddWithValue("$avg_kps", stats.KpsSampleCount > 0 ? stats.KpsSum / stats.KpsSampleCount : 0);
+                cmd.Parameters.AddWithValue("$max_kps", stats.MaxKps);
+                cmd.Parameters.AddWithValue("$score_count", stats.ScoreCount);
+                cmd.Parameters.AddWithValue("$kps_sample_count", stats.KpsSampleCount);
+                cmd.Parameters.AddWithValue("$total_pp", stats.TotalPp);
+                cmd.Parameters.AddWithValue("$total_duration_ms", stats.TotalDurationMs);
+                cmd.ExecuteNonQuery();
+            }
+
+            foreach (var (keyCount, stats) in result.ManiaKeyStats)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  INSERT INTO mania_key_stats (key_count, total_keys, avg_kps, max_kps, score_count, kps_sample_count, total_pp, total_duration_ms)
+                                  VALUES ($key_count, $total_keys, $avg_kps, $max_kps, $score_count, $kps_sample_count, $total_pp, $total_duration_ms);
+                                  """;
+                cmd.Parameters.AddWithValue("$key_count", keyCount);
+                cmd.Parameters.AddWithValue("$total_keys", stats.TotalKeys);
+                cmd.Parameters.AddWithValue("$avg_kps", stats.KpsSampleCount > 0 ? stats.KpsSum / stats.KpsSampleCount : 0);
+                cmd.Parameters.AddWithValue("$max_kps", stats.MaxKps);
+                cmd.Parameters.AddWithValue("$score_count", stats.ScoreCount);
+                cmd.Parameters.AddWithValue("$kps_sample_count", stats.KpsSampleCount);
+                cmd.Parameters.AddWithValue("$total_pp", stats.TotalPp);
+                cmd.Parameters.AddWithValue("$total_duration_ms", stats.TotalDurationMs);
+                cmd.ExecuteNonQuery();
+            }
+
+            foreach (var ((keyCount, column), stats) in result.ManiaColumnStats)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  INSERT INTO mania_column_stats (key_count, column_index, total_keys, avg_kps, max_kps, score_count, kps_sample_count)
+                                  VALUES ($key_count, $column_index, $total_keys, $avg_kps, $max_kps, $score_count, $kps_sample_count);
+                                  """;
+                cmd.Parameters.AddWithValue("$key_count", keyCount);
+                cmd.Parameters.AddWithValue("$column_index", column);
+                cmd.Parameters.AddWithValue("$total_keys", stats.TotalKeys);
+                cmd.Parameters.AddWithValue("$avg_kps", stats.KpsSampleCount > 0 ? stats.KpsSum / stats.KpsSampleCount : 0);
+                cmd.Parameters.AddWithValue("$max_kps", stats.MaxKps);
+                cmd.Parameters.AddWithValue("$score_count", stats.ScoreCount);
+                cmd.Parameters.AddWithValue("$kps_sample_count", stats.KpsSampleCount);
+                cmd.ExecuteNonQuery();
+            }
+
+            foreach (var ((rulesetId, rank), count) in result.GradeCounts)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  INSERT INTO grade_counts (ruleset_id, rank, count)
+                                  VALUES ($ruleset_id, $rank, $count);
+                                  """;
+                cmd.Parameters.AddWithValue("$ruleset_id", rulesetId);
+                cmd.Parameters.AddWithValue("$rank", (int)rank);
+                cmd.Parameters.AddWithValue("$count", count);
+                cmd.ExecuteNonQuery();
+            }
+
+            foreach (var ((rulesetId, starBucket), count) in result.StarPlayCounts)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  INSERT INTO star_play_counts (ruleset_id, star_bucket, count)
+                                  VALUES ($ruleset_id, $star_bucket, $count);
+                                  """;
+                cmd.Parameters.AddWithValue("$ruleset_id", rulesetId);
+                cmd.Parameters.AddWithValue("$star_bucket", starBucket);
+                cmd.Parameters.AddWithValue("$count", count);
+                cmd.ExecuteNonQuery();
+            }
+
+            foreach (var ((attr, value), stats) in result.StdAttrAffinities)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  INSERT INTO std_attr_affinity (attr, value, play_count, high_grade_count)
+                                  VALUES ($attr, $value, $play_count, $high_grade_count);
+                                  """;
+                cmd.Parameters.AddWithValue("$attr", (int)attr);
+                cmd.Parameters.AddWithValue("$value", value);
+                cmd.Parameters.AddWithValue("$play_count", stats.PlayCount);
+                cmd.Parameters.AddWithValue("$high_grade_count", stats.HighGradeCount);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
         public void Dispose()
         {
             if (isDisposed)
@@ -326,7 +540,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       avg_kps REAL NOT NULL,
                                       max_kps REAL NOT NULL,
                                       score_count INTEGER NOT NULL,
-                                      kps_sample_count INTEGER NOT NULL
+                                      kps_sample_count INTEGER NOT NULL,
+                                      total_pp REAL NOT NULL DEFAULT 0,
+                                      total_duration_ms INTEGER NOT NULL DEFAULT 0
                                   );
                                   CREATE TABLE IF NOT EXISTS mania_key_stats (
                                       key_count INTEGER PRIMARY KEY NOT NULL,
@@ -334,7 +550,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       avg_kps REAL NOT NULL,
                                       max_kps REAL NOT NULL,
                                       score_count INTEGER NOT NULL,
-                                      kps_sample_count INTEGER NOT NULL
+                                      kps_sample_count INTEGER NOT NULL,
+                                      total_pp REAL NOT NULL DEFAULT 0,
+                                      total_duration_ms INTEGER NOT NULL DEFAULT 0
                                   );
                                   CREATE TABLE IF NOT EXISTS mania_column_stats (
                                       key_count INTEGER NOT NULL,
@@ -372,13 +590,46 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       star_rating REAL NOT NULL,
                                       circle_size REAL NOT NULL,
                                       approach_rate REAL NOT NULL,
-                                      key_count INTEGER NOT NULL
+                                      key_count INTEGER NOT NULL,
+                                      pp REAL NOT NULL DEFAULT 0,
+                                      duration_ms INTEGER NOT NULL DEFAULT 0
+                                  );
+                                  CREATE TABLE IF NOT EXISTS username_partitions (
+                                      username TEXT PRIMARY KEY NOT NULL,
+                                      payload_json TEXT NOT NULL,
+                                      updated_at INTEGER NOT NULL
                                   );
                                   """;
                 cmd.ExecuteNonQuery();
             }
 
+            ensureColumn(connection, "ruleset_stats", "total_pp", "REAL NOT NULL DEFAULT 0");
+            ensureColumn(connection, "ruleset_stats", "total_duration_ms", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "mania_key_stats", "total_pp", "REAL NOT NULL DEFAULT 0");
+            ensureColumn(connection, "mania_key_stats", "total_duration_ms", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "online_score_contributions", "pp", "REAL NOT NULL DEFAULT 0");
+            ensureColumn(connection, "online_score_contributions", "duration_ms", "INTEGER NOT NULL DEFAULT 0");
+
             setMeta(connection, "schema_version", SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
+        }
+
+        private static void ensureColumn(SqliteConnection connection, string table, string column, string typeSql)
+        {
+            using var check = connection.CreateCommand();
+            check.CommandText = $"PRAGMA table_info({table});";
+            using var reader = check.ExecuteReader();
+
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+
+            reader.Close();
+
+            using var alter = connection.CreateCommand();
+            alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {typeSql};";
+            alter.ExecuteNonQuery();
         }
 
         private static void recreateManiaColumnTable(SqliteConnection connection)
@@ -454,7 +705,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             var list = new List<EzLocalProfileRulesetStats>();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT ruleset_id, total_keys, avg_kps, max_kps, score_count, kps_sample_count FROM ruleset_stats ORDER BY ruleset_id;";
+            cmd.CommandText = "SELECT ruleset_id, total_keys, avg_kps, max_kps, score_count, kps_sample_count, total_pp, total_duration_ms FROM ruleset_stats ORDER BY ruleset_id;";
             using var reader = cmd.ExecuteReader();
 
             while (reader.Read())
@@ -465,7 +716,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     reader.GetDouble(2),
                     reader.GetDouble(3),
                     reader.GetInt32(4),
-                    reader.GetInt32(5)));
+                    reader.GetInt32(5),
+                    reader.GetDouble(6),
+                    reader.GetInt64(7)));
             }
 
             return list;
@@ -475,7 +728,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             var list = new List<EzLocalProfileManiaKeyStats>();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT key_count, total_keys, avg_kps, max_kps, score_count, kps_sample_count FROM mania_key_stats ORDER BY key_count;";
+            cmd.CommandText = "SELECT key_count, total_keys, avg_kps, max_kps, score_count, kps_sample_count, total_pp, total_duration_ms FROM mania_key_stats ORDER BY key_count;";
             using var reader = cmd.ExecuteReader();
 
             while (reader.Read())
@@ -486,7 +739,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     reader.GetDouble(2),
                     reader.GetDouble(3),
                     reader.GetInt32(4),
-                    reader.GetInt32(5)));
+                    reader.GetInt32(5),
+                    reader.GetDouble(6),
+                    reader.GetInt64(7)));
             }
 
             return list;

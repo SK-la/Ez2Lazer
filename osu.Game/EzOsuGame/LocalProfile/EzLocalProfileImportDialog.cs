@@ -20,14 +20,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
     {
         private const float content_width = 420;
         private const float row_height = 36;
-        private const float list_max_height = 200;
+        private const float list_max_height = 180;
 
         private readonly Dictionary<string, BindableBool> selections = new Dictionary<string, BindableBool>(StringComparer.Ordinal);
+        private readonly BindableBool replaceMode = new BindableBool();
 
         public EzLocalProfileImportDialog(
             IReadOnlyList<EzLocalProfileUsernameCount> usernameCounts,
             IReadOnlyCollection<string> previouslyIncluded,
-            Action<IReadOnlyList<string>> onConfirm)
+            Action<IReadOnlyList<string>, bool> onConfirm)
         {
             HeaderText = EzSettingsStrings.LOCAL_PROFILE_IMPORT_HEADER;
             BodyText = EzSettingsStrings.LOCAL_PROFILE_IMPORT_BODY;
@@ -62,17 +63,32 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 row_height,
                 list_max_height);
 
-            MainContent.Child = new Container
+            MainContent.Child = new FillFlowContainer
             {
                 Margin = new MarginPadding { Top = 12 },
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Width = content_width,
-                Height = listHeight,
-                Child = new OsuScrollContainer
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(8),
+                Children = new Drawable[]
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Child = flow,
+                    new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Height = listHeight,
+                        Child = new OsuScrollContainer
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Child = flow,
+                        }
+                    },
+                    new OsuCheckbox
+                    {
+                        LabelText = EzSettingsStrings.LOCAL_PROFILE_IMPORT_REPLACE,
+                        Current = { BindTarget = replaceMode },
+                    },
                 }
             };
 
@@ -84,7 +100,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     Action = () =>
                     {
                         var chosen = selections.Where(kv => kv.Value.Value).Select(kv => kv.Key).ToList();
-                        onConfirm(chosen);
+                        onConfirm(chosen, replaceMode.Value);
                     }
                 },
                 new PopupDialogCancelButton

@@ -440,6 +440,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (keys <= 0)
                 keys = countKeysFromStatistics(solo.Statistics);
 
+            long durationMs = beatmap != null && beatmap.Length > 0 ? (long)beatmap.Length : 0;
+
             return new EzLocalProfileOnlineScoreContribution(
                 solo.OnlineID,
                 solo.RulesetID,
@@ -447,7 +449,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 beatmap?.StarRating ?? 0,
                 beatmap?.CircleSize ?? 0,
                 beatmap?.ApproachRate ?? 0,
-                keys);
+                keys,
+                solo.PP ?? 0,
+                durationMs);
         }
 
         private static long countKeysFromStatistics(IReadOnlyDictionary<HitResult, int> statistics)

@@ -30,7 +30,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             this.columns = columns;
             header =
-                $"{keyStats.KeyCount}K  ·  {keyStats.TotalKeys:N0} keys  ·  avg {keyStats.AvgKps.ToString("0.00", CultureInfo.InvariantCulture)}  ·  max {keyStats.MaxKps.ToString("0.00", CultureInfo.InvariantCulture)}  ·  {keyStats.ScoreCount} plays";
+                $"{keyStats.KeyCount}K  ·  {keyStats.TotalKeys:N0} keys  ·  avg {keyStats.AvgKps.ToString("0.00", CultureInfo.InvariantCulture)}  ·  max {keyStats.MaxKps.ToString("0.00", CultureInfo.InvariantCulture)}  ·  {keyStats.ScoreCount} plays  ·  {EzLocalProfileFormat.FormatPp(keyStats.TotalPp)}pp  ·  {EzLocalProfileFormat.FormatDuration(keyStats.TotalDurationMs)}";
 
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
