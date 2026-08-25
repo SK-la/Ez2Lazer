@@ -107,6 +107,67 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
+        public void UpsertOnlineScoreContribution(EzLocalProfileOnlineScoreContribution contribution)
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  INSERT INTO online_score_contributions
+                                      (online_id, ruleset_id, rank, star_rating, circle_size, approach_rate, key_count)
+                                  VALUES
+                                      ($online_id, $ruleset_id, $rank, $star_rating, $circle_size, $approach_rate, $key_count)
+                                  ON CONFLICT(online_id) DO UPDATE SET
+                                      ruleset_id = excluded.ruleset_id,
+                                      rank = excluded.rank,
+                                      star_rating = excluded.star_rating,
+                                      circle_size = excluded.circle_size,
+                                      approach_rate = excluded.approach_rate,
+                                      key_count = excluded.key_count;
+                                  """;
+                cmd.Parameters.AddWithValue("$online_id", contribution.OnlineId);
+                cmd.Parameters.AddWithValue("$ruleset_id", contribution.RulesetId);
+                cmd.Parameters.AddWithValue("$rank", (int)contribution.Rank);
+                cmd.Parameters.AddWithValue("$star_rating", contribution.StarRating);
+                cmd.Parameters.AddWithValue("$circle_size", contribution.CircleSize);
+                cmd.Parameters.AddWithValue("$approach_rate", contribution.ApproachRate);
+                cmd.Parameters.AddWithValue("$key_count", contribution.KeyCount);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        public IReadOnlyList<EzLocalProfileOnlineScoreContribution> LoadOnlineScoreContributions()
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                var list = new List<EzLocalProfileOnlineScoreContribution>();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  SELECT online_id, ruleset_id, rank, star_rating, circle_size, approach_rate, key_count
+                                  FROM online_score_contributions;
+                                  """;
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    list.Add(new EzLocalProfileOnlineScoreContribution(
+                        reader.GetInt64(0),
+                        reader.GetInt32(1),
+                        (ScoreRank)reader.GetInt32(2),
+                        reader.GetDouble(3),
+                        (float)reader.GetDouble(4),
+                        (float)reader.GetDouble(5),
+                        reader.GetInt64(6)));
+                }
+
+                return list;
+            }
+        }
+
         public void ReplaceAll(EzLocalProfileAggregationResult result)
         {
             lock (sync)
@@ -298,6 +359,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       play_count INTEGER NOT NULL,
                                       high_grade_count INTEGER NOT NULL,
                                       PRIMARY KEY (attr, value)
+                                  );
+                                  CREATE TABLE IF NOT EXISTS online_score_contributions (
+                                      online_id INTEGER PRIMARY KEY NOT NULL,
+                                      ruleset_id INTEGER NOT NULL,
+                                      rank INTEGER NOT NULL,
+                                      star_rating REAL NOT NULL,
+                                      circle_size REAL NOT NULL,
+                                      approach_rate REAL NOT NULL,
+                                      key_count INTEGER NOT NULL
                                   );
                                   """;
                 cmd.ExecuteNonQuery();

@@ -71,6 +71,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
         int HighGradeCount);
 
     /// <summary>
+    /// Online API score metadata persisted for profile stats when local .osr import is unavailable.
+    /// </summary>
+    public readonly record struct EzLocalProfileOnlineScoreContribution(
+        long OnlineId,
+        int RulesetId,
+        ScoreRank Rank,
+        double StarRating,
+        float CircleSize,
+        float ApproachRate,
+        long KeyCount);
+
+    /// <summary>
     /// In-memory aggregation buffer written atomically to SQLite.
     /// </summary>
     public sealed class EzLocalProfileAggregationResult

@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
+using System.Collections.Generic;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
@@ -48,7 +49,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL,
                 TooltipText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_TOOLTIP,
                 Keywords = new[] { "online", "bp", "most played", "osr", "拉取", "线上", "成绩", "回放" },
-                Action = () => requestOnlinePull(onlinePullService, rulesetStore, dialogOverlay, notifications),
+                Action = () => requestOnlinePull(onlinePullService, localProfileService, rulesetStore, dialogOverlay, notifications),
             });
 
             AddRange(new Drawable[]
@@ -123,7 +124,14 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (counts.Count == 0)
             {
-                notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_NO_SCORES });
+                if (!localProfileService.HasOnlineScoreContributions())
+                {
+                    notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_NO_SCORES });
+                    return;
+                }
+
+                notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_STARTED });
+                runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), notifications);
                 return;
             }
 
@@ -132,33 +140,41 @@ namespace osu.Game.EzOsuGame.Overlays
                 localProfileService.GetPreviouslyIncludedUsernames(),
                 selected =>
                 {
-                    if (selected.Count == 0)
+                    if (selected.Count == 0 && !localProfileService.HasOnlineScoreContributions())
                     {
                         notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_NONE_SELECTED });
                         return;
                     }
 
                     notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_STARTED });
-
-                    localProfileService.ComputeAsync(selected).ContinueWith(t => Schedule(() =>
-                    {
-                        if (t.IsFaulted)
-                        {
-                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_FAILED });
-                            return;
-                        }
-
-                        if (t.IsCanceled)
-                            return;
-
-                        localProfileService.ReloadFromDisk();
-                        notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_DONE });
-                    }));
+                    runCompute(localProfileService, selected, notifications);
                 }));
+        }
+
+        private void runCompute(
+            EzLocalProfileService localProfileService,
+            IReadOnlyCollection<string> selected,
+            INotificationOverlay? notifications)
+        {
+            localProfileService.ComputeAsync(selected).ContinueWith(t => Schedule(() =>
+            {
+                if (t.IsFaulted)
+                {
+                    notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_FAILED });
+                    return;
+                }
+
+                if (t.IsCanceled)
+                    return;
+
+                localProfileService.ReloadFromDisk();
+                notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_DONE });
+            }));
         }
 
         private void requestOnlinePull(
             EzLocalProfileOnlinePullService? onlinePullService,
+            EzLocalProfileService? localProfileService,
             RulesetStore? rulesetStore,
             IDialogOverlay? dialogOverlay,
             INotificationOverlay? notifications)
@@ -231,8 +247,12 @@ namespace osu.Game.EzOsuGame.Overlays
                                 result.AlreadyOwned,
                                 result.NoReplay,
                                 result.MissingBeatmap,
-                                result.Failed),
+                                result.Failed,
+                                result.StatsRecorded),
                         });
+
+                        if (result.StatsRecorded > 0 && localProfileService is not null && !localProfileService.IsComputing.Value)
+                            runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), notifications);
                     }));
                 }));
         }

@@ -39,6 +39,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public IReadOnlyList<string> GetPreviouslyIncludedUsernames() => store.LoadIncludedUsernames();
 
+        public bool HasOnlineScoreContributions() => store.LoadOnlineScoreContributions().Count > 0;
+
         public Task ComputeAsync(IReadOnlyCollection<string> includedUsernames, CancellationToken cancellationToken = default)
         {
             lock (computeLock)
@@ -54,7 +56,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     try
                     {
                         token.ThrowIfCancellationRequested();
-                        var result = aggregator.Aggregate(includedUsernames);
+                        var result = aggregator.Aggregate(includedUsernames, store.LoadOnlineScoreContributions());
                         token.ThrowIfCancellationRequested();
                         store.ReplaceAll(result);
                     }

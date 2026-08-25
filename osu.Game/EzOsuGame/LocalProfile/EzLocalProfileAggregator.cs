@@ -45,7 +45,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             });
         }
 
-        public EzLocalProfileAggregationResult Aggregate(IReadOnlyCollection<string> includedUsernames)
+        public EzLocalProfileAggregationResult Aggregate(
+            IReadOnlyCollection<string> includedUsernames,
+            IReadOnlyList<EzLocalProfileOnlineScoreContribution>? onlineContributions = null)
         {
             var includeSet = new HashSet<string>(includedUsernames.Select(normaliseUsername), StringComparer.Ordinal);
             var result = new EzLocalProfileAggregationResult
@@ -54,11 +56,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 ComputedAt = DateTimeOffset.UtcNow,
             };
 
-            if (includeSet.Count == 0)
-                return result;
+            var localOnlineIds = new HashSet<long>();
 
             realm.Run(r =>
             {
+                foreach (var score in r.All<ScoreInfo>().Where(s => !s.DeletePending && s.OnlineID > 0))
+                    localOnlineIds.Add(score.OnlineID);
+
+                if (includeSet.Count == 0)
+                    return;
+
                 foreach (var score in queryValidScores(r))
                 {
                     string username = normaliseUsername(score.RealmUser.Username);
@@ -98,7 +105,48 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
             });
 
+            if (onlineContributions != null)
+                mergeOnlineContributions(result, onlineContributions, localOnlineIds);
+
             return result;
+        }
+
+        private static void mergeOnlineContributions(
+            EzLocalProfileAggregationResult result,
+            IReadOnlyList<EzLocalProfileOnlineScoreContribution> contributions,
+            HashSet<long> localOnlineIds)
+        {
+            foreach (var c in contributions)
+            {
+                if (c.OnlineId > 0 && localOnlineIds.Contains(c.OnlineId))
+                    continue;
+
+                int rulesetId = c.RulesetId;
+                var rulesetStats = getOrCreate(result.RulesetStats, rulesetId, () => new EzLocalProfileAggregationResult.MutableRulesetStats());
+                rulesetStats.TotalKeys += Math.Max(0, c.KeyCount);
+                rulesetStats.ScoreCount++;
+
+                incrementGrade(result, rulesetId, c.Rank);
+                incrementStar(result, rulesetId, c.StarRating);
+
+                if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
+                {
+                    int keyMode = (int)Math.Round(c.CircleSize);
+                    if (keyMode > 0)
+                    {
+                        var keyStats = getOrCreate(result.ManiaKeyStats, keyMode, () => new EzLocalProfileAggregationResult.MutableManiaKeyStats());
+                        keyStats.TotalKeys += Math.Max(0, c.KeyCount);
+                        keyStats.ScoreCount++;
+                    }
+                }
+
+                if (rulesetId == EzLocalProfileConstants.OSU_RULESET_ID)
+                {
+                    bool highGrade = isHighGrade(c.Rank);
+                    addStd(result, EzLocalProfileStdAttr.ApproachRate, roundAttr(c.ApproachRate), highGrade);
+                    addStd(result, EzLocalProfileStdAttr.CircleSize, roundAttr(c.CircleSize), highGrade);
+                }
+            }
         }
 
         private static void accumulateMania(

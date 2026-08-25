@@ -17,6 +17,7 @@ using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.LocalProfile
@@ -116,10 +117,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 case EzLocalProfileOnlinePullKind.MostPlayed:
                 {
-                    int offset = request.ResetMostPlayedOffset ? 0 : store.GetMostPlayedOffset(rulesetId);
-                    if (request.ResetMostPlayedOffset)
-                        store.SetMostPlayedOffset(rulesetId, 0);
-
+                    int offset = Math.Max(0, request.MostPlayedStartOffset);
                     candidates = await fetchMostPlayedScoresAsync(userId, ruleset, offset, batchSize, token).ConfigureAwait(false);
                     int nextOffset = offset + batchSize;
                     store.SetMostPlayedOffset(rulesetId, nextOffset);
@@ -137,7 +135,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             foreach (var solo in candidates)
             {
                 token.ThrowIfCancellationRequested();
-                await processCandidateAsync(solo, result, token).ConfigureAwait(false);
+                await processCandidateAsync(solo, request.IncludeInStatsWithoutImport, result, token).ConfigureAwait(false);
                 await Task.Delay(request_delay, token).ConfigureAwait(false);
             }
 
@@ -207,6 +205,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private async Task processCandidateAsync(
             SoloScoreInfo solo,
+            bool includeInStatsWithoutImport,
             EzLocalProfileOnlinePullResult result,
             CancellationToken token)
         {
@@ -216,6 +215,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 result.Failed++;
                 return;
+            }
+
+            if (includeInStatsWithoutImport)
+            {
+                store.UpsertOnlineScoreContribution(CreateContribution(solo));
+                result.StatsRecorded++;
             }
 
             if (scoreManager.Query(s => s.OnlineID == onlineId) != null)
@@ -280,6 +285,36 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     }
                 }
             }
+        }
+
+        public static EzLocalProfileOnlineScoreContribution CreateContribution(SoloScoreInfo solo)
+        {
+            var beatmap = solo.Beatmap;
+            long keys = countKeysFromStatistics(solo.MaximumStatistics);
+            if (keys <= 0)
+                keys = countKeysFromStatistics(solo.Statistics);
+
+            return new EzLocalProfileOnlineScoreContribution(
+                solo.OnlineID,
+                solo.RulesetID,
+                solo.Rank,
+                beatmap?.StarRating ?? 0,
+                beatmap?.CircleSize ?? 0,
+                beatmap?.ApproachRate ?? 0,
+                keys);
+        }
+
+        private static long countKeysFromStatistics(IReadOnlyDictionary<HitResult, int> statistics)
+        {
+            long total = 0;
+
+            foreach (var (hitResult, count) in statistics)
+            {
+                if (hitResult.IsScorable() && !hitResult.IsBonus())
+                    total += count;
+            }
+
+            return total;
         }
 
         private async Task<string?> downloadReplayAsync(IScoreInfo scoreInfo, CancellationToken token)
