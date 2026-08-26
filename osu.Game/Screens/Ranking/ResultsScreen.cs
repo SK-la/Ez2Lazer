@@ -128,7 +128,7 @@ namespace osu.Game.Screens.Ranking
                                     RelativeSizeAxes = Axes.Both,
                                     Children = new Drawable[]
                                     {
-                                        new GlobalScrollAdjustsVolume(),
+                                        new AltScrollAdjustsVolume(),
                                         StatisticsPanel = new StatisticsPanel
                                         {
                                             RelativeSizeAxes = Axes.Both,
@@ -607,12 +607,28 @@ namespace osu.Game.Screens.Ranking
             return base.OnScroll(e);
         }
 
+        /// <summary>
+        /// Volume adjust only with Alt+scroll so plain wheel can scroll statistics / score panels.
+        /// </summary>
+        private partial class AltScrollAdjustsVolume : GlobalScrollAdjustsVolume
+        {
+            protected override bool OnScroll(ScrollEvent e)
+            {
+                if (!e.AltPressed)
+                    return false;
+
+                return base.OnScroll(e);
+            }
+        }
+
         protected partial class VerticalScrollContainer : OsuScrollContainer
         {
             protected override Container<Drawable> Content => content;
 
             private readonly Container content;
 
+            // Swallow plain wheel so the whole results page does not vertical-scroll;
+            // expanded statistics use their own OsuScrollContainer, collapsed list scrolls horizontally.
             protected override bool OnScroll(ScrollEvent e) => !e.ControlPressed && !e.AltPressed && !e.ShiftPressed && !e.SuperPressed;
 
             public VerticalScrollContainer()

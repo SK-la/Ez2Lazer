@@ -172,14 +172,23 @@ namespace osu.Game.Screens.Ranking.Statistics
                 else
                 {
                     FillFlowContainer flow;
-                    container = flow = new FillFlowContainer
+                    // Independent vertical scroll for the expanded statistics region (left list stays horizontal).
+                    // Restored after #38643 removed this container; outer ResultsScreen VerticalScrollContainer
+                    // intentionally does not wheel-scroll the whole page.
+                    container = new OsuScrollContainer(Direction.Vertical)
                     {
-                        Alpha = 0,
+                        RelativeSizeAxes = Axes.Both,
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Direction = FillDirection.Full,
+                        Masking = false,
+                        ScrollbarOverlapsContent = false,
+                        Alpha = 0,
+                        Child = flow = new FillFlowContainer
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Direction = FillDirection.Full,
+                        }
                     };
 
                     bool anyRequiredHitEvents = false;
