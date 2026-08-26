@@ -119,6 +119,10 @@ namespace osu.Game.Overlays.Toolbar
                 StateContainer = localProfileOverlay;
             else if (loginOverlay != null)
                 StateContainer = loginOverlay;
+
+            // ToolbarUserButton already shows username + avatar. Binding a FullscreenOverlay
+            // (INamedOverlayComponent) would SetIcon(User) and draw a silhouette over the name.
+            IconContainer.Hide();
         }
 
         private void userChanged(ValueChangedEvent<APIUser> user) => Schedule(() =>
