@@ -15,6 +15,12 @@ namespace osu.Game.Screens
 
         private readonly ParallaxContainer parallaxContainer;
 
+        /// <summary>
+        /// Parallax host for <see cref="BackgroundScreenStack"/> — used when acrylic capture
+        /// reparents the screen tree and needs to refresh nested background blur buffers.
+        /// </summary>
+        public Drawable BackgroundContent => parallaxContainer;
+
         protected float ParallaxAmount => parallaxContainer.ParallaxAmount;
 
         public new MarginPadding Padding
