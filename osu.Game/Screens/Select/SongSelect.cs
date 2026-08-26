@@ -173,6 +173,7 @@ namespace osu.Game.Screens.Select
         private readonly RealmPopulatingOnlineLookupSource onlineLookupSource = new RealmPopulatingOnlineLookupSource();
 
         private Bindable<bool> configBackgroundBlur = null!;
+        private Bindable<bool> acrylicUiEnabled = null!;
         private Bindable<bool> showConvertedBeatmaps = null!;
         private Bindable<KeySoundPreviewMode> keySoundPreview = null!;
         private EzPreviewTrackManager ezPreviewManager = null!;
@@ -337,6 +338,15 @@ namespace osu.Game.Screens.Select
 
             LoadComponent(modSelectOverlay = CreateModSelectOverlay());
 
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            acrylicUiEnabled.BindValueChanged(_ =>
+            {
+                if (!this.IsCurrentScreen())
+                    return;
+
+                updateBackgroundDim();
+            });
+
             configBackgroundBlur = config.GetBindable<bool>(OsuSetting.SongSelectBackgroundBlur);
             configBackgroundBlur.BindValueChanged(e =>
             {
@@ -386,32 +396,32 @@ namespace osu.Game.Screens.Select
             {
                 footerButtonMods,
                 new FooterButtonRandom
-            {
-                NextRandom = () =>
                 {
-                    if (!carousel.NextRandom())
-                        errorSample?.Play();
+                    NextRandom = () =>
+                    {
+                        if (!carousel.NextRandom())
+                            errorSample?.Play();
+                    },
+                    PreviousRandom = () =>
+                    {
+                        if (!carousel.PreviousRandom())
+                            errorSample?.Play();
+                    }
                 },
-                PreviousRandom = () =>
+                new FooterButtonOptions
                 {
-                    if (!carousel.PreviousRandom())
-                        errorSample?.Play();
-                }
-            },
-            new FooterButtonOptions
-            {
-                Hotkey = GlobalAction.ToggleBeatmapOptions,
-            },
-            new FooterButtonEzExport(
-                carousel.GetFilteredBeatmaps,
-                () => Beatmap.IsDefault ? null : Beatmap.Value.BeatmapInfo),
-            new FooterButtonEzPreView(
-                () =>
-                {
-                    ezBeatmapPreviewOverlay.Toggle();
-                    updateBeatmapPreviewSelection();
+                    Hotkey = GlobalAction.ToggleBeatmapOptions,
                 },
-                ezBeatmapPreviewOverlay.ExpandedState)
+                new FooterButtonEzExport(
+                    carousel.GetFilteredBeatmaps,
+                    () => Beatmap.IsDefault ? null : Beatmap.Value.BeatmapInfo),
+                new FooterButtonEzPreView(
+                    () =>
+                    {
+                        ezBeatmapPreviewOverlay.Toggle();
+                        updateBeatmapPreviewSelection();
+                    },
+                    ezBeatmapPreviewOverlay.ExpandedState)
             };
         }
 
@@ -1004,9 +1014,18 @@ namespace osu.Game.Screens.Select
         private void updateBackgroundDim() => ApplyToBackground(backgroundModeBeatmap =>
         {
             backgroundModeBeatmap.Beatmap = Beatmap.Value;
-            backgroundModeBeatmap.IgnoreUserSettings.Value = true;
 
-            backgroundModeBeatmap.DimWhenUserSettingsIgnored.Value = 0.1f;
+            // [Ez] Only while acrylic UI is on: apply gameplay DimLevel / BlurLevel.
+            // Off = official IgnoreUserSettings path (fixed 0.1 dim; SongSelectBackgroundBlur only).
+            if (acrylicUiEnabled.Value)
+            {
+                backgroundModeBeatmap.IgnoreUserSettings.Value = false;
+            }
+            else
+            {
+                backgroundModeBeatmap.IgnoreUserSettings.Value = true;
+                backgroundModeBeatmap.DimWhenUserSettingsIgnored.Value = 0.1f;
+            }
 
             // Required to undo results screen dimming the background.
             // Probably needs more thought because this needs to be in every `ApplyToBackground` currently to restore sane defaults.
