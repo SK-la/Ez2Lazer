@@ -21,10 +21,14 @@ namespace osu.Game.EzOsuGame.Acrylic
         /// <summary>Carousel panel veil — dark enough that bright song-select BGs do not wash cards.</summary>
         public static readonly Color4 PanelVeil = new Color4(5 / 255f, 7 / 255f, 11 / 255f, 0.72f);
 
+        /// <summary>Footer glass veil — cool dark so blur stays readable (not the same hue as solid Background5).</summary>
+        public static readonly Color4 FooterVeil = new Color4(8 / 255f, 10 / 255f, 14 / 255f, 0.50f);
+
         /// <summary>
-        /// Scheme-coloured tint on the frosted footer bar (applied to N's TintBox, not classic M).
+        /// Light scheme wash on the frosted footer TintBox. Kept low so blur is not masked
+        /// into looking like solid Background5.
         /// </summary>
-        public const float FooterSchemeTintAlpha = 0.45f;
+        public const float FooterSchemeTintAlpha = 0.22f;
 
         /// <summary>Downscale panel acrylic blur to limit cost with many visible cards.</summary>
         public static readonly Vector2 PanelFrameBufferScale = new Vector2(0.5f);
