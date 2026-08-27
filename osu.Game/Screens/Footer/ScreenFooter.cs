@@ -6,13 +6,18 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Threading;
+using osu.Game.EzOsuGame.Acrylic;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
 using osu.Game.Overlays;
@@ -49,6 +54,8 @@ namespace osu.Game.Screens.Footer
         private readonly List<OverlayContainer> overlays = new List<OverlayContainer>();
 
         private Box background = null!;
+        private EzAcrylicPanelBackground footerAcrylic = null!;
+        private Bindable<bool> acrylicUiEnabled = null!;
         private FillFlowContainer<ScreenFooterButton> buttonsFlow = null!;
         private Container overlayContentContainer = null!;
         private Container<ScreenFooterButton> hiddenButtonsContainer = null!;
@@ -78,14 +85,29 @@ namespace osu.Game.Screens.Footer
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(Ez2ConfigManager ezConfig)
         {
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+
             InternalChildren = new Drawable[]
             {
-                background = new Box
+                new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = colourProvider.Background5
+                    Children = new Drawable[]
+                    {
+                        // N: frosted glass — cool FooterVeil so blur reads (not same hue as solid M).
+                        footerAcrylic = new EzAcrylicPanelBackground(EzAcrylicStyle.FooterVeil)
+                        {
+                            AcrylicCaptureVisible = true,
+                        },
+                        // M: classic solid fill.
+                        background = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = colourProvider.Background5
+                        },
+                    }
                 },
                 new GridContainer
                 {
@@ -145,6 +167,14 @@ namespace osu.Game.Screens.Footer
                     f.Position = new Vector2(-76, -36);
                 })),
             };
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            // ON: hide M, show N. OFF: hide N, show M.
+            EzAcrylicOverlayAlpha.BindExclusive(background, footerAcrylic, acrylicUiEnabled);
         }
 
         private ScheduledDelegate? changeLogoDepthDelegate;
@@ -333,6 +363,8 @@ namespace osu.Game.Screens.Footer
             colourProvider.ChangeColourScheme(hue);
 
             background.FadeColour(colourProvider.Background5, 150, Easing.OutQuint);
+            // Light scheme wash only — keep frost readable (do not retint to opaque Background5).
+            footerAcrylic.TintBox.FadeColour(colourProvider.Background5.Opacity(EzAcrylicStyle.FooterSchemeTintAlpha), 150, Easing.OutQuint);
 
             foreach (var button in buttonsFlow)
                 button.UpdateDisplay();

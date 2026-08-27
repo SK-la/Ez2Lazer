@@ -27,6 +27,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Screens.Select.Filter;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Overlays;
@@ -68,6 +69,8 @@ namespace osu.Game.Screens.Select
         private CancellationTokenSource? ezAnalysisCancellationSource;
 
         private string? scratchText;
+
+        private Bindable<bool> acrylicUiEnabled = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -125,23 +128,33 @@ namespace osu.Game.Screens.Select
                 RelativeSizeAxes = Axes.Both,
             };
 
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            Container colourOverlays;
+
             Content.Children = new Drawable[]
             {
-                new Box
+                colourOverlays = new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = ColourInfo.GradientHorizontal(colourProvider.Background3, colourProvider.Background4),
-                },
-                backgroundDifficultyTint = new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                },
-                triangles = new TrianglesV2
-                {
-                    ScaleAdjust = 1.2f,
-                    Thickness = 0.01f,
-                    Velocity = 0.3f,
-                    RelativeSizeAxes = Axes.Both,
+                    Children = new Drawable[]
+                    {
+                        new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = ColourInfo.GradientHorizontal(colourProvider.Background3, colourProvider.Background4),
+                        },
+                        backgroundDifficultyTint = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                        },
+                        triangles = new TrianglesV2
+                        {
+                            ScaleAdjust = 1.2f,
+                            Thickness = 0.01f,
+                            Velocity = 0.3f,
+                            RelativeSizeAxes = Axes.Both,
+                        },
+                    }
                 },
                 new FillFlowContainer
                 {
@@ -265,6 +278,9 @@ namespace osu.Game.Screens.Select
                     }
                 }
             };
+
+            // Glass N lives on Panel; hide classic M overlays when acrylic is on.
+            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, acrylicUiEnabled);
         }
 
         protected override void LoadComplete()
@@ -516,12 +532,13 @@ namespace osu.Game.Screens.Select
                 starCounter.Colour = starColour;
 
             if (AccentColour != diffColour)
-            {
                 AccentColour = diffColour;
 
-                backgroundBorder.Colour = diffColour;
-                backgroundDifficultyTint.Colour = ColourInfo.GradientHorizontal(diffColour.Opacity(0.25f), diffColour.Opacity(0f));
+            ApplyAcrylicIconStripBackground(backgroundBorder, acrylicUiEnabled.Value, diffColour);
 
+            if (!acrylicUiEnabled.Value)
+            {
+                backgroundDifficultyTint.Colour = ColourInfo.GradientHorizontal(diffColour.Opacity(0.25f), diffColour.Opacity(0f));
                 triangles.Colour = ColourInfo.GradientVertical(diffColour.Opacity(0.25f), diffColour.Opacity(0f));
             }
 

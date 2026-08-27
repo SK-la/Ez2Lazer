@@ -27,6 +27,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
 using osuTK;
 using osuTK.Graphics;
@@ -53,6 +54,11 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private Bindable<bool> acrylicUiEnabled = null!;
 
         [Resolved]
         private BeatmapSetOverlay? beatmapOverlay { get; set; }
@@ -90,6 +96,8 @@ namespace osu.Game.Screens.Select
         private void load()
         {
             Height = HEIGHT;
+
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
 
             Icon = chevronIcon = new Container
             {
@@ -171,20 +179,49 @@ namespace osu.Game.Screens.Select
             base.LoadComplete();
 
             Expanded.BindValueChanged(_ => onExpanded(), true);
+            acrylicUiEnabled.BindValueChanged(_ => onExpanded());
             KeyboardSelected.BindValueChanged(k => KeyboardSelected.Value = k.NewValue, true);
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            // Keep accent strip width in sync while the chevron icon animates open/closed.
+            if (acrylicUiEnabled.Value)
+                ApplyAcrylicIconStripBackground(chevronBackground, true, colourProvider.Highlight1);
         }
 
         private void onExpanded()
         {
+            bool acrylic = acrylicUiEnabled.Value;
+
+            // Cancel size/alpha fades before retargeting — a FadeIn started while still full-bleed white
+            // is what washed the whole set card under acrylic.
+            chevronBackground.ClearTransforms();
+
+            if (acrylic)
+            {
+                ApplyAcrylicIconStripBackground(chevronBackground, true, colourProvider.Highlight1);
+                chevronBackground.Alpha = Expanded.Value ? 1f : 0f;
+            }
+            else
+            {
+                ApplyAcrylicIconStripBackground(chevronBackground, false, Color4.White);
+
+                if (Expanded.Value)
+                    chevronBackground.FadeIn(DURATION / 2, Easing.OutQuint);
+                else
+                    chevronBackground.FadeOut(DURATION, Easing.OutQuint);
+            }
+
             if (Expanded.Value)
             {
-                chevronBackground.FadeIn(DURATION / 2, Easing.OutQuint);
                 chevronIcon.ResizeWidthTo(18, DURATION * 1.5f, Easing.OutElasticQuarter);
                 chevronIcon.FadeTo(1f, DURATION, Easing.OutQuint);
             }
             else
             {
-                chevronBackground.FadeOut(DURATION, Easing.OutQuint);
                 chevronIcon.ResizeWidthTo(0f, DURATION, Easing.OutQuint);
                 chevronIcon.FadeTo(0f, DURATION, Easing.OutQuint);
             }

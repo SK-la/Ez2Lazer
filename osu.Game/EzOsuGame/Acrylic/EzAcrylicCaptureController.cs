@@ -2,25 +2,24 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Rendering;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Acrylic
 {
     /// <summary>
     /// Shared acquire/release logic for <see cref="AcrylicBackdropDrawable"/> consumers.
+    /// Always uses <see cref="IAcrylicCaptureRegistrar"/> so footer / overlays share the same
+    /// BufferedContainer path as song-select wedges (backbuffer region copy is unreliable for late-drawn chrome).
     /// </summary>
     internal sealed class EzAcrylicCaptureController
     {
         private readonly IAcrylicCaptureRegistrar? registrar;
-        private readonly IRenderer renderer;
         private readonly AcrylicBackdropDrawable acrylicBackdrop;
         private bool captureAcquired;
 
-        public EzAcrylicCaptureController(IAcrylicCaptureRegistrar? registrar, IRenderer renderer, AcrylicBackdropDrawable acrylicBackdrop)
+        public EzAcrylicCaptureController(IAcrylicCaptureRegistrar? registrar, AcrylicBackdropDrawable acrylicBackdrop)
         {
             this.registrar = registrar;
-            this.renderer = renderer;
             this.acrylicBackdrop = acrylicBackdrop;
         }
 
@@ -28,30 +27,15 @@ namespace osu.Game.EzOsuGame.Acrylic
         {
             acrylicBackdrop.BlurSigma = new Vector2(blurStrength);
 
-            bool needsScopeCapture = wantsCapture && !renderer.SupportsBackbufferRegionCopy;
-
             if (wantsCapture)
             {
-                if (needsScopeCapture)
+                if (!captureAcquired && registrar != null)
                 {
-                    if (!captureAcquired && registrar != null)
-                    {
-                        registrar.AcquireCapture();
-                        captureAcquired = true;
-                    }
-
-                    acrylicBackdrop.EffectEnabled = captureAcquired;
+                    registrar.AcquireCapture();
+                    captureAcquired = true;
                 }
-                else
-                {
-                    if (captureAcquired && registrar != null)
-                    {
-                        registrar.ReleaseCapture();
-                        captureAcquired = false;
-                    }
 
-                    acrylicBackdrop.EffectEnabled = true;
-                }
+                acrylicBackdrop.EffectEnabled = captureAcquired || registrar == null;
             }
             else
             {

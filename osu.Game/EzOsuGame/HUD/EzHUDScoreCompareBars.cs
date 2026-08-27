@@ -11,7 +11,6 @@ using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
@@ -126,9 +125,6 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved(canBeNull: true)]
         private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
 
-        [Resolved]
-        private IRenderer renderer { get; set; } = null!;
-
         public EzHUDScoreCompareBars()
         {
             Width = 3 * BarWidth.Value + 2 * bar_spacing + container_padding * 2;
@@ -158,7 +154,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void LoadComplete()
         {
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, renderer, acrylicBackdrop);
+            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop);
 
             barsContainer = new Container
             {

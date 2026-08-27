@@ -40,6 +40,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -337,6 +338,8 @@ namespace osu.Game.Screens.Select
             });
 
             LoadComponent(modSelectOverlay = CreateModSelectOverlay());
+
+            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(rightGradientBackground, ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled));
 
             acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
             acrylicUiEnabled.BindValueChanged(_ =>
