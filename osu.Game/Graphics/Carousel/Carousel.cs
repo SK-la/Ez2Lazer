@@ -1168,6 +1168,11 @@ namespace osu.Game.Graphics.Carousel
             carouselPanel.Expanded.Value = false;
         }
 
+        /// <summary>
+        /// Force <see cref="refreshAfterSelection"/> so panel Y positions recompute (e.g. spacing policy change).
+        /// </summary>
+        protected void InvalidateSelectionLayout() => selectionValid.Invalidate();
+
         protected override bool OnInvalidate(Invalidation invalidation, InvalidationSource source)
         {
             // handles the vertical size of the carousel changing (ie. on window resize when aspect ratio has changed).
