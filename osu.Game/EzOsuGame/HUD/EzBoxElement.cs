@@ -6,7 +6,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Acrylic;
@@ -76,9 +75,6 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved(canBeNull: true)]
         private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
 
-        [Resolved]
-        private IRenderer renderer { get; set; } = null!;
-
         public EzBoxElement()
         {
             Size = new Vector2(400, 80);
@@ -104,7 +100,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, renderer, acrylicBackdrop);
+            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop);
 
             BoxWidth.BindValueChanged(v => Width = v.NewValue, true);
             BoxHeight.BindValueChanged(v => Height = v.NewValue, true);

@@ -5,7 +5,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
@@ -37,9 +36,6 @@ namespace osu.Game.EzOsuGame.UI
         [Resolved(canBeNull: true)]
         private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
 
-        [Resolved]
-        private IRenderer renderer { get; set; } = null!;
-
         public EzAcrylicPanelBackground(Color4 initialTint)
         {
             RelativeSizeAxes = Axes.Both;
@@ -66,7 +62,7 @@ namespace osu.Game.EzOsuGame.UI
             acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
             acrylicUiBlurStrength = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength);
 
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, renderer, acrylicBackdrop);
+            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop);
         }
 
         protected override void LoadComplete()
