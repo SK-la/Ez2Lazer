@@ -4,6 +4,7 @@
 using System;
 using System.Threading;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Extensions.PolygonExtensions;
 using osu.Framework.Graphics;
@@ -13,6 +14,8 @@ using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Overlays;
 using osuTK;
 using osuTK.Graphics;
@@ -31,6 +34,9 @@ namespace osu.Game.Screens.Select
         private CancellationTokenSource? loadCancellation;
 
         private double timeSinceUnpool;
+
+        private Bindable<bool> acrylicUiEnabled = null!;
+        private Container colourOverlays = null!;
 
         public WorkingBeatmap? Beatmap
         {
@@ -87,52 +93,91 @@ namespace osu.Game.Screens.Select
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colourProvider)
+        private void load(OverlayColourProvider colourProvider, Ez2ConfigManager ezConfig)
         {
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+
             InternalChildren = new Drawable[]
             {
-                new Box
+                colourOverlays = new Container
                 {
                     Depth = 1,
                     RelativeSizeAxes = Axes.Both,
-                    Colour = ColourInfo.GradientHorizontal(colourProvider.Background3, colourProvider.Background4),
-                },
-                new FillFlowContainer
-                {
-                    Depth = -1,
-                    RelativeSizeAxes = Axes.Both,
-                    Direction = FillDirection.Horizontal,
-                    // This makes the gradient not be perfectly horizontal, but diagonal at a ~40° angle
-                    Shear = new Vector2(0.8f, 0),
-                    Children = new[]
+                    Children = new Drawable[]
                     {
-                        // The left half with no gradient applied
                         new Box
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Colour = Color4.Black.Opacity(0.5f),
-                            Width = 0.4f,
+                            Colour = ColourInfo.GradientHorizontal(colourProvider.Background3, colourProvider.Background4),
                         },
-                        new Box
+                        new FillFlowContainer
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Colour = ColourInfo.GradientHorizontal(Color4.Black.Opacity(0.5f), Color4.Black.Opacity(0.3f)),
-                            Width = 0.2f,
-                        },
-                        new Box
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Colour = ColourInfo.GradientHorizontal(Color4.Black.Opacity(0.3f), Color4.Black.Opacity(0.2f)),
-                            // Slightly more than 1.0 in total to account for shear.
-                            Width = 0.45f,
+                            Direction = FillDirection.Horizontal,
+                            // This makes the gradient not be perfectly horizontal, but diagonal at a ~40° angle
+                            Shear = new Vector2(0.8f, 0),
+                            Children = new[]
+                            {
+                                // The left half with no gradient applied
+                                new Box
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Colour = Color4.Black.Opacity(0.5f),
+                                    Width = 0.4f,
+                                },
+                                new Box
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Colour = ColourInfo.GradientHorizontal(Color4.Black.Opacity(0.5f), Color4.Black.Opacity(0.3f)),
+                                    Width = 0.2f,
+                                },
+                                new Box
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Colour = ColourInfo.GradientHorizontal(Color4.Black.Opacity(0.3f), Color4.Black.Opacity(0.2f)),
+                                    // Slightly more than 1.0 in total to account for shear.
+                                    Width = 0.45f,
+                                },
+                            }
                         },
                     }
                 },
             };
+
+            // Glass N is on Panel parent; hide classic colour overlays when acrylic is on.
+            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, acrylicUiEnabled);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            acrylicUiEnabled.BindValueChanged(e =>
+            {
+                if (e.NewValue)
+                {
+                    // Penetrate to the global song-select background — drop panel cover art.
+                    loadCancellation?.Cancel();
+                    loadCancellation = null;
+                    sprite?.Expire();
+                    sprite = null;
+                }
+                else
+                {
+                    // Restore classic cover art after acrylic is turned off.
+                    timeSinceUnpool = 0;
+                    loadCancellation?.Cancel();
+                    loadCancellation = null;
+                }
+            }, true);
         }
 
         private void loadContentIfRequired()
         {
+            // Acrylic UI: skip panel cover textures and let the backdrop blur sample the global background.
+            if (acrylicUiEnabled.Value)
+                return;
+
             // A load is already in progress if the cancellation token is non-null.
             if (loadCancellation != null || working == null)
                 return;
@@ -168,6 +213,12 @@ namespace osu.Game.Screens.Select
                 FillMode = FillMode.Fill,
             }, s =>
             {
+                if (acrylicUiEnabled.Value)
+                {
+                    s.Expire();
+                    return;
+                }
+
                 AddInternal(sprite = s);
                 bool spriteOnScreen = beatmapCarousel?.ScreenSpaceDrawQuad.Intersects(sprite.ScreenSpaceDrawQuad) != false;
                 sprite.FadeInFromZero(spriteOnScreen ? 400 : 0, Easing.OutQuint);
