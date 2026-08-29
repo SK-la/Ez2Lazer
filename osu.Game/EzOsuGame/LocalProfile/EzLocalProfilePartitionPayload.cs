@@ -17,7 +17,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public List<PartitionManiaColumnStats> ManiaColumnStats { get; set; } = new List<PartitionManiaColumnStats>();
         public List<PartitionGradeCount> GradeCounts { get; set; } = new List<PartitionGradeCount>();
         public List<PartitionStarPlayCount> StarPlayCounts { get; set; } = new List<PartitionStarPlayCount>();
+        public List<PartitionXxyPlayCount> XxyPlayCounts { get; set; } = new List<PartitionXxyPlayCount>();
         public List<PartitionStdAttrAffinity> StdAttrAffinities { get; set; } = new List<PartitionStdAttrAffinity>();
+        public List<EzLocalProfileDrillScoreRow> DrillScores { get; set; } = new List<EzLocalProfileDrillScoreRow>();
 
         public static EzLocalProfilePartitionPayload FromAggregation(EzLocalProfileAggregationResult result)
         {
@@ -73,6 +75,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             foreach (var ((rulesetId, starBucket), count) in result.StarPlayCounts)
                 payload.StarPlayCounts.Add(new PartitionStarPlayCount { RulesetId = rulesetId, StarBucket = starBucket, Count = count });
 
+            foreach (var ((rulesetId, starBucket), count) in result.XxyPlayCounts)
+                payload.XxyPlayCounts.Add(new PartitionXxyPlayCount { RulesetId = rulesetId, StarBucket = starBucket, Count = count });
+
             foreach (var ((attr, value), stats) in result.StdAttrAffinities)
             {
                 payload.StdAttrAffinities.Add(new PartitionStdAttrAffinity
@@ -83,6 +88,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     HighGradeCount = stats.HighGradeCount,
                 });
             }
+
+            payload.DrillScores.AddRange(result.DrillScores);
 
             return payload;
         }
@@ -140,6 +147,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 target.StarPlayCounts[key] = existing + row.Count;
             }
 
+            foreach (var row in XxyPlayCounts)
+            {
+                var key = (row.RulesetId, row.StarBucket);
+                target.XxyPlayCounts.TryGetValue(key, out int existing);
+                target.XxyPlayCounts[key] = existing + row.Count;
+            }
+
             foreach (var row in StdAttrAffinities)
             {
                 var key = ((EzLocalProfileStdAttr)row.Attr, row.Value);
@@ -147,6 +161,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 stats.PlayCount += row.PlayCount;
                 stats.HighGradeCount += row.HighGradeCount;
             }
+
+            target.DrillScores.AddRange(DrillScores);
         }
 
         private static TValue getOrCreate<TKey, TValue>(Dictionary<TKey, TValue> dict, TKey key, Func<TValue> factory)
@@ -205,6 +221,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
     }
 
     public sealed class PartitionStarPlayCount
+    {
+        public int RulesetId { get; set; }
+        public int StarBucket { get; set; }
+        public int Count { get; set; }
+    }
+
+    public sealed class PartitionXxyPlayCount
     {
         public int RulesetId { get; set; }
         public int StarBucket { get; set; }

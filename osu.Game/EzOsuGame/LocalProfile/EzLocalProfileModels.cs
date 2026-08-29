@@ -31,7 +31,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public IReadOnlyList<EzLocalProfileManiaColumnStats> ManiaColumnStats { get; init; } = Array.Empty<EzLocalProfileManiaColumnStats>();
         public IReadOnlyList<EzLocalProfileGradeCount> GradeCounts { get; init; } = Array.Empty<EzLocalProfileGradeCount>();
         public IReadOnlyList<EzLocalProfileStarPlayCount> StarPlayCounts { get; init; } = Array.Empty<EzLocalProfileStarPlayCount>();
+        public IReadOnlyList<EzLocalProfileXxyPlayCount> XxyPlayCounts { get; init; } = Array.Empty<EzLocalProfileXxyPlayCount>();
         public IReadOnlyList<EzLocalProfileStdAttrAffinity> StdAttrAffinities { get; init; } = Array.Empty<EzLocalProfileStdAttrAffinity>();
+        public IReadOnlyList<EzLocalProfileDrillScoreRow> DrillScores { get; init; } = Array.Empty<EzLocalProfileDrillScoreRow>();
     }
 
     public readonly record struct EzLocalProfileRulesetStats(
@@ -66,6 +68,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
     public readonly record struct EzLocalProfileGradeCount(int RulesetId, ScoreRank Rank, int Count);
 
     public readonly record struct EzLocalProfileStarPlayCount(int RulesetId, int StarBucket, int Count);
+
+    /// <summary>
+    /// xxy SR play distribution; bucket semantics mirror <see cref="EzLocalProfileStarPlayCount"/>.
+    /// </summary>
+    public readonly record struct EzLocalProfileXxyPlayCount(int RulesetId, int StarBucket, int Count);
 
     public enum EzLocalProfileStdAttr
     {
@@ -105,7 +112,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public Dictionary<(int KeyCount, int Column), MutableManiaColumnStats> ManiaColumnStats { get; } = new Dictionary<(int KeyCount, int Column), MutableManiaColumnStats>();
         public Dictionary<(int RulesetId, ScoreRank Rank), int> GradeCounts { get; } = new Dictionary<(int RulesetId, ScoreRank Rank), int>();
         public Dictionary<(int RulesetId, int StarBucket), int> StarPlayCounts { get; } = new Dictionary<(int RulesetId, int StarBucket), int>();
+        public Dictionary<(int RulesetId, int StarBucket), int> XxyPlayCounts { get; } = new Dictionary<(int RulesetId, int StarBucket), int>();
         public Dictionary<(EzLocalProfileStdAttr Attr, double Value), MutableStdAttr> StdAttrAffinities { get; } = new Dictionary<(EzLocalProfileStdAttr Attr, double Value), MutableStdAttr>();
+        public List<EzLocalProfileDrillScoreRow> DrillScores { get; } = new List<EzLocalProfileDrillScoreRow>();
 
         public sealed class MutableRulesetStats
         {

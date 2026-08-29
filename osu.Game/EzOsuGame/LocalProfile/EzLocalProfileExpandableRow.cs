@@ -20,24 +20,23 @@ namespace osu.Game.EzOsuGame.LocalProfile
 {
     public partial class EzLocalProfileExpandableRow : CompositeDrawable
     {
-        private readonly string header;
+        private readonly EzLocalProfileManiaKeyStats keyStats;
         private readonly IReadOnlyList<EzLocalProfileManiaColumnStats> columns;
         private Container detailFlow = null!;
         private SpriteIcon chevron = null!;
+        private FillFlowContainer headerMetrics = null!;
         private bool expanded;
 
         public EzLocalProfileExpandableRow(EzLocalProfileManiaKeyStats keyStats, IReadOnlyList<EzLocalProfileManiaColumnStats> columns)
         {
+            this.keyStats = keyStats;
             this.columns = columns;
-            header =
-                $"{keyStats.KeyCount}K  ·  {keyStats.TotalKeys:N0} keys  ·  avg {keyStats.AvgKps.ToString("0.00", CultureInfo.InvariantCulture)}  ·  max {keyStats.MaxKps.ToString("0.00", CultureInfo.InvariantCulture)}  ·  {keyStats.ScoreCount} plays  ·  {EzLocalProfileFormat.FormatPp(keyStats.TotalPp)}pp  ·  {EzLocalProfileFormat.FormatDuration(keyStats.TotalDurationMs)}";
-
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colours)
+        private void load(OverlayColourProvider colours, OsuColour osuColours)
         {
             InternalChild = new FillFlowContainer
             {
@@ -65,15 +64,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                     Origin = Anchor.CentreLeft,
                                     Colour = colours.Content2,
                                 },
-                                new OsuSpriteText
+                                headerMetrics = new FillFlowContainer
                                 {
-                                    Text = header,
-                                    Font = OsuFont.GetFont(size: 13),
-                                    Colour = colours.Content1,
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
                                     Margin = new MarginPadding { Left = 22 },
-                                }
+                                    AutoSizeAxes = Axes.Both,
+                                    Direction = FillDirection.Horizontal,
+                                    Spacing = new Vector2(10, 0),
+                                },
                             }
                         }
                     },
@@ -87,13 +86,41 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     }
                 }
             };
+
+            rebuildHeader(colours, osuColours);
         }
+
+        private void rebuildHeader(OverlayColourProvider colours, OsuColour osuColours)
+        {
+            headerMetrics.Clear();
+
+            headerMetrics.Add(createSegment($"{keyStats.KeyCount}K", colours.Highlight1));
+            headerMetrics.Add(createSegment($"{keyStats.TotalKeys:N0} keys", osuColours.BlueLight));
+            headerMetrics.Add(createSegment(
+                $"{EzSettingsStrings.LOCAL_PROFILE_AVG_KPS} {formatKps(keyStats.AvgKps)} KPS",
+                osuColours.Orange1));
+            headerMetrics.Add(createSegment(
+                $"{EzSettingsStrings.LOCAL_PROFILE_MAX_KPS} {formatKps(keyStats.MaxKps)} KPS",
+                osuColours.Yellow));
+            headerMetrics.Add(createSegment($"{keyStats.ScoreCount} plays", colours.Content1));
+            headerMetrics.Add(createSegment($"{EzLocalProfileFormat.FormatPp(keyStats.TotalPp)}pp", osuColours.PinkLight));
+            headerMetrics.Add(createSegment(EzLocalProfileFormat.FormatDuration(keyStats.TotalDurationMs), osuColours.Lime1));
+        }
+
+        private static OsuSpriteText createSegment(string text, osuTK.Graphics.Color4 colour) => new OsuSpriteText
+        {
+            Text = text,
+            Font = OsuFont.GetFont(size: 13),
+            Colour = colour,
+        };
+
+        private static string formatKps(double value) => value.ToString("0.00", CultureInfo.InvariantCulture);
 
         private void toggle()
         {
             expanded = !expanded;
             detailFlow.FadeTo(expanded ? 1 : 0, 150, Easing.OutQuint);
-            chevron.RotateTo(expanded ? 90 : 0, 150, Easing.OutQuint);
+            chevron.RotateTo(expanded ? 90 : 0,  150, Easing.OutQuint);
         }
 
         private partial class HeaderButton : OsuClickableContainer
@@ -155,12 +182,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             int maxPlays = ordered.Max(k => k.ScoreCount);
 
-            Add(new OsuSpriteText
-            {
-                Text = EzSettingsStrings.LOCAL_PROFILE_MANIA_PLAYS_BY_KEY,
-                Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
-            });
-
             var barFlow = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
@@ -175,41 +196,26 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 barFlow.Add(new KeyPlayBarRow($"{key.KeyCount}K", key.ScoreCount, ratio));
             }
 
-            Add(barFlow);
+            Add(new EzLocalProfileChartCard(EzSettingsStrings.LOCAL_PROFILE_MANIA_PLAYS_BY_KEY, barFlow));
 
-            Add(new OsuSpriteText
-            {
-                Text = EzSettingsStrings.LOCAL_PROFILE_MANIA_AVG_KPS_LINE,
-                Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
-                Margin = new MarginPadding { Top = 4 },
-            });
-
-            Add(new EzLocalProfileLabeledLineChart(
-                ordered.Select(k => (float)k.AvgKps).ToArray(),
-                ordered.Select(k => $"{k.KeyCount}K").ToArray())
-            {
-                RelativeSizeAxes = Axes.X,
-            });
+            Add(new EzLocalProfileChartCard(
+                EzSettingsStrings.LOCAL_PROFILE_MANIA_AVG_KPS_LINE,
+                new EzLocalProfileLabeledLineChart(
+                    ordered.Select(k => (float)k.AvgKps).ToArray(),
+                    ordered.Select(k => $"{k.KeyCount}K").ToArray())
+                {
+                    RelativeSizeAxes = Axes.X,
+                }));
         }
 
         private partial class KeyPlayBarRow : Container
         {
-            private readonly string label;
-            private readonly int plays;
-            private readonly float ratio;
-
             public KeyPlayBarRow(string label, int plays, float ratio)
             {
-                this.label = label;
-                this.plays = plays;
-                this.ratio = ratio;
                 RelativeSizeAxes = Axes.X;
                 Height = 20;
-            }
+                Padding = new MarginPadding { Horizontal = 4 };
 
-            [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider colours)
-            {
                 Children = new Drawable[]
                 {
                     new OsuSpriteText
@@ -226,15 +232,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         Padding = new MarginPadding { Left = 40, Right = 48 },
                         Child = new EzLocalProfileRoundedBar(ratio),
                     },
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.CentreRight,
-                        Origin = Anchor.CentreRight,
-                        Text = plays.ToString("N0"),
-                        Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
-                        Colour = colours.Content2,
-                    }
+                    new CountText(plays),
                 };
+            }
+
+            private partial class CountText : OsuSpriteText
+            {
+                public CountText(int plays)
+                {
+                    Anchor = Anchor.CentreRight;
+                    Origin = Anchor.CentreRight;
+                    Text = plays.ToString("N0");
+                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold);
+                }
+
+                [BackgroundDependencyLoader]
+                private void load(OverlayColourProvider colours) => Colour = colours.Content2;
             }
         }
     }
