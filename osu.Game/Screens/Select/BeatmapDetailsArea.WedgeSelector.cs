@@ -31,9 +31,11 @@ namespace osu.Game.Screens.Select
 
             protected override Dropdown<T>? CreateDropdown() => null;
 
-            protected override TabItem<T> CreateTabItem(T value) => new TabItem(value);
+            protected override TabItem<T> CreateTabItem(T value) => new TabItem(value, this);
 
             protected new TabItem SelectedTab => (TabItem)base.SelectedTab;
+
+            public Func<T, bool>? IsItemActivatable { get; set; }
 
             public WedgeSelector(float spacing)
             {
@@ -79,6 +81,14 @@ namespace osu.Game.Screens.Select
                 strip.ResizeWidthTo(SelectedTab.Text.Width, 0, Easing.OutQuint);
             }
 
+            public void SetItemDisabled(T value, bool disabled)
+            {
+                if (!TabMap.TryGetValue(value, out var tab))
+                    return;
+
+                ((TabItem)tab).Disabled = disabled;
+            }
+
             protected partial class TabItem : TabItem<T>
             {
                 private Sample? selectSample;
@@ -88,9 +98,29 @@ namespace osu.Game.Screens.Select
 
                 public readonly OsuSpriteText Text;
 
-                public TabItem(T value)
+                private bool disabled;
+
+                public bool Disabled
+                {
+                    get => disabled;
+                    set
+                    {
+                        if (disabled == value)
+                            return;
+
+                        disabled = value;
+                        updateDisplay();
+                    }
+                }
+
+                public override bool IsSwitchable => !Disabled;
+
+                private readonly WedgeSelector<T> owner;
+
+                public TabItem(T value, WedgeSelector<T> owner)
                     : base(value)
                 {
+                    this.owner = owner;
                     AutoSizeAxes = Axes.Both;
 
                     Children = new Drawable[]
@@ -132,8 +162,28 @@ namespace osu.Game.Screens.Select
 
                 protected override void OnHoverLost(HoverLostEvent e) => updateDisplay();
 
+                public override bool HandlePositionalInput => !Disabled && base.HandlePositionalInput;
+
+                protected override bool OnClick(ClickEvent e)
+                {
+                    if (Disabled)
+                        return true;
+
+                    if (owner.IsItemActivatable != null && !owner.IsItemActivatable(Value))
+                        return true;
+
+                    return base.OnClick(e);
+                }
+
                 private void updateDisplay()
                 {
+                    if (Disabled)
+                    {
+                        Text.FadeColour(colourProvider.Foreground1, 300, Easing.OutQuint);
+                        Text.Font = Text.Font.With(weight: FontWeight.Regular);
+                        return;
+                    }
+
                     if (Active.Value || IsHovered)
                         Text.FadeColour(colourProvider.Content1, 300, Easing.OutQuint);
                     else

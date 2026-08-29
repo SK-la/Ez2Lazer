@@ -141,6 +141,15 @@ namespace osu.Game.EzOsuGame.Localization
             "由极速模式接管。关闭极速模式后会还原成你原来的值。",
             "Managed by turbo mode. Your original value is restored when turbo mode is turned off.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString FLOW_MODE =
+            new EzLocalizationManager.EzLocalisableString("心流", "Zen Flow");
+
+        public static readonly EzLocalizationManager.EzLocalisableString FLOW_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "专注过程，淡化成绩。"
+            + "\n开启后，游戏结束将直接返回选曲界面，成绩依然保留但不显示结算。选曲界面禁用切换到成绩排名页。",
+            "Focus on play, not results."
+            + "\nWhen enabled, the game skips the results screen after play. Scores are saved but not shown. Ranking view is disabled in song select.");
+
         public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_ENABLED =
             new EzLocalizationManager.EzLocalisableString("毛玻璃 UI", "Acrylic UI");
 

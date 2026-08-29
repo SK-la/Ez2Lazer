@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
@@ -9,6 +10,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -30,6 +32,8 @@ namespace osu.Game.Screens.Select
             private ShearedDropdown<LeaderboardSortMode> sortDropdown = null!;
             private ShearedToggleButton selectedModsToggle = null!;
 
+            private Bindable<bool> flowMode = null!;
+
             public IBindable<Selection> Type => tabControl.Current;
 
             public IBindable<BeatmapLeaderboardScope> Scope => scopeDropdown.Current;
@@ -43,7 +47,7 @@ namespace osu.Game.Screens.Select
             public IBindable<bool> FilterBySelectedMods => selectedModsToggle.Active;
 
             [BackgroundDependencyLoader]
-            private void load(OsuConfigManager config)
+            private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
             {
                 InternalChildren = new Drawable[]
                 {
@@ -108,6 +112,8 @@ namespace osu.Game.Screens.Select
                 config.BindWith(OsuSetting.BeatmapDetailTab, configDetailTab);
                 config.BindWith(OsuSetting.BeatmapLeaderboardSortMode, configLeaderboardSortMode);
                 config.BindWith(OsuSetting.BeatmapDetailModsFilter, selectedModsToggle.Active);
+
+                flowMode = ezConfig.GetBindable<bool>(Ez2Setting.FlowMode);
             }
 
             protected override void LoadComplete()
@@ -118,11 +124,16 @@ namespace osu.Game.Screens.Select
                 scopeDropdown.Current.BindValueChanged(_ => updateConfigDetailTab());
 
                 tabControl.Current.Value = configDetailTab.Value == BeatmapDetailTab.Details ? Selection.Details : Selection.Ranking;
+
+                tabControl.IsItemActivatable = type => !flowMode.Value || !EqualityComparer<Selection>.Default.Equals(type, Selection.Ranking);
+
                 tabControl.Current.BindValueChanged(v =>
                 {
                     leaderboardControls.FadeTo(v.NewValue == Selection.Ranking ? 1 : 0, 300, Easing.OutQuint);
                     updateConfigDetailTab();
                 }, true);
+
+                flowMode.BindValueChanged(e => applyFlowModeState(e.NewValue), true);
 
                 scopeDropdown.Current.BindValueChanged(scope =>
                 {
@@ -140,6 +151,20 @@ namespace osu.Game.Screens.Select
                         sortDropdown.Current.Disabled = true;
                     }
                 }, true);
+            }
+
+            private void applyFlowModeState(bool enabled)
+            {
+                tabControl.SetItemDisabled(Selection.Ranking, enabled);
+
+                if (!enabled)
+                    return;
+
+                ScheduleAfterChildren(() =>
+                {
+                    if (EqualityComparer<Selection>.Default.Equals(tabControl.Current.Value, Selection.Ranking))
+                        tabControl.SelectItem(Selection.Details);
+                });
             }
 
             #region Reading / writing state from / to configuration

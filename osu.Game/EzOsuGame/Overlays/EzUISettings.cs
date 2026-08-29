@@ -52,6 +52,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
+                    Caption = EzSettingsStrings.FLOW_MODE,
+                    HintText = EzSettingsStrings.FLOW_MODE_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.FlowMode),
+                })
+                {
+                    Keywords = new[] { "flow", "zen", "心流", "results", "ranking", "song select" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
                     Caption = EzSettingsStrings.ACRYLIC_UI_ENABLED,
                     HintText = EzSettingsStrings.ACRYLIC_UI_ENABLED_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled),

@@ -112,6 +112,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.TurboMode, false);
             SetDefault(Ez2Setting.TurboModeSnapshot, string.Empty);
+            SetDefault(Ez2Setting.FlowMode, false);
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
             SetDefault(Ez2Setting.AcrylicUiEnabled, false);
@@ -938,6 +939,11 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 启动时若发现它非空即为上次异常退出，需立即还原。不面向用户。
         /// </summary>
         TurboModeSnapshot,
+
+        /// <summary>
+        /// 心流（Zen Flow）：从选歌进入的单人游玩结束后跳过结算直接回选歌；选歌界面禁用 Ranking 标签。
+        /// </summary>
+        FlowMode,
 
         StoryboardAutoVideoSize,
         AcrylicUiEnabled,

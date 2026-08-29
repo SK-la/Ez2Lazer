@@ -1136,6 +1136,14 @@ namespace osu.Game.Screens.Play
                     // This player instance may already be in the process of exiting.
                     return;
 
+                // [Ez] 心流：从选歌进入的单人游玩跳过结算，成绩已导入后直接回选歌。
+                if (EzFlowMode.ShouldSkipResults(this))
+                {
+                    EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.FlowMode", "Skipping results screen – returning to song select");
+                    EzFlowMode.ReturnToSongSelect(game as OsuGame);
+                    return;
+                }
+
                 EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.Push", "Navigating to results screen");
                 OnShowingResults?.Invoke();
                 this.Push(CreateResults(prepareScoreForDisplayTask.GetResultSafely()));
