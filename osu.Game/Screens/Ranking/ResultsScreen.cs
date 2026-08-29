@@ -26,6 +26,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Statistics;
+using osu.Game.EzOsuGame.Screens.Rotation;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
@@ -219,6 +220,8 @@ namespace osu.Game.Screens.Ranking
                 buttons.Add(new RetryButton { Width = 300 });
                 allowHotkeyRetry = true;
             }
+
+            EzQuickRotationResults.TryAddContinueButton(buttons, this);
 
             if (allowHotkeyRetry)
             {
@@ -585,6 +588,9 @@ namespace osu.Game.Screens.Ranking
                     break;
 
                 case GlobalAction.Select:
+                    if (EzQuickRotationResults.TryHandleSelect(this))
+                        return true;
+
                     if (SelectedScore.Value != null)
                         StatisticsPanel.ToggleVisibility();
                     return true;

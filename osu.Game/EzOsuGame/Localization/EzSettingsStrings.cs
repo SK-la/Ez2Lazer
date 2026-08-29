@@ -150,6 +150,37 @@ namespace osu.Game.EzOsuGame.Localization
             "Focus on play, not results."
             + "\nWhen enabled, the game skips the results screen after play. Scores are saved but not shown. Ranking view is disabled in song select.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_SECTION_HEADER =
+            new EzLocalizationManager.EzLocalisableString("快速轮换", "Quick Rotation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("快速轮换", "Quick Rotation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "从选歌进入的单人局结束后，在专用抽卡界面连续游玩相似难度的谱面，全程不回到选歌界面。",
+            "After solo play from song select, continue in a dedicated card-pick screen with similar difficulty. Never returns to song select until ended.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_DIFFICULTY_TOLERANCE =
+            new EzLocalizationManager.EzLocalisableString("难度容差", "Difficulty tolerance");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_DIFFICULTY_TOLERANCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "抽卡后通过 Nice BPM 调速，使有效难度落在首次进入时基准难度的 ± 此值范围内。",
+            "After picking a card, Nice BPM adjusts speed so effective difficulty stays within ± this value of the baseline from your first chart.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CROSS_KEY_MODE =
+            new EzLocalizationManager.EzLocalisableString("跨键数轮换", "Cross key-count rotation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CROSS_KEY_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "仅 Mania。开启后候选池可含 4–10K；关闭则整段会话锁定首轮谱面的键数。",
+            "Mania only. When enabled, the pool may include 4–10K charts. When disabled, key count is locked to the first chart.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CANDIDATE_COUNT =
+            new EzLocalizationManager.EzLocalisableString("候选卡片数", "Candidate card count");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CANDIDATE_COUNT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "每轮抽卡界面展示的谱面数量（3–6）。",
+            "Number of beatmap cards shown each pick round (3–6).");
+
         public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_ENABLED =
             new EzLocalizationManager.EzLocalisableString("毛玻璃 UI", "Acrylic UI");
 

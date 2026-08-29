@@ -32,6 +32,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Performance;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Screens.Play;
+using osu.Game.EzOsuGame.Screens.Rotation;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
@@ -1135,6 +1136,14 @@ namespace osu.Game.Screens.Play
                 if (!this.IsCurrentScreen())
                     // This player instance may already be in the process of exiting.
                     return;
+
+                // [Ez] 快速轮换：会话进行中时进入抽卡/过渡界面。
+                if (EzQuickRotationCoordinator.Session.IsActive)
+                {
+                    EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.QuickRotation", "Navigating to quick rotation flow");
+                    EzQuickRotationCoordinator.NavigateAfterPlay(this);
+                    return;
+                }
 
                 // [Ez] 心流：从选歌进入的单人游玩跳过结算，成绩已导入后直接回选歌。
                 if (EzFlowMode.ShouldSkipResults(this))
