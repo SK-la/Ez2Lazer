@@ -70,7 +70,10 @@ namespace osu.Game.Graphics.Containers.Markdown.Footnotes
         {
             get
             {
-                var span = FootnoteLink.Footnote.LastChild.Span;
+                if (FootnoteLink.Footnote.LastChild is not { } lastChild)
+                    return string.Empty;
+
+                var span = lastChild.Span;
                 return markdownContainer.Text.Substring(span.Start, span.Length);
             }
         }

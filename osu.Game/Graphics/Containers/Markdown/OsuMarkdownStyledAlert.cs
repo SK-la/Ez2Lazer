@@ -33,13 +33,15 @@ namespace osu.Game.Graphics.Containers.Markdown
 
         public OsuMarkdownStyledAlert(CustomContainer customContainer)
         {
-            if (Enum.TryParse(customContainer.Info.Split("-")[1], true, out AlertType alertTypeParsed))
+            string[] infoParts = customContainer.Info?.Split('-') ?? Array.Empty<string>();
+
+            if (infoParts.Length > 1 && Enum.TryParse(infoParts[1], true, out AlertType alertTypeParsed))
                 alertType = alertTypeParsed;
             else
                 alertType = AlertType.None;
 
             if (customContainer.FirstOrDefault() is ParagraphBlock paragraphBlock &&
-                paragraphBlock.Inline.FirstChild is EmphasisInline emphasisInline &&
+                paragraphBlock.Inline?.FirstChild is EmphasisInline emphasisInline &&
                 emphasisInline.NextSibling is LineBreakInline)
             {
                 blockTitle = true;
