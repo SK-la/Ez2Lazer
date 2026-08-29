@@ -1,10 +1,19 @@
 ﻿<!-- Ez2Lazer：Framework / Resources 依赖。版本仅在此文件维护。 -->
 <Project>
   <PropertyGroup Label="Ez2Lazer">
-    <Ez2LazerFrameworkVersion>2026.815.0-ez2lazer</Ez2LazerFrameworkVersion>
-    <Ez2LazerGameResourcesVersion>2026.815.0-ez2lazer</Ez2LazerGameResourcesVersion>
-    <Ez2LazerFrameworkProjectPath>$(MSBuildThisFileDirectory)..\osu-framework\osu.Framework\osu.Framework.csproj</Ez2LazerFrameworkProjectPath>
-    <Ez2LazerResourcesProjectPath>$(MSBuildThisFileDirectory)..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj</Ez2LazerResourcesProjectPath>
+    <Ez2LazerFrameworkVersion>2026.829.0-ez2lazer</Ez2LazerFrameworkVersion>
+    <Ez2LazerGameResourcesVersion>2026.829.0-ez2lazer</Ez2LazerGameResourcesVersion>
+
+    <!-- ../ for repo root siblings (osu/, osu-Agent/); ../../ for Agent/osu-Agent worktree. -->
+    <_EzFwCandidate1>$(MSBuildThisFileDirectory)..\osu-framework\osu.Framework\osu.Framework.csproj</_EzFwCandidate1>
+    <_EzFwCandidate2>$(MSBuildThisFileDirectory)..\..\osu-framework\osu.Framework\osu.Framework.csproj</_EzFwCandidate2>
+    <Ez2LazerFrameworkProjectPath Condition="Exists('$(_EzFwCandidate1)')">$(_EzFwCandidate1)</Ez2LazerFrameworkProjectPath>
+    <Ez2LazerFrameworkProjectPath Condition="'$(Ez2LazerFrameworkProjectPath)' == '' and Exists('$(_EzFwCandidate2)')">$(_EzFwCandidate2)</Ez2LazerFrameworkProjectPath>
+
+    <_EzResCandidate1>$(MSBuildThisFileDirectory)..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj</_EzResCandidate1>
+    <_EzResCandidate2>$(MSBuildThisFileDirectory)..\..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj</_EzResCandidate2>
+    <Ez2LazerResourcesProjectPath Condition="Exists('$(_EzResCandidate1)')">$(_EzResCandidate1)</Ez2LazerResourcesProjectPath>
+    <Ez2LazerResourcesProjectPath Condition="'$(Ez2LazerResourcesProjectPath)' == '' and Exists('$(_EzResCandidate2)')">$(_EzResCandidate2)</Ez2LazerResourcesProjectPath>
 
     <!-- 依赖来源：默认 NuGet；启用本地同级工程时打开下面两个开关，并在 IDE 中打开 osu.Desktop.Local.slnf。 -->
 <!--    <UseEz2LazerLocalFrameworkProject>true</UseEz2LazerLocalFrameworkProject>-->
