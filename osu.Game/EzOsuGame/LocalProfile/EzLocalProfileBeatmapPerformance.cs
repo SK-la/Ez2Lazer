@@ -4,10 +4,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
+using osu.Game.Beatmaps;
+using osu.Game.Database;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Scoring;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.LocalProfile
@@ -17,25 +24,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private const float card_spacing = 8;
 
         private readonly FillFlowContainer cardsFlow;
+        private readonly Dictionary<Guid, double?> resolvedOffsets = new Dictionary<Guid, double?>();
+        private CancellationTokenSource? offsetLoadCts;
+        private EzLocalProfileDrillScoreRow? pendingCurrent;
+        private IReadOnlyList<EzLocalProfileDrillScoreRow> pendingAllScores = Array.Empty<EzLocalProfileDrillScoreRow>();
 
-        private static readonly MetricDefinition[] metrics =
-        {
-            new MetricDefinition(
-                EzSettingsStrings.LOCAL_PROFILE_BEATMAP_PERF_PP,
-                row => row.PpResolved > 0 ? row.PpResolved : null,
-                EzLocalProfileFormat.FormatPp,
-                "pp"),
-            new MetricDefinition(
-                EzSettingsStrings.LOCAL_PROFILE_BEATMAP_PERF_ACC,
-                row => row.Accuracy,
-                v => $"{v * 100:0.00}%",
-                string.Empty),
-            new MetricDefinition(
-                EzSettingsStrings.LOCAL_PROFILE_BEATMAP_PERF_OFF,
-                row => row.AvgAbsOffsetMs,
-                v => $"{v:0} ms",
-                string.Empty),
-        };
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
+
+        [Resolved]
+        private ScoreManager scoreManager { get; set; } = null!;
+
+        [Resolved]
+        private BeatmapManager beatmapManager { get; set; } = null!;
+
+        [Resolved]
+        private IEzReplaySession replaySession { get; set; } = null!;
 
         public EzLocalProfileBeatmapPerformance()
         {
@@ -53,7 +57,60 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public void Update(EzLocalProfileDrillScoreRow? current, IReadOnlyList<EzLocalProfileDrillScoreRow> allScores)
         {
+            offsetLoadCts?.Cancel();
+            offsetLoadCts = null;
+            pendingCurrent = current;
+            pendingAllScores = allScores;
+
+            rebuildCards();
+
+            if (current == null)
+                return;
+
+            var peers = EzLocalProfileScoreDrillQuery.PeersOnSameBeatmap(current, allScores);
+            var missing = peers.Where(row => resolveOffset(row) == null).Select(row => row.ScoreId).Distinct().ToList();
+
+            if (missing.Count == 0)
+                return;
+
+            var localCancellation = offsetLoadCts = new CancellationTokenSource();
+
+            Task.Run(async () =>
+            {
+                foreach (var scoreId in missing)
+                {
+                    localCancellation.Token.ThrowIfCancellationRequested();
+
+                    double? offset = await EzLocalProfileHitEventResolver.ResolveAvgAbsOffsetMsAsync(
+                        scoreId,
+                        realm,
+                        scoreManager,
+                        beatmapManager,
+                        replaySession,
+                        localCancellation.Token).ConfigureAwait(false);
+
+                    resolvedOffsets[scoreId] = offset;
+                }
+            }, localCancellation.Token).ContinueWith(task => Schedule(() =>
+            {
+                if (task.IsCanceled || pendingCurrent == null)
+                    return;
+
+                rebuildCards();
+            }), localCancellation.Token);
+        }
+
+        protected override void UpdateAfterChildren()
+        {
+            base.UpdateAfterChildren();
+            distributeCardWidths();
+        }
+
+        private void rebuildCards()
+        {
             cardsFlow.Clear();
+
+            var current = pendingCurrent;
 
             if (current == null)
             {
@@ -61,19 +118,42 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return;
             }
 
-            var peers = EzLocalProfileScoreDrillQuery.PeersOnSameBeatmap(current, allScores);
+            var peers = EzLocalProfileScoreDrillQuery.PeersOnSameBeatmap(current, pendingAllScores);
 
-            foreach (var metric in metrics)
+            foreach (var metric in createMetrics())
                 cardsFlow.Add(createCard(metric, current, peers));
 
             Show();
             distributeCardWidths();
         }
 
-        protected override void UpdateAfterChildren()
+        private IEnumerable<MetricDefinition> createMetrics()
         {
-            base.UpdateAfterChildren();
-            distributeCardWidths();
+            yield return new MetricDefinition(
+                EzSettingsStrings.LOCAL_PROFILE_BEATMAP_PERF_PP,
+                row => row.PpResolved > 0 ? row.PpResolved : null,
+                EzLocalProfileFormat.FormatPp,
+                "pp");
+
+            yield return new MetricDefinition(
+                EzSettingsStrings.LOCAL_PROFILE_BEATMAP_PERF_ACC,
+                row => row.Accuracy,
+                v => $"{v * 100:0.00}%",
+                string.Empty);
+
+            yield return new MetricDefinition(
+                EzSettingsStrings.LOCAL_PROFILE_BEATMAP_PERF_OFFSET,
+                resolveOffset,
+                v => $"{v:0} ms",
+                string.Empty);
+        }
+
+        private double? resolveOffset(EzLocalProfileDrillScoreRow row)
+        {
+            if (row.AvgAbsOffsetMs is double stored)
+                return stored;
+
+            return resolvedOffsets.GetValueOrDefault(row.ScoreId);
         }
 
         private void distributeCardWidths()

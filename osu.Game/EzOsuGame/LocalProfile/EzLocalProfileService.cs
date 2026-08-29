@@ -8,11 +8,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Logging;
+using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Framework.Platform;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
@@ -30,10 +32,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public BindableBool IsComputing { get; } = new BindableBool();
 
-        public EzLocalProfileService(Storage storage, RealmAccess realm, EzAnalysisPersistentStore analysisStore, BeatmapManager beatmapManager)
+        public EzLocalProfileService(
+            Storage storage,
+            RealmAccess realm,
+            EzAnalysisPersistentStore analysisStore,
+            BeatmapManager beatmapManager,
+            ScoreManager scoreManager,
+            IEzReplaySession replaySession)
         {
             store = new EzLocalProfileStore(storage);
-            aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager);
+            aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager, scoreManager, replaySession);
             Snapshot.Value = store.LoadSnapshot();
         }
 

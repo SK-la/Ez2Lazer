@@ -9,6 +9,7 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.Rulesets;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Tests.Database;
 
@@ -76,6 +77,28 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
             var maniaScores = store.LoadDrillScores(3);
             Assert.That(maniaScores, Has.Count.EqualTo(1));
             Assert.That(maniaScores[0].RulesetId, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void TestComputeAvgAbsOffsetMsReturnsNullWithoutHitEvents()
+        {
+            var score = new ScoreInfo();
+            Assert.That(EzLocalProfileDrillScoreRow.ComputeAvgAbsOffsetMs(score), Is.Null);
+        }
+
+        [Test]
+        public void TestComputeAvgAbsOffsetMsAveragesAbsoluteOffsets()
+        {
+            var score = new ScoreInfo
+            {
+                HitEvents =
+                {
+                    new HitEvent(-10, null, HitResult.Great, null!, null, null),
+                    new HitEvent(6, null, HitResult.Great, null!, null, null),
+                },
+            };
+
+            Assert.That(EzLocalProfileDrillScoreRow.ComputeAvgAbsOffsetMs(score), Is.EqualTo(8).Within(0.001));
         }
 
         private static EzLocalProfileDrillScoreRow createRow(

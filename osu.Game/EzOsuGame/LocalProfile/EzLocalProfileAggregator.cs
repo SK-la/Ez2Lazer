@@ -8,6 +8,7 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using Realms;
@@ -19,13 +20,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly RealmAccess realm;
         private readonly EzAnalysisPersistentStore analysisStore;
         private readonly BeatmapManager beatmapManager;
+        private readonly ScoreManager scoreManager;
+        private readonly IEzReplaySession replaySession;
         private readonly EzLocalProfilePpResolver ppResolver;
 
-        public EzLocalProfileAggregator(RealmAccess realm, EzAnalysisPersistentStore analysisStore, BeatmapManager beatmapManager)
+        public EzLocalProfileAggregator(
+            RealmAccess realm,
+            EzAnalysisPersistentStore analysisStore,
+            BeatmapManager beatmapManager,
+            ScoreManager scoreManager,
+            IEzReplaySession replaySession)
         {
             this.realm = realm;
             this.analysisStore = analysisStore;
             this.beatmapManager = beatmapManager;
+            this.scoreManager = scoreManager;
+            this.replaySession = replaySession;
             ppResolver = new EzLocalProfilePpResolver(beatmapManager);
         }
 
@@ -95,8 +105,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             int total = Math.Max(1, detachedScores.Count);
             int processed = 0;
 
-            void report() =>
-                progress?.Report(new EzLocalProfileComputeProgress(processed, total, Saving: false));
+            void report() => progress?.Report(new EzLocalProfileComputeProgress(processed, total, Saving: false));
 
             report();
 
@@ -121,12 +130,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 double pp = resolvedPp[i];
                 long durationMs = beatmap.Length > 0 ? (long)beatmap.Length : 0;
 
+                double? avgAbsOffsetMs = EzLocalProfileHitEventResolver.ResolveAvgAbsOffsetMs(
+                    score,
+                    realm,
+                    scoreManager,
+                    beatmapManager,
+                    replaySession,
+                    cancellationToken);
+
                 result.DrillScores.Add(EzLocalProfileDrillScoreRow.FromScore(
                     score,
                     username,
                     pp,
                     hasKps ? analysis : default,
-                    hasKps));
+                    hasKps,
+                    avgAbsOffsetMs));
 
                 var rulesetStats = getOrCreate(result.RulesetStats, rulesetId, () => new EzLocalProfileAggregationResult.MutableRulesetStats());
                 rulesetStats.TotalKeys += keys;
@@ -378,8 +396,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private static double roundAttr(float value) => Math.Round(value, 1, MidpointRounding.AwayFromZero);
 
-        private static bool isHighGrade(ScoreRank rank) =>
-            rank is ScoreRank.S or ScoreRank.SH or ScoreRank.X or ScoreRank.XH;
+        private static bool isHighGrade(ScoreRank rank) => rank is ScoreRank.S or ScoreRank.SH or ScoreRank.X or ScoreRank.XH;
 
         private static TValue getOrCreate<TKey, TValue>(Dictionary<TKey, TValue> dict, TKey key, Func<TValue> factory)
             where TKey : notnull

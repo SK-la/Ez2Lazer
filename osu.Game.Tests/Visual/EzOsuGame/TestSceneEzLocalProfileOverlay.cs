@@ -6,15 +6,13 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
-using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Scoring;
-using osu.Game.Tests.Visual;
 
 namespace osu.Game.Tests.Visual.EzOsuGame
 {
@@ -33,6 +31,12 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         [Resolved]
         private EzAnalysisPersistentStore analysisStore { get; set; } = null!;
 
+        [Resolved]
+        private ScoreManager scoreManager { get; set; } = null!;
+
+        [Resolved]
+        private IEzReplaySession replaySession { get; set; } = null!;
+
         [Test]
         public void TestFullProfile()
         {
@@ -47,7 +51,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             using (var seedStore = new EzLocalProfileStore(profileStorage))
                 seedStore.ReplaceAll(EzLocalProfileOverlayTestData.CreateMockResult());
 
-            profileService = new EzLocalProfileService(profileStorage, realm, analysisStore, beatmapManager);
+            profileService = new EzLocalProfileService(profileStorage, realm, analysisStore, beatmapManager, scoreManager, replaySession);
             overlay = new EzLocalProfileOverlay();
 
             Child = new DependencyProvidingContainer
@@ -65,8 +69,8 @@ namespace osu.Game.Tests.Visual.EzOsuGame
 
         protected override void Dispose(bool isDisposing)
         {
-            profileService?.Dispose();
-            profileStorage?.Dispose();
+            profileService.Dispose();
+            profileStorage.Dispose();
             base.Dispose(isDisposing);
         }
     }
@@ -79,22 +83,26 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             {
                 IncludedUsernames = new[] { "peppy" },
                 ComputedAt = DateTimeOffset.UtcNow,
+                RulesetStats =
+                {
+                    [EzLocalProfileConstants.OSU_RULESET_ID] = new EzLocalProfileAggregationResult.MutableRulesetStats
+                    {
+                        ScoreCount = 42,
+                        TotalPp = 5123.4,
+                        TotalKeys = 18_000,
+                        KpsSampleCount = 40,
+                        KpsSum = 320,
+                        MaxKps = 12.5,
+                        TotalDurationMs = 3_600_000,
+                    }
+                },
+                GradeCounts =
+                {
+                    [(EzLocalProfileConstants.OSU_RULESET_ID, ScoreRank.S)] = 18,
+                    [(EzLocalProfileConstants.OSU_RULESET_ID, ScoreRank.A)] = 12,
+                    [(EzLocalProfileConstants.OSU_RULESET_ID, ScoreRank.B)] = 8
+                }
             };
-
-            result.RulesetStats[EzLocalProfileConstants.OSU_RULESET_ID] = new EzLocalProfileAggregationResult.MutableRulesetStats
-            {
-                ScoreCount = 42,
-                TotalPp = 5123.4,
-                TotalKeys = 18_000,
-                KpsSampleCount = 40,
-                KpsSum = 320,
-                MaxKps = 12.5,
-                TotalDurationMs = 3_600_000,
-            };
-
-            result.GradeCounts[(EzLocalProfileConstants.OSU_RULESET_ID, ScoreRank.S)] = 18;
-            result.GradeCounts[(EzLocalProfileConstants.OSU_RULESET_ID, ScoreRank.A)] = 12;
-            result.GradeCounts[(EzLocalProfileConstants.OSU_RULESET_ID, ScoreRank.B)] = 8;
 
             foreach (int bucket in new[] { 3, 4, 5, 6, 7 })
                 result.StarPlayCounts[(EzLocalProfileConstants.OSU_RULESET_ID, bucket)] = bucket * 4;
@@ -118,10 +126,10 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         private static IEnumerable<EzLocalProfileDrillScoreRow> createDrillScores()
         {
             var beatmapId = Guid.NewGuid();
-            const string beatmapHash = "mock-beatmap-hash";
+            const string beatmap_hash = "mock-beatmap-hash";
 
-            yield return createDrillRow(beatmapId, beatmapHash, "Visual Test Song With A Long Title", 234.56, withMods: true);
-            yield return createDrillRow(beatmapId, beatmapHash, "Second Score On Same Map", 210.0, withMods: false);
+            yield return createDrillRow(beatmapId, beatmap_hash, "Visual Test Song With A Long Title", 234.56, withMods: true);
+            yield return createDrillRow(beatmapId, beatmap_hash, "Second Score On Same Map", 210.0, withMods: false);
             yield return createDrillRow(Guid.NewGuid(), "other-hash", "Another Beatmap", 180.0, withMods: false);
         }
 

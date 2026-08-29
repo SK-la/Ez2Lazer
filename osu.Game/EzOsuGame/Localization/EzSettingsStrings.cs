@@ -880,8 +880,8 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BEATMAP_PERF_ACC =
             new EzLocalizationManager.EzLocalisableString("Acc", "Acc");
 
-        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BEATMAP_PERF_OFF =
-            new EzLocalizationManager.EzLocalisableString("Off", "Off");
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BEATMAP_PERF_OFFSET =
+            new EzLocalizationManager.EzLocalisableString("Offset", "Offset");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TREND_OFFSET =
             new EzLocalizationManager.EzLocalisableString("击打偏移", "Hit offset");

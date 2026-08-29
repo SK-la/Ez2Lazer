@@ -82,29 +82,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             var localCancellation = loadCancellation = new CancellationTokenSource();
 
-            Task.Run(async () =>
-            {
-                var detached = realm.Run(r => r.Find<ScoreInfo>(row.ScoreId)?.DeepClone());
-                if (detached == null)
-                    return null;
-
-                if (detached.HitEvents.Count == 0)
-                {
-                    var databasedScore = scoreManager.GetScore(detached);
-
-                    if (databasedScore != null)
-                    {
-                        var workingBeatmap = beatmapManager.GetWorkingBeatmap(detached.BeatmapInfo);
-                        var playable = workingBeatmap.GetPlayableBeatmap(detached.Ruleset, detached.Mods);
-                        var generated = await replaySession.RunHitEventsAsync(databasedScore, playable, ReplayRunPurpose.ForStored, localCancellation.Token).ConfigureAwait(false);
-
-                        if (generated != null)
-                            detached.HitEvents = generated;
-                    }
-                }
-
-                return detached;
-            }, localCancellation.Token).ContinueWith(task => Schedule(() =>
+            Task.Run(async () => await EzLocalProfileHitEventResolver.LoadScoreWithHitEventsAsync(
+                row.ScoreId,
+                realm,
+                scoreManager,
+                beatmapManager,
+                replaySession,
+                localCancellation.Token).ConfigureAwait(false), localCancellation.Token).ContinueWith(task => Schedule(() =>
             {
                 if (task.IsCanceled)
                     return;

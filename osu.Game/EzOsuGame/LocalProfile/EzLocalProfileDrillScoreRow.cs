@@ -83,7 +83,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             string username,
             double ppResolved,
             EzAnalysisResult analysis,
-            bool hasKps)
+            bool hasKps,
+            double? avgAbsOffsetMs = null)
         {
             var beatmap = score.BeatmapInfo!;
             var metadata = beatmap.Metadata;
@@ -106,10 +107,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 BeatmapHash = score.BeatmapHash,
                 BeatmapId = beatmap.ID,
                 BeatmapSetId = beatmap.BeatmapSet?.ID,
-                Title = metadata.Title ?? "?",
-                Artist = metadata.Artist ?? string.Empty,
+                Title = metadata.Title,
+                Artist = metadata.Artist,
                 DifficultyName = beatmap.DifficultyName,
-                MapperUsername = metadata.Author.Username ?? string.Empty,
+                MapperUsername = metadata.Author.Username,
                 BeatmapStatus = beatmap.Status,
                 StarRating = beatmap.StarRating,
                 XxyStarRating = beatmap.XxyStarRating,
@@ -119,14 +120,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 KpsListJson = JsonSerializer.Serialize(hasKps ? analysis.KpsList.ToList() : new List<double>()),
                 ColumnCountsJson = JsonSerializer.Serialize(maniaSummary?.ColumnCounts ?? new Dictionary<int, int>()),
                 HoldCountsJson = JsonSerializer.Serialize(maniaSummary?.HoldNoteCounts ?? new Dictionary<int, int>()),
-                AvgAbsOffsetMs = computeAvgAbsOffset(score),
+                AvgAbsOffsetMs = avgAbsOffsetMs ?? ComputeAvgAbsOffsetMs(score),
                 HasVideo = beatmap.HasVideo == true,
                 HasStoryboard = beatmap.HasStoryboard == true,
                 Date = score.Date,
             };
         }
 
-        private static double? computeAvgAbsOffset(ScoreInfo score)
+        public static double? ComputeAvgAbsOffsetMs(ScoreInfo score)
         {
             if (score.HitEvents.Count == 0)
                 return null;
