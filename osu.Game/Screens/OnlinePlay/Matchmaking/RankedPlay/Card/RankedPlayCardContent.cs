@@ -58,10 +58,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card
                             FillMode = FillMode.Fit,
                             Children =
                             [
-                                new CardCover(Beatmap)
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                },
+                                createCardCover(),
                                 new CardMetadata(Beatmap)
                                 {
                                     RelativeSizeAxes = Axes.Both,

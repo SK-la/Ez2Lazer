@@ -115,6 +115,11 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.TurboModeSnapshot, string.Empty);
             SetDefault(Ez2Setting.FlowMode, false);
 
+            SetDefault(Ez2Setting.QuickRotationEnabled, false);
+            SetDefault(Ez2Setting.QuickRotationDifficultyTolerance, 0.5, 0.1, 2.0, 0.1);
+            SetDefault(Ez2Setting.QuickRotationCrossKeyMode, false);
+            SetDefault(Ez2Setting.QuickRotationCandidateCount, 5, 3, 6);
+
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
             SetDefault(Ez2Setting.AcrylicUiEnabled, false);
             SetDefault(Ez2Setting.AcrylicUiBlurStrength, 16.0, 0.0, 40.0, 1.0);
@@ -945,6 +950,26 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 心流（Zen Flow）：从选歌进入的单人游玩结束后跳过结算直接回选歌；选歌界面禁用 Ranking 标签。
         /// </summary>
         FlowMode,
+
+        /// <summary>
+        /// 快速轮换总开关：从选歌进入的单人局结束后在专用界面连续抽卡开下一首。
+        /// </summary>
+        QuickRotationEnabled,
+
+        /// <summary>
+        /// 快速轮换难度平衡容差（相对首次进入时的基准难度）。
+        /// </summary>
+        QuickRotationDifficultyTolerance,
+
+        /// <summary>
+        /// Mania 快速轮换是否允许跨键数（4–10K）；关闭则锁定首轮键数。
+        /// </summary>
+        QuickRotationCrossKeyMode,
+
+        /// <summary>
+        /// 每轮抽卡展示的候选谱面数量（3–6）。
+        /// </summary>
+        QuickRotationCandidateCount,
 
         StoryboardAutoVideoSize,
         AcrylicUiEnabled,

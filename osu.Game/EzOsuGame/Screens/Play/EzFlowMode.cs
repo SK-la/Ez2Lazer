@@ -3,6 +3,7 @@
 
 using osu.Framework.Screens;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Screens.Rotation;
 using osu.Game.Screens.Select;
 
 namespace osu.Game.EzOsuGame.Screens.Play
@@ -15,6 +16,9 @@ namespace osu.Game.EzOsuGame.Screens.Play
         public static bool ShouldSkipResults(IScreen from)
         {
             if (!IsEnabled)
+                return false;
+
+            if (EzQuickRotationCoordinator.Session.IsActive)
                 return false;
 
             for (var screen = from; screen != null; screen = screen.GetParentScreen())

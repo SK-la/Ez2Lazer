@@ -98,6 +98,8 @@ namespace osu.Game.Screens.Select
         {
             if (playerLoader != null) return;
 
+            tryBeginQuickRotation();
+
             modsAtGameplayStart = Mods.Value.Select(m => m.DeepClone()).ToArray();
 
             // Ctrl+Enter should start map with autoplay enabled.
