@@ -799,6 +799,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_NONE_SELECTED =
             new EzLocalizationManager.EzLocalisableString("请至少勾选一个玩家名。", "Select at least one player name.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SELECT_SCORE =
+            new EzLocalizationManager.EzLocalisableString("在左侧选择一条成绩", "Select a score on the left");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TITLE =
             new EzLocalizationManager.EzLocalisableString("本地个人主页", "Local Profile");
 
@@ -836,7 +839,58 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("成绩评级", "Grades");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_STARS =
-            new EzLocalizationManager.EzLocalisableString("难度游玩次数", "Plays by difficulty");
+            new EzLocalizationManager.EzLocalisableString("星级分布", "Star rating");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_CAREER =
+            new EzLocalizationManager.EzLocalisableString("生涯总览", "Career overview");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_MODE_DATA =
+            new EzLocalizationManager.EzLocalisableString("各模式统计", "Stats by mode");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_XXY_PLAY_DISTRIBUTION =
+            new EzLocalizationManager.EzLocalisableString("xxy 星级分布", "Plays by xxy SR");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_STAR_PLAY_LINE =
+            new EzLocalizationManager.EzLocalisableString("星级游玩分布", "Plays by star rating");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_XXY_PLAY_LINE =
+            new EzLocalizationManager.EzLocalisableString("xxy 游玩分布", "xxy SR distribution");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_SCORE_DRILL =
+            new EzLocalizationManager.EzLocalisableString("成绩记录", "Score history");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_BEATMAP_PERF =
+            new EzLocalizationManager.EzLocalisableString("同图对比", "On this beatmap");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_SCORE_KEYS =
+            new EzLocalizationManager.EzLocalisableString("本局数据", "This score");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_TRENDS =
+            new EzLocalizationManager.EzLocalisableString("命中趋势", "Hit trends");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DRILL_SEARCH_PLACEHOLDER =
+            new EzLocalizationManager.EzLocalisableString("按 PP、曲名或艺术家搜索", "Search by PP, title, or artist");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DRILL_NO_MATCHES =
+            new EzLocalizationManager.EzLocalisableString("没有符合条件的成绩", "No scores match your search");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BEATMAP_PERF_PP =
+            new EzLocalizationManager.EzLocalisableString("PP", "PP");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BEATMAP_PERF_ACC =
+            new EzLocalizationManager.EzLocalisableString("Acc", "Acc");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BEATMAP_PERF_OFF =
+            new EzLocalizationManager.EzLocalisableString("Off", "Off");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TREND_OFFSET =
+            new EzLocalizationManager.EzLocalisableString("击打偏移", "Hit offset");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TREND_ACCURACY =
+            new EzLocalizationManager.EzLocalisableString("准确率", "Accuracy");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TREND_EMPTY =
+            new EzLocalizationManager.EzLocalisableString("暂无趋势数据（需保留本地回放）", "No trend data yet (local replay required).");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TOTAL_KEYS =
             new EzLocalizationManager.EzLocalisableString("按键总数", "Total keys");

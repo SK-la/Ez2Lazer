@@ -41,6 +41,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public IReadOnlyList<string> GetPreviouslyIncludedUsernames() => store.LoadIncludedUsernames();
 
+        public IReadOnlyList<EzLocalProfileDrillScoreRow> LoadDrillScores(int rulesetId) => store.LoadDrillScores(rulesetId);
+
         public bool HasOnlineScoreContributions() => store.LoadOnlineScoreContributions().Count > 0;
 
         /// <param name="usernamesToRecompute">Names whose score stats will be recalculated and overwrite their stored slice.</param>
