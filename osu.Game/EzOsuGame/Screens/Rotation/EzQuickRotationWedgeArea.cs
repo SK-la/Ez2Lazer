@@ -32,8 +32,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
 
         public EzQuickRotationWedgeArea(WorkingBeatmap? initialWorking = null, RulesetInfo? initialRuleset = null, IReadOnlyList<Mod>? initialMods = null)
         {
-            RelativeSizeAxes = Axes.Both;
-            Width = 0.6f;
+            RelativeSizeAxes = Axes.Y;
             Anchor = Anchor.TopLeft;
             Origin = Anchor.TopLeft;
             Masking = true;
@@ -77,6 +76,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
                     RelativeSizeAxes = Axes.Both,
                     Direction = FillDirection.Vertical,
                     Spacing = new Vector2(0, 4),
+                    Padding = new MarginPadding { Right = 40 },
                     Children = new Drawable[]
                     {
                         new ShearAligningWrapper(titleWedge = new BeatmapTitleWedge()),
@@ -110,7 +110,21 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
         protected override void Update()
         {
             base.Update();
+            updateWedgeWidth();
             updateDetailsHeight();
+        }
+
+        /// <summary>
+        /// Match <see cref="SongSelect"/> left grid column: 50% relative width capped at 700 (+ widescreen bonus).
+        /// </summary>
+        private void updateWedgeWidth()
+        {
+            if (Parent == null)
+                return;
+
+            float widescreenBonusWidth = Math.Max(0, Parent.DrawWidth / Parent.DrawHeight - 2f);
+            float maxWedgeWidth = 700 + widescreenBonusWidth * 100;
+            Width = Math.Min(Parent.DrawWidth * 0.5f, maxWedgeWidth);
         }
 
         private void updateDetailsHeight()
