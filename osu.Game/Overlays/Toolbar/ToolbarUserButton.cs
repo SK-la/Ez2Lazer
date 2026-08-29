@@ -9,7 +9,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Sprites;
-using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -36,9 +35,7 @@ namespace osu.Game.Overlays.Toolbar
 
         private OsuSpriteText usernameText = null!;
 
-        private IAPIProvider api = null!;
         private LoginOverlay? loginOverlay;
-        private EzLocalProfileOverlay? localProfileOverlay;
 
         public ToolbarUserButton()
         {
@@ -46,11 +43,9 @@ namespace osu.Game.Overlays.Toolbar
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuColour colours, IAPIProvider api, LoginOverlay? login, EzLocalProfileOverlay? localProfile)
+        private void load(OsuColour colours, IAPIProvider api, LoginOverlay? login)
         {
-            this.api = api;
             loginOverlay = login;
-            localProfileOverlay = localProfile;
 
             Flow.AddRange(new Drawable[]
             {
@@ -115,9 +110,7 @@ namespace osu.Game.Overlays.Toolbar
 
         private void updateOverlayTarget()
         {
-            if (api.IsLocalOnly && localProfileOverlay != null)
-                StateContainer = localProfileOverlay;
-            else if (loginOverlay != null)
+            if (loginOverlay != null)
                 StateContainer = loginOverlay;
 
             // ToolbarUserButton already shows username + avatar. Binding a FullscreenOverlay
