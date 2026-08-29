@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Text;
+using System.Threading;
 using JetBrains.Annotations;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
@@ -63,7 +64,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         private readonly Dictionary<EzColumnType, Bindable<Colour4>> columnColorBindables = new Dictionary<EzColumnType, Bindable<Colour4>>();
         private readonly Dictionary<(int keyMode, int columnIndex), ColumnBindings> columnBindings = new Dictionary<(int keyMode, int columnIndex), ColumnBindings>();
-        private readonly object columnBindingsLock = new object();
+        private readonly Lock columnBindingsLock = new Lock();
 
         public event Action<int, int, EzColumnType>? ColumnTypeChanged;
 
