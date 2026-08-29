@@ -8,9 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osuTK;
@@ -159,58 +157,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
             int rulesetId = ruleset.Value?.OnlineID ?? 0;
             var rulesetStats = snapshot.RulesetStats.FirstOrDefault(s => s.RulesetId == rulesetId);
 
-            contentFlow.Add(new EzLocalProfileSection(EzSettingsStrings.LOCAL_PROFILE_SECTION_PERFORMANCE, new EzLocalProfilePerformanceRow(rulesetStats)));
-            contentFlow.Add(new EzLocalProfileSection(EzSettingsStrings.LOCAL_PROFILE_SECTION_KEYS, new EzLocalProfileMetricRow(rulesetStats)));
-
-            if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
-                contentFlow.Add(new EzLocalProfileSection(EzSettingsStrings.LOCAL_PROFILE_SECTION_MANIA, createManiaContent(snapshot)));
-
-            if (rulesetId == EzLocalProfileConstants.OSU_RULESET_ID)
-                contentFlow.Add(new EzLocalProfileSection(EzSettingsStrings.LOCAL_PROFILE_SECTION_STD, new EzLocalProfileStdAffinityBlock(snapshot)));
+            contentFlow.Add(new EzLocalProfileSection(
+                EzSettingsStrings.LOCAL_PROFILE_SECTION_CAREER,
+                new EzLocalProfileCareerBody(rulesetStats, snapshot.GradeCounts.Where(g => g.RulesetId == rulesetId))));
 
             contentFlow.Add(new EzLocalProfileSection(
-                EzSettingsStrings.LOCAL_PROFILE_SECTION_GRADES,
-                new EzLocalProfileGradeRow(snapshot.GradeCounts.Where(g => g.RulesetId == rulesetId))));
+                EzSettingsStrings.LOCAL_PROFILE_SECTION_MODE_DATA,
+                new EzLocalProfileModeDataBody(snapshot, rulesetId)));
 
-            contentFlow.Add(new EzLocalProfileSection(
-                EzSettingsStrings.LOCAL_PROFILE_SECTION_STARS,
-                new EzLocalProfileStarBars(snapshot.StarPlayCounts.Where(s => s.RulesetId == rulesetId))));
-        }
-
-        private static Drawable createManiaContent(EzLocalProfileSnapshot snapshot)
-        {
-            var flow = new FillFlowContainer
-            {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Spacing = new Vector2(0, 12),
-            };
-
-            var keyStats = snapshot.ManiaKeyStats.OrderBy(k => k.KeyCount).ToList();
-
-            if (keyStats.Count == 0)
-            {
-                flow.Add(new OsuSpriteText
-                {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_NO_RULESET_DATA,
-                    Font = OsuFont.GetFont(size: 14),
-                });
-                return flow;
-            }
-
-            flow.Add(new EzLocalProfileManiaOverview(keyStats));
-
-            foreach (var key in keyStats)
-            {
-                var columns = snapshot.ManiaColumnStats
-                                      .Where(c => c.KeyCount == key.KeyCount)
-                                      .OrderBy(c => c.ColumnIndex)
-                                      .ToList();
-                flow.Add(new EzLocalProfileExpandableRow(key, columns));
-            }
-
-            return flow;
+            refreshDrillContent(snapshot, rulesetId);
         }
     }
 }

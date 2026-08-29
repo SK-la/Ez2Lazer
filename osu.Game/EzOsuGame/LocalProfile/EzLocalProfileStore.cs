@@ -9,6 +9,7 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Scoring;
 
@@ -20,7 +21,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     public class EzLocalProfileStore : IDisposable
     {
         public const string DATABASE_FILENAME = "ez-local-profile.sqlite";
-        public const int SCHEMA_VERSION = 3;
+        public const int SCHEMA_VERSION = 1;
 
         private readonly Storage storage;
         private readonly object sync = new object();
@@ -62,6 +63,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         ManiaColumnStats = readManiaColumnStats(connection),
                         GradeCounts = readGradeCounts(connection),
                         StarPlayCounts = readStarPlayCounts(connection),
+                        XxyPlayCounts = readXxyPlayCounts(connection),
                         StdAttrAffinities = readStdAttrAffinities(connection),
                     };
                 }
@@ -83,10 +85,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
+        public IReadOnlyList<EzLocalProfileDrillScoreRow> LoadDrillScores(int rulesetId)
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                return readDrillScores(connection, rulesetId);
+            }
+        }
+
         public int GetMostPlayedOffset(int rulesetId) => GetPullOffset(EzLocalProfileOnlinePullKind.MostPlayed, rulesetId);
 
-        public void SetMostPlayedOffset(int rulesetId, int offset) =>
-            SetPullOffset(EzLocalProfileOnlinePullKind.MostPlayed, rulesetId, offset);
+        public void SetMostPlayedOffset(int rulesetId, int offset) => SetPullOffset(EzLocalProfileOnlinePullKind.MostPlayed, rulesetId, offset);
 
         public int GetPullOffset(EzLocalProfileOnlinePullKind kind, int rulesetId)
         {
@@ -275,6 +286,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     cmd.ExecuteNonQuery();
                 }
 
+                foreach (var ((rulesetId, starBucket), count) in result.XxyPlayCounts)
+                {
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = """
+                                      INSERT INTO xxy_play_counts (ruleset_id, star_bucket, count)
+                                      VALUES ($ruleset_id, $star_bucket, $count);
+                                      """;
+                    cmd.Parameters.AddWithValue("$ruleset_id", rulesetId);
+                    cmd.Parameters.AddWithValue("$star_bucket", starBucket);
+                    cmd.Parameters.AddWithValue("$count", count);
+                    cmd.ExecuteNonQuery();
+                }
+
                 foreach (var ((attr, value), stats) in result.StdAttrAffinities)
                 {
                     using var cmd = connection.CreateCommand();
@@ -288,6 +312,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     cmd.Parameters.AddWithValue("$high_grade_count", stats.HighGradeCount);
                     cmd.ExecuteNonQuery();
                 }
+
+                writeDrillScores(connection, result.DrillScores);
 
                 transaction.Commit();
             }
@@ -482,6 +508,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 cmd.ExecuteNonQuery();
             }
 
+            foreach (var ((rulesetId, starBucket), count) in result.XxyPlayCounts)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  INSERT INTO xxy_play_counts (ruleset_id, star_bucket, count)
+                                  VALUES ($ruleset_id, $star_bucket, $count);
+                                  """;
+                cmd.Parameters.AddWithValue("$ruleset_id", rulesetId);
+                cmd.Parameters.AddWithValue("$star_bucket", starBucket);
+                cmd.Parameters.AddWithValue("$count", count);
+                cmd.ExecuteNonQuery();
+            }
+
             foreach (var ((attr, value), stats) in result.StdAttrAffinities)
             {
                 using var cmd = connection.CreateCommand();
@@ -495,6 +534,125 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 cmd.Parameters.AddWithValue("$high_grade_count", stats.HighGradeCount);
                 cmd.ExecuteNonQuery();
             }
+
+            writeDrillScores(connection, result.DrillScores);
+        }
+
+        private static void writeDrillScores(SqliteConnection connection, IReadOnlyList<EzLocalProfileDrillScoreRow> rows)
+        {
+            foreach (var row in rows)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  INSERT INTO drill_scores (
+                                      score_id, score_hash, username, ruleset_id, rank, pp_resolved, accuracy,
+                                      max_combo, max_achievable_combo, total_score, mods_json, total_keys,
+                                      beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
+                                      mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
+                                      kps_avg, kps_max, kps_list_json, column_counts_json, hold_counts_json,
+                                      avg_abs_offset_ms, has_video, has_storyboard, date_ms)
+                                  VALUES (
+                                      $score_id, $score_hash, $username, $ruleset_id, $rank, $pp_resolved, $accuracy,
+                                      $max_combo, $max_achievable_combo, $total_score, $mods_json, $total_keys,
+                                      $beatmap_hash, $beatmap_id, $beatmap_set_id, $title, $artist, $difficulty_name,
+                                      $mapper_username, $beatmap_status, $star_rating, $xxy_star_rating, $map_performance_points,
+                                      $kps_avg, $kps_max, $kps_list_json, $column_counts_json, $hold_counts_json,
+                                      $avg_abs_offset_ms, $has_video, $has_storyboard, $date_ms);
+                                  """;
+                cmd.Parameters.AddWithValue("$score_id", row.ScoreId.ToString("N"));
+                cmd.Parameters.AddWithValue("$score_hash", row.ScoreHash);
+                cmd.Parameters.AddWithValue("$username", row.Username);
+                cmd.Parameters.AddWithValue("$ruleset_id", row.RulesetId);
+                cmd.Parameters.AddWithValue("$rank", (int)row.Rank);
+                cmd.Parameters.AddWithValue("$pp_resolved", row.PpResolved);
+                cmd.Parameters.AddWithValue("$accuracy", row.Accuracy);
+                cmd.Parameters.AddWithValue("$max_combo", row.MaxCombo);
+                cmd.Parameters.AddWithValue("$max_achievable_combo", row.MaxAchievableCombo);
+                cmd.Parameters.AddWithValue("$total_score", row.TotalScore);
+                cmd.Parameters.AddWithValue("$mods_json", row.ModsJson);
+                cmd.Parameters.AddWithValue("$total_keys", row.TotalKeys);
+                cmd.Parameters.AddWithValue("$beatmap_hash", row.BeatmapHash);
+                cmd.Parameters.AddWithValue("$beatmap_id", row.BeatmapId.ToString("N"));
+                cmd.Parameters.AddWithValue("$beatmap_set_id", row.BeatmapSetId?.ToString("N") ?? (object)DBNull.Value);
+                cmd.Parameters.AddWithValue("$title", row.Title);
+                cmd.Parameters.AddWithValue("$artist", row.Artist);
+                cmd.Parameters.AddWithValue("$difficulty_name", row.DifficultyName);
+                cmd.Parameters.AddWithValue("$mapper_username", row.MapperUsername);
+                cmd.Parameters.AddWithValue("$beatmap_status", (int)row.BeatmapStatus);
+                cmd.Parameters.AddWithValue("$star_rating", row.StarRating);
+                cmd.Parameters.AddWithValue("$xxy_star_rating", row.XxyStarRating);
+                cmd.Parameters.AddWithValue("$map_performance_points", row.MapPerformancePoints);
+                cmd.Parameters.AddWithValue("$kps_avg", row.KpsAvg);
+                cmd.Parameters.AddWithValue("$kps_max", row.KpsMax);
+                cmd.Parameters.AddWithValue("$kps_list_json", row.KpsListJson);
+                cmd.Parameters.AddWithValue("$column_counts_json", row.ColumnCountsJson);
+                cmd.Parameters.AddWithValue("$hold_counts_json", row.HoldCountsJson);
+                cmd.Parameters.AddWithValue("$avg_abs_offset_ms", row.AvgAbsOffsetMs ?? (object)DBNull.Value);
+                cmd.Parameters.AddWithValue("$has_video", row.HasVideo ? 1 : 0);
+                cmd.Parameters.AddWithValue("$has_storyboard", row.HasStoryboard ? 1 : 0);
+                cmd.Parameters.AddWithValue("$date_ms", row.Date.ToUnixTimeMilliseconds());
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        private static IReadOnlyList<EzLocalProfileDrillScoreRow> readDrillScores(SqliteConnection connection, int rulesetId)
+        {
+            var list = new List<EzLocalProfileDrillScoreRow>();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = """
+                              SELECT score_id, score_hash, username, ruleset_id, rank, pp_resolved, accuracy,
+                                     max_combo, max_achievable_combo, total_score, mods_json, total_keys,
+                                     beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
+                                     mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
+                                     kps_avg, kps_max, kps_list_json, column_counts_json, hold_counts_json,
+                                     avg_abs_offset_ms, has_video, has_storyboard, date_ms
+                              FROM drill_scores
+                              WHERE ruleset_id = $ruleset_id
+                              ORDER BY pp_resolved DESC, date_ms DESC;
+                              """;
+            cmd.Parameters.AddWithValue("$ruleset_id", rulesetId);
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                list.Add(new EzLocalProfileDrillScoreRow
+                {
+                    ScoreId = Guid.Parse(reader.GetString(0)),
+                    ScoreHash = reader.GetString(1),
+                    Username = reader.GetString(2),
+                    RulesetId = reader.GetInt32(3),
+                    Rank = (ScoreRank)reader.GetInt32(4),
+                    PpResolved = reader.GetDouble(5),
+                    Accuracy = reader.GetDouble(6),
+                    MaxCombo = reader.GetInt32(7),
+                    MaxAchievableCombo = reader.GetInt32(8),
+                    TotalScore = reader.GetInt64(9),
+                    ModsJson = reader.GetString(10),
+                    TotalKeys = reader.GetInt64(11),
+                    BeatmapHash = reader.GetString(12),
+                    BeatmapId = Guid.Parse(reader.GetString(13)),
+                    BeatmapSetId = reader.IsDBNull(14) ? null : Guid.Parse(reader.GetString(14)),
+                    Title = reader.GetString(15),
+                    Artist = reader.GetString(16),
+                    DifficultyName = reader.GetString(17),
+                    MapperUsername = reader.GetString(18),
+                    BeatmapStatus = (BeatmapOnlineStatus)reader.GetInt32(19),
+                    StarRating = reader.GetDouble(20),
+                    XxyStarRating = reader.GetDouble(21),
+                    MapPerformancePoints = reader.GetDouble(22),
+                    KpsAvg = reader.GetDouble(23),
+                    KpsMax = reader.GetDouble(24),
+                    KpsListJson = reader.GetString(25),
+                    ColumnCountsJson = reader.GetString(26),
+                    HoldCountsJson = reader.GetString(27),
+                    AvgAbsOffsetMs = reader.IsDBNull(28) ? null : reader.GetDouble(28),
+                    HasVideo = reader.GetInt32(29) != 0,
+                    HasStoryboard = reader.GetInt32(30) != 0,
+                    Date = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(31)),
+                });
+            }
+
+            return list;
         }
 
         public void Dispose()
@@ -576,6 +734,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       count INTEGER NOT NULL,
                                       PRIMARY KEY (ruleset_id, star_bucket)
                                   );
+                                  CREATE TABLE IF NOT EXISTS xxy_play_counts (
+                                      ruleset_id INTEGER NOT NULL,
+                                      star_bucket INTEGER NOT NULL,
+                                      count INTEGER NOT NULL,
+                                      PRIMARY KEY (ruleset_id, star_bucket)
+                                  );
                                   CREATE TABLE IF NOT EXISTS std_attr_affinity (
                                       attr INTEGER NOT NULL,
                                       value REAL NOT NULL,
@@ -599,6 +763,42 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       payload_json TEXT NOT NULL,
                                       updated_at INTEGER NOT NULL
                                   );
+                                  CREATE TABLE IF NOT EXISTS drill_scores (
+                                      score_id TEXT PRIMARY KEY NOT NULL,
+                                      score_hash TEXT NOT NULL,
+                                      username TEXT NOT NULL,
+                                      ruleset_id INTEGER NOT NULL,
+                                      rank INTEGER NOT NULL,
+                                      pp_resolved REAL NOT NULL,
+                                      accuracy REAL NOT NULL,
+                                      max_combo INTEGER NOT NULL,
+                                      max_achievable_combo INTEGER NOT NULL,
+                                      total_score INTEGER NOT NULL,
+                                      mods_json TEXT NOT NULL,
+                                      total_keys INTEGER NOT NULL,
+                                      beatmap_hash TEXT NOT NULL,
+                                      beatmap_id TEXT NOT NULL,
+                                      beatmap_set_id TEXT,
+                                      title TEXT NOT NULL,
+                                      artist TEXT NOT NULL,
+                                      difficulty_name TEXT NOT NULL,
+                                      mapper_username TEXT NOT NULL,
+                                      beatmap_status INTEGER NOT NULL,
+                                      star_rating REAL NOT NULL,
+                                      xxy_star_rating REAL NOT NULL,
+                                      map_performance_points REAL NOT NULL,
+                                      kps_avg REAL NOT NULL,
+                                      kps_max REAL NOT NULL,
+                                      kps_list_json TEXT NOT NULL,
+                                      column_counts_json TEXT NOT NULL,
+                                      hold_counts_json TEXT NOT NULL,
+                                      avg_abs_offset_ms REAL,
+                                      has_video INTEGER NOT NULL,
+                                      has_storyboard INTEGER NOT NULL,
+                                      date_ms INTEGER NOT NULL
+                                  );
+                                  CREATE INDEX IF NOT EXISTS idx_drill_scores_ruleset_pp
+                                      ON drill_scores(ruleset_id, pp_resolved DESC, date_ms DESC);
                                   """;
                 cmd.ExecuteNonQuery();
             }
@@ -663,7 +863,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                               DELETE FROM mania_column_stats WHERE TRUE;
                               DELETE FROM grade_counts WHERE TRUE;
                               DELETE FROM star_play_counts WHERE TRUE;
+                              DELETE FROM xxy_play_counts WHERE TRUE;
                               DELETE FROM std_attr_affinity WHERE TRUE;
+                              DELETE FROM drill_scores WHERE TRUE;
                               """;
             cmd.ExecuteNonQuery();
         }
@@ -805,6 +1007,24 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return list;
         }
 
+        private static IReadOnlyList<EzLocalProfileXxyPlayCount> readXxyPlayCounts(SqliteConnection connection)
+        {
+            var list = new List<EzLocalProfileXxyPlayCount>();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT ruleset_id, star_bucket, count FROM xxy_play_counts ORDER BY ruleset_id, star_bucket;";
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                list.Add(new EzLocalProfileXxyPlayCount(
+                    reader.GetInt32(0),
+                    reader.GetInt32(1),
+                    reader.GetInt32(2)));
+            }
+
+            return list;
+        }
+
         private static IReadOnlyList<EzLocalProfileStdAttrAffinity> readStdAttrAffinities(SqliteConnection connection)
         {
             var list = new List<EzLocalProfileStdAttrAffinity>();
@@ -824,10 +1044,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return list;
         }
 
-        private static string pullOffsetKey(EzLocalProfileOnlinePullKind kind, int rulesetId) =>
-            kind == EzLocalProfileOnlinePullKind.Best
-                ? $"online_bp_offset_{rulesetId}"
-                : $"online_mp_offset_{rulesetId}";
+        private static string pullOffsetKey(EzLocalProfileOnlinePullKind kind, int rulesetId) => kind == EzLocalProfileOnlinePullKind.Best
+            ? $"online_bp_offset_{rulesetId}"
+            : $"online_mp_offset_{rulesetId}";
 
         private static void setMeta(SqliteConnection connection, string key, string value)
         {
