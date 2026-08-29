@@ -95,7 +95,7 @@ jobs:
     steps:
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Download ez2lazer.Game nupkg from Release
         env:
@@ -132,9 +132,9 @@ jobs:
           fi
 
           unzip -q "artifacts/ez2lazer.Game.${TAG}.nupkg" -d "$WORK/nupkg-extract"
-          NUGET_DLL="$WORK/nupkg-extract/lib/net8.0/osu.Game.dll"
+          NUGET_DLL="$WORK/nupkg-extract/lib/net10.0/osu.Game.dll"
           if [[ ! -f "$NUGET_DLL" ]]; then
-            echo "::error::nupkg 中未找到 lib/net8.0/osu.Game.dll"
+            echo "::error::nupkg 中未找到 lib/net10.0/osu.Game.dll"
             exit 1
           fi
 
