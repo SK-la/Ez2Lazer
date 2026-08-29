@@ -6,7 +6,7 @@
     <Ez2LazerFrameworkProjectPath>$(MSBuildThisFileDirectory)..\osu-framework\osu.Framework\osu.Framework.csproj</Ez2LazerFrameworkProjectPath>
     <Ez2LazerResourcesProjectPath>$(MSBuildThisFileDirectory)..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj</Ez2LazerResourcesProjectPath>
 
-    <!-- 依赖来源：默认使用本地同级工程；如需改回 NuGet，可分别关闭下面两个开关。 -->
+    <!-- 依赖来源：默认 NuGet；启用本地同级工程时打开下面两个开关，并在 IDE 中打开 osu.Desktop.Local.slnf。 -->
 <!--    <UseEz2LazerLocalFrameworkProject>true</UseEz2LazerLocalFrameworkProject>-->
 <!--    <UseEz2LazerLocalResourcesProject>true</UseEz2LazerLocalResourcesProject>-->
 
