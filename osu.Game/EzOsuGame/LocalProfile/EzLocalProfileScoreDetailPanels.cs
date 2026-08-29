@@ -81,7 +81,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     {
         public const float HEIGHT = PanelBeatmapStandalone.HEIGHT;
 
-        private PanelSetBackground beatmapBackground = null!;
+        private EzLocalProfilePanelSetBackground beatmapBackground = null!;
         private UpdateableRank rankDisplay = null!;
         private StarRatingDisplay starRatingDisplay = null!;
         private OsuSpriteText titleText = null!;
@@ -112,7 +112,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             InternalChildren = new Drawable[]
             {
-                beatmapBackground = new PanelSetBackground(),
+                beatmapBackground = new EzLocalProfilePanelSetBackground(),
+                // Match song-select panel dimming over cover art.
                 new Box
                 {
                     RelativeSizeAxes = Axes.Both,
