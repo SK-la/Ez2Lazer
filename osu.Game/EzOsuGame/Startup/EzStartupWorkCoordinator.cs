@@ -53,8 +53,6 @@ namespace osu.Game.EzOsuGame.Startup
 
         public void OnPrepareMenuLoad()
         {
-            EzStartupTrace.Log($"Coordinator.OnPrepareMenuLoad timing={EzStartupTuning.PreloadTiming} bdspDelay={EzStartupTuning.BdspStartupBackfillDelaySeconds}s");
-
             switch (EzStartupTuning.PreloadTiming)
             {
                 case EzStartupPreloadTiming.PipelineDefault:
@@ -78,21 +76,12 @@ namespace osu.Game.EzOsuGame.Startup
 
         public void OnLoadMenu()
         {
-            songSelectHost?.LogSongSelectPreloadStatus("Intro.LoadMenu");
-            preloader.LogStatus("Intro.LoadMenu");
-            EzStartupTrace.Log("Coordinator.OnLoadMenu (Intro Push MainMenu imminent)");
-
             tryStartSongSelectPreloadAfterBdsp("LoadMenu");
         }
 
         public void OnMainMenuOffscreenReady(IEzStartupSongSelectPreloadHost songSelectHost)
         {
             this.songSelectHost = songSelectHost;
-
-            EzStartupTrace.Log(
-                $"Coordinator.OnMainMenuOffscreenReady timing={EzStartupTuning.PreloadTiming} bdspFinished={backgroundDataStoreProcessor?.IsStartupProcessingFinished}");
-
-            songSelectHost.LogSongSelectPreloadStatus("OnMainMenuOffscreenReady");
             registerSongSelectPreloadSchedule();
         }
 
@@ -100,12 +89,6 @@ namespace osu.Game.EzOsuGame.Startup
         {
             this.songSelectHost = songSelectHost;
             mainMenuEntered = true;
-
-            EzStartupTrace.Log(
-                $"Coordinator.OnMainMenuEntered timing={EzStartupTuning.PreloadTiming} bdspFinished={backgroundDataStoreProcessor?.IsStartupProcessingFinished} " +
-                $"bdspEzBackfillRunning={backgroundDataStoreProcessor?.IsEzRealmMetadataBackfillRunning} songSelectPreloadStarted={songSelectPreloadStarted}");
-            preloader.LogStatus("OnMainMenuEntered");
-            songSelectHost.LogSongSelectPreloadStatus("OnMainMenuEntered");
 
             // Fallback if offscreen MainMenu load finished after Push.
             if (!songSelectScheduleRegistered)
@@ -141,7 +124,6 @@ namespace osu.Game.EzOsuGame.Startup
                     break;
 
                 case EzStartupPreloadTiming.PipelineLateSongSelect:
-                    EzStartupTrace.Log($"Coordinator scheduling late song select preload in {late_song_select_delay_ms}ms");
                     Scheduler.AddDelayed(() => startSongSelectPreload("offscreen-late"), late_song_select_delay_ms);
                     break;
             }
@@ -151,7 +133,6 @@ namespace osu.Game.EzOsuGame.Startup
         {
             if (backgroundDataStoreProcessor == null)
             {
-                EzStartupTrace.Log($"Coordinator BDSP not ready yet; retry in {bdsp_availability_poll_interval_ms}ms");
                 Scheduler.AddDelayed(scheduleSongSelectPreloadWhenBdspFinished, bdsp_availability_poll_interval_ms);
                 ensureSongSelectFallbackScheduled();
                 return;
@@ -159,13 +140,11 @@ namespace osu.Game.EzOsuGame.Startup
 
             if (backgroundDataStoreProcessor.IsStartupProcessingFinished)
             {
-                EzStartupTrace.Log($"Coordinator BDSP already finished; song select preload in {bdsp_finished_song_select_buffer_ms}ms");
                 Scheduler.AddDelayed(() => startSongSelectPreload("BDSP-already-finished"), bdsp_finished_song_select_buffer_ms);
                 return;
             }
 
             backgroundDataStoreProcessor.StartupProcessingFinished += onBdspStartupProcessingFinished;
-            EzStartupTrace.Log($"Coordinator waiting for BDSP startup processing (fallback in {EzStartupTuning.SongSelectPreloadFallbackDelayMs}ms)");
             ensureSongSelectFallbackScheduled();
         }
 
@@ -177,7 +156,6 @@ namespace osu.Game.EzOsuGame.Startup
             if (!backgroundDataStoreProcessor.IsStartupProcessingFinished)
                 return;
 
-            EzStartupTrace.Log($"Coordinator {reason}: BDSP finished before preload started; scheduling song select preload");
             songSelectFallbackDelegate?.Cancel();
             songSelectFallbackDelegate = null;
             backgroundDataStoreProcessor.StartupProcessingFinished -= onBdspStartupProcessingFinished;
@@ -194,8 +172,6 @@ namespace osu.Game.EzOsuGame.Startup
 
         private void onBdspStartupProcessingFinished()
         {
-            EzStartupTrace.Log(
-                $"Coordinator BDSP finished → next: songSelect (+{bdsp_finished_song_select_buffer_ms}ms), detach (main menu +{main_menu_detach_delay_ms}ms if not started)");
             Scheduler.AddDelayed(() => startSongSelectPreload("BDSP-finished"), bdsp_finished_song_select_buffer_ms);
         }
 
@@ -212,12 +188,7 @@ namespace osu.Game.EzOsuGame.Startup
                 backgroundDataStoreProcessor.StartupProcessingFinished -= onBdspStartupProcessingFinished;
 
             if (songSelectHost == null)
-            {
-                EzStartupTrace.Log($"Coordinator song select preload skipped ({reason}, no host)");
                 return;
-            }
-
-            EzStartupTrace.Log($"Coordinator starting song select preload ({reason}) mainMenuEntered={mainMenuEntered}");
 
             if (mainMenuEntered)
                 songSelectHost.ScheduleSongSelectPreloadAfterUiSettle();
@@ -231,19 +202,16 @@ namespace osu.Game.EzOsuGame.Startup
                 return;
 
             detachWarmupScheduled = true;
-            EzStartupTrace.Log($"Coordinator scheduling detach warmup check in {delayMs}ms");
 
             Scheduler.AddDelayed(() =>
             {
                 if (backgroundDataStoreProcessor?.IsEzRealmMetadataBackfillRunning == true)
                 {
-                    EzStartupTrace.Log("Coordinator detach warmup deferred (BDSP Ez backfill still running)");
                     detachWarmupScheduled = false;
                     scheduleDetachWarmupWhenSafe(bdsp_poll_interval_ms);
                     return;
                 }
 
-                EzStartupTrace.Log("Coordinator starting detach warmup");
                 preloader.ScheduleDetachWarmup();
             }, delayMs);
         }

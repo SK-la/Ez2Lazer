@@ -20,12 +20,11 @@ namespace osu.Game.Screens.Select
             }
         }
 
-        private partial double? onEzGetFilterScheduleDelay(bool isFirstFilter, bool isSelectionValid)
+        private partial double? onEzGetFilterScheduleDelay(bool isFirstFilter)
         {
             if (ezDeferInitialCarouselFilter && isFirstFilter)
             {
                 ezDeferInitialCarouselFilter = false;
-                EzStartupTrace.Log($"SongSelect deferring initial carousel filter by {EzStartupTuning.SongSelectEnterFilterDelayMs}ms");
                 return EzStartupTuning.SongSelectEnterFilterDelayMs;
             }
 

@@ -12,7 +12,6 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Overlays;
-using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Localisation;
@@ -51,7 +50,6 @@ namespace osu.Game.Overlays
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            EzStartupTrace.Log("SettingsOverlay.LoadComplete → BeginLoadingSections");
             BeginLoadingSections();
         }
 

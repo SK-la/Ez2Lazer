@@ -14,7 +14,6 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Startup;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Performance;
@@ -132,12 +131,10 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (backgroundDataStoreProcessor == null || backgroundDataStoreProcessor.IsStartupProcessingFinished)
             {
-                EzStartupTrace.Log("SQLite auto warmup scheduling (BDSP already finished or unavailable)");
                 tryQueueAutomaticSqliteUpgradeWarmup();
                 return;
             }
 
-            EzStartupTrace.Log("SQLite auto warmup waiting for BDSP startup processing");
             onBdspFinishedForSqliteWarmup ??= onBdspStartupProcessingFinishedForSqliteWarmup;
             backgroundDataStoreProcessor.StartupProcessingFinished += onBdspFinishedForSqliteWarmup;
         }
@@ -145,7 +142,6 @@ namespace osu.Game.EzOsuGame.Analysis
         private void onBdspStartupProcessingFinishedForSqliteWarmup()
         {
             unsubscribeBdspForSqliteWarmup();
-            EzStartupTrace.Log("SQLite auto warmup scheduling (BDSP finished)");
             tryQueueAutomaticSqliteUpgradeWarmup();
         }
 
@@ -179,24 +175,18 @@ namespace osu.Game.EzOsuGame.Analysis
         private void tryQueueAutomaticSqliteUpgradeWarmup()
         {
             if (!sqliteEnabled || !analysisDatabase.ShouldRunAutomaticSqliteWarmup())
-            {
-                EzStartupTrace.Log($"SQLite auto warmup skipped (sqliteEnabled={sqliteEnabled})");
                 return;
-            }
 
-            EzStartupTrace.Log("SQLite auto warmup queued");
             Task.Factory.StartNew(() =>
             {
                 try
                 {
-                    EzStartupTrace.Log("SQLite auto warmup started");
                     Logger.Log("Automatic SQLite upgrade warmup started.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
                     analysisDatabase.EnsureInitialised();
                     executeSqliteMainRebuild(forceAll: false);
                     executeSqliteSongsBranchesRebuild(forceAll: false);
 
-                    EzStartupTrace.Log("SQLite auto warmup finished");
                     Logger.Log("Automatic SQLite upgrade warmup finished.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 }
                 catch (Exception e)

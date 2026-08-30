@@ -369,8 +369,6 @@ namespace osu.Game.Screens.Menu
             if (nextScreen != null)
                 return;
 
-            EzStartupTrace.Log("Intro.PrepareMenuLoad");
-
             nextScreen = createNextScreen?.Invoke();
 
             if (nextScreen != null)
@@ -389,8 +387,6 @@ namespace osu.Game.Screens.Menu
         {
             if (DidLoadMenu)
                 return;
-
-            EzStartupTrace.Log("Intro.LoadMenu (Push MainMenu)");
 
             startupWorkCoordinator?.OnLoadMenu();
 

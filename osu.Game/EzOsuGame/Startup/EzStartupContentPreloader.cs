@@ -23,7 +23,8 @@ namespace osu.Game.EzOsuGame.Startup
 
         private bool lightStarted;
         private bool detachWarmupScheduled;
-        private bool detachWarmupFinished;
+
+        // private bool detachWarmupFinished;
 
         public EzStartupContentPreloader()
         {
@@ -41,13 +42,9 @@ namespace osu.Game.EzOsuGame.Startup
         public void ScheduleSettingsPreload()
         {
             if (lightStarted)
-            {
-                EzStartupTrace.Log("Preloader.ScheduleSettingsPreload skipped (already started)");
                 return;
-            }
 
             lightStarted = true;
-            EzStartupTrace.Log("Preloader.ScheduleSettingsPreload");
             tryScheduleSettingsPreload();
         }
 
@@ -59,7 +56,6 @@ namespace osu.Game.EzOsuGame.Startup
                 return;
             }
 
-            EzStartupTrace.Log("Preloader calling Settings.BeginLoadingSections");
             settings.BeginLoadingSections();
         }
 
@@ -69,7 +65,6 @@ namespace osu.Game.EzOsuGame.Startup
                 return;
 
             detachWarmupScheduled = true;
-            EzStartupTrace.Log("Preloader.ScheduleDetachWarmup started (background thread)");
 
             var store = beatmapStore;
             Task.Run(() =>
@@ -77,25 +72,16 @@ namespace osu.Game.EzOsuGame.Startup
                 try
                 {
                     store.GetBeatmapSets(CancellationToken.None);
-                    detachWarmupFinished = true;
-                    EzStartupTrace.Log("Preloader.ScheduleDetachWarmup finished");
+                    // detachWarmupFinished = true;
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
-                    EzStartupTrace.Log($"Preloader.ScheduleDetachWarmup failed: {e.Message}");
                 }
             });
         }
 
         public void LogStatus(string context)
         {
-            bool settingsLoaded = settings?.AreSectionsLoaded ?? false;
-            bool settingsDisplayReady = settings?.AreSectionsReadyForDisplay ?? false;
-
-            EzStartupTrace.Log(
-                $"Preloader[{context}] settingsRequested={lightStarted} settingsLoaded={settingsLoaded} settingsDisplayReady={settingsDisplayReady} " +
-                $"detachScheduled={detachWarmupScheduled} detachFinished={detachWarmupFinished}");
-            settings?.LogPreloadStatus(context);
         }
 
         public bool AreSettingsLoaded => settings?.AreSectionsLoaded ?? false;

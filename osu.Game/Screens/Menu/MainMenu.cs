@@ -275,17 +275,15 @@ namespace osu.Game.Screens.Menu
         public override void OnEntering(ScreenTransitionEvent e)
         {
             double enterBegin = Clock.CurrentTime;
-            EzStartupTrace.Log("MainMenu.OnEntering begin");
 
             base.OnEntering(e);
 
             NotifyMainMenuEnteredForStartup();
-            EzStartupTrace.Log("MainMenu.OnEntering");
             startupWorkCoordinator?.OnMainMenuEntered(this);
             Buttons.FadeInFromZero(500);
 
             Scheduler.Add(() =>
-                EzStartupTrace.Log($"MainMenu.OnEntering end frameCost={(Clock.CurrentTime - enterBegin):0}ms"));
+                EzStartupTrace.Log($"MainMenu.OnEntering frameCost={(Clock.CurrentTime - enterBegin):0}ms"));
 
             if (e.Last is IntroScreen && musicController.TrackLoaded)
             {
@@ -517,9 +515,7 @@ namespace osu.Game.Screens.Menu
 
         private void loadSongSelect()
         {
-            EzStartupTrace.Log("MainMenu.loadSongSelect");
             startupContentPreloader?.LogStatus("MainMenu.loadSongSelect");
-            LogSongSelectPreloadStatus("MainMenu.loadSongSelect");
 
             bool preloadHit = TryConsumePreloadedSongSelect(out var screen);
             EzSongSelectEnterTrace.RecordPlayPressed(preloadHit);

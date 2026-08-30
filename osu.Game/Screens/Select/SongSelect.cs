@@ -1075,7 +1075,7 @@ namespace osu.Game.Screens.Select
         /// </summary>
         protected virtual double GetFilterScheduleDelay(bool isFirstFilter, bool isSelectionValid)
         {
-            double? ezDelay = onEzGetFilterScheduleDelay(isFirstFilter, isSelectionValid);
+            double? ezDelay = onEzGetFilterScheduleDelay(isFirstFilter);
             if (ezDelay.HasValue)
                 return ezDelay.Value;
 
@@ -1084,7 +1084,7 @@ namespace osu.Game.Screens.Select
 
         partial void onEzSongSelectEntering(ScreenTransitionEvent e);
 
-        private partial double? onEzGetFilterScheduleDelay(bool isFirstFilter, bool isSelectionValid);
+        private partial double? onEzGetFilterScheduleDelay(bool isFirstFilter);
 
         partial void onEzCarouselItemsPresented();
 

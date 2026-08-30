@@ -35,16 +35,12 @@ namespace osu.Game.Screens.Menu
             preloadedSongSelect?.Expire();
             preloadedSongSelect = null;
 
-            EzStartupTrace.Log("MainMenu.ScheduleSongSelectPreload started");
             var screen = songSelectScreenFactory.Create();
 
             LoadComponentAsync(screen, loaded =>
             {
                 songSelectPreloadScheduled = false;
                 preloadedSongSelect = loaded;
-
-                EzStartupTrace.Log(
-                    $"MainMenu.ScheduleSongSelectPreload finished LoadState={loaded.LoadState} preloadReady={isSongSelectPreloadReady(loaded)}");
             });
         }
 
@@ -70,7 +66,6 @@ namespace osu.Game.Screens.Menu
                 return;
             }
 
-            EzStartupTrace.Log($"MainMenu.ScheduleSongSelectPreloadAfterUiSettle delay={delay:0}ms");
             songSelectUiSettleDelegate = Scheduler.AddDelayed(ScheduleSongSelectPreload, delay);
         }
 
@@ -81,30 +76,20 @@ namespace osu.Game.Screens.Menu
 
         public bool TryConsumePreloadedSongSelect(out SoloSongSelect? screen)
         {
-            LogSongSelectPreloadStatus("TryConsumePreloadedSongSelect");
-
             if (preloadedSongSelect != null && !songSelectConsumed && isSongSelectPreloadReady(preloadedSongSelect))
             {
                 screen = preloadedSongSelect;
                 songSelectConsumed = true;
                 preloadedSongSelect = null;
-                EzStartupTrace.Log($"MainMenu.TryConsumePreloadedSongSelect hit (LoadState={screen.LoadState})");
                 return true;
             }
 
             screen = null;
-            EzStartupTrace.Log(
-                $"MainMenu.TryConsumePreloadedSongSelect miss (preloaded={preloadedSongSelect != null}, consumed={songSelectConsumed}, loadState={preloadedSongSelect?.LoadState})");
             return false;
         }
 
         public void LogSongSelectPreloadStatus(string context)
         {
-            bool preloadReady = preloadedSongSelect != null && isSongSelectPreloadReady(preloadedSongSelect);
-
-            EzStartupTrace.Log(
-                $"MainMenu[{context}] songSelectScheduled={songSelectPreloadScheduled} songSelectPreloaded={preloadedSongSelect != null} " +
-                $"songSelectPreloadReady={preloadReady} songSelectLoadState={preloadedSongSelect?.LoadState} songSelectConsumed={songSelectConsumed}");
         }
 
         private static bool isSongSelectPreloadReady(SoloSongSelect screen)

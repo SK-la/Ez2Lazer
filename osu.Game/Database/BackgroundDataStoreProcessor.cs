@@ -60,7 +60,7 @@ namespace osu.Game.Database
                 return;
 
             IsStartupProcessingFinished = true;
-            EzStartupTrace.Log("BDSP startup processing marked finished");
+            EzStartupTrace.Log("BDSP finished");
             StartupProcessingFinished?.Invoke();
         }
 
@@ -376,19 +376,15 @@ namespace osu.Game.Database
 
             localMetadataSource = new LocalCachedBeatmapMetadataSource(storage);
 
-            EzStartupTrace.Log($"BDSP.LoadComplete scheduling processing thread (StartupBackfillDelay={StartupBackfillDelay.TotalSeconds}s)");
-
             ProcessingTask = Task.Factory.StartNew(() =>
             {
                 try
                 {
                     Logger.Log("Beginning background data store processing..");
-                    EzStartupTrace.Log("BDSP processing thread started, entering StartupBackfillDelay sleep");
 
                     // Let SongSelect settle before Invalidate storms from Ez/official backfill
                     // (users see a 3–5s FPS cliff when unlimited carousel Replaces land in one burst).
                     Thread.Sleep(StartupBackfillDelay);
-                    EzStartupTrace.Log("BDSP StartupBackfillDelay sleep finished");
                     sleepIfRequired();
 
                     clearOutdatedStarRatings();
@@ -399,9 +395,7 @@ namespace osu.Game.Database
                     {
                         try
                         {
-                            EzStartupTrace.Log("BDSP Ez Realm metadata backfill started");
                             runEzRealmMetadataBackfill();
-                            EzStartupTrace.Log("BDSP Ez Realm metadata backfill finished");
                         }
                         finally
                         {
@@ -411,7 +405,6 @@ namespace osu.Game.Database
                     else
                     {
                         Logger.Log("Skipping startup Ez Realm metadata backfill because another backfill is already running.");
-                        EzStartupTrace.Log("BDSP Ez Realm metadata backfill skipped (already running)");
                     }
 
                     populateMissingStarRatings();
@@ -443,7 +436,6 @@ namespace osu.Game.Database
                 }
 
                 Logger.Log("Finished background data store processing!");
-                EzStartupTrace.Log("BDSP processing thread finished");
                 Scheduler.Add(markStartupProcessingFinished);
             });
         }

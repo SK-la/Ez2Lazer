@@ -73,11 +73,7 @@ namespace osu.Game.Overlays
 
         private Task sectionsLoadingTask;
         private List<SettingsSection> loadedSections;
-        private bool sectionsLoaded;
-        private bool sectionsDisplayReady;
-        private bool sectionsAsyncCallbackInvoked;
         private bool sectionsMountInProgress;
-        private int sectionsMountedCount;
         private Stopwatch sectionsLoadStopwatch;
         private long? sectionsPreloadDurationMs;
         private bool loadHeartbeatActive;
@@ -86,12 +82,12 @@ namespace osu.Game.Overlays
         /// <summary>
         /// Whether settings sections have finished async construction (tree mount is deferred until PopIn).
         /// </summary>
-        public bool AreSectionsLoaded => sectionsLoaded;
+        public bool AreSectionsLoaded { get; private set; }
 
         /// <summary>
         /// Whether settings sections and sidebar buttons are mounted and ready to show without further loading.
         /// </summary>
-        public bool AreSectionsReadyForDisplay => sectionsDisplayReady;
+        public bool AreSectionsReadyForDisplay { get; private set; }
 
         public IBindable<SettingsSection> CurrentSection = new Bindable<SettingsSection>();
 
@@ -195,11 +191,9 @@ namespace osu.Game.Overlays
 
         protected override void PopIn()
         {
-            logPreloadStatus("PopIn");
-
             lastPopInTime = Time.Current;
 
-            if (!sectionsDisplayReady)
+            if (!AreSectionsReadyForDisplay)
                 loading.Show();
 
             ContentContainer.MoveToX(ExpandedPosition, TRANSITION_LENGTH, Easing.OutQuint);
@@ -222,11 +216,11 @@ namespace osu.Game.Overlays
 
         private double getPopInLoadSectionsDelay()
         {
-            if (sectionsDisplayReady)
+            if (AreSectionsReadyForDisplay)
                 return 0;
 
             // Async CPU preload is done; defer tree mount until the slide/fade finishes.
-            if (sectionsLoaded)
+            if (AreSectionsLoaded)
                 return TRANSITION_LENGTH;
 
             return TRANSITION_LENGTH / 3;
@@ -234,7 +228,7 @@ namespace osu.Game.Overlays
 
         private double getRemainingPopInAnimationDelay()
         {
-            if (sectionsDisplayReady)
+            if (AreSectionsReadyForDisplay)
                 return 0;
 
             return Math.Max(0, TRANSITION_LENGTH - (Time.Current - lastPopInTime));
@@ -294,44 +288,25 @@ namespace osu.Game.Overlays
         /// </summary>
         public void BeginLoadingSections()
         {
-            EzStartupTrace.Log("Settings.BeginLoadingSections called");
             loadSections();
         }
 
         /// <summary>
         /// Emit a snapshot of section preload progress to the startup trace log.
         /// </summary>
-        public void LogPreloadStatus(string context) => logPreloadStatus(context);
-
-        private void logPreloadStatus(string context)
+        public void LogPreloadStatus(string context)
         {
-            string timing = sectionsPreloadDurationMs.HasValue
-                ? $"preloadDuration={sectionsPreloadDurationMs}ms"
-                : $"preloadElapsed={sectionsLoadStopwatch?.ElapsedMilliseconds ?? 0}ms";
-            string taskStatus = sectionsLoadingTask?.Status.ToString() ?? "none";
-            bool workerDone = sectionsLoadingTask?.IsCompleted ?? false;
-
-            EzStartupTrace.Log(
-                $"Settings[{context}] loaded={sectionsLoaded} displayReady={sectionsDisplayReady} " +
-                $"workerDone={workerDone} callbackInvoked={sectionsAsyncCallbackInvoked} " +
-                $"mounted={SectionsContainer.Count}/{loadableSections.Count} taskStatus={taskStatus} {timing} visible={State.Value == Visibility.Visible}");
         }
 
         private void loadSections()
         {
-            if (sectionsDisplayReady)
-            {
-                EzStartupTrace.Log("Settings.loadSections skipped (already complete)");
+            if (AreSectionsReadyForDisplay)
                 return;
-            }
 
-            if (!sectionsLoaded)
+            if (!AreSectionsLoaded)
             {
                 if (sectionsLoadingTask != null)
-                {
-                    EzStartupTrace.Log("Settings.loadSections skipped (async in progress)");
                     return;
-                }
 
                 beginAsyncSectionLoad();
                 return;
@@ -343,32 +318,29 @@ namespace osu.Game.Overlays
         private void beginAsyncSectionLoad()
         {
             sectionsLoadStopwatch = Stopwatch.StartNew();
-            EzStartupTrace.Log($"Settings.loadSections started ({loadableSections.Count} sections)");
             startLoadHeartbeat();
 
             sectionsLoadingTask = LoadComponentsAsync(loadableSections, sections =>
             {
-                sectionsAsyncCallbackInvoked = true;
                 loadedSections = sections.ToList();
-                sectionsLoaded = true;
+                AreSectionsLoaded = true;
 
                 if (State.Value != Visibility.Visible)
                 {
                     sectionsPreloadDurationMs = sectionsLoadStopwatch.ElapsedMilliseconds;
                     sectionsLoadStopwatch.Stop();
                     loadHeartbeatActive = false;
-                    EzStartupTrace.Log($"Settings async preload complete after {sectionsPreloadDurationMs}ms (mount deferred until PopIn)");
+                    EzStartupTrace.Log($"Settings.asyncPreload complete {sectionsPreloadDurationMs}ms (mount deferred)");
                     return;
                 }
 
-                EzStartupTrace.Log($"Settings sections worker finished after {sectionsLoadStopwatch.ElapsedMilliseconds}ms, scheduling mount after PopIn animation");
                 scheduleAfterPopInAnimation(scheduleMountLoadedSections);
             }, scheduler: preloadScheduler);
         }
 
         private void scheduleMountLoadedSections()
         {
-            if (sectionsDisplayReady || loadedSections == null)
+            if (AreSectionsReadyForDisplay || loadedSections == null)
                 return;
 
             int startIndex = SectionsContainer.Count;
@@ -377,13 +349,9 @@ namespace osu.Game.Overlays
                 return;
 
             if (sectionsMountInProgress)
-            {
-                EzStartupTrace.Log("Settings.mount skipped (already in progress)");
                 return;
-            }
 
             sectionsMountInProgress = true;
-            EzStartupTrace.Log($"Settings mounting preloaded sections from index {startIndex}");
             Scheduler.Add(() => addSectionsInBatches(loadedSections, startIndex));
         }
 
@@ -400,13 +368,11 @@ namespace osu.Game.Overlays
         {
             preloadScheduler.AddDelayed(() =>
             {
-                if (sectionsDisplayReady || (sectionsLoaded && State.Value != Visibility.Visible))
+                if (AreSectionsReadyForDisplay || (AreSectionsLoaded && State.Value != Visibility.Visible))
                 {
                     loadHeartbeatActive = false;
                     return;
                 }
-
-                logPreloadStatus("heartbeat");
 
                 if (sectionsLoadingTask != null)
                     scheduleLoadHeartbeat();
@@ -428,8 +394,6 @@ namespace osu.Game.Overlays
             for (int i = startIndex; i < endIndex; i++)
                 SectionsContainer.Add(sections[i]);
 
-            sectionsMountedCount = endIndex;
-
             if (endIndex < sections.Count)
             {
                 Scheduler.Add(() => addSectionsInBatches(sections, endIndex));
@@ -437,7 +401,6 @@ namespace osu.Game.Overlays
             }
 
             sectionsMountInProgress = false;
-            EzStartupTrace.Log($"Settings sections mount complete after {sectionsLoadStopwatch.ElapsedMilliseconds}ms");
             finishSectionsDisplay();
         }
 
@@ -484,11 +447,10 @@ namespace osu.Game.Overlays
                         selectedSidebarButton.Selected = true;
                 }, true);
 
-                sectionsDisplayReady = true;
+                AreSectionsReadyForDisplay = true;
                 loadHeartbeatActive = false;
                 sectionsPreloadDurationMs = sectionsLoadStopwatch.ElapsedMilliseconds;
                 sectionsLoadStopwatch.Stop();
-                EzStartupTrace.Log($"Settings display ready after {sectionsPreloadDurationMs}ms (sidebar mounted)");
             }, scheduler: preloadScheduler);
         }
 
