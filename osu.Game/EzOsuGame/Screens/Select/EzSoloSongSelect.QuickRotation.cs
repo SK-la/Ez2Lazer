@@ -19,13 +19,25 @@ namespace osu.Game.EzOsuGame.Screens.Select
                                                  Bindable<IReadOnlyList<Mod>> mods,
                                                  FilterControl filterControl)
         {
-            if (!EzQuickRotationSession.IsEnabled || EzQuickRotationCoordinator.Session.IsActive)
+            if (!EzQuickRotationSession.IsEnabled)
+                return;
+
+            if (EzQuickRotationCoordinator.Session.IsActive)
                 return;
 
             var criteria = filterControl.CreateCriteria();
             var beatmapInfo = beatmap.BeatmapInfo;
 
             EzQuickRotationCoordinator.Session.Begin(beatmaps, criteria, beatmapInfo, ruleset.Value, mods.Value);
+        }
+
+        /// <summary>
+        /// Ends an in-progress quick rotation session when the user returns to song select.
+        /// </summary>
+        public static void EndSessionIfActive()
+        {
+            if (EzQuickRotationCoordinator.Session.IsActive)
+                EzQuickRotationCoordinator.Session.End();
         }
     }
 }

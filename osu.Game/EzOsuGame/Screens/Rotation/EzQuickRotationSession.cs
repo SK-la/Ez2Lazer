@@ -161,6 +161,9 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
         public void End()
         {
             IsActive = false;
+            BaselineDifficulty = 0;
+            CachedPool = Array.Empty<BeatmapInfo>();
+            PlayedBeatmapIds.Clear();
             poolBuildTask = null;
             poolBeatmapManager = null;
             poolFirstBeatmap = null;

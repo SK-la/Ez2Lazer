@@ -158,6 +158,7 @@ namespace osu.Game.Screens.Select
 
         public override void OnResuming(ScreenTransitionEvent e)
         {
+            EzSoloSongSelect.EndSessionIfActive();
             base.OnResuming(e);
             revertMods();
         }
