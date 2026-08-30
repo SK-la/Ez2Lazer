@@ -3,6 +3,7 @@
 
 using osu.Framework.Allocation;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Audio;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Multiplayer.MatchTypes.RankedPlay;
 using osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay;
@@ -29,8 +30,11 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            SetContent(new EzQuickRotationRankedPlayCardContent(apiBeatmap, SourceBeatmap));
             SongPreviewEnabled.Value = false;
-            EzQuickRotationRankedPlayCardHelper.PresentLocalBeatmap(this, apiBeatmap, SourceBeatmap, beatmaps);
+            LoadSongPreview(apiBeatmap, new EzLocalBeatmapPreviewTrack(beatmaps.GetWorkingBeatmap(SourceBeatmap)));
+            CompleteCardReveal();
         }
     }
 }
