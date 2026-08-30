@@ -575,8 +575,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         {
             musicController?.ResetTrackAdjustments();
             musicController?.Stop();
-            if (musicController != null)
-                musicController.AllowTrackControl.Value = false;
+            musicController?.AllowTrackControl.Value = false;
         }
     }
 }

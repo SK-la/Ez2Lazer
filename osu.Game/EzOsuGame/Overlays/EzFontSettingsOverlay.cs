@@ -691,8 +691,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 current.BindValueChanged(v =>
                 {
-                    if (syncLocalized != null)
-                        syncLocalized.Value = v.NewValue;
+                    syncLocalized?.Value = v.NewValue;
 
                     updatePreview(v.NewValue);
                 }, true);

@@ -209,10 +209,8 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.OnGameplayClockResolved(clock);
 
-            if (ghostProcessor1 != null)
-                ghostProcessor1.ReferenceClock = clock;
-            if (ghostProcessor2 != null)
-                ghostProcessor2.ReferenceClock = clock;
+            ghostProcessor1?.ReferenceClock = clock;
+            ghostProcessor2?.ReferenceClock = clock;
         }
 
         private void bindStateLookupWhenAvailable()

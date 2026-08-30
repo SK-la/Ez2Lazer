@@ -14,14 +14,14 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Platform;
-using osu.Game.Configuration;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
-using osu.Game.Skinning;
 using osu.Game.Rulesets.Difficulty.Utils;
+using osu.Game.Skinning;
 using osu.Game.Utils;
 using osuTK;
 

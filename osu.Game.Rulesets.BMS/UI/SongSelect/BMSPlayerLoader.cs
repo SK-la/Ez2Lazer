@@ -3,6 +3,7 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -13,7 +14,6 @@ using osu.Framework.Threading;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
-using osu.Framework.Bindables;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.BMS.Localization;

@@ -189,7 +189,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (!hold.IsHolding.Value)
                 return false;
 
-            if (ManiaEzDrawableJudgement.TryMalodyHoldOnReleased(hold))
+            if (TryMalodyHoldOnReleased(hold))
                 return true;
 
             hold.Tail.UpdateResult();

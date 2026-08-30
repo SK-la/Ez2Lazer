@@ -165,8 +165,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             scroll.Alpha = 1;
 
-            if (LoadingText != null)
-                LoadingText.Alpha = 0;
+            LoadingText?.Alpha = 0;
 
             if (!sortTimerScheduled)
             {
@@ -246,8 +245,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             foreach (var entry in entryStates)
             {
-                if (entry.Processor != null)
-                    entry.Processor.ReferenceClock = clock;
+                entry.Processor?.ReferenceClock = clock;
             }
         }
 

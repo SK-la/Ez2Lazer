@@ -140,8 +140,7 @@ namespace osu.Game.Rulesets.BMS.Audio
             try
             {
                 var channel = sample.Play();
-                if (channel != null)
-                    channel.Volume.Value = sampleVolume;
+                channel?.Volume.Value = sampleVolume;
             }
             catch (Exception ex)
             {
