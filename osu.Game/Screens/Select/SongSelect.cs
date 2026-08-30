@@ -751,6 +751,7 @@ namespace osu.Game.Screens.Select
 
         public override void OnEntering(ScreenTransitionEvent e)
         {
+            onEzSongSelectEntering(e);
             base.OnEntering(e);
 
             this.FadeIn();
@@ -1066,8 +1067,26 @@ namespace osu.Game.Screens.Select
             // Criteria change may have included a ruleset change which made the current selection invalid.
             bool isSelectionValid = checkBeatmapValidForSelection(Beatmap.Value.BeatmapInfo);
 
-            filterDebounce = Scheduler.AddDelayed(() => carousel.Filter(criteria, !isSelectionValid), isFirstFilter || !isSelectionValid ? 0 : filter_delay);
+            filterDebounce = Scheduler.AddDelayed(() => carousel.Filter(criteria, !isSelectionValid), GetFilterScheduleDelay(isFirstFilter, isSelectionValid));
         }
+
+        /// <summary>
+        /// Delay before applying carousel filter. Overridable for startup enter-path staggering.
+        /// </summary>
+        protected virtual double GetFilterScheduleDelay(bool isFirstFilter, bool isSelectionValid)
+        {
+            double? ezDelay = onEzGetFilterScheduleDelay(isFirstFilter, isSelectionValid);
+            if (ezDelay.HasValue)
+                return ezDelay.Value;
+
+            return isFirstFilter || !isSelectionValid ? 0 : filter_delay;
+        }
+
+        partial void onEzSongSelectEntering(ScreenTransitionEvent e);
+
+        private partial double? onEzGetFilterScheduleDelay(bool isFirstFilter, bool isSelectionValid);
+
+        partial void onEzCarouselItemsPresented();
 
         private void newItemsPresented(IEnumerable<CarouselItem> carouselItems)
         {
@@ -1075,6 +1094,7 @@ namespace osu.Game.Screens.Select
                 return;
 
             CarouselItemsPresented = true;
+            onEzCarouselItemsPresented();
 
             updateNoResultsPlaceholder();
 
