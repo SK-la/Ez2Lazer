@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Localisation;
@@ -47,6 +48,13 @@ namespace osu.Game.Overlays
         {
         }
 
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            EzStartupTrace.Log("SettingsOverlay.LoadComplete → BeginLoadingSections");
+            BeginLoadingSections();
+        }
+
         public override bool AcceptsFocus => lastOpenedSubPanel == null || lastOpenedSubPanel.State.Value == Visibility.Hidden;
 
         public void ShowAtControl<T>() where T : Drawable
@@ -68,15 +76,20 @@ namespace osu.Game.Overlays
 
         protected override float ExpandedPosition => lastOpenedSubPanel?.State.Value == Visibility.Visible ? -PANEL_WIDTH : base.ExpandedPosition;
 
+        private KeyBindingPanel keyBindingPanel = null!;
+        private bool keyBindingPanelAdded;
+
         [BackgroundDependencyLoader]
         private void load(RulesetStore rulesets)
         {
+            keyBindingPanel = createSubPanel(new KeyBindingPanel());
+
             var sections = new List<SettingsSection>
             {
                 // This list should be kept in sync with ScreenBehaviour.
                 new GeneralSection(),
                 new SkinSection(),
-                new InputSection(createSubPanel(new KeyBindingPanel())),
+                new InputSection(openKeyBindingPanel),
                 new UserInterfaceSection(),
                 new GameplaySection(),
                 new EzGameSection()
@@ -114,7 +127,27 @@ namespace osu.Game.Overlays
                 AddSection(s);
 
             foreach (var s in subPanels)
+            {
+                if (ReferenceEquals(s, keyBindingPanel))
+                    continue;
+
                 ContentContainer.Add(s);
+            }
+        }
+
+        private void openKeyBindingPanel()
+        {
+            ensureKeyBindingPanelAdded();
+            keyBindingPanel.Show();
+        }
+
+        private void ensureKeyBindingPanelAdded()
+        {
+            if (keyBindingPanelAdded)
+                return;
+
+            keyBindingPanelAdded = true;
+            ContentContainer.Add(keyBindingPanel);
         }
 
         private T createSubPanel<T>(T subPanel)
