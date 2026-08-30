@@ -41,7 +41,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             Sprite.Texture = textures.Get(loadedTexturePath);
         }
 
-        public override bool Equals(Graphics.Backgrounds.Background other)
+        public override bool Equals(Graphics.Backgrounds.Background? other)
         {
             if (other is PixivBackground pixiv)
             {

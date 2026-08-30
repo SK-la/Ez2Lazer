@@ -36,6 +36,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private void load(OverlayColourProvider colours)
         {
             int count = values.Length;
+
             if (count == 0)
             {
                 Height = 40;

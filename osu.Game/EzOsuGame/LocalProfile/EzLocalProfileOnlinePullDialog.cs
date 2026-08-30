@@ -177,16 +177,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
     public enum EzLocalProfileOnlinePullRulesetChoice
     {
-        [DescriptionAttribute("osu!")]
+        [Description("osu!")]
         Osu = 0,
 
-        [DescriptionAttribute("osu!taiko")]
+        [Description("osu!taiko")]
         Taiko = 1,
 
-        [DescriptionAttribute("osu!catch")]
+        [Description("osu!catch")]
         Catch = 2,
 
-        [DescriptionAttribute("osu!mania")]
+        [Description("osu!mania")]
         Mania = 3,
     }
 }

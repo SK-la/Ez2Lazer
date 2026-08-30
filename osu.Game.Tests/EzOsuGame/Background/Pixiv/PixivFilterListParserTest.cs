@@ -12,21 +12,21 @@ namespace osu.Game.Tests.EzOsuGame.Background.Pixiv
         [Test]
         public void TestSpaceSeparatedAccounts()
         {
-            var parsed = PixivFilterListParser.Parse("foo bar  baz");
+            string[] parsed = PixivFilterListParser.Parse("foo bar  baz");
             Assert.That(parsed, Is.EqualTo(new[] { "foo", "bar", "baz" }));
         }
 
         [Test]
         public void TestCommaSeparatedEntries()
         {
-            var parsed = PixivFilterListParser.Parse("foo, bar;baz");
+            string[] parsed = PixivFilterListParser.Parse("foo, bar;baz");
             Assert.That(parsed, Is.EqualTo(new[] { "foo", "bar", "baz" }));
         }
 
         [Test]
         public void TestCommaPreservesTagWithSpaces()
         {
-            var parsed = PixivFilterListParser.Parse("女の子,AI Generated,オリジナル");
+            string[] parsed = PixivFilterListParser.Parse("女の子,AI Generated,オリジナル");
             Assert.That(parsed, Is.EqualTo(new[] { "女の子", "AI Generated", "オリジナル" }));
         }
     }

@@ -99,9 +99,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
                 200);
 
             if (charts.Items.Count == 0)
+            {
                 return hasChildFolders
                     ? new BmsFolderBar(BmsPathCrc.Compute(folder.FolderPath), folder.Name, folder.FolderPath)
                     : null;
+            }
 
             return new BmsSongPackBar(folder.FolderPath, folder.Name, charts.Items);
         }

@@ -45,6 +45,7 @@ namespace osu.Game.Overlays.SkinEditor
             Drawable[] positionControls = [];
 
             positionSettings = SkinHudPositionSettings.TryCreate(component);
+
             if (positionSettings != null)
             {
                 positionControls = positionSettings.CreateControls();

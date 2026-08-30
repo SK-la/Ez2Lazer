@@ -59,7 +59,7 @@ namespace osu.Game.EzOsuGame.Scoring
                 new ReplayRunRequest(databasedScore.DeepClone(), playableBeatmap, purpose),
                 cancellationToken).ConfigureAwait(false);
 
-            scoreManager.ApplyEzSessionRecalculation(scoreInfo, result.Score!.ScoreInfo, purpose, result.ResolvedEnvironment!);
+            scoreManager.ApplyEzSessionRecalculation(scoreInfo, result.Score.ScoreInfo, purpose, result.ResolvedEnvironment!);
         }
     }
 }

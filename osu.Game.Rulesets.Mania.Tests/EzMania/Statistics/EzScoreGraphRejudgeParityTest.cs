@@ -286,7 +286,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Statistics
                 Frames = score.Replay!.Frames.Select(frame =>
                 {
                     if (frame is ManiaReplayFrame maniaFrame)
-                        return (ReplayFrame)new ManiaReplayFrame(maniaFrame.Time + offset, maniaFrame.Actions.ToArray());
+                        return new ManiaReplayFrame(maniaFrame.Time + offset, maniaFrame.Actions.ToArray());
 
                     return frame;
                 }).ToList()

@@ -83,6 +83,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Localization
         public static readonly LocalisableString MATCH_HIT_POSITION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启后高度与 Ez 判定线高度设置一致", "When enabled, height follows the Ez HitPosition setting.");
 
         public static readonly LocalisableString MATCH_HIT_POSITION_LAYOUT_LABEL = new EzLocalizationManager.EzLocalisableString("关联判定线位置", "Match Hit Position Layout");
+
         public static readonly LocalisableString MATCH_HIT_POSITION_LAYOUT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "开启后锚点为底部中心、原点为中心，纵坐标对齐判定线高度",
             "When enabled, uses bottom-centre anchor, centre origin, and aligns Y to the hit position.");

@@ -161,7 +161,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private partial class ScoreEntry : OsuClickableContainer
         {
             private readonly EzLocalProfileDrillScoreRow row;
-            private FillFlowContainer modsFlow = null!;
+            private readonly FillFlowContainer modsFlow;
 
             public ScoreEntry(EzLocalProfileDrillScoreRow row, bool selected, Action onSelect, RulesetStore rulesets)
             {

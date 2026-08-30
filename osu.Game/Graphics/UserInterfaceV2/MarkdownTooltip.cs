@@ -197,7 +197,7 @@ namespace osu.Game.Graphics.UserInterfaceV2
                     continue;
 
                 int columnCount = grid.Content[0].Count;
-                var columnWidths = new float[columnCount];
+                float[] columnWidths = new float[columnCount];
 
                 for (int r = 0; r < grid.Content.Count; r++)
                 {

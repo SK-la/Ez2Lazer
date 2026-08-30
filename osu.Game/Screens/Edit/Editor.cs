@@ -1310,9 +1310,11 @@ namespace osu.Game.Screens.Edit
                 TimingControlPoint timingPoint;
 
                 if (editorBeatmap.FixedGridEnabled.Value)
+                {
                     timingPoint = editorBeatmap.ControlPointInfo.TimingPoints.Count > 0
                         ? editorBeatmap.ControlPointInfo.TimingPoints[0]
                         : TimingControlPoint.DEFAULT;
+                }
                 else
                     timingPoint = editorBeatmap.ControlPointInfo.TimingPointAt(clock.CurrentTimeAccurate);
 
