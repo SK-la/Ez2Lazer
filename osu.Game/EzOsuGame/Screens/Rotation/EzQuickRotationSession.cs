@@ -24,6 +24,11 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
 
         private bool poolApplied;
 
+        private BeatmapManager? poolBeatmapManager;
+        private BeatmapInfo? poolFirstBeatmap;
+        private RulesetInfo? poolRuleset;
+        private IReadOnlyList<Mod>? poolMods;
+
         public bool IsActive { get; private set; }
 
         public EzQuickRotationPoolConstraints PoolConstraints { get; private set; } = null!;
@@ -42,6 +47,8 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
         {
             get
             {
+                tryApplyPoolResult();
+
                 lock (poolLock)
                     return poolApplied;
             }
@@ -66,18 +73,38 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
             CachedPool = Array.Empty<BeatmapInfo>();
 
             lock (poolLock)
-                poolApplied = false;
-
-            var capturedFirstBeatmap = firstBeatmap;
-            var capturedRuleset = ruleset;
-            var capturedMods = BaseMods;
-
-            poolBuildTask = Task.Run(() =>
             {
-                var pool = EzQuickRotationPoolBuilder.BuildPool(beatmapManager, PoolConstraints);
-                double baseline = EzQuickRotationDifficultyHelper.GetBaselineStarRating(beatmapManager, capturedFirstBeatmap, capturedRuleset, capturedMods);
-                return (pool, baseline);
-            });
+                poolApplied = false;
+                poolBuildTask = null;
+            }
+
+            poolBeatmapManager = beatmapManager;
+            poolFirstBeatmap = firstBeatmap;
+            poolRuleset = ruleset;
+            poolMods = BaseMods;
+        }
+
+        public void StartPoolBuild(BeatmapManager beatmapManager)
+        {
+            lock (poolLock)
+            {
+                if (!IsActive || poolBuildTask != null)
+                    return;
+
+                poolBeatmapManager ??= beatmapManager;
+
+                var capturedManager = poolBeatmapManager;
+                var capturedFirstBeatmap = poolFirstBeatmap!;
+                var capturedRuleset = poolRuleset!;
+                var capturedMods = poolMods!;
+
+                poolBuildTask = Task.Run(() =>
+                {
+                    var pool = EzQuickRotationPoolBuilder.BuildPool(capturedManager, PoolConstraints);
+                    double baseline = EzQuickRotationDifficultyHelper.GetBaselineStarRating(capturedManager, capturedFirstBeatmap, capturedRuleset, capturedMods);
+                    return (pool, baseline);
+                });
+            }
         }
 
         public void EnsurePoolReady(Action onReady)
@@ -135,6 +162,10 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
         {
             IsActive = false;
             poolBuildTask = null;
+            poolBeatmapManager = null;
+            poolFirstBeatmap = null;
+            poolRuleset = null;
+            poolMods = null;
 
             lock (poolLock)
                 poolApplied = false;

@@ -11,6 +11,7 @@ using osu.Framework.Screens;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Input.Bindings;
+using osu.Game.Overlays;
 using osu.Game.Screens.Play;
 using osuTK;
 
@@ -23,6 +24,9 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
 
         [Resolved]
         private OsuGame? game { get; set; }
+
+        [Resolved]
+        private MusicController musicController { get; set; } = null!;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -68,6 +72,12 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
                     },
                 },
             };
+        }
+
+        public override void OnEntering(ScreenTransitionEvent e)
+        {
+            EzQuickRotationAudio.StopGameplayAndMenuAudio(musicController, Beatmap);
+            base.OnEntering(e);
         }
 
         protected override void LoadComplete()

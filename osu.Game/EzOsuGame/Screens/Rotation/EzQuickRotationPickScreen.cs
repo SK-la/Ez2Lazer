@@ -23,6 +23,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input.Bindings;
+using osu.Game.Overlays;
 using osu.Game.Screens.Footer;
 using osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card;
 using osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Hand;
@@ -61,6 +62,9 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
 
         [Resolved]
         private PreviewTrackManager previewTrackManager { get; set; } = null!;
+
+        [Resolved]
+        private MusicController musicController { get; set; } = null!;
 
         [BackgroundDependencyLoader]
         private void load(AudioManager audio)
@@ -137,6 +141,13 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
 
             playerHand.SelectionChanged += onCardSelectionChanged;
             playerHand.StateChanged += enforceSingleActivePreview;
+        }
+
+        public override void OnEntering(ScreenTransitionEvent e)
+        {
+            EzQuickRotationAudio.StopGameplayAndMenuAudio(musicController, Beatmap);
+            stopCardPreviews();
+            base.OnEntering(e);
         }
 
         protected override void LoadComplete()

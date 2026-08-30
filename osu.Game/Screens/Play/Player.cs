@@ -1141,6 +1141,12 @@ namespace osu.Game.Screens.Play
                 if (EzQuickRotationCoordinator.Session.IsActive)
                 {
                     EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.QuickRotation", "Navigating to quick rotation flow");
+                    (GameplayClockContainer as MasterGameplayClockContainer)?.StopUsingBeatmapClock();
+
+                    if (Beatmap.Value.TrackLoaded)
+                        EzQuickRotationAudio.StopTrack(Beatmap.Value.Track);
+
+                    musicController.Stop();
                     EzQuickRotationCoordinator.NavigateAfterPlay(this);
                     return;
                 }

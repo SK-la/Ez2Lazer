@@ -14,6 +14,8 @@ namespace osu.Game.EzOsuGame.Audio
     {
         private readonly IWorkingBeatmap workingBeatmap;
 
+        private bool usesSharedBeatmapTrack;
+
         public EzLocalBeatmapPreviewTrack(IWorkingBeatmap workingBeatmap)
         {
             this.workingBeatmap = workingBeatmap;
@@ -23,7 +25,22 @@ namespace osu.Game.EzOsuGame.Audio
         {
             workingBeatmap.LoadTrack();
             workingBeatmap.PrepareTrackForPreview(true);
+            usesSharedBeatmapTrack = true;
             return workingBeatmap.Track;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                Stop();
+
+                // The preview borrows the gameplay WorkingBeatmap track; disposing it would break song select / replay.
+                if (usesSharedBeatmapTrack)
+                    return;
+            }
+
+            base.Dispose(isDisposing);
         }
     }
 }
