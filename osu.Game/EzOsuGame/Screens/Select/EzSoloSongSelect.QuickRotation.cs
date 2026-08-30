@@ -24,9 +24,8 @@ namespace osu.Game.EzOsuGame.Screens.Select
 
             var criteria = filterControl.CreateCriteria();
             var beatmapInfo = beatmap.BeatmapInfo;
-            double baseline = EzQuickRotationDifficultyHelper.GetBaselineStarRating(beatmaps, beatmapInfo, ruleset.Value, mods.Value);
 
-            EzQuickRotationCoordinator.Session.Begin(beatmaps, criteria, beatmapInfo, ruleset.Value, mods.Value, baseline);
+            EzQuickRotationCoordinator.Session.Begin(beatmaps, criteria, beatmapInfo, ruleset.Value, mods.Value);
         }
     }
 }

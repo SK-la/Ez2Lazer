@@ -33,7 +33,7 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.Screens.Rotation
 {
     [Cached]
-    public class EzQuickRotationPickScreen : ScreenWithBeatmapBackground, IKeyBindingHandler<GlobalAction>, IPreviewTrackOwner
+    public partial class EzQuickRotationPickScreen : ScreenWithBeatmapBackground, IKeyBindingHandler<GlobalAction>, IPreviewTrackOwner
     {
         private static readonly Color4 header_plate_colour = Color4.Black.Opacity(0.65f);
         private const float background_dim_alpha = 0.25f;
@@ -68,10 +68,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
             cardAddSample = audio.Samples.Get(@"Multiplayer/Matchmaking/Ranked/card-add-1");
 
             var session = EzQuickRotationCoordinator.Session;
-            var initialCandidates = EzQuickRotationPoolBuilder.DrawCandidates(session.CachedPool, session.PlayedBeatmapIds, EzQuickRotationSession.CandidateCount);
-            var initialWedgeBeatmap = initialCandidates.Count > 0
-                ? beatmaps.GetWorkingBeatmap(initialCandidates[0])
-                : beatmaps.GetWorkingBeatmap(null);
+            var initialWedgeBeatmap = beatmaps.GetWorkingBeatmap(null);
 
             InternalChildren = new Drawable[]
             {
@@ -129,7 +126,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
                                     Origin = Anchor.BottomCentre,
                                     RelativeSizeAxes = Axes.Both,
                                     Height = 0.55f,
-                                    SelectionMode = HandSelectionMode.Single,
+                                    SelectionMode = HandSelectionMode.Disabled,
                                     PlayCardAction = onPlayButtonClicked,
                                 },
                             },
@@ -140,6 +137,25 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
 
             playerHand.SelectionChanged += onCardSelectionChanged;
             playerHand.StateChanged += enforceSingleActivePreview;
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            var session = EzQuickRotationCoordinator.Session;
+
+            session.EnsurePoolReady(() => Schedule(beginPickPhase));
+        }
+
+        private void beginPickPhase()
+        {
+            var session = EzQuickRotationCoordinator.Session;
+            var initialCandidates = EzQuickRotationPoolBuilder.DrawCandidates(session.CachedPool, session.PlayedBeatmapIds, EzQuickRotationSession.CandidateCount);
+
+            if (initialCandidates.Count > 0)
+                updateWedgeForBeatmap(initialCandidates[0]);
+
             loadCandidates(initialCandidates);
         }
 
@@ -220,6 +236,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
 
             emptyStateContainer.Hide();
             playerHand.SelectionMode = HandSelectionMode.Single;
+            playerHand.PlayCardAction = onPlayButtonClicked;
             addCandidatesToHand(candidates, autoSelectFirst: true);
         }
 
