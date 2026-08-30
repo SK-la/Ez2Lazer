@@ -23,6 +23,8 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card
 
         protected virtual Drawable CreateCardCover() => new CardCover(Beatmap);
 
+        protected virtual Drawable CreateCardMetadata() => new CardMetadata(Beatmap) { RelativeSizeAxes = Axes.Both };
+
         private partial class CardCover(APIBeatmap beatmap) : CompositeDrawable
         {
             [BackgroundDependencyLoader]

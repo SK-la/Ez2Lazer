@@ -3,7 +3,6 @@
 
 using System;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Rulesets;
 
@@ -23,7 +22,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
                 Checksum = beatmap.MD5Hash,
                 AuthorID = beatmap.Metadata.Author.OnlineID,
                 RulesetID = ruleset.OnlineID,
-                StarRating = resolveStarRating(beatmap, ruleset),
+                StarRating = beatmap.StarRating,
                 DifficultyName = beatmap.DifficultyName,
                 CircleSize = beatmap.Difficulty.CircleSize,
                 DrainRate = beatmap.Difficulty.DrainRate,
@@ -36,14 +35,6 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
             };
 
             return apiBeatmap;
-        }
-
-        private static double resolveStarRating(BeatmapInfo beatmap, RulesetInfo ruleset)
-        {
-            if (EzQuickRotationDifficultyHelper.UsesXxyStarRating(ruleset))
-                return beatmap.GetPersistedXxyStarRating() ?? beatmap.StarRating;
-
-            return beatmap.StarRating;
         }
 
         private static APIBeatmapSet CreateBeatmapSet(BeatmapInfo beatmap)
