@@ -14,6 +14,15 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card
 {
     public partial class RankedPlayCardContent
     {
+        private Drawable createCardCover()
+        {
+            var cover = CreateCardCover();
+            cover.RelativeSizeAxes = Axes.Both;
+            return cover;
+        }
+
+        protected virtual Drawable CreateCardCover() => new CardCover(Beatmap);
+
         private partial class CardCover(APIBeatmap beatmap) : CompositeDrawable
         {
             [BackgroundDependencyLoader]

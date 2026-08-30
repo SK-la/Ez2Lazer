@@ -6,31 +6,22 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Screens.Rotation;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card;
 
-namespace osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card
+namespace osu.Game.EzOsuGame.Screens.Rotation
 {
-    public partial class RankedPlayCardContent
+    public sealed partial class EzQuickRotationRankedPlayCardContent : RankedPlayCardContent
     {
-        private BeatmapInfo? ezLocalCoverBeatmap;
+        private readonly BeatmapInfo localCoverBeatmap;
 
-        public RankedPlayCardContent(APIBeatmap beatmap, BeatmapInfo localCoverBeatmap)
+        public EzQuickRotationRankedPlayCardContent(APIBeatmap beatmap, BeatmapInfo localCoverBeatmap)
+            : base(beatmap)
         {
-            Beatmap = beatmap;
-            ezLocalCoverBeatmap = localCoverBeatmap;
-            Size = RankedPlayCard.SIZE;
+            this.localCoverBeatmap = localCoverBeatmap;
         }
 
-        private Drawable createCardCover()
-        {
-            Drawable cover = ezLocalCoverBeatmap != null
-                ? new EzQuickRotationLocalCardCoverAdapter(ezLocalCoverBeatmap)
-                : new CardCover(Beatmap);
-
-            cover.RelativeSizeAxes = Axes.Both;
-            return cover;
-        }
+        protected override Drawable CreateCardCover() => new EzQuickRotationLocalCardCoverAdapter(localCoverBeatmap);
 
         private partial class EzQuickRotationLocalCardCoverAdapter(BeatmapInfo beatmap) : CompositeDrawable
         {

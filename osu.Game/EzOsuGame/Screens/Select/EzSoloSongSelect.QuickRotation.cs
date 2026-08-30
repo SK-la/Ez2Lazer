@@ -1,29 +1,32 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using osu.Framework.Screens;
+using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Screens.Rotation;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Select;
 
-namespace osu.Game.Screens.Select
+namespace osu.Game.EzOsuGame.Screens.Select
 {
-    public partial class SoloSongSelect
+    public static class EzSoloSongSelect
     {
-        private void tryBeginQuickRotation()
+        public static void TryBeginQuickRotation(BeatmapManager beatmaps,
+                                                 WorkingBeatmap beatmap,
+                                                 Bindable<RulesetInfo> ruleset,
+                                                 Bindable<IReadOnlyList<Mod>> mods,
+                                                 FilterControl filterControl)
         {
             if (!EzQuickRotationSession.IsEnabled || EzQuickRotationCoordinator.Session.IsActive)
                 return;
 
-            var criteria = FilterControl.CreateCriteria();
-            var beatmapInfo = Beatmap.Value.BeatmapInfo;
-            double baseline = EzQuickRotationDifficultyHelper.GetBaselineStarRating(beatmaps, beatmapInfo, Ruleset.Value, Mods.Value);
+            var criteria = filterControl.CreateCriteria();
+            var beatmapInfo = beatmap.BeatmapInfo;
+            double baseline = EzQuickRotationDifficultyHelper.GetBaselineStarRating(beatmaps, beatmapInfo, ruleset.Value, mods.Value);
 
-            EzQuickRotationCoordinator.Session.Begin(beatmaps, criteria, beatmapInfo, Ruleset.Value, Mods.Value, baseline);
+            EzQuickRotationCoordinator.Session.Begin(beatmaps, criteria, beatmapInfo, ruleset.Value, mods.Value, baseline);
         }
     }
 }

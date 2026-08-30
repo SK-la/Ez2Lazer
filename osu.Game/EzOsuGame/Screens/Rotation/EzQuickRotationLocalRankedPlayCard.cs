@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Allocation;
 using osu.Game.Beatmaps;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Multiplayer.MatchTypes.RankedPlay;
@@ -15,6 +16,9 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
 
         private readonly APIBeatmap apiBeatmap;
 
+        [Resolved]
+        private BeatmapManager beatmaps { get; set; } = null!;
+
         public EzQuickRotationLocalRankedPlayCard(BeatmapInfo beatmap, APIBeatmap apiBeatmap)
             : base(new RankedPlayCardWithPlaylistItem(new RankedPlayCardItem { ID = beatmap.ID }))
         {
@@ -25,7 +29,8 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            EzQuickRotationRankedPlayCardHelper.PresentLocalBeatmap(this, apiBeatmap, SourceBeatmap);
+            SongPreviewEnabled.Value = false;
+            EzQuickRotationRankedPlayCardHelper.PresentLocalBeatmap(this, apiBeatmap, SourceBeatmap, beatmaps);
         }
     }
 }
