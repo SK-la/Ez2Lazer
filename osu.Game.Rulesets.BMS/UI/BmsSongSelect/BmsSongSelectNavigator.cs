@@ -89,7 +89,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
 
         public void SetListFilter(string text)
         {
-            listFilterText = text?.Trim() ?? string.Empty;
+            listFilterText = text.Trim();
 
             if (ActiveLevel != null || currentDirectory != null)
                 refreshList();

@@ -452,7 +452,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                 LoadScreen(currentPlayer = new ScoreAccessibleReplayPlayer(replayScore));
             });
 
-            AddUntilStep("wait for completion", () => currentPlayer?.ScoreProcessor?.HasCompleted.Value == true);
+            AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             AddStep("capture drawable hit events", () =>
             {
@@ -495,7 +495,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                 LoadScreen(currentPlayer = new ScoreAccessibleReplayPlayer(replayScore));
             });
 
-            AddUntilStep("wait for completion", () => currentPlayer?.ScoreProcessor?.HasCompleted.Value == true);
+            AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             AddStep("capture drawable results", () =>
             {
@@ -587,19 +587,23 @@ namespace osu.Game.Rulesets.Mania.Tests
                 LoadScreen(currentPlayer = new ScoreAccessibleReplayPlayer(replayScore));
             });
 
-            AddUntilStep("wait for completion", () => currentPlayer?.ScoreProcessor?.HasCompleted.Value == true);
+            AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             AddAssert("replay result matches recalculated Now", () =>
             {
                 const double tolerance = 1e-6;
 
                 if (Math.Abs(currentPlayer.ScoreProcessor.Accuracy.Value - recalculatedScoreInfo.Accuracy) >= tolerance)
+                {
                     throw new AssertionException(
                         $"accuracy mismatch: drawable={currentPlayer.ScoreProcessor.Accuracy.Value}, session={recalculatedScoreInfo.Accuracy}");
+                }
 
                 if (currentPlayer.ScoreProcessor.TotalScore.Value != recalculatedScoreInfo.TotalScore)
+                {
                     throw new AssertionException(
                         $"total score mismatch: drawable={currentPlayer.ScoreProcessor.TotalScore.Value}, session={recalculatedScoreInfo.TotalScore}");
+                }
 
                 foreach (var result in Enum.GetValues<HitResult>())
                 {

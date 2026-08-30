@@ -73,7 +73,7 @@ namespace osu.Game.Rulesets.Osu.Tests
                 LoadScreen(currentPlayer = new ScoreAccessibleReplayPlayer(replayScore));
             });
 
-            AddUntilStep("wait for completion", () => currentPlayer?.ScoreProcessor?.HasCompleted.Value == true);
+            AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value == true);
 
             AddStep("capture drawable hit events", () =>
             {

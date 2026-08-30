@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.UI
 
         public float WidthForGradient { get; init; } = 0.3f;
 
-        public bool WantsAcrylicCapture => acrylicUiEnabled?.Value ?? false;
+        public bool WantsAcrylicCapture => acrylicUiEnabled.Value;
 
         private AcrylicBackdropDrawable acrylicBackdrop = null!;
         private Box darkVeil = null!;

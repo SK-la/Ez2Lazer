@@ -267,7 +267,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return beatmapSet;
         }
 
-        public void CancelScan() => scanCts?.Cancel();
+        public void CancelScan()
+        {
+            lock (this)
+            {
+                scanCts?.Cancel();
+            }
+        }
 
         public Task ScanLibraryAsync(string rootPath, CancellationToken cancellationToken = default) => ScanLibraryAsync(new[] { rootPath }, cancellationToken);
 
@@ -284,7 +290,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             if (previous != null)
             {
-                previous.Cancel();
+                await previous.CancelAsync().ConfigureAwait(false);
 
                 try
                 {
@@ -715,7 +721,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             foreach (string path in paths)
             {
-                string trimmed = path?.Trim() ?? string.Empty;
+                string trimmed = path.Trim();
 
                 if (string.IsNullOrEmpty(trimmed) || !seen.Add(trimmed))
                     continue;

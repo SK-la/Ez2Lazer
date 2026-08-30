@@ -24,7 +24,7 @@ namespace osu.Game.EzOsuGame.UI
         /// </summary>
         public bool AcrylicCaptureVisible { get; set; }
 
-        public bool WantsAcrylicCapture => (acrylicUiEnabled?.Value ?? false) && AcrylicCaptureVisible;
+        public bool WantsAcrylicCapture => (acrylicUiEnabled.Value) && AcrylicCaptureVisible;
 
         public Box TintBox { get; private set; }
 
