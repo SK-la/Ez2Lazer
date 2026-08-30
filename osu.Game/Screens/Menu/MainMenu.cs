@@ -41,6 +41,7 @@ using osu.Game.Screens.Edit;
 using osu.Game.Screens.OnlinePlay.DailyChallenge;
 using osu.Game.Screens.OnlinePlay.Multiplayer;
 using osu.Game.Screens.OnlinePlay.Playlists;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Screens.Select;
 using osu.Game.Seasonal;
 using osuTK;
@@ -114,6 +115,12 @@ namespace osu.Game.Screens.Menu
         private SupporterDisplay supporterDisplay;
 
         private Sample reappearSampleSwoosh;
+
+        [Resolved(CanBeNull = true)]
+        private IEzStartupWorkCoordinator startupWorkCoordinator { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private IEzStartupContentPreloader startupContentPreloader { get; set; }
 
         [Resolved(canBeNull: true)]
         private SkinEditorOverlay skinEditor { get; set; }
@@ -267,8 +274,18 @@ namespace osu.Game.Screens.Menu
 
         public override void OnEntering(ScreenTransitionEvent e)
         {
+            double enterBegin = Clock.CurrentTime;
+            EzStartupTrace.Log("MainMenu.OnEntering begin");
+
             base.OnEntering(e);
+
+            NotifyMainMenuEnteredForStartup();
+            EzStartupTrace.Log("MainMenu.OnEntering");
+            startupWorkCoordinator?.OnMainMenuEntered(this);
             Buttons.FadeInFromZero(500);
+
+            Scheduler.Add(() =>
+                EzStartupTrace.Log($"MainMenu.OnEntering end frameCost={(Clock.CurrentTime - enterBegin):0}ms"));
 
             if (e.Last is IntroScreen && musicController.TrackLoaded)
             {
@@ -498,7 +515,20 @@ namespace osu.Game.Screens.Menu
         {
         }
 
-        private void loadSongSelect() => this.Push(new SoloSongSelect());
+        private void loadSongSelect()
+        {
+            EzStartupTrace.Log("MainMenu.loadSongSelect");
+            startupContentPreloader?.LogStatus("MainMenu.loadSongSelect");
+            LogSongSelectPreloadStatus("MainMenu.loadSongSelect");
+
+            bool preloadHit = TryConsumePreloadedSongSelect(out var screen);
+            EzSongSelectEnterTrace.RecordPlayPressed(preloadHit);
+
+            if (preloadHit)
+                this.Push(screen!);
+            else
+                this.Push(new SoloSongSelect());
+        }
 
         private void loadQuickPlay() => this.Push(new OnlinePlay.Matchmaking.Intro.ScreenIntro(MatchmakingPoolType.QuickPlay));
 
