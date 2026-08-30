@@ -40,10 +40,10 @@ using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Acrylic;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Background.Pixiv;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Overlays;
@@ -1358,6 +1358,8 @@ namespace osu.Game
 
             loadComponentSingleFile(new PixivAutoDownloadProcessor(), Add, true);
 
+            loadStartupContentPreloader();
+
             Add(externalLinkOpener = new ExternalLinkOpener());
             Add(new MusicKeyBindingHandler());
             Add(new OnlineStatusNotifier(() => ScreenStack.CurrentScreen));
@@ -1965,6 +1967,7 @@ namespace osu.Game
         private void screenExited(IScreen lastScreen, IScreen newScreen)
         {
             ScreenChanged((OsuScreen)lastScreen, (OsuScreen)newScreen);
+            onScreenExitedForStartupPreload((OsuScreen)lastScreen, (OsuScreen)newScreen);
 
             if (newScreen == null)
                 Exit();

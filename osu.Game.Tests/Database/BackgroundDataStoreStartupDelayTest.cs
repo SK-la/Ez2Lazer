@@ -4,6 +4,7 @@
 using System;
 using NUnit.Framework;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Startup;
 
 namespace osu.Game.Tests.Database
 {
@@ -11,10 +12,10 @@ namespace osu.Game.Tests.Database
     public partial class BackgroundDataStoreStartupDelayTest
     {
         [Test]
-        public void ProductionStartupBackfillDelayIsFiveSeconds()
+        public void ProductionStartupBackfillDelayUsesEzStartupTuningDefault()
         {
             var probe = new ProbeBackgroundDataStoreProcessor();
-            Assert.That(probe.ExposedStartupBackfillDelay, Is.EqualTo(TimeSpan.FromSeconds(2)));
+            Assert.That(probe.ExposedStartupBackfillDelay, Is.EqualTo(TimeSpan.FromSeconds(EzStartupTuning.BdspStartupBackfillDelaySeconds)));
         }
 
         private partial class ProbeBackgroundDataStoreProcessor : BackgroundDataStoreProcessor

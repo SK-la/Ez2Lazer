@@ -20,6 +20,7 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Extensions;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -103,6 +104,9 @@ namespace osu.Game.Screens.Menu
         {
             this.createNextScreen = createNextScreen;
         }
+
+        [Resolved(CanBeNull = true)]
+        private IEzStartupWorkCoordinator startupWorkCoordinator { get; set; }
 
         [Resolved]
         private BeatmapManager beatmaps { get; set; }
@@ -333,7 +337,9 @@ namespace osu.Game.Screens.Menu
                 // an exception is running ruleset tests, where the osu! ruleset may not be present (causing importing the intro to fail).
                 if (initialBeatmap != null)
                     beatmap.Value = initialBeatmap;
-                Track = beatmap.Value.Track;
+
+                if (beatmap.Value != null)
+                    Track = beatmap.Value.Track;
 
                 // ensure the track starts at maximum volume
                 musicController.CurrentTrack.FinishTransforms();
@@ -363,16 +369,30 @@ namespace osu.Game.Screens.Menu
             if (nextScreen != null)
                 return;
 
+            EzStartupTrace.Log("Intro.PrepareMenuLoad");
+
             nextScreen = createNextScreen?.Invoke();
 
             if (nextScreen != null)
-                LoadComponentAsync(nextScreen);
+            {
+                LoadComponentAsync(nextScreen, loaded =>
+                {
+                    if (loaded is MainMenu mainMenu)
+                        startupWorkCoordinator?.OnMainMenuOffscreenReady(mainMenu);
+                });
+            }
+
+            startupWorkCoordinator?.OnPrepareMenuLoad();
         }
 
         protected void LoadMenu()
         {
             if (DidLoadMenu)
                 return;
+
+            EzStartupTrace.Log("Intro.LoadMenu (Push MainMenu)");
+
+            startupWorkCoordinator?.OnLoadMenu();
 
             beatmap.Return();
 
