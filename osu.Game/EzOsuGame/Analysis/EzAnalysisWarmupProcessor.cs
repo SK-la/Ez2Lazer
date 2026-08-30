@@ -52,6 +52,9 @@ namespace osu.Game.EzOsuGame.Analysis
         [Resolved]
         private IHighPerformanceSessionManager? highPerformanceSessionManager { get; set; }
 
+        [Resolved(CanBeNull = true)]
+        private BackgroundDataStoreProcessor? backgroundDataStoreProcessor { get; set; }
+
         private IBindable<bool> sqliteEnabledBindable = null!;
         private bool sqliteEnabled;
         private bool backgroundWorkersStarted;
@@ -83,6 +86,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private volatile bool pendingScanCompleted;
 
+        private Action? onBdspFinishedForSqliteWarmup;
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
@@ -110,12 +115,40 @@ namespace osu.Game.EzOsuGame.Analysis
                 ensureBackgroundWorkersStarted();
                 pendingScanCompleted = true;
                 Schedule(() => queueSelectedBeatmapRecomputeIfRequired(currentBeatmap.Value));
-                tryQueueAutomaticSqliteUpgradeWarmup();
+                scheduleSqliteWarmupAfterBdsp();
                 return;
             }
 
             pendingScanCompleted = false;
             cancelPendingBeatmapProcessing();
+            unsubscribeBdspForSqliteWarmup();
+        }
+
+        private void scheduleSqliteWarmupAfterBdsp()
+        {
+            if (!sqliteEnabled)
+                return;
+
+            if (backgroundDataStoreProcessor == null || backgroundDataStoreProcessor.IsStartupProcessingFinished)
+            {
+                tryQueueAutomaticSqliteUpgradeWarmup();
+                return;
+            }
+
+            onBdspFinishedForSqliteWarmup ??= onBdspStartupProcessingFinishedForSqliteWarmup;
+            backgroundDataStoreProcessor.StartupProcessingFinished += onBdspFinishedForSqliteWarmup;
+        }
+
+        private void onBdspStartupProcessingFinishedForSqliteWarmup()
+        {
+            unsubscribeBdspForSqliteWarmup();
+            tryQueueAutomaticSqliteUpgradeWarmup();
+        }
+
+        private void unsubscribeBdspForSqliteWarmup()
+        {
+            if (backgroundDataStoreProcessor != null && onBdspFinishedForSqliteWarmup != null)
+                backgroundDataStoreProcessor.StartupProcessingFinished -= onBdspFinishedForSqliteWarmup;
         }
 
         private void ensureBackgroundWorkersStarted()
@@ -789,6 +822,8 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             if (isDisposing)
             {
+                unsubscribeBdspForSqliteWarmup();
+
                 startupWarmupCancellationSource.Cancel();
                 selectedBeatmapRecomputeCancellationSource.Cancel();
                 pendingBeatmapRecomputeCancellationSource.Cancel();
