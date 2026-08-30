@@ -337,7 +337,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 }
 
                 long generation = indexRepository.BeginScanGeneration();
-                using var pipelineCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                var pipelineCts = CancellationTokenSource.CreateLinkedTokenSource(token);
                 CancellationToken pipelineToken = pipelineCts.Token;
                 var files = Channel.CreateBounded<string>(new BoundedChannelOptions(512)
                 {
@@ -476,20 +476,26 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     }
                 }, pipelineToken);
 
-                const TaskContinuationOptions cancel_on_failure = TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously;
+                try
+                {
+                    await Task.WhenAll(producer, completeWrites, writer).ConfigureAwait(false);
+                    pipelineToken.ThrowIfCancellationRequested();
 
-                _ = producer.ContinueWith(_ => pipelineCts.Cancel(), CancellationToken.None, cancel_on_failure, TaskScheduler.Default);
-                _ = completeWrites.ContinueWith(_ => pipelineCts.Cancel(), CancellationToken.None, cancel_on_failure, TaskScheduler.Default);
-                _ = writer.ContinueWith(_ => pipelineCts.Cancel(), CancellationToken.None, cancel_on_failure, TaskScheduler.Default);
+                    LastScanRevision = indexRepository.CompleteScanGeneration(generation, configuredPaths);
+                    SetRootPaths(configuredPaths);
+                    realmSyncRequired = true;
 
-                await Task.WhenAll(producer, completeWrites, writer).ConfigureAwait(false);
-                pipelineToken.ThrowIfCancellationRequested();
-
-                LastScanRevision = indexRepository.CompleteScanGeneration(generation, configuredPaths);
-                SetRootPaths(configuredPaths);
-                realmSyncRequired = true;
-
-                StatusMessage.Value = BmsStrings.Scan_Complete(SongCount, ChartCount);
+                    StatusMessage.Value = BmsStrings.Scan_Complete(SongCount, ChartCount);
+                }
+                catch
+                {
+                    pipelineCts.Cancel();
+                    throw;
+                }
+                finally
+                {
+                    pipelineCts.Dispose();
+                }
             }
             catch (OperationCanceledException)
             {

@@ -166,8 +166,11 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
         private void invalidateAccessToken()
         {
-            cachedAccessToken = null;
-            accessTokenExpiresAt = DateTimeOffset.MinValue;
+            lock (tokenLock)
+            {
+                cachedAccessToken = null;
+                accessTokenExpiresAt = DateTimeOffset.MinValue;
+            }
         }
 
         private string? loadRefreshTokenFromFile() => loadAuthFromFile()?.RefreshToken;
