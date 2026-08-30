@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     {
         private readonly EzLocalProfileStore store;
         private readonly EzLocalProfileAggregator aggregator;
-        private readonly object computeLock = new object();
+        private readonly Lock computeLock = new Lock();
         private CancellationTokenSource? computeCts;
 
         public Bindable<EzLocalProfileSnapshot> Snapshot { get; } = new Bindable<EzLocalProfileSnapshot>(new EzLocalProfileSnapshot());

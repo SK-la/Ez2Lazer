@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using Microsoft.Data.Sqlite;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
@@ -24,7 +25,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public const int SCHEMA_VERSION = 1;
 
         private readonly Storage storage;
-        private readonly object sync = new object();
+        private readonly Lock sync = new Lock();
         private bool initialised;
         private string dbPath = string.Empty;
         private bool isDisposed;

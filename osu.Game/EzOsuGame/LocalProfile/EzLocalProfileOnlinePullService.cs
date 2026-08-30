@@ -44,7 +44,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly BeatmapManager beatmapManager;
         private readonly RealmAccess realm;
         private readonly EzLocalProfileStore store;
-        private readonly object pullLock = new object();
+        private readonly Lock pullLock = new Lock();
         private CancellationTokenSource? pullCts;
         private bool isDisposed;
 

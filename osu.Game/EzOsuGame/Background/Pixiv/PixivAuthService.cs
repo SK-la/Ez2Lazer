@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using osu.Framework.Localisation;
@@ -23,7 +24,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         private string? cachedAccessToken;
         private string? cachedAccount;
         private DateTimeOffset accessTokenExpiresAt = DateTimeOffset.MinValue;
-        private readonly object tokenLock = new object();
+        private readonly Lock tokenLock = new Lock();
 
         public PixivAuthService(Storage storage)
         {

@@ -50,7 +50,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly IBindable<bool> sqliteAnalysisEnabled;
         private readonly Bindable<string?> activeSongsBranchDisplayName = new Bindable<string?>();
         private readonly Bindable<int> activeSongsBranchVersion = new Bindable<int>();
-        private readonly object activeSongsBranchStateLock = new object();
+        private readonly Lock activeSongsBranchStateLock = new Lock();
         private readonly List<ActiveSongsBranchState> activeSongsBranches = new List<ActiveSongsBranchState>();
 
         private readonly record struct ActiveSongsBranchState(string DatabasePath, string DisplayName, int RulesetOnlineId, string ModsFingerprint);

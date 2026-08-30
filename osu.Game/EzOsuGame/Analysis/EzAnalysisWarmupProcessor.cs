@@ -58,12 +58,12 @@ namespace osu.Game.EzOsuGame.Analysis
         private IBindable<bool> sqliteEnabledBindable = null!;
         private bool sqliteEnabled;
         private bool backgroundWorkersStarted;
-        private readonly object sqliteManualRebuildLock = new object();
+        private readonly Lock sqliteManualRebuildLock = new Lock();
         private bool sqliteMainRebuildQueued;
         private bool sqliteSongsBranchesRebuildQueued;
 
         protected virtual int TimeToSleepDuringGameplay => 30000;
-        private readonly object pendingBeatmapLock = new object();
+        private readonly Lock pendingBeatmapLock = new Lock();
         private readonly Queue<Guid> pendingBeatmapQueue = new Queue<Guid>();
         private readonly HashSet<Guid> inFlightBeatmapIds = new HashSet<Guid>();
         private ProgressNotification? startupWarmupProgressNotification;

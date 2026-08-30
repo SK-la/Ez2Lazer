@@ -108,7 +108,7 @@ namespace osu.Game.Database
 
         private LocalCachedBeatmapMetadataSource localMetadataSource = null!;
 
-        private readonly object ezRealmMetadataBackfillLock = new object();
+        private readonly Lock ezRealmMetadataBackfillLock = new Lock();
         private bool ezRealmMetadataBackfillQueued;
 
         protected virtual int TimeToSleepDuringGameplay => 30000;
@@ -197,7 +197,7 @@ namespace osu.Game.Database
                 ezRealmMetadataBackfillQueued = false;
         }
 
-        private readonly object ezScoreRecalculationLock = new object();
+        private readonly Lock ezScoreRecalculationLock = new Lock();
         private bool ezScoreRecalculationQueued;
 
         /// <summary>

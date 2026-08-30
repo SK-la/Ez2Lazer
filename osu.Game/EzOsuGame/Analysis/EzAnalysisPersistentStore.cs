@@ -103,7 +103,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private const string col_pp = "pp";
 
         private readonly Storage storage;
-        private readonly object initLock = new object();
+        private readonly Lock initLock = new Lock();
         private static readonly IReadOnlyDictionary<Guid, double> empty_xxy_sr_values = new Dictionary<Guid, double>();
         private static readonly IReadOnlyDictionary<Guid, double> empty_pp_values = new Dictionary<Guid, double>();
 
