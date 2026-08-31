@@ -2395,8 +2395,8 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
         private static PendingWrite snapshotPendingWrite(BeatmapInfo beatmap, EzAnalysisResult analysis)
             => new PendingWrite(
                 beatmap.ID,
-                beatmap.Hash ?? string.Empty,
-                beatmap.MD5Hash ?? string.Empty,
+                beatmap.Hash,
+                beatmap.MD5Hash,
                 beatmap.Ruleset.OnlineID,
                 analysis,
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
