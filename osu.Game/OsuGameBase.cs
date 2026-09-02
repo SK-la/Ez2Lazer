@@ -54,6 +54,7 @@ using osu.Game.EzOsuGame.Input;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.ExternalRulesets;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API;
@@ -347,7 +348,7 @@ namespace osu.Game
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
 
-            dependencies.CacheAs<RulesetStore>(RulesetStore = new RealmRulesetStore(realm, Storage));
+            dependencies.CacheAs<RulesetStore>(RulesetStore = new EzRealmRulesetStore(realm, Storage));
             dependencies.CacheAs<IRulesetStore>(RulesetStore);
 
             Decoder.RegisterDependencies(RulesetStore);
