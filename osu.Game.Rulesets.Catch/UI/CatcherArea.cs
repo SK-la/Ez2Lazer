@@ -92,7 +92,17 @@ namespace osu.Game.Rulesets.Catch.UI
 
             SetCatcherPosition(
                 replayState?.CatcherX ??
-                (float)(Catcher.X + Catcher.Speed * (catchInputManager?.ScratchMovementSpeedMultiplier ?? 1) * currentDirection * Clock.ElapsedFrameTime));
+                (float)(Catcher.X + getMovementSpeed() * currentDirection * Clock.ElapsedFrameTime));
+        }
+
+        private double getMovementSpeed()
+        {
+            double speed = Catcher.Speed;
+
+            if (catchInputManager?.ScratchDashActive == true)
+                speed *= catchInputManager.ScratchDashSpeedMultiplier;
+
+            return speed;
         }
 
         protected override void UpdateAfterChildren()

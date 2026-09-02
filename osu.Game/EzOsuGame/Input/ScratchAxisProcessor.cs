@@ -67,6 +67,11 @@ namespace osu.Game.EzOsuGame.Input
         public double SmoothedAngularVelocity { get; private set; }
 
         /// <summary>
+        /// 角加速度（轴单位/ms²），由平滑角速度对 wall-clock 求导，与帧率无关。
+        /// </summary>
+        public double AngularAcceleration { get; private set; }
+
+        /// <summary>
         /// 平滑角速度半衰期（ms）。热重载调试时可改。
         /// </summary>
         public static double SmoothedVelocityHalfLifeMs { get; set; } = 50;
@@ -95,8 +100,13 @@ namespace osu.Game.EzOsuGame.Input
         {
             bool wasPressed = IsPressed.Value;
 
+            double dt = lastUpdateTime > double.NegativeInfinity
+                ? Math.Max(currentTime - lastUpdateTime, 1)
+                : 0;
+
+            double smoothedBefore = SmoothedAngularVelocity;
+
             applyTimeBasedSmoothingDecay(currentTime);
-            lastUpdateTime = currentTime;
 
             if (!hasSample)
             {
@@ -105,8 +115,10 @@ namespace osu.Game.EzOsuGame.Input
                 LastMotionTime = lastMotionTime = double.NegativeInfinity;
                 AngularVelocity = 0;
                 SmoothedAngularVelocity = 0;
+                AngularAcceleration = 0;
                 clearPending();
                 reverseTravel = 0;
+                lastUpdateTime = currentTime;
                 return false;
             }
 
@@ -159,6 +171,13 @@ namespace osu.Game.EzOsuGame.Input
                 }
             }
 
+            if (dt > 0)
+                AngularAcceleration = (SmoothedAngularVelocity - smoothedBefore) / dt;
+            else
+                AngularAcceleration = 0;
+
+            lastUpdateTime = currentTime;
+
             return wasPressed != IsPressed.Value;
         }
 
@@ -174,6 +193,7 @@ namespace osu.Game.EzOsuGame.Input
                 reverseTravel = 0;
                 AngularVelocity = 0;
                 SmoothedAngularVelocity = 0;
+                AngularAcceleration = 0;
                 IsPressed.Value = false;
                 Direction.Value = ScratchAxisDirection.None;
                 return wasPressed;
@@ -189,6 +209,7 @@ namespace osu.Game.EzOsuGame.Input
             LastMotionTime = lastMotionTime = double.NegativeInfinity;
             AngularVelocity = 0;
             SmoothedAngularVelocity = 0;
+            AngularAcceleration = 0;
             lastUpdateTime = double.NegativeInfinity;
             clearPending();
             reverseTravel = 0;

@@ -102,28 +102,79 @@ namespace osu.Game.Rulesets.Catch.Tests
         }
 
         [Test]
-        public void TestSpeedMapper_ScalesUpToOnePointFive()
+        public void TestDashState_EntersOnAccelerationThreshold()
         {
-            Assert.That(CatchScratchSpeedMapper.Map(0), Is.EqualTo(1));
+            var state = new CatchScratchDashState();
 
-            Assert.That(
-                CatchScratchSpeedMapper.Map(CatchScratchSpeedMapper.ReferenceVelocity * 0.5),
-                Is.EqualTo(1.25).Within(0.001));
+            (bool active, double multiplier) = state.Update(CatchScratchDashState.EnterAcceleration, 0);
 
-            Assert.That(
-                CatchScratchSpeedMapper.Map(CatchScratchSpeedMapper.ReferenceVelocity),
-                Is.EqualTo(1.5).Within(0.001));
-
-            Assert.That(
-                CatchScratchSpeedMapper.Map(CatchScratchSpeedMapper.ReferenceVelocity * 3),
-                Is.EqualTo(1.5).Within(0.001));
+            Assert.That(active, Is.True);
+            Assert.That(multiplier, Is.EqualTo(1));
         }
 
         [Test]
-        public void TestSpeedMapper_FastSpinVelocity_IsClearlyAboveWalkSpeed()
+        public void TestDashState_ExitsWhenVelocityBelowThreshold()
         {
-            double multiplier = CatchScratchSpeedMapper.Map(0.001);
-            Assert.That(multiplier, Is.GreaterThan(1.2));
+            var state = new CatchScratchDashState();
+
+            state.Update(CatchScratchDashState.EnterAcceleration, 0.001);
+
+            (bool active, _) = state.Update(0, CatchScratchDashState.ExitVelocity * 0.5);
+
+            Assert.That(active, Is.False);
+        }
+
+        [Test]
+        public void TestDashState_StaysActiveAtConstantVelocityWithoutWalkTransition()
+        {
+            var state = new CatchScratchDashState();
+
+            state.Update(CatchScratchDashState.EnterAcceleration, 0.001);
+
+            (bool active, double multiplier) = state.Update(0, 0.001);
+
+            Assert.That(active, Is.True);
+            Assert.That(multiplier, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TestDashState_ScalesMultiplierOnlyWithinDash()
+        {
+            var state = new CatchScratchDashState();
+
+            (bool walkActive, double walkMultiplier) = state.Update(
+                CatchScratchDashState.EnterAcceleration * 0.5,
+                CatchScratchDashState.ExitVelocity * 2);
+
+            Assert.That(walkActive, Is.False);
+            Assert.That(walkMultiplier, Is.EqualTo(1));
+
+            state.Update(CatchScratchDashState.EnterAcceleration, 0.001);
+
+            double midAcceleration = (CatchScratchDashState.EnterAcceleration + CatchScratchDashState.MaxAcceleration) / 2;
+            (_, double dashMultiplier) = state.Update(midAcceleration, 0.001);
+
+            Assert.That(dashMultiplier, Is.EqualTo(1.25).Within(0.001));
+
+            (_, double maxDashMultiplier) = state.Update(CatchScratchDashState.MaxAcceleration, 0.001);
+            Assert.That(maxDashMultiplier, Is.EqualTo(CatchScratchDashState.MaxDashMultiplier).Within(0.001));
+        }
+
+        [Test]
+        public void TestAngularAcceleration_PositiveWhenSpinningUp()
+        {
+            var processor = new ScratchAxisProcessor
+            {
+                RequiredActivationTicks = { Value = 1 },
+                Deadzone = { Value = 0.001 },
+            };
+
+            processor.Update(0, 0);
+            processor.Update(0.002f, 10);
+            processor.Update(0.02f, 20);
+
+            Assert.That(processor.AngularAcceleration, Is.GreaterThan(0));
+            Assert.That(processor.SmoothedAngularVelocity, Is.GreaterThan(0));
         }
 
         [Test]

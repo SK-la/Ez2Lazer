@@ -29,6 +29,9 @@ namespace osu.Game.Rulesets.Catch
 
         private bool moveLeftInjected;
         private bool moveRightInjected;
+        private bool dashInjected;
+
+        private readonly CatchScratchDashState scratchDashState = new CatchScratchDashState();
 
         [Resolved(CanBeNull = true)]
         private DrawableCatchRuleset? drawableRuleset { get; set; }
@@ -39,9 +42,14 @@ namespace osu.Game.Rulesets.Catch
         public bool ScratchJudgmentAssistActive => CatchScratchAxisResolver.ResolveActive(scratchAxes.Left, scratchAxes.Right) != null;
 
         /// <summary>
-        /// Ez2Catch 开启且转盘转动时的移动速度倍率（1 ~ 1.5）。
+        /// Ez2Catch 转盘模拟 Dash 按住（角加速度进入、转速退出）。
         /// </summary>
-        public double ScratchMovementSpeedMultiplier { get; private set; } = 1;
+        public bool ScratchDashActive { get; private set; }
+
+        /// <summary>
+        /// Dash 内速度倍率（1 ~ 1.5），仅 <see cref="ScratchDashActive"/> 时生效。
+        /// </summary>
+        public double ScratchDashSpeedMultiplier { get; private set; } = 1;
 
         [BackgroundDependencyLoader]
         private void loadScratchAxis(Ez2ConfigManager ezConfig, ScratchAxisDeviceTracker tracker, GameHost gameHost)
@@ -80,11 +88,12 @@ namespace osu.Game.Rulesets.Catch
 
         private void pollScratchAxes()
         {
-            ScratchMovementSpeedMultiplier = 1;
+            ScratchDashActive = false;
+            ScratchDashSpeedMultiplier = 1;
 
             if (ReplayInputHandler != null || !scratchEnabled.Value || isRelaxActive())
             {
-                if (moveLeftInjected || moveRightInjected)
+                if (moveLeftInjected || moveRightInjected || dashInjected)
                     releaseInjected();
                 return;
             }
@@ -95,10 +104,17 @@ namespace osu.Game.Rulesets.Catch
             var active = CatchScratchAxisResolver.ResolveActive(scratchAxes.Left, scratchAxes.Right);
 
             if (catchScratchEz2Enabled.Value && active != null)
-                ScratchMovementSpeedMultiplier = CatchScratchSpeedMapper.Map(active.SmoothedAngularVelocity);
+            {
+                (ScratchDashActive, ScratchDashSpeedMultiplier) = scratchDashState.Update(
+                    active.AngularAcceleration,
+                    active.SmoothedAngularVelocity);
+            }
+            else
+                scratchDashState.Reset();
 
             syncInjection(active?.Direction.Value == ScratchAxisDirection.CounterClockwise, CatchAction.MoveLeft, ref moveLeftInjected);
             syncInjection(active?.Direction.Value == ScratchAxisDirection.Clockwise, CatchAction.MoveRight, ref moveRightInjected);
+            syncInjection(ScratchDashActive, CatchAction.Dash, ref dashInjected);
         }
 
         private void applyCatchEz2Tuning(bool ez2Enabled)
@@ -156,6 +172,13 @@ namespace osu.Game.Rulesets.Catch
                 moveRightInjected = false;
             }
 
+            if (dashInjected)
+            {
+                KeyBindingContainer.TriggerReleased(CatchAction.Dash);
+                dashInjected = false;
+            }
+
+            scratchDashState.Reset();
             scratchAxes.Reset();
         }
     }
