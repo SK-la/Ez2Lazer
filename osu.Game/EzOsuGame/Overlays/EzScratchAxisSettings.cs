@@ -45,8 +45,12 @@ namespace osu.Game.EzOsuGame.Overlays
         private Bindable<string> rightBinding = null!;
         private Bindable<double> deadzone = null!;
         private Bindable<int> stopThreshold = null!;
+        private Bindable<double> dashEnterAcceleration = null!;
+        private Bindable<double> dashExitVelocity = null!;
 
         private ScratchAxisDeviceTracker tracker = null!;
+
+        private FillFlowContainer catchEz2SettingsContainer = null!;
 
         private SettingsButtonV2 leftBindButton = null!;
         private SettingsButtonV2 rightBindButton = null!;
@@ -77,6 +81,8 @@ namespace osu.Game.EzOsuGame.Overlays
             rightBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisR);
             deadzone = ezConfig.GetBindable<double>(Ez2Setting.ScratchAxisDeadzone);
             stopThreshold = ezConfig.GetBindable<int>(Ez2Setting.ScratchAxisStopThreshold);
+            dashEnterAcceleration = ezConfig.GetBindable<double>(Ez2Setting.CatchScratchDashEnterAcceleration);
+            dashExitVelocity = ezConfig.GetBindable<double>(Ez2Setting.CatchScratchDashExitVelocity);
 
             leftMonitor.Deadzone.BindTo(deadzone);
             rightMonitor.Deadzone.BindTo(deadzone);
@@ -102,6 +108,40 @@ namespace osu.Game.EzOsuGame.Overlays
                 })
                 {
                     Keywords = new[] { "ez", "catch", "scratch", "turntable", "ez2catch", "转盘" }
+                },
+                catchEz2SettingsContainer = new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(0, SettingsSection.ITEM_SPACING_V2),
+                    Children = new Drawable[]
+                    {
+                        new SettingsItemV2(new FormSliderBar<double>
+                        {
+                            Caption = EzSettingsStrings.CATCH_SCRATCH_DASH_ENTER_ACCELERATION,
+                            HintText = EzSettingsStrings.CATCH_SCRATCH_DASH_ENTER_ACCELERATION_TOOLTIP,
+                            RelativeSizeAxes = Axes.X,
+                            Current = dashEnterAcceleration,
+                            KeyboardStep = 0.00005f,
+                            LabelFormat = v => $"{v * 1000:0.##}",
+                        })
+                        {
+                            Keywords = new[] { "ez", "catch", "scratch", "dash", "acceleration", "加速" }
+                        },
+                        new SettingsItemV2(new FormSliderBar<double>
+                        {
+                            Caption = EzSettingsStrings.CATCH_SCRATCH_DASH_EXIT_VELOCITY,
+                            HintText = EzSettingsStrings.CATCH_SCRATCH_DASH_EXIT_VELOCITY_TOOLTIP,
+                            RelativeSizeAxes = Axes.X,
+                            Current = dashExitVelocity,
+                            KeyboardStep = 0.00001f,
+                            LabelFormat = v => $"{v * 1000:0.##}",
+                        })
+                        {
+                            Keywords = new[] { "ez", "catch", "scratch", "dash", "velocity", "重置" }
+                        },
+                    },
                 },
                 leftBindButton = new SettingsButtonV2
                 {
@@ -179,7 +219,11 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 if (!e.NewValue)
                     catchEz2Enabled.Value = false;
+
+                refreshCatchEz2SettingsVisibility();
             }, true);
+
+            catchEz2Enabled.BindValueChanged(_ => refreshCatchEz2SettingsVisibility(), true);
 
             leftMonitor.IsPressed.BindValueChanged(_ => refreshStatus(leftMonitor, leftStatusText), true);
             leftMonitor.Direction.BindValueChanged(_ => refreshStatus(leftMonitor, leftStatusText));
@@ -188,6 +232,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             tracker.AxisMoved += onAxisMoved;
             refreshBindHint();
+            refreshCatchEz2SettingsVisibility();
         }
 
         protected override void Dispose(bool isDisposing)
@@ -224,6 +269,16 @@ namespace osu.Game.EzOsuGame.Overlays
                 rightMonitor.Update(rightValue, t);
             else
                 rightMonitor.UpdateMissing(t);
+        }
+
+        private void refreshCatchEz2SettingsVisibility()
+        {
+            bool visible = enabled.Value && catchEz2Enabled.Value;
+
+            if (visible)
+                catchEz2SettingsContainer.Show();
+            else
+                catchEz2SettingsContainer.Hide();
         }
 
         private void onAxisMoved(JoystickDeviceAxis axis)

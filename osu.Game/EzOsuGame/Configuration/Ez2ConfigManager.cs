@@ -110,6 +110,8 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ScratchAxisR, string.Empty);
             SetDefault(Ez2Setting.ScratchAxisDeadzone, 0.005, 0.001, 0.01, 0.001);
             SetDefault(Ez2Setting.ScratchAxisStopThreshold, 30, 10, 150);
+            SetDefault(Ez2Setting.CatchScratchDashEnterAcceleration, 0.0005, 0.0001, 0.0010, 0.00005);
+            SetDefault(Ez2Setting.CatchScratchDashExitVelocity, 0.00010, 0.00010, 0.00020, 0.00001);
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
             SetDefault(Ez2Setting.TurboMode, false);
@@ -937,6 +939,16 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 停转判定：距上次有效转动超过多少毫秒后松开。
         /// </summary>
         ScratchAxisStopThreshold,
+
+        /// <summary>
+        /// Ez2Catch 转盘进入 Dash 的角加速度阈值（轴单位/ms²）。
+        /// </summary>
+        CatchScratchDashEnterAcceleration,
+
+        /// <summary>
+        /// Ez2Catch 转盘退出 Dash 的平滑角速度阈值（轴单位/ms）。
+        /// </summary>
+        CatchScratchDashExitVelocity,
 
         SkipWithGameplayKeys,
 

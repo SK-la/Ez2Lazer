@@ -10,11 +10,11 @@ namespace osu.Game.Rulesets.Catch
     /// </summary>
     internal class CatchScratchDashState
     {
-        /// <summary>角加速度进入 Dash（轴单位/ms²）。</summary>
-        internal static double EnterAcceleration => 0.0005;
+        /// <summary>角加速度进入 Dash 默认值（轴单位/ms²）。</summary>
+        internal const double DefaultEnterAcceleration = 0.0005;
 
-        /// <summary>平滑角速度低于此值退出 Dash（轴单位/ms，应低于进入 Dash 时的典型转速）。</summary>
-        internal static double ExitVelocity => 0.00010;
+        /// <summary>平滑角速度退出 Dash 默认值（轴单位/ms）。</summary>
+        internal const double DefaultExitVelocity = 0.00010;
 
         /// <summary>Dash 内角加速度映射到 <see cref="MaxDashMultiplier"/> 的上限（轴单位/ms²）。</summary>
         internal static double MaxAcceleration => 0.0002;
@@ -26,21 +26,25 @@ namespace osu.Game.Rulesets.Catch
         internal void Reset() => dashActive = false;
 
         /// <returns>是否处于 Dash；Dash 速度倍率（1~MaxDashMultiplier，仅 Dash 内有效）。</returns>
-        internal (bool dashActive, double dashSpeedMultiplier) Update(double angularAcceleration, double smoothedAngularVelocity)
+        internal (bool dashActive, double dashSpeedMultiplier) Update(
+            double angularAcceleration,
+            double smoothedAngularVelocity,
+            double enterAcceleration,
+            double exitVelocity)
         {
-            if (!dashActive && angularAcceleration >= EnterAcceleration)
+            if (!dashActive && angularAcceleration >= enterAcceleration)
                 dashActive = true;
-            else if (dashActive && smoothedAngularVelocity <= ExitVelocity)
+            else if (dashActive && smoothedAngularVelocity <= exitVelocity)
                 dashActive = false;
 
             if (!dashActive)
                 return (false, 1);
 
             // 已进入 Dash：默认 1× Dash；更高角加速度线性升至 MaxDashMultiplier，无 Walk 中间档。
-            if (angularAcceleration <= EnterAcceleration || MaxAcceleration <= EnterAcceleration)
+            if (angularAcceleration <= enterAcceleration || MaxAcceleration <= enterAcceleration)
                 return (true, 1);
 
-            double t = Math.Clamp((angularAcceleration - EnterAcceleration) / (MaxAcceleration - EnterAcceleration), 0, 1);
+            double t = Math.Clamp((angularAcceleration - enterAcceleration) / (MaxAcceleration - enterAcceleration), 0, 1);
             return (true, 1 + t * (MaxDashMultiplier - 1));
         }
     }

@@ -464,6 +464,22 @@ namespace osu.Game.EzOsuGame.Localization
             + "\n• Faster spin = faster movement, up to ~1.5× Dash; Dash keys unchanged."
             + "\nDoes not affect Mania scratch.");
 
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_ENTER_ACCELERATION = new EzLocalizationManager.EzLocalisableString(
+            "进入加速阈值",
+            "Enter dash acceleration threshold");
+
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_ENTER_ACCELERATION_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "角加速度达到此值时进入 Dash（模拟按住加速键）。滑条显示值为实际阈值×1000。",
+            "Enter Dash when angular acceleration reaches this value (simulates holding Dash). Slider shows actual threshold ×1000.");
+
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_EXIT_VELOCITY = new EzLocalizationManager.EzLocalisableString(
+            "重置速度阈值",
+            "Reset dash velocity threshold");
+
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_EXIT_VELOCITY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "平滑角速度低于此值时退出 Dash（模拟松开加速键）。滑条显示值为实际阈值×1000。",
+            "Exit Dash when smoothed angular velocity drops below this value (simulates releasing Dash). Slider shows actual threshold ×1000.");
+
         public static readonly LocalisableString SCRATCH_AXIS_L = new EzLocalizationManager.EzLocalisableString("L-Scratch 轴", "L-Scratch Axis");
 
         public static readonly LocalisableString SCRATCH_AXIS_R = new EzLocalizationManager.EzLocalisableString("R-Scratch 轴", "R-Scratch Axis");

@@ -26,6 +26,8 @@ namespace osu.Game.Rulesets.Catch
         private Bindable<string> rightBinding = null!;
         private Bindable<double> deadzone = null!;
         private Bindable<int> stopThreshold = null!;
+        private Bindable<double> dashEnterAcceleration = null!;
+        private Bindable<double> dashExitVelocity = null!;
 
         private bool moveLeftInjected;
         private bool moveRightInjected;
@@ -63,6 +65,8 @@ namespace osu.Game.Rulesets.Catch
             rightBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisR);
             deadzone = ezConfig.GetBindable<double>(Ez2Setting.ScratchAxisDeadzone);
             stopThreshold = ezConfig.GetBindable<int>(Ez2Setting.ScratchAxisStopThreshold);
+            dashEnterAcceleration = ezConfig.GetBindable<double>(Ez2Setting.CatchScratchDashEnterAcceleration);
+            dashExitVelocity = ezConfig.GetBindable<double>(Ez2Setting.CatchScratchDashExitVelocity);
 
             scratchAxes.LeftBinding.BindTo(leftBinding);
             scratchAxes.RightBinding.BindTo(rightBinding);
@@ -107,7 +111,9 @@ namespace osu.Game.Rulesets.Catch
             {
                 (ScratchDashActive, ScratchDashSpeedMultiplier) = scratchDashState.Update(
                     active.AngularAcceleration,
-                    active.SmoothedAngularVelocity);
+                    active.SmoothedAngularVelocity,
+                    dashEnterAcceleration.Value,
+                    dashExitVelocity.Value);
             }
             else
                 scratchDashState.Reset();

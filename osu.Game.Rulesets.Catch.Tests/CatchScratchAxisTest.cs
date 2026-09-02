@@ -105,8 +105,10 @@ namespace osu.Game.Rulesets.Catch.Tests
         public void TestDashState_EntersOnAccelerationThreshold()
         {
             var state = new CatchScratchDashState();
+            const double enter = CatchScratchDashState.DefaultEnterAcceleration;
+            const double exit = CatchScratchDashState.DefaultExitVelocity;
 
-            (bool active, double multiplier) = state.Update(CatchScratchDashState.EnterAcceleration, 0);
+            (bool active, double multiplier) = state.Update(enter, 0, enter, exit);
 
             Assert.That(active, Is.True);
             Assert.That(multiplier, Is.EqualTo(1));
@@ -116,10 +118,12 @@ namespace osu.Game.Rulesets.Catch.Tests
         public void TestDashState_ExitsWhenVelocityBelowThreshold()
         {
             var state = new CatchScratchDashState();
+            const double enter = CatchScratchDashState.DefaultEnterAcceleration;
+            const double exit = CatchScratchDashState.DefaultExitVelocity;
 
-            state.Update(CatchScratchDashState.EnterAcceleration, 0.001);
+            state.Update(enter, 0.001, enter, exit);
 
-            (bool active, _) = state.Update(0, CatchScratchDashState.ExitVelocity * 0.5);
+            (bool active, _) = state.Update(0, exit * 0.5, enter, exit);
 
             Assert.That(active, Is.False);
         }
@@ -128,10 +132,12 @@ namespace osu.Game.Rulesets.Catch.Tests
         public void TestDashState_StaysActiveAtConstantVelocityWithoutWalkTransition()
         {
             var state = new CatchScratchDashState();
+            const double enter = CatchScratchDashState.DefaultEnterAcceleration;
+            const double exit = CatchScratchDashState.DefaultExitVelocity;
 
-            state.Update(CatchScratchDashState.EnterAcceleration, 0.001);
+            state.Update(enter, 0.001, enter, exit);
 
-            (bool active, double multiplier) = state.Update(0, 0.001);
+            (bool active, double multiplier) = state.Update(0, 0.001, enter, exit);
 
             Assert.That(active, Is.True);
             Assert.That(multiplier, Is.EqualTo(1));
@@ -141,22 +147,26 @@ namespace osu.Game.Rulesets.Catch.Tests
         public void TestDashState_ScalesMultiplierOnlyWithinDash()
         {
             var state = new CatchScratchDashState();
+            const double enter = 0.0001;
+            const double exit = CatchScratchDashState.DefaultExitVelocity;
 
             (bool walkActive, double walkMultiplier) = state.Update(
-                CatchScratchDashState.EnterAcceleration * 0.5,
-                CatchScratchDashState.ExitVelocity * 2);
+                enter * 0.5,
+                exit * 2,
+                enter,
+                exit);
 
             Assert.That(walkActive, Is.False);
             Assert.That(walkMultiplier, Is.EqualTo(1));
 
-            state.Update(CatchScratchDashState.EnterAcceleration, 0.001);
+            state.Update(enter, 0.001, enter, exit);
 
-            double midAcceleration = (CatchScratchDashState.EnterAcceleration + CatchScratchDashState.MaxAcceleration) / 2;
-            (_, double dashMultiplier) = state.Update(midAcceleration, 0.001);
+            double midAcceleration = (enter + CatchScratchDashState.MaxAcceleration) / 2;
+            (_, double dashMultiplier) = state.Update(midAcceleration, 0.001, enter, exit);
 
             Assert.That(dashMultiplier, Is.EqualTo(1.25).Within(0.001));
 
-            (_, double maxDashMultiplier) = state.Update(CatchScratchDashState.MaxAcceleration, 0.001);
+            (_, double maxDashMultiplier) = state.Update(CatchScratchDashState.MaxAcceleration, 0.001, enter, exit);
             Assert.That(maxDashMultiplier, Is.EqualTo(CatchScratchDashState.MaxDashMultiplier).Within(0.001));
         }
 
