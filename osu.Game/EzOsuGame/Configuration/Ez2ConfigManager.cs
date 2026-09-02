@@ -103,12 +103,15 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ScreenshotAction, EzScreenshotAction.SaveAndCopy);
             SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
-            SetDefault(Ez2Setting.ManiaScratchAxisEnabled, false);
+            SetDefault(Ez2Setting.ScratchAxisEnabled, false);
+            SetDefault(Ez2Setting.CatchScratchEz2Enabled, false);
             // 格式：guid|axisIndex（多设备）；兼容旧版纯数字轴下标
             SetDefault(Ez2Setting.ScratchAxisL, string.Empty);
             SetDefault(Ez2Setting.ScratchAxisR, string.Empty);
             SetDefault(Ez2Setting.ScratchAxisDeadzone, 0.005, 0.001, 0.01, 0.001);
             SetDefault(Ez2Setting.ScratchAxisStopThreshold, 30, 10, 150);
+            SetDefault(Ez2Setting.CatchScratchDashEnterAcceleration, 0.0005, 0.0001, 0.0010, 0.00005);
+            SetDefault(Ez2Setting.CatchScratchDashExitVelocity, 0.00010, 0.00010, 0.00020, 0.00001);
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
             SetDefault(Ez2Setting.TurboMode, false);
@@ -908,9 +911,14 @@ namespace osu.Game.EzOsuGame.Configuration
         ManiaSkipEmptyEdgeColumns,
 
         /// <summary>
-        /// 开启后按 12/14/16K 模板将 L/R 转盘轴运行时注入首尾列（不改写 Realm 键位）。
+        /// 开启后 L/R 转盘轴可用于 Mania 首尾列与 Catch 左右移动（不改写 Realm 键位）。
         /// </summary>
-        ManiaScratchAxisEnabled,
+        ScratchAxisEnabled,
+
+        /// <summary>
+        /// Catch 转盘 Ez2 增强：半死区、1 帧激活、转速变速（最高 1.5× Dash）。
+        /// </summary>
+        CatchScratchEz2Enabled,
 
         /// <summary>
         /// L 转盘绑定（<c>guid|axisIndex</c>）。规则集无关。
@@ -931,6 +939,16 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 停转判定：距上次有效转动超过多少毫秒后松开。
         /// </summary>
         ScratchAxisStopThreshold,
+
+        /// <summary>
+        /// Ez2Catch 转盘进入 Dash 的角加速度阈值（轴单位/ms²）。
+        /// </summary>
+        CatchScratchDashEnterAcceleration,
+
+        /// <summary>
+        /// Ez2Catch 转盘退出 Dash 的平滑角速度阈值（轴单位/ms）。
+        /// </summary>
+        CatchScratchDashExitVelocity,
 
         SkipWithGameplayKeys,
 

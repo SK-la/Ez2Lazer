@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
@@ -42,6 +43,9 @@ namespace osu.Game.Rulesets.Catch.UI
         /// <c>0</c> when none or both left and right buttons are pressed.
         /// </summary>
         private int currentDirection;
+
+        [Resolved(CanBeNull = true)]
+        private CatchInputManager? catchInputManager { get; set; }
 
         // TODO: support replay rewind
         private bool lastHyperDashState;
@@ -88,7 +92,17 @@ namespace osu.Game.Rulesets.Catch.UI
 
             SetCatcherPosition(
                 replayState?.CatcherX ??
-                (float)(Catcher.X + Catcher.Speed * currentDirection * Clock.ElapsedFrameTime));
+                (float)(Catcher.X + getMovementSpeed() * currentDirection * Clock.ElapsedFrameTime));
+        }
+
+        private double getMovementSpeed()
+        {
+            double speed = Catcher.Speed;
+
+            if (catchInputManager?.ScratchDashActive == true)
+                speed *= catchInputManager.ScratchDashSpeedMultiplier;
+
+            return speed;
         }
 
         protected override void UpdateAfterChildren()

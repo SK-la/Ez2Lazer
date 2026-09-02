@@ -18,11 +18,8 @@ using osu.Game.EzOsuGame.Configuration;
 namespace osu.Game.EzOsuGame.Input
 {
     /// <summary>
-    /// 订阅 <see cref="JoystickHandler.DeviceAxisChanged"/>，维护多设备轴值表，供转盘绑定与游玩读取。
+    /// 订阅 <see cref="JoystickHandler.DeviceAxisChanged"/>，维护多设备轴值表，供转盘绑定与 Mania/Catch 游玩读取。
     /// </summary>
-    /// <remarks>
-    /// TODO(Catch)：可由此读取绑定轴的 Direction 做左右移动。
-    /// </remarks>
     [Cached]
     public partial class ScratchAxisDeviceTracker : Component
     {

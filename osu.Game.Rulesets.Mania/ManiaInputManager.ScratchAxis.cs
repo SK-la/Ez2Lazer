@@ -36,7 +36,7 @@ namespace osu.Game.Rulesets.Mania
             scratchTracker = tracker;
             host = gameHost;
 
-            scratchEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ManiaScratchAxisEnabled);
+            scratchEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisEnabled);
             skipEmptyEdge = ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
             leftBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisL);
             rightBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisR);
