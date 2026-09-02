@@ -40,6 +40,12 @@ namespace osu.Game.EzOsuGame.Input
 
         private float lastValue;
         private bool hasSample;
+
+        /// <summary>
+        /// 最近一次有效转动的时间（wall clock ms），供多转盘 last-active 仲裁。
+        /// </summary>
+        public double LastMotionTime { get; private set; } = double.NegativeInfinity;
+
         private double lastMotionTime = double.NegativeInfinity;
 
         private int pendingTicks;
@@ -57,7 +63,7 @@ namespace osu.Game.EzOsuGame.Input
             {
                 lastValue = axisValue;
                 hasSample = true;
-                lastMotionTime = double.NegativeInfinity;
+                LastMotionTime = lastMotionTime = double.NegativeInfinity;
                 clearPending();
                 reverseTravel = 0;
                 return false;
@@ -69,7 +75,7 @@ namespace osu.Game.EzOsuGame.Input
             if (absDelta >= Deadzone.Value)
             {
                 lastValue = axisValue;
-                lastMotionTime = currentTime;
+                LastMotionTime = lastMotionTime = currentTime;
 
                 var dir = delta > 0 ? ScratchAxisDirection.Clockwise : ScratchAxisDirection.CounterClockwise;
 
@@ -125,7 +131,7 @@ namespace osu.Game.EzOsuGame.Input
         {
             hasSample = false;
             lastValue = 0;
-            lastMotionTime = double.NegativeInfinity;
+            LastMotionTime = lastMotionTime = double.NegativeInfinity;
             clearPending();
             reverseTravel = 0;
             IsPressed.Value = false;

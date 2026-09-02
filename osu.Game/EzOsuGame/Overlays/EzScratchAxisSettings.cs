@@ -27,9 +27,9 @@ using CommonStrings = osu.Game.Resources.Localisation.Web.CommonStrings;
 namespace osu.Game.EzOsuGame.Overlays
 {
     /// <summary>
-    /// Mania L/R 转盘轴设置：按设备 GUID+轴绑定，支持多设备/同设备多轴。
+    /// L/R 转盘轴设置：按设备 GUID+轴绑定，支持 Mania 与 Catch。
     /// </summary>
-    public partial class EzManiaScratchAxisSettings : FillFlowContainer
+    public partial class EzScratchAxisSettings : FillFlowContainer
     {
         /// <summary>绑定捕获用的累计位移阈值（与游玩死区独立，避免绑不上）。</summary>
         private const float bind_travel_threshold = 0.03f;
@@ -57,7 +57,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private BindTarget? bindTarget;
         private (string device, int axis, string name, float travel)? bestBindCandidate;
 
-        public EzManiaScratchAxisSettings()
+        public EzScratchAxisSettings()
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -70,7 +70,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             tracker = scratchTracker;
 
-            enabled = ezConfig.GetBindable<bool>(Ez2Setting.ManiaScratchAxisEnabled);
+            enabled = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisEnabled);
             leftBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisL);
             rightBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisR);
             deadzone = ezConfig.GetBindable<double>(Ez2Setting.ScratchAxisDeadzone);
@@ -85,22 +85,22 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.MANIA_SCRATCH_AXIS_ENABLED,
-                    HintText = EzSettingsStrings.MANIA_SCRATCH_AXIS_ENABLED_TOOLTIP,
+                    Caption = EzSettingsStrings.SCRATCH_AXIS_ENABLED,
+                    HintText = EzSettingsStrings.SCRATCH_AXIS_ENABLED_TOOLTIP,
                     Current = enabled,
                 })
                 {
-                    Keywords = new[] { "ez", "mania", "scratch", "turntable", "axis", "joystick", "转盘" }
+                    Keywords = new[] { "ez", "mania", "catch", "scratch", "turntable", "axis", "joystick", "转盘" }
                 },
                 leftBindButton = new SettingsButtonV2
                 {
-                    Keywords = new[] { "ez", "mania", "scratch", "l", "axis" },
+                    Keywords = new[] { "ez", "scratch", "l", "axis" },
                     Action = () => toggleBind(BindTarget.Left),
                 },
                 createStatusRow(out leftStatusText),
                 rightBindButton = new SettingsButtonV2
                 {
-                    Keywords = new[] { "ez", "mania", "scratch", "r", "axis" },
+                    Keywords = new[] { "ez", "scratch", "r", "axis" },
                     Action = () => toggleBind(BindTarget.Right),
                 },
                 createStatusRow(out rightStatusText),
@@ -175,7 +175,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             base.Dispose(isDisposing);
 
-            if (isDisposing && tracker != null)
+            if (isDisposing)
                 tracker.AxisMoved -= onAxisMoved;
         }
 
@@ -212,13 +212,11 @@ namespace osu.Game.EzOsuGame.Overlays
             string deviceKey = !string.IsNullOrEmpty(axis.Guid) ? axis.Guid : $"id:{axis.InstanceId}";
             var key = (deviceKey, axis.AxisIndex);
 
-            // 始终更新 tracker 侧已有逻辑；绑定窗口内累计位移
             if (bindTarget == null)
                 return;
 
             if (!bindLastValue.TryGetValue(key, out float last))
             {
-                // 首帧只记停靠点，不算位移（避免把绝对值当转动）
                 bindLastValue[key] = axis.Value;
                 bindTravel[key] = 0;
                 refreshBindHint();
@@ -240,10 +238,7 @@ namespace osu.Game.EzOsuGame.Overlays
             refreshBindHint();
 
             if (travel >= bind_travel_threshold)
-            {
-                // 写入绑定，但不退出监听——否则一转就「已绑定」并关掉 hint，看不到后续轴值
                 commitBindIfPossible();
-            }
         }
 
         private void toggleBind(BindTarget target)

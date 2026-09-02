@@ -144,7 +144,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "ez", "skip", "empty", "column" }
                 },
-                new EzManiaScratchAxisSettings(),
+                new EzScratchAxisSettings(),
             };
 
             maniaHealthModeBindable.BindValueChanged(e =>

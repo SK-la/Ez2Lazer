@@ -103,7 +103,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ScreenshotAction, EzScreenshotAction.SaveAndCopy);
             SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
-            SetDefault(Ez2Setting.ManiaScratchAxisEnabled, false);
+            SetDefault(Ez2Setting.ScratchAxisEnabled, false);
             // 格式：guid|axisIndex（多设备）；兼容旧版纯数字轴下标
             SetDefault(Ez2Setting.ScratchAxisL, string.Empty);
             SetDefault(Ez2Setting.ScratchAxisR, string.Empty);
@@ -908,9 +908,9 @@ namespace osu.Game.EzOsuGame.Configuration
         ManiaSkipEmptyEdgeColumns,
 
         /// <summary>
-        /// 开启后按 12/14/16K 模板将 L/R 转盘轴运行时注入首尾列（不改写 Realm 键位）。
+        /// 开启后 L/R 转盘轴可用于 Mania 首尾列与 Catch 左右移动（不改写 Realm 键位）。
         /// </summary>
-        ManiaScratchAxisEnabled,
+        ScratchAxisEnabled,
 
         /// <summary>
         /// L 转盘绑定（<c>guid|axisIndex</c>）。规则集无关。

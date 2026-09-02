@@ -430,19 +430,25 @@ namespace osu.Game.EzOsuGame.Localization
             "When enabled, 14K beatmaps display as 13K (last column hidden) for Ez2Ac arcade maps with an empty last column."
             + "\nDisable this if the last column contains notes.");
 
-        public static readonly LocalisableString MANIA_SCRATCH_AXIS_ENABLED = new EzLocalizationManager.EzLocalisableString(
-            "启用转盘轴模板（L/R Scratch）",
-            "Enable turntable axis template (L/R Scratch)");
+        public static readonly LocalisableString SCRATCH_AXIS_ENABLED = new EzLocalizationManager.EzLocalisableString(
+            "启用转盘轴（L/R Scratch）",
+            "Enable turntable axis (L/R Scratch)");
 
-        public static readonly LocalisableString MANIA_SCRATCH_AXIS_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启后，按键数模板将 L/R 转盘轴运行时注入首尾列（不改写键位配置）："
-            + "\n12K：列 0 / 11；16K：列 0 / 15；"
-            + "\n14K：列 0 / 13；开启 10k2s1p 时为列 0 / 12。"
-            + "\n转动=按下，停止转动=松开。请勿把同一轴再绑到其它 Mania 键。",
-            "When enabled, L/R turntable axes are injected into edge columns at runtime (key bindings are not rewritten):"
-            + "\n12K: cols 0 / 11; 16K: cols 0 / 15;"
-            + "\n14K: cols 0 / 13; with 10k2s1p: cols 0 / 12."
-            + "\nSpinning = pressed, stop = released. Do not also bind the same axis to other Mania keys.");
+        public static readonly LocalisableString SCRATCH_AXIS_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后 L/R 转盘轴可用于 Mania 与 Catch（共用下方绑定与死区/停转设置）："
+            + "\n• Mania：转动 L/R 转盘 → 对应首尾列按下；停止 = 松开。"
+            + "\n  12K：列 0/11；16K：列 0/15；14K：列 0/13（10k2s1p 为 0/12）。"
+            + "\n• Catch：逆时针 → 左移，顺时针 → 右移；转动期间判定放宽（早 10ms / 晚 20ms）；Dash 键照常。"
+            + "\n• 单盘：只绑定 L 或 R 其中一个即可，顺/逆控制两个方向。"
+            + "\n• 双盘：L/R 可各自顺逆；同时转动时以最近转动为准。"
+            + "\n请勿把同一轴再绑到其它键位。",
+            "When enabled, L/R turntable axes work in Mania and Catch (shared bindings and deadzone/stop settings below):"
+            + "\n• Mania: spin L/R → press edge columns; stop = release."
+            + "\n  12K: cols 0/11; 16K: cols 0/15; 14K: cols 0/13 (10k2s1p: 0/12)."
+            + "\n• Catch: CCW → move left, CW → move right; judgment assist while spinning (10ms early / 20ms late); Dash keys unchanged."
+            + "\n• Single deck: bind only L or R; both directions via spin direction."
+            + "\n• Dual deck: each spins independently; if both active, the most recent spin wins."
+            + "\nDo not bind the same axis to other keys.");
 
         public static readonly LocalisableString SCRATCH_AXIS_L = new EzLocalizationManager.EzLocalisableString("L-Scratch 轴", "L-Scratch Axis");
 
@@ -453,8 +459,8 @@ namespace osu.Game.EzOsuGame.Localization
             "Spin turntable to bind… (click again / Esc to cancel)");
 
         public static readonly LocalisableString SCRATCH_AXIS_BIND_IDLE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "点击 L/R 后转动对应转盘；仅累计位移，停靠位置不会触发绑定。",
-            "Click L/R then spin the turntable; only movement is counted, resting position does not bind.");
+            "点击 L/R 后转动对应转盘；仅累计位移，停靠位置不会触发绑定。Catch 单盘只需绑一侧。",
+            "Click L/R then spin the turntable; only movement is counted, resting position does not bind. For Catch, binding one side is enough.");
 
         public static readonly LocalisableString SCRATCH_AXIS_BIND_LISTENING_HINT = new EzLocalizationManager.EzLocalisableString(
             "正在听轴… 累计位移 {0} / {1}",

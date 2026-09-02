@@ -3,6 +3,7 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Input.Bindings;
+using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Localisation;
 using osu.Game.Localisation.Catch;
@@ -16,6 +17,32 @@ namespace osu.Game.Rulesets.Catch
         public CatchInputManager(RulesetInfo ruleset)
             : base(ruleset, 0, SimultaneousBindingMode.Unique)
         {
+        }
+
+        protected override KeyBindingContainer<CatchAction> CreateKeyBindingContainer(RulesetInfo ruleset, int variant, SimultaneousBindingMode unique)
+            => new CatchKeyBindingContainer(this, ruleset, variant, unique);
+
+        private partial class CatchKeyBindingContainer : RulesetKeyBindingContainer
+        {
+            private readonly CatchInputManager catchInputManager;
+
+            public CatchKeyBindingContainer(CatchInputManager catchInputManager, RulesetInfo ruleset, int variant, SimultaneousBindingMode unique)
+                : base(ruleset, variant, unique)
+            {
+                this.catchInputManager = catchInputManager;
+            }
+
+            protected override bool Handle(UIEvent e)
+            {
+                switch (e)
+                {
+                    case JoystickPressEvent joystickPress when catchInputManager.ShouldSuppressJoystickAxisButton(joystickPress.Button):
+                    case JoystickReleaseEvent joystickRelease when catchInputManager.ShouldSuppressJoystickAxisButton(joystickRelease.Button):
+                        return false;
+                }
+
+                return base.Handle(e);
+            }
         }
     }
 
