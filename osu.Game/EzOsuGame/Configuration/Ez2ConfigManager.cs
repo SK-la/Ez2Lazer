@@ -104,6 +104,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
             SetDefault(Ez2Setting.ScratchAxisEnabled, false);
+            SetDefault(Ez2Setting.CatchScratchEz2Enabled, false);
             // 格式：guid|axisIndex（多设备）；兼容旧版纯数字轴下标
             SetDefault(Ez2Setting.ScratchAxisL, string.Empty);
             SetDefault(Ez2Setting.ScratchAxisR, string.Empty);
@@ -911,6 +912,11 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 开启后 L/R 转盘轴可用于 Mania 首尾列与 Catch 左右移动（不改写 Realm 键位）。
         /// </summary>
         ScratchAxisEnabled,
+
+        /// <summary>
+        /// Catch 转盘 Ez2 增强：半死区、1 帧激活、转速变速（最高 1.5× Dash）。
+        /// </summary>
+        CatchScratchEz2Enabled,
 
         /// <summary>
         /// L 转盘绑定（<c>guid|axisIndex</c>）。规则集无关。

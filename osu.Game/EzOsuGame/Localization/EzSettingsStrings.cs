@@ -450,6 +450,20 @@ namespace osu.Game.EzOsuGame.Localization
             + "\n• Dual deck: each spins independently; if both active, the most recent spin wins."
             + "\nDo not bind the same axis to other keys.");
 
+        public static readonly LocalisableString CATCH_SCRATCH_EZ2_ENABLED = new EzLocalizationManager.EzLocalisableString(
+            "启用 Ez2Catch 转盘增强",
+            "Enable Ez2Catch turntable enhancement");
+
+        public static readonly LocalisableString CATCH_SCRATCH_EZ2_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Catch 专用增强（需先开启上方转盘轴）："
+            + "\n• 死区减半、1 帧即开始移动（默认需连续 2 帧同向超过死区才动，故小转一圈才有反应）。"
+            + "\n• 转速越快移动越快，最高约 1.5× Dash 速度；Dash 键照常。"
+            + "\n不影响 Mania scratch。",
+            "Catch-only enhancement (requires turntable axis above):"
+            + "\n• Half deadzone, 1-frame activation (default needs 2 consecutive frames above deadzone — why small spins feel dead)."
+            + "\n• Faster spin = faster movement, up to ~1.5× Dash; Dash keys unchanged."
+            + "\nDoes not affect Mania scratch.");
+
         public static readonly LocalisableString SCRATCH_AXIS_L = new EzLocalizationManager.EzLocalisableString("L-Scratch 轴", "L-Scratch Axis");
 
         public static readonly LocalisableString SCRATCH_AXIS_R = new EzLocalizationManager.EzLocalisableString("R-Scratch 轴", "R-Scratch Axis");

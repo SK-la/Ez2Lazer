@@ -68,6 +68,112 @@ namespace osu.Game.Rulesets.Catch.Tests
             Assert.That(CatchScratchJudgmentWindow.ShouldApplyMiss(1, assist: false), Is.True);
         }
 
+        [Test]
+        public void TestEz2Activation_SingleTickWithHalfDeadzone()
+        {
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone = { Value = 0.01 },
+                DeadzoneMultiplier = { Value = 0.5 },
+                RequiredActivationTicks = { Value = 1 },
+            };
+
+            processor.Update(0, 0);
+            processor.Update(0.006f, 1);
+
+            Assert.That(processor.IsPressed.Value, Is.True);
+        }
+
+        [Test]
+        public void TestDefaultActivation_RequiresTwoTicks()
+        {
+            var processor = new ScratchAxisProcessor
+            {
+                Deadzone = { Value = 0.01 },
+                RequiredActivationTicks = { Value = 2 },
+            };
+
+            processor.Update(0, 0);
+            processor.Update(0.02f, 1);
+            Assert.That(processor.IsPressed.Value, Is.False);
+
+            processor.Update(0.04f, 2);
+            Assert.That(processor.IsPressed.Value, Is.True);
+        }
+
+        [Test]
+        public void TestSpeedMapper_ScalesUpToOnePointFive()
+        {
+            Assert.That(CatchScratchSpeedMapper.Map(0), Is.EqualTo(1));
+
+            Assert.That(
+                CatchScratchSpeedMapper.Map(CatchScratchSpeedMapper.ReferenceVelocity * 0.5),
+                Is.EqualTo(1.25).Within(0.001));
+
+            Assert.That(
+                CatchScratchSpeedMapper.Map(CatchScratchSpeedMapper.ReferenceVelocity),
+                Is.EqualTo(1.5).Within(0.001));
+
+            Assert.That(
+                CatchScratchSpeedMapper.Map(CatchScratchSpeedMapper.ReferenceVelocity * 3),
+                Is.EqualTo(1.5).Within(0.001));
+        }
+
+        [Test]
+        public void TestSpeedMapper_FastSpinVelocity_IsClearlyAboveWalkSpeed()
+        {
+            double multiplier = CatchScratchSpeedMapper.Map(0.001);
+            Assert.That(multiplier, Is.GreaterThan(1.2));
+        }
+
+        [Test]
+        public void TestAngularVelocity_IsFrameRateIndependent()
+        {
+            var lowFps = new ScratchAxisProcessor();
+            lowFps.Update(0, 0);
+            lowFps.Update(0.02f, 16);
+
+            var highFps = new ScratchAxisProcessor();
+            highFps.Update(0, 0);
+
+            for (int i = 1; i <= 16; i++)
+                highFps.Update(i * 0.02f / 16, i);
+
+            Assert.That(highFps.AngularVelocity, Is.EqualTo(lowFps.AngularVelocity).Within(0.0001));
+        }
+
+        [Test]
+        public void TestSmoothedAngularVelocity_DecaysWithWallClock()
+        {
+            var processor = new ScratchAxisProcessor
+            {
+                RequiredActivationTicks = { Value = 1 },
+            };
+
+            processor.Update(0, 0);
+            processor.Update(0.02f, 10);
+            processor.Update(0.04f, 20);
+
+            double peak = processor.SmoothedAngularVelocity;
+            Assert.That(peak, Is.EqualTo(0.002).Within(0.0001));
+
+            processor.Update(0.0401f, 45);
+            Assert.That(processor.SmoothedAngularVelocity, Is.LessThan(peak));
+            Assert.That(processor.SmoothedAngularVelocity, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void TestAngularVelocity_ComputedFromMotionInterval()
+        {
+            var processor = new ScratchAxisProcessor();
+
+            processor.Update(0, 0);
+            processor.Update(0.01f, 5);
+            processor.Update(0.02f, 10);
+
+            Assert.That(processor.AngularVelocity, Is.EqualTo(0.01 / 5).Within(0.0001));
+        }
+
         private static ScratchAxisProcessor createProcessor(
             bool pressed,
             double lastMotionTime = 100,

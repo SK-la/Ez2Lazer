@@ -40,6 +40,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Dictionary<(string device, int axis), float> bindTravel = new Dictionary<(string, int), float>();
 
         private Bindable<bool> enabled = null!;
+        private Bindable<bool> catchEz2Enabled = null!;
         private Bindable<string> leftBinding = null!;
         private Bindable<string> rightBinding = null!;
         private Bindable<double> deadzone = null!;
@@ -71,6 +72,7 @@ namespace osu.Game.EzOsuGame.Overlays
             tracker = scratchTracker;
 
             enabled = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisEnabled);
+            catchEz2Enabled = ezConfig.GetBindable<bool>(Ez2Setting.CatchScratchEz2Enabled);
             leftBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisL);
             rightBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisR);
             deadzone = ezConfig.GetBindable<double>(Ez2Setting.ScratchAxisDeadzone);
@@ -91,6 +93,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 })
                 {
                     Keywords = new[] { "ez", "mania", "catch", "scratch", "turntable", "axis", "joystick", "转盘" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.CATCH_SCRATCH_EZ2_ENABLED,
+                    HintText = EzSettingsStrings.CATCH_SCRATCH_EZ2_ENABLED_TOOLTIP,
+                    Current = catchEz2Enabled,
+                })
+                {
+                    Keywords = new[] { "ez", "catch", "scratch", "turntable", "ez2catch", "转盘" }
                 },
                 leftBindButton = new SettingsButtonV2
                 {
@@ -161,6 +172,14 @@ namespace osu.Game.EzOsuGame.Overlays
 
             leftBinding.BindValueChanged(_ => refreshBindLabels(), true);
             rightBinding.BindValueChanged(_ => refreshBindLabels(), true);
+
+            enabled.BindValueChanged(e =>
+            {
+                catchEz2Enabled.Disabled = !e.NewValue;
+
+                if (!e.NewValue)
+                    catchEz2Enabled.Value = false;
+            }, true);
 
             leftMonitor.IsPressed.BindValueChanged(_ => refreshStatus(leftMonitor, leftStatusText), true);
             leftMonitor.Direction.BindValueChanged(_ => refreshStatus(leftMonitor, leftStatusText));
