@@ -378,6 +378,60 @@ namespace osu.Game.Rulesets.Mania.Tests
                 });
         }
 
+        /// <summary>
+        /// [Ez] 断连 LN（提早松手、不重按）：显式断言 JudgedHits 与 MaximumJudgements 一致，覆盖结算门闩。
+        /// </summary>
+        [Test]
+        public void TestFullScoreParity_Ez2AcBrokenHoldNoRepress()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 4000, Column = 1 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(1500), // 提早松手 → hold break，尾判 miss
+                    new ManiaReplayFrame(4000, ManiaAction.Key2),
+                    new ManiaReplayFrame(4100),
+                },
+                assertJudgedHitsComplete: true);
+        }
+
+        /// <summary>
+        /// [Ez] 持满 body 但在尾键窗外松手：曾导致 Tail HandledNoOp 永久循环、HasCompleted 无法达标。
+        /// </summary>
+        [Test]
+        public void TestFullScoreParity_Ez2AcLateTailRelease()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
+
+            const double head = 1000;
+            const double tail = 3000;
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 5000, Column = 1 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(3500), // 尾窗结束后松手
+                    new ManiaReplayFrame(5000, ManiaAction.Key2),
+                    new ManiaReplayFrame(5100),
+                },
+                assertJudgedHitsComplete: true);
+        }
+
         [Test]
         public void TestReplayAfterRecalcEz2AcMatchesNow()
         {
@@ -473,7 +527,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         // P2-B: 完整 Score parity 测试（accuracy/score/statistics）
-        private void runFullScoreParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames)
+        private void runFullScoreParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames, bool assertJudgedHitsComplete = false)
         {
             AddStep("configure environment", () => ReplayJudgeTestConfig.ApplyToGlobalConfig(parityEnvironment));
 
@@ -496,6 +550,15 @@ namespace osu.Game.Rulesets.Mania.Tests
             });
 
             AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
+
+            if (assertJudgedHitsComplete)
+            {
+                AddAssert("all judgements applied", () =>
+                {
+                    var processor = currentPlayer.ScoreProcessor;
+                    return processor.JudgedHits == processor.MaximumJudgements;
+                });
+            }
 
             AddStep("capture drawable results", () =>
             {
