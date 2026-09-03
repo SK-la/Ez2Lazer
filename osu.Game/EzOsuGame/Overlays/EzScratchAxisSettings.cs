@@ -39,7 +39,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Dictionary<(string device, int axis), float> bindLastValue = new Dictionary<(string, int), float>();
         private readonly Dictionary<(string device, int axis), float> bindTravel = new Dictionary<(string, int), float>();
 
-        private Bindable<bool> enabled = null!;
+        private Bindable<bool> scratchAxisEnabled = null!;
         private Bindable<bool> catchEz2Enabled = null!;
         private Bindable<string> leftBinding = null!;
         private Bindable<string> rightBinding = null!;
@@ -75,7 +75,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             tracker = scratchTracker;
 
-            enabled = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisEnabled);
+            scratchAxisEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisEnabled);
             catchEz2Enabled = ezConfig.GetBindable<bool>(Ez2Setting.CatchScratchEz2Enabled);
             leftBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisL);
             rightBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisR);
@@ -95,7 +95,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Caption = EzSettingsStrings.SCRATCH_AXIS_ENABLED,
                     HintText = EzSettingsStrings.SCRATCH_AXIS_ENABLED_TOOLTIP,
-                    Current = enabled,
+                    Current = scratchAxisEnabled,
                 })
                 {
                     Keywords = new[] { "ez", "mania", "catch", "scratch", "turntable", "axis", "joystick", "转盘" }
@@ -213,12 +213,9 @@ namespace osu.Game.EzOsuGame.Overlays
             leftBinding.BindValueChanged(_ => refreshBindLabels(), true);
             rightBinding.BindValueChanged(_ => refreshBindLabels(), true);
 
-            enabled.BindValueChanged(e =>
+            scratchAxisEnabled.BindValueChanged(e =>
             {
                 catchEz2Enabled.Disabled = !e.NewValue;
-
-                if (!e.NewValue)
-                    catchEz2Enabled.Value = false;
 
                 refreshCatchEz2SettingsVisibility();
             }, true);
@@ -232,7 +229,6 @@ namespace osu.Game.EzOsuGame.Overlays
 
             tracker.AxisMoved += onAxisMoved;
             refreshBindHint();
-            refreshCatchEz2SettingsVisibility();
         }
 
         protected override void Dispose(bool isDisposing)
@@ -273,7 +269,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void refreshCatchEz2SettingsVisibility()
         {
-            bool visible = enabled.Value && catchEz2Enabled.Value;
+            bool visible = scratchAxisEnabled.Value && catchEz2Enabled.Value;
 
             if (visible)
                 catchEz2SettingsContainer.Show();
