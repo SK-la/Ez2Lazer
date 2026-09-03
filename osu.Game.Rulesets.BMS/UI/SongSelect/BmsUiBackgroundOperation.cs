@@ -14,10 +14,10 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         public BmsUiBackgroundOperation(CancellationToken externalToken = default)
         {
             cts = CancellationTokenSource.CreateLinkedTokenSource(externalToken);
-            Id = Interlocked.Increment(ref next_id);
+            Id = Interlocked.Increment(ref nextID);
         }
 
-        private static long next_id;
+        private static long nextID;
 
         public long Id { get; }
 

@@ -82,7 +82,7 @@ namespace osu.Game.Rulesets.BMS.Scoring.Lamp
         /// Look up the best lamp recorded for the given beatmap, or <see cref="BmsClearLamp.NoPlay"/>
         /// if nothing has been recorded yet.
         /// </summary>
-        public BmsClearLamp GetLamp(BeatmapInfo beatmap)
+        public BmsClearLamp GetLamp(BeatmapInfo? beatmap)
         {
             if (beatmap == null)
                 return BmsClearLamp.NoPlay;
@@ -102,7 +102,7 @@ namespace osu.Game.Rulesets.BMS.Scoring.Lamp
         /// a new personal best the row is shipped to <see cref="AttachRepository"/>'s
         /// backend asynchronously.
         /// </summary>
-        public BmsClearLamp ReportPlay(BeatmapInfo beatmap, BmsLampContext context)
+        public BmsClearLamp ReportPlay(BeatmapInfo? beatmap, BmsLampContext context)
         {
             var lamp = Scheme.ResolveLamp(context);
 
@@ -158,7 +158,7 @@ namespace osu.Game.Rulesets.BMS.Scoring.Lamp
         /// Intended for the beatoraja importer and tests that need to pin the carousel to a
         /// specific lamp colour.
         /// </summary>
-        public void SetLamp(BeatmapInfo beatmap, BmsClearLamp lamp)
+        public void SetLamp(BeatmapInfo? beatmap, BmsClearLamp lamp)
         {
             if (beatmap == null)
                 return;

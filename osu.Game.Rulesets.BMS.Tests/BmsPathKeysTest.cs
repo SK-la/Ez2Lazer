@@ -32,18 +32,18 @@ namespace osu.Game.Rulesets.BMS.Tests
         [Test]
         public void TestChartIdentityPreservesExistingIdentifiers()
         {
-            const string chartPath = @"E:\Music\Test\chart.bms";
-            const string folderPath = @"E:\Music\Test";
+            const string chart_path = @"E:\Music\Test\chart.bms";
+            const string folder_path = @"E:\Music\Test";
 
-            BmsChartIdentity identity = BmsChartIdentity.Create(chartPath, folderPath);
-            Guid expectedBeatmapId = new Guid(MD5.HashData(Encoding.UTF8.GetBytes($"bms:chart:{chartPath}")));
-            Guid expectedSetId = new Guid(MD5.HashData(Encoding.UTF8.GetBytes($"bms:set:{folderPath}")));
+            BmsChartIdentity identity = BmsChartIdentity.Create(chart_path, folder_path);
+            Guid expectedBeatmapId = new Guid(MD5.HashData(Encoding.UTF8.GetBytes($"bms:chart:{chart_path}")));
+            Guid expectedSetId = new Guid(MD5.HashData(Encoding.UTF8.GetBytes($"bms:set:{folder_path}")));
 
             Assert.Multiple(() =>
             {
                 Assert.That(identity.BeatmapId, Is.EqualTo(expectedBeatmapId));
                 Assert.That(identity.SetId, Is.EqualTo(expectedSetId));
-                Assert.That(identity.PathKey, Is.EqualTo(BmsPathKeys.ComputeChartPathKey(chartPath)));
+                Assert.That(identity.PathKey, Is.EqualTo(BmsPathKeys.ComputeChartPathKey(chart_path)));
             });
         }
     }

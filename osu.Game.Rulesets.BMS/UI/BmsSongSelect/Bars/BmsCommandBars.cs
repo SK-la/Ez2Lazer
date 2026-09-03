@@ -42,9 +42,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
         public override bool IsSortable => true;
 
         public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context)
-            => GetPage(context, null, 150)!.Bars;
+            => GetPage(context, null, 150).Bars;
 
-        public override BmsBarPage? GetPage(BmsBarContext context, BmsBarPageCursor? after, int limit)
+        public override BmsBarPage GetPage(BmsBarContext context, BmsBarPageCursor? after, int limit)
         {
             IReadOnlyCollection<int>? keyCounts = showInvisible ? null : context.KeyModeFilter.ToKeyCounts();
             IReadOnlyList<BmsChartSummary> summaries = context.SqlQuery.ExecutePage(sql, after?.FilterCursor, limit, keyCounts);
@@ -74,9 +74,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
         public override bool IsSortable => true;
 
         public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context)
-            => GetPage(context, null, 150)!.Bars;
+            => GetPage(context, null, 150).Bars;
 
-        public override BmsBarPage? GetPage(BmsBarContext context, BmsBarPageCursor? after, int limit)
+        public override BmsBarPage GetPage(BmsBarContext context, BmsBarPageCursor? after, int limit)
         {
             BmsChartSummaryPage page = context.SqlQuery.SearchByText(
                 Query,
@@ -123,9 +123,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
         public override bool IsSortable => true;
 
         public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context)
-            => GetPage(context, null, 150)!.Bars;
+            => GetPage(context, null, 150).Bars;
 
-        public override BmsBarPage? GetPage(BmsBarContext context, BmsBarPageCursor? after, int limit)
+        public override BmsBarPage GetPage(BmsBarContext context, BmsBarPageCursor? after, int limit)
         {
             var query = new BmsChartQuery(
                 FolderPath: folderPath,
