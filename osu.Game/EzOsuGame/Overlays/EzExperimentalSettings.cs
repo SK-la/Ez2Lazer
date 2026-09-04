@@ -34,7 +34,8 @@ namespace osu.Game.EzOsuGame.Overlays
                           INotificationOverlay? notifications,
                           EzLocalProfileService? localProfileService,
                           EzLocalProfileOnlinePullService? onlinePullService,
-                          RulesetStore? rulesetStore)
+                          RulesetStore? rulesetStore,
+                          EzExternalRulesetManagerDialog? externalRulesetManager)
         {
             EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
 
@@ -59,7 +60,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER,
                 TooltipText = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_TOOLTIP,
                 Keywords = new[] { "ruleset", "external", "mapping", "onlineid", "第三方", "规则集", "映射", "外部" },
-                Action = () => requestExternalRulesetManager(dialogOverlay, notifications),
+                Action = () => externalRulesetManager?.ShowManager(),
             });
 
             AddRange(new Drawable[]
@@ -256,12 +257,6 @@ namespace osu.Game.EzOsuGame.Overlays
             notification.Progress = 1f;
             notification.CompletionText = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_DONE;
             notification.State = ProgressNotificationState.Completed;
-        }
-
-        private void requestExternalRulesetManager(IDialogOverlay? dialogOverlay, INotificationOverlay? notifications)
-        {
-            dialogOverlay?.Push(new EzExternalRulesetManagerDialog(() =>
-                notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_SAVED })));
         }
 
         private void requestOnlinePull(

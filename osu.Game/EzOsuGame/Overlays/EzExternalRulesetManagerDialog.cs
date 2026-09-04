@@ -3,60 +3,285 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Platform;
-using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.ExternalRulesets;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Overlays.Dialog;
+using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
-    public partial class EzExternalRulesetManagerDialog : PopupDialog
+    public partial class EzExternalRulesetManagerDialog : OsuFocusedOverlayContainer
     {
-        private const float content_width = 520;
-        private const float row_height = 40;
+        private const float row_height = 44;
+        private const double enter_duration = 500;
+        private const double exit_duration = 200;
+
+        protected override string PopInSampleName => @"UI/overlay-big-pop-in";
+        protected override string PopOutSampleName => @"UI/overlay-big-pop-out";
 
         private readonly List<ManagerRow> rows = new List<ManagerRow>();
+
         private FillFlowContainer rowFlow = null!;
+        private OsuSpriteText emptyHint = null!;
         private OsuColour colours = null!;
 
         [Resolved]
         private Storage storage { get; set; } = null!;
 
-        public EzExternalRulesetManagerDialog(Action onSaved)
-        {
-            Icon = FontAwesome.Solid.PuzzlePiece;
-            HeaderText = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_HEADER;
-            BodyText = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_BODY;
+        [Resolved(CanBeNull = true)]
+        private INotificationOverlay? notifications { get; set; }
 
-            Buttons = new PopupDialogButton[]
-            {
-                new PopupDialogOkButton
-                {
-                    Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_SAVE,
-                    Action = () => save(onSaved),
-                },
-                new PopupDialogCancelButton
-                {
-                    Text = EzSettingsStrings.CANCEL_BUTTON,
-                },
-            };
+        public EzExternalRulesetManagerDialog()
+        {
+            Anchor = Anchor.Centre;
+            Origin = Anchor.Centre;
+
+            RelativeSizeAxes = Axes.Both;
+            Size = new Vector2(0.55f, 0.72f);
+
+            Masking = true;
+            CornerRadius = 10;
+        }
+
+        public void ShowManager()
+        {
+            if (IsLoaded)
+                refreshEntries();
+
+            Show();
         }
 
         [BackgroundDependencyLoader]
         private void load(OsuColour loadedColours)
         {
             colours = loadedColours;
+
+            Children = new Drawable[]
+            {
+                new Box
+                {
+                    Colour = colours.GreySeaFoamDark,
+                    RelativeSizeAxes = Axes.Both,
+                },
+                new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Child = new GridContainer
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        RowDimensions = new[]
+                        {
+                            new Dimension(GridSizeMode.AutoSize),
+                            new Dimension(),
+                            new Dimension(GridSizeMode.AutoSize),
+                        },
+                        Content = new[]
+                        {
+                            new Drawable[]
+                            {
+                                new Container
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    AutoSizeAxes = Axes.Y,
+                                    Children = new Drawable[]
+                                    {
+                                        new FillFlowContainer
+                                        {
+                                            RelativeSizeAxes = Axes.X,
+                                            AutoSizeAxes = Axes.Y,
+                                            Direction = FillDirection.Vertical,
+                                            Padding = new MarginPadding { Vertical = 12, Horizontal = 20 },
+                                            Spacing = new Vector2(0, 4),
+                                            Children = new Drawable[]
+                                            {
+                                                new OsuSpriteText
+                                                {
+                                                    Anchor = Anchor.TopCentre,
+                                                    Origin = Anchor.TopCentre,
+                                                    Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_HEADER,
+                                                    Font = OsuFont.GetFont(size: 28),
+                                                },
+                                                new OsuSpriteText
+                                                {
+                                                    Anchor = Anchor.TopCentre,
+                                                    Origin = Anchor.TopCentre,
+                                                    Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_BODY,
+                                                    Font = OsuFont.Default.With(size: 14),
+                                                    Colour = colours.Yellow,
+                                                },
+                                            },
+                                        },
+                                        new IconButton
+                                        {
+                                            Anchor = Anchor.TopRight,
+                                            Origin = Anchor.TopRight,
+                                            Icon = FontAwesome.Solid.Times,
+                                            Colour = colours.GreySeaFoamDarker,
+                                            Scale = new Vector2(0.8f),
+                                            Margin = new MarginPadding { Top = 10, Right = 10 },
+                                            Action = Hide,
+                                        },
+                                    },
+                                },
+                            },
+                            new Drawable[]
+                            {
+                                new Container
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Padding = new MarginPadding { Horizontal = 12 },
+                                    Masking = true,
+                                    CornerRadius = 10,
+                                    Children = new Drawable[]
+                                    {
+                                        new Box
+                                        {
+                                            RelativeSizeAxes = Axes.Both,
+                                            Colour = colours.GreySeaFoamDarker,
+                                        },
+                                        new Container
+                                        {
+                                            RelativeSizeAxes = Axes.Both,
+                                            Padding = new MarginPadding(10),
+                                            Children = new Drawable[]
+                                            {
+                                                emptyHint = new OsuSpriteText
+                                                {
+                                                    Anchor = Anchor.Centre,
+                                                    Origin = Anchor.Centre,
+                                                    Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_EMPTY,
+                                                    Font = OsuFont.Default.With(size: 16),
+                                                    Colour = colours.Gray5,
+                                                    Alpha = 0,
+                                                },
+                                                new OsuScrollContainer
+                                                {
+                                                    RelativeSizeAxes = Axes.Both,
+                                                    Child = rowFlow = new FillFlowContainer
+                                                    {
+                                                        RelativeSizeAxes = Axes.X,
+                                                        AutoSizeAxes = Axes.Y,
+                                                        Direction = FillDirection.Vertical,
+                                                        Spacing = new Vector2(0, 8),
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            new Drawable[]
+                            {
+                                new Container
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    AutoSizeAxes = Axes.Y,
+                                    Padding = new MarginPadding(12),
+                                    Child = new FillFlowContainer
+                                    {
+                                        RelativeSizeAxes = Axes.X,
+                                        AutoSizeAxes = Axes.Y,
+                                        Direction = FillDirection.Vertical,
+                                        Spacing = new Vector2(0, 8),
+                                        Children = new Drawable[]
+                                        {
+                                            new OsuSpriteText
+                                            {
+                                                RelativeSizeAxes = Axes.X,
+                                                Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_RESTART_HINT,
+                                                Font = OsuFont.Default.With(size: 13),
+                                                Colour = colours.Yellow,
+                                            },
+                                            new GridContainer
+                                            {
+                                                RelativeSizeAxes = Axes.X,
+                                                AutoSizeAxes = Axes.Y,
+                                                RowDimensions = new[]
+                                                {
+                                                    new Dimension(GridSizeMode.AutoSize),
+                                                },
+                                                ColumnDimensions = new[]
+                                                {
+                                                    new Dimension(),
+                                                    new Dimension(),
+                                                    new Dimension(),
+                                                },
+                                                Content = new[]
+                                                {
+                                                    new Drawable[]
+                                                    {
+                                                        new RoundedButton
+                                                        {
+                                                            RelativeSizeAxes = Axes.X,
+                                                            Height = 40,
+                                                            Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_OPEN_FOLDER,
+                                                            Action = openRulesetsFolder,
+                                                        },
+                                                        new RoundedButton
+                                                        {
+                                                            RelativeSizeAxes = Axes.X,
+                                                            Height = 40,
+                                                            Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_SAVE,
+                                                            Action = save,
+                                                        },
+                                                        new RoundedButton
+                                                        {
+                                                            RelativeSizeAxes = Axes.X,
+                                                            Height = 40,
+                                                            Text = EzSettingsStrings.CANCEL_BUTTON,
+                                                            Action = Hide,
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            };
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            refreshEntries();
+        }
+
+        protected override void PopIn()
+        {
+            refreshEntries();
+            this.FadeIn(enter_duration, Easing.OutQuint);
+            this.ScaleTo(1, enter_duration, Easing.OutQuint);
+        }
+
+        protected override void PopOut()
+        {
+            this.FadeOut(exit_duration, Easing.OutQuint);
+            this.ScaleTo(0.95f, exit_duration, Easing.OutQuint);
+        }
+
+        private void refreshEntries()
+        {
+            rows.Clear();
+
             var discovered = EzExternalRulesetScanner.Scan(storage);
             var config = EzRulesetMappingConfig.Load(storage);
             config.EnsureDefaults(discovered);
@@ -89,47 +314,7 @@ namespace osu.Game.EzOsuGame.Overlays
             });
 
             normaliseExplicitOrder();
-
-            rowFlow = new FillFlowContainer
-            {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Spacing = new Vector2(0, 6),
-            };
-
             rebuildRowFlow();
-
-            MainContent.Child = new FillFlowContainer
-            {
-                Margin = new MarginPadding { Top = 12 },
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                Width = content_width,
-                AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Spacing = new Vector2(8),
-                Children = new Drawable[]
-                {
-                    new Container
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        Height = Math.Min(280, Math.Max(row_height, rows.Count * (row_height + 6))),
-                        Child = new OsuScrollContainer
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Child = rowFlow,
-                        },
-                    },
-                    new OsuSpriteText
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_RESTART_HINT,
-                        Font = OsuFont.Default.With(size: 14),
-                        Colour = colours.Yellow,
-                    },
-                },
-            };
         }
 
         private void rebuildRowFlow()
@@ -138,10 +323,13 @@ namespace osu.Game.EzOsuGame.Overlays
 
             foreach (var row in rows)
                 rowFlow.Add(createRowDrawable(row));
+
+            emptyHint.Alpha = rows.Count == 0 ? 1 : 0;
         }
 
         private Drawable createRowDrawable(ManagerRow row)
         {
+            // Row shell: left label + right controls (not FillFlow left/right mix).
             var controlsFlow = new FillFlowContainer
             {
                 AutoSizeAxes = Axes.Both,
@@ -155,6 +343,8 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 controlsFlow.Add(new OsuSpriteText
                 {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
                     Text = $"ID {row.OnlineId}",
                     Font = OsuFont.Default.With(weight: FontWeight.Bold),
                 });
@@ -166,6 +356,8 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 controlsFlow.Add(new OsuSpriteText
                 {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
                     Text = EzSettingsStrings.EXTERNAL_RULESET_NO_DEFINED_ID,
                     Font = OsuFont.Default.With(size: 14),
                     Colour = colours.Gray5,
@@ -174,6 +366,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             controlsFlow.Add(new OsuCheckbox
             {
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
                 LabelText = EzSettingsStrings.EXTERNAL_RULESET_ENABLED,
                 Current = { BindTarget = row.Enabled },
             });
@@ -200,6 +394,8 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             return new IconButton
             {
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
                 Icon = icon,
                 Scale = new Vector2(0.75f),
                 Action = action,
@@ -241,7 +437,28 @@ namespace osu.Game.EzOsuGame.Overlays
                 row.Order = order++;
         }
 
-        private void save(Action onSaved)
+        private void openRulesetsFolder()
+        {
+            string path = storage.GetStorageForDirectory(@"rulesets").GetFullPath(@".");
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true,
+                });
+            }
+            catch (Exception)
+            {
+                notifications?.Post(new SimpleErrorNotification
+                {
+                    Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_OPEN_FOLDER_FAILED,
+                });
+            }
+        }
+
+        private void save()
         {
             var config = EzRulesetMappingConfig.Load(storage);
 
@@ -265,7 +482,8 @@ namespace osu.Game.EzOsuGame.Overlays
             }
 
             config.Save(storage);
-            onSaved();
+            notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_SAVED });
+            Hide();
         }
 
         private sealed class ManagerRow

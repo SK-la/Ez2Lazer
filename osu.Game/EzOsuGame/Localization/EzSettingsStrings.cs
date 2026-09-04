@@ -1083,6 +1083,16 @@ namespace osu.Game.EzOsuGame.Localization
             "保存后请重启游戏使配置生效。",
             "Restart the game after saving to apply changes.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "rulesets/ 目录下暂无外部规则集 DLL。\n请将 osu.Game.Rulesets.*.dll 放入该目录后重新打开本窗口。",
+            "No external ruleset DLLs in rulesets/.\nPlace osu.Game.Rulesets.*.dll there, then reopen this window.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_OPEN_FOLDER =
+            new EzLocalizationManager.EzLocalisableString("打开 rulesets 文件夹", "Open rulesets folder");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_OPEN_FOLDER_FAILED =
+            new EzLocalizationManager.EzLocalisableString("无法打开 rulesets 文件夹。", "Could not open the rulesets folder.");
+
         public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_NO_DEFINED_ID =
             new EzLocalizationManager.EzLocalisableString("未定义 ID", "No ID defined");
 
