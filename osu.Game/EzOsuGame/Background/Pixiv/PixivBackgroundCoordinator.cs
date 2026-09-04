@@ -75,7 +75,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 try
                 {
                     if (!tryDownloadOnSongChange(out LocalisableString? error))
-                        LogFailure(EzSettingsStrings.PIXIV_LOG_SONG_CHANGE_DOWNLOAD, error);
+                        LogFailure(EzSettingsPixivString.PIXIV_LOG_SONG_CHANGE_DOWNLOAD, error);
                 }
                 finally
                 {
@@ -105,7 +105,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
             if (!Auth.HasRefreshToken)
             {
-                error = EzSettingsStrings.PIXIV_STATUS_NOT_CONFIGURED;
+                error = EzSettingsPixivString.PIXIV_STATUS_NOT_CONFIGURED;
                 return false;
             }
 
@@ -154,7 +154,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
             if (!Auth.HasRefreshToken)
             {
-                error = EzSettingsStrings.PIXIV_STATUS_NOT_CONFIGURED;
+                error = EzSettingsPixivString.PIXIV_STATUS_NOT_CONFIGURED;
                 return false;
             }
 

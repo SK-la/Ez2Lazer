@@ -70,7 +70,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 outputDeviceSettingsItem = new SettingsItemV2(dropdown = new AudioDeviceDropdown
                 {
                     Caption = AudioSettingsStrings.OutputDevice,
-                    HintText = EzSettingsStrings.AUDIO_DEVICE_OUTPUT_HINT,
+                    HintText = EzSettingsAudioString.AUDIO_DEVICE_OUTPUT_HINT,
                 })
                 {
                     Keywords = new[] { "speaker", "headphone", "output" }
@@ -82,7 +82,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             {
                 notifications?.Post(new SimpleNotification
                 {
-                    Text = EzSettingsStrings.ASIO_OUTPUT_UNAVAILABLE_NOTIFICATION,
+                    Text = EzSettingsAudioString.ASIO_OUTPUT_UNAVAILABLE_NOTIFICATION,
                 });
             });
 
@@ -97,24 +97,24 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
                 sampleRateDropdown = new AsioFormatDropdown
                 {
-                    Caption = EzSettingsStrings.ASIO_SAMPLE_RATE_LABEL,
-                    HintText = EzSettingsStrings.ASIO_SAMPLE_RATE_HINT,
+                    Caption = EzSettingsAudioString.ASIO_SAMPLE_RATE_LABEL,
+                    HintText = EzSettingsAudioString.ASIO_SAMPLE_RATE_HINT,
                     Items = new[] { initialFormat },
                     Current = new Bindable<EzAsioFormatOption>(initialFormat),
                 };
 
                 bufferSizeDropdown = new FormDropdown<int>
                 {
-                    Caption = EzSettingsStrings.ASIO_BUFFER_SIZE_LABEL,
-                    HintText = EzSettingsStrings.ASIO_BUFFER_SIZE_HINT,
+                    Caption = EzSettingsAudioString.ASIO_BUFFER_SIZE_LABEL,
+                    HintText = EzSettingsAudioString.ASIO_BUFFER_SIZE_HINT,
                     Current = configBufferSize,
                     Items = new[] { initialBuffer },
                 };
 
                 Add(asioPassThroughSettingsItem = new SettingsItemV2(asioPassThrough = new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.ASIO_PASSTHROUGH_LABEL,
-                    HintText = EzSettingsStrings.ASIO_PASSTHROUGH_HINT,
+                    Caption = EzSettingsAudioString.ASIO_PASSTHROUGH_LABEL,
+                    HintText = EzSettingsAudioString.ASIO_PASSTHROUGH_HINT,
                     Current = configAsioUseExternalPCM,
                 })
                 {
@@ -130,8 +130,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 });
                 Add(reloadAsioDriverButton = new SettingsButtonV2
                 {
-                    Text = EzSettingsStrings.ASIO_RELOAD_DRIVER_LABEL,
-                    TooltipText = EzSettingsStrings.ASIO_RELOAD_DRIVER_HINT,
+                    Text = EzSettingsAudioString.ASIO_RELOAD_DRIVER_LABEL,
+                    TooltipText = EzSettingsAudioString.ASIO_RELOAD_DRIVER_HINT,
                     Keywords = new[] { "asio", "reload", "driver", "refresh", "restart" },
                     Action = reloadAsioDriver,
                 });
@@ -344,7 +344,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     {
                         notifications?.Post(new SimpleNotification
                         {
-                            Text = EzSettingsStrings.ASIO_RELOAD_DRIVER_FAILED_NOTIFICATION,
+                            Text = EzSettingsAudioString.ASIO_RELOAD_DRIVER_FAILED_NOTIFICATION,
                         });
                     }
                 });

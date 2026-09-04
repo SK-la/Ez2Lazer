@@ -60,12 +60,12 @@ namespace osu.Game.EzOsuGame.Overlays
                 Colour = colourProvider.Content2,
             };
 
-            linkFlow.AddText(EzSettingsStrings.PIXIV_AUTH_TOOL_HINT_PREFIX);
+            linkFlow.AddText(EzSettingsPixivString.PIXIV_AUTH_TOOL_HINT_PREFIX);
             linkFlow.AddLink(
-                EzSettingsStrings.PIXIV_AUTH_TOOL_HINT_LINK,
-                EzSettingsStrings.PIXIV_AUTH_TOOL_RELEASES_URL,
+                EzSettingsPixivString.PIXIV_AUTH_TOOL_HINT_LINK,
+                EzSettingsPixivString.PIXIV_AUTH_TOOL_RELEASES_URL,
                 sp => sp.Font = sp.Font.With(weight: FontWeight.SemiBold));
-            linkFlow.AddText(EzSettingsStrings.PIXIV_AUTH_TOOL_HINT_SUFFIX);
+            linkFlow.AddText(EzSettingsPixivString.PIXIV_AUTH_TOOL_HINT_SUFFIX);
 
             return linkFlow;
         }

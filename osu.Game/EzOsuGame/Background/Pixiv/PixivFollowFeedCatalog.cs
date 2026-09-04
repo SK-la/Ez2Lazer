@@ -144,7 +144,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
             if (entries.Count == 0)
             {
-                error = EzSettingsStrings.PIXIV_ERROR_FOLLOW_FEED_EMPTY;
+                error = EzSettingsPixivString.PIXIV_ERROR_FOLLOW_FEED_EMPTY;
                 return false;
             }
 

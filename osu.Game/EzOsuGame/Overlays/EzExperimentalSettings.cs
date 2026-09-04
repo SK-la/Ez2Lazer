@@ -67,6 +67,24 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 new SettingsItemV2(new FormCheckBox
                 {
+                    Caption = EzSettingsStrings.EZ_ANALYSIS_REC_ENABLED,
+                    HintText = EzSettingsStrings.EZ_ANALYSIS_REC_ENABLED_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled),
+                })
+                {
+                    Keywords = new[] { "analysis", "ez", "song select", "kps", "kpc" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.EZ_ANALYSIS_SQLITE_ENABLED,
+                    HintText = EzSettingsStrings.EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled),
+                })
+                {
+                    Keywords = new[] { "analysis", "sqlite", "cache", "warmup", "persistent" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.EzSubFrameCorrectionEnabled),
                     Caption = EZ_SUB_FRAME_CORRECTION_ENABLED,
                     HintText = EZ_SUB_FRAME_CORRECTION_ENABLED_TOOLTIP,
