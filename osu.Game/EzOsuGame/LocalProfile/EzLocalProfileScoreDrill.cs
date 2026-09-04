@@ -87,6 +87,119 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
     }
 
+    /// <summary>
+    /// Persistent drill block: search filters the selector in place without recreating the text box.
+    /// </summary>
+    public partial class EzLocalProfileScoreDrillPanel : CompositeDrawable
+    {
+        private readonly Bindable<EzLocalProfileDrillScoreRow?> currentScore;
+        private readonly Bindable<string> searchQuery;
+        private readonly IReadOnlyList<EzLocalProfileDrillScoreRow> allScores;
+
+        private EzLocalProfileScoreSelector selector = null!;
+        private OsuSpriteText noMatchesText = null!;
+        private GridContainer resultsGrid = null!;
+
+        public EzLocalProfileScoreDrillPanel(
+            Bindable<EzLocalProfileDrillScoreRow?> currentScore,
+            Bindable<string> searchQuery,
+            IReadOnlyList<EzLocalProfileDrillScoreRow> allScores)
+        {
+            this.currentScore = currentScore;
+            this.searchQuery = searchQuery;
+            this.allScores = allScores;
+
+            RelativeSizeAxes = Axes.X;
+            AutoSizeAxes = Axes.Y;
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            var searchBox = new EzLocalProfileScoreSearchBox();
+            if (!string.IsNullOrEmpty(searchQuery.Value))
+                searchBox.Text = searchQuery.Value;
+
+            searchBox.Current.BindValueChanged(e =>
+            {
+                searchQuery.Value = e.NewValue ?? string.Empty;
+                applyFilter();
+            });
+
+            selector = new EzLocalProfileScoreSelector { Current = { BindTarget = currentScore } };
+
+            noMatchesText = new OsuSpriteText
+            {
+                Text = EzSettingsProfile.LOCAL_PROFILE_DRILL_NO_MATCHES,
+                Font = OsuFont.GetFont(size: 14),
+            };
+
+            resultsGrid = new GridContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                RowDimensions = new[]
+                {
+                    new Dimension(GridSizeMode.AutoSize),
+                },
+                ColumnDimensions = new[]
+                {
+                    new Dimension(GridSizeMode.Absolute, EzLocalProfileScoreSelector.WIDTH),
+                    new Dimension(),
+                },
+                Content = new[]
+                {
+                    new Drawable[]
+                    {
+                        selector,
+                        new Container
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Margin = new MarginPadding { Left = 12 },
+                            Child = new EzLocalProfileScoreDetailColumn(currentScore, allScores),
+                        },
+                    },
+                },
+            };
+
+            InternalChild = new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 12),
+                Children = new Drawable[]
+                {
+                    searchBox,
+                    new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Children = new Drawable[]
+                        {
+                            noMatchesText,
+                            resultsGrid,
+                        }
+                    },
+                }
+            };
+
+            applyFilter();
+        }
+
+        private void applyFilter()
+        {
+            var filtered = EzLocalProfileScoreDrillQuery.Filter(allScores, searchQuery.Value);
+            bool hasMatches = filtered.Count > 0;
+
+            noMatchesText.Alpha = hasMatches ? 0 : 1;
+            resultsGrid.Alpha = hasMatches ? 1 : 0;
+
+            selector.SetScores(filtered);
+        }
+    }
+
     public partial class EzLocalProfileScoreSelector : CompositeDrawable
     {
         public Bindable<EzLocalProfileDrillScoreRow?> Current { get; } = new Bindable<EzLocalProfileDrillScoreRow?>();
@@ -119,8 +232,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return;
             }
 
-            if (Current.Value == null || !entries.Any(e => e.ScoreId == Current.Value.ScoreId))
+            if (Current.Value == null || entries.All(e => e.ScoreId != Current.Value.ScoreId))
                 Current.Value = entries[0];
+            else
+                updateSelectionHighlight();
         }
 
         [BackgroundDependencyLoader]
@@ -138,38 +253,49 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
             };
 
-            Current.BindValueChanged(_ => rebuildList(), true);
+            Current.BindValueChanged(_ => updateSelectionHighlight());
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
             rebuildList();
+            updateSelectionHighlight();
         }
 
         private void rebuildList()
         {
-            if (listFlow == null)
-                return;
-
             listFlow.Clear();
 
             foreach (var row in entries)
-                listFlow.Add(new ScoreEntry(row, Current.Value?.ScoreId == row.ScoreId, () => Current.Value = row, rulesets));
+                listFlow.Add(new ScoreEntry(row, () => Current.Value = row, rulesets));
+        }
+
+        private void updateSelectionHighlight()
+        {
+            Guid? selectedId = Current.Value?.ScoreId;
+
+            foreach (var child in listFlow)
+            {
+                if (child is ScoreEntry entry)
+                    entry.SetSelected(selectedId != null && entry.ScoreId == selectedId);
+            }
         }
 
         private partial class ScoreEntry : OsuClickableContainer
         {
+            public Guid ScoreId => row.ScoreId;
+
             private readonly EzLocalProfileDrillScoreRow row;
             private readonly FillFlowContainer modsFlow;
 
-            public ScoreEntry(EzLocalProfileDrillScoreRow row, bool selected, Action onSelect, RulesetStore rulesets)
+            public ScoreEntry(EzLocalProfileDrillScoreRow row, Action onSelect, RulesetStore rulesets)
             {
                 this.row = row;
                 RelativeSizeAxes = Axes.X;
                 Height = BeatmapLeaderboardScore.HEIGHT;
                 Action = onSelect;
-                Alpha = selected ? 1 : 0.65f;
+                Alpha = 0.65f;
                 Masking = true;
                 CornerRadius = 6;
 
@@ -204,6 +330,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 populateMods(EzLocalProfileDrillMods.Resolve(row, rulesets));
             }
+
+            public void SetSelected(bool selected) => Alpha = selected ? 1 : 0.65f;
 
             [BackgroundDependencyLoader]
             private void load(OverlayColourProvider colours)

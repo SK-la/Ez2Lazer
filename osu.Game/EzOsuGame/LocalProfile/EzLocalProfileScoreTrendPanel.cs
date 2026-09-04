@@ -26,6 +26,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     public partial class EzLocalProfileScoreTrendPanel : CompositeDrawable
     {
         private const string space_graph_name = "Space Graph";
+        private const float content_min_height = 160f;
 
         private readonly Bindable<EzLocalProfileDrillScoreRow?> currentScore;
         private FillFlowContainer contentFlow = null!;
@@ -68,17 +69,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             loadCancellation?.Cancel();
             loadCancellation = null;
-            contentFlow.Clear();
 
             var row = currentScore.Value;
 
+            // Replace in place with a fixed-height placeholder so AutoSize does not collapse.
+            contentFlow.Clear();
+            contentFlow.Add(createLoadingPlaceholder());
+
             if (row == null)
             {
+                contentFlow.Clear();
                 contentFlow.Add(createEmptyHint());
                 return;
             }
-
-            contentFlow.Add(new LoadingSpinner { RelativeSizeAxes = Axes.X, Height = 80 });
 
             var localCancellation = loadCancellation = new CancellationTokenSource();
 
@@ -130,6 +133,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 });
             }), localCancellation.Token);
         }
+
+        private static Drawable createLoadingPlaceholder() => new Container
+        {
+            RelativeSizeAxes = Axes.X,
+            Height = content_min_height,
+            Child = new LoadingSpinner
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                State = { Value = Visibility.Visible },
+            },
+        };
 
         private static OsuSpriteText createEmptyHint() => new OsuSpriteText
         {
