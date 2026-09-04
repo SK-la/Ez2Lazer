@@ -84,11 +84,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
             double ppResolved,
             EzAnalysisResult analysis,
             bool hasKps,
-            double? avgAbsOffsetMs = null)
+            double? avgAbsOffsetMs = null,
+            double? starRating = null,
+            double? xxyStarRating = null)
         {
             var beatmap = score.BeatmapInfo!;
             var metadata = beatmap.Metadata;
             var maniaSummary = analysis.ManiaSummary;
+
+            double resolvedXxy = xxyStarRating
+                                 ?? (hasKps && maniaSummary?.XxySr is double analysisXxy && analysisXxy >= 0
+                                     ? analysisXxy
+                                     : beatmap.XxyStarRating);
 
             return new EzLocalProfileDrillScoreRow
             {
@@ -112,8 +119,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 DifficultyName = beatmap.DifficultyName,
                 MapperUsername = metadata.Author.Username,
                 BeatmapStatus = beatmap.Status,
-                StarRating = beatmap.StarRating,
-                XxyStarRating = beatmap.XxyStarRating,
+                StarRating = starRating ?? beatmap.StarRating,
+                XxyStarRating = resolvedXxy,
                 MapPerformancePoints = beatmap.PerformancePoints,
                 KpsAvg = hasKps ? analysis.AverageKps : 0,
                 KpsMax = hasKps ? analysis.MaxKps : 0,

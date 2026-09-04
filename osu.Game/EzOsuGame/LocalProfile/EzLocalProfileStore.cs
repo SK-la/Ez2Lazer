@@ -24,6 +24,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public const string DATABASE_FILENAME = "ez-local-profile.sqlite";
         public const int SCHEMA_VERSION = 1;
 
+        /// <summary>
+        /// Logic version for aggregated stats (independent of table schema).
+        /// Bump when recompute is required for correct numbers (e.g. playable-mod analysis).
+        /// </summary>
+        public const int CONTENT_VERSION = 2;
+
+        private const string meta_content_version = "content_version";
+
         private readonly Storage storage;
         private readonly Lock sync = new Lock();
         private bool initialised;
@@ -57,6 +65,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     return new EzLocalProfileSnapshot
                     {
                         HasData = true,
+                        NeedsRecompute = readNeedsRecompute(connection),
                         LastComputedAt = tryReadLastComputedAt(connection),
                         IncludedUsernames = readIncludedUsernames(connection),
                         RulesetStats = readRulesetStats(connection),
@@ -205,6 +214,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 recreateManiaColumnTable(connection);
 
                 setMeta(connection, "schema_version", SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
+                setMeta(connection, meta_content_version, CONTENT_VERSION.ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, "last_computed_at", result.ComputedAt.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, "included_usernames_json", JsonSerializer.Serialize(result.IncludedUsernames.ToList()));
 
@@ -421,6 +431,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 writeAggregationTables(connection, merged);
 
                 setMeta(connection, "schema_version", SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
+                // Only mark logic current when local partitions were rebuilt with the new aggregator.
+                if (recomputedByUsername.Count > 0)
+                    setMeta(connection, meta_content_version, CONTENT_VERSION.ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, "last_computed_at", merged.ComputedAt.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, "included_usernames_json", JsonSerializer.Serialize(included));
 
@@ -885,6 +898,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return null;
 
             return DateTimeOffset.FromUnixTimeMilliseconds(ms);
+        }
+
+        private static bool readNeedsRecompute(SqliteConnection connection)
+        {
+            string? raw = tryGetMeta(connection, meta_content_version);
+            if (string.IsNullOrEmpty(raw)
+                || !int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int stored)
+                || stored < CONTENT_VERSION)
+                return true;
+
+            return false;
         }
 
         private static IReadOnlyList<string> readIncludedUsernames(SqliteConnection connection)

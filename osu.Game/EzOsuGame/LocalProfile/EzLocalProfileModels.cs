@@ -24,6 +24,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
     public sealed class EzLocalProfileSnapshot
     {
         public bool HasData { get; init; }
+
+        /// <summary>
+        /// True when stored stats were produced by an older analysis logic version and should be recomputed.
+        /// </summary>
+        public bool NeedsRecompute { get; init; }
+
         public DateTimeOffset? LastComputedAt { get; init; }
         public IReadOnlyList<string> IncludedUsernames { get; init; } = Array.Empty<string>();
         public IReadOnlyList<EzLocalProfileRulesetStats> RulesetStats { get; init; } = Array.Empty<EzLocalProfileRulesetStats>();

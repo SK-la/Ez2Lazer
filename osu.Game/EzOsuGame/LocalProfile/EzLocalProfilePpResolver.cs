@@ -12,7 +12,7 @@ using osu.Game.Scoring;
 namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
-    /// Shared PP resolution for career aggregation and drill score snapshots.
+    /// Shared PP / star-rating resolution for career aggregation and drill score snapshots.
     /// </summary>
     public sealed class EzLocalProfilePpResolver
     {
@@ -23,15 +23,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
             this.beatmapManager = beatmapManager;
         }
 
-        public double[] ResolveAll(
+        public readonly record struct ResolveBatch(double[] Pp, double[] StarRatings);
+
+        public ResolveBatch ResolveAll(
             IReadOnlyList<ScoreInfo> scores,
             IProgress<EzLocalProfileComputeProgress>? progress = null,
             int progressTotal = 0,
             System.Threading.CancellationToken cancellationToken = default)
         {
-            double[] values = new double[scores.Count];
+            double[] pp = new double[scores.Count];
+            double[] starRatings = new double[scores.Count];
+
             if (scores.Count == 0)
-                return values;
+                return new ResolveBatch(pp, starRatings);
 
             var attributeCache = new Dictionary<string, DifficultyAttributes?>(StringComparer.Ordinal);
             int failures = 0;
@@ -43,7 +47,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                values[i] = resolvePp(scores[i], attributeCache, ref failures, ref loggedFailures, max_logged_failures);
+                var score = scores[i];
+                starRatings[i] = resolveStarRating(score, attributeCache);
+                pp[i] = resolvePp(score, attributeCache, ref failures, ref loggedFailures, max_logged_failures);
 
                 int current = i + 1;
                 if (progress != null && (current == scores.Count || current % reportEvery == 0))
@@ -57,7 +63,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     Ez2ConfigManager.LOGGER_NAME);
             }
 
-            return values;
+            return new ResolveBatch(pp, starRatings);
         }
 
         public double ResolvePp(ScoreInfo score)
@@ -65,6 +71,33 @@ namespace osu.Game.EzOsuGame.LocalProfile
             int failures = 0;
             int loggedFailures = 0;
             return resolvePp(score, new Dictionary<string, DifficultyAttributes?>(StringComparer.Ordinal), ref failures, ref loggedFailures, maxLoggedFailures: 0);
+        }
+
+        private double resolveStarRating(ScoreInfo score, Dictionary<string, DifficultyAttributes?> attributeCache)
+        {
+            if (score.BeatmapInfo == null)
+                return -1;
+
+            try
+            {
+                string cacheKey = buildAttributeCacheKey(score);
+
+                if (!attributeCache.TryGetValue(cacheKey, out var attributes))
+                {
+                    var ruleset = score.Ruleset.CreateInstance();
+                    attributes = tryCalculateAttributes(score, ruleset);
+                    attributeCache[cacheKey] = attributes;
+                }
+
+                if (attributes != null)
+                    return attributes.StarRating;
+
+                return score.BeatmapInfo.StarRating;
+            }
+            catch
+            {
+                return score.BeatmapInfo.StarRating;
+            }
         }
 
         private double resolvePp(

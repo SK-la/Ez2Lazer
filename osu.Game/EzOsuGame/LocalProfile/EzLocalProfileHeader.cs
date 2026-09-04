@@ -174,7 +174,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
             string names = snapshot.IncludedUsernames.Count == 0
                 ? "-"
                 : string.Join(", ", snapshot.IncludedUsernames);
-            metaText.Text = $"{EzSettingsProfile.LOCAL_PROFILE_SHARED_HINT} · {snapshot.LastComputedAt.Value.LocalDateTime:g} · {names}";
+
+            string baseText = $"{EzSettingsProfile.LOCAL_PROFILE_SHARED_HINT} · {snapshot.LastComputedAt.Value.LocalDateTime:g} · {names}";
+
+            if (snapshot.NeedsRecompute)
+                metaText.Text = $"{baseText} · {EzSettingsProfile.LOCAL_PROFILE_NEEDS_RECOMPUTE}";
+            else
+                metaText.Text = baseText;
         }
 
         private partial class HeaderTitle : OverlayTitle

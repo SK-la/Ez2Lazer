@@ -63,6 +63,11 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SHARED_HINT =
             new EzLocalizationManager.EzLocalisableString("本地统计（共享存档）", "Local stats (shared archive)");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_NEEDS_RECOMPUTE =
+            new EzLocalizationManager.EzLocalisableString(
+                "算法已更新，请到设置 → Ez → 实验性功能 重新计算本地个人成绩",
+                "Stats logic updated — recompute Local Profile Stats under Settings → Ez → Experimental");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BADGE =
             new EzLocalizationManager.EzLocalisableString("本地", "Local");
 
