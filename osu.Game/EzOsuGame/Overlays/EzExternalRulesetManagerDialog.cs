@@ -329,7 +329,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private Drawable createRowDrawable(ManagerRow row)
         {
-            // Row shell: left label + right controls (not FillFlow left/right mix).
+            // Row shell: left label + right controls (Container left/right; FillFlow children share CentreLeft).
             var controlsFlow = new FillFlowContainer
             {
                 AutoSizeAxes = Axes.Both,
@@ -345,10 +345,31 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
-                    Text = $"ID {row.OnlineId}",
-                    Font = OsuFont.Default.With(weight: FontWeight.Bold),
+                    Text = EzSettingsStrings.EXTERNAL_RULESET_ID_LABEL,
+                    Font = OsuFont.Default.With(size: 14, weight: FontWeight.Bold),
                 });
 
+                var idBox = new OsuNumberBox
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Width = 72,
+                    Height = 30,
+                    Text = row.OnlineId?.ToString() ?? string.Empty,
+                    PlaceholderText = "≥4",
+                };
+
+                row.IdBox = idBox;
+
+                idBox.OnCommit += (sender, _) =>
+                {
+                    if (int.TryParse(sender.Text, out int parsed) && isAllowedOnlineId(parsed))
+                        row.OnlineId = parsed;
+                    else
+                        sender.Text = row.OnlineId?.ToString() ?? string.Empty;
+                };
+
+                controlsFlow.Add(idBox);
                 controlsFlow.Add(createMoveButton(FontAwesome.Solid.ArrowUp, () => moveExplicitRow(row, -1)));
                 controlsFlow.Add(createMoveButton(FontAwesome.Solid.ArrowDown, () => moveExplicitRow(row, 1)));
             }
@@ -460,6 +481,23 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void save()
         {
+            GetContainingFocusManager()?.ChangeFocus(null);
+
+            foreach (var row in rows.Where(r => r.HasExplicitId))
+            {
+                if (row.IdBox != null && int.TryParse(row.IdBox.Text, out int typed) && isAllowedOnlineId(typed))
+                    row.OnlineId = typed;
+
+                if (row.OnlineId is not int id || !isAllowedOnlineId(id))
+                {
+                    notifications?.Post(new SimpleErrorNotification
+                    {
+                        Text = EzSettingsStrings.EXTERNAL_RULESET_INVALID_ONLINE_ID,
+                    });
+                    return;
+                }
+            }
+
             var config = EzRulesetMappingConfig.Load(storage);
 
             int explicitOrder = 0;
@@ -486,13 +524,17 @@ namespace osu.Game.EzOsuGame.Overlays
             Hide();
         }
 
+        private static bool isAllowedOnlineId(int onlineId)
+            => onlineId == -1 || onlineId >= EzExternalRulesetMapping.EXPLICIT_ONLINE_ID_MINIMUM;
+
         private sealed class ManagerRow
         {
             public DiscoveredExternalRuleset Ruleset { get; }
             public BindableBool Enabled { get; }
             public bool HasExplicitId { get; }
-            public int? OnlineId { get; }
+            public int? OnlineId { get; set; }
             public int Order { get; set; }
+            public OsuNumberBox? IdBox { get; set; }
 
             public ManagerRow(DiscoveredExternalRuleset ruleset, BindableBool enabled, bool hasExplicitId, int? onlineId, int order)
             {

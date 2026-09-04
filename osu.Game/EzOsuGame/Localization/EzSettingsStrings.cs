@@ -1099,6 +1099,13 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_ENABLED =
             new EzLocalizationManager.EzLocalisableString("启用", "Enabled");
 
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_ID_LABEL =
+            new EzLocalizationManager.EzLocalisableString("ID", "ID");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_INVALID_ONLINE_ID = new EzLocalizationManager.EzLocalisableString(
+            "OnlineID 必须为 -1 或 ≥4（不能使用 0~3）。",
+            "OnlineID must be -1 or ≥4 (0~3 are reserved).");
+
         #endregion
     }
 }
