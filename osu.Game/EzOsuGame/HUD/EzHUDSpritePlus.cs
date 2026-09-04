@@ -271,57 +271,82 @@ namespace osu.Game.EzOsuGame.HUD
                        .Trim('/');
         }
 
+        /// <summary>
+        /// Ensures <paramref name="current"/> is present in <paramref name="items"/> before assigning to a Dropdown,
+        /// so <c>ensureItemSelectionIsValid</c> cannot rewrite the bound setting on settings-panel rebuild.
+        /// </summary>
+        private static void ensureCurrentInItems(Bindable<string> current, List<string> items, bool normaliseAsPath)
+        {
+            string value = normaliseAsPath
+                ? normaliseModifyPath(current.Value)
+                : (current.Value?.Trim() ?? string.Empty);
+
+            int existing = items.FindIndex(i => string.Equals(i, value, StringComparison.OrdinalIgnoreCase));
+
+            if (existing >= 0)
+            {
+                if (current.Value != items[existing])
+                    current.Value = items[existing];
+                return;
+            }
+
+            if (value.Length > 0)
+            {
+                items.Insert(0, value);
+                if (current.Value != value)
+                    current.Value = value;
+                return;
+            }
+
+            if (items.Count == 0)
+                items.Add(string.Empty);
+
+            current.Value = items[0];
+        }
+
         public partial class ModifyPathSelectorControl : SettingsDropdown<string>
         {
             [Resolved]
             private Storage storage { get; set; } = null!;
 
             private EzHUDSpritePlus source = null!;
-            private readonly BindableList<string> itemSource = new BindableList<string>();
 
             protected override void LoadComplete()
             {
                 base.LoadComplete();
 
                 source = (EzHUDSpritePlus)SettingSourceObject;
-                ItemSource = itemSource;
                 refreshItems();
             }
 
             private void refreshItems()
             {
-                string modifyRoot = storage.GetFullPath("EzResources/Modify");
+                var list = new List<string>();
 
-                IEnumerable<string> items = Enumerable.Empty<string>();
-
-                if (Directory.Exists(modifyRoot))
+                try
                 {
-                    items = Directory.GetDirectories(modifyRoot, "*", SearchOption.AllDirectories)
-                                     .Select(path => Path.GetRelativePath(modifyRoot, path))
-                                     .Where(path => !string.IsNullOrWhiteSpace(path))
-                                     .Select(path => path.Replace('/', '\\').Trim('\\'))
-                                     .Where(path => !string.IsNullOrWhiteSpace(path))
-                                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                                     .OrderBy(path => path.Count(c => c == '\\'))
-                                     .ThenBy(path => path, StringComparer.OrdinalIgnoreCase);
+                    string modifyRoot = storage.GetFullPath("EzResources/Modify");
+
+                    if (Directory.Exists(modifyRoot))
+                    {
+                        list.AddRange(Directory.GetDirectories(modifyRoot, "*", SearchOption.AllDirectories)
+                                               .Select(path => Path.GetRelativePath(modifyRoot, path))
+                                               .Select(normaliseModifyPath)
+                                               .Where(path => path.Length > 0)
+                                               .Distinct(StringComparer.OrdinalIgnoreCase)
+                                               .OrderBy(path => path.Count(c => c == '/'))
+                                               .ThenBy(path => path, StringComparer.OrdinalIgnoreCase));
+                    }
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
                 }
 
-                string[] itemArray = items.ToArray();
-
-                if (!itemSource.SequenceEqual(itemArray))
-                {
-                    itemSource.Clear();
-                    itemSource.AddRange(itemArray);
-                }
-
-                if (itemArray.Length == 0)
-                {
-                    source.ModifyPath.Value = string.Empty;
-                    return;
-                }
-
-                if (itemArray.All(i => !string.Equals(i, source.ModifyPath.Value, StringComparison.OrdinalIgnoreCase)))
-                    source.ModifyPath.Value = itemArray[0];
+                ensureCurrentInItems(source.ModifyPath, list, normaliseAsPath: true);
+                Items = list;
             }
         }
 
@@ -331,7 +356,6 @@ namespace osu.Game.EzOsuGame.HUD
             private Storage storage { get; set; } = null!;
 
             private EzHUDSpritePlus source = null!;
-            private readonly BindableList<string> itemSource = new BindableList<string>();
             private static readonly Regex selector_frame_template_regex = new Regex(@"^\{(0{1,3})\}$", RegexOptions.Compiled);
 
             protected override void LoadComplete()
@@ -339,49 +363,44 @@ namespace osu.Game.EzOsuGame.HUD
                 base.LoadComplete();
 
                 source = (EzHUDSpritePlus)SettingSourceObject;
-                ItemSource = itemSource;
-                source.ModifyPath.BindValueChanged(_ => refreshItems(), true);
+                refreshItems();
+                source.ModifyPath.BindValueChanged(_ => refreshItems());
                 source.FrameTemplate.BindValueChanged(_ => refreshItems());
             }
 
             private void refreshItems()
             {
-                string path = source.ModifyPath.Value?.Trim() ?? string.Empty;
-                string fullDir = storage.GetFullPath(buildModifyDirectory(path));
+                var list = new List<string>();
 
-                IEnumerable<string> items = Enumerable.Empty<string>();
-
-                if (Directory.Exists(fullDir))
+                try
                 {
-                    string[] rawFileNames = Directory.GetFiles(fullDir)
-                                                     .Where(file => SupportedExtensions.IMAGE_EXTENSIONS.Contains(Path.GetExtension(file).ToLowerInvariant()))
-                                                     .Select(file => Path.GetFileNameWithoutExtension(file))
-                                                     .Where(name => !string.IsNullOrEmpty(name))
-                                                     .ToArray();
+                    string path = source.ModifyPath.Value?.Trim() ?? string.Empty;
+                    string fullDir = storage.GetFullPath(buildModifyDirectory(path));
 
-                    var rawFileNameSet = new HashSet<string>(rawFileNames, StringComparer.OrdinalIgnoreCase);
+                    if (Directory.Exists(fullDir))
+                    {
+                        string[] rawFileNames = Directory.GetFiles(fullDir)
+                                                         .Where(file => SupportedExtensions.IMAGE_EXTENSIONS.Contains(Path.GetExtension(file).ToLowerInvariant()))
+                                                         .Select(file => Path.GetFileNameWithoutExtension(file))
+                                                         .Where(name => !string.IsNullOrEmpty(name))
+                                                         .ToArray();
 
-                    items = rawFileNames.Select(name => resolveDisplayName(name, rawFileNameSet))
-                                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase);
+                        var rawFileNameSet = new HashSet<string>(rawFileNames, StringComparer.OrdinalIgnoreCase);
+
+                        list.AddRange(rawFileNames.Select(name => resolveDisplayName(name, rawFileNameSet))
+                                                  .Distinct(StringComparer.OrdinalIgnoreCase)
+                                                  .OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
+                    }
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
                 }
 
-                string[] itemArray = items.ToArray();
-
-                if (!itemSource.SequenceEqual(itemArray))
-                {
-                    itemSource.Clear();
-                    itemSource.AddRange(itemArray);
-                }
-
-                if (itemArray.Length == 0)
-                {
-                    source.SpriteName.Value = string.Empty;
-                    return;
-                }
-
-                if (itemArray.All(i => !string.Equals(i, source.SpriteName.Value, StringComparison.OrdinalIgnoreCase)))
-                    source.SpriteName.Value = itemArray[0];
+                ensureCurrentInItems(source.SpriteName, list, normaliseAsPath: false);
+                Items = list;
             }
 
             private static string buildModifyDirectory(string relativePath)
