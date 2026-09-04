@@ -90,7 +90,7 @@ namespace osu.Game.Skinning
                                 var score = container.OfType<EzHUDScoreCounter>().FirstOrDefault();
                                 var acc = container.OfType<ArgonAccuracyCounter>().FirstOrDefault();
                                 var pps = container.OfType<ArgonPerformancePointsCounter>().FirstOrDefault();
-                                var songProgress = container.OfType<ArgonSongProgress>().FirstOrDefault();
+                                var songProgress = container.OfType<SongProgress>().FirstOrDefault();
 
                                 const float x_offset = 20;
                                 const float padding = 10;
@@ -190,7 +190,7 @@ namespace osu.Game.Skinning
                                     {
                                         WireframeOpacity = { Value = 0 },
                                     },
-                                    new ArgonSongProgress(),
+                                    new EzArgonSongProgress(),
                                     new JudgementCounterDisplay
                                     {
                                         FillMode = FillMode.Fill,

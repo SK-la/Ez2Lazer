@@ -226,5 +226,17 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SCORE_RACE_LEADERBOARD_COMPONENT_NAME = new EzLocalizationManager.EzLocalisableString("角逐排行榜", "Score Race Leaderboard");
         public static readonly LocalisableString SCORE_COMPARE_BARS_COMPONENT_NAME = new EzLocalizationManager.EzLocalisableString("分数对比柱", "Score Compare Bars");
+
+        public static readonly LocalisableString SONG_PROGRESS_SHOW_MISS_MARKERS_LABEL = new EzLocalizationManager.EzLocalisableString("回放时显示 miss 标记", "Show miss markers in replay");
+
+        public static readonly LocalisableString SONG_PROGRESS_SHOW_MISS_MARKERS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "在回放进度条上用红色区间标出 miss；悬停时显示引线与密集 miss 计数。",
+            "Tint miss intervals on the replay progress bar in red; hover to show stems and clustered miss counts.");
+
+        public static readonly LocalisableString SONG_PROGRESS_SHOW_REST_MARKERS_LABEL = new EzLocalizationManager.EzLocalisableString("游戏时显示休息标记", "Show rest markers in gameplay");
+
+        public static readonly LocalisableString SONG_PROGRESS_SHOW_REST_MARKERS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "在进度条主体上用淡绿→淡黄渐变标出谱面休息区间。",
+            "Tint rest intervals on the progress bar with a light-green to light-yellow gradient.");
     }
 }
