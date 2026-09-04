@@ -158,11 +158,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var rulesetStats = snapshot.RulesetStats.FirstOrDefault(s => s.RulesetId == rulesetId);
 
             contentFlow.Add(new EzLocalProfileSection(
-                EzSettingsStrings.LOCAL_PROFILE_SECTION_CAREER,
+                EzSettingsProfile.LOCAL_PROFILE_SECTION_CAREER,
                 new EzLocalProfileCareerBody(rulesetStats, snapshot.GradeCounts.Where(g => g.RulesetId == rulesetId))));
 
             contentFlow.Add(new EzLocalProfileSection(
-                EzSettingsStrings.LOCAL_PROFILE_SECTION_MODE_DATA,
+                EzSettingsProfile.LOCAL_PROFILE_SECTION_MODE_DATA,
                 new EzLocalProfileModeDataBody(snapshot, rulesetId)));
 
             refreshDrillContent(snapshot, rulesetId);

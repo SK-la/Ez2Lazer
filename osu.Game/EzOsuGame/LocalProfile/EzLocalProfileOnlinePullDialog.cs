@@ -35,8 +35,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             Func<EzLocalProfileOnlinePullKind, int, int> getPullOffset,
             Action<EzLocalProfileOnlinePullRequest> onConfirm)
         {
-            HeaderText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_HEADER;
-            BodyText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BODY;
+            HeaderText = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_HEADER;
+            BodyText = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_BODY;
             Icon = FontAwesome.Solid.CloudDownloadAlt;
 
             offsetStoredHint = new OsuSpriteText
@@ -49,14 +49,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 RelativeSizeAxes = Axes.X,
                 Height = 36,
-                PlaceholderText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_OFFSET_INPUT,
+                PlaceholderText = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_OFFSET_INPUT,
             };
 
             void syncOffsetFromStore()
             {
                 int stored = getPullOffset(kind.Value, (int)rulesetChoice.Value);
                 offsetStoredHint.Text = string.Format(
-                    EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_OFFSET_HINT.ToString(),
+                    EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_OFFSET_HINT.ToString(),
                     stored,
                     EzLocalProfileOnlinePullService.BATCH_SIZE);
                 offsetInput.Text = stored.ToString(CultureInfo.InvariantCulture);
@@ -76,7 +76,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     offsetStoredHint,
                     new OsuSpriteText
                     {
-                        Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_OFFSET_INPUT,
+                        Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_OFFSET_INPUT,
                         Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
                     },
                     offsetInput,
@@ -94,17 +94,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 Spacing = new Vector2(6),
                 Children = new Drawable[]
                 {
-                    createLabeledDropdown(EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_RULESET.ToString(), rulesetChoice),
-                    createLabeledDropdown(EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_KIND.ToString(), kind),
+                    createLabeledDropdown(EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_RULESET.ToString(), rulesetChoice),
+                    createLabeledDropdown(EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_KIND.ToString(), kind),
                     offsetSection,
                     new OsuCheckbox
                     {
-                        LabelText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_INCLUDE_STATS,
+                        LabelText = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_INCLUDE_STATS,
                         Current = { BindTarget = includeStatsWithoutImport },
                     },
                     new OsuCheckbox
                     {
-                        LabelText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_DOWNLOAD_MAPS,
+                        LabelText = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_DOWNLOAD_MAPS,
                         Current = { BindTarget = downloadMissingBeatmaps },
                     },
                 }
@@ -114,7 +114,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 new PopupDialogOkButton
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_CONFIRM,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_CONFIRM,
                     Action = () =>
                     {
                         var ruleset = rulesetStore.GetRuleset((int)rulesetChoice.Value)
@@ -144,7 +144,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 },
                 new PopupDialogCancelButton
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_IMPORT_CANCEL,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_IMPORT_CANCEL,
                 }
             };
         }

@@ -38,7 +38,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 },
                 new OsuSpriteText
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_EMPTY_HINT,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_EMPTY_HINT,
                     Font = OsuFont.GetFont(size: 14),
                     Colour = colours.Content2,
                     Anchor = Anchor.TopCentre,

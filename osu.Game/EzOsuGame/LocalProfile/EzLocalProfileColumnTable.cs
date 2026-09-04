@@ -35,24 +35,24 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 Add(new OsuSpriteText
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_NO_RULESET_DATA,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_NO_RULESET_DATA,
                     Font = OsuFont.GetFont(size: 13),
                 });
                 return;
             }
 
             var headers = new LocalisableString[ordered.Count + 1];
-            headers[0] = EzSettingsStrings.LOCAL_PROFILE_COL_HEADER;
+            headers[0] = EzSettingsProfile.LOCAL_PROFILE_COL_HEADER;
 
             for (int i = 0; i < ordered.Count; i++)
                 headers[i + 1] = $"#{ordered[i].ColumnIndex + 1}";
 
             Add(new MetricRow(headers, header: true, alternate: false));
 
-            Add(new MetricRow(buildMetricRow(EzSettingsStrings.LOCAL_PROFILE_TOTAL_KEYS, ordered.Select(c => (LocalisableString)c.TotalKeys.ToString("N0"))), header: false, alternate: false));
-            Add(new MetricRow(buildMetricRow(EzSettingsStrings.LOCAL_PROFILE_AVG_KPS, ordered.Select(c => (LocalisableString)formatKps(c.AvgKps))), header: false, alternate: true));
-            Add(new MetricRow(buildMetricRow(EzSettingsStrings.LOCAL_PROFILE_MAX_KPS, ordered.Select(c => (LocalisableString)formatKps(c.MaxKps))), header: false, alternate: false));
-            Add(new MetricRow(buildMetricRow(EzSettingsStrings.LOCAL_PROFILE_SCORE_COUNT, ordered.Select(c => (LocalisableString)c.ScoreCount.ToString("N0"))), header: false, alternate: true));
+            Add(new MetricRow(buildMetricRow(EzSettingsProfile.LOCAL_PROFILE_TOTAL_KEYS, ordered.Select(c => (LocalisableString)c.TotalKeys.ToString("N0"))), header: false, alternate: false));
+            Add(new MetricRow(buildMetricRow(EzSettingsProfile.LOCAL_PROFILE_AVG_KPS, ordered.Select(c => (LocalisableString)formatKps(c.AvgKps))), header: false, alternate: true));
+            Add(new MetricRow(buildMetricRow(EzSettingsProfile.LOCAL_PROFILE_MAX_KPS, ordered.Select(c => (LocalisableString)formatKps(c.MaxKps))), header: false, alternate: false));
+            Add(new MetricRow(buildMetricRow(EzSettingsProfile.LOCAL_PROFILE_SCORE_COUNT, ordered.Select(c => (LocalisableString)c.ScoreCount.ToString("N0"))), header: false, alternate: true));
         }
 
         private static LocalisableString[] buildMetricRow(LocalisableString label, IEnumerable<LocalisableString> values)

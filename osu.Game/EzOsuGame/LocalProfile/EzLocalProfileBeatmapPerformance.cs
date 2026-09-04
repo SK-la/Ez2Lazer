@@ -130,19 +130,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private IEnumerable<MetricDefinition> createMetrics()
         {
             yield return new MetricDefinition(
-                EzSettingsStrings.LOCAL_PROFILE_BEATMAP_PERF_PP,
+                EzSettingsProfile.LOCAL_PROFILE_BEATMAP_PERF_PP,
                 row => row.PpResolved > 0 ? row.PpResolved : null,
                 EzLocalProfileFormat.FormatPp,
                 "pp");
 
             yield return new MetricDefinition(
-                EzSettingsStrings.LOCAL_PROFILE_BEATMAP_PERF_ACC,
+                EzSettingsProfile.LOCAL_PROFILE_BEATMAP_PERF_ACC,
                 row => row.Accuracy,
                 v => $"{v * 100:0.00}%",
                 string.Empty);
 
             yield return new MetricDefinition(
-                EzSettingsStrings.LOCAL_PROFILE_BEATMAP_PERF_OFFSET,
+                EzSettingsProfile.LOCAL_PROFILE_BEATMAP_PERF_OFFSET,
                 resolveOffset,
                 v => $"{v:0} ms",
                 string.Empty);

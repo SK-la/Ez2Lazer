@@ -50,32 +50,32 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 Spacing = new Vector2(0, 12),
             };
 
-            addLineChart(lineSection, EzSettingsStrings.LOCAL_PROFILE_STAR_PLAY_LINE, createStarLineChart());
+            addLineChart(lineSection, EzSettingsProfile.LOCAL_PROFILE_STAR_PLAY_LINE, createStarLineChart());
             if (showXxy)
-                addLineChart(lineSection, EzSettingsStrings.LOCAL_PROFILE_XXY_PLAY_LINE, createXxyLineChart());
+                addLineChart(lineSection, EzSettingsProfile.LOCAL_PROFILE_XXY_PLAY_LINE, createXxyLineChart());
 
             if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
-                addLineChart(lineSection, EzSettingsStrings.LOCAL_PROFILE_MANIA_AVG_KPS_LINE, createManiaKpsLineChart());
+                addLineChart(lineSection, EzSettingsProfile.LOCAL_PROFILE_MANIA_AVG_KPS_LINE, createManiaKpsLineChart());
 
             Add(lineSection);
 
             var barColumns = new List<Drawable>();
 
             barColumns.Add(createBarColumn(
-                EzSettingsStrings.LOCAL_PROFILE_SECTION_STARS,
+                EzSettingsProfile.LOCAL_PROFILE_SECTION_STARS,
                 EzLocalProfileBucketBars.FromStarPlayCounts(snapshot.StarPlayCounts.Where(s => s.RulesetId == rulesetId))));
 
             if (showXxy)
             {
                 barColumns.Add(createBarColumn(
-                    EzSettingsStrings.LOCAL_PROFILE_XXY_PLAY_DISTRIBUTION,
+                    EzSettingsProfile.LOCAL_PROFILE_XXY_PLAY_DISTRIBUTION,
                     EzLocalProfileBucketBars.FromXxyPlayCounts(snapshot.XxyPlayCounts.Where(s => s.RulesetId == rulesetId))));
             }
 
             if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
             {
                 barColumns.Add(createBarColumn(
-                    EzSettingsStrings.LOCAL_PROFILE_MANIA_PLAYS_BY_KEY,
+                    EzSettingsProfile.LOCAL_PROFILE_MANIA_PLAYS_BY_KEY,
                     new EzLocalProfileManiaKeyPlayBars(snapshot.ManiaKeyStats.ToList())));
             }
 
@@ -111,7 +111,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 flow.Add(new OsuSpriteText
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_NO_RULESET_DATA,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_NO_RULESET_DATA,
                     Font = OsuFont.GetFont(size: 14),
                 });
                 return flow;

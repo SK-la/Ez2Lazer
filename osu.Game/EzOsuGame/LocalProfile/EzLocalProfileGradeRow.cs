@@ -30,7 +30,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 Add(new OsuSpriteText
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_NO_RULESET_DATA,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_NO_RULESET_DATA,
                     Font = OsuFont.GetFont(size: 14),
                 });
                 return;

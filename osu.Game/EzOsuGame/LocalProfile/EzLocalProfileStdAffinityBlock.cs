@@ -27,8 +27,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             Direction = FillDirection.Vertical;
             Spacing = new Vector2(0, 14);
 
-            Add(createGroup(EzSettingsStrings.LOCAL_PROFILE_BEST_AR, snapshot.StdAttrAffinities.Where(a => a.Attr == EzLocalProfileStdAttr.ApproachRate)));
-            Add(createGroup(EzSettingsStrings.LOCAL_PROFILE_BEST_CS, snapshot.StdAttrAffinities.Where(a => a.Attr == EzLocalProfileStdAttr.CircleSize)));
+            Add(createGroup(EzSettingsProfile.LOCAL_PROFILE_BEST_AR, snapshot.StdAttrAffinities.Where(a => a.Attr == EzLocalProfileStdAttr.ApproachRate)));
+            Add(createGroup(EzSettingsProfile.LOCAL_PROFILE_BEST_CS, snapshot.StdAttrAffinities.Where(a => a.Attr == EzLocalProfileStdAttr.CircleSize)));
         }
 
         private static Drawable createGroup(LocalisableString title, IEnumerable<EzLocalProfileStdAttrAffinity> affinities)
@@ -59,7 +59,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 flow.Add(new OsuSpriteText
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_NO_RULESET_DATA,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_NO_RULESET_DATA,
                     Font = OsuFont.GetFont(size: 14),
                 });
                 return flow;

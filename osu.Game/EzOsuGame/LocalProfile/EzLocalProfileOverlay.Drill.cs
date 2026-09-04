@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var detailColumn = new EzLocalProfileScoreDetailColumn(currentDrillScore, allScores);
 
             contentFlow.Add(new EzLocalProfileSection(
-                EzSettingsStrings.LOCAL_PROFILE_SECTION_SCORE_DRILL,
+                EzSettingsProfile.LOCAL_PROFILE_SECTION_SCORE_DRILL,
                 new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,
@@ -50,7 +50,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         filteredScores.Count == 0
                             ? new OsuSpriteText
                             {
-                                Text = EzSettingsStrings.LOCAL_PROFILE_DRILL_NO_MATCHES,
+                                Text = EzSettingsProfile.LOCAL_PROFILE_DRILL_NO_MATCHES,
                                 Font = OsuFont.GetFont(size: 14),
                             }
                             : new GridContainer
@@ -85,7 +85,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }));
 
             contentFlow.Add(new EzLocalProfileSection(
-                EzSettingsStrings.LOCAL_PROFILE_SECTION_TRENDS,
+                EzSettingsProfile.LOCAL_PROFILE_SECTION_TRENDS,
                 new EzLocalProfileScoreTrendPanel(currentDrillScore)));
         }
     }

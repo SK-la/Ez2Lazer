@@ -133,7 +133,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private static OsuSpriteText createEmptyHint() => new OsuSpriteText
         {
-            Text = EzSettingsStrings.LOCAL_PROFILE_TREND_EMPTY,
+            Text = EzSettingsProfile.LOCAL_PROFILE_TREND_EMPTY,
             Font = OsuFont.GetFont(size: 14),
         };
     }

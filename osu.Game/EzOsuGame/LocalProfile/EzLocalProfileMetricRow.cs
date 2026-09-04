@@ -32,18 +32,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 Add(new OsuSpriteText
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_NO_RULESET_DATA,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_NO_RULESET_DATA,
                     Font = OsuFont.GetFont(size: 14),
                 });
                 return;
             }
 
-            Add(EzLocalProfileMetricChip.Create(EzSettingsStrings.LOCAL_PROFILE_TOTAL_PP, EzLocalProfileFormat.FormatPp(stats.TotalPp)));
-            Add(EzLocalProfileMetricChip.Create(EzSettingsStrings.LOCAL_PROFILE_TOTAL_DURATION, EzLocalProfileFormat.FormatDuration(stats.TotalDurationMs)));
-            Add(EzLocalProfileMetricChip.Create(EzSettingsStrings.LOCAL_PROFILE_TOTAL_KEYS, stats.TotalKeys.ToString("N0")));
-            Add(EzLocalProfileMetricChip.Create(EzSettingsStrings.LOCAL_PROFILE_AVG_KPS, formatKps(stats.AvgKps)));
-            Add(EzLocalProfileMetricChip.Create(EzSettingsStrings.LOCAL_PROFILE_MAX_KPS, formatKps(stats.MaxKps)));
-            Add(EzLocalProfileMetricChip.Create(EzSettingsStrings.LOCAL_PROFILE_SCORE_COUNT, stats.ScoreCount.ToString("N0")));
+            Add(EzLocalProfileMetricChip.Create(EzSettingsProfile.LOCAL_PROFILE_TOTAL_PP, EzLocalProfileFormat.FormatPp(stats.TotalPp)));
+            Add(EzLocalProfileMetricChip.Create(EzSettingsProfile.LOCAL_PROFILE_TOTAL_DURATION, EzLocalProfileFormat.FormatDuration(stats.TotalDurationMs)));
+            Add(EzLocalProfileMetricChip.Create(EzSettingsProfile.LOCAL_PROFILE_TOTAL_KEYS, stats.TotalKeys.ToString("N0")));
+            Add(EzLocalProfileMetricChip.Create(EzSettingsProfile.LOCAL_PROFILE_AVG_KPS, formatKps(stats.AvgKps)));
+            Add(EzLocalProfileMetricChip.Create(EzSettingsProfile.LOCAL_PROFILE_MAX_KPS, formatKps(stats.MaxKps)));
+            Add(EzLocalProfileMetricChip.Create(EzSettingsProfile.LOCAL_PROFILE_SCORE_COUNT, stats.ScoreCount.ToString("N0")));
         }
 
         private static string formatKps(double value) => value.ToString("0.00", CultureInfo.InvariantCulture);
@@ -62,16 +62,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 Add(new OsuSpriteText
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_NO_RULESET_DATA,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_NO_RULESET_DATA,
                     Font = OsuFont.GetFont(size: 14),
                 });
                 return;
             }
 
-            Add(createChip(EzSettingsStrings.LOCAL_PROFILE_TOTAL_KEYS, stats.TotalKeys.ToString("N0")));
-            Add(createChip(EzSettingsStrings.LOCAL_PROFILE_AVG_KPS, formatKps(stats.AvgKps)));
-            Add(createChip(EzSettingsStrings.LOCAL_PROFILE_MAX_KPS, formatKps(stats.MaxKps)));
-            Add(createChip(EzSettingsStrings.LOCAL_PROFILE_SCORE_COUNT, stats.ScoreCount.ToString("N0")));
+            Add(createChip(EzSettingsProfile.LOCAL_PROFILE_TOTAL_KEYS, stats.TotalKeys.ToString("N0")));
+            Add(createChip(EzSettingsProfile.LOCAL_PROFILE_AVG_KPS, formatKps(stats.AvgKps)));
+            Add(createChip(EzSettingsProfile.LOCAL_PROFILE_MAX_KPS, formatKps(stats.MaxKps)));
+            Add(createChip(EzSettingsProfile.LOCAL_PROFILE_SCORE_COUNT, stats.ScoreCount.ToString("N0")));
         }
 
         private static Drawable createChip(LocalisableString title, string value) => EzLocalProfileMetricChip.Create(title, value);
@@ -95,14 +95,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 Add(new OsuSpriteText
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_NO_RULESET_DATA,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_NO_RULESET_DATA,
                     Font = OsuFont.GetFont(size: 14),
                 });
                 return;
             }
 
-            Add(EzLocalProfileMetricChip.Create(EzSettingsStrings.LOCAL_PROFILE_TOTAL_PP, EzLocalProfileFormat.FormatPp(stats.TotalPp)));
-            Add(EzLocalProfileMetricChip.Create(EzSettingsStrings.LOCAL_PROFILE_TOTAL_DURATION, EzLocalProfileFormat.FormatDuration(stats.TotalDurationMs)));
+            Add(EzLocalProfileMetricChip.Create(EzSettingsProfile.LOCAL_PROFILE_TOTAL_PP, EzLocalProfileFormat.FormatPp(stats.TotalPp)));
+            Add(EzLocalProfileMetricChip.Create(EzSettingsProfile.LOCAL_PROFILE_TOTAL_DURATION, EzLocalProfileFormat.FormatDuration(stats.TotalDurationMs)));
         }
     }
 

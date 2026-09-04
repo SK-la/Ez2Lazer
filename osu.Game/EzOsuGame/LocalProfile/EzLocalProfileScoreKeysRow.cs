@@ -31,7 +31,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 Add(new OsuSpriteText
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_SELECT_SCORE,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_SELECT_SCORE,
                     Font = OsuFont.GetFont(size: 14),
                 });
                 return;
@@ -49,10 +49,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             string avgKps = row.KpsAvg > 0 ? formatKps(row.KpsAvg) : "—";
             string maxKps = row.KpsMax > 0 ? formatKps(row.KpsMax) : "—";
 
-            Add(createChip(EzSettingsStrings.LOCAL_PROFILE_TOTAL_KEYS, row.TotalKeys.ToString("N0", CultureInfo.InvariantCulture)));
-            Add(createChip(EzSettingsStrings.LOCAL_PROFILE_AVG_KPS, avgKps));
-            Add(createChip(EzSettingsStrings.LOCAL_PROFILE_MAX_KPS, maxKps));
-            Add(createChip(EzSettingsStrings.LOCAL_PROFILE_SCORE_COUNT, "1"));
+            Add(createChip(EzSettingsProfile.LOCAL_PROFILE_TOTAL_KEYS, row.TotalKeys.ToString("N0", CultureInfo.InvariantCulture)));
+            Add(createChip(EzSettingsProfile.LOCAL_PROFILE_AVG_KPS, avgKps));
+            Add(createChip(EzSettingsProfile.LOCAL_PROFILE_MAX_KPS, maxKps));
+            Add(createChip(EzSettingsProfile.LOCAL_PROFILE_SCORE_COUNT, "1"));
         }
 
         private static Drawable createChip(LocalisableString title, string value)

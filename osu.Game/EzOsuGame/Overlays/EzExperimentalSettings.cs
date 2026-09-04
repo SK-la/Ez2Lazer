@@ -41,16 +41,16 @@ namespace osu.Game.EzOsuGame.Overlays
 
             Add(new SettingsButtonV2
             {
-                Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE,
-                TooltipText = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_TOOLTIP,
+                Text = EzSettingsProfile.LOCAL_PROFILE_COMPUTE,
+                TooltipText = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_TOOLTIP,
                 Keywords = new[] { "local", "profile", "stats", "kps", "个人", "本地", "统计", "成绩" },
                 Action = () => requestComputeLocalProfile(localProfileService, dialogOverlay, notifications),
             });
 
             Add(new SettingsButtonV2
             {
-                Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL,
-                TooltipText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_TOOLTIP,
+                Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL,
+                TooltipText = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_TOOLTIP,
                 Keywords = new[] { "online", "bp", "most played", "osr", "下载", "拉取", "线上", "成绩", "谱面", "回放" },
                 Action = () => requestOnlinePull(onlinePullService, localProfileService, rulesetStore, dialogOverlay, notifications),
             });
@@ -139,13 +139,13 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             if (localProfileService == null || dialogOverlay == null)
             {
-                notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_FAILED });
+                notifications?.Post(new SimpleErrorNotification { Text = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_FAILED });
                 return;
             }
 
             if (localProfileService.IsComputing.Value)
             {
-                notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_STARTED });
+                notifications?.Post(new SimpleNotification { Text = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_STARTED });
                 return;
             }
 
@@ -155,7 +155,7 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 if (!localProfileService.HasOnlineScoreContributions())
                 {
-                    notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_NO_SCORES });
+                    notifications?.Post(new SimpleNotification { Text = EzSettingsProfile.LOCAL_PROFILE_NO_SCORES });
                     return;
                 }
 
@@ -171,7 +171,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     if (selected.Count == 0 && !localProfileService.HasOnlineScoreContributions()
                                             && (replaceMode || localProfileService.GetPreviouslyIncludedUsernames().Count == 0))
                     {
-                        notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_NONE_SELECTED });
+                        notifications?.Post(new SimpleNotification { Text = EzSettingsProfile.LOCAL_PROFILE_NONE_SELECTED });
                         return;
                     }
 
@@ -197,8 +197,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             var notification = new ProgressNotification
             {
-                Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_STARTED,
-                CompletionText = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_DONE,
+                Text = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_STARTED,
+                CompletionText = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_DONE,
                 State = ProgressNotificationState.Active,
             };
 
@@ -232,7 +232,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 if (value.Saving)
                 {
-                    notification.Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_SAVING;
+                    notification.Text = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_SAVING;
                     notification.Progress = 0.99f;
                     return;
                 }
@@ -242,7 +242,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 // Keep bar under 100% until we explicitly Complete — avoids a stuck spinner at 1.0 Active.
                 notification.Text = LocalisableString.Format(
-                    EzSettingsStrings.LOCAL_PROFILE_COMPUTE_PROGRESS.ToString(),
+                    EzSettingsProfile.LOCAL_PROFILE_COMPUTE_PROGRESS.ToString(),
                     processed,
                     total);
                 notification.Progress = Math.Min(0.99f, (float)processed / total);
@@ -261,7 +261,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (computeTask.IsFaulted)
             {
                 notification.State = ProgressNotificationState.Cancelled;
-                notifications.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_FAILED });
+                notifications.Post(new SimpleErrorNotification { Text = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_FAILED });
                 return;
             }
 
@@ -273,7 +273,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             localProfileService.ReloadFromDisk();
             notification.Progress = 1f;
-            notification.CompletionText = EzSettingsStrings.LOCAL_PROFILE_COMPUTE_DONE;
+            notification.CompletionText = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_DONE;
             notification.State = ProgressNotificationState.Completed;
         }
 
@@ -286,13 +286,13 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             if (onlinePullService == null || rulesetStore == null || dialogOverlay == null)
             {
-                notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_FAILED });
+                notifications?.Post(new SimpleErrorNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_FAILED });
                 return;
             }
 
             if (onlinePullService.IsPulling.Value)
             {
-                notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+                notifications?.Post(new SimpleNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_BUSY });
                 return;
             }
 
@@ -303,17 +303,17 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     if (onlinePullService.IsPulling.Value)
                     {
-                        notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+                        notifications?.Post(new SimpleNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_BUSY });
                         return;
                     }
 
-                    notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+                    notifications?.Post(new SimpleNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_BUSY });
 
                     onlinePullService.PullAsync(request).ContinueWith(t => Schedule(() =>
                     {
                         if (t.IsFaulted)
                         {
-                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_FAILED });
+                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_FAILED });
                             return;
                         }
 
@@ -324,19 +324,19 @@ namespace osu.Game.EzOsuGame.Overlays
 
                         if (result.ErrorMessage == "need_online")
                         {
-                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_NEED_ONLINE });
+                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_NEED_ONLINE });
                             return;
                         }
 
                         if (result.ErrorMessage == "already_pulling")
                         {
-                            notifications?.Post(new SimpleNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_BUSY });
+                            notifications?.Post(new SimpleNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_BUSY });
                             return;
                         }
 
                         if (!string.IsNullOrEmpty(result.ErrorMessage) && result.ErrorMessage != "cancelled")
                         {
-                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_FAILED });
+                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_FAILED });
                             return;
                         }
 
@@ -346,7 +346,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         notifications?.Post(new SimpleNotification
                         {
                             Text = string.Format(
-                                EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_DONE.ToString(),
+                                EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_DONE.ToString(),
                                 result.Candidates,
                                 result.Imported,
                                 result.AlreadyOwned,

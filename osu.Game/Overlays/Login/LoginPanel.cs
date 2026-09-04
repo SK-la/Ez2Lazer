@@ -176,7 +176,7 @@ namespace osu.Game.Overlays.Login
                         new RoundedButton
                         {
                             RelativeSizeAxes = Axes.X,
-                            Text = EzSettingsStrings.LOCAL_PROFILE_PANEL_BUTTON,
+                            Text = EzSettingsProfile.LOCAL_PROFILE_PANEL_BUTTON,
                             Action = () =>
                             {
                                 RequestHide?.Invoke();

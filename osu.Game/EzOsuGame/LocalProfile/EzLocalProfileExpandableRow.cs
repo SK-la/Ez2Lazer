@@ -97,10 +97,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             headerMetrics.Add(createSegment($"{keyStats.KeyCount}K", colours.Highlight1));
             headerMetrics.Add(createSegment($"{keyStats.TotalKeys:N0} keys", osuColours.BlueLight));
             headerMetrics.Add(createSegment(
-                $"{EzSettingsStrings.LOCAL_PROFILE_AVG_KPS} {formatKps(keyStats.AvgKps)} KPS",
+                $"{EzSettingsProfile.LOCAL_PROFILE_AVG_KPS} {formatKps(keyStats.AvgKps)} KPS",
                 osuColours.Orange1));
             headerMetrics.Add(createSegment(
-                $"{EzSettingsStrings.LOCAL_PROFILE_MAX_KPS} {formatKps(keyStats.MaxKps)} KPS",
+                $"{EzSettingsProfile.LOCAL_PROFILE_MAX_KPS} {formatKps(keyStats.MaxKps)} KPS",
                 osuColours.Yellow));
             headerMetrics.Add(createSegment($"{keyStats.ScoreCount} plays", colours.Content1));
             headerMetrics.Add(createSegment($"{EzLocalProfileFormat.FormatPp(keyStats.TotalPp)}pp", osuColours.PinkLight));
@@ -196,10 +196,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 barFlow.Add(new KeyPlayBarRow($"{key.KeyCount}K", key.ScoreCount, ratio));
             }
 
-            Add(new EzLocalProfileChartCard(EzSettingsStrings.LOCAL_PROFILE_MANIA_PLAYS_BY_KEY, barFlow));
+            Add(new EzLocalProfileChartCard(EzSettingsProfile.LOCAL_PROFILE_MANIA_PLAYS_BY_KEY, barFlow));
 
             Add(new EzLocalProfileChartCard(
-                EzSettingsStrings.LOCAL_PROFILE_MANIA_AVG_KPS_LINE,
+                EzSettingsProfile.LOCAL_PROFILE_MANIA_AVG_KPS_LINE,
                 new EzLocalProfileLabeledLineChart(
                     ordered.Select(k => (float)k.AvgKps).ToArray(),
                     ordered.Select(k => $"{k.KeyCount}K").ToArray())

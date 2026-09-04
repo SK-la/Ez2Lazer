@@ -82,7 +82,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     {
         public EzLocalProfileScoreSearchBox()
         {
-            PlaceholderText = EzSettingsStrings.LOCAL_PROFILE_DRILL_SEARCH_PLACEHOLDER;
+            PlaceholderText = EzSettingsProfile.LOCAL_PROFILE_DRILL_SEARCH_PLACEHOLDER;
             RelativeSizeAxes = Axes.X;
         }
     }

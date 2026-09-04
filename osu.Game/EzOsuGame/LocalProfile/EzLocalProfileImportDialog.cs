@@ -30,8 +30,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             IReadOnlyCollection<string> previouslyIncluded,
             Action<IReadOnlyList<string>, bool> onConfirm)
         {
-            HeaderText = EzSettingsStrings.LOCAL_PROFILE_IMPORT_HEADER;
-            BodyText = EzSettingsStrings.LOCAL_PROFILE_IMPORT_BODY;
+            HeaderText = EzSettingsProfile.LOCAL_PROFILE_IMPORT_HEADER;
+            BodyText = EzSettingsProfile.LOCAL_PROFILE_IMPORT_BODY;
             Icon = FontAwesome.Solid.User;
 
             var previous = new HashSet<string>(previouslyIncluded, StringComparer.Ordinal);
@@ -86,7 +86,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     },
                     new OsuCheckbox
                     {
-                        LabelText = EzSettingsStrings.LOCAL_PROFILE_IMPORT_REPLACE,
+                        LabelText = EzSettingsProfile.LOCAL_PROFILE_IMPORT_REPLACE,
                         Current = { BindTarget = replaceMode },
                     },
                 }
@@ -96,7 +96,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 new PopupDialogOkButton
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_IMPORT_CONFIRM,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_IMPORT_CONFIRM,
                     Action = () =>
                     {
                         var chosen = selections.Where(kv => kv.Value.Value).Select(kv => kv.Key).ToList();
@@ -105,7 +105,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 },
                 new PopupDialogCancelButton
                 {
-                    Text = EzSettingsStrings.LOCAL_PROFILE_IMPORT_CANCEL,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_IMPORT_CANCEL,
                 }
             };
         }
