@@ -162,7 +162,7 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 int frameIndex = start + i;
                 string frameSuffix = frameIndex.ToString($"D{width}");
-                Texture? texture = resource.Get($"{baseLookup}{frameSuffix}");
+                Texture? texture = resource.Get($"{baseLookup}{frameSuffix}", EzTextureUsage.AnimationSafe);
                 if (texture == null)
                     break;
 
@@ -196,7 +196,8 @@ namespace osu.Game.EzOsuGame.HUD
             if (!string.IsNullOrEmpty(template) && !template.Contains('{') && !template.Contains('}'))
                 lookup += template;
 
-            Texture? texture = resource.Get(lookup) ?? resource.Get(baseLookup);
+            Texture? texture = resource.Get(lookup, EzTextureUsage.AnimationSafe)
+                               ?? resource.Get(baseLookup, EzTextureUsage.AnimationSafe);
             if (texture == null)
                 return null;
 

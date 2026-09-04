@@ -62,7 +62,6 @@ namespace osu.Game.EzOsuGame.Pets
 
         private EzPetPackLoader loader = null!;
         private EzResourceStore resources = null!;
-        private TextureStore petTextures = null!;
         private OsuGame? game;
 
         private Container petBox = null!;
@@ -115,15 +114,6 @@ namespace osu.Game.EzOsuGame.Pets
 
             loader = new EzPetPackLoader(storage);
             loader.EnsureDefaultPack();
-
-            // TextureAnimation/Sprite disposes the previous frame on each switch.
-            // LargeTextureStore's TextureWithRefCount then purges the native texture and crashes
-            // on the next loop. A non-atlas TextureStore keeps frames alive (Dispose is a no-op).
-            petTextures = new TextureStore(
-                resources.Renderer,
-                resources.CreateTextureLoaderStore(resources.Files),
-                useAtlas: false,
-                scaleAdjust: 1);
 
             InternalChild = petBox = new Container
             {
@@ -289,7 +279,6 @@ namespace osu.Game.EzOsuGame.Pets
             motionDriver.Stop();
             animation.ClearFrames();
             clipTextures.Clear();
-            petTextures.Dispose();
 
             base.Dispose(isDisposing);
         }
@@ -396,7 +385,7 @@ namespace osu.Game.EzOsuGame.Pets
             {
                 try
                 {
-                    var texture = petTextures.Get($"Pets/{pack.Name}/{frameName}");
+                    var texture = resources.Get($"Pets/{pack.Name}/{frameName}", EzTextureUsage.AnimationSafe);
                     if (texture != null)
                         textures.Add(texture);
                 }

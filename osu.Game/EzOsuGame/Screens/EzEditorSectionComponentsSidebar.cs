@@ -165,7 +165,8 @@ namespace osu.Game.EzOsuGame.Screens
         }
 
         private Texture? createNotePreview(string noteSet)
-            => resources.Get($"note/{noteSet}/whitenote/000") ?? resources.Get($"note/{noteSet}/whitenote/001");
+            => resources.Get($"note/{noteSet}/whitenote/000", EzTextureUsage.AnimationSafe)
+               ?? resources.Get($"note/{noteSet}/whitenote/001", EzTextureUsage.AnimationSafe);
 
         private Texture? createStagePreview(string stageSet)
         {
@@ -176,7 +177,7 @@ namespace osu.Game.EzOsuGame.Screens
             //         return t;
             // }
 
-            return resources.Get($"Stage/{stageSet}/Stage/eightkey/Body", useLargeStore: true);
+            return resources.Get($"Stage/{stageSet}/Stage/eightkey/Body", EzTextureUsage.Large);
         }
 
         private partial class VisualTextureItem : CompositeDrawable

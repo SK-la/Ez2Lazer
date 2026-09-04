@@ -111,7 +111,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     return t;
             }
 
-            return provider.Get($"Stage/{key}/Stage/{groove_base}", useLargeStore: true);
+            return provider.Get($"Stage/{key}/Stage/{groove_base}", EzTextureUsage.Large);
         }
     }
 }
