@@ -36,7 +36,8 @@ namespace osu.Game.Screens.Select
         private double timeSinceUnpool;
 
         private Bindable<bool> acrylicUiEnabled = null!;
-        private Container colourOverlays = null!;
+        private Box gradientBackground = null!;
+        private FillFlowContainer darkOverlays = null!;
 
         public WorkingBeatmap? Beatmap
         {
@@ -99,53 +100,49 @@ namespace osu.Game.Screens.Select
 
             InternalChildren = new Drawable[]
             {
-                colourOverlays = new Container
+                // Match official draw order: gradient behind cover, dark overlays in front of cover.
+                gradientBackground = new Box
                 {
                     Depth = 1,
                     RelativeSizeAxes = Axes.Both,
-                    Children = new Drawable[]
+                    Colour = ColourInfo.GradientHorizontal(colourProvider.Background3, colourProvider.Background4),
+                },
+                darkOverlays = new FillFlowContainer
+                {
+                    Depth = -1,
+                    RelativeSizeAxes = Axes.Both,
+                    Direction = FillDirection.Horizontal,
+                    // This makes the gradient not be perfectly horizontal, but diagonal at a ~40° angle
+                    Shear = new Vector2(0.8f, 0),
+                    Children = new[]
                     {
+                        // The left half with no gradient applied
                         new Box
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Colour = ColourInfo.GradientHorizontal(colourProvider.Background3, colourProvider.Background4),
+                            Colour = Color4.Black.Opacity(0.5f),
+                            Width = 0.4f,
                         },
-                        new FillFlowContainer
+                        new Box
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Direction = FillDirection.Horizontal,
-                            // This makes the gradient not be perfectly horizontal, but diagonal at a ~40° angle
-                            Shear = new Vector2(0.8f, 0),
-                            Children = new[]
-                            {
-                                // The left half with no gradient applied
-                                new Box
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                    Colour = Color4.Black.Opacity(0.5f),
-                                    Width = 0.4f,
-                                },
-                                new Box
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                    Colour = ColourInfo.GradientHorizontal(Color4.Black.Opacity(0.5f), Color4.Black.Opacity(0.3f)),
-                                    Width = 0.2f,
-                                },
-                                new Box
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                    Colour = ColourInfo.GradientHorizontal(Color4.Black.Opacity(0.3f), Color4.Black.Opacity(0.2f)),
-                                    // Slightly more than 1.0 in total to account for shear.
-                                    Width = 0.45f,
-                                },
-                            }
+                            Colour = ColourInfo.GradientHorizontal(Color4.Black.Opacity(0.5f), Color4.Black.Opacity(0.3f)),
+                            Width = 0.2f,
+                        },
+                        new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = ColourInfo.GradientHorizontal(Color4.Black.Opacity(0.3f), Color4.Black.Opacity(0.2f)),
+                            // Slightly more than 1.0 in total to account for shear.
+                            Width = 0.45f,
                         },
                     }
                 },
             };
 
-            // Glass N is on Panel parent; hide classic colour overlays when acrylic is on.
-            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, acrylicUiEnabled);
+            // Glass N is on Panel parent; hide classic layers when acrylic is on.
+            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(gradientBackground, acrylicUiEnabled);
+            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(darkOverlays, acrylicUiEnabled);
         }
 
         protected override void LoadComplete()
