@@ -1237,6 +1237,7 @@ CREATE TABLE IF NOT EXISTS {table_songs} (
                 else if (existingVersion == 1)
                 {
                     migrateVersion1To2(connection);
+                    writeMeta(connection, "schema_version", "2");
                     migrateVersion2To3(connection);
                 }
                 else if (existingVersion == 2)
@@ -1321,23 +1322,16 @@ CREATE INDEX IF NOT EXISTS idx_charts_summary_folder ON {table_charts}((lower(fo
         {
             using var transaction = connection.BeginTransaction();
 
-            using (var alter = connection.CreateCommand())
+            tryAddColumn(connection, transaction, table_charts, "content_md5", "TEXT NOT NULL DEFAULT ''");
+            tryAddColumn(connection, transaction, table_charts, "content_sha256", "TEXT NOT NULL DEFAULT ''");
+
+            using (var index = connection.CreateCommand())
             {
-                alter.Transaction = transaction;
-                alter.CommandText = $@"
-ALTER TABLE {table_charts} ADD COLUMN content_md5 TEXT NOT NULL DEFAULT '';
-ALTER TABLE {table_charts} ADD COLUMN content_sha256 TEXT NOT NULL DEFAULT '';
+                index.Transaction = transaction;
+                index.CommandText = $@"
 CREATE INDEX IF NOT EXISTS idx_charts_content_md5 ON {table_charts}(content_md5);
 CREATE INDEX IF NOT EXISTS idx_charts_content_sha256 ON {table_charts}(content_sha256);";
-
-                try
-                {
-                    alter.ExecuteNonQuery();
-                }
-                catch (SqliteException)
-                {
-                    // Columns may already exist from a partial migration.
-                }
+                index.ExecuteNonQuery();
             }
 
             transaction.Commit();
@@ -1352,17 +1346,17 @@ CREATE INDEX IF NOT EXISTS idx_charts_content_sha256 ON {table_charts}(content_s
         {
             using var transaction = connection.BeginTransaction();
 
+            tryAddColumn(connection, transaction, table_charts, "set_id", "TEXT NOT NULL DEFAULT ''");
+            tryAddColumn(connection, transaction, table_charts, "seen_generation", "INTEGER NOT NULL DEFAULT 0");
+            tryAddColumn(connection, transaction, table_charts, "sync_revision", "INTEGER NOT NULL DEFAULT 0");
+            tryAddColumn(connection, transaction, table_charts, "sync_state", "INTEGER NOT NULL DEFAULT 0");
+            tryAddColumn(connection, transaction, table_charts, "parse_version", "INTEGER NOT NULL DEFAULT 1");
+
             using (var alter = connection.CreateCommand())
             {
                 alter.Transaction = transaction;
                 alter.CommandText = $@"
-ALTER TABLE {table_charts} ADD COLUMN set_id TEXT NOT NULL DEFAULT '';
-ALTER TABLE {table_charts} ADD COLUMN seen_generation INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE {table_charts} ADD COLUMN sync_revision INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE {table_charts} ADD COLUMN sync_state INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE {table_charts} ADD COLUMN parse_version INTEGER NOT NULL DEFAULT 1;
-
-CREATE TABLE {table_sync_changes} (
+CREATE TABLE IF NOT EXISTS {table_sync_changes} (
     revision INTEGER PRIMARY KEY AUTOINCREMENT,
     beatmap_id TEXT NOT NULL,
     set_id TEXT NOT NULL,
@@ -1388,7 +1382,9 @@ CREATE INDEX IF NOT EXISTS idx_charts_summary_folder ON {table_charts}((lower(fo
             using (var select = connection.CreateCommand())
             {
                 select.Transaction = transaction;
-                select.CommandText = $"SELECT chart_path, folder_path, beatmap_id FROM {table_charts};";
+                // Only backfill rows that still have the ADD COLUMN default, so retries do not
+                // enqueue duplicate sync_changes for charts that already completed this step.
+                select.CommandText = $"SELECT chart_path, folder_path, beatmap_id FROM {table_charts} WHERE set_id = '';";
 
                 using var reader = select.ExecuteReader();
 
@@ -1413,6 +1409,22 @@ CREATE INDEX IF NOT EXISTS idx_charts_summary_folder ON {table_charts}((lower(fo
             }
 
             transaction.Commit();
+        }
+
+        private static void tryAddColumn(SqliteConnection connection, SqliteTransaction transaction, string table, string column, string definition)
+        {
+            using var alter = connection.CreateCommand();
+            alter.Transaction = transaction;
+            alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition};";
+
+            try
+            {
+                alter.ExecuteNonQuery();
+            }
+            catch (SqliteException)
+            {
+                // Column may already exist from a partial migration.
+            }
         }
 
         private long readLongMeta(string key)
