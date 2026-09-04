@@ -243,6 +243,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 }
             }, true);
 
+            // 幂等兜底：主预热已在 EzPlayerLoaderStartGate 完成；此处仅补漏。
             try
             {
                 var factory = Dependencies.Get<EzLocalTextureFactory>();
