@@ -34,7 +34,8 @@ namespace osu.Game.EzOsuGame.Overlays
                           INotificationOverlay? notifications,
                           EzLocalProfileService? localProfileService,
                           EzLocalProfileOnlinePullService? onlinePullService,
-                          RulesetStore? rulesetStore)
+                          RulesetStore? rulesetStore,
+                          EzExternalRulesetManagerDialog? externalRulesetManager)
         {
             EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
 
@@ -52,6 +53,14 @@ namespace osu.Game.EzOsuGame.Overlays
                 TooltipText = EzSettingsStrings.LOCAL_PROFILE_ONLINE_PULL_TOOLTIP,
                 Keywords = new[] { "online", "bp", "most played", "osr", "下载", "拉取", "线上", "成绩", "谱面", "回放" },
                 Action = () => requestOnlinePull(onlinePullService, localProfileService, rulesetStore, dialogOverlay, notifications),
+            });
+
+            Add(new SettingsButtonV2
+            {
+                Text = EzSettingsStrings.EXTERNAL_RULESET_MANAGER,
+                TooltipText = EzSettingsStrings.EXTERNAL_RULESET_MANAGER_TOOLTIP,
+                Keywords = new[] { "ruleset", "external", "mapping", "onlineid", "第三方", "规则集", "映射", "外部" },
+                Action = () => externalRulesetManager?.ShowManager(),
             });
 
             AddRange(new Drawable[]
@@ -183,7 +192,7 @@ namespace osu.Game.EzOsuGame.Overlays
             var progress = new DirectLocalProfileComputeProgress(notification);
 
             localProfileService.ComputeAsync(selected, replaceIncludedUsernames, progress, notification.CancellationToken)
-                              .ContinueWith(t => finishComputeNotification(t, localProfileService, notification, notifications));
+                               .ContinueWith(t => finishComputeNotification(t, localProfileService, notification, notifications));
         }
 
         /// <summary>

@@ -1059,6 +1059,53 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_FAILED =
             new EzLocalizationManager.EzLocalisableString("线上成绩下载失败。", "Failed to download online scores.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER =
+            new EzLocalizationManager.EzLocalisableString("外部规则集管理器", "External Ruleset Manager");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "管理 rulesets/ 目录下的第三方规则集：启用/禁用加载，以及显式 OnlineID（≥4）的排序与映射。修改后需重启游戏。",
+            "Manage third-party rulesets in rulesets/: enable/disable loading and order explicit OnlineIDs (>=4). Restart required after saving.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_HEADER =
+            new EzLocalizationManager.EzLocalisableString("外部规则集管理", "External Ruleset Management");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_BODY = new EzLocalizationManager.EzLocalisableString(
+            "仅影响 rulesets/ 目录中的用户 DLL。未定义 OnlineID（-1）的规则集不会被分配新 ID。",
+            "Only affects user DLLs in rulesets/. Rulesets without an explicit OnlineID (-1) are not assigned new IDs.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_SAVE =
+            new EzLocalizationManager.EzLocalisableString("保存", "Save");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_SAVED =
+            new EzLocalizationManager.EzLocalisableString("外部规则集配置已保存，请重启游戏后生效。", "External ruleset config saved. Restart the game to apply.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_RESTART_HINT = new EzLocalizationManager.EzLocalisableString(
+            "保存后请重启游戏使配置生效。",
+            "Restart the game after saving to apply changes.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "rulesets/ 目录下暂无外部规则集 DLL。\n请将 osu.Game.Rulesets.*.dll 放入该目录后重新打开本窗口。",
+            "No external ruleset DLLs in rulesets/.\nPlace osu.Game.Rulesets.*.dll there, then reopen this window.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_OPEN_FOLDER =
+            new EzLocalizationManager.EzLocalisableString("打开 rulesets 文件夹", "Open rulesets folder");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_OPEN_FOLDER_FAILED =
+            new EzLocalizationManager.EzLocalisableString("无法打开 rulesets 文件夹。", "Could not open the rulesets folder.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_NO_DEFINED_ID =
+            new EzLocalizationManager.EzLocalisableString("未定义 ID", "No ID defined");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("启用", "Enabled");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_ID_LABEL =
+            new EzLocalizationManager.EzLocalisableString("ID", "ID");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_INVALID_ONLINE_ID = new EzLocalizationManager.EzLocalisableString(
+            "OnlineID 必须为 -1 或 ≥4（不能使用 0~3）。",
+            "OnlineID must be -1 or ≥4 (0~3 are reserved).");
+
         #endregion
     }
 }

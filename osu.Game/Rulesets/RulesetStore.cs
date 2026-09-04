@@ -19,6 +19,13 @@ namespace osu.Game.Rulesets
 
         protected readonly Dictionary<Assembly, Type> LoadedAssemblies = new Dictionary<Assembly, Type>();
         protected readonly HashSet<Assembly> UserRulesetAssemblies = new HashSet<Assembly>();
+
+        /// <summary>
+        /// Game configuration root storage (same level as <c>client.realm</c>), if provided.
+        /// Available during the base constructor — before derived fields are assigned.
+        /// </summary>
+        protected readonly Storage? GameStorage;
+
         protected readonly Storage? RulesetStorage;
 
         /// <summary>
@@ -28,6 +35,8 @@ namespace osu.Game.Rulesets
 
         protected RulesetStore(Storage? storage = null)
         {
+            GameStorage = storage;
+
             // On android in release configuration assemblies are loaded from the apk directly into memory.
             // We cannot read assemblies from cwd, so should check loaded assemblies instead.
             loadFromAppDomain();
@@ -61,6 +70,8 @@ namespace osu.Game.Rulesets
         /// <param name="shortName">The ruleset's short name.</param>
         /// <returns>A ruleset, if available, else null.</returns>
         public RulesetInfo? GetRuleset(string shortName) => AvailableRulesets.FirstOrDefault(r => r.ShortName == shortName);
+
+        public bool IsUserRulesetAssembly(Assembly assembly) => UserRulesetAssemblies.Contains(assembly);
 
         private Assembly? resolveRulesetDependencyAssembly(object? sender, ResolveEventArgs args)
         {
