@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using Live2DCSharpSDK.Framework;
 using Live2DCSharpSDK.Framework.Effect;
 using Live2DCSharpSDK.Framework.Model;
+using Live2DCSharpSDK.Framework.Motion;
 using Live2DCSharpSDK.Framework.Physics;
 using Newtonsoft.Json.Linq;
 using osu.Framework.Logging;
@@ -26,6 +27,18 @@ namespace osu.Game.EzOsuGame.Pets
         private CubismMoc? moc;
         private CubismBreath? breath;
         private CubismPhysics? physics;
+        private readonly CubismMotionManager motionManager = new CubismMotionManager();
+        private readonly Dictionary<string, CubismMotion> motions = new Dictionary<string, CubismMotion>(StringComparer.OrdinalIgnoreCase);
+
+        private readonly List<string> eyeBlinkParameterIds =
+        [
+            CubismDefaultParameterId.ParamEyeLOpen,
+            CubismDefaultParameterId.ParamEyeROpen,
+        ];
+
+        private readonly List<string> lipSyncParameterIds = [];
+        private string? activeMotionKey;
+        private bool hasMotionLibrary;
         private float userTime;
         private float nextBlinkAt = 2f;
         private float blinkPhase; // 0 idle, >0 closing/opening progress
@@ -96,13 +109,16 @@ namespace osu.Game.EzOsuGame.Pets
                 created.TextureRelativePaths = resolveTexturePaths(petsStorage, modelEntryRelativePath);
                 created.physics = tryLoadPhysics(petsStorage, modelEntryRelativePath);
                 created.breath = createDefaultBreath();
+                created.loadMotions(petsStorage, modelEntryRelativePath);
                 created.moc.Model.SaveParameters();
                 created.IsReady = true;
                 created.Status =
                     $"Core OK · {Path.GetFileName(mocRelative)} · drawables={created.DrawableCount} · tex={created.TextureRelativePaths.Count}"
-                    + (created.physics != null ? " · physics" : string.Empty);
+                    + (created.physics != null ? " · physics" : string.Empty)
+                    + (created.hasMotionLibrary ? $" · motions={created.motions.Count}" : string.Empty);
                 session = created;
                 Logger.Log($"Ez pet Cubism: {created.Status}", LoggingTarget.Runtime);
+                created.startMotion("idle", MotionPriority.PriorityIdle, loop: true);
                 return true;
             }
             catch (Exception ex)
@@ -118,20 +134,40 @@ namespace osu.Game.EzOsuGame.Pets
             LastState = state;
             LastClip = clip;
 
-            // This pack has no motion3 files — drive a short procedural reaction instead.
-            if (string.Equals(state, "poke", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(clip, "poke", StringComparison.OrdinalIgnoreCase))
+            string key = !string.IsNullOrWhiteSpace(clip) ? clip : state;
+
+            if (string.Equals(key, "idle", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(state, "idle", StringComparison.OrdinalIgnoreCase))
             {
-                reactionRemaining = 0.55f;
-                reactionAngleX = (Random.Shared.NextSingle() * 2f - 1f) * 18f;
-                reactionMouth = 0.7f;
+                startMotion("idle", MotionPriority.PriorityIdle, loop: true);
+                return;
             }
-            else if (string.Equals(state, "grabbed", StringComparison.OrdinalIgnoreCase)
-                     || string.Equals(clip, "grabbed", StringComparison.OrdinalIgnoreCase))
+
+            if (string.Equals(key, "poke", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(state, "poke", StringComparison.OrdinalIgnoreCase))
             {
-                reactionRemaining = 0.35f;
-                reactionAngleX = 12f;
-                reactionMouth = 0.35f;
+                if (!startMotion("nod", MotionPriority.PriorityForce, loop: false)
+                    && !startMotion("shake", MotionPriority.PriorityForce, loop: false)
+                    && !startMotion("tap", MotionPriority.PriorityForce, loop: false))
+                {
+                    reactionRemaining = 0.55f;
+                    reactionAngleX = (Random.Shared.NextSingle() * 2f - 1f) * 18f;
+                    reactionMouth = 0.7f;
+                }
+
+                return;
+            }
+
+            if (string.Equals(key, "grabbed", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(state, "grabbed", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!startMotion("shake", MotionPriority.PriorityForce, loop: true)
+                    && !startMotion("grabbed", MotionPriority.PriorityForce, loop: true))
+                {
+                    reactionRemaining = 0.35f;
+                    reactionAngleX = 12f;
+                    reactionMouth = 0.35f;
+                }
             }
         }
 
@@ -146,28 +182,67 @@ namespace osu.Game.EzOsuGame.Pets
 
             model.LoadParameters();
 
-            // Idle look-around (no motion3 available on many official-edit packs).
-            float lookX = MathF.Sin(userTime * 0.55f) * 8f;
-            float lookY = MathF.Sin(userTime * 0.37f) * 5f;
-            model.AddParameterValue(CubismDefaultParameterId.ParamAngleX, lookX);
-            model.AddParameterValue(CubismDefaultParameterId.ParamAngleY, lookY);
-            model.AddParameterValue(CubismDefaultParameterId.ParamAngleZ, lookX * lookY * -0.05f);
-            model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleX, lookX * 0.25f);
-            model.AddParameterValue(CubismDefaultParameterId.ParamEyeBallX, MathF.Sin(userTime * 0.45f) * 0.35f);
-            model.AddParameterValue(CubismDefaultParameterId.ParamEyeBallY, MathF.Sin(userTime * 0.33f) * 0.2f);
+            bool motionUpdated = false;
+
+            if (hasMotionLibrary)
+            {
+                if (motionManager.IsFinished())
+                    startMotion("idle", MotionPriority.PriorityIdle, loop: true);
+
+                motionUpdated = false;
+
+                try
+                {
+                    motionUpdated = motionManager.UpdateMotion(model, dt);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Ez pet Cubism: UpdateMotion failed");
+                    motionManager.StopAllMotions();
+                    activeMotionKey = null;
+                }
+            }
+
+            // Procedural idle only when no motion library is driving the body.
+            // Prefer AngleZ tilt (\ /) while facing forward — not AngleX yaw.
+            if (!hasMotionLibrary)
+            {
+                float tilt = MathF.Sin(userTime * 0.55f) * 10f;
+                model.AddParameterValue(CubismDefaultParameterId.ParamAngleZ, tilt);
+                model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleZ, tilt * 0.25f);
+            }
 
             if (reactionRemaining > 0)
             {
                 float t = Math.Clamp(reactionRemaining / 0.55f, 0f, 1f);
-                model.AddParameterValue(CubismDefaultParameterId.ParamAngleX, reactionAngleX * t);
-                model.AddParameterValue(CubismDefaultParameterId.ParamMouthOpenY, reactionMouth * t);
+                model.AddParameterValue(CubismDefaultParameterId.ParamAngleZ, reactionAngleX * t);
                 reactionRemaining = Math.Max(0, reactionRemaining - dt);
             }
 
+            // Keep facing forward: kill yaw/pitch drift from breath / reactions.
+            model.SetParameterValue(CubismDefaultParameterId.ParamAngleX, 0f);
+            model.SetParameterValue(CubismDefaultParameterId.ParamAngleY, 0f);
+            model.SetParameterValue(CubismDefaultParameterId.ParamBodyAngleX, 0f);
+            model.SetParameterValue(CubismDefaultParameterId.ParamBodyAngleY, 0f);
+
+            // Mouth slightly open (middle), not fully closed.
+            model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, 0.35f);
+            model.SetParameterValue(CubismDefaultParameterId.ParamMouthForm, 0f);
+
             model.SaveParameters();
 
+            if (!motionUpdated)
+                updateEyeBlink(model, dt);
+
             breath?.UpdateParameters(model, dt);
-            updateEyeBlink(model, dt);
+
+            // Breath must not reintroduce yaw after SaveParameters.
+            model.SetParameterValue(CubismDefaultParameterId.ParamAngleX, 0f);
+            model.SetParameterValue(CubismDefaultParameterId.ParamAngleY, 0f);
+            model.SetParameterValue(CubismDefaultParameterId.ParamBodyAngleX, 0f);
+            model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, 0.35f);
+            model.SetParameterValue(CubismDefaultParameterId.ParamMouthForm, 0f);
+
             physics?.Evaluate(model, dt);
             model.Update();
 
@@ -180,6 +255,81 @@ namespace osu.Game.EzOsuGame.Pets
             {
                 BreathValue = 0.5f + 0.5f * MathF.Sin(userTime * 2f);
             }
+        }
+
+        private bool startMotion(string key, MotionPriority priority, bool loop)
+        {
+            if (!motions.TryGetValue(key, out var motion))
+                return false;
+
+            // Avoid restarting the same looping idle every frame when finished-check restarts it.
+            if (loop
+                && string.Equals(activeMotionKey, key, StringComparison.OrdinalIgnoreCase)
+                && !motionManager.IsFinished()
+                && motionManager.CurrentPriority == priority)
+            {
+                return true;
+            }
+
+            motion.IsLoop = loop;
+            motionManager.StartMotionPriority(motion, priority);
+
+            if (!string.Equals(activeMotionKey, key, StringComparison.OrdinalIgnoreCase))
+                Logger.Log($"Ez pet Cubism: start motion '{key}' (loop={loop})", LoggingTarget.Runtime);
+
+            activeMotionKey = key;
+            return true;
+        }
+
+        private void loadMotions(Storage petsStorage, string modelEntryRelativePath)
+        {
+            motions.Clear();
+            hasMotionLibrary = false;
+
+            string normalised = modelEntryRelativePath.Replace('\\', '/');
+            string dir = Path.GetDirectoryName(normalised.Replace('/', Path.DirectorySeparatorChar)) ?? string.Empty;
+
+            try
+            {
+                foreach (string relative in petsStorage.GetFiles(dir, "*.motion3.json"))
+                {
+                    string fileName = Path.GetFileName(relative);
+                    string key = extractMotionKey(fileName);
+                    if (string.IsNullOrEmpty(key))
+                        continue;
+
+                    string fullPath = petsStorage.GetFullPath(relative);
+                    if (!File.Exists(fullPath))
+                        continue;
+
+                    var motion = new CubismMotion(fullPath)
+                    {
+                        IsLoop = string.Equals(key, "idle", StringComparison.OrdinalIgnoreCase)
+                    };
+                    // CubismMotion.DoUpdateParameters assumes these lists are non-null.
+                    motion.SetEffectIds(eyeBlinkParameterIds, lipSyncParameterIds);
+                    motions[key] = motion;
+                    Logger.Log($"Ez pet Cubism: loaded motion '{key}' from {fileName}", LoggingTarget.Runtime);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Ez pet Cubism: failed scanning motion3 files");
+            }
+
+            hasMotionLibrary = motions.Count > 0;
+        }
+
+        private static string extractMotionKey(string fileName)
+        {
+            // miku-edit.idle.motion3.json → idle ; idle.motion3.json → idle
+            const string suffix = ".motion3.json";
+            if (!fileName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+
+            string stem = fileName[..^suffix.Length];
+            int dot = stem.LastIndexOf('.');
+            return dot >= 0 && dot < stem.Length - 1 ? stem[(dot + 1)..] : stem;
         }
 
         private void updateEyeBlink(CubismModel model, float dt)
@@ -204,6 +354,7 @@ namespace osu.Game.EzOsuGame.Pets
             blinkPhase = Math.Max(0, blinkPhase - dt);
 
             float open;
+
             if (remaining > open_seconds)
             {
                 // closing
@@ -220,39 +371,24 @@ namespace osu.Game.EzOsuGame.Pets
             model.SetParameterValue(CubismDefaultParameterId.ParamEyeROpen, open);
         }
 
-        private static CubismBreath createDefaultBreath() => new()
+        private static CubismBreath createDefaultBreath() => new CubismBreath
         {
             Parameters =
             [
-                new BreathParameterData
-                {
-                    ParameterId = CubismDefaultParameterId.ParamAngleX,
-                    Offset = 0f,
-                    Peak = 12f,
-                    Cycle = 6.5345f,
-                    Weight = 0.5f,
-                },
-                new BreathParameterData
-                {
-                    ParameterId = CubismDefaultParameterId.ParamAngleY,
-                    Offset = 0f,
-                    Peak = 8f,
-                    Cycle = 3.5345f,
-                    Weight = 0.5f,
-                },
+                // Forward-facing side tilt only (\ /), not left/right yaw.
                 new BreathParameterData
                 {
                     ParameterId = CubismDefaultParameterId.ParamAngleZ,
                     Offset = 0f,
-                    Peak = 8f,
+                    Peak = 10f,
                     Cycle = 5.5345f,
                     Weight = 0.5f,
                 },
                 new BreathParameterData
                 {
-                    ParameterId = CubismDefaultParameterId.ParamBodyAngleX,
+                    ParameterId = CubismDefaultParameterId.ParamBodyAngleZ,
                     Offset = 0f,
-                    Peak = 4f,
+                    Peak = 3f,
                     Cycle = 15.5345f,
                     Weight = 0.5f,
                 },
@@ -270,24 +406,27 @@ namespace osu.Game.EzOsuGame.Pets
         private static CubismPhysics? tryLoadPhysics(Storage petsStorage, string modelEntryRelativePath)
         {
             string? physicsRel = resolveSiblingFromModel3(petsStorage, modelEntryRelativePath, "Physics");
-            if (physicsRel == null || !petsStorage.Exists(physicsRel.Replace('/', Path.DirectorySeparatorChar)))
+            if (physicsRel == null)
+                return null;
+
+            string relative = physicsRel.Replace('/', Path.DirectorySeparatorChar);
+            if (!petsStorage.Exists(relative))
                 return null;
 
             try
             {
-                using var stream = petsStorage.GetStream(physicsRel.Replace('/', Path.DirectorySeparatorChar));
-                if (stream == null)
+                // Live2DCSharpSDK CubismPhysics(string) opens a filesystem path (same as CubismMotion), not JSON text.
+                string fullPath = petsStorage.GetFullPath(relative);
+                if (!File.Exists(fullPath))
                     return null;
 
-                using var reader = new StreamReader(stream);
-                string json = reader.ReadToEnd();
-                var physics = new CubismPhysics(json);
+                var physics = new CubismPhysics(fullPath);
                 Logger.Log($"Ez pet Cubism: loaded physics '{physicsRel}'", LoggingTarget.Runtime);
                 return physics;
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Ez pet Cubism: failed loading physics3.json");
+                Logger.Error(ex, $"Ez pet Cubism: failed loading physics '{physicsRel}'");
                 return null;
             }
         }
@@ -309,7 +448,7 @@ namespace osu.Game.EzOsuGame.Pets
                 float canvasWPx = Math.Max(1f, model.GetCanvasWidthPixel());
                 float canvasHPx = Math.Max(1f, model.GetCanvasHeightPixel());
 
-                var order = new int[count];
+                int[] order = new int[count];
                 for (int i = 0; i < count; i++)
                     order[i] = i;
 
@@ -341,7 +480,7 @@ namespace osu.Game.EzOsuGame.Pets
 
                     var positionsPtr = model.GetDrawableVertexPositions(di);
                     var uvsPtr = model.GetDrawableVertexUvs(di);
-                    var indicesPtr = model.GetDrawableVertexIndices(di);
+                    ushort* indicesPtr = model.GetDrawableVertexIndices(di);
 
                     var positions = new Vector2[vertexCount];
                     var uvs = new Vector2[vertexCount];
@@ -360,7 +499,7 @@ namespace osu.Game.EzOsuGame.Pets
                         visibleVerts++;
                     }
 
-                    var indices = new ushort[indexCount];
+                    ushort[] indices = new ushort[indexCount];
                     for (int i = 0; i < indexCount; i++)
                         indices[i] = indicesPtr[i];
 
@@ -401,6 +540,9 @@ namespace osu.Game.EzOsuGame.Pets
         {
             breath = null;
             physics = null;
+            motions.Clear();
+            hasMotionLibrary = false;
+            activeMotionKey = null;
             moc?.Dispose();
             moc = null;
             IsReady = false;
@@ -446,7 +588,7 @@ namespace osu.Game.EzOsuGame.Pets
 
                 foreach (var t in textures)
                 {
-                    string? rel = t.ToString();
+                    string rel = t.ToString();
                     if (string.IsNullOrWhiteSpace(rel))
                         continue;
 
