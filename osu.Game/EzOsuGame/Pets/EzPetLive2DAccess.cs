@@ -132,6 +132,6 @@ namespace osu.Game.EzOsuGame.Pets
         /// <summary>
         /// Minimum <c>ParamMouthOpenY</c> while lip-sync is active (never fully closed).
         /// </summary>
-        public float MinOpen { get; set; } = 0.15f;
+        public float MinOpen { get; set; } = 0.25f;
     }
 }

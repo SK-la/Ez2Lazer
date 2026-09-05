@@ -51,7 +51,7 @@ namespace osu.Game.EzOsuGame.Pets
         private readonly EzPetCubismExpressionStack expressionStack = new EzPetCubismExpressionStack(EzPetCubismExpressionLibrary.CreateDefaults());
         private EzPetLive2DDefinition? live2DDefinition;
         private bool lipSyncEnabled;
-        private float lipSyncMinOpen = 0.15f;
+        private float lipSyncMinOpen = 0.25f;
         private float lipSyncAmplitude;
 
         public bool IsReady { get; private set; }
@@ -281,9 +281,17 @@ namespace osu.Game.EzOsuGame.Pets
             // Procedural idle sway when no motion library is driving the body.
             if (!hasMotionLibrary)
             {
-                float tilt = MathF.Sin(userTime * 0.55f) * 10f;
+                float tilt = MathF.Sin(userTime * MathF.Tau * 0.45f) * 4f;
                 model.AddParameterValue(CubismDefaultParameterId.ParamAngleZ, tilt);
-                model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleZ, tilt * 0.25f);
+                model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleZ, tilt * 0.3f);
+            }
+
+            // Soft singing sway while lip-sync follows music (even if motion3 is playing).
+            if (lipSyncEnabled)
+            {
+                float sway = MathF.Sin(userTime * MathF.Tau * 0.55f) * 2.8f;
+                model.AddParameterValue(CubismDefaultParameterId.ParamAngleZ, sway);
+                model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleZ, sway * 0.35f);
             }
 
             if (reactionRemaining > 0)
@@ -300,8 +308,6 @@ namespace osu.Game.EzOsuGame.Pets
             model.SetParameterValue(CubismDefaultParameterId.ParamAngleX, 0f);
             model.SetParameterValue(CubismDefaultParameterId.ParamBodyAngleX, 0f);
 
-            applyMouth(model);
-
             model.SaveParameters();
 
             if (!motionUpdated)
@@ -311,9 +317,12 @@ namespace osu.Game.EzOsuGame.Pets
 
             model.SetParameterValue(CubismDefaultParameterId.ParamAngleX, 0f);
             model.SetParameterValue(CubismDefaultParameterId.ParamBodyAngleX, 0f);
-            applyMouth(model);
 
             physics?.Evaluate(model, dt);
+
+            // Mouth last so motion / breath / physics cannot leave it stuck near ~0.3.
+            applyMouth(model);
+
             model.Update();
 
             try
@@ -331,13 +340,14 @@ namespace osu.Game.EzOsuGame.Pets
         {
             if (lipSyncEnabled)
             {
-                // Half the previous swing so music follow is subtler above the floor.
-                float open = Math.Max(lipSyncMinOpen, lipSyncMinOpen + (1f - lipSyncMinOpen) * lipSyncAmplitude * 0.5f);
+                // Track Maximum is often soft (~0.2–0.5); boost so loud parts can reach ~1 like the editor.
+                float driven = Math.Clamp(lipSyncAmplitude * 2.2f, 0f, 1f);
+                float open = lipSyncMinOpen + (1f - lipSyncMinOpen) * driven;
                 model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, open);
                 return;
             }
 
-            // Default half-open mouth when not lip-syncing.
+            // Default half-open mouth when not lip-syncing (editor scale 0–1).
             model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, 0.5f);
         }
 

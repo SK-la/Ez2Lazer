@@ -70,9 +70,10 @@ namespace osu.Game.EzOsuGame.Pets
                 ["nod"] = recipe("nod", hold: 1.1f, bounce: 0,
                     osc(CubismDefaultParameterId.ParamAngleY, 14f, 3.2f),
                     osc(CubismDefaultParameterId.ParamBodyAngleY, 4f, 3.2f)),
-                ["shake"] = recipe("shake", hold: 1.1f, bounce: 0,
-                    osc(CubismDefaultParameterId.ParamAngleZ, 4f, 4f),
-                    osc(CubismDefaultParameterId.ParamBodyAngleZ, 1.25f, 4f)),
+                // Singing-style sway: slow (~0.6 Hz), small roll — not a rapid puppet rattle.
+                ["shake"] = recipe("shake", hold: 0, bounce: 0,
+                    osc(CubismDefaultParameterId.ParamAngleZ, 3.5f, 0.6f),
+                    osc(CubismDefaultParameterId.ParamBodyAngleZ, 1.2f, 0.6f)),
                 ["wave"] = recipe("wave", hold: 0, bounce: 0,
                     osc(CubismDefaultParameterId.ParamArmRA, 0.85f, 2.6f),
                     p(CubismDefaultParameterId.ParamArmLA, 0.25f),

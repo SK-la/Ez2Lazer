@@ -50,7 +50,7 @@ EzResources/Pets/
     "fail": ["shake"],
     "clear": ["nod"]
   },
-  "lipSync": { "minOpen": 0.15 }
+  "lipSync": { "minOpen": 0.25 }
 }
 ```
 
@@ -66,7 +66,7 @@ EzResources/Pets/
 | `clear` | 本局通关 |
 | `resultsRank` | 进入结算；可选 `"rank": "A"` / `S` / `SH` / `X` / `XH` / `B` / `C`… |
 
-设置 → 桌宠 → **Live2D 口型关联音乐**：按曲目振幅开合 `ParamMouthOpenY`（最低 `minOpen`，变化幅度约为满量程一半；未跟随时默认约 `0.5`）。
+设置 → 桌宠 → **Live2D 口型关联音乐**：按曲目振幅开合 `ParamMouthOpenY`（0–1 与编辑器一致，安静时不低于 `minOpen`、响时可靠近 1；未跟随时默认 `0.5`）。跟音乐时附带缓慢轻晃头。
 
 ## 半身模（如当前 Miku）边界
 
