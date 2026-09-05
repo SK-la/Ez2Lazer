@@ -135,6 +135,11 @@ namespace osu.Game.EzOsuGame.Pets
         public bool Enabled { get; set; }
 
         /// <summary>
+        /// Resting <c>ParamMouthOpenY</c> when mouth sync is off (editor scale 0–1). Default 0.5.
+        /// </summary>
+        public float DefaultOpen { get; set; } = 0.5f;
+
+        /// <summary>
         /// Minimum <c>ParamMouthOpenY</c> while mouth sync is active (never fully closed).
         /// </summary>
         public float MinOpen { get; set; } = 0.25f;

@@ -54,7 +54,56 @@ EzResources/Pets/
 }
 ```
 
-未写 `clipExpressions` 时，客户端对 `fail`/`clear`/`rankA`… 有内置默认。可用 `live2d.expressions` 覆盖某表情的参数配方（自定义 Param ID 时用）。
+未写 `clipExpressions` 时，客户端对 `fail`/`clear`/`rankA`… 有内置默认。可用 `live2d.expressions` **整份覆盖**某表情配方（改幅度、频率、Param ID）。
+
+### 口型字段（`live2d.lipSync`）
+
+| 字段 | 含义 |
+| --- | --- |
+| `enabled` | 是否按 BPM 四分音符开合嘴（默认 `false`） |
+| `defaultOpen` | **平时**嘴张开程度 0–1（关闭联动时也生效；默认 `0.5`） |
+| `minOpen` | 仅联动开启时的最低开口（拍点之间不会低于此值） |
+
+例：平时半开、不要跟音乐：
+
+```json
+"lipSync": { "enabled": false, "defaultOpen": 0.5 }
+```
+
+例：平时略闭、跟音乐时最低 0.3：
+
+```json
+"lipSync": { "enabled": true, "defaultOpen": 0.35, "minOpen": 0.3 }
+```
+
+### 改内置动作幅度（`live2d.expressions`）
+
+内置 ID：`smile` / `wave` / `jump` / `nod` / `shake` / `lookDown` / `pout` / `kick` / `coverEyes`。覆盖时写完整 `params`（会替换该 ID 的整份配方，不是合并单个参数）。
+
+例：更轻更慢的摇头/点头：
+
+```json
+"expressions": {
+  "shake": {
+    "holdSeconds": 0,
+    "params": [
+      { "id": "ParamAngleZ", "value": 2.5, "oscillate": true, "frequency": 0.6 },
+      { "id": "ParamBodyAngleZ", "value": 2.5, "oscillate": true, "frequency": 0.6 }
+    ]
+  },
+  "nod": {
+    "holdSeconds": 1.1,
+    "params": [
+      { "id": "ParamAngleY", "value": 8, "oscillate": true, "frequency": 2.0 },
+      { "id": "ParamBodyAngleY", "value": 3, "oscillate": true, "frequency": 2.0 }
+    ]
+  }
+}
+```
+
+`value`：固定偏移；`oscillate: true` 时 `value` 为振幅、`frequency` 为 Hz。缺模型里没有的 `Param*` 会自动跳过。
+
+改「哪个场景播哪些表情」用 `clipExpressions`（上面已有）；改「表情本身长什么样」用 `expressions`。
 
 可选 `motion3`：与表情叠层一起播；`live2d.clipMotions` 可把 clip 映射到不同 motion 文件名键。
 
@@ -67,7 +116,7 @@ EzResources/Pets/
 | `resultsRank` | 进入结算；可选 `"rank": "A"` / `S` / `SH` / `X` / `XH` / `B` / `C`… |
 
 设置 → 桌宠 → **Live2D 音乐关联**：只控制按 BPM **晃头**（二分音符）。  
-**口型**默认关闭；在 `pet.json` 写 `"lipSync": { "enabled": true, "minOpen": 0.25 }` 后按四分音符开合，与设置开关无关。
+**口型联动**用 `lipSync.enabled`；**平时开口**用 `lipSync.defaultOpen`（0–1，与编辑器一致）。
 
 ## 半身模（如当前 Miku）边界
 

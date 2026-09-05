@@ -55,6 +55,7 @@ namespace osu.Game.EzOsuGame.Pets
         private bool musicAssociationEnabled;
         private bool mouthSyncFromPack;
         private float lipSyncMinOpen = 0.25f;
+        private float mouthDefaultOpen = 0.5f;
         private float musicBpm;
         private double musicTrackTimeMs;
         private float musicSyncWeight;
@@ -159,10 +160,12 @@ namespace osu.Game.EzOsuGame.Pets
                 mouthSyncFromPack = definition.LipSync.Enabled;
                 if (definition.LipSync.MinOpen > 0)
                     lipSyncMinOpen = Math.Clamp(definition.LipSync.MinOpen, 0.01f, 0.95f);
+                mouthDefaultOpen = Math.Clamp(definition.LipSync.DefaultOpen, 0f, 1f);
             }
             else
             {
                 mouthSyncFromPack = false;
+                mouthDefaultOpen = 0.5f;
             }
         }
 
@@ -364,12 +367,12 @@ namespace osu.Game.EzOsuGame.Pets
                 float beatFrac = (float)(beats - Math.Floor(beats));
                 float pulse = MathF.Pow(Math.Max(0f, MathF.Cos(beatFrac * MathF.Tau)), 1.6f);
                 float open = lipSyncMinOpen + (1f - lipSyncMinOpen) * pulse * mouthSyncWeight
-                             + 0.5f * (1f - mouthSyncWeight);
+                             + mouthDefaultOpen * (1f - mouthSyncWeight);
                 model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, Math.Clamp(open, 0f, 1f));
                 return;
             }
 
-            model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, 0.5f);
+            model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, mouthDefaultOpen);
         }
 
         private static float approach(float current, float target, float dt, float attack, float release)
@@ -377,6 +380,7 @@ namespace osu.Game.EzOsuGame.Pets
             float speed = target > current ? attack : release;
             if (Math.Abs(target - current) <= speed * dt)
                 return target;
+
             return current + Math.Sign(target - current) * speed * dt;
         }
 
