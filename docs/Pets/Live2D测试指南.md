@@ -1,13 +1,15 @@
 # Live2D 桌宠使用指南
 
-客户端已内置 Cubism 网格绘制（无 clipping mask；部分混合近似）。模型与 Core **不随安装包分发**，放在游戏数据目录的 `EzResources/Pets/`。
-
-**不再需要** `_official_live2d_presets.json` 或登记脚本。只要 `renderer: live2d` 且能找到模型入口即可授权；真正缺的是自备 Core。
+客户端已内置 Cubism 网格绘制（无 clipping mask；部分混合近似）。角色模型放在游戏数据目录的 `EzResources/Pets/`。Cubism Core 动态库按平台放在 `_cubism/<rid>/`（发行版可随包附带当前平台；公开源码仓库不收录该二进制）。
 
 ## 你需要准备
 
 1. 从 [Cubism SDK for Native](https://www.live2d.com/download/cubism-sdk/download-native/) 下载 SDK（需同意 Live2D 协议）。
-2. 取出 Windows x64 的 `Live2DCubismCore.dll`。
+2. 从 SDK 的 **`Core/dll/...`** 取出**当前系统**的动态库（不要用 `Core/lib` 下的 `.lib` / `.a`）：
+   - Windows x64：`Live2DCubismCore.dll` → `_cubism/win-x64/`
+   - Linux x64：`libLive2DCubismCore.so` → `_cubism/linux-x64/`
+   - macOS Apple Silicon：`libLive2DCubismCore.dylib` → `_cubism/osx-arm64/`
+   - macOS Intel：`libLive2DCubismCore.dylib` → `_cubism/osx-x64/`
 3. 准备一套 `.model3.json` + `.moc3` + 贴图（自制或有授权的模型）。
 
 ## 放到游戏数据目录
@@ -15,14 +17,18 @@
 ```
 EzResources/Pets/
   _cubism/
-    Live2DCubismCore.dll          ← 不要提交到公开 git
+    win-x64/Live2DCubismCore.dll      ← 按你的平台选一个子目录
+    linux-x64/libLive2DCubismCore.so
+    osx-arm64/libLive2DCubismCore.dylib
   MyPet/
-    pet.json                      ← "renderer": "live2d"
+    pet.json                          ← "renderer": "live2d"
     live2d/
       xxx.model3.json
       xxx.moc3
       ...
 ```
+
+Windows 仍兼容旧路径：`_cubism/Live2DCubismCore.dll`（平铺）。
 
 `pet.json` 最小示例：
 
@@ -55,7 +61,7 @@ EzResources/Pets/
 2. 包下拉下方状态行：应显示「Live2D 模型与 Cubism Core 均已就绪」。
 3. **成功**：看到立绘（呼吸 / 眨眼）；点一下可切 `poke`。日志含 `Core OK` 与 `loaded texture`。
 4. **缺贴图**：日志 `missing texture`；确认 model3 内路径与文件夹一致。
-5. **缺 Core**：紫色占位 + 缺 DLL 提示；若同包还有 PNG 帧会回退帧动画。
+5. **缺 Core**：紫色占位；状态行会写出期望的 `_cubism/<rid>/...` 路径。若同包还有 PNG 帧会回退帧动画。
 6. **缺模型入口**：状态行提示 live2d/ 下没有 model3/moc3；不会走 Cubism。
 
 ## 日志关键字
@@ -70,7 +76,7 @@ EzResources/Pets/
 | 场景 | 做什么 |
 | --- | --- |
 | 首次只要桌宠（PNG） | 放 PNG 包即可，不必装 Core |
-| 首次 / 自制 Live2D | 放 Core + `renderer:live2d` 包；无需白名单 |
-| 分发包给别人 | 见 [Release资源包规范.md](Release资源包规范.md)；**不要**把 Core 打进 zip |
+| 首次 / 自制 Live2D | 放当前平台 Core + `renderer:live2d` 包 |
+| 分发模型包给别人 | 见 [Release资源包规范.md](Release资源包规范.md) |
 
 更多 PNG 规则见 [`docs/桌宠使用说明.md`](../桌宠使用说明.md)。

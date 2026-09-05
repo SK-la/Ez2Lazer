@@ -87,10 +87,10 @@ namespace osu.Game.EzOsuGame.Pets
         }
 
         /// <summary>
-        /// Whether <c>Live2DCubismCore.dll</c> is present under Pets/_cubism (does not load it).
+        /// Whether the current-platform Cubism Core dynamic library is present under Pets/_cubism (does not load it).
         /// </summary>
         public static bool HasCubismCoreOnDisk(Storage petsStorage)
-            => petsStorage.Exists(Path.Combine(EzPetCubismNative.CORE_DIRECTORY, EzPetCubismNative.CORE_DLL_WINDOWS));
+            => EzPetCubismNative.HasCubismCoreOnDisk(petsStorage);
     }
 
     public class EzPetLive2DDefinition

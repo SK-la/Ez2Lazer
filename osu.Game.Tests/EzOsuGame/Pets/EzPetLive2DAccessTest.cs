@@ -100,15 +100,43 @@ namespace osu.Game.Tests.EzOsuGame.Pets
         }
 
         [Test]
-        public void TestHasCubismCoreOnDisk()
+        public void TestHasCubismCoreOnDiskRidAndLegacyFlat()
         {
             Assert.That(EzPetLive2DAccess.HasCubismCoreOnDisk(petsStorage), Is.False);
+            Assert.That(EzPetCubismNative.FindCoreRelativePath(petsStorage), Is.Null);
+
+            string expected = EzPetCubismNative.GetExpectedCoreRelativePath();
+            Assert.That(expected, Does.StartWith("_cubism/"));
+
+            string ridPath = Path.Combine(tempRoot, "EzResources", "Pets", expected.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(ridPath)!);
+            File.WriteAllBytes(ridPath, [0x00]);
+
+            Assert.That(EzPetLive2DAccess.HasCubismCoreOnDisk(petsStorage), Is.True);
+            Assert.That(EzPetCubismNative.FindCoreRelativePath(petsStorage), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void TestLegacyFlatWindowsCoreStillDetected()
+        {
+            if (!OperatingSystem.IsWindows())
+                Assert.Ignore("Legacy flat Core path is Windows-only.");
 
             string coreDir = Path.Combine(tempRoot, "EzResources", "Pets", "_cubism");
             Directory.CreateDirectory(coreDir);
             File.WriteAllBytes(Path.Combine(coreDir, EzPetCubismNative.CORE_DLL_WINDOWS), [0x00]);
 
             Assert.That(EzPetLive2DAccess.HasCubismCoreOnDisk(petsStorage), Is.True);
+            Assert.That(EzPetCubismNative.FindCoreRelativePath(petsStorage), Is.EqualTo("_cubism/Live2DCubismCore.dll"));
+        }
+
+        [Test]
+        public void TestResolveCurrentRidAndNativeFileName()
+        {
+            string? rid = EzPetCubismNative.ResolveCurrentRid();
+            Assert.That(rid, Is.Not.Null.And.Not.Empty);
+            Assert.That(EzPetCubismNative.GetNativeLibraryFileName(), Is.Not.Empty);
+            Assert.That(EzPetCubismNative.GetExpectedCoreRelativePath(), Does.Contain(rid!));
         }
 
         private void writePack(string name, string petJson, string modelPayload)

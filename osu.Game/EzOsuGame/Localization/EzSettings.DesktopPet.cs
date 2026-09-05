@@ -42,8 +42,8 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK = new EzLocalizationManager.EzLocalisableString("桌宠包", "Pet pack");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "扫描 EzResources/Pets 下带 pet.json 的文件夹。PNG 包直接可用；Live2D 需 pet.json 写 renderer:live2d、live2d/ 模型，以及 _cubism/Live2DCubismCore.dll（自行从 Cubism SDK 取得）。",
-            "Scans folders with pet.json under EzResources/Pets. PNG packs work as-is; Live2D needs renderer:live2d, a live2d/ model, and _cubism/Live2DCubismCore.dll from the Cubism SDK.");
+            "扫描 EzResources/Pets 下带 pet.json 的文件夹。PNG 包直接可用；Live2D 需 renderer:live2d、live2d/ 模型，以及 _cubism/<平台>/ 下的 Cubism Core 动态库。",
+            "Scans folders with pet.json under EzResources/Pets. PNG packs work as-is; Live2D needs renderer:live2d, a live2d/ model, and the Cubism Core dynamic library under _cubism/<platform>/.");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_STATUS_PNG_OK = new EzLocalizationManager.EzLocalisableString(
             "当前包：PNG 帧可用。",
@@ -62,8 +62,8 @@ namespace osu.Game.EzOsuGame.Localization
             "Current pack: Live2D model and Cubism Core are ready.");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_STATUS_LIVE2D_MISSING_CORE = new EzLocalizationManager.EzLocalisableString(
-            "当前包是 Live2D，但缺少 EzResources/Pets/_cubism/Live2DCubismCore.dll（从 Cubism SDK for Native 自行复制）。",
-            "Live2D pack selected, but EzResources/Pets/_cubism/Live2DCubismCore.dll is missing (copy from Cubism SDK for Native).");
+            "当前包是 Live2D，但缺少当前平台的 Cubism Core（从 Cubism SDK for Native 的 Core/dll 复制到下方路径）。",
+            "Live2D pack selected, but the Cubism Core for this platform is missing (copy from Cubism SDK for Native Core/dll to the path below).");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_STATUS_LIVE2D_MISSING_MODEL = new EzLocalizationManager.EzLocalisableString(
             "当前包声明了 Live2D，但 live2d/ 下没有 .model3.json 或 .moc3。",

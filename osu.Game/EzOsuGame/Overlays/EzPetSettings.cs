@@ -143,9 +143,16 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (pack.Live2DAuthorized)
             {
-                packStatusText.Text = corePresent
-                    ? EzSettingsDesktopPet.DESKTOP_PET_STATUS_LIVE2D_READY
-                    : EzSettingsDesktopPet.DESKTOP_PET_STATUS_LIVE2D_MISSING_CORE;
+                if (corePresent)
+                {
+                    packStatusText.Text = EzSettingsDesktopPet.DESKTOP_PET_STATUS_LIVE2D_READY;
+                }
+                else
+                {
+                    packStatusText.Text =
+                        $"{EzSettingsDesktopPet.DESKTOP_PET_STATUS_LIVE2D_MISSING_CORE}\nEzResources/Pets/{EzPetCubismNative.GetExpectedCoreRelativePath()}";
+                }
+
                 return;
             }
 
