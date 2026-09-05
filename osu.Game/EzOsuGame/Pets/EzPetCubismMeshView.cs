@@ -126,7 +126,6 @@ namespace osu.Game.EzOsuGame.Pets
                     var texture = renderer.CreateTexture(upload.Width, upload.Height);
                     texture.SetData(upload);
                     loaded.Add(texture);
-                    Logger.Log($"Ez pet Cubism: loaded texture '{relative}' ({texture.Width}x{texture.Height})", LoggingTarget.Runtime);
                 }
                 catch (Exception ex)
                 {
@@ -142,7 +141,7 @@ namespace osu.Game.EzOsuGame.Pets
         {
             foreach (var t in textures)
             {
-                if (t != null && !ReferenceEquals(t, renderer?.WhitePixel))
+                if (!ReferenceEquals(t, renderer?.WhitePixel))
                     t.Dispose();
             }
 

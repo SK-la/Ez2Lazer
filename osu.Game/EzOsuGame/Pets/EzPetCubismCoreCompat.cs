@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Framework.Logging;
 
 namespace osu.Game.EzOsuGame.Pets
 {
@@ -42,25 +41,22 @@ namespace osu.Game.EzOsuGame.Pets
 
         private static void resolveOrderApi()
         {
-            if (EzPetCubismNative.TryGetExport("csmGetRenderOrders", out var renderOrders))
+            if (EzPetCubismNative.TryGetExport("csmGetRenderOrders", out IntPtr renderOrders))
             {
                 orderFn = (delegate* unmanaged[Cdecl]<IntPtr, int*>)renderOrders;
                 orderApi = OrderApi.RenderOrders;
-                Logger.Log("Ez pet Cubism: using csmGetRenderOrders (Cubism 5.3+ Core).", LoggingTarget.Runtime);
                 return;
             }
 
-            if (EzPetCubismNative.TryGetExport("csmGetDrawableDrawOrders", out var drawOrders))
+            if (EzPetCubismNative.TryGetExport("csmGetDrawableDrawOrders", out IntPtr drawOrders))
             {
                 orderFn = (delegate* unmanaged[Cdecl]<IntPtr, int*>)drawOrders;
                 orderApi = OrderApi.DrawableDrawOrders;
-                Logger.Log("Ez pet Cubism: using csmGetDrawableDrawOrders.", LoggingTarget.Runtime);
                 return;
             }
 
             orderApi = OrderApi.None;
             orderFn = null;
-            Logger.Log("Ez pet Cubism: no drawable order exports; drawing in index order.", LoggingTarget.Runtime, LogLevel.Important);
         }
     }
 }

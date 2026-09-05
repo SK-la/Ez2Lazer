@@ -43,12 +43,10 @@ namespace osu.Game.EzOsuGame.Pets
         private float nextBlinkAt = 2f;
         private float blinkPhase; // 0 idle, >0 closing/opening progress
         private float currentEyeOpen = 1f;
-        private static bool loggedEyeBlinkOnce;
         private float reactionRemaining;
         private float reactionAngleX;
         private float reactionMouth;
         private static bool frameworkStarted;
-        private static bool loggedCanvasOnce;
 
         private readonly EzPetCubismExpressionStack expressionStack = new EzPetCubismExpressionStack(EzPetCubismExpressionLibrary.CreateDefaults());
         private EzPetLive2DDefinition? live2DDefinition;
@@ -135,7 +133,6 @@ namespace osu.Game.EzOsuGame.Pets
                     + (created.physics != null ? " · physics" : string.Empty)
                     + (created.hasMotionLibrary ? $" · motions={created.motions.Count}" : string.Empty);
                 session = created;
-                Logger.Log($"Ez pet Cubism: {created.Status}", LoggingTarget.Runtime);
                 created.startMotion("idle", MotionPriority.PriorityIdle, loop: true);
                 return true;
             }
@@ -401,9 +398,6 @@ namespace osu.Game.EzOsuGame.Pets
             motion.IsLoop = loop;
             motionManager.StartMotionPriority(motion, priority);
 
-            if (!string.Equals(activeMotionKey, key, StringComparison.OrdinalIgnoreCase))
-                Logger.Log($"Ez pet Cubism: start motion '{key}' (loop={loop})", LoggingTarget.Runtime);
-
             activeMotionKey = key;
             return true;
         }
@@ -436,7 +430,6 @@ namespace osu.Game.EzOsuGame.Pets
                     // CubismMotion.DoUpdateParameters assumes these lists are non-null.
                     motion.SetEffectIds(eyeBlinkParameterIds, lipSyncParameterIds);
                     motions[key] = motion;
-                    Logger.Log($"Ez pet Cubism: loaded motion '{key}' from {fileName}", LoggingTarget.Runtime);
                 }
             }
             catch (Exception ex)
@@ -581,7 +574,6 @@ namespace osu.Game.EzOsuGame.Pets
                     return null;
 
                 var physics = new CubismPhysics(fullPath);
-                Logger.Log($"Ez pet Cubism: loaded physics '{physicsRel}'", LoggingTarget.Runtime);
                 return physics;
             }
             catch (Exception ex)
@@ -605,8 +597,6 @@ namespace osu.Game.EzOsuGame.Pets
 
                 float canvasW = Math.Max(0.001f, model.GetCanvasWidth());
                 float canvasH = Math.Max(0.001f, model.GetCanvasHeight());
-                float canvasWPx = Math.Max(1f, model.GetCanvasWidthPixel());
-                float canvasHPx = Math.Max(1f, model.GetCanvasHeightPixel());
 
                 int[] order = new int[count];
                 for (int i = 0; i < count; i++)
@@ -619,20 +609,8 @@ namespace osu.Game.EzOsuGame.Pets
                     Array.Sort(order, (a, b) => sortKeys[a].CompareTo(sortKeys[b]));
 
                 var parts = new List<EzPetCubismMeshPart>(count);
-                float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
-                int visibleVerts = 0;
                 int* maskCounts = model.GetDrawableMaskCounts();
                 float eyeFade = Math.Clamp(currentEyeOpen, 0f, 1f);
-
-                if (!loggedEyeBlinkOnce)
-                {
-                    loggedEyeBlinkOnce = true;
-                    bool hasL = model.ParameterIds.IndexOf(CubismDefaultParameterId.ParamEyeLOpen) >= 0;
-                    bool hasR = model.ParameterIds.IndexOf(CubismDefaultParameterId.ParamEyeROpen) >= 0;
-                    Logger.Log(
-                        $"Ez pet Cubism blink: ParamEyeLOpen={(hasL ? "ok" : "missing")} ParamEyeROpen={(hasR ? "ok" : "missing")} masking={model.IsUsingMasking()} (no GPU clip — fade eye meshes)",
-                        LoggingTarget.Runtime);
-                }
 
                 for (int o = 0; o < count; o++)
                 {
@@ -669,12 +647,6 @@ namespace osu.Game.EzOsuGame.Pets
                         var uv = uvsPtr[v];
                         positions[v] = new Vector2(p.X, p.Y);
                         uvs[v] = new Vector2(uv.X, uv.Y);
-
-                        minX = Math.Min(minX, p.X);
-                        maxX = Math.Max(maxX, p.X);
-                        minY = Math.Min(minY, p.Y);
-                        maxY = Math.Max(maxY, p.Y);
-                        visibleVerts++;
                     }
 
                     ushort[] indices = new ushort[indexCount];
@@ -690,14 +662,6 @@ namespace osu.Game.EzOsuGame.Pets
                         UVs = uvs,
                         Indices = indices,
                     });
-                }
-
-                if (!loggedCanvasOnce)
-                {
-                    loggedCanvasOnce = true;
-                    Logger.Log(
-                        $"Ez pet Cubism canvas: units={canvasW:0.###}x{canvasH:0.###} px={canvasWPx:0}x{canvasHPx:0} ppu={model.GetPixelsPerUnit():0.###} verts≈({minX:0.##},{minY:0.##})-({maxX:0.##},{maxY:0.##}) n={visibleVerts} parts={parts.Count}",
-                        LoggingTarget.Runtime);
                 }
 
                 return new EzPetCubismFrameSnapshot
@@ -823,8 +787,8 @@ namespace osu.Game.EzOsuGame.Pets
 
             bool ok = CubismFramework.StartUp(new EzCubismAllocator(), new Option
             {
-                LogFunction = msg => Logger.Log($"[Cubism] {msg}", LoggingTarget.Runtime),
-                LoggingLevel = LogLevel.Warning,
+                LogFunction = static _ => { },
+                LoggingLevel = LogLevel.Off,
             });
 
             if (!ok)
