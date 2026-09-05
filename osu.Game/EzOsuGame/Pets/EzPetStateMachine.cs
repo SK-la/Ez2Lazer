@@ -190,6 +190,10 @@ namespace osu.Game.EzOsuGame.Pets
 
         public bool HandleGameplayEnter() => handleNamed("gameplayEnter", resetIdle: true, restartIfSame: true);
 
+        public bool HandleFail() => handleNamed("fail", resetIdle: true, restartIfSame: true);
+
+        public bool HandleClear() => handleNamed("clear", resetIdle: true, restartIfSame: true);
+
         /// <summary>
         /// Results screen: optional rank-filtered rule (<c>when: resultsRank</c>).
         /// </summary>

@@ -20,6 +20,7 @@ using osu.Game.Input;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
 using osuTK;
+using osuTK.Input;
 
 namespace osu.Game.EzOsuGame.Pets
 {
@@ -47,6 +48,7 @@ namespace osu.Game.EzOsuGame.Pets
         private readonly EzPetMotionDriver motionDriver = new EzPetMotionDriver();
         private string? motionOwnerState;
         private string? activeMotionMode;
+        private double live2DClipStartTime = double.MaxValue;
 
         private Bindable<bool> enabled = null!;
         private Bindable<string> packName = null!;
@@ -57,6 +59,7 @@ namespace osu.Game.EzOsuGame.Pets
         private Bindable<bool> showOnSongSelect = null!;
         private Bindable<bool> showOnGameplay = null!;
         private Bindable<bool> showOnResults = null!;
+        private Bindable<bool> live2DLipSync = null!;
 
         private IBindable<WorkingBeatmap> beatmap = null!;
 
@@ -66,8 +69,11 @@ namespace osu.Game.EzOsuGame.Pets
 
         private Container petBox = null!;
         private TextureAnimation animation = null!;
+        private EzPetLive2DHost live2DHost = null!;
+        private EzPetCubismSession? cubismSession;
         private Container missingPackPanel = null!;
         private bool showingMissingPack;
+        private bool preferLive2DHost;
 
         [Resolved(canBeNull: true)]
         private IdleTracker? idleTracker { get; set; }
@@ -83,6 +89,8 @@ namespace osu.Game.EzOsuGame.Pets
         private double lastStarRating = double.NaN;
         private ScoreProcessor? boundScoreProcessor;
         private Player? boundPlayer;
+        private bool firedFail;
+        private bool firedClear;
 
         protected override bool StartHidden => false;
 
@@ -111,6 +119,7 @@ namespace osu.Game.EzOsuGame.Pets
             showOnSongSelect = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnSongSelect);
             showOnGameplay = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnGameplay);
             showOnResults = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnResults);
+            live2DLipSync = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetLive2DLipSync);
 
             loader = new EzPetPackLoader(storage);
             loader.EnsureDefaultPack();
@@ -128,6 +137,11 @@ namespace osu.Game.EzOsuGame.Pets
                         FillMode = FillMode.Fit,
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
+                    },
+                    live2DHost = new EzPetLive2DHost
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Alpha = 0,
                     },
                     missingPackPanel = createMissingPackPanel(),
                 },
@@ -222,8 +236,17 @@ namespace osu.Game.EzOsuGame.Pets
                 if (State.Value == Visibility.Visible)
                     Hide();
 
+                live2DHost.SuspendCapture();
                 return;
             }
+
+            if (State.Value != Visibility.Visible)
+            {
+                live2DHost.SuspendCapture();
+                return;
+            }
+
+            live2DHost.ResumeCapture();
 
             base.Update();
 
@@ -244,6 +267,52 @@ namespace osu.Game.EzOsuGame.Pets
                 stateMachine.UpdateIdle(Time.Elapsed / 1000.0);
 
             checkClipFinished();
+
+            if (preferLive2DHost && cubismSession?.IsReady == true)
+            {
+                float bpm = 0;
+                double trackTime = 0;
+                var working = beatmap.Value;
+                var track = working?.Track;
+                bool trackPlaying = track?.IsRunning == true;
+
+                if (trackPlaying)
+                {
+                    // Base BPM from beatmap info; scale by playback rate (DT/HT).
+                    double baseBpm = working.BeatmapInfo?.BPM ?? 0;
+                    if (baseBpm <= 0)
+                        baseBpm = 120;
+                    bpm = (float)(baseBpm * Math.Max(0.1, track.Rate));
+                    trackTime = track.CurrentTime;
+                }
+
+                // Settings toggle = head association only; mouth uses pet.json lipSync.enabled.
+                cubismSession.SetMusicSync(live2DLipSync.Value && trackPlaying, bpm, trackTime);
+                cubismSession.Update(Time.Elapsed / 1000.0);
+                live2DHost.ApplyBreath(cubismSession.BreathValue);
+            }
+
+            pollFailClear();
+        }
+
+        private void pollFailClear()
+        {
+            if (boundPlayer?.GameplayState == null)
+                return;
+
+            var state = boundPlayer.GameplayState;
+
+            if (state.HasFailed && !firedFail)
+            {
+                firedFail = true;
+                stateMachine.HandleFail();
+            }
+
+            if (state.HasPassed && !firedClear)
+            {
+                firedClear = true;
+                stateMachine.HandleClear();
+            }
         }
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
@@ -280,6 +349,8 @@ namespace osu.Game.EzOsuGame.Pets
             motionDriver.Stop();
             animation.ClearFrames();
             clipTextures.Clear();
+            cubismSession?.Dispose();
+            cubismSession = null;
 
             base.Dispose(isDisposing);
         }
@@ -288,8 +359,11 @@ namespace osu.Game.EzOsuGame.Pets
         {
             clipTextures.Clear();
             motionDriver.Stop();
+            cubismSession?.Dispose();
+            cubismSession = null;
             currentPack = null;
             eventHidden = false;
+            preferLive2DHost = false;
 
             try
             {
@@ -313,10 +387,27 @@ namespace osu.Game.EzOsuGame.Pets
                 };
             }
 
-            showingMissingPack = currentPack.AvailableClips.Count == 0;
+            if (currentPack.Live2DAuthorized)
+            {
+                string? cubismError = null;
+
+                if (EzPetCubismSession.TryCreate(loader.PetsStorage, currentPack.Live2DModelEntryPath, out var session, out cubismError))
+                {
+                    cubismSession = session;
+                    cubismSession?.ConfigurePack(currentPack.Definition.Live2D);
+                }
+
+                // Prefer Cubism host when Core works; else PNG frames if present; else setup placeholder.
+                preferLive2DHost = cubismSession?.IsReady == true || !currentPack.HasRasterFrames;
+                live2DHost.BindPack(currentPack, currentPack.Live2DModelEntryPath, cubismSession, loader.PetsStorage, cubismError);
+                Logger.Log(
+                    $"Ez pet pack '{currentPack.Name}' Live2D authorised; cubism={(cubismSession?.IsReady == true ? "ready" : cubismError ?? "unavailable")}.",
+                    LoggingTarget.Runtime);
+            }
+
+            showingMissingPack = currentPack.AvailableClips.Count == 0 && !currentPack.Live2DAuthorized;
             setMissingPackVisible(showingMissingPack);
 
-            // Only drive the state machine when real frames exist; otherwise keep the fixed notice.
             if (showingMissingPack)
             {
                 animation.ClearFrames();
@@ -407,16 +498,41 @@ namespace osu.Game.EzOsuGame.Pets
             return textures.Count > 0 ? textures.ToArray() : [];
         }
 
+        private bool usingLive2DHost => preferLive2DHost && currentPack?.Live2DAuthorized == true;
+
         private void setMissingPackVisible(bool visible)
         {
             missingPackPanel.Alpha = visible ? 1 : 0;
-            animation.Alpha = visible ? 0 : 1;
+
+            if (usingLive2DHost && !visible)
+            {
+                live2DHost.Alpha = 1;
+                animation.Alpha = 0;
+                animation.IsPlaying = false;
+            }
+            else
+            {
+                live2DHost.Alpha = 0;
+                animation.Alpha = visible ? 0 : 1;
+            }
         }
 
-        private void onClipChanged(string _, string clip)
+        private void onClipChanged(string state, string clip)
         {
             if (showingMissingPack)
                 return;
+
+            if (usingLive2DHost)
+            {
+                animation.ClearFrames();
+                animation.IsPlaying = false;
+                live2DClipStartTime = Time.Current;
+                live2DHost.NotifyState(state, clip, cubismSession);
+                setMissingPackVisible(false);
+                applyScale();
+                stopOrphanedWanderMotion();
+                return;
+            }
 
             animation.ClearFrames();
 
@@ -540,7 +656,23 @@ namespace osu.Game.EzOsuGame.Pets
 
         private void checkClipFinished()
         {
-            if (showingMissingPack || animation.Loop || animation.FrameCount == 0 || animation.Duration <= 0)
+            if (showingMissingPack)
+                return;
+
+            if (usingLive2DHost)
+            {
+                if (currentPack?.Definition.Clips.TryGetValue(stateMachine.CurrentClip, out var clip) == true
+                    && clip is { Loop: false }
+                    && Time.Current - live2DClipStartTime >= 800)
+                {
+                    live2DClipStartTime = double.MaxValue;
+                    stateMachine.NotifyClipFinished();
+                }
+
+                return;
+            }
+
+            if (animation.Loop || animation.FrameCount == 0 || animation.Duration <= 0)
                 return;
 
             if (animation.PlaybackPosition >= animation.Duration)
@@ -554,6 +686,13 @@ namespace osu.Game.EzOsuGame.Pets
             if (showingMissingPack)
             {
                 petBox.Size = new Vector2(missing_pack_width * s, missing_pack_height * s);
+                return;
+            }
+
+            if (usingLive2DHost)
+            {
+                const float live2d_base = 256;
+                petBox.Size = new Vector2(live2d_base * s, live2d_base * s);
                 return;
             }
 
@@ -585,9 +724,13 @@ namespace osu.Game.EzOsuGame.Pets
             if (DrawSize.X <= 0 || DrawSize.Y <= 0)
                 return;
 
-            petBox.Position = new Vector2(
-                Math.Clamp(posX.Value, 0f, 1f) * DrawSize.X,
-                Math.Clamp(posY.Value, 0f, 1f) * DrawSize.Y);
+            float x = Math.Clamp(posX.Value, 0f, 1f) * DrawSize.X;
+            float y = Math.Clamp(posY.Value, 0f, 1f) * DrawSize.Y;
+
+            if (usingLive2DHost && cubismSession?.IsReady == true)
+                y -= cubismSession.VisualBounce * petBox.Height * 0.4f;
+
+            petBox.Position = new Vector2(x, y);
         }
 
         private void persistPosition()
@@ -657,7 +800,7 @@ namespace osu.Game.EzOsuGame.Pets
         private bool isLeftAltHeld()
         {
             var input = GetContainingInputManager();
-            return input != null && input.CurrentState.Keyboard.Keys.IsPressed(osuTK.Input.Key.LAlt);
+            return input != null && input.CurrentState.Keyboard.Keys.IsPressed(Key.LAlt);
         }
     }
 }

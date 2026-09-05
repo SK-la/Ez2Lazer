@@ -1,0 +1,60 @@
+{
+  "renderer": "live2d",
+  "defaultState": "idle",
+  "live2d": {
+    "root": "live2d",
+    "lipSync": { "enabled": false, "defaultOpen": 0.5, "minOpen": 0.25 },
+    "clipExpressions": {
+      "idle": [],
+      "poke": ["nod"],
+      "grabbed": ["shake"],
+      "fail": ["shake"],
+      "clear": ["nod"],
+      "rankA": ["smile"],
+      "rankS": ["smile", "wave"],
+      "rankSS": ["smile", "wave", "jump"],
+      "rankB": ["lookDown", "pout", "kick"],
+      "rankC": ["pout", "coverEyes"]
+    }
+  },
+  "clips": {
+    "idle": { "loop": true },
+    "poke": { "loop": false },
+    "grabbed": { "loop": true },
+    "fail": { "loop": false },
+    "clear": { "loop": false },
+    "rankA": { "loop": false },
+    "rankS": { "loop": false },
+    "rankSS": { "loop": false },
+    "rankB": { "loop": false },
+    "rankC": { "loop": false }
+  },
+  "states": {
+    "idle": { "clip": "idle" },
+    "poke": { "clip": "poke", "next": "idle" },
+    "grabbed": { "clip": "grabbed" },
+    "fail": { "clip": "fail", "next": "idle" },
+    "clear": { "clip": "clear", "next": "idle" },
+    "rankA": { "clip": "rankA", "next": "idle" },
+    "rankS": { "clip": "rankS", "next": "idle" },
+    "rankSS": { "clip": "rankSS", "next": "idle" },
+    "rankB": { "clip": "rankB", "next": "idle" },
+    "rankC": { "clip": "rankC", "next": "idle" }
+  },
+  "rules": [
+    { "when": "hover", "goto": "idle" },
+    { "when": "click", "goto": "poke", "interrupt": true },
+    { "when": "drag", "goto": "grabbed", "interrupt": true },
+    { "when": "fail", "goto": "fail", "interrupt": true },
+    { "when": "clear", "goto": "clear", "interrupt": true },
+    { "when": "resultsRank", "rank": "A", "goto": "rankA", "interrupt": true },
+    { "when": "resultsRank", "rank": "S", "goto": "rankS", "interrupt": true },
+    { "when": "resultsRank", "rank": "SH", "goto": "rankS", "interrupt": true },
+    { "when": "resultsRank", "rank": "X", "goto": "rankSS", "interrupt": true },
+    { "when": "resultsRank", "rank": "XH", "goto": "rankSS", "interrupt": true },
+    { "when": "resultsRank", "rank": "B", "goto": "rankB", "interrupt": true },
+    { "when": "resultsRank", "rank": "C", "goto": "rankC", "interrupt": true },
+    { "when": "resultsRank", "rank": "D", "goto": "rankC", "interrupt": true },
+    { "when": "resultsRank", "rank": "F", "goto": "rankC", "interrupt": true }
+  ]
+}

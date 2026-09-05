@@ -101,6 +101,8 @@ namespace osu.Game.EzOsuGame.Pets
             unbindPlayer();
             boundPlayer = player;
             stateMachine.ResetPlaySession();
+            firedFail = false;
+            firedClear = false;
 
             if (player.IsLoaded)
                 attachScoreProcessor(player);

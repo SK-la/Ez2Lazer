@@ -42,13 +42,44 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK = new EzLocalizationManager.EzLocalisableString("桌宠包", "Pet pack");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "扫描 EzResources/Pets 下带 pet.json 的文件夹。复制整个目录即可换包（PNG 序列帧）。",
-            "Scans folders with pet.json under EzResources/Pets. Copy a folder to switch packs (PNG frame clips).");
+            "扫描 EzResources/Pets 下带 pet.json 的文件夹。PNG 包直接可用；Live2D 需 renderer:live2d、live2d/ 模型，以及 _cubism/<平台>/ 下的 Cubism Core 动态库。",
+            "Scans folders with pet.json under EzResources/Pets. PNG packs work as-is; Live2D needs renderer:live2d, a live2d/ model, and the Cubism Core dynamic library under _cubism/<platform>/.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_STATUS_PNG_OK = new EzLocalizationManager.EzLocalisableString(
+            "当前包：PNG 帧可用。",
+            "Current pack: PNG frames ready.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_STATUS_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "当前包没有可用帧。把 PNG 放进动作文件夹，或改用 Live2D（见文档）。",
+            "Current pack has no frames. Add PNGs to action folders, or use Live2D (see docs).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_STATUS_MISSING_PACK = new EzLocalizationManager.EzLocalisableString(
+            "找不到该桌宠包文件夹。",
+            "Pet pack folder not found.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_STATUS_LIVE2D_READY = new EzLocalizationManager.EzLocalisableString(
+            "当前包：Live2D 模型与 Cubism Core 均已就绪。",
+            "Current pack: Live2D model and Cubism Core are ready.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_STATUS_LIVE2D_MISSING_CORE = new EzLocalizationManager.EzLocalisableString(
+            "当前包是 Live2D，但缺少当前平台的 Cubism Core（从 Cubism SDK for Native 的 Core/dll 复制到下方路径）。",
+            "Live2D pack selected, but the Cubism Core for this platform is missing (copy from Cubism SDK for Native Core/dll to the path below).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_STATUS_LIVE2D_MISSING_MODEL = new EzLocalizationManager.EzLocalisableString(
+            "当前包声明了 Live2D，但 live2d/ 下没有 .model3.json 或 .moc3。",
+            "Pack asks for Live2D, but no .model3.json or .moc3 was found under live2d/.");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SCALE = new EzLocalizationManager.EzLocalisableString("桌宠缩放", "Pet scale");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SCALE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "桌宠立绘缩放。按住 Left Alt 拖动改位置；未按时点击穿透，悬浮仍可触发反应。",
             "Scale of the pet sprite. Hold Left Alt and drag to move; without Alt, clicks pass through while hover reactions still work.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_LIP_SYNC = new EzLocalizationManager.EzLocalisableString(
+            "Live2D 音乐关联", "Live2D music association");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_LIP_SYNC_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后按谱面基准 BPM 轻晃头（二分音符）。口型开合需在 pet.json 的 live2d.lipSync.enabled 打开，与本开关无关。",
+            "When enabled, head sways gently to beatmap BPM (half notes). Mouth sync is separate: enable live2d.lipSync.enabled in pet.json.");
     }
 }

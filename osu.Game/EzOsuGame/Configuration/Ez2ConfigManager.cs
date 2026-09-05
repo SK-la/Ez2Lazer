@@ -141,6 +141,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.DesktopPetShowOnSongSelect, true);
             SetDefault(Ez2Setting.DesktopPetShowOnGameplay, true);
             SetDefault(Ez2Setting.DesktopPetShowOnResults, true);
+            SetDefault(Ez2Setting.DesktopPetLive2DLipSync, false);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
             SetDefault(Ez2Setting.BeatmapPreviewMode, EzBeatmapPreviewMode.Static);
             SetDefault(Ez2Setting.BeatmapPreviewModeMania, EzBeatmapPreviewMode.StaticFullMap);
@@ -1032,6 +1033,9 @@ namespace osu.Game.EzOsuGame.Configuration
         DesktopPetShowOnGameplay,
 
         DesktopPetShowOnResults,
+
+        /// <summary>Drive Live2D mouth open from track amplitude (min open &gt; 0).</summary>
+        DesktopPetLive2DLipSync,
 
         // 界面功能
         KeySoundPreviewMode,
