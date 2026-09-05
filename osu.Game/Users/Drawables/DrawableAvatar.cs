@@ -3,23 +3,51 @@
 
 #nullable disable
 
+using System;
+using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Platform;
 using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.LocalAvatar;
 using osu.Game.Graphics;
 using osu.Game.Online.API.Requests.Responses;
 
 namespace osu.Game.Users.Drawables
 {
     [LongRunningLoad]
-    public partial class DrawableAvatar : Sprite
+    public partial class DrawableAvatar : CompositeDrawable
     {
         private readonly IUser user;
 
+        private EzLocalAvatarLoader avatarLoader;
+        private string avatarKey;
+        private Drawable content;
+        private FillMode contentFillMode = FillMode.Fit;
+
         /// <summary>
-        /// A simple, non-interactable avatar sprite for the specified user.
+        /// Forwarded to the inner sprite / animation (outer composite stays stretch-fill of parent).
+        /// </summary>
+        public new FillMode FillMode
+        {
+            get => contentFillMode;
+            set
+            {
+                contentFillMode = value;
+                content?.FillMode = value;
+            }
+        }
+
+        /// <summary>
+        /// Local clip folder names under <c>Modify/avatars/{Username}/</c>. Empty when using a still or online avatar.
+        /// </summary>
+        public IReadOnlyList<string> AvailableAnimations { get; private set; } = Array.Empty<string>();
+
+        /// <summary>
+        /// A simple, non-interactable avatar for the specified user.
         /// </summary>
         /// <param name="user">The user. A null value will get a placeholder avatar.</param>
         public DrawableAvatar(IUser user = null)
@@ -27,31 +55,93 @@ namespace osu.Game.Users.Drawables
             this.user = user;
 
             RelativeSizeAxes = Axes.Both;
-            FillMode = FillMode.Fit;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
         }
 
         [BackgroundDependencyLoader]
-        private void load(LargeTextureStore textures, OnlineAssetCachingStore onlineTextures, EzResourceStore ezResourceStore)
+        private void load(LargeTextureStore textures, OnlineAssetCachingStore onlineTextures, EzResourceStore ezResourceStore, Storage storage)
         {
-            // 优先尝试加载自定义头像
-            if (user != null && !string.IsNullOrEmpty(user.Username))
+            avatarLoader = new EzLocalAvatarLoader(storage, ezResourceStore);
+
+            Drawable local = tryLoadLocalAvatar();
+
+            if (local != null)
             {
-                string customAvatarPath = $"Modify/avatars/{user.Username}";
-                Texture = ezResourceStore.Get(customAvatarPath, true);
+                setContent(local);
+                return;
             }
 
-            // 如果没有自定义头像，使用默认逻辑
-            if (Texture == null && user != null && user.OnlineID > 1)
+            if (user != null && user.OnlineID > 1)
             {
                 // TODO: The fallback here should not need to exist. Users should be looked up and populated via UserLookupCache or otherwise
                 // in remaining cases where this is required (chat tabs, local leaderboard), at which point this should be removed.
-                Texture = onlineTextures.Get((user as APIUser)?.AvatarUrl ?? $@"https://a.ppy.sh/{user.OnlineID}");
+                Texture online = onlineTextures.Get((user as APIUser)?.AvatarUrl ?? $@"https://a.ppy.sh/{user.OnlineID}");
+
+                if (online != null)
+                {
+                    setContent(new Sprite { Texture = online });
+                    return;
+                }
             }
 
-            // 最后回退：先尝试本地 guest.png，再使用内置默认头像
-            Texture ??= ezResourceStore.Get(@"Modify/avatars/guest", true) ?? textures.Get(@"Online/avatar-guest");
+            Drawable guest = tryLoadLocalAvatarKey("guest")
+                             ?? createSprite(textures.Get(@"Online/avatar-guest"));
+            if (guest != null)
+                setContent(guest);
+        }
+
+        /// <summary>
+        /// Switch to a local clip by subfolder name and loop it. No-op if the clip is missing.
+        /// </summary>
+        public bool PlayAnimation(string clipName)
+        {
+            if (avatarLoader == null || string.IsNullOrEmpty(avatarKey) || string.IsNullOrEmpty(clipName))
+                return false;
+
+            Drawable animation = avatarLoader.CreateAnimation(avatarKey, clipName, looping: true);
+            if (animation == null)
+                return false;
+
+            setContent(animation);
+            return true;
+        }
+
+        private Drawable tryLoadLocalAvatar()
+        {
+            if (user == null || string.IsNullOrEmpty(user.Username))
+                return null;
+
+            return tryLoadLocalAvatarKey(user.Username);
+        }
+
+        private Drawable tryLoadLocalAvatarKey(string key)
+        {
+            AvailableAnimations = avatarLoader.ListClipNames(key);
+            avatarKey = AvailableAnimations.Count > 0 ? key : null;
+
+            Drawable animation = avatarLoader.TryCreateDefaultAnimation(key);
+            if (animation != null)
+                return animation;
+
+            Texture still = avatarLoader.GetStaticTexture(key);
+            return still != null ? new Sprite { Texture = still } : null;
+        }
+
+        private static Drawable createSprite(Texture texture) =>
+            texture == null ? null : new Sprite { Texture = texture };
+
+        private void setContent(Drawable drawable)
+        {
+            content?.Expire();
+            content = drawable;
+
+            content.RelativeSizeAxes = Axes.Both;
+            content.FillMode = contentFillMode;
+            content.Anchor = Anchor.Centre;
+            content.Origin = Anchor.Centre;
+
+            InternalChild = content;
         }
 
         protected override void LoadComplete()

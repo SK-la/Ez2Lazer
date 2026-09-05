@@ -21,6 +21,11 @@ namespace osu.Game.EzOsuGame
         public const string PETS_PATH = @"EzResources/Pets";
 
         /// <summary>
+        /// Local custom avatars: <c>{Username}.png</c> or <c>{Username}/{clip}/000.png</c>.
+        /// </summary>
+        public const string AVATARS_PATH = @"EzResources/Modify/avatars";
+
+        /// <summary>
         /// Pixiv OAuth refresh token (same directory as client.realm / framework.ini).
         /// </summary>
         public const string PIXIV_AUTH_FILE = @"pixiv_auth.json";
