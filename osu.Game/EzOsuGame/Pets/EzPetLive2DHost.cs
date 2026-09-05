@@ -62,6 +62,23 @@ namespace osu.Game.EzOsuGame.Pets
             };
         }
 
+        private bool captureSuspended;
+
+        public void SuspendCapture()
+        {
+            captureSuspended = true;
+            meshView.SuspendCapture();
+        }
+
+        public void ResumeCapture()
+        {
+            if (!captureSuspended)
+                return;
+
+            captureSuspended = false;
+            meshView.ResumeCapture();
+        }
+
         public void BindPack(EzPetPack pack, string? modelEntryPath, EzPetCubismSession? session, Storage petsStorage, string? cubismError)
         {
             ModelEntryPath = modelEntryPath;

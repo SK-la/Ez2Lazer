@@ -29,8 +29,18 @@ namespace osu.Game.EzOsuGame.Pets
         private Texture[] textures = [];
         private EzPetCubismFrameSnapshot? latestFrame;
         private IRenderer? renderer;
+        private bool captureSuspended;
 
         public IShader TextureShader { get; private set; } = null!;
+
+        public void SuspendCapture()
+        {
+            captureSuspended = true;
+            latestFrame = null;
+            Invalidate(Invalidation.DrawNode);
+        }
+
+        public void ResumeCapture() => captureSuspended = false;
 
         public void Bind(EzPetCubismSession cubismSession, Storage pets)
         {
@@ -63,7 +73,7 @@ namespace osu.Game.EzOsuGame.Pets
         {
             base.Update();
 
-            if (session?.IsReady != true)
+            if (captureSuspended || session?.IsReady != true)
             {
                 latestFrame = null;
                 return;
@@ -165,6 +175,10 @@ namespace osu.Game.EzOsuGame.Pets
             {
                 base.Draw(renderer);
 
+                // Custom verts ignored inherited Alpha before — pet Hide() left Live2D fully visible.
+                if (DrawColourInfo.Colour.MaxAlpha < 0.001f)
+                    return;
+
                 if (frame == null || frame.Parts.Length == 0 || textures.Length == 0)
                     return;
 
@@ -177,6 +191,8 @@ namespace osu.Game.EzOsuGame.Pets
                 float offsetY = (drawSize.Y - canvasH * scale) * 0.5f;
 
                 batch ??= renderer.CreateLinearBatch<TexturedVertex2D>(IRenderer.MAX_VERTICES, 2, PrimitiveTopology.Triangles);
+
+                Color4 drawCol = DrawColourInfo.Colour.TopLeft.SRGB;
 
                 foreach (var part in frame.Parts)
                 {
@@ -193,8 +209,8 @@ namespace osu.Game.EzOsuGame.Pets
                         continue;
 
                     var texRect = texture.GetTextureRect();
-                    float a = Math.Clamp(part.Opacity, 0f, 1f);
-                    var colour = new Color4(1f, 1f, 1f, a);
+                    float a = Math.Clamp(part.Opacity, 0f, 1f) * drawCol.A;
+                    var colour = new Color4(drawCol.R, drawCol.G, drawCol.B, a);
 
                     for (int i = 0; i + 2 < part.Indices.Length; i += 3)
                     {

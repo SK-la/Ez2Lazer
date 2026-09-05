@@ -236,8 +236,17 @@ namespace osu.Game.EzOsuGame.Pets
                 if (State.Value == Visibility.Visible)
                     Hide();
 
+                live2DHost.SuspendCapture();
                 return;
             }
+
+            if (State.Value != Visibility.Visible)
+            {
+                live2DHost.SuspendCapture();
+                return;
+            }
+
+            live2DHost.ResumeCapture();
 
             base.Update();
 
