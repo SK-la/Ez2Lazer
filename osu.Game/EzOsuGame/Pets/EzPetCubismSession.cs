@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using Live2DCSharpSDK.Framework;
 using Live2DCSharpSDK.Framework.Effect;
 using Live2DCSharpSDK.Framework.Model;
+using Live2DCSharpSDK.Framework.Physics;
 using Newtonsoft.Json.Linq;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
@@ -24,7 +25,13 @@ namespace osu.Game.EzOsuGame.Pets
     {
         private CubismMoc? moc;
         private CubismBreath? breath;
+        private CubismPhysics? physics;
         private float userTime;
+        private float nextBlinkAt = 2f;
+        private float blinkPhase; // 0 idle, >0 closing/opening progress
+        private float reactionRemaining;
+        private float reactionAngleX;
+        private float reactionMouth;
         private static bool frameworkStarted;
         private static bool loggedCanvasOnce;
 
@@ -87,23 +94,13 @@ namespace osu.Game.EzOsuGame.Pets
                 created.moc = new CubismMoc(bytes, shouldCheckMocConsistency: true);
                 created.DrawableCount = created.moc.Model.GetDrawableCount();
                 created.TextureRelativePaths = resolveTexturePaths(petsStorage, modelEntryRelativePath);
-                created.breath = new CubismBreath
-                {
-                    Parameters =
-                    [
-                        new BreathParameterData
-                        {
-                            ParameterId = CubismDefaultParameterId.ParamBreath,
-                            Offset = 0.5f,
-                            Peak = 0.5f,
-                            Cycle = 3.2345f,
-                            Weight = 0.5f,
-                        },
-                    ],
-                };
+                created.physics = tryLoadPhysics(petsStorage, modelEntryRelativePath);
+                created.breath = createDefaultBreath();
+                created.moc.Model.SaveParameters();
                 created.IsReady = true;
                 created.Status =
-                    $"Core OK · {Path.GetFileName(mocRelative)} · drawables={created.DrawableCount} · tex={created.TextureRelativePaths.Count}";
+                    $"Core OK · {Path.GetFileName(mocRelative)} · drawables={created.DrawableCount} · tex={created.TextureRelativePaths.Count}"
+                    + (created.physics != null ? " · physics" : string.Empty);
                 session = created;
                 Logger.Log($"Ez pet Cubism: {created.Status}", LoggingTarget.Runtime);
                 return true;
@@ -120,6 +117,22 @@ namespace osu.Game.EzOsuGame.Pets
         {
             LastState = state;
             LastClip = clip;
+
+            // This pack has no motion3 files — drive a short procedural reaction instead.
+            if (string.Equals(state, "poke", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(clip, "poke", StringComparison.OrdinalIgnoreCase))
+            {
+                reactionRemaining = 0.55f;
+                reactionAngleX = (Random.Shared.NextSingle() * 2f - 1f) * 18f;
+                reactionMouth = 0.7f;
+            }
+            else if (string.Equals(state, "grabbed", StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(clip, "grabbed", StringComparison.OrdinalIgnoreCase))
+            {
+                reactionRemaining = 0.35f;
+                reactionAngleX = 12f;
+                reactionMouth = 0.35f;
+            }
         }
 
         public void Update(double elapsedSeconds)
@@ -127,21 +140,155 @@ namespace osu.Game.EzOsuGame.Pets
             if (!IsReady || moc == null)
                 return;
 
-            userTime += (float)Math.Max(0, elapsedSeconds);
-            breath?.UpdateParameters(moc.Model, (float)elapsedSeconds);
-            moc.Model.Update();
+            float dt = (float)Math.Max(0, Math.Min(elapsedSeconds, 0.1));
+            userTime += dt;
+            var model = moc.Model;
+
+            model.LoadParameters();
+
+            // Idle look-around (no motion3 available on many official-edit packs).
+            float lookX = MathF.Sin(userTime * 0.55f) * 8f;
+            float lookY = MathF.Sin(userTime * 0.37f) * 5f;
+            model.AddParameterValue(CubismDefaultParameterId.ParamAngleX, lookX);
+            model.AddParameterValue(CubismDefaultParameterId.ParamAngleY, lookY);
+            model.AddParameterValue(CubismDefaultParameterId.ParamAngleZ, lookX * lookY * -0.05f);
+            model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleX, lookX * 0.25f);
+            model.AddParameterValue(CubismDefaultParameterId.ParamEyeBallX, MathF.Sin(userTime * 0.45f) * 0.35f);
+            model.AddParameterValue(CubismDefaultParameterId.ParamEyeBallY, MathF.Sin(userTime * 0.33f) * 0.2f);
+
+            if (reactionRemaining > 0)
+            {
+                float t = Math.Clamp(reactionRemaining / 0.55f, 0f, 1f);
+                model.AddParameterValue(CubismDefaultParameterId.ParamAngleX, reactionAngleX * t);
+                model.AddParameterValue(CubismDefaultParameterId.ParamMouthOpenY, reactionMouth * t);
+                reactionRemaining = Math.Max(0, reactionRemaining - dt);
+            }
+
+            model.SaveParameters();
+
+            breath?.UpdateParameters(model, dt);
+            updateEyeBlink(model, dt);
+            physics?.Evaluate(model, dt);
+            model.Update();
 
             try
             {
-                int index = moc.Model.GetParameterIndex(CubismDefaultParameterId.ParamBreath);
-                if (index >= 0)
-                    BreathValue = moc.Model.GetParameterValue(index);
-                else
-                    BreathValue = 0.5f + 0.5f * MathF.Sin(userTime * 2f);
+                int index = model.GetParameterIndex(CubismDefaultParameterId.ParamBreath);
+                BreathValue = index >= 0 ? model.GetParameterValue(index) : 0.5f + 0.5f * MathF.Sin(userTime * 2f);
             }
             catch
             {
                 BreathValue = 0.5f + 0.5f * MathF.Sin(userTime * 2f);
+            }
+        }
+
+        private void updateEyeBlink(CubismModel model, float dt)
+        {
+            const float close_seconds = 0.08f;
+            const float open_seconds = 0.12f;
+
+            if (blinkPhase <= 0)
+            {
+                if (userTime < nextBlinkAt)
+                {
+                    model.SetParameterValue(CubismDefaultParameterId.ParamEyeLOpen, 1f);
+                    model.SetParameterValue(CubismDefaultParameterId.ParamEyeROpen, 1f);
+                    return;
+                }
+
+                blinkPhase = close_seconds + open_seconds;
+                nextBlinkAt = userTime + 2.5f + Random.Shared.NextSingle() * 3.5f;
+            }
+
+            float remaining = blinkPhase;
+            blinkPhase = Math.Max(0, blinkPhase - dt);
+
+            float open;
+            if (remaining > open_seconds)
+            {
+                // closing
+                float t = 1f - (remaining - open_seconds) / close_seconds;
+                open = 1f - Math.Clamp(t, 0f, 1f);
+            }
+            else
+            {
+                // opening
+                open = 1f - Math.Clamp(remaining / open_seconds, 0f, 1f);
+            }
+
+            model.SetParameterValue(CubismDefaultParameterId.ParamEyeLOpen, open);
+            model.SetParameterValue(CubismDefaultParameterId.ParamEyeROpen, open);
+        }
+
+        private static CubismBreath createDefaultBreath() => new()
+        {
+            Parameters =
+            [
+                new BreathParameterData
+                {
+                    ParameterId = CubismDefaultParameterId.ParamAngleX,
+                    Offset = 0f,
+                    Peak = 12f,
+                    Cycle = 6.5345f,
+                    Weight = 0.5f,
+                },
+                new BreathParameterData
+                {
+                    ParameterId = CubismDefaultParameterId.ParamAngleY,
+                    Offset = 0f,
+                    Peak = 8f,
+                    Cycle = 3.5345f,
+                    Weight = 0.5f,
+                },
+                new BreathParameterData
+                {
+                    ParameterId = CubismDefaultParameterId.ParamAngleZ,
+                    Offset = 0f,
+                    Peak = 8f,
+                    Cycle = 5.5345f,
+                    Weight = 0.5f,
+                },
+                new BreathParameterData
+                {
+                    ParameterId = CubismDefaultParameterId.ParamBodyAngleX,
+                    Offset = 0f,
+                    Peak = 4f,
+                    Cycle = 15.5345f,
+                    Weight = 0.5f,
+                },
+                new BreathParameterData
+                {
+                    ParameterId = CubismDefaultParameterId.ParamBreath,
+                    Offset = 0.5f,
+                    Peak = 0.5f,
+                    Cycle = 3.2345f,
+                    Weight = 0.5f,
+                },
+            ],
+        };
+
+        private static CubismPhysics? tryLoadPhysics(Storage petsStorage, string modelEntryRelativePath)
+        {
+            string? physicsRel = resolveSiblingFromModel3(petsStorage, modelEntryRelativePath, "Physics");
+            if (physicsRel == null || !petsStorage.Exists(physicsRel.Replace('/', Path.DirectorySeparatorChar)))
+                return null;
+
+            try
+            {
+                using var stream = petsStorage.GetStream(physicsRel.Replace('/', Path.DirectorySeparatorChar));
+                if (stream == null)
+                    return null;
+
+                using var reader = new StreamReader(stream);
+                string json = reader.ReadToEnd();
+                var physics = new CubismPhysics(json);
+                Logger.Log($"Ez pet Cubism: loaded physics '{physicsRel}'", LoggingTarget.Runtime);
+                return physics;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Ez pet Cubism: failed loading physics3.json");
+                return null;
             }
         }
 
@@ -253,6 +400,7 @@ namespace osu.Game.EzOsuGame.Pets
         public void Dispose()
         {
             breath = null;
+            physics = null;
             moc?.Dispose();
             moc = null;
             IsReady = false;
@@ -312,6 +460,34 @@ namespace osu.Game.EzOsuGame.Pets
             }
 
             return result;
+        }
+
+        private static string? resolveSiblingFromModel3(Storage petsStorage, string modelEntryRelativePath, string fileReferenceKey)
+        {
+            string normalised = modelEntryRelativePath.Replace('\\', '/');
+            if (!normalised.EndsWith(".model3.json", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            string dir = Path.GetDirectoryName(normalised.Replace('/', Path.DirectorySeparatorChar)) ?? string.Empty;
+
+            try
+            {
+                using var stream = petsStorage.GetStream(normalised.Replace('/', Path.DirectorySeparatorChar));
+                if (stream == null)
+                    return null;
+
+                using var reader = new StreamReader(stream);
+                var root = JObject.Parse(reader.ReadToEnd());
+                string? rel = root["FileReferences"]?[fileReferenceKey]?.ToString();
+                if (string.IsNullOrWhiteSpace(rel))
+                    return null;
+
+                return Path.Combine(dir, rel.Replace('/', Path.DirectorySeparatorChar)).Replace('\\', '/');
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static string? resolveMocRelative(Storage petsStorage, string modelEntryRelativePath)
