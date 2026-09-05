@@ -38,7 +38,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (packNames.Count == 0)
                 packNames.Add(EzDefaultPetPack.NAME);
 
-            AddRange(new Drawable[]
+            AddRange(new[]
             {
                 new SettingsItemV2(new FormCheckBox
                 {

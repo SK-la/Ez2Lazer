@@ -765,8 +765,8 @@ namespace osu.Game.EzOsuGame.Pets
             return s.Contains("eye", StringComparison.Ordinal)
                    || s.Contains("hitomi", StringComparison.Ordinal)
                    || s.Contains("pupil", StringComparison.Ordinal)
-                   || s.Contains("瞳")
-                   || s.Contains("眼");
+                   || s.Contains('瞳')
+                   || s.Contains('眼');
         }
 
         private static bool isEyeInteriorMesh(string id)
@@ -781,8 +781,8 @@ namespace osu.Game.EzOsuGame.Pets
                    || s.Contains("hl", StringComparison.Ordinal)
                    || s.Contains("hitomi", StringComparison.Ordinal)
                    || s.Contains("pupil", StringComparison.Ordinal)
-                   || s.Contains("虹")
-                   || s.Contains("瞳")
+                   || s.Contains('虹')
+                   || s.Contains('瞳')
                    || s.Contains("白目")
                    // Generic "EyeL"/"EyeR" artmeshes that are not lids/lashes — fade to be safe when masked.
                    || (s.Contains("eye", StringComparison.Ordinal) && (s.Contains('l') || s.Contains('r')));
@@ -798,8 +798,8 @@ namespace osu.Game.EzOsuGame.Pets
                    || s.Contains("brow", StringComparison.Ordinal)
                    || s.Contains("matsuge", StringComparison.Ordinal)
                    || s.Contains("mayu", StringComparison.Ordinal)
-                   || s.Contains("睫")
-                   || s.Contains("眉")
+                   || s.Contains('睫')
+                   || s.Contains('眉')
                    || s.Contains("lid", StringComparison.Ordinal)
                    || s.Contains("まぶた");
         }

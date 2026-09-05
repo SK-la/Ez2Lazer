@@ -200,6 +200,7 @@ namespace osu.Game.EzOsuGame.Pets
                     Architecture.Arm64 => Path.Combine("windows", "arm64", fileName),
                     _ => Path.Combine("windows", "x86_64", fileName),
                 };
+
                 yield break;
             }
 
@@ -210,6 +211,7 @@ namespace osu.Game.EzOsuGame.Pets
                     Architecture.Arm64 => Path.Combine("linux", "arm64", fileName),
                     _ => Path.Combine("linux", "x86_64", fileName),
                 };
+
                 yield break;
             }
 

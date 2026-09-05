@@ -279,11 +279,15 @@ namespace osu.Game.EzOsuGame.Pets
                 if (trackPlaying)
                 {
                     // Base BPM from beatmap info; scale by playback rate (DT/HT).
-                    double baseBpm = working.BeatmapInfo?.BPM ?? 0;
+                    double baseBpm = working?.BeatmapInfo?.BPM ?? 0;
                     if (baseBpm <= 0)
                         baseBpm = 120;
-                    bpm = (float)(baseBpm * Math.Max(0.1, track.Rate));
-                    trackTime = track.CurrentTime;
+
+                    if (track != null)
+                    {
+                        bpm = (float)(baseBpm * Math.Max(0.1, track.Rate));
+                        trackTime = track.CurrentTime;
+                    }
                 }
 
                 // Settings toggle = head association only; mouth uses pet.json lipSync.enabled.

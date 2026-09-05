@@ -332,6 +332,7 @@ namespace osu.Game.EzOsuGame.Pets
                     float releaseT = (Age - releaseStartAge) / release;
                     if (releaseT >= 1f)
                         return 0f;
+
                     return weightAtRelease * (1f - releaseT);
                 }
 
