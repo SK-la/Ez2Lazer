@@ -3,7 +3,7 @@
   "defaultState": "idle",
   "live2d": {
     "root": "live2d",
-    "lipSync": { "minOpen": 0.25 },
+    "lipSync": { "enabled": false, "minOpen": 0.25 },
     "clipExpressions": {
       "idle": [],
       "poke": ["nod"],

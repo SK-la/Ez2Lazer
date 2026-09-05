@@ -130,7 +130,12 @@ namespace osu.Game.EzOsuGame.Pets
     public class EzPetLive2DLipSyncDefinition
     {
         /// <summary>
-        /// Minimum <c>ParamMouthOpenY</c> while lip-sync is active (never fully closed).
+        /// When true, BPM quarter-note mouth open while the track is playing. Default off; independent of the settings music-association toggle.
+        /// </summary>
+        public bool Enabled { get; set; }
+
+        /// <summary>
+        /// Minimum <c>ParamMouthOpenY</c> while mouth sync is active (never fully closed).
         /// </summary>
         public float MinOpen { get; set; } = 0.25f;
     }

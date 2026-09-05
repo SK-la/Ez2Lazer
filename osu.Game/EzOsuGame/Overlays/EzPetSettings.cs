@@ -113,7 +113,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetLive2DLipSync),
                 })
                 {
-                    Keywords = new[] { "pet", "live2d", "lip", "mouth", "口型", "桌宠" }
+                    Keywords = new[] { "pet", "live2d", "music", "bpm", "关联", "晃头", "桌宠" }
                 },
             });
 

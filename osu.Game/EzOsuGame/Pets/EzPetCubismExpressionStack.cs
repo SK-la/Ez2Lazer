@@ -85,8 +85,9 @@ namespace osu.Game.EzOsuGame.Pets
                 ["coverEyes"] = recipe("coverEyes", hold: 0, bounce: 0,
                     p(CubismDefaultParameterId.ParamArmLA, 1f),
                     p(CubismDefaultParameterId.ParamArmRA, 1f),
-                    p(CubismDefaultParameterId.ParamEyeLOpen, 0.15f),
-                    p(CubismDefaultParameterId.ParamEyeROpen, 0.15f),
+                    // Relative to blink/motion EyeOpen≈1 so eyes mostly shut.
+                    p(CubismDefaultParameterId.ParamEyeLOpen, -0.85f),
+                    p(CubismDefaultParameterId.ParamEyeROpen, -0.85f),
                     p(CubismDefaultParameterId.ParamBrowLY, -0.5f),
                     p(CubismDefaultParameterId.ParamBrowRY, -0.5f)),
             };

@@ -50,11 +50,13 @@ namespace osu.Game.EzOsuGame.Pets
 
         private readonly EzPetCubismExpressionStack expressionStack = new EzPetCubismExpressionStack(EzPetCubismExpressionLibrary.CreateDefaults());
         private EzPetLive2DDefinition? live2DDefinition;
-        private bool lipSyncEnabled;
+        private bool musicAssociationEnabled;
+        private bool mouthSyncFromPack;
         private float lipSyncMinOpen = 0.25f;
         private float musicBpm;
         private double musicTrackTimeMs;
         private float musicSyncWeight;
+        private float mouthSyncWeight;
 
         public bool IsReady { get; private set; }
 
@@ -150,16 +152,25 @@ namespace osu.Game.EzOsuGame.Pets
                 definition?.Expressions);
             expressionStack.SetRecipes(recipes);
 
-            if (definition?.LipSync != null && definition.LipSync.MinOpen > 0)
-                lipSyncMinOpen = Math.Clamp(definition.LipSync.MinOpen, 0.01f, 0.95f);
+            if (definition?.LipSync != null)
+            {
+                mouthSyncFromPack = definition.LipSync.Enabled;
+                if (definition.LipSync.MinOpen > 0)
+                    lipSyncMinOpen = Math.Clamp(definition.LipSync.MinOpen, 0.01f, 0.95f);
+            }
+            else
+            {
+                mouthSyncFromPack = false;
+            }
         }
 
         /// <summary>
-        /// Drive mouth / head from beatmap base BPM and track clock (not audio amplitude).
+        /// <paramref name="associationEnabled"/>: settings toggle for BPM head sway.
+        /// Mouth uses pack <c>live2d.lipSync.enabled</c> only (see <see cref="ConfigurePack"/>).
         /// </summary>
-        public void SetMusicSync(bool enabled, float bpm, double trackTimeMs)
+        public void SetMusicSync(bool associationEnabled, float bpm, double trackTimeMs)
         {
-            lipSyncEnabled = enabled;
+            musicAssociationEnabled = associationEnabled;
             musicBpm = bpm > 1f && bpm < 1000f ? bpm : 0f;
             musicTrackTimeMs = trackTimeMs;
         }
@@ -265,8 +276,6 @@ namespace osu.Game.EzOsuGame.Pets
 
             model.LoadParameters();
 
-            bool motionUpdated = false;
-
             if (hasMotionLibrary)
             {
                 if (motionManager.IsFinished())
@@ -274,7 +283,7 @@ namespace osu.Game.EzOsuGame.Pets
 
                 try
                 {
-                    motionUpdated = motionManager.UpdateMotion(model, dt);
+                    motionManager.UpdateMotion(model, dt);
                 }
                 catch (Exception ex)
                 {
@@ -292,8 +301,11 @@ namespace osu.Game.EzOsuGame.Pets
                 model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleZ, tilt * 0.3f);
             }
 
-            float musicTarget = lipSyncEnabled && musicBpm > 0 ? 1f : 0f;
+            float musicTarget = musicAssociationEnabled && musicBpm > 0 ? 1f : 0f;
             musicSyncWeight = approach(musicSyncWeight, musicTarget, dt, attack: 2.5f, release: 3.5f);
+
+            float mouthTarget = mouthSyncFromPack && musicBpm > 0 ? 1f : 0f;
+            mouthSyncWeight = approach(mouthSyncWeight, mouthTarget, dt, attack: 2.5f, release: 3.5f);
 
             if (reactionRemaining > 0)
             {
@@ -303,17 +315,12 @@ namespace osu.Game.EzOsuGame.Pets
             }
 
             expressionStack.Update(dt);
-            // While BPM head sway is active, skip expression AngleZ/BodyAngleZ so they cannot snap-fight.
-            expressionStack.Apply(model, skipHeadRoll: musicSyncWeight > 0.05f);
 
             // Keep facing forward: kill yaw/pitch drift from breath / reactions.
             model.SetParameterValue(CubismDefaultParameterId.ParamAngleX, 0f);
             model.SetParameterValue(CubismDefaultParameterId.ParamBodyAngleX, 0f);
 
             model.SaveParameters();
-
-            if (!motionUpdated)
-                updateEyeBlink(model, dt);
 
             breath?.UpdateParameters(model, dt);
 
@@ -322,7 +329,12 @@ namespace osu.Game.EzOsuGame.Pets
 
             physics?.Evaluate(model, dt);
 
-            // BPM sway once after physics (continuous phase — avoids doubled Add + snap).
+            // After motion/physics: idle motion3 often writes EyeOpen=1 every frame; blinking must win.
+            updateEyeBlink(model, dt);
+
+            // Expressions after blink so EyeSmile / coverEyes still layer on top.
+            expressionStack.Apply(model, skipHeadRoll: musicSyncWeight > 0.05f);
+
             if (musicSyncWeight > 0.001f)
                 applyBpmHeadSway(model, musicSyncWeight);
 
@@ -343,14 +355,14 @@ namespace osu.Game.EzOsuGame.Pets
 
         private void applyMouth(CubismModel model)
         {
-            if (musicSyncWeight > 0.001f && musicBpm > 0)
+            if (mouthSyncWeight > 0.001f && musicBpm > 0)
             {
                 // Quarter-note pulse: open on each beat (editor scale 0–1).
                 double beats = musicTrackTimeMs * musicBpm / 60000.0;
                 float beatFrac = (float)(beats - Math.Floor(beats));
                 float pulse = MathF.Pow(Math.Max(0f, MathF.Cos(beatFrac * MathF.Tau)), 1.6f);
-                float open = lipSyncMinOpen + (1f - lipSyncMinOpen) * pulse * musicSyncWeight
-                             + 0.5f * (1f - musicSyncWeight);
+                float open = lipSyncMinOpen + (1f - lipSyncMinOpen) * pulse * mouthSyncWeight
+                             + 0.5f * (1f - mouthSyncWeight);
                 model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, Math.Clamp(open, 0f, 1f));
                 return;
             }

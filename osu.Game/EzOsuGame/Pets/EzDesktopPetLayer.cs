@@ -261,13 +261,13 @@ namespace osu.Game.EzOsuGame.Pets
 
             if (preferLive2DHost && cubismSession?.IsReady == true)
             {
-                bool sync = live2DLipSync.Value;
                 float bpm = 0;
                 double trackTime = 0;
                 var working = beatmap.Value;
                 var track = working?.Track;
+                bool trackPlaying = track?.IsRunning == true;
 
-                if (sync && track?.IsRunning == true)
+                if (trackPlaying)
                 {
                     // Base BPM from beatmap info; scale by playback rate (DT/HT).
                     double baseBpm = working.BeatmapInfo?.BPM ?? 0;
@@ -277,7 +277,8 @@ namespace osu.Game.EzOsuGame.Pets
                     trackTime = track.CurrentTime;
                 }
 
-                cubismSession.SetMusicSync(sync && track?.IsRunning == true, bpm, trackTime);
+                // Settings toggle = head association only; mouth uses pet.json lipSync.enabled.
+                cubismSession.SetMusicSync(live2DLipSync.Value && trackPlaying, bpm, trackTime);
                 cubismSession.Update(Time.Elapsed / 1000.0);
                 live2DHost.ApplyBreath(cubismSession.BreathValue);
             }
