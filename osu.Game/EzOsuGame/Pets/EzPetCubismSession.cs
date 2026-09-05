@@ -42,6 +42,8 @@ namespace osu.Game.EzOsuGame.Pets
         private float userTime;
         private float nextBlinkAt = 2f;
         private float blinkPhase; // 0 idle, >0 closing/opening progress
+        private float currentEyeOpen = 1f;
+        private static bool loggedEyeBlinkOnce;
         private float reactionRemaining;
         private float reactionAngleX;
         private float reactionMouth;
@@ -370,21 +372,6 @@ namespace osu.Game.EzOsuGame.Pets
             model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, 0.5f);
         }
 
-        /// <summary>
-        /// Half-note head sway (period = 2 beats), continuous phase from track time — no free-running sin.
-        /// </summary>
-        private void applyBpmHeadSway(CubismModel model, float weight)
-        {
-            if (musicBpm <= 0)
-                return;
-
-            double beats = musicTrackTimeMs * musicBpm / 60000.0;
-            // Period 2 beats → half-note rate; Sin(beats * π).
-            float sway = MathF.Sin((float)(beats * Math.PI)) * 3f * weight;
-            model.AddParameterValue(CubismDefaultParameterId.ParamAngleZ, sway);
-            model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleZ, sway * 0.35f);
-        }
-
         private static float approach(float current, float target, float dt, float attack, float release)
         {
             float speed = target > current ? attack : release;
@@ -477,8 +464,8 @@ namespace osu.Game.EzOsuGame.Pets
             {
                 if (userTime < nextBlinkAt)
                 {
-                    model.SetParameterValue(CubismDefaultParameterId.ParamEyeLOpen, 1f);
-                    model.SetParameterValue(CubismDefaultParameterId.ParamEyeROpen, 1f);
+                    currentEyeOpen = 1f;
+                    setEyeOpen(model, 1f);
                     return;
                 }
 
@@ -503,8 +490,41 @@ namespace osu.Game.EzOsuGame.Pets
                 open = 1f - Math.Clamp(remaining / open_seconds, 0f, 1f);
             }
 
-            model.SetParameterValue(CubismDefaultParameterId.ParamEyeLOpen, open);
-            model.SetParameterValue(CubismDefaultParameterId.ParamEyeROpen, open);
+            currentEyeOpen = open;
+            setEyeOpen(model, open);
+        }
+
+        private void setEyeOpen(CubismModel model, float open)
+        {
+            // Prefer real model parameters; writing missing IDs only fills a phantom slot.
+            trySetEyeParam(model, CubismDefaultParameterId.ParamEyeLOpen, open);
+            trySetEyeParam(model, CubismDefaultParameterId.ParamEyeROpen, open);
+        }
+
+        private static void trySetEyeParam(CubismModel model, string id, float open)
+        {
+            int index = model.ParameterIds.IndexOf(id);
+            if (index < 0)
+                return;
+
+            model.SetParameterValue(index, open);
+        }
+
+        /// <summary>
+        /// Half-note whole-body sway (head + torso same phase).
+        /// </summary>
+        private void applyBpmHeadSway(CubismModel model, float weight)
+        {
+            if (musicBpm <= 0)
+                return;
+
+            double beats = musicTrackTimeMs * musicBpm / 60000.0;
+            // Period 2 beats; roll head and body together so it is not a floating head.
+            float roll = MathF.Sin((float)(beats * Math.PI)) * 4f * weight;
+            model.AddParameterValue(CubismDefaultParameterId.ParamAngleZ, roll);
+            model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleZ, roll);
+            // Slight side lean for torso readability on bust models.
+            model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleX, roll * 0.35f);
         }
 
         private static CubismBreath createDefaultBreath() => new CubismBreath
@@ -597,6 +617,18 @@ namespace osu.Game.EzOsuGame.Pets
                 var parts = new List<EzPetCubismMeshPart>(count);
                 float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
                 int visibleVerts = 0;
+                int* maskCounts = model.GetDrawableMaskCounts();
+                float eyeFade = Math.Clamp(currentEyeOpen, 0f, 1f);
+
+                if (!loggedEyeBlinkOnce)
+                {
+                    loggedEyeBlinkOnce = true;
+                    bool hasL = model.ParameterIds.IndexOf(CubismDefaultParameterId.ParamEyeLOpen) >= 0;
+                    bool hasR = model.ParameterIds.IndexOf(CubismDefaultParameterId.ParamEyeROpen) >= 0;
+                    Logger.Log(
+                        $"Ez pet Cubism blink: ParamEyeLOpen={(hasL ? "ok" : "missing")} ParamEyeROpen={(hasR ? "ok" : "missing")} masking={model.IsUsingMasking()} (no GPU clip — fade eye meshes)",
+                        LoggingTarget.Runtime);
+                }
 
                 for (int o = 0; o < count; o++)
                 {
@@ -606,6 +638,12 @@ namespace osu.Game.EzOsuGame.Pets
                         continue;
 
                     float opacity = model.GetDrawableOpacity(di);
+
+                    // Without clipping masks, eyelid deformation leaves eyeballs visible.
+                    // Approximate closed eyes by fading clipped / eye-interior drawables with EyeOpen.
+                    if (eyeFade < 0.999f && shouldFadeDrawableWithBlink(model, di, maskCounts))
+                        opacity *= eyeFade;
+
                     if (opacity <= 0.001f)
                         continue;
 
@@ -670,6 +708,96 @@ namespace osu.Game.EzOsuGame.Pets
                 Logger.Error(ex, "Ez pet Cubism: CaptureFrame failed");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Drawables that should disappear with EyeOpen when GPU clipping is unavailable.
+        /// </summary>
+        private static unsafe bool shouldFadeDrawableWithBlink(CubismModel model, int drawableIndex, int* maskCounts)
+        {
+            string id = drawableIndex >= 0 && drawableIndex < model.DrawableIds.Count
+                ? model.DrawableIds[drawableIndex]
+                : string.Empty;
+
+            if (isEyelashOrBrowMesh(id))
+                return false;
+
+            if (isEyeInteriorMesh(id))
+                return true;
+
+            // Clipped eye content (white / iris / highlight) even with opaque names.
+            if (maskCounts != null
+                && maskCounts[drawableIndex] > 0
+                && isEyeRelatedMesh(id))
+                return true;
+
+            // Any mesh clipped by an eye-related mask (typical eyeball / highlight setup).
+            if (maskCounts == null || maskCounts[drawableIndex] <= 0)
+                return false;
+
+            int** masks = model.GetDrawableMasks();
+            int n = maskCounts[drawableIndex];
+
+            for (int m = 0; m < n; m++)
+            {
+                int maskDi = masks[drawableIndex][m];
+                if (maskDi < 0 || maskDi >= model.DrawableIds.Count)
+                    continue;
+
+                string maskId = model.DrawableIds[maskDi];
+                if (isEyeRelatedMesh(maskId) && !isEyelashOrBrowMesh(maskId))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool isEyeRelatedMesh(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+                return false;
+
+            string s = id.ToLowerInvariant();
+            return s.Contains("eye", StringComparison.Ordinal)
+                   || s.Contains("hitomi", StringComparison.Ordinal)
+                   || s.Contains("pupil", StringComparison.Ordinal)
+                   || s.Contains("瞳")
+                   || s.Contains("眼");
+        }
+
+        private static bool isEyeInteriorMesh(string id)
+        {
+            if (!isEyeRelatedMesh(id) || isEyelashOrBrowMesh(id))
+                return false;
+
+            string s = id.ToLowerInvariant();
+            return s.Contains("ball", StringComparison.Ordinal)
+                   || s.Contains("white", StringComparison.Ordinal)
+                   || s.Contains("highlight", StringComparison.Ordinal)
+                   || s.Contains("hl", StringComparison.Ordinal)
+                   || s.Contains("hitomi", StringComparison.Ordinal)
+                   || s.Contains("pupil", StringComparison.Ordinal)
+                   || s.Contains("虹")
+                   || s.Contains("瞳")
+                   || s.Contains("白目")
+                   // Generic "EyeL"/"EyeR" artmeshes that are not lids/lashes — fade to be safe when masked.
+                   || (s.Contains("eye", StringComparison.Ordinal) && (s.Contains('l') || s.Contains('r')));
+        }
+
+        private static bool isEyelashOrBrowMesh(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+                return false;
+
+            string s = id.ToLowerInvariant();
+            return s.Contains("lash", StringComparison.Ordinal)
+                   || s.Contains("brow", StringComparison.Ordinal)
+                   || s.Contains("matsuge", StringComparison.Ordinal)
+                   || s.Contains("mayu", StringComparison.Ordinal)
+                   || s.Contains("睫")
+                   || s.Contains("眉")
+                   || s.Contains("lid", StringComparison.Ordinal)
+                   || s.Contains("まぶた");
         }
 
         public void Dispose()
