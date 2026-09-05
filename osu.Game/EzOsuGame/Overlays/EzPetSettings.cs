@@ -4,12 +4,16 @@
 using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Pets;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.Overlays
@@ -18,10 +22,13 @@ namespace osu.Game.EzOsuGame.Overlays
     {
         protected override LocalisableString Header => EzSettingsDesktopPet.DESKTOP_PET_SETTINGS_HEADER;
 
+        private EzPetPackLoader loader = null!;
+        private OsuSpriteText packStatusText = null!;
+
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig, Storage storage)
         {
-            var loader = new EzPetPackLoader(storage);
+            loader = new EzPetPackLoader(storage);
             var packNames = new List<string>(loader.ListPackNames());
             var packBindable = ezConfig.GetBindable<string>(Ez2Setting.DesktopPetPack);
 
@@ -86,8 +93,9 @@ namespace osu.Game.EzOsuGame.Overlays
                     Items = packNames,
                 })
                 {
-                    Keywords = new[] { "pet", "pack", "mascot", "桌宠" }
+                    Keywords = new[] { "pet", "pack", "mascot", "桌宠", "live2d" }
                 },
+                createPackStatusRow(),
                 new SettingsItemV2(new FormSliderBar<double>
                 {
                     Caption = EzSettingsDesktopPet.DESKTOP_PET_SCALE,
@@ -99,6 +107,57 @@ namespace osu.Game.EzOsuGame.Overlays
                     Keywords = new[] { "pet", "scale", "size", "桌宠" }
                 },
             });
+
+            packBindable.BindValueChanged(_ => refreshPackStatus(packBindable.Value), true);
+        }
+
+        private Drawable createPackStatusRow()
+        {
+            packStatusText = new OsuSpriteText
+            {
+                RelativeSizeAxes = Axes.X,
+                Font = OsuFont.GetFont(size: 12),
+                Colour = Colour4.Gray,
+                Text = string.Empty,
+            };
+
+            return new Container
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Padding = SettingsPanel.CONTENT_PADDING,
+                Child = packStatusText,
+            };
+        }
+
+        private void refreshPackStatus(string? packName)
+        {
+            var pack = loader.Load(string.IsNullOrWhiteSpace(packName) ? EzDefaultPetPack.NAME : packName);
+            bool corePresent = EzPetLive2DAccess.HasCubismCoreOnDisk(loader.PetsStorage);
+
+            if (pack == null)
+            {
+                packStatusText.Text = EzSettingsDesktopPet.DESKTOP_PET_STATUS_MISSING_PACK;
+                return;
+            }
+
+            if (pack.Live2DAuthorized)
+            {
+                packStatusText.Text = corePresent
+                    ? EzSettingsDesktopPet.DESKTOP_PET_STATUS_LIVE2D_READY
+                    : EzSettingsDesktopPet.DESKTOP_PET_STATUS_LIVE2D_MISSING_CORE;
+                return;
+            }
+
+            if (EzPetLive2DAccess.ParseRenderer(pack.Definition.Renderer) == EzPetRendererKind.Live2D)
+            {
+                packStatusText.Text = EzSettingsDesktopPet.DESKTOP_PET_STATUS_LIVE2D_MISSING_MODEL;
+                return;
+            }
+
+            packStatusText.Text = pack.HasRasterFrames
+                ? EzSettingsDesktopPet.DESKTOP_PET_STATUS_PNG_OK
+                : EzSettingsDesktopPet.DESKTOP_PET_STATUS_EMPTY;
         }
     }
 }

@@ -2,10 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Security.Cryptography;
-using System.Text;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 
@@ -18,24 +15,11 @@ namespace osu.Game.EzOsuGame.Pets
     }
 
     /// <summary>
-    /// Official Live2D preset gate. Scan still lists any folder with pet.json, but Cubism
-    /// (and <see cref="EzPetPack.Live2DAuthorized"/>) only applies when pack id + entry hash match.
+    /// Live2D pack gate: Cubism runs when <c>renderer</c> is live2d and a model entry exists.
+    /// Cubism Core DLL is checked at session create time, not here.
     /// </summary>
-    public static partial class EzPetLive2DAccess
+    public static class EzPetLive2DAccess
     {
-        /// <summary>
-        /// Pack folder name (case-insensitive) → SHA-256 hex of the canonical model entry
-        /// (prefer <c>live2d/*.model3.json</c>, else first <c>.moc3</c>).
-        /// Empty until official presets are registered.
-        /// </summary>
-        public static IReadOnlyDictionary<string, string> PresetHashes { get; private set; } =
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        public static void SetPresetHashesForTests(IReadOnlyDictionary<string, string> hashes)
-        {
-            PresetHashes = new Dictionary<string, string>(hashes, StringComparer.OrdinalIgnoreCase);
-        }
-
         public static EzPetRendererKind ParseRenderer(string? renderer)
         {
             if (string.Equals(renderer, "live2d", StringComparison.OrdinalIgnoreCase)
@@ -47,7 +31,7 @@ namespace osu.Game.EzOsuGame.Pets
         }
 
         /// <summary>
-        /// True only when the pack asks for Live2D and passes whitelist + hash.
+        /// True when the pack asks for Live2D and a <c>.model3.json</c> / <c>.moc3</c> entry is present.
         /// </summary>
         public static bool TryAuthorize(string packName, EzPetPackDefinition definition, Storage petsStorage, out string? denialReason)
         {
@@ -59,34 +43,12 @@ namespace osu.Game.EzOsuGame.Pets
                 return false;
             }
 
-            if (!PresetHashes.TryGetValue(packName, out string? expectedHash) || string.IsNullOrWhiteSpace(expectedHash))
-            {
-                denialReason = $"pack '{packName}' is not an official Live2D preset";
-                Logger.Log($"Ez pet: Live2D denied for '{packName}' (not in preset whitelist).", LoggingTarget.Runtime);
-                return false;
-            }
-
             string? entryRelative = FindCanonicalEntryRelativePath(petsStorage, packName, definition);
 
             if (entryRelative == null)
             {
                 denialReason = "missing live2d model entry";
                 Logger.Log($"Ez pet: Live2D denied for '{packName}' (no model3.json/moc3).", LoggingTarget.Runtime, LogLevel.Error);
-                return false;
-            }
-
-            string? actual = ComputeFileSha256Hex(petsStorage, entryRelative);
-
-            if (actual == null)
-            {
-                denialReason = "failed to hash live2d entry";
-                return false;
-            }
-
-            if (!string.Equals(actual, expectedHash.Trim(), StringComparison.OrdinalIgnoreCase))
-            {
-                denialReason = "live2d payload hash mismatch";
-                Logger.Log($"Ez pet: Live2D denied for '{packName}' (hash mismatch).", LoggingTarget.Runtime, LogLevel.Error);
                 return false;
             }
 
@@ -124,29 +86,11 @@ namespace osu.Game.EzOsuGame.Pets
             return null;
         }
 
-        public static string? ComputeFileSha256Hex(Storage storage, string relativePath)
-        {
-            try
-            {
-                using var stream = storage.GetStream(relativePath);
-                if (stream == null)
-                    return null;
-
-                using var sha = SHA256.Create();
-                byte[] hash = sha.ComputeHash(stream);
-                var sb = new StringBuilder(hash.Length * 2);
-
-                foreach (byte b in hash)
-                    sb.Append(b.ToString("x2"));
-
-                return sb.ToString();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, $"Ez pet: failed hashing '{relativePath}'");
-                return null;
-            }
-        }
+        /// <summary>
+        /// Whether <c>Live2DCubismCore.dll</c> is present under Pets/_cubism (does not load it).
+        /// </summary>
+        public static bool HasCubismCoreOnDisk(Storage petsStorage)
+            => petsStorage.Exists(Path.Combine(EzPetCubismNative.CORE_DIRECTORY, EzPetCubismNative.CORE_DLL_WINDOWS));
     }
 
     public class EzPetLive2DDefinition

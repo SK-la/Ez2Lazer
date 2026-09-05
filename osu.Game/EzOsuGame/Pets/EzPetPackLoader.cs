@@ -57,7 +57,6 @@ namespace osu.Game.EzOsuGame.Pets
         public EzPetPackLoader(Storage gameStorage)
         {
             petsStorage = gameStorage.GetStorageForDirectory(EzModifyPath.PETS_PATH);
-            EzPetLive2DAccess.LoadPresetsFromStorage(petsStorage);
         }
 
         public IReadOnlyList<string> ListPackNames()

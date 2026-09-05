@@ -28,7 +28,7 @@ namespace osu.Game.EzOsuGame.Pets
         public string BlendMode { get; set; } = string.Empty;
 
         /// <summary>
-        /// <c>frames</c> (default) or <c>live2d</c>. Live2D only runs when the pack passes <see cref="EzPetLive2DAccess"/>.
+        /// <c>frames</c> (default) or <c>live2d</c>. Live2D runs when a model entry exists (Cubism Core checked at session create).
         /// </summary>
         public string Renderer { get; set; } = string.Empty;
 
