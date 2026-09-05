@@ -51,6 +51,7 @@ namespace osu.Game.EzOsuGame.Pets
                 return false;
 
             string? mocRelative = resolveMocRelative(petsStorage, modelEntryRelativePath);
+
             if (mocRelative == null || !petsStorage.Exists(mocRelative))
             {
                 error = $"could not locate .moc3 next to {modelEntryRelativePath}";
@@ -62,6 +63,7 @@ namespace osu.Game.EzOsuGame.Pets
                 ensureFramework();
 
                 using var stream = petsStorage.GetStream(mocRelative);
+
                 if (stream == null)
                 {
                     error = $"failed to open {mocRelative}";
@@ -145,7 +147,7 @@ namespace osu.Game.EzOsuGame.Pets
             if (frameworkStarted)
                 return;
 
-            var ok = CubismFramework.StartUp(new EzCubismAllocator(), new Option
+            bool ok = CubismFramework.StartUp(new EzCubismAllocator(), new Option
             {
                 LogFunction = msg => Logger.Log($"[Cubism] {msg}", LoggingTarget.Runtime),
                 LoggingLevel = LogLevel.Warning,

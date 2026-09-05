@@ -28,6 +28,7 @@ namespace osu.Game.EzOsuGame.Pets
             error = null;
 
             string relative = Path.Combine(CORE_DIRECTORY, CORE_DLL_WINDOWS);
+
             if (!petsStorage.Exists(relative))
             {
                 error = $"Missing {relative}. Download Cubism SDK for Native and copy Live2DCubismCore.dll there.";
@@ -35,6 +36,7 @@ namespace osu.Game.EzOsuGame.Pets
             }
 
             string fullPath = petsStorage.GetFullPath(relative);
+
             if (!File.Exists(fullPath))
             {
                 error = $"Core DLL path not found on disk: {fullPath}";

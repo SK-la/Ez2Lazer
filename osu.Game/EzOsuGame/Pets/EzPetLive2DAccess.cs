@@ -67,6 +67,7 @@ namespace osu.Game.EzOsuGame.Pets
             }
 
             string? entryRelative = FindCanonicalEntryRelativePath(petsStorage, packName, definition);
+
             if (entryRelative == null)
             {
                 denialReason = "missing live2d model entry";
@@ -75,6 +76,7 @@ namespace osu.Game.EzOsuGame.Pets
             }
 
             string? actual = ComputeFileSha256Hex(petsStorage, entryRelative);
+
             if (actual == null)
             {
                 denialReason = "failed to hash live2d entry";
