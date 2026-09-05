@@ -37,7 +37,7 @@ namespace osu.Game.Graphics.Containers.Markdown
                     break;
 
                 case CustomContainer customContainer:
-                    if (customContainer.Info.StartsWith(@"alert-", StringComparison.Ordinal))
+                    if (customContainer.Info?.StartsWith(@"alert-", StringComparison.Ordinal) == true)
                     {
                         var alertContainer = CreateStyledAlert(customContainer);
 
@@ -57,7 +57,7 @@ namespace osu.Game.Graphics.Containers.Markdown
                     // (https://github.com/ppy/osu-framework/blob/9746d7d06f48910c05a24687a25f435f30d12f8b/osu.Framework/osu.Framework.csproj#L52C1-L54)
                     // Therefore...
                     // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
-                    bool isOrdered = ((ListBlock)listItemBlock.Parent)?.IsOrdered == true;
+                    bool isOrdered = listItemBlock.Parent is ListBlock parentList && parentList.IsOrdered;
 
                     OsuMarkdownListItem childContainer = CreateListItem(listItemBlock, level, isOrdered);
 

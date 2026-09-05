@@ -2,16 +2,14 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osuTK.Graphics;
-
-// ReSharper disable RedundantUsingDirective
-using osu.Framework.Allocation;
-using osu.Framework.Graphics;
 using osu.Game.Graphics.UserInterface;
+using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit.Settings.Sections
 {

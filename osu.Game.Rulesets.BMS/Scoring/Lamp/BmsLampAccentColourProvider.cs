@@ -31,12 +31,6 @@ namespace osu.Game.Rulesets.BMS.Scoring.Lamp
 
         public Color4? GetAccentColourFor(BeatmapInfo? beatmap)
         {
-            if (beatmap?.Ruleset == null)
-                return null;
-
-            if (!string.Equals(beatmap.Ruleset.ShortName, bms_ruleset_short_name, StringComparison.OrdinalIgnoreCase))
-                return null;
-
             var lamp = lampStore.GetLamp(beatmap);
             return lampStore.Scheme.GetLampColour(lamp);
         }

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using osu.Framework;
 using osu.Framework.Logging;
 using osu.Framework.Text;
@@ -20,7 +21,7 @@ namespace osu.Game.EzOsuGame.Fonts
     {
         public const string NONE_OPTION = "";
 
-        private static readonly object cache_lock = new object();
+        private static readonly Lock cache_lock = new Lock();
         private static IReadOnlyList<EzSystemFontEntry>? cached;
         public static IReadOnlyList<EzSystemFontEntry>? CachedEmoji;
 

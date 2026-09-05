@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.BMS.Tests
             Assert.That(driver, Is.Not.Null);
             Assert.That(driver, Is.AssignableTo<Drawable>());
 
-            var alwaysPresent = (bool)driver_type.GetProperty("AlwaysPresent")!.GetValue(driver)!;
+            bool alwaysPresent = (bool)driver_type.GetProperty("AlwaysPresent")!.GetValue(driver)!;
             Assert.That(alwaysPresent, Is.True);
         }
 

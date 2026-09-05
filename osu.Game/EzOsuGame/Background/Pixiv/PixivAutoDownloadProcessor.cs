@@ -78,7 +78,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                     coordinator.RunBackgroundPrefetch(out LocalisableString? error);
 
                     if (error != null)
-                        coordinator.LogFailure(EzSettingsStrings.PIXIV_LOG_AUTO_PREFETCH, error);
+                        coordinator.LogFailure(EzSettingsPixivString.PIXIV_LOG_AUTO_PREFETCH, error);
                 }
                 finally
                 {

@@ -91,7 +91,7 @@ namespace osu.Game.Screens.Ranking.Contracted
                                     Padding = new MarginPadding(10),
                                     Direction = FillDirection.Vertical,
                                     Spacing = new Vector2(0, 10),
-                                    Children = new Drawable[]
+                                    Children = new[]
                                     {
                                         new UpdateableAvatar(score.User)
                                         {

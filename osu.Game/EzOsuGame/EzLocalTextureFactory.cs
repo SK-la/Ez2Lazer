@@ -176,7 +176,8 @@ namespace osu.Game.EzOsuGame
         /// </summary>
         public Texture? GetNoteTexture(string path)
         {
-            Texture? texture = resource.Get($@"{path}/000") ?? resource.Get($@"{path}/0");
+            Texture? texture = resource.Get($@"{path}/000", EzTextureUsage.AnimationSafe)
+                               ?? resource.Get($@"{path}/0", EzTextureUsage.AnimationSafe);
 
             return texture;
         }
@@ -315,10 +316,10 @@ namespace osu.Game.EzOsuGame
             {
                 var textures = new Texture?[60];
 
-                Parallel.For(0, 60, i =>
+                Parallel.For((long)0, 60, i =>
                 {
                     string frameFile = $"{notePath}/{i:D3}";
-                    textures[i] = resource.Get(frameFile);
+                    textures[i] = resource.Get(frameFile, EzTextureUsage.AnimationSafe);
                 });
 
                 // 按顺序收集非空纹理
@@ -333,7 +334,7 @@ namespace osu.Game.EzOsuGame
             else
             {
                 string frameFile = notePath;
-                var texture = resource.Get(frameFile);
+                var texture = resource.Get(frameFile, EzTextureUsage.AnimationSafe);
 
                 if (texture != null)
                 {
@@ -401,7 +402,7 @@ namespace osu.Game.EzOsuGame
 
             for (int i = 0;; i++)
             {
-                Texture? texture = resource.Get($"{basePath}_{i}");
+                Texture? texture = resource.Get($"{basePath}_{i}", EzTextureUsage.AnimationSafe);
                 if (texture == null) break;
 
                 Logger.Log($"[EzLocalTextureFactory] Added Stage Frames: {basePath}_{i}.png", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
@@ -411,7 +412,7 @@ namespace osu.Game.EzOsuGame
 
             if (frames.Count == 0)
             {
-                Texture? texture = resource.Get($"{basePath}", useLargeStore: true);
+                Texture? texture = resource.Get($"{basePath}", EzTextureUsage.Large);
 
                 if (texture != null)
                 {
@@ -457,7 +458,7 @@ namespace osu.Game.EzOsuGame
             {
                 for (int i = 0;; i++)
                 {
-                    Texture? texture = resource.Get($"{basePath}_frame{i}");
+                    Texture? texture = resource.Get($"{basePath}_frame{i}", EzTextureUsage.AnimationSafe);
                     if (texture == null) break;
 
                     Logger.Log($"[EzLocalTextureFactory] Added Keys Frames: {basePath}_{i}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
@@ -468,7 +469,7 @@ namespace osu.Game.EzOsuGame
                 // 如果没有帧，加载单个纹理作为单帧
                 if (frames.Count == 0)
                 {
-                    Texture? texture = resource.Get($"{basePath}");
+                    Texture? texture = resource.Get($"{basePath}", EzTextureUsage.AnimationSafe);
 
                     if (texture != null)
                     {

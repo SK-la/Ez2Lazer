@@ -16,7 +16,7 @@ namespace osu.Game.EzOsuGame.Overlays
 {
     public partial class EzPetSettings : SettingsSubsection
     {
-        protected override LocalisableString Header => EzSettingsStrings.DESKTOP_PET_SETTINGS_HEADER;
+        protected override LocalisableString Header => EzSettingsDesktopPet.DESKTOP_PET_SETTINGS_HEADER;
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig, Storage storage)
@@ -35,8 +35,8 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.DESKTOP_PET_ENABLED,
-                    HintText = EzSettingsStrings.DESKTOP_PET_ENABLED_TOOLTIP,
+                    Caption = EzSettingsDesktopPet.DESKTOP_PET_ENABLED,
+                    HintText = EzSettingsDesktopPet.DESKTOP_PET_ENABLED_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetEnabled),
                 })
                 {
@@ -44,8 +44,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.DESKTOP_PET_SHOW_ON_MENU,
-                    HintText = EzSettingsStrings.DESKTOP_PET_SHOW_ON_MENU_TOOLTIP,
+                    Caption = EzSettingsDesktopPet.DESKTOP_PET_SHOW_ON_MENU,
+                    HintText = EzSettingsDesktopPet.DESKTOP_PET_SHOW_ON_MENU_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnMenu),
                 })
                 {
@@ -53,8 +53,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.DESKTOP_PET_SHOW_ON_SONG_SELECT,
-                    HintText = EzSettingsStrings.DESKTOP_PET_SHOW_ON_SONG_SELECT_TOOLTIP,
+                    Caption = EzSettingsDesktopPet.DESKTOP_PET_SHOW_ON_SONG_SELECT,
+                    HintText = EzSettingsDesktopPet.DESKTOP_PET_SHOW_ON_SONG_SELECT_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnSongSelect),
                 })
                 {
@@ -62,8 +62,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.DESKTOP_PET_SHOW_ON_GAMEPLAY,
-                    HintText = EzSettingsStrings.DESKTOP_PET_SHOW_ON_GAMEPLAY_TOOLTIP,
+                    Caption = EzSettingsDesktopPet.DESKTOP_PET_SHOW_ON_GAMEPLAY,
+                    HintText = EzSettingsDesktopPet.DESKTOP_PET_SHOW_ON_GAMEPLAY_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnGameplay),
                 })
                 {
@@ -71,8 +71,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.DESKTOP_PET_SHOW_ON_RESULTS,
-                    HintText = EzSettingsStrings.DESKTOP_PET_SHOW_ON_RESULTS_TOOLTIP,
+                    Caption = EzSettingsDesktopPet.DESKTOP_PET_SHOW_ON_RESULTS,
+                    HintText = EzSettingsDesktopPet.DESKTOP_PET_SHOW_ON_RESULTS_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetShowOnResults),
                 })
                 {
@@ -80,8 +80,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormDropdown<string>
                 {
-                    Caption = EzSettingsStrings.DESKTOP_PET_PACK,
-                    HintText = EzSettingsStrings.DESKTOP_PET_PACK_TOOLTIP,
+                    Caption = EzSettingsDesktopPet.DESKTOP_PET_PACK,
+                    HintText = EzSettingsDesktopPet.DESKTOP_PET_PACK_TOOLTIP,
                     Current = packBindable,
                     Items = packNames,
                 })
@@ -90,8 +90,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = EzSettingsStrings.DESKTOP_PET_SCALE,
-                    HintText = EzSettingsStrings.DESKTOP_PET_SCALE_TOOLTIP,
+                    Caption = EzSettingsDesktopPet.DESKTOP_PET_SCALE,
+                    HintText = EzSettingsDesktopPet.DESKTOP_PET_SCALE_TOOLTIP,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.DesktopPetScale),
                     KeyboardStep = 0.05f,
                 })

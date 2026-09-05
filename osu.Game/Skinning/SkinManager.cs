@@ -73,11 +73,11 @@ namespace osu.Game.Skinning
         [CanBeNull]
         private readonly HotReloadManager hotReloadManager;
 
-        private readonly object scriptedCatalogLock = new object();
+        private readonly Lock scriptedCatalogLock = new Lock();
         private List<Live<SkinInfo>> scriptedSkinCatalog = new List<Live<SkinInfo>>();
         private int scriptedCatalogRefreshVersion;
 
-        private readonly object scriptedSkinInstanceLock = new object();
+        private readonly Lock scriptedSkinInstanceLock = new Lock();
         private readonly Dictionary<Guid, Skin> scriptedSkinInstances = new Dictionary<Guid, Skin>();
         private readonly Dictionary<Guid, Task<Skin>> scriptedSkinLoadTasks = new Dictionary<Guid, Task<Skin>>();
 

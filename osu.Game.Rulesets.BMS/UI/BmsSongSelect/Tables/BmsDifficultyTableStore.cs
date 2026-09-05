@@ -20,17 +20,16 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
             AllowTrailingCommas = true,
         };
 
-        private readonly string tablesDirectory;
         private IReadOnlyList<BmsDifficultyTable> cached = Array.Empty<BmsDifficultyTable>();
 
         public BmsDifficultyTableStore(Storage storage)
         {
             BmsStoragePaths.EnsureInitialized(storage);
-            tablesDirectory = BmsStoragePaths.GetTablesDirectoryPath(storage);
-            Directory.CreateDirectory(tablesDirectory);
+            TablesDirectory = BmsStoragePaths.GetTablesDirectoryPath(storage);
+            Directory.CreateDirectory(TablesDirectory);
         }
 
-        public string TablesDirectory => tablesDirectory;
+        public string TablesDirectory { get; }
 
         public IReadOnlyList<BmsDifficultyTable> GetTables(bool forceReload = false)
         {
@@ -39,7 +38,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
 
             var tables = new List<BmsDifficultyTable>();
 
-            foreach (string path in Directory.EnumerateFiles(tablesDirectory)
+            foreach (string path in Directory.EnumerateFiles(TablesDirectory)
                          .Where(p => p.EndsWith(".bmt", StringComparison.OrdinalIgnoreCase)
                                      || p.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
                          .OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
@@ -71,7 +70,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
             if (string.IsNullOrEmpty(destName))
                 return null;
 
-            string dest = Path.Combine(tablesDirectory, destName);
+            string dest = Path.Combine(TablesDirectory, destName);
 
             if (!string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(dest), StringComparison.OrdinalIgnoreCase))
                 File.Copy(sourcePath, dest, overwrite: true);
@@ -126,7 +125,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
                     continue;
                 }
 
-                string destPath = Path.Combine(tablesDirectory, fileNameForUrl(entry.Url.Trim()) + ".bmt");
+                string destPath = Path.Combine(TablesDirectory, fileNameForUrl(entry.Url.Trim()) + ".bmt");
 
                 if (!force && File.Exists(destPath))
                 {
@@ -160,7 +159,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Tables
 
         private async Task<BmsDifficultyTable?> importFromUrlAsync(HttpClient http, string url, bool skipIfCached, CancellationToken cancellationToken)
         {
-            string destPath = Path.Combine(tablesDirectory, fileNameForUrl(url) + ".bmt");
+            string destPath = Path.Combine(TablesDirectory, fileNameForUrl(url) + ".bmt");
 
             if (skipIfCached && File.Exists(destPath))
             {

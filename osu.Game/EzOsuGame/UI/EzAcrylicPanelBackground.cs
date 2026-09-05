@@ -5,7 +5,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
@@ -15,16 +14,17 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.UI
 {
     /// <summary>
-    /// 可配置穿透虚化的面板背景（Acrylic +  tint）。
+    /// Acrylic glass panel (N): blur backdrop + tint. Visibility is owned by the host via
+    /// <see cref="EzAcrylicOverlayAlpha.BindExclusive"/> (do not half-alpha classic M over this).
     /// </summary>
     public partial class EzAcrylicPanelBackground : Container, IAcrylicBackdropConsumer
     {
         /// <summary>
-        /// 宿主面板是否处于需要采样的可见状态（例如预览展开）。收起时应为 false 以释放离屏承载层引用。
+        /// Host panel is in a state that should sample capture (e.g. preview expanded).
         /// </summary>
         public bool AcrylicCaptureVisible { get; set; }
 
-        public bool WantsAcrylicCapture => (acrylicUiEnabled?.Value ?? false) && AcrylicCaptureVisible;
+        public bool WantsAcrylicCapture => (acrylicUiEnabled.Value) && AcrylicCaptureVisible;
 
         public Box TintBox { get; private set; }
 
@@ -37,10 +37,9 @@ namespace osu.Game.EzOsuGame.UI
         [Resolved(canBeNull: true)]
         private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
 
-        [Resolved]
-        private IRenderer renderer { get; set; } = null!;
-
-        public EzAcrylicPanelBackground(Color4 initialTint)
+        /// <param name="initialTint">Veil colour drawn over the blurred backdrop.</param>
+        /// <param name="frameBufferScale">Optional downscale for the blur pass (panels use 0.5).</param>
+        public EzAcrylicPanelBackground(Color4 initialTint, Vector2? frameBufferScale = null)
         {
             RelativeSizeAxes = Axes.Both;
 
@@ -50,7 +49,7 @@ namespace osu.Game.EzOsuGame.UI
                 {
                     RelativeSizeAxes = Axes.Both,
                     EffectEnabled = false,
-                    FrameBufferScale = Vector2.One,
+                    FrameBufferScale = frameBufferScale ?? Vector2.One,
                 },
                 TintBox = new Box
                 {
@@ -66,7 +65,7 @@ namespace osu.Game.EzOsuGame.UI
             acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
             acrylicUiBlurStrength = ezConfig.GetBindable<double>(Ez2Setting.AcrylicUiBlurStrength);
 
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, renderer, acrylicBackdrop);
+            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop);
         }
 
         protected override void LoadComplete()

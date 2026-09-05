@@ -14,7 +14,7 @@ namespace osu.Game.Beatmaps.ExternalLibraries
     {
         public const string HASH_PREFIX = "ext:set:";
 
-        public static string Encode(string folderPath)
+        public static string Encode(string? folderPath)
         {
             string normalised = Path.GetFullPath(folderPath ?? string.Empty);
             string encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(normalised));

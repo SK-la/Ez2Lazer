@@ -35,6 +35,8 @@ namespace osu.Game.Overlays.Toolbar
 
         private OsuSpriteText usernameText = null!;
 
+        private LoginOverlay? loginOverlay;
+
         public ToolbarUserButton()
         {
             ButtonContent.AutoSizeAxes = Axes.X;
@@ -43,6 +45,8 @@ namespace osu.Game.Overlays.Toolbar
         [BackgroundDependencyLoader]
         private void load(OsuColour colours, IAPIProvider api, LoginOverlay? login)
         {
+            loginOverlay = login;
+
             Flow.AddRange(new Drawable[]
             {
                 usernameText = new OsuSpriteText
@@ -101,7 +105,17 @@ namespace osu.Game.Overlays.Toolbar
             localUser = api.LocalUser.GetBoundCopy();
             localUser.BindValueChanged(userChanged, true);
 
-            StateContainer = login;
+            updateOverlayTarget();
+        }
+
+        private void updateOverlayTarget()
+        {
+            if (loginOverlay != null)
+                StateContainer = loginOverlay;
+
+            // ToolbarUserButton already shows username + avatar. Binding a FullscreenOverlay
+            // (INamedOverlayComponent) would SetIcon(User) and draw a silhouette over the name.
+            IconContainer.Hide();
         }
 
         private void userChanged(ValueChangedEvent<APIUser> user) => Schedule(() =>
@@ -143,6 +157,8 @@ namespace osu.Game.Overlays.Toolbar
                 default:
                     throw new ArgumentOutOfRangeException(nameof(state.NewValue));
             }
+
+            updateOverlayTarget();
         });
     }
 }

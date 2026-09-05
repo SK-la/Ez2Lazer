@@ -40,6 +40,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -111,7 +112,7 @@ namespace osu.Game.Screens.Select
 
         private ModSelectOverlay modSelectOverlay = null!;
         private ModSpeedHotkeyHandler modSpeedHotkeyHandler = null!;
-        private readonly EzModSelectionRestoreController modRestoreController = new();
+        private readonly EzModSelectionRestoreController modRestoreController = new EzModSelectionRestoreController();
         private FooterButtonMods footerButtonMods = null!;
 
         // Blue is the most neutral choice, so I'm using that for now.
@@ -173,6 +174,7 @@ namespace osu.Game.Screens.Select
         private readonly RealmPopulatingOnlineLookupSource onlineLookupSource = new RealmPopulatingOnlineLookupSource();
 
         private Bindable<bool> configBackgroundBlur = null!;
+        private Bindable<bool> acrylicUiEnabled = null!;
         private Bindable<bool> showConvertedBeatmaps = null!;
         private Bindable<KeySoundPreviewMode> keySoundPreview = null!;
         private EzPreviewTrackManager ezPreviewManager = null!;
@@ -337,6 +339,17 @@ namespace osu.Game.Screens.Select
 
             LoadComponent(modSelectOverlay = CreateModSelectOverlay());
 
+            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(rightGradientBackground, ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled));
+
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+            acrylicUiEnabled.BindValueChanged(_ =>
+            {
+                if (!this.IsCurrentScreen())
+                    return;
+
+                updateBackgroundDim();
+            });
+
             configBackgroundBlur = config.GetBindable<bool>(OsuSetting.SongSelectBackgroundBlur);
             configBackgroundBlur.BindValueChanged(e =>
             {
@@ -386,32 +399,32 @@ namespace osu.Game.Screens.Select
             {
                 footerButtonMods,
                 new FooterButtonRandom
-            {
-                NextRandom = () =>
                 {
-                    if (!carousel.NextRandom())
-                        errorSample?.Play();
+                    NextRandom = () =>
+                    {
+                        if (!carousel.NextRandom())
+                            errorSample?.Play();
+                    },
+                    PreviousRandom = () =>
+                    {
+                        if (!carousel.PreviousRandom())
+                            errorSample?.Play();
+                    }
                 },
-                PreviousRandom = () =>
+                new FooterButtonOptions
                 {
-                    if (!carousel.PreviousRandom())
-                        errorSample?.Play();
-                }
-            },
-            new FooterButtonOptions
-            {
-                Hotkey = GlobalAction.ToggleBeatmapOptions,
-            },
-            new FooterButtonEzExport(
-                carousel.GetFilteredBeatmaps,
-                () => Beatmap.IsDefault ? null : Beatmap.Value.BeatmapInfo),
-            new FooterButtonEzPreView(
-                () =>
-                {
-                    ezBeatmapPreviewOverlay.Toggle();
-                    updateBeatmapPreviewSelection();
+                    Hotkey = GlobalAction.ToggleBeatmapOptions,
                 },
-                ezBeatmapPreviewOverlay.ExpandedState)
+                new FooterButtonEzExport(
+                    carousel.GetFilteredBeatmaps,
+                    () => Beatmap.IsDefault ? null : Beatmap.Value.BeatmapInfo),
+                new FooterButtonEzPreView(
+                    () =>
+                    {
+                        ezBeatmapPreviewOverlay.Toggle();
+                        updateBeatmapPreviewSelection();
+                    },
+                    ezBeatmapPreviewOverlay.ExpandedState)
             };
         }
 
@@ -738,6 +751,7 @@ namespace osu.Game.Screens.Select
 
         public override void OnEntering(ScreenTransitionEvent e)
         {
+            onEzSongSelectEntering(e);
             base.OnEntering(e);
 
             this.FadeIn();
@@ -1004,9 +1018,18 @@ namespace osu.Game.Screens.Select
         private void updateBackgroundDim() => ApplyToBackground(backgroundModeBeatmap =>
         {
             backgroundModeBeatmap.Beatmap = Beatmap.Value;
-            backgroundModeBeatmap.IgnoreUserSettings.Value = true;
 
-            backgroundModeBeatmap.DimWhenUserSettingsIgnored.Value = 0.1f;
+            // [Ez] Only while acrylic UI is on: apply gameplay DimLevel / BlurLevel.
+            // Off = official IgnoreUserSettings path (fixed 0.1 dim; SongSelectBackgroundBlur only).
+            if (acrylicUiEnabled.Value)
+            {
+                backgroundModeBeatmap.IgnoreUserSettings.Value = false;
+            }
+            else
+            {
+                backgroundModeBeatmap.IgnoreUserSettings.Value = true;
+                backgroundModeBeatmap.DimWhenUserSettingsIgnored.Value = 0.1f;
+            }
 
             // Required to undo results screen dimming the background.
             // Probably needs more thought because this needs to be in every `ApplyToBackground` currently to restore sane defaults.
@@ -1044,8 +1067,26 @@ namespace osu.Game.Screens.Select
             // Criteria change may have included a ruleset change which made the current selection invalid.
             bool isSelectionValid = checkBeatmapValidForSelection(Beatmap.Value.BeatmapInfo);
 
-            filterDebounce = Scheduler.AddDelayed(() => carousel.Filter(criteria, !isSelectionValid), isFirstFilter || !isSelectionValid ? 0 : filter_delay);
+            filterDebounce = Scheduler.AddDelayed(() => carousel.Filter(criteria, !isSelectionValid), GetFilterScheduleDelay(isFirstFilter, isSelectionValid));
         }
+
+        /// <summary>
+        /// Delay before applying carousel filter. Overridable for startup enter-path staggering.
+        /// </summary>
+        protected virtual double GetFilterScheduleDelay(bool isFirstFilter, bool isSelectionValid)
+        {
+            double? ezDelay = onEzGetFilterScheduleDelay(isFirstFilter);
+            if (ezDelay.HasValue)
+                return ezDelay.Value;
+
+            return isFirstFilter || !isSelectionValid ? 0 : filter_delay;
+        }
+
+        partial void onEzSongSelectEntering(ScreenTransitionEvent e);
+
+        private partial double? onEzGetFilterScheduleDelay(bool isFirstFilter);
+
+        partial void onEzCarouselItemsPresented();
 
         private void newItemsPresented(IEnumerable<CarouselItem> carouselItems)
         {
@@ -1053,6 +1094,7 @@ namespace osu.Game.Screens.Select
                 return;
 
             CarouselItemsPresented = true;
+            onEzCarouselItemsPresented();
 
             updateNoResultsPlaceholder();
 

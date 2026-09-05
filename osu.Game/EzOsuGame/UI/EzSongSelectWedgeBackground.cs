@@ -4,7 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
@@ -14,7 +14,8 @@ using osuTK;
 namespace osu.Game.EzOsuGame.UI
 {
     /// <summary>
-    /// 选歌界面面板背景：关闭时为原版 <see cref="WedgeBackground"/>；开启时在底层叠加穿透虚化。
+    /// Song-select wedge background: OFF = classic <see cref="WedgeBackground"/> (M);
+    /// ON = blur + dark veil (N), classic wedge fully hidden.
     /// </summary>
     public partial class EzSongSelectWedgeBackground : InputBlockingContainer, IAcrylicBackdropConsumer
     {
@@ -24,9 +25,10 @@ namespace osu.Game.EzOsuGame.UI
 
         public float WidthForGradient { get; init; } = 0.3f;
 
-        public bool WantsAcrylicCapture => acrylicUiEnabled?.Value ?? false;
+        public bool WantsAcrylicCapture => acrylicUiEnabled.Value;
 
         private AcrylicBackdropDrawable acrylicBackdrop = null!;
+        private Box darkVeil = null!;
         private WedgeBackground wedgeBackground = null!;
         private EzAcrylicCaptureController? captureController;
 
@@ -35,9 +37,6 @@ namespace osu.Game.EzOsuGame.UI
 
         [Resolved(canBeNull: true)]
         private IAcrylicCaptureRegistrar? acrylicCaptureRegistrar { get; set; }
-
-        [Resolved]
-        private IRenderer renderer { get; set; } = null!;
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
@@ -55,6 +54,12 @@ namespace osu.Game.EzOsuGame.UI
                     EffectEnabled = false,
                     FrameBufferScale = Vector2.One,
                 },
+                darkVeil = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = EzAcrylicStyle.Veil,
+                    Alpha = 0,
+                },
                 wedgeBackground = new WedgeBackground
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -64,13 +69,15 @@ namespace osu.Game.EzOsuGame.UI
                 },
             };
 
-            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, renderer, acrylicBackdrop);
+            captureController = new EzAcrylicCaptureController(acrylicCaptureRegistrar, acrylicBackdrop);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
+            // N = blur (via Sync) + darkVeil; M = classic wedgeBackground.
+            EzAcrylicOverlayAlpha.BindExclusive(wedgeBackground, darkVeil, acrylicUiEnabled);
             acrylicUiEnabled.BindValueChanged(_ => syncAcrylicState(), true);
             acrylicUiBlurStrength.BindValueChanged(_ => syncAcrylicState(), true);
         }

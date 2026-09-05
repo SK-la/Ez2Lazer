@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -9,10 +10,13 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Events;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Overlays.Settings;
@@ -45,6 +49,9 @@ namespace osu.Game.Overlays.Login
 
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
+
+        [Resolved]
+        private EzLocalProfileOverlay? localProfileOverlay { get; set; }
 
         public override RectangleF BoundingBox => bounding ? base.BoundingBox : RectangleF.Empty;
 
@@ -151,6 +158,35 @@ namespace osu.Game.Overlays.Login
 
                 case APIState.Online:
                 case APIState.LocalOnline:
+                {
+                    var signedInChildren = new List<Drawable>
+                    {
+                        new OsuSpriteText
+                        {
+                            Anchor = Anchor.TopCentre,
+                            Origin = Anchor.TopCentre,
+                            Text = LoginPanelStrings.SignedIn,
+                            Font = OsuFont.GetFont(size: 18, weight: FontWeight.Bold),
+                        },
+                        new UserRankPanel(api.LocalUser.Value)
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Action = RequestHide
+                        },
+                        new RoundedButton
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Text = EzSettingsProfile.LOCAL_PROFILE_PANEL_BUTTON,
+                            Action = () =>
+                            {
+                                RequestHide?.Invoke();
+                                localProfileOverlay?.Show();
+                            },
+                        },
+                    };
+
+                    signedInChildren.Add(dropdown = new UserDropdown { RelativeSizeAxes = Axes.X });
+
                     Child = new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.X,
@@ -158,22 +194,7 @@ namespace osu.Game.Overlays.Login
                         Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS },
                         Direction = FillDirection.Vertical,
                         Spacing = new Vector2(0f, SettingsSection.ITEM_SPACING),
-                        Children = new Drawable[]
-                        {
-                            new OsuSpriteText
-                            {
-                                Anchor = Anchor.TopCentre,
-                                Origin = Anchor.TopCentre,
-                                Text = LoginPanelStrings.SignedIn,
-                                Font = OsuFont.GetFont(size: 18, weight: FontWeight.Bold),
-                            },
-                            new UserRankPanel(api.LocalUser.Value)
-                            {
-                                RelativeSizeAxes = Axes.X,
-                                Action = RequestHide
-                            },
-                            dropdown = new UserDropdown { RelativeSizeAxes = Axes.X },
-                        },
+                        Children = signedInChildren,
                     };
 
                     updateDropdownCurrent(configUserStatus.Value);
@@ -203,6 +224,7 @@ namespace osu.Game.Overlays.Login
                     }, true);
 
                     break;
+                }
             }
 
             if (form != null)

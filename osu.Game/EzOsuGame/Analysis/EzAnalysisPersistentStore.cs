@@ -103,7 +103,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private const string col_pp = "pp";
 
         private readonly Storage storage;
-        private readonly object initLock = new object();
+        private readonly Lock initLock = new Lock();
         private static readonly IReadOnlyDictionary<Guid, double> empty_xxy_sr_values = new Dictionary<Guid, double>();
         private static readonly IReadOnlyDictionary<Guid, double> empty_pp_values = new Dictionary<Guid, double>();
 
@@ -2395,8 +2395,8 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
         private static PendingWrite snapshotPendingWrite(BeatmapInfo beatmap, EzAnalysisResult analysis)
             => new PendingWrite(
                 beatmap.ID,
-                beatmap.Hash ?? string.Empty,
-                beatmap.MD5Hash ?? string.Empty,
+                beatmap.Hash,
+                beatmap.MD5Hash,
                 beatmap.Ruleset.OnlineID,
                 analysis,
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());

@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Utils;
@@ -20,7 +21,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         private readonly PixivAuthService auth;
         private readonly PixivImageStore images;
 
-        private readonly object gate = new object();
+        private readonly Lock gate = new Lock();
         private readonly List<PixivIllustInfo> entries = new List<PixivIllustInfo>();
 
         private string? nextPageUrl;
@@ -143,7 +144,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
             if (entries.Count == 0)
             {
-                error = EzSettingsStrings.PIXIV_ERROR_FOLLOW_FEED_EMPTY;
+                error = EzSettingsPixivString.PIXIV_ERROR_FOLLOW_FEED_EMPTY;
                 return false;
             }
 

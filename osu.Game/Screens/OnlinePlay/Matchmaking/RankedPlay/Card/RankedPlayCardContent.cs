@@ -58,14 +58,8 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card
                             FillMode = FillMode.Fit,
                             Children =
                             [
-                                new CardCover(Beatmap)
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                },
-                                new CardMetadata(Beatmap)
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                },
+                                createCardCover(),
+                                CreateCardMetadata(),
                                 new DifficultyNameBadge(Beatmap)
                                 {
                                     Width = 100,

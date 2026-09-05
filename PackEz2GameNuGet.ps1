@@ -54,10 +54,20 @@ New-Item -ItemType Directory -Path $temp | Out-Null
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::ExtractToDirectory($nupkg, $temp)
 
-$libDir = Join-Path $temp 'lib/net8.0'
-if (-not (Test-Path $libDir)) {
-    throw "nupkg 中缺少 lib/net8.0 目录"
+$libRoot = Join-Path $temp 'lib'
+if (-not (Test-Path $libRoot)) {
+    throw "nupkg 中缺少 lib 目录"
 }
+
+$tfmDir = Get-ChildItem -Path $libRoot -Directory |
+    Where-Object { Test-Path (Join-Path $_.FullName 'osu.Game.dll') } |
+    Select-Object -First 1
+if ($null -eq $tfmDir) {
+    $tfmNames = (Get-ChildItem -Path $libRoot -Directory).Name -join ', '
+    throw "nupkg 中缺少 osu.Game.dll (lib 下 TFM: $tfmNames)"
+}
+
+$libDir = $tfmDir.FullName
 
 $packedDll = Join-Path $libDir 'osu.Game.dll'
 Copy-Item -Path $releaseDll -Destination $packedDll -Force

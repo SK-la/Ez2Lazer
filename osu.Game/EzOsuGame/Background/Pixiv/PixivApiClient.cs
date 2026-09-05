@@ -38,7 +38,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
             if (string.IsNullOrWhiteSpace(accessToken))
             {
-                error = EzSettingsStrings.PIXIV_ERROR_ACCESS_TOKEN_NOT_SET;
+                error = EzSettingsPixivString.PIXIV_ERROR_ACCESS_TOKEN_NOT_SET;
                 return false;
             }
 
@@ -89,13 +89,13 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 if (request.ResponseStatusCode == HttpStatusCode.OK)
                     return true;
 
-                error = EzSettingsStrings.PIXIV_VERIFY_FAILED;
+                error = EzSettingsPixivString.PIXIV_VERIFY_FAILED;
                 Logger.Log($"[Pixiv] login probe HTTP {request.ResponseStatusCode}: {request.GetResponseString()}", LoggingTarget.Network, LogLevel.Important);
                 return false;
             }
             catch (Exception ex)
             {
-                error = EzSettingsStrings.PIXIV_ERROR_REQUEST_FAILED;
+                error = EzSettingsPixivString.PIXIV_ERROR_REQUEST_FAILED;
                 Logger.Log($"[Pixiv] login probe: {ex.Message}", LoggingTarget.Network, LogLevel.Important);
                 return false;
             }
@@ -113,7 +113,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
                 if (request.ResponseStatusCode != HttpStatusCode.OK)
                 {
-                    error = EzSettingsStrings.PIXIV_ERROR_FOLLOW_FEED_FAILED;
+                    error = EzSettingsPixivString.PIXIV_ERROR_FOLLOW_FEED_FAILED;
                     Logger.Log($"[Pixiv] follow feed HTTP {request.ResponseStatusCode}: {request.GetResponseString()}", LoggingTarget.Network, LogLevel.Important);
                     return false;
                 }
@@ -157,7 +157,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
             catch (Exception ex)
             {
-                error = EzSettingsStrings.PIXIV_ERROR_REQUEST_FAILED;
+                error = EzSettingsPixivString.PIXIV_ERROR_REQUEST_FAILED;
                 Logger.Log($"[Pixiv] follow feed: {ex.Message}", LoggingTarget.Network, LogLevel.Important);
                 return false;
             }

@@ -5,8 +5,8 @@ using System.IO;
 using System.Text;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.IO;
 using osu.Game.Skinning;
 

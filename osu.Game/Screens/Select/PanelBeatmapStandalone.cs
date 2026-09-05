@@ -22,6 +22,8 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
@@ -60,6 +62,9 @@ namespace osu.Game.Screens.Select
         #region Ez功能
 
         [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
         private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
         [Resolved]
@@ -75,6 +80,8 @@ namespace osu.Game.Screens.Select
         private CancellationTokenSource? ezAnalysisCancellationSource;
 
         private string? scratchText;
+
+        private Bindable<bool> acrylicUiEnabled = null!;
 
         private bool supportsEzAnalysis => EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value);
 
@@ -114,6 +121,8 @@ namespace osu.Game.Screens.Select
         private void load()
         {
             Height = HEIGHT;
+
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
 
             Icon = difficultyIcon = new ConstrainedIconContainer
             {
@@ -273,6 +282,9 @@ namespace osu.Game.Screens.Select
                     }
                 }
             };
+
+            // Cover art is skipped under acrylic; the dim layer is only useful over panel sprites.
+            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(backgroundDim, acrylicUiEnabled);
         }
 
         protected override void LoadComplete()
@@ -514,7 +526,7 @@ namespace osu.Game.Screens.Select
             AccentColour = diffColour;
             // spreadDisplay.Current.Colour = starColour;
 
-            backgroundBorder.Colour = diffColour;
+            ApplyAcrylicIconStripBackground(backgroundBorder, acrylicUiEnabled.Value, diffColour);
             difficultyIcon.Colour = starRatingDisplay.DisplayedDifficultyTextColour;
         }
 

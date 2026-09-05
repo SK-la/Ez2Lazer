@@ -118,11 +118,17 @@ namespace osu.Game.Rulesets.BMS.Tests
                 Length = 90,
                 TotalObjectCount = 500,
                 EndTimeObjectCount = 20,
+                Metadata =
+                {
+                    Title = "Updated",
+                    Artist = "Artist"
+                },
+                Difficulty =
+                {
+                    CircleSize = 7,
+                    OverallDifficulty = 8
+                }
             };
-            target.Metadata.Title = "Updated";
-            target.Metadata.Artist = "Artist";
-            target.Difficulty.CircleSize = 7;
-            target.Difficulty.OverallDifficulty = 8;
 
             BMSOsuLibrarySynchronizer.ApplyVirtualBeatmapFieldsForTesting(existing, target);
 

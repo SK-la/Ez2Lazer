@@ -407,7 +407,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             if (Tail.AllJudged)
                 Body.TriggerResult(Tail.IsHit);
-            else if (isEarlyHoldRelease())
+            else if (isEarlyHoldRelease() || UsesEzJudgement)
                 Body.TriggerResult(false);
         }
 

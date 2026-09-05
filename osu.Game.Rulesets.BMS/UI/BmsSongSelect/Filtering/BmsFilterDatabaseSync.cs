@@ -139,6 +139,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Filtering
                     }
                     else if (!string.IsNullOrEmpty(change.ChartPath))
                         deleteKeys.Add(BmsPathKeys.ComputeChartPathKey(change.ChartPath));
+
                     continue;
                 }
 

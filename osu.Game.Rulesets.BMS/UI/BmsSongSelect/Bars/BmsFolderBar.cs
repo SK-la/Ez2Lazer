@@ -22,9 +22,9 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
         public override bool IsSortable => true;
 
         public override IReadOnlyList<BmsBar> GetChildren(BmsBarContext context)
-            => GetPage(context, null, 150)!.Bars;
+            => GetPage(context, null, 150).Bars;
 
-        public override BmsBarPage? GetPage(BmsBarContext context, BmsBarPageCursor? after, int limit)
+        public override BmsBarPage GetPage(BmsBarContext context, BmsBarPageCursor? after, int limit)
         {
             var result = new List<BmsBar>(limit);
 
@@ -99,9 +99,11 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Bars
                 200);
 
             if (charts.Items.Count == 0)
+            {
                 return hasChildFolders
                     ? new BmsFolderBar(BmsPathCrc.Compute(folder.FolderPath), folder.Name, folder.FolderPath)
                     : null;
+            }
 
             return new BmsSongPackBar(folder.FolderPath, folder.Name, charts.Items);
         }

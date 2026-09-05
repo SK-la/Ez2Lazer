@@ -10,14 +10,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using osu.Framework.Bindables;
-using osu.Framework.Logging;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.Extensions;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
@@ -50,7 +50,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly IBindable<bool> sqliteAnalysisEnabled;
         private readonly Bindable<string?> activeSongsBranchDisplayName = new Bindable<string?>();
         private readonly Bindable<int> activeSongsBranchVersion = new Bindable<int>();
-        private readonly object activeSongsBranchStateLock = new object();
+        private readonly Lock activeSongsBranchStateLock = new Lock();
         private readonly List<ActiveSongsBranchState> activeSongsBranches = new List<ActiveSongsBranchState>();
 
         private readonly record struct ActiveSongsBranchState(string DatabasePath, string DisplayName, int RulesetOnlineId, string ModsFingerprint);

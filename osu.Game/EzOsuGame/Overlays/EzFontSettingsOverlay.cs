@@ -57,7 +57,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly HashSet<string> failedFontPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Task<bool>> pendingFontRegistrations = new Dictionary<string, Task<bool>>(StringComparer.OrdinalIgnoreCase);
         private readonly List<OutlineGlyphStore> dialogGlyphStores = new List<OutlineGlyphStore>();
-        private readonly object fontRegisterLock = new object();
+        private readonly Lock fontRegisterLock = new Lock();
         private FontFamilyPicker? expandedPicker;
         private FontStore? dialogFonts;
         private bool dialogFontsActive;
@@ -691,8 +691,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 current.BindValueChanged(v =>
                 {
-                    if (syncLocalized != null)
-                        syncLocalized.Value = v.NewValue;
+                    syncLocalized?.Value = v.NewValue;
 
                     updatePreview(v.NewValue);
                 }, true);

@@ -93,15 +93,17 @@ namespace osu.Game.EzOsuGame.Layout
 
             if (onPlayer && screen is Player player)
             {
-                if (!player.IsLoaded)
+                if (canAttachGameplayLayout(player))
+                    recreateGameplayContainers(player);
+                else if (!player.IsLoaded)
                 {
                     pendingPlayer = player;
                     pendingPlayer.OnLoadComplete += onPendingPlayerLoaded;
-                    notifyTargetsChanged();
-                    return;
                 }
+                else
+                    expireGameplayContainers();
 
-                recreateGameplayContainers(player);
+                notifyTargetsChanged();
             }
             else if (gameplayContainer != null || rulesetGameplayContainer != null)
             {
@@ -120,7 +122,7 @@ namespace osu.Game.EzOsuGame.Layout
 
             Schedule(() =>
             {
-                if (game.ScreenStack.CurrentScreen == loaded && loaded is Player player)
+                if (game.ScreenStack.CurrentScreen == loaded && loaded is Player player && canAttachGameplayLayout(player))
                     recreateGameplayContainers(player);
             });
         }
@@ -147,10 +149,19 @@ namespace osu.Game.EzOsuGame.Layout
             notifyTargetsChanged();
         }
 
+        private static bool canAttachGameplayLayout(Player player) =>
+            player.IsLoaded && player.Dependencies != null;
+
         private EzLayoutContainer addGameplayContainer(Player player, GlobalSkinnableContainerLookup lookup)
         {
             var container = new EzLayoutContainer(Store, lookup);
-            container.SetDependencyDonor(player.Dependencies.Get(typeof(HUDOverlay)) as CompositeDrawable ?? player);
+
+            if (canAttachGameplayLayout(player))
+            {
+                var donor = player.Dependencies!.Get(typeof(HUDOverlay)) as CompositeDrawable ?? player;
+                container.SetDependencyDonor(donor);
+            }
+
             AddInternal(container);
             return container;
         }

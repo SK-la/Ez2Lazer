@@ -108,7 +108,7 @@ namespace osu.Desktop
 
         public static bool IsPackageManaged => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OSU_EXTERNAL_UPDATE_PROVIDER"));
 
-        public static bool IsOfficialEz2Build => RuntimeInfo.EntryAssembly?.GetCustomAttribute<OfficialBuildAttribute>() != null;
+        public static bool IsOfficialEz2Build => RuntimeInfo.EntryAssembly.GetCustomAttribute<OfficialBuildAttribute>() != null;
 
         protected override UpdateManager CreateUpdateManager()
         {

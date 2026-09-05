@@ -8,6 +8,9 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Game.EzOsuGame.Acrylic;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Screens.Footer;
@@ -70,17 +73,33 @@ namespace osu.Game.Overlays.Mods
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(Ez2ConfigManager ezConfig)
         {
+            var acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+
+            Box pageDim;
+            EzAcrylicPanelBackground pageAcrylic;
+
             Child = TopLevelContent = new Container
             {
                 RelativeSizeAxes = Axes.Both,
                 Children = new Drawable[]
                 {
-                    new Box
+                    new Container
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = ColourProvider.Background6.Opacity(0.75f),
+                        Children = new Drawable[]
+                        {
+                            pageAcrylic = new EzAcrylicPanelBackground(EzAcrylicStyle.ModPageVeil)
+                            {
+                                AcrylicCaptureVisible = true,
+                            },
+                            pageDim = new Box
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                                Colour = ColourProvider.Background6.Opacity(0.75f),
+                            },
+                        }
                     },
                     Header = new ShearedOverlayHeader
                     {
@@ -100,6 +119,8 @@ namespace osu.Game.Overlays.Mods
                     },
                 }
             };
+
+            EzAcrylicOverlayAlpha.BindExclusive(pageDim, pageAcrylic, acrylicUiEnabled);
         }
 
         public VisibilityContainer? DisplayedFooterContent { get; private set; }

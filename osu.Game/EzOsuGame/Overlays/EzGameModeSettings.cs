@@ -15,7 +15,7 @@ using osu.Game.Screens.Play.PlayerSettings;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
-    public partial class EzGameSettings : SettingsSubsection
+    public partial class EzGameModeSettings : SettingsSubsection
     {
         protected override LocalisableString Header => EzSettingsStrings.EZ_GAME_SETTINGS_HEADER;
 
@@ -144,7 +144,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "ez", "skip", "empty", "column" }
                 },
-                new EzManiaScratchAxisSettings(),
+                new EzScratchAxisSettings(),
             };
 
             maniaHealthModeBindable.BindValueChanged(e =>

@@ -182,7 +182,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
                 if (request.ResponseStatusCode != HttpStatusCode.OK)
                 {
-                    error = EzSettingsStrings.PIXIV_ERROR_IMAGE_DOWNLOAD_FAILED;
+                    error = EzSettingsPixivString.PIXIV_ERROR_IMAGE_DOWNLOAD_FAILED;
                     Logger.Log($"[Pixiv] image download HTTP {request.ResponseStatusCode}: {request.GetResponseString()}", LoggingTarget.Network, LogLevel.Important);
                     return false;
                 }
@@ -191,7 +191,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
                 if (data != null && data.Length == 0)
                 {
-                    error = EzSettingsStrings.PIXIV_ERROR_IMAGE_EMPTY;
+                    error = EzSettingsPixivString.PIXIV_ERROR_IMAGE_EMPTY;
                     return false;
                 }
 
@@ -201,7 +201,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             }
             catch (Exception ex)
             {
-                error = EzSettingsStrings.PIXIV_ERROR_REQUEST_FAILED;
+                error = EzSettingsPixivString.PIXIV_ERROR_REQUEST_FAILED;
                 Logger.Log($"[Pixiv] image download: {ex.Message}", LoggingTarget.Network, LogLevel.Important);
                 return false;
             }

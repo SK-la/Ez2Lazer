@@ -26,6 +26,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Statistics;
+using osu.Game.EzOsuGame.Screens.Rotation;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
@@ -128,7 +129,7 @@ namespace osu.Game.Screens.Ranking
                                     RelativeSizeAxes = Axes.Both,
                                     Children = new Drawable[]
                                     {
-                                        new GlobalScrollAdjustsVolume(),
+                                        new AltScrollAdjustsVolume(),
                                         StatisticsPanel = new StatisticsPanel
                                         {
                                             RelativeSizeAxes = Axes.Both,
@@ -219,6 +220,8 @@ namespace osu.Game.Screens.Ranking
                 buttons.Add(new RetryButton { Width = 300 });
                 allowHotkeyRetry = true;
             }
+
+            EzQuickRotationResults.TryAddContinueButton(buttons, this);
 
             if (allowHotkeyRetry)
             {
@@ -585,6 +588,9 @@ namespace osu.Game.Screens.Ranking
                     break;
 
                 case GlobalAction.Select:
+                    if (EzQuickRotationResults.TryHandleSelect(this))
+                        return true;
+
                     if (SelectedScore.Value != null)
                         StatisticsPanel.ToggleVisibility();
                     return true;
@@ -607,12 +613,28 @@ namespace osu.Game.Screens.Ranking
             return base.OnScroll(e);
         }
 
+        /// <summary>
+        /// Volume adjust only with Alt+scroll so plain wheel can scroll statistics / score panels.
+        /// </summary>
+        private partial class AltScrollAdjustsVolume : GlobalScrollAdjustsVolume
+        {
+            protected override bool OnScroll(ScrollEvent e)
+            {
+                if (!e.AltPressed)
+                    return false;
+
+                return base.OnScroll(e);
+            }
+        }
+
         protected partial class VerticalScrollContainer : OsuScrollContainer
         {
             protected override Container<Drawable> Content => content;
 
             private readonly Container content;
 
+            // Swallow plain wheel so the whole results page does not vertical-scroll;
+            // expanded statistics use their own OsuScrollContainer, collapsed list scrolls horizontally.
             protected override bool OnScroll(ScrollEvent e) => !e.ControlPressed && !e.AltPressed && !e.ShiftPressed && !e.SuperPressed;
 
             public VerticalScrollContainer()

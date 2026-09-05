@@ -79,7 +79,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
             // 如果已存在相同键的缓存，先清理旧实例
             if (cache.TryGetValue(cacheKey, out var oldEntry))
             {
-                oldEntry.Skin?.Dispose();
+                oldEntry.Skin.Dispose();
             }
 
             cache[cacheKey] = new CachedEntry(skin, lastWriteTime, scriptPath);
@@ -97,7 +97,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
 
             if (cache.TryRemove(cacheKey, out var entry))
             {
-                entry.Skin?.Dispose();
+                entry.Skin.Dispose();
                 Logger.Log($"Removed from cache: {Path.GetFileName(scriptPath)}", LoggingTarget.Information);
                 return true;
             }
@@ -114,7 +114,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
 
             foreach (var entry in cache.Values)
             {
-                entry.Skin?.Dispose();
+                entry.Skin.Dispose();
             }
 
             cache.Clear();

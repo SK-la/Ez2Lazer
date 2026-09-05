@@ -52,15 +52,18 @@ namespace osu.Game.EzOsuGame.Analysis
         [Resolved]
         private IHighPerformanceSessionManager? highPerformanceSessionManager { get; set; }
 
+        [Resolved(CanBeNull = true)]
+        private BackgroundDataStoreProcessor? backgroundDataStoreProcessor { get; set; }
+
         private IBindable<bool> sqliteEnabledBindable = null!;
         private bool sqliteEnabled;
         private bool backgroundWorkersStarted;
-        private readonly object sqliteManualRebuildLock = new object();
+        private readonly Lock sqliteManualRebuildLock = new Lock();
         private bool sqliteMainRebuildQueued;
         private bool sqliteSongsBranchesRebuildQueued;
 
         protected virtual int TimeToSleepDuringGameplay => 30000;
-        private readonly object pendingBeatmapLock = new object();
+        private readonly Lock pendingBeatmapLock = new Lock();
         private readonly Queue<Guid> pendingBeatmapQueue = new Queue<Guid>();
         private readonly HashSet<Guid> inFlightBeatmapIds = new HashSet<Guid>();
         private ProgressNotification? startupWarmupProgressNotification;
@@ -82,6 +85,8 @@ namespace osu.Game.EzOsuGame.Analysis
         private bool selectedBeatmapRecomputeSignalPending;
 
         private volatile bool pendingScanCompleted;
+
+        private Action? onBdspFinishedForSqliteWarmup;
 
         protected override void LoadComplete()
         {
@@ -110,12 +115,40 @@ namespace osu.Game.EzOsuGame.Analysis
                 ensureBackgroundWorkersStarted();
                 pendingScanCompleted = true;
                 Schedule(() => queueSelectedBeatmapRecomputeIfRequired(currentBeatmap.Value));
-                tryQueueAutomaticSqliteUpgradeWarmup();
+                scheduleSqliteWarmupAfterBdsp();
                 return;
             }
 
             pendingScanCompleted = false;
             cancelPendingBeatmapProcessing();
+            unsubscribeBdspForSqliteWarmup();
+        }
+
+        private void scheduleSqliteWarmupAfterBdsp()
+        {
+            if (!sqliteEnabled)
+                return;
+
+            if (backgroundDataStoreProcessor == null || backgroundDataStoreProcessor.IsStartupProcessingFinished)
+            {
+                tryQueueAutomaticSqliteUpgradeWarmup();
+                return;
+            }
+
+            onBdspFinishedForSqliteWarmup ??= onBdspStartupProcessingFinishedForSqliteWarmup;
+            backgroundDataStoreProcessor.StartupProcessingFinished += onBdspFinishedForSqliteWarmup;
+        }
+
+        private void onBdspStartupProcessingFinishedForSqliteWarmup()
+        {
+            unsubscribeBdspForSqliteWarmup();
+            tryQueueAutomaticSqliteUpgradeWarmup();
+        }
+
+        private void unsubscribeBdspForSqliteWarmup()
+        {
+            if (backgroundDataStoreProcessor != null && onBdspFinishedForSqliteWarmup != null)
+                backgroundDataStoreProcessor.StartupProcessingFinished -= onBdspFinishedForSqliteWarmup;
         }
 
         private void ensureBackgroundWorkersStarted()
@@ -789,6 +822,8 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             if (isDisposing)
             {
+                unsubscribeBdspForSqliteWarmup();
+
                 startupWarmupCancellationSource.Cancel();
                 selectedBeatmapRecomputeCancellationSource.Cancel();
                 pendingBeatmapRecomputeCancellationSource.Cancel();

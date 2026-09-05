@@ -5,9 +5,9 @@ using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.Analysis.KeyPattern;
 using osu.Game.Rulesets.Mania.EzMania.Analysis.SR4Pattern;
-using osu.Game.Rulesets.Mania.Beatmaps;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 {

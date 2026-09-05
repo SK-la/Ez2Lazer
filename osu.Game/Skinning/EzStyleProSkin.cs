@@ -124,7 +124,7 @@ namespace osu.Game.Skinning
                                 var score = container.OfType<EzHUDScoreCounter>().FirstOrDefault();
                                 var pps = container.OfType<ArgonPerformancePointsCounter>().FirstOrDefault();
                                 var acc = container.OfType<EzHUDAccuracyCounter>().FirstOrDefault();
-                                var songProgress = container.OfType<ArgonSongProgress>().FirstOrDefault();
+                                var songProgress = container.OfType<SongProgress>().FirstOrDefault();
                                 var scoreRaceLeaderboard = container.OfType<EzHUDScoreRaceLeaderboard>().FirstOrDefault();
                                 var unused = container.OfType<EzHUDScoreCompareBars>().FirstOrDefault();
 
@@ -232,7 +232,7 @@ namespace osu.Game.Skinning
                                     {
                                         WireframeOpacity = { Value = 0 },
                                     },
-                                    new ArgonSongProgress(),
+                                    new EzArgonSongProgress(),
                                     new JudgementCounterDisplay
                                     {
                                         FillMode = FillMode.Fill,

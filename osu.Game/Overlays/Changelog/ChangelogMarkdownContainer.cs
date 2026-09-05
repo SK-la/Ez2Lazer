@@ -24,7 +24,7 @@ namespace osu.Game.Overlays.Changelog
             switch (markdownObject)
             {
                 case ParagraphBlock paragraphBlock:
-                    if (paragraphBlock.Inline.FirstChild is HtmlInline firstChild &&
+                    if (paragraphBlock.Inline?.FirstChild is HtmlInline firstChild &&
                         paragraphBlock.Inline.LastChild is HtmlInline lastChild &&
                         firstChild.Tag.Contains("video") && lastChild.Tag.Contains("video"))
                     {

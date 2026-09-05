@@ -11,6 +11,7 @@ using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Screens.Select;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -98,6 +99,8 @@ namespace osu.Game.Screens.Select
         {
             if (playerLoader != null) return;
 
+            EzSoloSongSelect.TryBeginQuickRotation(beatmaps, Beatmap.Value, Ruleset, Mods, FilterControl);
+
             modsAtGameplayStart = Mods.Value.Select(m => m.DeepClone()).ToArray();
 
             // Ctrl+Enter should start map with autoplay enabled.
@@ -155,6 +158,7 @@ namespace osu.Game.Screens.Select
 
         public override void OnResuming(ScreenTransitionEvent e)
         {
+            EzSoloSongSelect.EndSessionIfActive();
             base.OnResuming(e);
             revertMods();
         }

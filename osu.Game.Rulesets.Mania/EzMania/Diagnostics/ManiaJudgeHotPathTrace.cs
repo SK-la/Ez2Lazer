@@ -100,6 +100,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
                 return;
 
             long current;
+
             do
             {
                 current = Interlocked.Read(ref maxObservedPressTimesCount);

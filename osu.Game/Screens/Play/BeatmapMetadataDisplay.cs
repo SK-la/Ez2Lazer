@@ -4,6 +4,7 @@
 #nullable disable
 
 using System.Collections.Generic;
+using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -12,7 +13,8 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.Drawables;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -90,7 +92,13 @@ namespace osu.Game.Screens.Play
         private IBindable<StarDifficulty> starDifficulty;
 
         private FillFlowContainer versionFlow;
-        private StarRatingDisplay starRatingDisplay;
+        private EzDualDifficultyDisplay dualDifficultyDisplay;
+
+        private CancellationTokenSource ezAnalysisCancellationSource;
+        private IBindable<EzAnalysisResult> ezAnalysisBindable;
+
+        [Resolved]
+        private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
         [BackgroundDependencyLoader]
         private void load(BeatmapDifficultyCache difficultyCache, OsuColour colours)
@@ -190,7 +198,7 @@ namespace osu.Game.Screens.Play
                                     Anchor = Anchor.TopCentre,
                                     Origin = Anchor.TopCentre,
                                 },
-                                starRatingDisplay = new StarRatingDisplay(default)
+                                dualDifficultyDisplay = new EzDualDifficultyDisplay(animated: true)
                                 {
                                     Alpha = 0f,
                                     Anchor = Anchor.TopCentre,
@@ -249,13 +257,55 @@ namespace osu.Game.Screens.Play
 
             starDifficulty.BindValueChanged(d =>
             {
-                starRatingDisplay.Current.Value = d.NewValue;
+                dualDifficultyDisplay.UpdateOfficial(d.NewValue);
 
                 versionFlow.AutoSizeDuration = 300;
                 versionFlow.AutoSizeEasing = Easing.OutQuint;
 
-                starRatingDisplay.FadeIn(300, Easing.InQuint);
+                dualDifficultyDisplay.FadeIn(300, Easing.InQuint);
             }, true);
+
+            if (beatmap.BeatmapInfo is BeatmapInfo beatmapInfo)
+            {
+                dualDifficultyDisplay.UpdateFromBeatmap(beatmapInfo);
+                bindEzAnalysis(beatmapInfo);
+            }
+
+            mods.BindValueChanged(_ =>
+            {
+                if (beatmap.BeatmapInfo is BeatmapInfo beatmapInfo && ezAnalysisBindable != null)
+                    dualDifficultyDisplay.ApplyAnalysisMetrics(beatmapInfo, EzSongSelectAnalysisDisplay.Resolve(beatmapInfo, ezAnalysisBindable.Value, mods.Value));
+            });
+        }
+
+        private void bindEzAnalysis(BeatmapInfo beatmapInfo)
+        {
+            ezAnalysisBindable?.UnbindAll();
+            ezAnalysisBindable = null;
+
+            ezAnalysisCancellationSource?.Cancel();
+            ezAnalysisCancellationSource?.Dispose();
+            ezAnalysisCancellationSource = new CancellationTokenSource();
+
+            if (!EzDualDifficultyDisplay.ShouldShowXxyDisplay(beatmapInfo))
+            {
+                dualDifficultyDisplay.ResetXxy();
+                return;
+            }
+
+            ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmapInfo, ezAnalysisCancellationSource.Token);
+            ezAnalysisBindable.BindValueChanged(change =>
+            {
+                dualDifficultyDisplay.ApplyAnalysisMetrics(beatmapInfo, EzSongSelectAnalysisDisplay.Resolve(beatmapInfo, change.NewValue, mods.Value));
+            }, true);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            ezAnalysisBindable?.UnbindAll();
+            ezAnalysisCancellationSource?.Cancel();
+            ezAnalysisCancellationSource?.Dispose();
+            base.Dispose(isDisposing);
         }
 
         private partial class MetadataLineLabel : OsuSpriteText

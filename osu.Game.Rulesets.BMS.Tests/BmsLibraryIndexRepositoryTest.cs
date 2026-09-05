@@ -201,6 +201,67 @@ namespace osu.Game.Rulesets.BMS.Tests
         }
 
         [Test]
+        public void TestMigratesPartialVersion1WithExistingSetIdColumn()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), $"bms-index-v1-partial-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempDir);
+
+            try
+            {
+                string dbPath = Path.Combine(tempDir, BmsStoragePaths.INDEX_DATABASE_FILE);
+                const string folder_path = @"D:\BMS\song";
+                string chartPath = Path.Combine(folder_path, "chart.bms");
+                Guid beatmapId = Guid.NewGuid();
+                const string path_key = "existing-path-key";
+
+                createVersion1Database(dbPath, chartPath, folder_path, beatmapId, path_key);
+
+                // Simulate a crash after ADD COLUMN set_id (and peers) but before schema_version was updated.
+                using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+                {
+                    connection.Open();
+                    using var command = connection.CreateCommand();
+                    command.CommandText = @"
+ALTER TABLE charts ADD COLUMN set_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE charts ADD COLUMN seen_generation INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE charts ADD COLUMN sync_revision INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE charts ADD COLUMN sync_state INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE charts ADD COLUMN parse_version INTEGER NOT NULL DEFAULT 1;";
+                    command.ExecuteNonQuery();
+                }
+
+                var repository = new BmsLibraryIndexRepository(dbPath);
+                Assert.That(repository.ChartCount, Is.EqualTo(1));
+                Assert.That(repository.TryGetChart(beatmapId, out var chart), Is.True);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(chart.Identity.BeatmapId, Is.EqualTo(beatmapId));
+                    Assert.That(chart.Identity.PathKey, Is.EqualTo(path_key));
+                    Assert.That(chart.Identity.SetId, Is.EqualTo(BmsChartIdentity.CreateSetId(folder_path)));
+                    Assert.That(chart.SyncState, Is.EqualTo(BmsLibraryIndexRepository.SyncState.Pending));
+                    Assert.That(chart.ParseVersion, Is.EqualTo(1));
+                });
+
+                var changes = repository.GetPendingSyncChanges(10);
+                Assert.That(changes, Has.Count.EqualTo(1));
+                Assert.That(changes[0].BeatmapId, Is.EqualTo(beatmapId));
+                Assert.That(changes[0].SetId, Is.EqualTo(BmsChartIdentity.CreateSetId(folder_path)));
+                Assert.That(changes[0].Kind, Is.EqualTo(BmsLibraryIndexRepository.SyncChangeKind.Upsert));
+
+                using var verify = new SqliteConnection($"Data Source={dbPath}");
+                verify.Open();
+                using var meta = verify.CreateCommand();
+                meta.CommandText = "SELECT value FROM meta WHERE key = 'schema_version';";
+                Assert.That(meta.ExecuteScalar(), Is.EqualTo("3"));
+            }
+            finally
+            {
+                cleanupTempDirectory(tempDir);
+            }
+        }
+
+        [Test]
         public void TestGenerationWritesOnlyDeltasAndCompletesRevision()
         {
             string tempDir = Path.Combine(Path.GetTempPath(), $"bms-index-generation-{Guid.NewGuid():N}");

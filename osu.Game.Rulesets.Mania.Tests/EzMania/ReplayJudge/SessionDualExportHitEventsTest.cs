@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             var fromHitEvents = await service.RunHitEventsAsync(score, beatmap).ConfigureAwait(true);
             var fromRequest = await service.RunRequestAsync(new ReplayRunRequest(score, beatmap, ReplayRunPurpose.ForLive)).ConfigureAwait(true);
 
-            Assert.That(ManiaReplayParityHelper.AreHitEventsEquivalent(fromHitEvents, fromRequest.Score!.ScoreInfo.HitEvents.ToList()), Is.True);
+            Assert.That(ManiaReplayParityHelper.AreHitEventsEquivalent(fromHitEvents, fromRequest.Score.ScoreInfo.HitEvents.ToList()), Is.True);
         }
 
         [Test]

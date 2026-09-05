@@ -140,7 +140,7 @@ namespace osu.Game.Screens.Select
                     if (!tryParseBool(value, out bool hasVideo))
                         return false;
 
-                    criteria.HasVideo = hasVideo ? true : false;
+                    criteria.HasVideo = hasVideo;
                     return true;
 
                 case "storyboard":
@@ -148,7 +148,7 @@ namespace osu.Game.Screens.Select
                     if (!tryParseBool(value, out bool hasStoryboard))
                         return false;
 
-                    criteria.HasStoryboard = hasStoryboard ? true : false;
+                    criteria.HasStoryboard = hasStoryboard;
                     return true;
 
                 default:

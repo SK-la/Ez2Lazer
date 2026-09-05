@@ -185,21 +185,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             if (!lnGradient)
             {
-                if (bodyContainer != null)
-                    bodyContainer.Colour = NoteColor;
+                bodyContainer?.Colour = NoteColor;
 
                 return;
             }
 
-            if (topContainer != null)
-            {
-                topContainer.Colour = ColourInfo.GradientVertical(
-                    NoteColor.Opacity((float)tailAlpha.Value),
-                    NoteColor);
-            }
+            topContainer?.Colour = ColourInfo.GradientVertical(
+                NoteColor.Opacity((float)tailAlpha.Value),
+                NoteColor);
 
-            if (bodyContainer != null)
-                bodyContainer.Colour = NoteColor;
+            bodyContainer?.Colour = NoteColor;
         }
 
         protected override void Update()
@@ -348,7 +343,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void onIsHittingChanged(ValueChangedEvent<bool> isHitting)
         {
-            if (hittingLayer != null) hittingLayer.IsHitting.Value = isHitting.NewValue;
+            hittingLayer?.IsHitting.Value = isHitting.NewValue;
 
             if (lightContainer == null)
                 return;

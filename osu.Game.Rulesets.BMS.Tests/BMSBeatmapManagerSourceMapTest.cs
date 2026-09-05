@@ -26,7 +26,7 @@ namespace osu.Game.Rulesets.BMS.Tests
             try
             {
                 var index = new BmsLibraryIndexRepository(Path.Combine(tempDir, BmsStoragePaths.INDEX_DATABASE_FILE));
-                const string folderPath = @"E:\bms\song-a";
+                const string folder_path = @"E:\bms\song-a";
                 var cache = new BMSLibraryCache
                 {
                     RootPaths = { @"E:\bms" },
@@ -34,7 +34,7 @@ namespace osu.Game.Rulesets.BMS.Tests
                     {
                         new BMSSongCache
                         {
-                            FolderPath = folderPath,
+                            FolderPath = folder_path,
                             Title = "Song A",
                             Artist = "Artist A",
                             LastModified = DateTime.UtcNow,
@@ -45,10 +45,10 @@ namespace osu.Game.Rulesets.BMS.Tests
                 for (int i = 0; i < 256; i++)
                 {
                     string fileName = $"{i:D4}.bms";
-                    string chartPath = Path.Combine(folderPath, fileName);
+                    string chartPath = Path.Combine(folder_path, fileName);
                     cache.Songs[0].Charts.Add(new BMSChartCache
                     {
-                        FolderPath = folderPath,
+                        FolderPath = folder_path,
                         FileName = fileName,
                         Md5Hash = BmsPathKeys.ComputeChartPathKey(chartPath),
                         Title = $"Chart {i}",
@@ -61,7 +61,7 @@ namespace osu.Game.Rulesets.BMS.Tests
                 var manager = new BMSBeatmapManager(tempDir);
                 manager.LoadCache();
 
-                string selectedPath = Path.Combine(folderPath, "0128.bms");
+                string selectedPath = Path.Combine(folder_path, "0128.bms");
                 string selectedKey = BmsPathKeys.ComputeChartPathKey(selectedPath);
                 Guid selectedId = BmsChartIdentity.CreateBeatmapId(selectedPath);
 

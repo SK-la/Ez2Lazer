@@ -4,6 +4,7 @@
 using System;
 using System.Threading;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Extensions.PolygonExtensions;
 using osu.Framework.Graphics;
@@ -13,6 +14,8 @@ using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Overlays;
 using osuTK;
 using osuTK.Graphics;
@@ -31,6 +34,10 @@ namespace osu.Game.Screens.Select
         private CancellationTokenSource? loadCancellation;
 
         private double timeSinceUnpool;
+
+        private Bindable<bool> acrylicUiEnabled = null!;
+        private Box gradientBackground = null!;
+        private FillFlowContainer darkOverlays = null!;
 
         public WorkingBeatmap? Beatmap
         {
@@ -87,17 +94,20 @@ namespace osu.Game.Screens.Select
         }
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colourProvider)
+        private void load(OverlayColourProvider colourProvider, Ez2ConfigManager ezConfig)
         {
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+
             InternalChildren = new Drawable[]
             {
-                new Box
+                // Match official draw order: gradient behind cover, dark overlays in front of cover.
+                gradientBackground = new Box
                 {
                     Depth = 1,
                     RelativeSizeAxes = Axes.Both,
                     Colour = ColourInfo.GradientHorizontal(colourProvider.Background3, colourProvider.Background4),
                 },
-                new FillFlowContainer
+                darkOverlays = new FillFlowContainer
                 {
                     Depth = -1,
                     RelativeSizeAxes = Axes.Both,
@@ -129,10 +139,42 @@ namespace osu.Game.Screens.Select
                     }
                 },
             };
+
+            // Glass N is on Panel parent; hide classic layers when acrylic is on.
+            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(gradientBackground, acrylicUiEnabled);
+            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(darkOverlays, acrylicUiEnabled);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            acrylicUiEnabled.BindValueChanged(e =>
+            {
+                if (e.NewValue)
+                {
+                    // Penetrate to the global song-select background — drop panel cover art.
+                    loadCancellation?.Cancel();
+                    loadCancellation = null;
+                    sprite?.Expire();
+                    sprite = null;
+                }
+                else
+                {
+                    // Restore classic cover art after acrylic is turned off.
+                    timeSinceUnpool = 0;
+                    loadCancellation?.Cancel();
+                    loadCancellation = null;
+                }
+            }, true);
         }
 
         private void loadContentIfRequired()
         {
+            // Acrylic UI: skip panel cover textures and let the backdrop blur sample the global background.
+            if (acrylicUiEnabled.Value)
+                return;
+
             // A load is already in progress if the cancellation token is non-null.
             if (loadCancellation != null || working == null)
                 return;
@@ -168,6 +210,12 @@ namespace osu.Game.Screens.Select
                 FillMode = FillMode.Fill,
             }, s =>
             {
+                if (acrylicUiEnabled.Value)
+                {
+                    s.Expire();
+                    return;
+                }
+
                 AddInternal(sprite = s);
                 bool spriteOnScreen = beatmapCarousel?.ScreenSpaceDrawQuad.Intersects(sprite.ScreenSpaceDrawQuad) != false;
                 sprite.FadeInFromZero(spriteOnScreen ? 400 : 0, Easing.OutQuint);

@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
@@ -19,10 +18,10 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
-using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
@@ -32,6 +31,7 @@ using osuTK;
 using osuTK.Graphics;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 using Triangle = osu.Framework.Graphics.Primitives.Triangle;
 
 namespace osu.Game.EzOsuGame.HUD
@@ -595,11 +595,9 @@ namespace osu.Game.EzOsuGame.HUD
                 var labelText = axisLabelContainers[i].OfType<OsuSpriteText>().FirstOrDefault(t => t.Name == "LabelText");
                 var valueText = axisLabelContainers[i].OfType<OsuSpriteText>().FirstOrDefault(t => t.Name == "ValueText");
 
-                if (labelText != null)
-                    labelText.Text = getAxisLabel(i);
+                labelText?.Text = getAxisLabel(i);
 
-                if (valueText != null)
-                    valueText.Text = formatAxisValue(i);
+                valueText?.Text = formatAxisValue(i);
             }
         }
 

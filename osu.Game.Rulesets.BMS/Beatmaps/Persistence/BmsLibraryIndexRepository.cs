@@ -784,9 +784,9 @@ ON CONFLICT(folder_path) DO UPDATE SET
     last_modified_ticks = excluded.last_modified_ticks;";
 
                 cmd.Parameters.AddWithValue("$folder", song.FolderPath);
-                cmd.Parameters.AddWithValue("$title", song.Title ?? string.Empty);
-                cmd.Parameters.AddWithValue("$artist", song.Artist ?? string.Empty);
-                cmd.Parameters.AddWithValue("$genre", song.Genre ?? string.Empty);
+                cmd.Parameters.AddWithValue("$title", song.Title);
+                cmd.Parameters.AddWithValue("$artist", song.Artist);
+                cmd.Parameters.AddWithValue("$genre", song.Genre);
                 cmd.Parameters.AddWithValue("$banner", (object?)song.BannerPath ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$stage", (object?)song.StageFilePath ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$modified", song.LastModified.ToUniversalTime().Ticks);
@@ -870,15 +870,15 @@ ON CONFLICT(chart_path) DO UPDATE SET
                 cmd.Parameters.AddWithValue("$beatmapId", beatmapId.ToString());
                 cmd.Parameters.AddWithValue("$setId", BmsChartIdentity.CreateSetId(chart.FolderPath).ToString());
                 cmd.Parameters.AddWithValue("$pathKey", pathKey);
-                cmd.Parameters.AddWithValue("$contentMd5", chart.ContentMd5 ?? string.Empty);
-                cmd.Parameters.AddWithValue("$contentSha256", chart.ContentSha256 ?? string.Empty);
+                cmd.Parameters.AddWithValue("$contentMd5", chart.ContentMd5);
+                cmd.Parameters.AddWithValue("$contentSha256", chart.ContentSha256);
                 cmd.Parameters.AddWithValue("$seenGeneration", ScanRevision + 1);
                 cmd.Parameters.AddWithValue("$parseVersion", chart_parse_version);
-                cmd.Parameters.AddWithValue("$title", chart.Title ?? string.Empty);
-                cmd.Parameters.AddWithValue("$subTitle", chart.SubTitle ?? string.Empty);
-                cmd.Parameters.AddWithValue("$artist", chart.Artist ?? string.Empty);
-                cmd.Parameters.AddWithValue("$subArtist", chart.SubArtist ?? string.Empty);
-                cmd.Parameters.AddWithValue("$genre", chart.Genre ?? string.Empty);
+                cmd.Parameters.AddWithValue("$title", chart.Title);
+                cmd.Parameters.AddWithValue("$subTitle", chart.SubTitle);
+                cmd.Parameters.AddWithValue("$artist", chart.Artist);
+                cmd.Parameters.AddWithValue("$subArtist", chart.SubArtist);
+                cmd.Parameters.AddWithValue("$genre", chart.Genre);
                 cmd.Parameters.AddWithValue("$playLevel", chart.PlayLevel);
                 cmd.Parameters.AddWithValue("$rank", chart.Rank);
                 cmd.Parameters.AddWithValue("$lnType", chart.LnType);
@@ -1237,6 +1237,7 @@ CREATE TABLE IF NOT EXISTS {table_songs} (
                 else if (existingVersion == 1)
                 {
                     migrateVersion1To2(connection);
+                    writeMeta(connection, "schema_version", "2");
                     migrateVersion2To3(connection);
                 }
                 else if (existingVersion == 2)
@@ -1321,23 +1322,16 @@ CREATE INDEX IF NOT EXISTS idx_charts_summary_folder ON {table_charts}((lower(fo
         {
             using var transaction = connection.BeginTransaction();
 
-            using (var alter = connection.CreateCommand())
+            tryAddColumn(connection, transaction, table_charts, "content_md5", "TEXT NOT NULL DEFAULT ''");
+            tryAddColumn(connection, transaction, table_charts, "content_sha256", "TEXT NOT NULL DEFAULT ''");
+
+            using (var index = connection.CreateCommand())
             {
-                alter.Transaction = transaction;
-                alter.CommandText = $@"
-ALTER TABLE {table_charts} ADD COLUMN content_md5 TEXT NOT NULL DEFAULT '';
-ALTER TABLE {table_charts} ADD COLUMN content_sha256 TEXT NOT NULL DEFAULT '';
+                index.Transaction = transaction;
+                index.CommandText = $@"
 CREATE INDEX IF NOT EXISTS idx_charts_content_md5 ON {table_charts}(content_md5);
 CREATE INDEX IF NOT EXISTS idx_charts_content_sha256 ON {table_charts}(content_sha256);";
-
-                try
-                {
-                    alter.ExecuteNonQuery();
-                }
-                catch (SqliteException)
-                {
-                    // Columns may already exist from a partial migration.
-                }
+                index.ExecuteNonQuery();
             }
 
             transaction.Commit();
@@ -1352,17 +1346,17 @@ CREATE INDEX IF NOT EXISTS idx_charts_content_sha256 ON {table_charts}(content_s
         {
             using var transaction = connection.BeginTransaction();
 
+            tryAddColumn(connection, transaction, table_charts, "set_id", "TEXT NOT NULL DEFAULT ''");
+            tryAddColumn(connection, transaction, table_charts, "seen_generation", "INTEGER NOT NULL DEFAULT 0");
+            tryAddColumn(connection, transaction, table_charts, "sync_revision", "INTEGER NOT NULL DEFAULT 0");
+            tryAddColumn(connection, transaction, table_charts, "sync_state", "INTEGER NOT NULL DEFAULT 0");
+            tryAddColumn(connection, transaction, table_charts, "parse_version", "INTEGER NOT NULL DEFAULT 1");
+
             using (var alter = connection.CreateCommand())
             {
                 alter.Transaction = transaction;
                 alter.CommandText = $@"
-ALTER TABLE {table_charts} ADD COLUMN set_id TEXT NOT NULL DEFAULT '';
-ALTER TABLE {table_charts} ADD COLUMN seen_generation INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE {table_charts} ADD COLUMN sync_revision INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE {table_charts} ADD COLUMN sync_state INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE {table_charts} ADD COLUMN parse_version INTEGER NOT NULL DEFAULT 1;
-
-CREATE TABLE {table_sync_changes} (
+CREATE TABLE IF NOT EXISTS {table_sync_changes} (
     revision INTEGER PRIMARY KEY AUTOINCREMENT,
     beatmap_id TEXT NOT NULL,
     set_id TEXT NOT NULL,
@@ -1388,7 +1382,9 @@ CREATE INDEX IF NOT EXISTS idx_charts_summary_folder ON {table_charts}((lower(fo
             using (var select = connection.CreateCommand())
             {
                 select.Transaction = transaction;
-                select.CommandText = $"SELECT chart_path, folder_path, beatmap_id FROM {table_charts};";
+                // Only backfill rows that still have the ADD COLUMN default, so retries do not
+                // enqueue duplicate sync_changes for charts that already completed this step.
+                select.CommandText = $"SELECT chart_path, folder_path, beatmap_id FROM {table_charts} WHERE set_id = '';";
 
                 using var reader = select.ExecuteReader();
 
@@ -1413,6 +1409,22 @@ CREATE INDEX IF NOT EXISTS idx_charts_summary_folder ON {table_charts}((lower(fo
             }
 
             transaction.Commit();
+        }
+
+        private static void tryAddColumn(SqliteConnection connection, SqliteTransaction transaction, string table, string column, string definition)
+        {
+            using var alter = connection.CreateCommand();
+            alter.Transaction = transaction;
+            alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition};";
+
+            try
+            {
+                alter.ExecuteNonQuery();
+            }
+            catch (SqliteException)
+            {
+                // Column may already exist from a partial migration.
+            }
         }
 
         private long readLongMeta(string key)
@@ -1876,9 +1888,9 @@ WHERE beatmap_id = $beatmapId;", "$revision", "$syncState", "$beatmapId");
             private void bindSong(BMSSongCache song)
             {
                 set(upsertSong, "$folder", song.FolderPath);
-                set(upsertSong, "$title", song.Title ?? string.Empty);
-                set(upsertSong, "$artist", song.Artist ?? string.Empty);
-                set(upsertSong, "$genre", song.Genre ?? string.Empty);
+                set(upsertSong, "$title", song.Title);
+                set(upsertSong, "$artist", song.Artist);
+                set(upsertSong, "$genre", song.Genre);
                 set(upsertSong, "$banner", (object?)song.BannerPath ?? DBNull.Value);
                 set(upsertSong, "$stage", (object?)song.StageFilePath ?? DBNull.Value);
                 set(upsertSong, "$modified", song.LastModified.ToUniversalTime().Ticks);
@@ -1894,15 +1906,15 @@ WHERE beatmap_id = $beatmapId;", "$revision", "$syncState", "$beatmapId");
                 set(upsertChart, "$beatmapId", identity.BeatmapId.ToString());
                 set(upsertChart, "$setId", identity.SetId.ToString());
                 set(upsertChart, "$pathKey", identity.PathKey);
-                set(upsertChart, "$contentMd5", chart.ContentMd5 ?? string.Empty);
-                set(upsertChart, "$contentSha256", chart.ContentSha256 ?? string.Empty);
+                set(upsertChart, "$contentMd5", chart.ContentMd5);
+                set(upsertChart, "$contentSha256", chart.ContentSha256);
                 set(upsertChart, "$generation", generation);
                 set(upsertChart, "$parseVersion", chart_parse_version);
-                set(upsertChart, "$title", chart.Title ?? string.Empty);
-                set(upsertChart, "$subTitle", chart.SubTitle ?? string.Empty);
-                set(upsertChart, "$artist", chart.Artist ?? string.Empty);
-                set(upsertChart, "$subArtist", chart.SubArtist ?? string.Empty);
-                set(upsertChart, "$genre", chart.Genre ?? string.Empty);
+                set(upsertChart, "$title", chart.Title);
+                set(upsertChart, "$subTitle", chart.SubTitle);
+                set(upsertChart, "$artist", chart.Artist);
+                set(upsertChart, "$subArtist", chart.SubArtist);
+                set(upsertChart, "$genre", chart.Genre);
                 set(upsertChart, "$playLevel", chart.PlayLevel);
                 set(upsertChart, "$rank", chart.Rank);
                 set(upsertChart, "$lnType", chart.LnType);

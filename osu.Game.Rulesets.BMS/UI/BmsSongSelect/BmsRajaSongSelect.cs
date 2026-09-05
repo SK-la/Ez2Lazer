@@ -537,14 +537,10 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
                 screenWorkCts?.Dispose();
                 screenWorkCts = null;
 
-                if (navigator != null)
-                    navigator.Changed -= onSelectionChanged;
+                navigator.Changed -= onSelectionChanged;
 
-                if (shell != null)
-                {
-                    shell.RequestPlay -= tryStartSelectedChart;
-                    shell.RequestOpenDownload -= openSelectedChartDownload;
-                }
+                shell.RequestPlay -= tryStartSelectedChart;
+                shell.RequestOpenDownload -= openSelectedChartDownload;
             }
 
             base.Dispose(isDisposing);
@@ -575,8 +571,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect
         {
             musicController?.ResetTrackAdjustments();
             musicController?.Stop();
-            if (musicController != null)
-                musicController.AllowTrackControl.Value = false;
+            musicController?.AllowTrackControl.Value = false;
         }
     }
 }

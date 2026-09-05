@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using osu.Framework.Localisation;
@@ -23,7 +24,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         private string? cachedAccessToken;
         private string? cachedAccount;
         private DateTimeOffset accessTokenExpiresAt = DateTimeOffset.MinValue;
-        private readonly object tokenLock = new object();
+        private readonly Lock tokenLock = new Lock();
 
         public PixivAuthService(Storage storage)
         {
@@ -87,7 +88,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             if (string.IsNullOrWhiteSpace(refreshToken))
             {
                 accessToken = null;
-                error = EzSettingsStrings.PIXIV_STATUS_NOT_CONFIGURED;
+                error = EzSettingsPixivString.PIXIV_STATUS_NOT_CONFIGURED;
                 return false;
             }
 
@@ -105,7 +106,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 if (request.ResponseStatusCode != HttpStatusCode.OK)
                 {
                     accessToken = null;
-                    error = EzSettingsStrings.PIXIV_ERROR_TOKEN_REFRESH_FAILED;
+                    error = EzSettingsPixivString.PIXIV_ERROR_TOKEN_REFRESH_FAILED;
                     Logger.Log($"[Pixiv] token refresh HTTP {request.ResponseStatusCode}: {request.GetResponseString()}", LoggingTarget.Network, LogLevel.Important);
                     invalidateAccessToken();
                     return false;
@@ -139,7 +140,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                     if (string.IsNullOrWhiteSpace(cachedAccessToken))
                     {
                         accessToken = null;
-                        error = EzSettingsStrings.PIXIV_ERROR_TOKEN_REFRESH_EMPTY;
+                        error = EzSettingsPixivString.PIXIV_ERROR_TOKEN_REFRESH_EMPTY;
                         invalidateAccessToken();
                         return false;
                     }
@@ -152,7 +153,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             catch (Exception ex)
             {
                 accessToken = null;
-                error = EzSettingsStrings.PIXIV_ERROR_REQUEST_FAILED;
+                error = EzSettingsPixivString.PIXIV_ERROR_REQUEST_FAILED;
                 Logger.Log($"[Pixiv] token refresh: {ex.Message}", LoggingTarget.Network, LogLevel.Important);
                 invalidateAccessToken();
                 return false;
@@ -166,8 +167,11 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
 
         private void invalidateAccessToken()
         {
-            cachedAccessToken = null;
-            accessTokenExpiresAt = DateTimeOffset.MinValue;
+            lock (tokenLock)
+            {
+                cachedAccessToken = null;
+                accessTokenExpiresAt = DateTimeOffset.MinValue;
+            }
         }
 
         private string? loadRefreshTokenFromFile() => loadAuthFromFile()?.RefreshToken;

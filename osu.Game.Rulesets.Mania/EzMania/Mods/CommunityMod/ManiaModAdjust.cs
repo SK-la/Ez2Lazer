@@ -8,6 +8,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Framework.Logging;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -20,10 +22,6 @@ using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
-
-// ReSharper disable RedundantUsingDirective
-using osu.Game.EzOsuGame.Configuration;
-using osu.Framework.Logging;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {

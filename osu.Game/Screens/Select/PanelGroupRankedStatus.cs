@@ -4,6 +4,7 @@
 using System;
 using System.Diagnostics;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
@@ -17,6 +18,8 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Overlays;
 using osuTK;
 using osuTK.Graphics;
@@ -43,10 +46,17 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private Bindable<bool> acrylicUiEnabled = null!;
+
         [BackgroundDependencyLoader]
         private void load()
         {
             Height = PanelGroup.HEIGHT;
+
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
 
             Icon = iconContainer = new Container
             {
@@ -69,24 +79,34 @@ namespace osu.Game.Screens.Select
             };
 
             AccentColour = colourProvider.Highlight1;
+
+            Container colourOverlays;
+
             Content.Children = new Drawable[]
             {
-                contentBackground = new Box
+                colourOverlays = new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                },
-                triangles = new TrianglesV2
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Thickness = 0.02f,
-                    SpawnRatio = 0.6f,
-                    Colour = ColourInfo.GradientHorizontal(colourProvider.Background6, colourProvider.Background5)
-                },
-                glow = new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Width = 0.5f,
-                    Colour = ColourInfo.GradientHorizontal(colourProvider.Highlight1, colourProvider.Highlight1.Opacity(0f)),
+                    Children = new Drawable[]
+                    {
+                        contentBackground = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                        },
+                        triangles = new TrianglesV2
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Thickness = 0.02f,
+                            SpawnRatio = 0.6f,
+                            Colour = ColourInfo.GradientHorizontal(colourProvider.Background6, colourProvider.Background5)
+                        },
+                        glow = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Width = 0.5f,
+                            Colour = ColourInfo.GradientHorizontal(colourProvider.Highlight1, colourProvider.Highlight1.Opacity(0f)),
+                        },
+                    }
                 },
                 new FillFlowContainer
                 {
@@ -130,6 +150,8 @@ namespace osu.Game.Screens.Select
                     },
                 }
             };
+
+            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, acrylicUiEnabled);
         }
 
         protected override void LoadComplete()
@@ -194,6 +216,8 @@ namespace osu.Game.Screens.Select
         protected override void Update()
         {
             base.Update();
+
+            ApplyAcrylicIconStripBackground(backgroundBorder, acrylicUiEnabled.Value, AccentColour ?? colourProvider.Highlight1);
 
             // Move the count pill in the opposite direction to keep it pinned to the screen regardless of the X position of TopLevelContent.
             countPill.X = -TopLevelContent.X;

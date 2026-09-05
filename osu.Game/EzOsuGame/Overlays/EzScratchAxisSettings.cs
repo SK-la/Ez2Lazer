@@ -27,9 +27,9 @@ using CommonStrings = osu.Game.Resources.Localisation.Web.CommonStrings;
 namespace osu.Game.EzOsuGame.Overlays
 {
     /// <summary>
-    /// Mania L/R 转盘轴设置：按设备 GUID+轴绑定，支持多设备/同设备多轴。
+    /// L/R 转盘轴设置：按设备 GUID+轴绑定，支持 Mania 与 Catch。
     /// </summary>
-    public partial class EzManiaScratchAxisSettings : FillFlowContainer
+    public partial class EzScratchAxisSettings : FillFlowContainer
     {
         /// <summary>绑定捕获用的累计位移阈值（与游玩死区独立，避免绑不上）。</summary>
         private const float bind_travel_threshold = 0.03f;
@@ -39,13 +39,18 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Dictionary<(string device, int axis), float> bindLastValue = new Dictionary<(string, int), float>();
         private readonly Dictionary<(string device, int axis), float> bindTravel = new Dictionary<(string, int), float>();
 
-        private Bindable<bool> enabled = null!;
+        private Bindable<bool> scratchAxisEnabled = null!;
+        private Bindable<bool> catchEz2Enabled = null!;
         private Bindable<string> leftBinding = null!;
         private Bindable<string> rightBinding = null!;
         private Bindable<double> deadzone = null!;
         private Bindable<int> stopThreshold = null!;
+        private Bindable<double> dashEnterAcceleration = null!;
+        private Bindable<double> dashExitVelocity = null!;
 
         private ScratchAxisDeviceTracker tracker = null!;
+
+        private FillFlowContainer catchEz2SettingsContainer = null!;
 
         private SettingsButtonV2 leftBindButton = null!;
         private SettingsButtonV2 rightBindButton = null!;
@@ -57,7 +62,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private BindTarget? bindTarget;
         private (string device, int axis, string name, float travel)? bestBindCandidate;
 
-        public EzManiaScratchAxisSettings()
+        public EzScratchAxisSettings()
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -70,11 +75,14 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             tracker = scratchTracker;
 
-            enabled = ezConfig.GetBindable<bool>(Ez2Setting.ManiaScratchAxisEnabled);
+            scratchAxisEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisEnabled);
+            catchEz2Enabled = ezConfig.GetBindable<bool>(Ez2Setting.CatchScratchEz2Enabled);
             leftBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisL);
             rightBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisR);
             deadzone = ezConfig.GetBindable<double>(Ez2Setting.ScratchAxisDeadzone);
             stopThreshold = ezConfig.GetBindable<int>(Ez2Setting.ScratchAxisStopThreshold);
+            dashEnterAcceleration = ezConfig.GetBindable<double>(Ez2Setting.CatchScratchDashEnterAcceleration);
+            dashExitVelocity = ezConfig.GetBindable<double>(Ez2Setting.CatchScratchDashExitVelocity);
 
             leftMonitor.Deadzone.BindTo(deadzone);
             rightMonitor.Deadzone.BindTo(deadzone);
@@ -85,22 +93,65 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.MANIA_SCRATCH_AXIS_ENABLED,
-                    HintText = EzSettingsStrings.MANIA_SCRATCH_AXIS_ENABLED_TOOLTIP,
-                    Current = enabled,
+                    Caption = EzSettingsStrings.SCRATCH_AXIS_ENABLED,
+                    HintText = EzSettingsStrings.SCRATCH_AXIS_ENABLED_TOOLTIP,
+                    Current = scratchAxisEnabled,
                 })
                 {
-                    Keywords = new[] { "ez", "mania", "scratch", "turntable", "axis", "joystick", "转盘" }
+                    Keywords = new[] { "ez", "mania", "catch", "scratch", "turntable", "axis", "joystick", "转盘" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.CATCH_SCRATCH_EZ2_ENABLED,
+                    HintText = EzSettingsStrings.CATCH_SCRATCH_EZ2_ENABLED_TOOLTIP,
+                    Current = catchEz2Enabled,
+                })
+                {
+                    Keywords = new[] { "ez", "catch", "scratch", "turntable", "ez2catch", "转盘" }
+                },
+                catchEz2SettingsContainer = new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(0, SettingsSection.ITEM_SPACING_V2),
+                    Children = new Drawable[]
+                    {
+                        new SettingsItemV2(new FormSliderBar<double>
+                        {
+                            Caption = EzSettingsStrings.CATCH_SCRATCH_DASH_ENTER_ACCELERATION,
+                            HintText = EzSettingsStrings.CATCH_SCRATCH_DASH_ENTER_ACCELERATION_TOOLTIP,
+                            RelativeSizeAxes = Axes.X,
+                            Current = dashEnterAcceleration,
+                            KeyboardStep = 0.00005f,
+                            LabelFormat = v => $"{v * 1000:0.##}",
+                        })
+                        {
+                            Keywords = new[] { "ez", "catch", "scratch", "dash", "acceleration", "加速" }
+                        },
+                        new SettingsItemV2(new FormSliderBar<double>
+                        {
+                            Caption = EzSettingsStrings.CATCH_SCRATCH_DASH_EXIT_VELOCITY,
+                            HintText = EzSettingsStrings.CATCH_SCRATCH_DASH_EXIT_VELOCITY_TOOLTIP,
+                            RelativeSizeAxes = Axes.X,
+                            Current = dashExitVelocity,
+                            KeyboardStep = 0.00001f,
+                            LabelFormat = v => $"{v * 1000:0.##}",
+                        })
+                        {
+                            Keywords = new[] { "ez", "catch", "scratch", "dash", "velocity", "重置" }
+                        },
+                    },
                 },
                 leftBindButton = new SettingsButtonV2
                 {
-                    Keywords = new[] { "ez", "mania", "scratch", "l", "axis" },
+                    Keywords = new[] { "ez", "scratch", "l", "axis" },
                     Action = () => toggleBind(BindTarget.Left),
                 },
                 createStatusRow(out leftStatusText),
                 rightBindButton = new SettingsButtonV2
                 {
-                    Keywords = new[] { "ez", "mania", "scratch", "r", "axis" },
+                    Keywords = new[] { "ez", "scratch", "r", "axis" },
                     Action = () => toggleBind(BindTarget.Right),
                 },
                 createStatusRow(out rightStatusText),
@@ -162,6 +213,15 @@ namespace osu.Game.EzOsuGame.Overlays
             leftBinding.BindValueChanged(_ => refreshBindLabels(), true);
             rightBinding.BindValueChanged(_ => refreshBindLabels(), true);
 
+            scratchAxisEnabled.BindValueChanged(e =>
+            {
+                catchEz2Enabled.Disabled = !e.NewValue;
+
+                refreshCatchEz2SettingsVisibility();
+            }, true);
+
+            catchEz2Enabled.BindValueChanged(_ => refreshCatchEz2SettingsVisibility(), true);
+
             leftMonitor.IsPressed.BindValueChanged(_ => refreshStatus(leftMonitor, leftStatusText), true);
             leftMonitor.Direction.BindValueChanged(_ => refreshStatus(leftMonitor, leftStatusText));
             rightMonitor.IsPressed.BindValueChanged(_ => refreshStatus(rightMonitor, rightStatusText), true);
@@ -175,7 +235,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             base.Dispose(isDisposing);
 
-            if (isDisposing && tracker != null)
+            if (isDisposing)
                 tracker.AxisMoved -= onAxisMoved;
         }
 
@@ -207,18 +267,26 @@ namespace osu.Game.EzOsuGame.Overlays
                 rightMonitor.UpdateMissing(t);
         }
 
+        private void refreshCatchEz2SettingsVisibility()
+        {
+            bool visible = scratchAxisEnabled.Value && catchEz2Enabled.Value;
+
+            if (visible)
+                catchEz2SettingsContainer.Show();
+            else
+                catchEz2SettingsContainer.Hide();
+        }
+
         private void onAxisMoved(JoystickDeviceAxis axis)
         {
             string deviceKey = !string.IsNullOrEmpty(axis.Guid) ? axis.Guid : $"id:{axis.InstanceId}";
             var key = (deviceKey, axis.AxisIndex);
 
-            // 始终更新 tracker 侧已有逻辑；绑定窗口内累计位移
             if (bindTarget == null)
                 return;
 
             if (!bindLastValue.TryGetValue(key, out float last))
             {
-                // 首帧只记停靠点，不算位移（避免把绝对值当转动）
                 bindLastValue[key] = axis.Value;
                 bindTravel[key] = 0;
                 refreshBindHint();
@@ -240,10 +308,7 @@ namespace osu.Game.EzOsuGame.Overlays
             refreshBindHint();
 
             if (travel >= bind_travel_threshold)
-            {
-                // 写入绑定，但不退出监听——否则一转就「已绑定」并关掉 hint，看不到后续轴值
                 commitBindIfPossible();
-            }
         }
 
         private void toggleBind(BindTarget target)

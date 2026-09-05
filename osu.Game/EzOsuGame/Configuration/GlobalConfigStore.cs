@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Threading;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Configuration;
@@ -10,7 +11,7 @@ namespace osu.Game.EzOsuGame.Configuration
 {
     public static class GlobalConfigStore
     {
-        private static readonly object initialization_lock = new object();
+        private static readonly Lock initialization_lock = new Lock();
         private static Storage? fallbackStorage;
 
         public static OsuConfigManager Config { get; set; } = null!;

@@ -82,13 +82,13 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         private static void drawLayer(Image<Rgba32> result, Image<Rgba32> source, int y, int width, int height, Colour4 tint)
         {
-            using var layer = source.Clone();
-
-            layer.Mutate(c => c.Resize(width, height));
-            applyTint(layer, tint);
-
-            int drawY = y;
-            result.Mutate(c => c.DrawImage(layer, new Point(0, drawY), 1f));
+            result.Mutate(ctx =>
+            {
+                using var layer = source.Clone();
+                layer.Mutate(c => c.Resize(width, height));
+                applyTint(layer, tint);
+                ctx.DrawImage(layer, new Point(0, y), 1f);
+            });
         }
 
         private static Image<Rgba32>? loadTextureImage(string mountedSkinPath, string? textureName)

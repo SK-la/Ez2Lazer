@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Skinning
@@ -105,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.Skinning
         public bool IsEmpty => notes.All(wr => !wr.TryGetTarget(out _));
 
         private static readonly Dictionary<WeakReference<Column>, ColumnWatcher> watchers = new Dictionary<WeakReference<Column>, ColumnWatcher>();
-        private static readonly object watcher_lock = new object();
+        private static readonly Lock watcher_lock = new Lock();
 
         public static ColumnWatcher GetOrCreate(Column c)
         {

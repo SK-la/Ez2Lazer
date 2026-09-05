@@ -58,7 +58,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void load(EzResourceStore resources)
         {
             // 计算 drawSeparator 结果（基于不变的列数和列索引）
-            // TODO: 以后要支持自定义
             hasSeparator = stageDefinition.HasSeparator(column.Index);
 
             InternalChildren = new[]

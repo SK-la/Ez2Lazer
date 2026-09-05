@@ -266,14 +266,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             if (strategy is Ez2AcHitModeJudgement ez2Ac)
             {
-                bool headMissOrBreak = !request.HeadHit || request.HasHoldBreak;
-
                 if (!request.UserTriggered)
                 {
                     if (request.TimeOffset < 0)
                         return HoldTailEvaluationResult.HandledNoOp;
 
-                    if (headMissOrBreak && !request.HitWindows.CanBeHit(request.TimeOffset))
+                    if (!request.HitWindows.CanBeHit(request.TimeOffset))
                         return HoldTailEvaluationResult.MinResult;
 
                     return HoldTailEvaluationResult.HandledNoOp;
@@ -292,7 +290,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                 if (tailJudge == Ez2AcJudge.None)
                 {
-                    if (!request.UserTriggered && !request.HitWindows.CanBeHit(request.TimeOffset))
+                    if (!request.HitWindows.CanBeHit(request.TimeOffset))
                         return HoldTailEvaluationResult.MinResult;
 
                     return HoldTailEvaluationResult.HandledNoOp;

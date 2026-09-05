@@ -2,9 +2,10 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using JetBrains.Annotations;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
@@ -63,7 +64,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         private readonly Dictionary<EzColumnType, Bindable<Colour4>> columnColorBindables = new Dictionary<EzColumnType, Bindable<Colour4>>();
         private readonly Dictionary<(int keyMode, int columnIndex), ColumnBindings> columnBindings = new Dictionary<(int keyMode, int columnIndex), ColumnBindings>();
-        private readonly object columnBindingsLock = new object();
+        private readonly Lock columnBindingsLock = new Lock();
 
         public event Action<int, int, EzColumnType>? ColumnTypeChanged;
 
@@ -102,16 +103,25 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ScreenshotAction, EzScreenshotAction.SaveAndCopy);
             SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
-            SetDefault(Ez2Setting.ManiaScratchAxisEnabled, false);
+            SetDefault(Ez2Setting.ScratchAxisEnabled, false);
+            SetDefault(Ez2Setting.CatchScratchEz2Enabled, false);
             // 格式：guid|axisIndex（多设备）；兼容旧版纯数字轴下标
             SetDefault(Ez2Setting.ScratchAxisL, string.Empty);
             SetDefault(Ez2Setting.ScratchAxisR, string.Empty);
             SetDefault(Ez2Setting.ScratchAxisDeadzone, 0.005, 0.001, 0.01, 0.001);
             SetDefault(Ez2Setting.ScratchAxisStopThreshold, 30, 10, 150);
+            SetDefault(Ez2Setting.CatchScratchDashEnterAcceleration, 0.0005, 0.0001, 0.0010, 0.00005);
+            SetDefault(Ez2Setting.CatchScratchDashExitVelocity, 0.00010, 0.00010, 0.00020, 0.00001);
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
             SetDefault(Ez2Setting.TurboMode, false);
             SetDefault(Ez2Setting.TurboModeSnapshot, string.Empty);
+            SetDefault(Ez2Setting.FlowMode, false);
+
+            SetDefault(Ez2Setting.QuickRotationEnabled, false);
+            SetDefault(Ez2Setting.QuickRotationDifficultyTolerance, 0.5, 0.1, 2.0, 0.1);
+            SetDefault(Ez2Setting.QuickRotationCrossKeyMode, false);
+            SetDefault(Ez2Setting.QuickRotationCandidateCount, 5, 3, 6);
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, false);
             SetDefault(Ez2Setting.AcrylicUiEnabled, false);
@@ -901,9 +911,14 @@ namespace osu.Game.EzOsuGame.Configuration
         ManiaSkipEmptyEdgeColumns,
 
         /// <summary>
-        /// 开启后按 12/14/16K 模板将 L/R 转盘轴运行时注入首尾列（不改写 Realm 键位）。
+        /// 开启后 L/R 转盘轴可用于 Mania 首尾列与 Catch 左右移动（不改写 Realm 键位）。
         /// </summary>
-        ManiaScratchAxisEnabled,
+        ScratchAxisEnabled,
+
+        /// <summary>
+        /// Catch 转盘 Ez2 增强：半死区、1 帧激活、转速变速（最高 1.5× Dash）。
+        /// </summary>
+        CatchScratchEz2Enabled,
 
         /// <summary>
         /// L 转盘绑定（<c>guid|axisIndex</c>）。规则集无关。
@@ -925,6 +940,16 @@ namespace osu.Game.EzOsuGame.Configuration
         /// </summary>
         ScratchAxisStopThreshold,
 
+        /// <summary>
+        /// Ez2Catch 转盘进入 Dash 的角加速度阈值（轴单位/ms²）。
+        /// </summary>
+        CatchScratchDashEnterAcceleration,
+
+        /// <summary>
+        /// Ez2Catch 转盘退出 Dash 的平滑角速度阈值（轴单位/ms）。
+        /// </summary>
+        CatchScratchDashExitVelocity,
+
         SkipWithGameplayKeys,
 
         /// <summary>
@@ -938,6 +963,31 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 启动时若发现它非空即为上次异常退出，需立即还原。不面向用户。
         /// </summary>
         TurboModeSnapshot,
+
+        /// <summary>
+        /// 心流（Zen Flow）：从选歌进入的单人游玩结束后跳过结算直接回选歌；选歌界面禁用 Ranking 标签。
+        /// </summary>
+        FlowMode,
+
+        /// <summary>
+        /// 快速轮换总开关：从选歌进入的单人局结束后在专用界面连续抽卡开下一首。
+        /// </summary>
+        QuickRotationEnabled,
+
+        /// <summary>
+        /// 快速轮换难度平衡容差（相对首次进入时的基准难度）。
+        /// </summary>
+        QuickRotationDifficultyTolerance,
+
+        /// <summary>
+        /// Mania 快速轮换是否允许跨键数（4–10K）；关闭则锁定首轮键数。
+        /// </summary>
+        QuickRotationCrossKeyMode,
+
+        /// <summary>
+        /// 每轮抽卡展示的候选谱面数量（3–6）。
+        /// </summary>
+        QuickRotationCandidateCount,
 
         StoryboardAutoVideoSize,
         AcrylicUiEnabled,

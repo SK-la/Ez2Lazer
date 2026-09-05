@@ -33,54 +33,11 @@ namespace osu.Game.EzOsuGame.Localization
 
         #endregion
 
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString("Ez游玩设置", "Ez Gameplay");
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_UI_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez 界面设置", "Ez UI Settings");
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString("Ez 游玩", "Ez Gameplay");
 
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("桌宠", "Desktop pet");
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_UI_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez UI", "Ez UI");
 
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_ENABLED = new EzLocalizationManager.EzLocalisableString("启用桌宠", "Enable desktop pet");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "总开关。打开后还要勾下面的场景；pet.json 里的 hide/show 规则也能临时显隐。"
-            + "\n不用在皮肤编辑器或 Ez 布局编辑器里添加。位置用 Left Alt 拖动。",
-            "Master toggle. Also enable the scene checkboxes below; pet.json hide/show rules can override visibility."
-            + "\nDo not add it in the skin editor or Ez layout editor. Move it with Left Alt + drag.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SHOW_ON_MENU = new EzLocalizationManager.EzLocalisableString("主菜单显示", "Show on main menu");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SHOW_ON_MENU_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "主菜单是否显示桌宠。",
-            "Show the pet on the main menu.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SHOW_ON_SONG_SELECT = new EzLocalizationManager.EzLocalisableString("选歌界面显示", "Show on song select");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SHOW_ON_SONG_SELECT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "选歌界面是否显示桌宠。",
-            "Show the pet on song select.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SHOW_ON_GAMEPLAY = new EzLocalizationManager.EzLocalisableString("游戏中显示", "Show during gameplay");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SHOW_ON_GAMEPLAY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "游玩时是否允许显示。仍可被 pet.json 的 hide/show 临时关掉或再打开，例如进图隐藏、combo 200 再出现。",
-            "Allow the pet during gameplay. pet.json hide/show rules can still hide it on enter and show it again at a combo threshold.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SHOW_ON_RESULTS = new EzLocalizationManager.EzLocalisableString("结算显示", "Show on results");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SHOW_ON_RESULTS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "结算界面是否显示桌宠。可用 pet.json 的 resultsRank 规则配合舞台 motion 走到分数旁。",
-            "Show the pet on the results screen. Use pet.json resultsRank rules with stage motions to walk toward the rank.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK = new EzLocalizationManager.EzLocalisableString("桌宠包", "Pet pack");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_PACK_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "扫描 EzResources/Pets 下带 pet.json 的文件夹。PNG 社区包直接可用；Live2D 仅官方预设白名单。",
-            "Scans folders with pet.json under EzResources/Pets. PNG community packs work freely; Live2D is official presets only.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SCALE = new EzLocalizationManager.EzLocalisableString("桌宠缩放", "Pet scale");
-
-        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SCALE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "桌宠立绘缩放。位置请用 Left Alt 拖动，不在此修改。",
-            "Scale of the pet sprite. Move it with Left Alt + drag; position is not edited here.");
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_GAMEPLAY_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez Gameplay", "Ez Gameplay");
 
         public static readonly EzLocalizationManager.EzLocalisableString FRAME_LIMITER_BASE =
             new EzLocalizationManager.EzLocalisableString("帧率基数", "Frame limiter");
@@ -140,6 +97,46 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString TURBO_MODE_MANAGED_NOTE = new EzLocalizationManager.EzLocalisableString(
             "由极速模式接管。关闭极速模式后会还原成你原来的值。",
             "Managed by turbo mode. Your original value is restored when turbo mode is turned off.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString FLOW_MODE =
+            new EzLocalizationManager.EzLocalisableString("心流", "Zen Flow");
+
+        public static readonly EzLocalizationManager.EzLocalisableString FLOW_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "专注过程，淡化成绩。"
+            + "\n开启后，游戏结束将直接返回选曲界面，成绩依然保留但不显示结算。选曲界面禁用切换到成绩排名页。",
+            "Focus on play, not results."
+            + "\nWhen enabled, the game skips the results screen after play. Scores are saved but not shown. Ranking view is disabled in song select.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_SECTION_HEADER =
+            new EzLocalizationManager.EzLocalisableString("快速轮换", "Quick Rotation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("快速轮换", "Quick Rotation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "从选歌进入的单人局结束后，在专用抽卡界面连续游玩相似难度的谱面，全程不回到选歌界面。",
+            "After solo play from song select, continue in a dedicated card-pick screen with similar difficulty. Never returns to song select until ended.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_DIFFICULTY_TOLERANCE =
+            new EzLocalizationManager.EzLocalisableString("难度容差", "Difficulty tolerance");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_DIFFICULTY_TOLERANCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "抽卡后通过 Nice BPM 调速，使有效难度落在首次进入时基准难度的 ± 此值范围内。",
+            "After picking a card, Nice BPM adjusts speed so effective difficulty stays within ± this value of the baseline from your first chart.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CROSS_KEY_MODE =
+            new EzLocalizationManager.EzLocalisableString("跨键数轮换", "Cross key-count rotation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CROSS_KEY_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "仅 Mania。开启后候选池可含 4–10K；关闭则整段会话锁定首轮谱面的键数。",
+            "Mania only. When enabled, the pool may include 4–10K charts. When disabled, key count is locked to the first chart.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CANDIDATE_COUNT =
+            new EzLocalizationManager.EzLocalisableString("候选卡片数", "Candidate card count");
+
+        public static readonly EzLocalizationManager.EzLocalisableString QUICK_ROTATION_CANDIDATE_COUNT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "每轮抽卡界面展示的谱面数量（3–6）。",
+            "Number of beatmap cards shown each pick round (3–6).");
 
         public static readonly EzLocalizationManager.EzLocalisableString ACRYLIC_UI_ENABLED =
             new EzLocalizationManager.EzLocalisableString("毛玻璃 UI", "Acrylic UI");
@@ -390,19 +387,55 @@ namespace osu.Game.EzOsuGame.Localization
             "When enabled, 14K beatmaps display as 13K (last column hidden) for Ez2Ac arcade maps with an empty last column."
             + "\nDisable this if the last column contains notes.");
 
-        public static readonly LocalisableString MANIA_SCRATCH_AXIS_ENABLED = new EzLocalizationManager.EzLocalisableString(
-            "启用转盘轴模板（L/R Scratch）",
-            "Enable turntable axis template (L/R Scratch)");
+        public static readonly LocalisableString SCRATCH_AXIS_ENABLED = new EzLocalizationManager.EzLocalisableString(
+            "启用转盘轴（L/R Scratch）",
+            "Enable turntable axis (L/R Scratch)");
 
-        public static readonly LocalisableString MANIA_SCRATCH_AXIS_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启后，按键数模板将 L/R 转盘轴运行时注入首尾列（不改写键位配置）："
-            + "\n12K：列 0 / 11；16K：列 0 / 15；"
-            + "\n14K：列 0 / 13；开启 10k2s1p 时为列 0 / 12。"
-            + "\n转动=按下，停止转动=松开。请勿把同一轴再绑到其它 Mania 键。",
-            "When enabled, L/R turntable axes are injected into edge columns at runtime (key bindings are not rewritten):"
-            + "\n12K: cols 0 / 11; 16K: cols 0 / 15;"
-            + "\n14K: cols 0 / 13; with 10k2s1p: cols 0 / 12."
-            + "\nSpinning = pressed, stop = released. Do not also bind the same axis to other Mania keys.");
+        public static readonly LocalisableString SCRATCH_AXIS_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后 L/R 转盘轴可用于 Mania 与 Catch（共用下方绑定与死区/停转设置）："
+            + "\n• Mania：转动 L/R 转盘 → 对应首尾列按下；停止 = 松开。"
+            + "\n  12K：列 0/11；16K：列 0/15；14K：列 0/13（10k2s1p 为 0/12）。"
+            + "\n• Catch：逆时针 → 左移，顺时针 → 右移；转动期间判定放宽（早 10ms / 晚 20ms）；Dash 键照常。"
+            + "\n• 单盘：只绑定 L 或 R 其中一个即可，顺/逆控制两个方向。"
+            + "\n• 双盘：L/R 可各自顺逆；同时转动时以最近转动为准。"
+            + "\n请勿把同一轴再绑到其它键位。",
+            "When enabled, L/R turntable axes work in Mania and Catch (shared bindings and deadzone/stop settings below):"
+            + "\n• Mania: spin L/R → press edge columns; stop = release."
+            + "\n  12K: cols 0/11; 16K: cols 0/15; 14K: cols 0/13 (10k2s1p: 0/12)."
+            + "\n• Catch: CCW → move left, CW → move right; judgment assist while spinning (10ms early / 20ms late); Dash keys unchanged."
+            + "\n• Single deck: bind only L or R; both directions via spin direction."
+            + "\n• Dual deck: each spins independently; if both active, the most recent spin wins."
+            + "\nDo not bind the same axis to other keys.");
+
+        public static readonly LocalisableString CATCH_SCRATCH_EZ2_ENABLED = new EzLocalizationManager.EzLocalisableString(
+            "启用 Ez2Catch 转盘增强",
+            "Enable Ez2Catch turntable enhancement");
+
+        public static readonly LocalisableString CATCH_SCRATCH_EZ2_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Catch 专用增强（需先开启上方转盘轴）："
+            + "\n• 死区减半、1 帧即开始移动（默认需连续 2 帧同向超过死区才动，故小转一圈才有反应）。"
+            + "\n• 转速越快移动越快，最高约 1.5× Dash 速度；Dash 键照常。"
+            + "\n不影响 Mania scratch。",
+            "Catch-only enhancement (requires turntable axis above):"
+            + "\n• Half deadzone, 1-frame activation (default needs 2 consecutive frames above deadzone — why small spins feel dead)."
+            + "\n• Faster spin = faster movement, up to ~1.5× Dash; Dash keys unchanged."
+            + "\nDoes not affect Mania scratch.");
+
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_ENTER_ACCELERATION = new EzLocalizationManager.EzLocalisableString(
+            "进入加速阈值",
+            "Enter dash acceleration threshold");
+
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_ENTER_ACCELERATION_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "角加速度达到此值时进入 Dash（模拟按住加速键）。滑条显示值为实际阈值×1000。",
+            "Enter Dash when angular acceleration reaches this value (simulates holding Dash). Slider shows actual threshold ×1000.");
+
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_EXIT_VELOCITY = new EzLocalizationManager.EzLocalisableString(
+            "重置速度阈值",
+            "Reset dash velocity threshold");
+
+        public static readonly LocalisableString CATCH_SCRATCH_DASH_EXIT_VELOCITY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "平滑角速度低于此值时退出 Dash（模拟松开加速键）。滑条显示值为实际阈值×1000。",
+            "Exit Dash when smoothed angular velocity drops below this value (simulates releasing Dash). Slider shows actual threshold ×1000.");
 
         public static readonly LocalisableString SCRATCH_AXIS_L = new EzLocalizationManager.EzLocalisableString("L-Scratch 轴", "L-Scratch Axis");
 
@@ -413,8 +446,8 @@ namespace osu.Game.EzOsuGame.Localization
             "Spin turntable to bind… (click again / Esc to cancel)");
 
         public static readonly LocalisableString SCRATCH_AXIS_BIND_IDLE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "点击 L/R 后转动对应转盘；仅累计位移，停靠位置不会触发绑定。",
-            "Click L/R then spin the turntable; only movement is counted, resting position does not bind.");
+            "点击 L/R 后转动对应转盘；仅累计位移，停靠位置不会触发绑定。Catch 单盘只需绑一侧。",
+            "Click L/R then spin the turntable; only movement is counted, resting position does not bind. For Catch, binding one side is enough.");
 
         public static readonly LocalisableString SCRATCH_AXIS_BIND_LISTENING_HINT = new EzLocalizationManager.EzLocalisableString(
             "正在听轴… 累计位移 {0} / {1}",
@@ -522,228 +555,6 @@ namespace osu.Game.EzOsuGame.Localization
 
         #endregion
 
-        #region 音频设备设置
-
-        public static readonly EzLocalizationManager.EzLocalisableString AUDIO_DEVICE_OUTPUT_HINT = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 处于测试阶段！"
-            + "\n对于虚拟音频驱动，如VoiceMeeter，可能需要先切换到物理输出设备，激活驱动后，之后再切换回VM。"
-            + "\n请不要认为虚拟ASIO比WASAPI更好，如果没有声音请尝试重启。",
-            "ASIO is testing! "
-            + "\nFor virtual audio drivers like VoiceMeeter, you may need to switch to a physical output device first, activate the driver, and then switch back to VM."
-            + "\nPlease do not assume virtual ASIO is better than WASAPI, and try restarting if there is no sound.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 输出格式（内部 PCM）",
-            "ASIO Output Format (Internal PCM)");
-
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "仅在关闭「外部 PCM」时生效。所有音频仍会混音到统一的输出采样率。"
-            + "\n推荐 48000 Hz，次选 44100 Hz。",
-            "Only applies when External PCM is off. All audio is still mixed to a single output sample rate."
-            + "\n48000 Hz is recommended; 44100 Hz is the alternative.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 缓冲区大小（内部 PCM）",
-            "ASIO Buffer Size (Internal PCM)");
-
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_HINT = new EzLocalizationManager.EzLocalisableString(
-            "仅在关闭「外部 PCM」时生效。数值越低延迟越低，过低可能爆音或无法启动。",
-            "Only applies when External PCM is off. Lower values reduce latency but may crackle or fail to start.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_PASSTHROUGH_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 外部 PCM（推荐）",
-            "ASIO External PCM (Recommended)");
-
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_PASSTHROUGH_HINT = new EzLocalizationManager.EzLocalisableString(
-            "开启：输出采样率、位深与缓冲区由 ASIO 驱动控制面板决定，游戏不覆盖（外部 PCM）。"
-            + "\n关闭：使用下方游戏内设置指定输出格式（内部 PCM，适用于无驱动面板的设备）。"
-            + "\n无论哪种模式，多路音效都会在混音后以统一格式输出。",
-            "On: sample rate, bit depth, and buffer follow the ASIO driver control panel; the game does not override (external PCM)."
-            + "\nOff: use the in-game settings below (internal PCM; for devices without a driver panel)."
-            + "\nIn both modes, multiple sounds are mixed to one output format.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_RELOAD_DRIVER_LABEL = new EzLocalizationManager.EzLocalisableString(
-            "重新加载 ASIO 驱动",
-            "Reload ASIO Driver");
-
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_RELOAD_DRIVER_HINT = new EzLocalizationManager.EzLocalisableString(
-            "释放本程序占用的音频设备后，按当前输出设备选择重新初始化，并重新读取驱动当前生效的格式与缓冲区。",
-            "Releases audio resources held by the game, re-initialises the current output device, and re-reads the driver's active format and buffer settings.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_RELOAD_DRIVER_FAILED_NOTIFICATION = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 驱动重新加载失败。请确认驱动控制面板中的设置，或尝试重启游戏。",
-            "ASIO driver reload failed. Check the driver control panel settings, or try restarting the game.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString ASIO_OUTPUT_UNAVAILABLE_NOTIFICATION = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 输出未能启动，当前没有声音。请尝试重启游戏；若仍失败，请关闭占用该 ASIO 驱动的其他程序，或切换到其他音频设备。",
-            "ASIO output failed to start; there is no audio. Try restarting the game. If it still fails, close other apps using this ASIO driver or switch to another audio device.");
-
-        #endregion
-
-        #region Pixiv 背景
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTH_TOOL_HINT_PREFIX = new EzLocalizationManager.EzLocalisableString(
-            "请从 ",
-            "Download EzPixivAuth from ");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTH_TOOL_HINT_LINK = new EzLocalizationManager.EzLocalisableString(
-            "EzPixivAuth Releases",
-            "EzPixivAuth Releases");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTH_TOOL_HINT_SUFFIX = new EzLocalizationManager.EzLocalisableString(
-            " 下载 EzPixivAuth，双击运行后会自动写入本机 pixiv_auth.json（与 client.realm 同目录）。",
-            " and run it to write pixiv_auth.json next to client.realm.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CUSTOM_TOOL_HINT = new EzLocalizationManager.EzLocalisableString(
-            "自定义",
-            "Custom");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CUSTOM_TOOL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "展开高级选项：手动 refresh_token、反代地址、过滤、黑白名单。",
-            "Show advanced options: manual refresh_token, proxy URL, filters, and artist/tag lists.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_MANUAL_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "仅当你已从其他途径获得 refresh_token 时使用。输入为隐藏显示，勿泄露给他人。",
-            "Only if you already have a refresh_token from elsewhere. Input is masked; do not share it.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_REFRESH_TOKEN = new EzLocalizationManager.EzLocalisableString(
-            "refresh_token", "refresh_token");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_REFRESH_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "粘贴后点「保存」。仅保存在本机。",
-            "Paste and click Save. Stored locally only.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_API_PROXY_BASE_URL = new EzLocalizationManager.EzLocalisableString(
-            "反代地址", "Proxy base URL");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_API_PROXY_BASE_URL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "替换 app-api.pixiv.net 与 i.pximg.net 请求（OAuth 登录仍直连）。"
-            + "\n留空则全部直连官方。"
-            + "\nCloudflare Workers 示例：https://pixiv.yourdomain.com"
-            + "\nVercel 示例：https://your-project.vercel.app/api"
-            + "\n参考：https://github.com/vmoranv/pixiv-proxy",
-            "Rewrites app-api.pixiv.net API calls and i.pximg.net image downloads (OAuth login stays direct)."
-            + "\nLeave empty to use official endpoints."
-            + "\nCloudflare Workers example: https://pixiv.yourdomain.com"
-            + "\nVercel example: https://your-project.vercel.app/api"
-            + "\nSee: https://github.com/vmoranv/pixiv-proxy");
-
-        public const string PIXIV_AUTH_TOOL_RELEASES_URL = "https://github.com/SK-la/EzPixivAuth/releases";
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN = new EzLocalizationManager.EzLocalisableString("保存", "Save");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_SAVE_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "将上方输入框中的 refresh_token 保存到本机。",
-            "Saves the refresh_token from the input field above to local storage.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CHECK_LOGIN = new EzLocalizationManager.EzLocalisableString("检查登录", "Check login");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CHECK_LOGIN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "验证凭证是否可用。", "Verifies the saved credential.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_STATUS_NOT_CONFIGURED = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv：尚未保存登录凭证。", "Pixiv: no credential saved yet.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_STATUS_LOGGED_IN = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv：已登录 @{0}", "Pixiv: logged in as @{0}");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_STATUS_INVALID = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv：凭证无效，请重新运行 EzPixivAuth 或手动保存。", "Pixiv: invalid credential; run EzPixivAuth again or save manually.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CLEAR_TOKEN = new EzLocalizationManager.EzLocalisableString("清除", "Clear");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_CLEAR_TOKEN_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "删除本机保存的凭证。", "Deletes the locally saved credential.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_SAVED = new EzLocalizationManager.EzLocalisableString("已保存。", "Saved.");
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_CLEARED = new EzLocalizationManager.EzLocalisableString("已清除。", "Cleared.");
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TOKEN_EMPTY = new EzLocalizationManager.EzLocalisableString("请先粘贴 refresh_token。", "Paste a refresh_token first.");
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_SUCCESS = new EzLocalizationManager.EzLocalisableString("Pixiv 登录成功：@{0}", "Pixiv login OK: @{0}");
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_VERIFY_FAILED = new EzLocalizationManager.EzLocalisableString("Pixiv 登录验证失败。", "Pixiv login verification failed.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_TOKEN_REFRESH_FAILED = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv 凭证刷新失败。", "Pixiv token refresh failed.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_TOKEN_REFRESH_EMPTY = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv 凭证刷新未返回 access token。", "Pixiv token refresh returned an empty access token.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_ACCESS_TOKEN_NOT_SET = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv access token 未就绪。", "Pixiv access token is not set.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_FOLLOW_FEED_FAILED = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv 关注流加载失败。", "Failed to load Pixiv follow feed.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_FOLLOW_FEED_EMPTY = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv 关注流过滤后无可用插图。", "Pixiv follow feed returned no illustrations after filtering.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_IMAGE_DOWNLOAD_FAILED = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv 插图下载失败。", "Failed to download Pixiv image.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_IMAGE_EMPTY = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv 插图下载结果为空。", "Downloaded Pixiv image was empty.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ERROR_REQUEST_FAILED = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv 网络请求失败。", "Pixiv network request failed.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_LOG_SONG_CHANGE_DOWNLOAD = new EzLocalizationManager.EzLocalisableString(
-            "切歌下载", "Song change download");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_LOG_AUTO_PREFETCH = new EzLocalizationManager.EzLocalisableString(
-            "自动预缓存", "Auto prefetch");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTO_DOWNLOAD_ENABLED = new EzLocalizationManager.EzLocalisableString(
-            "Pixiv 自动下载", "Pixiv background auto-download");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_AUTO_DOWNLOAD_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "切歌时优先显示 BG_PIXIV 已有图片（不阻塞界面），并在后台每次追加下载 1 张。"
-            + "\n开启后额外持续预缓存；未缓存不足 10 张时自动再拉一页关注流。",
-            "Song changes show a random cached BG_PIXIV image immediately without blocking, while one new illustration downloads in the background."
-            + "\nWhen enabled, also keeps prefetching and fetches another feed page when fewer than 10 are cached.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ALLOW_R18 = new EzLocalizationManager.EzLocalisableString(
-            "允许 R-18 作品", "Allow R-18 works");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ALLOW_R18_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "关闭时过滤 sanity_level ≥ 4 或含 R-18 标签的作品。",
-            "When disabled, filters works with sanity_level ≥ 4 or R-18 tags.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_LANDSCAPE_ONLY = new EzLocalizationManager.EzLocalisableString(
-            "仅横图", "Landscape only");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_LANDSCAPE_ONLY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启时只接受宽大于高的第一页（p0；多页作品不会选用 p1 及之后）。",
-            "When enabled, only accepts page 0 (p0) when wider than tall; later pages of multi-page works are never used.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_WHITELIST = new EzLocalizationManager.EzLocalisableString(
-            "画师 account 白名单", "Artist account whitelist");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_WHITELIST_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "非空时仅允许列表中的画师 account 句柄；多项用空格分隔（与 osu 标签类似，也可用逗号/分号）。",
-            "When non-empty, only listed artist account handles are allowed. Separate with spaces (like osu tags), or commas/semicolons.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_BLACKLIST = new EzLocalizationManager.EzLocalisableString(
-            "画师 account 黑名单", "Artist account blacklist");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_ACCOUNT_BLACKLIST_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "命中则跳过；多项用空格分隔（也可用逗号/分号）。",
-            "Matching accounts are skipped. Separate with spaces, or commas/semicolons.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_INCLUDE = new EzLocalizationManager.EzLocalisableString(
-            "标签包含（任一）", "Tag include (any)");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_INCLUDE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "非空时作品须至少包含其中一个标签（不区分大小写）；多项用空格分隔。含空格的标签请用逗号括起，如：女の子,AI Generated",
-            "When non-empty, works must include at least one listed tag (case-insensitive). Separate with spaces; use commas for tags that contain spaces.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_EXCLUDE = new EzLocalizationManager.EzLocalisableString(
-            "标签排除", "Tag exclude");
-
-        public static readonly EzLocalizationManager.EzLocalisableString PIXIV_TAG_EXCLUDE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "命中任一标签则跳过；多项用空格分隔。含空格的标签请用逗号括起。",
-            "Works with any listed tag are skipped. Separate with spaces; use commas for tags that contain spaces.");
-
-        #endregion
-
         #region 实验性功能
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_ACCOUNT = new EzLocalizationManager.EzLocalisableString(
@@ -752,6 +563,53 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_ACCOUNT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "允许无密码登录本地账户。跳过一切成绩上传、网络账户检查。",
             "Allows local account login without password. Skip all score submissions and online account checks.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER =
+            new EzLocalizationManager.EzLocalisableString("外部规则集管理器", "External Ruleset Manager");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "管理 rulesets/ 目录下的第三方规则集：启用/禁用加载，以及显式 OnlineID（≥4）的排序与映射。修改后需重启游戏。",
+            "Manage third-party rulesets in rulesets/: enable/disable loading and order explicit OnlineIDs (>=4). Restart required after saving.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_HEADER =
+            new EzLocalizationManager.EzLocalisableString("外部规则集管理", "External Ruleset Management");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_BODY = new EzLocalizationManager.EzLocalisableString(
+            "仅影响 rulesets/ 目录中的用户 DLL。未定义 OnlineID（-1）的规则集不会被分配新 ID。",
+            "Only affects user DLLs in rulesets/. Rulesets without an explicit OnlineID (-1) are not assigned new IDs.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_SAVE =
+            new EzLocalizationManager.EzLocalisableString("保存", "Save");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_SAVED =
+            new EzLocalizationManager.EzLocalisableString("外部规则集配置已保存，请重启游戏后生效。", "External ruleset config saved. Restart the game to apply.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_RESTART_HINT = new EzLocalizationManager.EzLocalisableString(
+            "保存后请重启游戏使配置生效。",
+            "Restart the game after saving to apply changes.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_EMPTY = new EzLocalizationManager.EzLocalisableString(
+            "rulesets/ 目录下暂无外部规则集 DLL。\n请将 osu.Game.Rulesets.*.dll 放入该目录后重新打开本窗口。",
+            "No external ruleset DLLs in rulesets/.\nPlace osu.Game.Rulesets.*.dll there, then reopen this window.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_OPEN_FOLDER =
+            new EzLocalizationManager.EzLocalisableString("打开 rulesets 文件夹", "Open rulesets folder");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER_OPEN_FOLDER_FAILED =
+            new EzLocalizationManager.EzLocalisableString("无法打开 rulesets 文件夹。", "Could not open the rulesets folder.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_NO_DEFINED_ID =
+            new EzLocalizationManager.EzLocalisableString("未定义 ID", "No ID defined");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("启用", "Enabled");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_ID_LABEL =
+            new EzLocalizationManager.EzLocalisableString("ID", "ID");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_INVALID_ONLINE_ID = new EzLocalizationManager.EzLocalisableString(
+            "OnlineID 必须为 -1 或 ≥4（不能使用 0~3）。",
+            "OnlineID must be -1 or ≥4 (0~3 are reserved).");
 
         #endregion
     }

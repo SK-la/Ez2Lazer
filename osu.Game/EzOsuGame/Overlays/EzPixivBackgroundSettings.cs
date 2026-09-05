@@ -58,8 +58,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     new SettingsItemV2(new PixivTokenFormTextBox
                     {
-                        Caption = EzSettingsStrings.PIXIV_REFRESH_TOKEN,
-                        HintText = EzSettingsStrings.PIXIV_MANUAL_TOKEN_TOOLTIP,
+                        Caption = EzSettingsPixivString.PIXIV_REFRESH_TOKEN,
+                        HintText = EzSettingsPixivString.PIXIV_MANUAL_TOKEN_TOOLTIP,
                         Current = tokenInput,
                     })
                     {
@@ -67,8 +67,8 @@ namespace osu.Game.EzOsuGame.Overlays
                     },
                     new SettingsButtonV2
                     {
-                        Text = EzSettingsStrings.PIXIV_SAVE_TOKEN,
-                        TooltipText = EzSettingsStrings.PIXIV_SAVE_TOKEN_TOOLTIP,
+                        Text = EzSettingsPixivString.PIXIV_SAVE_TOKEN,
+                        TooltipText = EzSettingsPixivString.PIXIV_SAVE_TOKEN_TOOLTIP,
                         Keywords = new[] { "pixiv", "save", "token" },
                         Action = () =>
                         {
@@ -76,20 +76,20 @@ namespace osu.Game.EzOsuGame.Overlays
 
                             if (string.IsNullOrWhiteSpace(token))
                             {
-                                post(notifications, EzSettingsStrings.PIXIV_TOKEN_EMPTY);
+                                post(notifications, EzSettingsPixivString.PIXIV_TOKEN_EMPTY);
                                 return;
                             }
 
                             coordinator.Auth.SaveRefreshToken(token);
                             tokenInput.Value = string.Empty;
                             refreshLocalStatus();
-                            post(notifications, EzSettingsStrings.PIXIV_TOKEN_SAVED);
+                            post(notifications, EzSettingsPixivString.PIXIV_TOKEN_SAVED);
                         },
                     },
                     new SettingsItemV2(new FormTextBox
                     {
-                        Caption = EzSettingsStrings.PIXIV_API_PROXY_BASE_URL,
-                        HintText = EzSettingsStrings.PIXIV_API_PROXY_BASE_URL_TOOLTIP,
+                        Caption = EzSettingsPixivString.PIXIV_API_PROXY_BASE_URL,
+                        HintText = EzSettingsPixivString.PIXIV_API_PROXY_BASE_URL_TOOLTIP,
                         Current = ezConfig.GetBindable<string>(Ez2Setting.PixivApiProxyBaseUrl),
                     })
                     {
@@ -97,8 +97,8 @@ namespace osu.Game.EzOsuGame.Overlays
                     },
                     new SettingsItemV2(new FormCheckBox
                     {
-                        Caption = EzSettingsStrings.PIXIV_ALLOW_R18,
-                        HintText = EzSettingsStrings.PIXIV_ALLOW_R18_TOOLTIP,
+                        Caption = EzSettingsPixivString.PIXIV_ALLOW_R18,
+                        HintText = EzSettingsPixivString.PIXIV_ALLOW_R18_TOOLTIP,
                         Current = ezConfig.GetBindable<bool>(Ez2Setting.PixivAllowR18),
                     })
                     {
@@ -106,20 +106,20 @@ namespace osu.Game.EzOsuGame.Overlays
                     },
                     new SettingsItemV2(new FormCheckBox
                     {
-                        Caption = EzSettingsStrings.PIXIV_LANDSCAPE_ONLY,
-                        HintText = EzSettingsStrings.PIXIV_LANDSCAPE_ONLY_TOOLTIP,
+                        Caption = EzSettingsPixivString.PIXIV_LANDSCAPE_ONLY,
+                        HintText = EzSettingsPixivString.PIXIV_LANDSCAPE_ONLY_TOOLTIP,
                         Current = ezConfig.GetBindable<bool>(Ez2Setting.PixivLandscapeOnly),
                     })
                     {
                         Keywords = new[] { "pixiv", "landscape", "horizontal", "横图", "filter", "aspect" }
                     },
-                    createListSetting(ezConfig, Ez2Setting.PixivAccountWhitelist, EzSettingsStrings.PIXIV_ACCOUNT_WHITELIST, EzSettingsStrings.PIXIV_ACCOUNT_WHITELIST_TOOLTIP,
+                    createListSetting(ezConfig, Ez2Setting.PixivAccountWhitelist, EzSettingsPixivString.PIXIV_ACCOUNT_WHITELIST, EzSettingsPixivString.PIXIV_ACCOUNT_WHITELIST_TOOLTIP,
                         new[] { "pixiv", "whitelist", "account", "artist", "filter" }),
-                    createListSetting(ezConfig, Ez2Setting.PixivAccountBlacklist, EzSettingsStrings.PIXIV_ACCOUNT_BLACKLIST, EzSettingsStrings.PIXIV_ACCOUNT_BLACKLIST_TOOLTIP,
+                    createListSetting(ezConfig, Ez2Setting.PixivAccountBlacklist, EzSettingsPixivString.PIXIV_ACCOUNT_BLACKLIST, EzSettingsPixivString.PIXIV_ACCOUNT_BLACKLIST_TOOLTIP,
                         new[] { "pixiv", "blacklist", "account", "artist", "filter" }),
-                    createListSetting(ezConfig, Ez2Setting.PixivTagInclude, EzSettingsStrings.PIXIV_TAG_INCLUDE, EzSettingsStrings.PIXIV_TAG_INCLUDE_TOOLTIP,
+                    createListSetting(ezConfig, Ez2Setting.PixivTagInclude, EzSettingsPixivString.PIXIV_TAG_INCLUDE, EzSettingsPixivString.PIXIV_TAG_INCLUDE_TOOLTIP,
                         new[] { "pixiv", "tag", "include", "filter" }),
-                    createListSetting(ezConfig, Ez2Setting.PixivTagExclude, EzSettingsStrings.PIXIV_TAG_EXCLUDE, EzSettingsStrings.PIXIV_TAG_EXCLUDE_TOOLTIP,
+                    createListSetting(ezConfig, Ez2Setting.PixivTagExclude, EzSettingsPixivString.PIXIV_TAG_EXCLUDE, EzSettingsPixivString.PIXIV_TAG_EXCLUDE_TOOLTIP,
                         new[] { "pixiv", "tag", "exclude", "filter" }),
                 },
             };
@@ -165,8 +165,8 @@ namespace osu.Game.EzOsuGame.Overlays
                     {
                         checkButton = new SettingsButton
                         {
-                            Text = EzSettingsStrings.PIXIV_CHECK_LOGIN,
-                            TooltipText = EzSettingsStrings.PIXIV_CHECK_LOGIN_TOOLTIP,
+                            Text = EzSettingsPixivString.PIXIV_CHECK_LOGIN,
+                            TooltipText = EzSettingsPixivString.PIXIV_CHECK_LOGIN_TOOLTIP,
                             Keywords = new[] { "pixiv", "login", "verify", "auth" },
                             Width = 1 / 3f,
                             Margin = new MarginPadding { Vertical = 0 },
@@ -175,8 +175,8 @@ namespace osu.Game.EzOsuGame.Overlays
                         },
                         new SettingsButton
                         {
-                            Text = EzSettingsStrings.PIXIV_CLEAR_TOKEN,
-                            TooltipText = EzSettingsStrings.PIXIV_CLEAR_TOKEN_TOOLTIP,
+                            Text = EzSettingsPixivString.PIXIV_CLEAR_TOKEN,
+                            TooltipText = EzSettingsPixivString.PIXIV_CLEAR_TOKEN_TOOLTIP,
                             Keywords = new[] { "pixiv", "clear", "logout", "token" },
                             Width = 1 / 3f,
                             Margin = new MarginPadding { Vertical = 0 },
@@ -186,13 +186,13 @@ namespace osu.Game.EzOsuGame.Overlays
                                 coordinator.Auth.ClearRefreshToken();
                                 tokenInput.Value = string.Empty;
                                 refreshLocalStatus();
-                                post(notifications, EzSettingsStrings.PIXIV_TOKEN_CLEARED);
+                                post(notifications, EzSettingsPixivString.PIXIV_TOKEN_CLEARED);
                             },
                         },
                         new SettingsButton
                         {
-                            Text = EzSettingsStrings.PIXIV_CUSTOM_TOOL_HINT,
-                            TooltipText = EzSettingsStrings.PIXIV_CUSTOM_TOOL_TOOLTIP,
+                            Text = EzSettingsPixivString.PIXIV_CUSTOM_TOOL_HINT,
+                            TooltipText = EzSettingsPixivString.PIXIV_CUSTOM_TOOL_TOOLTIP,
                             Keywords = new[] { "pixiv", "custom", "advanced", "filter", "proxy", "token" },
                             Width = 1 / 3f,
                             Margin = new MarginPadding { Vertical = 0 },
@@ -204,8 +204,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 advancedSection,
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.PIXIV_AUTO_DOWNLOAD_ENABLED,
-                    HintText = EzSettingsStrings.PIXIV_AUTO_DOWNLOAD_ENABLED_TOOLTIP,
+                    Caption = EzSettingsPixivString.PIXIV_AUTO_DOWNLOAD_ENABLED,
+                    HintText = EzSettingsPixivString.PIXIV_AUTO_DOWNLOAD_ENABLED_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.PixivAutoDownloadEnabled),
                 })
                 {
@@ -244,7 +244,7 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 Interlocked.Exchange(ref loginRequestInFlight, 0);
                 refreshLocalStatus();
-                post(notifications, EzSettingsStrings.PIXIV_STATUS_NOT_CONFIGURED);
+                post(notifications, EzSettingsPixivString.PIXIV_STATUS_NOT_CONFIGURED);
                 return;
             }
 
@@ -261,13 +261,13 @@ namespace osu.Game.EzOsuGame.Overlays
 
                     if (success)
                     {
-                        statusNote.Value = new SettingsNote.Data(EzSettingsStrings.PIXIV_STATUS_LOGGED_IN.Format(account ?? "?"), SettingsNote.Type.Informational);
-                        post(notifications, EzSettingsStrings.PIXIV_VERIFY_SUCCESS.Format(account ?? "?"));
+                        statusNote.Value = new SettingsNote.Data(EzSettingsPixivString.PIXIV_STATUS_LOGGED_IN.Format(account ?? "?"), SettingsNote.Type.Informational);
+                        post(notifications, EzSettingsPixivString.PIXIV_VERIFY_SUCCESS.Format(account ?? "?"));
                     }
                     else
                     {
-                        statusNote.Value = new SettingsNote.Data(EzSettingsStrings.PIXIV_STATUS_INVALID, SettingsNote.Type.Warning);
-                        post(notifications, error ?? EzSettingsStrings.PIXIV_VERIFY_FAILED);
+                        statusNote.Value = new SettingsNote.Data(EzSettingsPixivString.PIXIV_STATUS_INVALID, SettingsNote.Type.Warning);
+                        post(notifications, error ?? EzSettingsPixivString.PIXIV_VERIFY_FAILED);
                     }
                 });
             });
@@ -277,12 +277,12 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             if (!coordinator.Auth.HasRefreshToken)
             {
-                statusNote.Value = new SettingsNote.Data(EzSettingsStrings.PIXIV_STATUS_NOT_CONFIGURED, SettingsNote.Type.Informational);
+                statusNote.Value = new SettingsNote.Data(EzSettingsPixivString.PIXIV_STATUS_NOT_CONFIGURED, SettingsNote.Type.Informational);
                 return;
             }
 
             statusNote.Value = new SettingsNote.Data(
-                EzSettingsStrings.PIXIV_STATUS_LOGGED_IN.Format(coordinator.Auth.LoadAccountName() ?? "?"),
+                EzSettingsPixivString.PIXIV_STATUS_LOGGED_IN.Format(coordinator.Auth.LoadAccountName() ?? "?"),
                 SettingsNote.Type.Informational);
         }
 

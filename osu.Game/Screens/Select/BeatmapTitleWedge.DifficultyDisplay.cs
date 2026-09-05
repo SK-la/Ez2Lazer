@@ -20,6 +20,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online;
@@ -52,7 +53,9 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
 
-            private StarRatingDisplay starRatingDisplay = null!;
+            private StarRatingDisplay starRatingDisplay => dualDifficultyDisplay.Official;
+
+            private EzDualDifficultyDisplay dualDifficultyDisplay = null!;
             private FillFlowContainer nameLine = null!;
             private OsuSpriteText difficultyText = null!;
             private OsuSpriteText mappedByText = null!;
@@ -83,7 +86,7 @@ namespace osu.Game.Screens.Select
 
                 InternalChildren = new Drawable[]
                 {
-                    new WedgeBackground(),
+                    new EzSongSelectWedgeBackground(),
                     new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.X,
@@ -111,7 +114,7 @@ namespace osu.Game.Screens.Select
                                 {
                                     new[]
                                     {
-                                        starRatingDisplay = new StarRatingDisplay(default, animated: true)
+                                        dualDifficultyDisplay = new EzDualDifficultyDisplay(animated: true)
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
@@ -269,6 +272,7 @@ namespace osu.Game.Screens.Select
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
                     spreadDisplay.Beatmap.Value = null;
                     spreadDisplay.StarDifficulty.UnbindAll();
+                    dualDifficultyDisplay.ResetXxy();
                 }
                 else
                 {
@@ -277,14 +281,17 @@ namespace osu.Game.Screens.Select
                     mapperLink.Action = () => linkHandler?.HandleLink(new LinkDetails(LinkAction.OpenUserProfile, beatmap.Value.Metadata.Author));
                     mapperText.Text = beatmap.Value.Metadata.Author.Username;
                     spreadDisplay.Beatmap.Value = beatmap.Value.BeatmapInfo;
+
+                    if (beatmap.Value.BeatmapInfo is BeatmapInfo beatmapInfo)
+                        dualDifficultyDisplay.UpdateFromBeatmap(beatmapInfo);
                 }
 
-                starRatingDisplay.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+                dualDifficultyDisplay.Official.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
 
                 if (!beatmap.IsDefault)
                 {
                     spreadDisplay.StarDifficulty.UnbindAll();
-                    spreadDisplay.StarDifficulty.BindTo(starRatingDisplay.Current);
+                    spreadDisplay.StarDifficulty.BindTo(dualDifficultyDisplay.Official.Current);
                 }
 
                 updateCountStatistics(cancellationSource.Token);
@@ -299,11 +306,13 @@ namespace osu.Game.Screens.Select
                 {
                     ezDisplayKpc.ManiaSummary = null;
                     ezDisplayKpc.Hide();
+                    dualDifficultyDisplay.ResetXxy();
                     return;
                 }
 
                 ezDisplayKpc.ManiaSummary = metrics.ManiaSummary;
                 ezDisplayKpc.Show();
+                dualDifficultyDisplay.ApplyAnalysisMetrics(beatmapInfo, metrics);
             }
 
             private void updateCountStatistics(CancellationToken cancellationToken)

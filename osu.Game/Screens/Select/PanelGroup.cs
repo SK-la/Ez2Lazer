@@ -4,6 +4,7 @@
 using System;
 using System.Diagnostics;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
@@ -17,6 +18,8 @@ using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Overlays;
 using osuTK;
 using osuTK.Graphics;
@@ -38,10 +41,18 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private Bindable<bool> acrylicUiEnabled = null!;
+        private Box backgroundBorder = null!;
+
         [BackgroundDependencyLoader]
         private void load()
         {
             Height = HEIGHT;
+
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
 
             Icon = iconContainer = new Container
             {
@@ -58,32 +69,42 @@ namespace osu.Game.Screens.Select
                 },
             };
 
-            Background = new Box
+            Background = backgroundBorder = new Box
             {
                 RelativeSizeAxes = Axes.Both,
                 Colour = colourProvider.Highlight1,
             };
 
             AccentColour = colourProvider.Highlight1;
+
+            Container colourOverlays;
+
             Content.Children = new Drawable[]
             {
-                new Box
+                colourOverlays = new Container
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = colourProvider.Background5,
-                },
-                triangles = new TrianglesV2
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Thickness = 0.02f,
-                    SpawnRatio = 0.6f,
-                    Colour = ColourInfo.GradientHorizontal(colourProvider.Background6, colourProvider.Background5)
-                },
-                glow = new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Width = 0.5f,
-                    Colour = ColourInfo.GradientHorizontal(colourProvider.Highlight1, colourProvider.Highlight1.Opacity(0f)),
+                    Children = new Drawable[]
+                    {
+                        new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = colourProvider.Background5,
+                        },
+                        triangles = new TrianglesV2
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Thickness = 0.02f,
+                            SpawnRatio = 0.6f,
+                            Colour = ColourInfo.GradientHorizontal(colourProvider.Background6, colourProvider.Background5)
+                        },
+                        glow = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Width = 0.5f,
+                            Colour = ColourInfo.GradientHorizontal(colourProvider.Highlight1, colourProvider.Highlight1.Opacity(0f)),
+                        },
+                    }
                 },
                 titleText = new OsuSpriteText
                 {
@@ -117,6 +138,8 @@ namespace osu.Game.Screens.Select
                     },
                 },
             };
+
+            EzAcrylicOverlayAlpha.BindHiddenWhenAcrylic(colourOverlays, acrylicUiEnabled);
         }
 
         protected override void LoadComplete()
@@ -124,6 +147,13 @@ namespace osu.Game.Screens.Select
             base.LoadComplete();
 
             Expanded.BindValueChanged(_ => onExpanded(), true);
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            ApplyAcrylicIconStripBackground(backgroundBorder, acrylicUiEnabled.Value, colourProvider.Highlight1);
         }
 
         private void onExpanded()
