@@ -30,6 +30,8 @@ EzResources/Pets/
 
 Windows 仍兼容旧路径：`_cubism/Live2DCubismCore.dll`（平铺）。
 
+也可以直接把 SDK 的 `Core/dll` 目录内容拷进 `_cubism/`（保持 `windows/x86_64/`、`linux/x86_64/`、`macos/` 结构），客户端同样能找到。
+
 `pet.json` 最小示例：
 
 ```json

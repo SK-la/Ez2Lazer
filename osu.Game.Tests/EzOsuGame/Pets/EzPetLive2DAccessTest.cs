@@ -131,12 +131,27 @@ namespace osu.Game.Tests.EzOsuGame.Pets
         }
 
         [Test]
+        public void TestSdkLayoutCoreDetected()
+        {
+            if (!OperatingSystem.IsWindows())
+                Assert.Ignore("This machine layout probe uses windows/x86_64.");
+
+            string sdkPath = Path.Combine(tempRoot, "EzResources", "Pets", "_cubism", "windows", "x86_64", EzPetCubismNative.CORE_DLL_WINDOWS);
+            Directory.CreateDirectory(Path.GetDirectoryName(sdkPath)!);
+            File.WriteAllBytes(sdkPath, [0x00]);
+
+            Assert.That(EzPetLive2DAccess.HasCubismCoreOnDisk(petsStorage), Is.True);
+            Assert.That(EzPetCubismNative.FindCoreRelativePath(petsStorage), Is.EqualTo("_cubism/windows/x86_64/Live2DCubismCore.dll"));
+        }
+
+        [Test]
         public void TestResolveCurrentRidAndNativeFileName()
         {
             string? rid = EzPetCubismNative.ResolveCurrentRid();
             Assert.That(rid, Is.Not.Null.And.Not.Empty);
             Assert.That(EzPetCubismNative.GetNativeLibraryFileName(), Is.Not.Empty);
             Assert.That(EzPetCubismNative.GetExpectedCoreRelativePath(), Does.Contain(rid!));
+            Assert.That(EzPetCubismNative.GetCoreSearchRelativePaths(), Is.Not.Empty);
         }
 
         private void writePack(string name, string petJson, string modelPayload)
