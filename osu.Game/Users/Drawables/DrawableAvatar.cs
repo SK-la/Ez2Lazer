@@ -18,18 +18,23 @@ using osu.Game.Online.API.Requests.Responses;
 
 namespace osu.Game.Users.Drawables
 {
+    /// <summary>
+    /// Non-interactive avatar. Local still/animation under <c>Modify/avatars</c>, else online / guest.
+    /// </summary>
     [LongRunningLoad]
     public partial class DrawableAvatar : CompositeDrawable
     {
         private readonly IUser user;
 
+        private readonly Sprite stillSprite;
+
         private EzLocalAvatarLoader avatarLoader;
         private string avatarKey;
-        private Drawable content;
+        private Drawable activeContent;
         private FillMode contentFillMode = FillMode.Fit;
 
         /// <summary>
-        /// Forwarded to the inner sprite / animation (outer composite stays stretch-fill of parent).
+        /// Applied to the displayed sprite / animation (keeps outer composite filling the parent slot).
         /// </summary>
         public new FillMode FillMode
         {
@@ -37,18 +42,15 @@ namespace osu.Game.Users.Drawables
             set
             {
                 contentFillMode = value;
-                content?.FillMode = value;
+                applyFillMode();
             }
         }
 
         /// <summary>
-        /// Local clip folder names under <c>Modify/avatars/{Username}/</c>. Empty when using a still or online avatar.
+        /// Animation prefixes under <c>Modify/avatars/{Username}/</c> (<c>name-0.png</c> / <c>name_0.png</c>).
         /// </summary>
         public IReadOnlyList<string> AvailableAnimations { get; private set; } = Array.Empty<string>();
 
-        /// <summary>
-        /// A simple, non-interactable avatar for the specified user.
-        /// </summary>
         /// <param name="user">The user. A null value will get a placeholder avatar.</param>
         public DrawableAvatar(IUser user = null)
         {
@@ -57,6 +59,17 @@ namespace osu.Game.Users.Drawables
             RelativeSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
+
+            // Same layout pattern as DrawableTeamFlag: sprite exists from construction so parent FillMode works.
+            InternalChild = stillSprite = new Sprite
+            {
+                RelativeSizeAxes = Axes.Both,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                FillMode = FillMode.Fit,
+            };
+
+            activeContent = stillSprite;
         }
 
         [BackgroundDependencyLoader]
@@ -64,13 +77,8 @@ namespace osu.Game.Users.Drawables
         {
             avatarLoader = new EzLocalAvatarLoader(storage, ezResourceStore);
 
-            Drawable local = tryLoadLocalAvatar();
-
-            if (local != null)
-            {
-                setContent(local);
+            if (tryShowLocalAvatar())
                 return;
-            }
 
             if (user != null && user.OnlineID > 1)
             {
@@ -80,19 +88,21 @@ namespace osu.Game.Users.Drawables
 
                 if (online != null)
                 {
-                    setContent(new Sprite { Texture = online });
+                    showStill(online);
                     return;
                 }
             }
 
-            Drawable guest = tryLoadLocalAvatarKey("guest")
-                             ?? createSprite(textures.Get(@"Online/avatar-guest"));
+            if (tryShowLocalAvatarKey("guest"))
+                return;
+
+            Texture guest = textures.Get(@"Online/avatar-guest");
             if (guest != null)
-                setContent(guest);
+                showStill(guest);
         }
 
         /// <summary>
-        /// Switch to a local clip by subfolder name and loop it. No-op if the clip is missing.
+        /// Switch to a local animation by file-name prefix (<c>name</c> in <c>name-0.png</c>). No-op if missing.
         /// </summary>
         public bool PlayAnimation(string clipName)
         {
@@ -103,45 +113,82 @@ namespace osu.Game.Users.Drawables
             if (animation == null)
                 return false;
 
-            setContent(animation);
+            showDrawable(animation);
             return true;
         }
 
-        private Drawable tryLoadLocalAvatar()
+        private bool tryShowLocalAvatar()
         {
             if (user == null || string.IsNullOrEmpty(user.Username))
-                return null;
+                return false;
 
-            return tryLoadLocalAvatarKey(user.Username);
+            return tryShowLocalAvatarKey(user.Username);
         }
 
-        private Drawable tryLoadLocalAvatarKey(string key)
+        private bool tryShowLocalAvatarKey(string key)
         {
             AvailableAnimations = avatarLoader.ListClipNames(key);
             avatarKey = AvailableAnimations.Count > 0 ? key : null;
 
             Drawable animation = avatarLoader.TryCreateDefaultAnimation(key);
+
             if (animation != null)
-                return animation;
+            {
+                showDrawable(animation);
+                return true;
+            }
 
             Texture still = avatarLoader.GetStaticTexture(key);
-            return still != null ? new Sprite { Texture = still } : null;
+            if (still == null)
+                return false;
+
+            showStill(still);
+            return true;
         }
 
-        private static Drawable createSprite(Texture texture) =>
-            texture == null ? null : new Sprite { Texture = texture };
-
-        private void setContent(Drawable drawable)
+        private void showStill(Texture texture)
         {
-            content?.Expire();
-            content = drawable;
+            // Prefer the ctor sprite so FillMode / layout stay identical to a plain Sprite avatar.
+            if (activeContent != stillSprite)
+            {
+                ClearInternal();
+                InternalChild = stillSprite;
+                activeContent = stillSprite;
+            }
 
-            content.RelativeSizeAxes = Axes.Both;
-            content.FillMode = contentFillMode;
-            content.Anchor = Anchor.Centre;
-            content.Origin = Anchor.Centre;
+            stillSprite.Texture = texture;
+            applyFillMode();
+        }
 
-            InternalChild = content;
+        private void showDrawable(Drawable drawable)
+        {
+            if (ReferenceEquals(drawable, stillSprite))
+            {
+                showStill(stillSprite.Texture);
+                return;
+            }
+
+            // Single-frame "animation" from loader is a Sprite — copy onto stillSprite.
+            if (drawable is Sprite sprite && sprite.Texture != null)
+            {
+                showStill(sprite.Texture);
+                return;
+            }
+
+            ClearInternal();
+            activeContent = drawable;
+            activeContent.RelativeSizeAxes = Axes.Both;
+            activeContent.Anchor = Anchor.Centre;
+            activeContent.Origin = Anchor.Centre;
+            applyFillMode();
+            InternalChild = activeContent;
+        }
+
+        private void applyFillMode()
+        {
+            stillSprite.FillMode = contentFillMode;
+            if (activeContent != null && !ReferenceEquals(activeContent, stillSprite))
+                activeContent.FillMode = contentFillMode;
         }
 
         protected override void LoadComplete()

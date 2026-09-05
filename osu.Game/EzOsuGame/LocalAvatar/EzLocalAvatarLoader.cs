@@ -15,8 +15,9 @@ using osu.Framework.Platform;
 namespace osu.Game.EzOsuGame.LocalAvatar
 {
     /// <summary>
-    /// Loads local avatar stills / clip folders under <see cref="EzModifyPath.AVATARS_PATH"/>.
-    /// Clip frames always use <see cref="EzTextureUsage.AnimationSafe"/>.
+    /// Local avatars under <see cref="EzModifyPath.AVATARS_PATH"/>.
+    /// Still: <c>{key}.png</c>. Animation frames in folder <c>{key}/</c> as <c>name-0.png</c> / <c>name_0.png</c>.
+    /// Frames use <see cref="EzTextureUsage.AnimationSafe"/>; stills use <see cref="EzTextureUsage.Large"/>.
     /// </summary>
     public class EzLocalAvatarLoader
     {
@@ -24,11 +25,15 @@ namespace osu.Game.EzOsuGame.LocalAvatar
         public const int MAX_FRAMES = 120;
         public const double DEFAULT_FRAME_LENGTH = 1000.0 / 12.0;
 
-        /// <summary>Resource-store relative prefix (under EzResources), e.g. <c>Modify/avatars</c>.</summary>
+        /// <summary>Resource-store relative prefix (under EzResources).</summary>
         public const string RESOURCE_PREFIX = "Modify/avatars";
 
-        private static readonly Regex pure_index = new Regex(@"^(\d+)\.(png|jpg|jpeg)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        private static readonly Regex suffix_index = new Regex(@"_(\d+)\.(png|jpg|jpeg)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        /// <summary>
+        /// <c>prefix-0.png</c> / <c>prefix_0.png</c> (prefix = animation name).
+        /// </summary>
+        private static readonly Regex frame_regex = new Regex(
+            @"^(?<prefix>.+?)[-_](?<index>\d+)\.(png|jpg|jpeg)$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         private readonly Storage avatarsStorage;
         private readonly EzResourceStore resources;
@@ -40,32 +45,15 @@ namespace osu.Game.EzOsuGame.LocalAvatar
         }
 
         /// <summary>
-        /// Subfolder names under <paramref name="avatarKey"/> that contain at least one indexed frame file.
+        /// Animation prefixes found as files under <c>avatars/{avatarKey}/</c>.
         /// </summary>
         public IReadOnlyList<string> ListClipNames(string avatarKey)
         {
-            if (string.IsNullOrEmpty(avatarKey) || !avatarsStorage.ExistsDirectory(avatarKey))
+            var grouped = groupFramesByPrefix(avatarKey);
+            if (grouped.Count == 0)
                 return Array.Empty<string>();
 
-            var names = new List<string>();
-
-            try
-            {
-                foreach (string dir in avatarsStorage.GetDirectories(avatarKey))
-                {
-                    string clip = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-                    if (string.IsNullOrEmpty(clip))
-                        continue;
-
-                    if (listFrameFileNames(avatarKey, clip).Count > 0)
-                        names.Add(clip);
-                }
-            }
-            catch
-            {
-                return Array.Empty<string>();
-            }
-
+            var names = new List<string>(grouped.Keys);
             names.Sort(StringComparer.OrdinalIgnoreCase);
             return names;
         }
@@ -87,16 +75,18 @@ namespace osu.Game.EzOsuGame.LocalAvatar
 
         public Texture[] LoadClipFrames(string avatarKey, string clipName)
         {
-            var frameNames = listFrameFileNames(avatarKey, clipName);
-            if (frameNames.Count == 0)
+            if (string.IsNullOrEmpty(avatarKey) || string.IsNullOrEmpty(clipName))
                 return Array.Empty<Texture>();
 
-            var textures = new List<Texture>(frameNames.Count);
+            if (!groupFramesByPrefix(avatarKey).TryGetValue(clipName, out var frames) &&
+                !tryGetFramesIgnoreCase(avatarKey, clipName, out frames))
+                return Array.Empty<Texture>();
 
-            foreach (string frameName in frameNames)
+            var textures = new List<Texture>(frames.Count);
+
+            foreach (string frameName in frames)
             {
-                string path = $"{RESOURCE_PREFIX}/{avatarKey}/{clipName}/{frameName}";
-                Texture? texture = resources.Get(path, EzTextureUsage.AnimationSafe);
+                Texture? texture = resources.Get($"{RESOURCE_PREFIX}/{avatarKey}/{frameName}", EzTextureUsage.AnimationSafe);
                 if (texture != null)
                     textures.Add(texture);
             }
@@ -104,34 +94,11 @@ namespace osu.Game.EzOsuGame.LocalAvatar
             return textures.Count > 0 ? textures.ToArray() : Array.Empty<Texture>();
         }
 
-        private IReadOnlyList<string> listFrameFileNames(string avatarKey, string clipName)
-        {
-            if (string.IsNullOrEmpty(avatarKey) || string.IsNullOrEmpty(clipName))
-                return Array.Empty<string>();
-
-            string directory = Path.Combine(avatarKey, clipName);
-
-            try
-            {
-                if (!avatarsStorage.ExistsDirectory(directory))
-                    return Array.Empty<string>();
-
-                return CollectIndexedFrameNames(avatarsStorage.GetFiles(directory));
-            }
-            catch
-            {
-                return Array.Empty<string>();
-            }
-        }
-
         public Drawable? CreateAnimation(string avatarKey, string clipName, bool looping = true, double? frameLength = null)
-        {
-            Texture[] textures = LoadClipFrames(avatarKey, clipName);
-            return CreateDrawableFromFrames(textures, looping, frameLength);
-        }
+            => CreateDrawableFromFrames(LoadClipFrames(avatarKey, clipName), looping, frameLength);
 
         /// <summary>
-        /// Default looping clip animation, or <c>null</c> when no clip folders exist.
+        /// Default looping animation from <c>avatars/{avatarKey}/</c>, or <c>null</c> if no frames.
         /// </summary>
         public Drawable? TryCreateDefaultAnimation(string avatarKey)
         {
@@ -171,21 +138,65 @@ namespace osu.Game.EzOsuGame.LocalAvatar
             }
         }
 
-        /// <summary>
-        /// Pure numeric <c>000.png</c> or pet-style <c>name_000.png</c>; returns names without extension, sorted by index.
-        /// </summary>
-        public static IReadOnlyList<string> CollectIndexedFrameNames(IEnumerable<string> fileNames)
+        private bool tryGetFramesIgnoreCase(string avatarKey, string clipName, out List<string> frames)
         {
-            var byIndex = new SortedDictionary<int, string>();
+            frames = new List<string>();
 
-            foreach (string fileName in fileNames)
+            foreach ((string prefix, List<string> list) in groupFramesByPrefix(avatarKey))
             {
-                string name = Path.GetFileName(fileName);
+                if (!string.Equals(prefix, clipName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                frames = list;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Maps animation prefix → frame names without extension, sorted by index.
+        /// </summary>
+        private Dictionary<string, List<string>> groupFramesByPrefix(string avatarKey)
+        {
+            var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+            if (string.IsNullOrEmpty(avatarKey) || !avatarsStorage.ExistsDirectory(avatarKey))
+                return result;
+
+            IEnumerable<string> files;
+
+            try
+            {
+                files = avatarsStorage.GetFiles(avatarKey);
+            }
+            catch
+            {
+                return result;
+            }
+
+            // prefix → (index → nameWithoutExt)
+            var buckets = new Dictionary<string, SortedDictionary<int, string>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string file in files)
+            {
+                string name = Path.GetFileName(file);
                 if (string.IsNullOrEmpty(name))
                     continue;
 
-                if (!tryGetFrameIndex(name, out int index))
+                var match = frame_regex.Match(name);
+                if (!match.Success)
                     continue;
+
+                string prefix = match.Groups["prefix"].Value;
+                if (string.IsNullOrEmpty(prefix))
+                    continue;
+
+                if (!int.TryParse(match.Groups["index"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out int index))
+                    continue;
+
+                if (!buckets.TryGetValue(prefix, out var byIndex))
+                    buckets[prefix] = byIndex = new SortedDictionary<int, string>();
 
                 string withoutExtension = Path.GetFileNameWithoutExtension(name);
                 if (string.IsNullOrEmpty(withoutExtension))
@@ -195,31 +206,22 @@ namespace osu.Game.EzOsuGame.LocalAvatar
                     byIndex[index] = withoutExtension;
             }
 
-            var names = new List<string>(Math.Min(byIndex.Count, MAX_FRAMES));
-
-            foreach ((_, string frame) in byIndex)
+            foreach ((string prefix, SortedDictionary<int, string> byIndex) in buckets)
             {
-                names.Add(frame);
-                if (names.Count >= MAX_FRAMES)
-                    break;
+                var list = new List<string>(Math.Min(byIndex.Count, MAX_FRAMES));
+
+                foreach ((_, string frame) in byIndex)
+                {
+                    list.Add(frame);
+                    if (list.Count >= MAX_FRAMES)
+                        break;
+                }
+
+                if (list.Count > 0)
+                    result[prefix] = list;
             }
 
-            return names;
-        }
-
-        private static bool tryGetFrameIndex(string fileName, out int index)
-        {
-            index = -1;
-
-            var pure = pure_index.Match(fileName);
-            if (pure.Success)
-                return int.TryParse(pure.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out index);
-
-            var suffix = suffix_index.Match(fileName);
-            if (suffix.Success)
-                return int.TryParse(suffix.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out index);
-
-            return false;
+            return result;
         }
     }
 }
