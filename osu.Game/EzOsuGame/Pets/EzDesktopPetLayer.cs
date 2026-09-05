@@ -342,7 +342,7 @@ namespace osu.Game.EzOsuGame.Pets
 
                 // Prefer Cubism host when Core works; else PNG frames if present; else setup placeholder.
                 preferLive2DHost = cubismSession?.IsReady == true || !currentPack.HasRasterFrames;
-                live2DHost.BindPack(currentPack, currentPack.Live2DModelEntryPath, cubismSession, cubismError);
+                live2DHost.BindPack(currentPack, currentPack.Live2DModelEntryPath, cubismSession, loader.PetsStorage, cubismError);
                 Logger.Log(
                     $"Ez pet pack '{currentPack.Name}' Live2D authorised; cubism={(cubismSession?.IsReady == true ? "ready" : cubismError ?? "unavailable")}.",
                     LoggingTarget.Runtime);

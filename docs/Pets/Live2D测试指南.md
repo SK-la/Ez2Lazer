@@ -1,6 +1,6 @@
 # Live2D 桌宠本地测试指南（ez-pet-live2d-builtin）
 
-当前分支可验证：**官方白名单门控 + Cubism Core 加载 + 呼吸脉冲占位**。网格 DrawNode 尚未接入，因此你会看到紫色呼吸方块与状态文字，而不是完整立绘网格。
+当前分支可验证：**官方白名单 + Cubism Core + 贴图网格绘制（无 clipping mask）**。遮罩/完整混合色尚未做齐，部分部件可能缺遮罩效果，但应能看到立绘。
 
 ## 你需要准备
 
@@ -68,9 +68,10 @@ pwsh -File docs/Pets/Register-Live2DPreset.ps1 `
 
 1. 编译并启动（当前分支 `ez-pet-live2d-builtin`）。
 2. 设置 → 桌宠 → 选 `MyOfficialPet`。
-3. **成功**：看到紫色呼吸脉冲 + 文案含 `Core OK · … drawables=N`；点一下状态切到 `poke`。
-4. **缺 Core**：文案提示把 DLL 放到 `_cubism/`；若同包还有 PNG 帧，会自动回退播 PNG。
-5. **未登记哈希**：当作普通包，不会走 Live2D（自制 moc3 默认不授权）。
+3. **成功**：看到 Miku 立绘（呼吸微动）；点一下状态切到 `poke`。日志含 `Core OK` 与 `loaded texture`。
+4. **缺贴图**：日志 `missing texture`，立绘发白/破图；确认 `model3.json` 里路径与文件夹一致（如 `miku-edit.512/`）。
+5. **缺 Core**：紫色占位 + 缺 DLL 提示；若同包还有 PNG 帧会回退帧动画。
+6. **未登记哈希**：当作普通包，不会走 Live2D。
 
 ## 日志关键字
 
@@ -80,4 +81,4 @@ pwsh -File docs/Pets/Register-Live2DPreset.ps1 `
 
 ## 下一步（尚未做）
 
-把 drawable 网格画进 osu-framework `DrawNode`（参考 Coloryr OpenGL 渲染器），才能看到真正的 Live2D 立绘。
+Clipping mask、multiply 混合色、motion3 动作切换。当前 mesh 为 MVP。

@@ -3,9 +3,9 @@
 
 using System;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Live2DCSharpSDK.Framework.Core;
-using osu.Framework.Logging;
 using osu.Framework.Platform;
 
 namespace osu.Game.EzOsuGame.Pets
@@ -19,9 +19,9 @@ namespace osu.Game.EzOsuGame.Pets
         public const string CORE_DLL_WINDOWS = "Live2DCubismCore.dll";
 
         private static bool resolverInstalled;
-        private static string? resolvedCorePath;
+        private static IntPtr coreHandle;
 
-        public static string? ResolvedCorePath => resolvedCorePath;
+        public static string? ResolvedCorePath { get; private set; }
 
         public static bool TryPrepare(Storage petsStorage, out string? error)
         {
@@ -43,9 +43,26 @@ namespace osu.Game.EzOsuGame.Pets
                 return false;
             }
 
-            resolvedCorePath = fullPath;
+            ResolvedCorePath = fullPath;
+
+            if (!NativeLibrary.TryLoad(fullPath, out coreHandle))
+            {
+                error = $"NativeLibrary.Load failed for {fullPath}";
+                return false;
+            }
+
             ensureResolver();
             return true;
+        }
+
+        public static bool TryGetExport(string name, out IntPtr address)
+        {
+            address = IntPtr.Zero;
+
+            if (coreHandle == IntPtr.Zero)
+                return false;
+
+            return NativeLibrary.TryGetExport(coreHandle, name, out address);
         }
 
         private static void ensureResolver()
@@ -53,22 +70,17 @@ namespace osu.Game.EzOsuGame.Pets
             if (resolverInstalled)
                 return;
 
-            NativeLibrary.SetDllImportResolver(typeof(CubismCore).Assembly, (name, _, _) =>
+            IntPtr resolve(string name, Assembly _, DllImportSearchPath? __)
             {
                 if (!string.Equals(name, "Live2DCubismCore", StringComparison.OrdinalIgnoreCase)
                     && !name.Contains("Live2DCubismCore", StringComparison.OrdinalIgnoreCase))
                     return IntPtr.Zero;
 
-                if (string.IsNullOrEmpty(resolvedCorePath))
-                    return IntPtr.Zero;
+                return coreHandle;
+            }
 
-                if (NativeLibrary.TryLoad(resolvedCorePath, out var handle))
-                    return handle;
-
-                Logger.Log($"Ez pet: failed to NativeLibrary.Load('{resolvedCorePath}')", LoggingTarget.Runtime, LogLevel.Error);
-                return IntPtr.Zero;
-            });
-
+            NativeLibrary.SetDllImportResolver(typeof(CubismCore).Assembly, resolve);
+            NativeLibrary.SetDllImportResolver(typeof(EzPetCubismNative).Assembly, resolve);
             resolverInstalled = true;
         }
     }
