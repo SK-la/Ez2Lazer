@@ -11,9 +11,9 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "总开关。打开后还要勾下面的场景；pet.json 里的 hide/show 规则也能临时显隐。"
-            + "\n不用在皮肤编辑器或 Ez 布局编辑器里添加。位置用 Left Alt 拖动。",
+            + "\n不用在皮肤编辑器或 Ez 布局编辑器里添加。未按 Left Alt 时点击穿透；按住 Left Alt 可点击互动或拖动位置。",
             "Master toggle. Also enable the scene checkboxes below; pet.json hide/show rules can override visibility."
-            + "\nDo not add it in the skin editor or Ez layout editor. Move it with Left Alt + drag.");
+            + "\nDo not add it in the skin editor or Ez layout editor. Clicks pass through unless Left Alt is held; hold Left Alt to click or drag.");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SHOW_ON_MENU = new EzLocalizationManager.EzLocalisableString("主菜单显示", "Show on main menu");
 
@@ -48,7 +48,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SCALE = new EzLocalizationManager.EzLocalisableString("桌宠缩放", "Pet scale");
 
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SCALE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "桌宠立绘缩放。位置请用 Left Alt 拖动，不在此修改。",
-            "Scale of the pet sprite. Move it with Left Alt + drag; position is not edited here.");
+            "桌宠立绘缩放。按住 Left Alt 拖动改位置；未按时点击穿透，悬浮仍可触发反应。",
+            "Scale of the pet sprite. Hold Left Alt and drag to move; without Alt, clicks pass through while hover reactions still work.");
     }
 }

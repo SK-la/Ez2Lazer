@@ -10,16 +10,8 @@ namespace osu.Game.EzOsuGame.Pets
     {
         protected override bool OnMouseDown(MouseDownEvent e)
         {
-            if (e.Button != MouseButton.Left)
-                return false;
-
-            if (isLeftAlt(e))
-            {
-                dragging = true;
-                return true;
-            }
-
-            return !inGameplay;
+            // Only claim the pointer while LAlt is held; otherwise clicks pass through.
+            return e.Button == MouseButton.Left && isLeftAlt(e);
         }
 
         protected override bool OnDragStart(DragStartEvent e)
@@ -65,7 +57,7 @@ namespace osu.Game.EzOsuGame.Pets
 
         protected override bool OnClick(ClickEvent e)
         {
-            if (inGameplay || isLeftAlt(e) || e.Button != MouseButton.Left)
+            if (e.Button != MouseButton.Left || !isLeftAlt(e))
                 return false;
 
             stateMachine.HandleClick();

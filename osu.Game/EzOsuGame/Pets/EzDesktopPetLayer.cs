@@ -254,11 +254,12 @@ namespace osu.Game.EzOsuGame.Pets
             if (!petBox.ReceivePositionalInputAt(screenSpacePos))
                 return false;
 
-            // Gameplay: pass through ordinary clicks so notes still receive input. LAlt drag still hits.
-            if (inGameplay && !isLeftAltHeld())
-                return false;
+            // Hover reactions use pollHover (petBox hit-test). Clicks/drags only while LAlt is held
+            // (or mid-drag) so the pet never blocks UI underneath.
+            if (dragging || isLeftAltHeld())
+                return true;
 
-            return true;
+            return false;
         }
 
         protected override bool ReceivePositionalInputAtSubTree(Vector2 screenSpacePos)
