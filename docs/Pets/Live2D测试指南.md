@@ -4,6 +4,8 @@
 
 场景触发与 PNG **共用** `pet.json` 的 `rules` / `states` / `clips`。Live2D 额外把 clip 解成**同时叠加**的参数表情（游戏内置配方），不必为每个场景单独做 `motion3`。
 
+**注意：** 模型子目录写在 `live2d.root`（默认 `"live2d"`），**不要**写成 `"clips": { "root": "live2d" }`——`clips` 的值必须是对象（如 `{ "loop": true }`），字符串会反序列化失败。
+
 完整示例：[`pet.live2d.example.json`](pet.live2d.example.json)。
 
 ## 你需要准备
@@ -64,7 +66,7 @@ EzResources/Pets/
 | `clear` | 本局通关 |
 | `resultsRank` | 进入结算；可选 `"rank": "A"` / `S` / `SH` / `X` / `XH` / `B` / `C`… |
 
-设置 → 桌宠 → **Live2D 口型关联音乐**：按曲目振幅开合 `ParamMouthOpenY`（最低 `minOpen`，不会闭死）。
+设置 → 桌宠 → **Live2D 口型关联音乐**：按曲目振幅开合 `ParamMouthOpenY`（最低 `minOpen`，变化幅度约为满量程一半；未跟随时默认约 `0.5`）。
 
 ## 半身模（如当前 Miku）边界
 

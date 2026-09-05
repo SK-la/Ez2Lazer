@@ -331,13 +331,14 @@ namespace osu.Game.EzOsuGame.Pets
         {
             if (lipSyncEnabled)
             {
-                float open = Math.Max(lipSyncMinOpen, lipSyncMinOpen + (1f - lipSyncMinOpen) * lipSyncAmplitude);
+                // Half the previous swing so music follow is subtler above the floor.
+                float open = Math.Max(lipSyncMinOpen, lipSyncMinOpen + (1f - lipSyncMinOpen) * lipSyncAmplitude * 0.5f);
                 model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, open);
                 return;
             }
 
-            // Default: slightly open mouth (middle), not fully closed.
-            model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, 0.35f);
+            // Default half-open mouth when not lip-syncing.
+            model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, 0.5f);
         }
 
         private bool startMotion(string key, MotionPriority priority, bool loop)
