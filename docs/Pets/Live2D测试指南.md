@@ -1,84 +1,80 @@
 # Live2D 桌宠使用指南
 
-客户端已内置 Cubism 网格绘制（无 clipping mask；部分混合近似）。角色模型放在游戏数据目录的 `EzResources/Pets/`。Cubism Core 动态库按平台放在 `_cubism/<rid>/`（发行版可随包附带当前平台；公开源码仓库不收录该二进制）。
+客户端已内置 Cubism 网格绘制（无 clipping mask；部分混合近似）。角色模型放在游戏数据目录的 `EzResources/Pets/`。Cubism Core 动态库按平台放在 `_cubism/<rid>/`（或直接放入 SDK 的 `Core/dll` 目录树）。
+
+场景触发与 PNG **共用** `pet.json` 的 `rules` / `states` / `clips`。Live2D 额外把 clip 解成**同时叠加**的参数表情（游戏内置配方），不必为每个场景单独做 `motion3`。
+
+完整示例：[`pet.live2d.example.json`](pet.live2d.example.json)。
 
 ## 你需要准备
 
 1. 从 [Cubism SDK for Native](https://www.live2d.com/download/cubism-sdk/download-native/) 下载 SDK（需同意 Live2D 协议）。
-2. 从 SDK 的 **`Core/dll/...`** 取出**当前系统**的动态库（不要用 `Core/lib` 下的 `.lib` / `.a`）：
-   - Windows x64：`Live2DCubismCore.dll` → `_cubism/win-x64/`
-   - Linux x64：`libLive2DCubismCore.so` → `_cubism/linux-x64/`
-   - macOS Apple Silicon：`libLive2DCubismCore.dylib` → `_cubism/osx-arm64/`
-   - macOS Intel：`libLive2DCubismCore.dylib` → `_cubism/osx-x64/`
-3. 准备一套 `.model3.json` + `.moc3` + 贴图（自制或有授权的模型）。
+2. 从 SDK 的 **`Core/dll/...`** 取出当前系统动态库（不要用 `.lib` / `.a`）。也可把整个 `dll` 树拷到 `_cubism/`。
+3. 一套 `.model3.json` + `.moc3` + 贴图。
 
-## 放到游戏数据目录
+## 目录
 
 ```
 EzResources/Pets/
-  _cubism/
-    win-x64/Live2DCubismCore.dll      ← 按你的平台选一个子目录
-    linux-x64/libLive2DCubismCore.so
-    osx-arm64/libLive2DCubismCore.dylib
+  _cubism/…                    ← Core（RID 或 SDK 布局）
   MyPet/
-    pet.json                          ← "renderer": "live2d"
+    pet.json                   ← "renderer": "live2d"
     live2d/
       xxx.model3.json
       xxx.moc3
-      ...
+      *.motion3.json           ← 可选加分
 ```
 
-Windows 仍兼容旧路径：`_cubism/Live2DCubismCore.dll`（平铺）。
+## 参数表情（同时叠加）
 
-也可以直接把 SDK 的 `Core/dll` 目录内容拷进 `_cubism/`（保持 `windows/x86_64/`、`linux/x86_64/`、`macos/` 结构），客户端同样能找到。
+内置表情 ID（缺对应 `Param*` 则跳过该键）：
 
-`pet.json` 最小示例：
+| ID | 作用（示意） |
+| --- | --- |
+| `smile` | 嘴型笑、眼笑、腮红等 |
+| `wave` | 手臂挥动（需 `ParamArm*`） |
+| `jump` | 身体微动 + 立绘弹跳 |
+| `nod` / `shake` | 点头 / 摇头 |
+| `lookDown` / `pout` / `kick` / `coverEyes` | 低头、噘嘴、踢、捂眼 |
+
+结算 SS 等应写成 **同时**激活多个 ID，例如 `["smile","wave","jump"]`，不是排队三段。
+
+`pet.json`：
 
 ```json
-{
-  "renderer": "live2d",
-  "defaultState": "idle",
-  "clips": {
-    "idle": { "fps": 12, "loop": true },
-    "poke": { "fps": 12, "loop": false },
-    "grabbed": { "fps": 12, "loop": true }
+"live2d": {
+  "clipExpressions": {
+    "rankSS": ["smile", "wave", "jump"],
+    "fail": ["shake"],
+    "clear": ["nod"]
   },
-  "states": {
-    "idle": { "clip": "idle" },
-    "poke": { "clip": "poke", "next": "idle" },
-    "grabbed": { "clip": "grabbed" }
-  },
-  "rules": [
-    { "when": "click", "goto": "poke", "interrupt": true },
-    { "when": "drag", "goto": "grabbed", "interrupt": true }
-  ]
+  "lipSync": { "minOpen": 0.15 }
 }
 ```
 
-可选：在 `pet.json` 里写 `"live2d": { "root": "live2d", "model": "xxx.model3.json" }` 指定入口；省略则自动取 `live2d/` 下第一个 `*.model3.json`，否则第一个 `*.moc3`。
+未写 `clipExpressions` 时，客户端对 `fail`/`clear`/`rankA`… 有内置默认。可用 `live2d.expressions` 覆盖某表情的参数配方（自定义 Param ID 时用）。
 
-## 游戏内验证
+可选 `motion3`：与表情叠层一起播；`live2d.clipMotions` 可把 clip 映射到不同 motion 文件名键。
 
-1. 设置 → Ez 游玩设置 → 桌宠 → 选包。
-2. 包下拉下方状态行：应显示「Live2D 模型与 Cubism Core 均已就绪」。
-3. **成功**：看到立绘（呼吸 / 眨眼）；点一下可切 `poke`。日志含 `Core OK` 与 `loaded texture`。
-4. **缺贴图**：日志 `missing texture`；确认 model3 内路径与文件夹一致。
-5. **缺 Core**：紫色占位；状态行会写出期望的 `_cubism/<rid>/...` 路径。若同包还有 PNG 帧会回退帧动画。
-6. **缺模型入口**：状态行提示 live2d/ 下没有 model3/moc3；不会走 Cubism。
+## 规则事件（与 PNG 相同 + Live2D 常用）
 
-## 日志关键字
-
-- `Live2D authorised; cubism=ready`
-- `Ez pet Cubism: Core OK`
-- `Ez pet Cubism: loaded texture`
-- `Ez pet Cubism: missing texture` / `UpdateMotion failed` 等排查用
-
-## 首次用户 vs 自制模型
-
-| 场景 | 做什么 |
+| `when` | 说明 |
 | --- | --- |
-| 首次只要桌宠（PNG） | 放 PNG 包即可，不必装 Core |
-| 首次 / 自制 Live2D | 放当前平台 Core + `renderer:live2d` 包 |
-| 分发模型包给别人 | 见 [Release资源包规范.md](Release资源包规范.md) |
+| `fail` | 本局失败 |
+| `clear` | 本局通关 |
+| `resultsRank` | 进入结算；可选 `"rank": "A"` / `S` / `SH` / `X` / `XH` / `B` / `C`… |
+
+设置 → 桌宠 → **Live2D 口型关联音乐**：按曲目振幅开合 `ParamMouthOpenY`（最低 `minOpen`，不会闭死）。
+
+## 半身模（如当前 Miku）边界
+
+有头身/嘴型参 → 笑、点头、摇头、口型跟音乐、立绘弹跳可用。  
+无手臂参 → `wave` / `coverEyes` 几乎无效，除非换带 `ParamArm*` 的模型或改配方。
+
+## 验证
+
+1. 设置选 Live2D 包；状态行显示 Core 就绪。
+2. 点击应点头/表情；失败/通关/结算档位按 `rules` 切换。
+3. 开户口型开关后，有音乐播放时嘴会动。
 
 更多 PNG 规则见 [`docs/桌宠使用说明.md`](../桌宠使用说明.md)。

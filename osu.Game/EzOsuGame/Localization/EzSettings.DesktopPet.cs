@@ -74,5 +74,12 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_SCALE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "桌宠立绘缩放。按住 Left Alt 拖动改位置；未按时点击穿透，悬浮仍可触发反应。",
             "Scale of the pet sprite. Hold Left Alt and drag to move; without Alt, clicks pass through while hover reactions still work.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_LIP_SYNC = new EzLocalizationManager.EzLocalisableString(
+            "Live2D 口型关联音乐", "Live2D lip-sync to music");
+
+        public static readonly EzLocalizationManager.EzLocalisableString DESKTOP_PET_LIP_SYNC_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后按音频振幅开合嘴巴（最低不完全闭合）。仅对 Live2D 包生效。",
+            "When enabled, mouth open follows track amplitude (never fully closed). Live2D packs only.");
     }
 }

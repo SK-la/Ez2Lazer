@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
@@ -57,11 +58,11 @@ namespace osu.Game.EzOsuGame.Pets
 
         public static string? FindCanonicalEntryRelativePath(Storage petsStorage, string packName, EzPetPackDefinition definition)
         {
-            string live2dRoot = string.IsNullOrWhiteSpace(definition.Live2D?.Root)
+            string live2DRoot = string.IsNullOrWhiteSpace(definition.Live2D?.Root)
                 ? "live2d"
                 : definition.Live2D!.Root.Trim().Replace('\\', '/').Trim('/');
 
-            string baseDir = Path.Combine(packName, live2dRoot.Replace('/', Path.DirectorySeparatorChar));
+            string baseDir = Path.Combine(packName, live2DRoot.Replace('/', Path.DirectorySeparatorChar));
 
             if (!string.IsNullOrWhiteSpace(definition.Live2D?.Model))
             {
@@ -104,5 +105,33 @@ namespace osu.Game.EzOsuGame.Pets
         /// Optional relative path under <see cref="Root"/> to the <c>.model3.json</c> (or moc3) entry.
         /// </summary>
         public string Model { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Clip/state id → simultaneous expression ids (e.g. rankSS → smile+wave+jump).
+        /// </summary>
+        public Dictionary<string, List<string>> ClipExpressions { get; set; } =
+            new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Optional override of built-in expression recipes by id.
+        /// </summary>
+        public Dictionary<string, EzPetExpressionRecipe> Expressions { get; set; } =
+            new Dictionary<string, EzPetExpressionRecipe>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Optional clip → motion3 key when file name differs from clip id.
+        /// </summary>
+        public Dictionary<string, string> ClipMotions { get; set; } =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        public EzPetLive2DLipSyncDefinition? LipSync { get; set; }
+    }
+
+    public class EzPetLive2DLipSyncDefinition
+    {
+        /// <summary>
+        /// Minimum <c>ParamMouthOpenY</c> while lip-sync is active (never fully closed).
+        /// </summary>
+        public float MinOpen { get; set; } = 0.15f;
     }
 }

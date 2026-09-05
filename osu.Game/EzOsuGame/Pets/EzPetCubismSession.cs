@@ -48,6 +48,12 @@ namespace osu.Game.EzOsuGame.Pets
         private static bool frameworkStarted;
         private static bool loggedCanvasOnce;
 
+        private readonly EzPetCubismExpressionStack expressionStack = new EzPetCubismExpressionStack(EzPetCubismExpressionLibrary.CreateDefaults());
+        private EzPetLive2DDefinition? live2DDefinition;
+        private bool lipSyncEnabled;
+        private float lipSyncMinOpen = 0.15f;
+        private float lipSyncAmplitude;
+
         public bool IsReady { get; private set; }
 
         public string? Status { get; private set; }
@@ -55,6 +61,11 @@ namespace osu.Game.EzOsuGame.Pets
         public int DrawableCount { get; private set; }
 
         public float BreathValue { get; private set; }
+
+        /// <summary>
+        /// 0–1 drawable bounce from jump-like expressions (applied by the pet layer).
+        /// </summary>
+        public float VisualBounce => expressionStack.VisualBounce;
 
         public string? LastState { get; private set; }
 
@@ -129,21 +140,90 @@ namespace osu.Game.EzOsuGame.Pets
             }
         }
 
+        public void ConfigurePack(EzPetLive2DDefinition? definition)
+        {
+            live2DDefinition = definition;
+            var recipes = EzPetCubismExpressionLibrary.Merge(
+                EzPetCubismExpressionLibrary.CreateDefaults(),
+                definition?.Expressions);
+            expressionStack.SetRecipes(recipes);
+
+            if (definition?.LipSync != null && definition.LipSync.MinOpen > 0)
+                lipSyncMinOpen = Math.Clamp(definition.LipSync.MinOpen, 0.01f, 0.95f);
+        }
+
+        public void SetLipSync(bool enabled, float amplitude01)
+        {
+            lipSyncEnabled = enabled;
+            lipSyncAmplitude = Math.Clamp(amplitude01, 0f, 1f);
+        }
+
         public void NotifyState(string state, string clip)
         {
             LastState = state;
             LastClip = clip;
 
             string key = !string.IsNullOrWhiteSpace(clip) ? clip : state;
+            activateExpressionsForClip(key, state);
+            tryStartMotionForClip(key, state);
+        }
 
-            if (string.Equals(key, "idle", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(state, "idle", StringComparison.OrdinalIgnoreCase))
+        private void activateExpressionsForClip(string clip, string state)
+        {
+            IReadOnlyList<string> ids = resolveExpressionIds(clip);
+
+            if (ids.Count == 0 && !string.Equals(clip, state, StringComparison.OrdinalIgnoreCase))
+                ids = resolveExpressionIds(state);
+
+            expressionStack.Activate(ids);
+        }
+
+        private IReadOnlyList<string> resolveExpressionIds(string clipOrState)
+        {
+            if (live2DDefinition?.ClipExpressions != null
+                && live2DDefinition.ClipExpressions.TryGetValue(clipOrState, out var listed)
+                && listed is { Count: > 0 })
+            {
+                return listed;
+            }
+
+            return EzPetCubismExpressionLibrary.DefaultExpressionsForClip(clipOrState);
+        }
+
+        private void tryStartMotionForClip(string clip, string state)
+        {
+            string? motionKey = null;
+
+            if (live2DDefinition?.ClipMotions != null
+                && live2DDefinition.ClipMotions.TryGetValue(clip, out string? mapped)
+                && !string.IsNullOrWhiteSpace(mapped))
+            {
+                motionKey = mapped;
+            }
+
+            motionKey ??= clip;
+
+            bool idle = string.Equals(clip, "idle", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(state, "idle", StringComparison.OrdinalIgnoreCase);
+
+            if (idle)
             {
                 startMotion("idle", MotionPriority.PriorityIdle, loop: true);
                 return;
             }
 
-            if (string.Equals(key, "poke", StringComparison.OrdinalIgnoreCase)
+            bool loop = string.Equals(clip, "grabbed", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(state, "grabbed", StringComparison.OrdinalIgnoreCase);
+
+            if (startMotion(motionKey, loop ? MotionPriority.PriorityForce : MotionPriority.PriorityForce, loop))
+                return;
+
+            if (!string.Equals(motionKey, clip, StringComparison.OrdinalIgnoreCase)
+                && startMotion(clip, MotionPriority.PriorityForce, loop))
+                return;
+
+            // Fallback poke/grabbed reactions when no motion3 and expressions may also be empty.
+            if (string.Equals(clip, "poke", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(state, "poke", StringComparison.OrdinalIgnoreCase))
             {
                 if (!startMotion("nod", MotionPriority.PriorityForce, loop: false)
@@ -154,12 +234,9 @@ namespace osu.Game.EzOsuGame.Pets
                     reactionAngleX = (Random.Shared.NextSingle() * 2f - 1f) * 18f;
                     reactionMouth = 0.7f;
                 }
-
-                return;
             }
-
-            if (string.Equals(key, "grabbed", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(state, "grabbed", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(clip, "grabbed", StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(state, "grabbed", StringComparison.OrdinalIgnoreCase))
             {
                 if (!startMotion("shake", MotionPriority.PriorityForce, loop: true)
                     && !startMotion("grabbed", MotionPriority.PriorityForce, loop: true))
@@ -189,8 +266,6 @@ namespace osu.Game.EzOsuGame.Pets
                 if (motionManager.IsFinished())
                     startMotion("idle", MotionPriority.PriorityIdle, loop: true);
 
-                motionUpdated = false;
-
                 try
                 {
                     motionUpdated = motionManager.UpdateMotion(model, dt);
@@ -203,8 +278,7 @@ namespace osu.Game.EzOsuGame.Pets
                 }
             }
 
-            // Procedural idle only when no motion library is driving the body.
-            // Prefer AngleZ tilt (\ /) while facing forward — not AngleX yaw.
+            // Procedural idle sway when no motion library is driving the body.
             if (!hasMotionLibrary)
             {
                 float tilt = MathF.Sin(userTime * 0.55f) * 10f;
@@ -219,15 +293,14 @@ namespace osu.Game.EzOsuGame.Pets
                 reactionRemaining = Math.Max(0, reactionRemaining - dt);
             }
 
+            expressionStack.Update(dt);
+            expressionStack.Apply(model);
+
             // Keep facing forward: kill yaw/pitch drift from breath / reactions.
             model.SetParameterValue(CubismDefaultParameterId.ParamAngleX, 0f);
-            model.SetParameterValue(CubismDefaultParameterId.ParamAngleY, 0f);
             model.SetParameterValue(CubismDefaultParameterId.ParamBodyAngleX, 0f);
-            model.SetParameterValue(CubismDefaultParameterId.ParamBodyAngleY, 0f);
 
-            // Mouth slightly open (middle), not fully closed.
-            model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, 0.35f);
-            model.SetParameterValue(CubismDefaultParameterId.ParamMouthForm, 0f);
+            applyMouth(model);
 
             model.SaveParameters();
 
@@ -236,12 +309,9 @@ namespace osu.Game.EzOsuGame.Pets
 
             breath?.UpdateParameters(model, dt);
 
-            // Breath must not reintroduce yaw after SaveParameters.
             model.SetParameterValue(CubismDefaultParameterId.ParamAngleX, 0f);
-            model.SetParameterValue(CubismDefaultParameterId.ParamAngleY, 0f);
             model.SetParameterValue(CubismDefaultParameterId.ParamBodyAngleX, 0f);
-            model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, 0.35f);
-            model.SetParameterValue(CubismDefaultParameterId.ParamMouthForm, 0f);
+            applyMouth(model);
 
             physics?.Evaluate(model, dt);
             model.Update();
@@ -255,6 +325,19 @@ namespace osu.Game.EzOsuGame.Pets
             {
                 BreathValue = 0.5f + 0.5f * MathF.Sin(userTime * 2f);
             }
+        }
+
+        private void applyMouth(CubismModel model)
+        {
+            if (lipSyncEnabled)
+            {
+                float open = Math.Max(lipSyncMinOpen, lipSyncMinOpen + (1f - lipSyncMinOpen) * lipSyncAmplitude);
+                model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, open);
+                return;
+            }
+
+            // Default: slightly open mouth (middle), not fully closed.
+            model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, 0.35f);
         }
 
         private bool startMotion(string key, MotionPriority priority, bool loop)

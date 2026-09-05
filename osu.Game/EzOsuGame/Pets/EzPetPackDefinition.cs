@@ -113,7 +113,7 @@ namespace osu.Game.EzOsuGame.Pets
     public class EzPetRule
     {
         /// <summary>
-        /// hover / hoverEnd / click / gameplayEnter / combo / miss / idle
+        /// hover / hoverEnd / click / gameplayEnter / combo / miss / idle / fail / clear / resultsRank
         /// Idle rules use hardware AFK time (not song-select carousel).
         /// </summary>
         public string When { get; set; } = string.Empty;

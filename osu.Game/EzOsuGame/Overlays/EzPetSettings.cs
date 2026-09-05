@@ -106,6 +106,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "pet", "scale", "size", "桌宠" }
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsDesktopPet.DESKTOP_PET_LIP_SYNC,
+                    HintText = EzSettingsDesktopPet.DESKTOP_PET_LIP_SYNC_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.DesktopPetLive2DLipSync),
+                })
+                {
+                    Keywords = new[] { "pet", "live2d", "lip", "mouth", "口型", "桌宠" }
+                },
             });
 
             packBindable.BindValueChanged(_ => refreshPackStatus(packBindable.Value), true);
