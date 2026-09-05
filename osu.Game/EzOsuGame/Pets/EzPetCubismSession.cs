@@ -52,7 +52,9 @@ namespace osu.Game.EzOsuGame.Pets
         private EzPetLive2DDefinition? live2DDefinition;
         private bool lipSyncEnabled;
         private float lipSyncMinOpen = 0.25f;
-        private float lipSyncAmplitude;
+        private float musicBpm;
+        private double musicTrackTimeMs;
+        private float musicSyncWeight;
 
         public bool IsReady { get; private set; }
 
@@ -152,10 +154,14 @@ namespace osu.Game.EzOsuGame.Pets
                 lipSyncMinOpen = Math.Clamp(definition.LipSync.MinOpen, 0.01f, 0.95f);
         }
 
-        public void SetLipSync(bool enabled, float amplitude01)
+        /// <summary>
+        /// Drive mouth / head from beatmap base BPM and track clock (not audio amplitude).
+        /// </summary>
+        public void SetMusicSync(bool enabled, float bpm, double trackTimeMs)
         {
             lipSyncEnabled = enabled;
-            lipSyncAmplitude = Math.Clamp(amplitude01, 0f, 1f);
+            musicBpm = bpm > 1f && bpm < 1000f ? bpm : 0f;
+            musicTrackTimeMs = trackTimeMs;
         }
 
         public void NotifyState(string state, string clip)
@@ -279,20 +285,15 @@ namespace osu.Game.EzOsuGame.Pets
             }
 
             // Procedural idle sway when no motion library is driving the body.
-            if (!hasMotionLibrary)
+            if (!hasMotionLibrary && musicSyncWeight < 0.05f)
             {
                 float tilt = MathF.Sin(userTime * MathF.Tau * 0.45f) * 4f;
                 model.AddParameterValue(CubismDefaultParameterId.ParamAngleZ, tilt);
                 model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleZ, tilt * 0.3f);
             }
 
-            // Soft singing sway while lip-sync follows music (even if motion3 is playing).
-            if (lipSyncEnabled)
-            {
-                float sway = MathF.Sin(userTime * MathF.Tau * 0.55f) * 2.8f;
-                model.AddParameterValue(CubismDefaultParameterId.ParamAngleZ, sway);
-                model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleZ, sway * 0.35f);
-            }
+            float musicTarget = lipSyncEnabled && musicBpm > 0 ? 1f : 0f;
+            musicSyncWeight = approach(musicSyncWeight, musicTarget, dt, attack: 2.5f, release: 3.5f);
 
             if (reactionRemaining > 0)
             {
@@ -302,7 +303,8 @@ namespace osu.Game.EzOsuGame.Pets
             }
 
             expressionStack.Update(dt);
-            expressionStack.Apply(model);
+            // While BPM head sway is active, skip expression AngleZ/BodyAngleZ so they cannot snap-fight.
+            expressionStack.Apply(model, skipHeadRoll: musicSyncWeight > 0.05f);
 
             // Keep facing forward: kill yaw/pitch drift from breath / reactions.
             model.SetParameterValue(CubismDefaultParameterId.ParamAngleX, 0f);
@@ -320,7 +322,10 @@ namespace osu.Game.EzOsuGame.Pets
 
             physics?.Evaluate(model, dt);
 
-            // Mouth last so motion / breath / physics cannot leave it stuck near ~0.3.
+            // BPM sway once after physics (continuous phase — avoids doubled Add + snap).
+            if (musicSyncWeight > 0.001f)
+                applyBpmHeadSway(model, musicSyncWeight);
+
             applyMouth(model);
 
             model.Update();
@@ -338,17 +343,42 @@ namespace osu.Game.EzOsuGame.Pets
 
         private void applyMouth(CubismModel model)
         {
-            if (lipSyncEnabled)
+            if (musicSyncWeight > 0.001f && musicBpm > 0)
             {
-                // Track Maximum is often soft (~0.2–0.5); boost so loud parts can reach ~1 like the editor.
-                float driven = Math.Clamp(lipSyncAmplitude * 2.2f, 0f, 1f);
-                float open = lipSyncMinOpen + (1f - lipSyncMinOpen) * driven;
-                model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, open);
+                // Quarter-note pulse: open on each beat (editor scale 0–1).
+                double beats = musicTrackTimeMs * musicBpm / 60000.0;
+                float beatFrac = (float)(beats - Math.Floor(beats));
+                float pulse = MathF.Pow(Math.Max(0f, MathF.Cos(beatFrac * MathF.Tau)), 1.6f);
+                float open = lipSyncMinOpen + (1f - lipSyncMinOpen) * pulse * musicSyncWeight
+                             + 0.5f * (1f - musicSyncWeight);
+                model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, Math.Clamp(open, 0f, 1f));
                 return;
             }
 
-            // Default half-open mouth when not lip-syncing (editor scale 0–1).
             model.SetParameterValue(CubismDefaultParameterId.ParamMouthOpenY, 0.5f);
+        }
+
+        /// <summary>
+        /// Half-note head sway (period = 2 beats), continuous phase from track time — no free-running sin.
+        /// </summary>
+        private void applyBpmHeadSway(CubismModel model, float weight)
+        {
+            if (musicBpm <= 0)
+                return;
+
+            double beats = musicTrackTimeMs * musicBpm / 60000.0;
+            // Period 2 beats → half-note rate; Sin(beats * π).
+            float sway = MathF.Sin((float)(beats * Math.PI)) * 3f * weight;
+            model.AddParameterValue(CubismDefaultParameterId.ParamAngleZ, sway);
+            model.AddParameterValue(CubismDefaultParameterId.ParamBodyAngleZ, sway * 0.35f);
+        }
+
+        private static float approach(float current, float target, float dt, float attack, float release)
+        {
+            float speed = target > current ? attack : release;
+            if (Math.Abs(target - current) <= speed * dt)
+                return target;
+            return current + Math.Sign(target - current) * speed * dt;
         }
 
         private bool startMotion(string key, MotionPriority priority, bool loop)

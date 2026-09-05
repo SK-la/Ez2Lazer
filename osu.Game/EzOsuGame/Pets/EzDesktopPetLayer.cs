@@ -261,12 +261,23 @@ namespace osu.Game.EzOsuGame.Pets
 
             if (preferLive2DHost && cubismSession?.IsReady == true)
             {
-                float amplitude = 0;
-                var track = beatmap.Value?.Track;
-                if (track?.IsRunning == true)
-                    amplitude = track.CurrentAmplitudes.Maximum;
+                bool sync = live2DLipSync.Value;
+                float bpm = 0;
+                double trackTime = 0;
+                var working = beatmap.Value;
+                var track = working?.Track;
 
-                cubismSession.SetLipSync(live2DLipSync.Value, amplitude);
+                if (sync && track?.IsRunning == true)
+                {
+                    // Base BPM from beatmap info; scale by playback rate (DT/HT).
+                    double baseBpm = working.BeatmapInfo?.BPM ?? 0;
+                    if (baseBpm <= 0)
+                        baseBpm = 120;
+                    bpm = (float)(baseBpm * Math.Max(0.1, track.Rate));
+                    trackTime = track.CurrentTime;
+                }
+
+                cubismSession.SetMusicSync(sync && track?.IsRunning == true, bpm, trackTime);
                 cubismSession.Update(Time.Elapsed / 1000.0);
                 live2DHost.ApplyBreath(cubismSession.BreathValue);
             }

@@ -202,8 +202,9 @@ namespace osu.Game.EzOsuGame.Pets
 
         public void Activate(IEnumerable<string> expressionIds)
         {
-            layers.Clear();
-            time = 0;
+            // Fade previous layers out instead of hard-clear (avoids AngleZ snap).
+            foreach (var layer in layers)
+                layer.ForceIntoRelease();
 
             foreach (string id in expressionIds)
             {
@@ -246,7 +247,7 @@ namespace osu.Game.EzOsuGame.Pets
             }
         }
 
-        public void Apply(CubismModel model)
+        public void Apply(CubismModel model, bool skipHeadRoll = false)
         {
             foreach (var layer in layers)
             {
@@ -257,6 +258,11 @@ namespace osu.Game.EzOsuGame.Pets
                 foreach (var param in layer.Recipe.Params)
                 {
                     if (string.IsNullOrWhiteSpace(param.Id))
+                        continue;
+
+                    if (skipHeadRoll
+                        && (string.Equals(param.Id, CubismDefaultParameterId.ParamAngleZ, StringComparison.Ordinal)
+                            || string.Equals(param.Id, CubismDefaultParameterId.ParamBodyAngleZ, StringComparison.Ordinal)))
                         continue;
 
                     float value = param.Oscillate
@@ -295,13 +301,38 @@ namespace osu.Game.EzOsuGame.Pets
 
             public float Age { get; set; }
 
-            public bool IsFinished => Recipe.HoldSeconds > 0
-                                      && Age >= Recipe.AttackSeconds + Recipe.HoldSeconds + Recipe.ReleaseSeconds;
+            public bool IsFinished =>
+                (releasing && Age >= releaseStartAge + Math.Max(0.001f, Recipe.ReleaseSeconds))
+                || (Recipe.HoldSeconds > 0
+                    && !releasing
+                    && Age >= Recipe.AttackSeconds + Recipe.HoldSeconds + Recipe.ReleaseSeconds);
+
+            private bool releasing;
+            private float releaseStartAge;
+            private float weightAtRelease = 1f;
+
+            public void ForceIntoRelease()
+            {
+                if (releasing)
+                    return;
+
+                weightAtRelease = Math.Max(0.001f, ComputeWeight());
+                releasing = true;
+                releaseStartAge = Age;
+            }
 
             public float ComputeWeight()
             {
                 float attack = Math.Max(0.001f, Recipe.AttackSeconds);
                 float release = Math.Max(0.001f, Recipe.ReleaseSeconds);
+
+                if (releasing)
+                {
+                    float releaseT = (Age - releaseStartAge) / release;
+                    if (releaseT >= 1f)
+                        return 0f;
+                    return weightAtRelease * (1f - releaseT);
+                }
 
                 if (Age < attack)
                     return Age / attack;
@@ -313,11 +344,11 @@ namespace osu.Game.EzOsuGame.Pets
                 if (Age < holdEnd)
                     return 1f;
 
-                float releaseT = (Age - holdEnd) / release;
-                if (releaseT >= 1f)
+                float naturalReleaseT = (Age - holdEnd) / release;
+                if (naturalReleaseT >= 1f)
                     return 0f;
 
-                return 1f - releaseT;
+                return 1f - naturalReleaseT;
             }
         }
     }
