@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.Extensions;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Storyboards.Drawables;
 using osu.Game.Utils;
@@ -115,6 +116,19 @@ namespace osu.Game.Storyboards
             if (Path.HasExtension(path))
             {
                 resolvedPath = BeatmapInfo.BeatmapSet?.GetPathForFile(path);
+
+                // Nested set files may be registered as "folder/file.ext" while events use "file.ext".
+                if (resolvedPath == null && BeatmapInfo.BeatmapSet != null)
+                {
+                    string fileName = Path.GetFileName(path);
+
+                    if (!string.IsNullOrEmpty(fileName))
+                    {
+                        var match = BeatmapInfo.BeatmapSet.Files.FirstOrDefault(f =>
+                            string.Equals(Path.GetFileName(f.Filename), fileName, StringComparison.OrdinalIgnoreCase));
+                        resolvedPath = match?.File.GetStoragePath();
+                    }
+                }
             }
             else
             {

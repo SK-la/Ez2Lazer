@@ -77,8 +77,17 @@ namespace osu.Game.Beatmaps.ExternalLibraries
 
             string fileName = Path.GetFileName(name);
 
-            if (!string.IsNullOrEmpty(fileName))
-                yield return fileName;
+            if (string.IsNullOrEmpty(fileName))
+                yield break;
+
+            yield return fileName;
+
+            // Mapped files may live in subfolders while storyboard events use a bare filename.
+            foreach (var relative in storagePathToRelativeFilename.Values)
+            {
+                if (string.Equals(Path.GetFileName(relative), fileName, StringComparison.OrdinalIgnoreCase))
+                    yield return relative;
+            }
         }
     }
 }
