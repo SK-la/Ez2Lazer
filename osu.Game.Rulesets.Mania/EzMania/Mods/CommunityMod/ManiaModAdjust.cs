@@ -8,8 +8,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Framework.Logging;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -22,6 +20,10 @@ using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
+#if DEBUG
+using osu.Framework.Logging;
+using osu.Game.EzOsuGame.Configuration;
+#endif
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
@@ -227,10 +229,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         #endregion
 
 #if DEBUG
-
         [SettingSource("Test")]
         public BindableBool Test { get; } = new BindableBool();
-
 # endif
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
@@ -354,7 +354,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
 #if DEBUG
-
             if (Test.Value)
             {
                 var obj = maniaBeatmap;
@@ -362,10 +361,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 // int note = obj.HitObjects.Select(h => h.GetEndTime() != h.StartTime).Count();
                 // int note = obj.HitObjects.Count - note;
                 foreach (var column in groups)
-                    Logger.Log($"Column {column.Key + 1}: {column.Count()} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                    Logger.Log($"Column {column.Key + 1}: {column.Count()} notes",  Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 //Logger.Log($"Test:\nThis beatmap has {obj.HitObjects.Count} HitObjects.\n", level: LogLevel.Important);
             }
-
 # endif
 
             Seed.Value ??= RNG.Next();
