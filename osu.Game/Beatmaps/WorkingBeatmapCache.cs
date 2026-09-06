@@ -22,9 +22,9 @@ using osu.Framework.Statistics;
 using osu.Game.Beatmaps.ExternalLibraries;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Database;
-using osu.Game.Models;
 using osu.Game.Extensions;
 using osu.Game.IO;
+using osu.Game.Models;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
 
@@ -146,6 +146,17 @@ namespace osu.Game.Beatmaps
             private readonly IBeatmapResourceProvider resources;
 
             private readonly IResourceStore<byte[]> beatmapFileStore;
+
+            /// <summary>
+            /// Track store mounted on <see cref="beatmapFileStore"/> for externally hosted sets.
+            /// Kept alive for the lifetime of this working beatmap so decoded tracks remain valid.
+            /// </summary>
+            private ITrackStore externalTrackStore;
+
+            /// <summary>
+            /// Texture store mounted on <see cref="beatmapFileStore"/> for externally hosted backgrounds.
+            /// </summary>
+            private LargeTextureStore externalTextureStore;
 
             public BeatmapManagerWorkingBeatmap(BeatmapInfo beatmapInfo, [NotNull] IBeatmapResourceProvider resources)
                 : base(beatmapInfo, resources.AudioManager)
@@ -297,6 +308,15 @@ namespace osu.Game.Beatmaps
 
                 try
                 {
+                    // External sets keep bytes on disk (RegisterExternalHash); global texture stores only see files/.
+                    if (isExternalChartSet())
+                    {
+                        var externalTexture = tryGetExternalBackground(Metadata.BackgroundFile);
+
+                        if (externalTexture != null)
+                            return externalTexture;
+                    }
+
                     string fileStorePath = BeatmapSetInfo.GetPathForFile(Metadata.BackgroundFile);
                     var texture = store.Get(fileStorePath);
 
@@ -315,6 +335,34 @@ namespace osu.Game.Beatmaps
                 }
             }
 
+            private Texture tryGetExternalBackground(string backgroundFile)
+            {
+                var textureStore = getOrCreateExternalTextureStore();
+
+                if (textureStore == null)
+                    return null;
+
+                string relative = backgroundFile.Replace('\\', '/');
+                string fileStorePath = BeatmapSetInfo.GetPathForFile(backgroundFile);
+
+                return textureStore.Get(relative)
+                       ?? (!string.IsNullOrEmpty(fileStorePath) ? textureStore.Get(fileStorePath) : null)
+                       ?? textureStore.Get(Path.GetFileName(relative));
+            }
+
+            private LargeTextureStore getOrCreateExternalTextureStore()
+            {
+                if (externalTextureStore != null)
+                    return externalTextureStore;
+
+                var loader = resources.CreateTextureLoaderStore(beatmapFileStore);
+
+                if (loader == null)
+                    return null;
+
+                return externalTextureStore = new LargeTextureStore(resources.Renderer, loader);
+            }
+
             protected override Track GetBeatmapTrack()
             {
                 if (string.IsNullOrEmpty(Metadata?.AudioFile))
@@ -325,6 +373,15 @@ namespace osu.Game.Beatmaps
 
                 try
                 {
+                    // External sets: mount content via beatmapFileStore (ExternalBeatmapFileStore), never Tracks.Get(absolutePath).
+                    if (isExternalChartSet())
+                    {
+                        var externalTrack = tryGetExternalTrack(Metadata.AudioFile);
+
+                        if (externalTrack != null)
+                            return externalTrack;
+                    }
+
                     string fileStorePath = BeatmapSetInfo.GetPathForFile(Metadata.AudioFile);
                     var track = resources.Tracks.Get(fileStorePath);
 
@@ -341,6 +398,28 @@ namespace osu.Game.Beatmaps
                     Logger.Error(e, "Track failed to load");
                     return null;
                 }
+            }
+
+            private Track tryGetExternalTrack(string audioFile)
+            {
+                var trackStore = getOrCreateExternalTrackStore();
+                string relative = audioFile.Replace('\\', '/');
+                string fileStorePath = BeatmapSetInfo.GetPathForFile(audioFile);
+
+                return trackStore.Get(relative)
+                       ?? (!string.IsNullOrEmpty(fileStorePath) ? trackStore.Get(fileStorePath) : null)
+                       ?? trackStore.Get(Path.GetFileName(relative));
+            }
+
+            private ITrackStore getOrCreateExternalTrackStore()
+            {
+                if (externalTrackStore != null)
+                    return externalTrackStore;
+
+                if (resources.AudioManager != null)
+                    return externalTrackStore = resources.AudioManager.GetTrackStore(beatmapFileStore);
+
+                return externalTrackStore;
             }
 
             protected override Waveform GetWaveform()
