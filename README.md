@@ -1,6 +1,16 @@
 <p align="center">
-  <img width="500" alt="osu! logo" src="assets/lazer.png">
+  <img width="640" alt="osu! logo" src="assets/Ez2Lazer-previewr.png">
 </p>
+
+<div align="center">
+    <a href="https://github.com/SK-la/Ez2Lazer/releases" target="_blank"><img src="https://img.shields.io/badge/Releases-d73a49.svg?logo=github" height="22px" alt="Releases"></a>  
+    <a href="https://github.com/SK-la/Ez2Lazer/wiki" target="_blank"><img src="https://img.shields.io/badge/Wiki-0366d6.svg?logo=github" height="22px" alt="Wiki"></a>
+    <a href="https://github.com/SK-la/Ez2Lazer" target="_blank"><img src="https://img.shields.io/badge/Game-181717.svg?logo=github" height="22px" alt="Game"></a>
+    <a href="https://github.com/SK-la/osu-framework" target="_blank"><img src="https://img.shields.io/badge/Framework-black.svg?logo=github" height="22px" alt="Framework"></a>
+    <a href="https://github.com/SK-la/osu-resources" target="_blank"><img src="https://img.shields.io/badge/Resources-2ea44f.svg?logo=github" height="22px" alt="Resources"></a>
+    <a href="https://space.bilibili.com/4100834" target="_blank"><img src="https://img.shields.io/badge/Bilibili-00A1D6.svg?logo=bilibili&logoColor=white" height="22px" alt="Bilibili"></a>
+
+</div>
 
 # Ez2Lazer
 
@@ -13,11 +23,11 @@ Ez2Lazer is a heavily customized branch based on osu! lazer, focused on Mania/BM
 
 - 最新版本发布页 / Latest releases: [SK-la/Ez2Lazer Releases](https://github.com/SK-la/Ez2Lazer/releases)
 - 资源包 / Resource pack: [EzResources (OneDrive)](https://la1225-my.sharepoint.com/:f:/g/personal/la_la1225_onmicrosoft_com/EiosAbw_1C9ErYCNRD1PQvkBaYvhflOkt8G9ZKHNYuppLg?e=DWY1kn)
-- 运行时要求 / Runtime: [.NET 8.0 Runtime](https://dotnet.microsoft.com/download)
+- 运行时要求 / Runtime: [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
 
 **自动更新（推荐）** / **Auto-update (recommended)**  
-- Windows：下载 Release 中的 `ez2lazer-win-Setup.exe` 安装（需已安装 [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download)）；之后可在游戏内接收增量更新。  
-- Windows: use `ez2lazer-win-Setup.exe` from Releases (requires [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download)); in-game updates download deltas afterward.  
+- Windows：下载 Release 中的 `ez2lazer-win-Setup.exe` 安装（需已安装 [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)）；之后可在游戏内接收增量更新。  
+- Windows: use `ez2lazer-win-Setup.exe` from Releases (requires [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)); in-game updates download deltas afterward.  
 - 手动安装请用 `Ez2Lazer_release_*.zip` 解压运行；zip 无法使用增量更新，需改用 Setup 安装一次。  
 - For manual installs use `Ez2Lazer_release_*.zip`; zip installs cannot receive delta updates until you switch to Setup once.
 
