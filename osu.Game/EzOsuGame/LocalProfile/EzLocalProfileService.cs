@@ -49,7 +49,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public IReadOnlyList<string> GetPreviouslyIncludedUsernames() => store.LoadIncludedUsernames();
 
-        public IReadOnlyList<EzLocalProfileDrillScoreRow> LoadDrillScores(int rulesetId) => store.LoadDrillScores(rulesetId);
+        /// <summary>
+        /// Display snapshot for the player filter: <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> or one stored username.
+        /// </summary>
+        public EzLocalProfileSnapshot LoadDisplaySnapshot(string? usernameFilter) => store.LoadSnapshotForUsername(usernameFilter);
+
+        public IReadOnlyList<EzLocalProfileDrillScoreRow> LoadDrillScores(int rulesetId, string? usernameFilter = null)
+            => store.LoadDrillScores(rulesetId, usernameFilter);
 
         public bool HasOnlineScoreContributions() => store.LoadOnlineScoreContributions().Count > 0;
 

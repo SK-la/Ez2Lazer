@@ -85,6 +85,69 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
+        /// <summary>
+        /// Load display snapshot for <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> (merged archive)
+        /// or a single stored username partition (local stats only, no online merge).
+        /// </summary>
+        public EzLocalProfileSnapshot LoadSnapshotForUsername(string? usernameFilter)
+        {
+            if (string.IsNullOrEmpty(usernameFilter)
+                || string.Equals(usernameFilter, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal))
+                return LoadSnapshot();
+
+            lock (sync)
+            {
+                try
+                {
+                    ensureInitialised();
+
+                    using var connection = openConnection();
+
+                    string? json = tryReadPartitionJson(connection, usernameFilter);
+
+                    if (json == null)
+                    {
+                        return new EzLocalProfileSnapshot
+                        {
+                            HasData = false,
+                            IncludedUsernames = new[] { usernameFilter },
+                            LastComputedAt = tryReadLastComputedAt(connection),
+                            NeedsRecompute = readNeedsRecompute(connection),
+                        };
+                    }
+
+                    EzLocalProfilePartitionPayload? payload;
+
+                    try
+                    {
+                        payload = JsonSerializer.Deserialize<EzLocalProfilePartitionPayload>(json);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"[EzLocalProfile] Bad partition for {usernameFilter}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
+                        return new EzLocalProfileSnapshot { HasData = false, IncludedUsernames = new[] { usernameFilter } };
+                    }
+
+                    if (payload == null)
+                        return new EzLocalProfileSnapshot { HasData = false, IncludedUsernames = new[] { usernameFilter } };
+
+                    var merged = new EzLocalProfileAggregationResult
+                    {
+                        IncludedUsernames = new[] { usernameFilter },
+                        ComputedAt = tryReadLastComputedAt(connection) ?? DateTimeOffset.UtcNow,
+                    };
+                    payload.MergeInto(merged);
+
+                    return snapshotFromAggregation(merged, tryReadLastComputedAt(connection), readNeedsRecompute(connection));
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[EzLocalProfile] Failed to load partition snapshot: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
+                    return new EzLocalProfileSnapshot { HasData = false };
+                }
+            }
+        }
+
         public IReadOnlyList<string> LoadIncludedUsernames()
         {
             lock (sync)
@@ -95,13 +158,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        public IReadOnlyList<EzLocalProfileDrillScoreRow> LoadDrillScores(int rulesetId)
+        public IReadOnlyList<EzLocalProfileDrillScoreRow> LoadDrillScores(int rulesetId, string? usernameFilter = null)
         {
             lock (sync)
             {
                 ensureInitialised();
                 using var connection = openConnection();
-                return readDrillScores(connection, rulesetId);
+                return readDrillScores(connection, rulesetId, usernameFilter);
             }
         }
 
@@ -609,22 +672,125 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        private static IReadOnlyList<EzLocalProfileDrillScoreRow> readDrillScores(SqliteConnection connection, int rulesetId)
+        private static string? tryReadPartitionJson(SqliteConnection connection, string username)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT payload_json FROM username_partitions WHERE username = $username;";
+            cmd.Parameters.AddWithValue("$username", username);
+            return cmd.ExecuteScalar() as string;
+        }
+
+        private static EzLocalProfileSnapshot snapshotFromAggregation(
+            EzLocalProfileAggregationResult result,
+            DateTimeOffset? lastComputedAt,
+            bool needsRecompute)
+        {
+            bool hasData = result.RulesetStats.Count > 0 || result.DrillScores.Count > 0;
+
+            return new EzLocalProfileSnapshot
+            {
+                HasData = hasData,
+                NeedsRecompute = needsRecompute,
+                LastComputedAt = lastComputedAt ?? result.ComputedAt,
+                IncludedUsernames = result.IncludedUsernames,
+                RulesetStats = result.RulesetStats
+                                     .OrderBy(kv => kv.Key)
+                                     .Select(kv => new EzLocalProfileRulesetStats(
+                                         kv.Key,
+                                         kv.Value.TotalKeys,
+                                         kv.Value.KpsSampleCount > 0 ? kv.Value.KpsSum / kv.Value.KpsSampleCount : 0,
+                                         kv.Value.MaxKps,
+                                         kv.Value.ScoreCount,
+                                         kv.Value.KpsSampleCount,
+                                         kv.Value.TotalPp,
+                                         kv.Value.TotalDurationMs))
+                                     .ToList(),
+                ManiaKeyStats = result.ManiaKeyStats
+                                      .OrderBy(kv => kv.Key)
+                                      .Select(kv => new EzLocalProfileManiaKeyStats(
+                                          kv.Key,
+                                          kv.Value.TotalKeys,
+                                          kv.Value.KpsSampleCount > 0 ? kv.Value.KpsSum / kv.Value.KpsSampleCount : 0,
+                                          kv.Value.MaxKps,
+                                          kv.Value.ScoreCount,
+                                          kv.Value.KpsSampleCount,
+                                          kv.Value.TotalPp,
+                                          kv.Value.TotalDurationMs))
+                                      .ToList(),
+                ManiaColumnStats = result.ManiaColumnStats
+                                         .OrderBy(kv => kv.Key.KeyCount)
+                                         .ThenBy(kv => kv.Key.Column)
+                                         .Select(kv => new EzLocalProfileManiaColumnStats(
+                                             kv.Key.KeyCount,
+                                             kv.Key.Column,
+                                             kv.Value.TotalKeys,
+                                             kv.Value.KpsSampleCount > 0 ? kv.Value.KpsSum / kv.Value.KpsSampleCount : 0,
+                                             kv.Value.MaxKps,
+                                             kv.Value.ScoreCount,
+                                             kv.Value.KpsSampleCount))
+                                         .ToList(),
+                GradeCounts = result.GradeCounts
+                                    .OrderBy(kv => kv.Key.RulesetId)
+                                    .ThenByDescending(kv => kv.Key.Rank)
+                                    .Select(kv => new EzLocalProfileGradeCount(kv.Key.RulesetId, kv.Key.Rank, kv.Value))
+                                    .ToList(),
+                StarPlayCounts = result.StarPlayCounts
+                                       .OrderBy(kv => kv.Key.RulesetId)
+                                       .ThenBy(kv => kv.Key.StarBucket)
+                                       .Select(kv => new EzLocalProfileStarPlayCount(kv.Key.RulesetId, kv.Key.StarBucket, kv.Value))
+                                       .ToList(),
+                XxyPlayCounts = result.XxyPlayCounts
+                                      .OrderBy(kv => kv.Key.RulesetId)
+                                      .ThenBy(kv => kv.Key.StarBucket)
+                                      .Select(kv => new EzLocalProfileXxyPlayCount(kv.Key.RulesetId, kv.Key.StarBucket, kv.Value))
+                                      .ToList(),
+                StdAttrAffinities = result.StdAttrAffinities
+                                          .OrderBy(kv => kv.Key.Attr)
+                                          .ThenByDescending(kv => kv.Value.PlayCount)
+                                          .Select(kv => new EzLocalProfileStdAttrAffinity(
+                                              kv.Key.Attr,
+                                              kv.Key.Value,
+                                              kv.Value.PlayCount,
+                                              kv.Value.HighGradeCount))
+                                          .ToList(),
+                DrillScores = result.DrillScores,
+            };
+        }
+
+        private static IReadOnlyList<EzLocalProfileDrillScoreRow> readDrillScores(SqliteConnection connection, int rulesetId, string? usernameFilter)
         {
             var list = new List<EzLocalProfileDrillScoreRow>();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = """
-                              SELECT score_id, score_hash, username, ruleset_id, rank, pp_resolved, accuracy,
-                                     max_combo, max_achievable_combo, total_score, mods_json, total_keys,
-                                     beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
-                                     mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
-                                     kps_avg, kps_max, kps_list_json, column_counts_json, hold_counts_json,
-                                     avg_abs_offset_ms, has_video, has_storyboard, date_ms
-                              FROM drill_scores
-                              WHERE ruleset_id = $ruleset_id
-                              ORDER BY pp_resolved DESC, date_ms DESC;
-                              """;
+
+            bool filterUsername = !string.IsNullOrEmpty(usernameFilter)
+                                  && !string.Equals(usernameFilter, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal);
+
+            cmd.CommandText = filterUsername
+                ? """
+                  SELECT score_id, score_hash, username, ruleset_id, rank, pp_resolved, accuracy,
+                         max_combo, max_achievable_combo, total_score, mods_json, total_keys,
+                         beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
+                         mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
+                         kps_avg, kps_max, kps_list_json, column_counts_json, hold_counts_json,
+                         avg_abs_offset_ms, has_video, has_storyboard, date_ms
+                  FROM drill_scores
+                  WHERE ruleset_id = $ruleset_id AND username = $username
+                  ORDER BY pp_resolved DESC, date_ms DESC;
+                  """
+                : """
+                  SELECT score_id, score_hash, username, ruleset_id, rank, pp_resolved, accuracy,
+                         max_combo, max_achievable_combo, total_score, mods_json, total_keys,
+                         beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
+                         mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
+                         kps_avg, kps_max, kps_list_json, column_counts_json, hold_counts_json,
+                         avg_abs_offset_ms, has_video, has_storyboard, date_ms
+                  FROM drill_scores
+                  WHERE ruleset_id = $ruleset_id
+                  ORDER BY pp_resolved DESC, date_ms DESC;
+                  """;
             cmd.Parameters.AddWithValue("$ruleset_id", rulesetId);
+            if (filterUsername)
+                cmd.Parameters.AddWithValue("$username", usernameFilter);
             using var reader = cmd.ExecuteReader();
 
             while (reader.Read())

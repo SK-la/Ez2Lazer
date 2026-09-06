@@ -1,6 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -8,7 +10,10 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osuTK;
@@ -17,10 +22,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
 {
     public partial class EzLocalProfileOverlay : FullscreenOverlay<EzLocalProfileHeader>
     {
+        private const float player_filter_row_height = 64;
+
         private readonly Bindable<RulesetInfo> ruleset = new Bindable<RulesetInfo>();
+        private readonly Bindable<string> selectedPlayer = new Bindable<string>(EzLocalProfileConstants.ALL_PLAYERS);
+
         private FillFlowContainer contentFlow = null!;
         private Container emptyStateContainer = null!;
         private OverlayRulesetSelector rulesetSelector = null!;
+        private OsuDropdown<string> playerDropdown = null!;
 
         [Resolved]
         private EzLocalProfileService profileService { get; set; } = null!;
@@ -48,26 +58,60 @@ namespace osu.Game.EzOsuGame.LocalProfile
         [BackgroundDependencyLoader]
         private void load()
         {
-            Child = new OsuScrollContainer
+            // Dropdown sits above the scroll layer so the open menu is not masked, and uses a fixed-height
+            // chrome with Masking=false so the menu paints over content instead of vertically centering
+            // inside a clipped Autosize row.
+            Child = new Container
             {
                 RelativeSizeAxes = Axes.Both,
-                Child = new FillFlowContainer
+                Children = new Drawable[]
                 {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Direction = FillDirection.Vertical,
-                    Children = new Drawable[]
+                    new OsuScrollContainer
                     {
-                        new Container
+                        RelativeSizeAxes = Axes.Both,
+                        Child = new FillFlowContainer
                         {
                             RelativeSizeAxes = Axes.X,
                             AutoSizeAxes = Axes.Y,
+                            Direction = FillDirection.Vertical,
                             Children = new Drawable[]
                             {
-                                new Box
+                                new Container
                                 {
-                                    RelativeSizeAxes = Axes.Both,
-                                    Colour = ColourProvider.Background5,
+                                    RelativeSizeAxes = Axes.X,
+                                    Height = player_filter_row_height,
+                                    Child = new Box
+                                    {
+                                        RelativeSizeAxes = Axes.Both,
+                                        Colour = ColourProvider.Background5,
+                                    }
+                                },
+                                new Container
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    AutoSizeAxes = Axes.Y,
+                                    Children = new Drawable[]
+                                    {
+                                        new Box
+                                        {
+                                            RelativeSizeAxes = Axes.Both,
+                                            Colour = ColourProvider.Background5,
+                                        },
+                                        new Container
+                                        {
+                                            RelativeSizeAxes = Axes.X,
+                                            AutoSizeAxes = Axes.Y,
+                                            Padding = new MarginPadding
+                                            {
+                                                Horizontal = HORIZONTAL_PADDING,
+                                                Vertical = 10
+                                            },
+                                            Child = rulesetSelector = new OverlayRulesetSelector
+                                            {
+                                                Current = { BindTarget = ruleset }
+                                            }
+                                        }
+                                    }
                                 },
                                 new Container
                                 {
@@ -76,39 +120,87 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                     Padding = new MarginPadding
                                     {
                                         Horizontal = HORIZONTAL_PADDING,
-                                        Vertical = 10
+                                        Vertical = 20
                                     },
-                                    Child = rulesetSelector = new OverlayRulesetSelector
+                                    Children = new Drawable[]
                                     {
-                                        Current = { BindTarget = ruleset }
+                                        emptyStateContainer = new Container
+                                        {
+                                            RelativeSizeAxes = Axes.X,
+                                            AutoSizeAxes = Axes.Y,
+                                            Alpha = 0,
+                                            Child = new EzLocalProfileEmptyState()
+                                        },
+                                        contentFlow = new FillFlowContainer
+                                        {
+                                            RelativeSizeAxes = Axes.X,
+                                            AutoSizeAxes = Axes.Y,
+                                            Direction = FillDirection.Vertical,
+                                            Spacing = new Vector2(0, 16),
+                                        }
                                     }
                                 }
                             }
-                        },
-                        new Container
+                        }
+                    },
+                    createPlayerFilterLayer()
+                }
+            };
+        }
+
+        private Drawable createPlayerFilterLayer()
+        {
+            return new Container
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = player_filter_row_height,
+                Masking = false,
+                Children = new Drawable[]
+                {
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = ColourProvider.Background5,
+                    },
+                    new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Masking = false,
+                        Padding = new MarginPadding
                         {
-                            RelativeSizeAxes = Axes.X,
-                            AutoSizeAxes = Axes.Y,
-                            Padding = new MarginPadding
-                            {
-                                Horizontal = HORIZONTAL_PADDING,
-                                Vertical = 20
-                            },
+                            Horizontal = HORIZONTAL_PADDING,
+                            Vertical = 10
+                        },
+                        // TopLeft on the horizontal flow axis so the label stays put when the menu grows.
+                        Child = new FillFlowContainer
+                        {
+                            AutoSizeAxes = Axes.Both,
+                            Direction = FillDirection.Horizontal,
+                            Spacing = new Vector2(12, 0),
                             Children = new Drawable[]
                             {
-                                emptyStateContainer = new Container
+                                new Container
                                 {
-                                    RelativeSizeAxes = Axes.X,
-                                    AutoSizeAxes = Axes.Y,
-                                    Alpha = 0,
-                                    Child = new EzLocalProfileEmptyState()
+                                    Anchor = Anchor.TopLeft,
+                                    Origin = Anchor.TopLeft,
+                                    AutoSizeAxes = Axes.X,
+                                    // Match OsuDropdownHeader height so the label lines up with the closed control.
+                                    Height = 40,
+                                    Child = new OsuSpriteText
+                                    {
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                        Text = EzSettingsProfile.LOCAL_PROFILE_SELECT_PLAYER,
+                                        Font = OsuFont.GetFont(size: 14, weight: FontWeight.Bold),
+                                    }
                                 },
-                                contentFlow = new FillFlowContainer
+                                playerDropdown = new OsuDropdown<string>
                                 {
-                                    RelativeSizeAxes = Axes.X,
-                                    AutoSizeAxes = Axes.Y,
-                                    Direction = FillDirection.Vertical,
-                                    Spacing = new Vector2(0, 16),
+                                    Anchor = Anchor.TopLeft,
+                                    Origin = Anchor.TopLeft,
+                                    Width = 280,
+                                    Current = { BindTarget = selectedPlayer },
                                 }
                             }
                         }
@@ -123,10 +215,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             ruleset.Value = rulesets.GetRuleset(0) ?? rulesets.AvailableRulesets.First();
             ruleset.BindValueChanged(_ => Schedule(refreshContent), true);
+            selectedPlayer.BindValueChanged(_ => Schedule(refreshContent));
 
             profileService.Snapshot.BindValueChanged(s => Schedule(() =>
             {
                 Header.UpdateMeta(s.NewValue);
+                refreshPlayerDropdownItems(s.NewValue);
                 refreshContent();
             }), true);
 
@@ -140,11 +234,30 @@ namespace osu.Game.EzOsuGame.LocalProfile
             refreshContent();
         }
 
+        private void refreshPlayerDropdownItems(EzLocalProfileSnapshot archiveSnapshot)
+        {
+            var items = new List<string> { EzLocalProfileConstants.ALL_PLAYERS };
+
+            foreach (string name in archiveSnapshot.IncludedUsernames
+                                                   .Where(n => !string.IsNullOrWhiteSpace(n))
+                                                   .Distinct(StringComparer.Ordinal)
+                                                   .OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
+            {
+                items.Add(name);
+            }
+
+            playerDropdown.Items = items;
+
+            if (!items.Contains(selectedPlayer.Value, StringComparer.Ordinal))
+                selectedPlayer.Value = EzLocalProfileConstants.ALL_PLAYERS;
+        }
+
         private void refreshContent()
         {
             contentFlow.Clear();
+            currentDrillScore.Value = null;
 
-            var snapshot = profileService.Snapshot.Value;
+            var snapshot = profileService.LoadDisplaySnapshot(selectedPlayer.Value);
 
             if (!snapshot.HasData)
             {

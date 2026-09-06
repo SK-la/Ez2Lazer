@@ -10,6 +10,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
     public static class EzLocalProfileConstants
     {
         public const string UNKNOWN_USERNAME = "(unknown)";
+
+        /// <summary>
+        /// Sentinel value for the player filter dropdown: show merged archive totals.
+        /// </summary>
+        public const string ALL_PLAYERS = "All";
+
         public const int OSU_RULESET_ID = 0;
         public const int MANIA_RULESET_ID = 3;
     }

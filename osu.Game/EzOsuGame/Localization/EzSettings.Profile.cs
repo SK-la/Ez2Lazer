@@ -77,6 +77,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_PANEL_BUTTON =
             new EzLocalizationManager.EzLocalisableString("本地档案", "Local Profile");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SELECT_PLAYER =
+            new EzLocalizationManager.EzLocalisableString("选择玩家", "Select player");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_EMPTY_HINT =
             new EzLocalizationManager.EzLocalisableString("暂无统计。请到 设置 → Ez → 实验性功能 中点击「计算本地个人成绩」。", "No stats yet. Open Settings → Ez → Experimental and run “Compute Local Profile Stats”.");
 

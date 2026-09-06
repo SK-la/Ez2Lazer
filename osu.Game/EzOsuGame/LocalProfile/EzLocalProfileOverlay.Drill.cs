@@ -13,7 +13,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private void refreshDrillContent(EzLocalProfileSnapshot snapshot, int rulesetId)
         {
-            var allScores = profileService.LoadDrillScores(rulesetId);
+            var allScores = profileService.LoadDrillScores(rulesetId, selectedPlayer.Value);
 
             contentFlow.Add(new EzLocalProfileSection(
                 EzSettingsProfile.LOCAL_PROFILE_SECTION_SCORE_DRILL,
