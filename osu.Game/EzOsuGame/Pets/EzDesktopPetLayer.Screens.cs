@@ -71,6 +71,24 @@ namespace osu.Game.EzOsuGame.Pets
         {
             if (game?.ScreenStack.CurrentScreen is ISongSelect)
                 tryHandleStarRating();
+
+            updateMouthSyncGate();
+        }
+
+        private void updateMouthSyncGate()
+        {
+            if (cubismSession == null)
+                return;
+
+            var triggers = currentPack?.Definition.Live2D?.MetadataTriggers;
+            var metadata = beatmap.Value?.Metadata;
+
+            bool gate = EzPetMetadataTriggerMatcher.PassesGate(
+                triggers,
+                EzPetMetadataTriggerMatcher.ACTION_LIP_SYNC,
+                metadata);
+
+            cubismSession.SetMouthSyncGate(gate);
         }
 
         private void tryHandleStarRating()

@@ -52,6 +52,7 @@ namespace osu.Game.EzOsuGame.Pets
         private EzPetLive2DDefinition? live2DDefinition;
         private bool musicAssociationEnabled;
         private bool mouthSyncFromPack;
+        private bool mouthSyncGate = true;
         private float lipSyncMinOpen = 0.25f;
         private float mouthDefaultOpen = 0.5f;
         private float musicBpm;
@@ -168,13 +169,23 @@ namespace osu.Game.EzOsuGame.Pets
 
         /// <summary>
         /// <paramref name="associationEnabled"/>: settings toggle for BPM head sway.
-        /// Mouth uses pack <c>live2d.lipSync.enabled</c> only (see <see cref="ConfigurePack"/>).
+        /// Mouth uses pack <c>live2d.lipSync.enabled</c> ANDed with <see cref="SetMouthSyncGate"/> (metadata triggers).
         /// </summary>
         public void SetMusicSync(bool associationEnabled, float bpm, double trackTimeMs)
         {
             musicAssociationEnabled = associationEnabled;
             musicBpm = bpm > 1f && bpm < 1000f ? bpm : 0f;
             musicTrackTimeMs = trackTimeMs;
+        }
+
+        /// <summary>
+        /// Metadata gate for mouth sync. When pack has <c>metadataTriggers</c> for <c>lipSync</c>,
+        /// pass only on whole-token Artist/Tags match; otherwise leave <c>true</c>.
+        /// Does not override <c>lipSync.enabled</c> — both must be true for BPM mouth open.
+        /// </summary>
+        public void SetMouthSyncGate(bool allowed)
+        {
+            mouthSyncGate = allowed;
         }
 
         public void NotifyState(string state, string clip)
@@ -306,7 +317,7 @@ namespace osu.Game.EzOsuGame.Pets
             float musicTarget = musicAssociationEnabled && musicBpm > 0 ? 1f : 0f;
             musicSyncWeight = approach(musicSyncWeight, musicTarget, dt, attack: 2.5f, release: 3.5f);
 
-            float mouthTarget = mouthSyncFromPack && musicBpm > 0 ? 1f : 0f;
+            float mouthTarget = mouthSyncFromPack && mouthSyncGate && musicBpm > 0 ? 1f : 0f;
             mouthSyncWeight = approach(mouthSyncWeight, mouthTarget, dt, attack: 2.5f, release: 3.5f);
 
             if (reactionRemaining > 0)

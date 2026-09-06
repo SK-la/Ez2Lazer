@@ -125,12 +125,19 @@ namespace osu.Game.EzOsuGame.Pets
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public EzPetLive2DLipSyncDefinition? LipSync { get; set; }
+
+        /// <summary>
+        /// Metadata word gates for Live2D features. When any entry targets an action (e.g. <c>lipSync</c>),
+        /// that feature only runs if a word fully matches beatmap Artist/Tags — <c>enabled</c> alone does not pass.
+        /// </summary>
+        public List<EzPetMetadataTriggerDefinition>? MetadataTriggers { get; set; }
     }
 
     public class EzPetLive2DLipSyncDefinition
     {
         /// <summary>
-        /// When true, BPM quarter-note mouth open while the track is playing. Default off; independent of the settings music-association toggle.
+        /// When true, BPM quarter-note mouth open while the track is playing (and metadata gate passes).
+        /// Default off; independent of the settings music-association toggle.
         /// </summary>
         public bool Enabled { get; set; }
 
@@ -143,5 +150,18 @@ namespace osu.Game.EzOsuGame.Pets
         /// Minimum <c>ParamMouthOpenY</c> while mouth sync is active (never fully closed).
         /// </summary>
         public float MinOpen { get; set; } = 0.25f;
+    }
+
+    /// <summary>
+    /// Whole-token metadata match that gates a Live2D action (does not force the feature on by itself).
+    /// </summary>
+    public class EzPetMetadataTriggerDefinition
+    {
+        public List<string> Words { get; set; } = new List<string>();
+
+        /// <summary>
+        /// Feature id to gate, e.g. <c>lipSync</c>. Unknown actions are ignored at runtime.
+        /// </summary>
+        public string Action { get; set; } = string.Empty;
     }
 }

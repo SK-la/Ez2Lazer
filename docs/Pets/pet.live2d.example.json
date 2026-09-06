@@ -4,6 +4,9 @@
   "live2d": {
     "root": "live2d",
     "lipSync": { "enabled": false, "defaultOpen": 0.5, "minOpen": 0.25 },
+    "metadataTriggers": [
+      { "words": ["miku", "初音"], "action": "lipSync" }
+    ],
     "clipExpressions": {
       "idle": [],
       "poke": ["nod"],

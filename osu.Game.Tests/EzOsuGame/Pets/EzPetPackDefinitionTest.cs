@@ -232,5 +232,28 @@ namespace osu.Game.Tests.EzOsuGame.Pets
                 }
             }
         }
+
+        [Test]
+        public void TestParseLive2DMetadataTriggers()
+        {
+            var pack = EzPetPackDefinition.Parse("""
+                {
+                  "renderer": "live2d",
+                  "live2d": {
+                    "lipSync": { "enabled": true, "defaultOpen": 0.4, "minOpen": 0.2 },
+                    "metadataTriggers": [
+                      { "words": ["miku", "初音"], "action": "lipSync" }
+                    ]
+                  }
+                }
+                """);
+
+            Assert.That(pack.Live2D, Is.Not.Null);
+            Assert.That(pack.Live2D!.LipSync!.Enabled, Is.True);
+            Assert.That(pack.Live2D.LipSync.DefaultOpen, Is.EqualTo(0.4f).Within(0.001f));
+            Assert.That(pack.Live2D.MetadataTriggers, Has.Count.EqualTo(1));
+            Assert.That(pack.Live2D.MetadataTriggers![0].Action, Is.EqualTo("lipSync"));
+            Assert.That(pack.Live2D.MetadataTriggers[0].Words, Is.EqualTo(new[] { "miku", "初音" }));
+        }
     }
 }

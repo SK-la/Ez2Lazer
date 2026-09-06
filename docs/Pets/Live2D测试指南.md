@@ -60,7 +60,7 @@ EzResources/Pets/
 
 | 字段 | 含义 |
 | --- | --- |
-| `enabled` | 是否按 BPM 四分音符开合嘴（默认 `false`） |
+| `enabled` | 是否允许按 BPM 四分音符开合嘴（默认 `false`） |
 | `defaultOpen` | **平时**嘴张开程度 0–1（关闭联动时也生效；默认 `0.5`） |
 | `minOpen` | 仅联动开启时的最低开口（拍点之间不会低于此值） |
 
@@ -75,6 +75,40 @@ EzResources/Pets/
 ```json
 "lipSync": { "enabled": true, "defaultOpen": 0.35, "minOpen": 0.3 }
 ```
+
+### 谱面触发词门限（`live2d.metadataTriggers`）
+
+`action` 是**门限**，不是强制开关：命中只表示「允许走该功能」，功能仍受自己的 `enabled` 约束。  
+写了对应 `action` 的 trigger 后，`enabled: true` **不会**在未命中时直接生效。
+
+| 字段 | 含义 |
+| --- | --- |
+| `words` | 触发词列表（不区分大小写） |
+| `action` | 门限目标，首期仅 `lipSync` |
+
+完整命中规则（当前选中难度的 metadata）：
+
+- 字段：`Artist`、`ArtistUnicode`、`.osu Tags`（空格分词）、`UserTags`
+- 整词相等：`Hatsune Miku` 命中 `miku`；`mikurun` **不**命中 `miku`
+
+口型有效条件：
+
+```
+mouthOn = lipSync.enabled
+       && metadataGate("lipSync")   // 无 lipSync trigger → 恒 true；有则必须命中
+       && 曲目在播放
+```
+
+例：仅当艺人/标签含 miku 时跟 BPM 开口：
+
+```json
+"lipSync": { "enabled": true, "defaultOpen": 0.35, "minOpen": 0.3 },
+"metadataTriggers": [
+  { "words": ["miku", "初音"], "action": "lipSync" }
+]
+```
+
+无 `metadataTriggers`（或没有 `action: "lipSync"`）时，行为与以前相同：只看 `lipSync.enabled`。
 
 ### 改内置动作幅度（`live2d.expressions`）
 
@@ -116,7 +150,7 @@ EzResources/Pets/
 | `resultsRank` | 进入结算；可选 `"rank": "A"` / `S` / `SH` / `X` / `XH` / `B` / `C`… |
 
 设置 → 桌宠 → **Live2D 音乐关联**：只控制按 BPM **晃头**（二分音符）。  
-**口型联动**用 `lipSync.enabled`；**平时开口**用 `lipSync.defaultOpen`（0–1，与编辑器一致）。
+**口型联动**用 `lipSync.enabled`（可加 `metadataTriggers` 做谱面词门限）；**平时开口**用 `lipSync.defaultOpen`（0–1，与编辑器一致）。
 
 ## 半身模（如当前 Miku）边界
 
@@ -127,6 +161,6 @@ EzResources/Pets/
 
 1. 设置选 Live2D 包；状态行显示 Core 就绪。
 2. 点击应点头/表情；失败/通关/结算档位按 `rules` 切换。
-3. 开户口型开关后，有音乐播放时嘴会动。
+3. `lipSync.enabled` 为 true 且无 metadata 门限时，有音乐播放嘴会动；配置了 `metadataTriggers` 的 `lipSync` 时，仅 Artist/Tags 整词命中后嘴才跟 BPM。
 
 更多 PNG 规则见 [`docs/桌宠使用说明.md`](../桌宠使用说明.md)。

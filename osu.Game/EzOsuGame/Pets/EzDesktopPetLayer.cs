@@ -290,7 +290,7 @@ namespace osu.Game.EzOsuGame.Pets
                     }
                 }
 
-                // Settings toggle = head association only; mouth uses pet.json lipSync.enabled.
+                // Settings toggle = head association only; mouth uses pet.json lipSync.enabled + metadataTriggers gate.
                 cubismSession.SetMusicSync(live2DLipSync.Value && trackPlaying, bpm, trackTime);
                 cubismSession.Update(Time.Elapsed / 1000.0);
                 live2DHost.ApplyBreath(cubismSession.BreathValue);
@@ -399,6 +399,7 @@ namespace osu.Game.EzOsuGame.Pets
                 {
                     cubismSession = session;
                     cubismSession?.ConfigurePack(currentPack.Definition.Live2D);
+                    updateMouthSyncGate();
                 }
 
                 // Prefer Cubism host when Core works; else PNG frames if present; else setup placeholder.
