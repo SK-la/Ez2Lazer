@@ -19,12 +19,15 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.RankedPlay.Card
 {
     public partial class RankedPlayCardContent
     {
-        private partial class AttributeListing(APIBeatmap beatmap) : CompositeDrawable
+        protected virtual Drawable CreateAttributeListing() =>
+            new AttributeListing(Beatmap) { RelativeSizeAxes = Axes.Both };
+
+        protected partial class AttributeListing(APIBeatmap beatmap, RulesetInfo? rulesetOverride = null) : CompositeDrawable
         {
             [BackgroundDependencyLoader]
             private void load(RulesetStore rulesets)
             {
-                var rulesetInfo = rulesets.GetRuleset(beatmap.RulesetID);
+                var rulesetInfo = rulesetOverride ?? rulesets.GetRuleset(beatmap.RulesetID);
                 Debug.Assert(rulesetInfo != null);
                 var ruleset = rulesetInfo.CreateInstance();
 

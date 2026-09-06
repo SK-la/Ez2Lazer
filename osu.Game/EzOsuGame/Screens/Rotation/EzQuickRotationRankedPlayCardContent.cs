@@ -29,6 +29,10 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
 
         protected override Drawable CreateCardMetadata() => new EzQuickRotationCardMetadata(Beatmap, localCoverBeatmap) { RelativeSizeAxes = Axes.Both };
 
+        // APIBeatmap.RulesetID is OnlineID (-1 for custom rulesets); GetRuleset(-1) is ambiguous when BMS/DIVA coexist.
+        protected override Drawable CreateAttributeListing() =>
+            new AttributeListing(Beatmap, localCoverBeatmap.Ruleset) { RelativeSizeAxes = Axes.Both };
+
         private partial class EzQuickRotationCardMetadata(APIBeatmap beatmap, BeatmapInfo localBeatmap) : CompositeDrawable
         {
             [BackgroundDependencyLoader]
