@@ -7,7 +7,7 @@ using Realms;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Persisted independent skill value for a beatmap (e.g. msd.stream).
+    /// Persisted independent skill value for a beatmap (e.g. beatmap_msd.stream).
     /// </summary>
     [MapTo("EzBeatmapSkillValue")]
     public class EzBeatmapSkillValue : RealmObject
@@ -17,6 +17,10 @@ namespace osu.Game.EzOsuGame.Skills
 
         [Indexed]
         public string BeatmapHash { get; set; } = string.Empty;
+
+        /// <summary>Optional <see cref="Beatmaps.BeatmapInfo.ID"/> for maintenance when hash changes.</summary>
+        [Indexed]
+        public Guid BeatmapId { get; set; } = Guid.Empty;
 
         [Indexed]
         public string SystemId { get; set; } = string.Empty;

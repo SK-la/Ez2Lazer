@@ -12,6 +12,7 @@ namespace osu.Game.EzOsuGame.Skills
     /// <item>xxy radar skill-ification is explicitly deferred.</item>
     /// </list>
     /// Reference clone: sibling repo <c>Ez2Lazer/mania-hub</c>.
+    /// Ez Realm v8 (single bump) holds skill rows, dan estimate columns, and history points.
     /// </summary>
     public static class EzSkillBoundary
     {

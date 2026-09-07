@@ -121,7 +121,8 @@ namespace osu.Game.Database
         /// Ez v5: Change BeatmapInfo.HasVideo/HasStoryboard to nullable (null = unknown).
         /// Ez v6: Add RulesetInfo.LastAppliedXxySrVersion.
         /// Ez v7: Normalize BeatmapSetInfo external hosting paths.
-        /// Ez v8: Add EzBeatmapSkillValue / EzPlayerSkillValue / EzDanEstimate; RulesetInfo.LastAppliedManiaSkillVersion.
+        /// Ez v8: Add mania skill RealmObjects (EzBeatmapSkillValue, EzPlayerSkillValue, EzDanEstimate,
+        /// EzPlayerSkillHistoryPoint) with extended dan/provisional fields; RulesetInfo.LastAppliedManiaSkillVersion.
         /// </summary>
         public const int EZ_REALM_SCHEMA_VERSION = 8;
 
@@ -1567,7 +1568,8 @@ namespace osu.Game.Database
                     break;
 
                 case 8:
-                    // New skill RealmObjects start empty. Mark mania skill algorithm as unset on rulesets.
+                    // Skill tables are new and start empty. Mark mania skill algorithm as unset on rulesets.
+                    // Extended columns (Provisional/Stale, dan course fields, history points, BeatmapId) use defaults.
                     foreach (var ruleset in migration.NewRealm.All<RulesetInfo>())
                         ruleset.LastAppliedManiaSkillVersion = 0;
 

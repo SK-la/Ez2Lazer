@@ -7,10 +7,10 @@ using Realms;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Persisted independent player skill value for one keymode (e.g. player_ssr.stream @ 7K).
+    /// One point on a player's per-skillset history curve (Skills history UI).
     /// </summary>
-    [MapTo("EzPlayerSkillValue")]
-    public class EzPlayerSkillValue : RealmObject
+    [MapTo("EzPlayerSkillHistoryPoint")]
+    public class EzPlayerSkillHistoryPoint : RealmObject
     {
         [PrimaryKey]
         public Guid ID { get; set; } = Guid.NewGuid();
@@ -22,23 +22,13 @@ namespace osu.Game.EzOsuGame.Skills
         public int KeyCount { get; set; }
 
         [Indexed]
-        public string SystemId { get; set; } = string.Empty;
-
-        [Indexed]
         public string SkillId { get; set; } = string.Empty;
 
         public double Value { get; set; }
 
-        public int AnalyzedPlays { get; set; }
-
-        /// <summary>Thin evidence: rating shrunk toward population median (hub provisional chip).</summary>
-        public bool Provisional { get; set; }
-
-        /// <summary>Stored snapshot may be mid-recompute (hub stale chip).</summary>
-        public bool Stale { get; set; }
+        [Indexed]
+        public DateTimeOffset RecordedAt { get; set; }
 
         public int AlgorithmVersion { get; set; }
-
-        public DateTimeOffset ComputedAt { get; set; }
     }
 }

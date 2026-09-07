@@ -54,7 +54,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (vector.Overall <= 0 && vector.Stream <= 0)
                 return null;
 
-            skillStore.WriteBeatmapMsd(beatmapInfo.Hash, vector);
+            skillStore.WriteBeatmapMsd(beatmapInfo.Hash, vector, beatmapInfo.ID);
             return skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_MSD);
         }
     }

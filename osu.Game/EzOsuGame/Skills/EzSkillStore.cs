@@ -60,7 +60,7 @@ namespace osu.Game.EzOsuGame.Skills
             return true;
         }
 
-        public void WriteBeatmapMsd(string beatmapHash, EzSkillsetVector vector, DateTimeOffset? computedAt = null)
+        public void WriteBeatmapMsd(string beatmapHash, EzSkillsetVector vector, Guid beatmapId = default, DateTimeOffset? computedAt = null)
         {
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = EzManiaSkillAlgorithm.VERSION;
@@ -79,6 +79,7 @@ namespace osu.Game.EzOsuGame.Skills
                     r.Add(new EzBeatmapSkillValue
                     {
                         BeatmapHash = beatmapHash,
+                        BeatmapId = beatmapId,
                         SystemId = EzSkillSystems.BEATMAP_MSD,
                         SkillId = EzSkillIds.Msd(axis),
                         Value = value,
@@ -105,7 +106,15 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        public void WritePlayerSsr(string username, int keyCount, EzSkillsetVector vector, int analyzedPlays, DateTimeOffset? computedAt = null)
+        public void WritePlayerSsr(
+            string username,
+            int keyCount,
+            EzSkillsetVector vector,
+            int analyzedPlays,
+            bool provisional = false,
+            bool stale = false,
+            DateTimeOffset? computedAt = null,
+            bool appendHistory = true)
         {
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = EzManiaSkillAlgorithm.VERSION;
@@ -123,18 +132,56 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach ((string axis, double value) in vector.Enumerate())
                 {
+                    string skillId = EzSkillIds.Ssr(axis);
+
                     r.Add(new EzPlayerSkillValue
                     {
                         Username = username,
                         KeyCount = keyCount,
                         SystemId = EzSkillSystems.PLAYER_SSR,
-                        SkillId = EzSkillIds.Ssr(axis),
+                        SkillId = skillId,
                         Value = value,
                         AnalyzedPlays = analyzedPlays,
+                        Provisional = provisional,
+                        Stale = stale,
                         AlgorithmVersion = version,
                         ComputedAt = at,
                     });
+
+                    if (appendHistory && value > 0)
+                    {
+                        r.Add(new EzPlayerSkillHistoryPoint
+                        {
+                            Username = username,
+                            KeyCount = keyCount,
+                            SkillId = skillId,
+                            Value = value,
+                            RecordedAt = at,
+                            AlgorithmVersion = version,
+                        });
+                    }
                 }
+            });
+        }
+
+        public IReadOnlyList<EzPlayerSkillHistoryPoint> GetPlayerSkillHistory(
+            string username,
+            int keyCount,
+            string skillId,
+            int maxPoints = 64)
+        {
+            return realmAccess.Run(r =>
+            {
+                return r.All<EzPlayerSkillHistoryPoint>()
+                        .Where(v => v.Username == username
+                                    && v.KeyCount == keyCount
+                                    && v.SkillId == skillId)
+                        .ToList()
+                        .OrderByDescending(v => v.RecordedAt)
+                        .Take(maxPoints)
+                        .Select(v => v.Detach())
+                        .Reverse()
+                        .ToList();
             });
         }
 
@@ -144,7 +191,41 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 var row = r.All<EzDanEstimate>()
                            .FirstOrDefault(v => v.Username == username && v.KeyCount == keyCount && v.Side == side);
-                return row?.Detach();
+                return row == null ? null : row.Detach();
+            });
+        }
+
+        public void WriteDanEstimate(EzDanEstimate estimate)
+        {
+            ArgumentNullException.ThrowIfNull(estimate);
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzDanEstimate>()
+                                .Where(v => v.Username == estimate.Username
+                                            && v.KeyCount == estimate.KeyCount
+                                            && v.Side == estimate.Side)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+
+                r.Add(new EzDanEstimate
+                {
+                    Username = estimate.Username,
+                    KeyCount = estimate.KeyCount,
+                    Side = estimate.Side,
+                    RawDan = estimate.RawDan,
+                    Label = estimate.Label,
+                    Clears = estimate.Clears,
+                    BeyondTable = estimate.BeyondTable,
+                    CourseName = estimate.CourseName,
+                    CourseAccuracy = estimate.CourseAccuracy,
+                    ClearWindowHave = estimate.ClearWindowHave,
+                    ClearWindowNeed = estimate.ClearWindowNeed,
+                    AlgorithmVersion = estimate.AlgorithmVersion != 0 ? estimate.AlgorithmVersion : EzManiaSkillAlgorithm.VERSION,
+                    ComputedAt = estimate.ComputedAt == default ? DateTimeOffset.UtcNow : estimate.ComputedAt,
+                });
             });
         }
     }
