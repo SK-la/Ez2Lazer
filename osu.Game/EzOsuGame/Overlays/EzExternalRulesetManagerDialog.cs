@@ -385,10 +385,13 @@ namespace osu.Game.EzOsuGame.Overlays
                 });
             }
 
+            // OsuCheckbox defaults to RelativeSizeAxes.X; horizontal AutoSize FillFlow forbids that.
             controlsFlow.Add(new OsuCheckbox
             {
                 Anchor = Anchor.CentreLeft,
                 Origin = Anchor.CentreLeft,
+                RelativeSizeAxes = Axes.None,
+                Width = 110,
                 LabelText = EzSettingsStrings.EXTERNAL_RULESET_ENABLED,
                 Current = { BindTarget = row.Enabled },
             });
