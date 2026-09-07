@@ -12,6 +12,7 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Scoring;
 
 namespace osu.Game.Tests.Visual.EzOsuGame
@@ -60,6 +61,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 CachedDependencies = new (Type, object)[]
                 {
                     (typeof(EzLocalProfileService), profileService),
+                    (typeof(EzSkillProvider), new EzSkillProvider(new EzSkillStore(realm))),
                 },
                 Child = overlay,
             };

@@ -16,10 +16,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
     public partial class EzLocalProfileRoundedBar : Container
     {
         private readonly float fillRatio;
+        private readonly Colour4? fillColour;
 
-        public EzLocalProfileRoundedBar(float fillRatio)
+        public EzLocalProfileRoundedBar(float fillRatio, Colour4? fillColour = null)
         {
             this.fillRatio = float.IsFinite(fillRatio) ? Math.Clamp(fillRatio, 0f, 1f) : 0;
+            this.fillColour = fillColour;
             RelativeSizeAxes = Axes.Both;
             Masking = true;
             CornerRadius = 6;
@@ -39,7 +41,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 {
                     RelativeSizeAxes = Axes.Both,
                     Width = fillRatio,
-                    Colour = colours.Highlight1,
+                    Colour = fillColour ?? colours.Highlight1,
                 }
             };
         }

@@ -411,16 +411,18 @@ namespace osu.Game
             dependencies.Cache(ezAnalysisCache = new EzAnalysisCache());
             ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets);
             dependencies.CacheAs<IEzReplaySession>(ReplaySession);
-            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, ScoreManager, ReplaySession));
-            dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
 
             var skillRegistry = new EzSkillRegistry();
             var skillStore = new EzSkillStore(realm);
+            var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore);
             dependencies.Cache(skillRegistry);
             dependencies.Cache(skillStore);
             dependencies.Cache(new EzSkillProvider(skillStore, skillRegistry));
             dependencies.Cache(new EzBeatmapMsdComputer(BeatmapManager, skillStore));
-            dependencies.Cache(new EzPlayerSsrAggregator(BeatmapManager, skillStore));
+            dependencies.Cache(playerSsrAggregator);
+
+            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, ScoreManager, ReplaySession, playerSsrAggregator));
+            dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
 
             if (Ez2ConfigManager.Get<bool>(Ez2Setting.EzScoreRaceServiceEnabled))
             {

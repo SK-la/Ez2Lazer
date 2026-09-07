@@ -26,10 +26,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private readonly Bindable<RulesetInfo> ruleset = new Bindable<RulesetInfo>();
         private readonly Bindable<string> selectedPlayer = new Bindable<string>(EzLocalProfileConstants.ALL_PLAYERS);
+        private readonly Bindable<EzLocalProfileAnalysisSystem> analysisSystem = new Bindable<EzLocalProfileAnalysisSystem>(EzLocalProfileAnalysisSystem.Ez);
 
         private FillFlowContainer contentFlow = null!;
         private Container emptyStateContainer = null!;
+        private Container analysisSystemRow = null!;
         private OverlayRulesetSelector rulesetSelector = null!;
+        private EzLocalProfileAnalysisSystemSelector analysisSystemSelector = null!;
         private OsuDropdown<string> playerDropdown = null!;
 
         [Resolved]
@@ -97,18 +100,42 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                             RelativeSizeAxes = Axes.Both,
                                             Colour = ColourProvider.Background5,
                                         },
-                                        new Container
+                                        new FillFlowContainer
                                         {
                                             RelativeSizeAxes = Axes.X,
                                             AutoSizeAxes = Axes.Y,
-                                            Padding = new MarginPadding
+                                            Direction = FillDirection.Vertical,
+                                            Children = new Drawable[]
                                             {
-                                                Horizontal = HORIZONTAL_PADDING,
-                                                Vertical = 10
-                                            },
-                                            Child = rulesetSelector = new OverlayRulesetSelector
-                                            {
-                                                Current = { BindTarget = ruleset }
+                                                new Container
+                                                {
+                                                    RelativeSizeAxes = Axes.X,
+                                                    AutoSizeAxes = Axes.Y,
+                                                    Padding = new MarginPadding
+                                                    {
+                                                        Horizontal = HORIZONTAL_PADDING,
+                                                        Vertical = 10
+                                                    },
+                                                    Child = rulesetSelector = new OverlayRulesetSelector
+                                                    {
+                                                        Current = { BindTarget = ruleset }
+                                                    }
+                                                },
+                                                analysisSystemRow = new Container
+                                                {
+                                                    RelativeSizeAxes = Axes.X,
+                                                    AutoSizeAxes = Axes.Y,
+                                                    Padding = new MarginPadding
+                                                    {
+                                                        Horizontal = HORIZONTAL_PADDING,
+                                                        Bottom = 10
+                                                    },
+                                                    Alpha = 0,
+                                                    Child = analysisSystemSelector = new EzLocalProfileAnalysisSystemSelector
+                                                    {
+                                                        Current = { BindTarget = analysisSystem }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -214,8 +241,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
             base.LoadComplete();
 
             ruleset.Value = rulesets.GetRuleset(0) ?? rulesets.AvailableRulesets.First();
-            ruleset.BindValueChanged(_ => Schedule(refreshContent), true);
+            ruleset.BindValueChanged(_ => Schedule(() =>
+            {
+                updateAnalysisSystemVisibility();
+                refreshContent();
+            }), true);
             selectedPlayer.BindValueChanged(_ => Schedule(refreshContent));
+            analysisSystem.BindValueChanged(_ => Schedule(refreshContent));
 
             profileService.Snapshot.BindValueChanged(s => Schedule(() =>
             {
@@ -225,6 +257,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }), true);
 
             API.LocalUser.BindValueChanged(u => Schedule(() => Header.UpdateUsername(u.NewValue.Username)), true);
+            updateAnalysisSystemVisibility();
+        }
+
+        private void updateAnalysisSystemVisibility()
+        {
+            bool mania = (ruleset.Value?.OnlineID ?? -1) == EzLocalProfileConstants.MANIA_RULESET_ID;
+            analysisSystemRow.Alpha = mania ? 1 : 0;
+
+            if (!mania && analysisSystem.Value != EzLocalProfileAnalysisSystem.Ez)
+                analysisSystem.Value = EzLocalProfileAnalysisSystem.Ez;
         }
 
         protected override void PopIn()
@@ -269,14 +311,41 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             int rulesetId = ruleset.Value?.OnlineID ?? 0;
             var rulesetStats = snapshot.RulesetStats.FirstOrDefault(s => s.RulesetId == rulesetId);
+            bool trackMode = rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID
+                             && analysisSystem.Value == EzLocalProfileAnalysisSystem.Track;
 
             contentFlow.Add(new EzLocalProfileSection(
                 EzSettingsProfile.LOCAL_PROFILE_SECTION_CAREER,
                 new EzLocalProfileCareerBody(rulesetStats, snapshot.GradeCounts.Where(g => g.RulesetId == rulesetId))));
 
-            contentFlow.Add(new EzLocalProfileSection(
-                EzSettingsProfile.LOCAL_PROFILE_SECTION_MODE_DATA,
-                new EzLocalProfileModeDataBody(snapshot, rulesetId)));
+            if (trackMode)
+            {
+                Drawable trackBody;
+
+                if (string.Equals(selectedPlayer.Value, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal))
+                {
+                    trackBody = new OsuSpriteText
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Text = EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER,
+                        Font = OsuFont.GetFont(size: 14),
+                    };
+                }
+                else
+                {
+                    trackBody = new EzLocalProfileTrackSkillsBody(selectedPlayer.Value);
+                }
+
+                contentFlow.Add(new EzLocalProfileSection(
+                    EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS,
+                    trackBody));
+            }
+            else
+            {
+                contentFlow.Add(new EzLocalProfileSection(
+                    EzSettingsProfile.LOCAL_PROFILE_SECTION_MODE_DATA,
+                    new EzLocalProfileModeDataBody(snapshot, rulesetId)));
+            }
 
             refreshDrillContent(snapshot, rulesetId);
         }

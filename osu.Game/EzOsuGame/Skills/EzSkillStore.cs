@@ -106,6 +106,24 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username, int? algorithmVersion = null)
+        {
+            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+
+            return realmAccess.Run(r =>
+            {
+                return r.All<EzPlayerSkillValue>()
+                        .Where(v => v.Username == username
+                                    && v.SystemId == EzSkillSystems.PLAYER_SSR
+                                    && v.AlgorithmVersion == version)
+                        .AsEnumerable()
+                        .Select(v => v.KeyCount)
+                        .Distinct()
+                        .OrderBy(k => k)
+                        .ToList();
+            });
+        }
+
         public void WritePlayerSsr(
             string username,
             int keyCount,
@@ -191,7 +209,7 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 var row = r.All<EzDanEstimate>()
                            .FirstOrDefault(v => v.Username == username && v.KeyCount == keyCount && v.Side == side);
-                return row == null ? null : row.Detach();
+                return row?.Detach();
             });
         }
 
