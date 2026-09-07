@@ -113,15 +113,18 @@ namespace osu.Game.Database
         /// Ez2Lazer schema revision. Bump when adding Ez-persisted fields; do not change <see cref="schema_version"/> for Ez-only work.
         ///
         /// Ez2Lazer-only revisions are tracked separately via <see cref="EZ_REALM_SCHEMA_VERSION"/>.
-        /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 52007).
+        /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 52008).
         /// Ez v1: Add ScoreInfo.ManiaHitMode and ManiaHealthMode.
         /// Ez v2: Add BeatmapInfo.HasVideo and HasStoryboard.
         /// Ez v3: Add BeatmapInfo.XxyStarRating.
         /// Ez v4: Add BeatmapInfo.PerformancePoints.
         /// Ez v5: Change BeatmapInfo.HasVideo/HasStoryboard to nullable (null = unknown).
         /// Ez v6: Add RulesetInfo.LastAppliedXxySrVersion.
+        /// Ez v7: Normalize BeatmapSetInfo external hosting paths.
+        /// Ez v8: Add mania skill RealmObjects (EzBeatmapSkillValue, EzPlayerSkillValue, EzDanEstimate,
+        /// EzPlayerSkillHistoryPoint) with extended dan/provisional fields; RulesetInfo.LastAppliedManiaSkillVersion.
         /// </summary>
-        public const int EZ_REALM_SCHEMA_VERSION = 7;
+        public const int EZ_REALM_SCHEMA_VERSION = 8;
 
         public static int EzFileSchemaVersion => schema_version * 1000 + EZ_REALM_SCHEMA_VERSION;
 
@@ -1561,6 +1564,14 @@ namespace osu.Game.Database
                         if (set.HostingKind == BeatmapSetHostingKind.External && !string.IsNullOrWhiteSpace(set.ExternalContentRoot))
                             set.ExternalContentRoot = Path.GetFullPath(set.ExternalContentRoot);
                     }
+
+                    break;
+
+                case 8:
+                    // Skill tables are new and start empty. Mark mania skill algorithm as unset on rulesets.
+                    // Extended columns (Provisional/Stale, dan course fields, history points, BeatmapId) use defaults.
+                    foreach (var ruleset in migration.NewRealm.All<RulesetInfo>())
+                        ruleset.LastAppliedManiaSkillVersion = 0;
 
                     break;
             }
