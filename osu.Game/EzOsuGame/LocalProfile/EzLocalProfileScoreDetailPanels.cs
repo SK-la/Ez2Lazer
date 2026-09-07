@@ -459,7 +459,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             beatmapCard.Update(row);
             var displayData = EzLocalProfileScoreDisplayData.From(row, EzLocalProfileDrillMods.Resolve(row, rulesets));
             scoreRow.Update(displayData);
-            keysRow.UpdateRow(row, displayData);
+
+            // 「成绩数」= 该谱面（BeatmapId）在全部成绩中的游玩次数。
+            int playCount = allScores.Count(s => s.BeatmapId == row.BeatmapId);
+            keysRow.UpdateRow(row, displayData, playCount);
             beatmapPerformance.Update(row, allScores);
         }
     }

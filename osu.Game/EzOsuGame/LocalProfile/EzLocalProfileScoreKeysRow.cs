@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             Spacing = new Vector2(8);
         }
 
-        public void UpdateRow(EzLocalProfileDrillScoreRow? row, EzLocalProfileScoreDisplayData? data = null)
+        public void UpdateRow(EzLocalProfileDrillScoreRow? row, EzLocalProfileScoreDisplayData? data = null, int? playCount = null)
         {
             Clear();
 
@@ -52,7 +52,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             Add(createChip(EzSettingsProfile.LOCAL_PROFILE_TOTAL_KEYS, row.TotalKeys.ToString("N0", CultureInfo.InvariantCulture)));
             Add(createChip(EzSettingsProfile.LOCAL_PROFILE_AVG_KPS, avgKps));
             Add(createChip(EzSettingsProfile.LOCAL_PROFILE_MAX_KPS, maxKps));
-            Add(createChip(EzSettingsProfile.LOCAL_PROFILE_SCORE_COUNT, "1"));
+
+            if (playCount is int count && count > 0)
+                Add(createChip(EzSettingsProfile.LOCAL_PROFILE_SCORE_COUNT, count.ToString("N0")));
         }
 
         private static Drawable createChip(LocalisableString title, string value)
