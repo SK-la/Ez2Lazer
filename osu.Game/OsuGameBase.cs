@@ -54,6 +54,7 @@ using osu.Game.EzOsuGame.Input;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.ExternalRulesets;
 using osu.Game.Localisation;
 using osu.Game.Online;
@@ -412,6 +413,14 @@ namespace osu.Game
             dependencies.CacheAs<IEzReplaySession>(ReplaySession);
             dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, ScoreManager, ReplaySession));
             dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
+
+            var skillRegistry = new EzSkillRegistry();
+            var skillStore = new EzSkillStore(realm);
+            dependencies.Cache(skillRegistry);
+            dependencies.Cache(skillStore);
+            dependencies.Cache(new EzSkillProvider(skillStore, skillRegistry));
+            dependencies.Cache(new EzBeatmapMsdComputer(BeatmapManager, skillStore));
+            dependencies.Cache(new EzPlayerSsrAggregator(BeatmapManager, skillStore));
 
             if (Ez2ConfigManager.Get<bool>(Ez2Setting.EzScoreRaceServiceEnabled))
             {

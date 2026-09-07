@@ -32,6 +32,12 @@ namespace osu.Game.Rulesets
         /// </summary>
         public int LastAppliedXxySrVersion { get; set; }
 
+        /// <summary>
+        /// Ez2Lazer: last applied mania skill algorithm version (<see cref="EzOsuGame.Skills.EzManiaSkillAlgorithm.VERSION"/>).
+        /// Used to invalidate <see cref="EzOsuGame.Skills.EzBeatmapSkillValue"/> / player SSR rows.
+        /// </summary>
+        public int LastAppliedManiaSkillVersion { get; set; }
+
         public RulesetInfo(string shortName, string name, string instantiationInfo, int onlineID)
         {
             ShortName = shortName;

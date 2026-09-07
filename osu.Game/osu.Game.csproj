@@ -37,6 +37,7 @@
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.9" />
     <PackageReference Include="Microsoft.Toolkit.HighPerformance" Version="7.1.2" />
+    <PackageReference Include="MinaCalc" Version="0.4.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="ppy.LocalisationAnalyser" Version="2026.611.0">
       <PrivateAssets>all</PrivateAssets>
@@ -71,9 +72,7 @@
     <ProjectReference Include="$(Ez2LazerResourcesProjectPath)" />
   </ItemGroup>
   <Target Name="ValidateEz2LazerSiblingProjects" BeforeTargets="BeforeBuild">
-    <Error Condition="'$(UseEz2LazerLocalFrameworkProject)' == 'true' and !Exists('$(Ez2LazerFrameworkProjectPath)')"
-           Text="Missing sibling directory osu-framework. Please clone https://github.com/SK-la/osu-framework into $(MSBuildThisFileDirectory)..\..\osu-framework, or disable UseEz2LazerLocalFrameworkProject to rely on NuGet." />
-    <Error Condition="'$(UseEz2LazerLocalResourcesProject)' == 'true' and !Exists('$(Ez2LazerResourcesProjectPath)')"
-           Text="Missing sibling directory osu-resources. Please clone https://github.com/SK-la/osu-resources into $(MSBuildThisFileDirectory)..\..\osu-resources, or disable UseEz2LazerLocalResourcesProject to rely on NuGet." />
+    <Error Condition="'$(UseEz2LazerLocalFrameworkProject)' == 'true' and !Exists('$(Ez2LazerFrameworkProjectPath)')" Text="Missing sibling directory osu-framework. Please clone https://github.com/SK-la/osu-framework into $(MSBuildThisFileDirectory)..\..\osu-framework, or disable UseEz2LazerLocalFrameworkProject to rely on NuGet." />
+    <Error Condition="'$(UseEz2LazerLocalResourcesProject)' == 'true' and !Exists('$(Ez2LazerResourcesProjectPath)')" Text="Missing sibling directory osu-resources. Please clone https://github.com/SK-la/osu-resources into $(MSBuildThisFileDirectory)..\..\osu-resources, or disable UseEz2LazerLocalResourcesProject to rely on NuGet." />
   </Target>
 </Project>
