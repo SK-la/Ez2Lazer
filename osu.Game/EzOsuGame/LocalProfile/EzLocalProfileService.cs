@@ -14,6 +14,7 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.LocalProfile
@@ -25,6 +26,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     {
         private readonly EzLocalProfileStore store;
         private readonly EzLocalProfileAggregator aggregator;
+        private readonly EzPlayerSsrAggregator? ssrAggregator;
         private readonly Lock computeLock = new Lock();
         private CancellationTokenSource? computeCts;
 
@@ -38,10 +40,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
             EzAnalysisPersistentStore analysisStore,
             BeatmapManager beatmapManager,
             ScoreManager scoreManager,
-            IEzReplaySession replaySession)
+            IEzReplaySession replaySession,
+            EzPlayerSsrAggregator? ssrAggregator = null)
         {
             store = new EzLocalProfileStore(storage);
             aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager, scoreManager, replaySession);
+            this.ssrAggregator = ssrAggregator;
             Snapshot.Value = store.LoadSnapshot();
         }
 
@@ -104,6 +108,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         var online = store.LoadOnlineScoreContributions();
                         var localOnlineIds = aggregator.CollectLocalOnlineScoreIds();
                         store.ApplyUsernamePartitions(byUser, replaceOtherUsernames, online, localOnlineIds);
+
+                        if (ssrAggregator != null && selected.Count > 0)
+                            writePlayerSsr(selected, token);
                     }
                     catch (OperationCanceledException)
                     {
@@ -119,6 +126,33 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         IsComputing.Value = false;
                     }
                 }, token);
+            }
+        }
+
+        private void writePlayerSsr(IReadOnlyList<string> usernames, CancellationToken token)
+        {
+            try
+            {
+                var maniaScores = aggregator.CollectDetachedManiaScores(usernames);
+
+                foreach ((string username, List<ScoreInfo> scores) in maniaScores)
+                {
+                    token.ThrowIfCancellationRequested();
+
+                    if (scores.Count == 0)
+                        continue;
+
+                    ssrAggregator!.ComputeAndStore(username, scores);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Profile archive already saved; SSR is best-effort for Track mode.
+                Logger.Error(ex, "[EzLocalProfile] Failed to compute player SSR skills after profile save.", Ez2ConfigManager.LOGGER_NAME);
             }
         }
 

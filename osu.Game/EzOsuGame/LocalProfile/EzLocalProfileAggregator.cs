@@ -64,6 +64,41 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
+        /// Detached mania scores for SSR skill aggregation, keyed by normalised username.
+        /// </summary>
+        public Dictionary<string, List<ScoreInfo>> CollectDetachedManiaScores(IReadOnlyCollection<string> usernames)
+        {
+            var includeSet = new HashSet<string>(usernames.Select(normaliseUsername), StringComparer.Ordinal);
+            var byUser = new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
+
+            realm.Run(r =>
+            {
+                if (includeSet.Count == 0)
+                    return;
+
+                foreach (var score in queryValidScores(r))
+                {
+                    if (score.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
+                        continue;
+
+                    string username = normaliseUsername(score.RealmUser.Username);
+                    if (!includeSet.Contains(username))
+                        continue;
+
+                    if (score.BeatmapInfo == null)
+                        continue;
+
+                    if (!byUser.TryGetValue(username, out var list))
+                        byUser[username] = list = new List<ScoreInfo>();
+
+                    list.Add(score.DeepClone());
+                }
+            });
+
+            return byUser;
+        }
+
+        /// <summary>
         /// Aggregate only the given usernames, returning one result slice per username (all scores counted).
         /// Does not merge online contributions — that happens when rebuilding display totals.
         /// </summary>

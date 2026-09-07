@@ -107,6 +107,22 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_MODE_DATA =
             new EzLocalizationManager.EzLocalisableString("各模式统计", "Stats by mode");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ANALYSIS_SYSTEM =
+            new EzLocalizationManager.EzLocalisableString("分析系统", "Analysis");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_TRACK_SKILLS =
+            new EzLocalizationManager.EzLocalisableString("Track 技能", "Track Skills");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TRACK_EMPTY =
+            new EzLocalizationManager.EzLocalisableString(
+                "暂无 Track 技能。请到设置重新计算本地个人成绩（需该玩家名下的 Mania 成绩）。",
+                "No Track skills yet. Recompute Local Profile Stats in Settings (requires mania scores for this player).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TRACK_NEEDS_PLAYER =
+            new EzLocalizationManager.EzLocalisableString(
+                "Track 技能按玩家名计算。请在上方选择具体玩家（不要选 All）。",
+                "Track skills are per player. Select a specific player above (not All).");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_XXY_PLAY_DISTRIBUTION =
             new EzLocalizationManager.EzLocalisableString("xxy 星级分布", "Plays by xxy SR");
 
