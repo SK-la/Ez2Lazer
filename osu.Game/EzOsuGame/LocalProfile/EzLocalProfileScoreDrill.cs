@@ -61,6 +61,28 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return results;
         }
 
+        /// <summary>
+        /// 每张谱面（BeatmapId）只保留最高 PP 的一条，用于成绩记录列表展示。
+        /// 输入假定已按 PP 降序；对无序输入先按 PP 降序排列。
+        /// </summary>
+        public static List<EzLocalProfileDrillScoreRow> BestPerBeatmap(IEnumerable<EzLocalProfileDrillScoreRow> scores)
+        {
+            var ordered = scores.OrderByDescending(s => s.PpResolved).ToList();
+            var seen = new HashSet<Guid>();
+
+            var result = new List<EzLocalProfileDrillScoreRow>();
+
+            foreach (var row in ordered)
+            {
+                if (!seen.Add(row.BeatmapId))
+                    continue;
+
+                result.Add(row);
+            }
+
+            return result;
+        }
+
         private static bool matchesSearch(EzLocalProfileDrillScoreRow row, string term)
         {
             if (double.TryParse(term, NumberStyles.Float, CultureInfo.InvariantCulture, out double ppTarget)
@@ -191,12 +213,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private void applyFilter()
         {
             var filtered = EzLocalProfileScoreDrillQuery.Filter(allScores, searchQuery.Value);
-            bool hasMatches = filtered.Count > 0;
+
+            // 成绩记录列表按谱面去重（每谱面最高 PP 一条）；详情列仍用全量 allScores 聚合 max/min/avg。
+            var bestPerBeatmap = EzLocalProfileScoreDrillQuery.BestPerBeatmap(filtered);
+
+            bool hasMatches = bestPerBeatmap.Count > 0;
 
             noMatchesText.Alpha = hasMatches ? 0 : 1;
             resultsGrid.Alpha = hasMatches ? 1 : 0;
 
-            selector.SetScores(filtered);
+            selector.SetScores(bestPerBeatmap);
         }
     }
 
