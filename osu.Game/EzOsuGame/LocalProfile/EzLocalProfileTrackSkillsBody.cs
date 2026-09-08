@@ -23,8 +23,8 @@ using osuTK;
 namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
-    /// Track-mode skills: key chips, Overall header, radar, SSR bars;
-    /// selecting a skill shows trend (top) + supporting plays (bottom).
+    /// Track-mode skills: key chips + rating + dan (left) beside radar with axis
+    /// indicators (right); SSR bars below; selecting a skill shows trend + plays.
     /// </summary>
     public partial class EzLocalProfileTrackSkillsBody : FillFlowContainer
     {
@@ -39,9 +39,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly Bindable<string?> selectedSkillId = new Bindable<string?>();
         private readonly Bindable<string?> selectedDanSide = new Bindable<string?>();
 
+        private Container overviewContainer = null!;
         private FillFlowContainer keyChipFlow = null!;
-        private Container headerContainer = null!;
-        private Container radarContainer = null!;
+        private Container headerSlot = null!;
+        private Container radarSlot = null!;
         private FillFlowContainer skillBarsFlow = null!;
         private Container detailContainer = null!;
         private OsuSpriteText emptyHint = null!;
@@ -69,28 +70,51 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             Children = new Drawable[]
             {
-                keyChipFlow = new FillFlowContainer
+                overviewContainer = new Container
                 {
                     RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Direction = FillDirection.Full,
-                    Spacing = new Vector2(8),
+                    Height = SkillsRadarPanel.RequiredHeight,
+                    Children = new Drawable[]
+                    {
+                        // Left: key chips + rating + dan — no background; sibling of radar.
+                        new FillFlowContainer
+                        {
+                            Anchor = Anchor.TopLeft,
+                            Origin = Anchor.TopLeft,
+                            RelativeSizeAxes = Axes.X,
+                            Width = 0.4f,
+                            AutoSizeAxes = Axes.Y,
+                            Direction = FillDirection.Vertical,
+                            Spacing = new Vector2(0, 12),
+                            Children = new Drawable[]
+                            {
+                                keyChipFlow = new FillFlowContainer
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    AutoSizeAxes = Axes.Y,
+                                    Direction = FillDirection.Full,
+                                    Spacing = new Vector2(8),
+                                },
+                                headerSlot = new Container
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    AutoSizeAxes = Axes.Y,
+                                },
+                            },
+                        },
+                        radarSlot = new Container
+                        {
+                            Anchor = Anchor.CentreRight,
+                            Origin = Anchor.CentreRight,
+                            RelativeSizeAxes = Axes.Both,
+                            Width = 0.58f,
+                        },
+                    },
                 },
                 emptyHint = new OsuSpriteText
                 {
                     RelativeSizeAxes = Axes.X,
                     Font = OsuFont.GetFont(size: 14),
-                    Alpha = 0,
-                },
-                headerContainer = new Container
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                },
-                radarContainer = new Container
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = 220,
                     Alpha = 0,
                 },
                 skillBarsFlow = new FillFlowContainer
@@ -159,8 +183,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private void rebuild()
         {
             keyChipFlow.Clear();
-            headerContainer.Clear();
-            radarContainer.Clear();
+            headerSlot.Clear();
+            radarSlot.Clear();
             skillBarsFlow.Clear();
             detailContainer.Clear();
             clearDetailSelection();
@@ -171,11 +195,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 emptyHint.Text = EzSettingsProfile.LOCAL_PROFILE_TRACK_EMPTY;
                 emptyHint.Show();
-                radarContainer.Hide();
+                overviewContainer.Hide();
                 return;
             }
 
             emptyHint.Hide();
+            overviewContainer.Show();
 
             foreach (int key in keyCounts)
             {
@@ -194,8 +219,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private void refreshSkills()
         {
-            headerContainer.Clear();
-            radarContainer.Clear();
+            headerSlot.Clear();
+            radarSlot.Clear();
             skillBarsFlow.Clear();
 
             int keyCount = selectedKeyCount.Value;
@@ -206,7 +231,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var definitions = skillProvider.Registry.GetSystem(EzSkillSystems.PLAYER_SSR)?.Skills
                               ?? Array.Empty<EzSkillDefinition>();
 
-            headerContainer.Child = new SkillsHeader(keyCount, snapshot, username, skillProvider, toggleDanClears, selectedDanSide);
+            headerSlot.Child = new SkillsHeader(keyCount, snapshot, username, skillProvider, toggleDanClears, selectedDanSide);
 
             var radarAxes = definitions.Where(d => d.SkillId != EzSkillIds.Ssr(EzSkillIds.OVERALL)).ToList();
             double radarMax = radarAxes
@@ -216,27 +241,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             if (radarAxes.Count >= 3 && radarMax > 0)
             {
-                var ratios = radarAxes
-                             .Select(d =>
-                             {
-                                 snapshot.Values.TryGetValue(d.SkillId, out double v);
-                                 return (float)(v / radarMax);
-                             })
-                             .ToList();
+                var axes = radarAxes
+                           .Select(d =>
+                           {
+                               snapshot.Values.TryGetValue(d.SkillId, out double v);
+                               return new SkillsRadarPanel.AxisData(
+                                   v,
+                                   (float)(v / radarMax),
+                                   Colour4.FromHex(d.AccentHex));
+                           })
+                           .ToList();
 
-                var chart = new RadarChart
+                radarSlot.Child = new SkillsRadarPanel(axes)
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    AxisCount = ratios.Count,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
                 };
-
-                radarContainer.Child = chart;
-                chart.SetData(ratios);
-                radarContainer.Show();
-            }
-            else
-            {
-                radarContainer.Hide();
             }
 
             double barMax = snapshot.Values.Values.DefaultIfEmpty(0).Max();
@@ -453,6 +473,127 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return string.IsNullOrEmpty(drill.DifficultyName)
                 ? $"{drill.Artist} - {drill.Title}"
                 : $"{drill.Artist} - {drill.Title} [{drill.DifficultyName}]";
+        }
+
+        /// <summary>
+        /// Radar chart with per-axis value indicators outside the polygon
+        /// (dan badge slot above, numeric value below).
+        /// </summary>
+        private partial class SkillsRadarPanel : Container
+        {
+            public const float CHART_SIZE = 168f;
+            private const float label_edge_gap = 10f;
+            private const float panel_padding = 56f;
+
+            public static float RequiredHeight => CHART_SIZE + panel_padding * 2;
+
+            public readonly record struct AxisData(double Value, float Ratio, Colour4 Accent);
+
+            public SkillsRadarPanel(IReadOnlyList<AxisData> axes)
+            {
+                Size = new Vector2(RequiredHeight);
+
+                var ratios = axes.Select(a => a.Ratio).ToList();
+
+                var chart = new RadarChart
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Size = new Vector2(CHART_SIZE),
+                    AxisCount = ratios.Count,
+                };
+
+                var labelLayer = new Container
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Size = Size,
+                };
+
+                float chartRadius = CHART_SIZE * 0.5f * chart.RadiusRatio;
+                int axisCount = Math.Max(3, ratios.Count);
+
+                for (int i = 0; i < axes.Count; i++)
+                {
+                    float angle = MathF.PI * 2f / axisCount * i - MathF.PI / 2f;
+                    var direction = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
+                    Vector2 position = direction * (chartRadius + label_edge_gap);
+
+                    labelLayer.Add(new RadarAxisIndicator(axes[i].Value, axes[i].Accent)
+                    {
+                        Anchor = Anchor.Centre,
+                        Origin = originFacingChart(direction),
+                        Position = position,
+                    });
+                }
+
+                Children = new Drawable[]
+                {
+                    chart,
+                    labelLayer,
+                };
+
+                chart.SetData(ratios);
+            }
+
+            /// <summary>
+            /// Origin on the edge toward the chart centre so the indicator grows outward.
+            /// </summary>
+            private static Anchor originFacingChart(Vector2 direction)
+            {
+                float ax = MathF.Abs(direction.X);
+                float ay = MathF.Abs(direction.Y);
+
+                if (ay >= ax * 1.15f)
+                    return direction.Y < 0 ? Anchor.BottomCentre : Anchor.TopCentre;
+
+                if (ax >= ay * 1.15f)
+                    return direction.X < 0 ? Anchor.CentreRight : Anchor.CentreLeft;
+
+                bool top = direction.Y < 0;
+                bool left = direction.X < 0;
+
+                if (top && left) return Anchor.BottomRight;
+                if (top) return Anchor.BottomLeft;
+                if (left) return Anchor.TopRight;
+
+                return Anchor.TopLeft;
+            }
+        }
+
+        /// <summary>
+        /// One axis metric: reserved dan/rank badge slot on top, value below.
+        /// </summary>
+        private partial class RadarAxisIndicator : FillFlowContainer
+        {
+            private const float dan_slot_size = 22f;
+
+            public RadarAxisIndicator(double value, Colour4 accent)
+            {
+                AutoSizeAxes = Axes.Both;
+                Direction = FillDirection.Vertical;
+                Spacing = new Vector2(0, 2);
+
+                Children = new Drawable[]
+                {
+                    // Reserved for future per-axis dan / rank badge.
+                    new Container
+                    {
+                        Anchor = Anchor.TopCentre,
+                        Origin = Anchor.TopCentre,
+                        Width = dan_slot_size,
+                        Height = dan_slot_size,
+                    },
+                    new OsuSpriteText
+                    {
+                        Anchor = Anchor.TopCentre,
+                        Origin = Anchor.TopCentre,
+                        Text = value.ToString("0.00", CultureInfo.InvariantCulture),
+                        Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
+                        Colour = accent,
+                    },
+                };
+            }
         }
 
         private partial class SkillsHeader : FillFlowContainer
