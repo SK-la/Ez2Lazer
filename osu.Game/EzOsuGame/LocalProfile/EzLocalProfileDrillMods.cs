@@ -13,12 +13,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
     public static class EzLocalProfileDrillMods
     {
         public static Mod[] Resolve(EzLocalProfileDrillScoreRow row, RulesetStore rulesets)
-        {
-            if (string.IsNullOrEmpty(row.ModsJson))
-                return Array.Empty<Mod>();
+            => Resolve(row, rulesets.GetRuleset(row.RulesetId)?.CreateInstance());
 
-            var ruleset = rulesets.GetRuleset(row.RulesetId)?.CreateInstance();
-            if (ruleset == null)
+        public static Mod[] Resolve(EzLocalProfileDrillScoreRow row, Ruleset? ruleset)
+        {
+            if (string.IsNullOrEmpty(row.ModsJson) || ruleset == null)
                 return Array.Empty<Mod>();
 
             try
