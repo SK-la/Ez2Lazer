@@ -320,25 +320,36 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             if (trackMode)
             {
-                Drawable trackBody;
-
                 if (string.Equals(selectedPlayer.Value, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal))
                 {
-                    trackBody = new OsuSpriteText
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        Text = EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER,
-                        Font = OsuFont.GetFont(size: 14),
-                    };
+                    contentFlow.Add(new EzLocalProfileSection(
+                        EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_INSIGHTS,
+                        new OsuSpriteText
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Text = EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER,
+                            Font = OsuFont.GetFont(size: 14),
+                        }));
+
+                    contentFlow.Add(new EzLocalProfileSection(
+                        EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS,
+                        new OsuSpriteText
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Text = EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER,
+                            Font = OsuFont.GetFont(size: 14),
+                        }));
                 }
                 else
                 {
-                    trackBody = new EzLocalProfileTrackSkillsBody(selectedPlayer.Value);
-                }
+                    contentFlow.Add(new EzLocalProfileSection(
+                        EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_INSIGHTS,
+                        new EzLocalProfileTrackInsightsBody(selectedPlayer.Value, currentDrillScore)));
 
-                contentFlow.Add(new EzLocalProfileSection(
-                    EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS,
-                    trackBody));
+                    contentFlow.Add(new EzLocalProfileSection(
+                        EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS,
+                        new EzLocalProfileTrackSkillsBody(selectedPlayer.Value)));
+                }
             }
             else
             {
