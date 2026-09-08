@@ -233,12 +233,17 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        public EzDanEstimate? GetDanEstimate(string username, int keyCount, string side)
+        public EzDanEstimate? GetDanEstimate(string username, int keyCount, string side, int? algorithmVersion = null)
         {
+            int version = algorithmVersion ?? EzDanAlgorithm.VERSION;
+
             return realmAccess.Run(r =>
             {
                 var row = r.All<EzDanEstimate>()
-                           .FirstOrDefault(v => v.Username == username && v.KeyCount == keyCount && v.Side == side);
+                           .FirstOrDefault(v => v.Username == username
+                                                && v.KeyCount == keyCount
+                                                && v.Side == side
+                                                && v.AlgorithmVersion == version);
                 return row?.Detach();
             });
         }

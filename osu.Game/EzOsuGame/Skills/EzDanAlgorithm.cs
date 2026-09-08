@@ -4,8 +4,8 @@
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Bump when MVP dan credit / MSD→rawDan heuristic semantics change.
-    /// Independent from <see cref="EzManiaSkillAlgorithm.VERSION"/>.
+    /// Bump when dan credit / chart→rawDan semantics change (not <see cref="osu.Game.Database.RealmAccess.EZ_REALM_SCHEMA_VERSION"/>).
+    /// Independent from <see cref="EzManiaSkillAlgorithm.VERSION"/>. Reads via <see cref="EzSkillStore.GetDanEstimate"/> filter on this value.
     /// </summary>
     public static class EzDanAlgorithm
     {
