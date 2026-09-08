@@ -123,6 +123,58 @@ namespace osu.Game.EzOsuGame.Localization
                 "Track 技能按玩家名计算。请在上方选择具体玩家（不要选 All）。",
                 "Track skills are per player. Select a specific player above (not All).");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_TRACK_INSIGHTS =
+            new EzLocalizationManager.EzLocalisableString("成绩洞察", "Profile Insights");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_EMPTY =
+            new EzLocalizationManager.EzLocalisableString(
+                "暂无可用的 Mania 成绩洞察（需要已计算的 PP）。",
+                "No mania profile insights yet (computed PP scores required).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_KEY_SPLIT =
+            new EzLocalizationManager.EzLocalisableString("键数分布", "Key Split");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_MOST_USED_MOD =
+            new EzLocalizationManager.EzLocalisableString("最常用 Mod", "Most Used Mod");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_MEDIAN_BPM =
+            new EzLocalizationManager.EzLocalisableString("中位 BPM", "Median BPM");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_PP_RANGE =
+            new EzLocalizationManager.EzLocalisableString("PP 范围", "PP Range");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_KEY_PP =
+            new EzLocalizationManager.EzLocalisableString("各键数加权 PP", "PP by Keymode");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_MOD_USAGE =
+            new EzLocalizationManager.EzLocalisableString("Mod 使用", "Mod Usage");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_BPM_BREAKDOWN =
+            new EzLocalizationManager.EzLocalisableString("BPM 明细", "BPM Breakdown");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_PP_DISTRIBUTION =
+            new EzLocalizationManager.EzLocalisableString("PP 分布", "PP Distribution");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_PP_CUMULATIVE =
+            new EzLocalizationManager.EzLocalisableString("累计（≥ 阈值）", "Cumulative (≥ threshold)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_BPM_RANGE =
+            new EzLocalizationManager.EzLocalisableString("范围 {0}–{1} BPM", "Range {0}–{1} BPM");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_CONVERTS_EXCLUDED =
+            new EzLocalizationManager.EzLocalisableString(
+                "已排除 {0} 条 convert（不计入键数 PP）",
+                "{0} convert plays excluded from keymode PP");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_NO_MODS =
+            new EzLocalizationManager.EzLocalisableString("窗口内成绩均为无 Mod。", "All window plays are nomod.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_NEWEST_TOP =
+            new EzLocalizationManager.EzLocalisableString("最新 Top Play", "Newest Top Play");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_INSIGHTS_OLDEST_TOP =
+            new EzLocalizationManager.EzLocalisableString("最早 Top Play", "Oldest Top Play");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_XXY_PLAY_DISTRIBUTION =
             new EzLocalizationManager.EzLocalisableString("xxy 星级分布", "Plays by xxy SR");
 
