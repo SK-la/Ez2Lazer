@@ -203,11 +203,9 @@ namespace osu.Game.EzOsuGame.Skills
         {
             double mean = means[index];
 
+            // Midpoint to the left neighbour; for the first bucket extrapolate using means[1].
             if (index == 0)
-            {
-                return mean - (means[
-                    index + 1] - mean) / 2;
-            }
+                return mean - (means[1] - mean) / 2;
 
             return (means[index - 1] + mean) / 2;
         }
@@ -215,6 +213,7 @@ namespace osu.Game.EzOsuGame.Skills
         private static double boundaryUpper(ReadOnlySpan<double> means, int index)
         {
             double mean = means[index];
+
             if (index == means.Length - 1)
                 return mean + (mean - means[index - 1]) / 2;
 

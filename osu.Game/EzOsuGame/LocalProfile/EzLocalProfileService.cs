@@ -24,7 +24,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
     /// </summary>
     public class EzLocalProfileService : IDisposable
     {
-        private readonly EzLocalProfileStore store;
         private readonly EzLocalProfileAggregator aggregator;
         private readonly EzPlayerSsrAggregator? ssrAggregator;
         private readonly EzPlayerDanAggregator? danAggregator;
@@ -46,29 +45,29 @@ namespace osu.Game.EzOsuGame.LocalProfile
             EzPlayerDanAggregator? danAggregator = null,
             EzLocalProfileStore? sharedStore = null)
         {
-            store = sharedStore ?? new EzLocalProfileStore(storage);
+            Store = sharedStore ?? new EzLocalProfileStore(storage);
             aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager, scoreManager, replaySession);
             this.ssrAggregator = ssrAggregator;
             this.danAggregator = danAggregator;
-            Snapshot.Value = store.LoadSnapshot();
+            Snapshot.Value = Store.LoadSnapshot();
         }
 
         /// <summary>Shared store for DI (e.g. <see cref="EzSkillProvider"/> evidence reads).</summary>
-        public EzLocalProfileStore Store => store;
+        public EzLocalProfileStore Store { get; }
 
         public IReadOnlyList<EzLocalProfileUsernameCount> ScanUsernameCounts() => aggregator.ScanUsernameCounts();
 
-        public IReadOnlyList<string> GetPreviouslyIncludedUsernames() => store.LoadIncludedUsernames();
+        public IReadOnlyList<string> GetPreviouslyIncludedUsernames() => Store.LoadIncludedUsernames();
 
         /// <summary>
         /// Display snapshot for the player filter: <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> or one stored username.
         /// </summary>
-        public EzLocalProfileSnapshot LoadDisplaySnapshot(string? usernameFilter) => store.LoadSnapshotForUsername(usernameFilter);
+        public EzLocalProfileSnapshot LoadDisplaySnapshot(string? usernameFilter) => Store.LoadSnapshotForUsername(usernameFilter);
 
         public IReadOnlyList<EzLocalProfileDrillScoreRow> LoadDrillScores(int rulesetId, string? usernameFilter = null)
-            => store.LoadDrillScores(rulesetId, usernameFilter);
+            => Store.LoadDrillScores(rulesetId, usernameFilter);
 
-        public bool HasOnlineScoreContributions() => store.LoadOnlineScoreContributions().Count > 0;
+        public bool HasOnlineScoreContributions() => Store.LoadOnlineScoreContributions().Count > 0;
 
         /// <param name="usernamesToRecompute">Names whose score stats will be recalculated and overwrite their stored slice.</param>
         /// <param name="replaceOtherUsernames">
@@ -121,9 +120,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         // Signal UI that aggregation is done and we are persisting (may include a Realm scan).
                         progress?.Report(new EzLocalProfileComputeProgress(1, 1, Saving: true));
 
-                        var online = store.LoadOnlineScoreContributions();
+                        var online = Store.LoadOnlineScoreContributions();
                         var localOnlineIds = aggregator.CollectLocalOnlineScoreIds();
-                        store.ApplyUsernamePartitions(byUser, replaceOtherUsernames, online, localOnlineIds);
+                        Store.ApplyUsernamePartitions(byUser, replaceOtherUsernames, online, localOnlineIds);
 
                         if (selected.Count > 0)
                             writePlayerSkills(maniaScores, token);
@@ -162,7 +161,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     () =>
                     {
                         ssrAggregator!.ComputeAndStore(username, scores);
-                        store.ReplaceAxisPlays(username, ssrAggregator.PendingEvidence);
+                        Store.ReplaceAxisPlays(username, ssrAggregator.PendingEvidence);
                     },
                     ssrAggregator != null,
                     "[EzLocalProfile] Failed to compute/persist player SSR skills after profile save.");
@@ -172,7 +171,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     () =>
                     {
                         danAggregator!.ComputeAndStore(username, scores);
-                        store.ReplaceDanClears(username, danAggregator.PendingEvidence);
+                        Store.ReplaceDanClears(username, danAggregator.PendingEvidence);
                     },
                     danAggregator != null,
                     "[EzLocalProfile] Failed to compute/persist player Dan estimates after profile save.");
@@ -195,21 +194,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         public IReadOnlyList<EzDanClearEvidenceRow> GetDanClears(string username, int? keyCount = null, string? side = null, int? algorithmVersion = null)
-            => store.GetDanClears(username, keyCount, side, algorithmVersion);
+            => Store.GetDanClears(username, keyCount, side, algorithmVersion);
 
         public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null, int? algorithmVersion = null)
-            => store.GetAxisPlays(username, keyCount, skillId, algorithmVersion);
+            => Store.GetAxisPlays(username, keyCount, skillId, algorithmVersion);
 
         public void ReloadFromDisk()
         {
-            Snapshot.Value = store.LoadSnapshot();
+            Snapshot.Value = Store.LoadSnapshot();
         }
 
         public void Dispose()
         {
             computeCts?.Cancel();
             computeCts?.Dispose();
-            store.Dispose();
+            Store.Dispose();
         }
     }
 }

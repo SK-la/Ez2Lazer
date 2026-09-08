@@ -14,6 +14,7 @@ namespace osu.Game.EzOsuGame.Skills
         public const string DAN = "dan";
     }
 
+    // TODO: 改为枚举，添加注释及本地化
     public static class EzSkillIds
     {
         public const string OVERALL = "overall";

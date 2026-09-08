@@ -15,6 +15,7 @@ namespace osu.Game.EzOsuGame.Skills
     /// </summary>
     public static class EzSsrGoal
     {
+        // TODO: 常量需要审查，之后统一格式化命名规范
         public const double GOAL_MIN = 0.8;
         public const double CALC_GOAL_CAP = 0.965;
         public const double GOAL_CAP = 0.9975;
@@ -88,7 +89,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         private static double? estimateWifeAccuracy(IReadOnlyDictionary<HitResult, int> statistics, double? od, double windowScale)
         {
-            if (statistics == null || statistics.Count == 0)
+            if (statistics.Count == 0)
                 return null;
 
             double odValue = od is double o && double.IsFinite(o) ? Math.Clamp(o, 0, 10) : ASSUMED_OD;
@@ -122,7 +123,7 @@ namespace osu.Game.EzOsuGame.Skills
         private static double[] expectedWife3Points(double od, double windowScale)
         {
             string key = $"{od}|{windowScale}";
-            if (expected_points_cache.TryGetValue(key, out var cached))
+            if (expected_points_cache.TryGetValue(key, out double[]? cached))
                 return cached;
 
             double[] edges =
@@ -134,7 +135,7 @@ namespace osu.Game.EzOsuGame.Skills
                 (stable_window_bases_ms[3] - OD_WINDOW_STEP_MS * od) * windowScale,
             };
 
-            var points = new[]
+            double[] points = new[]
             {
                 wife3BandAverage(0, edges[0]),
                 wife3BandAverage(edges[0], edges[1]),

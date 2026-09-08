@@ -31,8 +31,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private FillFlowContainer contentFlow = null!;
         private Container emptyStateContainer = null!;
         private Container analysisSystemRow = null!;
-        private OverlayRulesetSelector rulesetSelector = null!;
-        private EzLocalProfileAnalysisSystemSelector analysisSystemSelector = null!;
         private OsuDropdown<string> playerDropdown = null!;
 
         [Resolved]
@@ -67,7 +65,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             Child = new Container
             {
                 RelativeSizeAxes = Axes.Both,
-                Children = new Drawable[]
+                Children = new[]
                 {
                     new OsuScrollContainer
                     {
@@ -116,7 +114,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                                         Horizontal = HORIZONTAL_PADDING,
                                                         Vertical = 10
                                                     },
-                                                    Child = rulesetSelector = new OverlayRulesetSelector
+                                                    Child = new OverlayRulesetSelector
                                                     {
                                                         Current = { BindTarget = ruleset }
                                                     }
@@ -131,7 +129,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                                         Bottom = 10
                                                     },
                                                     Alpha = 0,
-                                                    Child = analysisSystemSelector = new EzLocalProfileAnalysisSystemSelector
+                                                    Child = new EzLocalProfileAnalysisSystemSelector
                                                     {
                                                         Current = { BindTarget = analysisSystem }
                                                     }

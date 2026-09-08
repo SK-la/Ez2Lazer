@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame.Skills
                     rating += res;
                     sum = 0;
 
-                        foreach (double ssr in ssrs)
+                    foreach (double ssr in ssrs)
                         sum += Math.Max(0, 2 / (1 - EzAbramowitzErf.Erf(0.1 * (ssr - rating))) - 2);
                 }
                 while (Math.Pow(2, rating * 0.1) < sum);
