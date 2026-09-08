@@ -4,14 +4,13 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Aggregates per-play SSR vectors into independent player skills (Etterna AggregateSSRs).
-    /// Accuracy→goal is a simplified mapping for foundation; Wife estimate can be refined later.
+    /// Accuracy→goal is a simplified mapping for foundation; Wife estimate can be refined later (DATA-2).
     /// </summary>
     public sealed class EzPlayerSsrAggregator
     {
@@ -47,7 +46,7 @@ namespace osu.Game.EzOsuGame.Skills
                 var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
                 var playable = working.GetPlayableBeatmap(score.Ruleset, score.Mods);
                 int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
-                float rate = resolveRate(score.Mods);
+                float rate = EzModRate.Resolve(score.Mods);
                 float goal = accuracyToGoal(score.Accuracy);
 
                 if (goal <= 0.8f)
@@ -73,19 +72,6 @@ namespace osu.Game.EzOsuGame.Skills
                 bool provisional = plays.Count < EzPlayerSsrSnapshot.QUALIFYING_PLAYS;
                 skillStore.WritePlayerSsr(username, keyCount, aggregated, plays.Count, provisional);
             }
-        }
-
-        private static float resolveRate(IEnumerable<Mod> mods)
-        {
-            double rate = 1;
-
-            foreach (var mod in mods)
-            {
-                if (mod is ModRateAdjust rateAdjust)
-                    rate *= rateAdjust.SpeedChange.Value;
-            }
-
-            return (float)Math.Clamp(rate, 0.5, 2.0);
         }
 
         /// <summary>

@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
@@ -11,8 +12,9 @@ using osu.Game.Rulesets.Objects.Types;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Public chart-dan entry for song select and player credit. Swap internals later (LeoBlack / rate MSD)
-    /// without changing consumers that read <see cref="EzChartDanVerdict"/>.
+    /// Public chart-dan entry for song select and player credit.
+    /// Rate≠1 uses live MinaCalc MSD (not persisted); 1.0x may use Realm cache.
+    /// LeoBlack deferred (DATA-LB).
     /// </summary>
     public sealed class EzChartDanEstimator
     {
@@ -26,8 +28,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Estimates chart dan for a beatmap. MSD is currently NoMod 1.0x only; <paramref name="mods"/>
-        /// only affect key count / LN-side classification via the playable beatmap.
+        /// Estimates chart dan. <paramref name="mods"/> affect rate (MSD) and key/LN classification.
         /// </summary>
         public EzChartDanVerdict? TryEstimate(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
         {
@@ -36,18 +37,34 @@ namespace osu.Game.EzOsuGame.Skills
             if (beatmapInfo.Ruleset.OnlineID != 3)
                 return null;
 
-            var msd = msdComputer.TryGetOrCompute(beatmapInfo);
+            mods ??= Array.Empty<Mod>();
+            float rate = EzModRate.Resolve(mods);
+
+            var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+            var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
+
+            IReadOnlyDictionary<string, double>? msd;
+
+            if (EzModRate.IsNomodRate(rate))
+            {
+                msd = msdComputer.TryGetOrCompute(beatmapInfo);
+            }
+            else
+            {
+                using var calc = new EzMinaCalcFacade();
+                var vector = calc.CalculateMsd(playable, rate);
+                if (vector.Overall <= 0 && vector.Stream <= 0)
+                    return null;
+
+                msd = vectorToMsdDict(vector);
+            }
+
             if (msd == null || msd.Count == 0)
                 return null;
 
-            var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-            var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods ?? Array.Empty<Mod>());
             return FromMsdAndPlayable(msd, playable);
         }
 
-        /// <summary>
-        /// Shared path used by player aggregation when MSD and playable are already loaded.
-        /// </summary>
         public static EzChartDanVerdict? FromMsdAndPlayable(IReadOnlyDictionary<string, double> msd, IBeatmap playable)
         {
             ArgumentNullException.ThrowIfNull(msd);
@@ -64,9 +81,6 @@ namespace osu.Game.EzOsuGame.Skills
             return FromMsd(msd, keyCount, holdRatio);
         }
 
-        /// <summary>
-        /// Pure mapping for tests and callers that already know key/LN ratio.
-        /// </summary>
         public static EzChartDanVerdict? FromMsd(IReadOnlyDictionary<string, double> msd, int keyCount, double holdRatio)
         {
             ArgumentNullException.ThrowIfNull(msd);
@@ -116,5 +130,11 @@ namespace osu.Game.EzOsuGame.Skills
 
             return total <= 0 ? 0 : (double)holds / total;
         }
+
+        public static IReadOnlyDictionary<string, double> VectorToMsdDict(EzSkillsetVector vector)
+            => vectorToMsdDict(vector);
+
+        private static IReadOnlyDictionary<string, double> vectorToMsdDict(EzSkillsetVector vector)
+            => vector.Enumerate().ToDictionary(p => EzSkillIds.Msd(p.AxisId), p => p.Value, StringComparer.Ordinal);
     }
 }

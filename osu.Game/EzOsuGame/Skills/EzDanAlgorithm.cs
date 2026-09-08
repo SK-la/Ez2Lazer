@@ -4,7 +4,9 @@
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Bump when dan credit / chart→rawDan semantics change (not <see cref="osu.Game.Database.RealmAccess.EZ_REALM_SCHEMA_VERSION"/>).
+    /// Pre-release: corrective formula fixes keep this at 1 (no client shipped yet).
+    /// After public release, bump when dan credit / chart→rawDan semantics change
+    /// (not <see cref="osu.Game.Database.RealmAccess.EZ_REALM_SCHEMA_VERSION"/>).
     /// Independent from <see cref="EzManiaSkillAlgorithm.VERSION"/>. Reads via <see cref="EzSkillStore.GetDanEstimate"/> filter on this value.
     /// </summary>
     public static class EzDanAlgorithm
