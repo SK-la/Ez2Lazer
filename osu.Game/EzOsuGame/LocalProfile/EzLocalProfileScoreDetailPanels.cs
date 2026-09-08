@@ -249,6 +249,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 },
             };
 
+            titleText.Colour = colourProvider.Content1;
+            artistText.Colour = colourProvider.Content2;
+            difficultyText.Colour = colourProvider.Content2;
+
             // Drill detail column is narrow; keep KPS metrics numeric only.
             ezDisplayKpsGraph = new EzDisplayKpsGraph();
         }

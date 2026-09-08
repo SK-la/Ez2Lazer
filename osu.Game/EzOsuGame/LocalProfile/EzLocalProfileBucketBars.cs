@@ -53,7 +53,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public static EzLocalProfileBucketBars FromXxyPlayCounts(IEnumerable<EzLocalProfileXxyPlayCount> plays) =>
             new EzLocalProfileBucketBars(
                 plays.Select(s => (s.StarBucket, s.Count)),
-                bucket => $"{bucket}xxy–{bucket + 1}xxy");
+                bucket => $"{bucket}–{bucket + 1} SR");
 
         private partial class BucketBarRow : Container
         {
@@ -67,14 +67,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 Children = new Drawable[]
                 {
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                        Text = formatBucketLabel(bucket),
-                        Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
-                        Width = 72,
-                    },
+                    new LabelText(formatBucketLabel(bucket)),
                     new Container
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -83,6 +76,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     },
                     new CountText(count),
                 };
+            }
+
+            private partial class LabelText : OsuSpriteText
+            {
+                public LabelText(string text)
+                {
+                    Anchor = Anchor.CentreLeft;
+                    Origin = Anchor.CentreLeft;
+                    Text = text;
+                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold);
+                    Width = 72;
+                }
+
+                [BackgroundDependencyLoader]
+                private void load(OverlayColourProvider colours) => Colour = EzLocalProfileColours.Plays(colours);
             }
 
             private partial class CountText : OsuSpriteText
@@ -96,7 +104,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
 
                 [BackgroundDependencyLoader]
-                private void load(OverlayColourProvider colours) => Colour = colours.Content2;
+                private void load(OverlayColourProvider colours) => Colour = EzLocalProfileColours.Numeric(colours);
             }
         }
     }

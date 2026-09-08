@@ -17,11 +17,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
     {
         private readonly float fillRatio;
         private readonly Colour4? fillColour;
+        private readonly bool growFromRight;
 
-        public EzLocalProfileRoundedBar(float fillRatio, Colour4? fillColour = null)
+        public EzLocalProfileRoundedBar(float fillRatio, Colour4? fillColour = null, bool growFromRight = false)
         {
             this.fillRatio = float.IsFinite(fillRatio) ? Math.Clamp(fillRatio, 0f, 1f) : 0;
             this.fillColour = fillColour;
+            this.growFromRight = growFromRight;
             RelativeSizeAxes = Axes.Both;
             Masking = true;
             CornerRadius = 6;
@@ -39,6 +41,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 },
                 new Box
                 {
+                    Anchor = growFromRight ? Anchor.CentreRight : Anchor.CentreLeft,
+                    Origin = growFromRight ? Anchor.CentreRight : Anchor.CentreLeft,
                     RelativeSizeAxes = Axes.Both,
                     Width = fillRatio,
                     Colour = fillColour ?? colours.Highlight1,

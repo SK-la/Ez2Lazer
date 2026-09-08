@@ -9,7 +9,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
+using osu.Framework.Input.Events;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -314,6 +314,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             private readonly EzLocalProfileDrillScoreRow row;
             private readonly FillFlowContainer modsFlow;
+            private readonly OsuSpriteText ppText;
+            private readonly OsuSpriteText dateText;
+            private readonly TruncatingSpriteText titleText;
+
+            private EzLocalProfileHoverBox background = null!;
 
             public ScoreEntry(EzLocalProfileDrillScoreRow row, Action onSelect, RulesetStore rulesets)
             {
@@ -321,9 +326,29 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 RelativeSizeAxes = Axes.X;
                 Height = BeatmapLeaderboardScore.HEIGHT;
                 Action = onSelect;
-                Alpha = 0.65f;
                 Masking = true;
                 CornerRadius = 6;
+
+                ppText = new OsuSpriteText
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Text = row.FormatPpText(),
+                    Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
+                };
+                dateText = new OsuSpriteText
+                {
+                    Anchor = Anchor.CentreRight,
+                    Origin = Anchor.CentreRight,
+                    Text = row.Date.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    Font = OsuFont.GetFont(size: 10),
+                };
+                titleText = new TruncatingSpriteText
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Text = row.Title,
+                    Font = OsuFont.GetFont(size: 11, weight: FontWeight.SemiBold),
+                };
 
                 Child = new FillFlowContainer
                 {
@@ -334,17 +359,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     Spacing = new Vector2(0, 2),
                     Children = new Drawable[]
                     {
-                        new OsuSpriteText
-                        {
-                            Text = row.FormatPpText(),
-                            Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
-                        },
-                        new TruncatingSpriteText
+                        new Container
                         {
                             RelativeSizeAxes = Axes.X,
-                            Text = row.Title,
-                            Font = OsuFont.GetFont(size: 11),
+                            Height = 16,
+                            Children = new Drawable[]
+                            {
+                                ppText,
+                                dateText,
+                            }
                         },
+                        titleText,
                         modsFlow = new FillFlowContainer
                         {
                             AutoSizeAxes = Axes.Both,
@@ -357,17 +382,35 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 populateMods(EzLocalProfileDrillMods.Resolve(row, rulesets));
             }
 
-            public void SetSelected(bool selected) => Alpha = selected ? 1 : 0.65f;
+            public void SetSelected(bool value)
+            {
+                background.SetSelected(value);
+                background.Refresh(IsHovered);
+            }
 
             [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider colours)
+            private void load(OverlayColourProvider colours, OsuColour osuColours)
             {
-                AddInternal(new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = colours.Background5,
-                    Depth = 1,
-                });
+                background = new EzLocalProfileHoverBox { Depth = 1 };
+                background.Configure(colours);
+                AddInternal(background);
+
+                ppText.Colour = EzLocalProfileColours.Pp(osuColours);
+                titleText.Colour = EzLocalProfileColours.Plays(colours);
+                dateText.Colour = EzLocalProfileColours.Meta(colours);
+                dateText.Alpha = 0.85f;
+            }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                background.Refresh(true);
+                return base.OnHover(e);
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                background.Refresh(false);
+                base.OnHoverLost(e);
             }
 
             private void populateMods(IReadOnlyList<Mod> mods)

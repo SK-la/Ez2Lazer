@@ -23,7 +23,8 @@ using osuTK;
 namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
-    /// Track-mode skills: key chips, Overall header, radar, SSR bars, axis supporting plays, optional history.
+    /// Track-mode skills: key chips, Overall header, radar, SSR bars;
+    /// selecting a skill shows trend (top) + supporting plays (bottom).
     /// </summary>
     public partial class EzLocalProfileTrackSkillsBody : FillFlowContainer
     {
@@ -35,8 +36,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly IReadOnlyList<EzLocalProfileDrillScoreRow>? preloadedDrillScores;
 
         private readonly BindableInt selectedKeyCount = new BindableInt();
-        private readonly Bindable<string?> selectedAxisSkillId = new Bindable<string?>();
-        private readonly Bindable<string?> selectedHistorySkillId = new Bindable<string?>();
+        private readonly Bindable<string?> selectedSkillId = new Bindable<string?>();
         private readonly Bindable<string?> selectedDanSide = new Bindable<string?>();
 
         private FillFlowContainer keyChipFlow = null!;
@@ -98,7 +98,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
                     Direction = FillDirection.Vertical,
-                    Spacing = new Vector2(0, 8),
+                    Spacing = new Vector2(0, 6),
                 },
                 detailContainer = new Container
                 {
@@ -117,43 +117,31 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 clearDetailSelection();
                 refreshSkills();
             }, false);
-            selectedAxisSkillId.BindValueChanged(_ => refreshDetailPanel(), false);
-            selectedHistorySkillId.BindValueChanged(_ => refreshDetailPanel(), false);
+            selectedSkillId.BindValueChanged(_ =>
+            {
+                refreshSkillBarSelection();
+                refreshDetailPanel();
+            }, false);
             selectedDanSide.BindValueChanged(_ => refreshDetailPanel(), false);
             rebuild();
         }
 
         private void clearDetailSelection()
         {
-            selectedAxisSkillId.Value = null;
-            selectedHistorySkillId.Value = null;
+            selectedSkillId.Value = null;
             selectedDanSide.Value = null;
         }
 
-        private void toggleAxisPlays(string skillId)
+        private void toggleSkill(string skillId)
         {
-            if (string.Equals(selectedAxisSkillId.Value, skillId, StringComparison.Ordinal))
+            if (string.Equals(selectedSkillId.Value, skillId, StringComparison.Ordinal))
             {
-                selectedAxisSkillId.Value = null;
+                selectedSkillId.Value = null;
                 return;
             }
 
-            selectedHistorySkillId.Value = null;
             selectedDanSide.Value = null;
-            selectedAxisSkillId.Value = skillId;
-        }
-
-        private void toggleHistory(string skillId)
-        {
-            if (string.Equals(selectedHistorySkillId.Value, skillId, StringComparison.Ordinal))
-            {
-                selectedHistorySkillId.Value = null;
-                return;
-            }
-
-            selectedAxisSkillId.Value = null;
-            selectedDanSide.Value = null;
-            selectedHistorySkillId.Value = skillId;
+            selectedSkillId.Value = skillId;
         }
 
         private void toggleDanClears(string side)
@@ -164,8 +152,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return;
             }
 
-            selectedAxisSkillId.Value = null;
-            selectedHistorySkillId.Value = null;
+            selectedSkillId.Value = null;
             selectedDanSide.Value = side;
         }
 
@@ -263,15 +250,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 string skillId = def.SkillId;
 
                 skillBarsFlow.Add(new SkillBarRow(
+                    skillId,
                     def.DisplayName,
                     value,
                     ratio,
                     Colour4.FromHex(def.AccentHex),
-                    () => toggleAxisPlays(skillId),
-                    () => toggleHistory(skillId)));
+                    selectedSkillId,
+                    () => toggleSkill(skillId)));
             }
 
             refreshDetailPanel();
+        }
+
+        private void refreshSkillBarSelection()
+        {
+            foreach (var row in skillBarsFlow.OfType<SkillBarRow>())
+                row.RefreshSelection();
         }
 
         private void refreshDetailPanel()
@@ -282,20 +276,97 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (keyCount <= 0)
                 return;
 
-            if (!string.IsNullOrEmpty(selectedAxisSkillId.Value))
-            {
-                showAxisPlays(selectedAxisSkillId.Value, keyCount);
-                return;
-            }
-
             if (!string.IsNullOrEmpty(selectedDanSide.Value))
             {
                 showDanClears(selectedDanSide.Value, keyCount);
                 return;
             }
 
-            if (!string.IsNullOrEmpty(selectedHistorySkillId.Value))
-                showHistory(selectedHistorySkillId.Value, keyCount);
+            string? skillId = selectedSkillId.Value;
+            if (string.IsNullOrEmpty(skillId))
+                return;
+
+            string displayName = resolveDisplayName(skillId);
+
+            detailContainer.Child = new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 12),
+                Children = new[]
+                {
+                    buildHistoryCard(skillId, keyCount, displayName),
+                    buildAxisPlaysCard(skillId, keyCount, displayName),
+                },
+            };
+        }
+
+        private Drawable buildHistoryCard(string skillId, int keyCount, string displayName)
+        {
+            var points = skillProvider.GetPlayerSkillHistory(username, keyCount, skillId);
+
+            if (points.Count == 0)
+            {
+                return new EzLocalProfileChartCard(
+                    EzSettingsProfile.LOCAL_PROFILE_SKILL_HISTORY_FOR.Format(displayName),
+                    new OsuSpriteText
+                    {
+                        Text = EzSettingsProfile.LOCAL_PROFILE_SKILL_HISTORY_EMPTY,
+                        Font = OsuFont.GetFont(size: 13),
+                    });
+            }
+
+            float[] values = points.Select(p => (float)p.Value).ToArray();
+            string[] labels = points.Select(p => p.RecordedAt.ToLocalTime().ToString("MM-dd", CultureInfo.InvariantCulture)).ToArray();
+
+            return new EzLocalProfileChartCard(
+                EzSettingsProfile.LOCAL_PROFILE_SKILL_HISTORY_FOR.Format(displayName),
+                new EzLocalProfileLabeledLineChart(values, labels));
+        }
+
+        private Drawable buildAxisPlaysCard(string skillId, int keyCount, string displayName)
+        {
+            var plays = skillProvider
+                        .GetAxisPlays(username, keyCount, skillId, EzManiaSkillAlgorithm.VERSION)
+                        .Take(axis_plays_top_n)
+                        .ToList();
+
+            if (plays.Count == 0)
+            {
+                return new EzLocalProfileChartCard(
+                    EzSettingsProfile.LOCAL_PROFILE_AXIS_PLAYS_FOR.Format(displayName),
+                    new OsuSpriteText
+                    {
+                        Text = EzSettingsProfile.LOCAL_PROFILE_AXIS_PLAYS_EMPTY,
+                        Font = OsuFont.GetFont(size: 13),
+                    });
+            }
+
+            var list = new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 6),
+            };
+
+            foreach (var play in plays)
+            {
+                var drill = findDrillRow(play.BeatmapHash);
+                string title = formatPlayTitle(drill);
+
+                list.Add(new EzEvidenceScoreRow(
+                    title,
+                    EzEvidenceScoreRow.FormatAxisMeta(play.AxisValue, play.Accuracy, play.Rate, play.ScoredAt),
+                    drill != null && selectDrillScore != null
+                        ? () => selectDrillScore.Value = drill
+                        : null));
+            }
+
+            return new EzLocalProfileChartCard(
+                EzSettingsProfile.LOCAL_PROFILE_AXIS_PLAYS_FOR.Format(displayName),
+                list);
         }
 
         private void showDanClears(string side, int keyCount)
@@ -345,77 +416,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
             detailContainer.Child = new EzLocalProfileChartCard(
                 EzSettingsProfile.LOCAL_PROFILE_DAN_CLEARS_FOR.Format(sideLabel),
                 list);
-        }
-
-        private void showAxisPlays(string skillId, int keyCount)
-        {
-            string displayName = resolveDisplayName(skillId);
-            var plays = skillProvider
-                        .GetAxisPlays(username, keyCount, skillId, EzManiaSkillAlgorithm.VERSION)
-                        .Take(axis_plays_top_n)
-                        .ToList();
-
-            if (plays.Count == 0)
-            {
-                detailContainer.Child = new EzLocalProfileChartCard(
-                    EzSettingsProfile.LOCAL_PROFILE_AXIS_PLAYS_FOR.Format(displayName),
-                    new OsuSpriteText
-                    {
-                        Text = EzSettingsProfile.LOCAL_PROFILE_AXIS_PLAYS_EMPTY,
-                        Font = OsuFont.GetFont(size: 13),
-                    });
-                return;
-            }
-
-            var list = new FillFlowContainer
-            {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Spacing = new Vector2(0, 6),
-            };
-
-            foreach (var play in plays)
-            {
-                var drill = findDrillRow(play.BeatmapHash);
-                string title = formatPlayTitle(drill);
-
-                list.Add(new EzEvidenceScoreRow(
-                    title,
-                    EzEvidenceScoreRow.FormatAxisMeta(play.AxisValue, play.Accuracy, play.Rate, play.ScoredAt),
-                    drill != null && selectDrillScore != null
-                        ? () => selectDrillScore.Value = drill
-                        : null));
-            }
-
-            detailContainer.Child = new EzLocalProfileChartCard(
-                EzSettingsProfile.LOCAL_PROFILE_AXIS_PLAYS_FOR.Format(displayName),
-                list);
-        }
-
-        private void showHistory(string skillId, int keyCount)
-        {
-            var points = skillProvider.GetPlayerSkillHistory(username, keyCount, skillId);
-            string displayName = resolveDisplayName(skillId);
-
-            if (points.Count == 0)
-            {
-                detailContainer.Child = new EzLocalProfileChartCard(
-                    EzSettingsProfile.LOCAL_PROFILE_SKILL_HISTORY,
-                    new OsuSpriteText
-                    {
-                        Text = EzSettingsProfile.LOCAL_PROFILE_SKILL_HISTORY_EMPTY,
-                        Font = OsuFont.GetFont(size: 13),
-                    });
-                return;
-            }
-
-            float[] values = points.Select(p => (float)p.Value).ToArray();
-            string[] labels = points.Select(p => p.RecordedAt.ToLocalTime().ToString("MM-dd", CultureInfo.InvariantCulture)).ToArray();
-
-            detailContainer.Child = new EzLocalProfileChartCard(
-                EzSettingsProfile.LOCAL_PROFILE_SKILL_HISTORY_FOR.Format(displayName),
-                new EzLocalProfileLabeledLineChart(values, labels));
         }
 
         private string resolveDisplayName(string skillId)
@@ -527,6 +527,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             [BackgroundDependencyLoader]
             private void load(OverlayColourProvider colours)
             {
+                if (Children.Count >= 2)
+                    Children[1].Colour = EzLocalProfileColours.Numeric(colours);
                 if (Children.Count >= 3)
                     Children[2].Colour = colours.Content2;
             }
@@ -708,74 +710,127 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        private partial class SkillBarRow : Container
+        private partial class SkillBarRow : OsuClickableContainer
         {
-            private const float trend_width = 44f;
+            private const float name_width = 96f;
+            private const float dan_icon_slot_width = 28f;
+            private const float value_width = 48f;
+
+            private readonly string skillId;
+            private readonly IBindable<string?> selectedSkillId;
+            private readonly OsuSpriteText nameText;
+            private readonly OsuSpriteText valueText;
+
+            private readonly EzLocalProfileHoverBox background;
 
             public SkillBarRow(
+                string skillId,
                 string displayName,
                 double value,
                 float ratio,
                 Colour4 accent,
-                Action onAxisClick,
-                Action onTrendClick)
+                IBindable<string?> selectedSkillId,
+                Action onClick)
             {
-                RelativeSizeAxes = Axes.X;
-                Height = 22;
+                this.skillId = skillId;
+                this.selectedSkillId = selectedSkillId.GetBoundCopy();
 
+                RelativeSizeAxes = Axes.X;
+                Height = 28;
+                Masking = true;
+                CornerRadius = 6;
+                Action = onClick;
+
+                nameText = new OsuSpriteText
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Text = displayName,
+                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
+                    Width = name_width,
+                };
+                valueText = new OsuSpriteText
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Text = value.ToString("0.00", CultureInfo.InvariantCulture),
+                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
+                    Width = value_width,
+                };
+
+                float leftChrome = name_width + dan_icon_slot_width;
+
+                // name | dan-icon slot | value | bar growing left from the right edge
                 Children = new Drawable[]
                 {
-                    new OsuClickableContainer
+                    background = new EzLocalProfileHoverBox(),
+                    new Container
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Padding = new MarginPadding { Right = trend_width },
-                        Action = onAxisClick,
-                        Child = new Container
+                        Padding = new MarginPadding { Horizontal = 8 },
+                        Children = new Drawable[]
                         {
-                            RelativeSizeAxes = Axes.Both,
-                            Padding = new MarginPadding { Horizontal = 4 },
-                            Children = new Drawable[]
+                            nameText,
+                            new Container
                             {
-                                new OsuSpriteText
+                                // Reserved for future dan / rank icon.
+                                Anchor = Anchor.CentreLeft,
+                                Origin = Anchor.CentreLeft,
+                                X = name_width,
+                                Width = dan_icon_slot_width,
+                                RelativeSizeAxes = Axes.Y,
+                            },
+                            new Container
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                                Padding = new MarginPadding { Left = leftChrome },
+                                Children = new Drawable[]
                                 {
-                                    Anchor = Anchor.CentreLeft,
-                                    Origin = Anchor.CentreLeft,
-                                    Text = displayName,
-                                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
-                                    Width = 96,
-                                },
-                                new Container
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                    Padding = new MarginPadding { Left = 104, Right = 56 },
-                                    Child = new EzLocalProfileRoundedBar(ratio, accent),
-                                },
-                                new OsuSpriteText
-                                {
-                                    Anchor = Anchor.CentreRight,
-                                    Origin = Anchor.CentreRight,
-                                    Text = value.ToString("0.00", CultureInfo.InvariantCulture),
-                                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
-                                },
-                            }
-                        }
-                    },
-                    new OsuClickableContainer
-                    {
-                        Anchor = Anchor.CentreRight,
-                        Origin = Anchor.CentreRight,
-                        RelativeSizeAxes = Axes.Y,
-                        Width = trend_width,
-                        Action = onTrendClick,
-                        Child = new OsuSpriteText
-                        {
-                            Anchor = Anchor.Centre,
-                            Origin = Anchor.Centre,
-                            Text = EzSettingsProfile.LOCAL_PROFILE_AXIS_TREND,
-                            Font = OsuFont.GetFont(size: 11, weight: FontWeight.SemiBold),
+                                    valueText,
+                                    new Container
+                                    {
+                                        RelativeSizeAxes = Axes.Both,
+                                        Padding = new MarginPadding { Left = value_width + 8 },
+                                        Child = new EzLocalProfileRoundedBar(ratio, accent, growFromRight: true),
+                                    },
+                                }
+                            },
                         }
                     }
                 };
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OverlayColourProvider colours)
+            {
+                background.Configure(colours, transparentIdle: true);
+                nameText.Colour = EzLocalProfileColours.Plays(colours);
+                // Skill SSR uses Highlight1 — never PinkLight (reserved for PP).
+                valueText.Colour = EzLocalProfileColours.Numeric(colours);
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+                selectedSkillId.BindValueChanged(_ => RefreshSelection(), true);
+            }
+
+            public void RefreshSelection()
+            {
+                background.SetSelected(string.Equals(selectedSkillId.Value, skillId, StringComparison.Ordinal));
+                background.Refresh(IsHovered);
+            }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                background.Refresh(true);
+                return base.OnHover(e);
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                background.Refresh(false);
+                base.OnHoverLost(e);
             }
         }
     }

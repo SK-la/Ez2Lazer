@@ -30,7 +30,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private FillFlowContainer contentFlow = null!;
         private Container emptyStateContainer = null!;
-        private Container analysisSystemRow = null!;
+        private EzLocalProfileAnalysisSystemSelector analysisSystemSelector = null!;
         private OsuDropdown<string> playerDropdown = null!;
 
         [Resolved]
@@ -41,6 +41,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         [Resolved]
         private RulesetStore rulesets { get; set; } = null!;
+
+        [Resolved]
+        private IBindable<RulesetInfo> gameRuleset { get; set; } = null!;
 
         public EzLocalProfileOverlay()
             : base(OverlayColourScheme.Pink)
@@ -84,7 +87,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                     Child = new Box
                                     {
                                         RelativeSizeAxes = Axes.Both,
-                                        Colour = ColourProvider.Background5,
+                                        // Match Insights section chrome so Background5 controls read as filled.
+                                        Colour = ColourProvider.Background4,
                                     }
                                 },
                                 new Container
@@ -119,21 +123,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                                         Current = { BindTarget = ruleset }
                                                     }
                                                 },
-                                                analysisSystemRow = new Container
-                                                {
-                                                    RelativeSizeAxes = Axes.X,
-                                                    AutoSizeAxes = Axes.Y,
-                                                    Padding = new MarginPadding
-                                                    {
-                                                        Horizontal = HORIZONTAL_PADDING,
-                                                        Bottom = 10
-                                                    },
-                                                    Alpha = 0,
-                                                    Child = new EzLocalProfileAnalysisSystemSelector
-                                                    {
-                                                        Current = { BindTarget = analysisSystem }
-                                                    }
-                                                }
                                             }
                                         }
                                     }
@@ -175,6 +164,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private Drawable createPlayerFilterLayer()
         {
+            // Background4 parent (same as Insights section): dropdown + Ez/Track chips keep
+            // their own Background5 idle / hover colours and stay visible without restyling OsuDropdown.
             return new Container
             {
                 RelativeSizeAxes = Axes.X,
@@ -185,7 +176,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     new Box
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = ColourProvider.Background5,
+                        Colour = ColourProvider.Background4,
                     },
                     new Container
                     {
@@ -197,7 +188,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                             Horizontal = HORIZONTAL_PADDING,
                             Vertical = 10
                         },
-                        // TopLeft on the horizontal flow axis so the label stays put when the menu grows.
                         Child = new FillFlowContainer
                         {
                             AutoSizeAxes = Axes.Both,
@@ -210,7 +200,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                     Anchor = Anchor.TopLeft,
                                     Origin = Anchor.TopLeft,
                                     AutoSizeAxes = Axes.X,
-                                    // Match OsuDropdownHeader height so the label lines up with the closed control.
                                     Height = 40,
                                     Child = new OsuSpriteText
                                     {
@@ -226,7 +215,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                     Origin = Anchor.TopLeft,
                                     Width = 280,
                                     Current = { BindTarget = selectedPlayer },
-                                }
+                                },
+                                new Container
+                                {
+                                    Anchor = Anchor.TopLeft,
+                                    Origin = Anchor.TopLeft,
+                                    AutoSizeAxes = Axes.X,
+                                    Height = 40,
+                                    Child = analysisSystemSelector = new EzLocalProfileAnalysisSystemSelector
+                                    {
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                        Current = { BindTarget = analysisSystem },
+                                        Alpha = 0,
+                                    }
+                                },
                             }
                         }
                     }
@@ -238,7 +241,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             base.LoadComplete();
 
-            ruleset.Value = rulesets.GetRuleset(0) ?? rulesets.AvailableRulesets.First();
+            applyActiveRulesetOrDefault();
             ruleset.BindValueChanged(_ => Schedule(() =>
             {
                 updateAnalysisSystemVisibility();
@@ -261,7 +264,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private void updateAnalysisSystemVisibility()
         {
             bool mania = (ruleset.Value?.OnlineID ?? -1) == EzLocalProfileConstants.MANIA_RULESET_ID;
-            analysisSystemRow.Alpha = mania ? 1 : 0;
+            analysisSystemSelector.Alpha = mania ? 1 : 0;
 
             if (!mania && analysisSystem.Value != EzLocalProfileAnalysisSystem.Ez)
                 analysisSystem.Value = EzLocalProfileAnalysisSystem.Ez;
@@ -270,7 +273,27 @@ namespace osu.Game.EzOsuGame.LocalProfile
         protected override void PopIn()
         {
             base.PopIn();
+            applyActiveRulesetOrDefault();
             profileService.ReloadFromDisk();
+        }
+
+        /// <summary>
+        /// Prefer the game's current ruleset when opening; fall back to osu! (id 0) if unavailable.
+        /// </summary>
+        private void applyActiveRulesetOrDefault()
+        {
+            RulesetInfo? preferred = null;
+            var active = gameRuleset.Value;
+
+            if (active != null)
+            {
+                preferred = rulesets.AvailableRulesets.FirstOrDefault(r => r.OnlineID == active.OnlineID)
+                            ?? rulesets.GetRuleset(active.OnlineID);
+            }
+
+            ruleset.Value = preferred
+                            ?? rulesets.GetRuleset(0)
+                            ?? rulesets.AvailableRulesets.First();
         }
 
         private void refreshPlayerDropdownItems(EzLocalProfileSnapshot archiveSnapshot)

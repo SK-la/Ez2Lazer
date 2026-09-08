@@ -57,14 +57,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 Children = new Drawable[]
                 {
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                        Text = label,
-                        Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
-                        Width = 36,
-                    },
+                    new LabelText(label),
                     new Container
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -73,6 +66,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     },
                     new CountText(plays),
                 };
+            }
+
+            private partial class LabelText : OsuSpriteText
+            {
+                public LabelText(string text)
+                {
+                    Anchor = Anchor.CentreLeft;
+                    Origin = Anchor.CentreLeft;
+                    Text = text;
+                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold);
+                    Width = 36;
+                }
+
+                [BackgroundDependencyLoader]
+                private void load(OverlayColourProvider colours) => Colour = EzLocalProfileColours.Plays(colours);
             }
 
             private partial class CountText : OsuSpriteText
@@ -86,7 +94,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
 
                 [BackgroundDependencyLoader]
-                private void load(OverlayColourProvider colours) => Colour = colours.Content2;
+                private void load(OverlayColourProvider colours) => Colour = EzLocalProfileColours.Numeric(colours);
             }
         }
     }

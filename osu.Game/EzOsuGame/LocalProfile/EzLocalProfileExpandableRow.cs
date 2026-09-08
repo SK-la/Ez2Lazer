@@ -15,6 +15,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
@@ -94,20 +95,20 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             headerMetrics.Clear();
 
-            headerMetrics.Add(createSegment($"{keyStats.KeyCount}K", colours.Highlight1));
-            headerMetrics.Add(createSegment($"{keyStats.TotalKeys:N0} keys", osuColours.BlueLight));
+            headerMetrics.Add(createSegment($"{keyStats.KeyCount}K", EzLocalProfileColours.KeyMode(colours)));
+            headerMetrics.Add(createSegment($"{keyStats.TotalKeys:N0} keys", EzLocalProfileColours.KeyCount(osuColours)));
             headerMetrics.Add(createSegment(
                 $"{EzSettingsProfile.LOCAL_PROFILE_AVG_KPS} {formatKps(keyStats.AvgKps)} KPS",
-                osuColours.Orange1));
+                EzLocalProfileColours.AvgRate(osuColours)));
             headerMetrics.Add(createSegment(
                 $"{EzSettingsProfile.LOCAL_PROFILE_MAX_KPS} {formatKps(keyStats.MaxKps)} KPS",
-                osuColours.Yellow));
-            headerMetrics.Add(createSegment($"{keyStats.ScoreCount} plays", colours.Content1));
-            headerMetrics.Add(createSegment($"{EzLocalProfileFormat.FormatPp(keyStats.TotalPp)}pp", osuColours.PinkLight));
-            headerMetrics.Add(createSegment(EzLocalProfileFormat.FormatDuration(keyStats.TotalDurationMs), osuColours.Lime1));
+                EzLocalProfileColours.Peak(osuColours)));
+            headerMetrics.Add(createSegment($"{keyStats.ScoreCount} plays", EzLocalProfileColours.Plays(colours)));
+            headerMetrics.Add(createSegment($"{EzLocalProfileFormat.FormatPp(keyStats.TotalPp)}pp", EzLocalProfileColours.Pp(osuColours)));
+            headerMetrics.Add(createSegment(EzLocalProfileFormat.FormatDuration(keyStats.TotalDurationMs), EzLocalProfileColours.Duration(osuColours)));
         }
 
-        private static OsuSpriteText createSegment(string text, osuTK.Graphics.Color4 colour) => new OsuSpriteText
+        private static OsuSpriteText createSegment(string text, Color4 colour) => new OsuSpriteText
         {
             Text = text,
             Font = OsuFont.GetFont(size: 13),
@@ -218,14 +219,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 Children = new Drawable[]
                 {
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                        Text = label,
-                        Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
-                        Width = 36,
-                    },
+                    new LabelText(label),
                     new Container
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -234,6 +228,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     },
                     new CountText(plays),
                 };
+            }
+
+            private partial class LabelText : OsuSpriteText
+            {
+                public LabelText(string text)
+                {
+                    Anchor = Anchor.CentreLeft;
+                    Origin = Anchor.CentreLeft;
+                    Text = text;
+                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold);
+                    Width = 36;
+                }
+
+                [BackgroundDependencyLoader]
+                private void load(OverlayColourProvider colours) => Colour = EzLocalProfileColours.Plays(colours);
             }
 
             private partial class CountText : OsuSpriteText
@@ -247,7 +256,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
 
                 [BackgroundDependencyLoader]
-                private void load(OverlayColourProvider colours) => Colour = colours.Content2;
+                private void load(OverlayColourProvider colours) => Colour = EzLocalProfileColours.Numeric(colours);
             }
         }
     }

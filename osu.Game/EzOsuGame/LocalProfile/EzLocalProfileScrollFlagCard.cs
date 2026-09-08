@@ -80,9 +80,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private partial class Body : Container
         {
             private readonly Box background;
-            private readonly OsuSpriteText maxText;
-            private readonly OsuSpriteText minText;
-            private readonly OsuSpriteText avgText;
+            private readonly StatRow maxRow;
+            private readonly StatRow avgRow;
+            private readonly StatRow minRow;
 
             public Body(string max, string min, string avg)
             {
@@ -105,24 +105,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         Spacing = new Vector2(0, 2),
                         Children = new Drawable[]
                         {
-                            maxText = new OsuSpriteText
-                            {
-                                RelativeSizeAxes = Axes.X,
-                                Text = $"Max  {max}",
-                                Font = OsuFont.GetFont(size: 13),
-                            },
-                            avgText = new OsuSpriteText
-                            {
-                                RelativeSizeAxes = Axes.X,
-                                Text = $"Avg  {avg}",
-                                Font = OsuFont.GetFont(size: 13),
-                            },
-                            minText = new OsuSpriteText
-                            {
-                                RelativeSizeAxes = Axes.X,
-                                Text = $"Min  {min}",
-                                Font = OsuFont.GetFont(size: 13),
-                            },
+                            maxRow = new StatRow("Max", max),
+                            avgRow = new StatRow("Avg", avg),
+                            minRow = new StatRow("Min", min),
                         },
                     },
                 };
@@ -132,9 +117,44 @@ namespace osu.Game.EzOsuGame.LocalProfile
             private void load(OverlayColourProvider colours)
             {
                 background.Colour = colours.Background5;
-                maxText.Colour = colours.Content1;
-                minText.Colour = colours.Content1;
-                avgText.Colour = colours.Content1;
+                maxRow.ApplyColours(colours);
+                avgRow.ApplyColours(colours);
+                minRow.ApplyColours(colours);
+            }
+
+            private partial class StatRow : FillFlowContainer
+            {
+                private readonly OsuSpriteText labelText;
+                private readonly OsuSpriteText valueText;
+
+                public StatRow(string label, string value)
+                {
+                    RelativeSizeAxes = Axes.X;
+                    AutoSizeAxes = Axes.Y;
+                    Direction = FillDirection.Horizontal;
+                    Spacing = new Vector2(8, 0);
+
+                    Children = new Drawable[]
+                    {
+                        labelText = new OsuSpriteText
+                        {
+                            Text = label,
+                            Font = OsuFont.GetFont(size: 13),
+                            Width = 36,
+                        },
+                        valueText = new OsuSpriteText
+                        {
+                            Text = value,
+                            Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
+                        },
+                    };
+                }
+
+                public void ApplyColours(OverlayColourProvider colours)
+                {
+                    labelText.Colour = colours.Content2;
+                    valueText.Colour = colours.Highlight1;
+                }
             }
         }
     }

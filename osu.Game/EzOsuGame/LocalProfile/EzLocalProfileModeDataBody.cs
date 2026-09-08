@@ -2,10 +2,12 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
@@ -59,11 +61,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             Add(lineSection);
 
-            var barColumns = new List<Drawable>();
-
-            barColumns.Add(createBarColumn(
-                EzSettingsProfile.LOCAL_PROFILE_SECTION_STARS,
-                EzLocalProfileBucketBars.FromStarPlayCounts(snapshot.StarPlayCounts.Where(s => s.RulesetId == rulesetId))));
+            var barColumns = new List<Drawable>
+            {
+                createBarColumn(
+                    EzSettingsProfile.LOCAL_PROFILE_SECTION_STARS,
+                    EzLocalProfileBucketBars.FromStarPlayCounts(snapshot.StarPlayCounts.Where(s => s.RulesetId == rulesetId)))
+            };
 
             if (showXxy)
             {
@@ -137,7 +140,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             return new EzLocalProfileLabeledLineChart(
                 list.Select(s => (float)s.Count).ToArray(),
-                list.Select(s => $"{s.StarBucket}★").ToArray());
+                list.Select(s => s.StarBucket.ToString(CultureInfo.InvariantCulture)).ToArray(),
+                FontAwesome.Solid.Star);
         }
 
         private EzLocalProfileLabeledLineChart? createXxyLineChart()
@@ -148,7 +152,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             return new EzLocalProfileLabeledLineChart(
                 list.Select(s => (float)s.Count).ToArray(),
-                list.Select(s => $"{s.StarBucket}xxy").ToArray());
+                list.Select(s => s.StarBucket.ToString(CultureInfo.InvariantCulture)).ToArray(),
+                FontAwesome.Solid.Moon);
         }
 
         private EzLocalProfileLabeledLineChart? createManiaKpsLineChart()

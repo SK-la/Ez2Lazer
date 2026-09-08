@@ -9,7 +9,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
+using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
@@ -441,6 +441,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             private readonly LocalisableString title;
             private readonly string value;
+            private EzLocalProfileHoverBox background = null!;
 
             public InsightChip(LocalisableString title, string value, Action action)
             {
@@ -456,13 +457,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
             [BackgroundDependencyLoader]
             private void load(OverlayColourProvider colours)
             {
+                background = new EzLocalProfileHoverBox();
+                background.Configure(colours);
+
                 Children = new Drawable[]
                 {
-                    new Box
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Colour = colours.Background5,
-                    },
+                    background,
                     new FillFlowContainer
                     {
                         AutoSizeAxes = Axes.Both,
@@ -481,10 +481,23 @@ namespace osu.Game.EzOsuGame.LocalProfile
                             {
                                 Text = value,
                                 Font = OsuFont.GetFont(size: 16, weight: FontWeight.Bold),
+                                Colour = EzLocalProfileColours.Numeric(colours),
                             },
                         }
                     }
                 };
+            }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                background.Refresh(true);
+                return base.OnHover(e);
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                background.Refresh(false);
+                base.OnHoverLost(e);
             }
         }
 
@@ -492,6 +505,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             private readonly LocalisableString caption;
             private readonly EzLocalProfileInsightPlay play;
+            private EzLocalProfileHoverBox background = null!;
 
             public TopPlayCard(LocalisableString caption, EzLocalProfileInsightPlay play, Action action)
             {
@@ -506,15 +520,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider colours)
+            private void load(OverlayColourProvider colours, OsuColour osuColours)
             {
+                background = new EzLocalProfileHoverBox();
+                background.Configure(colours);
+
                 Children = new Drawable[]
                 {
-                    new Box
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Colour = colours.Background5,
-                    },
+                    background,
                     new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.X,
@@ -535,52 +548,84 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                 RelativeSizeAxes = Axes.X,
                                 Text = string.IsNullOrEmpty(play.Artist) ? play.Title : $"{play.Artist} - {play.Title}",
                                 Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
+                                Colour = colours.Content1,
                             },
                             new TruncatingSpriteText
                             {
                                 RelativeSizeAxes = Axes.X,
-                                Text = $"{play.DifficultyName} · {EzLocalProfileFormat.FormatPp(play.Pp)}pp · {play.Rank}",
+                                Text = $"{play.DifficultyName} · {play.Rank}",
                                 Font = OsuFont.GetFont(size: 12),
-                                Colour = colours.Content1,
+                                Colour = EzLocalProfileColours.Meta(colours),
+                            },
+                            new OsuSpriteText
+                            {
+                                Text = $"{EzLocalProfileFormat.FormatPp(play.Pp)}pp",
+                                Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
+                                Colour = EzLocalProfileColours.Pp(osuColours),
                             },
                         }
                     }
                 };
             }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                background.Refresh(true);
+                return base.OnHover(e);
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                background.Refresh(false);
+                base.OnHoverLost(e);
+            }
         }
 
         private partial class LabeledBarRow : Container
         {
+            private readonly OsuSpriteText labelText;
+            private readonly OsuSpriteText valueLabel;
+
             public LabeledBarRow(string label, string valueText, float ratio)
             {
                 RelativeSizeAxes = Axes.X;
                 Height = 22;
                 Padding = new MarginPadding { Horizontal = 4 };
 
+                labelText = new OsuSpriteText
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Text = label,
+                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
+                    Width = 72,
+                };
+                valueLabel = new OsuSpriteText
+                {
+                    Anchor = Anchor.CentreRight,
+                    Origin = Anchor.CentreRight,
+                    Text = valueText,
+                    Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
+                };
+
                 Children = new Drawable[]
                 {
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                        Text = label,
-                        Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
-                        Width = 72,
-                    },
+                    labelText,
                     new Container
                     {
                         RelativeSizeAxes = Axes.Both,
                         Padding = new MarginPadding { Left = 80, Right = 96 },
                         Child = new EzLocalProfileRoundedBar(ratio),
                     },
-                    new OsuSpriteText
-                    {
-                        Anchor = Anchor.CentreRight,
-                        Origin = Anchor.CentreRight,
-                        Text = valueText,
-                        Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
-                    },
+                    valueLabel,
                 };
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OverlayColourProvider colours)
+            {
+                labelText.Colour = EzLocalProfileColours.Plays(colours);
+                valueLabel.Colour = EzLocalProfileColours.Numeric(colours);
             }
         }
     }
