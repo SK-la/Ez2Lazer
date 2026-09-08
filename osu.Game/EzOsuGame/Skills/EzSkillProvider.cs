@@ -2,6 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using osu.Game.Beatmaps;
+using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -11,10 +13,12 @@ namespace osu.Game.EzOsuGame.Skills
     public sealed class EzSkillProvider
     {
         private readonly EzSkillStore store;
+        private readonly EzChartDanEstimator? chartDanEstimator;
 
-        public EzSkillProvider(EzSkillStore store, EzSkillRegistry? registry = null)
+        public EzSkillProvider(EzSkillStore store, EzSkillRegistry? registry = null, EzChartDanEstimator? chartDanEstimator = null)
         {
             this.store = store;
+            this.chartDanEstimator = chartDanEstimator;
             Registry = registry ?? new EzSkillRegistry();
         }
 
@@ -40,5 +44,11 @@ namespace osu.Game.EzOsuGame.Skills
 
         public EzDanEstimate? GetDan(string username, int keyCount, string side)
             => store.GetDanEstimate(username, keyCount, side);
+
+        /// <summary>
+        /// Chart-side dan for song select me-vs-chart. Null when estimator unset or chart cannot be rated.
+        /// </summary>
+        public EzChartDanVerdict? TryGetChartDan(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
+            => chartDanEstimator?.TryEstimate(beatmapInfo, mods);
     }
 }

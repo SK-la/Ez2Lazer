@@ -6,7 +6,7 @@ using System.Collections.Generic;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Independent dan estimate system (LeoBlack / course clears). Stub skills only until estimator is ported.
+    /// Independent dan estimate system. Chart path: <see cref="EzChartDanEstimator"/>; player path: <see cref="EzPlayerDanAggregator"/>.
     /// Must not be mixed into MSD/SSR aggregation.
     /// </summary>
     public sealed class DanSkillSystem : IEzSkillSystem

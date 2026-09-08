@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Skills;
 
@@ -36,6 +37,28 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             double low = EzDanLabels.SrToRawDan(4.0, "stream");
             double high = EzDanLabels.SrToRawDan(8.0, "stream");
             Assert.That(high, Is.GreaterThan(low));
+        }
+
+        [Test]
+        public void ChartDanFromMsdClassifiesLnSideByHoldRatio()
+        {
+            var msd = new Dictionary<string, double>
+            {
+                [EzSkillIds.Msd(EzSkillIds.OVERALL)] = 6.5,
+                [EzSkillIds.Msd(EzSkillIds.STREAM)] = 6.0,
+                [EzSkillIds.Msd(EzSkillIds.JUMPSTREAM)] = 5.0,
+            };
+
+            var rc = EzChartDanEstimator.FromMsd(msd, keyCount: 4, holdRatio: 0.1);
+            Assert.That(rc, Is.Not.Null);
+            Assert.That(rc!.Side, Is.EqualTo(DanSkillSystem.SIDE_RC));
+            Assert.That(rc.RawDan, Is.GreaterThan(0));
+            Assert.That(rc.Label, Is.Not.Empty);
+
+            var ln = EzChartDanEstimator.FromMsd(msd, keyCount: 4, holdRatio: 0.5);
+            Assert.That(ln, Is.Not.Null);
+            Assert.That(ln!.Side, Is.EqualTo(DanSkillSystem.SIDE_LN));
+            Assert.That(ln.RawDan, Is.EqualTo(rc.RawDan).Within(0.001));
         }
     }
 }
