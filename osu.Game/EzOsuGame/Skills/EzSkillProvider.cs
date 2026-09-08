@@ -29,6 +29,9 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyDictionary<string, double> GetPlayerSsr(string username, int keyCount)
             => store.GetPlayerSkills(username, keyCount, EzSkillSystems.PLAYER_SSR);
 
+        public EzPlayerSsrSnapshot GetPlayerSsrSnapshot(string username, int keyCount)
+            => store.GetPlayerSsrSnapshot(username, keyCount);
+
         public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username)
             => store.GetPlayerSsrKeyCounts(username);
 

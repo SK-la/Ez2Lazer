@@ -123,6 +123,29 @@ namespace osu.Game.EzOsuGame.Localization
                 "Track 技能按玩家名计算。请在上方选择具体玩家（不要选 All）。",
                 "Track skills are per player. Select a specific player above (not All).");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_RATING =
+            new EzLocalizationManager.EzLocalisableString("{0}K 技能评分", "{0}K skill rating");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_PLAYS =
+            new EzLocalizationManager.EzLocalisableString("{0} 局分析", "{0} analyzed plays");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_PROVISIONAL =
+            new EzLocalizationManager.EzLocalisableString("临时评分", "Provisional");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_STALE =
+            new EzLocalizationManager.EzLocalisableString("待更新", "Updating");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_HISTORY =
+            new EzLocalizationManager.EzLocalisableString("技能历史", "Skill History");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_HISTORY_FOR =
+            new EzLocalizationManager.EzLocalisableString("技能历史 · {0}", "Skill History · {0}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_HISTORY_EMPTY =
+            new EzLocalizationManager.EzLocalisableString(
+                "暂无历史点。重新计算本地个人成绩后会写入。",
+                "No history points yet. Recompute Local Profile Stats to record them.");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_TRACK_INSIGHTS =
             new EzLocalizationManager.EzLocalisableString("成绩洞察", "Profile Insights");
 
