@@ -28,6 +28,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     public partial class EzLocalProfileTrackSkillsBody : FillFlowContainer
     {
         private const int axis_plays_top_n = 15;
+        private const int dan_clears_top_n = 15;
 
         private readonly string username;
         private readonly Bindable<EzLocalProfileDrillScoreRow?>? selectDrillScore;
@@ -36,6 +37,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly BindableInt selectedKeyCount = new BindableInt();
         private readonly Bindable<string?> selectedAxisSkillId = new Bindable<string?>();
         private readonly Bindable<string?> selectedHistorySkillId = new Bindable<string?>();
+        private readonly Bindable<string?> selectedDanSide = new Bindable<string?>();
 
         private FillFlowContainer keyChipFlow = null!;
         private Container headerContainer = null!;
@@ -117,6 +119,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }, false);
             selectedAxisSkillId.BindValueChanged(_ => refreshDetailPanel(), false);
             selectedHistorySkillId.BindValueChanged(_ => refreshDetailPanel(), false);
+            selectedDanSide.BindValueChanged(_ => refreshDetailPanel(), false);
             rebuild();
         }
 
@@ -124,6 +127,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             selectedAxisSkillId.Value = null;
             selectedHistorySkillId.Value = null;
+            selectedDanSide.Value = null;
         }
 
         private void toggleAxisPlays(string skillId)
@@ -135,6 +139,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             selectedHistorySkillId.Value = null;
+            selectedDanSide.Value = null;
             selectedAxisSkillId.Value = skillId;
         }
 
@@ -147,7 +152,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             selectedAxisSkillId.Value = null;
+            selectedDanSide.Value = null;
             selectedHistorySkillId.Value = skillId;
+        }
+
+        private void toggleDanClears(string side)
+        {
+            if (string.Equals(selectedDanSide.Value, side, StringComparison.Ordinal))
+            {
+                selectedDanSide.Value = null;
+                return;
+            }
+
+            selectedAxisSkillId.Value = null;
+            selectedHistorySkillId.Value = null;
+            selectedDanSide.Value = side;
         }
 
         private void rebuild()
@@ -200,7 +219,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var definitions = skillProvider.Registry.GetSystem(EzSkillSystems.PLAYER_SSR)?.Skills
                               ?? Array.Empty<EzSkillDefinition>();
 
-            headerContainer.Child = new SkillsHeader(keyCount, snapshot, username, skillProvider);
+            headerContainer.Child = new SkillsHeader(keyCount, snapshot, username, skillProvider, toggleDanClears, selectedDanSide);
 
             var radarAxes = definitions.Where(d => d.SkillId != EzSkillIds.Ssr(EzSkillIds.OVERALL)).ToList();
             double radarMax = radarAxes
@@ -269,8 +288,63 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return;
             }
 
+            if (!string.IsNullOrEmpty(selectedDanSide.Value))
+            {
+                showDanClears(selectedDanSide.Value, keyCount);
+                return;
+            }
+
             if (!string.IsNullOrEmpty(selectedHistorySkillId.Value))
                 showHistory(selectedHistorySkillId.Value, keyCount);
+        }
+
+        private void showDanClears(string side, int keyCount)
+        {
+            string sideLabel = side == DanSkillSystem.SIDE_LN
+                ? EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_LN.ToString()
+                : EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_RC.ToString();
+
+            var clears = skillProvider
+                         .GetDanClears(username, keyCount, side, EzDanAlgorithm.VERSION)
+                         .Take(dan_clears_top_n)
+                         .ToList();
+
+            if (clears.Count == 0)
+            {
+                detailContainer.Child = new EzLocalProfileChartCard(
+                    EzSettingsProfile.LOCAL_PROFILE_DAN_CLEARS_FOR.Format(sideLabel),
+                    new OsuSpriteText
+                    {
+                        Text = EzSettingsProfile.LOCAL_PROFILE_DAN_CLEARS_EMPTY,
+                        Font = OsuFont.GetFont(size: 13),
+                    });
+                return;
+            }
+
+            var list = new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 6),
+            };
+
+            foreach (var clear in clears)
+            {
+                var drill = findDrillRow(clear.BeatmapHash);
+                string title = formatPlayTitle(drill);
+
+                list.Add(new EzEvidenceScoreRow(
+                    title,
+                    EzEvidenceScoreRow.FormatDanMeta(clear.CreditedDan, clear.Accuracy, clear.Rate, clear.ScoredAt),
+                    drill != null && selectDrillScore != null
+                        ? () => selectDrillScore.Value = drill
+                        : null));
+            }
+
+            detailContainer.Child = new EzLocalProfileChartCard(
+                EzSettingsProfile.LOCAL_PROFILE_DAN_CLEARS_FOR.Format(sideLabel),
+                list);
         }
 
         private void showAxisPlays(string skillId, int keyCount)
@@ -383,7 +457,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private partial class SkillsHeader : FillFlowContainer
         {
-            public SkillsHeader(int keyCount, EzPlayerSsrSnapshot snapshot, string username, EzSkillProvider skillProvider)
+            public SkillsHeader(
+                int keyCount,
+                EzPlayerSsrSnapshot snapshot,
+                string username,
+                EzSkillProvider skillProvider,
+                Action<string> onDanSideClick,
+                IBindable<string?> selectedDanSide)
             {
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
@@ -418,8 +498,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     Margin = new MarginPadding { Top = 4 },
                 };
 
-                addDanChip(danFlow, skillProvider.GetDan(username, keyCount, DanSkillSystem.SIDE_RC), DanSkillSystem.SIDE_RC);
-                addDanChip(danFlow, skillProvider.GetDan(username, keyCount, DanSkillSystem.SIDE_LN), DanSkillSystem.SIDE_LN);
+                addDanChip(danFlow, skillProvider.GetDan(username, keyCount, DanSkillSystem.SIDE_RC), DanSkillSystem.SIDE_RC, onDanSideClick, selectedDanSide);
+                addDanChip(danFlow, skillProvider.GetDan(username, keyCount, DanSkillSystem.SIDE_LN), DanSkillSystem.SIDE_LN, onDanSideClick, selectedDanSide);
 
                 if (danFlow.Children.Count > 0)
                     children.Add(danFlow);
@@ -427,12 +507,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 Children = children;
             }
 
-            private static void addDanChip(FillFlowContainer flow, EzDanEstimate? estimate, string side)
+            private static void addDanChip(
+                FillFlowContainer flow,
+                EzDanEstimate? estimate,
+                string side,
+                Action<string> onDanSideClick,
+                IBindable<string?> selectedDanSide)
             {
                 if (estimate == null || string.IsNullOrEmpty(estimate.Label) || estimate.RawDan < 0)
                     return;
 
-                flow.Add(new DanChip(side, estimate)
+                flow.Add(new DanChip(side, estimate, () => onDanSideClick(side), selectedDanSide)
                 {
                     Anchor = Anchor.TopLeft,
                     Origin = Anchor.TopLeft,
@@ -463,19 +548,23 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        private partial class DanChip : Container
+        private partial class DanChip : OsuClickableContainer
         {
             private readonly string side;
             private readonly EzDanEstimate estimate;
+            private readonly IBindable<string?> selectedDanSide;
+            private Box background = null!;
 
-            public DanChip(string side, EzDanEstimate estimate)
+            public DanChip(string side, EzDanEstimate estimate, Action action, IBindable<string?> selectedDanSide)
             {
                 this.side = side;
                 this.estimate = estimate;
+                this.selectedDanSide = selectedDanSide.GetBoundCopy();
 
                 AutoSizeAxes = Axes.Both;
                 Masking = true;
                 CornerRadius = 8;
+                Action = action;
             }
 
             [BackgroundDependencyLoader]
@@ -491,7 +580,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 Children = new Drawable[]
                 {
-                    new Box
+                    background = new Box
                     {
                         RelativeSizeAxes = Axes.Both,
                         Colour = colours.Background5,
@@ -517,13 +606,37 @@ namespace osu.Game.EzOsuGame.LocalProfile
                             },
                             new OsuSpriteText
                             {
-                                Text = EzSettingsProfile.LOCAL_PROFILE_DAN_HEURISTIC_HINT,
+                                Text = EzSettingsProfile.LOCAL_PROFILE_DAN_CHIP_HINT,
                                 Font = OsuFont.GetFont(size: 10),
                                 Colour = colours.Content2,
                             },
                         }
                     }
                 };
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+                selectedDanSide.BindValueChanged(_ => updateVisual(), true);
+            }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                updateVisual();
+                return base.OnHover(e);
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                updateVisual();
+                base.OnHoverLost(e);
+            }
+
+            private void updateVisual()
+            {
+                bool active = string.Equals(selectedDanSide.Value, side, StringComparison.Ordinal);
+                background.FadeTo(active || IsHovered ? 1f : 0.7f, 80);
             }
         }
 

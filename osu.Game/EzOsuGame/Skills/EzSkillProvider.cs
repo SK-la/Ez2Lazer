@@ -78,7 +78,17 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>Dan clear evidence (sqlite). Empty when local-profile store unset.</summary>
         public IReadOnlyList<EzDanClearEvidenceRow> GetDanClears(string username, int? keyCount = null, string? side = null, int? algorithmVersion = null)
-            => localProfileStore?.GetDanClears(username, keyCount, side, algorithmVersion) ?? [];
+        {
+            var rows = localProfileStore?.GetDanClears(username, keyCount, side, algorithmVersion) ?? [];
+            if (rows.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username) || localProfileStore == null)
+                return rows;
+
+            return localProfileStore.GetDanClears(
+                EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME,
+                keyCount,
+                side,
+                algorithmVersion);
+        }
 
         /// <summary>SSR axis play evidence (sqlite). Empty when local-profile store unset.</summary>
         public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null, int? algorithmVersion = null)

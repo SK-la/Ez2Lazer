@@ -169,6 +169,19 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_SIDE_LN =
             new EzLocalizationManager.EzLocalisableString("LN", "LN");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_CHIP_HINT =
+            new EzLocalizationManager.EzLocalisableString(
+                "点击查看清除记录 · 启发式非 LeoBlack",
+                "Tap for clear evidence · heuristic, not LeoBlack");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_CLEARS_FOR =
+            new EzLocalizationManager.EzLocalisableString("清除记录 · {0}", "Clear evidence · {0}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_CLEARS_EMPTY =
+            new EzLocalizationManager.EzLocalisableString(
+                "暂无该侧清除记录。请重新计算本地个人成绩。",
+                "No clear evidence for this side yet. Recompute Local Profile Stats.");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_HEURISTIC_HINT =
             new EzLocalizationManager.EzLocalisableString(
                 "MSD→Dan 近似，非 LeoBlack",

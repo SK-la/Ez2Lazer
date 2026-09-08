@@ -87,5 +87,20 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 scoredAt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             });
         }
+
+        public static string FormatDanMeta(double creditedDan, double accuracy, double rate, DateTimeOffset scoredAt)
+        {
+            string rateText = Math.Abs(rate - 1) < 0.001
+                ? "1.0x"
+                : rate.ToString("0.##x", CultureInfo.InvariantCulture);
+
+            return string.Join(" · ", new[]
+            {
+                creditedDan.ToString("0.00", CultureInfo.InvariantCulture),
+                accuracy.ToString("0.00%", CultureInfo.InvariantCulture),
+                rateText,
+                scoredAt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            });
+        }
     }
 }
