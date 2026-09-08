@@ -414,14 +414,17 @@ namespace osu.Game
 
             var skillRegistry = new EzSkillRegistry();
             var skillStore = new EzSkillStore(realm);
+            var beatmapMsdComputer = new EzBeatmapMsdComputer(BeatmapManager, skillStore);
             var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore);
+            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, skillStore, beatmapMsdComputer);
             dependencies.Cache(skillRegistry);
             dependencies.Cache(skillStore);
             dependencies.Cache(new EzSkillProvider(skillStore, skillRegistry));
-            dependencies.Cache(new EzBeatmapMsdComputer(BeatmapManager, skillStore));
+            dependencies.Cache(beatmapMsdComputer);
             dependencies.Cache(playerSsrAggregator);
+            dependencies.Cache(playerDanAggregator);
 
-            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, ScoreManager, ReplaySession, playerSsrAggregator));
+            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, ScoreManager, ReplaySession, playerSsrAggregator, playerDanAggregator));
             dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
 
             if (Ez2ConfigManager.Get<bool>(Ez2Setting.EzScoreRaceServiceEnabled))

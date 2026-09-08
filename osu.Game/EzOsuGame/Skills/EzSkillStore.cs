@@ -271,7 +271,7 @@ namespace osu.Game.EzOsuGame.Skills
                     CourseAccuracy = estimate.CourseAccuracy,
                     ClearWindowHave = estimate.ClearWindowHave,
                     ClearWindowNeed = estimate.ClearWindowNeed,
-                    AlgorithmVersion = estimate.AlgorithmVersion != 0 ? estimate.AlgorithmVersion : EzManiaSkillAlgorithm.VERSION,
+                    AlgorithmVersion = estimate.AlgorithmVersion != 0 ? estimate.AlgorithmVersion : EzDanAlgorithm.VERSION,
                     ComputedAt = estimate.ComputedAt == default ? DateTimeOffset.UtcNow : estimate.ComputedAt,
                 });
             });

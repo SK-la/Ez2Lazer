@@ -159,7 +159,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var definitions = skillProvider.Registry.GetSystem(EzSkillSystems.PLAYER_SSR)?.Skills
                               ?? Array.Empty<EzSkillDefinition>();
 
-            headerContainer.Child = new SkillsHeader(keyCount, snapshot);
+            headerContainer.Child = new SkillsHeader(keyCount, snapshot, username, skillProvider);
 
             var radarAxes = definitions.Where(d => d.SkillId != EzSkillIds.Ssr(EzSkillIds.OVERALL)).ToList();
             double radarMax = radarAxes
@@ -259,14 +259,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private partial class SkillsHeader : FillFlowContainer
         {
-            public SkillsHeader(int keyCount, EzPlayerSsrSnapshot snapshot)
+            public SkillsHeader(int keyCount, EzPlayerSsrSnapshot snapshot, string username, EzSkillProvider skillProvider)
             {
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
                 Direction = FillDirection.Vertical;
                 Spacing = new Vector2(0, 4);
 
-                Children = new Drawable[]
+                var children = new List<Drawable>
                 {
                     new OsuSpriteText
                     {
@@ -284,6 +284,35 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         Font = OsuFont.GetFont(size: 12),
                     },
                 };
+
+                var danFlow = new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Full,
+                    Spacing = new Vector2(8),
+                    Margin = new MarginPadding { Top = 4 },
+                };
+
+                addDanChip(danFlow, skillProvider.GetDan(username, keyCount, DanSkillSystem.SIDE_RC), DanSkillSystem.SIDE_RC);
+                addDanChip(danFlow, skillProvider.GetDan(username, keyCount, DanSkillSystem.SIDE_LN), DanSkillSystem.SIDE_LN);
+
+                if (danFlow.Children.Count > 0)
+                    children.Add(danFlow);
+
+                Children = children;
+            }
+
+            private static void addDanChip(FillFlowContainer flow, EzDanEstimate? estimate, string side)
+            {
+                if (estimate == null || string.IsNullOrEmpty(estimate.Label) || estimate.RawDan < 0)
+                    return;
+
+                flow.Add(new DanChip(side, estimate)
+                {
+                    Anchor = Anchor.TopLeft,
+                    Origin = Anchor.TopLeft,
+                });
             }
 
             [BackgroundDependencyLoader]
@@ -307,6 +336,70 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     parts.Add(EzSettingsProfile.LOCAL_PROFILE_SKILL_STALE.ToString());
 
                 return string.Join(" · ", parts);
+            }
+        }
+
+        private partial class DanChip : Container
+        {
+            private readonly string side;
+            private readonly EzDanEstimate estimate;
+
+            public DanChip(string side, EzDanEstimate estimate)
+            {
+                this.side = side;
+                this.estimate = estimate;
+
+                AutoSizeAxes = Axes.Both;
+                Masking = true;
+                CornerRadius = 8;
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OverlayColourProvider colours)
+            {
+                string sideLabel = side == DanSkillSystem.SIDE_LN
+                    ? EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_LN.ToString()
+                    : EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_RC.ToString();
+
+                string body = $"{sideLabel} {estimate.Label}";
+                if (estimate.Clears > 0)
+                    body += $" · {estimate.Clears}";
+
+                Children = new Drawable[]
+                {
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = colours.Background5,
+                    },
+                    new FillFlowContainer
+                    {
+                        AutoSizeAxes = Axes.Both,
+                        Direction = FillDirection.Vertical,
+                        Padding = new MarginPadding { Horizontal = 12, Vertical = 8 },
+                        Spacing = new Vector2(0, 2),
+                        Children = new Drawable[]
+                        {
+                            new OsuSpriteText
+                            {
+                                Text = EzSettingsProfile.LOCAL_PROFILE_DAN_CHIP_TITLE,
+                                Font = OsuFont.GetFont(size: 10, weight: FontWeight.SemiBold),
+                                Colour = colours.Content2,
+                            },
+                            new OsuSpriteText
+                            {
+                                Text = body,
+                                Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
+                            },
+                            new OsuSpriteText
+                            {
+                                Text = EzSettingsProfile.LOCAL_PROFILE_DAN_HEURISTIC_HINT,
+                                Font = OsuFont.GetFont(size: 10),
+                                Colour = colours.Content2,
+                            },
+                        }
+                    }
+                };
             }
         }
 

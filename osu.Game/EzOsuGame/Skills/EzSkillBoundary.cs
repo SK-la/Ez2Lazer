@@ -8,7 +8,7 @@ namespace osu.Game.EzOsuGame.Skills
     /// <list type="bullet">
     /// <item><see cref="EzSkillSystems.BEATMAP_MSD"/> — chart difficulty axes from MinaCalc MSD. Not player skill.</item>
     /// <item><see cref="EzSkillSystems.PLAYER_SSR"/> — player skill axes from score-goal SSR + AggregateSSRs. Profile Skills radar source.</item>
-    /// <item><see cref="EzSkillSystems.DAN"/> — independent dan estimates (LeoBlack). Stub only in this foundation.</item>
+    /// <item><see cref="EzSkillSystems.DAN"/> — independent dan estimates. MVP uses MSD→rawDan heuristic + credit clears; full LeoBlack deferred.</item>
     /// <item>xxy radar skill-ification is explicitly deferred.</item>
     /// </list>
     /// Reference clone: sibling repo <c>Ez2Lazer/mania-hub</c>.
