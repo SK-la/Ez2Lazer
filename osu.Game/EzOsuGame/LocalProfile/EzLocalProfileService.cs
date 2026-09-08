@@ -57,12 +57,29 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public IReadOnlyList<EzLocalProfileUsernameCount> ScanUsernameCounts() => aggregator.ScanUsernameCounts();
 
-        public IReadOnlyList<string> GetPreviouslyIncludedUsernames() => Store.LoadIncludedUsernames();
+        public IReadOnlyList<string> GetPreviouslyIncludedUsernames()
+            => Store.LoadIncludedUsernames()
+                    .Select(EzLocalProfileConstants.NormaliseUsername)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
 
         /// <summary>
         /// Display snapshot for the player filter: <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> or one stored username.
+        /// Guest also falls back to legacy <c>(unknown)</c> partitions.
         /// </summary>
-        public EzLocalProfileSnapshot LoadDisplaySnapshot(string? usernameFilter) => Store.LoadSnapshotForUsername(usernameFilter);
+        public EzLocalProfileSnapshot LoadDisplaySnapshot(string? usernameFilter)
+        {
+            if (EzLocalProfileConstants.IsGuestUsername(usernameFilter))
+            {
+                var guest = Store.LoadSnapshotForUsername(EzLocalProfileConstants.GUEST_USERNAME);
+                if (guest.HasData)
+                    return guest;
+
+                return Store.LoadSnapshotForUsername(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME);
+            }
+
+            return Store.LoadSnapshotForUsername(usernameFilter);
+        }
 
         public IReadOnlyList<EzLocalProfileDrillScoreRow> LoadDrillScores(int rulesetId, string? usernameFilter = null)
             => Store.LoadDrillScores(rulesetId, usernameFilter);

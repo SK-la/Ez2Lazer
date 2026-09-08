@@ -523,12 +523,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         private static string normaliseUsername(string? username)
-        {
-            if (string.IsNullOrWhiteSpace(username))
-                return EzLocalProfileConstants.UNKNOWN_USERNAME;
-
-            return username.Trim();
-        }
+            => EzLocalProfileConstants.NormaliseUsername(username);
 
         private static long countKeys(ScoreInfo score)
         {

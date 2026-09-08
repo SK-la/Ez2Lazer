@@ -15,6 +15,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
@@ -63,6 +64,9 @@ namespace osu.Game.Screens.Select
 
             [Resolved]
             private EzLocalProfileService? localProfileService { get; set; }
+
+            [Resolved]
+            private EzSkillProvider? skillProvider { get; set; }
 
             [BackgroundDependencyLoader]
             private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
@@ -222,7 +226,10 @@ namespace osu.Game.Screens.Select
 
             private void refreshPlayerDropdownItems()
             {
-                var names = localProfileService?.GetPreviouslyIncludedUsernames().ToList() ?? new List<string>();
+                var names = localProfileService?.GetPreviouslyIncludedUsernames()
+                                               .Where(playerHasSkillData)
+                                               .ToList()
+                            ?? new List<string>();
                 ezPlayerDropdown.Items = names;
 
                 if (names.Count == 0)
@@ -231,16 +238,24 @@ namespace osu.Game.Screens.Select
                     return;
                 }
 
-                if (EzAnalysisPlayer.Value == null || !names.Contains(EzAnalysisPlayer.Value))
+                string? current = EzAnalysisPlayer.Value != null
+                    ? EzLocalProfileConstants.NormaliseUsername(EzAnalysisPlayer.Value)
+                    : null;
+
+                if (current == null || !names.Contains(current))
                 {
                     EzAnalysisPlayer.Value = names[0];
                     ezPlayerDropdown.Current.Value = names[0];
                 }
                 else
                 {
-                    ezPlayerDropdown.Current.Value = EzAnalysisPlayer.Value;
+                    EzAnalysisPlayer.Value = current;
+                    ezPlayerDropdown.Current.Value = current;
                 }
             }
+
+            private bool playerHasSkillData(string username)
+                => skillProvider == null || skillProvider.GetPlayerSsrKeyCounts(username).Count > 0;
 
             private void applyFlowModeState(bool enabled)
             {

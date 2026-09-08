@@ -38,16 +38,34 @@ namespace osu.Game.EzOsuGame.Skills
             => store.TryGetBeatmapSkill(beatmapHash, EzSkillIds.Msd(axisId), out value);
 
         public IReadOnlyDictionary<string, double> GetPlayerSsr(string username, int keyCount)
-            => store.GetPlayerSkills(username, keyCount, EzSkillSystems.PLAYER_SSR);
+            => GetPlayerSsrSnapshot(username, keyCount).Values;
 
         public EzPlayerSsrSnapshot GetPlayerSsrSnapshot(string username, int keyCount)
-            => store.GetPlayerSsrSnapshot(username, keyCount);
+        {
+            var snapshot = store.GetPlayerSsrSnapshot(username, keyCount);
+            if (snapshot.Values.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
+                return snapshot;
+
+            return store.GetPlayerSsrSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
+        }
 
         public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username)
-            => store.GetPlayerSsrKeyCounts(username);
+        {
+            var keys = store.GetPlayerSsrKeyCounts(username);
+            if (keys.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
+                return keys;
+
+            return store.GetPlayerSsrKeyCounts(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME);
+        }
 
         public IReadOnlyList<EzPlayerSkillHistoryPoint> GetPlayerSkillHistory(string username, int keyCount, string skillId, int maxPoints = 64)
-            => store.GetPlayerSkillHistory(username, keyCount, skillId, maxPoints);
+        {
+            var history = store.GetPlayerSkillHistory(username, keyCount, skillId, maxPoints);
+            if (history.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
+                return history;
+
+            return store.GetPlayerSkillHistory(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount, skillId, maxPoints);
+        }
 
         public EzDanEstimate? GetDan(string username, int keyCount, string side)
             => store.GetDanEstimate(username, keyCount, side);

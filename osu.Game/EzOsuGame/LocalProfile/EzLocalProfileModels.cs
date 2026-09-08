@@ -9,7 +9,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
 {
     public static class EzLocalProfileConstants
     {
-        public const string UNKNOWN_USERNAME = "(unknown)";
+        /// <summary>Canonical bucket for scores with empty Realm username (matches API <c>GuestUser</c>).</summary>
+        public const string GUEST_USERNAME = "Guest";
+
+        /// <summary>Legacy empty-username bucket written before Guest normalisation.</summary>
+        public const string LEGACY_UNKNOWN_USERNAME = "(unknown)";
+
+        [Obsolete("Use GUEST_USERNAME")]
+        public const string UNKNOWN_USERNAME = GUEST_USERNAME;
 
         /// <summary>
         /// Sentinel value for the player filter dropdown: show merged archive totals.
@@ -18,6 +25,24 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public const int OSU_RULESET_ID = 0;
         public const int MANIA_RULESET_ID = 3;
+
+        public static string NormaliseUsername(string? username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return GUEST_USERNAME;
+
+            string trimmed = username.Trim();
+
+            if (string.Equals(trimmed, LEGACY_UNKNOWN_USERNAME, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(trimmed, "unknown", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(trimmed, GUEST_USERNAME, StringComparison.OrdinalIgnoreCase))
+                return GUEST_USERNAME;
+
+            return trimmed;
+        }
+
+        public static bool IsGuestUsername(string? username)
+            => string.Equals(NormaliseUsername(username), GUEST_USERNAME, StringComparison.Ordinal);
     }
 
     public readonly record struct EzLocalProfileUsernameCount(string Username, int ScoreCount);

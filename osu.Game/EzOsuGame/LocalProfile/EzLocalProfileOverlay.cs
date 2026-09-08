@@ -279,7 +279,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var items = new List<string> { EzLocalProfileConstants.ALL_PLAYERS };
 
             foreach (string name in archiveSnapshot.IncludedUsernames
-                                                   .Where(n => !string.IsNullOrWhiteSpace(n))
+                                                   .Select(EzLocalProfileConstants.NormaliseUsername)
                                                    .Distinct(StringComparer.Ordinal)
                                                    .OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
             {

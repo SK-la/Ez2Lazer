@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -173,7 +174,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             string names = snapshot.IncludedUsernames.Count == 0
                 ? "-"
-                : string.Join(", ", snapshot.IncludedUsernames);
+                : string.Join(", ", snapshot.IncludedUsernames
+                                            .Select(EzLocalProfileConstants.NormaliseUsername)
+                                            .Distinct(StringComparer.Ordinal));
 
             string baseText = $"{EzSettingsProfile.LOCAL_PROFILE_SHARED_HINT} · {snapshot.LastComputedAt.Value.LocalDateTime:g} · {names}";
 
