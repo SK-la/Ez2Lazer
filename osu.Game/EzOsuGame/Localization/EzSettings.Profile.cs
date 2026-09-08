@@ -146,6 +146,20 @@ namespace osu.Game.EzOsuGame.Localization
                 "暂无历史点。重新计算本地个人成绩后会写入。",
                 "No history points yet. Recompute Local Profile Stats to record them.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_CHIP_TITLE =
+            new EzLocalizationManager.EzLocalisableString("段位（启发式）", "Dan (heuristic)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_SIDE_RC =
+            new EzLocalizationManager.EzLocalisableString("RC", "RC");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_SIDE_LN =
+            new EzLocalizationManager.EzLocalisableString("LN", "LN");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_HEURISTIC_HINT =
+            new EzLocalizationManager.EzLocalisableString(
+                "MSD→Dan 近似，非 LeoBlack",
+                "MSD→Dan approx, not LeoBlack");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_TRACK_INSIGHTS =
             new EzLocalizationManager.EzLocalisableString("成绩洞察", "Profile Insights");
 
