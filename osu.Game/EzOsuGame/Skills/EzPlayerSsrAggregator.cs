@@ -86,6 +86,7 @@ namespace osu.Game.EzOsuGame.Skills
                         Accuracy = score.Accuracy,
                         Rate = rate,
                         ScoredAt = score.Date,
+                        AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
                     });
                 }
             }

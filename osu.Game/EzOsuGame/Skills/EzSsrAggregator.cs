@@ -32,8 +32,8 @@ namespace osu.Game.EzOsuGame.Skills
                     rating += res;
                     sum = 0;
 
-                    foreach (double ssr in ssrs)
-                        sum += Math.Max(0, 2 / (1 - erf(0.1 * (ssr - rating))) - 2);
+                        foreach (double ssr in ssrs)
+                        sum += Math.Max(0, 2 / (1 - EzAbramowitzErf.Erf(0.1 * (ssr - rating))) - 2);
                 }
                 while (Math.Pow(2, rating * 0.1) < sum);
 
@@ -61,16 +61,6 @@ namespace osu.Game.EzOsuGame.Skills
                 Aggregate(plays.Select(p => p.JackSpeed)),
                 Aggregate(plays.Select(p => p.Chordjack)),
                 Aggregate(plays.Select(p => p.Technical)));
-        }
-
-        /// <summary>Abramowitz &amp; Stegun 7.1.26.</summary>
-        private static double erf(double x)
-        {
-            int sign = x < 0 ? -1 : 1;
-            double ax = Math.Abs(x);
-            double t = 1 / (1 + 0.3275911 * ax);
-            double poly = ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t;
-            return sign * (1 - poly * Math.Exp(-ax * ax));
         }
     }
 }

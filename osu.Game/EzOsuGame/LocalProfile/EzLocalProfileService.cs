@@ -43,14 +43,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
             ScoreManager scoreManager,
             IEzReplaySession replaySession,
             EzPlayerSsrAggregator? ssrAggregator = null,
-            EzPlayerDanAggregator? danAggregator = null)
+            EzPlayerDanAggregator? danAggregator = null,
+            EzLocalProfileStore? sharedStore = null)
         {
-            store = new EzLocalProfileStore(storage);
+            store = sharedStore ?? new EzLocalProfileStore(storage);
             aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager, scoreManager, replaySession);
             this.ssrAggregator = ssrAggregator;
             this.danAggregator = danAggregator;
             Snapshot.Value = store.LoadSnapshot();
         }
+
+        /// <summary>Shared store for DI (e.g. <see cref="EzSkillProvider"/> evidence reads).</summary>
+        public EzLocalProfileStore Store => store;
 
         public IReadOnlyList<EzLocalProfileUsernameCount> ScanUsernameCounts() => aggregator.ScanUsernameCounts();
 
@@ -99,9 +103,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                        .ToList();
 
                         // Online-only refresh path: no local usernames selected, just rebuild display from existing partitions + online.
-                        var byUser = selected.Count > 0
-                            ? aggregator.AggregateByUsername(selected, progress, token)
-                            : new Dictionary<string, EzLocalProfileAggregationResult>(StringComparer.Ordinal);
+                        Dictionary<string, EzLocalProfileAggregationResult> byUser;
+                        Dictionary<string, List<ScoreInfo>> maniaScores;
+
+                        if (selected.Count > 0)
+                        {
+                            (byUser, maniaScores) = aggregator.AggregateByUsername(selected, progress, token);
+                        }
+                        else
+                        {
+                            byUser = new Dictionary<string, EzLocalProfileAggregationResult>(StringComparer.Ordinal);
+                            maniaScores = new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
+                        }
 
                         token.ThrowIfCancellationRequested();
 
@@ -113,7 +126,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         store.ApplyUsernamePartitions(byUser, replaceOtherUsernames, online, localOnlineIds);
 
                         if (selected.Count > 0)
-                            writePlayerSkills(selected, token);
+                            writePlayerSkills(maniaScores, token);
                     }
                     catch (OperationCanceledException)
                     {
@@ -132,80 +145,60 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        private void writePlayerSkills(IReadOnlyList<string> usernames, CancellationToken token)
+        private void writePlayerSkills(Dictionary<string, List<ScoreInfo>> maniaScoresByUser, CancellationToken token)
         {
             if (ssrAggregator == null && danAggregator == null)
                 return;
 
-            try
+            foreach ((string username, List<ScoreInfo> scores) in maniaScoresByUser)
             {
-                var maniaScores = aggregator.CollectDetachedManiaScores(usernames);
+                token.ThrowIfCancellationRequested();
 
-                foreach ((string username, List<ScoreInfo> scores) in maniaScores)
-                {
-                    token.ThrowIfCancellationRequested();
+                if (scores.Count == 0)
+                    continue;
 
-                    if (scores.Count == 0)
-                        continue;
-
-                    try
+                tryComputeAndPersist(
+                    username,
+                    () =>
                     {
-                        if (ssrAggregator != null)
-                        {
-                            ssrAggregator.ComputeAndStore(username, scores);
+                        ssrAggregator!.ComputeAndStore(username, scores);
+                        store.ReplaceAxisPlays(username, ssrAggregator.PendingEvidence);
+                    },
+                    ssrAggregator != null,
+                    "[EzLocalProfile] Failed to compute/persist player SSR skills after profile save.");
 
-                            try
-                            {
-                                store.ReplaceAxisPlays(username, ssrAggregator.PendingEvidence);
-                            }
-                            catch (Exception ex) when (ex is not OperationCanceledException)
-                            {
-                                Logger.Error(ex, "[EzLocalProfile] Failed to persist axis play evidence after SSR compute.", Ez2ConfigManager.LOGGER_NAME);
-                            }
-                        }
-                    }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
+                tryComputeAndPersist(
+                    username,
+                    () =>
                     {
-                        Logger.Error(ex, "[EzLocalProfile] Failed to compute player SSR skills after profile save.", Ez2ConfigManager.LOGGER_NAME);
-                    }
-
-                    try
-                    {
-                        if (danAggregator != null)
-                        {
-                            danAggregator.ComputeAndStore(username, scores);
-
-                            try
-                            {
-                                store.ReplaceDanClears(username, danAggregator.PendingEvidence);
-                            }
-                            catch (Exception ex) when (ex is not OperationCanceledException)
-                            {
-                                Logger.Error(ex, "[EzLocalProfile] Failed to persist dan clear evidence after Dan compute.", Ez2ConfigManager.LOGGER_NAME);
-                            }
-                        }
-                    }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        Logger.Error(ex, "[EzLocalProfile] Failed to compute player Dan estimates after profile save.", Ez2ConfigManager.LOGGER_NAME);
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "[EzLocalProfile] Failed to collect mania scores for skill/dan compute.", Ez2ConfigManager.LOGGER_NAME);
+                        danAggregator!.ComputeAndStore(username, scores);
+                        store.ReplaceDanClears(username, danAggregator.PendingEvidence);
+                    },
+                    danAggregator != null,
+                    "[EzLocalProfile] Failed to compute/persist player Dan estimates after profile save.");
             }
         }
 
-        public IReadOnlyList<EzDanClearEvidenceRow> GetDanClears(string username, int? keyCount = null, string? side = null)
-            => store.GetDanClears(username, keyCount, side);
+        private static void tryComputeAndPersist(string username, Action action, bool enabled, string errorMessage)
+        {
+            if (!enabled)
+                return;
 
-        public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null)
-            => store.GetAxisPlays(username, keyCount, skillId);
+            try
+            {
+                action();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Logger.Error(ex, $"{errorMessage} ({username})", Ez2ConfigManager.LOGGER_NAME);
+            }
+        }
+
+        public IReadOnlyList<EzDanClearEvidenceRow> GetDanClears(string username, int? keyCount = null, string? side = null, int? algorithmVersion = null)
+            => store.GetDanClears(username, keyCount, side, algorithmVersion);
+
+        public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null, int? algorithmVersion = null)
+            => store.GetAxisPlays(username, keyCount, skillId, algorithmVersion);
 
         public void ReloadFromDisk()
         {
