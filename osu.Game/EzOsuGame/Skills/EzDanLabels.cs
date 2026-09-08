@@ -63,12 +63,37 @@ namespace osu.Game.EzOsuGame.Skills
 
         public const int LN_LADDER_TOP = 17;
 
-        public static double SrToRawDan(double sr, string family = "stream")
+        public static double SrToRawDan(double sr, string family = "stream", bool calibrate = true)
         {
             if (!double.IsFinite(sr) || sr <= 0)
                 return 1;
 
-            return rawDanFromMeans(sr, meansFor(family));
+            string calibrationFamily = family == "jumpstream" ? "handstream" : family;
+            double calibratedSr = calibrate ? calibrateSrForFamily(sr, calibrationFamily) : sr;
+            return rawDanFromMeans(calibratedSr, meansFor(calibrationFamily));
+        }
+
+        private readonly record struct SrCalibration(double Slope, double Offset, double GateStart, double GateWidth);
+
+        private static readonly Dictionary<string, SrCalibration> sr_calibration = new Dictionary<string, SrCalibration>
+        {
+            ["jack"] = new SrCalibration(0.74, 1.3, 7.4, 0.3),
+            ["stream"] = new SrCalibration(0.92, -0.4, 7, 0.9),
+            ["jumpstream"] = new SrCalibration(1.02, -0.45, 7.25, 0.55),
+            ["handstream"] = new SrCalibration(1.16, -2, 7.4, 0.2),
+            ["stamina"] = new SrCalibration(1.12, -1.5, 7.3, 0.55),
+            ["chordjack"] = new SrCalibration(1, 0, 7.15, 0.85),
+            ["tech"] = new SrCalibration(0.95, -0.9, 7.6, 0.9),
+        };
+
+        private static double calibrateSrForFamily(double sr, string family)
+        {
+            if (!sr_calibration.TryGetValue(family, out var calibration))
+                calibration = sr_calibration["stream"];
+
+            double targetSr = sr * calibration.Slope + calibration.Offset;
+            double gate = Math.Clamp((sr - calibration.GateStart) / calibration.GateWidth, 0, 1);
+            return sr + (targetSr - sr) * gate;
         }
 
         public static string LabelFor(double rawDan, string side, int keyCount)

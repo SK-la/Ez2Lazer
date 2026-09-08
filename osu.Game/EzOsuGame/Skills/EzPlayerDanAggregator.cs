@@ -10,8 +10,8 @@ using osu.Game.Scoring;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// MVP player dan: chart verdict → credit clears → average window. Chart side via <see cref="EzChartDanEstimator"/>.
-    /// Not comparable to mania-hub LeoBlack verdicts; estimates are provisional.
+    /// Player dan: rate-aware chart verdict → credit clears → average window.
+    /// Not LeoBlack; estimates are provisional (DATA-1 heuristic + rate).
     /// </summary>
     public sealed class EzPlayerDanAggregator
     {
@@ -31,6 +31,7 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
             var clearsByBucket = new Dictionary<(int KeyCount, string Side), List<double>>();
+            var msdCache = new Dictionary<(string Hash, int RateMilli), IReadOnlyDictionary<string, double>>();
 
             foreach (var score in scores)
             {
@@ -44,13 +45,36 @@ namespace osu.Game.EzOsuGame.Skills
                 if (beatmapInfo == null)
                     continue;
 
-                // Converts excluded from dan (same spirit as keymode PP).
                 if (beatmapInfo.Ruleset.OnlineID != 3)
                     continue;
 
-                var msd = msdComputer.TryGetOrCompute(beatmapInfo);
-                if (msd == null || msd.Count == 0)
-                    continue;
+                float rate = EzModRate.Resolve(score.Mods);
+                int rateMilli = (int)Math.Round(rate * 1000);
+                var cacheKey = (beatmapInfo.Hash, rateMilli);
+
+                if (!msdCache.TryGetValue(cacheKey, out var msd))
+                {
+                    if (EzModRate.IsNomodRate(rate))
+                    {
+                        msd = msdComputer.TryGetOrCompute(beatmapInfo);
+                    }
+                    else
+                    {
+                        var workingForMsd = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+                        var playableForMsd = workingForMsd.GetPlayableBeatmap(score.Ruleset, score.Mods);
+                        using var calc = new EzMinaCalcFacade();
+                        var vector = calc.CalculateMsd(playableForMsd, rate);
+                        if (vector.Overall <= 0 && vector.Stream <= 0)
+                            continue;
+
+                        msd = EzChartDanEstimator.VectorToMsdDict(vector);
+                    }
+
+                    if (msd == null || msd.Count == 0)
+                        continue;
+
+                    msdCache[cacheKey] = msd;
+                }
 
                 var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
                 var playable = working.GetPlayableBeatmap(score.Ruleset, score.Mods);

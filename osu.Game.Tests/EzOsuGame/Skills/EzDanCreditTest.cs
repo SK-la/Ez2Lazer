@@ -60,5 +60,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(ln!.Side, Is.EqualTo(DanSkillSystem.SIDE_LN));
             Assert.That(ln.RawDan, Is.EqualTo(rc.RawDan).Within(0.001));
         }
+
+        [Test]
+        public void SrCalibrationChangesHighSrRawDan()
+        {
+            double plain = EzDanLabels.SrToRawDan(9.0, "stream", calibrate: false);
+            double calibrated = EzDanLabels.SrToRawDan(9.0, "stream", calibrate: true);
+            Assert.That(calibrated, Is.Not.EqualTo(plain).Within(0.001));
+        }
     }
 }
