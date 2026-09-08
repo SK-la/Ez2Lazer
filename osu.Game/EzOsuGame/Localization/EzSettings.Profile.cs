@@ -146,6 +146,20 @@ namespace osu.Game.EzOsuGame.Localization
                 "暂无历史点。重新计算本地个人成绩后会写入。",
                 "No history points yet. Recompute Local Profile Stats to record them.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_AXIS_PLAYS_FOR =
+            new EzLocalizationManager.EzLocalisableString("支撑成绩 · {0}", "Supporting plays · {0}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_AXIS_PLAYS_EMPTY =
+            new EzLocalizationManager.EzLocalisableString(
+                "暂无该轴的支撑成绩。请重新计算本地个人成绩。",
+                "No supporting plays for this axis yet. Recompute Local Profile Stats.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_AXIS_TREND =
+            new EzLocalizationManager.EzLocalisableString("趋势", "Trend");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_AXIS_UNKNOWN_MAP =
+            new EzLocalizationManager.EzLocalisableString("未知谱面", "Unknown beatmap");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_CHIP_TITLE =
             new EzLocalizationManager.EzLocalisableString("段位（启发式）", "Dan (heuristic)");
 
