@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -11,6 +12,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
+using osu.Game.Database;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -28,6 +30,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     {
         private readonly string username;
         private readonly Bindable<EzLocalProfileDrillScoreRow?>? selectDrillScore;
+        private readonly IReadOnlyList<EzLocalProfileDrillScoreRow>? preloadedDrillScores;
 
         private enum DetailKind
         {
@@ -54,10 +57,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
         [Resolved]
         private RulesetStore rulesets { get; set; } = null!;
 
-        public EzLocalProfileTrackInsightsBody(string username, Bindable<EzLocalProfileDrillScoreRow?>? selectDrillScore = null)
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
+
+        public EzLocalProfileTrackInsightsBody(
+            string username,
+            Bindable<EzLocalProfileDrillScoreRow?>? selectDrillScore = null,
+            IReadOnlyList<EzLocalProfileDrillScoreRow>? preloadedDrillScores = null)
         {
             this.username = username;
             this.selectDrillScore = selectDrillScore;
+            this.preloadedDrillScores = preloadedDrillScores;
 
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -111,8 +121,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             playCardsFlow.Clear();
             openDetail = DetailKind.None;
 
-            var rows = profileService.LoadDrillScores(EzLocalProfileConstants.MANIA_RULESET_ID, username);
-            var plays = EzLocalProfileInsightScoreBuilder.Build(rows, beatmapManager, rulesets);
+            var rows = preloadedDrillScores
+                       ?? profileService.LoadDrillScores(EzLocalProfileConstants.MANIA_RULESET_ID, username);
+            var plays = EzLocalProfileInsightScoreBuilder.Build(rows, beatmapManager, rulesets, realm);
             insights = EzLocalProfileInsightsCalculator.Calculate(plays);
 
             if (insights.SampleSize == 0)

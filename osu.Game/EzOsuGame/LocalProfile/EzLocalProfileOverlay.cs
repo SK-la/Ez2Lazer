@@ -271,7 +271,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             base.PopIn();
             profileService.ReloadFromDisk();
-            refreshContent();
         }
 
         private void refreshPlayerDropdownItems(EzLocalProfileSnapshot archiveSnapshot)
@@ -279,7 +278,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var items = new List<string> { EzLocalProfileConstants.ALL_PLAYERS };
 
             foreach (string name in archiveSnapshot.IncludedUsernames
-                                                   .Where(n => !string.IsNullOrWhiteSpace(n))
+                                                   .Select(EzLocalProfileConstants.NormaliseUsername)
                                                    .Distinct(StringComparer.Ordinal)
                                                    .OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
             {
@@ -337,16 +336,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
                             Text = EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER,
                             Font = OsuFont.GetFont(size: 14),
                         }));
+
+                    refreshDrillContent(snapshot, rulesetId);
                 }
                 else
                 {
+                    var drillScores = profileService.LoadDrillScores(rulesetId, selectedPlayer.Value);
+
                     contentFlow.Add(new EzLocalProfileSection(
                         EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_INSIGHTS,
-                        new EzLocalProfileTrackInsightsBody(selectedPlayer.Value, currentDrillScore)));
+                        new EzLocalProfileTrackInsightsBody(selectedPlayer.Value, currentDrillScore, drillScores)));
 
                     contentFlow.Add(new EzLocalProfileSection(
                         EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS,
                         new EzLocalProfileTrackSkillsBody(selectedPlayer.Value)));
+
+                    refreshDrillContent(snapshot, rulesetId, drillScores);
                 }
             }
             else
@@ -354,9 +359,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 contentFlow.Add(new EzLocalProfileSection(
                     EzSettingsProfile.LOCAL_PROFILE_SECTION_MODE_DATA,
                     new EzLocalProfileModeDataBody(snapshot, rulesetId)));
-            }
 
-            refreshDrillContent(snapshot, rulesetId);
+                refreshDrillContent(snapshot, rulesetId);
+            }
         }
     }
 }
