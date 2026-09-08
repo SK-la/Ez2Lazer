@@ -82,6 +82,16 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>SSR axis play evidence (sqlite). Empty when local-profile store unset.</summary>
         public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null, int? algorithmVersion = null)
-            => localProfileStore?.GetAxisPlays(username, keyCount, skillId, algorithmVersion) ?? [];
+        {
+            var rows = localProfileStore?.GetAxisPlays(username, keyCount, skillId, algorithmVersion) ?? [];
+            if (rows.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username) || localProfileStore == null)
+                return rows;
+
+            return localProfileStore.GetAxisPlays(
+                EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME,
+                keyCount,
+                skillId,
+                algorithmVersion);
+        }
     }
 }

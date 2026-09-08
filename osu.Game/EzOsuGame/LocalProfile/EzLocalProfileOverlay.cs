@@ -349,7 +349,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                     contentFlow.Add(new EzLocalProfileSection(
                         EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS,
-                        new EzLocalProfileTrackSkillsBody(selectedPlayer.Value)));
+                        new EzLocalProfileTrackSkillsBody(selectedPlayer.Value, currentDrillScore, drillScores)));
 
                     refreshDrillContent(snapshot, rulesetId, drillScores);
                 }
