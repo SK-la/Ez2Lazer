@@ -308,16 +308,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             int rulesetId = ruleset.Value?.OnlineID ?? 0;
             var rulesetStats = snapshot.RulesetStats.FirstOrDefault(s => s.RulesetId == rulesetId);
-            bool trackMode = rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID
-                             && analysisSystem.Value == EzLocalProfileAnalysisSystem.Track;
+            bool mania = rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID;
+            bool trackMode = mania && analysisSystem.Value == EzLocalProfileAnalysisSystem.Track;
+            bool allPlayers = string.Equals(selectedPlayer.Value, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal);
 
             contentFlow.Add(new EzLocalProfileSection(
                 EzSettingsProfile.LOCAL_PROFILE_SECTION_CAREER,
                 new EzLocalProfileCareerBody(rulesetStats, snapshot.GradeCounts.Where(g => g.RulesetId == rulesetId))));
 
-            if (trackMode)
+            IReadOnlyList<EzLocalProfileDrillScoreRow>? sharedDrillScores = null;
+
+            if (mania)
             {
-                if (string.Equals(selectedPlayer.Value, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal))
+                if (allPlayers)
                 {
                     contentFlow.Add(new EzLocalProfileSection(
                         EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_INSIGHTS,
@@ -327,32 +330,44 @@ namespace osu.Game.EzOsuGame.LocalProfile
                             Text = EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER,
                             Font = OsuFont.GetFont(size: 14),
                         }));
-
-                    contentFlow.Add(new EzLocalProfileSection(
-                        EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS,
-                        new OsuSpriteText
-                        {
-                            RelativeSizeAxes = Axes.X,
-                            Text = EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER,
-                            Font = OsuFont.GetFont(size: 14),
-                        }));
-
-                    refreshDrillContent(snapshot, rulesetId);
                 }
                 else
                 {
-                    var drillScores = profileService.LoadDrillScores(rulesetId, selectedPlayer.Value);
+                    sharedDrillScores = profileService.LoadDrillScores(rulesetId, selectedPlayer.Value);
 
                     contentFlow.Add(new EzLocalProfileSection(
                         EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_INSIGHTS,
-                        new EzLocalProfileTrackInsightsBody(selectedPlayer.Value, currentDrillScore, drillScores)));
-
-                    contentFlow.Add(new EzLocalProfileSection(
-                        EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS,
-                        new EzLocalProfileTrackSkillsBody(selectedPlayer.Value, currentDrillScore, drillScores)));
-
-                    refreshDrillContent(snapshot, rulesetId, drillScores);
+                        new EzLocalProfileInsightsBody(selectedPlayer.Value, currentDrillScore, sharedDrillScores)));
                 }
+
+                if (trackMode)
+                {
+                    if (allPlayers)
+                    {
+                        contentFlow.Add(new EzLocalProfileSection(
+                            EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS,
+                            new OsuSpriteText
+                            {
+                                RelativeSizeAxes = Axes.X,
+                                Text = EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER,
+                                Font = OsuFont.GetFont(size: 14),
+                            }));
+                    }
+                    else
+                    {
+                        contentFlow.Add(new EzLocalProfileSection(
+                            EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS,
+                            new EzLocalProfileTrackSkillsBody(selectedPlayer.Value, currentDrillScore, sharedDrillScores)));
+                    }
+                }
+                else
+                {
+                    contentFlow.Add(new EzLocalProfileSection(
+                        EzSettingsProfile.LOCAL_PROFILE_SECTION_MODE_DATA,
+                        new EzLocalProfileModeDataBody(snapshot, rulesetId)));
+                }
+
+                refreshDrillContent(snapshot, rulesetId, sharedDrillScores);
             }
             else
             {

@@ -24,9 +24,9 @@ using osuTK;
 namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
-    /// Track-mode Profile Insights: Key Split / Mod / BPM / PP + newest/oldest top plays.
+    /// Profile Insights (Mania Ez / Track): Key Split / Mod / BPM / PP + newest/oldest top plays.
     /// </summary>
-    public partial class EzLocalProfileTrackInsightsBody : FillFlowContainer
+    public partial class EzLocalProfileInsightsBody : FillFlowContainer
     {
         private readonly string username;
         private readonly Bindable<EzLocalProfileDrillScoreRow?>? selectDrillScore;
@@ -60,7 +60,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
 
-        public EzLocalProfileTrackInsightsBody(
+        public EzLocalProfileInsightsBody(
             string username,
             Bindable<EzLocalProfileDrillScoreRow?>? selectDrillScore = null,
             IReadOnlyList<EzLocalProfileDrillScoreRow>? preloadedDrillScores = null)
