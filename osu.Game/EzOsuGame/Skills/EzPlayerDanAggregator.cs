@@ -26,11 +26,15 @@ namespace osu.Game.EzOsuGame.Skills
             this.msdComputer = msdComputer;
         }
 
+        /// <summary>Credited clears collected during the last <see cref="ComputeAndStore"/> (for DATA-3 evidence).</summary>
+        public IReadOnlyList<EzDanClearEvidenceRow> PendingEvidence { get; private set; } = Array.Empty<EzDanClearEvidenceRow>();
+
         public void ComputeAndStore(string username, IEnumerable<ScoreInfo> scores)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
             var clearsByBucket = new Dictionary<(int KeyCount, string Side), List<double>>();
+            var evidence = new List<EzDanClearEvidenceRow>();
             var msdCache = new Dictionary<(string Hash, int RateMilli), IReadOnlyDictionary<string, double>>();
 
             foreach (var score in scores)
@@ -91,6 +95,22 @@ namespace osu.Game.EzOsuGame.Skills
                     clearsByBucket[key] = list = new List<double>();
 
                 list.Add(value);
+
+                string hash = score.BeatmapHash;
+                if (string.IsNullOrWhiteSpace(hash))
+                    hash = beatmapInfo.Hash;
+
+                evidence.Add(new EzDanClearEvidenceRow
+                {
+                    Username = username,
+                    KeyCount = chart.KeyCount,
+                    Side = chart.Side,
+                    BeatmapHash = hash,
+                    Rate = rate,
+                    CreditedDan = value,
+                    Accuracy = score.Accuracy,
+                    ScoredAt = score.Date,
+                });
             }
 
             DateTimeOffset at = DateTimeOffset.UtcNow;
@@ -124,6 +144,8 @@ namespace osu.Game.EzOsuGame.Skills
                     ComputedAt = at,
                 });
             }
+
+            PendingEvidence = evidence;
         }
     }
 }

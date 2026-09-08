@@ -23,11 +23,15 @@ namespace osu.Game.EzOsuGame.Skills
             this.skillStore = skillStore;
         }
 
+        /// <summary>Per-play axis rows collected during the last <see cref="ComputeAndStore"/> (for DATA-3 evidence).</summary>
+        public IReadOnlyList<EzAxisPlayEvidenceRow> PendingEvidence { get; private set; } = Array.Empty<EzAxisPlayEvidenceRow>();
+
         public void ComputeAndStore(string username, IEnumerable<ScoreInfo> scores)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
             var byKey = new Dictionary<int, List<EzSkillsetVector>>();
+            var evidence = new List<EzAxisPlayEvidenceRow>();
 
             using var calc = new EzMinaCalcFacade();
 
@@ -66,6 +70,24 @@ namespace osu.Game.EzOsuGame.Skills
                     byKey[keyCount] = list = new List<EzSkillsetVector>();
 
                 list.Add(vector);
+
+                foreach ((string axisId, double axisValue) in vector.Enumerate())
+                {
+                    if (axisValue <= 0 || !double.IsFinite(axisValue))
+                        continue;
+
+                    evidence.Add(new EzAxisPlayEvidenceRow
+                    {
+                        Username = username,
+                        KeyCount = keyCount,
+                        SkillId = EzSkillIds.Ssr(axisId),
+                        BeatmapHash = score.BeatmapHash,
+                        AxisValue = axisValue,
+                        Accuracy = score.Accuracy,
+                        Rate = rate,
+                        ScoredAt = score.Date,
+                    });
+                }
             }
 
             foreach ((int keyCount, List<EzSkillsetVector> plays) in byKey)
@@ -74,6 +96,8 @@ namespace osu.Game.EzOsuGame.Skills
                 bool provisional = plays.Count < EzPlayerSsrSnapshot.QUALIFYING_PLAYS;
                 skillStore.WritePlayerSsr(username, keyCount, aggregated, plays.Count, provisional);
             }
+
+            PendingEvidence = evidence;
         }
 
         /// <summary>Accuracy-only clamp path (tests / callers without full score).</summary>
