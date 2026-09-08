@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.HUD;
@@ -14,8 +15,14 @@ namespace osu.Game.EzOsuGame.Overlays
 {
     public partial class BeatmapEzAnalysisWedge : VisibilityContainer
     {
-        private EzHUDRadarPanel xxySrRadar = null!;
-        private EzHUDRadarPanel keyPatternRadar = null!;
+        private EzHUDRadarPanel leftRadar = null!;
+        private EzHUDRadarPanel rightRadar = null!;
+
+        public Bindable<string?> TargetUsername { get; } = new Bindable<string?>();
+
+        public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.XxySrPattern);
+
+        public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.Skill);
 
         [BackgroundDependencyLoader]
         private void load()
@@ -49,27 +56,33 @@ namespace osu.Game.EzOsuGame.Overlays
                             Spacing = new Vector2(-10f, 0f),
                             Children = new Drawable[]
                             {
-                                // 左侧雷达图 - XxySR Pattern
-                                xxySrRadar = new EzHUDRadarPanel
+                                leftRadar = new EzHUDRadarPanel
                                 {
                                     Anchor = Anchor.TopLeft,
                                     Origin = Anchor.TopLeft,
                                     Shear = -OsuGame.SHEAR,
-                                    RadarDisplayMode = { Value = EzRadarDisplayMode.XxySrPattern },
                                 },
-                                // 右侧雷达图 - Key Pattern
-                                keyPatternRadar = new EzHUDRadarPanel
+                                rightRadar = new EzHUDRadarPanel
                                 {
                                     Anchor = Anchor.TopLeft,
                                     Origin = Anchor.TopLeft,
                                     Shear = -OsuGame.SHEAR,
-                                    RadarDisplayMode = { Value = EzRadarDisplayMode.KeyPattern },
                                 },
                             },
                         },
                     },
                 },
             });
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            leftRadar.RadarDisplayMode.BindTo(LeftRadarMode);
+            rightRadar.RadarDisplayMode.BindTo(RightRadarMode);
+            leftRadar.TargetUsername.BindTo(TargetUsername);
+            rightRadar.TargetUsername.BindTo(TargetUsername);
         }
 
         protected override void PopIn()
@@ -80,7 +93,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         protected override void PopOut()
         {
-            this.MoveToX(-150, SongSelect.ENTER_DURATION, Easing.OutQuint)
+            this.MoveToX(-100, SongSelect.ENTER_DURATION, Easing.OutQuint)
                 .FadeOut(SongSelect.ENTER_DURATION / 3, Easing.In);
         }
     }

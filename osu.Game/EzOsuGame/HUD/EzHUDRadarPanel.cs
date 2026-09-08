@@ -21,6 +21,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
@@ -45,7 +46,10 @@ namespace osu.Game.EzOsuGame.HUD
         KeyPattern,
 
         [Description("XxySR Pattern")]
-        XxySrPattern
+        XxySrPattern,
+
+        [Description("Skill")]
+        Skill
     }
 
     /// <summary>
@@ -112,6 +116,15 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 DataAreaColour { get; } = new BindableColour4(new Color4(255, 215, 0, 128));
 
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_PLAYER_DATA_LINE_COLOUR), nameof(EzHUDStrings.RADAR_PLAYER_DATA_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        public BindableColour4 PlayerDataLineColour { get; } = new BindableColour4(new Color4(80, 220, 120, 230));
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_PLAYER_DATA_AREA_COLOUR), nameof(EzHUDStrings.RADAR_PLAYER_DATA_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        public BindableColour4 PlayerDataAreaColour { get; } = new BindableColour4(new Color4(80, 220, 120, 128));
+
+        /// <summary>Target player for Skill-mode SSR overlay. Externally bindable (e.g. EzAnalysis header).</summary>
+        public Bindable<string?> TargetUsername { get; } = new Bindable<string?>();
+
         public int AxisCount
         {
             get => chart?.AxisCount ?? parameterRatios.Length;
@@ -150,6 +163,12 @@ namespace osu.Game.EzOsuGame.HUD
 
         [Resolved]
         private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
+
+        [Resolved]
+        private EzSkillProvider? skillProvider { get; set; }
+
+        [Resolved]
+        private EzBeatmapMsdComputer? beatmapMsdComputer { get; set; }
 
         private IBindable<StarDifficulty>? difficultyBindable;
         private CancellationTokenSource? difficultyCancellationSource;
@@ -227,6 +246,8 @@ namespace osu.Game.EzOsuGame.HUD
             bindPreserveAlpha(BaseAreaColour);
             bindPreserveAlpha(DataLineColour);
             bindPreserveAlpha(DataAreaColour);
+            bindPreserveAlpha(PlayerDataLineColour);
+            bindPreserveAlpha(PlayerDataAreaColour);
             bindPreserveAlpha(BackgroundColour);
             bindPreserveAlpha(LabelColour);
 
@@ -238,19 +259,20 @@ namespace osu.Game.EzOsuGame.HUD
             BaseAreaColour.BindValueChanged(_ => applyChartColours(), true);
             DataLineColour.BindValueChanged(_ => applyChartColours(), true);
             DataAreaColour.BindValueChanged(_ => applyChartColours(), true);
+            PlayerDataLineColour.BindValueChanged(_ => applyChartColours(), true);
+            PlayerDataAreaColour.BindValueChanged(_ => applyChartColours(), true);
             BackgroundColour.BindValueChanged(e =>
             {
                 background.Colour = e.NewValue;
             }, true);
             LabelColour.BindValueChanged(_ => applyChartColours(), true);
-            RadarDisplayMode.BindValueChanged(_ =>
+            RadarDisplayMode.BindValueChanged(_ => refreshRadarPresentation(), true);
+            UseAbsoluteValue.BindValueChanged(_ => refreshRadarPresentation(), true);
+            TargetUsername.BindValueChanged(_ =>
             {
-                if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate)
-                    updateParameterRatios(difficultyBindable?.Value ?? default);
-                else
-                    updateRulesetSpecificRadarPresentation();
-            }, true);
-            UseAbsoluteValue.BindValueChanged(_ => updateRulesetSpecificRadarPresentation(), true);
+                if (RadarDisplayMode.Value == EzRadarDisplayMode.Skill)
+                    updateSkillRadarPresentation();
+            });
 
             chart?.SetData(parameterRatios);
             updateAxisTexts();
@@ -287,6 +309,22 @@ namespace osu.Game.EzOsuGame.HUD
             }, true);
         }
 
+        private void refreshRadarPresentation()
+        {
+            if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate)
+            {
+                chart?.ClearSecondaryData();
+                updateParameterRatios(difficultyBindable?.Value ?? default);
+            }
+            else if (RadarDisplayMode.Value == EzRadarDisplayMode.Skill)
+                updateSkillRadarPresentation();
+            else
+            {
+                chart?.ClearSecondaryData();
+                updateRulesetSpecificRadarPresentation();
+            }
+        }
+
         private static void bindPreserveAlpha(BindableColour4 colourBindable)
         {
             colourBindable.BindValueChanged(e =>
@@ -308,22 +346,124 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateParameterRatios(StarDifficulty difficulty)
         {
+            if (RadarDisplayMode.Value == EzRadarDisplayMode.Skill)
+            {
+                updateSkillRadarPresentation();
+                return;
+            }
+
             if (RadarDisplayMode.Value != EzRadarDisplayMode.Metadate && beginRulesetSpecificRadarUpdate())
                 return;
 
             cancelRadarAnalysis();
+            chart?.ClearSecondaryData();
             applyRadarData(createGeneralRadarData(difficulty), getGeneralAxisMaxValues());
         }
 
         private void updateRulesetSpecificRadarPresentation()
         {
-            if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate)
+            if (RadarDisplayMode.Value is EzRadarDisplayMode.Metadate or EzRadarDisplayMode.Skill)
                 return;
 
             if (cachedRulesetSpecificRadarResult is EzRulesetSpecificRadarResult cachedResult)
                 applyRulesetSpecificRadarResult(cachedResult);
             else
                 updateParameterRatios(difficultyBindable?.Value ?? default);
+        }
+
+        private void updateSkillRadarPresentation()
+        {
+            cancelRadarAnalysis();
+
+            string[] axes = skill_radar_axes;
+            AxisCount = axes.Length;
+            activeAxisLabels = axes.Select(skillAxisDisplayName).ToArray();
+            activeAxisFormats = Enumerable.Repeat("0.00", axes.Length).ToArray();
+
+            var beatmapInfo = beatmap.Value.BeatmapInfo;
+
+            if (beatmapInfo == null || beatmapInfo.Ruleset.OnlineID != 3)
+            {
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            IReadOnlyDictionary<string, double> msd = skillProvider?.GetBeatmapMsd(beatmapInfo.Hash)
+                                                      ?? new Dictionary<string, double>();
+
+            if (msd.Count == 0 && beatmapMsdComputer != null)
+                msd = beatmapMsdComputer.TryGetOrCompute(beatmapInfo) ?? new Dictionary<string, double>();
+
+            int keyCount = 0;
+
+            try
+            {
+                var working = beatmap.Value;
+                var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods.Value);
+                keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
+            }
+            catch
+            {
+                // fall through with keyCount 0
+            }
+
+            IReadOnlyDictionary<string, double> ssr = new Dictionary<string, double>();
+
+            string? username = TargetUsername.Value;
+            if (!string.IsNullOrWhiteSpace(username) && keyCount > 0 && skillProvider != null)
+                ssr = skillProvider.GetPlayerSsrSnapshot(username, keyCount).Values;
+
+            double max = 0;
+
+            for (int i = 0; i < axes.Length; i++)
+            {
+                string axis = axes[i];
+                double beatmapValue = msd.GetValueOrDefault(EzSkillIds.Msd(axis), 0);
+                double playerValue = ssr.GetValueOrDefault(EzSkillIds.Ssr(axis), 0);
+                parameterValues[i] = (float)beatmapValue;
+                max = Math.Max(max, Math.Max(beatmapValue, playerValue));
+            }
+
+            if (max <= 0)
+                max = 1;
+
+            float[] playerRatios = new float[axes.Length];
+
+            for (int i = 0; i < axes.Length; i++)
+            {
+                string axis = axes[i];
+                parameterRatios[i] = (float)(parameterValues[i] / max);
+                playerRatios[i] = (float)(ssr.GetValueOrDefault(EzSkillIds.Ssr(axis), 0) / max);
+            }
+
+            chart?.SetData(parameterRatios);
+            chart?.SetSecondaryData(playerRatios);
+            updateAxisTexts();
+            applyChartColours();
+        }
+
+        private static readonly string[] skill_radar_axes = EzSkillIds.MINA_SKILLSETS
+                                                                      .Where(a => a != EzSkillIds.OVERALL)
+                                                                      .ToArray();
+
+        private static string skillAxisDisplayName(string axis) => axis switch
+        {
+            EzSkillIds.STREAM => "Stream",
+            EzSkillIds.JUMPSTREAM => "JS",
+            EzSkillIds.HANDSTREAM => "HS",
+            EzSkillIds.STAMINA => "Stam",
+            EzSkillIds.JACK_SPEED => "Jack",
+            EzSkillIds.CHORDJACK => "CJ",
+            EzSkillIds.TECHNICAL => "Tech",
+            _ => axis,
+        };
+
+        private void cancelRadarAnalysis()
+        {
+            radarAnalysisCancellationSource?.Cancel();
+            radarAnalysisCancellationSource?.Dispose();
+            radarAnalysisCancellationSource = null;
         }
 
         private bool beginRulesetSpecificRadarUpdate()
@@ -429,11 +569,13 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             chart?.SetData(parameterRatios);
+            chart?.ClearSecondaryData();
             updateAxisTexts();
         }
 
         private void applyRulesetSpecificRadarResult(EzRulesetSpecificRadarResult radarResult)
         {
+            chart?.ClearSecondaryData();
             EzRadarChartData<string> displayedRadarData = createDisplayedRulesetRadarData(radarResult);
             applyRadarData(displayedRadarData, getRulesetSpecificAxisMaxValues());
         }
@@ -485,14 +627,8 @@ namespace osu.Game.EzOsuGame.HUD
             Array.Clear(parameterValues, 0, parameterValues.Length);
             Array.Clear(parameterRatios, 0, parameterRatios.Length);
             chart?.SetData(parameterRatios);
+            chart?.ClearSecondaryData();
             updateAxisTexts();
-        }
-
-        private void cancelRadarAnalysis()
-        {
-            radarAnalysisCancellationSource?.Cancel();
-            radarAnalysisCancellationSource?.Dispose();
-            radarAnalysisCancellationSource = null;
         }
 
         private static float normalise(float value, float maxValue)
@@ -514,6 +650,9 @@ namespace osu.Game.EzOsuGame.HUD
             chart.DataStrokeColour = DataLineColour.Value;
             chart.DataPointColour = DataLineColour.Value;
             chart.DataFillColour = DataAreaColour.Value;
+            chart.SecondaryDataStrokeColour = PlayerDataLineColour.Value;
+            chart.SecondaryDataPointColour = PlayerDataLineColour.Value;
+            chart.SecondaryDataFillColour = PlayerDataAreaColour.Value;
             chart.Invalidate(Invalidation.DrawNode);
 
             foreach (var container in axisLabelContainers)
@@ -636,6 +775,7 @@ namespace osu.Game.EzOsuGame.HUD
     {
         private int axisCount = 6;
         private float[] dataRatios = new float[6];
+        private float[]? secondaryDataRatios;
         private Texture? whitePixel;
 
         public int AxisCount
@@ -650,6 +790,8 @@ namespace osu.Game.EzOsuGame.HUD
 
                 axisCount = clamped;
                 Array.Resize(ref dataRatios, axisCount);
+                if (secondaryDataRatios != null)
+                    Array.Resize(ref secondaryDataRatios, axisCount);
                 Invalidate(Invalidation.DrawNode);
             }
         }
@@ -677,6 +819,12 @@ namespace osu.Game.EzOsuGame.HUD
         public Color4 DataStrokeColour { get; set; } = new Color4(255, 230, 128, 230);
 
         public Color4 DataPointColour { get; set; } = new Color4(255, 242, 176, 255);
+
+        public Color4 SecondaryDataFillColour { get; set; } = new Color4(80, 220, 120, 95);
+
+        public Color4 SecondaryDataStrokeColour { get; set; } = new Color4(80, 220, 120, 230);
+
+        public Color4 SecondaryDataPointColour { get; set; } = new Color4(120, 240, 160, 255);
 
         public RadarChart()
         {
@@ -715,6 +863,24 @@ namespace osu.Game.EzOsuGame.HUD
             Invalidate(Invalidation.DrawNode);
         }
 
+        public void SetSecondaryData(IReadOnlyList<float> ratios)
+        {
+            secondaryDataRatios ??= new float[axisCount];
+            if (secondaryDataRatios.Length != axisCount)
+                Array.Resize(ref secondaryDataRatios, axisCount);
+
+            for (int i = 0; i < axisCount; i++)
+                secondaryDataRatios[i] = i < ratios.Count ? Math.Clamp(ratios[i], 0, 1) : 0;
+
+            Invalidate(Invalidation.DrawNode);
+        }
+
+        public void ClearSecondaryData()
+        {
+            secondaryDataRatios = null;
+            Invalidate(Invalidation.DrawNode);
+        }
+
         protected override DrawNode CreateDrawNode() => new RadarChartDrawNode(this);
 
         private class RadarChartDrawNode : DrawNode
@@ -722,6 +888,7 @@ namespace osu.Game.EzOsuGame.HUD
             private readonly RadarChart source;
 
             private float[] ratios = Array.Empty<float>();
+            private float[]? secondaryRatios;
             private int axisCount;
 
             private int gridLevels;
@@ -737,6 +904,9 @@ namespace osu.Game.EzOsuGame.HUD
             private Color4 dataFillColour;
             private Color4 dataStrokeColour;
             private Color4 dataPointColour;
+            private Color4 secondaryDataFillColour;
+            private Color4 secondaryDataStrokeColour;
+            private Color4 secondaryDataPointColour;
 
             private Vector2 drawSize;
             private Texture? texture;
@@ -772,9 +942,26 @@ namespace osu.Game.EzOsuGame.HUD
                 dataFillColour = source.DataFillColour;
                 dataStrokeColour = source.DataStrokeColour;
                 dataPointColour = source.DataPointColour;
+                secondaryDataFillColour = source.SecondaryDataFillColour;
+                secondaryDataStrokeColour = source.SecondaryDataStrokeColour;
+                secondaryDataPointColour = source.SecondaryDataPointColour;
 
                 for (int i = 0; i < axisCount; i++)
                     ratios[i] = source.dataRatios[i];
+
+                if (source.secondaryDataRatios == null)
+                {
+                    secondaryRatios = null;
+                }
+                else
+                {
+                    secondaryRatios ??= new float[axisCount];
+                    if (secondaryRatios.Length != axisCount)
+                        Array.Resize(ref secondaryRatios, axisCount);
+
+                    for (int i = 0; i < axisCount; i++)
+                        secondaryRatios[i] = source.secondaryDataRatios[i];
+                }
             }
 
             protected override void Draw(IRenderer renderer)
@@ -804,13 +991,55 @@ namespace osu.Game.EzOsuGame.HUD
                 for (int i = 0; i < axisCount; i++)
                     drawLine(renderer, center, outerVertices[i], axisColour, axisThickness);
 
-                var dataVertices = createVertices(center, radius, ratios);
+                var primaryVertices = createVertices(center, radius, ratios);
 
-                drawFanFill(renderer, center, dataVertices, dataFillColour);
-                drawPolygonOutline(renderer, dataVertices, dataStrokeColour, dataOutlineThickness);
-                drawPoints(renderer, dataVertices, dataPointColour, dataPointSize);
+                if (secondaryRatios == null)
+                {
+                    drawFanFill(renderer, center, primaryVertices, dataFillColour);
+                    drawPolygonOutline(renderer, primaryVertices, dataStrokeColour, dataOutlineThickness);
+                    drawPoints(renderer, primaryVertices, dataPointColour, dataPointSize);
+                }
+                else
+                {
+                    var secondaryVertices = createVertices(center, radius, secondaryRatios);
+
+                    // Smaller coverage draws above so both polygons stay readable when nested.
+                    bool primaryIsSmaller = averageRatio(ratios) <= averageRatio(secondaryRatios);
+
+                    if (primaryIsSmaller)
+                    {
+                        drawFanFill(renderer, center, secondaryVertices, secondaryDataFillColour);
+                        drawPolygonOutline(renderer, secondaryVertices, secondaryDataStrokeColour, dataOutlineThickness);
+                        drawFanFill(renderer, center, primaryVertices, dataFillColour);
+                        drawPolygonOutline(renderer, primaryVertices, dataStrokeColour, dataOutlineThickness);
+                    }
+                    else
+                    {
+                        drawFanFill(renderer, center, primaryVertices, dataFillColour);
+                        drawPolygonOutline(renderer, primaryVertices, dataStrokeColour, dataOutlineThickness);
+                        drawFanFill(renderer, center, secondaryVertices, secondaryDataFillColour);
+                        drawPolygonOutline(renderer, secondaryVertices, secondaryDataStrokeColour, dataOutlineThickness);
+                    }
+
+                    // Endpoint nodes always on top of both fills/strokes.
+                    drawPoints(renderer, primaryVertices, dataPointColour, dataPointSize);
+                    drawPoints(renderer, secondaryVertices, secondaryDataPointColour, dataPointSize);
+                }
 
                 renderer.PopLocalMatrix();
+            }
+
+            private static float averageRatio(IReadOnlyList<float> values)
+            {
+                if (values.Count == 0)
+                    return 0;
+
+                float sum = 0;
+
+                for (int i = 0; i < values.Count; i++)
+                    sum += Math.Clamp(values[i], 0, 1);
+
+                return sum / values.Count;
             }
 
             private Vector2[] createVertices(Vector2 center, float radius, float ratio)
