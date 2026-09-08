@@ -10,23 +10,23 @@ using osu.Game.Scoring;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Player dan: rate-aware chart verdict → credit clears → average window.
+    /// Player dan: chart <see cref="EzChartDanEstimator.TryEstimate"/> → credit clears → average window.
     /// Not LeoBlack; estimates are provisional (DATA-1 heuristic + rate).
     /// </summary>
     public sealed class EzPlayerDanAggregator
     {
         private readonly BeatmapManager beatmapManager;
         private readonly EzSkillStore skillStore;
-        private readonly EzBeatmapMsdComputer msdComputer;
+        private readonly EzChartDanEstimator chartDanEstimator;
 
-        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzSkillStore skillStore, EzBeatmapMsdComputer msdComputer)
+        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzSkillStore skillStore, EzChartDanEstimator chartDanEstimator)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
-            this.msdComputer = msdComputer;
+            this.chartDanEstimator = chartDanEstimator;
         }
 
-        /// <summary>Credited clears collected during the last <see cref="ComputeAndStore"/> (for DATA-3 evidence).</summary>
+        /// <summary>Credited clears collected during the last <see cref="ComputeAndStore"/> (for evidence).</summary>
         public IReadOnlyList<EzDanClearEvidenceRow> PendingEvidence { get; private set; } = Array.Empty<EzDanClearEvidenceRow>();
 
         public void ComputeAndStore(string username, IEnumerable<ScoreInfo> scores)
@@ -35,7 +35,6 @@ namespace osu.Game.EzOsuGame.Skills
 
             var clearsByBucket = new Dictionary<(int KeyCount, string Side), List<double>>();
             var evidence = new List<EzDanClearEvidenceRow>();
-            var msdCache = new Dictionary<(string Hash, int RateMilli), IReadOnlyDictionary<string, double>>();
 
             foreach (var score in scores)
             {
@@ -52,37 +51,7 @@ namespace osu.Game.EzOsuGame.Skills
                 if (beatmapInfo.Ruleset.OnlineID != 3)
                     continue;
 
-                float rate = EzModRate.Resolve(score.Mods);
-                int rateMilli = (int)Math.Round(rate * 1000);
-                var cacheKey = (beatmapInfo.Hash, rateMilli);
-
-                if (!msdCache.TryGetValue(cacheKey, out var msd))
-                {
-                    if (EzModRate.IsNomodRate(rate))
-                    {
-                        msd = msdComputer.TryGetOrCompute(beatmapInfo);
-                    }
-                    else
-                    {
-                        var workingForMsd = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                        var playableForMsd = workingForMsd.GetPlayableBeatmap(score.Ruleset, score.Mods);
-                        using var calc = new EzMinaCalcFacade();
-                        var vector = calc.CalculateMsd(playableForMsd, rate);
-                        if (vector.Overall <= 0 && vector.Stream <= 0)
-                            continue;
-
-                        msd = EzChartDanEstimator.VectorToMsdDict(vector);
-                    }
-
-                    if (msd == null || msd.Count == 0)
-                        continue;
-
-                    msdCache[cacheKey] = msd;
-                }
-
-                var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                var playable = working.GetPlayableBeatmap(score.Ruleset, score.Mods);
-                var chart = EzChartDanEstimator.FromMsdAndPlayable(msd, playable);
+                var chart = chartDanEstimator.TryEstimate(beatmapInfo, score.Mods);
                 if (chart == null)
                     continue;
 
@@ -106,10 +75,11 @@ namespace osu.Game.EzOsuGame.Skills
                     KeyCount = chart.KeyCount,
                     Side = chart.Side,
                     BeatmapHash = hash,
-                    Rate = rate,
+                    Rate = EzModRate.Resolve(score.Mods),
                     CreditedDan = value,
                     Accuracy = score.Accuracy,
                     ScoredAt = score.Date,
+                    AlgorithmVersion = EzDanAlgorithm.VERSION,
                 });
             }
 

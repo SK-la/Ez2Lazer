@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -14,11 +15,17 @@ namespace osu.Game.EzOsuGame.Skills
     {
         private readonly EzSkillStore store;
         private readonly EzChartDanEstimator? chartDanEstimator;
+        private readonly EzLocalProfileStore? localProfileStore;
 
-        public EzSkillProvider(EzSkillStore store, EzSkillRegistry? registry = null, EzChartDanEstimator? chartDanEstimator = null)
+        public EzSkillProvider(
+            EzSkillStore store,
+            EzSkillRegistry? registry = null,
+            EzChartDanEstimator? chartDanEstimator = null,
+            EzLocalProfileStore? localProfileStore = null)
         {
             this.store = store;
             this.chartDanEstimator = chartDanEstimator;
+            this.localProfileStore = localProfileStore;
             Registry = registry ?? new EzSkillRegistry();
         }
 
@@ -50,5 +57,13 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         public EzChartDanVerdict? TryGetChartDan(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
             => chartDanEstimator?.TryEstimate(beatmapInfo, mods);
+
+        /// <summary>Dan clear evidence (sqlite). Empty when local-profile store unset.</summary>
+        public IReadOnlyList<EzDanClearEvidenceRow> GetDanClears(string username, int? keyCount = null, string? side = null, int? algorithmVersion = null)
+            => localProfileStore?.GetDanClears(username, keyCount, side, algorithmVersion) ?? [];
+
+        /// <summary>SSR axis play evidence (sqlite). Empty when local-profile store unset.</summary>
+        public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null, int? algorithmVersion = null)
+            => localProfileStore?.GetAxisPlays(username, keyCount, skillId, algorithmVersion) ?? [];
     }
 }

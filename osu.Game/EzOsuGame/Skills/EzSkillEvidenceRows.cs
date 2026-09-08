@@ -6,7 +6,7 @@ using System;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// One credited dan clear stored in <c>ez-local-profile.sqlite</c> (DATA-3).
+    /// One credited dan clear stored in <c>ez-local-profile.sqlite</c> (DATA-3 / DATA-H).
     /// </summary>
     public sealed class EzDanClearEvidenceRow
     {
@@ -18,10 +18,11 @@ namespace osu.Game.EzOsuGame.Skills
         public double CreditedDan { get; init; }
         public double Accuracy { get; init; }
         public DateTimeOffset ScoredAt { get; init; }
+        public int AlgorithmVersion { get; init; } = EzDanAlgorithm.VERSION;
     }
 
     /// <summary>
-    /// One per-play SSR axis contribution stored in <c>ez-local-profile.sqlite</c> (DATA-3).
+    /// One per-play SSR axis contribution stored in <c>ez-local-profile.sqlite</c> (DATA-3 / DATA-H).
     /// </summary>
     public sealed class EzAxisPlayEvidenceRow
     {
@@ -33,5 +34,6 @@ namespace osu.Game.EzOsuGame.Skills
         public double Accuracy { get; init; }
         public double Rate { get; init; } = 1;
         public DateTimeOffset ScoredAt { get; init; }
+        public int AlgorithmVersion { get; init; } = EzManiaSkillAlgorithm.VERSION;
     }
 }
