@@ -70,7 +70,8 @@ namespace osu.Game.EzOsuGame.Skills
             foreach ((int keyCount, List<EzSkillsetVector> plays) in byKey)
             {
                 var aggregated = EzSsrAggregator.AggregateVectors(plays);
-                skillStore.WritePlayerSsr(username, keyCount, aggregated, plays.Count);
+                bool provisional = plays.Count < EzPlayerSsrSnapshot.QUALIFYING_PLAYS;
+                skillStore.WritePlayerSsr(username, keyCount, aggregated, plays.Count, provisional);
             }
         }
 

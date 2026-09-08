@@ -106,6 +106,36 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        public EzPlayerSsrSnapshot GetPlayerSsrSnapshot(string username, int keyCount, int? algorithmVersion = null)
+        {
+            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+
+            return realmAccess.Run(r =>
+            {
+                var rows = r.All<EzPlayerSkillValue>()
+                            .Where(v => v.Username == username
+                                        && v.KeyCount == keyCount
+                                        && v.SystemId == EzSkillSystems.PLAYER_SSR
+                                        && v.AlgorithmVersion == version)
+                            .ToList();
+
+                if (rows.Count == 0)
+                    return new EzPlayerSsrSnapshot();
+
+                var values = rows.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
+                var meta = rows.FirstOrDefault(v => v.SkillId == EzSkillIds.Ssr(EzSkillIds.OVERALL)) ?? rows[0];
+
+                return new EzPlayerSsrSnapshot
+                {
+                    Values = values,
+                    AnalyzedPlays = meta.AnalyzedPlays,
+                    Provisional = meta.Provisional,
+                    Stale = meta.Stale,
+                    ComputedAt = meta.ComputedAt,
+                };
+            });
+        }
+
         public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
