@@ -12,6 +12,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.LocalProfile
@@ -193,6 +194,186 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 ensureInitialised();
                 using var connection = openConnection();
                 setMeta(connection, pullOffsetKey(kind, rulesetId), Math.Max(0, offset).ToString(CultureInfo.InvariantCulture));
+            }
+        }
+
+        /// <summary>
+        /// Replace all dan clear evidence rows for <paramref name="username"/> (DATA-3).
+        /// </summary>
+        public void ReplaceDanClears(string username, IReadOnlyList<EzDanClearEvidenceRow> rows)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentNullException.ThrowIfNull(rows);
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var tx = connection.BeginTransaction();
+
+                using (var del = connection.CreateCommand())
+                {
+                    del.Transaction = tx;
+                    del.CommandText = "DELETE FROM dan_clear_evidence WHERE username = $username;";
+                    del.Parameters.AddWithValue("$username", username);
+                    del.ExecuteNonQuery();
+                }
+
+                foreach (var row in rows)
+                {
+                    using var ins = connection.CreateCommand();
+                    ins.Transaction = tx;
+                    ins.CommandText = """
+                                      INSERT INTO dan_clear_evidence
+                                          (username, key_count, side, beatmap_hash, rate, credited_dan, accuracy, scored_at_ms)
+                                      VALUES
+                                          ($username, $key_count, $side, $beatmap_hash, $rate, $credited_dan, $accuracy, $scored_at_ms);
+                                      """;
+                    ins.Parameters.AddWithValue("$username", username);
+                    ins.Parameters.AddWithValue("$key_count", row.KeyCount);
+                    ins.Parameters.AddWithValue("$side", row.Side);
+                    ins.Parameters.AddWithValue("$beatmap_hash", row.BeatmapHash);
+                    ins.Parameters.AddWithValue("$rate", row.Rate);
+                    ins.Parameters.AddWithValue("$credited_dan", row.CreditedDan);
+                    ins.Parameters.AddWithValue("$accuracy", row.Accuracy);
+                    ins.Parameters.AddWithValue("$scored_at_ms", row.ScoredAt.ToUnixTimeMilliseconds());
+                    ins.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+        }
+
+        /// <summary>
+        /// Replace all SSR axis play evidence rows for <paramref name="username"/> (DATA-3).
+        /// </summary>
+        public void ReplaceAxisPlays(string username, IReadOnlyList<EzAxisPlayEvidenceRow> rows)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentNullException.ThrowIfNull(rows);
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var tx = connection.BeginTransaction();
+
+                using (var del = connection.CreateCommand())
+                {
+                    del.Transaction = tx;
+                    del.CommandText = "DELETE FROM axis_play_evidence WHERE username = $username;";
+                    del.Parameters.AddWithValue("$username", username);
+                    del.ExecuteNonQuery();
+                }
+
+                foreach (var row in rows)
+                {
+                    using var ins = connection.CreateCommand();
+                    ins.Transaction = tx;
+                    ins.CommandText = """
+                                      INSERT INTO axis_play_evidence
+                                          (username, key_count, skill_id, beatmap_hash, axis_value, accuracy, rate, scored_at_ms)
+                                      VALUES
+                                          ($username, $key_count, $skill_id, $beatmap_hash, $axis_value, $accuracy, $rate, $scored_at_ms);
+                                      """;
+                    ins.Parameters.AddWithValue("$username", username);
+                    ins.Parameters.AddWithValue("$key_count", row.KeyCount);
+                    ins.Parameters.AddWithValue("$skill_id", row.SkillId);
+                    ins.Parameters.AddWithValue("$beatmap_hash", row.BeatmapHash);
+                    ins.Parameters.AddWithValue("$axis_value", row.AxisValue);
+                    ins.Parameters.AddWithValue("$accuracy", row.Accuracy);
+                    ins.Parameters.AddWithValue("$rate", row.Rate);
+                    ins.Parameters.AddWithValue("$scored_at_ms", row.ScoredAt.ToUnixTimeMilliseconds());
+                    ins.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+            }
+        }
+
+        public IReadOnlyList<EzDanClearEvidenceRow> GetDanClears(string username, int? keyCount = null, string? side = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  SELECT username, key_count, side, beatmap_hash, rate, credited_dan, accuracy, scored_at_ms
+                                  FROM dan_clear_evidence
+                                  WHERE username = $username
+                                    AND ($key_count IS NULL OR key_count = $key_count)
+                                    AND ($side IS NULL OR side = $side)
+                                  ORDER BY credited_dan DESC, scored_at_ms DESC;
+                                  """;
+                cmd.Parameters.AddWithValue("$username", username);
+                cmd.Parameters.AddWithValue("$key_count", (object?)keyCount ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("$side", (object?)side ?? DBNull.Value);
+
+                var list = new List<EzDanClearEvidenceRow>();
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    list.Add(new EzDanClearEvidenceRow
+                    {
+                        Username = reader.GetString(0),
+                        KeyCount = reader.GetInt32(1),
+                        Side = reader.GetString(2),
+                        BeatmapHash = reader.GetString(3),
+                        Rate = reader.GetDouble(4),
+                        CreditedDan = reader.GetDouble(5),
+                        Accuracy = reader.GetDouble(6),
+                        ScoredAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(7)),
+                    });
+                }
+
+                return list;
+            }
+        }
+
+        public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  SELECT username, key_count, skill_id, beatmap_hash, axis_value, accuracy, rate, scored_at_ms
+                                  FROM axis_play_evidence
+                                  WHERE username = $username
+                                    AND ($key_count IS NULL OR key_count = $key_count)
+                                    AND ($skill_id IS NULL OR skill_id = $skill_id)
+                                  ORDER BY axis_value DESC, scored_at_ms DESC;
+                                  """;
+                cmd.Parameters.AddWithValue("$username", username);
+                cmd.Parameters.AddWithValue("$key_count", (object?)keyCount ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("$skill_id", (object?)skillId ?? DBNull.Value);
+
+                var list = new List<EzAxisPlayEvidenceRow>();
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    list.Add(new EzAxisPlayEvidenceRow
+                    {
+                        Username = reader.GetString(0),
+                        KeyCount = reader.GetInt32(1),
+                        SkillId = reader.GetString(2),
+                        BeatmapHash = reader.GetString(3),
+                        AxisValue = reader.GetDouble(4),
+                        Accuracy = reader.GetDouble(5),
+                        Rate = reader.GetDouble(6),
+                        ScoredAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(7)),
+                    });
+                }
+
+                return list;
             }
         }
 
@@ -979,6 +1160,32 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                   );
                                   CREATE INDEX IF NOT EXISTS idx_drill_scores_ruleset_pp
                                       ON drill_scores(ruleset_id, pp_resolved DESC, date_ms DESC);
+                                  CREATE TABLE IF NOT EXISTS dan_clear_evidence (
+                                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                      username TEXT NOT NULL,
+                                      key_count INTEGER NOT NULL,
+                                      side TEXT NOT NULL,
+                                      beatmap_hash TEXT NOT NULL,
+                                      rate REAL NOT NULL,
+                                      credited_dan REAL NOT NULL,
+                                      accuracy REAL NOT NULL,
+                                      scored_at_ms INTEGER NOT NULL
+                                  );
+                                  CREATE TABLE IF NOT EXISTS axis_play_evidence (
+                                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                      username TEXT NOT NULL,
+                                      key_count INTEGER NOT NULL,
+                                      skill_id TEXT NOT NULL,
+                                      beatmap_hash TEXT NOT NULL,
+                                      axis_value REAL NOT NULL,
+                                      accuracy REAL NOT NULL,
+                                      rate REAL NOT NULL,
+                                      scored_at_ms INTEGER NOT NULL
+                                  );
+                                  CREATE INDEX IF NOT EXISTS idx_dan_clear_evidence_user
+                                      ON dan_clear_evidence(username, key_count, side, credited_dan DESC);
+                                  CREATE INDEX IF NOT EXISTS idx_axis_play_evidence_user
+                                      ON axis_play_evidence(username, key_count, skill_id, axis_value DESC);
                                   """;
                 cmd.ExecuteNonQuery();
             }

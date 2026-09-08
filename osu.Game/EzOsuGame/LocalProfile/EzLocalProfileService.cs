@@ -150,7 +150,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                     try
                     {
-                        ssrAggregator?.ComputeAndStore(username, scores);
+                        if (ssrAggregator != null)
+                        {
+                            ssrAggregator.ComputeAndStore(username, scores);
+
+                            try
+                            {
+                                store.ReplaceAxisPlays(username, ssrAggregator.PendingEvidence);
+                            }
+                            catch (Exception ex) when (ex is not OperationCanceledException)
+                            {
+                                Logger.Error(ex, "[EzLocalProfile] Failed to persist axis play evidence after SSR compute.", Ez2ConfigManager.LOGGER_NAME);
+                            }
+                        }
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
@@ -159,7 +171,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                     try
                     {
-                        danAggregator?.ComputeAndStore(username, scores);
+                        if (danAggregator != null)
+                        {
+                            danAggregator.ComputeAndStore(username, scores);
+
+                            try
+                            {
+                                store.ReplaceDanClears(username, danAggregator.PendingEvidence);
+                            }
+                            catch (Exception ex) when (ex is not OperationCanceledException)
+                            {
+                                Logger.Error(ex, "[EzLocalProfile] Failed to persist dan clear evidence after Dan compute.", Ez2ConfigManager.LOGGER_NAME);
+                            }
+                        }
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
@@ -176,6 +200,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 Logger.Error(ex, "[EzLocalProfile] Failed to collect mania scores for skill/dan compute.", Ez2ConfigManager.LOGGER_NAME);
             }
         }
+
+        public IReadOnlyList<EzDanClearEvidenceRow> GetDanClears(string username, int? keyCount = null, string? side = null)
+            => store.GetDanClears(username, keyCount, side);
+
+        public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null)
+            => store.GetAxisPlays(username, keyCount, skillId);
 
         public void ReloadFromDisk()
         {
