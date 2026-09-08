@@ -39,6 +39,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
@@ -1377,7 +1378,10 @@ namespace osu.Game.Screens.Select
 
                 if (t.Exception != null)
                 {
-                    Logger.Log($"Error when fetching online beatmap set: {t.Exception}", LoggingTarget.Network);
+                    // 本地账号无法访问 osu! 服务器是预期行为，勿当网络错误刷日志（同 FavouriteButton）。
+                    if (!t.Exception.Flatten().InnerExceptions.OfType<LocalOnlyUnavailableException>().Any())
+                        Logger.Log($"Error when fetching online beatmap set: {t.Exception}", LoggingTarget.Network);
+
                     Schedule(() =>
                     {
                         onlineLookupCache[onlineSetId] = null;
