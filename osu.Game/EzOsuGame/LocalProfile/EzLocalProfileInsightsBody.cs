@@ -5,8 +5,11 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Events;
@@ -17,6 +20,7 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osuTK;
@@ -46,7 +50,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private Container detailContainer = null!;
         private FillFlowContainer playCardsFlow = null!;
         private OsuSpriteText emptyHint = null!;
+        private Container loadingHost = null!;
         private EzLocalProfileInsights? insights;
+        private CancellationTokenSource? rebuildCts;
 
         [Resolved]
         private EzLocalProfileService profileService { get; set; } = null!;
@@ -86,6 +92,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     Font = OsuFont.GetFont(size: 14),
                     Alpha = 0,
                 },
+                loadingHost = new Container
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = 64,
+                    Child = new LoadingSpinner
+                    {
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        State = { Value = Visibility.Visible },
+                    },
+                },
                 summaryFlow = new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,
@@ -114,18 +131,62 @@ namespace osu.Game.EzOsuGame.LocalProfile
             rebuild();
         }
 
+        protected override void Dispose(bool isDisposing)
+        {
+            rebuildCts?.Cancel();
+            rebuildCts?.Dispose();
+            rebuildCts = null;
+            base.Dispose(isDisposing);
+        }
+
         private void rebuild()
         {
+            rebuildCts?.Cancel();
+            rebuildCts?.Dispose();
+            rebuildCts = new CancellationTokenSource();
+            var token = rebuildCts.Token;
+
             summaryFlow.Clear();
             detailContainer.Clear();
             playCardsFlow.Clear();
             openDetail = DetailKind.None;
+            emptyHint.Hide();
+            loadingHost.Show();
 
-            var rows = preloadedDrillScores
-                       ?? profileService.LoadDrillScores(EzLocalProfileConstants.MANIA_RULESET_ID, username);
-            var plays = EzLocalProfileInsightScoreBuilder.Build(rows, beatmapManager, rulesets, realm);
-            insights = EzLocalProfileInsightsCalculator.Calculate(plays);
+            var localProfileService = profileService;
+            string localUsername = username;
+            var localPreloaded = preloadedDrillScores;
+            var localRealm = realm;
+            var localBeatmaps = beatmapManager;
+            var localRulesets = rulesets;
 
+            Task.Run(() =>
+            {
+                var rows = localPreloaded
+                           ?? localProfileService.LoadDrillScores(EzLocalProfileConstants.MANIA_RULESET_ID, localUsername);
+                var plays = EzLocalProfileInsightScoreBuilder.Build(rows, localBeatmaps, localRulesets, localRealm);
+                return EzLocalProfileInsightsCalculator.Calculate(plays);
+            }, token).ContinueWith(task => Schedule(() =>
+            {
+                if (token.IsCancellationRequested || task.IsCanceled)
+                    return;
+
+                loadingHost.Hide();
+
+                if (task.IsFaulted)
+                {
+                    emptyHint.Text = EzSettingsProfile.LOCAL_PROFILE_INSIGHTS_EMPTY;
+                    emptyHint.Show();
+                    return;
+                }
+
+                insights = task.GetResultSafely();
+                applyInsightsUi(insights);
+            }), token);
+        }
+
+        private void applyInsightsUi(EzLocalProfileInsights insights)
+        {
             if (insights.SampleSize == 0)
             {
                 emptyHint.Text = EzSettingsProfile.LOCAL_PROFILE_INSIGHTS_EMPTY;

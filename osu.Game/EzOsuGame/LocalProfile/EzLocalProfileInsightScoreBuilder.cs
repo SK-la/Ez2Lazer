@@ -91,17 +91,24 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             if (realm != null)
             {
+                var hashSet = new HashSet<string>(hashes, StringComparer.Ordinal);
+
                 realm.Run(r =>
                 {
-                    foreach (string hash in hashes)
+                    foreach (var beatmap in r.All<BeatmapInfo>()
+                                             .Filter($"{nameof(BeatmapInfo.BeatmapSet)}.{nameof(BeatmapSetInfo.DeletePending)} == false"))
                     {
-                        var beatmap = r.All<BeatmapInfo>()
-                                       .Filter($"{nameof(BeatmapInfo.BeatmapSet)}.{nameof(BeatmapSetInfo.DeletePending)} == false && {nameof(BeatmapInfo.Hash)} == $0", hash)
-                                       .FirstOrDefault()
-                                       ?.Detach();
+                        if (!hashSet.Contains(beatmap.Hash))
+                            continue;
 
-                        if (beatmap != null)
-                            result[hash] = beatmap;
+                        var detached = beatmap.Detach();
+                        if (string.IsNullOrEmpty(detached.Hash))
+                            continue;
+
+                        result[detached.Hash] = detached;
+
+                        if (result.Count >= hashes.Count)
+                            break;
                     }
                 });
 

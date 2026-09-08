@@ -5,11 +5,15 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Events;
+using osu.Framework.Threading;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -228,10 +232,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
     public partial class EzLocalProfileScoreSelector : CompositeDrawable
     {
+        private const int entries_per_frame = 24;
+
         public Bindable<EzLocalProfileDrillScoreRow?> Current { get; } = new Bindable<EzLocalProfileDrillScoreRow?>();
 
         private readonly BindableList<EzLocalProfileDrillScoreRow> entries = new BindableList<EzLocalProfileDrillScoreRow>();
         private FillFlowContainer listFlow = null!;
+
+        private CancellationTokenSource? rebuildCts;
+        private ScheduledDelegate? batchDelegate;
+        private int rebuildGeneration;
 
         [Resolved]
         private RulesetStore rulesets { get; set; } = null!;
@@ -289,12 +299,86 @@ namespace osu.Game.EzOsuGame.LocalProfile
             updateSelectionHighlight();
         }
 
+        protected override void Dispose(bool isDisposing)
+        {
+            cancelRebuild();
+            base.Dispose(isDisposing);
+        }
+
+        private void cancelRebuild()
+        {
+            rebuildCts?.Cancel();
+            rebuildCts?.Dispose();
+            rebuildCts = null;
+            batchDelegate?.Cancel();
+            batchDelegate = null;
+        }
+
         private void rebuildList()
         {
+            cancelRebuild();
             listFlow.Clear();
 
-            foreach (var row in entries)
-                listFlow.Add(new ScoreEntry(row, () => Current.Value = row, rulesets));
+            if (entries.Count == 0)
+                return;
+
+            int generation = ++rebuildGeneration;
+            var rows = entries.ToList();
+            var localCts = rebuildCts = new CancellationTokenSource();
+            var localRulesets = rulesets;
+
+            Task.Run(() =>
+            {
+                var prepared = new List<(EzLocalProfileDrillScoreRow Row, Mod[] Mods)>(rows.Count);
+
+                foreach (var row in rows)
+                {
+                    localCts.Token.ThrowIfCancellationRequested();
+                    prepared.Add((row, EzLocalProfileDrillMods.Resolve(row, localRulesets)));
+                }
+
+                return prepared;
+            }, localCts.Token).ContinueWith(task => Schedule(() =>
+            {
+                if (generation != rebuildGeneration || localCts.IsCancellationRequested || task.IsCanceled)
+                    return;
+
+                if (task.IsFaulted)
+                {
+                    foreach (var row in rows)
+                        listFlow.Add(new ScoreEntry(row, () => Current.Value = row, Array.Empty<Mod>()));
+                    updateSelectionHighlight();
+                    return;
+                }
+
+                startBatchedAdd(task.GetResultSafely(), generation);
+            }), localCts.Token);
+        }
+
+        private void startBatchedAdd(IReadOnlyList<(EzLocalProfileDrillScoreRow Row, Mod[] Mods)> prepared, int generation)
+        {
+            int index = 0;
+
+            void addBatch()
+            {
+                if (generation != rebuildGeneration)
+                    return;
+
+                int end = Math.Min(index + entries_per_frame, prepared.Count);
+
+                for (; index < end; index++)
+                {
+                    var (row, mods) = prepared[index];
+                    listFlow.Add(new ScoreEntry(row, () => Current.Value = row, mods));
+                }
+
+                if (index < prepared.Count)
+                    batchDelegate = Scheduler.AddDelayed(addBatch, 0);
+                else
+                    updateSelectionHighlight();
+            }
+
+            addBatch();
         }
 
         private void updateSelectionHighlight()
@@ -320,7 +404,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             private EzLocalProfileHoverBox background = null!;
 
-            public ScoreEntry(EzLocalProfileDrillScoreRow row, Action onSelect, RulesetStore rulesets)
+            public ScoreEntry(EzLocalProfileDrillScoreRow row, Action onSelect, IReadOnlyList<Mod> mods)
             {
                 this.row = row;
                 RelativeSizeAxes = Axes.X;
@@ -379,7 +463,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     }
                 };
 
-                populateMods(EzLocalProfileDrillMods.Resolve(row, rulesets));
+                populateMods(mods);
             }
 
             public void SetSelected(bool value)

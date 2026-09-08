@@ -169,8 +169,30 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return;
 
             int passCount = (ssrAggregator != null ? 1 : 0) + (danAggregator != null ? 1 : 0);
-            int maniaTotal = maniaScoresByUser.Values.Sum(list => list.Count);
-            int skillsTotal = Math.Max(1, maniaTotal * passCount);
+            if (passCount == 0)
+                return;
+
+            // Per-user from this compute bag, then All from the full included set (Ez-parity).
+            var included = Store.LoadIncludedUsernames()
+                                .Select(EzLocalProfileConstants.NormaliseUsername)
+                                .Where(n => !string.IsNullOrEmpty(n)
+                                            && !string.Equals(n, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal))
+                                .Distinct(StringComparer.Ordinal)
+                                .ToList();
+
+            Dictionary<string, List<ScoreInfo>> scoresForAll;
+
+            if (included.Count > 0 && included.All(maniaScoresByUser.ContainsKey))
+                scoresForAll = maniaScoresByUser;
+            else if (included.Count > 0)
+                scoresForAll = aggregator.CollectManiaScoresByUsername(included, token);
+            else
+                scoresForAll = maniaScoresByUser;
+
+            int perUserTotal = maniaScoresByUser.Values.Sum(list => list.Count);
+            int allTotal = scoresForAll.Values.Sum(list => list.Count);
+            bool materializeAll = allTotal > 0;
+            int skillsTotal = Math.Max(1, (perUserTotal + (materializeAll ? allTotal : 0)) * passCount);
             int skillsProcessed = 0;
             int reportEvery = Math.Max(1, Math.Min(yield_every, skillsTotal / 100));
 
@@ -193,29 +215,49 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 if (scores.Count == 0)
                     continue;
 
-                tryComputeAndPersist(
-                    username,
-                    () =>
-                    {
-                        ssrAggregator!.ComputeAndStore(username, scores, token, tick);
-                        Store.ReplaceAxisPlays(username, ssrAggregator.PendingEvidence);
-                    },
-                    ssrAggregator != null,
-                    "[EzLocalProfile] Failed to compute/persist player SSR skills after profile save.");
+                if (string.Equals(username, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal))
+                    continue;
 
-                tryComputeAndPersist(
-                    username,
-                    () =>
-                    {
-                        danAggregator!.ComputeAndStore(username, scores, token, tick);
-                        Store.ReplaceDanClears(username, danAggregator.PendingEvidence);
-                    },
-                    danAggregator != null,
-                    "[EzLocalProfile] Failed to compute/persist player Dan estimates after profile save.");
+                persistUserSkills(username, scores, tick, token);
+            }
+
+            if (materializeAll)
+            {
+                token.ThrowIfCancellationRequested();
+
+                var combined = new List<ScoreInfo>(allTotal);
+
+                foreach (var list in scoresForAll.Values)
+                    combined.AddRange(list);
+
+                persistUserSkills(EzLocalProfileConstants.ALL_PLAYERS, combined, tick, token);
             }
 
             if (skillsProcessed < skillsTotal)
                 progress?.Report(new EzLocalProfileComputeProgress(skillsTotal, skillsTotal, EzLocalProfileComputePhase.Skills));
+        }
+
+        private void persistUserSkills(string username, List<ScoreInfo> scores, Action tick, CancellationToken token)
+        {
+            tryComputeAndPersist(
+                username,
+                () =>
+                {
+                    ssrAggregator!.ComputeAndStore(username, scores, token, tick);
+                    Store.ReplaceAxisPlays(username, ssrAggregator.PendingEvidence);
+                },
+                ssrAggregator != null,
+                "[EzLocalProfile] Failed to compute/persist player SSR skills after profile save.");
+
+            tryComputeAndPersist(
+                username,
+                () =>
+                {
+                    danAggregator!.ComputeAndStore(username, scores, token, tick);
+                    Store.ReplaceDanClears(username, danAggregator.PendingEvidence);
+                },
+                danAggregator != null,
+                "[EzLocalProfile] Failed to compute/persist player Dan estimates after profile save.");
         }
 
         private static void tryComputeAndPersist(string username, Action action, bool enabled, string errorMessage)

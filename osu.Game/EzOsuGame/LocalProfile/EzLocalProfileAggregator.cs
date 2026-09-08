@@ -238,6 +238,46 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return (byUser, maniaScoresByUser);
         }
 
+        /// <summary>
+        /// Lightweight mania <see cref="ScoreInfo"/> collect for included usernames (no PP / analysis).
+        /// Used to materialize Track All after an incremental per-user recompute.
+        /// </summary>
+        public Dictionary<string, List<ScoreInfo>> CollectManiaScoresByUsername(
+            IReadOnlyCollection<string> usernames,
+            CancellationToken cancellationToken = default)
+        {
+            var includeSet = new HashSet<string>(usernames.Select(normaliseUsername), StringComparer.Ordinal);
+            var maniaScoresByUser = new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
+
+            if (includeSet.Count == 0)
+                return maniaScoresByUser;
+
+            realm.Run(r =>
+            {
+                foreach (var score in queryValidScores(r))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (score.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
+                        continue;
+
+                    string username = normaliseUsername(score.RealmUser.Username);
+                    if (!includeSet.Contains(username))
+                        continue;
+
+                    if (score.BeatmapInfo == null)
+                        continue;
+
+                    if (!maniaScoresByUser.TryGetValue(username, out var list))
+                        maniaScoresByUser[username] = list = new List<ScoreInfo>();
+
+                    list.Add(score.DeepClone());
+                }
+            });
+
+            return maniaScoresByUser;
+        }
+
         public HashSet<long> CollectLocalOnlineScoreIds()
         {
             return realm.Run(r =>

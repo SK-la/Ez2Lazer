@@ -118,13 +118,13 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TRACK_EMPTY =
             new EzLocalizationManager.EzLocalisableString(
-                "暂无 Track 技能。请到设置重新计算成绩分析（需该玩家名下的 Mania 成绩）。",
-                "No Track skills yet. Recompute Score Analysis in Settings (requires mania scores for this player).");
+                "暂无 Track 技能。请到设置重新计算成绩分析（All 与各玩家名会一并写入）。",
+                "No Track skills yet. Recompute Score Analysis in Settings (All and each name are stored together).");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TRACK_NEEDS_PLAYER =
             new EzLocalizationManager.EzLocalisableString(
-                "Track 技能按玩家名计算。请在上方选择具体玩家（不要选 All）。",
-                "Track skills are per player. Select a specific player above (not All).");
+                "暂无 Track 技能。请到设置重新计算成绩分析。",
+                "No Track skills yet. Recompute Score Analysis in Settings.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_RATING =
             new EzLocalizationManager.EzLocalisableString("{0}K 技能评分", "{0}K skill rating");
