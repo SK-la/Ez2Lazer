@@ -102,7 +102,12 @@ namespace osu.Game.Screens.Select
                     break;
 
                 case Header.Selection.EzAnalysis:
-                    currentContent = new BeatmapEzAnalysisWedge();
+                    currentContent = new BeatmapEzAnalysisWedge
+                    {
+                        TargetUsername = { BindTarget = header.EzAnalysisPlayer },
+                        LeftRadarMode = { BindTarget = header.LeftRadarMode },
+                        RightRadarMode = { BindTarget = header.RightRadarMode },
+                    };
                     break;
             }
 

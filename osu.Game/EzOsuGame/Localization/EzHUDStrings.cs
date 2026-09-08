@@ -22,6 +22,12 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString RADAR_DATA_AREA_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达数据区色", "Radar Data Area Colour");
         public static readonly LocalisableString RADAR_DATA_AREA_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("数据填充区域的颜色", "Colour of data filled area.");
 
+        public static readonly LocalisableString RADAR_PLAYER_DATA_LINE_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达玩家数据线色", "Radar Player Data Line Colour");
+        public static readonly LocalisableString RADAR_PLAYER_DATA_LINE_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Skill 模式下玩家 SSR 层轮廓线与顶点颜色", "Stroke/point colour for the player SSR layer in Skill mode.");
+
+        public static readonly LocalisableString RADAR_PLAYER_DATA_AREA_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达玩家数据区色", "Radar Player Data Area Colour");
+        public static readonly LocalisableString RADAR_PLAYER_DATA_AREA_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Skill 模式下玩家 SSR 层填充颜色", "Fill colour for the player SSR layer in Skill mode.");
+
         public static readonly LocalisableString BACKGROUND_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达背景色", "Radar Background Colour");
         public static readonly LocalisableString RADAR_BOX_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("雷达图圆角背景的颜色，设置为透明可隐藏背景", "Colour of radar chart rounded background. Set to transparent to hide background.");
 
@@ -34,12 +40,13 @@ namespace osu.Game.EzOsuGame.Localization
             "切换不同数据源的显示模式："
             + "\n- 全局：显示常规Metadate数据。"
             + "\n- Key Pattern: 显示类PS Mod风格的并行键型数据。衡量谱面中不同键型的相对难度关系。"
-            + "\n- xxySR Pattern: 显示xxySR星级分析的键型数据。衡量谱面中不同键型变化的难度系数，提现谱中键型变化差异程度，这里的bracket除了切指外还视为常规类型。",
+            + "\n- xxySR Pattern: 显示xxySR星级分析的键型数据。衡量谱面中不同键型变化的难度系数，提现谱中键型变化差异程度，这里的bracket除了切指外还视为常规类型。"
+            + "\n- Skill: 同一雷达叠加谱面 MSD（黄）与玩家 SSR（绿）。",
             "Switch between different data sources to display:"
             + "\n- Global: Display the standard Metadata data."
             + "\n- Key Pattern: Display the parallel key type data of the PS Mod style."
             + "\n- xxySR Pattern: Display the key type data of the xxySR star rating analysis."
-            + "\n- xxySR Pattern: Display the key type data of the xxySR star rating analysis.");
+            + "\n- Skill: Overlay beatmap MSD (yellow) and player SSR (green) on one chart.");
 
         public static readonly LocalisableString RADAR_USE_ABSOLUTE_VALUE = new EzLocalizationManager.EzLocalisableString("使用星数绝对值", "Use Star Absolute Value");
 

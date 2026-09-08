@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
@@ -11,13 +12,16 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Screens.Play.Leaderboards;
 using osuTK;
+using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 
 namespace osu.Game.Screens.Select
 {
@@ -27,10 +31,15 @@ namespace osu.Game.Screens.Select
         {
             private WedgeSelector<Selection> tabControl = null!;
             private FillFlowContainer leaderboardControls = null!;
+            private FillFlowContainer ezAnalysisControls = null!;
 
             private ShearedDropdown<BeatmapLeaderboardScope> scopeDropdown = null!;
             private ShearedDropdown<LeaderboardSortMode> sortDropdown = null!;
             private ShearedToggleButton selectedModsToggle = null!;
+
+            private ShearedDropdown<string> ezPlayerDropdown = null!;
+            private ShearedDropdown<EzRadarDisplayMode> leftRadarDropdown = null!;
+            private ShearedDropdown<EzRadarDisplayMode> rightRadarDropdown = null!;
 
             private Bindable<bool> flowMode = null!;
 
@@ -45,6 +54,15 @@ namespace osu.Game.Screens.Select
             private readonly Bindable<LeaderboardSortMode> configLeaderboardSortMode = new Bindable<LeaderboardSortMode>();
 
             public IBindable<bool> FilterBySelectedMods => selectedModsToggle.Active;
+
+            public Bindable<string?> EzAnalysisPlayer { get; } = new Bindable<string?>();
+
+            public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.XxySrPattern);
+
+            public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.Skill);
+
+            [Resolved]
+            private EzLocalProfileService? localProfileService { get; set; }
 
             [BackgroundDependencyLoader]
             private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
@@ -84,7 +102,6 @@ namespace osu.Game.Screens.Select
                                         AutoSizeAxes = Axes.X,
                                         Text = UserInterfaceStrings.SelectedMods,
                                         Height = 30f,
-                                        // Eyeballed to make spacing match. Because shear is silly and implemented in different ways between dropdown and button.
                                         Margin = new MarginPadding { Left = -9.2f },
                                     },
                                     sortDropdown = new ShearedDropdown<LeaderboardSortMode>(BeatmapLeaderboardWedgeStrings.Sort)
@@ -102,6 +119,41 @@ namespace osu.Game.Screens.Select
                                         RelativeSizeAxes = Axes.X,
                                         Width = 0.4f,
                                         Current = { Value = BeatmapLeaderboardScope.Global },
+                                    },
+                                },
+                            },
+                            ezAnalysisControls = new FillFlowContainer
+                            {
+                                Anchor = Anchor.CentreRight,
+                                Origin = Anchor.CentreRight,
+                                RelativeSizeAxes = Axes.X,
+                                Height = 30,
+                                Spacing = new Vector2(5f, 0f),
+                                Direction = FillDirection.Horizontal,
+                                Padding = new MarginPadding { Left = 258 },
+                                Alpha = 0,
+                                Children = new Drawable[]
+                                {
+                                    rightRadarDropdown = new RadarModeDropdown(EzSongSelectStrings.EZ_ANALYSIS_RADAR_RIGHT)
+                                    {
+                                        Anchor = Anchor.TopRight,
+                                        Origin = Anchor.TopRight,
+                                        RelativeSizeAxes = Axes.X,
+                                        Width = 0.32f,
+                                    },
+                                    leftRadarDropdown = new RadarModeDropdown(EzSongSelectStrings.EZ_ANALYSIS_RADAR_LEFT)
+                                    {
+                                        Anchor = Anchor.TopRight,
+                                        Origin = Anchor.TopRight,
+                                        RelativeSizeAxes = Axes.X,
+                                        Width = 0.32f,
+                                    },
+                                    ezPlayerDropdown = new ShearedDropdown<string>(EzSongSelectStrings.EZ_ANALYSIS_PLAYER)
+                                    {
+                                        Anchor = Anchor.TopRight,
+                                        Origin = Anchor.TopRight,
+                                        RelativeSizeAxes = Axes.X,
+                                        Width = 0.32f,
                                     },
                                 },
                             },
@@ -127,9 +179,25 @@ namespace osu.Game.Screens.Select
 
                 tabControl.IsItemActivatable = type => !flowMode.Value || !EqualityComparer<Selection>.Default.Equals(type, Selection.Ranking);
 
+                leftRadarDropdown.Current.BindTo(LeftRadarMode);
+                rightRadarDropdown.Current.BindTo(RightRadarMode);
+
+                refreshPlayerDropdownItems();
+                ezPlayerDropdown.Current.BindValueChanged(e => EzAnalysisPlayer.Value = string.IsNullOrWhiteSpace(e.NewValue) ? null : e.NewValue);
+                EzAnalysisPlayer.BindValueChanged(e =>
+                {
+                    if (e.NewValue != null && ezPlayerDropdown.Items.Contains(e.NewValue))
+                        ezPlayerDropdown.Current.Value = e.NewValue;
+                });
+
                 tabControl.Current.BindValueChanged(v =>
                 {
                     leaderboardControls.FadeTo(v.NewValue == Selection.Ranking ? 1 : 0, 300, Easing.OutQuint);
+                    ezAnalysisControls.FadeTo(v.NewValue == Selection.EzAnalysis ? 1 : 0, 300, Easing.OutQuint);
+
+                    if (v.NewValue == Selection.EzAnalysis)
+                        refreshPlayerDropdownItems();
+
                     updateConfigDetailTab();
                 }, true);
 
@@ -145,12 +213,33 @@ namespace osu.Game.Screens.Select
                     }
                     else
                     {
-                        // future implementation when we have web-side support.
                         sortDropdown.Current.UnbindFrom(configLeaderboardSortMode);
                         sortDropdown.Current.Value = LeaderboardSortMode.Score;
                         sortDropdown.Current.Disabled = true;
                     }
                 }, true);
+            }
+
+            private void refreshPlayerDropdownItems()
+            {
+                var names = localProfileService?.GetPreviouslyIncludedUsernames().ToList() ?? new List<string>();
+                ezPlayerDropdown.Items = names;
+
+                if (names.Count == 0)
+                {
+                    EzAnalysisPlayer.Value = null;
+                    return;
+                }
+
+                if (EzAnalysisPlayer.Value == null || !names.Contains(EzAnalysisPlayer.Value))
+                {
+                    EzAnalysisPlayer.Value = names[0];
+                    ezPlayerDropdown.Current.Value = names[0];
+                }
+                else
+                {
+                    ezPlayerDropdown.Current.Value = EzAnalysisPlayer.Value;
+                }
             }
 
             private void applyFlowModeState(bool enabled)
@@ -182,7 +271,6 @@ namespace osu.Game.Screens.Select
                         return;
 
                     case Selection.EzAnalysis:
-                        // 此处不需要处理
                         return;
 
                     default:
@@ -261,6 +349,27 @@ namespace osu.Game.Screens.Select
                 }
 
                 protected override LocalisableString GenerateItemText(BeatmapLeaderboardScope item) => item.GetLocalisableDescription();
+            }
+
+            private partial class RadarModeDropdown : ShearedDropdown<EzRadarDisplayMode>
+            {
+                public RadarModeDropdown(LocalisableString label)
+                    : base(label)
+                {
+                    Items = Enum.GetValues<EzRadarDisplayMode>();
+                }
+
+                protected override LocalisableString GenerateItemText(EzRadarDisplayMode item)
+                {
+                    if (item == EzRadarDisplayMode.Skill)
+                        return EzSongSelectStrings.RADAR_MODE_SKILL;
+
+                    var attr = typeof(EzRadarDisplayMode).GetField(item.ToString())
+                                                         ?.GetCustomAttributes(typeof(DescriptionAttribute), false)
+                                                         .OfType<DescriptionAttribute>()
+                                                         .FirstOrDefault();
+                    return attr?.Description ?? item.ToString();
+                }
             }
         }
     }

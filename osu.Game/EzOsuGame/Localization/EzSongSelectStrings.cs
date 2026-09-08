@@ -66,6 +66,22 @@ namespace osu.Game.EzOsuGame.Localization
             "Ez分析",
             "EzAnalysis");
 
+        public static readonly LocalisableString EZ_ANALYSIS_PLAYER = new EzLocalizationManager.EzLocalisableString(
+            "玩家",
+            "Player");
+
+        public static readonly LocalisableString EZ_ANALYSIS_RADAR_LEFT = new EzLocalizationManager.EzLocalisableString(
+            "雷达 L",
+            "Radar L");
+
+        public static readonly LocalisableString EZ_ANALYSIS_RADAR_RIGHT = new EzLocalizationManager.EzLocalisableString(
+            "雷达 R",
+            "Radar R");
+
+        public static readonly LocalisableString RADAR_MODE_SKILL = new EzLocalizationManager.EzLocalisableString(
+            "Skill",
+            "Skill");
+
         public static readonly LocalisableString RESTORE_MOD_SELECTION = new EzLocalizationManager.EzLocalisableString(
             "恢复上一次选择",
             "Restore previous selection");
