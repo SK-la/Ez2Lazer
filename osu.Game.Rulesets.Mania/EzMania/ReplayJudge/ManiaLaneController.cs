@@ -156,6 +156,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 registerAutoMissDrawable(hold.Tail);
                 registerAutoMissDrawable(hold);
                 hold.Body.ColumnSchedulesAutoMiss = true;
+
+                foreach (var nested in hold.NestedHitObjects)
+                {
+                    if (nested is DrawableHoldNoteTick tick)
+                        tick.ColumnSchedulesAutoMiss = true;
+                }
+
                 return;
             }
 
@@ -199,6 +206,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 unregisterAutoMissDrawable(hold.Tail);
                 unregisterAutoMissDrawable(hold);
                 hold.Body.ColumnSchedulesAutoMiss = false;
+
+                foreach (var nested in hold.NestedHitObjects)
+                {
+                    if (nested is DrawableHoldNoteTick tick)
+                        tick.ColumnSchedulesAutoMiss = false;
+                }
+
                 return;
             }
 

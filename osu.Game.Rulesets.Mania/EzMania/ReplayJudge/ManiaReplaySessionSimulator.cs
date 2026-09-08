@@ -52,13 +52,67 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             var headWasHit = new Dictionary<HeadNote, bool>();
             var keyHeldByColumn = new Dictionary<int, bool>();
+            var ez2AcHoldStates = new Dictionary<HoldNote, Ez2AcHoldState>();
+            var judgedTicks = new HashSet<HoldNoteTick>();
 
             foreach (var input in inputData.SortedEvents)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 bool wasHoldingBeforeEvent = keyHeldByColumn.TryGetValue(input.Column, out bool held) && held;
-                keyHeldByColumn[input.Column] = input.IsPress;
+
+                // Drawable：同帧先 Update tick 再（或交错）处理按键。
+                // 松手：先结算 <t 的持有 tick，再松，再结算 =t 为 Miss。
+                // 重按：先结算 <=t（仍为 Broken）为 Miss，再 Recover，避免 =t 被算进涨 combo。
+                applyEz2AcTicksUpTo(
+                    input.Time,
+                    environment,
+                    holdByHead,
+                    headWasHit,
+                    keyHeldByColumn,
+                    ez2AcHoldStates,
+                    judgedTicks,
+                    scoreProcessor,
+                    gameplayRate,
+                    timelineRecorder,
+                    endExclusive: true);
+
+                if (!input.IsPress)
+                {
+                    keyHeldByColumn[input.Column] = false;
+                    tryApplyEz2AcHoldRelease(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
+
+                    applyEz2AcTicksUpTo(
+                        input.Time,
+                        environment,
+                        holdByHead,
+                        headWasHit,
+                        keyHeldByColumn,
+                        ez2AcHoldStates,
+                        judgedTicks,
+                        scoreProcessor,
+                        gameplayRate,
+                        timelineRecorder,
+                        endExclusive: false);
+                }
+                else
+                {
+                    applyEz2AcTicksUpTo(
+                        input.Time,
+                        environment,
+                        holdByHead,
+                        headWasHit,
+                        keyHeldByColumn,
+                        ez2AcHoldStates,
+                        judgedTicks,
+                        scoreProcessor,
+                        gameplayRate,
+                        timelineRecorder,
+                        endExclusive: false);
+
+                    keyHeldByColumn[input.Column] = true;
+                    tryApplyEz2AcHoldRepress(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
+                }
 
                 var perColumnDict = input.IsPress ? pressColumns : releaseColumns;
                 if (!perColumnDict.TryGetValue(input.Column, out var laneStates))
@@ -103,7 +157,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 if (selected == null || selected.Judged)
                 {
                     if (!input.IsPress)
+                    {
+                        tryApplyEz2AcHoldRelease(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
                         tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
+                    }
+                    else if (input.IsPress)
+                        tryApplyEz2AcHoldRepress(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
+
                     continue;
                 }
 
@@ -157,7 +217,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         {
                             // [parity] 本次松手未判定尾键 → 检查是否构成断连（Body ComboBreak）。
                             if (!input.IsPress)
+                            {
+                                tryApplyEz2AcHoldRelease(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
                                 tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
+                            }
+
                             continue;
                         }
                     }
@@ -296,7 +360,204 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 }
 
                 if (target is HeadNote head)
+                {
                     headWasHit[head] = result.IsHit();
+
+                    if (environment.ManiaHitMode == EzEnumHitMode.EZ2AC
+                        && holdByHead.TryGetValue(head, out var judgedHold))
+                    {
+                        var state = getEz2AcState(ez2AcHoldStates, judgedHold);
+                        state.OnHeadJudged(Ez2AcHitModeJudgement.FromHitResult(result), preHeld: wasHoldingBeforeEvent);
+                    }
+                }
+            }
+
+            // 收尾：剩余 tick + EZ2AC 未判尾（持满不松）
+            double endTime = inputData.SortedEvents.Count > 0
+                ? inputData.SortedEvents[^1].Time + 1
+                : beatmap.HitObjects.LastOrDefault()?.GetEndTime() ?? 0;
+
+            applyEz2AcTicksUpTo(
+                endTime + 10_000,
+                environment,
+                holdByHead,
+                headWasHit,
+                keyHeldByColumn,
+                ez2AcHoldStates,
+                judgedTicks,
+                scoreProcessor,
+                gameplayRate,
+                timelineRecorder);
+
+            finalizeEz2AcOpenTails(
+                environment,
+                holdByHead,
+                headByTail,
+                releaseColumns,
+                headWasHit,
+                keyHeldByColumn,
+                scoreProcessor,
+                gameplayRate,
+                timelineRecorder,
+                endTime + 10_000);
+        }
+
+        private static Ez2AcHoldState getEz2AcState(Dictionary<HoldNote, Ez2AcHoldState> map, HoldNote hold)
+        {
+            if (!map.TryGetValue(hold, out var state))
+                map[hold] = state = new Ez2AcHoldState();
+
+            return state;
+        }
+
+        private static void tryApplyEz2AcHoldRelease(
+            int column,
+            Dictionary<HeadNote, HoldNote> holdByHead,
+            Dictionary<HeadNote, bool> headWasHit,
+            Dictionary<TailNote, HeadNote> headByTail,
+            Dictionary<int, List<LaneTargetState>> releaseColumns,
+            Dictionary<HoldNote, Ez2AcHoldState> ez2AcHoldStates,
+            IGameplayEnvironment environment)
+        {
+            if (environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+                return;
+
+            foreach (var (head, hold) in holdByHead)
+            {
+                if (hold.Column != column)
+                    continue;
+
+                if (!headWasHit.TryGetValue(head, out bool hit) || !hit)
+                    continue;
+
+                getEz2AcState(ez2AcHoldStates, hold).OnRelease();
+                return;
+            }
+        }
+
+        private static void tryApplyEz2AcHoldRepress(
+            int column,
+            Dictionary<HeadNote, HoldNote> holdByHead,
+            Dictionary<HeadNote, bool> headWasHit,
+            Dictionary<TailNote, HeadNote> headByTail,
+            Dictionary<int, List<LaneTargetState>> releaseColumns,
+            Dictionary<HoldNote, Ez2AcHoldState> ez2AcHoldStates,
+            IGameplayEnvironment environment)
+        {
+            if (environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+                return;
+
+            foreach (var (head, hold) in holdByHead)
+            {
+                if (hold.Column != column)
+                    continue;
+
+                if (!headWasHit.TryGetValue(head, out bool hit) || !hit)
+                    continue;
+
+                getEz2AcState(ez2AcHoldStates, hold).OnRepress();
+                return;
+            }
+        }
+
+        private static void applyEz2AcTicksUpTo(
+            double time,
+            IGameplayEnvironment environment,
+            Dictionary<HeadNote, HoldNote> holdByHead,
+            Dictionary<HeadNote, bool> headWasHit,
+            Dictionary<int, bool> keyHeldByColumn,
+            Dictionary<HoldNote, Ez2AcHoldState> ez2AcHoldStates,
+            HashSet<HoldNoteTick> judgedTicks,
+            ScoreProcessor scoreProcessor,
+            double gameplayRate,
+            ManiaReplayTimelineRecorder? timelineRecorder,
+            bool endExclusive = false)
+        {
+            if (environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+                return;
+
+            double cutoff = time + environment.OffsetPlusMania;
+
+            foreach (var hold in holdByHead.Values)
+            {
+                if (hold.Ticks == null)
+                    continue;
+
+                bool holding = keyHeldByColumn.TryGetValue(hold.Column, out bool held) && held;
+                var state = getEz2AcState(ez2AcHoldStates, hold);
+
+                foreach (var tick in hold.Ticks)
+                {
+                    if (judgedTicks.Contains(tick))
+                        continue;
+
+                    if (endExclusive ? tick.StartTime >= cutoff : tick.StartTime > cutoff)
+                        continue;
+
+                    // 涨 combo 由态机（是否已接上/未断开）+ 按住决定；不另查 head 档位。
+                    var result = Ez2AcHitModeJudgement.Instance.EvaluateTick(state, holding);
+                    judgedTicks.Add(tick);
+                    // 与 Drawable 到点结算对齐：事件时间取 tick.StartTime，TimeOffset≈0。
+                    ApplyAuxiliaryResult(
+                        scoreProcessor,
+                        tick,
+                        result,
+                        ComputeStoredTimeOffset(tick.StartTime, tick),
+                        tick.StartTime,
+                        gameplayRate,
+                        timelineRecorder);
+                }
+            }
+        }
+
+        private static void finalizeEz2AcOpenTails(
+            IGameplayEnvironment environment,
+            Dictionary<HeadNote, HoldNote> holdByHead,
+            Dictionary<TailNote, HeadNote> headByTail,
+            Dictionary<int, List<LaneTargetState>> releaseColumns,
+            Dictionary<HeadNote, bool> headWasHit,
+            Dictionary<int, bool> keyHeldByColumn,
+            ScoreProcessor scoreProcessor,
+            double gameplayRate,
+            ManiaReplayTimelineRecorder? timelineRecorder,
+            double eventTime)
+        {
+            if (environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+                return;
+
+            // Tail 绑 IgnoreHit 后不进 releaseColumns，直接扫 HoldNote。
+            foreach (var (head, hold) in holdByHead)
+            {
+                if (hold.Tail == null)
+                    continue;
+
+                // 已在常规路径判过尾则跳过（少见：尾若被重新纳入 targets）。
+                bool headHit = headWasHit.TryGetValue(head, out bool hit) && hit;
+
+                ApplyFinalResult(
+                    scoreProcessor,
+                    hold.Tail,
+                    HitResult.IgnoreHit,
+                    ComputeStoredTimeOffset(eventTime, hold.Tail),
+                    eventTime,
+                    gameplayRate,
+                    environment.ManiaHitMode,
+                    timelineRecorder);
+
+                if (hold.Body != null)
+                {
+                    ApplyAuxiliaryResult(scoreProcessor, hold.Body, HitResult.IgnoreHit,
+                        ComputeStoredTimeOffset(eventTime, hold.Body), eventTime, gameplayRate, timelineRecorder);
+                }
+
+                ApplyAuxiliaryResult(
+                    scoreProcessor,
+                    hold,
+                    headHit ? HitResult.IgnoreHit : HitResult.IgnoreMiss,
+                    ComputeStoredTimeOffset(eventTime, hold),
+                    eventTime,
+                    gameplayRate,
+                    timelineRecorder);
             }
         }
 
@@ -565,7 +826,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (!wasHoldingBeforeEvent)
                 return;
 
-            if (MalodyHitModeJudgement.IsMalodyMode(environment.ManiaHitMode))
+            if (MalodyHitModeJudgement.IsMalodyMode(environment.ManiaHitMode)
+                || environment.ManiaHitMode == EzEnumHitMode.EZ2AC)
                 return;
 
             foreach (var state in laneStates)

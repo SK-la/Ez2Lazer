@@ -264,39 +264,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return HoldTailEvaluationResult.FromResult(O2HitModeJudgement.MapTo(judge));
             }
 
-            if (strategy is Ez2AcHitModeJudgement ez2Ac)
+            if (strategy is Ez2AcHitModeJudgement)
             {
-                if (!request.UserTriggered)
-                {
-                    if (request.TimeOffset < 0)
-                        return HoldTailEvaluationResult.HandledNoOp;
-
-                    if (!request.HitWindows.CanBeHit(request.TimeOffset))
-                        return HoldTailEvaluationResult.MinResult;
-
+                // EZ2AC：尾无松手窗。未到尾 → 不完结（可再抓）；到点后 IgnoreHit。
+                if (request.TimeOffset < 0)
                     return HoldTailEvaluationResult.HandledNoOp;
-                }
 
-                var tailJudge = ez2Ac.EvaluateTailJudge(new HoldTailEvaluationContext
-                {
-                    RawOffset = request.RawOffset,
-                    TimeOffsetForJudgement = request.TimeOffset,
-                    HitWindows = request.HitWindows,
-                    HeadHit = request.HeadHit,
-                    HoldBreak = ez2Ac.IsHoldBreak(request.RawOffset, request.HitWindows),
-                    HoldBroken = request.HoldBroken,
-                    WasHoldingBeforeRelease = request.WasHolding,
-                });
-
-                if (tailJudge == Ez2AcJudge.None)
-                {
-                    if (!request.HitWindows.CanBeHit(request.TimeOffset))
-                        return HoldTailEvaluationResult.MinResult;
-
-                    return HoldTailEvaluationResult.HandledNoOp;
-                }
-
-                return HoldTailEvaluationResult.FromResult(Ez2AcHitModeJudgement.MapTo(tailJudge));
+                return HoldTailEvaluationResult.FromResult(HitResult.IgnoreHit);
             }
 
             var genericResult = strategy.EvaluateTail(new HoldTailEvaluationContext

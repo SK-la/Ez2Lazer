@@ -6,6 +6,9 @@
 using System.Collections.Generic;
 using System.Threading;
 using osu.Game.Audio;
+using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -65,6 +68,12 @@ namespace osu.Game.Rulesets.Mania.Objects
 
                 if (Tail != null)
                     Tail.Column = value;
+
+                if (Ticks != null)
+                {
+                    foreach (var tick in Ticks)
+                        tick.Column = value;
+                }
             }
         }
 
@@ -87,11 +96,28 @@ namespace osu.Game.Rulesets.Mania.Objects
         public HoldNoteBody Body { get; protected set; }
 
         /// <summary>
+        /// EZ2AC 风格 16 分 LN ticks（头格由 Head 承担，此处从下一格起）。
+        /// 非 EZ2AC 下判定会被绑成 Ignore。
+        /// </summary>
+        public List<HoldNoteTick> Ticks { get; private set; }
+
+        /// <summary>
         /// Whether sliding samples should be played when held.
         /// </summary>
         public bool PlaySlidingSamples { get; init; }
 
         public override double MaximumJudgementOffset => Tail.MaximumJudgementOffset;
+
+        /// <summary>头时刻拍长（ms），用于生成 16 分 tick。</summary>
+        private double beatLength = 500;
+
+        protected override void ApplyDefaultsToSelf(ControlPointInfo controlPointInfo, IBeatmapDifficultyInfo difficulty)
+        {
+            base.ApplyDefaultsToSelf(controlPointInfo, difficulty);
+
+            TimingControlPoint timingPoint = controlPointInfo.TimingPointAt(StartTime);
+            beatLength = timingPoint.BeatLength;
+        }
 
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
@@ -121,6 +147,62 @@ namespace osu.Game.Rulesets.Mania.Objects
                 Column = Column,
                 Duration = Duration
             });
+
+            Ticks = new List<HoldNoteTick>();
+
+            // 仅 EZ2AC HitMode 生成 16 分 tick；其它模式保持官方头尾松手语义。
+            if (isEz2AcHitMode())
+                createTicks(cancellationToken);
+        }
+
+        private static bool isEz2AcHitMode()
+        {
+            try
+            {
+                return GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode) == EzEnumHitMode.EZ2AC;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void createTicks(CancellationToken cancellationToken)
+        {
+            // 16 分音符间隔；头格由 Head 计判定+combo，tick 从下一格起只推 combo。
+            double interval = beatLength / 4;
+
+            if (interval <= 0 || double.IsNaN(interval) || double.IsInfinity(interval))
+                interval = 125;
+
+            double t = StartTime + interval;
+            const double end_epsilon = 0.5;
+
+            while (t < EndTime - end_epsilon)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var tick = new HoldNoteTick
+                {
+                    StartTime = t,
+                    Column = Column,
+                };
+                Ticks.Add(tick);
+                AddNested(tick);
+                t += interval;
+            }
+
+            // 短于一格的 LN：在尾前放一格，保证按住仍有 combo tick。
+            if (Ticks.Count == 0 && Duration > end_epsilon)
+            {
+                var tick = new HoldNoteTick
+                {
+                    StartTime = EndTime - end_epsilon,
+                    Column = Column,
+                };
+                Ticks.Add(tick);
+                AddNested(tick);
+            }
         }
 
         public override Judgement CreateJudgement() => new IgnoreJudgement();

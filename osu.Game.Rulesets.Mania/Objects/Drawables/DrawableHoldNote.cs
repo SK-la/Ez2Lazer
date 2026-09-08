@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Audio;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Judgements;
@@ -55,6 +56,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private Container<DrawableHoldNoteHead> headContainer;
         private Container<DrawableHoldNoteTail> tailContainer;
         private Container<DrawableHoldNoteBody> bodyContainer;
+        private Container<DrawableHoldNoteTick> tickContainer;
 
         private PausableSkinnableSound slidingSample;
 
@@ -105,6 +107,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                     }
                 },
                 bodyContainer = new Container<DrawableHoldNoteBody> { RelativeSizeAxes = Axes.Both },
+                tickContainer = new Container<DrawableHoldNoteTick> { RelativeSizeAxes = Axes.Both },
                 bodyPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.HoldNoteBody), _ => new DefaultBodyPiece
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -158,6 +161,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 case DrawableHoldNoteBody body:
                     bodyContainer.Child = body;
                     break;
+
+                case DrawableHoldNoteTick tick:
+                    // 不可见，但仍须挂入树以获得 Clock / ApplyResult 生命周期。
+                    tickContainer.Add(tick);
+                    break;
             }
         }
 
@@ -167,6 +175,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             headContainer.Clear(false);
             tailContainer.Clear(false);
             bodyContainer.Clear(false);
+            tickContainer.Clear(false);
         }
 
         protected override DrawableHitObject CreateNestedHitObject(HitObject hitObject)
@@ -181,6 +190,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
                 case HoldNoteBody body:
                     return new DrawableHoldNoteBody(body);
+
+                case HoldNoteTick tick:
+                    return new DrawableHoldNoteTick(tick);
             }
 
             return base.CreateNestedHitObject(hitObject);
@@ -225,6 +237,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             base.Update();
 
             ManiaEzDrawableJudgement.TryO2HoldUpdate(this);
+            judgePendingHoldTicks();
 
             if (Head.Judged && !Head.IsHit)
                 missingStartTime.Value ??= Head.Result.TimeAbsolute;
@@ -275,6 +288,21 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 sizingContainer.Height = 1;
         }
 
+        private void judgePendingHoldTicks()
+        {
+            // Empty HitWindows 的 tick 不会进列级 auto-miss 队列，必须由父 Hold 到点结算（含非 EZ2AC 的 Ignore）。
+            var nested = NestedHitObjects;
+
+            for (int i = 0; i < nested.Count; i++)
+            {
+                if (nested[i] is not DrawableHoldNoteTick tick || tick.AllJudged || tick.HitObject == null)
+                    continue;
+
+                if (Time.Current >= tick.HitObject.StartTime)
+                    tick.UpdateTickResult();
+            }
+        }
+
         protected override JudgementResult CreateResult(Judgement judgement) => new HoldNoteJudgementResult(HitObject, judgement);
 
         public new HoldNoteJudgementResult Result => (HoldNoteJudgementResult)base.Result;
@@ -284,6 +312,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             if (UsesEzJudgement)
             {
                 if (ManiaEzDrawableJudgement.TryMalodyHoldCheckForResult(this, userTriggered, timeOffset))
+                    return;
+
+                if (ManiaEzDrawableJudgement.TryEz2AcHoldCheckForResult(this, userTriggered, timeOffset))
                     return;
 
                 if (ManiaEzDrawableJudgement.TryO2HoldCheckForResult(this, userTriggered, timeOffset))
@@ -343,9 +374,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             if (currentTime > Tail.HitObject.StartTime && !Tail.HitObject.HitWindows.CanBeHit(currentTime - Tail.HitObject.StartTime))
                 return false;
 
-            beginHoldAt(currentTime - Head.HitObject.StartTime);
-
-            return Head.UpdateResult();
+            return beginHoldAndJudgeHead(currentTime);
         }
 
         /// <summary>
@@ -362,9 +391,28 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             if (currentTime > Tail.HitObject.StartTime && !Tail.HitObject.HitWindows.CanBeHit(currentTime - Tail.HitObject.StartTime))
                 return false;
 
+            return beginHoldAndJudgeHead(currentTime);
+        }
+
+        private bool beginHoldAndJudgeHead(double currentTime)
+        {
+            bool preHeld = Result.IsHolding(currentTime);
+            bool headAlreadyJudged = Head.AllJudged;
+
             beginHoldAt(currentTime - Head.HitObject.StartTime);
 
-            return Head.UpdateResult();
+            if (headAlreadyJudged)
+            {
+                ManiaEzDrawableJudgement.NotifyEz2AcRepress(this);
+                return true;
+            }
+
+            bool judged = Head.UpdateResult();
+
+            if (Head.AllJudged)
+                ManiaEzDrawableJudgement.NotifyEz2AcHeadJudged(this, Head.Result.Type, preHeld);
+
+            return judged;
         }
 
         private void beginHoldAt(double timeOffset)
@@ -394,6 +442,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             if (ManiaEzDrawableJudgement.TryMalodyHoldOnReleased(this))
                 return;
 
+            if (ManiaEzDrawableJudgement.TryEz2AcHoldOnReleased(this))
+                return;
+
             if (isHolding.Value)
             {
                 Tail.UpdateResult();
@@ -408,7 +459,13 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             if (Tail.AllJudged)
                 Body.TriggerResult(Tail.IsHit);
             else if (isEarlyHoldRelease() || UsesEzJudgement)
+            {
+                // EZ2AC LN：中途松手由 tick IgnoreMiss 处理，Miss 不断 combo。
+                if (ManiaEzDrawableJudgement.GetJudgementRound(this).Environment.ManiaHitMode == EzEnumHitMode.EZ2AC)
+                    return;
+
                 Body.TriggerResult(false);
+            }
         }
 
         private bool isEarlyHoldRelease()
@@ -449,6 +506,18 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 MissForcefully();
 
             EzTriggerBodyIfNeeded(Head.IsHit);
+            EzReportHoldReleased();
+        }
+
+        internal void EzFinalizeEz2AcHoldFromTail()
+        {
+            // 尾为 Ignore；父物件与 Body 以头是否命中收束，中途松不 ComboBreak。
+            if (Head.IsHit)
+                ApplyMaxResult();
+            else
+                MissForcefully();
+
+            EzTriggerBodyIfNeeded(true);
             EzReportHoldReleased();
         }
 

@@ -9,6 +9,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -41,6 +42,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
         public override void ApplyEzGameplayEnvironment()
         {
             HitModeOverride ??= GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+        }
+
+        public override void ApplyBeatmap(IBeatmap beatmap)
+        {
+            // Tail/Tick 的 Ignore 系 Judgement 必须在全谱模拟前绑定，否则 EZ2AC/Malody 会把官方尾 Perfect 计入 MaximumBaseScore。
+            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, hitMode);
+            base.ApplyBeatmap(beatmap);
         }
 
         public ManiaScoreProcessor()

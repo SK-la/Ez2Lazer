@@ -19,10 +19,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     {
         public static Judgement CreateForTailNote(EzEnumHitMode hitMode)
         {
-            if (MalodyHitModeJudgement.IsMalodyMode(hitMode))
+            // Malody / EZ2AC：尾不单独计分（无松手窗），仅 Ignore 完结。
+            if (MalodyHitModeJudgement.IsMalodyMode(hitMode) || hitMode == EzEnumHitMode.EZ2AC)
                 return new MalodyTailJudgement();
 
             return new ManiaJudgement();
+        }
+
+        public static Judgement CreateForHoldNoteTick(EzEnumHitMode hitMode)
+        {
+            if (hitMode == EzEnumHitMode.EZ2AC)
+                return new HoldNoteTickJudgement();
+
+            // 其它模式：tick 仍存在于 nested 树中，Ignore 完结以免卡 AllJudged，且不计分。
+            return new IgnoreJudgement();
         }
 
         public static void ApplyToBeatmap(IBeatmap beatmap, EzEnumHitMode hitMode)
@@ -33,8 +43,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         private static void applyRecursive(HitObject hitObject, EzEnumHitMode hitMode)
         {
-            if (hitObject is TailNote)
-                hitObject.SetJudgement(CreateForTailNote(hitMode));
+            switch (hitObject)
+            {
+                case TailNote:
+                    hitObject.SetJudgement(CreateForTailNote(hitMode));
+                    break;
+
+                case HoldNoteTick:
+                    hitObject.SetJudgement(CreateForHoldNoteTick(hitMode));
+                    break;
+            }
 
             foreach (var nested in hitObject.NestedHitObjects)
                 applyRecursive(nested, hitMode);

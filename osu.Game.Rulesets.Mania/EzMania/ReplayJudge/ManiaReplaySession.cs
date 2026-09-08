@@ -88,6 +88,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             if (scoreProcessor is ManiaScoreProcessor maniaScoreProcessor)
                 maniaScoreProcessor.HitModeOverride = environment.ManiaHitMode;
 
+            var simulationEnvironment = createSimulationEnvironment(environment);
+
+            // 先 Align + 绑定 Judgement，再 ApplyBeatmap，避免 MaximumBaseScore 按官方尾 Perfect 虚高。
+            ManiaWindowBaker.Align(beatmap, simulationEnvironment);
+            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, simulationEnvironment.ManiaHitMode);
+
             scoreProcessor.ApplyBeatmap(beatmap);
 
             if (score.ScoreInfo.IsLegacyScore)
@@ -101,10 +107,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             double gameplayRate = ModUtils.CalculateRateWithMods(resolvedMods);
             recorder?.RecordInitial(scoreProcessor, gameplayRate);
 
-            var simulationEnvironment = createSimulationEnvironment(environment);
-
-            ManiaWindowBaker.Align(beatmap, simulationEnvironment);
-            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, simulationEnvironment.ManiaHitMode);
             var targets = buildTargets(beatmap);
 
             var holdByHead = new Dictionary<HeadNote, HoldNote>();
