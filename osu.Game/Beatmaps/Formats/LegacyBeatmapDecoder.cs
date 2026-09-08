@@ -488,7 +488,8 @@ namespace osu.Game.Beatmaps.Formats
             double time = getOffsetTime(Parsing.ParseDouble(split[0].Trim()));
 
             // beatLength is allowed to be NaN to handle an edge case in which some beatmaps use NaN slider velocity to disable slider tick generation (see LegacyDifficultyControlPoint).
-            double beatLength = Parsing.ParseDouble(split[1].Trim(), allowNaN: true);
+            // [Ez] BMS conversions may write beatLength far beyond int.MaxValue; raise the parse limit so TimingControlPoint can clamp (0.6–600000).
+            double beatLength = Parsing.ParseDouble(split[1].Trim(), parseLimit: 1e15, allowNaN: true);
 
             // If beatLength is NaN, speedMultiplier should still be 1 because all comparisons against NaN are false.
             double speedMultiplier = beatLength < 0 ? 100.0 / -beatLength : 1;

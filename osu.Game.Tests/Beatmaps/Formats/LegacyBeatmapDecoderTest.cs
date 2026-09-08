@@ -376,6 +376,36 @@ namespace osu.Game.Tests.Beatmaps.Formats
             }
         }
 
+        /// <summary>
+        /// [Ez] BMS conversions may emit beatLength far above Parsing.MAX_PARSE_VALUE; decode must keep the point and clamp via TimingControlPoint.
+        /// </summary>
+        [Test]
+        public void TestDecodeExtremeBeatLengthClampsToEzTimingRange()
+        {
+            const string contents = @"osu file format v14
+
+[General]
+AudioFilename: audio.mp3
+Mode: 3
+
+[TimingPoints]
+0,500,4,2,0,100,1,0
+70916,999999999999999,4,2,0,5,1,0
+";
+
+            var decoder = new LegacyBeatmapDecoder { ApplyOffsets = false };
+
+            using (var resStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(contents)))
+            using (var stream = new LineBufferedReader(resStream))
+            {
+                var controlPoints = decoder.Decode(stream).ControlPointInfo;
+
+                Assert.That(controlPoints.TimingPoints.Count, Is.EqualTo(2));
+                Assert.That(controlPoints.TimingPointAt(0).BeatLength, Is.EqualTo(500));
+                Assert.That(controlPoints.TimingPointAt(70916).BeatLength, Is.EqualTo(600000));
+            }
+        }
+
         [Test]
         public void TestDecodeBeatmapColours()
         {
