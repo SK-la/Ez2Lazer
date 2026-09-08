@@ -4,8 +4,10 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Scoring;
 
@@ -70,20 +72,48 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (detached.HitEvents.Count > 0)
                 return true;
 
-            var databasedScore = scoreManager.GetScore(detached);
-            if (databasedScore == null)
+            try
+            {
+                var databasedScore = scoreManager.GetScore(detached);
+
+                if (databasedScore == null)
+                {
+                    Logger.Log(
+                        $"[EzLocalProfile] Skipping avg abs offset for score {detached.ID}: no replay ({detached.BeatmapInfo}). Offset left null; profile compute continues.",
+                        Ez2ConfigManager.LOGGER_NAME,
+                        LogLevel.Debug);
+                    return false;
+                }
+
+                var workingBeatmap = beatmapManager.GetWorkingBeatmap(detached.BeatmapInfo);
+                var playable = workingBeatmap.GetPlayableBeatmap(detached.Ruleset, detached.Mods);
+                var generated = await replaySession.RunHitEventsAsync(databasedScore, playable, ReplayRunPurpose.ForStored, cancellationToken).ConfigureAwait(false);
+
+                // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                if (generated == null)
+                {
+                    Logger.Log(
+                        $"[EzLocalProfile] Skipping avg abs offset for score {detached.ID}: HitEvents generation returned null ({detached.BeatmapInfo}). Offset left null; profile compute continues.",
+                        Ez2ConfigManager.LOGGER_NAME,
+                        LogLevel.Debug);
+                    return false;
+                }
+
+                detached.HitEvents = generated;
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Logger.Log(
+                    $"[EzLocalProfile] Skipping avg abs offset for score {detached.ID}: {ex.GetType().Name}: {ex.Message} ({detached.BeatmapInfo}). Offset left null; profile compute continues.",
+                    Ez2ConfigManager.LOGGER_NAME,
+                    LogLevel.Debug);
                 return false;
-
-            var workingBeatmap = beatmapManager.GetWorkingBeatmap(detached.BeatmapInfo);
-            var playable = workingBeatmap.GetPlayableBeatmap(detached.Ruleset, detached.Mods);
-            var generated = await replaySession.RunHitEventsAsync(databasedScore, playable, ReplayRunPurpose.ForStored, cancellationToken).ConfigureAwait(false);
-
-            // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-            if (generated == null)
-                return false;
-
-            detached.HitEvents = generated;
-            return true;
+            }
         }
     }
 }
