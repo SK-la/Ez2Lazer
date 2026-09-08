@@ -10,7 +10,7 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Aggregates per-play SSR vectors into independent player skills (Etterna AggregateSSRs).
-    /// Accuracy→goal is a simplified mapping for foundation; Wife estimate can be refined later (DATA-2).
+    /// Goal via <see cref="EzSsrGoal"/> (Wife subset when statistics exist).
     /// </summary>
     public sealed class EzPlayerSsrAggregator
     {
@@ -47,16 +47,18 @@ namespace osu.Game.EzOsuGame.Skills
                 var playable = working.GetPlayableBeatmap(score.Ruleset, score.Mods);
                 int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
                 float rate = EzModRate.Resolve(score.Mods);
-                float goal = accuracyToGoal(score.Accuracy);
+                double holdRatio = EzChartDanEstimator.ComputeHoldRatio(playable);
+                double od = beatmapInfo.Difficulty.OverallDifficulty;
 
-                if (goal <= 0.8f)
+                float? goal = EzSsrGoal.ForScore(score, holdRatio, od);
+                if (goal is not float goalValue)
                     continue;
 
                 var notes = EzMinaNoteConverter.Convert(playable);
                 if (notes.Length == 0)
                     continue;
 
-                var vector = calc.CalculateSsr(notes, rate, goal);
+                var vector = calc.CalculateSsr(notes, rate, goalValue);
                 if (vector.Overall <= 0)
                     continue;
 
@@ -74,17 +76,7 @@ namespace osu.Game.EzOsuGame.Skills
             }
         }
 
-        /// <summary>
-        /// Maps display accuracy to MinaCalc SSR goal. Foundation: clamp accuracy into [0.8, 0.9975].
-        /// </summary>
-        public static float AccuracyToGoal(double accuracy) => accuracyToGoal(accuracy);
-
-        private static float accuracyToGoal(double accuracy)
-        {
-            if (!double.IsFinite(accuracy) || accuracy <= 0)
-                return 0.8f;
-
-            return (float)Math.Clamp(accuracy, 0.8, 0.9975);
-        }
+        /// <summary>Accuracy-only clamp path (tests / callers without full score).</summary>
+        public static float AccuracyToGoal(double accuracy) => EzSsrGoal.ForAccuracy(accuracy);
     }
 }

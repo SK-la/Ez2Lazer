@@ -45,7 +45,8 @@ namespace osu.Game.EzOsuGame.Skills
     }
 
     /// <summary>
-    /// Bump when MinaCalc note conversion or aggregation semantics change; invalidates stored values.
+    /// Pre-release: corrective formula fixes keep this at 1 (no client shipped yet).
+    /// After public release, bump when MinaCalc note conversion or aggregation semantics change.
     /// </summary>
     public static class EzManiaSkillAlgorithm
     {
