@@ -991,21 +991,55 @@ namespace osu.Game.EzOsuGame.HUD
                 for (int i = 0; i < axisCount; i++)
                     drawLine(renderer, center, outerVertices[i], axisColour, axisThickness);
 
-                var dataVertices = createVertices(center, radius, ratios);
+                var primaryVertices = createVertices(center, radius, ratios);
 
-                drawFanFill(renderer, center, dataVertices, dataFillColour);
-                drawPolygonOutline(renderer, dataVertices, dataStrokeColour, dataOutlineThickness);
-                drawPoints(renderer, dataVertices, dataPointColour, dataPointSize);
-
-                if (secondaryRatios != null)
+                if (secondaryRatios == null)
+                {
+                    drawFanFill(renderer, center, primaryVertices, dataFillColour);
+                    drawPolygonOutline(renderer, primaryVertices, dataStrokeColour, dataOutlineThickness);
+                    drawPoints(renderer, primaryVertices, dataPointColour, dataPointSize);
+                }
+                else
                 {
                     var secondaryVertices = createVertices(center, radius, secondaryRatios);
-                    drawFanFill(renderer, center, secondaryVertices, secondaryDataFillColour);
-                    drawPolygonOutline(renderer, secondaryVertices, secondaryDataStrokeColour, dataOutlineThickness);
+
+                    // Smaller coverage draws above so both polygons stay readable when nested.
+                    bool primaryIsSmaller = averageRatio(ratios) <= averageRatio(secondaryRatios);
+
+                    if (primaryIsSmaller)
+                    {
+                        drawFanFill(renderer, center, secondaryVertices, secondaryDataFillColour);
+                        drawPolygonOutline(renderer, secondaryVertices, secondaryDataStrokeColour, dataOutlineThickness);
+                        drawFanFill(renderer, center, primaryVertices, dataFillColour);
+                        drawPolygonOutline(renderer, primaryVertices, dataStrokeColour, dataOutlineThickness);
+                    }
+                    else
+                    {
+                        drawFanFill(renderer, center, primaryVertices, dataFillColour);
+                        drawPolygonOutline(renderer, primaryVertices, dataStrokeColour, dataOutlineThickness);
+                        drawFanFill(renderer, center, secondaryVertices, secondaryDataFillColour);
+                        drawPolygonOutline(renderer, secondaryVertices, secondaryDataStrokeColour, dataOutlineThickness);
+                    }
+
+                    // Endpoint nodes always on top of both fills/strokes.
+                    drawPoints(renderer, primaryVertices, dataPointColour, dataPointSize);
                     drawPoints(renderer, secondaryVertices, secondaryDataPointColour, dataPointSize);
                 }
 
                 renderer.PopLocalMatrix();
+            }
+
+            private static float averageRatio(IReadOnlyList<float> values)
+            {
+                if (values.Count == 0)
+                    return 0;
+
+                float sum = 0;
+
+                for (int i = 0; i < values.Count; i++)
+                    sum += Math.Clamp(values[i], 0, 1);
+
+                return sum / values.Count;
             }
 
             private Vector2[] createVertices(Vector2 center, float radius, float ratio)
