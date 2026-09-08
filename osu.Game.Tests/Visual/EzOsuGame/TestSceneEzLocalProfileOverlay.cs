@@ -11,7 +11,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Scoring;
 
@@ -32,12 +31,6 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         [Resolved]
         private EzAnalysisPersistentStore analysisStore { get; set; } = null!;
 
-        [Resolved]
-        private ScoreManager scoreManager { get; set; } = null!;
-
-        [Resolved]
-        private IEzReplaySession replaySession { get; set; } = null!;
-
         [Test]
         public void TestFullProfile()
         {
@@ -52,7 +45,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             using (var seedStore = new EzLocalProfileStore(profileStorage))
                 seedStore.ReplaceAll(EzLocalProfileOverlayTestData.CreateMockResult());
 
-            profileService = new EzLocalProfileService(profileStorage, realm, analysisStore, beatmapManager, scoreManager, replaySession);
+            profileService = new EzLocalProfileService(profileStorage, realm, analysisStore, beatmapManager);
             overlay = new EzLocalProfileOverlay();
 
             Child = new DependencyProvidingContainer

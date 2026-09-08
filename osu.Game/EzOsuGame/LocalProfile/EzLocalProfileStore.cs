@@ -169,6 +169,67 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
+        /// <summary>
+        /// Previously stored average abs hit offsets for drill rows (non-null only).
+        /// Used to avoid re-running replay sessions during bulk score analysis.
+        /// </summary>
+        public Dictionary<Guid, double> LoadAvgAbsOffsets(IReadOnlyCollection<string>? usernames = null)
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+
+                var result = new Dictionary<Guid, double>();
+                using var cmd = connection.CreateCommand();
+
+                var names = usernames?
+                            .Where(n => !string.IsNullOrWhiteSpace(n))
+                            .Select(EzLocalProfileConstants.NormaliseUsername)
+                            .Distinct(StringComparer.Ordinal)
+                            .ToList();
+
+                if (names is { Count: > 0 })
+                {
+                    string[] placeholders = new string[names.Count];
+
+                    for (int i = 0; i < names.Count; i++)
+                    {
+                        string param = $"$u{i}";
+                        placeholders[i] = param;
+                        cmd.Parameters.AddWithValue(param, names[i]);
+                    }
+
+                    cmd.CommandText = $"""
+                                       SELECT score_id, avg_abs_offset_ms
+                                       FROM drill_scores
+                                       WHERE avg_abs_offset_ms IS NOT NULL
+                                         AND username IN ({string.Join(", ", placeholders)});
+                                       """;
+                }
+                else
+                {
+                    cmd.CommandText = """
+                                      SELECT score_id, avg_abs_offset_ms
+                                      FROM drill_scores
+                                      WHERE avg_abs_offset_ms IS NOT NULL;
+                                      """;
+                }
+
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    if (!Guid.TryParse(reader.GetString(0), out var scoreId))
+                        continue;
+
+                    result[scoreId] = reader.GetDouble(1);
+                }
+
+                return result;
+            }
+        }
+
         public int GetMostPlayedOffset(int rulesetId) => GetPullOffset(EzLocalProfileOnlinePullKind.MostPlayed, rulesetId);
 
         public void SetMostPlayedOffset(int rulesetId, int offset) => SetPullOffset(EzLocalProfileOnlinePullKind.MostPlayed, rulesetId, offset);

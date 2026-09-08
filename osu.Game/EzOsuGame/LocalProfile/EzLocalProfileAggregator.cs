@@ -10,7 +10,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -20,25 +19,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
 {
     public class EzLocalProfileAggregator
     {
+        private const int yield_every = 32;
+
         private readonly RealmAccess realm;
         private readonly EzAnalysisPersistentStore analysisStore;
         private readonly BeatmapManager beatmapManager;
-        private readonly ScoreManager scoreManager;
-        private readonly IEzReplaySession replaySession;
         private readonly EzLocalProfilePpResolver ppResolver;
 
         public EzLocalProfileAggregator(
             RealmAccess realm,
             EzAnalysisPersistentStore analysisStore,
-            BeatmapManager beatmapManager,
-            ScoreManager scoreManager,
-            IEzReplaySession replaySession)
+            BeatmapManager beatmapManager)
         {
             this.realm = realm;
             this.analysisStore = analysisStore;
             this.beatmapManager = beatmapManager;
-            this.scoreManager = scoreManager;
-            this.replaySession = replaySession;
             ppResolver = new EzLocalProfilePpResolver(beatmapManager);
         }
 
@@ -103,11 +98,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// Also returns detached mania scores from the same Realm pass (for skill/dan compute).
         /// Does not merge online contributions — that happens when rebuilding display totals.
         /// </summary>
+        /// <param name="cachedAvgAbsOffsets">
+        /// Previously stored drill offsets keyed by score id (HitEvents are not in Realm; bulk compute must not re-run sessions).
+        /// </param>
         public (Dictionary<string, EzLocalProfileAggregationResult> Results, Dictionary<string, List<ScoreInfo>> ManiaScoresByUser)
             AggregateByUsername(
                 IReadOnlyCollection<string> usernames,
                 IProgress<EzLocalProfileComputeProgress>? progress = null,
-                CancellationToken cancellationToken = default)
+                CancellationToken cancellationToken = default,
+                IReadOnlyDictionary<Guid, double>? cachedAvgAbsOffsets = null)
         {
             var includeSet = new HashSet<string>(usernames.Select(normaliseUsername), StringComparer.Ordinal);
             var byUser = new Dictionary<string, EzLocalProfileAggregationResult>(StringComparer.Ordinal);
@@ -143,19 +142,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             int total = Math.Max(1, detachedScores.Count);
-            int processed = 0;
-
-            void report() => progress?.Report(new EzLocalProfileComputeProgress(processed, total, Saving: false));
-
-            report();
-
-            var scoreList = detachedScores.Select(s => s.Score).ToList();
-            var resolved = ppResolver.ResolveAll(scoreList, progress, total, cancellationToken);
-            processed = scoreList.Count;
-            report();
-
+            int reportEvery = Math.Max(1, Math.Min(yield_every, Math.Max(1, total) / 100));
+            var attributeCache = ppResolver.CreateAttributeCache();
             var analysisCache = new Dictionary<string, CachedAnalysis>(StringComparer.Ordinal);
             var maniaScoresByUser = new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
+            int ppFailures = 0;
+            int ppLoggedFailures = 0;
+
+            progress?.Report(new EzLocalProfileComputeProgress(0, total, EzLocalProfileComputePhase.Analysing));
 
             for (int i = 0; i < detachedScores.Count; i++)
             {
@@ -167,24 +161,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 var beatmap = score.BeatmapInfo!;
                 bool modsAffect = EzLocalProfileModAffects.AffectsPlayableAnalysis(score.Mods);
 
+                var resolved = ppResolver.Resolve(score, attributeCache, ref ppFailures, ref ppLoggedFailures);
+                double pp = resolved.Pp;
+                double starRating = resolved.StarRating >= 0 ? resolved.StarRating : beatmap.StarRating;
+
                 long keys = countKeys(score);
                 var cached = resolveAnalysis(score, modsAffect, analysisCache, cancellationToken);
                 bool hasKps = cached.HasKps;
                 var analysis = cached.Result;
                 double avgKps = hasKps ? analysis.AverageKps : 0;
                 double maxKps = hasKps ? analysis.MaxKps : 0;
-                double pp = resolved.Pp[i];
-                double starRating = resolved.StarRatings[i] >= 0 ? resolved.StarRatings[i] : beatmap.StarRating;
                 double xxyStarRating = resolveXxyStarRating(beatmap, analysis, hasKps, modsAffect, starRating);
                 long durationMs = resolveDurationMs(score, beatmap);
 
-                double? avgAbsOffsetMs = EzLocalProfileHitEventResolver.ResolveAvgAbsOffsetMs(
-                    score,
-                    realm,
-                    scoreManager,
-                    beatmapManager,
-                    replaySession,
-                    cancellationToken);
+                double? avgAbsOffsetMs = null;
+                if (cachedAvgAbsOffsets != null && cachedAvgAbsOffsets.TryGetValue(score.ID, out double storedOffset))
+                    avgAbsOffsetMs = storedOffset;
 
                 result.DrillScores.Add(EzLocalProfileDrillScoreRow.FromScore(
                     score,
@@ -227,6 +219,20 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 if (rulesetId == EzLocalProfileConstants.OSU_RULESET_ID)
                     accumulateStdAttr(result, beatmap, score);
+
+                int processed = i + 1;
+                if (processed == detachedScores.Count || processed % reportEvery == 0)
+                    progress?.Report(new EzLocalProfileComputeProgress(processed, total, EzLocalProfileComputePhase.Analysing));
+
+                if (processed % yield_every == 0)
+                    Thread.Sleep(1);
+            }
+
+            if (ppFailures > 0)
+            {
+                Logger.Log(
+                    $"[EzLocalProfile] Score analysis PP failures: {ppFailures} of {detachedScores.Count}.",
+                    Ez2ConfigManager.LOGGER_NAME);
             }
 
             return (byUser, maniaScoresByUser);

@@ -13,7 +13,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Scoring;
 
@@ -24,6 +23,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
     /// </summary>
     public class EzLocalProfileService : IDisposable
     {
+        private const int yield_every = 32;
+
         private readonly EzLocalProfileAggregator aggregator;
         private readonly EzPlayerSsrAggregator? ssrAggregator;
         private readonly EzPlayerDanAggregator? danAggregator;
@@ -39,14 +40,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
             RealmAccess realm,
             EzAnalysisPersistentStore analysisStore,
             BeatmapManager beatmapManager,
-            ScoreManager scoreManager,
-            IEzReplaySession replaySession,
             EzPlayerSsrAggregator? ssrAggregator = null,
             EzPlayerDanAggregator? danAggregator = null,
             EzLocalProfileStore? sharedStore = null)
         {
             Store = sharedStore ?? new EzLocalProfileStore(storage);
-            aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager, scoreManager, replaySession);
+            aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager);
             this.ssrAggregator = ssrAggregator;
             this.danAggregator = danAggregator;
             Snapshot.Value = Store.LoadSnapshot();
@@ -124,7 +123,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                         if (selected.Count > 0)
                         {
-                            (byUser, maniaScores) = aggregator.AggregateByUsername(selected, progress, token);
+                            var cachedOffsets = Store.LoadAvgAbsOffsets(selected);
+                            (byUser, maniaScores) = aggregator.AggregateByUsername(selected, progress, token, cachedOffsets);
                         }
                         else
                         {
@@ -134,15 +134,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                         token.ThrowIfCancellationRequested();
 
-                        // Signal UI that aggregation is done and we are persisting (may include a Realm scan).
-                        progress?.Report(new EzLocalProfileComputeProgress(1, 1, Saving: true));
+                        progress?.Report(new EzLocalProfileComputeProgress(0, 1, EzLocalProfileComputePhase.Saving));
 
                         var online = Store.LoadOnlineScoreContributions();
                         var localOnlineIds = aggregator.CollectLocalOnlineScoreIds();
                         Store.ApplyUsernamePartitions(byUser, replaceOtherUsernames, online, localOnlineIds);
 
                         if (selected.Count > 0)
-                            writePlayerSkills(maniaScores, token);
+                            writePlayerSkills(maniaScores, progress, token);
                     }
                     catch (OperationCanceledException)
                     {
@@ -150,7 +149,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     }
                     catch (Exception ex)
                     {
-                        Logger.Error(ex, "[EzLocalProfile] Failed to compute local profile statistics.", Ez2ConfigManager.LOGGER_NAME);
+                        Logger.Error(ex, "[EzLocalProfile] Failed to compute local score analysis.", Ez2ConfigManager.LOGGER_NAME);
                         throw;
                     }
                     finally
@@ -161,10 +160,31 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        private void writePlayerSkills(Dictionary<string, List<ScoreInfo>> maniaScoresByUser, CancellationToken token)
+        private void writePlayerSkills(
+            Dictionary<string, List<ScoreInfo>> maniaScoresByUser,
+            IProgress<EzLocalProfileComputeProgress>? progress,
+            CancellationToken token)
         {
             if (ssrAggregator == null && danAggregator == null)
                 return;
+
+            int passCount = (ssrAggregator != null ? 1 : 0) + (danAggregator != null ? 1 : 0);
+            int maniaTotal = maniaScoresByUser.Values.Sum(list => list.Count);
+            int skillsTotal = Math.Max(1, maniaTotal * passCount);
+            int skillsProcessed = 0;
+            int reportEvery = Math.Max(1, Math.Min(yield_every, skillsTotal / 100));
+
+            void tick()
+            {
+                skillsProcessed++;
+                if (skillsProcessed == skillsTotal || skillsProcessed % reportEvery == 0)
+                    progress?.Report(new EzLocalProfileComputeProgress(skillsProcessed, skillsTotal, EzLocalProfileComputePhase.Skills));
+
+                if (skillsProcessed % yield_every == 0)
+                    Thread.Sleep(1);
+            }
+
+            progress?.Report(new EzLocalProfileComputeProgress(0, skillsTotal, EzLocalProfileComputePhase.Skills));
 
             foreach ((string username, List<ScoreInfo> scores) in maniaScoresByUser)
             {
@@ -177,7 +197,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     username,
                     () =>
                     {
-                        ssrAggregator!.ComputeAndStore(username, scores);
+                        ssrAggregator!.ComputeAndStore(username, scores, token, tick);
                         Store.ReplaceAxisPlays(username, ssrAggregator.PendingEvidence);
                     },
                     ssrAggregator != null,
@@ -187,12 +207,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     username,
                     () =>
                     {
-                        danAggregator!.ComputeAndStore(username, scores);
+                        danAggregator!.ComputeAndStore(username, scores, token, tick);
                         Store.ReplaceDanClears(username, danAggregator.PendingEvidence);
                     },
                     danAggregator != null,
                     "[EzLocalProfile] Failed to compute/persist player Dan estimates after profile save.");
             }
+
+            if (skillsProcessed < skillsTotal)
+                progress?.Report(new EzLocalProfileComputeProgress(skillsTotal, skillsTotal, EzLocalProfileComputePhase.Skills));
         }
 
         private static void tryComputeAndPersist(string username, Action action, bool enabled, string errorMessage)

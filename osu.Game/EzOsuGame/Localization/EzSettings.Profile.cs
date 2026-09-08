@@ -6,18 +6,18 @@ namespace osu.Game.EzOsuGame.Localization
     public class EzSettingsProfile
     {
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE =
-            new EzLocalizationManager.EzLocalisableString("计算本地个人成绩", "Compute Local Profile Stats");
+            new EzLocalizationManager.EzLocalisableString("计算成绩分析", "Compute Score Analysis");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "扫描本地成绩，按玩家名勾选导入后写入共享个人统计存档（与当前登录名无关）。",
-            "Scan local scores, pick player names to include, then write into the shared local profile archive (independent of the logged-in name).");
+            "扫描本地成绩，按玩家名勾选后做成绩分析并写入共享个人统计存档（与当前登录名无关）。",
+            "Scan local scores, pick player names, run score analysis, then write into the shared local profile archive (independent of the logged-in name).");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_HEADER =
             new EzLocalizationManager.EzLocalisableString("选择要导入的玩家名", "Select player names to import");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_BODY = new EzLocalizationManager.EzLocalisableString(
-            "勾选要【重新计算】的玩家名：只覆盖这些名称对应的统计切片，其它已计算名称不受影响。打开「替换模式」会删除未勾选名称的旧切片。",
-            "Check names to recompute: only those players’ stat slices are overwritten; other computed names stay. Enable replace mode to drop unchecked names’ old slices.");
+            "勾选要【重新分析】的玩家名：只覆盖这些名称对应的统计切片，其它已计算名称不受影响。打开「替换模式」会删除未勾选名称的旧切片。",
+            "Check names to re-analyse: only those players’ stat slices are overwritten; other computed names stay. Enable replace mode to drop unchecked names’ old slices.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_REPLACE =
             new EzLocalizationManager.EzLocalisableString(
@@ -25,25 +25,28 @@ namespace osu.Game.EzOsuGame.Localization
                 "Replace mode: delete old stats for unchecked names");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_CONFIRM =
-            new EzLocalizationManager.EzLocalisableString("开始计算", "Compute");
+            new EzLocalizationManager.EzLocalisableString("开始分析", "Analyse");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_CANCEL =
             new EzLocalizationManager.EzLocalisableString("取消", "Cancel");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_STARTED =
-            new EzLocalizationManager.EzLocalisableString("正在计算本地个人成绩…", "Computing local profile stats…");
+            new EzLocalizationManager.EzLocalisableString("正在计算成绩分析…", "Computing score analysis…");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_PROGRESS =
-            new EzLocalizationManager.EzLocalisableString("正在计算个人成绩 PP… {0}/{1}", "Computing profile PP… {0}/{1}");
+            new EzLocalizationManager.EzLocalisableString("正在分析成绩… {0}/{1}", "Analysing scores… {0}/{1}");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_SAVING =
-            new EzLocalizationManager.EzLocalisableString("正在写入本地个人成绩…", "Saving local profile stats…");
+            new EzLocalizationManager.EzLocalisableString("正在写入成绩分析…", "Saving score analysis…");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_SKILLS =
+            new EzLocalizationManager.EzLocalisableString("正在计算技能与段位… {0}/{1}", "Computing skills & dan… {0}/{1}");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_DONE =
-            new EzLocalizationManager.EzLocalisableString("本地个人成绩已更新。", "Local profile stats updated.");
+            new EzLocalizationManager.EzLocalisableString("成绩分析已更新。", "Score analysis updated.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_FAILED =
-            new EzLocalizationManager.EzLocalisableString("本地个人成绩计算失败。", "Failed to compute local profile stats.");
+            new EzLocalizationManager.EzLocalisableString("成绩分析计算失败。", "Failed to compute score analysis.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_NO_SCORES =
             new EzLocalizationManager.EzLocalisableString("未找到可导入的本地成绩。", "No local scores found to import.");
@@ -65,8 +68,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_NEEDS_RECOMPUTE =
             new EzLocalizationManager.EzLocalisableString(
-                "算法已更新，请到设置 → Ez → 实验性功能 重新计算本地个人成绩",
-                "Stats logic updated — recompute Local Profile Stats under Settings → Ez → Experimental");
+                "算法已更新，请到设置 → Ez → 实验性功能 重新计算成绩分析",
+                "Stats logic updated — recompute Score Analysis under Settings → Ez → Experimental");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_BADGE =
             new EzLocalizationManager.EzLocalisableString("本地", "Local");
@@ -81,7 +84,7 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("选择玩家", "Select player");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_EMPTY_HINT =
-            new EzLocalizationManager.EzLocalisableString("暂无统计。请到 设置 → Ez → 实验性功能 中点击「计算本地个人成绩」。", "No stats yet. Open Settings → Ez → Experimental and run “Compute Local Profile Stats”.");
+            new EzLocalizationManager.EzLocalisableString("暂无统计。请到 设置 → Ez → 实验性功能 中点击「计算成绩分析」。", "No stats yet. Open Settings → Ez → Experimental and run “Compute Score Analysis”.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SECTION_KEYS =
             new EzLocalizationManager.EzLocalisableString("按键与 KPS", "Keys & KPS");
@@ -115,8 +118,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TRACK_EMPTY =
             new EzLocalizationManager.EzLocalisableString(
-                "暂无 Track 技能。请到设置重新计算本地个人成绩（需该玩家名下的 Mania 成绩）。",
-                "No Track skills yet. Recompute Local Profile Stats in Settings (requires mania scores for this player).");
+                "暂无 Track 技能。请到设置重新计算成绩分析（需该玩家名下的 Mania 成绩）。",
+                "No Track skills yet. Recompute Score Analysis in Settings (requires mania scores for this player).");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_TRACK_NEEDS_PLAYER =
             new EzLocalizationManager.EzLocalisableString(
@@ -143,16 +146,16 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_HISTORY_EMPTY =
             new EzLocalizationManager.EzLocalisableString(
-                "暂无历史点。重新计算本地个人成绩后会写入。",
-                "No history points yet. Recompute Local Profile Stats to record them.");
+                "暂无历史点。重新计算成绩分析后会写入。",
+                "No history points yet. Recompute Score Analysis to record them.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_AXIS_PLAYS_FOR =
             new EzLocalizationManager.EzLocalisableString("支撑成绩 · {0}", "Supporting plays · {0}");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_AXIS_PLAYS_EMPTY =
             new EzLocalizationManager.EzLocalisableString(
-                "暂无该轴的支撑成绩。请重新计算本地个人成绩。",
-                "No supporting plays for this axis yet. Recompute Local Profile Stats.");
+                "暂无该轴的支撑成绩。请重新计算成绩分析。",
+                "No supporting plays for this axis yet. Recompute Score Analysis.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_AXIS_TREND =
             new EzLocalizationManager.EzLocalisableString("趋势", "Trend");
@@ -179,8 +182,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_CLEARS_EMPTY =
             new EzLocalizationManager.EzLocalisableString(
-                "暂无该侧清除记录。请重新计算本地个人成绩。",
-                "No clear evidence for this side yet. Recompute Local Profile Stats.");
+                "暂无该侧清除记录。请重新计算成绩分析。",
+                "No clear evidence for this side yet. Recompute Score Analysis.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_HEURISTIC_HINT =
             new EzLocalizationManager.EzLocalisableString(

@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Scoring;
 
@@ -26,7 +27,11 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Per-play axis rows collected during the last <see cref="ComputeAndStore"/> (for DATA-3 evidence).</summary>
         public IReadOnlyList<EzAxisPlayEvidenceRow> PendingEvidence { get; private set; } = Array.Empty<EzAxisPlayEvidenceRow>();
 
-        public void ComputeAndStore(string username, IEnumerable<ScoreInfo> scores)
+        public void ComputeAndStore(
+            string username,
+            IEnumerable<ScoreInfo> scores,
+            CancellationToken cancellationToken = default,
+            Action? afterEachScore = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
@@ -37,57 +42,66 @@ namespace osu.Game.EzOsuGame.Skills
 
             foreach (var score in scores)
             {
-                if (score.Ruleset.OnlineID != 3)
-                    continue;
+                cancellationToken.ThrowIfCancellationRequested();
 
-                if (string.IsNullOrWhiteSpace(score.BeatmapHash))
-                    continue;
-
-                var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == score.BeatmapHash);
-                if (beatmapInfo == null)
-                    continue;
-
-                var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                var playable = working.GetPlayableBeatmap(score.Ruleset, score.Mods);
-                int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
-                float rate = EzModRate.Resolve(score.Mods);
-                double holdRatio = EzChartDanEstimator.ComputeHoldRatio(playable);
-                double od = beatmapInfo.Difficulty.OverallDifficulty;
-
-                float? goal = EzSsrGoal.ForScore(score, holdRatio, od);
-                if (goal is not float goalValue)
-                    continue;
-
-                var notes = EzMinaNoteConverter.Convert(playable);
-                if (notes.Length == 0)
-                    continue;
-
-                var vector = calc.CalculateSsr(notes, rate, goalValue);
-                if (vector.Overall <= 0)
-                    continue;
-
-                if (!byKey.TryGetValue(keyCount, out var list))
-                    byKey[keyCount] = list = new List<EzSkillsetVector>();
-
-                list.Add(vector);
-
-                foreach ((string axisId, double axisValue) in vector.Enumerate())
+                try
                 {
-                    if (axisValue <= 0 || !double.IsFinite(axisValue))
+                    if (score.Ruleset.OnlineID != 3)
                         continue;
 
-                    evidence.Add(new EzAxisPlayEvidenceRow
+                    if (string.IsNullOrWhiteSpace(score.BeatmapHash))
+                        continue;
+
+                    var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == score.BeatmapHash);
+                    if (beatmapInfo == null)
+                        continue;
+
+                    var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+                    var playable = working.GetPlayableBeatmap(score.Ruleset, score.Mods);
+                    int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
+                    float rate = EzModRate.Resolve(score.Mods);
+                    double holdRatio = EzChartDanEstimator.ComputeHoldRatio(playable);
+                    double od = beatmapInfo.Difficulty.OverallDifficulty;
+
+                    float? goal = EzSsrGoal.ForScore(score, holdRatio, od);
+                    if (goal is not float goalValue)
+                        continue;
+
+                    var notes = EzMinaNoteConverter.Convert(playable);
+                    if (notes.Length == 0)
+                        continue;
+
+                    var vector = calc.CalculateSsr(notes, rate, goalValue);
+                    if (vector.Overall <= 0)
+                        continue;
+
+                    if (!byKey.TryGetValue(keyCount, out var list))
+                        byKey[keyCount] = list = new List<EzSkillsetVector>();
+
+                    list.Add(vector);
+
+                    foreach ((string axisId, double axisValue) in vector.Enumerate())
                     {
-                        Username = username,
-                        KeyCount = keyCount,
-                        SkillId = EzSkillIds.Ssr(axisId),
-                        BeatmapHash = score.BeatmapHash,
-                        AxisValue = axisValue,
-                        Accuracy = score.Accuracy,
-                        Rate = rate,
-                        ScoredAt = score.Date,
-                        AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
-                    });
+                        if (axisValue <= 0 || !double.IsFinite(axisValue))
+                            continue;
+
+                        evidence.Add(new EzAxisPlayEvidenceRow
+                        {
+                            Username = username,
+                            KeyCount = keyCount,
+                            SkillId = EzSkillIds.Ssr(axisId),
+                            BeatmapHash = score.BeatmapHash,
+                            AxisValue = axisValue,
+                            Accuracy = score.Accuracy,
+                            Rate = rate,
+                            ScoredAt = score.Date,
+                            AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
+                        });
+                    }
+                }
+                finally
+                {
+                    afterEachScore?.Invoke();
                 }
             }
 

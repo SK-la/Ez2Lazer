@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Scoring;
 
@@ -29,7 +30,11 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Credited clears collected during the last <see cref="ComputeAndStore"/> (for evidence).</summary>
         public IReadOnlyList<EzDanClearEvidenceRow> PendingEvidence { get; private set; } = Array.Empty<EzDanClearEvidenceRow>();
 
-        public void ComputeAndStore(string username, IEnumerable<ScoreInfo> scores)
+        public void ComputeAndStore(
+            string username,
+            IEnumerable<ScoreInfo> scores,
+            CancellationToken cancellationToken = default,
+            Action? afterEachScore = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
@@ -38,49 +43,58 @@ namespace osu.Game.EzOsuGame.Skills
 
             foreach (var score in scores)
             {
-                if (score.Ruleset.OnlineID != 3)
-                    continue;
+                cancellationToken.ThrowIfCancellationRequested();
 
-                if (score.Accuracy <= 0 || !double.IsFinite(score.Accuracy))
-                    continue;
-
-                var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == score.BeatmapHash);
-                if (beatmapInfo == null)
-                    continue;
-
-                if (beatmapInfo.Ruleset.OnlineID != 3)
-                    continue;
-
-                var chart = chartDanEstimator.TryEstimate(beatmapInfo, score.Mods);
-                if (chart == null)
-                    continue;
-
-                double? credited = EzDanCredit.CreditedDanFor(chart.RawDan, score.Accuracy, chart.Side, chart.KeyCount);
-                if (credited is not double value)
-                    continue;
-
-                var key = (chart.KeyCount, chart.Side);
-                if (!clearsByBucket.TryGetValue(key, out var list))
-                    clearsByBucket[key] = list = new List<double>();
-
-                list.Add(value);
-
-                string hash = score.BeatmapHash;
-                if (string.IsNullOrWhiteSpace(hash))
-                    hash = beatmapInfo.Hash;
-
-                evidence.Add(new EzDanClearEvidenceRow
+                try
                 {
-                    Username = username,
-                    KeyCount = chart.KeyCount,
-                    Side = chart.Side,
-                    BeatmapHash = hash,
-                    Rate = EzModRate.Resolve(score.Mods),
-                    CreditedDan = value,
-                    Accuracy = score.Accuracy,
-                    ScoredAt = score.Date,
-                    AlgorithmVersion = EzDanAlgorithm.VERSION,
-                });
+                    if (score.Ruleset.OnlineID != 3)
+                        continue;
+
+                    if (score.Accuracy <= 0 || !double.IsFinite(score.Accuracy))
+                        continue;
+
+                    var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == score.BeatmapHash);
+                    if (beatmapInfo == null)
+                        continue;
+
+                    if (beatmapInfo.Ruleset.OnlineID != 3)
+                        continue;
+
+                    var chart = chartDanEstimator.TryEstimate(beatmapInfo, score.Mods);
+                    if (chart == null)
+                        continue;
+
+                    double? credited = EzDanCredit.CreditedDanFor(chart.RawDan, score.Accuracy, chart.Side, chart.KeyCount);
+                    if (credited is not double value)
+                        continue;
+
+                    var key = (chart.KeyCount, chart.Side);
+                    if (!clearsByBucket.TryGetValue(key, out var list))
+                        clearsByBucket[key] = list = new List<double>();
+
+                    list.Add(value);
+
+                    string hash = score.BeatmapHash;
+                    if (string.IsNullOrWhiteSpace(hash))
+                        hash = beatmapInfo.Hash;
+
+                    evidence.Add(new EzDanClearEvidenceRow
+                    {
+                        Username = username,
+                        KeyCount = chart.KeyCount,
+                        Side = chart.Side,
+                        BeatmapHash = hash,
+                        Rate = EzModRate.Resolve(score.Mods),
+                        CreditedDan = value,
+                        Accuracy = score.Accuracy,
+                        ScoredAt = score.Date,
+                        AlgorithmVersion = EzDanAlgorithm.VERSION,
+                    });
+                }
+                finally
+                {
+                    afterEachScore?.Invoke();
+                }
             }
 
             DateTimeOffset at = DateTimeOffset.UtcNow;

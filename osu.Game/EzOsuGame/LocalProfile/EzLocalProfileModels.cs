@@ -47,10 +47,20 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
     public readonly record struct EzLocalProfileUsernameCount(string Username, int ScoreCount);
 
+    public enum EzLocalProfileComputePhase
+    {
+        Analysing,
+        Saving,
+        Skills,
+    }
+
     /// <summary>
-    /// Progress payload for local profile compute (scores processed / total, then save).
+    /// Progress payload for local score analysis (scores processed / total, then save / skills).
     /// </summary>
-    public readonly record struct EzLocalProfileComputeProgress(int Processed, int Total, bool Saving);
+    public readonly record struct EzLocalProfileComputeProgress(
+        int Processed,
+        int Total,
+        EzLocalProfileComputePhase Phase = EzLocalProfileComputePhase.Analysing);
 
     public sealed class EzLocalProfileSnapshot
     {

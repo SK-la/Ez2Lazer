@@ -23,54 +23,34 @@ namespace osu.Game.EzOsuGame.LocalProfile
             this.beatmapManager = beatmapManager;
         }
 
-        public readonly record struct ResolveBatch(double[] Pp, double[] StarRatings);
+        /// <summary>
+        /// Shared difficulty-attribute cache for a single analysis pass (keyed by beatmap+ruleset+mods).
+        /// </summary>
+        public Dictionary<string, DifficultyAttributes?> CreateAttributeCache()
+            => new Dictionary<string, DifficultyAttributes?>(StringComparer.Ordinal);
 
-        public ResolveBatch ResolveAll(
-            IReadOnlyList<ScoreInfo> scores,
-            IProgress<EzLocalProfileComputeProgress>? progress = null,
-            int progressTotal = 0,
-            System.Threading.CancellationToken cancellationToken = default)
+        public readonly record struct ResolvedDifficulty(double Pp, double StarRating);
+
+        /// <summary>
+        /// Resolve PP and star rating for one score, reusing <paramref name="attributeCache"/>.
+        /// </summary>
+        public ResolvedDifficulty Resolve(
+            ScoreInfo score,
+            Dictionary<string, DifficultyAttributes?> attributeCache,
+            ref int failures,
+            ref int loggedFailures,
+            int maxLoggedFailures = 8)
         {
-            double[] pp = new double[scores.Count];
-            double[] starRatings = new double[scores.Count];
-
-            if (scores.Count == 0)
-                return new ResolveBatch(pp, starRatings);
-
-            var attributeCache = new Dictionary<string, DifficultyAttributes?>(StringComparer.Ordinal);
-            int failures = 0;
-            int loggedFailures = 0;
-            const int max_logged_failures = 8;
-            int reportEvery = Math.Max(10, Math.Max(1, progressTotal) / 100);
-
-            for (int i = 0; i < scores.Count; i++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var score = scores[i];
-                starRatings[i] = resolveStarRating(score, attributeCache);
-                pp[i] = resolvePp(score, attributeCache, ref failures, ref loggedFailures, max_logged_failures);
-
-                int current = i + 1;
-                if (progress != null && (current == scores.Count || current % reportEvery == 0))
-                    progress.Report(new EzLocalProfileComputeProgress(current, progressTotal, Saving: false));
-            }
-
-            if (failures > 0)
-            {
-                Logger.Log(
-                    $"[EzLocalProfile] PP calc finished with {failures} failure(s) out of {scores.Count} score(s).",
-                    Ez2ConfigManager.LOGGER_NAME);
-            }
-
-            return new ResolveBatch(pp, starRatings);
+            double starRating = resolveStarRating(score, attributeCache);
+            double pp = resolvePp(score, attributeCache, ref failures, ref loggedFailures, maxLoggedFailures);
+            return new ResolvedDifficulty(pp, starRating);
         }
 
         public double ResolvePp(ScoreInfo score)
         {
             int failures = 0;
             int loggedFailures = 0;
-            return resolvePp(score, new Dictionary<string, DifficultyAttributes?>(StringComparer.Ordinal), ref failures, ref loggedFailures, maxLoggedFailures: 0);
+            return resolvePp(score, CreateAttributeCache(), ref failures, ref loggedFailures, maxLoggedFailures: 0);
         }
 
         private double resolveStarRating(ScoreInfo score, Dictionary<string, DifficultyAttributes?> attributeCache)

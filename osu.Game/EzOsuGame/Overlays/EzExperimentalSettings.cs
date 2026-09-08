@@ -230,22 +230,34 @@ namespace osu.Game.EzOsuGame.Overlays
                 if (notification.State is ProgressNotificationState.Cancelled or ProgressNotificationState.Completed)
                     return;
 
-                if (value.Saving)
-                {
-                    notification.Text = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_SAVING;
-                    notification.Progress = 0.99f;
-                    return;
-                }
-
                 int total = Math.Max(1, value.Total);
                 int processed = Math.Clamp(value.Processed, 0, total);
 
-                // Keep bar under 100% until we explicitly Complete — avoids a stuck spinner at 1.0 Active.
-                notification.Text = LocalisableString.Format(
-                    EzSettingsProfile.LOCAL_PROFILE_COMPUTE_PROGRESS.ToString(),
-                    processed,
-                    total);
-                notification.Progress = Math.Min(0.99f, (float)processed / total);
+                switch (value.Phase)
+                {
+                    case EzLocalProfileComputePhase.Saving:
+                        notification.Text = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_SAVING;
+                        notification.Progress = 0.99f;
+                        return;
+
+                    case EzLocalProfileComputePhase.Skills:
+                        notification.Text = LocalisableString.Format(
+                            EzSettingsProfile.LOCAL_PROFILE_COMPUTE_SKILLS.ToString(),
+                            processed,
+                            total);
+                        // Keep under 100% until finishComputeNotification Completes.
+                        notification.Progress = Math.Min(0.99f, 0.85f + 0.14f * processed / total);
+                        return;
+
+                    default:
+                        notification.Text = LocalisableString.Format(
+                            EzSettingsProfile.LOCAL_PROFILE_COMPUTE_PROGRESS.ToString(),
+                            processed,
+                            total);
+                        // Cap analysing phase so Saving/Skills still have visual room.
+                        notification.Progress = Math.Min(0.85f, 0.85f * processed / total);
+                        return;
+                }
             }
         }
 
