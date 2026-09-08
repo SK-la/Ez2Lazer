@@ -7,6 +7,11 @@ using System.Linq;
 
 namespace osu.Game.EzOsuGame.Skills
 {
+    /// <summary>
+    /// Catalog of skill systems. Default systems cover current Mina MSD/SSR + dan tracks for keys 4–9.
+    /// Reserved: register additional <see cref="IEzSkillSystem"/> implementations for keymode-specific axis sets
+    /// (do not replace this with a hard-coded Mina-only list when that lands).
+    /// </summary>
     public sealed class EzSkillRegistry
     {
         private readonly Dictionary<string, IEzSkillSystem> systems = new Dictionary<string, IEzSkillSystem>(StringComparer.Ordinal);

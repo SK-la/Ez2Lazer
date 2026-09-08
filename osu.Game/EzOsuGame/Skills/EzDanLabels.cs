@@ -3,22 +3,16 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Game.EzOsuGame.Skills.Dan;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Ports mania-hub labels.ts parseDan / srToRawDan (stream family default) and parseLnDan.
-    /// Chart rawDan is heuristic until LeoBlack is ported.
+    /// Ports mania-hub labels.ts srToRawDan / dominant axis (RcMina radar).
+    /// Label printing: <see cref="EzDanLadders"/>; xxy table path: <see cref="EzSunnyDanIntervals"/>.
     /// </summary>
     public static class EzDanLabels
     {
-        private static readonly string[] dan_labels =
-        {
-            "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-            "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa",
-        };
-
-        // stream family means from mania-hub labels.ts
         private static readonly double[] stream_means =
         {
             3.1, 3.5, 3.9, 4.3, 4.7, 5.05, 5.35, 5.6, 5.78, 5.92,
@@ -61,120 +55,102 @@ namespace osu.Game.EzOsuGame.Skills
             6.42, 6.82, 7.22, 7.72, 8.35, 9.02, 9.8, 10.52, 11.26, 12.0,
         };
 
-        public const int LN_LADDER_TOP = 17;
+        /// <summary>Reform ladder length used by SR→rawDan means tables (1…kappa).</summary>
+        private const int reform_means_levels = 20;
 
-        public static double SrToRawDan(double sr, string family = "stream", bool calibrate = true)
+        public static double SrToRawDan(double sr, EzMinaSkillAxis axis = EzMinaSkillAxis.Stream, bool calibrate = true)
         {
             if (!double.IsFinite(sr) || sr <= 0)
                 return 1;
 
-            string calibrationFamily = family == "jumpstream" ? "handstream" : family;
-            double calibratedSr = calibrate ? calibrateSrForFamily(sr, calibrationFamily) : sr;
-            return rawDanFromMeans(calibratedSr, meansFor(calibrationFamily));
+            // Hub: jumpstream calibration borrows handstream means.
+            var calibrationAxis = axis == EzMinaSkillAxis.Jumpstream ? EzMinaSkillAxis.Handstream : axis;
+            double calibratedSr = calibrate ? calibrateSrForAxis(sr, calibrationAxis) : sr;
+            return rawDanFromMeans(calibratedSr, meansFor(calibrationAxis));
         }
+
+        public static double SrToRawDan(double sr, string axisId, bool calibrate = true)
+        {
+            if (!EzMinaSkillAxisExtensions.TryParse(axisId, out var axis))
+                axis = EzMinaSkillAxis.Stream;
+
+            return SrToRawDan(sr, axis, calibrate);
+        }
+
+        /// <summary>Thin forward to <see cref="EzDanLadders"/>.</summary>
+        public static string LabelFor(double rawDan, EzDanSide side, int keyCount)
+            => EzDanLadders.For(keyCount, side).ParseLabel(rawDan);
+
+        public static string LabelFor(double rawDan, string sideId, int keyCount)
+            => LabelFor(rawDan, EzDanSideExtensions.ParseOrRc(sideId), keyCount);
+
+        public static double? CeilingFor(EzDanSide side, int keyCount)
+            => EzDanLadders.For(keyCount, side).Ceiling;
+
+        public static double? CeilingFor(string sideId, int keyCount)
+            => CeilingFor(EzDanSideExtensions.ParseOrRc(sideId), keyCount);
+
+        public static double FloorFor(EzDanSide side, int keyCount)
+            => EzDanLadders.For(keyCount, side).Floor;
+
+        public static double FloorFor(string sideId, int keyCount)
+            => FloorFor(EzDanSideExtensions.ParseOrRc(sideId), keyCount);
 
         private readonly record struct SrCalibration(double Slope, double Offset, double GateStart, double GateWidth);
 
-        private static readonly Dictionary<string, SrCalibration> sr_calibration = new Dictionary<string, SrCalibration>
+        private static readonly Dictionary<EzMinaSkillAxis, SrCalibration> sr_calibration = new()
         {
-            ["jack"] = new SrCalibration(0.74, 1.3, 7.4, 0.3),
-            ["stream"] = new SrCalibration(0.92, -0.4, 7, 0.9),
-            ["jumpstream"] = new SrCalibration(1.02, -0.45, 7.25, 0.55),
-            ["handstream"] = new SrCalibration(1.16, -2, 7.4, 0.2),
-            ["stamina"] = new SrCalibration(1.12, -1.5, 7.3, 0.55),
-            ["chordjack"] = new SrCalibration(1, 0, 7.15, 0.85),
-            ["tech"] = new SrCalibration(0.95, -0.9, 7.6, 0.9),
+            [EzMinaSkillAxis.JackSpeed] = new SrCalibration(0.74, 1.3, 7.4, 0.3),
+            [EzMinaSkillAxis.Stream] = new SrCalibration(0.92, -0.4, 7, 0.9),
+            [EzMinaSkillAxis.Jumpstream] = new SrCalibration(1.02, -0.45, 7.25, 0.55),
+            [EzMinaSkillAxis.Handstream] = new SrCalibration(1.16, -2, 7.4, 0.2),
+            [EzMinaSkillAxis.Stamina] = new SrCalibration(1.12, -1.5, 7.3, 0.55),
+            [EzMinaSkillAxis.Chordjack] = new SrCalibration(1, 0, 7.15, 0.85),
+            [EzMinaSkillAxis.Technical] = new SrCalibration(0.95, -0.9, 7.6, 0.9),
         };
 
-        private static double calibrateSrForFamily(double sr, string family)
+        private static double calibrateSrForAxis(double sr, EzMinaSkillAxis axis)
         {
-            if (!sr_calibration.TryGetValue(family, out var calibration))
-                calibration = sr_calibration["stream"];
+            if (!sr_calibration.TryGetValue(axis, out var calibration))
+                calibration = sr_calibration[EzMinaSkillAxis.Stream];
 
             double targetSr = sr * calibration.Slope + calibration.Offset;
             double gate = Math.Clamp((sr - calibration.GateStart) / calibration.GateWidth, 0, 1);
             return sr + (targetSr - sr) * gate;
         }
 
-        public static string LabelFor(double rawDan, string side, int keyCount)
+        /// <summary>Highest RcMina radar axis in MSD (for chart skill chip / means when not Sunny).</summary>
+        public static EzMinaSkillAxis DominantAxis(IReadOnlyDictionary<string, double> msdSkills)
         {
-            if (side == DanSkillSystem.SIDE_LN && keyCount == 4)
-                return parseLnDan(rawDan);
-
-            // Non-4K table labels deferred; use rice greek ladder as readable MVP.
-            return parseDan(rawDan);
-        }
-
-        public static double FloorFor(string side, int keyCount)
-            => keyCount == 4 ? 0.5 : 0;
-
-        public static double? CeilingFor(string side, int keyCount)
-        {
-            if (keyCount == 4 && side == DanSkillSystem.SIDE_LN)
-                return LN_LADDER_TOP + 0.5;
-
-            return null;
-        }
-
-        public static string DominantFamily(IReadOnlyDictionary<string, double> msdSkills)
-        {
-            (string axis, string family)[] map =
-            {
-                (EzSkillIds.Msd(EzSkillIds.STREAM), "stream"),
-                (EzSkillIds.Msd(EzSkillIds.JUMPSTREAM), "jumpstream"),
-                (EzSkillIds.Msd(EzSkillIds.HANDSTREAM), "handstream"),
-                (EzSkillIds.Msd(EzSkillIds.STAMINA), "stamina"),
-                (EzSkillIds.Msd(EzSkillIds.JACK_SPEED), "jack"),
-                (EzSkillIds.Msd(EzSkillIds.CHORDJACK), "chordjack"),
-                (EzSkillIds.Msd(EzSkillIds.TECHNICAL), "tech"),
-            };
-
-            string best = "stream";
+            var best = EzMinaSkillAxis.Stream;
             double bestValue = -1;
 
-            foreach (var (axis, family) in map)
+            foreach (var axis in EzMinaSkillAxisExtensions.RadarAxes)
             {
-                if (msdSkills.TryGetValue(axis, out double value) && value > bestValue)
-                {
-                    bestValue = value;
-                    best = family;
-                }
+                if (!msdSkills.TryGetValue(axis.ToMsdSkillId(), out double value) || value <= bestValue)
+                    continue;
+
+                bestValue = value;
+                best = axis;
             }
 
             return best;
         }
 
-        private static string parseDan(double rawDan)
+        private static double[] meansFor(EzMinaSkillAxis axis) => axis switch
         {
-            int maxLevel = dan_labels.Length;
-            int level = Math.Min(maxLevel, Math.Max(1, (int)Math.Round(rawDan)));
-            double offset = rawDan - level;
-            string? variant = offset <= -0.45 ? "--" : offset <= -0.25 ? "-" : offset < 0.1 ? null : offset < 0.26 ? "+" : "++";
-            return $"{dan_labels[level - 1]}{variant ?? string.Empty}";
-        }
-
-        private static string parseLnDan(double rawDan)
-        {
-            int level = Math.Max(1, Math.Min(LN_LADDER_TOP, (int)Math.Round(rawDan)));
-            double offset = rawDan - level;
-            string? variant = offset <= -0.45 ? "--" : offset <= -0.25 ? "-" : offset < 0.1 ? null : offset < 0.26 ? "+" : "++";
-            return $"{level}{variant ?? string.Empty}";
-        }
-
-        private static double[] meansFor(string family) => family switch
-        {
-            "jack" => jack_means,
-            "jumpstream" => jumpstream_means,
-            "handstream" => handstream_means,
-            "stamina" => stamina_means,
-            "chordjack" => chordjack_means,
-            "tech" => tech_means,
+            EzMinaSkillAxis.JackSpeed => jack_means,
+            EzMinaSkillAxis.Jumpstream => jumpstream_means,
+            EzMinaSkillAxis.Handstream => handstream_means,
+            EzMinaSkillAxis.Stamina => stamina_means,
+            EzMinaSkillAxis.Chordjack => chordjack_means,
+            EzMinaSkillAxis.Technical => tech_means,
             _ => stream_means,
         };
 
         private static double rawDanFromMeans(double value, double[] means)
         {
-            int maxIndex = dan_labels.Length - 1;
+            int maxIndex = reform_means_levels - 1;
             var capped = means.AsSpan(0, Math.Min(means.Length, maxIndex + 1));
 
             if (value < boundaryLower(capped, 0))
@@ -203,7 +179,6 @@ namespace osu.Game.EzOsuGame.Skills
         {
             double mean = means[index];
 
-            // Midpoint to the left neighbour; for the first bucket extrapolate using means[1].
             if (index == 0)
                 return mean - (means[1] - mean) / 2;
 

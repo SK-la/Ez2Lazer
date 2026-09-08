@@ -32,7 +32,8 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
 
             var existing = skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_MSD);
-            if (existing.Count >= EzSkillIds.MINA_SKILLSETS.Length)
+            if (existing.Count >= EzMinaSkillAxisExtensions.All.Length
+                && existing.ContainsKey(EzSkillSystems.MsdHoldRatioSkillId))
                 return existing;
 
             return ComputeAndStore(beatmapInfo);
@@ -54,7 +55,8 @@ namespace osu.Game.EzOsuGame.Skills
             if (vector.Overall <= 0 && vector.Stream <= 0)
                 return null;
 
-            skillStore.WriteBeatmapMsd(beatmapInfo.Hash, vector, beatmapInfo.ID);
+            double holdRatio = EzChartDanEstimator.ComputeHoldRatio(playable);
+            skillStore.WriteBeatmapMsd(beatmapInfo.Hash, vector, beatmapInfo.ID, holdRatio: holdRatio);
             return skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_MSD);
         }
     }

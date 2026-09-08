@@ -10,18 +10,19 @@ using osu.Game.Scoring;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Ports mania-hub ssrGoalForScore / estimateWifeAccuracy (subset).
+    /// Ports mania-hub <c>ssrGoalForScore</c> / <c>estimateWifeAccuracy</c> (subset).
     /// Pre-release corrective: does not bump <see cref="EzManiaSkillAlgorithm.VERSION"/>.
     /// </summary>
     public static class EzSsrGoal
     {
-        // TODO: 常量需要审查，之后统一格式化命名规范
+        // --- Goal clamps (hub ssrGoalForScore) ---
         public const double GOAL_MIN = 0.8;
         public const double CALC_GOAL_CAP = 0.965;
         public const double GOAL_CAP = 0.9975;
+
+        // --- Judgement / OD window (hub estimateWifeAccuracy inputs) ---
         public const double ASSUMED_OD = 8;
         private const double EZ_WINDOW_SCALE = 1.4;
-
         private const double WIFE3_FULL_POINTS_MS = 5;
         private const double WIFE3_ZERO_MS = 65;
         private const double WIFE3_ERF_DEV_MS = 22.7;

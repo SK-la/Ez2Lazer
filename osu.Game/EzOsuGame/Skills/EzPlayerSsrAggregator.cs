@@ -80,7 +80,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                     list.Add(vector);
 
-                    foreach ((string axisId, double axisValue) in vector.Enumerate())
+                    foreach (var (axis, axisValue) in vector.Enumerate())
                     {
                         if (axisValue <= 0 || !double.IsFinite(axisValue))
                             continue;
@@ -89,7 +89,7 @@ namespace osu.Game.EzOsuGame.Skills
                         {
                             Username = username,
                             KeyCount = keyCount,
-                            SkillId = EzSkillIds.Ssr(axisId),
+                            SkillId = axis.ToSsrSkillId(),
                             BeatmapHash = score.BeatmapHash,
                             AxisValue = axisValue,
                             Accuracy = score.Accuracy,

@@ -13,6 +13,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -25,7 +26,7 @@ using osuTK.Input;
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
-    /// 用于在难度卡底部显示标签的组件，包括用户标签、视频标签、故事版标签。
+    /// 难度卡底部标签行：左侧可选技能段位，其后为用户标签 / 视频 / 故事版。
     /// Video/Storyboard 标记由 <see cref="BeatmapUpdater"/> 写入 <see cref="BeatmapInfo"/>，此处只读 Realm 字段。
     /// </summary>
     public partial class EzDisplayTag : CompositeDrawable
@@ -33,7 +34,9 @@ namespace osu.Game.EzOsuGame.UserInterface
         private const int max_visible_tags = 10;
         private const float tag_corner_radius = 3;
 
+        private readonly FillFlowContainer rootFlow;
         private readonly FillFlowContainer tagFlow;
+        private readonly EzDisplaySkillsDan skillsDan;
 
         private ScheduledDelegate? scheduledTagUpdate;
 
@@ -57,17 +60,38 @@ namespace osu.Game.EzOsuGame.UserInterface
         [Resolved]
         private ISongSelect? songSelect { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private EzSkillProvider? skillProvider { get; set; }
+
         public EzDisplayTag()
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
 
-            InternalChild = tagFlow = new FillFlowContainer
+            skillsDan = new EzDisplaySkillsDan
+            {
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                PreferDanImage = true,
+                Alpha = 0,
+            };
+
+            tagFlow = new FillFlowContainer
+            {
+                AutoSizeAxes = Axes.Both,
+                Direction = FillDirection.Horizontal,
+                Spacing = new Vector2(3, 0),
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+            };
+
+            InternalChild = rootFlow = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
                 Direction = FillDirection.Horizontal,
-                Spacing = new Vector2(3, 0),
+                Spacing = new Vector2(4, 0),
+                Child = tagFlow,
             };
         }
 
@@ -115,7 +139,28 @@ namespace osu.Game.EzOsuGame.UserInterface
             tagFlow.Clear();
 
             if (beatmap == null)
+            {
+                skillsDan.Clear();
+                if (skillsDan.Parent != null)
+                    rootFlow.Remove(skillsDan, false);
                 return;
+            }
+
+            // Left: cached chart skill + dan (no beatmap load / no MSD compute).
+            var verdict = skillProvider?.TryGetCachedChartDan(beatmap);
+
+            if (verdict != null)
+            {
+                skillsDan.SetFrom(verdict);
+                if (skillsDan.Parent == null)
+                    rootFlow.Insert(0, skillsDan);
+            }
+            else
+            {
+                skillsDan.Clear();
+                if (skillsDan.Parent != null)
+                    rootFlow.Remove(skillsDan, false);
+            }
 
             var userTags = beatmap.Metadata.UserTags.Take(max_visible_tags);
 

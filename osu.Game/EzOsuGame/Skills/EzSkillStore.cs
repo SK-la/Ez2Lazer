@@ -60,7 +60,7 @@ namespace osu.Game.EzOsuGame.Skills
             return true;
         }
 
-        public void WriteBeatmapMsd(string beatmapHash, EzSkillsetVector vector, Guid beatmapId = default, DateTimeOffset? computedAt = null)
+        public void WriteBeatmapMsd(string beatmapHash, EzSkillsetVector vector, Guid beatmapId = default, DateTimeOffset? computedAt = null, double? holdRatio = null)
         {
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = EzManiaSkillAlgorithm.VERSION;
@@ -74,15 +74,29 @@ namespace osu.Game.EzOsuGame.Skills
                 foreach (var row in existing)
                     r.Remove(row);
 
-                foreach ((string axis, double value) in vector.Enumerate())
+                foreach (var (axis, value) in vector.Enumerate())
                 {
                     r.Add(new EzBeatmapSkillValue
                     {
                         BeatmapHash = beatmapHash,
                         BeatmapId = beatmapId,
                         SystemId = EzSkillSystems.BEATMAP_MSD,
-                        SkillId = EzSkillIds.Msd(axis),
+                        SkillId = axis.ToMsdSkillId(),
                         Value = value,
+                        AlgorithmVersion = version,
+                        ComputedAt = at,
+                    });
+                }
+
+                if (holdRatio is double ratio && double.IsFinite(ratio))
+                {
+                    r.Add(new EzBeatmapSkillValue
+                    {
+                        BeatmapHash = beatmapHash,
+                        BeatmapId = beatmapId,
+                        SystemId = EzSkillSystems.BEATMAP_MSD,
+                        SkillId = EzSkillSystems.MsdHoldRatioSkillId,
+                        Value = Math.Clamp(ratio, 0, 1),
                         AlgorithmVersion = version,
                         ComputedAt = at,
                     });
@@ -123,7 +137,7 @@ namespace osu.Game.EzOsuGame.Skills
                     return new EzPlayerSsrSnapshot();
 
                 var values = rows.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
-                var meta = rows.FirstOrDefault(v => v.SkillId == EzSkillIds.Ssr(EzSkillIds.OVERALL)) ?? rows[0];
+                var meta = rows.FirstOrDefault(v => v.SkillId == EzMinaSkillAxis.Overall.ToSsrSkillId()) ?? rows[0];
 
                 return new EzPlayerSsrSnapshot
                 {
@@ -178,9 +192,9 @@ namespace osu.Game.EzOsuGame.Skills
                 foreach (var row in existing)
                     r.Remove(row);
 
-                foreach ((string axis, double value) in vector.Enumerate())
+                foreach (var (axis, value) in vector.Enumerate())
                 {
-                    string skillId = EzSkillIds.Ssr(axis);
+                    string skillId = axis.ToSsrSkillId();
 
                     r.Add(new EzPlayerSkillValue
                     {

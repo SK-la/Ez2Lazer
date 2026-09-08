@@ -11,9 +11,11 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -233,7 +235,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             headerSlot.Child = new SkillsHeader(keyCount, snapshot, username, skillProvider, toggleDanClears, selectedDanSide);
 
-            var radarAxes = definitions.Where(d => d.SkillId != EzSkillIds.Ssr(EzSkillIds.OVERALL)).ToList();
+            var radarAxes = definitions.Where(d => d.SkillId != EzMinaSkillAxis.Overall.ToSsrSkillId()).ToList();
             double radarMax = radarAxes
                               .Select(d => snapshot.Values.GetValueOrDefault(d.SkillId, 0))
                               .DefaultIfEmpty(0)
@@ -444,10 +446,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                 ?? Array.Empty<EzSkillDefinition>())
             {
                 if (def.SkillId == skillId)
-                    return def.DisplayName;
+                    return def.DisplayName.ToString();
             }
 
-            return skillId;
+            return EzMinaSkillAxisExtensions.TryParse(skillId, out var axis)
+                ? axis.Chip().Name.ToString()
+                : skillId;
         }
 
         private EzLocalProfileDrillScoreRow? findDrillRow(string beatmapHash)
@@ -717,9 +721,56 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     ? EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_LN.ToString()
                     : EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_RC.ToString();
 
-                string body = $"{sideLabel} {estimate.Label}";
-                if (estimate.Clears > 0)
-                    body += $" · {estimate.Clears}";
+                var danDisplay = new EzDisplayDan
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    PreferImage = true,
+                    BadgeSize = 16,
+                };
+                danDisplay.SetLabel(estimate.Label, estimate.KeyCount, side);
+
+                var bodyFlow = new FillFlowContainer
+                {
+                    AutoSizeAxes = Axes.Both,
+                    Direction = FillDirection.Vertical,
+                    Padding = new MarginPadding { Horizontal = 12, Vertical = 8 },
+                    Spacing = new Vector2(0, 2),
+                    Children = new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = EzSettingsProfile.LOCAL_PROFILE_DAN_CHIP_TITLE,
+                            Font = OsuFont.GetFont(size: 10, weight: FontWeight.SemiBold),
+                            Colour = colours.Content2,
+                        },
+                        new FillFlowContainer
+                        {
+                            AutoSizeAxes = Axes.Both,
+                            Direction = FillDirection.Horizontal,
+                            Spacing = new Vector2(6, 0),
+                            Children = new Drawable[]
+                            {
+                                new OsuSpriteText
+                                {
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                    Text = sideLabel,
+                                    Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
+                                },
+                                danDisplay,
+                            }
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = estimate.Clears > 0
+                                ? $"{EzSettingsProfile.LOCAL_PROFILE_DAN_CHIP_HINT} · {estimate.Clears}"
+                                : EzSettingsProfile.LOCAL_PROFILE_DAN_CHIP_HINT,
+                            Font = OsuFont.GetFont(size: 10),
+                            Colour = colours.Content2,
+                        },
+                    }
+                };
 
                 Children = new Drawable[]
                 {
@@ -728,33 +779,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         RelativeSizeAxes = Axes.Both,
                         Colour = colours.Background5,
                     },
-                    new FillFlowContainer
-                    {
-                        AutoSizeAxes = Axes.Both,
-                        Direction = FillDirection.Vertical,
-                        Padding = new MarginPadding { Horizontal = 12, Vertical = 8 },
-                        Spacing = new Vector2(0, 2),
-                        Children = new Drawable[]
-                        {
-                            new OsuSpriteText
-                            {
-                                Text = EzSettingsProfile.LOCAL_PROFILE_DAN_CHIP_TITLE,
-                                Font = OsuFont.GetFont(size: 10, weight: FontWeight.SemiBold),
-                                Colour = colours.Content2,
-                            },
-                            new OsuSpriteText
-                            {
-                                Text = body,
-                                Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
-                            },
-                            new OsuSpriteText
-                            {
-                                Text = EzSettingsProfile.LOCAL_PROFILE_DAN_CHIP_HINT,
-                                Font = OsuFont.GetFont(size: 10),
-                                Colour = colours.Content2,
-                            },
-                        }
-                    }
+                    bodyFlow,
                 };
             }
 
@@ -866,7 +891,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             public SkillBarRow(
                 string skillId,
-                string displayName,
+                LocalisableString displayName,
                 double value,
                 float ratio,
                 Colour4 accent,
