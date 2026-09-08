@@ -441,6 +441,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 case HitResult.Good:
                     return 41;  // Good
 
+                // LN tick 只推 combo，不计 ACC/判定档分值
+                case HitResult.LargeTickHit:
+                case HitResult.LargeTickMiss:
+                case HitResult.SliderTailHit:
+                    return 0;
+
                 default:
                     return 0;
             }

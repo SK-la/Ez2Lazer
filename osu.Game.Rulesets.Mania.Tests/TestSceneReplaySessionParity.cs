@@ -223,21 +223,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestEz2AcHoldDrawableMatchesSession()
         {
-            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
-
-            const double head = 1000;
-            const double tail = 2000;
-
-            runDrawableParityTest(
-                new List<ManiaHitObject>
-                {
-                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
-                },
-                new List<ReplayFrame>
-                {
-                    new ManiaReplayFrame(head, ManiaAction.Key1),
-                    new ManiaReplayFrame(tail),
-                });
+            runDrawableParityTestFromFixture(HitModeReplayFixtures.CreateEz2AcHoldThroughEnd());
         }
 
         // ==================== POLICY-PARITY: JudgePrecedence × 叠键 ====================
@@ -324,8 +310,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         /// <summary>
-        /// [Ez] 断连 LN（提早松手、尾判 miss）：用户报告 EZ2AC 下游戏结束统计比 Session 重算少若干判定，
-        /// 缺失数量与 ComboBreak 数一致。全量比较 Statistics（含 ComboBreak / Miss）。
+        /// [Ez] 中途松手 LN：EZ2AC 现为 tick IgnoreMiss（不断 combo），尾 Ignore；与 Session 全量 Statistics 对齐。
         /// </summary>
         [Test]
         public void TestFullScoreParity_Ez2AcBrokenHold()
@@ -344,14 +329,14 @@ namespace osu.Game.Rulesets.Mania.Tests
                 new List<ReplayFrame>
                 {
                     new ManiaReplayFrame(head, ManiaAction.Key1),
-                    new ManiaReplayFrame(1500), // 提早松手 → hold break，尾判 miss
+                    new ManiaReplayFrame(1500), // 提早松手 → tick IgnoreMiss，不断 combo
                     new ManiaReplayFrame(4000, ManiaAction.Key2),
                     new ManiaReplayFrame(4100),
                 });
         }
 
         /// <summary>
-        /// [Ez] 断连后重按到尾判：EZ2AC 断连 LN 的另一常见形态。
+        /// [Ez] 断连后重按：再抓后 tick 恢复涨 combo。
         /// </summary>
         [Test]
         public void TestFullScoreParity_Ez2AcBrokenHoldRepress()
@@ -372,7 +357,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                     new ManiaReplayFrame(head, ManiaAction.Key1),
                     new ManiaReplayFrame(1500), // 中途断连
                     new ManiaReplayFrame(2000, ManiaAction.Key1), // 重按
-                    new ManiaReplayFrame(tail), // 到尾判才松手
+                    new ManiaReplayFrame(tail + 200), // 持过尾再松
                     new ManiaReplayFrame(4000, ManiaAction.Key2),
                     new ManiaReplayFrame(4100),
                 });
@@ -406,7 +391,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         }
 
         /// <summary>
-        /// [Ez] 持满 body 但在尾键窗外松手：曾导致 Tail HandledNoOp 永久循环、HasCompleted 无法达标。
+        /// [Ez] 持满过尾再松：尾为 IgnoreHit，不应再因晚松 Fail；与 Session 对齐并能正常收束。
         /// </summary>
         [Test]
         public void TestFullScoreParity_Ez2AcLateTailRelease()
@@ -425,7 +410,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                 new List<ReplayFrame>
                 {
                     new ManiaReplayFrame(head, ManiaAction.Key1),
-                    new ManiaReplayFrame(3500), // 尾窗结束后松手
+                    new ManiaReplayFrame(3500), // 持过尾再松
                     new ManiaReplayFrame(5000, ManiaAction.Key2),
                     new ManiaReplayFrame(5100),
                 },
@@ -490,16 +475,20 @@ namespace osu.Game.Rulesets.Mania.Tests
 
             AddStep("load player", () =>
             {
-                Beatmap.Value = CreateWorkingBeatmap(new ManiaBeatmap(new StageDefinition(4))
+                var beatmap = new ManiaBeatmap(new StageDefinition(4))
                 {
                     HitObjects = hitObjects,
                     BeatmapInfo =
                     {
                         Ruleset = new ManiaRuleset().RulesetInfo,
                     },
-                });
+                };
 
-                Beatmap.Value.Beatmap.ControlPointInfo.Add(0, new EffectControlPoint { ScrollSpeed = 0.1f });
+                // 与 Session fixtures 一致：120 BPM，保证 EZ2AC LN 16 分 tick 网格对齐。
+                beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = 500 });
+                beatmap.ControlPointInfo.Add(0, new EffectControlPoint { ScrollSpeed = 0.1f });
+
+                Beatmap.Value = CreateWorkingBeatmap(beatmap);
 
                 replayScore = new Score { Replay = new Replay { Frames = frames } };
                 ReplayJudgeTestConfig.ApplyEmbeddedModes(replayScore, parityEnvironment);
@@ -533,16 +522,20 @@ namespace osu.Game.Rulesets.Mania.Tests
 
             AddStep("load player", () =>
             {
-                Beatmap.Value = CreateWorkingBeatmap(new ManiaBeatmap(new StageDefinition(4))
+                var beatmap = new ManiaBeatmap(new StageDefinition(4))
                 {
                     HitObjects = hitObjects,
                     BeatmapInfo =
                     {
                         Ruleset = new ManiaRuleset().RulesetInfo,
                     },
-                });
+                };
 
-                Beatmap.Value.Beatmap.ControlPointInfo.Add(0, new EffectControlPoint { ScrollSpeed = 0.1f });
+                // 与 Session fixtures 一致：120 BPM，保证 EZ2AC LN 16 分 tick 网格对齐。
+                beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = 500 });
+                beatmap.ControlPointInfo.Add(0, new EffectControlPoint { ScrollSpeed = 0.1f });
+
+                Beatmap.Value = CreateWorkingBeatmap(beatmap);
 
                 replayScore = new Score { Replay = new Replay { Frames = frames } };
                 ReplayJudgeTestConfig.ApplyEmbeddedModes(replayScore, parityEnvironment);

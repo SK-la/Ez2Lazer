@@ -10,6 +10,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
     /// <summary>
     /// EZ2AC 判定 — Mode 原生名 + MapTo；
     /// Session 与 Drawable 唯一源。
+    /// LN：头定品质 + 16 分 tick 只推 combo；尾 Ignore（无松手窗）。
     /// </summary>
     public enum Ez2AcJudge
     {
@@ -46,13 +47,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
         };
 
         /// <summary>
-        /// LN 尾判软化：因长条更难对准，将尾判结果放松一档。
+        /// LN 头软化（7th 2.0+）：仅 Cool→Kool；Good/Miss 不整档抬升。
         /// </summary>
-        public static Ez2AcJudge SoftenLnJudge(Ez2AcJudge judge) => judge switch
+        public static Ez2AcJudge SoftenLnHeadJudge(Ez2AcJudge judge) => judge switch
         {
             Ez2AcJudge.Cool => Ez2AcJudge.Kool,
-            Ez2AcJudge.Good => Ez2AcJudge.Cool,
-            Ez2AcJudge.Miss => Ez2AcJudge.Good,
             _ => judge,
         };
 
@@ -74,40 +73,43 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
                 return ManiaNoteJudgementOutcome.Ignore;
 
             if (isLnHead)
-                judge = SoftenLnJudge(judge);
+                judge = SoftenLnHeadJudge(judge);
 
             return ManiaNoteJudgementOutcome.ApplyResult(MapTo(judge));
         }
 
         public ManiaNoteJudgementOutcome EvaluateDrawablePress(double timeOffset, HitWindows hitWindows, bool isLnHead) => EvaluatePress(timeOffset, hitWindows, isLnHead);
 
-        public HitResult EvaluateTail(in HoldTailEvaluationContext context) => MapTo(EvaluateTailJudge(context));
+        /// <summary>LN 尾不计分，仅 Ignore 完结（对齐 Malody 尾角色）。</summary>
+        public HitResult EvaluateTail(in HoldTailEvaluationContext context) => HitResult.IgnoreHit;
 
-        public Ez2AcJudge EvaluateTailJudge(in HoldTailEvaluationContext context)
+        public Ez2AcJudge EvaluateTailJudge(in HoldTailEvaluationContext context) => Ez2AcJudge.None;
+
+        /// <summary>
+        /// Tick：按住且状态允许 → SliderTailHit（只推 combo）；否则 IgnoreMiss（不断 combo、不计档）。
+        /// </summary>
+        public HitResult EvaluateTick(Ez2AcHoldState state, bool isHolding)
         {
-            var judge = FromHitResult(context.HitWindows.ResultFor(context.TimeOffsetForJudgement));
+            if (isHolding && state.ShouldIncreaseCombo)
+                return HitResult.SliderTailHit;
 
-            if (judge == Ez2AcJudge.None)
-                return Ez2AcJudge.None;
-
-            judge = SoftenLnJudge(judge);
-
-            if (judge > Ez2AcJudge.Miss && (!context.HeadHit || context.HoldBreak || context.HoldBroken))
-                judge = Ez2AcJudge.Good;
-
-            return judge;
+            return HitResult.IgnoreMiss;
         }
 
         public bool CanBeginHoldAt(double time, TailNote tail) => LazerHoldJudgementReplica.Instance.CanBeginHoldAt(time, tail);
 
-        public bool IsHoldBreak(double rawOffset, HitWindows hitWindows) => LazerHoldJudgementReplica.Instance.IsHoldBreak(rawOffset, hitWindows);
+        public bool IsHoldBreak(double rawOffset, HitWindows hitWindows) => false;
 
         public HitResult RejudgeHitEvent(HitEvent hitEvent, HitWindows hitWindows)
         {
             if (hitEvent.HitObject is TailNote)
+                return HitResult.IgnoreHit;
+
+            if (hitEvent.HitObject is HoldNoteTick)
             {
-                var tailOutcome = EvaluatePress(hitEvent.TimeOffset, hitWindows);
-                return tailOutcome.Kind == ManiaNoteJudgementOutcomeKind.Apply ? tailOutcome.Result : HitResult.Miss;
+                return hitEvent.Result is HitResult.SliderTailHit or HitResult.IgnoreMiss
+                    ? hitEvent.Result
+                    : HitResult.IgnoreMiss;
             }
 
             var outcome = EvaluatePress(hitEvent.TimeOffset, hitWindows, hitEvent.HitObject is HeadNote);

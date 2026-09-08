@@ -31,6 +31,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         private static readonly ConditionalWeakTable<DrawableHoldNote, O2HitModeJudgement.HoldBreakState> o2_hold_states =
             new ConditionalWeakTable<DrawableHoldNote, O2HitModeJudgement.HoldBreakState>();
 
+        private static readonly ConditionalWeakTable<DrawableHoldNote, Ez2AcHoldState> ez2ac_hold_states =
+            new ConditionalWeakTable<DrawableHoldNote, Ez2AcHoldState>();
+
         public static bool CanRouteToKPoor(DrawableNote note) => GetBmsState(note).CanRouteToKPoor;
 
         public static bool CanRouteToKPoor(DrawableHoldNoteTail tail) => GetBmsState(tail).CanRouteToKPoor;
@@ -98,6 +101,97 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             return true;
         }
 
+        internal static bool TryEz2AcHoldOnReleased(DrawableHoldNote hold)
+        {
+            var round = getJudgementRound(hold);
+
+            if (round.Environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+                return false;
+
+            if (!hold.IsHolding.Value)
+                return false;
+
+            var state = GetEz2AcHoldState(hold);
+            state.OnRelease();
+            hold.Result.ReportHoldState(hold.Time.Current, false);
+
+            // 尾到达后才完结；中途松手可再抓，不判尾、不断 Body。
+            if (hold.Time.Current >= hold.Tail.HitObject.StartTime)
+            {
+                hold.Tail.UpdateResult();
+                if (!hold.Body.AllJudged)
+                    hold.Body.TriggerResult(true);
+            }
+
+            return true;
+        }
+
+        internal static bool TryEz2AcHoldCheckForResult(DrawableHoldNote hold, bool userTriggered, double timeOffset)
+        {
+            var round = getJudgementRound(hold);
+
+            if (round.Environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+                return false;
+
+            if (!hold.Tail.AllJudged)
+                return false;
+
+            hold.EzFinalizeEz2AcHoldFromTail();
+            return true;
+        }
+
+        internal static bool TryHoldTickCheckForResult(DrawableHoldNoteTick tick, bool userTriggered, double timeOffset)
+        {
+            if (userTriggered)
+                return true;
+
+            if (timeOffset < 0)
+                return true;
+
+            if (tick.HoldNote is not DrawableHoldNote hold)
+                return false;
+
+            var round = getJudgementRound(tick);
+
+            if (round.Environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+                return false;
+
+            var state = GetEz2AcHoldState(hold);
+            bool holding = hold.IsHolding.Value;
+            var result = Ez2AcHitModeJudgement.Instance.EvaluateTick(state, holding);
+            tick.EzApplyTickResult(result);
+            return true;
+        }
+
+        internal static Ez2AcHoldState GetEz2AcHoldState(DrawableHoldNote hold)
+            => ez2ac_hold_states.GetValue(hold, _ => new Ez2AcHoldState());
+
+        /// <summary>头判定应用后同步 EZ2AC LN 状态机。</summary>
+        internal static void NotifyEz2AcHeadJudged(DrawableHoldNote hold, HitResult headResult, bool wasHoldingBeforePress)
+        {
+            var round = getJudgementRound(hold);
+
+            if (round.Environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+                return;
+
+            var state = GetEz2AcHoldState(hold);
+            var judge = Ez2AcHitModeJudgement.FromHitResult(headResult);
+            state.OnHeadJudged(judge, preHeld: wasHoldingBeforePress);
+        }
+
+        internal static void NotifyEz2AcRepress(DrawableHoldNote hold)
+        {
+            var round = getJudgementRound(hold);
+
+            if (round.Environment.ManiaHitMode != EzEnumHitMode.EZ2AC)
+                return;
+
+            if (!hold.Head.AllJudged)
+                return;
+
+            GetEz2AcHoldState(hold).OnRepress();
+        }
+
         internal static bool TryHitModeCheckForResult(DrawableNote note, bool userTriggered, double timeOffset)
             => TryApplyEzNoteCheckForResult(note, userTriggered, timeOffset);
 
@@ -150,6 +244,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     else
                         drawable.EzApplyFinalResult(outcome.Result, round.Environment.ManiaHitMode);
 
+                    if (drawable is DrawableHoldNoteHead head && head.ParentHold is DrawableHoldNote hold)
+                        NotifyEz2AcHeadJudged(hold, outcome.Result, wasHoldingBeforePress: false);
+
                     break;
 
                 case ManiaNoteJudgementOutcomeKind.DispatchExtra:
@@ -190,6 +287,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return false;
 
             if (TryMalodyHoldOnReleased(hold))
+                return true;
+
+            if (TryEz2AcHoldOnReleased(hold))
                 return true;
 
             hold.Tail.UpdateResult();

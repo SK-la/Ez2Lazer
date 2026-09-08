@@ -95,6 +95,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateEz2AcHoldHeadPerfect()
         {
+            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+
             var ruleset = new ManiaRuleset();
             var beatmap = new TestBeatmap(ruleset.RulesetInfo)
             {
@@ -102,7 +105,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 {
                     new HoldNote { StartTime = 1000, Duration = 1000, Column = 0 },
                 },
-                ControlPointInfo = new ControlPointInfo(),
+                ControlPointInfo = createTiming120(),
             };
 
             foreach (var obj in beatmap.HitObjects)
@@ -113,13 +116,51 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 Frames = new List<ReplayFrame>
                 {
                     new ManiaReplayFrame(1000, ManiaAction.Key1),
-                    new ManiaReplayFrame(2000),
+                    // 持满到尾后仍按住；尾为 Ignore，无需精准松手
+                    new ManiaReplayFrame(2200),
                 },
             };
 
-            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
+            return (createScore(ruleset, replay), beatmap, environment);
+        }
 
+        /// <summary>
+        /// 头按住到尾，中途不松：应有 SliderTailHit tick，且 Statistics 基础档不含 tick。
+        /// </summary>
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateEz2AcHoldThroughEnd()
+            => CreateEz2AcHoldHeadPerfect();
+
+        /// <summary>
+        /// 中途松手：tick 为 IgnoreMiss，无 ComboBreak；之后可再抓。
+        /// </summary>
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateEz2AcHoldEarlyReleaseNoComboBreak()
+        {
+            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+
+            var ruleset = new ManiaRuleset();
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HoldNote { StartTime = 1000, Duration = 2000, Column = 0 },
+                },
+                ControlPointInfo = createTiming120(),
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var replay = new Replay
+            {
+                Frames = new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(1000, ManiaAction.Key1),
+                    new ManiaReplayFrame(1500),
+                    new ManiaReplayFrame(3200),
+                },
+            };
+
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
@@ -389,12 +430,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 EzEnumHitMode.Malody_E or EzEnumHitMode.Malody_B => CreateMalodyHoldPerfect(hitMode),
                 EzEnumHitMode.EZ2AC => CreateEz2AcHoldHeadPerfect(),
                 EzEnumHitMode.O2Jam => CreateO2HoldPerfect(),
-                EzEnumHitMode.IIDX_HD or EzEnumHitMode.LR2_HD or EzEnumHitMode.Raja_NM => CreateBmsHoldPerfect(hitMode),
+                EzEnumHitMode.IIDX_HD or EzEnumHitMode.LR2_HD or EzEnumHitMode.Raja_NM => createBmsHoldPerfect(hitMode),
                 _ => CreateO2HoldPerfect(),
             };
         }
 
-        private static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateBmsHoldPerfect(EzEnumHitMode hitMode)
+        private static (Score score, IBeatmap beatmap, GameplayEnvironment environment) createBmsHoldPerfect(EzEnumHitMode hitMode)
         {
             const double head = 1500;
             const double tail = 4000;
@@ -521,7 +562,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// LN 头在 Great 窗口应经 SoftenLnJudge 升为 Perfect。
+        /// LN 头在 Great(Cool) 窗口应经 SoftenLnHeadJudge 升为 Kool。
         /// </summary>
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateEz2AcHoldHeadGreatSoftened()
         {
@@ -544,7 +585,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 {
                     new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
                 },
-                ControlPointInfo = new ControlPointInfo(),
+                ControlPointInfo = createTiming120(),
             };
 
             foreach (var obj in beatmap.HitObjects)

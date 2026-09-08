@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
@@ -344,6 +345,36 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             Assert.That(ManiaReplayParityHelper.AreJudgementsEquivalent(generatorEvents, sessionEvents), Is.True,
                 () => $"generator=[{ManiaReplayParityHelper.DescribeJudgements(generatorEvents)}] session=[{ManiaReplayParityHelper.DescribeJudgements(sessionEvents)}]");
             Assert.That(sessionEvents.Single(e => e.HitObject is HeadNote).Result, Is.EqualTo(Ez2AcHitModeJudgement.MapTo(Ez2AcJudge.Kool)));
+        }
+
+        [Test]
+        public void TestEz2AcHoldThroughEndTicksIncreaseComboWithoutBasicStats()
+        {
+            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldThroughEnd();
+            var hold = (HoldNote)beatmap.HitObjects[0];
+
+            Assert.That(hold.Ticks, Is.Not.Null.And.Not.Empty);
+
+            var resultScore = ManiaReplaySession.Run(score, beatmap, environment);
+            var events = resultScore.ScoreInfo.HitEvents;
+
+            Assert.That(events.Count(e => e.HitObject is HoldNoteTick && e.Result == HitResult.SliderTailHit), Is.EqualTo(hold.Ticks!.Count));
+            Assert.That(resultScore.ScoreInfo.Statistics.GetValueOrDefault(HitResult.Perfect), Is.EqualTo(1), "only head Kool should count as Perfect");
+            Assert.That(resultScore.ScoreInfo.Statistics.GetValueOrDefault(HitResult.SliderTailHit), Is.EqualTo(hold.Ticks.Count));
+            Assert.That(resultScore.ScoreInfo.Statistics.GetValueOrDefault(HitResult.ComboBreak), Is.EqualTo(0));
+            Assert.That(resultScore.ScoreInfo.MaxCombo, Is.GreaterThanOrEqualTo(1 + hold.Ticks.Count));
+        }
+
+        [Test]
+        public void TestEz2AcHoldEarlyReleaseDoesNotComboBreak()
+        {
+            var (score, beatmap, environment) = HitModeReplayFixtures.CreateEz2AcHoldEarlyReleaseNoComboBreak();
+            var resultScore = ManiaReplaySession.Run(score, beatmap, environment);
+            var events = resultScore.ScoreInfo.HitEvents;
+
+            Assert.That(resultScore.ScoreInfo.Statistics.GetValueOrDefault(HitResult.ComboBreak), Is.EqualTo(0));
+            Assert.That(events.Any(e => e.HitObject is HoldNoteTick && e.Result == HitResult.IgnoreMiss), Is.True);
+            Assert.That(events.Single(e => e.HitObject is HeadNote).Result, Is.EqualTo(HitResult.Perfect));
         }
 
         [Test]
