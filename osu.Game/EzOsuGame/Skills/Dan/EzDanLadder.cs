@@ -5,6 +5,8 @@ using System;
 using System.Text.RegularExpressions;
 using osu.Framework.Graphics;
 
+#pragma warning disable CS1574 // XML 注释中有无法解析的 cref 特性
+
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>

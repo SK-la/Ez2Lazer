@@ -38,16 +38,16 @@ namespace osu.Game.EzOsuGame.Skills
 
         public LocalisableString DisplayName => new EzLocalizationManager.EzLocalisableString(NameZh, NameEn);
 
-        public EzSkillChip Chip => new(DisplayName, AccentHex);
+        public EzSkillChip Chip => new EzSkillChip(DisplayName, AccentHex);
     }
 
     /// <summary>Builds enum→meta tables once from <see cref="EzSkillMetaAttribute"/> on each field.</summary>
     internal static class EzEnumMetaCache<TEnum>
         where TEnum : struct, Enum
     {
-        public static readonly TEnum[] All;
-        public static readonly IReadOnlyDictionary<TEnum, EzSkillMetaAttribute> ByValue;
-        public static readonly IReadOnlyDictionary<string, TEnum> ById;
+        public static readonly TEnum[] ALL;
+        public static readonly IReadOnlyDictionary<TEnum, EzSkillMetaAttribute> BY_VALUE;
+        public static readonly IReadOnlyDictionary<string, TEnum> BY_ID;
 
         static EzEnumMetaCache()
         {
@@ -68,16 +68,16 @@ namespace osu.Game.EzOsuGame.Skills
                     throw new InvalidOperationException($"Duplicate skill meta id '{meta.Id}' on {typeof(TEnum).Name}.");
             }
 
-            All = values;
-            ByValue = new ReadOnlyDictionary<TEnum, EzSkillMetaAttribute>(byValue);
-            ById = new ReadOnlyDictionary<string, TEnum>(byId);
+            ALL = values;
+            BY_VALUE = new ReadOnlyDictionary<TEnum, EzSkillMetaAttribute>(byValue);
+            BY_ID = new ReadOnlyDictionary<string, TEnum>(byId);
         }
 
-        public static EzSkillMetaAttribute Meta(TEnum value) => ByValue[value];
+        public static EzSkillMetaAttribute Meta(TEnum value) => BY_VALUE[value];
 
         public static bool TryParse(string? id, out TEnum value)
         {
-            if (!string.IsNullOrEmpty(id) && ById.TryGetValue(id, out value))
+            if (!string.IsNullOrEmpty(id) && BY_ID.TryGetValue(id, out value))
                 return true;
 
             value = default;
@@ -91,10 +91,10 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(id))
                 return false;
 
-            if (ById.TryGetValue(id, out value))
+            if (BY_ID.TryGetValue(id, out value))
                 return true;
 
-            foreach (var kvp in ById)
+            foreach (var kvp in BY_ID)
             {
                 if (string.Equals(kvp.Key, id, StringComparison.OrdinalIgnoreCase))
                 {

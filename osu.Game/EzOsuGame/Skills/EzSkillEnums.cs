@@ -66,7 +66,7 @@ namespace osu.Game.EzOsuGame.Skills
 
     public static class EzDanSideExtensions
     {
-        public static EzDanSide[] All => EzEnumMetaCache<EzDanSide>.All;
+        public static EzDanSide[] All => EzEnumMetaCache<EzDanSide>.ALL;
 
         public static EzSkillMetaAttribute Meta(this EzDanSide side)
             => EzEnumMetaCache<EzDanSide>.Meta(side);
@@ -91,7 +91,7 @@ namespace osu.Game.EzOsuGame.Skills
 
     public static class EzPatternAxisExtensions
     {
-        public static EzPatternAxis[] All => EzEnumMetaCache<EzPatternAxis>.All;
+        public static EzPatternAxis[] All => EzEnumMetaCache<EzPatternAxis>.ALL;
 
         public static EzSkillMetaAttribute Meta(this EzPatternAxis axis)
             => EzEnumMetaCache<EzPatternAxis>.Meta(axis);

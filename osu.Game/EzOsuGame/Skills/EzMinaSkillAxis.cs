@@ -42,7 +42,7 @@ namespace osu.Game.EzOsuGame.Skills
     public static class EzMinaSkillAxisExtensions
     {
         /// <summary>All axes from <see cref="Enum.GetValues{TEnum}"/> (cached).</summary>
-        public static EzMinaSkillAxis[] All => EzEnumMetaCache<EzMinaSkillAxis>.All;
+        public static EzMinaSkillAxis[] All => EzEnumMetaCache<EzMinaSkillAxis>.ALL;
 
         /// <summary>Axes with <see cref="EzSkillMetaAttribute.InRadar"/> (excludes Overall).</summary>
         public static EzMinaSkillAxis[] RadarAxes { get; } = All.Where(a => a.Meta().InRadar).ToArray();

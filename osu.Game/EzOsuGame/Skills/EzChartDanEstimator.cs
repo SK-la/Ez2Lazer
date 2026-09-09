@@ -58,7 +58,7 @@ namespace osu.Game.EzOsuGame.Skills
                 if (vector.Overall <= 0 && vector.Stream <= 0)
                     return null;
 
-                msd = vectorToMsdDict(vector);
+                msd = VectorToMsdDict(vector);
             }
 
             if (msd == null || msd.Count == 0)
@@ -176,7 +176,7 @@ namespace osu.Game.EzOsuGame.Skills
             return (double)holds / total;
         }
 
-        public static IReadOnlyDictionary<string, double> vectorToMsdDict(EzSkillsetVector vector)
+        public static IReadOnlyDictionary<string, double> VectorToMsdDict(EzSkillsetVector vector)
             => vector.Enumerate().ToDictionary(p => p.Axis.ToMsdSkillId(), p => p.Value, StringComparer.Ordinal);
     }
 }

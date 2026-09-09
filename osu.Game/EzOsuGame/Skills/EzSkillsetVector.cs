@@ -19,9 +19,8 @@ namespace osu.Game.EzOsuGame.Skills
         double Chordjack,
         double Technical)
     {
-        public static EzSkillsetVector FromMina(MinaCalcScores scores) => new(
-            scores.Overall, scores.Stream, scores.Jumpstream, scores.Handstream,
-            scores.Stamina, scores.JackSpeed, scores.Chordjack, scores.Technical);
+        public static EzSkillsetVector FromMina(MinaCalcScores scores)
+            => new EzSkillsetVector(scores.Overall, scores.Stream, scores.Jumpstream, scores.Handstream, scores.Stamina, scores.JackSpeed, scores.Chordjack, scores.Technical);
 
         public double Get(EzMinaSkillAxis axis) => axis switch
         {

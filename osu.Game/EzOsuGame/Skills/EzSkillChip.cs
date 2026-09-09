@@ -8,6 +8,6 @@ namespace osu.Game.EzOsuGame.Skills
     /// <summary>Display name + accent for a skill chip / registry entry.</summary>
     public readonly record struct EzSkillChip(LocalisableString Name, string AccentHex)
     {
-        public static readonly EzSkillChip Fallback = new(string.Empty, "#8f6bd8");
+        public static readonly EzSkillChip FALLBACK = new EzSkillChip(string.Empty, "#8f6bd8");
     }
 }

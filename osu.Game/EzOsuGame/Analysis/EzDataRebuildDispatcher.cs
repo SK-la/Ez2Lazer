@@ -11,8 +11,6 @@ namespace osu.Game.EzOsuGame.Analysis
 {
     public class EzDataRebuildDispatcher
     {
-        private readonly BackgroundDataStoreProcessor? backgroundDataStoreProcessor;
-        private readonly EzAnalysisWarmupProcessor? warmupProcessor;
         private readonly Func<EzRealmMetadataScope, bool, EzDataRebuildDispatchResult>? queueRealm;
         private readonly Func<bool, EzDataRebuildDispatchResult>? queueSqliteMain;
         private readonly Func<bool, EzDataRebuildDispatchResult>? queueSqliteSongsBranches;
@@ -26,10 +24,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 warmupProcessor == null ? null : warmupProcessor.QueueSqliteMainRebuild,
                 warmupProcessor == null ? null : warmupProcessor.QueueSqliteSongsBranchesRebuild,
                 backgroundDataStoreProcessor == null ? null : backgroundDataStoreProcessor.QueueEzScoreFullRecalculation)
-        {
-            this.backgroundDataStoreProcessor = backgroundDataStoreProcessor;
-            this.warmupProcessor = warmupProcessor;
-        }
+        { }
 
         internal EzDataRebuildDispatcher(
             Func<EzRealmMetadataScope, bool, EzDataRebuildDispatchResult>? queueRealm,
