@@ -3,7 +3,9 @@
 
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
@@ -13,6 +15,8 @@ using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.Database;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -25,7 +29,7 @@ using osuTK.Input;
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
-    /// 用于在难度卡底部显示标签的组件，包括用户标签、视频标签、故事版标签。
+    /// 难度卡底部标签行：左侧可选技能段位，其后为用户标签 / 视频 / 故事版。
     /// Video/Storyboard 标记由 <see cref="BeatmapUpdater"/> 写入 <see cref="BeatmapInfo"/>，此处只读 Realm 字段。
     /// </summary>
     public partial class EzDisplayTag : CompositeDrawable
@@ -33,9 +37,12 @@ namespace osu.Game.EzOsuGame.UserInterface
         private const int max_visible_tags = 10;
         private const float tag_corner_radius = 3;
 
+        private readonly FillFlowContainer rootFlow;
         private readonly FillFlowContainer tagFlow;
+        private readonly EzDisplaySkillsDan skillsDan;
 
         private ScheduledDelegate? scheduledTagUpdate;
+        private int chartDanRequestId;
 
         private bool altHighlightActive;
 
@@ -50,6 +57,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                     return;
 
                 beatmap = value;
+                chartDanRequestId++;
                 scheduleTagUpdate();
             }
         }
@@ -57,17 +65,44 @@ namespace osu.Game.EzOsuGame.UserInterface
         [Resolved]
         private ISongSelect? songSelect { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private EzSkillProvider? skillProvider { get; set; }
+
         public EzDisplayTag()
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
 
-            InternalChild = tagFlow = new FillFlowContainer
+            skillsDan = new EzDisplaySkillsDan
+            {
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                PreferDanImage = true,
+                Alpha = 0,
+                BypassAutoSizeAxes = Axes.Both,
+            };
+
+            tagFlow = new FillFlowContainer
+            {
+                AutoSizeAxes = Axes.Both,
+                Direction = FillDirection.Horizontal,
+                Spacing = new Vector2(3, 0),
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+            };
+
+            // skillsDan is always the leftmost child; visibility via Alpha / BypassAutoSizeAxes.
+            InternalChild = rootFlow = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
                 Direction = FillDirection.Horizontal,
-                Spacing = new Vector2(3, 0),
+                Spacing = new Vector2(4, 0),
+                Children = new Drawable[]
+                {
+                    skillsDan,
+                    tagFlow,
+                },
             };
         }
 
@@ -115,7 +150,26 @@ namespace osu.Game.EzOsuGame.UserInterface
             tagFlow.Clear();
 
             if (beatmap == null)
+            {
+                hideSkillsDan();
                 return;
+            }
+
+            var cached = skillProvider?.TryGetCachedChartDan(beatmap);
+
+            if (cached != null)
+            {
+                showSkillsDan(cached);
+            }
+            else if (skillProvider != null)
+            {
+                hideSkillsDan();
+                requestChartDanCompute(beatmap);
+            }
+            else
+            {
+                hideSkillsDan();
+            }
 
             var userTags = beatmap.Metadata.UserTags.Take(max_visible_tags);
 
@@ -146,6 +200,49 @@ namespace osu.Game.EzOsuGame.UserInterface
             }
         }
 
+        private void showSkillsDan(EzChartDanVerdict verdict)
+        {
+            skillsDan.BypassAutoSizeAxes = Axes.None;
+            skillsDan.SetFrom(verdict);
+            skillsDan.Show();
+        }
+
+        private void hideSkillsDan()
+        {
+            skillsDan.Clear();
+            skillsDan.Hide();
+            skillsDan.BypassAutoSizeAxes = Axes.Both;
+        }
+
+        private void requestChartDanCompute(BeatmapInfo target)
+        {
+            int requestId = ++chartDanRequestId;
+            var provider = skillProvider;
+            // Detach so MinaCalc can run off the update thread without touching live Realm.
+            var detached = target.Detach();
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    return provider?.TryGetChartDan(detached);
+                }
+                catch
+                {
+                    return null;
+                }
+            }).ContinueWith(t => Schedule(() =>
+            {
+                if (requestId != chartDanRequestId || beatmap == null || !string.Equals(beatmap.Hash, detached.Hash, StringComparison.Ordinal))
+                    return;
+
+                if (t.Status == TaskStatus.RanToCompletion && t.GetResultSafely() is EzChartDanVerdict verdict)
+                    showSkillsDan(verdict);
+                else
+                    hideSkillsDan();
+            }));
+        }
+
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
@@ -155,6 +252,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 EzDisplayTagAltHighlight.ActiveChanged -= onAltHighlightChanged;
                 scheduledTagUpdate?.Cancel();
                 scheduledTagUpdate = null;
+                chartDanRequestId++;
                 beatmap = null;
             }
         }

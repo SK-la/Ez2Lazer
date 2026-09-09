@@ -17,45 +17,20 @@ namespace osu.Game.EzOsuGame.Skills
 
         private static IReadOnlyList<EzSkillDefinition> createSkills()
         {
-            var list = new List<EzSkillDefinition>(EzSkillIds.MINA_SKILLSETS.Length);
+            var list = new List<EzSkillDefinition>(EzMinaSkillAxisExtensions.All.Length);
 
-            foreach (string axis in EzSkillIds.MINA_SKILLSETS)
+            foreach (var axis in EzMinaSkillAxisExtensions.All)
             {
+                var chip = axis.Chip();
                 list.Add(new EzSkillDefinition(
                     EzSkillSystems.PLAYER_SSR,
-                    EzSkillIds.Ssr(axis),
-                    axisDisplay(axis),
+                    axis.ToSsrSkillId(),
+                    chip.Name,
                     EzSkillScope.Player,
-                    accent(axis)));
+                    chip.AccentHex));
             }
 
             return list;
         }
-
-        private static string axisDisplay(string axis) => axis switch
-        {
-            EzSkillIds.OVERALL => "Overall",
-            EzSkillIds.STREAM => "Stream",
-            EzSkillIds.JUMPSTREAM => "Jumpstream",
-            EzSkillIds.HANDSTREAM => "Handstream",
-            EzSkillIds.STAMINA => "Stamina",
-            EzSkillIds.JACK_SPEED => "Jackspeed",
-            EzSkillIds.CHORDJACK => "Chordjack",
-            EzSkillIds.TECHNICAL => "Technical",
-            _ => axis,
-        };
-
-        private static string accent(string axis) => axis switch
-        {
-            EzSkillIds.OVERALL => "#c9cfdd",
-            EzSkillIds.STREAM => "#8f6bd8",
-            EzSkillIds.JUMPSTREAM => "#6f87d8",
-            EzSkillIds.HANDSTREAM => "#b06bc0",
-            EzSkillIds.STAMINA => "#ad6b5d",
-            EzSkillIds.JACK_SPEED => "#c66f84",
-            EzSkillIds.CHORDJACK => "#c59a5c",
-            EzSkillIds.TECHNICAL => "#83a86f",
-            _ => "#8f6bd8",
-        };
     }
 }

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -38,7 +39,7 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
-            var clearsByBucket = new Dictionary<(int KeyCount, string Side), List<double>>();
+            var clearsByBucket = new Dictionary<(int KeyCount, EzDanSide Side), List<double>>();
             var evidence = new List<EzDanClearEvidenceRow>();
 
             foreach (var score in scores)
@@ -82,7 +83,7 @@ namespace osu.Game.EzOsuGame.Skills
                     {
                         Username = username,
                         KeyCount = chart.KeyCount,
-                        Side = chart.Side,
+                        Side = chart.Side.ToId(),
                         BeatmapHash = hash,
                         Rate = EzModRate.Resolve(score.Mods),
                         CreditedDan = value,
@@ -99,7 +100,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             DateTimeOffset at = DateTimeOffset.UtcNow;
 
-            foreach (((int keyCount, string side), List<double> clears) in clearsByBucket)
+            foreach (((int keyCount, EzDanSide side), List<double> clears) in clearsByBucket)
             {
                 if (clears.Count < EzDanAlgorithm.CLEAR_QUORUM)
                     continue;
@@ -110,14 +111,15 @@ namespace osu.Game.EzOsuGame.Skills
                              .ToList();
 
                 double rawDan = window.Average();
-                string label = EzDanLabels.LabelFor(rawDan, side, keyCount);
-                double? ceiling = EzDanLabels.CeilingFor(side, keyCount);
+                var ladder = EzDanLadders.For(keyCount, side);
+                string label = ladder.ParseLabel(rawDan);
+                double? ceiling = ladder.Ceiling;
 
                 skillStore.WriteDanEstimate(new EzDanEstimate
                 {
                     Username = username,
                     KeyCount = keyCount,
-                    Side = side,
+                    Side = side.ToId(),
                     RawDan = rawDan,
                     Label = label,
                     Clears = clears.Count,

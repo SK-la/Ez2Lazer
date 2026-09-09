@@ -414,7 +414,8 @@ namespace osu.Game
             ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets);
             dependencies.CacheAs<IEzReplaySession>(ReplaySession);
 
-            // TODO: 需要审查是否过重，合并为统一的Skill管理器？ Dan也是玩家技能之一。技能指标是可以用在谱面、成绩、玩家水平之间的。
+            // Skill metrics: MSD (beatmap), SSR + Dan (player). Read via EzSkillProvider; writers stay separate.
+            // See EzSkillSystems. Dan is a player skill for Profile, but uses its own estimate table/algorithm.
             var skillRegistry = new EzSkillRegistry();
             var skillStore = new EzSkillStore(realm);
             var beatmapMsdComputer = new EzBeatmapMsdComputer(BeatmapManager, skillStore);
@@ -422,10 +423,13 @@ namespace osu.Game
             var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore);
             var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, skillStore, chartDanEstimator);
             var localProfileStore = new EzLocalProfileStore(Storage);
+            var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, ezAnalysisDatabase);
+
             dependencies.Cache(skillRegistry);
             dependencies.Cache(skillStore);
             dependencies.Cache(localProfileStore);
-            dependencies.Cache(new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore));
+            dependencies.Cache(skillProvider);
+            // Write-side services still cached for LocalProfile / analysis pipelines.
             dependencies.Cache(beatmapMsdComputer);
             dependencies.Cache(chartDanEstimator);
             dependencies.Cache(playerSsrAggregator);

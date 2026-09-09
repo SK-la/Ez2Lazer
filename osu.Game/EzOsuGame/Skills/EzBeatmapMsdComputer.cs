@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
 
             var existing = skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_MSD);
-            if (existing.Count >= EzSkillIds.MINA_SKILLSETS.Length)
+            if (IsCurrentMsdCache(existing))
                 return existing;
 
             return ComputeAndStore(beatmapInfo);
@@ -54,8 +54,27 @@ namespace osu.Game.EzOsuGame.Skills
             if (vector.Overall <= 0 && vector.Stream <= 0)
                 return null;
 
-            skillStore.WriteBeatmapMsd(beatmapInfo.Hash, vector, beatmapInfo.ID);
+            double holdRatio = EzChartDanEstimator.ComputeHoldRatio(playable);
+            skillStore.WriteBeatmapMsd(beatmapInfo.Hash, vector, beatmapInfo.ID, holdRatio: holdRatio);
             return skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_MSD);
+        }
+
+        /// <summary>
+        /// Requires every current Mina axis id plus hold ratio.
+        /// Legacy-only caches (jack_speed / technical) fail and are recomputed.
+        /// </summary>
+        public static bool IsCurrentMsdCache(IReadOnlyDictionary<string, double> existing)
+        {
+            if (!existing.ContainsKey(EzSkillSystems.MsdHoldRatioSkillId))
+                return false;
+
+            foreach (var axis in EzMinaSkillAxisExtensions.All)
+            {
+                if (!existing.ContainsKey(axis.ToMsdSkillId()))
+                    return false;
+            }
+
+            return true;
         }
     }
 }

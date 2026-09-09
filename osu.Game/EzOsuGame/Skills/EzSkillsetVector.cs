@@ -7,7 +7,7 @@ using MinaCalc;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// One MinaCalc skillset vector (MSD or SSR). Each axis maps to an independent skill id.
+    /// One MinaCalc skillset vector (MSD or SSR). Axes follow <see cref="EzMinaSkillAxis"/>.
     /// </summary>
     public readonly record struct EzSkillsetVector(
         double Overall,
@@ -19,26 +19,26 @@ namespace osu.Game.EzOsuGame.Skills
         double Chordjack,
         double Technical)
     {
-        public static EzSkillsetVector FromMina(MinaCalcScores scores) => new EzSkillsetVector(scores.Overall, scores.Stream, scores.Jumpstream, scores.Handstream, scores.Stamina, scores.JackSpeed,
-            scores.Chordjack, scores.Technical);
+        public static EzSkillsetVector FromMina(MinaCalcScores scores)
+            => new EzSkillsetVector(scores.Overall, scores.Stream, scores.Jumpstream, scores.Handstream, scores.Stamina, scores.JackSpeed, scores.Chordjack, scores.Technical);
 
-        public double Get(string skillId) => skillId switch
+        public double Get(EzMinaSkillAxis axis) => axis switch
         {
-            EzSkillIds.OVERALL => Overall,
-            EzSkillIds.STREAM => Stream,
-            EzSkillIds.JUMPSTREAM => Jumpstream,
-            EzSkillIds.HANDSTREAM => Handstream,
-            EzSkillIds.STAMINA => Stamina,
-            EzSkillIds.JACK_SPEED => JackSpeed,
-            EzSkillIds.CHORDJACK => Chordjack,
-            EzSkillIds.TECHNICAL => Technical,
+            EzMinaSkillAxis.Overall => Overall,
+            EzMinaSkillAxis.Stream => Stream,
+            EzMinaSkillAxis.Jumpstream => Jumpstream,
+            EzMinaSkillAxis.Handstream => Handstream,
+            EzMinaSkillAxis.Stamina => Stamina,
+            EzMinaSkillAxis.JackSpeed => JackSpeed,
+            EzMinaSkillAxis.Chordjack => Chordjack,
+            EzMinaSkillAxis.Technical => Technical,
             _ => 0,
         };
 
-        public IEnumerable<(string AxisId, double Value)> Enumerate()
+        public IEnumerable<(EzMinaSkillAxis Axis, double Value)> Enumerate()
         {
-            foreach (string id in EzSkillIds.MINA_SKILLSETS)
-                yield return (id, Get(id));
+            foreach (var axis in EzMinaSkillAxisExtensions.All)
+                yield return (axis, Get(axis));
         }
     }
 }

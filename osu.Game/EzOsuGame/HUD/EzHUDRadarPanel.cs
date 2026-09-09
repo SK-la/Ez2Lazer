@@ -375,7 +375,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             cancelRadarAnalysis();
 
-            string[] axes = skill_radar_axes;
+            var axes = skill_radar_axes;
             AxisCount = axes.Length;
             activeAxisLabels = axes.Select(skillAxisDisplayName).ToArray();
             activeAxisFormats = Enumerable.Repeat("0.00", axes.Length).ToArray();
@@ -418,9 +418,9 @@ namespace osu.Game.EzOsuGame.HUD
 
             for (int i = 0; i < axes.Length; i++)
             {
-                string axis = axes[i];
-                double beatmapValue = msd.GetValueOrDefault(EzSkillIds.Msd(axis), 0);
-                double playerValue = ssr.GetValueOrDefault(EzSkillIds.Ssr(axis), 0);
+                var axis = axes[i];
+                double beatmapValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
+                double playerValue = ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0);
                 parameterValues[i] = (float)beatmapValue;
                 max = Math.Max(max, Math.Max(beatmapValue, playerValue));
             }
@@ -432,9 +432,9 @@ namespace osu.Game.EzOsuGame.HUD
 
             for (int i = 0; i < axes.Length; i++)
             {
-                string axis = axes[i];
+                var axis = axes[i];
                 parameterRatios[i] = (float)(parameterValues[i] / max);
-                playerRatios[i] = (float)(ssr.GetValueOrDefault(EzSkillIds.Ssr(axis), 0) / max);
+                playerRatios[i] = (float)(ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0) / max);
             }
 
             chart?.SetData(parameterRatios);
@@ -443,21 +443,10 @@ namespace osu.Game.EzOsuGame.HUD
             applyChartColours();
         }
 
-        private static readonly string[] skill_radar_axes = EzSkillIds.MINA_SKILLSETS
-                                                                      .Where(a => a != EzSkillIds.OVERALL)
-                                                                      .ToArray();
+        private static readonly EzMinaSkillAxis[] skill_radar_axes = EzMinaSkillAxisExtensions.RadarAxes;
 
-        private static string skillAxisDisplayName(string axis) => axis switch
-        {
-            EzSkillIds.STREAM => "Stream",
-            EzSkillIds.JUMPSTREAM => "JS",
-            EzSkillIds.HANDSTREAM => "HS",
-            EzSkillIds.STAMINA => "Stam",
-            EzSkillIds.JACK_SPEED => "Jack",
-            EzSkillIds.CHORDJACK => "CJ",
-            EzSkillIds.TECHNICAL => "Tech",
-            _ => axis,
-        };
+        private static string skillAxisDisplayName(EzMinaSkillAxis axis)
+            => axis.Chip().Name.ToString();
 
         private void cancelRadarAnalysis()
         {
@@ -556,7 +545,9 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 EzRadarAxisValue<string> axis = radarData[i];
 
-                activeAxisLabels[i] = axis.Axis;
+                activeAxisLabels[i] = EzPatternAxisExtensions.TryParse(axis.Axis, out var pattern)
+                    ? pattern.DisplayName().ToString()
+                    : axis.Axis;
                 activeAxisFormats[i] = axis.Format;
                 parameterValues[i] = (float)axis.Value;
                 parameterRatios[i] = normalise(parameterValues[i], i < maxValues.Count ? maxValues[i] : 0);

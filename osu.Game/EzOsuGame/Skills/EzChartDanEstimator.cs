@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -12,9 +14,9 @@ using osu.Game.Rulesets.Objects.Types;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Public chart-dan entry for song select and player credit.
-    /// Rate≠1 uses live MinaCalc MSD (not persisted); 1.0x may use Realm cache.
-    /// LeoBlack deferred (DATA-LB).
+    /// Chart-dan entry for song select and player credit.
+    /// Prefer xxySR → Sunny interval tables when available; else MSD Overall heuristic.
+    /// Skill family / OverallMsd always come from MSD when present.
     /// </summary>
     public sealed class EzChartDanEstimator
     {
@@ -56,21 +58,25 @@ namespace osu.Game.EzOsuGame.Skills
                 if (vector.Overall <= 0 && vector.Stream <= 0)
                     return null;
 
-                msd = vectorToMsdDict(vector);
+                msd = VectorToMsdDict(vector);
             }
 
             if (msd == null || msd.Count == 0)
                 return null;
 
-            return FromMsdAndPlayable(msd, playable);
+            double? xxySr = beatmapInfo.XxyStarRating >= 0 ? beatmapInfo.XxyStarRating : null;
+            return FromMsdAndPlayable(msd, playable, xxySr);
         }
 
-        public static EzChartDanVerdict? FromMsdAndPlayable(IReadOnlyDictionary<string, double> msd, IBeatmap playable)
+        public static EzChartDanVerdict? FromMsdAndPlayable(
+            IReadOnlyDictionary<string, double> msd,
+            IBeatmap playable,
+            double? xxySr = null)
         {
             ArgumentNullException.ThrowIfNull(msd);
             ArgumentNullException.ThrowIfNull(playable);
 
-            if (!msd.TryGetValue(EzSkillIds.Msd(EzSkillIds.OVERALL), out double overall) || overall <= 0)
+            if (!msd.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double overall) || overall <= 0)
                 return null;
 
             int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
@@ -78,32 +84,50 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
 
             double holdRatio = ComputeHoldRatio(playable);
-            return FromMsd(msd, keyCount, holdRatio);
+            return FromMsd(msd, keyCount, holdRatio, xxySr);
         }
 
-        public static EzChartDanVerdict? FromMsd(IReadOnlyDictionary<string, double> msd, int keyCount, double holdRatio)
+        public static EzChartDanVerdict? FromMsd(
+            IReadOnlyDictionary<string, double> msd,
+            int keyCount,
+            double holdRatio,
+            double? xxySr = null)
         {
             ArgumentNullException.ThrowIfNull(msd);
 
             if (keyCount <= 0)
                 return null;
 
-            if (!msd.TryGetValue(EzSkillIds.Msd(EzSkillIds.OVERALL), out double overall) || overall <= 0)
+            if (!msd.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double overall) || overall <= 0)
                 return null;
 
-            string family = EzDanLabels.DominantFamily(msd);
-            double rawDan = EzDanLabels.SrToRawDan(overall, family);
-            string side = holdRatio >= EzDanAlgorithm.LnPrimaryMinRatioFor(keyCount)
-                ? DanSkillSystem.SIDE_LN
-                : DanSkillSystem.SIDE_RC;
+            var dominantAxis = EzDanLabels.DominantAxis(msd);
+            var side = holdRatio >= EzDanAlgorithm.LnPrimaryMinRatioFor(keyCount)
+                ? EzDanSide.Ln
+                : EzDanSide.Rc;
+
+            double rawDan;
+            string label;
+
+            if (xxySr is double sr
+                && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), sr, out var sunny))
+            {
+                rawDan = sunny.RawDan;
+                label = sunny.DisplayLabel;
+            }
+            else
+            {
+                rawDan = EzDanLabels.SrToRawDan(overall, dominantAxis);
+                label = EzDanLadders.For(keyCount, side).ParseLabel(rawDan);
+            }
 
             return new EzChartDanVerdict
             {
                 RawDan = rawDan,
-                Label = EzDanLabels.LabelFor(rawDan, side, keyCount),
+                Label = label,
                 KeyCount = keyCount,
                 Side = side,
-                Family = family,
+                DominantAxis = dominantAxis,
                 OverallMsd = overall,
                 HoldRatio = holdRatio,
                 AlgorithmVersion = EzDanAlgorithm.VERSION,
@@ -131,10 +155,28 @@ namespace osu.Game.EzOsuGame.Skills
             return total <= 0 ? 0 : (double)holds / total;
         }
 
-        public static IReadOnlyDictionary<string, double> VectorToMsdDict(EzSkillsetVector vector)
-            => vectorToMsdDict(vector);
+        /// <summary>Hold ratio from cached mania column/LN counts when available.</summary>
+        public static double? TryHoldRatioFromManiaSummary(EzManiaSummary summary)
+        {
+            if (!summary.HasHoldNoteCounts)
+                return null;
 
-        private static IReadOnlyDictionary<string, double> vectorToMsdDict(EzSkillsetVector vector)
-            => vector.Enumerate().ToDictionary(p => EzSkillIds.Msd(p.AxisId), p => p.Value, StringComparer.Ordinal);
+            int total = 0;
+            int holds = 0;
+
+            foreach (var kvp in summary.ColumnCounts)
+                total += kvp.Value;
+
+            foreach (var kvp in summary.HoldNoteCounts)
+                holds += kvp.Value;
+
+            if (total <= 0)
+                return null;
+
+            return (double)holds / total;
+        }
+
+        public static IReadOnlyDictionary<string, double> VectorToMsdDict(EzSkillsetVector vector)
+            => vector.Enumerate().ToDictionary(p => p.Axis.ToMsdSkillId(), p => p.Value, StringComparer.Ordinal);
     }
 }

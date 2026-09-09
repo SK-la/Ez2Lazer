@@ -2,11 +2,12 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Game.EzOsuGame.Skills.Dan;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Ports mania-hub dan-credit.ts creditedDanFor / danCreditOffset (MVP subset).
+    /// Ports mania-hub <c>dan-credit.ts</c> creditedDanFor / danCreditOffset (MVP subset).
     /// </summary>
     public static class EzDanCredit
     {
@@ -41,7 +42,10 @@ namespace osu.Game.EzOsuGame.Skills
             (0, -0.3), (0.2, -0.9), (1, -1.55),
         };
 
-        public static double? CreditedDanFor(double chartDan, double accuracy, string side, int keyCount)
+        public static double? CreditedDanFor(double chartDan, double accuracy, string sideId, int keyCount)
+            => CreditedDanFor(chartDan, accuracy, EzDanSideExtensions.ParseOrRc(sideId), keyCount);
+
+        public static double? CreditedDanFor(double chartDan, double accuracy, EzDanSide side, int keyCount)
         {
             double bar = EzDanAlgorithm.AccuracyBarFor(side, keyCount);
             double? offset = creditOffset(accuracy, bar, side, keyCount);
@@ -49,14 +53,14 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
 
             double credited = chartDan + o;
-            double? ceiling = EzDanLabels.CeilingFor(side, keyCount);
-            if (ceiling is double c)
+            var ladder = EzDanLadders.For(keyCount, side);
+            if (ladder.Ceiling is double c)
                 credited = Math.Min(credited, c);
 
-            return Math.Max(credited, EzDanLabels.FloorFor(side, keyCount));
+            return Math.Max(credited, ladder.Floor);
         }
 
-        private static double? creditOffset(double accuracy, double bar, string side, int keyCount)
+        private static double? creditOffset(double accuracy, double bar, EzDanSide side, int keyCount)
         {
             if (!double.IsFinite(accuracy))
                 return null;
@@ -76,7 +80,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return Math.Min(offset, -nearCap);
             }
 
-            if (side == DanSkillSystem.SIDE_LN && keyCount == 4)
+            if (side == EzDanSide.Ln && keyCount == 4)
                 return interpolate(above_bar_4k_ln, Math.Max(0, delta));
 
             double headroom = Math.Max(1 - bar, BONUS_MIN_SPAN);
@@ -84,27 +88,27 @@ namespace osu.Game.EzOsuGame.Skills
             return interpolate(above_bar_rc, t);
         }
 
-        private static double belowBarWindow(string side, int keyCount)
+        private static double belowBarWindow(EzDanSide side, int keyCount)
         {
-            if (side != DanSkillSystem.SIDE_LN)
+            if (side != EzDanSide.Ln)
                 return BELOW_BAR_WINDOW_RC;
 
             return keyCount == 4 ? BELOW_BAR_WINDOW_4K_LN : BELOW_BAR_WINDOW_LN;
         }
 
-        private static double nearBarCap(string side, int keyCount)
+        private static double nearBarCap(EzDanSide side, int keyCount)
         {
-            if (side == DanSkillSystem.SIDE_RC)
+            if (side == EzDanSide.Rc)
                 return 0;
 
             return keyCount == 4 ? 0.3 : 0.26;
         }
 
-        private static (double At, double Offset)[] belowBarAnchors(string side, int keyCount)
+        private static (double At, double Offset)[] belowBarAnchors(EzDanSide side, int keyCount)
         {
-            if (side == DanSkillSystem.SIDE_LN && keyCount == 4)
+            if (side == EzDanSide.Ln && keyCount == 4)
                 return below_bar_4k_ln;
-            if (side == DanSkillSystem.SIDE_LN)
+            if (side == EzDanSide.Ln)
                 return below_bar_ln;
 
             return below_bar_rc;
@@ -117,16 +121,12 @@ namespace osu.Game.EzOsuGame.Skills
 
             for (int i = 1; i < anchors.Length; i++)
             {
-                if (at > anchors[i].At)
-                    continue;
-
-                double lowerAt = anchors[i - 1].At;
-                double lowerOffset = anchors[i - 1].Offset;
-                double upperAt = anchors[i].At;
-                double upperOffset = anchors[i].Offset;
-                double span = upperAt - lowerAt;
-                double t = span > 0 ? (at - lowerAt) / span : 1;
-                return lowerOffset + (upperOffset - lowerOffset) * t;
+                if (at <= anchors[i].At)
+                {
+                    double span = anchors[i].At - anchors[i - 1].At;
+                    double t = span > 0 ? (at - anchors[i - 1].At) / span : 1;
+                    return anchors[i - 1].Offset + (anchors[i].Offset - anchors[i - 1].Offset) * t;
+                }
             }
 
             return anchors[^1].Offset;

@@ -13,29 +13,29 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void AtBarCreditsFullChartDan()
         {
-            double? credited = EzDanCredit.CreditedDanFor(10, 0.96, DanSkillSystem.SIDE_RC, 4);
+            double? credited = EzDanCredit.CreditedDanFor(10, 0.96, EzDanSide.Rc, 4);
             Assert.That(credited, Is.EqualTo(10).Within(0.001));
         }
 
         [Test]
         public void FarBelowBarCreditsNothing()
         {
-            double? credited = EzDanCredit.CreditedDanFor(10, 0.80, DanSkillSystem.SIDE_RC, 4);
+            double? credited = EzDanCredit.CreditedDanFor(10, 0.80, EzDanSide.Rc, 4);
             Assert.That(credited, Is.Null);
         }
 
         [Test]
         public void ParseDanLabelsGreek()
         {
-            Assert.That(EzDanLabels.LabelFor(11, DanSkillSystem.SIDE_RC, 4), Does.StartWith("alpha"));
-            Assert.That(EzDanLabels.LabelFor(10.0, DanSkillSystem.SIDE_LN, 4), Is.EqualTo("10"));
+            Assert.That(EzDanLabels.LabelFor(11, EzDanSide.Rc, 4), Does.StartWith("alpha"));
+            Assert.That(EzDanLabels.LabelFor(10.0, EzDanSide.Ln, 4), Is.EqualTo("10"));
         }
 
         [Test]
         public void SrToRawDanIncreasesWithSr()
         {
-            double low = EzDanLabels.SrToRawDan(4.0, "stream");
-            double high = EzDanLabels.SrToRawDan(8.0, "stream");
+            double low = EzDanLabels.SrToRawDan(4.0, EzMinaSkillAxis.Stream);
+            double high = EzDanLabels.SrToRawDan(8.0, EzMinaSkillAxis.Stream);
             Assert.That(high, Is.GreaterThan(low));
         }
 
@@ -44,28 +44,29 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var msd = new Dictionary<string, double>
             {
-                [EzSkillIds.Msd(EzSkillIds.OVERALL)] = 6.5,
-                [EzSkillIds.Msd(EzSkillIds.STREAM)] = 6.0,
-                [EzSkillIds.Msd(EzSkillIds.JUMPSTREAM)] = 5.0,
+                [EzMinaSkillAxis.Overall.ToMsdSkillId()] = 6.5,
+                [EzMinaSkillAxis.Stream.ToMsdSkillId()] = 6.0,
+                [EzMinaSkillAxis.Jumpstream.ToMsdSkillId()] = 5.0,
             };
 
             var rc = EzChartDanEstimator.FromMsd(msd, keyCount: 4, holdRatio: 0.1);
             Assert.That(rc, Is.Not.Null);
-            Assert.That(rc!.Side, Is.EqualTo(DanSkillSystem.SIDE_RC));
+            Assert.That(rc!.Side, Is.EqualTo(EzDanSide.Rc));
+            Assert.That(rc.DominantAxis, Is.EqualTo(EzMinaSkillAxis.Stream));
             Assert.That(rc.RawDan, Is.GreaterThan(0));
             Assert.That(rc.Label, Is.Not.Empty);
 
             var ln = EzChartDanEstimator.FromMsd(msd, keyCount: 4, holdRatio: 0.5);
             Assert.That(ln, Is.Not.Null);
-            Assert.That(ln!.Side, Is.EqualTo(DanSkillSystem.SIDE_LN));
+            Assert.That(ln!.Side, Is.EqualTo(EzDanSide.Ln));
             Assert.That(ln.RawDan, Is.EqualTo(rc.RawDan).Within(0.001));
         }
 
         [Test]
         public void SrCalibrationChangesHighSrRawDan()
         {
-            double plain = EzDanLabels.SrToRawDan(9.0, "stream", calibrate: false);
-            double calibrated = EzDanLabels.SrToRawDan(9.0, "stream", calibrate: true);
+            double plain = EzDanLabels.SrToRawDan(9.0, EzMinaSkillAxis.Stream, calibrate: false);
+            double calibrated = EzDanLabels.SrToRawDan(9.0, EzMinaSkillAxis.Stream, calibrate: true);
             Assert.That(calibrated, Is.Not.EqualTo(plain).Within(0.001));
         }
     }

@@ -32,5 +32,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_SQLITE_BRANCHES))]
         SqliteSongsBranches = 6,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_REALM_MSD))]
+        RealmMsd = 7,
     }
 }

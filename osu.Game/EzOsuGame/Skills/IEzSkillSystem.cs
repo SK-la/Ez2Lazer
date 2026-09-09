@@ -6,7 +6,8 @@ using System.Collections.Generic;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Pluggable skill family (MSD chart axes, SSR player axes, Dan, later xxy, …).
+    /// Pluggable skill family (MSD chart axes, SSR player axes, Dan, …).
+    /// Reserved: additional systems / keymode-specific axis catalogs register here via <see cref="EzSkillRegistry"/>.
     /// </summary>
     public interface IEzSkillSystem
     {
