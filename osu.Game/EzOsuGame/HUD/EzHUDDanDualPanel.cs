@@ -15,6 +15,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
@@ -252,7 +253,11 @@ namespace osu.Game.EzOsuGame.HUD
             bool showEvidence = ShowEvidence.Value && wantPlayer && hasUser;
 
             updateSide(rcList, EzDanSide.Rc, user, keys, chartAxes, playerAxes, wantChart, wantPlayer, showEvidence);
-            updateSide(lnList, EzDanSide.Ln, user, keys, chartAxes, playerAxes, wantChart, wantPlayer, showEvidence);
+            // LN has no Mina skill axes yet — pass empty skill dicts; aggregate dan still resolves per side.
+            updateSide(lnList, EzDanSide.Ln, user, keys,
+                new Dictionary<string, double>(),
+                new Dictionary<string, double>(),
+                wantChart, wantPlayer, showEvidence);
         }
 
         private void showEmpty(LocalisableString text)
@@ -288,14 +293,7 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             if (wantChart && beatmap?.Value.BeatmapInfo != null && skillProvider != null)
-            {
-                var modsList = mods?.Value ?? Array.Empty<Mod>();
-                var chart = skillProvider.TryGetChartDan(beatmap.Value.BeatmapInfo, modsList)
-                            ?? skillProvider.TryGetCachedChartDan(beatmap.Value.BeatmapInfo);
-
-                if (chart != null && (keys <= 0 || chart.KeyCount == keys) && chart.Side == side && !string.IsNullOrEmpty(chart.Label))
-                    chartLabel = chart.Label;
-            }
+                chartLabel = resolveChartAggregateLabel(side, keys);
 
             list.UpdateContent(
                 keys,
@@ -307,6 +305,34 @@ namespace osu.Game.EzOsuGame.HUD
                 resolveTitle,
                 onSelectClear,
                 showEvidence);
+        }
+
+        /// <summary>
+        /// Hub-style RC|LN chart halves: prefer Sunny xxy lookup per side; else primary-side TryGetChartDan only.
+        /// </summary>
+        private string? resolveChartAggregateLabel(EzDanSide side, int keys)
+        {
+            if (beatmap?.Value.BeatmapInfo == null || skillProvider == null)
+                return null;
+
+            var info = beatmap.Value.BeatmapInfo;
+            double xxy = info.XxyStarRating;
+
+            if (keys > 0 && xxy >= 0 && double.IsFinite(xxy)
+                && EzSunnyDanIntervals.TryLookup(keys, side.ToId(), xxy, out var sunny)
+                && !string.IsNullOrEmpty(sunny.DisplayLabel))
+            {
+                return sunny.DisplayLabel;
+            }
+
+            var modsList = mods?.Value ?? Array.Empty<Mod>();
+            var chart = skillProvider.TryGetChartDan(info, modsList)
+                        ?? skillProvider.TryGetCachedChartDan(info);
+
+            if (chart != null && (keys <= 0 || chart.KeyCount == keys) && chart.Side == side && !string.IsNullOrEmpty(chart.Label))
+                return chart.Label;
+
+            return null;
         }
 
         private string resolveTitle(string beatmapHash)

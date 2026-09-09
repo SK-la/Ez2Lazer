@@ -91,6 +91,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         public void SetFrom(EzChartDanVerdict verdict)
         {
+            // Aggregate chart verdict keeps its RC/LN side for badge art.
             Set(verdict.DominantAxis, verdict.Label, verdict.OverallMsd, null, null, verdict.KeyCount, verdict.Side);
         }
 
@@ -99,6 +100,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         /// <summary>
         /// Chart (primary) and optional player (secondary) values — Skill-radar AB style.
+        /// For Mina per-skill dans, pass <see cref="EzDanSide.Rc"/> so badge art uses reform / keymode RC ladders (hub parseDan), not LN 1–17.
         /// </summary>
         public void Set(
             EzMinaSkillAxis axis,

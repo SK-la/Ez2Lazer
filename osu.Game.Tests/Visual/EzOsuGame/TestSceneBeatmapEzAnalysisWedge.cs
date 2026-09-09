@@ -122,6 +122,66 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             AddStep("layout Auto", () => wedge.DanPanel.DualLayout.Value = EzDanPanelDualLayout.Auto);
         }
 
+        [Test]
+        public void TestRcAxesOnlyAndLnSkillSlotEmpty()
+        {
+            AddStep("seed mania + skills", seedPopulatedScene);
+            AddUntilStep("rc axis chips visible", () =>
+                wedge.ChildrenOfType<EzDanLabeledStatList>()
+                     .Where(l => l.Side == EzDanSide.Rc)
+                     .SelectMany(l => l.ChildrenOfType<EzDisplaySkillsDan>())
+                     .Count(c => c.Alpha > 0) >= 3);
+
+            AddAssert("ln column has no mina axis chips", () =>
+                wedge.ChildrenOfType<EzDanLabeledStatList>()
+                     .Where(l => l.Side == EzDanSide.Ln)
+                     .SelectMany(l => l.ChildrenOfType<EzDisplaySkillsDan>())
+                     .All(c => c.Alpha <= 0));
+
+            AddAssert("visible skill chips at most one mina set", () =>
+                wedge.ChildrenOfType<EzDisplaySkillsDan>().Count(c => c.Alpha > 0)
+                <= EzMinaSkillAxisExtensions.RadarAxes.Length);
+        }
+
+        [Test]
+        public void TestSkillAxisDansUseReformNotLnLadder()
+        {
+            // High MSD through LN 1–17 would mint labels like "15"/"17"; reform uses greek past 10.
+            AddAssert("stream sr maps to reform kappa band not ln-17", () =>
+            {
+                double raw = EzDanLabels.SrToRawDan(22.0, EzMinaSkillAxis.Stream);
+                string reformBare = EzDanLadders.BareLabel(EzDanLadders.For(test_keys, EzDanSide.Rc).ParseLabel(raw));
+                string lnBare = EzDanLadders.BareLabel(EzDanLadders.For(test_keys, EzDanSide.Ln).ParseLabel(raw));
+
+                bool reformGreek = reformBare is "kappa" or "iota" or "theta" or "eta" or "zeta"
+                    or "epsilon" or "delta" or "gamma" or "beta" or "alpha";
+                bool reformNumeric = int.TryParse(reformBare, out int n) && n is >= 1 and <= 10;
+                bool lnHighNumeric = int.TryParse(lnBare, out int lnN) && lnN > 10;
+
+                return (reformGreek || reformNumeric) && lnHighNumeric && reformBare != lnBare;
+            });
+        }
+
+        [Test]
+        public void TestHeaderAggregatesBothSides()
+        {
+            AddStep("seed mania + skills", seedPopulatedScene);
+            AddUntilStep("both side lists present", () =>
+                wedge.ChildrenOfType<EzDanLabeledStatList>().Count() == 2);
+
+            AddAssert("rc and ln player aggregates seeded", () =>
+            {
+                var rc = skillStore.GetDanEstimate(test_player, test_keys, EzDanSide.Rc.ToId());
+                var ln = skillStore.GetDanEstimate(test_player, test_keys, EzDanSide.Ln.ToId());
+                return rc != null && ln != null
+                       && !string.IsNullOrEmpty(rc.Label) && !string.IsNullOrEmpty(ln.Label)
+                       && rc.Label != ln.Label;
+            });
+
+            AddUntilStep("header aggregate dans visible", () =>
+                wedge.ChildrenOfType<EzDisplayDan>().Count(c => c.Alpha > 0 && Precision.AlmostEquals(c.Scale.X, 1.5f)) >= 2);
+        }
+
         private void seedPopulatedScene()
         {
             wedge.DanPanel.DataSource.Value = EzDanPanelDataSource.Both;

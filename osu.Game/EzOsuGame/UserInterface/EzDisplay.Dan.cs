@@ -29,7 +29,28 @@ namespace osu.Game.EzOsuGame.UserInterface
         private EzResourceStore? resources;
         private TextureStore? textures;
 
-        public bool PreferImage { get; set; } = true;
+        private string? pendingLabel;
+        private int pendingKeyCount = 4;
+        private EzDanSide pendingSide = EzDanSide.Rc;
+        private bool hasPendingLabel;
+
+        private bool preferImage = true;
+
+        /// <summary>When true, prefer badge texture over bare text (retries after DI load).</summary>
+        public bool PreferImage
+        {
+            get => preferImage;
+            set
+            {
+                if (preferImage == value)
+                    return;
+
+                preferImage = value;
+
+                if (hasPendingLabel)
+                    applyPendingLabel();
+            }
+        }
 
         public float BadgeSize { get; set; } = 22f;
 
@@ -101,10 +122,34 @@ namespace osu.Game.EzOsuGame.UserInterface
             this.textures = textures;
         }
 
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (hasPendingLabel)
+                applyPendingLabel();
+        }
+
         public void SetLabel(string label, int keyCount = 4, EzDanSide side = EzDanSide.Rc)
         {
-            string bare = EzDanLadders.BareLabel(label);
-            string suffix = EzDanLadders.TierSuffix(label);
+            pendingLabel = label;
+            pendingKeyCount = keyCount;
+            pendingSide = side;
+            hasPendingLabel = true;
+
+            applyPendingLabel();
+        }
+
+        public void SetLabel(string label, int keyCount, string sideId)
+            => SetLabel(label, keyCount, EzDanSideExtensions.ParseOrRc(sideId));
+
+        private void applyPendingLabel()
+        {
+            if (!hasPendingLabel || string.IsNullOrEmpty(pendingLabel))
+                return;
+
+            string bare = EzDanLadders.BareLabel(pendingLabel);
+            string suffix = EzDanLadders.TierSuffix(pendingLabel);
 
             bareText.Text = bare;
             bareText.Alpha = 1;
@@ -115,11 +160,8 @@ namespace osu.Game.EzOsuGame.UserInterface
             suffixText.Colour = tierColour ?? Colour4.White.Opacity(0.85f);
             suffixText.Alpha = string.IsNullOrEmpty(suffix) ? 0 : 1;
 
-            updateBadge(keyCount, side, bare);
+            updateBadge(pendingKeyCount, pendingSide, bare);
         }
-
-        public void SetLabel(string label, int keyCount, string sideId)
-            => SetLabel(label, keyCount, EzDanSideExtensions.ParseOrRc(sideId));
 
         private void updateBadge(int keyCount, EzDanSide side, string bare)
         {
@@ -130,6 +172,10 @@ namespace osu.Game.EzOsuGame.UserInterface
             contentPad.Padding = new MarginPadding { Horizontal = 5, Vertical = 2 };
 
             if (!PreferImage)
+                return;
+
+            // DI may not be ready yet (e.g. SetLabel from a parent ctor); LoadComplete retries.
+            if (resources == null && textures == null && LoadState < LoadState.Ready)
                 return;
 
             string? relative = EzDanLadders.TryGetTexturePath(keyCount, side, bare);

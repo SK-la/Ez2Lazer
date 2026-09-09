@@ -20,7 +20,8 @@ using osuTK;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// One RC/LN side: label + optional aggregate dans + full radar-axis <see cref="EzDisplaySkillsDan"/> + clear evidence.
+    /// One RC/LN side: label + optional aggregate dans + (RC only) radar-axis <see cref="EzDisplaySkillsDan"/> + clear evidence.
+    /// Mina skill→dan always uses the keymode RC ladder (hub parseDan); LN column leaves the skill slot empty until LN skills exist.
     /// </summary>
     public partial class EzDanLabeledStatList : CompositeDrawable
     {
@@ -29,8 +30,10 @@ namespace osu.Game.EzOsuGame.Skills
 
         private float displayScale => 1.5f;
 
-        private readonly EzDanSide side;
         private readonly Colour4 accent;
+
+        /// <summary>RC or LN column this list represents.</summary>
+        public EzDanSide Side { get; }
 
         private OsuSpriteText sideLabel = null!;
         private EzDisplayDan chartAggregateDan = null!;
@@ -47,7 +50,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public EzDanLabeledStatList(EzDanSide side, Colour4 accent)
         {
-            this.side = side;
+            this.Side = side;
             this.accent = accent;
 
             RelativeSizeAxes = Axes.X;
@@ -152,7 +155,7 @@ namespace osu.Game.EzOsuGame.Skills
             foreach (var chip in axisChips.Values)
                 cellsFlow.Add(chip);
 
-            sideLabel.Text = side == EzDanSide.Ln
+            sideLabel.Text = Side == EzDanSide.Ln
                 ? EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_LN
                 : EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_RC;
         }
@@ -186,25 +189,40 @@ namespace osu.Game.EzOsuGame.Skills
 
             cellsFlow.Direction = cellsDirection;
 
-            sideLabel.Text = side == EzDanSide.Ln
+            sideLabel.Text = Side == EzDanSide.Ln
                 ? EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_LN
                 : EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_RC;
 
-            setAggregate(chartAggregateDan, chartAggregateLabel, keyCount, side);
-            setAggregate(playerAggregateDan, playerAggregateLabel, keyCount, side);
+            setAggregate(chartAggregateDan, chartAggregateLabel, keyCount, Side);
+            setAggregate(playerAggregateDan, playerAggregateLabel, keyCount, Side);
 
-            var ladder = EzDanLadders.For(keyCount, side);
-
-            foreach (var axis in EzMinaSkillAxisExtensions.RadarAxes)
+            // Mina axes are RcMina only. Hub maps skill SR → parseDan (reform / keymode RC ladder),
+            // never through the 4K LN 1–17 ladder. LN column keeps an empty skill slot for later data.
+            if (Side == EzDanSide.Ln)
             {
-                var chip = axisChips[axis];
-                double chartValue = resolveAxisValue(chartAxes, axis);
-                double playerValue = resolveAxisValue(playerAxes, axis);
+                foreach (var chip in axisChips.Values)
+                    chip.Clear();
 
-                string? chartLabel = chartValue > 0 ? ladder.ParseLabel(EzDanLabels.SrToRawDan(chartValue, axis)) : null;
-                string? playerLabel = playerValue > 0 ? ladder.ParseLabel(EzDanLabels.SrToRawDan(playerValue, axis)) : null;
+                cellsFlow.Hide();
+            }
+            else
+            {
+                cellsFlow.Show();
 
-                chip.Set(axis, chartLabel, chartValue > 0 ? chartValue : null, playerLabel, playerValue > 0 ? playerValue : null, keyCount, side);
+                // TODO: LN skill axes when LnSkillSystem lands — do not feed Mina into LN side.
+                var skillLadder = EzDanLadders.For(keyCount, EzDanSide.Rc);
+
+                foreach (var axis in EzMinaSkillAxisExtensions.RadarAxes)
+                {
+                    var chip = axisChips[axis];
+                    double chartValue = resolveAxisValue(chartAxes, axis);
+                    double playerValue = resolveAxisValue(playerAxes, axis);
+
+                    string? chartLabel = chartValue > 0 ? skillLadder.ParseLabel(EzDanLabels.SrToRawDan(chartValue, axis)) : null;
+                    string? playerLabel = playerValue > 0 ? skillLadder.ParseLabel(EzDanLabels.SrToRawDan(playerValue, axis)) : null;
+
+                    chip.Set(axis, chartLabel, chartValue > 0 ? chartValue : null, playerLabel, playerValue > 0 ? playerValue : null, keyCount, EzDanSide.Rc);
+                }
             }
 
             if (!showEvidence)
