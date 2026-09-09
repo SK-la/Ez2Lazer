@@ -529,26 +529,33 @@ namespace osu.Game.Database
         {
             const int current_version = EzManiaSkillAlgorithm.VERSION;
 
-            foreach (var ruleset in rulesetStore.AvailableRulesets)
+            // Read the live Realm row — AvailableRulesets clones historically omitted
+            // LastAppliedManiaSkillVersion and would wipe MSD on every startup.
+            var liveState = realmAccess.Run(r =>
             {
-                if (ruleset.OnlineID != 3)
-                    continue;
+                var live = r.All<RulesetInfo>().FirstOrDefault(x => x.OnlineID == 3);
+                return live == null
+                    ? ((string?)null, 0)
+                    : (live.ShortName, live.LastAppliedManiaSkillVersion);
+            });
 
-                if (ruleset.LastAppliedManiaSkillVersion >= current_version)
-                    continue;
+            if (liveState.Item1 == null)
+                return;
 
-                Logger.Log($"Resetting beatmap MSD for {ruleset.Name} (mania skill version updated from {ruleset.LastAppliedManiaSkillVersion} to {current_version})");
+            if (liveState.Item2 >= current_version)
+                return;
 
-                skillStore.ClearBeatmapMsd();
+            Logger.Log($"Resetting beatmap MSD for mania (mania skill version updated from {liveState.Item2} to {current_version})");
 
-                realmAccess.Write(r =>
-                {
-                    if (r.Find<RulesetInfo>(ruleset.ShortName) is RulesetInfo live)
-                        live.LastAppliedManiaSkillVersion = current_version;
-                });
+            skillStore.ClearBeatmapMsd();
 
-                Logger.Log($"Finished resetting beatmap MSD for {ruleset.Name}");
-            }
+            realmAccess.Write(r =>
+            {
+                if (r.Find<RulesetInfo>(liveState.Item1) is RulesetInfo live)
+                    live.LastAppliedManiaSkillVersion = current_version;
+            });
+
+            Logger.Log("Finished resetting beatmap MSD for mania");
         }
 
         private void runEzRealmMetadataBackfill()

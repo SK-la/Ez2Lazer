@@ -105,6 +105,7 @@ namespace osu.Game.Rulesets
             Available = Available,
             LastAppliedDifficultyVersion = LastAppliedDifficultyVersion,
             LastAppliedXxySrVersion = LastAppliedXxySrVersion,
+            LastAppliedManiaSkillVersion = LastAppliedManiaSkillVersion,
         };
 
         public Ruleset CreateInstance()

@@ -58,6 +58,83 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(EzMinaCalcFacade.EngineVersion, Is.GreaterThan(0));
         }
 
+        [Test]
+        public void Msd_from_osu_text_rates_7k()
+        {
+            string chart = buildManiaChart(keyCount: 7, rows: 40);
+
+            using var calc = new EzMinaCalcFacade();
+            var msd = calc.CalculateMsdFromOsuText(chart, "7k.osu");
+
+            Assert.That(msd.Overall, Is.GreaterThan(0));
+            Assert.That(EzMinaCalcFacade.SupportsOsuTextKeyCount(7), Is.True);
+            Assert.That(EzMinaCalcFacade.SupportsNoteArrayKeyCount(7), Is.False);
+        }
+
+        [Test]
+        public void Note_array_7k_yields_zero_on_current_package()
+        {
+            var notes = new MinaCalcNote[32];
+
+            for (int i = 0; i < notes.Length; i++)
+            {
+                notes[i] = new MinaCalcNote
+                {
+                    Notes = 1u << (i % 7),
+                    RowTime = i * 0.1f,
+                };
+            }
+
+            using var calc = new EzMinaCalcFacade();
+            var msd = calc.CalculateMsd(notes, 1f);
+
+            // Documents why MSD backfill must use FromOsuText for non-4K.
+            Assert.That(msd.Overall, Is.EqualTo(0));
+            Assert.That(msd.Stream, Is.EqualTo(0));
+        }
+
+        private static string buildManiaChart(int keyCount, int rows)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("osu file format v14");
+            sb.AppendLine();
+            sb.AppendLine("[General]");
+            sb.AppendLine("AudioFilename: virtual");
+            sb.AppendLine("Mode: 3");
+            sb.AppendLine();
+            sb.AppendLine("[Metadata]");
+            sb.AppendLine("Title:t");
+            sb.AppendLine("TitleUnicode:t");
+            sb.AppendLine("Artist:a");
+            sb.AppendLine("ArtistUnicode:a");
+            sb.AppendLine("Creator:c");
+            sb.AppendLine($"Version:{keyCount}k");
+            sb.AppendLine("Source:");
+            sb.AppendLine("Tags:");
+            sb.AppendLine();
+            sb.AppendLine("[Difficulty]");
+            sb.AppendLine("HPDrainRate:8");
+            sb.AppendLine($"CircleSize:{keyCount}");
+            sb.AppendLine("OverallDifficulty:8");
+            sb.AppendLine("ApproachRate:5");
+            sb.AppendLine("SliderMultiplier:1.4");
+            sb.AppendLine("SliderTickRate:1");
+            sb.AppendLine();
+            sb.AppendLine("[TimingPoints]");
+            sb.AppendLine("0,500,4,2,0,100,1,0");
+            sb.AppendLine();
+            sb.AppendLine("[HitObjects]");
+
+            for (int i = 0; i < rows; i++)
+            {
+                int col = i % keyCount;
+                int x = (int)Math.Floor((col + 0.5) * 512.0 / keyCount);
+                sb.AppendLine($"{x},192,{i * 100},1,0,0:0:0:0:");
+            }
+
+            return sb.ToString();
+        }
+
         private static MinaCalcNote[] createStreamNotes()
         {
             var notes = new MinaCalcNote[32];
