@@ -118,6 +118,51 @@ namespace osu.Game.EzOsuGame.Skills
             => store.GetDanEstimate(username, keyCount, side);
 
         /// <summary>
+        /// Ordered DualPanel skillset slots for <paramref name="keyCount"/>×<paramref name="side"/> (hub table; may be empty).
+        /// </summary>
+        public IReadOnlyList<EzDanSkillsetSlot> GetDanSkillsetSlots(int keyCount, EzDanSide side)
+            => EzDanSkillsetBuckets.Slots(keyCount, side);
+
+        public IReadOnlyList<EzDanSkillsetSlot> GetDanSkillsetSlots(int keyCount, string sideId)
+            => GetDanSkillsetSlots(keyCount, EzDanSideExtensions.ParseOrRc(sideId));
+
+        /// <summary>
+        /// Skillset dan verdicts (clear-bucket averages). Missing keys = under quorum / no filing data yet.
+        /// 4K RC: thin MSD DominantAxis filing. Other modes: empty until TODO(data) pattern/LN filing.
+        /// </summary>
+        public IReadOnlyDictionary<string, EzDanSkillsetVerdict> GetDanSkillsets(string username, int keyCount, string side)
+        {
+            var sideEnum = EzDanSideExtensions.ParseOrRc(side);
+            var clears = GetDanClears(username, keyCount, side, EzDanAlgorithm.VERSION);
+            return EzDanSkillsetBuckets.ComputeFromClears(keyCount, sideEnum, clears, hash =>
+            {
+                var msd = GetBeatmapMsd(hash);
+                if (msd.Count == 0)
+                    return null;
+
+                return EzDanLabels.DominantAxis(msd);
+            });
+        }
+
+        /// <summary>
+        /// Chart-side: at most one skillset gets the real chart label (DominantAxis → bucket).
+        /// </summary>
+        public IReadOnlyDictionary<string, string> GetChartDanSkillsetLabels(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            var chart = TryGetChartDan(beatmapInfo, mods) ?? TryGetCachedChartDan(beatmapInfo);
+            if (chart == null || string.IsNullOrEmpty(chart.Label))
+                return result;
+
+            string? skillsetId = EzDanSkillsetBuckets.TryMapMinaAxisToSkillset(chart.DominantAxis);
+            if (skillsetId != null && chart.KeyCount == 4 && chart.Side == EzDanSide.Rc)
+                result[skillsetId] = chart.Label;
+
+            // TODO(data): 6/7K chart skillset filing via pattern tags
+            return result;
+        }
+
+        /// <summary>
         /// Chart-side dan for song select me-vs-chart. Null when estimator unset or chart cannot be rated.
         /// </summary>
         public EzChartDanVerdict? TryGetChartDan(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)

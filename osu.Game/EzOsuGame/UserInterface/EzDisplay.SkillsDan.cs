@@ -13,20 +13,26 @@ namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
     /// Composite skill + dan tag: e.g. <c>技 7++ (20.5)</c>.
-    /// Skill chip and dan container stay separate drawables.
+    /// Optional secondary (player) dan + value for AB overlays.
     /// </summary>
     public partial class EzDisplaySkillsDan : FillFlowContainer
     {
         private readonly EzDisplaySkillName skillName;
-        private readonly EzDisplayDan dan;
-        private readonly OsuSpriteText valueText;
+        private readonly EzDisplayDan chartDan;
+        private readonly OsuSpriteText chartValueText;
+        private readonly EzDisplayDan playerDan;
+        private readonly OsuSpriteText playerValueText;
 
         public bool ShowValue { get; set; } = true;
 
         public bool PreferDanImage
         {
-            get => dan.PreferImage;
-            set => dan.PreferImage = value;
+            get => chartDan.PreferImage;
+            set
+            {
+                chartDan.PreferImage = value;
+                playerDan.PreferImage = value;
+            }
         }
 
         public EzDisplaySkillsDan()
@@ -44,19 +50,35 @@ namespace osu.Game.EzOsuGame.UserInterface
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
                 },
-                dan = new EzDisplayDan
+                chartDan = new EzDisplayDan
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
                     BadgeSize = 22,
                     PreferImage = true,
                 },
-                valueText = new OsuSpriteText
+                chartValueText = new OsuSpriteText
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
                     Font = OsuFont.GetFont(size: 11, weight: FontWeight.SemiBold),
                     Colour = Colour4.White.Opacity(0.75f),
+                    Alpha = 0,
+                },
+                playerDan = new EzDisplayDan
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    BadgeSize = 20,
+                    PreferImage = true,
+                    Alpha = 0,
+                },
+                playerValueText = new OsuSpriteText
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Font = OsuFont.GetFont(size: 11, weight: FontWeight.SemiBold),
+                    Colour = Colour4.FromHex("#50dc78").Opacity(0.9f),
                     Alpha = 0,
                 },
             };
@@ -69,26 +91,128 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         public void SetFrom(EzChartDanVerdict verdict)
         {
-            Set(verdict.DominantAxis, verdict.Label, verdict.OverallMsd, verdict.KeyCount, verdict.Side);
+            // Aggregate chart verdict keeps its RC/LN side for badge art.
+            Set(verdict.DominantAxis, verdict.Label, verdict.OverallMsd, null, null, verdict.KeyCount, verdict.Side);
         }
 
         public void Set(EzMinaSkillAxis axis, string danLabel, double? overallMsd, int keyCount, EzDanSide side)
+            => Set(axis, danLabel, overallMsd, null, null, keyCount, side);
+
+        /// <summary>
+        /// Chart (primary) and optional player (secondary) values — Skill-radar AB style.
+        /// For Mina per-skill dans, pass <see cref="EzDanSide.Rc"/> so badge art uses reform / keymode RC ladders (hub parseDan), not LN 1–17.
+        /// </summary>
+        public void Set(
+            EzMinaSkillAxis axis,
+            string? chartLabel,
+            double? chartValue,
+            string? playerLabel,
+            double? playerValue,
+            int keyCount,
+            EzDanSide side)
         {
             skillName.SetFromAxis(axis);
-            dan.SetLabel(danLabel, keyCount, side);
 
-            if (ShowValue && overallMsd is double msd && double.IsFinite(msd) && msd > 0)
+            bool hasChart = !string.IsNullOrEmpty(chartLabel) && chartValue is > 0;
+            bool hasPlayer = !string.IsNullOrEmpty(playerLabel) && playerValue is > 0;
+
+            if (!hasChart && !hasPlayer)
             {
-                valueText.Text = $"({msd.ToString("0.0", CultureInfo.InvariantCulture)})";
-                valueText.Alpha = 1;
+                Alpha = 0;
+                return;
+            }
+
+            if (hasChart)
+            {
+                chartDan.SetLabel(chartLabel!, keyCount, side);
+                chartDan.Show();
+                setValueText(chartValueText, chartValue);
             }
             else
             {
-                valueText.Text = string.Empty;
-                valueText.Alpha = 0;
+                chartDan.Hide();
+                chartValueText.Alpha = 0;
+            }
+
+            if (hasPlayer)
+            {
+                playerDan.SetLabel(playerLabel!, keyCount, side);
+                playerDan.Show();
+                setValueText(playerValueText, playerValue);
+            }
+            else
+            {
+                playerDan.Hide();
+                playerValueText.Alpha = 0;
             }
 
             Alpha = 1;
+        }
+
+        /// <summary>
+        /// Hub skillset tile: always shows the slot name; dan badges only when labels are present (no SrToRawDan).
+        /// </summary>
+        public void SetSkillset(
+            EzDanSkillsetSlot slot,
+            string? chartLabel,
+            string? playerLabel,
+            int? playerClears,
+            int keyCount,
+            EzDanSide side)
+        {
+            skillName.Set(slot.DisplayName, slot.AccentHex);
+
+            if (!string.IsNullOrEmpty(chartLabel))
+            {
+                chartDan.SetLabel(chartLabel, keyCount, side);
+                chartDan.Show();
+            }
+            else
+            {
+                chartDan.Hide();
+            }
+
+            chartValueText.Alpha = 0;
+            chartValueText.Text = string.Empty;
+
+            if (!string.IsNullOrEmpty(playerLabel))
+            {
+                playerDan.SetLabel(playerLabel, keyCount, side);
+                playerDan.Show();
+
+                if (ShowValue && playerClears is int clears && clears > 0)
+                {
+                    playerValueText.Text = $"({clears.ToString(CultureInfo.InvariantCulture)})";
+                    playerValueText.Alpha = 1;
+                }
+                else
+                {
+                    playerValueText.Text = string.Empty;
+                    playerValueText.Alpha = 0;
+                }
+            }
+            else
+            {
+                playerDan.Hide();
+                playerValueText.Text = string.Empty;
+                playerValueText.Alpha = 0;
+            }
+
+            Alpha = 1;
+        }
+
+        private void setValueText(OsuSpriteText text, double? value)
+        {
+            if (ShowValue && value is double v && double.IsFinite(v) && v > 0)
+            {
+                text.Text = $"({v.ToString("0.0", CultureInfo.InvariantCulture)})";
+                text.Alpha = 1;
+            }
+            else
+            {
+                text.Text = string.Empty;
+                text.Alpha = 0;
+            }
         }
     }
 }

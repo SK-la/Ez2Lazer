@@ -245,5 +245,23 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SONG_PROGRESS_SHOW_REST_MARKERS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "在进度条主体上用淡绿→淡黄渐变标出谱面休息区间。",
             "Tint rest intervals on the progress bar with a light-green to light-yellow gradient.");
+
+        public static readonly LocalisableString DAN_PANEL_DATA_SOURCE = new EzLocalizationManager.EzLocalisableString("段位数据源", "Dan Data Source");
+
+        public static readonly LocalisableString DAN_PANEL_DATA_SOURCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Chart：谱面 MSD；Player：玩家 SSR/段位；Both：双源叠加（对齐 Skill 雷达黄/绿层）。",
+            "Chart: beatmap MSD; Player: SSR/dan; Both: overlay both (Skill radar yellow/green).");
+
+        public static readonly LocalisableString DAN_PANEL_DUAL_LAYOUT = new EzLocalizationManager.EzLocalisableString("RC|LN 布局", "RC|LN Layout");
+
+        public static readonly LocalisableString DAN_PANEL_DUAL_LAYOUT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Auto：按宽度切换；Horizontal：左右分列；Vertical：上下堆叠。",
+            "Auto by width; Horizontal side-by-side; Vertical stacked.");
+
+        public static readonly LocalisableString DAN_PANEL_SHOW_EVIDENCE = new EzLocalizationManager.EzLocalisableString("显示 Clear", "Show Clear");
+
+        public static readonly LocalisableString DAN_PANEL_SHOW_EVIDENCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "仅个人档案建议开启：Player/Both 时在每侧下方显示 Top-15 Clear 成绩卡。选歌 HUD 默认关闭。",
+            "Prefer Local Profile only: when Player/Both, show Top-15 Clear cards under each side. Song-select HUD defaults off.");
     }
 }

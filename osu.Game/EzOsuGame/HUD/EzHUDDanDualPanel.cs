@@ -1,0 +1,383 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Layout;
+using osu.Framework.Localisation;
+using osu.Game.Beatmaps;
+using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Overlays;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Skinning;
+using osuTK;
+
+namespace osu.Game.EzOsuGame.HUD
+{
+    /// <summary>
+    /// HUD RC|LN skills-dan dual panel (Skill-radar style Chart / Player / Both sources).
+    /// Borrowed by EzAnalysis wedge and Local Profile Track with bindable settings.
+    /// </summary>
+    public partial class EzHUDDanDualPanel : CompositeDrawable, ISerialisableDrawable
+    {
+        /// <summary>
+        /// Song-select wedge content is often ~450–550px; keep Auto on Horizontal RC|LN there.
+        /// Vertical dual stacks both sides and clips under BeatmapDetailsArea height.
+        /// </summary>
+        private float wideThreshold => 420f;
+
+        public static readonly Colour4 RC_ACCENT = Colour4.FromHex("#e0b04c");
+        public static readonly Colour4 LN_ACCENT = Colour4.FromHex("#f07474");
+
+        public bool UsesFixedAnchor { get; set; }
+
+        /// <summary>Chart MSD / Player SSR / Both — same idea as Skill radar layers.</summary>
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.DAN_PANEL_DATA_SOURCE), nameof(EzHUDStrings.DAN_PANEL_DATA_SOURCE_TOOLTIP))]
+        public Bindable<EzDanPanelDataSource> DataSource { get; } = new Bindable<EzDanPanelDataSource>(EzDanPanelDataSource.Both);
+
+        /// <summary>RC|LN dual arrangement (auto / horizontal / vertical).</summary>
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.DAN_PANEL_DUAL_LAYOUT), nameof(EzHUDStrings.DAN_PANEL_DUAL_LAYOUT_TOOLTIP))]
+        public Bindable<EzDanPanelDualLayout> DualLayout { get; } = new Bindable<EzDanPanelDualLayout>(EzDanPanelDualLayout.Auto);
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.DAN_PANEL_SHOW_EVIDENCE), nameof(EzHUDStrings.DAN_PANEL_SHOW_EVIDENCE_TOOLTIP))]
+        public BindableBool ShowEvidence { get; } = new BindableBool(false);
+
+        /// <summary>Target player for SSR / dan / clear evidence. Externally bindable (EzAnalysis header).</summary>
+        public Bindable<string?> TargetUsername { get; } = new Bindable<string?>();
+
+        public BindableInt KeyCount { get; } = new BindableInt();
+
+        private FillFlowContainer dualFlow = null!;
+        private EzDanLabeledStatList rcList = null!;
+        private EzDanLabeledStatList lnList = null!;
+        private OsuSpriteText emptyHint = null!;
+
+        private IReadOnlyList<EzLocalProfileDrillScoreRow>? drillScores;
+        private Action<EzLocalProfileDrillScoreRow>? onSelectDrill;
+
+        private readonly LayoutValue sizeLayout = new LayoutValue(Invalidation.DrawSize);
+
+        [Resolved]
+        private EzSkillProvider? skillProvider { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private IBindable<WorkingBeatmap>? beatmap { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private IBindable<IReadOnlyList<Mod>>? mods { get; set; }
+
+        public EzHUDDanDualPanel()
+        {
+            RelativeSizeAxes = Axes.X;
+            AutoSizeAxes = Axes.Y;
+            AddLayout(sizeLayout);
+        }
+
+        /// <summary>Optional Local Profile drill wiring for clear-evidence click-through.</summary>
+        public void ConfigureEvidence(
+            IReadOnlyList<EzLocalProfileDrillScoreRow>? drills = null,
+            Action<EzLocalProfileDrillScoreRow>? selectDrill = null)
+        {
+            drillScores = drills;
+            onSelectDrill = selectDrill;
+            Schedule(refresh);
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(OverlayColourProvider colours)
+        {
+            InternalChildren = new Drawable[]
+            {
+                emptyHint = new OsuSpriteText
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Font = OsuFont.GetFont(size: 13),
+                    Colour = colours.Content2,
+                    Text = EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER,
+                    Alpha = 0,
+                },
+                dualFlow = new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Spacing = new Vector2(0, 12),
+                    Children = new Drawable[]
+                    {
+                        rcList = new EzDanLabeledStatList(EzDanSide.Rc, RC_ACCENT)
+                        {
+                            RelativeSizeAxes = Axes.X,
+                        },
+                        lnList = new EzDanLabeledStatList(EzDanSide.Ln, LN_ACCENT)
+                        {
+                            RelativeSizeAxes = Axes.X,
+                        },
+                    },
+                },
+            };
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            TargetUsername.BindValueChanged(_ => refresh(), true);
+            KeyCount.BindValueChanged(_ => refresh());
+            DataSource.BindValueChanged(_ => refresh());
+            DualLayout.BindValueChanged(_ => applyLayoutMode(), true);
+            ShowEvidence.BindValueChanged(_ => refresh());
+
+            beatmap?.BindValueChanged(_ => refresh());
+            mods?.BindValueChanged(_ => refresh());
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (!sizeLayout.IsValid)
+            {
+                sizeLayout.Validate();
+                applyLayoutMode();
+            }
+        }
+
+        private void applyLayoutMode()
+        {
+            bool wide = DualLayout.Value switch
+            {
+                EzDanPanelDualLayout.Horizontal => true,
+                EzDanPanelDualLayout.Vertical => false,
+                _ => DrawWidth >= wideThreshold,
+            };
+
+            if (wide)
+            {
+                dualFlow.Direction = FillDirection.Horizontal;
+                dualFlow.Spacing = Vector2.Zero;
+                rcList.Width = 0.45f;
+                lnList.Width = 0.45f;
+                rcList.SetLayoutInset(new MarginPadding { Right = 4 });
+                lnList.SetLayoutInset(new MarginPadding { Left = 4 });
+                rcList.SetCellsDirection(FillDirection.Vertical);
+                lnList.SetCellsDirection(FillDirection.Vertical);
+            }
+            else
+            {
+                dualFlow.Direction = FillDirection.Vertical;
+                dualFlow.Spacing = new Vector2(0, 12);
+                rcList.Width = 1;
+                lnList.Width = 1;
+                rcList.SetLayoutInset(new MarginPadding());
+                lnList.SetLayoutInset(new MarginPadding());
+                rcList.SetCellsDirection(FillDirection.Horizontal);
+                lnList.SetCellsDirection(FillDirection.Horizontal);
+            }
+        }
+
+        private void refresh()
+        {
+            applyLayoutMode();
+
+            if (skillProvider == null)
+            {
+                showEmpty(EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER);
+                return;
+            }
+
+            int keys = KeyCount.Value;
+            string? user = TargetUsername.Value;
+            bool hasUser = !string.IsNullOrWhiteSpace(user);
+            var source = DataSource.Value;
+
+            bool wantChart = source is EzDanPanelDataSource.Chart or EzDanPanelDataSource.Both;
+            bool wantPlayer = source is EzDanPanelDataSource.Player or EzDanPanelDataSource.Both;
+
+            IReadOnlyDictionary<string, string> chartSkillsetLabels = new Dictionary<string, string>();
+
+            if (wantChart && beatmap?.Value.BeatmapInfo != null)
+            {
+                var modsList = mods?.Value ?? Array.Empty<Mod>();
+                var info = beatmap.Value.BeatmapInfo;
+
+                // Warm MSD cache when missing (chart skillset filing + key resolve helpers).
+                if (skillProvider.GetBeatmapMsd(info.Hash).Count == 0)
+                    skillProvider.TryGetChartDan(info, modsList);
+
+                chartSkillsetLabels = skillProvider.GetChartDanSkillsetLabels(info, modsList);
+
+                if (keys <= 0)
+                {
+                    try
+                    {
+                        var playable = beatmap.Value.GetPlayableBeatmap(info.Ruleset, modsList);
+                        keys = EzMinaNoteConverter.ResolveKeyCount(playable);
+                        if (KeyCount.Value <= 0 && keys > 0)
+                            KeyCount.Value = keys;
+                    }
+                    catch
+                    {
+                        if (info.Difficulty.CircleSize > 0)
+                            keys = (int)info.Difficulty.CircleSize;
+                    }
+                }
+            }
+
+            bool hasBeatmap = beatmap?.Value.BeatmapInfo != null;
+            bool canShowChart = wantChart && hasBeatmap && keys > 0;
+            bool canShowPlayer = wantPlayer && hasUser && keys > 0;
+
+            if (keys <= 0
+                || (!canShowChart && !canShowPlayer)
+                || (wantPlayer && !wantChart && !hasUser)
+                || (wantChart && !wantPlayer && !hasBeatmap))
+            {
+                showEmpty(EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER);
+                return;
+            }
+
+            emptyHint.Hide();
+            dualFlow.Show();
+
+            bool showEvidence = ShowEvidence.Value && wantPlayer && hasUser;
+
+            updateSide(rcList, EzDanSide.Rc, user, keys, chartSkillsetLabels, wantChart, wantPlayer, showEvidence);
+            updateSide(lnList, EzDanSide.Ln, user, keys,
+                // LN skillset chart labels: empty until TODO(data) LN pattern filing.
+                new Dictionary<string, string>(),
+                wantChart, wantPlayer, showEvidence);
+        }
+
+        private void showEmpty(LocalisableString text)
+        {
+            emptyHint.Text = text;
+            emptyHint.Show();
+            dualFlow.Hide();
+        }
+
+        private void updateSide(
+            EzDanLabeledStatList list,
+            EzDanSide side,
+            string? user,
+            int keys,
+            IReadOnlyDictionary<string, string> chartSkillsetLabels,
+            bool wantChart,
+            bool wantPlayer,
+            bool showEvidence)
+        {
+            string? chartLabel = null;
+            string? playerLabel = null;
+            IReadOnlyList<EzDanClearEvidenceRow> clears = Array.Empty<EzDanClearEvidenceRow>();
+            IReadOnlyDictionary<string, EzDanSkillsetVerdict> playerSkillsets =
+                new Dictionary<string, EzDanSkillsetVerdict>();
+
+            var slots = skillProvider?.GetDanSkillsetSlots(keys, side) ?? Array.Empty<EzDanSkillsetSlot>();
+
+            if (wantPlayer && !string.IsNullOrWhiteSpace(user) && keys > 0 && skillProvider != null)
+            {
+                var estimate = skillProvider.GetDan(user, keys, side.ToId());
+                if (estimate != null && !string.IsNullOrEmpty(estimate.Label) && estimate.RawDan >= 0)
+                    playerLabel = estimate.Label;
+
+                playerSkillsets = skillProvider.GetDanSkillsets(user, keys, side.ToId());
+
+                if (showEvidence)
+                    clears = skillProvider.GetDanClears(user, keys, side.ToId(), EzDanAlgorithm.VERSION);
+            }
+
+            if (wantChart && beatmap?.Value.BeatmapInfo != null && skillProvider != null)
+                chartLabel = resolveChartAggregateLabel(side, keys);
+
+            list.UpdateContent(
+                keys,
+                wantChart ? chartLabel : null,
+                wantPlayer ? playerLabel : null,
+                slots,
+                wantChart ? chartSkillsetLabels : new Dictionary<string, string>(),
+                wantPlayer ? playerSkillsets : new Dictionary<string, EzDanSkillsetVerdict>(),
+                clears,
+                resolveTitle,
+                onSelectClear,
+                showEvidence);
+        }
+
+        /// <summary>
+        /// Hub-style RC|LN chart halves: prefer Sunny xxy lookup per side; else primary-side TryGetChartDan only.
+        /// </summary>
+        private string? resolveChartAggregateLabel(EzDanSide side, int keys)
+        {
+            if (beatmap?.Value.BeatmapInfo == null || skillProvider == null)
+                return null;
+
+            var info = beatmap.Value.BeatmapInfo;
+            double xxy = info.XxyStarRating;
+
+            if (keys > 0 && xxy >= 0 && double.IsFinite(xxy)
+                && EzSunnyDanIntervals.TryLookup(keys, side.ToId(), xxy, out var sunny)
+                && !string.IsNullOrEmpty(sunny.DisplayLabel))
+            {
+                return sunny.DisplayLabel;
+            }
+
+            var modsList = mods?.Value ?? Array.Empty<Mod>();
+            var chart = skillProvider.TryGetChartDan(info, modsList)
+                        ?? skillProvider.TryGetCachedChartDan(info);
+
+            if (chart != null && (keys <= 0 || chart.KeyCount == keys) && chart.Side == side && !string.IsNullOrEmpty(chart.Label))
+                return chart.Label;
+
+            return null;
+        }
+
+        private string resolveTitle(string beatmapHash)
+        {
+            if (string.IsNullOrEmpty(beatmapHash) || drillScores == null)
+                return EzSettingsProfile.LOCAL_PROFILE_AXIS_UNKNOWN_MAP.ToString();
+
+            var drill = drillScores
+                        .Where(r => string.Equals(r.BeatmapHash, beatmapHash, StringComparison.Ordinal))
+                        .OrderByDescending(r => r.PpResolved)
+                        .ThenByDescending(r => r.Date)
+                        .FirstOrDefault();
+
+            if (drill == null)
+                return EzSettingsProfile.LOCAL_PROFILE_AXIS_UNKNOWN_MAP.ToString();
+
+            if (string.IsNullOrEmpty(drill.Artist))
+            {
+                return string.IsNullOrEmpty(drill.DifficultyName)
+                    ? drill.Title
+                    : $"{drill.Title} [{drill.DifficultyName}]";
+            }
+
+            return string.IsNullOrEmpty(drill.DifficultyName)
+                ? $"{drill.Artist} - {drill.Title}"
+                : $"{drill.Artist} - {drill.Title} [{drill.DifficultyName}]";
+        }
+
+        private void onSelectClear(EzDanClearEvidenceRow clear)
+        {
+            if (onSelectDrill == null || drillScores == null)
+                return;
+
+            var drill = drillScores
+                        .Where(r => string.Equals(r.BeatmapHash, clear.BeatmapHash, StringComparison.Ordinal))
+                        .OrderByDescending(r => r.PpResolved)
+                        .ThenByDescending(r => r.Date)
+                        .FirstOrDefault();
+
+            if (drill != null)
+                onSelectDrill(drill);
+        }
+    }
+}
