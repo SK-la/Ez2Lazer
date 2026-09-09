@@ -5,10 +5,13 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
@@ -119,21 +122,33 @@ namespace osu.Game.Rulesets.UI
                 lastAutoPlayedObject = null;
             }
 
-            // Auto-play notes when KeySoundPreviewMode == 2
+            // AutoPlayPlus: match Autoplay hitsound ownership at precise object times (no input / hit-result gating).
             if (isAutoPlay)
             {
                 double referenceTime = getReferenceTime();
                 var obj = GetMostValidObject();
 
-                if (obj != null && obj != lastAutoPlayedObject)
+                if (obj != null && obj != lastAutoPlayedObject && referenceTime >= obj.StartTime)
                 {
-                    // Play when we've reached or passed the object's start time
-                    if (referenceTime >= obj.StartTime)
+                    // Parent fallback for IgnoreJudgement duration objects: Autoplay never PlaySamples the parent
+                    // (e.g. HoldNote). Prefer EndTime nested samples; empty tail stays silent — never replay head Samples.
+                    if (obj.NestedHitObjects.Count > 0 && obj.Judgement is IgnoreJudgement)
                     {
-                        var samples = obj.Samples.Cast<ISampleInfo>().ToArray();
-                        PlaySamples(samples);
-                        lastAutoPlayedObject = obj;
+                        if (obj is IHasDuration duration)
+                        {
+                            var release = obj.NestedHitObjects.FirstOrDefault(n =>
+                                n.Samples.Count > 0 && Precision.AlmostEquals(n.StartTime, duration.EndTime, 1));
+
+                            if (release != null)
+                                PlaySamples(release.Samples.Cast<ISampleInfo>().ToArray());
+                        }
                     }
+                    else if (obj.Samples.Count > 0)
+                    {
+                        PlaySamples(obj.Samples.Cast<ISampleInfo>().ToArray());
+                    }
+
+                    lastAutoPlayedObject = obj;
                 }
             }
         }
