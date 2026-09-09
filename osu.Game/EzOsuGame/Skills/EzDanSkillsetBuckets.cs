@@ -41,6 +41,12 @@ namespace osu.Game.EzOsuGame.Skills
         public const string LN_INVERSE = "lninverse";
         public const string LN_RELEASE = "lnrelease";
 
+        /// <summary>
+        /// Persisted when a key×side was recomputed but produced no skillset tiles
+        /// (so readers can distinguish cache hit-empty from never cached).
+        /// </summary>
+        public const string CACHE_EMPTY_SENTINEL = "__empty__";
+
         private static readonly EzDanSkillsetSlot[] rc_4k =
         {
             new EzDanSkillsetSlot(JACK, "Jack", "#ec6a9c"),

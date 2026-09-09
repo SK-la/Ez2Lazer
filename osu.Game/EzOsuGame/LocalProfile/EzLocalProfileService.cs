@@ -28,6 +28,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly EzLocalProfileAggregator aggregator;
         private readonly EzPlayerSsrAggregator? ssrAggregator;
         private readonly EzPlayerDanAggregator? danAggregator;
+        private readonly EzSkillProvider? skillProvider;
         private readonly Lock computeLock = new Lock();
         private CancellationTokenSource? computeCts;
 
@@ -42,12 +43,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
             BeatmapManager beatmapManager,
             EzPlayerSsrAggregator? ssrAggregator = null,
             EzPlayerDanAggregator? danAggregator = null,
-            EzLocalProfileStore? sharedStore = null)
+            EzLocalProfileStore? sharedStore = null,
+            EzSkillProvider? skillProvider = null)
         {
             Store = sharedStore ?? new EzLocalProfileStore(storage);
             aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager);
             this.ssrAggregator = ssrAggregator;
             this.danAggregator = danAggregator;
+            this.skillProvider = skillProvider;
             Snapshot.Value = Store.LoadSnapshot();
         }
 
@@ -255,6 +258,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 {
                     danAggregator!.ComputeAndStore(username, scores, token, tick);
                     Store.ReplaceDanClears(username, danAggregator.PendingEvidence);
+                    skillProvider?.RefreshDanSkillsets(username);
                 },
                 danAggregator != null,
                 "[EzLocalProfile] Failed to compute/persist player Dan estimates after profile save.");

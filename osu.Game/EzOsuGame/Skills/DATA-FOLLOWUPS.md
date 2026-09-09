@@ -9,8 +9,8 @@ Do **not** re-encode these as `// TODO(data)` in product code. Open a dedicated 
 | — | SCHEMA EZ9 | Typed `EzBeatmapChartSkillInfo` + `EzPlayerDanSkillsetValue` in Realm | **Done** |
 | — | Debt: SQLite ChartSkillInfo | Abandoned analysis `chart_skill_info` JSON; no import/migrate; miss → recompute | **Done** |
 | — | Debt: single Realm skill facade | ChartSkillInfo CRUD merged into `EzSkillStore`; deleted `EzChartSkillInfoStore` | **Done** |
+| — | DATA-Skillset-Cache | Writers + Provider cache-hit; LocalProfile rebuild calls `RefreshDanSkillsets` | **Done** |
 | 1 | DATA-LeoBlack-ChartDan | Full LeoBlack chart-side aggregate dan (optional). Also fills cluster columns if still null. | Wish-list |
-| 2 | DATA-Skillset-Cache | Writers for existing `EzPlayerDanSkillsetValue` + Provider cache-hit (DualPanel / profile stop re-filing every clear on read) | **Next light PR** |
 | 3 | DATA-Dan-Headline-Anchor | 7K LN `anchoredSkillsetDans`-style side headline (only if product moves titles off side-level `GetDan`). | Optional |
 | 4 | DATA-ChartSkillInfo-Batch | Background / library-wide ChartSkillInfo warm (beyond on-demand DualPanel + clear hashes). | Optional |
 
