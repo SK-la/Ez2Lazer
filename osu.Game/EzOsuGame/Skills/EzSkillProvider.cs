@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
@@ -155,9 +156,10 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Recompute and persist skillset caches for a user after dan clears are replaced.
-        /// Chart resolve uses stored ChartSkillInfo only (no WorkingBeatmap load) so profile rebuild stays light.
+        /// Prefetches MSD + ChartSkillInfo for all clear hashes in one Realm pass (no per-clear Run).
+        /// Chart resolve uses stored ChartSkillInfo only (no WorkingBeatmap load).
         /// </summary>
-        public void RefreshDanSkillsets(string username)
+        public void RefreshDanSkillsets(string username, Action? tick = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
@@ -167,18 +169,65 @@ namespace osu.Game.EzOsuGame.Skills
             if (!string.Equals(resolvedUser, username, StringComparison.Ordinal))
                 store.ClearDanSkillsetValues(username);
 
+            var allClears = GetDanClears(resolvedUser, algorithmVersion: EzDanAlgorithm.VERSION);
+            var hashes = allClears
+                         .Select(c => c.BeatmapHash)
+                         .Where(static h => !string.IsNullOrEmpty(h))
+                         .Distinct(StringComparer.Ordinal)
+                         .ToList();
+
+            var msdByHash = store.GetBeatmapSkillsForHashes(hashes, EzSkillSystems.BEATMAP_MSD);
+            var chartByHash = store.GetChartSkillInfoForHashes(hashes);
+
             foreach (int keyCount in tracked_skillset_key_counts)
             {
                 foreach (var side in new[] { EzDanSide.Rc, EzDanSide.Ln })
                 {
                     string sideId = side.ToId();
-                    var verdicts = computeDanSkillsets(resolvedUser, keyCount, sideId, allowComputeChart: false);
+                    var clears = filterClears(allClears, keyCount, sideId);
+
+                    if (clears.Count == 0 && EzDanSkillsetBuckets.Slots(keyCount, side).Count == 0)
+                    {
+                        // No evidence and no UI slots — skip writing a cache stamp.
+                        tick?.Invoke();
+                        continue;
+                    }
+
+                    var verdicts = EzDanSkillsetBuckets.ComputeFromClears(
+                        keyCount,
+                        side,
+                        clears,
+                        hash => msdByHash.TryGetValue(hash, out var msd) && msd.Count > 0 ? msd : null,
+                        hash => chartByHash.TryGetValue(hash, out var chart) ? chart : null);
+
                     store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, sideId, verdicts);
+                    tick?.Invoke();
                 }
             }
         }
 
         private static readonly int[] tracked_skillset_key_counts = { 4, 5, 6, 7, 8, 9 };
+
+        private static IReadOnlyList<EzDanClearEvidenceRow> filterClears(
+            IReadOnlyList<EzDanClearEvidenceRow> clears,
+            int keyCount,
+            string sideId)
+        {
+            var list = new List<EzDanClearEvidenceRow>();
+
+            foreach (var clear in clears)
+            {
+                if (clear.KeyCount != keyCount)
+                    continue;
+
+                if (!string.Equals(clear.Side, sideId, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                list.Add(clear);
+            }
+
+            return list;
+        }
 
         private IReadOnlyDictionary<string, EzDanSkillsetVerdict> danSkillsetsFromCache(string username, int keyCount, string side)
         {
@@ -199,24 +248,27 @@ namespace osu.Game.EzOsuGame.Skills
         {
             var sideEnum = EzDanSideExtensions.ParseOrRc(side);
             var clears = GetDanClears(username, keyCount, side, EzDanAlgorithm.VERSION);
+
+            var hashes = clears
+                         .Select(c => c.BeatmapHash)
+                         .Where(static h => !string.IsNullOrEmpty(h))
+                         .Distinct(StringComparer.Ordinal)
+                         .ToList();
+
+            var msdByHash = store.GetBeatmapSkillsForHashes(hashes, EzSkillSystems.BEATMAP_MSD);
+            var chartByHash = store.GetChartSkillInfoForHashes(hashes);
+
             return EzDanSkillsetBuckets.ComputeFromClears(
                 keyCount,
                 sideEnum,
                 clears,
+                hash => msdByHash.TryGetValue(hash, out var msd) && msd.Count > 0 ? msd : null,
                 hash =>
                 {
-                    var msd = GetBeatmapMsd(hash);
-                    return msd.Count == 0 ? null : msd;
-                },
-                hash =>
-                {
-                    if (string.IsNullOrEmpty(hash))
-                        return null;
-
-                    if (store.TryGetChartSkillInfo(hash, out var stored) && stored != null)
+                    if (chartByHash.TryGetValue(hash, out var stored))
                         return stored;
 
-                    if (!allowComputeChart || beatmapManager == null)
+                    if (!allowComputeChart || beatmapManager == null || string.IsNullOrEmpty(hash))
                         return null;
 
                     var info = beatmapManager.QueryBeatmap(b => b.Hash == hash);

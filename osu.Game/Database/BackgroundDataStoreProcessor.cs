@@ -857,13 +857,13 @@ namespace osu.Game.Database
 
             int processedCount = 0;
             int failedCount = 0;
+            int attemptedCount = 0;
+            const int log_every = 25;
 
             foreach (var (id, _) in missing)
             {
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
-
-                updateNotificationProgress(notification, processedCount, missing.Count);
 
                 sleepIfRequired();
 
@@ -872,6 +872,8 @@ namespace osu.Game.Database
                 if (beatmap == null)
                 {
                     ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
                     continue;
                 }
 
@@ -887,6 +889,12 @@ namespace osu.Game.Database
                     Logger.Log($"Background MSD processing failed on {beatmap}: {e}");
                     ++failedCount;
                 }
+
+                ++attemptedCount;
+                updateNotificationProgress(notification, attemptedCount, missing.Count);
+
+                if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
+                    Logger.Log($"MSD backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount})");
             }
 
             completeNotification(notification, processedCount, missing.Count, failedCount);
@@ -1901,7 +1909,7 @@ namespace osu.Game.Database
 
         private int lastNotificationProgressReported = -1;
 
-        private const int notification_progress_update_interval = 50;
+        private const int notification_progress_update_interval = 25;
 
         private void updateNotificationProgress(ProgressNotification? notification, int processedCount, int totalCount)
         {
@@ -1930,7 +1938,7 @@ namespace osu.Game.Database
                 notification.Progress = (float)processedCount / totalCount;
             });
 
-            if (processedCount > 0 && processedCount % 100 == 0)
+            if (processedCount > 0 && processedCount % 25 == 0)
                 Logger.Log($"Background progress: {processedCount} of {totalCount}");
         }
 

@@ -36,6 +36,42 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        /// <summary>
+        /// Batch-read beatmap MSD (or other system) rows for many hashes in one Realm run.
+        /// Missing hashes are omitted from the result.
+        /// </summary>
+        public IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> GetBeatmapSkillsForHashes(
+            IEnumerable<string> beatmapHashes,
+            string systemId,
+            int? algorithmVersion = null)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapHashes);
+
+            var hashSet = beatmapHashes
+                          .Where(static h => !string.IsNullOrEmpty(h))
+                          .ToHashSet(StringComparer.Ordinal);
+
+            if (hashSet.Count == 0)
+                return new Dictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal);
+
+            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+
+            return realmAccess.Run(r =>
+            {
+                var result = new Dictionary<string, IReadOnlyDictionary<string, double>>(hashSet.Count, StringComparer.Ordinal);
+
+                var rows = r.All<EzBeatmapSkillValue>()
+                            .Where(v => v.SystemId == systemId && v.AlgorithmVersion == version)
+                            .AsEnumerable()
+                            .Where(v => hashSet.Contains(v.BeatmapHash));
+
+                foreach (var group in rows.GroupBy(v => v.BeatmapHash, StringComparer.Ordinal))
+                    result[group.Key] = group.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
+
+                return result;
+            });
+        }
+
         public bool TryGetBeatmapSkill(string beatmapHash, string skillId, out double value, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
@@ -439,6 +475,37 @@ namespace osu.Game.EzOsuGame.Skills
                     LengthSeconds = info.LengthSeconds ?? -1,
                     KeyCount = info.KeyCount ?? -1,
                 });
+            });
+        }
+
+        /// <summary>
+        /// Batch-read typed ChartSkillInfo rows for many hashes in one Realm run.
+        /// Missing / wrong-version hashes are omitted.
+        /// </summary>
+        public IReadOnlyDictionary<string, EzChartSkillInfo> GetChartSkillInfoForHashes(IEnumerable<string> beatmapHashes)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapHashes);
+
+            var hashSet = beatmapHashes
+                          .Where(static h => !string.IsNullOrEmpty(h))
+                          .ToHashSet(StringComparer.Ordinal);
+
+            if (hashSet.Count == 0)
+                return new Dictionary<string, EzChartSkillInfo>(StringComparer.Ordinal);
+
+            return realmAccess.Run(r =>
+            {
+                var result = new Dictionary<string, EzChartSkillInfo>(hashSet.Count, StringComparer.Ordinal);
+
+                var rows = r.All<EzBeatmapChartSkillInfo>()
+                            .Where(v => v.InfoVersion == EzChartSkillInfo.VERSION)
+                            .AsEnumerable()
+                            .Where(v => hashSet.Contains(v.BeatmapHash));
+
+                foreach (var row in rows)
+                    result[row.BeatmapHash] = chartSkillInfoToDto(row);
+
+                return result;
             });
         }
 

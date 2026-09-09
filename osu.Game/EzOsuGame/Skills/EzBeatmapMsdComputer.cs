@@ -56,7 +56,17 @@ namespace osu.Game.EzOsuGame.Skills
 
             double holdRatio = EzChartDanEstimator.ComputeHoldRatio(playable);
             skillStore.WriteBeatmapMsd(beatmapInfo.Hash, vector, beatmapInfo.ID, holdRatio: holdRatio);
-            return skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_MSD);
+
+            // Return the just-written values without a second Realm round-trip.
+            var result = new Dictionary<string, double>(StringComparer.Ordinal);
+
+            foreach (var (axis, value) in vector.Enumerate())
+                result[axis.ToMsdSkillId()] = value;
+
+            if (double.IsFinite(holdRatio))
+                result[EzSkillSystems.MsdHoldRatioSkillId] = Math.Clamp(holdRatio, 0, 1);
+
+            return result;
         }
 
         /// <summary>
