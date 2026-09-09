@@ -199,14 +199,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             Add(new EzLocalProfileChartCard(EzSettingsProfile.LOCAL_PROFILE_MANIA_PLAYS_BY_KEY, barFlow));
 
-            Add(new EzLocalProfileChartCard(
-                EzSettingsProfile.LOCAL_PROFILE_MANIA_AVG_KPS_LINE,
-                new EzLocalProfileLabeledLineChart(
-                    ordered.Select(k => (float)k.AvgKps).ToArray(),
-                    ordered.Select(k => $"{k.KeyCount}K").ToArray())
-                {
-                    RelativeSizeAxes = Axes.X,
-                }));
+            if (ordered.Count >= 2)
+            {
+                Add(new EzLocalProfileChartCard(
+                    EzSettingsProfile.LOCAL_PROFILE_MANIA_AVG_KPS_LINE,
+                    new EzLocalProfileTrendChart(
+                        ordered.Select(k => (float)k.AvgKps).ToArray(),
+                        ordered.Select(k => $"{k.KeyCount}K").ToArray(),
+                        EzSettingsProfile.LOCAL_PROFILE_MANIA_AVG_KPS_LINE,
+                        minValue: 0)));
+            }
         }
 
         private partial class KeyPlayBarRow : Container

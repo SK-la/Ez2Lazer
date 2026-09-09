@@ -132,52 +132,53 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return flow;
         }
 
-        private EzLocalProfileLabeledLineChart? createStarLineChart()
+        private EzLocalProfileTrendChart? createStarLineChart()
         {
             var list = snapshot.StarPlayCounts.Where(s => s.RulesetId == rulesetId).OrderBy(s => s.StarBucket).ToList();
-            if (list.Count == 0)
+            if (list.Count < 2)
                 return null;
 
-            return new EzLocalProfileLabeledLineChart(
+            return new EzLocalProfileTrendChart(
                 list.Select(s => (float)s.Count).ToArray(),
                 list.Select(s => s.StarBucket.ToString(CultureInfo.InvariantCulture)).ToArray(),
-                FontAwesome.Solid.Star);
+                EzSettingsProfile.LOCAL_PROFILE_STAR_PLAY_LINE,
+                FontAwesome.Solid.Star,
+                minValue: 0);
         }
 
-        private EzLocalProfileLabeledLineChart? createXxyLineChart()
+        private EzLocalProfileTrendChart? createXxyLineChart()
         {
             var list = snapshot.XxyPlayCounts.Where(s => s.RulesetId == rulesetId).OrderBy(s => s.StarBucket).ToList();
-            if (list.Count == 0)
+            if (list.Count < 2)
                 return null;
 
-            return new EzLocalProfileLabeledLineChart(
+            return new EzLocalProfileTrendChart(
                 list.Select(s => (float)s.Count).ToArray(),
                 list.Select(s => s.StarBucket.ToString(CultureInfo.InvariantCulture)).ToArray(),
-                FontAwesome.Solid.Moon);
+                EzSettingsProfile.LOCAL_PROFILE_XXY_PLAY_LINE,
+                FontAwesome.Solid.Moon,
+                minValue: 0);
         }
 
-        private EzLocalProfileLabeledLineChart? createManiaKpsLineChart()
+        private EzLocalProfileTrendChart? createManiaKpsLineChart()
         {
             var ordered = snapshot.ManiaKeyStats.OrderBy(k => k.KeyCount).ToList();
-            if (ordered.Count == 0)
+            if (ordered.Count < 2)
                 return null;
 
-            return new EzLocalProfileLabeledLineChart(
+            return new EzLocalProfileTrendChart(
                 ordered.Select(k => (float)k.AvgKps).ToArray(),
-                ordered.Select(k => $"{k.KeyCount}K").ToArray());
+                ordered.Select(k => $"{k.KeyCount}K").ToArray(),
+                EzSettingsProfile.LOCAL_PROFILE_MANIA_AVG_KPS_LINE,
+                minValue: 0);
         }
 
-        private static void addLineChart(FillFlowContainer parent, LocalisableString title, EzLocalProfileLabeledLineChart? chart)
+        private static void addLineChart(FillFlowContainer parent, LocalisableString title, EzLocalProfileTrendChart? chart)
         {
             if (chart == null)
                 return;
 
-            parent.Add(new OsuSpriteText
-            {
-                Text = title,
-                Font = OsuFont.GetFont(size: 13, weight: FontWeight.Bold),
-            });
-            parent.Add(chart);
+            parent.Add(new EzLocalProfileChartCard(title, chart));
         }
 
         private static Drawable createBarColumn(LocalisableString title, Drawable body) =>

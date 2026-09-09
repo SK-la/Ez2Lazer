@@ -328,10 +328,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             var points = skillProvider.GetPlayerSkillHistory(username, keyCount, skillId);
 
-            if (points.Count == 0)
+            string cardTitle = EzSettingsProfile.LOCAL_PROFILE_SKILL_HISTORY_FOR.Format(displayName);
+
+            if (points.Count < 2)
             {
                 return new EzLocalProfileChartCard(
-                    EzSettingsProfile.LOCAL_PROFILE_SKILL_HISTORY_FOR.Format(displayName),
+                    cardTitle,
                     new OsuSpriteText
                     {
                         Text = EzSettingsProfile.LOCAL_PROFILE_SKILL_HISTORY_EMPTY,
@@ -343,8 +345,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             string[] labels = points.Select(p => p.RecordedAt.ToLocalTime().ToString("MM-dd", CultureInfo.InvariantCulture)).ToArray();
 
             return new EzLocalProfileChartCard(
-                EzSettingsProfile.LOCAL_PROFILE_SKILL_HISTORY_FOR.Format(displayName),
-                new EzLocalProfileLabeledLineChart(values, labels));
+                cardTitle,
+                new EzLocalProfileTrendChart(values, labels, displayName));
         }
 
         private Drawable buildAxisPlaysCard(string skillId, int keyCount, string displayName)
