@@ -16,8 +16,14 @@ namespace osu.Game.EzOsuGame.Analysis
     internal static class EzAnalysisSchemaManager
     {
         // Note: main sqlite v7 stores kps/KPC only (slim schema). Legacy pp/tag/xxy_sr columns removed at schema v3.
+        // Schema v4 briefly added chart_skill_info JSON; abandoned without migration — ChartSkillInfo lives in Realm (EZ≥9).
+        // Schema v5: stop creating chart_skill_info; orphaned tables in old DBs are ignored.
         public const int ANALYSIS_VERSION = EzAnalysisPersistentStore.ANALYSIS_VERSION;
-        public const int MAIN_SCHEMA_VERSION = 3;
+        public const int MAIN_SCHEMA_VERSION = 5;
+
+        /// <summary>Last schema that rebuilt entry/mania table shapes.</summary>
+        public const int MAIN_STRUCTURAL_SCHEMA_VERSION = 3;
+
         public const string MAIN_DATABASE_KIND = "ez_analysis";
 
         public const string TABLE_ENTRY = "ez_analysis_entry";
@@ -168,10 +174,14 @@ WHERE {COL_UPDATED_AT} <> 0;
             if (!tableExists(connection, TABLE_ENTRY))
                 return;
 
-            if (!needsMainSchemaRebuild(connection))
-                return;
+            if (needsMainSchemaRebuild(connection))
+                rebuildMainDatabaseInPlace(connection);
 
-            rebuildMainDatabaseInPlace(connection);
+            if (!int.TryParse(TryGetMeta(connection, META_KEY_SCHEMA_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out int storedSchemaVersion)
+                || storedSchemaVersion < MAIN_SCHEMA_VERSION)
+            {
+                SetMeta(connection, META_KEY_SCHEMA_VERSION, MAIN_SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
+            }
         }
 
         /// <summary>
@@ -318,7 +328,7 @@ CREATE INDEX IF NOT EXISTS idx_ez_analysis_mania_updated ON {TABLE_MANIA}({COL_U
             if (!int.TryParse(TryGetMeta(connection, META_KEY_SCHEMA_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out int storedSchemaVersion))
                 return false;
 
-            return storedSchemaVersion < MAIN_SCHEMA_VERSION;
+            return storedSchemaVersion < MAIN_STRUCTURAL_SCHEMA_VERSION;
         }
 
         private static void rebuildMainDatabaseInPlace(SqliteConnection connection)

@@ -203,7 +203,8 @@ namespace osu.Game.EzOsuGame.HUD
             bool wantChart = source is EzDanPanelDataSource.Chart or EzDanPanelDataSource.Both;
             bool wantPlayer = source is EzDanPanelDataSource.Player or EzDanPanelDataSource.Both;
 
-            IReadOnlyDictionary<string, string> chartSkillsetLabels = new Dictionary<string, string>();
+            IReadOnlyDictionary<string, string> chartSkillsetLabelsRc = new Dictionary<string, string>();
+            IReadOnlyDictionary<string, string> chartSkillsetLabelsLn = new Dictionary<string, string>();
 
             if (wantChart && beatmap?.Value.BeatmapInfo != null)
             {
@@ -213,8 +214,6 @@ namespace osu.Game.EzOsuGame.HUD
                 // Warm MSD cache when missing (chart skillset filing + key resolve helpers).
                 if (skillProvider.GetBeatmapMsd(info.Hash).Count == 0)
                     skillProvider.TryGetChartDan(info, modsList);
-
-                chartSkillsetLabels = skillProvider.GetChartDanSkillsetLabels(info, modsList);
 
                 if (keys <= 0)
                 {
@@ -230,6 +229,23 @@ namespace osu.Game.EzOsuGame.HUD
                         if (info.Difficulty.CircleSize > 0)
                             keys = (int)info.Difficulty.CircleSize;
                     }
+                }
+
+                if (keys > 0)
+                {
+                    // Warm chart skill info for filing tags (current map DualPanel).
+                    try
+                    {
+                        var playable = beatmap.Value.GetPlayableBeatmap(info.Ruleset, modsList);
+                        skillProvider.TryGetOrComputeChartSkillInfo(info, playable, modsList);
+                    }
+                    catch
+                    {
+                        skillProvider.TryGetOrComputeChartSkillInfo(info, mods: modsList);
+                    }
+
+                    chartSkillsetLabelsRc = skillProvider.GetChartDanSkillsetLabels(info, keys, EzDanSide.Rc, modsList);
+                    chartSkillsetLabelsLn = skillProvider.GetChartDanSkillsetLabels(info, keys, EzDanSide.Ln, modsList);
                 }
             }
 
@@ -251,11 +267,8 @@ namespace osu.Game.EzOsuGame.HUD
 
             bool showEvidence = ShowEvidence.Value && wantPlayer && hasUser;
 
-            updateSide(rcList, EzDanSide.Rc, user, keys, chartSkillsetLabels, wantChart, wantPlayer, showEvidence);
-            updateSide(lnList, EzDanSide.Ln, user, keys,
-                // LN skillset chart labels: empty until TODO(data) LN pattern filing.
-                new Dictionary<string, string>(),
-                wantChart, wantPlayer, showEvidence);
+            updateSide(rcList, EzDanSide.Rc, user, keys, chartSkillsetLabelsRc, wantChart, wantPlayer, showEvidence);
+            updateSide(lnList, EzDanSide.Ln, user, keys, chartSkillsetLabelsLn, wantChart, wantPlayer, showEvidence);
         }
 
         private void showEmpty(LocalisableString text)

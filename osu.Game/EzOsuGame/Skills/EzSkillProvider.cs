@@ -12,8 +12,9 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Unified read API for skill metrics (song select, local profile Track, …).
-    /// Covers beatmap MSD, player SSR, player dan estimates, and chart-dan verdicts.
+    /// Covers beatmap MSD, player SSR, player dan estimates, chart skill info, and chart-dan verdicts.
     /// Writers (computers / aggregators) are separate DI services — see <see cref="EzSkillSystems"/>.
+    /// All UI surfaces (HUD DualPanel / Radar, Analysis Wedge, LocalProfile Track, display tags) read through this type.
     /// </summary>
     public sealed class EzSkillProvider
     {
@@ -21,18 +22,21 @@ namespace osu.Game.EzOsuGame.Skills
         private readonly EzChartDanEstimator? chartDanEstimator;
         private readonly EzLocalProfileStore? localProfileStore;
         private readonly EzAnalysisDatabase? analysisDatabase;
+        private readonly BeatmapManager? beatmapManager;
 
         public EzSkillProvider(
             EzSkillStore store,
             EzSkillRegistry? registry = null,
             EzChartDanEstimator? chartDanEstimator = null,
             EzLocalProfileStore? localProfileStore = null,
-            EzAnalysisDatabase? analysisDatabase = null)
+            EzAnalysisDatabase? analysisDatabase = null,
+            BeatmapManager? beatmapManager = null)
         {
             this.store = store;
             this.chartDanEstimator = chartDanEstimator;
             this.localProfileStore = localProfileStore;
             this.analysisDatabase = analysisDatabase;
+            this.beatmapManager = beatmapManager;
             Registry = registry ?? new EzSkillRegistry();
         }
 
@@ -128,38 +132,132 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Skillset dan verdicts (clear-bucket averages). Missing keys = under quorum / no filing data yet.
-        /// 4K RC: thin MSD DominantAxis filing. Other modes: empty until TODO(data) pattern/LN filing.
         /// </summary>
         public IReadOnlyDictionary<string, EzDanSkillsetVerdict> GetDanSkillsets(string username, int keyCount, string side)
         {
             var sideEnum = EzDanSideExtensions.ParseOrRc(side);
             var clears = GetDanClears(username, keyCount, side, EzDanAlgorithm.VERSION);
-            return EzDanSkillsetBuckets.ComputeFromClears(keyCount, sideEnum, clears, hash =>
-            {
-                var msd = GetBeatmapMsd(hash);
-                if (msd.Count == 0)
-                    return null;
+            return EzDanSkillsetBuckets.ComputeFromClears(
+                keyCount,
+                sideEnum,
+                clears,
+                hash =>
+                {
+                    var msd = GetBeatmapMsd(hash);
+                    return msd.Count == 0 ? null : msd;
+                },
+                hash =>
+                {
+                    if (string.IsNullOrEmpty(hash))
+                        return null;
 
-                return EzDanLabels.DominantAxis(msd);
-            });
+                    if (store.TryGetChartSkillInfo(hash, out var stored) && stored != null)
+                        return stored;
+
+                    if (beatmapManager == null)
+                        return null;
+
+                    var info = beatmapManager.QueryBeatmap(b => b.Hash == hash);
+                    return info == null ? null : TryGetOrComputeChartSkillInfo(info);
+                });
         }
 
         /// <summary>
-        /// Chart-side: at most one skillset gets the real chart label (DominantAxis → bucket).
+        /// Chart-side skillset labels for one DualPanel side via hub filing
+        /// (<see cref="EzDanSkillsetFiling.BucketsForValues"/>). Same aggregate label on every hit bucket.
         /// </summary>
-        public IReadOnlyDictionary<string, string> GetChartDanSkillsetLabels(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
+        public IReadOnlyDictionary<string, string> GetChartDanSkillsetLabels(
+            BeatmapInfo beatmapInfo,
+            int keyCount,
+            EzDanSide side,
+            IReadOnlyList<Mod>? mods = null)
         {
             var result = new Dictionary<string, string>(StringComparer.Ordinal);
-            var chart = TryGetChartDan(beatmapInfo, mods) ?? TryGetCachedChartDan(beatmapInfo);
-            if (chart == null || string.IsNullOrEmpty(chart.Label))
+            if (keyCount <= 0 || beatmapInfo.Ruleset.OnlineID != 3)
                 return result;
 
-            string? skillsetId = EzDanSkillsetBuckets.TryMapMinaAxisToSkillset(chart.DominantAxis);
-            if (skillsetId != null && chart.KeyCount == 4 && chart.Side == EzDanSide.Rc)
-                result[skillsetId] = chart.Label;
+            mods ??= Array.Empty<Mod>();
+            float rate = EzModRate.Resolve(mods);
 
-            // TODO(data): 6/7K chart skillset filing via pattern tags
+            var chartVerdict = TryGetChartDan(beatmapInfo, mods) ?? TryGetCachedChartDan(beatmapInfo);
+            string? aggregateLabel = chartVerdict?.Label;
+
+            if (string.IsNullOrEmpty(aggregateLabel))
+            {
+                // Sunny/xxy may still print a side label when MSD-side estimate is absent.
+                double xxy = beatmapInfo.XxyStarRating;
+
+                if (xxy >= 0 && double.IsFinite(xxy)
+                    && Dan.EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), xxy, out var sunny)
+                    && !string.IsNullOrEmpty(sunny.DisplayLabel))
+                {
+                    aggregateLabel = sunny.DisplayLabel;
+                }
+            }
+
+            if (string.IsNullOrEmpty(aggregateLabel))
+                return result;
+
+            var msd = GetBeatmapMsd(beatmapInfo.Hash);
+            var chartInfo = TryGetOrComputeChartSkillInfo(beatmapInfo, playable: null, mods);
+            double? length = chartInfo?.LengthSeconds ?? (beatmapInfo.Length > 0 ? beatmapInfo.Length / 1000.0 : null);
+
+            var buckets = EzDanSkillsetFiling.BucketsForValues(keyCount, side, msd, length, rate, chartInfo);
+            foreach (string id in buckets)
+                result[id] = aggregateLabel;
+
             return result;
+        }
+
+        /// <summary>Backward-compatible overload: RC-side labels only.</summary>
+        public IReadOnlyDictionary<string, string> GetChartDanSkillsetLabels(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
+        {
+            int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
+            if (keyCount <= 0)
+                keyCount = 4;
+
+            return GetChartDanSkillsetLabels(beatmapInfo, keyCount, EzDanSide.Rc, mods);
+        }
+
+        /// <summary>
+        /// Stored chart skill info, or compute+upsert when a playable (or WorkingBeatmap) is available.
+        /// </summary>
+        public EzChartSkillInfo? TryGetOrComputeChartSkillInfo(
+            BeatmapInfo beatmapInfo,
+            IBeatmap? playable = null,
+            IReadOnlyList<Mod>? mods = null)
+        {
+            if (beatmapInfo.Ruleset.OnlineID != 3)
+                return null;
+
+            if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
+                return stored;
+
+            try
+            {
+                mods ??= Array.Empty<Mod>();
+                IBeatmap? map = playable;
+
+                if (map == null && beatmapManager != null)
+                {
+                    var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+                    map = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
+                }
+
+                if (map == null)
+                    return null;
+
+                var input = EzChartSkillInfoComputer.FromPlayable(map);
+                var msd = GetBeatmapMsd(beatmapInfo.Hash);
+                // Motion / pattern shares are rate-invariant; always measure at 1.0x like hub.
+                var info = EzChartSkillInfoComputer.Compute(input, msd.Count > 0 ? msd : null, rate: 1);
+                store.UpsertChartSkillInfo(beatmapInfo.Hash, info);
+                return info;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         /// <summary>

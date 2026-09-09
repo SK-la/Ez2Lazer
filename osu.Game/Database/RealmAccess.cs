@@ -113,7 +113,7 @@ namespace osu.Game.Database
         /// Ez2Lazer schema revision. Bump when adding Ez-persisted fields; do not change <see cref="schema_version"/> for Ez-only work.
         ///
         /// Ez2Lazer-only revisions are tracked separately via <see cref="EZ_REALM_SCHEMA_VERSION"/>.
-        /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 52008).
+        /// The on-disk Realm schema version is <see cref="EzFileSchemaVersion"/> (schema_version * 1000 + EZ_REALM_SCHEMA_VERSION, currently 52009).
         /// Ez v1: Add ScoreInfo.ManiaHitMode and ManiaHealthMode.
         /// Ez v2: Add BeatmapInfo.HasVideo and HasStoryboard.
         /// Ez v3: Add BeatmapInfo.XxyStarRating.
@@ -123,8 +123,9 @@ namespace osu.Game.Database
         /// Ez v7: Normalize BeatmapSetInfo external hosting paths.
         /// Ez v8: Add mania skill RealmObjects (EzBeatmapSkillValue, EzPlayerSkillValue, EzDanEstimate,
         /// EzPlayerSkillHistoryPoint) with extended dan/provisional fields; RulesetInfo.LastAppliedManiaSkillVersion.
+        /// Ez v9: Add typed EzBeatmapChartSkillInfo + EzPlayerDanSkillsetValue (no JSON blobs).
         /// </summary>
-        public const int EZ_REALM_SCHEMA_VERSION = 8;
+        public const int EZ_REALM_SCHEMA_VERSION = 9;
 
         public static int EzFileSchemaVersion => schema_version * 1000 + EZ_REALM_SCHEMA_VERSION;
 
@@ -1573,6 +1574,11 @@ namespace osu.Game.Database
                     foreach (var ruleset in migration.NewRealm.All<RulesetInfo>())
                         ruleset.LastAppliedManiaSkillVersion = 0;
 
+                    break;
+
+                case 9:
+                    // EzBeatmapChartSkillInfo + EzPlayerDanSkillsetValue are new and start empty.
+                    // ChartSkillInfo is recomputed on demand; no SQLite JSON import.
                     break;
             }
 
