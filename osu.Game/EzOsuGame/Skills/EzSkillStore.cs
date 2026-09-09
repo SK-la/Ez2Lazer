@@ -572,7 +572,13 @@ namespace osu.Game.EzOsuGame.Skills
                             .Where(v => hashSet.Contains(v.BeatmapHash));
 
                 foreach (var row in rows)
-                    result[row.BeatmapHash] = chartSkillInfoToDto(row);
+                {
+                    var dto = chartSkillInfoToDto(row);
+                    if (dto.IsUnavailable)
+                        continue;
+
+                    result[row.BeatmapHash] = dto;
+                }
 
                 return result;
             });
@@ -783,7 +789,7 @@ namespace osu.Game.EzOsuGame.Skills
                 Vibro = row.Vibro,
                 DanEligible = row.DanEligible,
                 LengthSeconds = optionalDouble(row.LengthSeconds),
-                KeyCount = row.KeyCount < 0 ? null : row.KeyCount,
+                KeyCount = row.KeyCount,
             };
         }
     }

@@ -12,6 +12,20 @@ namespace osu.Game.EzOsuGame.Skills
     {
         public const int VERSION = 1;
 
+        /// <summary>
+        /// Persisted placeholder when the chart could not be loaded/analyzed.
+        /// <see cref="KeyCount"/> is negative so startup backfill treats the hash as done
+        /// without retrying every launch; readers must treat <see cref="IsUnavailable"/> as miss.
+        /// </summary>
+        public static EzChartSkillInfo Unavailable { get; } = new EzChartSkillInfo
+        {
+            KeyCount = -1,
+            DanEligible = false,
+        };
+
+        /// <summary>True when this row is an unavailable stub (see <see cref="Unavailable"/>).</summary>
+        public bool IsUnavailable => KeyCount is < 0;
+
         public string[] Patterns { get; init; } = [];
 
         /// <summary>Structurally detected 4K quadstream/minijack/jack-marathon demand.</summary>

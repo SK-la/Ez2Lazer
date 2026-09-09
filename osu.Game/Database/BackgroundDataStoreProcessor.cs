@@ -844,6 +844,7 @@ namespace osu.Game.Database
             Logger.Log("Querying for mania beatmaps with missing MSD...");
 
             List<(Guid Id, string Hash)> candidates = new List<(Guid, string)>();
+            int skippedUnsupportedKeyCount = 0;
 
             realmAccess.Run(r =>
             {
@@ -858,9 +859,24 @@ namespace osu.Game.Database
                     if (string.IsNullOrEmpty(b.Hash))
                         continue;
 
+                    // Exclude 5K / 8K+ at candidate time so they never enter the missing set
+                    // (loop-only skip left them as perpetual false-missing every launch).
+                    int keyCount = (int)Math.Round(b.Difficulty.CircleSize);
+
+                    if (keyCount > 0
+                        && !EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount)
+                        && !EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount))
+                    {
+                        ++skippedUnsupportedKeyCount;
+                        continue;
+                    }
+
                     candidates.Add((b.ID, b.Hash));
                 }
             });
+
+            if (skippedUnsupportedKeyCount > 0)
+                Logger.Log($"Skipping {skippedUnsupportedKeyCount} mania beatmaps with unsupported keycounts for MSD.");
 
             if (candidates.Count == 0)
                 return;
@@ -899,18 +915,6 @@ namespace osu.Game.Database
 
                 try
                 {
-                    int keyCount = (int)Math.Round(beatmap.Difficulty.CircleSize);
-
-                    if (keyCount > 0
-                        && !EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount)
-                        && !EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount))
-                    {
-                        // MinaCalc 0.4.2: 5K / 8K+ unsupported — skip without counting as hard fail.
-                        ++attemptedCount;
-                        updateNotificationProgress(notification, attemptedCount, missing.Count);
-                        continue;
-                    }
-
                     if (beatmapMsdComputer.ComputeAndStore(beatmap) == null)
                         ++failedCount;
                     else
@@ -999,10 +1003,15 @@ namespace osu.Game.Database
                     if (!beatmap.Ruleset.Available)
                         beatmap.Ruleset.Available = true;
 
-                    if (skillProvider.TryGetOrComputeChartSkillInfo(beatmap) == null)
-                        ++failedCount;
-                    else
+                    var info = skillProvider.TryGetOrComputeChartSkillInfo(beatmap);
+
+                    // Unavailable stubs return null from the provider but are persisted so the
+                    // hash leaves the missing set next launch — count them as processed.
+                    if (info != null
+                        || (skillStore.TryGetChartSkillInfo(beatmap.Hash, out var stub) && stub != null))
                         ++processedCount;
+                    else
+                        ++failedCount;
                 }
                 catch (Exception e)
                 {

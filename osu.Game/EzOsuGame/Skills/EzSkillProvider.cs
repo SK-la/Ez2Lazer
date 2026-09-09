@@ -422,7 +422,10 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
 
             if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
-                return stored;
+            {
+                // Unavailable stubs satisfy backfill completeness but are misses for filing/UI.
+                return stored.IsUnavailable ? null : stored;
+            }
 
             try
             {
@@ -436,17 +439,30 @@ namespace osu.Game.EzOsuGame.Skills
                 }
 
                 if (map == null)
+                {
+                    store.UpsertChartSkillInfo(beatmapInfo.Hash, EzChartSkillInfo.Unavailable, beatmapInfo.ID);
                     return null;
+                }
 
                 var input = EzChartSkillInfoComputer.FromPlayable(map);
                 var msd = GetBeatmapMsd(beatmapInfo.Hash);
                 // Motion / pattern shares are rate-invariant; always measure at 1.0x like hub.
                 var info = EzChartSkillInfoComputer.Compute(input, msd.Count > 0 ? msd : null, rate: 1);
-                store.UpsertChartSkillInfo(beatmapInfo.Hash, info);
+                store.UpsertChartSkillInfo(beatmapInfo.Hash, info, beatmapInfo.ID);
                 return info;
             }
             catch
             {
+                // Persist a stub so startup backfill does not retry this hash every launch.
+                try
+                {
+                    store.UpsertChartSkillInfo(beatmapInfo.Hash, EzChartSkillInfo.Unavailable, beatmapInfo.ID);
+                }
+                catch
+                {
+                    // ignore secondary failure
+                }
+
                 return null;
             }
         }
