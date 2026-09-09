@@ -15,11 +15,13 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Overlays.Preview;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Online.Leaderboards;
+using osu.Game.Rulesets;
 using osu.Game.Screens.Play.Leaderboards;
 using osuTK;
 using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
@@ -43,6 +45,9 @@ namespace osu.Game.Screens.Select
             private ShearedDropdown<EzRadarDisplayMode> rightRadarDropdown = null!;
 
             private Bindable<bool> flowMode = null!;
+
+            [Resolved]
+            private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
             public IBindable<Selection> Type => tabControl.Current;
 
@@ -206,6 +211,12 @@ namespace osu.Game.Screens.Select
                 }, true);
 
                 flowMode.BindValueChanged(e => applyFlowModeState(e.NewValue), true);
+
+                ruleset.BindValueChanged(e =>
+                {
+                    if (EzBeatmapPreviewModes.IsManiaRuleset(e.NewValue))
+                        tabControl.Current.Value = Selection.EzAnalysis;
+                }, true);
 
                 scopeDropdown.Current.BindValueChanged(scope =>
                 {
