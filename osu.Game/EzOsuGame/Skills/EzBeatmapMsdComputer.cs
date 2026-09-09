@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
 
             var existing = skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_MSD);
-            if (isCurrentMsdCache(existing))
+            if (IsCurrentMsdCache(existing))
                 return existing;
 
             return ComputeAndStore(beatmapInfo);
@@ -63,7 +63,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// Requires every current Mina axis id plus hold ratio.
         /// Legacy-only caches (jack_speed / technical) fail and are recomputed.
         /// </summary>
-        private static bool isCurrentMsdCache(IReadOnlyDictionary<string, double> existing)
+        public static bool IsCurrentMsdCache(IReadOnlyDictionary<string, double> existing)
         {
             if (!existing.ContainsKey(EzSkillSystems.MsdHoldRatioSkillId))
                 return false;

@@ -23,6 +23,7 @@ using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Extensions;
 using osu.Game.Online.API;
@@ -106,6 +107,12 @@ namespace osu.Game.Database
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
 
+        [Resolved]
+        private EzBeatmapMsdComputer beatmapMsdComputer { get; set; } = null!;
+
+        [Resolved]
+        private EzSkillStore skillStore { get; set; } = null!;
+
         private LocalCachedBeatmapMetadataSource localMetadataSource = null!;
 
         private readonly Lock ezRealmMetadataBackfillLock = new Lock();
@@ -140,7 +147,7 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// Queue Ez Realm metadata backfill (Tag / XxySR / PP) on a background thread.
+        /// Queue Ez Realm metadata backfill (Tag / XxySR / PP / MSD) on a background thread.
         /// </summary>
         /// <param name="forceAll">When true, clears persisted values first so all supported beatmaps are recomputed.</param>
         public EzDataRebuildDispatchResult QueueEzRealmMetadataBackfill(bool forceAll = false)
@@ -389,6 +396,7 @@ namespace osu.Game.Database
 
                     clearOutdatedStarRatings();
                     clearOutdatedXxyStarRatings();
+                    clearOutdatedManiaBeatmapMsd();
 
                     // Run Ez Realm backfill before official star population so it is not blocked for long periods.
                     if (tryBeginEzRealmMetadataBackfill())
@@ -514,6 +522,35 @@ namespace osu.Game.Database
             }
         }
 
+        /// <summary>
+        /// When the mania skill algorithm version advances, clear persisted beatmap MSD so startup backfill can recompute.
+        /// </summary>
+        private void clearOutdatedManiaBeatmapMsd()
+        {
+            const int current_version = EzManiaSkillAlgorithm.VERSION;
+
+            foreach (var ruleset in rulesetStore.AvailableRulesets)
+            {
+                if (ruleset.OnlineID != 3)
+                    continue;
+
+                if (ruleset.LastAppliedManiaSkillVersion >= current_version)
+                    continue;
+
+                Logger.Log($"Resetting beatmap MSD for {ruleset.Name} (mania skill version updated from {ruleset.LastAppliedManiaSkillVersion} to {current_version})");
+
+                skillStore.ClearBeatmapMsd();
+
+                realmAccess.Write(r =>
+                {
+                    if (r.Find<RulesetInfo>(ruleset.ShortName) is RulesetInfo live)
+                        live.LastAppliedManiaSkillVersion = current_version;
+                });
+
+                Logger.Log($"Finished resetting beatmap MSD for {ruleset.Name}");
+            }
+        }
+
         private void runEzRealmMetadataBackfill()
             => runEzRealmMetadataBackfill(EzRealmMetadataScope.All);
 
@@ -527,11 +564,30 @@ namespace osu.Game.Database
 
             if (scope.HasFlag(EzRealmMetadataScope.Tags))
                 populateMissingBeatmapTagFlags();
+
+            if (scope.HasFlag(EzRealmMetadataScope.Msd))
+                populateMissingBeatmapMsd();
         }
 
         private void clearEzRealmMetadata(EzRealmMetadataScope scope)
         {
             Logger.Log($"Forcing Ez Realm metadata recalculation ({scope})...");
+
+            if (scope.HasFlag(EzRealmMetadataScope.Msd))
+            {
+                Logger.Log("Clearing persisted beatmap MSD skill values...");
+                skillStore.ClearBeatmapMsd();
+            }
+
+            bool clearBeatmapInfoFields = scope.HasFlag(EzRealmMetadataScope.Tags)
+                                          || scope.HasFlag(EzRealmMetadataScope.Xxy)
+                                          || scope.HasFlag(EzRealmMetadataScope.Pp);
+
+            if (!clearBeatmapInfoFields)
+            {
+                Logger.Log($"Marked beatmap MSD for recalculation ({scope}).");
+                return;
+            }
 
             // Read phase: collect all eligible beatmap IDs (no write lock).
             List<Guid> allIds = new List<Guid>();
@@ -757,6 +813,83 @@ namespace osu.Game.Database
             }
 
             completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
+        }
+
+        /// <summary>
+        /// Backfill NoMod 1.0x beatmap MSD axes into <see cref="EzBeatmapSkillValue"/>.
+        /// Behaviour mirrors <see cref="populateMissingXxyStarRatings"/>: beatmap-level query, compute and write.
+        /// </summary>
+        private void populateMissingBeatmapMsd()
+        {
+            Logger.Log("Querying for mania beatmaps with missing MSD...");
+
+            List<(Guid Id, string Hash)> candidates = new List<(Guid, string)>();
+
+            realmAccess.Run(r =>
+            {
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null)
+                        continue;
+
+                    if (b.Ruleset.OnlineID != 3)
+                        continue;
+
+                    if (string.IsNullOrEmpty(b.Hash))
+                        continue;
+
+                    candidates.Add((b.ID, b.Hash));
+                }
+            });
+
+            if (candidates.Count == 0)
+                return;
+
+            var completeHashes = skillStore.GetCompleteBeatmapMsdHashes();
+            var missing = candidates.Where(c => !completeHashes.Contains(c.Hash)).ToList();
+
+            if (missing.Count == 0)
+                return;
+
+            Logger.Log($"Found {missing.Count} beatmaps which require MSD reprocessing.");
+
+            var notification = showProgressNotification(missing.Count, "Reprocessing beatmap MSD", "beatmaps' MSD have been updated");
+
+            int processedCount = 0;
+            int failedCount = 0;
+
+            foreach (var (id, _) in missing)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                updateNotificationProgress(notification, processedCount, missing.Count);
+
+                sleepIfRequired();
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                {
+                    ++failedCount;
+                    continue;
+                }
+
+                try
+                {
+                    if (beatmapMsdComputer.ComputeAndStore(beatmap) == null)
+                        ++failedCount;
+                    else
+                        ++processedCount;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background MSD processing failed on {beatmap}: {e}");
+                    ++failedCount;
+                }
+            }
+
+            completeNotification(notification, processedCount, missing.Count, failedCount);
         }
 
         /// <summary>

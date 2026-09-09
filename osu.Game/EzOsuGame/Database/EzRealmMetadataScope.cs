@@ -11,6 +11,7 @@ namespace osu.Game.EzOsuGame.Database
         Tags = 1,
         Xxy = 2,
         Pp = 4,
-        All = Tags | Xxy | Pp,
+        Msd = 8,
+        All = Tags | Xxy | Pp | Msd,
     }
 }

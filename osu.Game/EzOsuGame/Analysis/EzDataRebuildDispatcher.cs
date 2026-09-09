@@ -50,6 +50,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 case EzDataRebuildTarget.RealmTags:
                 case EzDataRebuildTarget.RealmXxy:
                 case EzDataRebuildTarget.RealmPp:
+                case EzDataRebuildTarget.RealmMsd:
                 case EzDataRebuildTarget.RealmAll:
                     return queueRealm != null;
 
@@ -79,6 +80,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 case EzDataRebuildTarget.RealmPp:
                     return dispatchRealm(EzRealmMetadataScope.Pp, forceAll);
+
+                case EzDataRebuildTarget.RealmMsd:
+                    return dispatchRealm(EzRealmMetadataScope.Msd, forceAll);
 
                 case EzDataRebuildTarget.RealmAll:
                     return dispatchRealm(EzRealmMetadataScope.All, forceAll);

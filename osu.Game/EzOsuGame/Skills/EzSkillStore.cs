@@ -104,6 +104,77 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        /// <summary>
+        /// Deletes persisted beatmap MSD rows. When <paramref name="hashes"/> is null, clears all MSD rows.
+        /// </summary>
+        public void ClearBeatmapMsd(IEnumerable<string>? hashes = null)
+        {
+            if (hashes == null)
+            {
+                realmAccess.Write(r =>
+                {
+                    var rows = r.All<EzBeatmapSkillValue>()
+                                .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD)
+                                .ToList();
+
+                    foreach (var row in rows)
+                        r.Remove(row);
+                });
+                return;
+            }
+
+            var hashList = hashes as IList<string> ?? hashes.ToList();
+            if (hashList.Count == 0)
+                return;
+
+            const int batch_size = 200;
+
+            for (int i = 0; i < hashList.Count; i += batch_size)
+            {
+                var batch = hashList.Skip(i).Take(batch_size).ToHashSet(StringComparer.Ordinal);
+
+                realmAccess.Write(r =>
+                {
+                    var rows = r.All<EzBeatmapSkillValue>()
+                                .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD)
+                                .AsEnumerable()
+                                .Where(v => batch.Contains(v.BeatmapHash))
+                                .ToList();
+
+                    foreach (var row in rows)
+                        r.Remove(row);
+                });
+            }
+        }
+
+        /// <summary>
+        /// Beatmap hashes that already have a complete current-version MSD cache (all axes + hold ratio).
+        /// </summary>
+        public HashSet<string> GetCompleteBeatmapMsdHashes(int? algorithmVersion = null)
+        {
+            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+
+            return realmAccess.Run(r =>
+            {
+                var byHash = r.All<EzBeatmapSkillValue>()
+                              .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD
+                                          && v.AlgorithmVersion == version)
+                              .AsEnumerable()
+                              .GroupBy(v => v.BeatmapHash, StringComparer.Ordinal);
+
+                var complete = new HashSet<string>(StringComparer.Ordinal);
+
+                foreach (var group in byHash)
+                {
+                    var skills = group.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
+                    if (EzBeatmapMsdComputer.IsCurrentMsdCache(skills))
+                        complete.Add(group.Key);
+                }
+
+                return complete;
+            });
+        }
+
         public IReadOnlyDictionary<string, double> GetPlayerSkills(string username, int keyCount, string systemId, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
