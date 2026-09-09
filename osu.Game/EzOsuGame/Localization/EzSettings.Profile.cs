@@ -146,8 +146,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_SKILL_HISTORY_EMPTY =
             new EzLocalizationManager.EzLocalisableString(
-                "暂无历史点。重新计算成绩分析后会写入。",
-                "No history points yet. Recompute Score Analysis to record them.");
+                "暂无历史点。重新计算成绩分析后会按游玩时间重建。",
+                "No history points yet. Recompute Score Analysis to rebuild them from play dates.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_AXIS_PLAYS_FOR =
             new EzLocalizationManager.EzLocalisableString("支撑成绩 · {0}", "Supporting plays · {0}");

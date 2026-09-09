@@ -334,6 +334,50 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        /// <summary>
+        /// Replace all history points for <paramref name="username"/> + <paramref name="keyCount"/>
+        /// with chronologically sampled skill snapshots (typically keyed by score play time).
+        /// </summary>
+        public void ReplacePlayerSkillHistory(
+            string username,
+            int keyCount,
+            IReadOnlyList<(DateTimeOffset RecordedAt, EzSkillsetVector Vector)> samples)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentNullException.ThrowIfNull(samples);
+
+            int version = EzManiaSkillAlgorithm.VERSION;
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzPlayerSkillHistoryPoint>()
+                                .Where(v => v.Username == username && v.KeyCount == keyCount)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+
+                foreach (var (recordedAt, vector) in samples)
+                {
+                    foreach (var (axis, value) in vector.Enumerate())
+                    {
+                        if (value <= 0 || !double.IsFinite(value))
+                            continue;
+
+                        r.Add(new EzPlayerSkillHistoryPoint
+                        {
+                            Username = username,
+                            KeyCount = keyCount,
+                            SkillId = axis.ToSsrSkillId(),
+                            Value = value,
+                            RecordedAt = recordedAt,
+                            AlgorithmVersion = version,
+                        });
+                    }
+                }
+            });
+        }
+
         public IReadOnlyList<EzPlayerSkillHistoryPoint> GetPlayerSkillHistory(
             string username,
             int keyCount,

@@ -342,11 +342,23 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             float[] values = points.Select(p => (float)p.Value).ToArray();
-            string[] labels = points.Select(p => p.RecordedAt.ToLocalTime().ToString("MM-dd", CultureInfo.InvariantCulture)).ToArray();
+            string[] labels = formatHistoryLabels(points);
 
             return new EzLocalProfileChartCard(
                 cardTitle,
                 new EzLocalProfileTrendChart(values, labels, displayName));
+        }
+
+        private static string[] formatHistoryLabels(IReadOnlyList<EzPlayerSkillHistoryPoint> points)
+        {
+            var first = points[0].RecordedAt.ToLocalTime();
+            var last = points[^1].RecordedAt.ToLocalTime();
+            bool spanYears = last.Year != first.Year || (last - first).TotalDays > 300;
+            string format = spanYears ? "yyyy-MM" : "MM-dd";
+
+            return points
+                   .Select(p => p.RecordedAt.ToLocalTime().ToString(format, CultureInfo.InvariantCulture))
+                   .ToArray();
         }
 
         private Drawable buildAxisPlaysCard(string skillId, int keyCount, string displayName)
