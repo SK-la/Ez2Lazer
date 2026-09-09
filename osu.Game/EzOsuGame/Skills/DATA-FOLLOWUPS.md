@@ -10,9 +10,11 @@ Do **not** re-encode these as `// TODO(data)` in product code. Open a dedicated 
 | — | Debt: SQLite ChartSkillInfo | Abandoned analysis `chart_skill_info` JSON; no import/migrate; miss → recompute | **Done** |
 | — | Debt: single Realm skill facade | ChartSkillInfo CRUD merged into `EzSkillStore`; deleted `EzChartSkillInfoStore` | **Done** |
 | — | DATA-Skillset-Cache | Writers + Provider cache-hit; LocalProfile rebuild calls `RefreshDanSkillsets` | **Done** |
+| — | DATA-ChartSkillInfo-Batch | BDSP `populateMissingChartSkillInfo` (+ rebuild target); runs after MSD | **Done** |
+| — | DATA-Dan-Headline-Anchor | Hub `anchoredSkillsetDans` / skillset mean → side `GetDan` via `EzDanSideHeadline` (dan algo v2) | **Done** |
+| — | MSD 6K/7K + no wipe-every-launch | FromString path; `RulesetInfo.Clone` + live LastAppliedManiaSkillVersion | **Done** |
 | 1 | DATA-LeoBlack-ChartDan | Full LeoBlack chart-side aggregate dan (optional). Also fills cluster columns if still null. | Wish-list |
-| 3 | DATA-Dan-Headline-Anchor | 7K LN `anchoredSkillsetDans`-style side headline (only if product moves titles off side-level `GetDan`). | Optional |
-| 4 | DATA-ChartSkillInfo-Batch | Background / library-wide ChartSkillInfo warm (beyond on-demand DualPanel + clear hashes). | Optional |
+| — | MinaCalc 5K / 8K+ | NuGet 0.4.2 engine rejects these (`-3`); skip in MSD backfill until package upgrade | Blocked on binding |
 
 UI read path (all of HUD DualPanel/Radar, Analysis Wedge, LocalProfile Track, display tags): **`EzSkillProvider` only**.
 

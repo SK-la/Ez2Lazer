@@ -12,6 +12,7 @@ namespace osu.Game.EzOsuGame.Database
         Xxy = 2,
         Pp = 4,
         Msd = 8,
-        All = Tags | Xxy | Pp | Msd,
+        ChartSkillInfo = 16,
+        All = Tags | Xxy | Pp | Msd | ChartSkillInfo,
     }
 }

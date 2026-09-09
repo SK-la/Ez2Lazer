@@ -201,9 +201,55 @@ namespace osu.Game.EzOsuGame.Skills
                         hash => chartByHash.TryGetValue(hash, out var chart) ? chart : null);
 
                     store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, sideId, verdicts);
+                    writeSideHeadline(resolvedUser, keyCount, side, clears, verdicts);
                     tick?.Invoke();
                 }
             }
+        }
+
+        /// <summary>
+        /// Hub <c>danSideFromClears</c>: skillset anchor/mean fold, else side-wide clear window.
+        /// Overwrites <see cref="GetDan"/> so DualPanel titles match filing tiles.
+        /// </summary>
+        private void writeSideHeadline(
+            string username,
+            int keyCount,
+            EzDanSide side,
+            IReadOnlyList<EzDanClearEvidenceRow> clears,
+            IReadOnlyDictionary<string, EzDanSkillsetVerdict> verdicts)
+        {
+            if (clears.Count < EzDanAlgorithm.CLEAR_QUORUM)
+                return;
+
+            var clearDans = clears.Select(c => c.CreditedDan).Where(double.IsFinite).ToList();
+            if (clearDans.Count < EzDanAlgorithm.CLEAR_QUORUM)
+                return;
+
+            var headline = EzDanSideHeadline.FromSkillsets(keyCount, side, verdicts, clearDans)
+                            ?? EzDanSideHeadline.FromSideClears(keyCount, side, clearDans);
+
+            if (headline == null)
+                return;
+
+            var window = clearDans
+                         .OrderByDescending(v => v)
+                         .Take(EzDanAlgorithm.CLEAR_WINDOW)
+                         .ToList();
+
+            store.WriteDanEstimate(new EzDanEstimate
+            {
+                Username = username,
+                KeyCount = keyCount,
+                Side = side.ToId(),
+                RawDan = headline.Value.RawDan,
+                Label = headline.Value.Label,
+                Clears = clears.Count,
+                BeyondTable = headline.Value.BeyondTable,
+                ClearWindowHave = window.Count,
+                ClearWindowNeed = EzDanAlgorithm.CLEAR_WINDOW,
+                AlgorithmVersion = EzDanAlgorithm.VERSION,
+                ComputedAt = DateTimeOffset.UtcNow,
+            });
         }
 
         private static readonly int[] tracked_skillset_key_counts = { 4, 5, 6, 7, 8, 9 };

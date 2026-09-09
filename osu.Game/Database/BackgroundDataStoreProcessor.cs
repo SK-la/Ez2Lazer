@@ -5,10 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.IO;
 using Newtonsoft.Json;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -19,13 +19,13 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Startup;
-using osu.Game.Extensions;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
@@ -112,6 +112,9 @@ namespace osu.Game.Database
 
         [Resolved]
         private EzSkillStore skillStore { get; set; } = null!;
+
+        [Resolved]
+        private EzSkillProvider skillProvider { get; set; } = null!;
 
         private LocalCachedBeatmapMetadataSource localMetadataSource = null!;
 
@@ -572,8 +575,12 @@ namespace osu.Game.Database
             if (scope.HasFlag(EzRealmMetadataScope.Tags))
                 populateMissingBeatmapTagFlags();
 
+            // MSD before ChartSkillInfo — filing prefers stored axes when present.
             if (scope.HasFlag(EzRealmMetadataScope.Msd))
                 populateMissingBeatmapMsd();
+
+            if (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo))
+                populateMissingChartSkillInfo();
         }
 
         private void clearEzRealmMetadata(EzRealmMetadataScope scope)
@@ -586,13 +593,19 @@ namespace osu.Game.Database
                 skillStore.ClearBeatmapMsd();
             }
 
+            if (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo))
+            {
+                Logger.Log("Clearing persisted ChartSkillInfo rows...");
+                skillStore.ClearChartSkillInfo();
+            }
+
             bool clearBeatmapInfoFields = scope.HasFlag(EzRealmMetadataScope.Tags)
                                           || scope.HasFlag(EzRealmMetadataScope.Xxy)
                                           || scope.HasFlag(EzRealmMetadataScope.Pp);
 
             if (!clearBeatmapInfoFields)
             {
-                Logger.Log($"Marked beatmap MSD for recalculation ({scope}).");
+                Logger.Log($"Marked skill Realm rows for recalculation ({scope}).");
                 return;
             }
 
@@ -886,6 +899,18 @@ namespace osu.Game.Database
 
                 try
                 {
+                    int keyCount = (int)Math.Round(beatmap.Difficulty.CircleSize);
+
+                    if (keyCount > 0
+                        && !EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount)
+                        && !EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount))
+                    {
+                        // MinaCalc 0.4.2: 5K / 8K+ unsupported — skip without counting as hard fail.
+                        ++attemptedCount;
+                        updateNotificationProgress(notification, attemptedCount, missing.Count);
+                        continue;
+                    }
+
                     if (beatmapMsdComputer.ComputeAndStore(beatmap) == null)
                         ++failedCount;
                     else
@@ -902,6 +927,94 @@ namespace osu.Game.Database
 
                 if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
                     Logger.Log($"MSD backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount})");
+            }
+
+            completeNotification(notification, processedCount, missing.Count, failedCount);
+        }
+
+        /// <summary>
+        /// Backfill typed <see cref="EzBeatmapChartSkillInfo"/> for mania beatmaps (EZ9 debt: schema without warm).
+        /// Prefer running after <see cref="populateMissingBeatmapMsd"/> so Compute can read stored axes.
+        /// </summary>
+        private void populateMissingChartSkillInfo()
+        {
+            Logger.Log("Querying for mania beatmaps with missing ChartSkillInfo...");
+
+            List<(Guid Id, string Hash)> candidates = new List<(Guid, string)>();
+
+            realmAccess.Run(r =>
+            {
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null)
+                        continue;
+
+                    if (b.Ruleset.OnlineID != 3)
+                        continue;
+
+                    if (string.IsNullOrEmpty(b.Hash))
+                        continue;
+
+                    candidates.Add((b.ID, b.Hash));
+                }
+            });
+
+            if (candidates.Count == 0)
+                return;
+
+            var completeHashes = skillStore.GetPersistedChartSkillInfoHashes();
+            var missing = candidates.Where(c => !completeHashes.Contains(c.Hash)).ToList();
+
+            if (missing.Count == 0)
+                return;
+
+            Logger.Log($"Found {missing.Count} beatmaps which require ChartSkillInfo reprocessing.");
+
+            var notification = showProgressNotification(missing.Count, "Reprocessing ChartSkillInfo", "beatmaps' ChartSkillInfo have been updated");
+
+            int processedCount = 0;
+            int failedCount = 0;
+            int attemptedCount = 0;
+            const int log_every = 25;
+
+            foreach (var (id, _) in missing)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                sleepIfRequired();
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                {
+                    ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
+                    continue;
+                }
+
+                try
+                {
+                    if (!beatmap.Ruleset.Available)
+                        beatmap.Ruleset.Available = true;
+
+                    if (skillProvider.TryGetOrComputeChartSkillInfo(beatmap) == null)
+                        ++failedCount;
+                    else
+                        ++processedCount;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background ChartSkillInfo processing failed on {beatmap}: {e}");
+                    ++failedCount;
+                }
+
+                ++attemptedCount;
+                updateNotificationProgress(notification, attemptedCount, missing.Count);
+
+                if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
+                    Logger.Log($"ChartSkillInfo backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount})");
             }
 
             completeNotification(notification, processedCount, missing.Count, failedCount);

@@ -14,6 +14,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [TestCase(EzDataRebuildTarget.RealmXxy, EzRealmMetadataScope.Xxy)]
         [TestCase(EzDataRebuildTarget.RealmPp, EzRealmMetadataScope.Pp)]
         [TestCase(EzDataRebuildTarget.RealmMsd, EzRealmMetadataScope.Msd)]
+        [TestCase(EzDataRebuildTarget.RealmChartSkillInfo, EzRealmMetadataScope.ChartSkillInfo)]
         [TestCase(EzDataRebuildTarget.RealmAll, EzRealmMetadataScope.All)]
         public void TestRealmTargetsDispatchWithCorrectScope(EzDataRebuildTarget target, EzRealmMetadataScope expectedScope)
         {

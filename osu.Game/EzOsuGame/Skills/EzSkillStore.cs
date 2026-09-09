@@ -478,6 +478,31 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        /// <summary>Hashes that already have a current-version ChartSkillInfo row.</summary>
+        public HashSet<string> GetPersistedChartSkillInfoHashes()
+        {
+            return realmAccess.Run(r =>
+            {
+                return r.All<EzBeatmapChartSkillInfo>()
+                        .Where(v => v.InfoVersion == EzChartSkillInfo.VERSION)
+                        .AsEnumerable()
+                        .Select(v => v.BeatmapHash)
+                        .Where(static h => !string.IsNullOrEmpty(h))
+                        .ToHashSet(StringComparer.Ordinal);
+            });
+        }
+
+        public void ClearChartSkillInfo()
+        {
+            realmAccess.Write(r =>
+            {
+                var rows = r.All<EzBeatmapChartSkillInfo>().ToList();
+
+                foreach (var row in rows)
+                    r.Remove(row);
+            });
+        }
+
         /// <summary>
         /// Batch-read typed ChartSkillInfo rows for many hashes in one Realm run.
         /// Missing / wrong-version hashes are omitted.
