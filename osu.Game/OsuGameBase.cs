@@ -423,13 +423,11 @@ namespace osu.Game
             var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore);
             var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, skillStore, chartDanEstimator);
             var localProfileStore = new EzLocalProfileStore(Storage);
-            var chartSkillInfoStore = new EzChartSkillInfoStore(realm, ezAnalysisPersistentStore);
-            var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, ezAnalysisDatabase, chartSkillInfoStore, BeatmapManager);
+            var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, ezAnalysisDatabase, BeatmapManager);
 
             dependencies.Cache(skillRegistry);
             dependencies.Cache(skillStore);
             dependencies.Cache(localProfileStore);
-            dependencies.Cache(chartSkillInfoStore);
             dependencies.Cache(skillProvider);
             // Write-side services still cached for LocalProfile / analysis pipelines.
             dependencies.Cache(beatmapMsdComputer);

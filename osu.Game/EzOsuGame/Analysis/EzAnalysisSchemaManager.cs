@@ -16,10 +16,10 @@ namespace osu.Game.EzOsuGame.Analysis
     internal static class EzAnalysisSchemaManager
     {
         // Note: main sqlite v7 stores kps/KPC only (slim schema). Legacy pp/tag/xxy_sr columns removed at schema v3.
-        // Schema v4 added legacy chart_skill_info (SQLite JSON); ChartSkillInfo now lives in Realm (EZ≥9).
-        // Table kept so old analysis DBs can one-shot import on read.
+        // Schema v4 briefly added chart_skill_info JSON; abandoned without migration — ChartSkillInfo lives in Realm (EZ≥9).
+        // Schema v5: stop creating chart_skill_info; orphaned tables in old DBs are ignored.
         public const int ANALYSIS_VERSION = EzAnalysisPersistentStore.ANALYSIS_VERSION;
-        public const int MAIN_SCHEMA_VERSION = 4;
+        public const int MAIN_SCHEMA_VERSION = 5;
 
         /// <summary>Last schema that rebuilt entry/mania table shapes.</summary>
         public const int MAIN_STRUCTURAL_SCHEMA_VERSION = 3;
@@ -28,10 +28,6 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public const string TABLE_ENTRY = "ez_analysis_entry";
         public const string TABLE_MANIA = "ez_analysis_mania";
-        public const string TABLE_CHART_SKILL_INFO = "chart_skill_info";
-
-        public const string COL_INFO_VERSION = "info_version";
-        public const string COL_PAYLOAD_JSON = "payload_json";
 
         public const string COL_BEATMAP_ID = "beatmap_id";
         public const string COL_BEATMAP_HASH = "beatmap_hash";
@@ -181,8 +177,6 @@ WHERE {COL_UPDATED_AT} <> 0;
             if (needsMainSchemaRebuild(connection))
                 rebuildMainDatabaseInPlace(connection);
 
-            ensureChartSkillInfoTable(connection);
-
             if (!int.TryParse(TryGetMeta(connection, META_KEY_SCHEMA_VERSION), NumberStyles.Integer, CultureInfo.InvariantCulture, out int storedSchemaVersion)
                 || storedSchemaVersion < MAIN_SCHEMA_VERSION)
             {
@@ -327,21 +321,6 @@ CREATE INDEX IF NOT EXISTS idx_ez_analysis_entry_common_updated ON {TABLE_ENTRY}
 CREATE INDEX IF NOT EXISTS idx_ez_analysis_mania_updated ON {TABLE_MANIA}({COL_UPDATED_AT});
 ";
             create.ExecuteNonQuery();
-            ensureChartSkillInfoTable(connection);
-        }
-
-        private static void ensureChartSkillInfoTable(SqliteConnection connection)
-        {
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = $@"
-CREATE TABLE IF NOT EXISTS {TABLE_CHART_SKILL_INFO} (
-    {COL_BEATMAP_HASH} TEXT PRIMARY KEY,
-    {COL_INFO_VERSION} INTEGER NOT NULL,
-    {COL_PAYLOAD_JSON} TEXT NOT NULL,
-    {COL_UPDATED_AT} INTEGER NOT NULL DEFAULT 0
-);
-";
-            cmd.ExecuteNonQuery();
         }
 
         private static bool needsMainSchemaRebuild(SqliteConnection connection)

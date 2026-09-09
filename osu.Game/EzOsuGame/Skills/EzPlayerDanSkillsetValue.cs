@@ -7,7 +7,8 @@ using Realms;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Cached player skillset-dan tile (EZ≥9). Writers land in a later DATA PR; schema reserved now so EZ need not bump again.
+    /// Cached player skillset-dan tile (EZ≥9). Schema reserved so Cache PR needs no EZ bump.
+    /// Writers / Provider cache-hit wiring land in DATA-Skillset-Cache — do not delete this type.
     /// </summary>
     [MapTo("EzPlayerDanSkillsetValue")]
     public class EzPlayerDanSkillsetValue : RealmObject

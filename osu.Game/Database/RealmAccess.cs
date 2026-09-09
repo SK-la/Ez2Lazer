@@ -1578,7 +1578,7 @@ namespace osu.Game.Database
 
                 case 9:
                     // EzBeatmapChartSkillInfo + EzPlayerDanSkillsetValue are new and start empty.
-                    // Optional one-shot import from analysis SQLite chart_skill_info happens at read time.
+                    // ChartSkillInfo is recomputed on demand; no SQLite JSON import.
                     break;
             }
 

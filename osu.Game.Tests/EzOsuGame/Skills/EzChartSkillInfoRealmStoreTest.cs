@@ -18,7 +18,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             RunTestWithRealm((realm, _) =>
             {
-                var store = new EzChartSkillInfoStore(realm);
+                var store = new EzSkillStore(realm);
                 const string hash = "chart-skill-roundtrip-hash";
 
                 var original = new EzChartSkillInfo
@@ -48,9 +48,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     KeyCount = 4,
                 };
 
-                store.Upsert(hash, original);
+                store.UpsertChartSkillInfo(hash, original);
 
-                Assert.That(store.TryGet(hash, out var loaded), Is.True);
+                Assert.That(store.TryGetChartSkillInfo(hash, out var loaded), Is.True);
                 Assert.That(loaded, Is.Not.Null);
                 Assert.That(loaded!.Patterns, Is.EquivalentTo(original.Patterns));
                 Assert.That(loaded.JackDemand, Is.True);
@@ -73,7 +73,6 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 realm.Run(r =>
                 {
                     var row = r.All<EzBeatmapChartSkillInfo>().Single(v => v.BeatmapHash == hash);
-                    // No JSON blob property on the Realm object — typed columns only.
                     Assert.That(row.GetType().GetProperty("PayloadJson"), Is.Null);
                     Assert.That(row.PatternTagsJoined.Split('\u001f'), Is.EquivalentTo(new[] { "chordjack", "delay" }));
                     Assert.That(row.StreamShare, Is.EqualTo(-1));

@@ -12,8 +12,9 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Unified read API for skill metrics (song select, local profile Track, …).
-    /// Covers beatmap MSD, player SSR, player dan estimates, and chart-dan verdicts.
+    /// Covers beatmap MSD, player SSR, player dan estimates, chart skill info, and chart-dan verdicts.
     /// Writers (computers / aggregators) are separate DI services — see <see cref="EzSkillSystems"/>.
+    /// All UI surfaces (HUD DualPanel / Radar, Analysis Wedge, LocalProfile Track, display tags) read through this type.
     /// </summary>
     public sealed class EzSkillProvider
     {
@@ -21,7 +22,6 @@ namespace osu.Game.EzOsuGame.Skills
         private readonly EzChartDanEstimator? chartDanEstimator;
         private readonly EzLocalProfileStore? localProfileStore;
         private readonly EzAnalysisDatabase? analysisDatabase;
-        private readonly EzChartSkillInfoStore? chartSkillInfoStore;
         private readonly BeatmapManager? beatmapManager;
 
         public EzSkillProvider(
@@ -30,14 +30,12 @@ namespace osu.Game.EzOsuGame.Skills
             EzChartDanEstimator? chartDanEstimator = null,
             EzLocalProfileStore? localProfileStore = null,
             EzAnalysisDatabase? analysisDatabase = null,
-            EzChartSkillInfoStore? chartSkillInfoStore = null,
             BeatmapManager? beatmapManager = null)
         {
             this.store = store;
             this.chartDanEstimator = chartDanEstimator;
             this.localProfileStore = localProfileStore;
             this.analysisDatabase = analysisDatabase;
-            this.chartSkillInfoStore = chartSkillInfoStore;
             this.beatmapManager = beatmapManager;
             Registry = registry ?? new EzSkillRegistry();
         }
@@ -153,7 +151,7 @@ namespace osu.Game.EzOsuGame.Skills
                     if (string.IsNullOrEmpty(hash))
                         return null;
 
-                    if (chartSkillInfoStore != null && chartSkillInfoStore.TryGet(hash, out var stored) && stored != null)
+                    if (store.TryGetChartSkillInfo(hash, out var stored) && stored != null)
                         return stored;
 
                     if (beatmapManager == null)
@@ -232,12 +230,8 @@ namespace osu.Game.EzOsuGame.Skills
             if (beatmapInfo.Ruleset.OnlineID != 3)
                 return null;
 
-            if (chartSkillInfoStore != null
-                && chartSkillInfoStore.TryGet(beatmapInfo.Hash, out var stored)
-                && stored != null)
-            {
+            if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
                 return stored;
-            }
 
             try
             {
@@ -257,7 +251,7 @@ namespace osu.Game.EzOsuGame.Skills
                 var msd = GetBeatmapMsd(beatmapInfo.Hash);
                 // Motion / pattern shares are rate-invariant; always measure at 1.0x like hub.
                 var info = EzChartSkillInfoComputer.Compute(input, msd.Count > 0 ? msd : null, rate: 1);
-                chartSkillInfoStore?.Upsert(beatmapInfo.Hash, info);
+                store.UpsertChartSkillInfo(beatmapInfo.Hash, info);
                 return info;
             }
             catch
