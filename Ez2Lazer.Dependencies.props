@@ -1,8 +1,8 @@
 ﻿<!-- Ez2Lazer：Framework / Resources 依赖。版本仅在此文件维护。 -->
 <Project>
   <PropertyGroup Label="Ez2Lazer">
-    <Ez2LazerFrameworkVersion>2026.829.0-ez2lazer</Ez2LazerFrameworkVersion>
-    <Ez2LazerGameResourcesVersion>2026.829.0-ez2lazer</Ez2LazerGameResourcesVersion>
+    <Ez2LazerFrameworkVersion>2026.908.0-ez2lazer</Ez2LazerFrameworkVersion>
+    <Ez2LazerGameResourcesVersion>2026.909.0-ez2lazer</Ez2LazerGameResourcesVersion>
 
     <!-- ../ for repo root siblings (osu/, osu-Agent/); ../../ for Agent/osu-Agent worktree. -->
     <_EzFwCandidate1>$(MSBuildThisFileDirectory)..\osu-framework\osu.Framework\osu.Framework.csproj</_EzFwCandidate1>
