@@ -16,6 +16,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
@@ -209,6 +210,86 @@ namespace osu.Game.EzOsuGame.Analysis
                     initialised = false;
                     Initialise();
                 }
+            }
+        }
+
+        /// <summary>Read stored chart skill filing payload by beatmap hash.</summary>
+        public bool TryGetChartSkillInfo(string beatmapHash, out EzChartSkillInfo? info)
+        {
+            info = null;
+
+            if (!Enabled || string.IsNullOrEmpty(beatmapHash))
+                return false;
+
+            try
+            {
+                Initialise();
+
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $@"
+SELECT {EzAnalysisSchemaManager.COL_INFO_VERSION}, {EzAnalysisSchemaManager.COL_PAYLOAD_JSON}
+FROM {EzAnalysisSchemaManager.TABLE_CHART_SKILL_INFO}
+WHERE {EzAnalysisSchemaManager.COL_BEATMAP_HASH} = $hash
+LIMIT 1;
+";
+                cmd.Parameters.AddWithValue("$hash", beatmapHash);
+
+                using var reader = cmd.ExecuteReader();
+                if (!reader.Read())
+                    return false;
+
+                int version = reader.GetInt32(0);
+                if (version != EzChartSkillInfo.VERSION)
+                    return false;
+
+                string json = reader.GetString(1);
+                return EzChartSkillInfoStore.TryDeserialize(json, out info) && info != null;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "TryGetChartSkillInfo failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
+        /// <summary>Upsert chart skill filing payload by beatmap hash.</summary>
+        public void UpsertChartSkillInfo(string beatmapHash, EzChartSkillInfo info)
+        {
+            if (!Enabled || string.IsNullOrEmpty(beatmapHash) || info == null)
+                return;
+
+            try
+            {
+                Initialise();
+
+                long updatedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                string json = EzChartSkillInfoStore.Serialize(info);
+
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $@"
+INSERT INTO {EzAnalysisSchemaManager.TABLE_CHART_SKILL_INFO}(
+    {EzAnalysisSchemaManager.COL_BEATMAP_HASH},
+    {EzAnalysisSchemaManager.COL_INFO_VERSION},
+    {EzAnalysisSchemaManager.COL_PAYLOAD_JSON},
+    {EzAnalysisSchemaManager.COL_UPDATED_AT}
+)
+VALUES($hash, $version, $payload, $updated)
+ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_HASH}) DO UPDATE SET
+    {EzAnalysisSchemaManager.COL_INFO_VERSION} = excluded.{EzAnalysisSchemaManager.COL_INFO_VERSION},
+    {EzAnalysisSchemaManager.COL_PAYLOAD_JSON} = excluded.{EzAnalysisSchemaManager.COL_PAYLOAD_JSON},
+    {EzAnalysisSchemaManager.COL_UPDATED_AT} = excluded.{EzAnalysisSchemaManager.COL_UPDATED_AT};
+";
+                cmd.Parameters.AddWithValue("$hash", beatmapHash);
+                cmd.Parameters.AddWithValue("$version", EzChartSkillInfo.VERSION);
+                cmd.Parameters.AddWithValue("$payload", json);
+                cmd.Parameters.AddWithValue("$updated", updatedAt);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "UpsertChartSkillInfo failed.", Ez2ConfigManager.LOGGER_NAME);
             }
         }
 
