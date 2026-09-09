@@ -7,7 +7,8 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Player-facing dan skill catalog (Profile Track). Registers RC/LN tracks for keys 4–9 as directory entries.
-    /// Chart path: <see cref="EzChartDanEstimator"/>; player path: <see cref="EzPlayerDanAggregator"/>.
+    /// Chart path: <see cref="EzChartDanEstimator"/>; player clears: <see cref="EzPlayerDanAggregator"/>;
+    /// side GetDan: <see cref="EzSkillProvider"/> headline fold after skillset refresh.
     /// Must not mix into MSD/SSR aggregation; storage remains <see cref="EzDanEstimate"/>.
     /// Reserved: keep multi-key entries even when some keys still fall back on Reform labels —
     /// custom ladders attach via <see cref="Dan.EzDanLadders"/>, not by shrinking this catalog.

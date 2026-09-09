@@ -7,6 +7,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -120,7 +121,14 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         public EzDanEstimate? GetDan(string username, int keyCount, string side)
-            => store.GetDanEstimate(username, keyCount, side);
+        {
+            string resolvedUser = resolveSkillsUsername(username);
+            var estimate = store.GetDanEstimate(resolvedUser, keyCount, side);
+            if (estimate != null || string.Equals(resolvedUser, username, StringComparison.Ordinal))
+                return estimate;
+
+            return store.GetDanEstimate(username, keyCount, side);
+        }
 
         /// <summary>
         /// Ordered DualPanel skillset slots for <paramref name="keyCount"/>×<paramref name="side"/> (hub table; may be empty).
@@ -132,7 +140,7 @@ namespace osu.Game.EzOsuGame.Skills
             => GetDanSkillsetSlots(keyCount, EzDanSideExtensions.ParseOrRc(sideId));
 
         /// <summary>
-        /// Skillset dan verdicts (clear-bucket averages). Prefers Realm cache; miss → compute, write, return.
+        /// Skillset dan verdicts (clear-bucket averages). Prefers Realm cache; miss → compute, write skillsets + side headline, return.
         /// Missing keys = under quorum / no filing data yet.
         /// </summary>
         public IReadOnlyDictionary<string, EzDanSkillsetVerdict> GetDanSkillsets(string username, int keyCount, string side)
@@ -151,6 +159,10 @@ namespace osu.Game.EzOsuGame.Skills
 
             var verdicts = computeDanSkillsets(resolvedUser, keyCount, side, allowComputeChart: true);
             store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, side, verdicts);
+
+            var clears = GetDanClears(resolvedUser, keyCount, side, EzDanAlgorithm.VERSION);
+            writeSideHeadline(resolvedUser, keyCount, EzDanSideExtensions.ParseOrRc(side), clears, verdicts);
+
             return verdicts;
         }
 
@@ -165,9 +177,13 @@ namespace osu.Game.EzOsuGame.Skills
 
             string resolvedUser = resolveSkillsUsername(username);
             store.ClearDanSkillsetValues(resolvedUser);
+            store.ClearDanEstimates(resolvedUser);
 
             if (!string.Equals(resolvedUser, username, StringComparison.Ordinal))
+            {
                 store.ClearDanSkillsetValues(username);
+                store.ClearDanEstimates(username);
+            }
 
             var allClears = GetDanClears(resolvedUser, algorithmVersion: EzDanAlgorithm.VERSION);
             var hashes = allClears
@@ -198,7 +214,7 @@ namespace osu.Game.EzOsuGame.Skills
                         side,
                         clears,
                         hash => msdByHash.TryGetValue(hash, out var msd) && msd.Count > 0 ? msd : null,
-                        hash => chartByHash.TryGetValue(hash, out var chart) ? chart : null);
+                        chartByHash.GetValueOrDefault);
 
                     store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, sideId, verdicts);
                     writeSideHeadline(resolvedUser, keyCount, side, clears, verdicts);
@@ -226,7 +242,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return;
 
             var headline = EzDanSideHeadline.FromSkillsets(keyCount, side, verdicts, clearDans)
-                            ?? EzDanSideHeadline.FromSideClears(keyCount, side, clearDans);
+                           ?? EzDanSideHeadline.FromSideClears(keyCount, side, clearDans);
 
             if (headline == null)
                 return;
@@ -363,8 +379,8 @@ namespace osu.Game.EzOsuGame.Skills
                 double xxy = beatmapInfo.XxyStarRating;
 
                 if (xxy >= 0 && double.IsFinite(xxy)
-                    && Dan.EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), xxy, out var sunny)
-                    && !string.IsNullOrEmpty(sunny.DisplayLabel))
+                             && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), xxy, out var sunny)
+                             && !string.IsNullOrEmpty(sunny.DisplayLabel))
                 {
                     aggregateLabel = sunny.DisplayLabel;
                 }

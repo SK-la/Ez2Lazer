@@ -421,7 +421,7 @@ namespace osu.Game
             var beatmapMsdComputer = new EzBeatmapMsdComputer(BeatmapManager, skillStore);
             var chartDanEstimator = new EzChartDanEstimator(BeatmapManager, beatmapMsdComputer);
             var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore);
-            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, skillStore, chartDanEstimator);
+            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator);
             var localProfileStore = new EzLocalProfileStore(Storage);
             var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, ezAnalysisDatabase, BeatmapManager);
 

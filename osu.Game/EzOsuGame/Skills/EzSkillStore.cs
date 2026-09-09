@@ -646,6 +646,22 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        /// <summary>Drop side GetDan estimates for a username (all keys/sides/versions).</summary>
+        public void ClearDanEstimates(string username)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzDanEstimate>()
+                                .Where(v => v.Username == username)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+            });
+        }
+
         /// <summary>Legacy row writer; prefer <see cref="WriteDanSkillsetVerdicts"/>.</summary>
         public void WriteDanSkillsetValues(string username, int keyCount, string side, IEnumerable<EzPlayerDanSkillsetValue> values)
         {

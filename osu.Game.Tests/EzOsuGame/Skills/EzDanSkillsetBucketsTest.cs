@@ -95,6 +95,118 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
+        public void SevenKeyRcPatternTagsFileWithoutClusters()
+        {
+            // LeoBlack clusters null; pattern tags alone must open DualPanel tiles (hub tag fallback).
+            var clears = new List<EzDanClearEvidenceRow>();
+
+            for (int i = 0; i < 5; i++)
+                clears.Add(clear($"jack-{i}", 10.0 + i * 0.1, keyCount: 7));
+
+            for (int i = 0; i < 4; i++)
+                clears.Add(clear($"tech-{i}", 9.0 + i * 0.2, keyCount: 7));
+
+            EzChartSkillInfo? resolveChart(string hash)
+            {
+                string[] patterns = hash.StartsWith("jack-", StringComparison.Ordinal)
+                    ? new[] { "jack" }
+                    : new[] { "tech" };
+
+                return new EzChartSkillInfo
+                {
+                    Patterns = patterns,
+                    LnRatio = 0.1,
+                    DanEligible = true,
+                    LengthSeconds = 90,
+                    KeyCount = 7,
+                };
+            }
+
+            var verdicts = EzDanSkillsetBuckets.ComputeFromClears(
+                7,
+                EzDanSide.Rc,
+                clears,
+                _ => null,
+                resolveChart);
+
+            Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.JACK), Is.True);
+            Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.TECH), Is.True);
+            Assert.That(verdicts[EzDanSkillsetBuckets.JACK].Clears, Is.EqualTo(5));
+            Assert.That(verdicts[EzDanSkillsetBuckets.TECH].Clears, Is.EqualTo(4));
+
+            var clearDans = clears.Select(c => c.CreditedDan).ToList();
+            var headline = EzDanSideHeadline.FromSkillsets(7, EzDanSide.Rc, verdicts, clearDans);
+            Assert.That(headline, Is.Not.Null);
+            Assert.That(headline!.Value.RawDan, Is.EqualTo(
+                Math.Round(verdicts.Values.Average(v => v.RawDan) * 100) / 100).Within(1e-6));
+        }
+
+        [Test]
+        public void SevenKeyLnPatternTagsFileAndAnchorHeadline()
+        {
+            var clears = new List<EzDanClearEvidenceRow>();
+
+            for (int i = 0; i < 5; i++)
+                clears.Add(clear($"gen-{i}", 13.0, keyCount: 7, side: "ln"));
+
+            for (int i = 0; i < 4; i++)
+                clears.Add(clear($"rel-{i}", 9.0, keyCount: 7, side: "ln"));
+
+            EzChartSkillInfo? resolveChart(string hash)
+            {
+                string[] patterns = hash.StartsWith("gen-", StringComparison.Ordinal)
+                    ? new[] { "lngeneral", "ln" }
+                    : new[] { "lnrelease" };
+
+                return new EzChartSkillInfo
+                {
+                    Patterns = patterns,
+                    LnRatio = 0.5,
+                    DanEligible = true,
+                    LengthSeconds = 120,
+                    KeyCount = 7,
+                };
+            }
+
+            var verdicts = EzDanSkillsetBuckets.ComputeFromClears(
+                7,
+                EzDanSide.Ln,
+                clears,
+                _ => null,
+                resolveChart);
+
+            Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.LN_GENERAL), Is.True);
+            Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.LN_RELEASE), Is.True);
+
+            var clearDans = clears.Select(c => c.CreditedDan).ToList();
+            var headline = EzDanSideHeadline.FromSkillsets(7, EzDanSide.Ln, verdicts, clearDans);
+            Assert.That(headline, Is.Not.Null);
+            // General 13 + Release 9 → anchor pull → 12
+            Assert.That(headline!.Value.RawDan, Is.EqualTo(12).Within(1e-6));
+        }
+
+        [Test]
+        public void BucketsForValuesUsesPatternTagsWhenClustersNull()
+        {
+            var chart = new EzChartSkillInfo
+            {
+                Patterns = new[] { "delay" },
+                DanEligible = true,
+                KeyCount = 7,
+            };
+
+            var buckets = EzDanSkillsetFiling.BucketsForValues(
+                7,
+                EzDanSide.Rc,
+                new Dictionary<string, double>(),
+                lengthSeconds: 60,
+                rate: 1,
+                chart);
+
+            Assert.That(buckets, Is.EqualTo(new[] { EzDanSkillsetBuckets.SPEED }));
+        }
+
+        [Test]
         public void MinaAxisMapsToFourKeyBuckets()
         {
             Assert.That(EzDanSkillsetBuckets.TryMapMinaAxisToSkillset(EzMinaSkillAxis.JackSpeed), Is.EqualTo("jack"));

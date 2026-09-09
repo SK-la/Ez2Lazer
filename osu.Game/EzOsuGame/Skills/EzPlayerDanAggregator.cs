@@ -3,28 +3,25 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Player dan: chart <see cref="EzChartDanEstimator.TryEstimate"/> → credit clears → average window.
-    /// Not LeoBlack; estimates are provisional (DATA-1 heuristic + rate).
+    /// Player dan clears: chart <see cref="EzChartDanEstimator.TryEstimate"/> → credit.
+    /// Side <see cref="EzDanEstimate"/> / GetDan is written only by
+    /// <see cref="EzSkillProvider"/> <c>writeSideHeadline</c> (hub fold), not here.
     /// </summary>
     public sealed class EzPlayerDanAggregator
     {
         private readonly BeatmapManager beatmapManager;
-        private readonly EzSkillStore skillStore;
         private readonly EzChartDanEstimator chartDanEstimator;
 
-        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzSkillStore skillStore, EzChartDanEstimator chartDanEstimator)
+        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzChartDanEstimator chartDanEstimator)
         {
             this.beatmapManager = beatmapManager;
-            this.skillStore = skillStore;
             this.chartDanEstimator = chartDanEstimator;
         }
 
@@ -39,7 +36,6 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
-            var clearsByBucket = new Dictionary<(int KeyCount, EzDanSide Side), List<double>>();
             var evidence = new List<EzDanClearEvidenceRow>();
 
             foreach (var score in scores)
@@ -69,12 +65,6 @@ namespace osu.Game.EzOsuGame.Skills
                     if (credited is not double value)
                         continue;
 
-                    var key = (chart.KeyCount, chart.Side);
-                    if (!clearsByBucket.TryGetValue(key, out var list))
-                        clearsByBucket[key] = list = new List<double>();
-
-                    list.Add(value);
-
                     string hash = score.BeatmapHash;
                     if (string.IsNullOrWhiteSpace(hash))
                         hash = beatmapInfo.Hash;
@@ -96,39 +86,6 @@ namespace osu.Game.EzOsuGame.Skills
                 {
                     afterEachScore?.Invoke();
                 }
-            }
-
-            DateTimeOffset at = DateTimeOffset.UtcNow;
-
-            foreach (((int keyCount, EzDanSide side), List<double> clears) in clearsByBucket)
-            {
-                if (clears.Count < EzDanAlgorithm.CLEAR_QUORUM)
-                    continue;
-
-                var window = clears
-                             .OrderByDescending(v => v)
-                             .Take(EzDanAlgorithm.CLEAR_WINDOW)
-                             .ToList();
-
-                double rawDan = window.Average();
-                var ladder = EzDanLadders.For(keyCount, side);
-                string label = ladder.ParseLabel(rawDan);
-                double? ceiling = ladder.Ceiling;
-
-                skillStore.WriteDanEstimate(new EzDanEstimate
-                {
-                    Username = username,
-                    KeyCount = keyCount,
-                    Side = side.ToId(),
-                    RawDan = rawDan,
-                    Label = label,
-                    Clears = clears.Count,
-                    BeyondTable = ceiling is double c && rawDan >= c,
-                    ClearWindowHave = window.Count,
-                    ClearWindowNeed = EzDanAlgorithm.CLEAR_WINDOW,
-                    AlgorithmVersion = EzDanAlgorithm.VERSION,
-                    ComputedAt = at,
-                });
             }
 
             PendingEvidence = evidence;
