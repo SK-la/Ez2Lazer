@@ -88,6 +88,7 @@ namespace osu.Game.EzOsuGame.Skills
                 HandstreamEndurance = handstreamEndurance,
                 TechScore = vetoesTech ? 0 : patternScores.GetValueOrDefault("tech"),
                 ChordjackScore = chordjackScore,
+                JackScore = jackScore > 0 ? jackScore : null,
                 Motion = EzMotionFeaturesComputer.Compute(features.Notes, keyCount),
                 LnRatio = lnRatio,
                 Vibro = false,

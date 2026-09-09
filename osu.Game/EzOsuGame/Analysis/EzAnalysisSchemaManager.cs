@@ -16,7 +16,8 @@ namespace osu.Game.EzOsuGame.Analysis
     internal static class EzAnalysisSchemaManager
     {
         // Note: main sqlite v7 stores kps/KPC only (slim schema). Legacy pp/tag/xxy_sr columns removed at schema v3.
-        // Schema v4 adds chart_skill_info (additive; does not rebuild entry/mania).
+        // Schema v4 added legacy chart_skill_info (SQLite JSON); ChartSkillInfo now lives in Realm (EZ≥9).
+        // Table kept so old analysis DBs can one-shot import on read.
         public const int ANALYSIS_VERSION = EzAnalysisPersistentStore.ANALYSIS_VERSION;
         public const int MAIN_SCHEMA_VERSION = 4;
 

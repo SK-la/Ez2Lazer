@@ -213,7 +213,10 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        /// <summary>Read stored chart skill filing payload by beatmap hash.</summary>
+        /// <summary>
+        /// Legacy read of orphaned analysis SQLite <c>chart_skill_info</c> for one-shot import into Realm (EZ≥9).
+        /// New writes go to <see cref="EzChartSkillInfoStore"/> / Realm only.
+        /// </summary>
         public bool TryGetChartSkillInfo(string beatmapHash, out EzChartSkillInfo? info)
         {
             info = null;
@@ -253,7 +256,9 @@ LIMIT 1;
             }
         }
 
-        /// <summary>Upsert chart skill filing payload by beatmap hash.</summary>
+        /// <summary>
+        /// Legacy upsert kept for tools/tests; product path no longer writes here (Realm owns ChartSkillInfo).
+        /// </summary>
         public void UpsertChartSkillInfo(string beatmapHash, EzChartSkillInfo info)
         {
             if (!Enabled || string.IsNullOrEmpty(beatmapHash) || info == null)

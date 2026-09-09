@@ -366,5 +366,67 @@ namespace osu.Game.EzOsuGame.Skills
                 });
             });
         }
+
+        public IReadOnlyList<EzPlayerDanSkillsetValue> GetDanSkillsetValues(
+            string username,
+            int keyCount,
+            string side,
+            int? algorithmVersion = null)
+        {
+            int version = algorithmVersion ?? EzDanAlgorithm.VERSION;
+
+            return realmAccess.Run(r =>
+            {
+                return r.All<EzPlayerDanSkillsetValue>()
+                        .Where(v => v.Username == username
+                                    && v.KeyCount == keyCount
+                                    && v.Side == side
+                                    && v.AlgorithmVersion == version)
+                        .ToList()
+                        .Select(v => v.Detach())
+                        .ToList();
+            });
+        }
+
+        /// <summary>
+        /// Replaces all skillset cache rows for one username/key/side bucket.
+        /// </summary>
+        public void WriteDanSkillsetValues(string username, int keyCount, string side, IEnumerable<EzPlayerDanSkillsetValue> values)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentNullException.ThrowIfNull(values);
+
+            var list = values as IList<EzPlayerDanSkillsetValue> ?? values.ToList();
+            DateTimeOffset at = DateTimeOffset.UtcNow;
+            int version = EzDanAlgorithm.VERSION;
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzPlayerDanSkillsetValue>()
+                                .Where(v => v.Username == username
+                                            && v.KeyCount == keyCount
+                                            && v.Side == side)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+
+                foreach (var value in list)
+                {
+                    r.Add(new EzPlayerDanSkillsetValue
+                    {
+                        Username = username,
+                        KeyCount = keyCount,
+                        Side = side,
+                        SkillsetId = value.SkillsetId,
+                        RawDan = value.RawDan,
+                        Label = value.Label,
+                        Clears = value.Clears,
+                        AlgorithmVersion = value.AlgorithmVersion != 0 ? value.AlgorithmVersion : version,
+                        ComputedAt = value.ComputedAt == default ? at : value.ComputedAt,
+                    });
+                }
+            });
+        }
     }
 }

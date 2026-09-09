@@ -6,6 +6,7 @@ namespace osu.Game.EzOsuGame.Skills
     /// <summary>
     ///     Chart analysis fields used by hub-aligned dan skillset filing
     ///     (mirror of mania-hub <c>ChartSkillInfo</c> filing subset).
+    ///     Persisted as typed Realm <see cref="EzBeatmapChartSkillInfo"/> (EZ≥9).
     /// </summary>
     public sealed class EzChartSkillInfo
     {
@@ -31,6 +32,9 @@ namespace osu.Game.EzOsuGame.Skills
         public double TechScore { get; init; }
 
         public double ChordjackScore { get; init; }
+
+        /// <summary>Pattern analyzer jack score; null when unset.</summary>
+        public double? JackScore { get; init; }
 
         public EzMotionFeatures? Motion { get; init; }
 

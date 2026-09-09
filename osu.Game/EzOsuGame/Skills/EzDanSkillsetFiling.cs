@@ -351,6 +351,7 @@ namespace osu.Game.EzOsuGame.Skills
                 HandstreamEndurance = chart.HandstreamEndurance,
                 TechScore = 0,
                 ChordjackScore = 0,
+                JackScore = null,
                 Motion = chart.Motion,
                 LnRatio = chart.LnRatio,
                 Vibro = chart.Vibro,
