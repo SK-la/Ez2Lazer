@@ -3,8 +3,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.Formats;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Rulesets.Mods;
@@ -54,7 +57,30 @@ namespace osu.Game.EzOsuGame.Skills
             else
             {
                 using var calc = new EzMinaCalcFacade();
-                var vector = calc.CalculateMsd(playable, rate);
+                int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
+                EzSkillsetVector vector;
+
+                if (EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount))
+                {
+                    vector = calc.CalculateMsd(playable, rate);
+                }
+                else if (EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount))
+                {
+                    var sb = new StringBuilder();
+                    using (var writer = new StringWriter(sb))
+                        new LegacyBeatmapEncoder(playable, working.Skin, null).Encode(writer);
+
+                    string osuText = sb.ToString();
+                    if (string.IsNullOrWhiteSpace(osuText))
+                        return null;
+
+                    vector = calc.CalculateMsdFromOsuText(osuText, beatmapInfo.Path ?? $"{keyCount}k.osu", rate);
+                }
+                else
+                {
+                    return null;
+                }
+
                 if (vector.Overall <= 0 && vector.Stream <= 0)
                     return null;
 

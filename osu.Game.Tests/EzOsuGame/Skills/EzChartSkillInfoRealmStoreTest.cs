@@ -140,6 +140,40 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
+        public void Batch_prefetch_msd_and_chart_skill_info_for_hashes()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+                const string hash_a = "batch-hash-a";
+                const string hash_b = "batch-hash-b";
+
+                store.WriteBeatmapMsd(hash_a, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+                store.WriteBeatmapMsd(hash_b, new EzSkillsetVector(11, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1), holdRatio: 0.3);
+
+                store.UpsertChartSkillInfo(hash_a, new EzChartSkillInfo
+                {
+                    Patterns = new[] { "jack" },
+                    TechScore = 0.5,
+                    ChordjackScore = 0.8,
+                    LnRatio = 0.1,
+                    DanEligible = true,
+                    KeyCount = 4,
+                });
+
+                var msdBatch = store.GetBeatmapSkillsForHashes(new[] { hash_a, hash_b, "missing" }, EzSkillSystems.BEATMAP_MSD);
+                Assert.That(msdBatch.Keys, Is.EquivalentTo(new[] { hash_a, hash_b }));
+                Assert.That(msdBatch[hash_a][EzSkillSystems.MsdHoldRatioSkillId], Is.EqualTo(0.2).Within(1e-9));
+                Assert.That(msdBatch[hash_b][EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(11).Within(1e-9));
+
+                var chartBatch = store.GetChartSkillInfoForHashes(new[] { hash_a, hash_b, "missing" });
+                Assert.That(chartBatch.Keys, Is.EquivalentTo(new[] { hash_a }));
+                Assert.That(chartBatch[hash_a].Patterns, Is.EquivalentTo(new[] { "jack" }));
+                Assert.That(chartBatch[hash_a].ChordjackScore, Is.EqualTo(0.8).Within(1e-9));
+            });
+        }
+
+        [Test]
         public void File_schema_version_is_ez9()
         {
             Assert.That(RealmAccess.EZ_REALM_SCHEMA_VERSION, Is.EqualTo(9));

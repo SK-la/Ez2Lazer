@@ -258,7 +258,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 {
                     danAggregator!.ComputeAndStore(username, scores, token, tick);
                     Store.ReplaceDanClears(username, danAggregator.PendingEvidence);
-                    skillProvider?.RefreshDanSkillsets(username);
+                    skillProvider?.RefreshDanSkillsets(username, tick);
                 },
                 danAggregator != null,
                 "[EzLocalProfile] Failed to compute/persist player Dan estimates after profile save.");

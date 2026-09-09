@@ -3,8 +3,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using System.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.Formats;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -68,10 +71,30 @@ namespace osu.Game.EzOsuGame.Skills
                         continue;
 
                     var notes = EzMinaNoteConverter.Convert(playable);
-                    if (notes.Length == 0)
-                        continue;
+                    EzSkillsetVector vector;
 
-                    var vector = calc.CalculateSsr(notes, rate, goalValue);
+                    if (EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount) && notes.Length > 0)
+                    {
+                        vector = calc.CalculateSsr(notes, rate, goalValue);
+                    }
+                    else if (EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount))
+                    {
+                        // Note-array API is 4K-only; encode playable (mods applied) for 6K/7K.
+                        var sb = new StringBuilder();
+                        using (var writer = new StringWriter(sb))
+                            new LegacyBeatmapEncoder(playable, working.Skin, null).Encode(writer);
+
+                        string osuText = sb.ToString();
+                        if (string.IsNullOrWhiteSpace(osuText))
+                            continue;
+
+                        vector = calc.CalculateSsrFromOsuText(osuText, score.BeatmapHash + ".osu", rate, goalValue);
+                    }
+                    else
+                    {
+                        continue;
+                    }
+
                     if (vector.Overall <= 0)
                         continue;
 

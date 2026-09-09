@@ -529,26 +529,33 @@ namespace osu.Game.Database
         {
             const int current_version = EzManiaSkillAlgorithm.VERSION;
 
-            foreach (var ruleset in rulesetStore.AvailableRulesets)
+            // Read the live Realm row — AvailableRulesets clones historically omitted
+            // LastAppliedManiaSkillVersion and would wipe MSD on every startup.
+            var liveState = realmAccess.Run(r =>
             {
-                if (ruleset.OnlineID != 3)
-                    continue;
+                var live = r.All<RulesetInfo>().FirstOrDefault(x => x.OnlineID == 3);
+                return live == null
+                    ? ((string?)null, 0)
+                    : (live.ShortName, live.LastAppliedManiaSkillVersion);
+            });
 
-                if (ruleset.LastAppliedManiaSkillVersion >= current_version)
-                    continue;
+            if (liveState.Item1 == null)
+                return;
 
-                Logger.Log($"Resetting beatmap MSD for {ruleset.Name} (mania skill version updated from {ruleset.LastAppliedManiaSkillVersion} to {current_version})");
+            if (liveState.Item2 >= current_version)
+                return;
 
-                skillStore.ClearBeatmapMsd();
+            Logger.Log($"Resetting beatmap MSD for mania (mania skill version updated from {liveState.Item2} to {current_version})");
 
-                realmAccess.Write(r =>
-                {
-                    if (r.Find<RulesetInfo>(ruleset.ShortName) is RulesetInfo live)
-                        live.LastAppliedManiaSkillVersion = current_version;
-                });
+            skillStore.ClearBeatmapMsd();
 
-                Logger.Log($"Finished resetting beatmap MSD for {ruleset.Name}");
-            }
+            realmAccess.Write(r =>
+            {
+                if (r.Find<RulesetInfo>(liveState.Item1) is RulesetInfo live)
+                    live.LastAppliedManiaSkillVersion = current_version;
+            });
+
+            Logger.Log("Finished resetting beatmap MSD for mania");
         }
 
         private void runEzRealmMetadataBackfill()
@@ -857,13 +864,13 @@ namespace osu.Game.Database
 
             int processedCount = 0;
             int failedCount = 0;
+            int attemptedCount = 0;
+            const int log_every = 25;
 
             foreach (var (id, _) in missing)
             {
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
-
-                updateNotificationProgress(notification, processedCount, missing.Count);
 
                 sleepIfRequired();
 
@@ -872,6 +879,8 @@ namespace osu.Game.Database
                 if (beatmap == null)
                 {
                     ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
                     continue;
                 }
 
@@ -887,6 +896,12 @@ namespace osu.Game.Database
                     Logger.Log($"Background MSD processing failed on {beatmap}: {e}");
                     ++failedCount;
                 }
+
+                ++attemptedCount;
+                updateNotificationProgress(notification, attemptedCount, missing.Count);
+
+                if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
+                    Logger.Log($"MSD backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount})");
             }
 
             completeNotification(notification, processedCount, missing.Count, failedCount);
@@ -1901,7 +1916,7 @@ namespace osu.Game.Database
 
         private int lastNotificationProgressReported = -1;
 
-        private const int notification_progress_update_interval = 50;
+        private const int notification_progress_update_interval = 25;
 
         private void updateNotificationProgress(ProgressNotification? notification, int processedCount, int totalCount)
         {
@@ -1930,7 +1945,7 @@ namespace osu.Game.Database
                 notification.Progress = (float)processedCount / totalCount;
             });
 
-            if (processedCount > 0 && processedCount % 100 == 0)
+            if (processedCount > 0 && processedCount % 25 == 0)
                 Logger.Log($"Background progress: {processedCount} of {totalCount}");
         }
 

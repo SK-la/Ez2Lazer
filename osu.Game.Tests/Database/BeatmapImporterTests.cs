@@ -91,7 +91,24 @@ namespace osu.Game.Tests.Database
                     // Detach at the BeatmapInfo point, similar to what GetWorkingBeatmap does.
                     BeatmapInfo? detachedBeatmap = null;
 
-                    beatmapSet.PerformRead(s => detachedBeatmap = s.Beatmaps.First().Detach());
+                    beatmapSet.PerformRead(s =>
+                    {
+                        var live = s.Beatmaps.First();
+                        ClassicAssert.NotNull(live.File);
+                        ClassicAssert.NotNull(live.Path);
+
+                        detachedBeatmap = live.Detach();
+
+                        // Nested RealmFile hashes must survive BeatmapInfo.Detach (MaxDepth).
+                        // Otherwise WorkingBeatmap.Path is null and MSD/difficulty loads empty charts.
+                        ClassicAssert.NotZero(detachedBeatmap.BeatmapSet!.Files.Count);
+                        ClassicAssert.IsTrue(detachedBeatmap.BeatmapSet.Files.All(f => f.File != null && !string.IsNullOrEmpty(f.File.Hash)));
+                        ClassicAssert.NotNull(detachedBeatmap.File);
+                        ClassicAssert.NotNull(detachedBeatmap.Path);
+                        ClassicAssert.AreEqual(live.Path, detachedBeatmap.Path);
+                        ClassicAssert.AreEqual(live.Ruleset.Available, detachedBeatmap.Ruleset.Available);
+                        ClassicAssert.AreEqual(live.Ruleset.OnlineID, detachedBeatmap.Ruleset.OnlineID);
+                    });
 
                     BeatmapSetInfo? detachedBeatmapSet = detachedBeatmap?.BeatmapSet;
 
