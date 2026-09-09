@@ -7,8 +7,9 @@ using Realms;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Cached player skillset-dan tile (EZ≥9). Schema reserved so Cache PR needs no EZ bump.
-    /// Writers / Provider cache-hit wiring land in DATA-Skillset-Cache — do not delete this type.
+    /// Cached player skillset-dan tile (EZ≥9). Written by <see cref="EzSkillProvider.RefreshDanSkillsets"/> /
+    /// <see cref="EzSkillProvider.GetDanSkillsets"/>; DualPanel prefers cache hits.
+    /// Empty buckets use <see cref="EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL"/> so “computed empty” ≠ “never cached”.
     /// </summary>
     [MapTo("EzPlayerDanSkillsetValue")]
     public class EzPlayerDanSkillsetValue : RealmObject

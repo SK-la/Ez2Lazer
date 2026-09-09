@@ -131,9 +131,71 @@ namespace osu.Game.EzOsuGame.Skills
             => GetDanSkillsetSlots(keyCount, EzDanSideExtensions.ParseOrRc(sideId));
 
         /// <summary>
-        /// Skillset dan verdicts (clear-bucket averages). Missing keys = under quorum / no filing data yet.
+        /// Skillset dan verdicts (clear-bucket averages). Prefers Realm cache; miss → compute, write, return.
+        /// Missing keys = under quorum / no filing data yet.
         /// </summary>
         public IReadOnlyDictionary<string, EzDanSkillsetVerdict> GetDanSkillsets(string username, int keyCount, string side)
+        {
+            string resolvedUser = resolveSkillsUsername(username);
+
+            if (store.HasDanSkillsetCache(resolvedUser, keyCount, side))
+                return danSkillsetsFromCache(resolvedUser, keyCount, side);
+
+            if (!EzLocalProfileConstants.IsGuestUsername(username)
+                && !string.Equals(resolvedUser, username, StringComparison.Ordinal)
+                && store.HasDanSkillsetCache(username, keyCount, side))
+            {
+                return danSkillsetsFromCache(username, keyCount, side);
+            }
+
+            var verdicts = computeDanSkillsets(resolvedUser, keyCount, side, allowComputeChart: true);
+            store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, side, verdicts);
+            return verdicts;
+        }
+
+        /// <summary>
+        /// Recompute and persist skillset caches for a user after dan clears are replaced.
+        /// Chart resolve uses stored ChartSkillInfo only (no WorkingBeatmap load) so profile rebuild stays light.
+        /// </summary>
+        public void RefreshDanSkillsets(string username)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
+            string resolvedUser = resolveSkillsUsername(username);
+            store.ClearDanSkillsetValues(resolvedUser);
+
+            if (!string.Equals(resolvedUser, username, StringComparison.Ordinal))
+                store.ClearDanSkillsetValues(username);
+
+            foreach (int keyCount in tracked_skillset_key_counts)
+            {
+                foreach (var side in new[] { EzDanSide.Rc, EzDanSide.Ln })
+                {
+                    string sideId = side.ToId();
+                    var verdicts = computeDanSkillsets(resolvedUser, keyCount, sideId, allowComputeChart: false);
+                    store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, sideId, verdicts);
+                }
+            }
+        }
+
+        private static readonly int[] tracked_skillset_key_counts = { 4, 5, 6, 7, 8, 9 };
+
+        private IReadOnlyDictionary<string, EzDanSkillsetVerdict> danSkillsetsFromCache(string username, int keyCount, string side)
+        {
+            var rows = store.GetDanSkillsetValues(username, keyCount, side);
+            var result = new Dictionary<string, EzDanSkillsetVerdict>(StringComparer.Ordinal);
+
+            foreach (var row in rows)
+                result[row.SkillsetId] = new EzDanSkillsetVerdict(row.SkillsetId, row.RawDan, row.Label, row.Clears);
+
+            return result;
+        }
+
+        private IReadOnlyDictionary<string, EzDanSkillsetVerdict> computeDanSkillsets(
+            string username,
+            int keyCount,
+            string side,
+            bool allowComputeChart)
         {
             var sideEnum = EzDanSideExtensions.ParseOrRc(side);
             var clears = GetDanClears(username, keyCount, side, EzDanAlgorithm.VERSION);
@@ -154,12 +216,27 @@ namespace osu.Game.EzOsuGame.Skills
                     if (store.TryGetChartSkillInfo(hash, out var stored) && stored != null)
                         return stored;
 
-                    if (beatmapManager == null)
+                    if (!allowComputeChart || beatmapManager == null)
                         return null;
 
                     var info = beatmapManager.QueryBeatmap(b => b.Hash == hash);
                     return info == null ? null : TryGetOrComputeChartSkillInfo(info);
                 });
+        }
+
+        private string resolveSkillsUsername(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return username;
+
+            if (!EzLocalProfileConstants.IsGuestUsername(username))
+                return username;
+
+            var clears = localProfileStore?.GetDanClears(username, algorithmVersion: EzDanAlgorithm.VERSION);
+            if (clears is { Count: > 0 })
+                return username;
+
+            return EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME;
         }
 
         /// <summary>

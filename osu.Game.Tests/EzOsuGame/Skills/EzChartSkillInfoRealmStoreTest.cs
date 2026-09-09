@@ -1,7 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Database;
@@ -87,25 +87,55 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             {
                 var store = new EzSkillStore(realm);
 
-                store.WriteDanSkillsetValues("tester", 4, DanSkillSystem.SIDE_RC, new[]
+                store.WriteDanSkillsetVerdicts("tester", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>
                 {
-                    new EzPlayerDanSkillsetValue
-                    {
-                        SkillsetId = EzDanSkillsetBuckets.JACK,
-                        RawDan = 12.5,
-                        Label = "Chuudan",
-                        Clears = 3,
-                        AlgorithmVersion = EzDanAlgorithm.VERSION,
-                        ComputedAt = DateTimeOffset.UtcNow,
-                    },
+                    [EzDanSkillsetBuckets.JACK] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.JACK, 12.5, "Chuudan", 3),
                 });
 
+                Assert.That(store.HasDanSkillsetCache("tester", 4, DanSkillSystem.SIDE_RC), Is.True);
                 var rows = store.GetDanSkillsetValues("tester", 4, DanSkillSystem.SIDE_RC);
                 Assert.That(rows, Has.Count.EqualTo(1));
                 Assert.That(rows[0].SkillsetId, Is.EqualTo(EzDanSkillsetBuckets.JACK));
                 Assert.That(rows[0].RawDan, Is.EqualTo(12.5).Within(1e-9));
                 Assert.That(rows[0].Label, Is.EqualTo("Chuudan"));
                 Assert.That(rows[0].Clears, Is.EqualTo(3));
+            });
+        }
+
+        [Test]
+        public void Skillset_empty_verdicts_write_sentinel_so_has_cache_is_true()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+
+                store.WriteDanSkillsetVerdicts("tester", 7, DanSkillSystem.SIDE_LN, new Dictionary<string, EzDanSkillsetVerdict>());
+
+                Assert.That(store.HasDanSkillsetCache("tester", 7, DanSkillSystem.SIDE_LN), Is.True);
+                Assert.That(store.GetDanSkillsetValues("tester", 7, DanSkillSystem.SIDE_LN), Is.Empty);
+
+                store.ClearDanSkillsetValues("tester");
+                Assert.That(store.HasDanSkillsetCache("tester", 7, DanSkillSystem.SIDE_LN), Is.False);
+            });
+        }
+
+        [Test]
+        public void Provider_GetDanSkillsets_uses_cache_without_clears()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+                store.WriteDanSkillsetVerdicts("cached-user", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>
+                {
+                    [EzDanSkillsetBuckets.TECH] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.TECH, 9.1, "Shodan", 5),
+                });
+
+                var provider = new EzSkillProvider(store);
+                var verdicts = provider.GetDanSkillsets("cached-user", 4, DanSkillSystem.SIDE_RC);
+
+                Assert.That(verdicts, Has.Count.EqualTo(1));
+                Assert.That(verdicts[EzDanSkillsetBuckets.TECH].RawDan, Is.EqualTo(9.1).Within(1e-9));
+                Assert.That(verdicts[EzDanSkillsetBuckets.TECH].Label, Is.EqualTo("Shodan"));
             });
         }
 

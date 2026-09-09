@@ -442,9 +442,20 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        /// <summary>
-        /// Reserved for DATA-Skillset-Cache: read cached skillset tiles. Product UI still computes via Provider until that PR wires writers.
-        /// </summary>
+        /// <summary>True when a skillset cache stamp exists for this username/key/side/version (including empty sentinel).</summary>
+        public bool HasDanSkillsetCache(string username, int keyCount, string side, int? algorithmVersion = null)
+        {
+            int version = algorithmVersion ?? EzDanAlgorithm.VERSION;
+
+            return realmAccess.Run(r =>
+                r.All<EzPlayerDanSkillsetValue>()
+                 .Any(v => v.Username == username
+                           && v.KeyCount == keyCount
+                           && v.Side == side
+                           && v.AlgorithmVersion == version));
+        }
+
+        /// <summary>Cached skillset tiles (excludes empty sentinel). Empty list may mean hit-empty or miss — use <see cref="HasDanSkillsetCache"/>.</summary>
         public IReadOnlyList<EzPlayerDanSkillsetValue> GetDanSkillsetValues(
             string username,
             int keyCount,
@@ -459,23 +470,26 @@ namespace osu.Game.EzOsuGame.Skills
                         .Where(v => v.Username == username
                                     && v.KeyCount == keyCount
                                     && v.Side == side
-                                    && v.AlgorithmVersion == version)
+                                    && v.AlgorithmVersion == version
+                                    && v.SkillsetId != EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL)
                         .ToList()
                         .Select(v => v.Detach())
                         .ToList();
             });
         }
 
-        /// <summary>
-        /// Reserved for DATA-Skillset-Cache: replace skillset cache rows for one username/key/side bucket.
-        /// </summary>
-        public void WriteDanSkillsetValues(string username, int keyCount, string side, IEnumerable<EzPlayerDanSkillsetValue> values)
+        /// <summary>Replace skillset cache for one username/key/side. Empty verdicts write a sentinel row.</summary>
+        public void WriteDanSkillsetVerdicts(
+            string username,
+            int keyCount,
+            string side,
+            IReadOnlyDictionary<string, EzDanSkillsetVerdict> verdicts,
+            DateTimeOffset? computedAt = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
-            ArgumentNullException.ThrowIfNull(values);
+            ArgumentNullException.ThrowIfNull(verdicts);
 
-            var list = values as IList<EzPlayerDanSkillsetValue> ?? values.ToList();
-            DateTimeOffset at = DateTimeOffset.UtcNow;
+            DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = EzDanAlgorithm.VERSION;
 
             realmAccess.Write(r =>
@@ -489,22 +503,75 @@ namespace osu.Game.EzOsuGame.Skills
                 foreach (var row in existing)
                     r.Remove(row);
 
-                foreach (var value in list)
+                if (verdicts.Count == 0)
                 {
                     r.Add(new EzPlayerDanSkillsetValue
                     {
                         Username = username,
                         KeyCount = keyCount,
                         Side = side,
-                        SkillsetId = value.SkillsetId,
-                        RawDan = value.RawDan,
-                        Label = value.Label,
-                        Clears = value.Clears,
-                        AlgorithmVersion = value.AlgorithmVersion != 0 ? value.AlgorithmVersion : version,
-                        ComputedAt = value.ComputedAt == default ? at : value.ComputedAt,
+                        SkillsetId = EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL,
+                        RawDan = -1,
+                        Label = string.Empty,
+                        Clears = 0,
+                        AlgorithmVersion = version,
+                        ComputedAt = at,
+                    });
+                    return;
+                }
+
+                foreach (var (id, verdict) in verdicts)
+                {
+                    r.Add(new EzPlayerDanSkillsetValue
+                    {
+                        Username = username,
+                        KeyCount = keyCount,
+                        Side = side,
+                        SkillsetId = string.IsNullOrEmpty(verdict.SkillsetId) ? id : verdict.SkillsetId,
+                        RawDan = verdict.RawDan,
+                        Label = verdict.Label,
+                        Clears = verdict.Clears,
+                        AlgorithmVersion = version,
+                        ComputedAt = at,
                     });
                 }
             });
+        }
+
+        /// <summary>Drop all skillset cache rows for a username (all keys/sides).</summary>
+        public void ClearDanSkillsetValues(string username)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzPlayerDanSkillsetValue>()
+                                .Where(v => v.Username == username)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+            });
+        }
+
+        /// <summary>Legacy row writer; prefer <see cref="WriteDanSkillsetVerdicts"/>.</summary>
+        public void WriteDanSkillsetValues(string username, int keyCount, string side, IEnumerable<EzPlayerDanSkillsetValue> values)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentNullException.ThrowIfNull(values);
+
+            var list = values as IList<EzPlayerDanSkillsetValue> ?? values.ToList();
+            var map = new Dictionary<string, EzDanSkillsetVerdict>(StringComparer.Ordinal);
+
+            foreach (var value in list)
+            {
+                if (value.SkillsetId == EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL)
+                    continue;
+
+                map[value.SkillsetId] = new EzDanSkillsetVerdict(value.SkillsetId, value.RawDan, value.Label, value.Clears);
+            }
+
+            WriteDanSkillsetVerdicts(username, keyCount, side, map);
         }
 
         private const char pattern_separator = '\u001f';

@@ -435,7 +435,7 @@ namespace osu.Game
             dependencies.Cache(playerSsrAggregator);
             dependencies.Cache(playerDanAggregator);
 
-            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerSsrAggregator, playerDanAggregator, localProfileStore));
+            dependencies.Cache(new EzLocalProfileService(Storage, realm, ezAnalysisPersistentStore, BeatmapManager, playerSsrAggregator, playerDanAggregator, localProfileStore, skillProvider));
             dependencies.Cache(new EzLocalProfileOnlinePullService(API, ScoreManager, BeatmapManager, realm, Storage));
 
             if (Ez2ConfigManager.Get<bool>(Ez2Setting.EzScoreRaceServiceEnabled))
