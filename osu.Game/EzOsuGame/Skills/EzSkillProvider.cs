@@ -150,10 +150,17 @@ namespace osu.Game.EzOsuGame.Skills
                 },
                 hash =>
                 {
+                    if (string.IsNullOrEmpty(hash))
+                        return null;
+
                     if (chartSkillInfoStore != null && chartSkillInfoStore.TryGet(hash, out var stored) && stored != null)
                         return stored;
 
-                    return null;
+                    if (beatmapManager == null)
+                        return null;
+
+                    var info = beatmapManager.QueryBeatmap(b => b.Hash == hash);
+                    return info == null ? null : TryGetOrComputeChartSkillInfo(info);
                 });
         }
 
