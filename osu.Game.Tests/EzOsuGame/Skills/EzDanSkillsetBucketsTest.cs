@@ -45,15 +45,18 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             clears.Add(clear("speed-0", 9.0));
             clears.Add(clear("speed-1", 9.1));
 
-            EzMinaSkillAxis? resolve(string hash) => hash switch
+            IReadOnlyDictionary<string, double>? resolveMsd(string hash)
             {
-                var h when h.StartsWith("jack-", StringComparison.Ordinal) => EzMinaSkillAxis.Chordjack,
-                var h when h.StartsWith("tech-", StringComparison.Ordinal) => EzMinaSkillAxis.Technical,
-                var h when h.StartsWith("speed-", StringComparison.Ordinal) => EzMinaSkillAxis.Stream,
-                _ => null,
-            };
+                if (hash.StartsWith("jack-", StringComparison.Ordinal))
+                    return mina(chordjack: 20, stream: 5, technical: 5);
+                if (hash.StartsWith("tech-", StringComparison.Ordinal))
+                    return mina(technical: 20, stream: 5, jumpstream: 8);
+                if (hash.StartsWith("speed-", StringComparison.Ordinal))
+                    return mina(stream: 20, technical: 5);
+                return null;
+            }
 
-            var verdicts = EzDanSkillsetBuckets.ComputeFromClears(4, EzDanSide.Rc, clears, resolve);
+            var verdicts = EzDanSkillsetBuckets.ComputeFromClears(4, EzDanSide.Rc, clears, resolveMsd);
 
             Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.JACK), Is.True);
             Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.TECH), Is.True);
@@ -65,16 +68,29 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void NonFourKeyOrLnReturnsEmptyVerdicts()
+        public void BeatmapMsdIdsNormalizeInsideFiling()
+        {
+            var msd = new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                [EzMinaSkillAxis.Stream.ToMsdSkillId()] = 18,
+                [EzMinaSkillAxis.Technical.ToMsdSkillId()] = 10,
+            };
+
+            var buckets = EzDanSkillsetFiling.BucketsForValues(4, EzDanSide.Rc, msd, lengthSeconds: 60, rate: 1, chart: null);
+            Assert.That(buckets, Is.EqualTo(new[] { EzDanSkillsetBuckets.SPEED }));
+        }
+
+        [Test]
+        public void NonFourKeyWithoutChartReturnsEmptyVerdicts()
         {
             var clears = Enumerable.Range(0, 8)
                                    .Select(i => clear($"m-{i}", 8.0, keyCount: 7))
                                    .ToList();
 
-            var empty7 = EzDanSkillsetBuckets.ComputeFromClears(7, EzDanSide.Rc, clears, _ => EzMinaSkillAxis.JackSpeed);
+            var empty7 = EzDanSkillsetBuckets.ComputeFromClears(7, EzDanSide.Rc, clears, _ => mina(jackSpeed: 20));
             Assert.That(empty7, Is.Empty);
 
-            var emptyLn = EzDanSkillsetBuckets.ComputeFromClears(7, EzDanSide.Ln, clears, _ => EzMinaSkillAxis.JackSpeed);
+            var emptyLn = EzDanSkillsetBuckets.ComputeFromClears(7, EzDanSide.Ln, clears, _ => mina(jackSpeed: 20));
             Assert.That(emptyLn, Is.Empty);
         }
 
@@ -85,6 +101,26 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(EzDanSkillsetBuckets.TryMapMinaAxisToSkillset(EzMinaSkillAxis.Technical), Is.EqualTo("tech"));
             Assert.That(EzDanSkillsetBuckets.TryMapMinaAxisToSkillset(EzMinaSkillAxis.Stream), Is.EqualTo("speed"));
             Assert.That(EzDanSkillsetBuckets.TryMapMinaAxisToSkillset(EzMinaSkillAxis.Stamina), Is.EqualTo("stamina"));
+        }
+
+        private static IReadOnlyDictionary<string, double> mina(
+            double stream = 0,
+            double jumpstream = 0,
+            double handstream = 0,
+            double stamina = 0,
+            double jackSpeed = 0,
+            double chordjack = 0,
+            double technical = 0)
+        {
+            var d = new Dictionary<string, double>(StringComparer.Ordinal);
+            if (stream > 0) d["Stream"] = stream;
+            if (jumpstream > 0) d["Jumpstream"] = jumpstream;
+            if (handstream > 0) d["Handstream"] = handstream;
+            if (stamina > 0) d["Stamina"] = stamina;
+            if (jackSpeed > 0) d["JackSpeed"] = jackSpeed;
+            if (chordjack > 0) d["Chordjack"] = chordjack;
+            if (technical > 0) d["Technical"] = technical;
+            return d;
         }
 
         private static EzDanClearEvidenceRow clear(string hash, double credited, int keyCount = 4, string side = "rc")

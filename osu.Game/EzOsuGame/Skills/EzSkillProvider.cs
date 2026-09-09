@@ -128,20 +128,21 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Skillset dan verdicts (clear-bucket averages). Missing keys = under quorum / no filing data yet.
-        /// 4K RC: thin MSD DominantAxis filing. Other modes: empty until TODO(data) pattern/LN filing.
+        /// Filing is hub-aligned (<see cref="EzDanSkillsetFiling"/>); chart analysis is optional until stored.
         /// </summary>
         public IReadOnlyDictionary<string, EzDanSkillsetVerdict> GetDanSkillsets(string username, int keyCount, string side)
         {
             var sideEnum = EzDanSideExtensions.ParseOrRc(side);
             var clears = GetDanClears(username, keyCount, side, EzDanAlgorithm.VERSION);
-            return EzDanSkillsetBuckets.ComputeFromClears(keyCount, sideEnum, clears, hash =>
-            {
-                var msd = GetBeatmapMsd(hash);
-                if (msd.Count == 0)
-                    return null;
-
-                return EzDanLabels.DominantAxis(msd);
-            });
+            return EzDanSkillsetBuckets.ComputeFromClears(
+                keyCount,
+                sideEnum,
+                clears,
+                hash =>
+                {
+                    var msd = GetBeatmapMsd(hash);
+                    return msd.Count == 0 ? null : msd;
+                });
         }
 
         /// <summary>
@@ -158,7 +159,6 @@ namespace osu.Game.EzOsuGame.Skills
             if (skillsetId != null && chart.KeyCount == 4 && chart.Side == EzDanSide.Rc)
                 result[skillsetId] = chart.Label;
 
-            // TODO(data): 6/7K chart skillset filing via pattern tags
             return result;
         }
 

@@ -3,9 +3,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Skills.Dan;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -21,14 +19,14 @@ namespace osu.Game.EzOsuGame.Skills
     public readonly record struct EzDanSkillsetVerdict(string SkillsetId, double RawDan, string Label, int Clears);
 
     /// <summary>
-    ///     Hub <c>danSkillsetBuckets</c> slot table + thin 4K RC filing.
+    ///     Hub <c>danSkillsetBuckets</c> slot table for DualPanel layout.
+    ///     Filing / verdicts: <see cref="EzDanSkillsetFiling"/>.
     ///     <para>
-    ///         Capability matrix (do not silently drop keys in UI — always call <see cref="Slots" />):
-    ///         4K RC: jack/tech/speed/stamina (MSD DominantAxis filing — this PR);
-    ///         6/7K RC: jack/tech/speed/stream — TODO(data): pattern-tag / cluster filing;
+    ///         Capability matrix (always call <see cref="Slots"/> for layout):
+    ///         4K RC: jack/tech/speed/stamina (MSD + chart overrides);
+    ///         6/7K RC: jack/tech/speed/stream (pattern tags / LeoBlack clusters when chart present);
     ///         4K/6K LN: empty slots (side aggregate only);
-    ///         7K LN: lngeneral/lntech/lninverse/lnrelease — TODO(data): LN pattern filing;
-    ///         LeoBlack jackDemand / Jumpstream arbitration — TODO(data).
+    ///         7K LN: lngeneral/lntech/lninverse/lnrelease (LN pattern tags when chart present).
     ///     </para>
     /// </summary>
     public static class EzDanSkillsetBuckets
@@ -98,69 +96,19 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        ///     Thin 4K RC skillset dans from clears + MSD dominant axis.
-        ///     Other key×side: empty (slots still from <see cref="Slots" />).
+        ///     Skillset dans from clears via hub-aligned filing (<see cref="EzDanSkillsetFiling.ComputeVerdicts"/>).
         /// </summary>
         public static IReadOnlyDictionary<string, EzDanSkillsetVerdict> ComputeFromClears(
             int keyCount,
             EzDanSide side,
             IReadOnlyList<EzDanClearEvidenceRow> clears,
-            Func<string, EzMinaSkillAxis?> resolveDominantAxis)
-        {
-            var result = new Dictionary<string, EzDanSkillsetVerdict>(StringComparer.Ordinal);
-
-            if (side != EzDanSide.Rc || keyCount != 4 || clears.Count == 0)
-            {
-                // TODO(data): 6/7K RC pattern-tag / cluster filing
-                // TODO(data): 7K LN pattern (lngeneral/lntech/lninverse/lnrelease) filing
-                return result;
-            }
-
-            var buckets = new Dictionary<string, List<double>>(StringComparer.Ordinal)
-            {
-                [JACK] = new List<double>(),
-                [TECH] = new List<double>(),
-                [SPEED] = new List<double>(),
-                [STAMINA] = new List<double>()
-            };
-
-            foreach (var clear in clears)
-            {
-                if (clear.KeyCount != keyCount)
-                    continue;
-                if (!string.Equals(clear.Side, side.ToId(), StringComparison.OrdinalIgnoreCase))
-                    continue;
-                if (string.IsNullOrEmpty(clear.BeatmapHash))
-                    continue;
-
-                var axis = resolveDominantAxis(clear.BeatmapHash);
-                if (axis is not EzMinaSkillAxis a)
-                    continue;
-
-                string? skillsetId = TryMapMinaAxisToSkillset(a);
-                if (skillsetId == null)
-                    continue;
-
-                buckets[skillsetId].Add(clear.CreditedDan);
-            }
-
-            var ladder = EzDanLadders.For(keyCount, EzDanSide.Rc);
-
-            foreach ((string id, var values) in buckets)
-            {
-                if (values.Count < EzDanAlgorithm.CLEAR_QUORUM)
-                    continue;
-
-                var window = values
-                             .OrderByDescending(v => v)
-                             .Take(EzDanAlgorithm.CLEAR_WINDOW)
-                             .ToList();
-
-                double rawDan = window.Average();
-                result[id] = new EzDanSkillsetVerdict(id, rawDan, ladder.ParseLabel(rawDan), values.Count);
-            }
-
-            return result;
-        }
+            Func<string, IReadOnlyDictionary<string, double>?> resolveMsd,
+            Func<string, EzChartSkillInfo?>? resolveChart = null)
+            => EzDanSkillsetFiling.ComputeVerdicts(
+                keyCount,
+                side,
+                clears,
+                resolveMsd,
+                resolveChart ?? (_ => null));
     }
 }
