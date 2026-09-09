@@ -203,45 +203,44 @@ namespace osu.Game.EzOsuGame.HUD
             bool wantChart = source is EzDanPanelDataSource.Chart or EzDanPanelDataSource.Both;
             bool wantPlayer = source is EzDanPanelDataSource.Player or EzDanPanelDataSource.Both;
 
-            IReadOnlyDictionary<string, double> chartAxes = new Dictionary<string, double>();
-            IReadOnlyDictionary<string, double> playerAxes = new Dictionary<string, double>();
+            IReadOnlyDictionary<string, string> chartSkillsetLabels = new Dictionary<string, string>();
 
             if (wantChart && beatmap?.Value.BeatmapInfo != null)
             {
                 var modsList = mods?.Value ?? Array.Empty<Mod>();
-                chartAxes = skillProvider.GetBeatmapMsd(beatmap.Value.BeatmapInfo.Hash);
+                var info = beatmap.Value.BeatmapInfo;
 
-                if (chartAxes.Count == 0)
-                {
-                    skillProvider.TryGetChartDan(beatmap.Value.BeatmapInfo, modsList);
-                    chartAxes = skillProvider.GetBeatmapMsd(beatmap.Value.BeatmapInfo.Hash);
-                }
+                // Warm MSD cache when missing (chart skillset filing + key resolve helpers).
+                if (skillProvider.GetBeatmapMsd(info.Hash).Count == 0)
+                    skillProvider.TryGetChartDan(info, modsList);
+
+                chartSkillsetLabels = skillProvider.GetChartDanSkillsetLabels(info, modsList);
 
                 if (keys <= 0)
                 {
                     try
                     {
-                        var playable = beatmap.Value.GetPlayableBeatmap(beatmap.Value.BeatmapInfo.Ruleset, modsList);
+                        var playable = beatmap.Value.GetPlayableBeatmap(info.Ruleset, modsList);
                         keys = EzMinaNoteConverter.ResolveKeyCount(playable);
                         if (KeyCount.Value <= 0 && keys > 0)
                             KeyCount.Value = keys;
                     }
                     catch
                     {
-                        // keep keys
+                        if (info.Difficulty.CircleSize > 0)
+                            keys = (int)info.Difficulty.CircleSize;
                     }
                 }
             }
 
-            if (wantPlayer && hasUser && keys > 0)
-                playerAxes = skillProvider.GetPlayerSsr(user!, keys);
+            bool hasBeatmap = beatmap?.Value.BeatmapInfo != null;
+            bool canShowChart = wantChart && hasBeatmap && keys > 0;
+            bool canShowPlayer = wantPlayer && hasUser && keys > 0;
 
-            bool hasChartData = chartAxes.Count > 0;
-            bool hasPlayerData = playerAxes.Count > 0 || (hasUser && keys > 0);
-
-            if (keys <= 0 || (wantChart && !hasChartData && wantPlayer && !hasPlayerData)
-                || (wantChart && !wantPlayer && !hasChartData)
-                || (wantPlayer && !wantChart && !hasUser))
+            if (keys <= 0
+                || (!canShowChart && !canShowPlayer)
+                || (wantPlayer && !wantChart && !hasUser)
+                || (wantChart && !wantPlayer && !hasBeatmap))
             {
                 showEmpty(EzSettingsProfile.LOCAL_PROFILE_TRACK_NEEDS_PLAYER);
                 return;
@@ -252,11 +251,10 @@ namespace osu.Game.EzOsuGame.HUD
 
             bool showEvidence = ShowEvidence.Value && wantPlayer && hasUser;
 
-            updateSide(rcList, EzDanSide.Rc, user, keys, chartAxes, playerAxes, wantChart, wantPlayer, showEvidence);
-            // LN has no Mina skill axes yet — pass empty skill dicts; aggregate dan still resolves per side.
+            updateSide(rcList, EzDanSide.Rc, user, keys, chartSkillsetLabels, wantChart, wantPlayer, showEvidence);
             updateSide(lnList, EzDanSide.Ln, user, keys,
-                new Dictionary<string, double>(),
-                new Dictionary<string, double>(),
+                // LN skillset chart labels: empty until TODO(data) LN pattern filing.
+                new Dictionary<string, string>(),
                 wantChart, wantPlayer, showEvidence);
         }
 
@@ -272,8 +270,7 @@ namespace osu.Game.EzOsuGame.HUD
             EzDanSide side,
             string? user,
             int keys,
-            IReadOnlyDictionary<string, double> chartAxes,
-            IReadOnlyDictionary<string, double> playerAxes,
+            IReadOnlyDictionary<string, string> chartSkillsetLabels,
             bool wantChart,
             bool wantPlayer,
             bool showEvidence)
@@ -281,12 +278,18 @@ namespace osu.Game.EzOsuGame.HUD
             string? chartLabel = null;
             string? playerLabel = null;
             IReadOnlyList<EzDanClearEvidenceRow> clears = Array.Empty<EzDanClearEvidenceRow>();
+            IReadOnlyDictionary<string, EzDanSkillsetVerdict> playerSkillsets =
+                new Dictionary<string, EzDanSkillsetVerdict>();
+
+            var slots = skillProvider?.GetDanSkillsetSlots(keys, side) ?? Array.Empty<EzDanSkillsetSlot>();
 
             if (wantPlayer && !string.IsNullOrWhiteSpace(user) && keys > 0 && skillProvider != null)
             {
                 var estimate = skillProvider.GetDan(user, keys, side.ToId());
                 if (estimate != null && !string.IsNullOrEmpty(estimate.Label) && estimate.RawDan >= 0)
                     playerLabel = estimate.Label;
+
+                playerSkillsets = skillProvider.GetDanSkillsets(user, keys, side.ToId());
 
                 if (showEvidence)
                     clears = skillProvider.GetDanClears(user, keys, side.ToId(), EzDanAlgorithm.VERSION);
@@ -299,8 +302,9 @@ namespace osu.Game.EzOsuGame.HUD
                 keys,
                 wantChart ? chartLabel : null,
                 wantPlayer ? playerLabel : null,
-                wantChart ? chartAxes : new Dictionary<string, double>(),
-                wantPlayer ? playerAxes : new Dictionary<string, double>(),
+                slots,
+                wantChart ? chartSkillsetLabels : new Dictionary<string, string>(),
+                wantPlayer ? playerSkillsets : new Dictionary<string, EzDanSkillsetVerdict>(),
                 clears,
                 resolveTitle,
                 onSelectClear,

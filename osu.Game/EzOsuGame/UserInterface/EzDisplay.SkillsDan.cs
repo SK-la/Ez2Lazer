@@ -149,6 +149,58 @@ namespace osu.Game.EzOsuGame.UserInterface
             Alpha = 1;
         }
 
+        /// <summary>
+        /// Hub skillset tile: always shows the slot name; dan badges only when labels are present (no SrToRawDan).
+        /// </summary>
+        public void SetSkillset(
+            EzDanSkillsetSlot slot,
+            string? chartLabel,
+            string? playerLabel,
+            int? playerClears,
+            int keyCount,
+            EzDanSide side)
+        {
+            skillName.Set(slot.DisplayName, slot.AccentHex);
+
+            if (!string.IsNullOrEmpty(chartLabel))
+            {
+                chartDan.SetLabel(chartLabel, keyCount, side);
+                chartDan.Show();
+            }
+            else
+            {
+                chartDan.Hide();
+            }
+
+            chartValueText.Alpha = 0;
+            chartValueText.Text = string.Empty;
+
+            if (!string.IsNullOrEmpty(playerLabel))
+            {
+                playerDan.SetLabel(playerLabel, keyCount, side);
+                playerDan.Show();
+
+                if (ShowValue && playerClears is int clears && clears > 0)
+                {
+                    playerValueText.Text = $"({clears.ToString(CultureInfo.InvariantCulture)})";
+                    playerValueText.Alpha = 1;
+                }
+                else
+                {
+                    playerValueText.Text = string.Empty;
+                    playerValueText.Alpha = 0;
+                }
+            }
+            else
+            {
+                playerDan.Hide();
+                playerValueText.Text = string.Empty;
+                playerValueText.Alpha = 0;
+            }
+
+            Alpha = 1;
+        }
+
         private void setValueText(OsuSpriteText text, double? value)
         {
             if (ShowValue && value is double v && double.IsFinite(v) && v > 0)

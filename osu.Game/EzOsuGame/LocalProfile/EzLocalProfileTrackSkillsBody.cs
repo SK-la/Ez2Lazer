@@ -15,8 +15,6 @@ using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
-using osu.Game.EzOsuGame.Skills.Dan;
-using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -525,7 +523,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
-        /// One axis metric: per-axis dan badge, skill short name, then numeric SSR.
+        /// One axis metric: skill short name + numeric SSR. Skillset dans live on DualPanel only (no SrToRawDan badges).
         /// </summary>
         private partial class RadarAxisIndicator : FillFlowContainer
         {
@@ -535,26 +533,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 Direction = FillDirection.Vertical;
                 Spacing = new Vector2(0, 2);
 
-                var dan = new EzDisplayDan
-                {
-                    Anchor = Anchor.TopCentre,
-                    Origin = Anchor.TopCentre,
-                    BadgeSize = 18,
-                    PreferImage = true,
-                    Alpha = 0,
-                };
-
-                if (data.Value > 0 && double.IsFinite(data.Value))
-                {
-                    double rawDan = EzDanLabels.SrToRawDan(data.Value, data.Axis);
-                    string label = EzDanLadders.For(data.KeyCount, data.Side).ParseLabel(rawDan);
-                    dan.SetLabel(label, data.KeyCount, data.Side);
-                    dan.Show();
-                }
-
                 Children = new Drawable[]
                 {
-                    dan,
                     new OsuSpriteText
                     {
                         Anchor = Anchor.TopCentre,

@@ -54,7 +54,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         public void TestPopulatedWedge()
         {
             AddStep("seed mania + skills", seedPopulatedScene);
-            AddUntilStep("skills dan chips visible", () =>
+            AddUntilStep("skillset chips visible", () =>
                 wedge.ChildrenOfType<EzDisplaySkillsDan>().Count(c => c.Alpha > 0) >= 3);
             AddAssert("aggregate dan visible", () =>
                 wedge.ChildrenOfType<EzDisplayDan>().Any(c => c.Alpha > 0 && Precision.AlmostEquals(c.Scale.X, 1.5f)));
@@ -77,7 +77,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             AddAssert("dan panel present", () => wedge.DanPanel != null);
             AddAssert("dan panel visible width", () => wedge.DanPanel.DrawWidth > 0);
 
-            AddUntilStep("axis chips loaded", () =>
+            AddUntilStep("skillset chips loaded", () =>
                 wedge.ChildrenOfType<EzDisplaySkillsDan>().Any(c => c.Alpha > 0));
 
             AddAssert("display chips scaled 1.5", () =>
@@ -123,43 +123,24 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         }
 
         [Test]
-        public void TestRcAxesOnlyAndLnSkillSlotEmpty()
+        public void TestFourKeySkillsetSlotsNotMinaAxes()
         {
             AddStep("seed mania + skills", seedPopulatedScene);
-            AddUntilStep("rc axis chips visible", () =>
+            AddUntilStep("rc has four skillset chips", () =>
                 wedge.ChildrenOfType<EzDanLabeledStatList>()
                      .Where(l => l.Side == EzDanSide.Rc)
                      .SelectMany(l => l.ChildrenOfType<EzDisplaySkillsDan>())
-                     .Count(c => c.Alpha > 0) >= 3);
+                     .Count(c => c.Alpha > 0) == 4);
 
-            AddAssert("ln column has no mina axis chips", () =>
+            AddAssert("ln 4k has no skillset chips", () =>
                 wedge.ChildrenOfType<EzDanLabeledStatList>()
                      .Where(l => l.Side == EzDanSide.Ln)
                      .SelectMany(l => l.ChildrenOfType<EzDisplaySkillsDan>())
                      .All(c => c.Alpha <= 0));
 
-            AddAssert("visible skill chips at most one mina set", () =>
-                wedge.ChildrenOfType<EzDisplaySkillsDan>().Count(c => c.Alpha > 0)
-                <= EzMinaSkillAxisExtensions.RadarAxes.Length);
-        }
-
-        [Test]
-        public void TestSkillAxisDansUseReformNotLnLadder()
-        {
-            // High MSD through LN 1–17 would mint labels like "15"/"17"; reform uses greek past 10.
-            AddAssert("stream sr maps to reform kappa band not ln-17", () =>
-            {
-                double raw = EzDanLabels.SrToRawDan(22.0, EzMinaSkillAxis.Stream);
-                string reformBare = EzDanLadders.BareLabel(EzDanLadders.For(test_keys, EzDanSide.Rc).ParseLabel(raw));
-                string lnBare = EzDanLadders.BareLabel(EzDanLadders.For(test_keys, EzDanSide.Ln).ParseLabel(raw));
-
-                bool reformGreek = reformBare is "kappa" or "iota" or "theta" or "eta" or "zeta"
-                    or "epsilon" or "delta" or "gamma" or "beta" or "alpha";
-                bool reformNumeric = int.TryParse(reformBare, out int n) && n is >= 1 and <= 10;
-                bool lnHighNumeric = int.TryParse(lnBare, out int lnN) && lnN > 10;
-
-                return (reformGreek || reformNumeric) && lnHighNumeric && reformBare != lnBare;
-            });
+            AddAssert("slot table is four for 4k rc", () =>
+                EzDanSkillsetBuckets.Slots(test_keys, EzDanSide.Rc).Count == 4
+                && EzDanSkillsetBuckets.Slots(test_keys, EzDanSide.Ln).Count == 0);
         }
 
         [Test]

@@ -10,7 +10,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -20,8 +19,8 @@ using osuTK;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// One RC/LN side: label + optional aggregate dans + (RC only) radar-axis <see cref="EzDisplaySkillsDan"/> + clear evidence.
-    /// Mina skill→dan always uses the keymode RC ladder (hub parseDan); LN column leaves the skill slot empty until LN skills exist.
+    /// One RC/LN side: aggregate dans + hub skillset chips (slots from <see cref="EzDanSkillsetBuckets"/>) + clear evidence.
+    /// UI never invents per-skill dans via <c>SrToRawDan</c> — only Provider verdicts / chart labels.
     /// </summary>
     public partial class EzDanLabeledStatList : CompositeDrawable
     {
@@ -46,7 +45,7 @@ namespace osu.Game.EzOsuGame.Skills
         private FillDirection cellsDirection = FillDirection.Horizontal;
         private readonly LayoutValue sizeLayout = new LayoutValue(Invalidation.DrawSize);
 
-        private readonly Dictionary<EzMinaSkillAxis, EzDisplaySkillsDan> axisChips = new Dictionary<EzMinaSkillAxis, EzDisplaySkillsDan>();
+        private readonly Dictionary<string, EzDisplaySkillsDan> skillsetChips = new Dictionary<string, EzDisplaySkillsDan>(StringComparer.Ordinal);
 
         public EzDanLabeledStatList(EzDanSide side, Colour4 accent)
         {
@@ -63,19 +62,6 @@ namespace osu.Game.EzOsuGame.Skills
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colours)
         {
-            foreach (var axis in EzMinaSkillAxisExtensions.RadarAxes)
-            {
-                axisChips[axis] = new EzDisplaySkillsDan
-                {
-                    PreferDanImage = true,
-                    ShowValue = true,
-                    Anchor = Anchor.TopLeft,
-                    Origin = Anchor.TopLeft,
-                    Scale = new Vector2(displayScale),
-                    Alpha = 0,
-                };
-            }
-
             InternalChild = new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
@@ -152,9 +138,6 @@ namespace osu.Game.EzOsuGame.Skills
                 },
             };
 
-            foreach (var chip in axisChips.Values)
-                cellsFlow.Add(chip);
-
             sideLabel.Text = Side == EzDanSide.Ln
                 ? EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_LN
                 : EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_RC;
@@ -172,8 +155,9 @@ namespace osu.Game.EzOsuGame.Skills
             int keyCount,
             string? chartAggregateLabel,
             string? playerAggregateLabel,
-            IReadOnlyDictionary<string, double> chartAxes,
-            IReadOnlyDictionary<string, double> playerAxes,
+            IReadOnlyList<EzDanSkillsetSlot> slots,
+            IReadOnlyDictionary<string, string> chartLabelsBySkillset,
+            IReadOnlyDictionary<string, EzDanSkillsetVerdict> playerSkillsets,
             IReadOnlyList<EzDanClearEvidenceRow> clears,
             Func<string, string> resolveTitle,
             Action<EzDanClearEvidenceRow>? onSelectClear,
@@ -183,7 +167,8 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 Schedule(() => UpdateContent(
                     keyCount, chartAggregateLabel, playerAggregateLabel,
-                    chartAxes, playerAxes, clears, resolveTitle, onSelectClear, showEvidence));
+                    slots, chartLabelsBySkillset, playerSkillsets,
+                    clears, resolveTitle, onSelectClear, showEvidence));
                 return;
             }
 
@@ -196,34 +181,7 @@ namespace osu.Game.EzOsuGame.Skills
             setAggregate(chartAggregateDan, chartAggregateLabel, keyCount, Side);
             setAggregate(playerAggregateDan, playerAggregateLabel, keyCount, Side);
 
-            // Mina axes are RcMina only. Hub maps skill SR → parseDan (reform / keymode RC ladder),
-            // never through the 4K LN 1–17 ladder. LN column keeps an empty skill slot for later data.
-            if (Side == EzDanSide.Ln)
-            {
-                foreach (var chip in axisChips.Values)
-                    chip.Clear();
-
-                cellsFlow.Hide();
-            }
-            else
-            {
-                cellsFlow.Show();
-
-                // TODO: LN skill axes when LnSkillSystem lands — do not feed Mina into LN side.
-                var skillLadder = EzDanLadders.For(keyCount, EzDanSide.Rc);
-
-                foreach (var axis in EzMinaSkillAxisExtensions.RadarAxes)
-                {
-                    var chip = axisChips[axis];
-                    double chartValue = resolveAxisValue(chartAxes, axis);
-                    double playerValue = resolveAxisValue(playerAxes, axis);
-
-                    string? chartLabel = chartValue > 0 ? skillLadder.ParseLabel(EzDanLabels.SrToRawDan(chartValue, axis)) : null;
-                    string? playerLabel = playerValue > 0 ? skillLadder.ParseLabel(EzDanLabels.SrToRawDan(playerValue, axis)) : null;
-
-                    chip.Set(axis, chartLabel, chartValue > 0 ? chartValue : null, playerLabel, playerValue > 0 ? playerValue : null, keyCount, EzDanSide.Rc);
-                }
-            }
+            rebuildSkillsetChips(keyCount, slots, chartLabelsBySkillset, playerSkillsets);
 
             if (!showEvidence)
             {
@@ -233,6 +191,71 @@ namespace osu.Game.EzOsuGame.Skills
 
             evidenceSection.Show();
             rebuildEvidence(clears, resolveTitle, onSelectClear);
+        }
+
+        private void rebuildSkillsetChips(
+            int keyCount,
+            IReadOnlyList<EzDanSkillsetSlot> slots,
+            IReadOnlyDictionary<string, string> chartLabelsBySkillset,
+            IReadOnlyDictionary<string, EzDanSkillsetVerdict> playerSkillsets)
+        {
+            if (slots.Count == 0)
+            {
+                cellsFlow.Clear();
+                skillsetChips.Clear();
+                cellsFlow.Hide();
+                return;
+            }
+
+            cellsFlow.Show();
+
+            var keep = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var slot in slots)
+            {
+                keep.Add(slot.Id);
+
+                if (!skillsetChips.TryGetValue(slot.Id, out var chip))
+                {
+                    chip = new EzDisplaySkillsDan
+                    {
+                        PreferDanImage = true,
+                        ShowValue = true,
+                        Anchor = Anchor.TopLeft,
+                        Origin = Anchor.TopLeft,
+                        Scale = new Vector2(displayScale),
+                    };
+                    skillsetChips[slot.Id] = chip;
+                    cellsFlow.Add(chip);
+                }
+
+                chartLabelsBySkillset.TryGetValue(slot.Id, out string? chartLabel);
+
+                string? playerLabel = null;
+                int? playerClears = null;
+
+                if (playerSkillsets.TryGetValue(slot.Id, out var verdict))
+                {
+                    playerLabel = verdict.Label;
+                    playerClears = verdict.Clears;
+                }
+
+                chip.SetSkillset(slot, chartLabel, playerLabel, playerClears, keyCount, Side);
+            }
+
+            foreach (string id in skillsetChips.Keys.Where(id => !keep.Contains(id)).ToList())
+            {
+                cellsFlow.Remove(skillsetChips[id], true);
+                skillsetChips.Remove(id);
+            }
+
+            // Keep visual order = slots order.
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var chip = skillsetChips[slots[i].Id];
+                if (cellsFlow.GetLayoutPosition(chip) != i)
+                    cellsFlow.SetLayoutPosition(chip, i);
+            }
         }
 
         private static void setAggregate(EzDisplayDan display, string? label, int keyCount, EzDanSide side)
@@ -246,18 +269,6 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 display.Hide();
             }
-        }
-
-        private static double resolveAxisValue(IReadOnlyDictionary<string, double> values, EzMinaSkillAxis axis)
-        {
-            if (values.TryGetValue(axis.ToMsdSkillId(), out double msd) && msd > 0)
-                return msd;
-            if (values.TryGetValue(axis.ToSsrSkillId(), out double ssr) && ssr > 0)
-                return ssr;
-            if (values.TryGetValue(axis.ToId(), out double bare) && bare > 0)
-                return bare;
-
-            return 0;
         }
 
         private void rebuildEvidence(

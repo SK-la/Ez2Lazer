@@ -51,6 +51,9 @@ namespace osu.Game.EzOsuGame.UserInterface
         public void SetFromAxis(EzMinaSkillAxis axis, LocalisableString? overrideText = null)
             => apply(axis.Chip(), overrideText);
 
+        public void Set(LocalisableString name, string accentHex)
+            => apply(new EzSkillChip(name, accentHex), null);
+
         public void SetFromAxisId(string? axisId, LocalisableString? overrideText = null)
         {
             if (EzMinaSkillAxisExtensions.TryParse(axisId, out var axis))
