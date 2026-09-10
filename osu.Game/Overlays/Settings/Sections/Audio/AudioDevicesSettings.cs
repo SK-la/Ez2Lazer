@@ -158,6 +158,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                             configBitDepth.Value = actualBitDepth;
 
                             requestAsioSettingsListRefresh(getCurrentDeviceSelection());
+                            updateAudioDeviceStatusNote(getCurrentDeviceSelection());
                         }
                         finally
                         {
@@ -174,6 +175,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                         {
                             ensureDropdownContainsValue(bufferSizeDropdown, actualBufferSize);
                             bufferSizeDropdown?.Current.Value = actualBufferSize;
+                            updateAudioDeviceStatusNote(getCurrentDeviceSelection());
                         }
                         finally
                         {
@@ -210,6 +212,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
                     Logger.Log($"User set ASIO buffer size to {e.NewValue}", LoggingTarget.Runtime, LogLevel.Debug);
                     audio.SetAsioBufferSize(e.NewValue);
+                    updateAudioDeviceStatusNote(getCurrentDeviceSelection());
                 });
 
                 asioPassThrough!.Current.BindValueChanged(e =>
@@ -228,6 +231,9 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         {
             base.LoadComplete();
 
+            updateItems();
+            updateAudioDeviceStatusNote(getCurrentDeviceSelection());
+
             if (RuntimeInfo.OS != RuntimeInfo.Platform.Windows || sampleRateDropdown == null)
                 return;
 
@@ -244,6 +250,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             {
                 string deviceSelection = getCurrentDeviceSelection();
                 setAsioSettingsVisible(isAsioSelection(deviceSelection));
+                updateAudioDeviceStatusNote(deviceSelection);
 
                 if (!isAsioSelection(deviceSelection))
                     return;
@@ -251,7 +258,6 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 audio.SetAsioUseExternalPCM(configAsioUseExternalPCM.Value);
 
                 requestAsioSettingsListRefresh(deviceSelection);
-                updateAudioDeviceStatusNote(deviceSelection);
 
                 var format = AudioExtensions.ToFormatOption(configSampleRate.Value, configBitDepth.Value);
                 ensureDropdownContainsValue(sampleRateDropdown, format);
@@ -510,19 +516,9 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             if (outputDeviceSettingsItem == null)
                 return;
 
-            if (!isAsioSelection(deviceSelection))
-            {
-                outputDeviceSettingsItem.Note.Value = null;
-                return;
-            }
-
-            if (!EzAsioDeviceManager.TryParseDeviceSelection(deviceSelection ?? string.Empty, out string asioName))
-            {
-                outputDeviceSettingsItem.Note.Value = null;
-                return;
-            }
-
-            outputDeviceSettingsItem.Note.Value = new SettingsNote.Data(audio.GetAsioStatusNote(asioName).ToDisplayText(), SettingsNote.Type.Informational);
+            outputDeviceSettingsItem.Note.Value = new SettingsNote.Data(
+                audio.GetOutputDeviceStatusNote(deviceSelection),
+                SettingsNote.Type.Informational);
         }
 
         protected override void Dispose(bool isDisposing)
