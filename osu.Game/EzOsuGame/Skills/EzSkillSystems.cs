@@ -19,6 +19,13 @@ namespace osu.Game.EzOsuGame.Skills
     {
         public const string BEATMAP_MSD = "beatmap_msd";
         public const string PLAYER_SSR = "player_ssr";
+
+        /// <summary>
+        /// Hub pattern ratings (Overall SSR aggregated per chart pattern tag).
+        /// Persisted in existing <see cref="EzPlayerSkillValue"/> rows — see DATA-Skills-PatternRatings.
+        /// </summary>
+        public const string PLAYER_PATTERN = "player_pattern";
+
         public const string DAN = "dan";
 
         /// <summary>Persisted beside MSD axes when computed (not a Mina axis).</summary>

@@ -102,6 +102,23 @@ namespace osu.Game.EzOsuGame.Skills
             return store.GetPlayerSsrSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
         }
 
+        public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount)
+        {
+            var ratings = store.GetPlayerPatternRatings(username, keyCount);
+            if (ratings.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
+                return ratings;
+
+            return store.GetPlayerPatternRatings(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
+        }
+
+        /// <summary>Hub <c>skillModeEntries</c> for LocalProfile Track / Skills HUD.</summary>
+        public IReadOnlyList<EzSkillModeEntry> GetSkillModeEntries(string username, int keyCount)
+        {
+            var snapshot = GetPlayerSsrSnapshot(username, keyCount);
+            var patterns = GetPlayerPatternRatings(username, keyCount);
+            return EzPatternRatings.SkillModeEntries(keyCount, snapshot.Values, patterns);
+        }
+
         public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username)
         {
             var keys = store.GetPlayerSsrKeyCounts(username);

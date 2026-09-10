@@ -40,6 +40,7 @@ namespace osu.Game.EzOsuGame.Skills
         {
             yield return new BeatmapMsdSkillSystem();
             yield return new PlayerSsrSkillSystem();
+            yield return new PlayerPatternSkillSystem();
             yield return new DanSkillSystem();
         }
     }

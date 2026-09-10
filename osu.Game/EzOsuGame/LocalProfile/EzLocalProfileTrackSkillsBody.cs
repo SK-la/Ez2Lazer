@@ -232,33 +232,28 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return;
 
             var snapshot = skillProvider.GetPlayerSsrSnapshot(username, keyCount);
-            var definitions = skillProvider.Registry.GetSystem(EzSkillSystems.PLAYER_SSR)?.Skills
-                              ?? Array.Empty<EzSkillDefinition>();
+            var modeEntries = skillProvider.GetSkillModeEntries(username, keyCount);
 
             headerSlot.Child = new SkillsHeader(keyCount, snapshot);
 
-            var radarAxes = definitions.Where(d => d.SkillId != EzMinaSkillAxis.Overall.ToSsrSkillId()).ToList();
-            double radarMax = radarAxes
-                              .Select(d => snapshot.Values.GetValueOrDefault(d.SkillId, 0))
-                              .DefaultIfEmpty(0)
-                              .Max();
+            double radarMax = modeEntries.Select(static e => e.Value).DefaultIfEmpty(0).Max();
 
-            if (radarAxes.Count >= 3 && radarMax > 0)
+            if (modeEntries.Count >= 3 && radarMax > 0)
             {
-                var axes = radarAxes
-                           .Select(d =>
+                var axes = modeEntries
+                           .Select(e =>
                            {
-                               snapshot.Values.TryGetValue(d.SkillId, out double v);
-                               var axis = EzMinaSkillAxisExtensions.TryParse(d.SkillId, out var parsed)
+                               var axis = EzMinaSkillAxisExtensions.TryParse(e.SkillId, out var parsed)
                                    ? parsed
                                    : EzMinaSkillAxis.Stream;
                                return new SkillsRadarPanel.AxisData(
                                    axis,
-                                   v,
-                                   (float)(v / radarMax),
-                                   Colour4.FromHex(d.AccentHex),
+                                   e.Value,
+                                   (float)(e.Value / radarMax),
+                                   Colour4.FromHex(e.AccentHex),
                                    keyCount,
-                                   EzDanSide.Rc);
+                                   EzDanSide.Rc,
+                                   e.DisplayName);
                            })
                            .ToList();
 
@@ -269,22 +264,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 };
             }
 
-            double barMax = snapshot.Values.Values.DefaultIfEmpty(0).Max();
+            double barMax = modeEntries.Select(static e => e.Value).DefaultIfEmpty(0).Max();
             if (barMax <= 0)
-                barMax = 1;
+                barMax = Math.Max(snapshot.Overall, 1);
 
-            foreach (var def in definitions)
+            foreach (var entry in modeEntries)
             {
-                snapshot.Values.TryGetValue(def.SkillId, out double value);
-                float ratio = (float)(value / barMax);
-                string skillId = def.SkillId;
+                float ratio = (float)(entry.Value / barMax);
+                string skillId = entry.SkillId;
 
                 skillBarsFlow.Add(new SkillBarRow(
                     skillId,
-                    def.DisplayName,
-                    value,
+                    entry.DisplayName,
+                    entry.Value,
                     ratio,
-                    Colour4.FromHex(def.AccentHex),
+                    Colour4.FromHex(entry.AccentHex),
                     selectedSkillId,
                     () => toggleSkill(skillId)));
             }
@@ -409,11 +403,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private string resolveDisplayName(string skillId)
         {
-            foreach (var def in skillProvider.Registry.GetSystem(EzSkillSystems.PLAYER_SSR)?.Skills
-                                ?? Array.Empty<EzSkillDefinition>())
+            foreach (string systemId in new[] { EzSkillSystems.PLAYER_PATTERN, EzSkillSystems.PLAYER_SSR })
             {
-                if (def.SkillId == skillId)
-                    return def.DisplayName.ToString();
+                foreach (var def in skillProvider.Registry.GetSystem(systemId)?.Skills
+                                    ?? Array.Empty<EzSkillDefinition>())
+                {
+                    if (def.SkillId == skillId)
+                        return def.DisplayName.ToString();
+                }
+            }
+
+            if (EzPatternRatings.TryParseSkillId(skillId, out string patternId))
+            {
+                var meta = EzPatternRatings.Meta.FirstOrDefault(m => m.Id == patternId);
+                if (!string.IsNullOrEmpty(meta.Id))
+                    return meta.DisplayName.ToString();
             }
 
             return EzMinaSkillAxisExtensions.TryParse(skillId, out var axis)
@@ -464,7 +468,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 float Ratio,
                 Colour4 Accent,
                 int KeyCount,
-                EzDanSide Side);
+                EzDanSide Side,
+                LocalisableString Label);
 
             public SkillsRadarPanel(IReadOnlyList<AxisData> axes)
             {
@@ -555,7 +560,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     {
                         Anchor = Anchor.TopCentre,
                         Origin = Anchor.TopCentre,
-                        Text = data.Axis.Chip().Name,
+                        Text = data.Label,
                         Font = OsuFont.GetFont(size: 11, weight: FontWeight.Bold),
                         Colour = data.Accent,
                     },

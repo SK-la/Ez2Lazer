@@ -24,7 +24,7 @@ namespace osu.Game.EzOsuGame.Skills
     ///     <para>
     ///         Capability matrix (always call <see cref="Slots(int, EzDanSide)"/> for layout):
     ///         4K RC: jack/tech/speed/stamina (MSD + chart overrides);
-    ///         6/7K RC: jack/tech/speed/stream (pattern tags / LeoBlack clusters when chart present);
+    ///         6/7K RC: jack/tech/speed/stream (pattern tags; LeoBlack clusters when filled — see DATA-LeoBlack-Clusters);
     ///         4K/6K LN: empty slots (side aggregate only);
     ///         7K LN: lngeneral/lntech/lninverse/lnrelease (LN pattern tags when chart present).
     ///     </para>
@@ -104,17 +104,34 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>
         ///     Skillset dans from clears via hub-aligned filing (<see cref="EzDanSkillsetFiling.ComputeVerdicts"/>).
         /// </summary>
+        /// <param name="resolvePlayValues">Hub <c>play.values</c> per clear (Mina SSR), not beatmap MSD.</param>
         public static IReadOnlyDictionary<string, EzDanSkillsetVerdict> ComputeFromClears(
             int keyCount,
             EzDanSide side,
             IReadOnlyList<EzDanClearEvidenceRow> clears,
-            Func<string, IReadOnlyDictionary<string, double>?> resolveMsd,
+            Func<EzDanClearEvidenceRow, IReadOnlyDictionary<string, double>?> resolvePlayValues,
             Func<string, EzChartSkillInfo?>? resolveChart = null)
             => EzDanSkillsetFiling.ComputeVerdicts(
                 keyCount,
                 side,
                 clears,
-                resolveMsd,
+                resolvePlayValues,
                 resolveChart ?? (_ => null));
+
+        /// <summary>
+        /// Test / chart-label helper: resolve play values by beatmap hash only (same vector for every clear on that chart).
+        /// </summary>
+        public static IReadOnlyDictionary<string, EzDanSkillsetVerdict> ComputeFromClears(
+            int keyCount,
+            EzDanSide side,
+            IReadOnlyList<EzDanClearEvidenceRow> clears,
+            Func<string, IReadOnlyDictionary<string, double>?> resolvePlayValuesByHash,
+            Func<string, EzChartSkillInfo?>? resolveChart = null)
+            => ComputeFromClears(
+                keyCount,
+                side,
+                clears,
+                clear => resolvePlayValuesByHash(clear.BeatmapHash),
+                resolveChart);
     }
 }

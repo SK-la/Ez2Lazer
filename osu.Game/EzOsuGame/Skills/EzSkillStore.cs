@@ -334,6 +334,84 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount, int? algorithmVersion = null)
+        {
+            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+
+            return realmAccess.Run(r =>
+            {
+                var rows = r.All<EzPlayerSkillValue>()
+                            .Where(v => v.Username == username
+                                        && v.KeyCount == keyCount
+                                        && v.SystemId == EzSkillSystems.PLAYER_PATTERN
+                                        && v.AlgorithmVersion == version)
+                            .ToList();
+
+                var list = new List<EzPatternRating>(rows.Count);
+
+                foreach (var row in rows)
+                {
+                    if (!EzPatternRatings.TryParseSkillId(row.SkillId, out string patternId))
+                        continue;
+
+                    list.Add(new EzPatternRating(patternId, row.Value, row.AnalyzedPlays));
+                }
+
+                return list.OrderByDescending(static p => p.Rating).ToList();
+            });
+        }
+
+        /// <summary>
+        /// Replace pattern ratings for one username×keymode (hub mode.patterns).
+        /// Uses existing <see cref="EzPlayerSkillValue"/> — DATA-Skills-PatternRatings.
+        /// </summary>
+        public void WritePlayerPatternRatings(
+            string username,
+            int keyCount,
+            IReadOnlyList<EzPatternRating> ratings,
+            bool provisional = false,
+            bool stale = false,
+            DateTimeOffset? computedAt = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentNullException.ThrowIfNull(ratings);
+
+            DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
+            int version = EzManiaSkillAlgorithm.VERSION;
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzPlayerSkillValue>()
+                                .Where(v => v.Username == username
+                                            && v.KeyCount == keyCount
+                                            && v.SystemId == EzSkillSystems.PLAYER_PATTERN)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+
+                foreach (var rating in ratings)
+                {
+                    if (string.IsNullOrWhiteSpace(rating.Id) || !(rating.Rating > 0))
+                        continue;
+
+                    r.Add(new EzPlayerSkillValue
+                    {
+                        Username = username,
+                        KeyCount = keyCount,
+                        SystemId = EzSkillSystems.PLAYER_PATTERN,
+                        SkillId = EzPatternRatings.ToSkillId(rating.Id),
+                        Value = rating.Rating,
+                        AnalyzedPlays = rating.Plays,
+                        Provisional = provisional,
+                        Stale = stale,
+                        AlgorithmVersion = version,
+                        ComputedAt = at,
+                    });
+                }
+            });
+        }
+
         /// <summary>
         /// Replace all history points for <paramref name="username"/> + <paramref name="keyCount"/>
         /// with chronologically sampled skill snapshots (typically keyed by score play time).

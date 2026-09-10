@@ -36,6 +36,8 @@ namespace osu.Game.EzOsuGame.Skills
 
         private readonly record struct TimedPlay(DateTimeOffset ScoredAt, EzSkillsetVector Vector);
 
+        private readonly record struct PatternPlay(double Overall, IReadOnlyList<string> Patterns);
+
         public void ComputeAndStore(
             string username,
             IEnumerable<ScoreInfo> scores,
@@ -45,6 +47,7 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
             var byKey = new Dictionary<int, List<TimedPlay>>();
+            var patternPlaysByKey = new Dictionary<int, List<PatternPlay>>();
             var evidence = new List<EzAxisPlayEvidenceRow>();
 
             using var calc = new EzMinaCalcFacade();
@@ -109,6 +112,60 @@ namespace osu.Game.EzOsuGame.Skills
 
                     list.Add(new TimedPlay(score.Date, vector));
 
+                    string[] patterns = Array.Empty<string>();
+
+                    // Hub pattern ratings need chart pattern tags (ChartSkillInfo). Prefer stored rows
+                    // (DATA-ChartSkillInfo-Batch). On miss, compute in-memory for this play only —
+                    // TODO(DATA-Skills-PatternRatings): do not Upsert per-score here; if SSR recompute
+                    // still races empty ChartSkillInfo in the wild, batch-ensure hashes before Aggregate.
+                    if (skillStore.TryGetChartSkillInfo(score.BeatmapHash, out var chart) && chart is { IsUnavailable: false })
+                    {
+                        patterns = chart.Patterns;
+                    }
+                    else
+                    {
+                        try
+                        {
+                            var msd = skillStore.GetBeatmapSkills(score.BeatmapHash, EzSkillSystems.BEATMAP_MSD);
+                            var computed = EzChartSkillInfoComputer.Compute(
+                                EzChartSkillInfoComputer.FromPlayable(playable),
+                                msd,
+                                rate);
+                            patterns = computed.Patterns;
+                        }
+                        catch
+                        {
+                            // leave empty — play contributes no pattern axes
+                        }
+                    }
+
+                    if (patterns.Length > 0)
+                    {
+                        if (!patternPlaysByKey.TryGetValue(keyCount, out var patternList))
+                            patternPlaysByKey[keyCount] = patternList = new List<PatternPlay>();
+
+                        patternList.Add(new PatternPlay(vector.Overall, patterns));
+
+                        foreach (string patternId in patterns.Distinct(StringComparer.Ordinal))
+                        {
+                            if (string.IsNullOrWhiteSpace(patternId))
+                                continue;
+
+                            evidence.Add(new EzAxisPlayEvidenceRow
+                            {
+                                Username = username,
+                                KeyCount = keyCount,
+                                SkillId = EzPatternRatings.ToSkillId(patternId),
+                                BeatmapHash = score.BeatmapHash,
+                                AxisValue = vector.Overall,
+                                Accuracy = score.Accuracy,
+                                Rate = rate,
+                                ScoredAt = score.Date,
+                                AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
+                            });
+                        }
+                    }
+
                     foreach (var (axis, axisValue) in vector.Enumerate())
                     {
                         if (axisValue <= 0 || !double.IsFinite(axisValue))
@@ -145,6 +202,15 @@ namespace osu.Game.EzOsuGame.Skills
                 // Final rating write must not stamp UtcNow history points — career curve is rebuilt below.
                 skillStore.WritePlayerSsr(username, keyCount, aggregated, plays.Count, provisional, appendHistory: false);
                 skillStore.ReplacePlayerSkillHistory(username, keyCount, buildChronologicalHistorySamples(timed));
+
+                IReadOnlyList<PatternPlay> patternPlays = patternPlaysByKey.TryGetValue(keyCount, out var pp)
+                    ? pp
+                    : Array.Empty<PatternPlay>();
+
+                var patternRatings = EzPatternRatings.AggregateModePatternRatings(
+                    patternPlays.Select(static p => (p.Overall, p.Patterns)));
+
+                skillStore.WritePlayerPatternRatings(username, keyCount, patternRatings, provisional);
             }
 
             PendingEvidence = evidence;
