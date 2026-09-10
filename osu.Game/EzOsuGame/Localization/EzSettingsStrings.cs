@@ -219,14 +219,14 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("通知行为", "Notification behaviour");
 
         public static readonly EzLocalizationManager.EzLocalisableString NOTIFICATION_BEHAVIOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "控制游戏内通知弹窗与提示音。"
-            + "\n正常：与 osu! lazer 默认行为一致。"
-            + "\n游戏内聚焦：进入谱面游玩（含加载与暂停）后屏蔽一切通知弹窗与提示音。"
-            + "\n永不通知：在任何时候均不显示通知弹窗或播放提示音。",
-            "Controls in-game notification toasts and sounds."
-            + "\nNormal: same as default osu! lazer behaviour."
-            + "\nIn-game focus: suppress all notification toasts and sounds while playing a beatmap (including load and pause)."
-            + "\nNever notify: suppress notification toasts and sounds at all times.");
+            "控制通知弹窗与提示音；任何选项都不会丢弃通知，仍可在通知中心查看。"
+            + "\n正常：与 osu! lazer 默认行为一致（可弹窗与提示音）。"
+            + "\n游戏内聚焦：进入谱面游玩（含加载与暂停）后不弹窗、无提示音，通知仍写入通知中心。"
+            + "\n永不通知：任何时候都不弹窗、无提示音，通知仍写入通知中心。",
+            "Controls notification toasts and sounds; no option discards notifications (they remain in the notification centre)."
+            + "\nNormal: same as default osu! lazer (toasts and sounds allowed)."
+            + "\nIn-game focus: while playing a beatmap (including load and pause), no toast or sound; notifications are still stored."
+            + "\nNever notify: never toast or play sounds; notifications are still stored.");
 
         public static readonly LocalisableString SCREENSHOT_ACTION =
             new EzLocalizationManager.EzLocalisableString("截图行为", "Screenshot action");

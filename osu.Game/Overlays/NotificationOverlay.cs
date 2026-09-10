@@ -175,8 +175,8 @@ namespace osu.Game.Overlays
 
         public void Post(Notification notification)
         {
-            if (EzNotificationFilter.ShouldSuppress(game))
-                return;
+            // Never discard: muted modes still store into history, only skip toast/sound/flash.
+            bool mutePresentation = EzNotificationFilter.ShouldMutePresentation(game);
 
             (notification.IsCritical ? criticalPostScheduler : postScheduler).Add(() =>
             {
@@ -189,15 +189,20 @@ namespace osu.Game.Overlays
                 if (notification is IHasCompletionTarget hasCompletionTarget)
                     hasCompletionTarget.CompletionTarget ??= Post;
 
-                playDebouncedSample(notification.PopInSampleName);
-
-                if (notification.IsImportant)
+                if (!mutePresentation)
                 {
-                    game?.Window?.Flash();
-                    notification.Closed += () => game?.Window?.CancelFlash();
+                    playDebouncedSample(notification.PopInSampleName);
+
+                    if (notification.IsImportant)
+                    {
+                        game?.Window?.Flash();
+                        notification.Closed += () => game?.Window?.CancelFlash();
+                    }
                 }
 
-                if (State.Value == Visibility.Hidden)
+                // Muted: always park in the overlay list (no toast popup).
+                // Unmuted + overlay hidden: toast tray as before.
+                if (!mutePresentation && State.Value == Visibility.Hidden)
                 {
                     notification.IsInToastTray = true;
                     toastTray.Post(notification);

@@ -6,9 +6,17 @@ using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
+    /// <summary>
+    /// Controls whether notification <em>presentation</em> (toast + sample + window flash) is muted.
+    /// Notifications are never discarded — muted posts still enter the overlay history.
+    /// </summary>
     public static class EzNotificationFilter
     {
-        public static bool ShouldSuppress(OsuGame? game)
+        /// <summary>
+        /// When true, <see cref="NotificationOverlay"/> must still accept the notification into
+        /// permanent storage, but must not show a toast, play pop-in sound, or flash the window.
+        /// </summary>
+        public static bool ShouldMutePresentation(OsuGame? game)
         {
             switch (GlobalConfigStore.EzConfig.Get<EzNotificationBehaviour>(Ez2Setting.NotificationBehaviour))
             {
