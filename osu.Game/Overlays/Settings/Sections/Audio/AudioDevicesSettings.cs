@@ -173,8 +173,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                         try
                         {
                             ensureDropdownContainsValue(bufferSizeDropdown, actualBufferSize);
-                            if (bufferSizeDropdown?.Current != null)
-                                bufferSizeDropdown.Current.Value = actualBufferSize;
+                            bufferSizeDropdown?.Current.Value = actualBufferSize;
                         }
                         finally
                         {
@@ -555,7 +554,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         public LegacyAudioCheckbox()
         {
             Caption = AudioSettingsStrings.LegacyAudioLabel;
-            HintText = AudioSettingsStrings.LegacyAudioTooltip;
+            HintText = EzSettingsAudioString.LEGACY_AUDIO_HINT;
         }
 
         [BackgroundDependencyLoader]
