@@ -371,11 +371,22 @@ namespace osu.Game.EzOsuGame.Skills
             float rate = EzModRate.Resolve(mods);
 
             var chartVerdict = TryGetChartDan(beatmapInfo, mods) ?? TryGetCachedChartDan(beatmapInfo);
-            string? aggregateLabel = chartVerdict?.Label;
+            string? aggregateLabel = null;
 
-            if (string.IsNullOrEmpty(aggregateLabel))
+            if (chartVerdict != null && chartVerdict.Side == side && !string.IsNullOrEmpty(chartVerdict.Label))
+                aggregateLabel = chartVerdict.Label;
+
+            var msd = GetBeatmapMsd(beatmapInfo.Hash);
+            double holdRatio = 0;
+            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+                holdRatio = Math.Clamp(cachedHold, 0, 1);
+            else if (chartVerdict != null && double.IsFinite(chartVerdict.HoldRatio))
+                holdRatio = Math.Clamp(chartVerdict.HoldRatio, 0, 1);
+
+            if (string.IsNullOrEmpty(aggregateLabel)
+                && EzDanAlgorithm.AllowsChartSideHalf(side, keyCount, holdRatio))
             {
-                // Sunny/xxy may still print a side label when MSD-side estimate is absent.
+                // Sunny/xxy only when this side is the chart's primary identity by hold ratio.
                 double xxy = beatmapInfo.XxyStarRating;
 
                 if (xxy >= 0 && double.IsFinite(xxy)
@@ -389,7 +400,6 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(aggregateLabel))
                 return result;
 
-            var msd = GetBeatmapMsd(beatmapInfo.Hash);
             var chartInfo = TryGetOrComputeChartSkillInfo(beatmapInfo, playable: null, mods);
             double? length = chartInfo?.LengthSeconds ?? (beatmapInfo.Length > 0 ? beatmapInfo.Length / 1000.0 : null);
 

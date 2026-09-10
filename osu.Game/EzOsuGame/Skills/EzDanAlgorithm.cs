@@ -35,6 +35,17 @@ namespace osu.Game.EzOsuGame.Skills
         public static double LnPrimaryMinRatioFor(int keyCount)
             => keyCount == 7 ? LN_PRIMARY_7K_MIN_RATIO : LN_PRIMARY_MIN_RATIO;
 
+        /// <summary>
+        /// Whether DualPanel / Sunny may print a chart aggregate for <paramref name="side"/>.
+        /// Matches primary identity: LN only when hold ratio reaches <see cref="LnPrimaryMinRatioFor"/>;
+        /// RC when below that line (or hold unknown — callers should pass 0 when missing).
+        /// </summary>
+        public static bool AllowsChartSideHalf(EzDanSide side, int keyCount, double holdRatio)
+        {
+            bool lnPrimary = holdRatio >= LnPrimaryMinRatioFor(keyCount);
+            return side == EzDanSide.Ln ? lnPrimary : !lnPrimary;
+        }
+
         public static double AccuracyBarFor(EzDanSide side, int keyCount)
         {
             if (side == EzDanSide.Ln)

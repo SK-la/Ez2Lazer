@@ -326,7 +326,8 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         /// <summary>
-        /// Hub-style RC|LN chart halves: prefer Sunny xxy lookup per side; else primary-side TryGetChartDan only.
+        /// Hub-style RC|LN chart halves: Sunny/xxy per side only when hold ratio matches that side's primary identity.
+        /// Sparse-LN rice charts must not print a high LN Sunny label.
         /// </summary>
         private string? resolveChartAggregateLabel(EzDanSide side, int keys)
         {
@@ -334,6 +335,23 @@ namespace osu.Game.EzOsuGame.HUD
                 return null;
 
             var info = beatmap.Value.BeatmapInfo;
+            var modsList = mods?.Value ?? Array.Empty<Mod>();
+
+            double holdRatio = 0;
+            var msd = skillProvider.GetBeatmapMsd(info.Hash);
+            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+                holdRatio = Math.Clamp(cachedHold, 0, 1);
+
+            var chart = skillProvider.TryGetChartDan(info, modsList)
+                        ?? skillProvider.TryGetCachedChartDan(info);
+
+            if (holdRatio <= 0 && chart != null && double.IsFinite(chart.HoldRatio))
+                holdRatio = Math.Clamp(chart.HoldRatio, 0, 1);
+
+            int gateKeys = keys > 0 ? keys : chart?.KeyCount ?? 0;
+            if (gateKeys > 0 && !EzDanAlgorithm.AllowsChartSideHalf(side, gateKeys, holdRatio))
+                return null;
+
             double xxy = info.XxyStarRating;
 
             if (keys > 0 && xxy >= 0 && double.IsFinite(xxy)
@@ -342,10 +360,6 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 return sunny.DisplayLabel;
             }
-
-            var modsList = mods?.Value ?? Array.Empty<Mod>();
-            var chart = skillProvider.TryGetChartDan(info, modsList)
-                        ?? skillProvider.TryGetCachedChartDan(info);
 
             if (chart != null && (keys <= 0 || chart.KeyCount == keys) && chart.Side == side && !string.IsNullOrEmpty(chart.Label))
                 return chart.Label;
