@@ -11,8 +11,9 @@ namespace osu.Game.EzOsuGame.Skills
     /// <summary>
     ///     Pure port of mania-hub <c>player-skills.ts</c> dan skillset filing
     ///     (<c>bucketingSkillset</c> / <c>bucketsForClear</c> / <c>groupDanClearsBySkillset</c> primary quorum).
-    ///     MSD keys are Mina names (<c>Stream</c>, <c>JackSpeed</c>, …); <see cref="NormalizeMsdValues"/>
-    ///     also accepts <c>beatmap_msd.*</c> ids from <see cref="EzSkillProvider.GetBeatmapMsd"/>.
+    ///     4K filing uses hub <c>play.values</c> (per-clear Mina SSR); keys are Mina names
+    ///     (<c>Stream</c>, <c>JackSpeed</c>, …). <see cref="NormalizeMsdValues"/> also accepts
+    ///     <c>player_ssr.*</c> and legacy <c>beatmap_msd.*</c> ids.
     /// </summary>
     public static class EzDanSkillsetFiling
     {
@@ -104,11 +105,14 @@ namespace osu.Game.EzOsuGame.Skills
         ///     Group clears into skillset verdicts. A tile opens on primary-filing quorum only;
         ///     averages over all filings into that tile (shared clears included).
         /// </summary>
+        /// <param name="resolvePlayValues">
+        ///     Hub <c>play.values</c> — per-clear Mina SSR vector (not beatmap MSD).
+        /// </param>
         public static IReadOnlyDictionary<string, EzDanSkillsetVerdict> ComputeVerdicts(
             int keyCount,
             EzDanSide side,
             IReadOnlyList<EzDanClearEvidenceRow> clears,
-            Func<string, IReadOnlyDictionary<string, double>?> resolveMsd,
+            Func<EzDanClearEvidenceRow, IReadOnlyDictionary<string, double>?> resolvePlayValues,
             Func<string, EzChartSkillInfo?> resolveChart)
         {
             var result = new Dictionary<string, EzDanSkillsetVerdict>(StringComparer.Ordinal);
@@ -158,8 +162,8 @@ namespace osu.Game.EzOsuGame.Skills
                     continue;
                 }
 
-                var rawMsd = resolveMsd(clear.BeatmapHash);
-                var values = NormalizeMsdValues(rawMsd ?? new Dictionary<string, double>());
+                var rawValues = resolvePlayValues(clear);
+                var values = NormalizeMsdValues(rawValues ?? new Dictionary<string, double>());
 
                 double? length = chart?.LengthSeconds;
                 string? top = BucketingSkillset(
@@ -205,6 +209,82 @@ namespace osu.Game.EzOsuGame.Skills
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Diagnostic counts for DualPanel empty-slot investigations (clears vs filed vs primary quorum).
+        /// </summary>
+        public readonly record struct FilingStats(
+            int ClearsConsidered,
+            int ClearsFiled,
+            IReadOnlyDictionary<string, int> PrimaryCounts);
+
+        public static FilingStats CollectFilingStats(
+            int keyCount,
+            EzDanSide side,
+            IReadOnlyList<EzDanClearEvidenceRow> clears,
+            Func<EzDanClearEvidenceRow, IReadOnlyDictionary<string, double>?> resolvePlayValues,
+            Func<string, EzChartSkillInfo?> resolveChart)
+        {
+            var bucketDefs = bucketsFor(keyCount, side);
+            var primaryCounts = bucketDefs.ToDictionary(b => b.Id, _ => 0, StringComparer.Ordinal);
+            int considered = 0;
+            int filed = 0;
+
+            foreach (var clear in clears)
+            {
+                if (clear.KeyCount != keyCount || string.IsNullOrEmpty(clear.BeatmapHash))
+                    continue;
+
+                considered++;
+                var chart = resolveChart(clear.BeatmapHash);
+
+                if (chart != null)
+                {
+                    if (chart.Vibro || !chart.DanEligible)
+                        continue;
+
+                    if (chart.LnRatio is double lnRatio)
+                    {
+                        var chartSide = lnRatio >= EzDanAlgorithm.LnPrimaryMinRatioFor(keyCount)
+                            ? EzDanSide.Ln
+                            : EzDanSide.Rc;
+                        if (chartSide != side)
+                            continue;
+                    }
+                    else if (!sideMatches(clear.Side, side))
+                    {
+                        continue;
+                    }
+                }
+                else if (!sideMatches(clear.Side, side))
+                {
+                    continue;
+                }
+
+                var values = NormalizeMsdValues(resolvePlayValues(clear) ?? new Dictionary<string, double>());
+                string? top = BucketingSkillset(
+                    values,
+                    chart?.LengthSeconds,
+                    clear.Rate,
+                    chart?.TechScore ?? 0,
+                    chart?.JackShare,
+                    chart?.HandstreamCluster == true);
+
+                var buckets = BucketsForClear(bucketDefs, top, chart, values, clear.Rate);
+                if (buckets.Count == 0)
+                    continue;
+
+                filed++;
+
+                for (int index = 0; index < buckets.Count; index++)
+                {
+                    if (index == 0 || buckets[index].Skillsets == null)
+                        primaryCounts[buckets[index].Id]++;
+                }
+            }
+
+            return new FilingStats(considered, filed, primaryCounts);
         }
 
         /// <summary>

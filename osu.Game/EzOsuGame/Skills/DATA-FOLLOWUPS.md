@@ -15,6 +15,8 @@ Do **not** re-encode lasting follow-ups as only `// TODO(data)` in product code 
 | — | MSD 6K/7K + no wipe-every-launch | FromString path; `RulesetInfo.Clone` + live LastAppliedManiaSkillVersion | **Done** |
 | — | DATA-Skills-PatternRatings | Hub `aggregateModePatternRatings` + Track/HUD `skillModeEntries` (6/7/8K). Store via existing `EzPlayerSkillValue` (`SystemId=player_pattern`) — no schema bump. SSR path: stored ChartSkillInfo preferred; miss → in-memory `EzChartSkillInfoComputer` (no per-score Upsert). | **Done** |
 | — | DATA-Skills-ValueFloor | Hub `skillModeEntries` `value >= 1` filter (Mina fallback + pattern axes) | **Done** (with PatternRatings) |
+| — | DATA-Dan-Skillset-PlaySsr | DualPanel 4K filing: hub `play.values` via `EzDanPlaySsrIndex` from `axis_play_evidence` (`player_ssr.*`), not beatmap MSD. CSI miss on Refresh: sync `TryGetOrCompute` (hub load+heal; no async job queue). Quorum 4 unchanged. | **Done** |
+| — | DATA-Dan-Skillset-CsiQueue | Hub `enqueueMissingChartAnalyses` async next-pass; Ez currently sync-heals in Refresh. Optional queue if sync cost hurts rebuild. | Wish-list |
 | 1 | DATA-LeoBlack-ChartDan | Full LeoBlack chart-side aggregate dan (optional). Also fills cluster columns if still null. | Wish-list |
 | — | DATA-LeoBlack-Clusters | Fill `JackShare` / `StreamShare` / `TechCategory` / `ClusterTrill` / `HandstreamCluster`; revive filing branches that need them. Overlaps row 1. | Wish-list |
 | — | DATA-SSR-VibroExclude | Hub `chart_vibro` / `rate_vibro` eviction from SSR pool (`Vibro` currently always false) | Wish-list |

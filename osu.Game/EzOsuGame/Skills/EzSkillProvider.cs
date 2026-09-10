@@ -185,8 +185,8 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Recompute and persist skillset caches for a user after dan clears are replaced.
-        /// Prefetches MSD + ChartSkillInfo for all clear hashes in one Realm pass (no per-clear Run).
-        /// Chart resolve uses stored ChartSkillInfo only (no WorkingBeatmap load).
+        /// Prefetches play SSR (axis evidence = hub <c>play.values</c>) and ChartSkillInfo for clear hashes.
+        /// Missing ChartSkillInfo is computed (hub load + heal), not left permanently null.
         /// </summary>
         public void RefreshDanSkillsets(string username, Action? tick = null)
         {
@@ -209,8 +209,8 @@ namespace osu.Game.EzOsuGame.Skills
                          .Distinct(StringComparer.Ordinal)
                          .ToList();
 
-            var msdByHash = store.GetBeatmapSkillsForHashes(hashes, EzSkillSystems.BEATMAP_MSD);
-            var chartByHash = store.GetChartSkillInfoForHashes(hashes);
+            var playSsr = EzDanPlaySsrIndex.FromAxisPlays(GetAxisPlays(resolvedUser, algorithmVersion: EzManiaSkillAlgorithm.VERSION));
+            var chartByHash = ensureChartSkillInfoForHashes(hashes);
 
             foreach (int keyCount in tracked_skillset_key_counts)
             {
@@ -230,8 +230,8 @@ namespace osu.Game.EzOsuGame.Skills
                         keyCount,
                         side,
                         clears,
-                        hash => msdByHash.TryGetValue(hash, out var msd) && msd.Count > 0 ? msd : null,
-                        chartByHash.GetValueOrDefault);
+                        playSsr.Resolve,
+                        hash => chartByHash.TryGetValue(hash, out var chart) ? chart : null);
 
                     store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, sideId, verdicts);
                     writeSideHeadline(resolvedUser, keyCount, side, clears, verdicts);
@@ -334,25 +334,45 @@ namespace osu.Game.EzOsuGame.Skills
                          .Distinct(StringComparer.Ordinal)
                          .ToList();
 
-            var msdByHash = store.GetBeatmapSkillsForHashes(hashes, EzSkillSystems.BEATMAP_MSD);
-            var chartByHash = store.GetChartSkillInfoForHashes(hashes);
+            var playSsr = EzDanPlaySsrIndex.FromAxisPlays(GetAxisPlays(username, keyCount, algorithmVersion: EzManiaSkillAlgorithm.VERSION));
+            IReadOnlyDictionary<string, EzChartSkillInfo> chartByHash = allowComputeChart
+                ? ensureChartSkillInfoForHashes(hashes)
+                : store.GetChartSkillInfoForHashes(hashes);
 
             return EzDanSkillsetBuckets.ComputeFromClears(
                 keyCount,
                 sideEnum,
                 clears,
-                hash => msdByHash.TryGetValue(hash, out var msd) && msd.Count > 0 ? msd : null,
-                hash =>
-                {
-                    if (chartByHash.TryGetValue(hash, out var stored))
-                        return stored;
+                playSsr.Resolve,
+                hash => chartByHash.TryGetValue(hash, out var chart) ? chart : null);
+        }
 
-                    if (!allowComputeChart || beatmapManager == null || string.IsNullOrEmpty(hash))
-                        return null;
+        /// <summary>
+        /// Hub <c>loadChartSkillInfo</c> + heal missing rows (sync compute; no separate job queue).
+        /// DATA-Dan-Skillset-PlaySsr: ChartSkillInfo must exist for tag keymodes before filing.
+        /// </summary>
+        private Dictionary<string, EzChartSkillInfo> ensureChartSkillInfoForHashes(IReadOnlyList<string> hashes)
+        {
+            var chartByHash = new Dictionary<string, EzChartSkillInfo>(store.GetChartSkillInfoForHashes(hashes), StringComparer.Ordinal);
 
-                    var info = beatmapManager.QueryBeatmap(b => b.Hash == hash);
-                    return info == null ? null : TryGetOrComputeChartSkillInfo(info);
-                });
+            foreach (string hash in hashes)
+            {
+                if (chartByHash.TryGetValue(hash, out var existing) && existing is { IsUnavailable: false })
+                    continue;
+
+                if (beatmapManager == null || string.IsNullOrEmpty(hash))
+                    continue;
+
+                var info = beatmapManager.QueryBeatmap(b => b.Hash == hash);
+                if (info == null)
+                    continue;
+
+                var computed = TryGetOrComputeChartSkillInfo(info);
+                if (computed != null && !computed.IsUnavailable)
+                    chartByHash[hash] = computed;
+            }
+
+            return chartByHash;
         }
 
         private string resolveSkillsUsername(string username)

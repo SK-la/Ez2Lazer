@@ -45,7 +45,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             clears.Add(clear("speed-0", 9.0));
             clears.Add(clear("speed-1", 9.1));
 
-            IReadOnlyDictionary<string, double>? resolveMsd(string hash)
+            IReadOnlyDictionary<string, double>? resolvePlayValues(string hash)
             {
                 if (hash.StartsWith("jack-", StringComparison.Ordinal))
                     return mina(chordjack: 20, stream: 5, technical: 5);
@@ -53,10 +53,11 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     return mina(technical: 20, stream: 5, jumpstream: 8);
                 if (hash.StartsWith("speed-", StringComparison.Ordinal))
                     return mina(stream: 20, technical: 5);
+
                 return null;
             }
 
-            var verdicts = EzDanSkillsetBuckets.ComputeFromClears(4, EzDanSide.Rc, clears, resolveMsd);
+            var verdicts = EzDanSkillsetBuckets.ComputeFromClears(4, EzDanSide.Rc, clears, resolvePlayValues);
 
             Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.JACK), Is.True);
             Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.TECH), Is.True);
@@ -87,10 +88,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                                    .Select(i => clear($"m-{i}", 8.0, keyCount: 7))
                                    .ToList();
 
-            var empty7 = EzDanSkillsetBuckets.ComputeFromClears(7, EzDanSide.Rc, clears, _ => mina(jackSpeed: 20));
+            var empty7 = EzDanSkillsetBuckets.ComputeFromClears(7, EzDanSide.Rc, clears, (string _) => mina(jackSpeed: 20));
             Assert.That(empty7, Is.Empty);
 
-            var emptyLn = EzDanSkillsetBuckets.ComputeFromClears(7, EzDanSide.Ln, clears, _ => mina(jackSpeed: 20));
+            var emptyLn = EzDanSkillsetBuckets.ComputeFromClears(7, EzDanSide.Ln, clears, (string _) => mina(jackSpeed: 20));
             Assert.That(emptyLn, Is.Empty);
         }
 
@@ -126,7 +127,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 7,
                 EzDanSide.Rc,
                 clears,
-                _ => null,
+                (string _) => null,
                 resolveChart);
 
             Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.JACK), Is.True);
@@ -172,7 +173,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 7,
                 EzDanSide.Ln,
                 clears,
-                _ => null,
+                (string _) => null,
                 resolveChart);
 
             Assert.That(verdicts.ContainsKey(EzDanSkillsetBuckets.LN_GENERAL), Is.True);

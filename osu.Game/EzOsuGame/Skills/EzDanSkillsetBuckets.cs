@@ -23,8 +23,8 @@ namespace osu.Game.EzOsuGame.Skills
     ///     Filing / verdicts: <see cref="EzDanSkillsetFiling"/>.
     ///     <para>
     ///         Capability matrix (always call <see cref="Slots(int, EzDanSide)"/> for layout):
-    ///         4K RC: jack/tech/speed/stamina (MSD + chart overrides);
-    ///         6/7K RC: jack/tech/speed/stream (pattern tags; LeoBlack clusters when filled — see DATA-LeoBlack-Clusters);
+        ///         4K RC: jack/tech/speed/stamina (play SSR + chart overrides);
+        ///         6/7K RC: jack/tech/speed/stream (pattern tags; LeoBlack clusters when filled — see DATA-LeoBlack-Clusters);
     ///         4K/6K LN: empty slots (side aggregate only);
     ///         7K LN: lngeneral/lntech/lninverse/lnrelease (LN pattern tags when chart present).
     ///     </para>
