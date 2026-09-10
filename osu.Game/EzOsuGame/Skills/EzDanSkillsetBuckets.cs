@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.Skills
     ///     Hub <c>danSkillsetBuckets</c> slot table for DualPanel layout.
     ///     Filing / verdicts: <see cref="EzDanSkillsetFiling"/>.
     ///     <para>
-    ///         Capability matrix (always call <see cref="Slots"/> for layout):
+    ///         Capability matrix (always call <see cref="Slots(int, EzDanSide)"/> for layout):
     ///         4K RC: jack/tech/speed/stamina (MSD + chart overrides);
     ///         6/7K RC: jack/tech/speed/stream (pattern tags / LeoBlack clusters when chart present);
     ///         4K/6K LN: empty slots (side aggregate only);

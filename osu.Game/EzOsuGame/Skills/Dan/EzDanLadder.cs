@@ -5,13 +5,11 @@ using System;
 using System.Text.RegularExpressions;
 using osu.Framework.Graphics;
 
-#pragma warning disable CS1574 // XML 注释中有无法解析的 cref 特性
-
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
     /// Known community dan ladders. 5K / 8K / 9K fall back to <see cref="Reform4K"/> text labels until dedicated tables exist.
-    /// Reserved: add <see cref="IEzDanLadder"/> implementations and wire them in <see cref="EzDanLadders.For"/> —
+    /// Reserved: add <see cref="IEzDanLadder"/> implementations and wire them in <see cref="EzDanLadders.For(int, EzDanSide)"/> —
     /// do not treat the Reform fallback as the permanent multi-key solution.
     /// </summary>
     public enum EzDanLadderKind
@@ -133,7 +131,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         }
 
         /// <summary>
-        /// DLL-embedded path for <see cref="TryGetTexturePath"/> when a folder starts with a digit
+        /// DLL-embedded path for <see cref="TryGetTexturePath(int, EzDanSide, string)"/> when a folder starts with a digit
         /// (MSBuild → <c>_6k</c> / <c>_7k</c>). Null if unchanged.
         /// </summary>
         public static string? TryGetEmbeddedTexturePath(string relativePathWithoutExtension)

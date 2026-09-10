@@ -98,6 +98,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// Also returns detached mania scores from the same Realm pass (for skill/dan compute).
         /// Does not merge online contributions — that happens when rebuilding display totals.
         /// </summary>
+        /// <param name="usernames">The usernames to aggregate.</param>
+        /// <param name="progress">The progress reporter.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         /// <param name="cachedAvgAbsOffsets">
         /// Previously stored drill offsets keyed by score id (HitEvents are not in Realm; bulk compute must not re-run sessions).
         /// </param>
