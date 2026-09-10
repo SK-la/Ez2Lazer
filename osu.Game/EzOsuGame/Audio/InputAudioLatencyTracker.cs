@@ -106,7 +106,7 @@ namespace osu.Game.EzOsuGame.Audio
         }
 
         /// <summary>
-        /// Mania column press (may arrive shortly after framework KeyDown; analyzer coalesces within 2ms).
+        /// Mania column press (may follow framework KeyDown for the same key; analyzer upgrades Key→column only).
         /// </summary>
         public void RecordColumnPress(int column)
         {
