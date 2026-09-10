@@ -74,7 +74,7 @@ namespace osu.Game.EzOsuGame.Skills
             (0.3927, 0.1981, 1.2100), // analyzer tech score
         };
 
-        private const double SPEED_TECH_BIAS = -0.5869;
+        private const double speed_tech_bias = -0.5869;
 
         /// <summary>Ordered primary+shared bucket ids for one play (hub <c>danSkillsetBucketsForValues</c>).</summary>
         public static IReadOnlyList<string> BucketsForValues(
@@ -363,11 +363,11 @@ namespace osu.Game.EzOsuGame.Skills
 
         public static string JumpstreamRunnerUp(IReadOnlyDictionary<string, double>? values, bool contaminated)
         {
-            var pool = SKILL_RATING_SKILLSETS
-                       .Where(skillset => skillset != "Overall"
-                                          && skillset != "Jumpstream"
-                                          && !(contaminated && skillset is "Stamina" or "Handstream"))
-                       .ToArray();
+            string[] pool = SKILL_RATING_SKILLSETS
+                            .Where(skillset => skillset != "Overall"
+                                               && skillset != "Jumpstream"
+                                               && !(contaminated && skillset is "Stamina" or "Handstream"))
+                            .ToArray();
 
             return DominantSkillset(pickSkillsets(values, pool)) ?? "Jumpstream";
         }
@@ -639,7 +639,7 @@ namespace osu.Game.EzOsuGame.Skills
                 techScore,
             };
 
-            double z = SPEED_TECH_BIAS;
+            double z = speed_tech_bias;
 
             for (int i = 0; i < inputs.Length; i++)
             {
@@ -703,12 +703,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (dot >= 0 && dot < key.Length - 1)
                 bare = key[(dot + 1)..];
 
-            // Legacy MSD ids.
-            if (string.Equals(bare, "jack_speed", StringComparison.OrdinalIgnoreCase))
-                return "JackSpeed";
-            if (string.Equals(bare, "technical", StringComparison.OrdinalIgnoreCase))
-                return "Technical";
-
+            // Bare / namespaced ids via current Mina meta (jack / tech).
             if (EzMinaSkillAxisExtensions.TryParse(bare, out var axis))
             {
                 return axis switch

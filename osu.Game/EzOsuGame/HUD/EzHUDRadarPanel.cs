@@ -392,8 +392,9 @@ namespace osu.Game.EzOsuGame.HUD
             IReadOnlyDictionary<string, double> msd = skillProvider?.GetBeatmapMsd(beatmapInfo.Hash)
                                                       ?? new Dictionary<string, double>();
 
-            if (msd.Count == 0 && beatmapMsdComputer != null)
-                msd = beatmapMsdComputer.TryGetOrCompute(beatmapInfo) ?? new Dictionary<string, double>();
+            // Incomplete caches must recompute; do not treat "any rows" as ready.
+            if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd) && beatmapMsdComputer != null)
+                msd = beatmapMsdComputer.TryGetOrCompute(beatmapInfo) ?? msd;
 
             int keyCount = 0;
 

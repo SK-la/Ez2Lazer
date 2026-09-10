@@ -211,8 +211,9 @@ namespace osu.Game.EzOsuGame.HUD
                 var modsList = mods?.Value ?? Array.Empty<Mod>();
                 var info = beatmap.Value.BeatmapInfo;
 
-                // Warm MSD cache when missing (chart skillset filing + key resolve helpers).
-                if (skillProvider.GetBeatmapMsd(info.Hash).Count == 0)
+                // Warm MSD when incomplete so filing uses current axis ids.
+                var msd = skillProvider.GetBeatmapMsd(info.Hash);
+                if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
                     skillProvider.TryGetChartDan(info, modsList);
 
                 if (keys <= 0)

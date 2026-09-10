@@ -137,21 +137,10 @@ namespace osu.Game.EzOsuGame.Skills
             return best;
         }
 
-        /// <summary>Current id, then pre-rename jack_speed / technical.</summary>
+        /// <summary>Look up one axis via its current MSD skill id.</summary>
         private static bool tryGetAxisMsd(IReadOnlyDictionary<string, double> msdSkills, EzMinaSkillAxis axis, out double value)
         {
             if (msdSkills.TryGetValue(axis.ToMsdSkillId(), out value))
-                return true;
-
-            string? legacyBare = axis switch
-            {
-                EzMinaSkillAxis.JackSpeed => "jack_speed",
-                EzMinaSkillAxis.Technical => "technical",
-                _ => null,
-            };
-
-            if (legacyBare != null
-                && msdSkills.TryGetValue($"{EzSkillSystems.BEATMAP_MSD}.{legacyBare}", out value))
                 return true;
 
             value = 0;

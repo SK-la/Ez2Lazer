@@ -169,7 +169,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Requires every current Mina axis id plus hold ratio.
-        /// Legacy-only caches (jack_speed / technical) fail and are recomputed.
+        /// Incomplete caches fail and are recomputed via <see cref="TryGetOrCompute"/>.
         /// </summary>
         public static bool IsCurrentMsdCache(IReadOnlyDictionary<string, double> existing)
         {

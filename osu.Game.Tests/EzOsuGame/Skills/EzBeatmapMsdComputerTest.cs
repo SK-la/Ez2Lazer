@@ -34,19 +34,6 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(buildCompleteSkills()), Is.True);
         }
 
-        [Test]
-        public void TestIsCurrentMsdCacheRejectsLegacyOnlyIds()
-        {
-            var skills = new Dictionary<string, double>
-            {
-                [$"{EzSkillSystems.BEATMAP_MSD}.jack_speed"] = 10,
-                [$"{EzSkillSystems.BEATMAP_MSD}.technical"] = 10,
-                [EzSkillSystems.MsdHoldRatioSkillId] = 0.2,
-            };
-
-            Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(skills), Is.False);
-        }
-
         private static Dictionary<string, double> buildCompleteSkills()
         {
             var skills = new Dictionary<string, double>
