@@ -94,6 +94,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private EzDisplayKpc ezDisplayKpc = null!;
         private EzDisplaySR displaySR = null!;
         private EzDisplayTag ezDisplayTag = null!;
+        private EzDisplaySkillsDan ezDisplaySkillsDan = null!;
         private Box accentStrip = null!;
 
         [Resolved]
@@ -136,12 +137,33 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         Spacing = new Vector2(5),
                         Children = new Drawable[]
                         {
-                            rankDisplay = new UpdateableRank(animate: false)
+                            new FillFlowContainer
                             {
+                                AutoSizeAxes = Axes.Both,
                                 Anchor = Anchor.CentreLeft,
                                 Origin = Anchor.CentreLeft,
-                                Size = new Vector2(40, 20),
-                                Scale = new Vector2(0.8f),
+                                Direction = FillDirection.Vertical,
+                                Spacing = new Vector2(0, 2),
+                                Children = new Drawable[]
+                                {
+                                    rankDisplay = new UpdateableRank(animate: false)
+                                    {
+                                        Anchor = Anchor.TopCentre,
+                                        Origin = Anchor.TopCentre,
+                                        Size = new Vector2(40, 20),
+                                        Scale = new Vector2(0.8f),
+                                    },
+                                    ezDisplaySkillsDan = new EzDisplaySkillsDan
+                                    {
+                                        LayoutDirection = FillDirection.Vertical,
+                                        PreferDanImage = true,
+                                        Scale = new Vector2(0.85f),
+                                        Anchor = Anchor.TopCentre,
+                                        Origin = Anchor.TopCentre,
+                                        Alpha = 0,
+                                        BypassAutoSizeAxes = Axes.Both,
+                                    },
+                                },
                             },
                             new Container
                             {
@@ -288,6 +310,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 displaySR.Hide();
             }
 
+            ezDisplaySkillsDan.Beatmap = beatmap;
             ezDisplayTag.Beatmap = beatmap;
             ezDisplayKps.SetPp(row.MapPerformancePoints > 0 ? row.MapPerformancePoints : null);
 
@@ -311,6 +334,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             rankDisplay.Rank = null;
             rankDisplay.Alpha = 0;
             beatmapBackground.Beatmap = null;
+            ezDisplaySkillsDan.Beatmap = null;
             ezDisplayTag.Beatmap = null;
         }
 

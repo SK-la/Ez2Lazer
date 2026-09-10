@@ -75,6 +75,7 @@ namespace osu.Game.Screens.Select
         private EzDisplayKpc ezDisplayKpc = null!;
         private EzDisplaySR displaySR = null!;
         private EzDisplayTag ezDisplayTag = null!;
+        private EzDisplaySkillsDan ezDisplaySkillsDan = null!;
 
         private IBindable<EzAnalysisResult>? ezAnalysisBindable;
         private CancellationTokenSource? ezAnalysisCancellationSource;
@@ -155,11 +156,32 @@ namespace osu.Game.Screens.Select
                     Direction = FillDirection.Horizontal,
                     Children = new Drawable[]
                     {
-                        localRank = new PanelLocalRankDisplay
+                        new FillFlowContainer
                         {
-                            Scale = new Vector2(0.8f),
-                            Origin = Anchor.CentreLeft,
+                            AutoSizeAxes = Axes.Both,
                             Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Direction = FillDirection.Vertical,
+                            Spacing = new Vector2(0, 2),
+                            Children = new Drawable[]
+                            {
+                                localRank = new PanelLocalRankDisplay
+                                {
+                                    Scale = new Vector2(0.8f),
+                                    Origin = Anchor.TopCentre,
+                                    Anchor = Anchor.TopCentre,
+                                },
+                                ezDisplaySkillsDan = new EzDisplaySkillsDan
+                                {
+                                    LayoutDirection = FillDirection.Vertical,
+                                    PreferDanImage = true,
+                                    Scale = new Vector2(0.85f),
+                                    Origin = Anchor.TopCentre,
+                                    Anchor = Anchor.TopCentre,
+                                    Alpha = 0,
+                                    BypassAutoSizeAxes = Axes.Both,
+                                },
+                            },
                         },
                         mainFill = new FillFlowContainer
                         {
@@ -338,6 +360,7 @@ namespace osu.Game.Screens.Select
             updateKeyCount();
 
             resetEzDisplay();
+            ezDisplaySkillsDan.Beatmap = beatmap;
             ezDisplayTag.Beatmap = beatmap;
 
             if (supportsEzAnalysis && beatmap.SupportsXxyStarRating())
@@ -396,6 +419,7 @@ namespace osu.Game.Screens.Select
             if (!resetDisplay)
                 return;
 
+            ezDisplaySkillsDan.Beatmap = null;
             ezDisplayTag.Beatmap = null;
             scratchText = null;
 

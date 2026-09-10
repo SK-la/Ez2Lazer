@@ -1,9 +1,15 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Globalization;
+using System.Threading.Tasks;
+using osu.Framework.Allocation;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Beatmaps;
+using osu.Game.Database;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -14,6 +20,7 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// <summary>
     /// Composite skill + dan tag: e.g. <c>技 7++ (20.5)</c>.
     /// Optional secondary (player) dan + value for AB overlays.
+    /// Supports <see cref="LayoutDirection"/> horizontal (default) or vertical (skill → dan → value).
     /// </summary>
     public partial class EzDisplaySkillsDan : FillFlowContainer
     {
@@ -22,6 +29,10 @@ namespace osu.Game.EzOsuGame.UserInterface
         private readonly OsuSpriteText chartValueText;
         private readonly EzDisplayDan playerDan;
         private readonly OsuSpriteText playerValueText;
+
+        private FillDirection layoutDirection = FillDirection.Horizontal;
+        private BeatmapInfo? beatmap;
+        private int chartDanRequestId;
 
         public bool ShowValue { get; set; } = true;
 
@@ -35,53 +46,95 @@ namespace osu.Game.EzOsuGame.UserInterface
             }
         }
 
+        /// <summary>
+        /// Horizontal: skill | dan | (value). Vertical: skill, dan, (value) stacked (dan in the middle).
+        /// </summary>
+        public FillDirection LayoutDirection
+        {
+            get => layoutDirection;
+            set
+            {
+                if (layoutDirection == value)
+                    return;
+
+                layoutDirection = value;
+                applyLayout();
+            }
+        }
+
+        /// <summary>
+        /// When set, loads chart dan via <see cref="EzSkillProvider"/> (cached then async).
+        /// Manual <see cref="Set(EzMinaSkillAxis, string?, double?, string?, double?, int, EzDanSide)"/> / <see cref="SetFrom"/> / <see cref="SetSkillset"/> still work without this.
+        /// </summary>
+        public BeatmapInfo? Beatmap
+        {
+            get => beatmap;
+            set
+            {
+                if (beatmap != null && beatmap.Equals(value))
+                    return;
+
+                beatmap = value;
+                chartDanRequestId++;
+                scheduleBeatmapUpdate();
+            }
+        }
+
+        [Resolved(canBeNull: true)]
+        private EzSkillProvider? skillProvider { get; set; }
+
         public EzDisplaySkillsDan()
         {
             AutoSizeAxes = Axes.Both;
-            Direction = FillDirection.Horizontal;
-            Spacing = new Vector2(4, 0);
             Anchor = Anchor.CentreLeft;
             Origin = Anchor.CentreLeft;
 
             Children = new Drawable[]
             {
-                skillName = new EzDisplaySkillName
-                {
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                },
+                skillName = new EzDisplaySkillName(),
                 chartDan = new EzDisplayDan
                 {
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
                     BadgeSize = 22,
                     PreferImage = true,
                 },
                 chartValueText = new OsuSpriteText
                 {
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
                     Font = OsuFont.GetFont(size: 11, weight: FontWeight.SemiBold),
                     Colour = Colour4.White.Opacity(0.75f),
                     Alpha = 0,
                 },
                 playerDan = new EzDisplayDan
                 {
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
                     BadgeSize = 20,
                     PreferImage = true,
                     Alpha = 0,
                 },
                 playerValueText = new OsuSpriteText
                 {
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
                     Font = OsuFont.GetFont(size: 11, weight: FontWeight.SemiBold),
                     Colour = Colour4.FromHex("#50dc78").Opacity(0.9f),
                     Alpha = 0,
                 },
             };
+
+            applyLayout();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            scheduleBeatmapUpdate();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (isDisposing)
+            {
+                chartDanRequestId++;
+                beatmap = null;
+            }
         }
 
         public new void Clear()
@@ -199,6 +252,102 @@ namespace osu.Game.EzOsuGame.UserInterface
             }
 
             Alpha = 1;
+        }
+
+        private void applyLayout()
+        {
+            Direction = layoutDirection;
+
+            bool vertical = layoutDirection == FillDirection.Vertical;
+            Spacing = vertical ? new Vector2(0, 2) : new Vector2(4, 0);
+
+            // FillFlow requires all children to share the same RelativeAnchorPosition on the flow axis.
+            var childAnchor = vertical ? Anchor.TopCentre : Anchor.CentreLeft;
+
+            foreach (var child in Children)
+            {
+                child.Anchor = childAnchor;
+                child.Origin = childAnchor;
+            }
+        }
+
+        private void scheduleBeatmapUpdate()
+        {
+            if (!IsLoaded)
+                return;
+
+            updateFromBeatmap();
+        }
+
+        private void updateFromBeatmap()
+        {
+            if (beatmap == null)
+            {
+                Clear();
+                Hide();
+                BypassAutoSizeAxes = Axes.Both;
+                return;
+            }
+
+            var cached = skillProvider?.TryGetCachedChartDan(beatmap);
+
+            if (cached != null)
+            {
+                showFromVerdict(cached);
+            }
+            else if (skillProvider != null)
+            {
+                Clear();
+                Hide();
+                BypassAutoSizeAxes = Axes.Both;
+                requestChartDanCompute(beatmap);
+            }
+            else
+            {
+                Clear();
+                Hide();
+                BypassAutoSizeAxes = Axes.Both;
+            }
+        }
+
+        private void showFromVerdict(EzChartDanVerdict verdict)
+        {
+            BypassAutoSizeAxes = Axes.None;
+            SetFrom(verdict);
+            Show();
+        }
+
+        private void requestChartDanCompute(BeatmapInfo target)
+        {
+            int requestId = ++chartDanRequestId;
+            var provider = skillProvider;
+            // Detach so MinaCalc can run off the update thread without touching live Realm.
+            var detached = target.Detach();
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    return provider?.TryGetChartDan(detached);
+                }
+                catch
+                {
+                    return null;
+                }
+            }).ContinueWith(t => Schedule(() =>
+            {
+                if (requestId != chartDanRequestId || beatmap == null || !string.Equals(beatmap.Hash, detached.Hash, StringComparison.Ordinal))
+                    return;
+
+                if (t.Status == TaskStatus.RanToCompletion && t.GetResultSafely() is EzChartDanVerdict verdict)
+                    showFromVerdict(verdict);
+                else
+                {
+                    Clear();
+                    Hide();
+                    BypassAutoSizeAxes = Axes.Both;
+                }
+            }));
         }
 
         private void setValueText(OsuSpriteText text, double? value)
