@@ -897,9 +897,11 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
             // [Ez] 子帧时间修正：使用上一帧的时钟值进行判断后进行补偿。
             // 按键在上一次 FSC 时钟更新和现在之间被按下；插值到实际按键时间。
+            long keyTs = 0;
+
             if (userTriggered)
             {
-                long keyTs = InputManager.EzSubFrameTimestamp;
+                keyTs = InputManager.EzSubFrameTimestamp;
                 double rate = (Clock as IGameplayClock)?.Rate ?? 1.0;
                 timeOffset += EzSubFrameCorrection.GetCorrectionMs(keyTs, rate);
             }
@@ -916,6 +918,17 @@ namespace osu.Game.Rulesets.Objects.Drawables
                     bassSource = gcc.BassSourceCurrentTime;
                 }
 
+                double inputToJudgeMs = double.NaN;
+
+                if (keyTs > 0)
+                {
+                    inputToJudgeMs = (Stopwatch.GetTimestamp() - keyTs) / (double)Stopwatch.Frequency * 1000.0;
+
+                    // Sanity: ignore absurd gaps (stale key stamp / unrelated press).
+                    if (inputToJudgeMs < 0 || inputToJudgeMs > 1000)
+                        inputToJudgeMs = double.NaN;
+                }
+
                 EzJudgmentDiagnostics.Record(
                     Time.Current,
                     HitObject.GetEndTime(),
@@ -923,7 +936,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
                     Time.Current, // interpClockTime = FSC ManualClock time
                     bassSource,
                     interpDrift,
-                    frameElapsed);
+                    frameElapsed,
+                    inputToJudgeMs);
             }
 
             CheckForResult(userTriggered, timeOffset);
