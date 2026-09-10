@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Threading.Tasks;
 using osu.Framework.Audio.EzLatency;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
@@ -15,7 +16,7 @@ using osuTK.Input;
 namespace osu.Game.EzOsuGame.Audio
 {
     /// <summary>
-    /// 音频闭环延迟桥：游戏输入戳 → <c>Sample.Play</c> → WASAPI loopback。
+    /// 音频闭环延迟桥：游戏输入戳 → <c>Sample.Play</c> → WASAPI loopback（仅 NAudio Default）。
     /// 判定耗时（In→Judge）归 <see cref="Diagnostics.EzJudgmentDiagnostics"/>，不在此追踪。
     /// </summary>
     public partial class InputAudioLatencyTracker : IDisposable
@@ -91,7 +92,8 @@ namespace osu.Game.EzOsuGame.Audio
 
             Logger.Log(
                 $"[EzOsuLatency] audio tracker armed (In→Play→Acou; threshold={AcousticRmsThreshold:F4}, acousticProbe={(latencyManager.AcousticProbeRunning ? "on" : "off")})",
-                Ez2ConfigManager.LOGGER_NAME);
+                Ez2ConfigManager.LOGGER_NAME,
+                LogLevel.Debug);
         }
 
         public void Start()
@@ -130,9 +132,11 @@ namespace osu.Game.EzOsuGame.Audio
         }
 
         /// <summary>
-        /// Emit session summary (log + notification). Safe to call from results or exit; only runs once per session.
+        /// Emit session summary. Always writes ez_runtime log on exit.
+        /// Toast is only for a completed play (<paramref name="postNotification"/>), deferred so
+        /// <c>InGameFocus</c> can show a toast after leaving <c>Player</c>.
         /// </summary>
-        public void GenerateLatencyReport()
+        public void GenerateLatencyReport(bool postNotification = false)
         {
             if (disposed || reportGenerated)
                 return;
@@ -144,7 +148,12 @@ namespace osu.Game.EzOsuGame.Audio
 
             if (!stats.HasData)
             {
-                Logger.Log("[EzOsuLatency] session ended with no complete records", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Log("[EzOsuLatency] session ended with no complete records", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+
+                if (postNotification)
+                    postSummaryNotification("Audio latency: no complete samples this play.");
+
+                latencyManager.ClearStatistics();
                 return;
             }
 
@@ -153,7 +162,6 @@ namespace osu.Game.EzOsuGame.Audio
 
             if (stats.AcousticRecordCount > 0)
             {
-                // Approximate hop avg when both segments exist (per-hit Play→Acou is exact in onMeasurement).
                 double playToAcouAvg = stats.AvgAcousticRoundtrip - stats.AvgInputToPlayback;
                 acousticPart =
                     $" | In→Acou avg/min/max={stats.AvgAcousticRoundtrip:F2}/{stats.MinAcousticRoundtrip:F2}/{stats.MaxAcousticRoundtrip:F2}ms (n={stats.AcousticRecordCount})";
@@ -166,13 +174,9 @@ namespace osu.Game.EzOsuGame.Audio
                 + playToAcouPart
                 + acousticPart;
 
-            Logger.Log(summary, Ez2ConfigManager.LOGGER_NAME);
+            Logger.Log(summary, Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
-            if (notificationOverlay == null)
-            {
-                Logger.Log("[EzOsuLatency] summary ready but INotificationOverlay is null", Ez2ConfigManager.LOGGER_NAME);
-            }
-            else
+            if (postNotification)
             {
                 string notificationText =
                     $"Audio latency (n={stats.RecordCount})\n"
@@ -187,14 +191,40 @@ namespace osu.Game.EzOsuGame.Audio
                         + $" (n={stats.AcousticRecordCount})";
                 }
 
-                notificationOverlay.Post(new SimpleNotification
-                {
-                    Text = notificationText,
-                    Icon = FontAwesome.Solid.ChartLine,
-                });
+                postSummaryNotification(notificationText);
             }
 
             latencyManager.ClearStatistics();
+        }
+
+        private void postSummaryNotification(string text)
+        {
+            if (notificationOverlay == null)
+            {
+                Logger.Log("[EzOsuLatency] summary ready but INotificationOverlay is null", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                return;
+            }
+
+            var overlay = notificationOverlay;
+            var notification = new SimpleNotification
+            {
+                Text = text,
+                Icon = FontAwesome.Solid.ChartLine,
+            };
+
+            // Defer past Player/PlayerLoader so InGameFocus allows toast + sound.
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(300).ConfigureAwait(false);
+                    overlay.Post(notification);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[EzOsuLatency] deferred notification failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                }
+            });
         }
 
         private void pushAcousticThreshold() => latencyManager.SetAcousticThreshold(AcousticRmsThreshold);
@@ -217,7 +247,8 @@ namespace osu.Game.EzOsuGame.Audio
 
             Logger.Log(
                 $"[EzOsuLatency] key={record.InputData.KeyValue} | In→Play={formatMs(inToPlay)} | Play→Acou={formatMs(playToAcou)} | In→Acou={formatMs(inToAcou)}",
-                Ez2ConfigManager.LOGGER_NAME);
+                Ez2ConfigManager.LOGGER_NAME,
+                LogLevel.Debug);
         }
 
         public void Dispose()
@@ -225,9 +256,9 @@ namespace osu.Game.EzOsuGame.Audio
             if (disposed)
                 return;
 
-            // Last chance if results/exit hooks were skipped (e.g. abrupt teardown).
+            // Exit/teardown: log only, never toast.
             if (!reportGenerated)
-                GenerateLatencyReport();
+                GenerateLatencyReport(postNotification: false);
 
             disposed = true;
             Stop();
@@ -248,7 +279,7 @@ namespace osu.Game.EzOsuGame.Audio
             if (Instance == this)
                 Instance = null;
 
-            Logger.Log("[EzOsuLatency] tracker disposed; GLOBAL.Enabled=false", Ez2ConfigManager.LOGGER_NAME);
+            Logger.Log("[EzOsuLatency] tracker disposed; GLOBAL.Enabled=false", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
         }
     }
 }
