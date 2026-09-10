@@ -8,12 +8,30 @@ namespace osu.Game.EzOsuGame.Localization
          #region 音频设备设置
 
         public static readonly EzLocalizationManager.EzLocalisableString AUDIO_DEVICE_OUTPUT_HINT = new EzLocalizationManager.EzLocalisableString(
-            "ASIO 处于测试阶段！"
-            + "\n对于虚拟音频驱动，如VoiceMeeter，可能需要先切换到物理输出设备，激活驱动后，之后再切换回VM。"
-            + "\n请不要认为虚拟ASIO比WASAPI更好，如果没有声音请尝试重启。",
-            "ASIO is testing! "
-            + "\nFor virtual audio drivers like VoiceMeeter, you may need to switch to a physical output device first, activate the driver, and then switch back to VM."
-            + "\nPlease do not assume virtual ASIO is better than WASAPI, and try restarting if there is no sound.");
+            "选择 | 输出路径"
+            + "\n————————————"
+            + "\n默认设备 + 勾选 Legacy | NAudio WASAPI 共享"
+            + "\n取消 Legacy（实验性） | BassWasapi 共享"
+            + "\n设备 (WASAPI Exclusive) | BassWasapi 独占"
+            + "\n设备 (ASIO) | ASIO"
+            + "\n————————————"
+            + "\n细节与注意事项见 wiki「游戏设置」。",
+            "Selection | Output path"
+            + "\n————————————"
+            + "\nDefault + Legacy on | NAudio WASAPI shared"
+            + "\nLegacy off (experimental) | BassWasapi shared"
+            + "\nDevice (WASAPI Exclusive) | BassWasapi exclusive"
+            + "\nDevice (ASIO) | ASIO"
+            + "\n————————————"
+            + "\nDetails: wiki Game Settings.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LEGACY_AUDIO_HINT = new EzLocalizationManager.EzLocalisableString(
+            "勾选 | NAudio WASAPI 共享（Ez 默认）"
+            + "\n取消 | BassWasapi 共享（官方实验性）"
+            + "\n与下方「(WASAPI Exclusive) / (ASIO)」无关。",
+            "On | NAudio WASAPI shared (Ez default)"
+            + "\nOff | BassWasapi shared (official experimental)"
+            + "\nIndependent of (WASAPI Exclusive) / (ASIO) below.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString(
             "ASIO 输出格式（内部 PCM）",
