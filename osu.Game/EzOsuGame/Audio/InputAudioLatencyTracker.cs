@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Threading.Tasks;
 using osu.Framework.Audio.EzLatency;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
@@ -9,25 +10,33 @@ using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osuTK.Input;
 
 namespace osu.Game.EzOsuGame.Audio
 {
     /// <summary>
-    /// Bridge between gameplay (input / judgement) and framework <see cref="EzLatencyManager"/>.
+    /// 音频闭环延迟桥：游戏输入戳 → <c>Sample.Play</c> → WASAPI loopback（仅 NAudio Default）。
+    /// 判定耗时（In→Judge）归 <see cref="Diagnostics.EzJudgmentDiagnostics"/>，不在此追踪。
     /// </summary>
     public partial class InputAudioLatencyTracker : IDisposable
     {
+        /// <summary>
+        /// Loopback RMS threshold (linear 0–1). Expression-bodied so IDE hot reload can tune without a settings entry.
+        /// <para></para>
+        /// 信号电平换算公式:
+        /// <code>20 * log10(0.02) ≈ -34 dBFS</code>
+        /// </summary>
+        public static float AcousticRmsThreshold => 0.02f;
+
         private readonly Ez2ConfigManager ezConfig;
         private readonly INotificationOverlay? notificationOverlay;
         private readonly EzLatencyManager latencyManager;
 
-        private ScoreProcessor? scoreProcessor;
         private Bindable<bool>? inputAudioLatencyConfigBindable;
         private Action<ValueChangedEvent<bool>>? inputAudioLatencyConfigHandler;
         private Action<ValueChangedEvent<bool>>? enabledChangedHandler;
+        private Action<EzLatencyRecord>? measurementHandler;
         private bool initialized;
         private bool started;
         private bool disposed;
@@ -48,13 +57,14 @@ namespace osu.Game.EzOsuGame.Audio
             if (disposed)
                 return;
 
-            scoreProcessor = processor;
+            // processor kept for call-site compatibility (Player still passes ScoreProcessor).
+            _ = processor;
 
             if (initialized)
             {
-                // Re-entering a session: keep bindings, refresh stats and judgement subscription.
                 latencyManager.ClearStatistics();
                 reportGenerated = false;
+                pushAcousticThreshold();
                 if (latencyManager.Enabled.Value)
                     Start();
                 return;
@@ -77,33 +87,36 @@ namespace osu.Game.EzOsuGame.Audio
             };
             latencyManager.Enabled.BindValueChanged(enabledChangedHandler, true);
 
-            Logger.Log("[EzOsuLatency] tracker armed for gameplay session", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            measurementHandler = onMeasurement;
+            latencyManager.OnNewRecord += measurementHandler;
+
+            Logger.Log(
+                $"[EzOsuLatency] audio tracker armed (In→Play→Acou; threshold={AcousticRmsThreshold:F4}, acousticProbe={(latencyManager.AcousticProbeRunning ? "on" : "off")})",
+                Ez2ConfigManager.LOGGER_NAME,
+                LogLevel.Debug);
         }
 
         public void Start()
         {
-            if (disposed || started || scoreProcessor == null)
+            if (disposed || started)
                 return;
 
             started = true;
-            scoreProcessor.NewJudgement += OnNewJudgement;
+            pushAcousticThreshold();
         }
 
         public void Stop()
         {
-            if (!started)
-                return;
-
             started = false;
-
-            if (scoreProcessor != null)
-                scoreProcessor.NewJudgement -= OnNewJudgement;
         }
 
         public void RecordKeyPress(Key key)
         {
-            if (latencyManager.Enabled.Value)
-                latencyManager.RecordInputEvent(key);
+            if (!latencyManager.Enabled.Value)
+                return;
+
+            pushAcousticThreshold();
+            latencyManager.RecordInputEvent(key);
         }
 
         /// <summary>
@@ -111,14 +124,19 @@ namespace osu.Game.EzOsuGame.Audio
         /// </summary>
         public void RecordColumnPress(int column)
         {
-            if (latencyManager.Enabled.Value)
-                latencyManager.RecordInputEvent(column);
+            if (!latencyManager.Enabled.Value)
+                return;
+
+            pushAcousticThreshold();
+            latencyManager.RecordInputEvent(column);
         }
 
         /// <summary>
-        /// Emit session summary (log + notification). Safe to call from results or exit; only runs once per session.
+        /// Emit session summary. Always writes ez_runtime log on exit.
+        /// Toast is only for a completed play (<paramref name="postNotification"/>), deferred so
+        /// <c>InGameFocus</c> can show a toast after leaving <c>Player</c>.
         /// </summary>
-        public void GenerateLatencyReport()
+        public void GenerateLatencyReport(bool postNotification = false)
         {
             if (disposed || reportGenerated)
                 return;
@@ -131,51 +149,106 @@ namespace osu.Game.EzOsuGame.Audio
             if (!stats.HasData)
             {
                 Logger.Log("[EzOsuLatency] session ended with no complete records", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+
+                if (postNotification)
+                    postSummaryNotification("Audio latency: no complete samples this play.");
+
+                latencyManager.ClearStatistics();
                 return;
+            }
+
+            string playToAcouPart = string.Empty;
+            string acousticPart = string.Empty;
+
+            if (stats.AcousticRecordCount > 0)
+            {
+                double playToAcouAvg = stats.AvgAcousticRoundtrip - stats.AvgInputToPlayback;
+                acousticPart =
+                    $" | In→Acou avg/min/max={stats.AvgAcousticRoundtrip:F2}/{stats.MinAcousticRoundtrip:F2}/{stats.MaxAcousticRoundtrip:F2}ms (n={stats.AcousticRecordCount})";
+                playToAcouPart = $" | Play→Acou≈{playToAcouAvg:F2}ms (avg)";
             }
 
             string summary =
                 $"[EzOsuLatency] n={stats.RecordCount}"
-                + $" | Input→Audio avg/min/max={stats.AvgInputToPlayback:F2}/{stats.MinInputToPlayback:F2}/{stats.MaxInputToPlayback:F2}ms"
-                + $" | Input→Judge avg/min/max={stats.AvgInputToJudge:F2}/{stats.MinInputToJudge:F2}/{stats.MaxInputToJudge:F2}ms"
-                + $" | Audio→Judge avg/min/max={stats.AvgPlaybackToJudge:F2}/{stats.MinPlaybackToJudge:F2}/{stats.MaxPlaybackToJudge:F2}ms";
+                + $" | In→Play avg/min/max={stats.AvgInputToPlayback:F2}/{stats.MinInputToPlayback:F2}/{stats.MaxInputToPlayback:F2}ms"
+                + playToAcouPart
+                + acousticPart;
 
             Logger.Log(summary, Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-            // Also mirror to runtime so the summary is easy to find without filtering Ez logger.
-            Logger.Log(summary, LoggingTarget.Runtime, LogLevel.Debug);
 
-            if (notificationOverlay == null)
+            if (postNotification)
             {
-                Logger.Log("[EzOsuLatency] summary ready but INotificationOverlay is null", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-            }
-            else
-            {
-                notificationOverlay.Post(new SimpleNotification
+                string notificationText =
+                    $"Audio latency (n={stats.RecordCount})\n"
+                    + $"In→Play  avg {stats.AvgInputToPlayback:F1}  min {stats.MinInputToPlayback:F1}  max {stats.MaxInputToPlayback:F1} ms";
+
+                if (stats.AcousticRecordCount > 0)
                 {
-                    Text =
-                        $"Latency summary (n={stats.RecordCount})\n"
-                        + $"Input→Audio  avg {stats.AvgInputToPlayback:F1}  min {stats.MinInputToPlayback:F1}  max {stats.MaxInputToPlayback:F1} ms\n"
-                        + $"Input→Judge  avg {stats.AvgInputToJudge:F1}  min {stats.MinInputToJudge:F1}  max {stats.MaxInputToJudge:F1} ms\n"
-                        + $"Audio→Judge  avg {stats.AvgPlaybackToJudge:F1}  min {stats.MinPlaybackToJudge:F1}  max {stats.MaxPlaybackToJudge:F1} ms",
-                    Icon = FontAwesome.Solid.ChartLine,
-                });
+                    double playToAcouAvg = stats.AvgAcousticRoundtrip - stats.AvgInputToPlayback;
+                    notificationText +=
+                        $"\nPlay→Acou  ≈ {playToAcouAvg:F1} ms (avg)"
+                        + $"\nIn→Acou  avg {stats.AvgAcousticRoundtrip:F1}  min {stats.MinAcousticRoundtrip:F1}  max {stats.MaxAcousticRoundtrip:F1} ms"
+                        + $" (n={stats.AcousticRecordCount})";
+                }
+
+                postSummaryNotification(notificationText);
             }
 
             latencyManager.ClearStatistics();
         }
 
-        private void OnNewJudgement(JudgementResult result)
+        private void postSummaryNotification(string text)
         {
-            if (!latencyManager.Enabled.Value || !result.Type.IsScorable())
+            if (notificationOverlay == null)
+            {
+                Logger.Log("[EzOsuLatency] summary ready but INotificationOverlay is null", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 return;
+            }
 
-            bool isNote = result.HitObject.GetType().Name.EndsWith("Note", StringComparison.Ordinal) ||
-                          result.HitObject.GetType().Name == "Fruit" ||
-                          result.HitObject.GetType().Name == "HitCircle" ||
-                          result.HitObject.GetType().Name == "Hit";
+            var overlay = notificationOverlay;
+            var notification = new SimpleNotification
+            {
+                Text = text,
+                Icon = FontAwesome.Solid.ChartLine,
+            };
 
-            if (isNote)
-                latencyManager.RecordJudgeEvent();
+            // Defer past Player/PlayerLoader so InGameFocus allows toast + sound.
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(300).ConfigureAwait(false);
+                    overlay.Post(notification);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[EzOsuLatency] deferred notification failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                }
+            });
+        }
+
+        private void pushAcousticThreshold() => latencyManager.SetAcousticThreshold(AcousticRmsThreshold);
+
+        private static string formatMs(double? ms) => ms.HasValue ? $"{ms.Value:F2}" : "n/a";
+
+        private void onMeasurement(EzLatencyRecord record)
+        {
+            double? inToPlay = record.PlaybackTime > 0 && record.InputTime > 0
+                ? record.PlaybackTime - record.InputTime
+                : null;
+
+            bool hasAcou = record.Note == EzLatencyAnalyzer.NOTE_ACOUSTIC_LOOPBACK
+                           || (record.LatencyDifference > 0 && record.HardwareData.IsValid);
+
+            double? inToAcou = hasAcou ? record.LatencyDifference : null;
+            double? playToAcou = inToPlay.HasValue && inToAcou.HasValue
+                ? inToAcou.Value - inToPlay.Value
+                : null;
+
+            Logger.Log(
+                $"[EzOsuLatency] key={record.InputData.KeyValue} | In→Play={formatMs(inToPlay)} | Play→Acou={formatMs(playToAcou)} | In→Acou={formatMs(inToAcou)}",
+                Ez2ConfigManager.LOGGER_NAME,
+                LogLevel.Debug);
         }
 
         public void Dispose()
@@ -183,9 +256,9 @@ namespace osu.Game.EzOsuGame.Audio
             if (disposed)
                 return;
 
-            // Last chance if results/exit hooks were skipped (e.g. abrupt teardown).
+            // Exit/teardown: log only, never toast.
             if (!reportGenerated)
-                GenerateLatencyReport();
+                GenerateLatencyReport(postNotification: false);
 
             disposed = true;
             Stop();
@@ -195,6 +268,9 @@ namespace osu.Game.EzOsuGame.Audio
 
             if (inputAudioLatencyConfigBindable != null && inputAudioLatencyConfigHandler != null)
                 inputAudioLatencyConfigBindable.ValueChanged -= inputAudioLatencyConfigHandler;
+
+            if (measurementHandler != null)
+                latencyManager.OnNewRecord -= measurementHandler;
 
             // Critical: do not leave GLOBAL.Enabled true after leaving gameplay.
             latencyManager.Enabled.Value = false;

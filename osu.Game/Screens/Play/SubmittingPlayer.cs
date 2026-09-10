@@ -335,8 +335,8 @@ namespace osu.Game.Screens.Play
 
             statics.SetValue(Static.LastLocalUserScore, Score?.ScoreInfo.DeepClone());
 
-            // 生成延迟报告
-            LatencyTracker?.GenerateLatencyReport();
+            // 退出：只打日志，不推送（打完一局的 toast 在 Results/抽卡/心流路径）
+            LatencyTracker?.GenerateLatencyReport(postNotification: false);
 
             return exiting;
         }

@@ -13,8 +13,8 @@ using osu.Framework.Logging;
 namespace osu.Game.EzOsuGame.Diagnostics
 {
     /// <summary>
-    /// 采集 mania 判定时序数据，用于分析"前-后-前-后"交替漂移问题。
-    /// 线程安全、低开销。仅在 DEBUG 构建中启用文件写出。
+    /// 判定诊断：时钟漂移 CSV，并含按键→判定检查耗时（InputToJudgeMs）。
+    /// 音频闭环（In→Play→Acou）见 <c>InputAudioLatencyTracker</c>，不在此采集。
     /// </summary>
     public static class EzJudgmentDiagnostics
     {
@@ -39,11 +39,14 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double InterpolatedClockTime,
             double BassSourceTime,
             double InterpolatedDrift,
-            double FrameElapsed);
+            double FrameElapsed,
+            /// <summary>按键 wall 戳到本条判定检查的耗时（ms）；无有效按键戳时为 NaN。</summary>
+            double InputToJudgeMs);
 
         /// <summary>
         /// 记录一次判定的完整时序上下文。
         /// </summary>
+        /// <param name="inputToJudgeMs">按键 → 本检查点的 wall 耗时（ms）；未知传 <see cref="double.NaN"/>。</param>
         public static void Record(
             double gameTime,
             double noteStartTime,
@@ -51,7 +54,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double interpClockTime,
             double bassSourceTime,
             double interpDrift,
-            double frameElapsed)
+            double frameElapsed,
+            double inputToJudgeMs = double.NaN)
         {
             if (!Enabled) return;
             if (samples.Count >= max_samples) return;
@@ -64,7 +68,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 interpClockTime,
                 bassSourceTime,
                 interpDrift,
-                frameElapsed));
+                frameElapsed,
+                inputToJudgeMs));
         }
 
         /// <summary>
@@ -73,7 +78,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         public static string Flush()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("WallMs,GameTime,NoteStart,TimeOffset,InterpClock,BassSource,Drift,FrameElapsed");
+            sb.AppendLine("WallMs,GameTime,NoteStart,TimeOffset,InterpClock,BassSource,Drift,FrameElapsed,InputToJudgeMs");
 
             // Drain current queue snapshot into the CSV builder.
             while (samples.TryDequeue(out var s))
@@ -85,7 +90,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(s.InterpolatedClockTime.ToString("F3")).Append(',');
                 sb.Append(s.BassSourceTime.ToString("F3")).Append(',');
                 sb.Append(s.InterpolatedDrift.ToString("F3")).Append(',');
-                sb.Append(s.FrameElapsed.ToString("F3"));
+                sb.Append(s.FrameElapsed.ToString("F3")).Append(',');
+                sb.Append(double.IsNaN(s.InputToJudgeMs) ? string.Empty : s.InputToJudgeMs.ToString("F3"));
                 sb.AppendLine();
             }
 
