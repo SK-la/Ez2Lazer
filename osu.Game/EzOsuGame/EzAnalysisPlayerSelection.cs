@@ -7,7 +7,8 @@ namespace osu.Game.EzOsuGame
 {
     /// <summary>
     /// Shared Ez-analysis player filter (wedge dropdown + SongSelect HUD panels).
-    /// Value is a stored username or <see cref="LocalProfile.EzLocalProfileConstants.ALL_PLAYERS"/>.
+    /// Value is a stored username or <see cref="LocalProfile.EzLocalProfileConstants.ALL_PLAYERS"/>
+    /// (archive-wide / hypothetical All — see <see cref="LocalProfile.EzLocalProfileConstants.IsAllPlayersFilter"/>).
     /// </summary>
     public class EzAnalysisPlayerSelection
     {

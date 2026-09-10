@@ -92,9 +92,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// </summary>
         public EzLocalProfileSnapshot LoadSnapshotForUsername(string? usernameFilter)
         {
-            if (string.IsNullOrEmpty(usernameFilter)
-                || string.Equals(usernameFilter, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal))
+            if (EzLocalProfileConstants.IsAllPlayersFilter(usernameFilter))
                 return LoadSnapshot();
+
+            // Not All ⇒ non-blank concrete username (IsAllPlayersFilter already rejected null/whitespace).
+            string username = usernameFilter!;
 
             lock (sync)
             {
@@ -104,14 +106,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                     using var connection = openConnection();
 
-                    string? json = tryReadPartitionJson(connection, usernameFilter);
+                    string? json = tryReadPartitionJson(connection, username);
 
                     if (json == null)
                     {
                         return new EzLocalProfileSnapshot
                         {
                             HasData = false,
-                            IncludedUsernames = new[] { usernameFilter },
+                            IncludedUsernames = new[] { username },
                             LastComputedAt = tryReadLastComputedAt(connection),
                             NeedsRecompute = readNeedsRecompute(connection),
                         };
@@ -125,16 +127,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"[EzLocalProfile] Bad partition for {usernameFilter}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
-                        return new EzLocalProfileSnapshot { HasData = false, IncludedUsernames = new[] { usernameFilter } };
+                        Logger.Log($"[EzLocalProfile] Bad partition for {username}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
+                        return new EzLocalProfileSnapshot { HasData = false, IncludedUsernames = new[] { username } };
                     }
 
                     if (payload == null)
-                        return new EzLocalProfileSnapshot { HasData = false, IncludedUsernames = new[] { usernameFilter } };
+                        return new EzLocalProfileSnapshot { HasData = false, IncludedUsernames = new[] { username } };
 
                     var merged = new EzLocalProfileAggregationResult
                     {
-                        IncludedUsernames = new[] { usernameFilter },
+                        IncludedUsernames = new[] { username },
                         ComputedAt = tryReadLastComputedAt(connection) ?? DateTimeOffset.UtcNow,
                     };
                     payload.MergeInto(merged);
@@ -325,11 +327,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
-        /// Dan clear evidence for <paramref name="username"/>. Defaults to current <see cref="EzDanAlgorithm.VERSION"/>.
+        /// Dan clear evidence for <paramref name="username"/>.
+        /// <see cref="EzLocalProfileConstants.IsAllPlayersFilter"/> reads all real-player rows (no username filter;
+        /// excludes residual <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> keys).
+        /// Defaults to current <see cref="EzDanAlgorithm.VERSION"/>.
         /// </summary>
         public IReadOnlyList<EzDanClearEvidenceRow> GetDanClears(string username, int? keyCount = null, string? side = null, int? algorithmVersion = null)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            bool allPlayers = EzLocalProfileConstants.IsAllPlayersFilter(username);
+            if (!allPlayers)
+                ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
             int version = algorithmVersion ?? EzDanAlgorithm.VERSION;
 
             lock (sync)
@@ -337,16 +345,29 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 ensureInitialised();
                 using var connection = openConnection();
                 using var cmd = connection.CreateCommand();
-                cmd.CommandText = """
-                                  SELECT username, key_count, side, beatmap_hash, rate, credited_dan, accuracy, scored_at_ms, algorithm_version
-                                  FROM dan_clear_evidence
-                                  WHERE username = $username
-                                    AND algorithm_version = $algorithm_version
-                                    AND ($key_count IS NULL OR key_count = $key_count)
-                                    AND ($side IS NULL OR side = $side)
-                                  ORDER BY credited_dan DESC, scored_at_ms DESC;
-                                  """;
-                cmd.Parameters.AddWithValue("$username", username);
+                cmd.CommandText = allPlayers
+                    ? """
+                      SELECT username, key_count, side, beatmap_hash, rate, credited_dan, accuracy, scored_at_ms, algorithm_version
+                      FROM dan_clear_evidence
+                      WHERE username != $all_sentinel
+                        AND algorithm_version = $algorithm_version
+                        AND ($key_count IS NULL OR key_count = $key_count)
+                        AND ($side IS NULL OR side = $side)
+                      ORDER BY credited_dan DESC, scored_at_ms DESC;
+                      """
+                    : """
+                      SELECT username, key_count, side, beatmap_hash, rate, credited_dan, accuracy, scored_at_ms, algorithm_version
+                      FROM dan_clear_evidence
+                      WHERE username = $username
+                        AND algorithm_version = $algorithm_version
+                        AND ($key_count IS NULL OR key_count = $key_count)
+                        AND ($side IS NULL OR side = $side)
+                      ORDER BY credited_dan DESC, scored_at_ms DESC;
+                      """;
+                if (allPlayers)
+                    cmd.Parameters.AddWithValue("$all_sentinel", EzLocalProfileConstants.ALL_PLAYERS);
+                else
+                    cmd.Parameters.AddWithValue("$username", username);
                 cmd.Parameters.AddWithValue("$algorithm_version", version);
                 cmd.Parameters.AddWithValue("$key_count", (object?)keyCount ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$side", (object?)side ?? DBNull.Value);
@@ -375,11 +396,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
-        /// Axis play evidence for <paramref name="username"/>. Defaults to current <see cref="EzManiaSkillAlgorithm.VERSION"/>.
+        /// Axis play evidence for <paramref name="username"/>.
+        /// <see cref="EzLocalProfileConstants.IsAllPlayersFilter"/> reads all real-player rows (no username filter;
+        /// excludes residual <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> keys).
+        /// Defaults to current <see cref="EzManiaSkillAlgorithm.VERSION"/>.
         /// </summary>
         public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null, int? algorithmVersion = null)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            bool allPlayers = EzLocalProfileConstants.IsAllPlayersFilter(username);
+            if (!allPlayers)
+                ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
             int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
 
             lock (sync)
@@ -387,16 +414,29 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 ensureInitialised();
                 using var connection = openConnection();
                 using var cmd = connection.CreateCommand();
-                cmd.CommandText = """
-                                  SELECT username, key_count, skill_id, beatmap_hash, axis_value, accuracy, rate, scored_at_ms, algorithm_version
-                                  FROM axis_play_evidence
-                                  WHERE username = $username
-                                    AND algorithm_version = $algorithm_version
-                                    AND ($key_count IS NULL OR key_count = $key_count)
-                                    AND ($skill_id IS NULL OR skill_id = $skill_id)
-                                  ORDER BY axis_value DESC, scored_at_ms DESC;
-                                  """;
-                cmd.Parameters.AddWithValue("$username", username);
+                cmd.CommandText = allPlayers
+                    ? """
+                      SELECT username, key_count, skill_id, beatmap_hash, axis_value, accuracy, rate, scored_at_ms, algorithm_version
+                      FROM axis_play_evidence
+                      WHERE username != $all_sentinel
+                        AND algorithm_version = $algorithm_version
+                        AND ($key_count IS NULL OR key_count = $key_count)
+                        AND ($skill_id IS NULL OR skill_id = $skill_id)
+                      ORDER BY axis_value DESC, scored_at_ms DESC;
+                      """
+                    : """
+                      SELECT username, key_count, skill_id, beatmap_hash, axis_value, accuracy, rate, scored_at_ms, algorithm_version
+                      FROM axis_play_evidence
+                      WHERE username = $username
+                        AND algorithm_version = $algorithm_version
+                        AND ($key_count IS NULL OR key_count = $key_count)
+                        AND ($skill_id IS NULL OR skill_id = $skill_id)
+                      ORDER BY axis_value DESC, scored_at_ms DESC;
+                      """;
+                if (allPlayers)
+                    cmd.Parameters.AddWithValue("$all_sentinel", EzLocalProfileConstants.ALL_PLAYERS);
+                else
+                    cmd.Parameters.AddWithValue("$username", username);
                 cmd.Parameters.AddWithValue("$algorithm_version", version);
                 cmd.Parameters.AddWithValue("$key_count", (object?)keyCount ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$skill_id", (object?)skillId ?? DBNull.Value);
@@ -1048,8 +1088,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var list = new List<EzLocalProfileDrillScoreRow>();
             using var cmd = connection.CreateCommand();
 
-            bool filterUsername = !string.IsNullOrEmpty(usernameFilter)
-                                  && !string.Equals(usernameFilter, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal);
+            bool filterUsername = !EzLocalProfileConstants.IsAllPlayersFilter(usernameFilter);
 
             cmd.CommandText = filterUsername
                 ? """

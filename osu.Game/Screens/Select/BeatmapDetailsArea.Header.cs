@@ -246,12 +246,16 @@ namespace osu.Game.Screens.Select
             {
                 var names = new List<string>();
 
-                if (playerHasSkillData(EzLocalProfileConstants.ALL_PLAYERS))
+                var includedWithSkills = localProfileService?.GetPreviouslyIncludedUsernames()
+                                                            .Where(playerHasSkillData)
+                                                            .ToList()
+                                         ?? new List<string>();
+
+                // Offer All whenever any archive player has SSR (All headlines may still be empty until recompute).
+                if (playerHasSkillData(EzLocalProfileConstants.ALL_PLAYERS) || includedWithSkills.Count > 0)
                     names.Add(EzLocalProfileConstants.ALL_PLAYERS);
 
-                names.AddRange(localProfileService?.GetPreviouslyIncludedUsernames()
-                                                   .Where(playerHasSkillData)
-                              ?? Enumerable.Empty<string>());
+                names.AddRange(includedWithSkills);
 
                 ezPlayerDropdown.Items = names;
 
@@ -263,7 +267,7 @@ namespace osu.Game.Screens.Select
 
                 string? current = EzAnalysisPlayer.Value == null
                     ? null
-                    : string.Equals(EzAnalysisPlayer.Value, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal)
+                    : EzLocalProfileConstants.IsAllPlayersFilter(EzAnalysisPlayer.Value)
                         ? EzLocalProfileConstants.ALL_PLAYERS
                         : EzLocalProfileConstants.NormaliseUsername(EzAnalysisPlayer.Value);
 

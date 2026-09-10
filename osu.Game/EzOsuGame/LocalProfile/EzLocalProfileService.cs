@@ -66,11 +66,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     .ToList();
 
         /// <summary>
-        /// Display snapshot for the player filter: <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> or one stored username.
-        /// Guest also falls back to legacy <c>(unknown)</c> partitions.
+        /// Display snapshot for the player filter: <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> (or null/blank)
+        /// or one stored username. Guest also falls back to legacy <c>(unknown)</c> partitions.
         /// </summary>
         public EzLocalProfileSnapshot LoadDisplaySnapshot(string? usernameFilter)
         {
+            if (EzLocalProfileConstants.IsAllPlayersFilter(usernameFilter))
+                return Store.LoadSnapshotForUsername(usernameFilter);
+
             if (EzLocalProfileConstants.IsGuestUsername(usernameFilter))
             {
                 var guest = Store.LoadSnapshotForUsername(EzLocalProfileConstants.GUEST_USERNAME);
@@ -175,22 +178,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (passCount == 0)
                 return;
 
-            // Per-user from this compute bag, then All from the full included set (Ez-parity).
+            // Per-user from this compute bag, then All from the full included set (archive-wide, no single-player filter).
             var included = Store.LoadIncludedUsernames()
                                 .Select(EzLocalProfileConstants.NormaliseUsername)
-                                .Where(n => !string.IsNullOrEmpty(n)
-                                            && !string.Equals(n, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal))
+                                .Where(n => !string.IsNullOrEmpty(n) && !EzLocalProfileConstants.IsAllPlayersFilter(n))
                                 .Distinct(StringComparer.Ordinal)
                                 .ToList();
 
-            Dictionary<string, List<ScoreInfo>> scoresForAll;
-
-            if (included.Count > 0 && included.All(maniaScoresByUser.ContainsKey))
-                scoresForAll = maniaScoresByUser;
-            else if (included.Count > 0)
-                scoresForAll = aggregator.CollectManiaScoresByUsername(included, token);
-            else
-                scoresForAll = maniaScoresByUser;
+            // Always re-collect from included so incremental recomputes still materialise a complete All bag.
+            Dictionary<string, List<ScoreInfo>> scoresForAll = included.Count > 0
+                ? aggregator.CollectManiaScoresByUsername(included, token)
+                : new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
 
             int perUserTotal = maniaScoresByUser.Values.Sum(list => list.Count);
             int allTotal = scoresForAll.Values.Sum(list => list.Count);
@@ -218,7 +216,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 if (scores.Count == 0)
                     continue;
 
-                if (string.Equals(username, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal))
+                if (EzLocalProfileConstants.IsAllPlayersFilter(username))
                     continue;
 
                 persistUserSkills(username, scores, tick, token);
@@ -242,12 +240,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private void persistUserSkills(string username, List<ScoreInfo> scores, Action tick, CancellationToken token)
         {
+            bool allPlayers = EzLocalProfileConstants.IsAllPlayersFilter(username);
+
             tryComputeAndPersist(
                 username,
                 () =>
                 {
                     ssrAggregator!.ComputeAndStore(username, scores, token, tick);
-                    Store.ReplaceAxisPlays(username, ssrAggregator.PendingEvidence);
+                    // All: keep SSR/pattern/history under the sentinel key; do not duplicate axis evidence rows.
+                    Store.ReplaceAxisPlays(
+                        username,
+                        allPlayers ? Array.Empty<EzAxisPlayEvidenceRow>() : ssrAggregator.PendingEvidence);
                 },
                 ssrAggregator != null,
                 "[EzLocalProfile] Failed to compute/persist player SSR skills after profile save.");
@@ -257,7 +260,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 () =>
                 {
                     danAggregator!.ComputeAndStore(username, scores, token, tick);
-                    Store.ReplaceDanClears(username, danAggregator.PendingEvidence);
+                    // All: clear residual All evidence; real-player clears stay; All reads use no username filter.
+                    Store.ReplaceDanClears(
+                        username,
+                        allPlayers ? Array.Empty<EzDanClearEvidenceRow>() : danAggregator.PendingEvidence);
                     skillProvider?.RefreshDanSkillsets(username, tick);
                 },
                 danAggregator != null,

@@ -19,12 +19,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public const string UNKNOWN_USERNAME = GUEST_USERNAME;
 
         /// <summary>
-        /// Sentinel value for the player filter dropdown: show merged archive totals.
+        /// Sentinel for the player filter: archive-wide totals (no per-player username filter).
+        /// Career / Drill / evidence reads treat this as unfiltered; SSR / Dan headlines are
+        /// materialised under this key as a hypothetical player (small rows only — evidence is not duplicated).
         /// </summary>
         public const string ALL_PLAYERS = "All";
 
         public const int OSU_RULESET_ID = 0;
         public const int MANIA_RULESET_ID = 3;
+
+        /// <summary>
+        /// True when the filter means archive-wide / no per-player username constraint
+        /// (<see langword="null"/>, blank, or <see cref="ALL_PLAYERS"/>).
+        /// </summary>
+        public static bool IsAllPlayersFilter(string? username)
+            => string.IsNullOrWhiteSpace(username)
+               || string.Equals(username.Trim(), ALL_PLAYERS, StringComparison.Ordinal);
 
         public static string NormaliseUsername(string? username)
         {
