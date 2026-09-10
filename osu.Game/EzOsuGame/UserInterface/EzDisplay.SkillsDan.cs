@@ -32,6 +32,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         private FillDirection layoutDirection = FillDirection.Horizontal;
         private BeatmapInfo? beatmap;
+        private bool beatmapBound;
         private int chartDanRequestId;
 
         public bool ShowValue { get; set; } = true;
@@ -76,7 +77,22 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                 beatmap = value;
                 chartDanRequestId++;
-                scheduleBeatmapUpdate();
+
+                if (value != null)
+                {
+                    beatmapBound = true;
+                    scheduleBeatmapUpdate();
+                    return;
+                }
+
+                // Clearing an active Beatmap binding (panel FreeAfterUse). Manual Set chips stay untouched.
+                if (beatmapBound)
+                {
+                    Clear();
+                    Hide();
+                    BypassAutoSizeAxes = Axes.Both;
+                    beatmapBound = false;
+                }
             }
         }
 
@@ -123,7 +139,10 @@ namespace osu.Game.EzOsuGame.UserInterface
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            scheduleBeatmapUpdate();
+
+            // Only refresh when Beatmap binding is in use — wedge chips use Set/SetSkillset only.
+            if (beatmap != null)
+                scheduleBeatmapUpdate();
         }
 
         protected override void Dispose(bool isDisposing)
@@ -134,6 +153,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 chartDanRequestId++;
                 beatmap = null;
+                beatmapBound = false;
             }
         }
 
@@ -199,6 +219,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 playerValueText.Alpha = 0;
             }
 
+            BypassAutoSizeAxes = Axes.None;
             Alpha = 1;
         }
 
@@ -251,6 +272,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 playerValueText.Alpha = 0;
             }
 
+            BypassAutoSizeAxes = Axes.None;
             Alpha = 1;
         }
 
@@ -282,12 +304,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         private void updateFromBeatmap()
         {
             if (beatmap == null)
-            {
-                Clear();
-                Hide();
-                BypassAutoSizeAxes = Axes.Both;
                 return;
-            }
 
             var cached = skillProvider?.TryGetCachedChartDan(beatmap);
 
