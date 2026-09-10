@@ -96,6 +96,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public void MergeInto(EzLocalProfileAggregationResult target)
         {
+            MergeStatsInto(target);
+            target.DrillScores.AddRange(DrillScores);
+        }
+
+        /// <summary>
+        /// Merge aggregate counters only (no drill rows). Used when rebuilding All without holding every partition's drills in memory.
+        /// </summary>
+        public void MergeStatsInto(EzLocalProfileAggregationResult target)
+        {
             foreach (var row in RulesetStats)
             {
                 var stats = getOrCreate(target.RulesetStats, row.RulesetId, () => new EzLocalProfileAggregationResult.MutableRulesetStats());
@@ -161,8 +170,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 stats.PlayCount += row.PlayCount;
                 stats.HighGradeCount += row.HighGradeCount;
             }
-
-            target.DrillScores.AddRange(DrillScores);
         }
 
         private static TValue getOrCreate<TKey, TValue>(Dictionary<TKey, TValue> dict, TKey key, Func<TValue> factory)

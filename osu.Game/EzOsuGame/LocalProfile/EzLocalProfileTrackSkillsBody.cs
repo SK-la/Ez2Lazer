@@ -139,6 +139,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             base.LoadComplete();
 
+            // Detach shared SongSelect player selection before applying archive filter username.
+            danPanel.TargetUsername.UnbindBindings();
             danPanel.TargetUsername.Value = username;
             danPanel.KeyCount.BindTo(selectedKeyCount);
             danPanel.DataSource.Value = EzDanPanelDataSource.Player;

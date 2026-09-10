@@ -77,6 +77,9 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved(canBeNull: true)]
         private IBindable<IReadOnlyList<Mod>>? mods { get; set; }
 
+        [Resolved]
+        private EzAnalysisPlayerSelection? ezAnalysisPlayerSelection { get; set; }
+
         public EzHUDDanDualPanel()
         {
             RelativeSizeAxes = Axes.X;
@@ -131,6 +134,8 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
+            tryBindSharedPlayerSelection();
+
             TargetUsername.BindValueChanged(_ => refresh(), true);
             KeyCount.BindValueChanged(_ => refresh());
             DataSource.BindValueChanged(_ => refresh());
@@ -139,6 +144,20 @@ namespace osu.Game.EzOsuGame.HUD
 
             beatmap?.BindValueChanged(_ => refresh());
             mods?.BindValueChanged(_ => refresh());
+        }
+
+        /// <summary>
+        /// SongSelect skin / wedge: follow shared Ez analysis player when host did not bind a username.
+        /// </summary>
+        private void tryBindSharedPlayerSelection()
+        {
+            if (ezAnalysisPlayerSelection == null)
+                return;
+
+            if (!string.IsNullOrEmpty(TargetUsername.Value))
+                return;
+
+            TargetUsername.BindTo(ezAnalysisPlayerSelection.Current);
         }
 
         protected override void Update()

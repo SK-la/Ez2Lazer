@@ -170,6 +170,9 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private EzBeatmapMsdComputer? beatmapMsdComputer { get; set; }
 
+        [Resolved]
+        private EzAnalysisPlayerSelection? ezAnalysisPlayerSelection { get; set; }
+
         private IBindable<StarDifficulty>? difficultyBindable;
         private CancellationTokenSource? difficultyCancellationSource;
         private CancellationTokenSource? radarAnalysisCancellationSource;
@@ -242,6 +245,8 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
+            tryBindSharedPlayerSelection();
+
             bindPreserveAlpha(BaseLineColour);
             bindPreserveAlpha(BaseAreaColour);
             bindPreserveAlpha(DataLineColour);
@@ -307,6 +312,20 @@ namespace osu.Game.EzOsuGame.HUD
                 cachedRulesetSpecificRadarResult = null;
                 updateParameterRatios(difficultyBindable?.Value ?? default);
             }, true);
+        }
+
+        /// <summary>
+        /// SongSelect skin / wedge: follow shared Ez analysis player when host did not bind a username.
+        /// </summary>
+        private void tryBindSharedPlayerSelection()
+        {
+            if (ezAnalysisPlayerSelection == null)
+                return;
+
+            if (!string.IsNullOrEmpty(TargetUsername.Value))
+                return;
+
+            TargetUsername.BindTo(ezAnalysisPlayerSelection.Current);
         }
 
         private void refreshRadarPresentation()

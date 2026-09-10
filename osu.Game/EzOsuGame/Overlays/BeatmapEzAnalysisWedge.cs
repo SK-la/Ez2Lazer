@@ -108,10 +108,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             leftRadar.RadarDisplayMode.BindTo(LeftRadarMode);
             rightRadar.RadarDisplayMode.BindTo(RightRadarMode);
-            leftRadar.TargetUsername.BindTo(TargetUsername);
-            rightRadar.TargetUsername.BindTo(TargetUsername);
+            // TargetUsername: panels bind EzAnalysisPlayerSelection themselves (skin / wedge share it).
 
-            DanPanel.TargetUsername.BindTo(TargetUsername);
             DanPanel.DataSource.Value = EzDanPanelDataSource.Both;
             DanPanel.DualLayout.Value = EzDanPanelDualLayout.Auto;
             DanPanel.ShowEvidence.Value = false;

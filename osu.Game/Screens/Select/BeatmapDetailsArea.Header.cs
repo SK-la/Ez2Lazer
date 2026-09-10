@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
@@ -72,6 +73,9 @@ namespace osu.Game.Screens.Select
 
             [Resolved]
             private EzSkillProvider? skillProvider { get; set; }
+
+            [Resolved]
+            private EzAnalysisPlayerSelection? ezAnalysisPlayerSelection { get; set; }
 
             [BackgroundDependencyLoader]
             private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
@@ -191,6 +195,9 @@ namespace osu.Game.Screens.Select
                 leftRadarDropdown.Current.BindTo(LeftRadarMode);
                 rightRadarDropdown.Current.BindTo(RightRadarMode);
 
+                if (ezAnalysisPlayerSelection != null)
+                    EzAnalysisPlayer.BindTo(ezAnalysisPlayerSelection.Current);
+
                 refreshPlayerDropdownItems();
                 ezPlayerDropdown.Current.BindValueChanged(e => EzAnalysisPlayer.Value = string.IsNullOrWhiteSpace(e.NewValue) ? null : e.NewValue);
                 EzAnalysisPlayer.BindValueChanged(e =>
@@ -237,10 +244,15 @@ namespace osu.Game.Screens.Select
 
             private void refreshPlayerDropdownItems()
             {
-                var names = localProfileService?.GetPreviouslyIncludedUsernames()
-                                               .Where(playerHasSkillData)
-                                               .ToList()
-                            ?? new List<string>();
+                var names = new List<string>();
+
+                if (playerHasSkillData(EzLocalProfileConstants.ALL_PLAYERS))
+                    names.Add(EzLocalProfileConstants.ALL_PLAYERS);
+
+                names.AddRange(localProfileService?.GetPreviouslyIncludedUsernames()
+                                                   .Where(playerHasSkillData)
+                              ?? Enumerable.Empty<string>());
+
                 ezPlayerDropdown.Items = names;
 
                 if (names.Count == 0)
@@ -249,14 +261,19 @@ namespace osu.Game.Screens.Select
                     return;
                 }
 
-                string? current = EzAnalysisPlayer.Value != null
-                    ? EzLocalProfileConstants.NormaliseUsername(EzAnalysisPlayer.Value)
-                    : null;
+                string? current = EzAnalysisPlayer.Value == null
+                    ? null
+                    : string.Equals(EzAnalysisPlayer.Value, EzLocalProfileConstants.ALL_PLAYERS, StringComparison.Ordinal)
+                        ? EzLocalProfileConstants.ALL_PLAYERS
+                        : EzLocalProfileConstants.NormaliseUsername(EzAnalysisPlayer.Value);
 
                 if (current == null || !names.Contains(current))
                 {
-                    EzAnalysisPlayer.Value = names[0];
-                    ezPlayerDropdown.Current.Value = names[0];
+                    string preferred = names.Contains(EzLocalProfileConstants.ALL_PLAYERS)
+                        ? EzLocalProfileConstants.ALL_PLAYERS
+                        : names[0];
+                    EzAnalysisPlayer.Value = preferred;
+                    ezPlayerDropdown.Current.Value = preferred;
                 }
                 else
                 {

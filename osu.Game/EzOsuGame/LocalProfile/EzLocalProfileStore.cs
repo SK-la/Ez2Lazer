@@ -718,6 +718,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 };
 
                 var included = new List<string>();
+                var partitionJsonByUser = new List<(string Username, string Json)>();
 
                 using (var read = connection.CreateCommand())
                 {
@@ -729,25 +730,53 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         string username = reader.GetString(0);
                         string json = reader.GetString(1);
                         included.Add(username);
-
-                        try
-                        {
-                            var payload = JsonSerializer.Deserialize<EzLocalProfilePartitionPayload>(json);
-                            payload?.MergeInto(merged);
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Log($"[EzLocalProfile] Bad partition for {username}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
-                        }
+                        partitionJsonByUser.Add((username, json));
                     }
                 }
 
-                merged.IncludedUsernames = included;
-                EzLocalProfileAggregator.MergeOnlineContributions(merged, onlineContributions, localOnlineScoreIds);
-
+                // Clear aggregation tables before streaming drills so we never hold every partition's drills in memory.
                 clearTables(connection);
                 recreateManiaColumnTable(connection);
-                writeAggregationTables(connection, merged);
+
+                foreach (var (username, json) in partitionJsonByUser)
+                {
+                    EzLocalProfilePartitionPayload payload;
+
+                    try
+                    {
+                        payload = JsonSerializer.Deserialize<EzLocalProfilePartitionPayload>(json)
+                                  ?? throw new InvalidOperationException("Partition payload deserialized to null.");
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new InvalidOperationException(
+                            $"[EzLocalProfile] Bad partition for {username}: {ex.Message}", ex);
+                    }
+
+                    payload.MergeStatsInto(merged);
+                    writeDrillScores(connection, payload.DrillScores);
+                }
+
+                merged.IncludedUsernames = included;
+
+                var partitionScoreCounts = merged.RulesetStats.ToDictionary(
+                    kv => kv.Key,
+                    kv => kv.Value.ScoreCount);
+
+                EzLocalProfileAggregator.MergeOnlineContributions(merged, onlineContributions, localOnlineScoreIds);
+
+                foreach (var (rulesetId, partitionCount) in partitionScoreCounts)
+                {
+                    int allCount = merged.RulesetStats.TryGetValue(rulesetId, out var stats) ? stats.ScoreCount : 0;
+
+                    if (allCount < partitionCount)
+                    {
+                        throw new InvalidOperationException(
+                            $"[EzLocalProfile] All ScoreCount for ruleset {rulesetId} ({allCount}) is less than partition sum ({partitionCount}).");
+                    }
+                }
+
+                writeAggregationTables(connection, merged, writeDrills: false);
 
                 setMeta(connection, "schema_version", SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
                 // Only mark logic current when local partitions were rebuilt with the new aggregator.
@@ -760,7 +789,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        private static void writeAggregationTables(SqliteConnection connection, EzLocalProfileAggregationResult result)
+        private static void writeAggregationTables(SqliteConnection connection, EzLocalProfileAggregationResult result, bool writeDrills = true)
         {
             foreach (var (rulesetId, stats) in result.RulesetStats)
             {
@@ -868,7 +897,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 cmd.ExecuteNonQuery();
             }
 
-            writeDrillScores(connection, result.DrillScores);
+            if (writeDrills)
+                writeDrillScores(connection, result.DrillScores);
         }
 
         private static void writeDrillScores(SqliteConnection connection, IReadOnlyList<EzLocalProfileDrillScoreRow> rows)
