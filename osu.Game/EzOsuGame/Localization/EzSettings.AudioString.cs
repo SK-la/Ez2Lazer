@@ -8,30 +8,32 @@ namespace osu.Game.EzOsuGame.Localization
          #region 音频设备设置
 
         public static readonly EzLocalizationManager.EzLocalisableString AUDIO_DEVICE_OUTPUT_HINT = new EzLocalizationManager.EzLocalisableString(
-            "选择 | 输出路径"
-            + "\n————————————"
-            + "\n默认设备 + 勾选 Legacy | NAudio WASAPI 共享"
-            + "\n取消 Legacy（实验性） | BassWasapi 共享"
-            + "\n设备 (WASAPI Exclusive) | BassWasapi 独占"
-            + "\n设备 (ASIO) | ASIO"
-            + "\n————————————"
-            + "\n细节与注意事项见 wiki「游戏设置」。",
-            "Selection | Output path"
-            + "\n————————————"
-            + "\nDefault + Legacy on | NAudio WASAPI shared"
-            + "\nLegacy off (experimental) | BassWasapi shared"
-            + "\nDevice (WASAPI Exclusive) | BassWasapi exclusive"
-            + "\nDevice (ASIO) | ASIO"
-            + "\n————————————"
-            + "\nDetails: wiki Game Settings.");
+            "| 选择 | 输出路径 |"
+            + "\n| --- | --- |"
+            + "\n| 默认设备 + 勾选 Legacy | NAudio WASAPI 共享 |"
+            + "\n| 取消 Legacy（实验性） | BassWasapi 共享 |"
+            + "\n| 设备 (WASAPI Exclusive) | BassWasapi 独占 |"
+            + "\n| 设备 (ASIO) | ASIO |"
+            + "\n\n细节与注意事项见 wiki「游戏设置」。",
+            "| Selection | Output path |"
+            + "\n| --- | --- |"
+            + "\n| Default + Legacy on | NAudio WASAPI shared |"
+            + "\n| Legacy off (experimental) | BassWasapi shared |"
+            + "\n| Device (WASAPI Exclusive) | BassWasapi exclusive |"
+            + "\n| Device (ASIO) | ASIO |"
+            + "\n\nDetails: wiki Game Settings.");
 
         public static readonly EzLocalizationManager.EzLocalisableString LEGACY_AUDIO_HINT = new EzLocalizationManager.EzLocalisableString(
-            "勾选 | NAudio WASAPI 共享（Ez 默认）"
-            + "\n取消 | BassWasapi 共享（官方实验性）"
-            + "\n与下方「(WASAPI Exclusive) / (ASIO)」无关。",
-            "On | NAudio WASAPI shared (Ez default)"
-            + "\nOff | BassWasapi shared (official experimental)"
-            + "\nIndependent of (WASAPI Exclusive) / (ASIO) below.");
+            "| Legacy | 输出路径 |"
+            + "\n| --- | --- |"
+            + "\n| 勾选 | NAudio WASAPI 共享（Ez 默认） |"
+            + "\n| 取消 | BassWasapi 共享（官方实验性） |"
+            + "\n\n与下方「(WASAPI Exclusive) / (ASIO)」无关。",
+            "| Legacy | Output path |"
+            + "\n| --- | --- |"
+            + "\n| On | NAudio WASAPI shared (Ez default) |"
+            + "\n| Off | BassWasapi shared (official experimental) |"
+            + "\n\nIndependent of (WASAPI Exclusive) / (ASIO) below.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString(
             "ASIO 输出格式（内部 PCM）",
