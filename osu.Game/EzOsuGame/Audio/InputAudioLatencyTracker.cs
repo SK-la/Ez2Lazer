@@ -31,6 +31,7 @@ namespace osu.Game.EzOsuGame.Audio
         private bool initialized;
         private bool started;
         private bool disposed;
+        private bool reportGenerated;
 
         public static InputAudioLatencyTracker? Instance { get; private set; }
 
@@ -53,19 +54,19 @@ namespace osu.Game.EzOsuGame.Audio
             {
                 // Re-entering a session: keep bindings, refresh stats and judgement subscription.
                 latencyManager.ClearStatistics();
+                reportGenerated = false;
                 if (latencyManager.Enabled.Value)
                     Start();
                 return;
             }
 
             initialized = true;
+            reportGenerated = false;
             latencyManager.ClearStatistics();
 
             inputAudioLatencyConfigBindable = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker);
             inputAudioLatencyConfigHandler = v => latencyManager.Enabled.Value = v.NewValue;
             inputAudioLatencyConfigBindable.BindValueChanged(inputAudioLatencyConfigHandler, true);
-
-            // Do not subscribe OnNewRecord for per-hit logging — session summary only (avoids audio-thread log spam).
 
             enabledChangedHandler = enabled =>
             {
@@ -114,11 +115,15 @@ namespace osu.Game.EzOsuGame.Audio
                 latencyManager.RecordInputEvent(column);
         }
 
+        /// <summary>
+        /// Emit session summary (log + notification). Safe to call from results or exit; only runs once per session.
+        /// </summary>
         public void GenerateLatencyReport()
         {
-            if (disposed)
+            if (disposed || reportGenerated)
                 return;
 
+            reportGenerated = true;
             Stop();
 
             var stats = latencyManager.GetStatistics();
@@ -129,17 +134,32 @@ namespace osu.Game.EzOsuGame.Audio
                 return;
             }
 
-            Logger.Log(
-                $"[EzOsuLatency] Input→Judge={stats.AvgInputToJudge:F2}ms Input→Audio={stats.AvgInputToPlayback:F2}ms Audio→Judge={stats.AvgPlaybackToJudge:F2}ms n={stats.RecordCount}",
-                Ez2ConfigManager.LOGGER_NAME,
-                LogLevel.Debug);
+            string summary =
+                $"[EzOsuLatency] n={stats.RecordCount}"
+                + $" | Input→Audio avg/min/max={stats.AvgInputToPlayback:F2}/{stats.MinInputToPlayback:F2}/{stats.MaxInputToPlayback:F2}ms"
+                + $" | Input→Judge avg/min/max={stats.AvgInputToJudge:F2}/{stats.MinInputToJudge:F2}/{stats.MaxInputToJudge:F2}ms"
+                + $" | Audio→Judge avg/min/max={stats.AvgPlaybackToJudge:F2}/{stats.MinPlaybackToJudge:F2}/{stats.MaxPlaybackToJudge:F2}ms";
 
-            notificationOverlay?.Post(new SimpleNotification
+            Logger.Log(summary, Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            // Also mirror to runtime so the summary is easy to find without filtering Ez logger.
+            Logger.Log(summary, LoggingTarget.Runtime, LogLevel.Debug);
+
+            if (notificationOverlay == null)
             {
-                Text =
-                    $"Latency analysis complete!\nInput→Judge: {stats.AvgInputToJudge:F1}ms\nInput→Audio: {stats.AvgInputToPlayback:F1}ms\nAudio→Judge: {stats.AvgPlaybackToJudge:F1}ms\nRecords: {stats.RecordCount}",
-                Icon = FontAwesome.Solid.ChartLine,
-            });
+                Logger.Log("[EzOsuLatency] summary ready but INotificationOverlay is null", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            }
+            else
+            {
+                notificationOverlay.Post(new SimpleNotification
+                {
+                    Text =
+                        $"Latency summary (n={stats.RecordCount})\n"
+                        + $"Input→Audio  avg {stats.AvgInputToPlayback:F1}  min {stats.MinInputToPlayback:F1}  max {stats.MaxInputToPlayback:F1} ms\n"
+                        + $"Input→Judge  avg {stats.AvgInputToJudge:F1}  min {stats.MinInputToJudge:F1}  max {stats.MaxInputToJudge:F1} ms\n"
+                        + $"Audio→Judge  avg {stats.AvgPlaybackToJudge:F1}  min {stats.MinPlaybackToJudge:F1}  max {stats.MaxPlaybackToJudge:F1} ms",
+                    Icon = FontAwesome.Solid.ChartLine,
+                });
+            }
 
             latencyManager.ClearStatistics();
         }
@@ -162,6 +182,10 @@ namespace osu.Game.EzOsuGame.Audio
         {
             if (disposed)
                 return;
+
+            // Last chance if results/exit hooks were skipped (e.g. abrupt teardown).
+            if (!reportGenerated)
+                GenerateLatencyReport();
 
             disposed = true;
             Stop();

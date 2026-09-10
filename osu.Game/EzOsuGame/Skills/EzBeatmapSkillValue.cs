@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Game.Beatmaps;
 using Realms;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -18,7 +19,7 @@ namespace osu.Game.EzOsuGame.Skills
         [Indexed]
         public string BeatmapHash { get; set; } = string.Empty;
 
-        /// <summary>Optional <see cref="Beatmaps.BeatmapInfo.ID"/> for maintenance when hash changes.</summary>
+        /// <summary>Optional <see cref="BeatmapInfo.ID"/> for maintenance when hash changes.</summary>
         [Indexed]
         public Guid BeatmapId { get; set; } = Guid.Empty;
 
