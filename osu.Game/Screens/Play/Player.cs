@@ -195,6 +195,9 @@ namespace osu.Game.Screens.Play
         [Resolved]
         private OsuGameBase game { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private INotificationOverlay notificationOverlay { get; set; }
+
         public GameplayState GameplayState { get; private set; }
 
         private Ruleset ruleset;
@@ -326,7 +329,7 @@ namespace osu.Game.Screens.Play
             // 初始化InputAudioLatencyTracker
             if (GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.InputAudioLatencyTracker))
             {
-                LatencyTracker = new InputAudioLatencyTracker(ez2Config);
+                LatencyTracker = new InputAudioLatencyTracker(ez2Config, notificationOverlay);
                 dependencies.CacheAs(LatencyTracker);
                 LatencyTracker.Initialize(ScoreProcessor);
                 LatencyTracker.Start();
