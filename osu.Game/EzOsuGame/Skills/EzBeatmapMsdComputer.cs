@@ -77,10 +77,10 @@ namespace osu.Game.EzOsuGame.Skills
 
             if (vector.Overall <= 0 && vector.Stream <= 0)
             {
-                if (!EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount) && !EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount))
-                    Logger.Log($"MSD skip unsupported keymode {keyCount}K for {beatmapInfo}");
-                else
+                if (EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount) && EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount))
                     Logger.Log($"MSD zero vector for {beatmapInfo} (keys={keyCount})");
+                // else
+                //     Logger.Log($"MSD skip unsupported keymode {keyCount}K for {beatmapInfo}");
 
                 return null;
             }
