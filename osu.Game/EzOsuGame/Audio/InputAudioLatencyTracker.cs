@@ -16,18 +16,17 @@ using osuTK.Input;
 namespace osu.Game.EzOsuGame.Audio
 {
     /// <summary>
-    /// 音频闭环延迟桥：游戏输入戳 → <c>Sample.Play</c> → WASAPI loopback（仅 NAudio Default）。
+    /// 音频闭环延迟桥：输入戳 → <c>Sample.Play</c> → 输出路径 PCM 过阈值
+    /// （Default / Shared / Exclusive / ASIO；非麦克风 loopback）。
     /// 判定耗时（In→Judge）归 <see cref="Diagnostics.EzJudgmentDiagnostics"/>，不在此追踪。
     /// </summary>
     public partial class InputAudioLatencyTracker : IDisposable
     {
         /// <summary>
-        /// Loopback RMS threshold (linear 0–1). Expression-bodied so IDE hot reload can tune without a settings entry.
-        /// <para></para>
-        /// 信号电平换算公式:
-        /// <code>20 * log10(0.02) ≈ -34 dBFS</code>
+        /// 输出路径 RMS 阈值（线性 0–1）。表达式属性便于 IDE 热重载调试，无设置项。
+        /// 电平换算：<c>20 * log10(0.08) ≈ -22 dBFS</c>。
         /// </summary>
-        public static float AcousticRmsThreshold => 0.02f;
+        public static float AcousticRmsThreshold => 0.08f;
 
         private readonly Ez2ConfigManager ezConfig;
         private readonly INotificationOverlay? notificationOverlay;

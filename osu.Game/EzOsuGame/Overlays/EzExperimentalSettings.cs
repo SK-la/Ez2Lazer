@@ -416,14 +416,15 @@ namespace osu.Game.EzOsuGame.Overlays
             "输入音频延迟追踪器", "Input Audio Latency Tracker");
 
         internal static readonly LocalisableString INPUT_AUDIO_LATENCY_TRACKER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(测试功能)追踪按键→Sample.Play→WASAPI Loopback 的音频闭环延迟（不含判定）。局末弹统计；明细见 ez_runtime。"
-            + "\nIn→Play：软件段；Play→Acou / In→Acou：当前输出 loopback 过阈值（非麦克风）。"
-            + "\n判定耗时请开「Ez 判定诊断」CSV。阈值：改 AcousticRmsThreshold（可热重载）。",
-            "(Testing feature) Tracks key → Sample.Play → WASAPI loopback audio latency (not judgment). "
-            + "Summary after play; details in ez_runtime."
-            + "\nIn→Play: software; Play→Acou / In→Acou: current-output loopback threshold (not a mic)."
+            "(测试功能) 追踪按键 → Sample.Play → 输出路径 PCM 过阈值的闭环延迟（不含判定）。"
+            + "Default / Shared / Exclusive / ASIO 均可用；局末弹统计，明细见 ez_runtime。"
+            + "\nIn→Play：软件段；Play→Acou / In→Acou：混音进入当前输出驱动时过阈值（非麦克风）。"
+            + "\n判定耗时请开「Ez 判定诊断」CSV。阈值：AcousticRmsThreshold（可热重载）。",
+            "(Testing feature) Tracks key → Sample.Play → output-path PCM threshold latency (not judgment). "
+            + "Works on Default / Shared / Exclusive / ASIO; summary after play, details in ez_runtime."
+            + "\nIn→Play: software; Play→Acou / In→Acou: mixer PCM crosses threshold as it enters the active output driver (not a mic)."
             + "\nFor key→judgment latency, enable Ez Judgment Diagnostics CSV. "
-            + "Threshold: edit AcousticRmsThreshold (hot-reloadable).");
+            + "Threshold: AcousticRmsThreshold (hot-reloadable).");
 
         internal static readonly LocalisableString EZ_SCORE_RACE_SERVICE_ENABLED = new EzLocalizationManager.EzLocalisableString(
             "启用角逐/时间线全局服务", "Enable Score Race / Timeline Global Service");

@@ -31,6 +31,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// <summary>高精度计时器，提供微秒级别 wallclock。</summary>
         private static readonly Stopwatch wallclock = Stopwatch.StartNew();
 
+        /// <summary>按键 wall 戳到本条判定检查的耗时（ms）；无有效按键戳时为 NaN。</summary>
         public readonly record struct JudgmentSample(
             double WallMs,
             double GameTime,
@@ -40,7 +41,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double BassSourceTime,
             double InterpolatedDrift,
             double FrameElapsed,
-            /// <summary>按键 wall 戳到本条判定检查的耗时（ms）；无有效按键戳时为 NaN。</summary>
             double InputToJudgeMs);
 
         /// <summary>
