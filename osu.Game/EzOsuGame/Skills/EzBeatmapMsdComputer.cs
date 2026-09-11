@@ -97,7 +97,41 @@ namespace osu.Game.EzOsuGame.Skills
             if (double.IsFinite(holdRatio))
                 result[EzSkillSystems.MsdHoldRatioSkillId] = Math.Clamp(holdRatio, 0, 1);
 
+            // Same as xxy import hot-write: when MSD lands, persist ChartDan so select can read Realm.
+            tryUpsertChartDanFromMsd(beatmapInfo, result, keyCount, holdRatio);
+
             return result;
+        }
+
+        private void tryUpsertChartDanFromMsd(
+            BeatmapInfo beatmapInfo,
+            IReadOnlyDictionary<string, double> msd,
+            int keyCount,
+            double holdRatio)
+        {
+            try
+            {
+                skillStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var chartInfo);
+                if (chartInfo is { IsUnavailable: true })
+                    chartInfo = null;
+
+                double? xxySr = beatmapInfo.XxyStarRating >= 0 ? beatmapInfo.XxyStarRating : null;
+                var persisted = EzPersistedChartDan.TryComputeFromStored(
+                    beatmapInfo.Hash,
+                    beatmapInfo.ID,
+                    msd,
+                    keyCount > 0 ? keyCount : 4,
+                    holdRatio,
+                    xxySr,
+                    chartInfo);
+
+                if (persisted != null)
+                    skillStore.UpsertChartDan(persisted);
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"ChartDan upsert after MSD failed for {beatmapInfo}: {e.Message}");
+            }
         }
 
         private static EzSkillsetVector calculateMsd(

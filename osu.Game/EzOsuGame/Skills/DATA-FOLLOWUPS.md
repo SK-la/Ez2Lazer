@@ -7,7 +7,7 @@ Do **not** re-encode lasting follow-ups as only `// TODO(data)` in product code 
 | ID | Plan name | Scope | Status |
 |----|-----------|--------|--------|
 | — | SCHEMA EZ9 | Typed `EzBeatmapChartSkillInfo` + `EzPlayerDanSkillsetValue` in Realm | **Done** |
-| — | SCHEMA EZ10 / DATA-ChartDan-Realm | Nomod `EzBeatmapChartDan` + skillset stamps; BDSP `populateMissingChartDan`; DualPanel/Provider song-select **zero engine** (no sync playable/Mina/LeoBlack); rate-mod chart dan stays out | **Done** |
+| — | SCHEMA EZ10 / DATA-ChartDan-Realm | Nomod `EzBeatmapChartDan` + skillset stamps; BDSP after MSD; DualPanel: Realm → session memory compute (no Upsert); panel: Realm/session only; MSD `ComputeAndStore` also Upsert ChartDan | **Done** |
 | — | Debt: SQLite ChartSkillInfo | Abandoned analysis `chart_skill_info` JSON; no import/migrate; miss → recompute | **Done** |
 | — | Debt: single Realm skill facade | ChartSkillInfo CRUD merged into `EzSkillStore`; deleted `EzChartSkillInfoStore` | **Done** |
 | — | DATA-Skillset-Cache | Writers + Provider cache-hit; LocalProfile rebuild calls `RefreshDanSkillsets` | **Done** |

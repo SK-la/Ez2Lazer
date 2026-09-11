@@ -2,10 +2,10 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Rulesets.Mods;
@@ -28,6 +28,16 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Session-only CSI compute failures — keep miss in Realm so BDSP can retry next launch.</summary>
         private readonly HashSet<string> chartSkillInfoSessionMisses = new HashSet<string>(StringComparer.Ordinal);
 
+        /// <summary>Session MSD cache (complete rows only). Not written to disk.</summary>
+        private readonly ConcurrentDictionary<string, IReadOnlyDictionary<string, double>> msdSessionCache
+            = new ConcurrentDictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Session ChartDan cache. May hold Realm copies or DualPanel memory-only computes (never auto-upserted).
+        /// </summary>
+        private readonly ConcurrentDictionary<string, EzPersistedChartDan> chartDanSessionCache
+            = new ConcurrentDictionary<string, EzPersistedChartDan>(StringComparer.Ordinal);
+
         public EzSkillProvider(
             EzSkillStore store,
             EzSkillRegistry? registry = null,
@@ -45,7 +55,33 @@ namespace osu.Game.EzOsuGame.Skills
         public EzSkillRegistry Registry { get; }
 
         public IReadOnlyDictionary<string, double> GetBeatmapMsd(string beatmapHash)
-            => store.GetBeatmapSkills(beatmapHash, EzSkillSystems.BEATMAP_MSD);
+        {
+            if (string.IsNullOrEmpty(beatmapHash))
+                return new Dictionary<string, double>(StringComparer.Ordinal);
+
+            if (msdSessionCache.TryGetValue(beatmapHash, out var cached))
+                return cached;
+
+            var msd = store.GetBeatmapSkills(beatmapHash, EzSkillSystems.BEATMAP_MSD);
+            if (EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
+                msdSessionCache[beatmapHash] = msd;
+
+            return msd;
+        }
+
+        /// <summary>Drop session MSD entry so the next read refreshes from Realm (e.g. after WriteBeatmapMsd).</summary>
+        public void InvalidateMsdSession(string beatmapHash)
+        {
+            if (!string.IsNullOrEmpty(beatmapHash))
+                msdSessionCache.TryRemove(beatmapHash, out _);
+        }
+
+        /// <summary>Drop session ChartDan entry (e.g. after Realm UpsertChartDan).</summary>
+        public void InvalidateChartDanSession(string beatmapHash)
+        {
+            if (!string.IsNullOrEmpty(beatmapHash))
+                chartDanSessionCache.TryRemove(beatmapHash, out _);
+        }
 
         /// <summary>
         /// Chart dan from persisted MSD (+ Realm xxy when present). No MSD compute / no beatmap note load.
@@ -451,71 +487,102 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Song-select / DualPanel: Realm ChartDan stamps, else in-memory filing from stored MSD+CSI.
-        /// Never sync Mina / LeoBlack / GetPlayable.
+        /// Song-select / DualPanel chart dan for UI.
+        /// Order: Realm (updates session) → session memory → optional in-memory compute from MSD+CSI (no disk write).
         /// </summary>
-        public IReadOnlyDictionary<string, string> GetChartDanSkillsetLabelsReadOnly(
-            BeatmapInfo beatmapInfo,
-            int keyCount,
-            EzDanSide side)
-        {
-            var result = new Dictionary<string, string>(StringComparer.Ordinal);
-            if (keyCount <= 0 || beatmapInfo.Ruleset.OnlineID != 3)
-                return result;
-
-            if (TryGetPersistedChartDan(beatmapInfo, out var persisted) && persisted != null)
-                return persisted.SkillsetLabelsFor(side);
-
-            var msd = GetBeatmapMsd(beatmapInfo.Hash);
-            double holdRatio = 0;
-            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
-                holdRatio = Math.Clamp(cachedHold, 0, 1);
-
-            EzChartSkillInfo? chartInfo = null;
-            if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var storedCsi) && storedCsi is { IsUnavailable: false })
-                chartInfo = storedCsi;
-
-            if (holdRatio <= 0 && chartInfo?.LnRatio is double lnRatio && double.IsFinite(lnRatio))
-                holdRatio = Math.Clamp(lnRatio, 0, 1);
-
-            if (!EzDanAlgorithm.AllowsChartSideHalf(side, keyCount, holdRatio))
-                return result;
-
-            string? aggregateLabel = null;
-            double xxy = beatmapInfo.XxyStarRating;
-
-            if (xxy >= 0 && double.IsFinite(xxy)
-                         && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), xxy, out var sunny)
-                         && !string.IsNullOrEmpty(sunny.DisplayLabel))
-            {
-                aggregateLabel = sunny.DisplayLabel;
-            }
-            else
-            {
-                var cached = TryGetCachedChartDan(beatmapInfo);
-                if (cached != null && cached.Side == side && !string.IsNullOrEmpty(cached.Label))
-                    aggregateLabel = cached.Label;
-            }
-
-            if (string.IsNullOrEmpty(aggregateLabel))
-                return result;
-
-            double? length = chartInfo?.LengthSeconds ?? (beatmapInfo.Length > 0 ? beatmapInfo.Length / 1000.0 : null);
-            var buckets = EzDanSkillsetFiling.BucketsForValues(keyCount, side, msd, length, rate: 1, chartInfo);
-            foreach (string id in buckets)
-                result[id] = aggregateLabel;
-
-            return result;
-        }
-
-        /// <summary>Current-version Realm ChartDan row (nomod). Miss when absent or algorithm mismatch.</summary>
-        public bool TryGetPersistedChartDan(BeatmapInfo beatmapInfo, out EzPersistedChartDan? chartDan)
+        /// <param name="allowMemoryCompute">
+        /// When true (DualPanel), miss may FromMsd+filing into <see cref="chartDanSessionCache"/> only.
+        /// When false (carousel panel), never compute — Realm/session hit or empty.
+        /// </param>
+        public bool TryGetChartDanForUi(BeatmapInfo beatmapInfo, out EzPersistedChartDan? chartDan, bool allowMemoryCompute = false)
         {
             chartDan = null;
             if (beatmapInfo.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(beatmapInfo.Hash))
                 return false;
 
-            return store.TryGetChartDan(beatmapInfo.Hash, out chartDan);
+            string hash = beatmapInfo.Hash;
+
+            if (store.TryGetChartDan(hash, out var fromRealm) && fromRealm != null)
+            {
+                chartDanSessionCache[hash] = fromRealm;
+                chartDan = fromRealm;
+                return true;
+            }
+
+            if (chartDanSessionCache.TryGetValue(hash, out var fromSession))
+            {
+                chartDan = fromSession;
+                return true;
+            }
+
+            if (!allowMemoryCompute)
+                return false;
+
+            var computed = tryComputeChartDanMemoryOnly(beatmapInfo);
+            if (computed == null)
+                return false;
+
+            chartDanSessionCache[hash] = computed;
+            chartDan = computed;
+            return true;
+        }
+
+        /// <summary>Current-version Realm ChartDan row (nomod). Also warms session cache. Miss when absent or algorithm mismatch.</summary>
+        public bool TryGetPersistedChartDan(BeatmapInfo beatmapInfo, out EzPersistedChartDan? chartDan)
+            => TryGetChartDanForUi(beatmapInfo, out chartDan, allowMemoryCompute: false);
+
+        /// <summary>
+        /// Song-select / DualPanel: labels from <see cref="TryGetChartDanForUi"/> (Realm or session memory).
+        /// Never sync Mina / LeoBlack / GetPlayable; never Upsert Realm from this path.
+        /// </summary>
+        public IReadOnlyDictionary<string, string> GetChartDanSkillsetLabelsReadOnly(
+            BeatmapInfo beatmapInfo,
+            int keyCount,
+            EzDanSide side,
+            bool allowMemoryCompute = false)
+        {
+            if (keyCount <= 0 || beatmapInfo.Ruleset.OnlineID != 3)
+                return new Dictionary<string, string>(StringComparer.Ordinal);
+
+            if (TryGetChartDanForUi(beatmapInfo, out var row, allowMemoryCompute) && row != null)
+                return row.SkillsetLabelsFor(side);
+
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+
+        private EzPersistedChartDan? tryComputeChartDanMemoryOnly(BeatmapInfo beatmapInfo)
+        {
+            var msd = GetBeatmapMsd(beatmapInfo.Hash);
+            if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
+                return null;
+
+            int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
+            if (keyCount <= 0)
+                keyCount = 4;
+
+            double holdRatio = 0;
+            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+                holdRatio = Math.Clamp(cachedHold, 0, 1);
+
+            EzChartSkillInfo? chartInfo = null;
+
+            if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var storedCsi) && storedCsi is { IsUnavailable: false })
+            {
+                chartInfo = storedCsi;
+                if (holdRatio <= 0 && chartInfo.LnRatio is double lnRatio && double.IsFinite(lnRatio))
+                    holdRatio = Math.Clamp(lnRatio, 0, 1);
+            }
+
+            double? xxySr = beatmapInfo.XxyStarRating >= 0 ? beatmapInfo.XxyStarRating : null;
+
+            return EzPersistedChartDan.TryComputeFromStored(
+                beatmapInfo.Hash,
+                beatmapInfo.ID,
+                msd,
+                keyCount,
+                holdRatio,
+                xxySr,
+                chartInfo);
         }
 
         /// <summary>Backward-compatible overload: RC-side labels only.</summary>

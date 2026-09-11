@@ -233,7 +233,8 @@ namespace osu.Game.EzOsuGame.HUD
             if (wantChart && beatmap?.Value.BeatmapInfo != null)
             {
                 var info = beatmap.Value.BeatmapInfo;
-                skillProvider.TryGetPersistedChartDan(info, out persistedChartDan);
+                // Realm first; miss → memory compute + session cache only (no Upsert).
+                skillProvider.TryGetChartDanForUi(info, out persistedChartDan, allowMemoryCompute: true);
 
                 if (keys <= 0)
                 {
@@ -243,18 +244,10 @@ namespace osu.Game.EzOsuGame.HUD
                         keys = (int)info.Difficulty.CircleSize;
                 }
 
-                if (keys > 0)
+                if (keys > 0 && persistedChartDan != null)
                 {
-                    if (persistedChartDan != null)
-                    {
-                        chartSkillsetLabelsRc = persistedChartDan.SkillsetLabelsFor(EzDanSide.Rc);
-                        chartSkillsetLabelsLn = persistedChartDan.SkillsetLabelsFor(EzDanSide.Ln);
-                    }
-                    else
-                    {
-                        chartSkillsetLabelsRc = skillProvider.GetChartDanSkillsetLabelsReadOnly(info, keys, EzDanSide.Rc);
-                        chartSkillsetLabelsLn = skillProvider.GetChartDanSkillsetLabelsReadOnly(info, keys, EzDanSide.Ln);
-                    }
+                    chartSkillsetLabelsRc = persistedChartDan.SkillsetLabelsFor(EzDanSide.Rc);
+                    chartSkillsetLabelsLn = persistedChartDan.SkillsetLabelsFor(EzDanSide.Ln);
                 }
             }
 
@@ -362,41 +355,29 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         /// <summary>
-        /// Hub-style RC|LN chart halves: Sunny/xxy per side only when hold ratio matches that side's primary identity.
-        /// Sparse-LN rice charts must not print a high LN Sunny label.
-        /// Read-only: Realm ChartDan → Sunny/xxy → cached MSD FromMsd (no Mina).
+        /// Hub-style RC|LN chart halves. Uses DualPanel-resolved ChartDan row (Realm or session memory).
         /// </summary>
         private string? resolveChartAggregateLabel(EzDanSide side, int keys, EzPersistedChartDan? persisted)
         {
             if (beatmap?.Value.BeatmapInfo == null || skillProvider == null)
                 return null;
 
-            var info = beatmap.Value.BeatmapInfo;
-
             string? fromRow = persisted?.LabelFor(side);
             if (fromRow != null)
                 return fromRow;
 
-            double holdRatio = 0;
+            if (persisted == null)
+                return null;
 
-            if (persisted != null && double.IsFinite(persisted.HoldRatio))
-                holdRatio = Math.Clamp(persisted.HoldRatio, 0, 1);
-            else
-            {
-                var msd = skillProvider.GetBeatmapMsd(info.Hash);
-                if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
-                    holdRatio = Math.Clamp(cachedHold, 0, 1);
-            }
+            double holdRatio = double.IsFinite(persisted.HoldRatio)
+                ? Math.Clamp(persisted.HoldRatio, 0, 1)
+                : 0;
 
-            var chart = skillProvider.TryGetCachedChartDan(info);
-
-            if (holdRatio <= 0 && chart != null && double.IsFinite(chart.HoldRatio))
-                holdRatio = Math.Clamp(chart.HoldRatio, 0, 1);
-
-            int gateKeys = keys > 0 ? keys : persisted?.KeyCount ?? chart?.KeyCount ?? 0;
+            int gateKeys = keys > 0 ? keys : persisted.KeyCount;
             if (gateKeys > 0 && !EzDanAlgorithm.AllowsChartSideHalf(side, gateKeys, holdRatio))
                 return null;
 
+            var info = beatmap.Value.BeatmapInfo;
             double xxy = info.XxyStarRating;
 
             if (keys > 0 && xxy >= 0 && double.IsFinite(xxy)
@@ -405,9 +386,6 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 return sunny.DisplayLabel;
             }
-
-            if (chart != null && (keys <= 0 || chart.KeyCount == keys) && chart.Side == side && !string.IsNullOrEmpty(chart.Label))
-                return chart.Label;
 
             return null;
         }

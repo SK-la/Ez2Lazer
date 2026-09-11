@@ -300,10 +300,9 @@ namespace osu.Game.EzOsuGame.UserInterface
             if (beatmap == null)
                 return;
 
-            // Song-select panel: only Realm ChartDan. Miss → hide (BDSP / Realm ChartDan).
-            // Do not call TryGetCachedChartDan — that reads MSD + FromMsd per visible panel.
+            // Realm or session (DualPanel may have memory-computed). Panel never computes.
             if (skillProvider != null
-                && skillProvider.TryGetPersistedChartDan(beatmap, out var persisted)
+                && skillProvider.TryGetChartDanForUi(beatmap, out var persisted, allowMemoryCompute: false)
                 && persisted != null)
             {
                 var side = persisted.HasSide(EzDanSide.Ln) ? EzDanSide.Ln : EzDanSide.Rc;
