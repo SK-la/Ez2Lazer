@@ -274,8 +274,29 @@ namespace osu.Game.EzOsuGame.HUD
 
             bool showClearCounts = ShowClearCounts.Value && wantPlayer && hasUser;
 
-            updateSide(rcList, EzDanSide.Rc, user, keys, chartSkillsetLabelsRc, wantChart, wantPlayer, showClearCounts);
-            updateSide(lnList, EzDanSide.Ln, user, keys, chartSkillsetLabelsLn, wantChart, wantPlayer, showClearCounts);
+            double? playerOverall = null;
+            double? chartOverall = null;
+
+            if (wantPlayer && hasUser && skillProvider != null)
+            {
+                double overall = skillProvider.GetPlayerSsrSnapshot(user!, keys).Overall;
+                if (overall > 0 && double.IsFinite(overall))
+                    playerOverall = overall;
+            }
+
+            if (wantChart && beatmap?.Value.BeatmapInfo != null && skillProvider != null)
+            {
+                var msd = skillProvider.GetBeatmapMsd(beatmap.Value.BeatmapInfo.Hash);
+
+                if (msd.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double overall)
+                    && overall > 0 && double.IsFinite(overall))
+                {
+                    chartOverall = overall;
+                }
+            }
+
+            updateSide(rcList, EzDanSide.Rc, user, keys, chartSkillsetLabelsRc, wantChart, wantPlayer, showClearCounts, playerOverall, chartOverall);
+            updateSide(lnList, EzDanSide.Ln, user, keys, chartSkillsetLabelsLn, wantChart, wantPlayer, showClearCounts, playerOverall, chartOverall);
         }
 
         private void showEmpty(LocalisableString text)
@@ -293,7 +314,9 @@ namespace osu.Game.EzOsuGame.HUD
             IReadOnlyDictionary<string, string> chartSkillsetLabels,
             bool wantChart,
             bool wantPlayer,
-            bool showClearCounts)
+            bool showClearCounts,
+            double? playerOverallRating,
+            double? chartOverallRating)
         {
             string? chartLabel = null;
             string? playerLabel = null;
@@ -321,7 +344,9 @@ namespace osu.Game.EzOsuGame.HUD
                 slots,
                 wantChart ? chartSkillsetLabels : new Dictionary<string, string>(),
                 wantPlayer ? playerSkillsets : new Dictionary<string, EzDanSkillsetVerdict>(),
-                showClearCounts);
+                showClearCounts,
+                wantPlayer ? playerOverallRating : null,
+                wantChart ? chartOverallRating : null);
         }
 
         /// <summary>

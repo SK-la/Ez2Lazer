@@ -257,5 +257,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DAN_PANEL_DUAL_LAYOUT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "Auto：按宽度切换；Horizontal：左右分列；Vertical：上下堆叠。",
             "Auto by width; Horizontal side-by-side; Vertical stacked.");
+
+        public static readonly LocalisableString DAN_PANEL_RATING = new EzLocalizationManager.EzLocalisableString("Rating", "Rating");
     }
 }

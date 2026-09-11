@@ -18,7 +18,8 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// One RC/LN side as a fixed 3-column grid: label | player | chart.
-    /// Skill rows stack vertically. Chart labels stay hub filing stamps (not per-axis chart dan).
+    /// Row 0: Rating (Overall SSR / Overall MSD); row 1: side dan aggregates; then skillset rows.
+    /// Chart skillset labels stay hub filing stamps (not per-axis chart dan).
     /// Clear score lists live on Local Profile, not here.
     /// </summary>
     public partial class EzDanLabeledStatList : CompositeDrawable
@@ -39,6 +40,9 @@ namespace osu.Game.EzOsuGame.Skills
         public EzDanSide Side { get; }
 
         private GridContainer grid = null!;
+        private OsuSpriteText ratingLabel = null!;
+        private OsuSpriteText playerRatingText = null!;
+        private OsuSpriteText chartRatingText = null!;
         private OsuSpriteText sideLabel = null!;
         private EzDisplayDan playerAggregateDan = null!;
         private EzDisplayDan chartAggregateDan = null!;
@@ -59,6 +63,18 @@ namespace osu.Game.EzOsuGame.Skills
         [BackgroundDependencyLoader]
         private void load()
         {
+            ratingLabel = new OsuSpriteText
+            {
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                Font = OsuFont.GetFont(size: 13, weight: FontWeight.SemiBold),
+                Colour = Colour4.White.Opacity(0.75f),
+                Text = EzHUDStrings.DAN_PANEL_RATING,
+            };
+
+            playerRatingText = createRatingValueText(Colour4.FromHex("#50dc78"));
+            chartRatingText = createRatingValueText(Colour4.FromHex("#e0b04c"));
+
             sideLabel = new OsuSpriteText
             {
                 Anchor = Anchor.CentreLeft,
@@ -96,15 +112,15 @@ namespace osu.Game.EzOsuGame.Skills
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
                 ColumnDimensions = column_dimensions,
-                RowDimensions = [new Dimension(GridSizeMode.Absolute, row_height)],
+                RowDimensions =
+                [
+                    new Dimension(GridSizeMode.Absolute, row_height),
+                    new Dimension(GridSizeMode.Absolute, row_height),
+                ],
                 Content = new[]
                 {
-                    new Drawable[]
-                    {
-                        sideLabel,
-                        playerAggregateDan,
-                        chartAggregateDan,
-                    },
+                    new Drawable[] { ratingLabel, playerRatingText, chartRatingText },
+                    new Drawable[] { sideLabel, playerAggregateDan, chartAggregateDan },
                 },
             };
         }
@@ -116,15 +132,21 @@ namespace osu.Game.EzOsuGame.Skills
             IReadOnlyList<EzDanSkillsetSlot> slots,
             IReadOnlyDictionary<string, string> chartLabelsBySkillset,
             IReadOnlyDictionary<string, EzDanSkillsetVerdict> playerSkillsets,
-            bool showClearCounts = false)
+            bool showClearCounts = false,
+            double? playerOverallRating = null,
+            double? chartOverallRating = null)
         {
             if (LoadState < LoadState.Ready)
             {
                 Schedule(() => UpdateContent(
                     keyCount, chartAggregateLabel, playerAggregateLabel,
-                    slots, chartLabelsBySkillset, playerSkillsets, showClearCounts));
+                    slots, chartLabelsBySkillset, playerSkillsets, showClearCounts,
+                    playerOverallRating, chartOverallRating));
                 return;
             }
+
+            setRatingValue(playerRatingText, playerOverallRating);
+            setRatingValue(chartRatingText, chartOverallRating);
 
             sideLabel.Text = Side == EzDanSide.Ln
                 ? EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_LN
@@ -146,9 +168,14 @@ namespace osu.Game.EzOsuGame.Skills
             var keep = new HashSet<string>(StringComparer.Ordinal);
             var content = new List<Drawable[]>
             {
+                new Drawable[] { ratingLabel, playerRatingText, chartRatingText },
                 new Drawable[] { sideLabel, playerAggregateDan, chartAggregateDan },
             };
-            var rowDims = new List<Dimension> { new Dimension(GridSizeMode.Absolute, row_height) };
+            var rowDims = new List<Dimension>
+            {
+                new Dimension(GridSizeMode.Absolute, row_height),
+                new Dimension(GridSizeMode.Absolute, row_height),
+            };
 
             foreach (var slot in slots)
             {
@@ -184,6 +211,29 @@ namespace osu.Game.EzOsuGame.Skills
             grid.Content = content.ToArray();
         }
 
+        private static OsuSpriteText createRatingValueText(Colour4 colour) => new OsuSpriteText
+        {
+            Anchor = Anchor.CentreLeft,
+            Origin = Anchor.CentreLeft,
+            Font = OsuFont.GetFont(size: 14, weight: FontWeight.Bold),
+            Colour = colour,
+            Alpha = 0,
+        };
+
+        private static void setRatingValue(OsuSpriteText text, double? value)
+        {
+            if (value is double v && double.IsFinite(v) && v > 0)
+            {
+                text.Text = v.ToString("0.00", CultureInfo.InvariantCulture);
+                text.Show();
+            }
+            else
+            {
+                text.Text = string.Empty;
+                text.Hide();
+            }
+        }
+
         private static void setAggregate(EzDisplayDan display, string? label, int keyCount, EzDanSide side)
         {
             if (!string.IsNullOrEmpty(label))
@@ -206,7 +256,6 @@ namespace osu.Game.EzOsuGame.Skills
             private readonly EzDisplayDan playerDan;
             private readonly OsuSpriteText playerClearsText;
             private readonly EzDisplayDan chartDan;
-            private readonly Container playerCell;
 
             public SkillsetGridRow(float displayScale)
             {
@@ -236,7 +285,7 @@ namespace osu.Game.EzOsuGame.Skills
                 };
 
                 // Horizontal FillFlow: all children CentreLeft (same RelativeAnchorPosition.X).
-                playerCell = new Container
+                var playerCell1 = new Container
                 {
                     RelativeSizeAxes = Axes.Both,
                     Child = new FillFlowContainer
@@ -264,7 +313,7 @@ namespace osu.Game.EzOsuGame.Skills
                     Alpha = 0,
                 };
 
-                Cells = new Drawable[] { name, playerCell, chartDan };
+                Cells = new Drawable[] { name, playerCell1, chartDan };
             }
 
             public void Update(
