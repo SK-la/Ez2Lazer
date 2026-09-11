@@ -105,7 +105,6 @@ namespace osu.Game.Screens.Select
 
                         dbBeatmap.HasStoryboard ??= onlineBeatmapSet.HasStoryboard;
 
-                        onlineBeatmap.BeatmapSet = onlineBeatmapSet;
                         HashSet<string> userTags = onlineBeatmap.GetTopUserTags(confirmedOnly: true)
                                                                 .Select(t => t.Tag.Name)
                                                                 .ToHashSet();
