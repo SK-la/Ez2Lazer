@@ -1039,12 +1039,15 @@ namespace osu.Game.Database
         /// <summary>
         /// Backfill nomod <see cref="EzBeatmapChartDan"/> from stored MSD (+ CSI / xxy when present).
         /// Prefer no <c>GetPlayable</c> — hold from MSD <c>hold_ratio</c> or CSI <c>LnRatio</c>.
+        /// Candidate set mirrors MSD: skip unsupported keymodes; only attempt hashes with complete MSD
+        /// (missing MSD is deferred, not counted as ChartDan failure).
         /// </summary>
         private void populateMissingChartDan()
         {
             Logger.Log("Querying for mania beatmaps with missing ChartDan...");
 
             List<(Guid Id, string Hash)> candidates = new List<(Guid, string)>();
+            int skippedUnsupportedKeyCount = 0;
 
             realmAccess.Run(r =>
             {
@@ -1059,20 +1062,56 @@ namespace osu.Game.Database
                     if (string.IsNullOrEmpty(b.Hash))
                         continue;
 
+                    int keyCount = (int)Math.Round(b.Difficulty.CircleSize);
+
+                    if (keyCount > 0
+                        && !EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount)
+                        && !EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount))
+                    {
+                        ++skippedUnsupportedKeyCount;
+                        continue;
+                    }
+
                     candidates.Add((b.ID, b.Hash));
                 }
             });
 
+            if (skippedUnsupportedKeyCount > 0)
+                Logger.Log($"Skipping {skippedUnsupportedKeyCount} mania beatmaps with unsupported keycounts for ChartDan (same as MSD).");
+
             if (candidates.Count == 0)
                 return;
 
-            var completeHashes = skillStore.GetPersistedChartDanHashes();
-            var missing = candidates.Where(c => !completeHashes.Contains(c.Hash)).ToList();
+            var completeChartDan = skillStore.GetPersistedChartDanHashes();
+            var completeMsd = skillStore.GetCompleteBeatmapMsdHashes();
+
+            int waitingOnMsd = 0;
+            var missing = new List<(Guid Id, string Hash)>();
+
+            foreach (var candidate in candidates)
+            {
+                if (completeChartDan.Contains(candidate.Hash))
+                    continue;
+
+                if (!completeMsd.Contains(candidate.Hash))
+                {
+                    ++waitingOnMsd;
+                    continue;
+                }
+
+                missing.Add(candidate);
+            }
+
+            if (waitingOnMsd > 0)
+                Logger.Log($"Deferring {waitingOnMsd} ChartDan candidates until MSD is complete (run Realm MSD first).");
 
             if (missing.Count == 0)
+            {
+                Logger.Log($"ChartDan backfill: nothing ready (have ChartDan or waiting on MSD). unsupportedKeymode={skippedUnsupportedKeyCount}, waitingOnMsd={waitingOnMsd}");
                 return;
+            }
 
-            Logger.Log($"Found {missing.Count} beatmaps which require ChartDan reprocessing.");
+            Logger.Log($"Found {missing.Count} beatmaps which require ChartDan reprocessing (have complete MSD).");
 
             var notification = showProgressNotification(missing.Count, "Reprocessing ChartDan", "beatmaps' ChartDan have been updated");
 
@@ -1102,6 +1141,7 @@ namespace osu.Game.Database
                 {
                     var msd = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD);
 
+                    // completeMsd already filtered; re-check guards races / version drift mid-run.
                     if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
                     {
                         ++failedCount;
@@ -1155,10 +1195,11 @@ namespace osu.Game.Database
                 updateNotificationProgress(notification, attemptedCount, missing.Count);
 
                 if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
-                    Logger.Log($"ChartDan backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount})");
+                    Logger.Log($"ChartDan backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount}; deferredNoMsd={waitingOnMsd}, unsupportedKeymode={skippedUnsupportedKeyCount})");
             }
 
             completeNotification(notification, processedCount, missing.Count, failedCount);
+            Logger.Log($"ChartDan backfill finished: ok={processedCount}, fail={failedCount}, deferredNoMsd={waitingOnMsd}, unsupportedKeymode={skippedUnsupportedKeyCount}");
         }
 
         /// <summary>
