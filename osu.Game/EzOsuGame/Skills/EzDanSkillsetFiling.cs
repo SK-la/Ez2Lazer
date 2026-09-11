@@ -121,13 +121,13 @@ namespace osu.Game.EzOsuGame.Skills
             if (bucketDefs.Count == 0 || clears.Count == 0)
                 return result;
 
-            var byBucket = new Dictionary<string, List<double>>(StringComparer.Ordinal);
-            var primaryByBucket = new Dictionary<string, List<double>>(StringComparer.Ordinal);
+            var byBucket = new Dictionary<string, List<EzDanClearEvidenceRow>>(StringComparer.Ordinal);
+            var primaryByBucket = new Dictionary<string, List<EzDanClearEvidenceRow>>(StringComparer.Ordinal);
 
             foreach (var bucket in bucketDefs)
             {
-                byBucket[bucket.Id] = new List<double>();
-                primaryByBucket[bucket.Id] = new List<double>();
+                byBucket[bucket.Id] = new List<EzDanClearEvidenceRow>();
+                primaryByBucket[bucket.Id] = new List<EzDanClearEvidenceRow>();
             }
 
             foreach (var clear in clears)
@@ -179,12 +179,12 @@ namespace osu.Game.EzOsuGame.Skills
                 for (int index = 0; index < filed.Count; index++)
                 {
                     var bucket = filed[index];
-                    byBucket[bucket.Id].Add(clear.CreditedDan);
+                    byBucket[bucket.Id].Add(clear);
 
                     // Tag keymodes overlap by analyzer tag; every tag filing is primary.
                     // Only 4K shared tiles rank (skillsets != null).
                     if (index == 0 || bucket.Skillsets == null)
-                        primaryByBucket[bucket.Id].Add(clear.CreditedDan);
+                        primaryByBucket[bucket.Id].Add(clear);
                 }
             }
 
@@ -199,13 +199,11 @@ namespace osu.Game.EzOsuGame.Skills
                 if (all.Count < EzDanAlgorithm.CLEAR_QUORUM)
                     continue;
 
-                var window = all
-                             .OrderByDescending(v => v)
-                             .Take(EzDanAlgorithm.CLEAR_WINDOW)
-                             .ToList();
+                double? rawDan = EzDanClearWindow.AverageRawDan(all);
+                if (rawDan is not double raw)
+                    continue;
 
-                double rawDan = window.Average();
-                result[bucket.Id] = new EzDanSkillsetVerdict(bucket.Id, rawDan, ladder.ParseLabel(rawDan), all.Count);
+                result[bucket.Id] = new EzDanSkillsetVerdict(bucket.Id, raw, ladder.ParseLabel(raw), all.Count);
             }
 
             return result;

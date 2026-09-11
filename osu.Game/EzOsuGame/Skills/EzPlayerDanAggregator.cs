@@ -3,8 +3,10 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -13,6 +15,7 @@ namespace osu.Game.EzOsuGame.Skills
     /// Player dan clears: chart <see cref="EzChartDanEstimator.TryEstimate"/> → credit.
     /// Side <see cref="EzDanEstimate"/> / GetDan is written only by
     /// <see cref="EzSkillProvider"/> <c>writeSideHeadline</c> (hub fold), not here.
+    /// Hub <c>collectDanClears</c> subset: fail/EZ reject, (hash,rate) best-only.
     /// </summary>
     public sealed class EzPlayerDanAggregator
     {
@@ -36,7 +39,8 @@ namespace osu.Game.EzOsuGame.Skills
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
-            var evidence = new List<EzDanClearEvidenceRow>();
+            // Best credited clear per (beatmap hash, rate) — hub collectDanClears dedupe.
+            var bestByChartRate = new Dictionary<(string Hash, double Rate), EzDanClearEvidenceRow>();
 
             foreach (var score in scores)
             {
@@ -47,7 +51,14 @@ namespace osu.Game.EzOsuGame.Skills
                     if (score.Ruleset.OnlineID != 3)
                         continue;
 
+                    if (!score.Passed || score.Rank == ScoreRank.F)
+                        continue;
+
                     if (score.Accuracy <= 0 || !double.IsFinite(score.Accuracy))
+                        continue;
+
+                    // Hub ez_windows: EZ widened hit windows — no dan credit.
+                    if (score.Mods.Any(static m => m is ModEasy))
                         continue;
 
                     var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == score.BeatmapHash);
@@ -69,18 +80,28 @@ namespace osu.Game.EzOsuGame.Skills
                     if (string.IsNullOrWhiteSpace(hash))
                         hash = beatmapInfo.Hash;
 
-                    evidence.Add(new EzDanClearEvidenceRow
+                    double rate = EzModRate.Resolve(score.Mods);
+                    var key = (hash, Math.Round(rate, 4));
+
+                    var row = new EzDanClearEvidenceRow
                     {
                         Username = username,
                         KeyCount = chart.KeyCount,
                         Side = chart.Side.ToId(),
                         BeatmapHash = hash,
-                        Rate = EzModRate.Resolve(score.Mods),
+                        Rate = rate,
                         CreditedDan = value,
                         Accuracy = score.Accuracy,
                         ScoredAt = score.Date,
                         AlgorithmVersion = EzDanAlgorithm.VERSION,
-                    });
+                    };
+
+                    if (!bestByChartRate.TryGetValue(key, out var existing)
+                        || value > existing.CreditedDan
+                        || (Math.Abs(value - existing.CreditedDan) < 1e-9 && score.Date > existing.ScoredAt))
+                    {
+                        bestByChartRate[key] = row;
+                    }
                 }
                 finally
                 {
@@ -88,7 +109,10 @@ namespace osu.Game.EzOsuGame.Skills
                 }
             }
 
-            PendingEvidence = evidence;
+            PendingEvidence = bestByChartRate.Values
+                                             .OrderByDescending(r => r.CreditedDan)
+                                             .ThenByDescending(r => r.ScoredAt)
+                                             .ToList();
         }
     }
 }

@@ -231,7 +231,7 @@ namespace osu.Game.EzOsuGame.Skills
                         side,
                         clears,
                         playSsr.Resolve,
-                        hash => chartByHash.TryGetValue(hash, out var chart) ? chart : null);
+                        chartByHash.GetValueOrDefault);
 
                     store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, sideId, verdicts);
                     writeSideHeadline(resolvedUser, keyCount, side, clears, verdicts);
@@ -259,15 +259,12 @@ namespace osu.Game.EzOsuGame.Skills
                 return;
 
             var headline = EzDanSideHeadline.FromSkillsets(keyCount, side, verdicts, clearDans)
-                           ?? EzDanSideHeadline.FromSideClears(keyCount, side, clearDans);
+                           ?? EzDanSideHeadline.FromSideClears(keyCount, side, clears);
 
             if (headline == null)
                 return;
 
-            var window = clearDans
-                         .OrderByDescending(v => v)
-                         .Take(EzDanAlgorithm.CLEAR_WINDOW)
-                         .ToList();
+            var (_, _, have) = EzDanClearWindow.Select(clears);
 
             store.WriteDanEstimate(new EzDanEstimate
             {
@@ -278,7 +275,7 @@ namespace osu.Game.EzOsuGame.Skills
                 Label = headline.Value.Label,
                 Clears = clears.Count,
                 BeyondTable = headline.Value.BeyondTable,
-                ClearWindowHave = window.Count,
+                ClearWindowHave = (int)Math.Round(have),
                 ClearWindowNeed = EzDanAlgorithm.CLEAR_WINDOW,
                 AlgorithmVersion = EzDanAlgorithm.VERSION,
                 ComputedAt = DateTimeOffset.UtcNow,
@@ -344,7 +341,7 @@ namespace osu.Game.EzOsuGame.Skills
                 sideEnum,
                 clears,
                 playSsr.Resolve,
-                hash => chartByHash.TryGetValue(hash, out var chart) ? chart : null);
+                chartByHash.GetValueOrDefault);
         }
 
         /// <summary>
@@ -392,7 +389,8 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Chart-side skillset labels for one DualPanel side via hub filing
-        /// (<see cref="EzDanSkillsetFiling.BucketsForValues"/>). Same aggregate label on every hit bucket.
+        /// (<see cref="EzDanSkillsetFiling.BucketsForValues"/>). Same aggregate label on every hit bucket
+        /// (hub DualPanel-style chart half; not primary-only).
         /// </summary>
         public IReadOnlyDictionary<string, string> GetChartDanSkillsetLabels(
             BeatmapInfo beatmapInfo,
@@ -407,31 +405,31 @@ namespace osu.Game.EzOsuGame.Skills
             mods ??= Array.Empty<Mod>();
             float rate = EzModRate.Resolve(mods);
 
-            var chartVerdict = TryGetChartDan(beatmapInfo, mods) ?? TryGetCachedChartDan(beatmapInfo);
-            string? aggregateLabel = null;
-
-            if (chartVerdict != null && chartVerdict.Side == side && !string.IsNullOrEmpty(chartVerdict.Label))
-                aggregateLabel = chartVerdict.Label;
-
             var msd = GetBeatmapMsd(beatmapInfo.Hash);
             double holdRatio = 0;
             if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
                 holdRatio = Math.Clamp(cachedHold, 0, 1);
-            else if (chartVerdict != null && double.IsFinite(chartVerdict.HoldRatio))
+
+            var chartVerdict = TryGetChartDan(beatmapInfo, mods) ?? TryGetCachedChartDan(beatmapInfo);
+            if (holdRatio <= 0 && chartVerdict != null && double.IsFinite(chartVerdict.HoldRatio))
                 holdRatio = Math.Clamp(chartVerdict.HoldRatio, 0, 1);
 
-            if (string.IsNullOrEmpty(aggregateLabel)
-                && EzDanAlgorithm.AllowsChartSideHalf(side, keyCount, holdRatio))
-            {
-                // Sunny/xxy only when this side is the chart's primary identity by hold ratio.
-                double xxy = beatmapInfo.XxyStarRating;
+            if (!EzDanAlgorithm.AllowsChartSideHalf(side, keyCount, holdRatio))
+                return result;
 
-                if (xxy >= 0 && double.IsFinite(xxy)
-                             && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), xxy, out var sunny)
-                             && !string.IsNullOrEmpty(sunny.DisplayLabel))
-                {
-                    aggregateLabel = sunny.DisplayLabel;
-                }
+            // Same priority as DualPanel headline: Sunny/xxy first, then chart verdict label.
+            string? aggregateLabel = null;
+            double xxy = beatmapInfo.XxyStarRating;
+
+            if (xxy >= 0 && double.IsFinite(xxy)
+                         && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), xxy, out var sunny)
+                         && !string.IsNullOrEmpty(sunny.DisplayLabel))
+            {
+                aggregateLabel = sunny.DisplayLabel;
+            }
+            else if (chartVerdict != null && chartVerdict.Side == side && !string.IsNullOrEmpty(chartVerdict.Label))
+            {
+                aggregateLabel = chartVerdict.Label;
             }
 
             if (string.IsNullOrEmpty(aggregateLabel))

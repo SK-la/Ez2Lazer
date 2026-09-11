@@ -22,6 +22,12 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Max skill-history samples stored per keymode (trend chart cap).</summary>
         public const int HISTORY_MAX_POINTS = 64;
 
+        /// <summary>
+        /// Rolling play count for history AggregateSSRs (recent window so the curve can fall).
+        /// Career-prefix Aggregate is structurally monotonic.
+        /// </summary>
+        public const int HISTORY_ROLLING_PLAYS = 50;
+
         private readonly BeatmapManager beatmapManager;
         private readonly EzSkillStore skillStore;
 
@@ -217,30 +223,35 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Running AggregateSSRs after each sampled play, timestamped with that play's <see cref="ScoreInfo.Date"/>.
-        /// Evenly samples up to <see cref="HISTORY_MAX_POINTS"/> points across the career (always includes first and last).
+        /// Running AggregateSSRs over a rolling window of recent plays, timestamped with that play's
+        /// <see cref="ScoreInfo.Date"/>. Evenly samples up to <see cref="HISTORY_MAX_POINTS"/> points
+        /// across the career (always includes first and last). Unlike a career-prefix Aggregate,
+        /// values can fall when strong early plays leave the window.
         /// </summary>
         public static IReadOnlyList<(DateTimeOffset RecordedAt, EzSkillsetVector Vector)> BuildChronologicalHistorySamples(
             IReadOnlyList<(DateTimeOffset ScoredAt, EzSkillsetVector Vector)> orderedPlays,
-            int maxPoints = HISTORY_MAX_POINTS)
+            int maxPoints = HISTORY_MAX_POINTS,
+            int rollingPlays = HISTORY_ROLLING_PLAYS)
         {
             if (orderedPlays.Count == 0 || maxPoints < 1)
                 return Array.Empty<(DateTimeOffset, EzSkillsetVector)>();
 
+            if (rollingPlays < 1)
+                rollingPlays = 1;
+
             var indices = SampleIndices(orderedPlays.Count, maxPoints);
-            var prefix = new List<EzSkillsetVector>(orderedPlays.Count);
             var samples = new List<(DateTimeOffset, EzSkillsetVector)>(indices.Count);
-            int nextSample = 0;
 
-            for (int i = 0; i < orderedPlays.Count; i++)
+            foreach (int i in indices)
             {
-                prefix.Add(orderedPlays[i].Vector);
+                int start = Math.Max(0, i - rollingPlays + 1);
+                int count = i - start + 1;
+                var window = new List<EzSkillsetVector>(count);
 
-                if (nextSample >= indices.Count || indices[nextSample] != i)
-                    continue;
+                for (int j = start; j <= i; j++)
+                    window.Add(orderedPlays[j].Vector);
 
-                samples.Add((orderedPlays[i].ScoredAt, EzSsrAggregator.AggregateVectors(prefix)));
-                nextSample++;
+                samples.Add((orderedPlays[i].ScoredAt, EzSsrAggregator.AggregateVectors(window)));
             }
 
             return samples;

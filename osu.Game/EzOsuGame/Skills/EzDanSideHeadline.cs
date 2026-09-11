@@ -32,21 +32,34 @@ namespace osu.Game.EzOsuGame.Skills
                    ?? averageSkillsetDans(keyCount, side, skillsets, clearDans);
         }
 
-        /// <summary>Side-wide top-N average (hub quorum path / no skillset buckets).</summary>
+        /// <summary>Side-wide weighted clear window (hub <c>danFromClears</c>).</summary>
+        public static Result? FromSideClears(int keyCount, EzDanSide side, IReadOnlyList<EzDanClearEvidenceRow> clears)
+        {
+            ArgumentNullException.ThrowIfNull(clears);
+
+            double? rawDan = EzDanClearWindow.AverageRawDan(clears);
+            if (rawDan is not double raw)
+                return null;
+
+            var clearDans = clears.Select(c => c.CreditedDan).Where(double.IsFinite).ToList();
+            return toResult(keyCount, side, raw, clearDans);
+        }
+
+        /// <summary>Convenience for tests that only have raw credited values.</summary>
         public static Result? FromSideClears(int keyCount, EzDanSide side, IReadOnlyList<double> clearDans)
         {
             ArgumentNullException.ThrowIfNull(clearDans);
 
-            if (clearDans.Count < EzDanAlgorithm.CLEAR_QUORUM)
-                return null;
+            var rows = clearDans.Select((v, i) => new EzDanClearEvidenceRow
+            {
+                BeatmapHash = $"t-{i}",
+                KeyCount = keyCount,
+                Side = side.ToId(),
+                CreditedDan = v,
+                AlgorithmVersion = EzDanAlgorithm.VERSION,
+            }).ToList();
 
-            var window = clearDans
-                         .OrderByDescending(v => v)
-                         .Take(EzDanAlgorithm.CLEAR_WINDOW)
-                         .ToList();
-
-            double rawDan = round2(window.Average());
-            return toResult(keyCount, side, rawDan, clearDans);
+            return FromSideClears(keyCount, side, rows);
         }
 
         private static Result? averageSkillsetDans(

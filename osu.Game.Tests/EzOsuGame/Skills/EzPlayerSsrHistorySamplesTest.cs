@@ -42,5 +42,32 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(samples[^1].RecordedAt.Year, Is.EqualTo(2028));
             Assert.That(samples[^1].Vector.Overall, Is.GreaterThan(samples[0].Vector.Overall));
         }
+
+        [Test]
+        public void Rolling_window_allows_rating_to_fall()
+        {
+            // Strong early plays then a long stretch of weak ones; after the
+            // strong prefix leaves the rolling window the aggregate must drop.
+            var plays = new List<(DateTimeOffset, EzSkillsetVector)>();
+            var t0 = DateTimeOffset.UtcNow;
+
+            for (int i = 0; i < 5; i++)
+                plays.Add((t0.AddMinutes(i), vec(20)));
+
+            for (int i = 5; i < 60; i++)
+                plays.Add((t0.AddMinutes(i), vec(5)));
+
+            var samples = EzPlayerSsrAggregator.BuildChronologicalHistorySamples(
+                plays,
+                maxPoints: plays.Count,
+                rollingPlays: 10);
+
+            Assert.That(samples.Count, Is.EqualTo(plays.Count));
+            double early = samples[4].Vector.Overall;
+            double late = samples[^1].Vector.Overall;
+            Assert.That(late, Is.LessThan(early));
+        }
+
+        private static EzSkillsetVector vec(double overall) => new EzSkillsetVector(overall, overall, overall, overall, overall, overall, overall, overall);
     }
 }

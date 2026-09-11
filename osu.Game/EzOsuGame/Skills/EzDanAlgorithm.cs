@@ -8,14 +8,17 @@ namespace osu.Game.EzOsuGame.Skills
     /// (not <see cref="osu.Game.Database.RealmAccess.EZ_REALM_SCHEMA_VERSION"/>).
     /// Independent from <see cref="EzManiaSkillAlgorithm.VERSION"/>. Reads via <see cref="EzSkillStore.GetDanEstimate"/> filter on this value.
     /// v2: side <c>GetDan</c> uses hub anchor/mean fold (<see cref="EzDanSideHeadline"/>).
+    /// v3: hub clear gates + (hash,rate) dedupe; <see cref="CLEAR_WINDOW"/>=20 + <see cref="EzDanClearWindow"/> weighting.
     /// </summary>
     public static class EzDanAlgorithm
     {
-        public const int VERSION = 2;
+        public const int VERSION = 3;
 
         // --- Player clear aggregation (hub clear window) ---
         public const int CLEAR_QUORUM = 4;
-        public const int CLEAR_WINDOW = 10;
+
+        /// <summary>Hub <c>DAN_CLEAR_AVERAGE_WINDOW</c>.</summary>
+        public const int CLEAR_WINDOW = 20;
 
         /// <summary>Minimum rated skillset tiles before averaging / anchoring a side headline.</summary>
         public const int SKILLSET_AVERAGE_MIN_BUCKETS = 2;
