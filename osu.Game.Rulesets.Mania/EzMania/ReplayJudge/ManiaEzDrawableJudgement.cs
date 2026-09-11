@@ -84,6 +84,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             hold.Tail.UpdateResult();
             hold.EzTriggerMalodyBodyOnRelease();
             hold.EzReportHoldReleased();
+            hold.EzTryFinalizeAfterTailJudged();
             return true;
         }
 
@@ -121,6 +122,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 hold.Tail.UpdateResult();
                 if (!hold.Body.AllJudged)
                     hold.Body.TriggerResult(true);
+                hold.EzTryFinalizeAfterTailJudged();
             }
 
             return true;
@@ -295,6 +297,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             hold.Tail.UpdateResult();
             hold.EzTriggerBodyAfterTailRelease();
             hold.Result.ReportHoldState(currentTime, false);
+            hold.EzTryFinalizeAfterTailJudged();
             return true;
         }
 

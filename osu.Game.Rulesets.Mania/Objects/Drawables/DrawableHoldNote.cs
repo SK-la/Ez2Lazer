@@ -35,6 +35,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         public override bool DisplayResult => false;
 
         /// <summary>
+        /// LN 松手后应立刻按实际判定时刻淡出；若沿用物件 EndTime，头冻结解除后仍会继续滚动一段。
+        /// </summary>
+        protected override bool HitObjectLifetimeUsesOwnTime => false;
+
+        /// <summary>
         /// Whether the user is currently pressing the hold note.
         /// </summary>
         public IBindable<bool> IsHolding => isHolding;
@@ -451,7 +456,19 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 EzTriggerBodyAfterTailRelease();
 
                 Result.ReportHoldState(Time.Current, false);
+                EzTryFinalizeAfterTailJudged();
             }
+        }
+
+        /// <summary>
+        /// 列级 AutoMiss 仅在 EndTime 才轮询父 Hold；尾已判时立刻走 CheckForResult，避免冻结解除后头/尾继续下落。
+        /// </summary>
+        internal void EzTryFinalizeAfterTailJudged()
+        {
+            if (AllJudged || !Tail.AllJudged)
+                return;
+
+            UpdateResult(false);
         }
 
         internal void EzTriggerBodyAfterTailRelease()
