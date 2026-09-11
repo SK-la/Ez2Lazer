@@ -1,15 +1,11 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Globalization;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
-using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
-using osu.Game.Database;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -21,6 +17,7 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// Composite skill + dan tag: e.g. <c>技 7++ (20.5)</c>.
     /// Optional secondary (player) dan + value for AB overlays.
     /// Supports <see cref="LayoutDirection"/> horizontal (default) or vertical (skill → dan → value).
+    /// Song-select panel binding is Realm/MSD read-only — never <c>TryGetChartDan</c> / Mina.
     /// </summary>
     public partial class EzDisplaySkillsDan : FillFlowContainer
     {
@@ -33,7 +30,6 @@ namespace osu.Game.EzOsuGame.UserInterface
         private FillDirection layoutDirection = FillDirection.Horizontal;
         private BeatmapInfo? beatmap;
         private bool beatmapBound;
-        private int chartDanRequestId;
 
         public bool ShowValue { get; set; } = true;
 
@@ -64,7 +60,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         }
 
         /// <summary>
-        /// When set, loads chart dan via <see cref="EzSkillProvider"/> (cached then async).
+        /// When set, loads chart dan via <see cref="EzSkillProvider"/> (cached / Realm only).
         /// Manual <see cref="Set(EzMinaSkillAxis, string?, double?, string?, double?, int, EzDanSide)"/> / <see cref="SetFrom"/> / <see cref="SetSkillset"/> still work without this.
         /// </summary>
         public BeatmapInfo? Beatmap
@@ -76,7 +72,6 @@ namespace osu.Game.EzOsuGame.UserInterface
                     return;
 
                 beatmap = value;
-                chartDanRequestId++;
 
                 if (value != null)
                 {
@@ -151,7 +146,6 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             if (isDisposing)
             {
-                chartDanRequestId++;
                 beatmap = null;
                 beatmapBound = false;
             }
@@ -306,25 +300,32 @@ namespace osu.Game.EzOsuGame.UserInterface
             if (beatmap == null)
                 return;
 
+            // Persisted ChartDan (EZ10) preferred; else MSD+xxy FromMsd — never GetPlayable/Mina on scroll.
+            if (skillProvider != null
+                && skillProvider.TryGetPersistedChartDan(beatmap, out var persisted)
+                && persisted != null)
+            {
+                var side = persisted.HasSide(EzDanSide.Ln) ? EzDanSide.Ln : EzDanSide.Rc;
+                var verdict = persisted.ToVerdict(side);
+
+                if (verdict != null)
+                {
+                    showFromVerdict(verdict);
+                    return;
+                }
+            }
+
             var cached = skillProvider?.TryGetCachedChartDan(beatmap);
 
             if (cached != null)
             {
                 showFromVerdict(cached);
+                return;
             }
-            else if (skillProvider != null)
-            {
-                Clear();
-                Hide();
-                BypassAutoSizeAxes = Axes.Both;
-                requestChartDanCompute(beatmap);
-            }
-            else
-            {
-                Clear();
-                Hide();
-                BypassAutoSizeAxes = Axes.Both;
-            }
+
+            Clear();
+            Hide();
+            BypassAutoSizeAxes = Axes.Both;
         }
 
         private void showFromVerdict(EzChartDanVerdict verdict)
@@ -332,39 +333,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             BypassAutoSizeAxes = Axes.None;
             SetFrom(verdict);
             Show();
-        }
-
-        private void requestChartDanCompute(BeatmapInfo target)
-        {
-            int requestId = ++chartDanRequestId;
-            var provider = skillProvider;
-            // Detach so MinaCalc can run off the update thread without touching live Realm.
-            var detached = target.Detach();
-
-            Task.Run(() =>
-            {
-                try
-                {
-                    return provider?.TryGetChartDan(detached);
-                }
-                catch
-                {
-                    return null;
-                }
-            }).ContinueWith(t => Schedule(() =>
-            {
-                if (requestId != chartDanRequestId || beatmap == null || !string.Equals(beatmap.Hash, detached.Hash, StringComparison.Ordinal))
-                    return;
-
-                if (t.Status == TaskStatus.RanToCompletion && t.GetResultSafely() is EzChartDanVerdict verdict)
-                    showFromVerdict(verdict);
-                else
-                {
-                    Clear();
-                    Hide();
-                    BypassAutoSizeAxes = Axes.Both;
-                }
-            }));
         }
 
         private void setValueText(OsuSpriteText text, double? value)

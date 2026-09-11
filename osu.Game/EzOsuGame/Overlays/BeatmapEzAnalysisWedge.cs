@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -36,6 +37,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
         [Resolved]
         private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
+
+        [Resolved(canBeNull: true)]
+        private EzSkillProvider? skillProvider { get; set; }
 
         [BackgroundDependencyLoader]
         private void load()
@@ -119,15 +123,25 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void updateDanKeyCount()
         {
-            try
-            {
-                var playable = beatmap.Value.GetPlayableBeatmap(beatmap.Value.BeatmapInfo.Ruleset, mods.Value);
-                DanPanel.KeyCount.Value = EzMinaNoteConverter.ResolveKeyCount(playable);
-            }
-            catch
+            var info = beatmap.Value.BeatmapInfo;
+
+            if (info == null)
             {
                 DanPanel.KeyCount.Value = 0;
+                return;
             }
+
+            int keys = (int)Math.Round(info.Difficulty.CircleSize);
+
+            if (keys <= 0
+                && skillProvider != null
+                && skillProvider.TryGetPersistedChartDan(info, out var chartDan)
+                && chartDan is { KeyCount: > 0 })
+            {
+                keys = chartDan.KeyCount;
+            }
+
+            DanPanel.KeyCount.Value = keys > 0 ? keys : 0;
         }
 
         protected override void PopIn()

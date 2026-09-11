@@ -245,8 +245,16 @@ namespace osu.Game.EzOsuGame.HUD
 
                 if (keys > 0)
                 {
-                    chartSkillsetLabelsRc = skillProvider.GetChartDanSkillsetLabelsReadOnly(info, keys, EzDanSide.Rc);
-                    chartSkillsetLabelsLn = skillProvider.GetChartDanSkillsetLabelsReadOnly(info, keys, EzDanSide.Ln);
+                    if (persistedChartDan != null)
+                    {
+                        chartSkillsetLabelsRc = persistedChartDan.SkillsetLabelsFor(EzDanSide.Rc);
+                        chartSkillsetLabelsLn = persistedChartDan.SkillsetLabelsFor(EzDanSide.Ln);
+                    }
+                    else
+                    {
+                        chartSkillsetLabelsRc = skillProvider.GetChartDanSkillsetLabelsReadOnly(info, keys, EzDanSide.Rc);
+                        chartSkillsetLabelsLn = skillProvider.GetChartDanSkillsetLabelsReadOnly(info, keys, EzDanSide.Ln);
+                    }
                 }
             }
 

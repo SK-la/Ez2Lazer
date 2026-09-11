@@ -168,9 +168,6 @@ namespace osu.Game.EzOsuGame.HUD
         private EzSkillProvider? skillProvider { get; set; }
 
         [Resolved]
-        private EzBeatmapMsdComputer? beatmapMsdComputer { get; set; }
-
-        [Resolved]
         private EzAnalysisPlayerSelection? ezAnalysisPlayerSelection { get; set; }
 
         private IBindable<StarDifficulty>? difficultyBindable;
@@ -403,17 +400,15 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
-            int keyCount = 0;
+            // Metadata / persisted ChartDan only — never GetPlayable or Mina on song-select hot path.
+            int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
 
-            try
+            if (keyCount <= 0
+                && skillProvider != null
+                && skillProvider.TryGetPersistedChartDan(beatmapInfo, out var chartDan)
+                && chartDan is { KeyCount: > 0 })
             {
-                var working = beatmap.Value;
-                var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods.Value);
-                keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
-            }
-            catch
-            {
-                // fall through with keyCount 0
+                keyCount = chartDan.KeyCount;
             }
 
             string? username = TargetUsername.Value;
@@ -457,12 +452,9 @@ namespace osu.Game.EzOsuGame.HUD
             activeAxisLabels = axes.Select(skillAxisDisplayName).ToArray();
             activeAxisFormats = Enumerable.Repeat("0.00", axes.Length).ToArray();
 
+            // Read-only Realm MSD; miss stays empty until BDSP / Realm MSD maintenance.
             IReadOnlyDictionary<string, double> msd = skillProvider?.GetBeatmapMsd(beatmapInfo.Hash)
                                                       ?? new Dictionary<string, double>();
-
-            // Incomplete caches must recompute; do not treat "any rows" as ready.
-            if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd) && beatmapMsdComputer != null)
-                msd = beatmapMsdComputer.TryGetOrCompute(beatmapInfo) ?? msd;
 
             IReadOnlyDictionary<string, double> ssr = new Dictionary<string, double>();
 
@@ -963,6 +955,12 @@ namespace osu.Game.EzOsuGame.HUD
             private Vector2 drawSize;
             private Texture? texture;
 
+            // Reused across Draw frames — never allocate Vector2[] per frame.
+            private Vector2[] outerVertices = Array.Empty<Vector2>();
+            private Vector2[] levelVertices = Array.Empty<Vector2>();
+            private Vector2[] primaryVertices = Array.Empty<Vector2>();
+            private Vector2[] secondaryVertices = Array.Empty<Vector2>();
+
             public RadarChartDrawNode(RadarChart chart)
                 : base(chart)
             {
@@ -980,6 +978,11 @@ namespace osu.Game.EzOsuGame.HUD
 
                 if (ratios.Length != axisCount)
                     Array.Resize(ref ratios, axisCount);
+
+                ensureVertexCapacity(ref outerVertices, axisCount);
+                ensureVertexCapacity(ref levelVertices, axisCount);
+                ensureVertexCapacity(ref primaryVertices, axisCount);
+                ensureVertexCapacity(ref secondaryVertices, axisCount);
 
                 gridLevels = Math.Max(1, source.GridLevels);
                 radiusRatio = Math.Clamp(source.RadiusRatio, 0.1f, 1);
@@ -1029,21 +1032,20 @@ namespace osu.Game.EzOsuGame.HUD
 
                 renderer.PushLocalMatrix(DrawInfo.Matrix);
 
-                var outerVertices = createVertices(center, radius, 1);
-
+                fillVerticesUniform(outerVertices, center, radius, 1);
                 drawPolygonFill(renderer, outerVertices, baseFillColour);
 
                 for (int level = 1; level <= gridLevels; level++)
                 {
                     float ratio = level / (float)gridLevels;
-                    var levelVertices = createVertices(center, radius, ratio);
+                    fillVerticesUniform(levelVertices, center, radius, ratio);
                     drawPolygonOutline(renderer, levelVertices, gridColour, gridThickness);
                 }
 
                 for (int i = 0; i < axisCount; i++)
                     drawLine(renderer, center, outerVertices[i], axisColour, axisThickness);
 
-                var primaryVertices = createVertices(center, radius, ratios);
+                fillVerticesFromRatios(primaryVertices, center, radius, ratios);
 
                 if (secondaryRatios == null)
                 {
@@ -1053,7 +1055,7 @@ namespace osu.Game.EzOsuGame.HUD
                 }
                 else
                 {
-                    var secondaryVertices = createVertices(center, radius, secondaryRatios);
+                    fillVerticesFromRatios(secondaryVertices, center, radius, secondaryRatios);
 
                     // Smaller coverage draws above so both polygons stay readable when nested.
                     bool primaryIsSmaller = averageRatio(ratios) <= averageRatio(secondaryRatios);
@@ -1094,10 +1096,14 @@ namespace osu.Game.EzOsuGame.HUD
                 return sum / values.Count;
             }
 
-            private Vector2[] createVertices(Vector2 center, float radius, float ratio)
+            private static void ensureVertexCapacity(ref Vector2[] buffer, int count)
             {
-                var vertices = new Vector2[axisCount];
+                if (buffer.Length != count)
+                    Array.Resize(ref buffer, count);
+            }
 
+            private void fillVerticesUniform(Vector2[] vertices, Vector2 center, float radius, float ratio)
+            {
                 for (int i = 0; i < axisCount; i++)
                 {
                     float angle = MathHelper.DegreesToRadians(360f / axisCount * i - 90);
@@ -1106,14 +1112,10 @@ namespace osu.Game.EzOsuGame.HUD
                         center.Y + radius * ratio * (float)Math.Sin(angle)
                     );
                 }
-
-                return vertices;
             }
 
-            private Vector2[] createVertices(Vector2 center, float radius, IReadOnlyList<float> axisRatios)
+            private void fillVerticesFromRatios(Vector2[] vertices, Vector2 center, float radius, IReadOnlyList<float> axisRatios)
             {
-                var vertices = new Vector2[axisCount];
-
                 for (int i = 0; i < axisCount; i++)
                 {
                     float clampedRatio = Math.Clamp(axisRatios[i], 0, 1);
@@ -1123,8 +1125,6 @@ namespace osu.Game.EzOsuGame.HUD
                         center.Y + radius * clampedRatio * (float)Math.Sin(angle)
                     );
                 }
-
-                return vertices;
             }
 
             private void drawPolygonFill(IRenderer renderer, IReadOnlyList<Vector2> polygonVertices, Color4 colour)

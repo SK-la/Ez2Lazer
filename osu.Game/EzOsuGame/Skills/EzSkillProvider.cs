@@ -166,7 +166,6 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyDictionary<string, EzDanSkillsetVerdict> GetDanSkillsets(string username, int keyCount, string side)
         {
             string resolvedUser = resolveSkillsUsername(username);
-            var clears = GetDanClears(resolvedUser, keyCount, side, EzDanAlgorithm.VERSION);
 
             if (store.HasDanSkillsetCache(resolvedUser, keyCount, side))
                 return danSkillsetsFromCache(resolvedUser, keyCount, side);
@@ -177,6 +176,8 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 return danSkillsetsFromCache(username, keyCount, side);
             }
+
+            var clears = GetDanClears(resolvedUser, keyCount, side, EzDanAlgorithm.VERSION);
 
             // No clears for current EzDanAlgorithm.VERSION → keep miss (do not write empty).
             if (clears.Count == 0)
@@ -476,7 +477,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return result;
 
             if (TryGetPersistedChartDan(beatmapInfo, out var persisted) && persisted != null)
-                return new Dictionary<string, string>(persisted.SkillsetLabelsFor(side), StringComparer.Ordinal);
+                return persisted.SkillsetLabelsFor(side);
 
             var msd = GetBeatmapMsd(beatmapInfo.Hash);
             double holdRatio = 0;
