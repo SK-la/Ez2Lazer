@@ -23,7 +23,6 @@ namespace osu.Game.EzOsuGame.Skills
         private readonly EzSkillStore store;
         private readonly EzChartDanEstimator? chartDanEstimator;
         private readonly EzLocalProfileStore? localProfileStore;
-        private readonly EzAnalysisDatabase? analysisDatabase;
         private readonly BeatmapManager? beatmapManager;
 
         /// <summary>Session-only CSI compute failures — keep miss in Realm so BDSP can retry next launch.</summary>
@@ -34,13 +33,11 @@ namespace osu.Game.EzOsuGame.Skills
             EzSkillRegistry? registry = null,
             EzChartDanEstimator? chartDanEstimator = null,
             EzLocalProfileStore? localProfileStore = null,
-            EzAnalysisDatabase? analysisDatabase = null,
             BeatmapManager? beatmapManager = null)
         {
             this.store = store;
             this.chartDanEstimator = chartDanEstimator;
             this.localProfileStore = localProfileStore;
-            this.analysisDatabase = analysisDatabase;
             this.beatmapManager = beatmapManager;
             Registry = registry ?? new EzSkillRegistry();
         }
@@ -52,7 +49,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Chart dan from persisted MSD (+ Realm xxy when present). No MSD compute / no beatmap note load.
-        /// Hold ratio prefers stored analysis mania summary when available.
+        /// Hold ratio uses MSD <c>hold_ratio</c> only (no analysis SQLite on this path).
         /// </summary>
         public EzChartDanVerdict? TryGetCachedChartDan(BeatmapInfo beatmapInfo)
         {
@@ -68,18 +65,8 @@ namespace osu.Game.EzOsuGame.Skills
                 keyCount = 4;
 
             double holdRatio = 0;
-
-            if (analysisDatabase != null
-                && analysisDatabase.TryGetStoredSqliteSlice(beatmapInfo, beatmapInfo.Ruleset, out var stored)
-                && stored.ManiaSummary is EzManiaSummary mania
-                && EzChartDanEstimator.TryHoldRatioFromManiaSummary(mania) is double ratio)
-            {
-                holdRatio = ratio;
-            }
-            else if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
-            {
+            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
                 holdRatio = Math.Clamp(cachedHold, 0, 1);
-            }
 
             double? xxySr = beatmapInfo.XxyStarRating >= 0 ? beatmapInfo.XxyStarRating : null;
             return EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, xxySr);

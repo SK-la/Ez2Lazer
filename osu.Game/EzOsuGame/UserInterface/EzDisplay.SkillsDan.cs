@@ -300,7 +300,8 @@ namespace osu.Game.EzOsuGame.UserInterface
             if (beatmap == null)
                 return;
 
-            // Persisted ChartDan (EZ10) preferred; else MSD+xxy FromMsd — never GetPlayable/Mina on scroll.
+            // Song-select panel: only Realm ChartDan. Miss → hide (BDSP / Realm ChartDan).
+            // Do not call TryGetCachedChartDan — that reads MSD + FromMsd per visible panel.
             if (skillProvider != null
                 && skillProvider.TryGetPersistedChartDan(beatmap, out var persisted)
                 && persisted != null)
@@ -313,14 +314,6 @@ namespace osu.Game.EzOsuGame.UserInterface
                     showFromVerdict(verdict);
                     return;
                 }
-            }
-
-            var cached = skillProvider?.TryGetCachedChartDan(beatmap);
-
-            if (cached != null)
-            {
-                showFromVerdict(cached);
-                return;
             }
 
             Clear();

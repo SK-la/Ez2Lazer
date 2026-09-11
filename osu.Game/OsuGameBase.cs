@@ -423,7 +423,7 @@ namespace osu.Game
             var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore);
             var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator);
             var localProfileStore = new EzLocalProfileStore(Storage);
-            var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, ezAnalysisDatabase, BeatmapManager);
+            var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, BeatmapManager);
 
             dependencies.Cache(skillRegistry);
             dependencies.Cache(skillStore);
