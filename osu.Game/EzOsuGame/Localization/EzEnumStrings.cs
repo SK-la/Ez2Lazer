@@ -50,6 +50,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_BRANCHES = new EzLocalizationManager.EzLocalisableString("SQLite 分支曲库 xxy/PP", "SQLite songs branches xxy/PP");
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_MSD = new EzLocalizationManager.EzLocalisableString("Realm MSD", "Realm MSD");
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_SKILL_INFO = new EzLocalizationManager.EzLocalisableString("Realm ChartSkillInfo", "Realm ChartSkillInfo");
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_DAN = new EzLocalizationManager.EzLocalisableString("Realm ChartDan", "Realm ChartDan");
 
         public static readonly LocalisableString LOGO_VIS_BARS = new EzLocalizationManager.EzLocalisableString("柱状", "Bars");
         public static readonly LocalisableString LOGO_VIS_POLYLINE = new EzLocalizationManager.EzLocalisableString("折线", "Polyline");

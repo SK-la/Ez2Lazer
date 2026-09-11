@@ -47,6 +47,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 case EzDataRebuildTarget.RealmPp:
                 case EzDataRebuildTarget.RealmMsd:
                 case EzDataRebuildTarget.RealmChartSkillInfo:
+                case EzDataRebuildTarget.RealmChartDan:
                 case EzDataRebuildTarget.RealmAll:
                     return queueRealm != null;
 
@@ -82,6 +83,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 case EzDataRebuildTarget.RealmChartSkillInfo:
                     return dispatchRealm(EzRealmMetadataScope.ChartSkillInfo, forceAll);
+
+                case EzDataRebuildTarget.RealmChartDan:
+                    return dispatchRealm(EzRealmMetadataScope.ChartDan, forceAll);
 
                 case EzDataRebuildTarget.RealmAll:
                     return dispatchRealm(EzRealmMetadataScope.All, forceAll);

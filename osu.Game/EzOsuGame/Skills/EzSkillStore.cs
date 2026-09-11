@@ -9,7 +9,7 @@ using osu.Game.Database;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Single Realm persistence facade for mania skill metrics (MSD / SSR / Dan / ChartSkillInfo / reserved skillset cache).
+    /// Single Realm persistence facade for mania skill metrics (MSD / SSR / Dan / ChartSkillInfo / ChartDan / skillset cache).
     /// Does not open the game for the caller. Evidence lists stay in local-profile SQLite.
     /// </summary>
     public sealed class EzSkillStore
@@ -633,6 +633,95 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// Typed Realm ChartDan (EZ≥10). Version mismatch → miss so BDSP can recompute.
+        /// </summary>
+        public bool TryGetChartDan(string beatmapHash, out EzPersistedChartDan? chartDan)
+        {
+            chartDan = null;
+
+            if (string.IsNullOrEmpty(beatmapHash))
+                return false;
+
+            EzPersistedChartDan? fromRealm = null;
+
+            realmAccess.Run(r =>
+            {
+                var row = r.All<EzBeatmapChartDan>()
+                           .FirstOrDefault(v => v.BeatmapHash == beatmapHash
+                                                && v.AlgorithmVersion == EzDanAlgorithm.VERSION);
+                if (row != null)
+                    fromRealm = chartDanToDto(row);
+            });
+
+            if (fromRealm == null)
+                return false;
+
+            chartDan = fromRealm;
+            return true;
+        }
+
+        public void UpsertChartDan(EzPersistedChartDan chartDan)
+        {
+            ArgumentNullException.ThrowIfNull(chartDan);
+            ArgumentException.ThrowIfNullOrWhiteSpace(chartDan.BeatmapHash);
+
+            DateTimeOffset at = chartDan.ComputedAt == default ? DateTimeOffset.UtcNow : chartDan.ComputedAt;
+            int version = chartDan.AlgorithmVersion != 0 ? chartDan.AlgorithmVersion : EzDanAlgorithm.VERSION;
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzBeatmapChartDan>()
+                                .Where(v => v.BeatmapHash == chartDan.BeatmapHash)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+
+                r.Add(new EzBeatmapChartDan
+                {
+                    BeatmapHash = chartDan.BeatmapHash,
+                    BeatmapId = chartDan.BeatmapId,
+                    AlgorithmVersion = version,
+                    KeyCount = chartDan.KeyCount,
+                    HoldRatio = chartDan.HoldRatio,
+                    OverallMsd = chartDan.OverallMsd,
+                    RcRawDan = chartDan.RcRawDan,
+                    RcLabel = chartDan.RcLabel,
+                    LnRawDan = chartDan.LnRawDan,
+                    LnLabel = chartDan.LnLabel,
+                    RcSkillsetLabelsJoined = EzPersistedChartDan.JoinSkillsetLabels(chartDan.RcSkillsetLabels),
+                    LnSkillsetLabelsJoined = EzPersistedChartDan.JoinSkillsetLabels(chartDan.LnSkillsetLabels),
+                    ComputedAt = at,
+                });
+            });
+        }
+
+        /// <summary>Hashes with a current-algorithm ChartDan row.</summary>
+        public HashSet<string> GetPersistedChartDanHashes()
+        {
+            return realmAccess.Run(r =>
+            {
+                return r.All<EzBeatmapChartDan>()
+                        .Where(v => v.AlgorithmVersion == EzDanAlgorithm.VERSION)
+                        .AsEnumerable()
+                        .Select(v => v.BeatmapHash)
+                        .Where(static h => !string.IsNullOrEmpty(h))
+                        .ToHashSet(StringComparer.Ordinal);
+            });
+        }
+
+        public void ClearChartDan()
+        {
+            realmAccess.Write(r =>
+            {
+                var rows = r.All<EzBeatmapChartDan>().ToList();
+
+                foreach (var row in rows)
+                    r.Remove(row);
+            });
+        }
+
+        /// <summary>
         /// Batch-read typed ChartSkillInfo rows for many hashes in one Realm run.
         /// Missing / wrong-version hashes are omitted.
         /// </summary>
@@ -885,5 +974,23 @@ namespace osu.Game.EzOsuGame.Skills
                 KeyCount = row.KeyCount,
             };
         }
+
+        private static EzPersistedChartDan chartDanToDto(EzBeatmapChartDan row)
+            => new EzPersistedChartDan
+            {
+                BeatmapHash = row.BeatmapHash,
+                BeatmapId = row.BeatmapId,
+                AlgorithmVersion = row.AlgorithmVersion,
+                KeyCount = row.KeyCount,
+                HoldRatio = row.HoldRatio,
+                OverallMsd = row.OverallMsd,
+                RcRawDan = row.RcRawDan,
+                RcLabel = row.RcLabel,
+                LnRawDan = row.LnRawDan,
+                LnLabel = row.LnLabel,
+                RcSkillsetLabels = EzPersistedChartDan.ParseSkillsetLabels(row.RcSkillsetLabelsJoined),
+                LnSkillsetLabels = EzPersistedChartDan.ParseSkillsetLabels(row.LnSkillsetLabelsJoined),
+                ComputedAt = row.ComputedAt,
+            };
     }
 }

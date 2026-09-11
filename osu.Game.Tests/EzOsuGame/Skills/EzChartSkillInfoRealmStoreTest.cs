@@ -269,10 +269,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void File_schema_version_is_ez9()
+        public void File_schema_version_is_ez10()
         {
-            Assert.That(RealmAccess.EZ_REALM_SCHEMA_VERSION, Is.EqualTo(9));
-            Assert.That(RealmAccess.EzFileSchemaVersion, Is.EqualTo(RealmAccess.UpstreamSchemaVersion * 1000 + 9));
+            Assert.That(RealmAccess.EZ_REALM_SCHEMA_VERSION, Is.EqualTo(10));
+            Assert.That(RealmAccess.EzFileSchemaVersion, Is.EqualTo(RealmAccess.UpstreamSchemaVersion * 1000 + 10));
         }
     }
 }

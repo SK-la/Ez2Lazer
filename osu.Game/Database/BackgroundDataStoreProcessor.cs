@@ -576,11 +576,15 @@ namespace osu.Game.Database
                 populateMissingBeatmapTagFlags();
 
             // MSD before ChartSkillInfo — filing prefers stored axes when present.
+            // ChartDan after MSD (+ CSI when available) — FromMsd + BucketsForValues, no playable.
             if (scope.HasFlag(EzRealmMetadataScope.Msd))
                 populateMissingBeatmapMsd();
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo))
                 populateMissingChartSkillInfo();
+
+            if (scope.HasFlag(EzRealmMetadataScope.ChartDan))
+                populateMissingChartDan();
         }
 
         private void clearEzRealmMetadata(EzRealmMetadataScope scope)
@@ -597,6 +601,12 @@ namespace osu.Game.Database
             {
                 Logger.Log("Clearing persisted ChartSkillInfo rows...");
                 skillStore.ClearChartSkillInfo();
+            }
+
+            if (scope.HasFlag(EzRealmMetadataScope.ChartDan))
+            {
+                Logger.Log("Clearing persisted ChartDan rows...");
+                skillStore.ClearChartDan();
             }
 
             bool clearBeatmapInfoFields = scope.HasFlag(EzRealmMetadataScope.Tags)
@@ -1021,6 +1031,131 @@ namespace osu.Game.Database
 
                 if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
                     Logger.Log($"ChartSkillInfo backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount})");
+            }
+
+            completeNotification(notification, processedCount, missing.Count, failedCount);
+        }
+
+        /// <summary>
+        /// Backfill nomod <see cref="EzBeatmapChartDan"/> from stored MSD (+ CSI / xxy when present).
+        /// Prefer no <c>GetPlayable</c> — hold from MSD <c>hold_ratio</c> or CSI <c>LnRatio</c>.
+        /// </summary>
+        private void populateMissingChartDan()
+        {
+            Logger.Log("Querying for mania beatmaps with missing ChartDan...");
+
+            List<(Guid Id, string Hash)> candidates = new List<(Guid, string)>();
+
+            realmAccess.Run(r =>
+            {
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null)
+                        continue;
+
+                    if (b.Ruleset.OnlineID != 3)
+                        continue;
+
+                    if (string.IsNullOrEmpty(b.Hash))
+                        continue;
+
+                    candidates.Add((b.ID, b.Hash));
+                }
+            });
+
+            if (candidates.Count == 0)
+                return;
+
+            var completeHashes = skillStore.GetPersistedChartDanHashes();
+            var missing = candidates.Where(c => !completeHashes.Contains(c.Hash)).ToList();
+
+            if (missing.Count == 0)
+                return;
+
+            Logger.Log($"Found {missing.Count} beatmaps which require ChartDan reprocessing.");
+
+            var notification = showProgressNotification(missing.Count, "Reprocessing ChartDan", "beatmaps' ChartDan have been updated");
+
+            int processedCount = 0;
+            int failedCount = 0;
+            int attemptedCount = 0;
+            const int log_every = 25;
+
+            foreach (var (id, hash) in missing)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                sleepIfRequired();
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                {
+                    ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
+                    continue;
+                }
+
+                try
+                {
+                    var msd = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD);
+
+                    if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
+                    {
+                        ++failedCount;
+                        ++attemptedCount;
+                        updateNotificationProgress(notification, attemptedCount, missing.Count);
+                        continue;
+                    }
+
+                    int keyCount = (int)Math.Round(beatmap.Difficulty.CircleSize);
+                    if (keyCount <= 0)
+                        keyCount = 4;
+
+                    double holdRatio = 0;
+                    if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+                        holdRatio = Math.Clamp(cachedHold, 0, 1);
+                    else if (skillStore.TryGetChartSkillInfo(hash, out var csiHold) && csiHold?.LnRatio is double lnRatio && double.IsFinite(lnRatio))
+                        holdRatio = Math.Clamp(lnRatio, 0, 1);
+
+                    skillStore.TryGetChartSkillInfo(hash, out var chartInfo);
+                    if (chartInfo is { IsUnavailable: true })
+                        chartInfo = null;
+
+                    double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
+
+                    var persisted = EzPersistedChartDan.TryComputeFromStored(
+                        hash,
+                        beatmap.ID,
+                        msd,
+                        keyCount,
+                        holdRatio,
+                        xxySr,
+                        chartInfo);
+
+                    if (persisted == null)
+                    {
+                        ++failedCount;
+                    }
+                    else
+                    {
+                        skillStore.UpsertChartDan(persisted);
+                        ++processedCount;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Background ChartDan processing failed on {beatmap}: {e}");
+                    ++failedCount;
+                }
+
+                ++attemptedCount;
+                updateNotificationProgress(notification, attemptedCount, missing.Count);
+
+                if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
+                    Logger.Log($"ChartDan backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount})");
             }
 
             completeNotification(notification, processedCount, missing.Count, failedCount);

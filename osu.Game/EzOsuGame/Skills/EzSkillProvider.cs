@@ -406,6 +406,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// (<see cref="EzDanSkillsetFiling.BucketsForValues"/>). Same aggregate label on every hit bucket
         /// (hub DualPanel-style chart half; not primary-only).
         /// TODO(data): DATA-DualPanel-ChartSkillsetDans — idea: independent chart skillset dans (MSD→SrToRawDan / LeoBlack).
+        /// Prefer <see cref="GetChartDanSkillsetLabelsReadOnly"/> on song-select hot paths.
         /// </summary>
         public IReadOnlyDictionary<string, string> GetChartDanSkillsetLabels(
             BeatmapInfo beatmapInfo,
@@ -459,6 +460,74 @@ namespace osu.Game.EzOsuGame.Skills
                 result[id] = aggregateLabel;
 
             return result;
+        }
+
+        /// <summary>
+        /// Song-select / DualPanel: Realm ChartDan stamps, else in-memory filing from stored MSD+CSI.
+        /// Never sync Mina / LeoBlack / GetPlayable.
+        /// </summary>
+        public IReadOnlyDictionary<string, string> GetChartDanSkillsetLabelsReadOnly(
+            BeatmapInfo beatmapInfo,
+            int keyCount,
+            EzDanSide side)
+        {
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (keyCount <= 0 || beatmapInfo.Ruleset.OnlineID != 3)
+                return result;
+
+            if (TryGetPersistedChartDan(beatmapInfo, out var persisted) && persisted != null)
+                return new Dictionary<string, string>(persisted.SkillsetLabelsFor(side), StringComparer.Ordinal);
+
+            var msd = GetBeatmapMsd(beatmapInfo.Hash);
+            double holdRatio = 0;
+            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+                holdRatio = Math.Clamp(cachedHold, 0, 1);
+
+            EzChartSkillInfo? chartInfo = null;
+            if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var storedCsi) && storedCsi is { IsUnavailable: false })
+                chartInfo = storedCsi;
+
+            if (holdRatio <= 0 && chartInfo?.LnRatio is double lnRatio && double.IsFinite(lnRatio))
+                holdRatio = Math.Clamp(lnRatio, 0, 1);
+
+            if (!EzDanAlgorithm.AllowsChartSideHalf(side, keyCount, holdRatio))
+                return result;
+
+            string? aggregateLabel = null;
+            double xxy = beatmapInfo.XxyStarRating;
+
+            if (xxy >= 0 && double.IsFinite(xxy)
+                         && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), xxy, out var sunny)
+                         && !string.IsNullOrEmpty(sunny.DisplayLabel))
+            {
+                aggregateLabel = sunny.DisplayLabel;
+            }
+            else
+            {
+                var cached = TryGetCachedChartDan(beatmapInfo);
+                if (cached != null && cached.Side == side && !string.IsNullOrEmpty(cached.Label))
+                    aggregateLabel = cached.Label;
+            }
+
+            if (string.IsNullOrEmpty(aggregateLabel))
+                return result;
+
+            double? length = chartInfo?.LengthSeconds ?? (beatmapInfo.Length > 0 ? beatmapInfo.Length / 1000.0 : null);
+            var buckets = EzDanSkillsetFiling.BucketsForValues(keyCount, side, msd, length, rate: 1, chartInfo);
+            foreach (string id in buckets)
+                result[id] = aggregateLabel;
+
+            return result;
+        }
+
+        /// <summary>Current-version Realm ChartDan row (nomod). Miss when absent or algorithm mismatch.</summary>
+        public bool TryGetPersistedChartDan(BeatmapInfo beatmapInfo, out EzPersistedChartDan? chartDan)
+        {
+            chartDan = null;
+            if (beatmapInfo.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(beatmapInfo.Hash))
+                return false;
+
+            return store.TryGetChartDan(beatmapInfo.Hash, out chartDan);
         }
 
         /// <summary>Backward-compatible overload: RC-side labels only.</summary>

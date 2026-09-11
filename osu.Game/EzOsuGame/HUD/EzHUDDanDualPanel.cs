@@ -26,6 +26,7 @@ namespace osu.Game.EzOsuGame.HUD
     /// <summary>
     /// HUD RC|LN skills-dan dual panel (Skill-radar style Chart / Player / Both sources).
     /// Borrowed by EzAnalysis wedge and Local Profile Track with bindable settings.
+    /// Song-select hot path is Realm/MSD read-only — no sync playable / Mina / LeoBlack.
     /// </summary>
     public partial class EzHUDDanDualPanel : CompositeDrawable, ISerialisableDrawable
     {
@@ -65,6 +66,8 @@ namespace osu.Game.EzOsuGame.HUD
         private OsuSpriteText emptyHint = null!;
 
         private readonly LayoutValue sizeLayout = new LayoutValue(Invalidation.DrawSize);
+
+        private bool refreshScheduled;
 
         [Resolved]
         private EzSkillProvider? skillProvider { get; set; }
@@ -124,14 +127,14 @@ namespace osu.Game.EzOsuGame.HUD
 
             tryBindSharedPlayerSelection();
 
-            TargetUsername.BindValueChanged(_ => refresh(), true);
-            KeyCount.BindValueChanged(_ => refresh());
-            DataSource.BindValueChanged(_ => refresh());
+            TargetUsername.BindValueChanged(_ => requestRefresh(), true);
+            KeyCount.BindValueChanged(_ => requestRefresh());
+            DataSource.BindValueChanged(_ => requestRefresh());
             DualLayout.BindValueChanged(_ => applyLayoutMode(), true);
-            ShowClearCounts.BindValueChanged(_ => refresh());
+            ShowClearCounts.BindValueChanged(_ => requestRefresh());
 
-            beatmap?.BindValueChanged(_ => refresh());
-            mods?.BindValueChanged(_ => refresh());
+            beatmap?.BindValueChanged(_ => requestRefresh());
+            mods?.BindValueChanged(_ => requestRefresh());
         }
 
         /// <summary>
@@ -189,6 +192,22 @@ namespace osu.Game.EzOsuGame.HUD
             }
         }
 
+        /// <summary>
+        /// Coalesce beatmap + KeyCount (and other bindable) changes in the same frame into one refresh.
+        /// </summary>
+        private void requestRefresh()
+        {
+            if (refreshScheduled)
+                return;
+
+            refreshScheduled = true;
+            Schedule(() =>
+            {
+                refreshScheduled = false;
+                refresh();
+            });
+        }
+
         private void refresh()
         {
             applyLayoutMode();
@@ -209,50 +228,25 @@ namespace osu.Game.EzOsuGame.HUD
 
             IReadOnlyDictionary<string, string> chartSkillsetLabelsRc = new Dictionary<string, string>();
             IReadOnlyDictionary<string, string> chartSkillsetLabelsLn = new Dictionary<string, string>();
+            EzPersistedChartDan? persistedChartDan = null;
 
             if (wantChart && beatmap?.Value.BeatmapInfo != null)
             {
-                var modsList = mods?.Value ?? Array.Empty<Mod>();
                 var info = beatmap.Value.BeatmapInfo;
-
-                // Warm MSD when incomplete so filing uses current axis ids.
-                var msd = skillProvider.GetBeatmapMsd(info.Hash);
-                if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
-                    skillProvider.TryGetChartDan(info, modsList);
+                skillProvider.TryGetPersistedChartDan(info, out persistedChartDan);
 
                 if (keys <= 0)
                 {
-                    try
-                    {
-                        var playable = beatmap.Value.GetPlayableBeatmap(info.Ruleset, modsList);
-                        keys = EzMinaNoteConverter.ResolveKeyCount(playable);
-                        if (KeyCount.Value <= 0 && keys > 0)
-                            KeyCount.Value = keys;
-                    }
-                    catch
-                    {
-                        if (info.Difficulty.CircleSize > 0)
-                            keys = (int)info.Difficulty.CircleSize;
-                    }
+                    if (persistedChartDan is { KeyCount: > 0 })
+                        keys = persistedChartDan.KeyCount;
+                    else if (info.Difficulty.CircleSize > 0)
+                        keys = (int)info.Difficulty.CircleSize;
                 }
 
                 if (keys > 0)
                 {
-                    IBeatmap? playable = null;
-
-                    // Warm chart skill info for filing tags (current map DualPanel).
-                    try
-                    {
-                        playable = beatmap.Value.GetPlayableBeatmap(info.Ruleset, modsList);
-                        skillProvider.TryGetOrComputeChartSkillInfo(info, playable, modsList);
-                    }
-                    catch
-                    {
-                        skillProvider.TryGetOrComputeChartSkillInfo(info, mods: modsList);
-                    }
-
-                    chartSkillsetLabelsRc = skillProvider.GetChartDanSkillsetLabels(info, keys, EzDanSide.Rc, modsList, playable);
-                    chartSkillsetLabelsLn = skillProvider.GetChartDanSkillsetLabels(info, keys, EzDanSide.Ln, modsList, playable);
+                    chartSkillsetLabelsRc = skillProvider.GetChartDanSkillsetLabelsReadOnly(info, keys, EzDanSide.Rc);
+                    chartSkillsetLabelsLn = skillProvider.GetChartDanSkillsetLabelsReadOnly(info, keys, EzDanSide.Ln);
                 }
             }
 
@@ -286,17 +280,26 @@ namespace osu.Game.EzOsuGame.HUD
 
             if (wantChart && beatmap?.Value.BeatmapInfo != null && skillProvider != null)
             {
-                var msd = skillProvider.GetBeatmapMsd(beatmap.Value.BeatmapInfo.Hash);
-
-                if (msd.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double overall)
-                    && overall > 0 && double.IsFinite(overall))
+                if (persistedChartDan != null
+                    && persistedChartDan.OverallMsd > 0
+                    && double.IsFinite(persistedChartDan.OverallMsd))
                 {
-                    chartOverall = overall;
+                    chartOverall = persistedChartDan.OverallMsd;
+                }
+                else
+                {
+                    var msd = skillProvider.GetBeatmapMsd(beatmap.Value.BeatmapInfo.Hash);
+
+                    if (msd.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double overall)
+                        && overall > 0 && double.IsFinite(overall))
+                    {
+                        chartOverall = overall;
+                    }
                 }
             }
 
-            updateSide(rcList, EzDanSide.Rc, user, keys, chartSkillsetLabelsRc, wantChart, wantPlayer, showClearCounts, playerOverall, chartOverall);
-            updateSide(lnList, EzDanSide.Ln, user, keys, chartSkillsetLabelsLn, wantChart, wantPlayer, showClearCounts, playerOverall, chartOverall);
+            updateSide(rcList, EzDanSide.Rc, user, keys, chartSkillsetLabelsRc, wantChart, wantPlayer, showClearCounts, playerOverall, chartOverall, persistedChartDan);
+            updateSide(lnList, EzDanSide.Ln, user, keys, chartSkillsetLabelsLn, wantChart, wantPlayer, showClearCounts, playerOverall, chartOverall, persistedChartDan);
         }
 
         private void showEmpty(LocalisableString text)
@@ -316,7 +319,8 @@ namespace osu.Game.EzOsuGame.HUD
             bool wantPlayer,
             bool showClearCounts,
             double? playerOverallRating,
-            double? chartOverallRating)
+            double? chartOverallRating,
+            EzPersistedChartDan? persistedChartDan)
         {
             string? chartLabel = null;
             string? playerLabel = null;
@@ -335,7 +339,7 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             if (wantChart && beatmap?.Value.BeatmapInfo != null && skillProvider != null)
-                chartLabel = resolveChartAggregateLabel(side, keys);
+                chartLabel = resolveChartAggregateLabel(side, keys, persistedChartDan);
 
             list.UpdateContent(
                 keys,
@@ -352,27 +356,36 @@ namespace osu.Game.EzOsuGame.HUD
         /// <summary>
         /// Hub-style RC|LN chart halves: Sunny/xxy per side only when hold ratio matches that side's primary identity.
         /// Sparse-LN rice charts must not print a high LN Sunny label.
+        /// Read-only: Realm ChartDan → Sunny/xxy → cached MSD FromMsd (no Mina).
         /// </summary>
-        private string? resolveChartAggregateLabel(EzDanSide side, int keys)
+        private string? resolveChartAggregateLabel(EzDanSide side, int keys, EzPersistedChartDan? persisted)
         {
             if (beatmap?.Value.BeatmapInfo == null || skillProvider == null)
                 return null;
 
             var info = beatmap.Value.BeatmapInfo;
-            var modsList = mods?.Value ?? Array.Empty<Mod>();
+
+            string? fromRow = persisted?.LabelFor(side);
+            if (fromRow != null)
+                return fromRow;
 
             double holdRatio = 0;
-            var msd = skillProvider.GetBeatmapMsd(info.Hash);
-            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
-                holdRatio = Math.Clamp(cachedHold, 0, 1);
 
-            var chart = skillProvider.TryGetChartDan(info, modsList)
-                        ?? skillProvider.TryGetCachedChartDan(info);
+            if (persisted != null && double.IsFinite(persisted.HoldRatio))
+                holdRatio = Math.Clamp(persisted.HoldRatio, 0, 1);
+            else
+            {
+                var msd = skillProvider.GetBeatmapMsd(info.Hash);
+                if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+                    holdRatio = Math.Clamp(cachedHold, 0, 1);
+            }
+
+            var chart = skillProvider.TryGetCachedChartDan(info);
 
             if (holdRatio <= 0 && chart != null && double.IsFinite(chart.HoldRatio))
                 holdRatio = Math.Clamp(chart.HoldRatio, 0, 1);
 
-            int gateKeys = keys > 0 ? keys : chart?.KeyCount ?? 0;
+            int gateKeys = keys > 0 ? keys : persisted?.KeyCount ?? chart?.KeyCount ?? 0;
             if (gateKeys > 0 && !EzDanAlgorithm.AllowsChartSideHalf(side, gateKeys, holdRatio))
                 return null;
 

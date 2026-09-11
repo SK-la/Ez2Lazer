@@ -1,12 +1,13 @@
 # Skillset / Dan DATA follow-ups
 
-Tracked so later PRs stay light. **EZ Realm frozen at 9** for this track — fill existing columns/tables only.
+Tracked so later PRs stay light. Fill existing columns/tables when possible; bump EZ only for new persisted shapes (see ChartDan EZ10).
 
 Do **not** re-encode lasting follow-ups as only `// TODO(data)` in product code — keep a row here. **Temp wires** must dual-write: code `TODO` pointing at a row ID **and** Status below (`Temp wire → …`).
 
 | ID | Plan name | Scope | Status |
 |----|-----------|--------|--------|
 | — | SCHEMA EZ9 | Typed `EzBeatmapChartSkillInfo` + `EzPlayerDanSkillsetValue` in Realm | **Done** |
+| — | SCHEMA EZ10 / DATA-ChartDan-Realm | Nomod `EzBeatmapChartDan` + skillset stamps; BDSP `populateMissingChartDan`; DualPanel/Provider song-select **zero engine** (no sync playable/Mina/LeoBlack); rate-mod chart dan stays out | **Done** |
 | — | Debt: SQLite ChartSkillInfo | Abandoned analysis `chart_skill_info` JSON; no import/migrate; miss → recompute | **Done** |
 | — | Debt: single Realm skill facade | ChartSkillInfo CRUD merged into `EzSkillStore`; deleted `EzChartSkillInfoStore` | **Done** |
 | — | DATA-Skillset-Cache | Writers + Provider cache-hit; LocalProfile rebuild calls `RefreshDanSkillsets` | **Done** |
@@ -27,6 +28,6 @@ Do **not** re-encode lasting follow-ups as only `// TODO(data)` in product code 
 | — | DATA-SSR-LnTailBlend | Hub `LN_TAIL_BLEND_BY_KEYMODE` (`EzMinaNoteConverter` lnTailTaps=false) | Wish-list |
 | — | MinaCalc 5K / 8K+ MSD | Hub rates **4–18K** (vendored MinaCalc). Ez NuGet **0.4.2** only 4/6/7 (`FromString`) / 4K (note-array); backfill skips 5/8+. Align engine separately. | Blocked on engine upgrade |
 
-UI read path (all of HUD DualPanel/Radar, Analysis Wedge, LocalProfile Track, display tags): **`EzSkillProvider` only**.
+UI read path (all of HUD DualPanel/Radar, Analysis Wedge, LocalProfile Track, display tags): **`EzSkillProvider` only**. Song-select DualPanel chart half: Realm ChartDan / MSD / CSI **read-only** (`GetChartDanSkillsetLabelsReadOnly`); cold miss stays empty until BDSP / 「Realm ChartDan」 maintenance.
 
 When starting any of the above, check this file and the matching Cursor/plan todos, then tick or remove the row here in the same PR.

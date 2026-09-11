@@ -38,5 +38,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_REALM_CHART_SKILL_INFO))]
         RealmChartSkillInfo = 8,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_REALM_CHART_DAN))]
+        RealmChartDan = 9,
     }
 }
