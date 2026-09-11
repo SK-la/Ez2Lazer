@@ -142,6 +142,39 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// Persist a settled-miss marker so BDSP does not reprocess the same zero-vector chart every launch.
+        /// Replaces any existing <see cref="EzSkillSystems.BEATMAP_MSD"/> rows for this hash.
+        /// </summary>
+        public void WriteBeatmapMsdUnrateable(string beatmapHash, Guid beatmapId = default, DateTimeOffset? computedAt = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
+
+            DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
+            int version = EzManiaSkillAlgorithm.VERSION;
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzBeatmapSkillValue>()
+                                .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == EzSkillSystems.BEATMAP_MSD)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+
+                r.Add(new EzBeatmapSkillValue
+                {
+                    BeatmapHash = beatmapHash,
+                    BeatmapId = beatmapId,
+                    SystemId = EzSkillSystems.BEATMAP_MSD,
+                    SkillId = EzSkillSystems.MsdUnrateableSkillId,
+                    Value = 1,
+                    AlgorithmVersion = version,
+                    ComputedAt = at,
+                });
+            });
+        }
+
+        /// <summary>
         /// Deletes persisted beatmap MSD rows. When <paramref name="hashes"/> is null, clears all MSD rows.
         /// </summary>
         public void ClearBeatmapMsd(IEnumerable<string>? hashes = null)
@@ -209,6 +242,34 @@ namespace osu.Game.EzOsuGame.Skills
                 }
 
                 return complete;
+            });
+        }
+
+        /// <summary>
+        /// Hashes that BDSP should not reprocess: complete MSD cache or settled <c>__unrateable</c> miss.
+        /// </summary>
+        public HashSet<string> GetSettledBeatmapMsdHashes(int? algorithmVersion = null)
+        {
+            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+
+            return realmAccess.Run(r =>
+            {
+                var byHash = r.All<EzBeatmapSkillValue>()
+                              .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD
+                                          && v.AlgorithmVersion == version)
+                              .AsEnumerable()
+                              .GroupBy(v => v.BeatmapHash, StringComparer.Ordinal);
+
+                var settled = new HashSet<string>(StringComparer.Ordinal);
+
+                foreach (var group in byHash)
+                {
+                    var skills = group.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
+                    if (EzBeatmapMsdComputer.IsSettledMsdCache(skills))
+                        settled.Add(group.Key);
+                }
+
+                return settled;
             });
         }
 

@@ -891,7 +891,7 @@ namespace osu.Game.Database
             if (candidates.Count == 0)
                 return;
 
-            var completeHashes = skillStore.GetCompleteBeatmapMsdHashes();
+            var completeHashes = skillStore.GetSettledBeatmapMsdHashes();
             var missing = candidates.Where(c => !completeHashes.Contains(c.Hash)).ToList();
 
             if (missing.Count == 0)
@@ -926,7 +926,14 @@ namespace osu.Game.Database
                 try
                 {
                     if (beatmapMsdComputer.ComputeAndStore(beatmap) == null)
-                        ++failedCount;
+                    {
+                        // Zero-vector charts write __unrateable and count as settled, not failure.
+                        var skills = skillStore.GetBeatmapSkills(beatmap.Hash, EzSkillSystems.BEATMAP_MSD);
+                        if (EzBeatmapMsdComputer.IsUnrateableMsd(skills))
+                            ++processedCount;
+                        else
+                            ++failedCount;
+                    }
                     else
                         ++processedCount;
                 }
@@ -1083,9 +1090,11 @@ namespace osu.Game.Database
                 return;
 
             var completeChartDan = skillStore.GetPersistedChartDanHashes();
+            var settledMsd = skillStore.GetSettledBeatmapMsdHashes();
             var completeMsd = skillStore.GetCompleteBeatmapMsdHashes();
 
             int waitingOnMsd = 0;
+            int skippedUnrateableMsd = 0;
             var missing = new List<(Guid Id, string Hash)>();
 
             foreach (var candidate in candidates)
@@ -1093,9 +1102,16 @@ namespace osu.Game.Database
                 if (completeChartDan.Contains(candidate.Hash))
                     continue;
 
-                if (!completeMsd.Contains(candidate.Hash))
+                if (!settledMsd.Contains(candidate.Hash))
                 {
                     ++waitingOnMsd;
+                    continue;
+                }
+
+                // Settled as unrateable: no ChartDan possible; do not fail-loop.
+                if (!completeMsd.Contains(candidate.Hash))
+                {
+                    ++skippedUnrateableMsd;
                     continue;
                 }
 
@@ -1105,9 +1121,12 @@ namespace osu.Game.Database
             if (waitingOnMsd > 0)
                 Logger.Log($"Deferring {waitingOnMsd} ChartDan candidates until MSD is complete (run Realm MSD first).");
 
+            if (skippedUnrateableMsd > 0)
+                Logger.Log($"Skipping {skippedUnrateableMsd} ChartDan candidates with unrateable MSD.");
+
             if (missing.Count == 0)
             {
-                Logger.Log($"ChartDan backfill: nothing ready (have ChartDan or waiting on MSD). unsupportedKeymode={skippedUnsupportedKeyCount}, waitingOnMsd={waitingOnMsd}");
+                Logger.Log($"ChartDan backfill: nothing ready (have ChartDan or waiting on MSD). unsupportedKeymode={skippedUnsupportedKeyCount}, waitingOnMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}");
                 return;
             }
 
@@ -1195,11 +1214,11 @@ namespace osu.Game.Database
                 updateNotificationProgress(notification, attemptedCount, missing.Count);
 
                 if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
-                    Logger.Log($"ChartDan backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount}; deferredNoMsd={waitingOnMsd}, unsupportedKeymode={skippedUnsupportedKeyCount})");
+                    Logger.Log($"ChartDan backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount}; deferredNoMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}, unsupportedKeymode={skippedUnsupportedKeyCount})");
             }
 
             completeNotification(notification, processedCount, missing.Count, failedCount);
-            Logger.Log($"ChartDan backfill finished: ok={processedCount}, fail={failedCount}, deferredNoMsd={waitingOnMsd}, unsupportedKeymode={skippedUnsupportedKeyCount}");
+            Logger.Log($"ChartDan backfill finished: ok={processedCount}, fail={failedCount}, deferredNoMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}, unsupportedKeymode={skippedUnsupportedKeyCount}");
         }
 
         /// <summary>

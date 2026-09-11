@@ -28,6 +28,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Returns existing MSD skills when present and current; otherwise computes and persists.
+        /// Settled <c>__unrateable</c> markers return null without recomputing.
         /// </summary>
         public IReadOnlyDictionary<string, double>? TryGetOrCompute(BeatmapInfo beatmapInfo)
         {
@@ -39,6 +40,9 @@ namespace osu.Game.EzOsuGame.Skills
             var existing = skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_MSD);
             if (IsCurrentMsdCache(existing))
                 return existing;
+
+            if (IsUnrateableMsd(existing))
+                return null;
 
             return ComputeAndStore(beatmapInfo);
         }
@@ -77,8 +81,14 @@ namespace osu.Game.EzOsuGame.Skills
 
             if (vector.Overall <= 0 && vector.Stream <= 0)
             {
-                if (EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount) && EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount))
+                bool supportedKeymode = EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount)
+                                        || EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount);
+
+                if (supportedKeymode)
+                {
                     Logger.Log($"MSD zero vector for {beatmapInfo} (keys={keyCount})");
+                    skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
+                }
                 // else
                 //     Logger.Log($"MSD skip unsupported keymode {keyCount}K for {beatmapInfo}");
 
@@ -218,5 +228,16 @@ namespace osu.Game.EzOsuGame.Skills
 
             return true;
         }
+
+        /// <summary>True when BDSP has recorded a zero-vector settled miss for this hash.</summary>
+        public static bool IsUnrateableMsd(IReadOnlyDictionary<string, double> existing)
+            => existing.ContainsKey(EzSkillSystems.MsdUnrateableSkillId);
+
+        /// <summary>
+        /// Complete MSD or settled <c>__unrateable</c> — BDSP should not reprocess.
+        /// Unrateable is never a valid read cache (<see cref="IsCurrentMsdCache"/> stays false).
+        /// </summary>
+        public static bool IsSettledMsdCache(IReadOnlyDictionary<string, double> existing)
+            => IsCurrentMsdCache(existing) || IsUnrateableMsd(existing);
     }
 }

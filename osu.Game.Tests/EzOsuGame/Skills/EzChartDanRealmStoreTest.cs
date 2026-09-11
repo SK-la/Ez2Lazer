@@ -145,6 +145,30 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
+        public void Unrateable_msd_is_settled_but_not_complete()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+                const string hash = "msd-unrateable-hash";
+
+                store.WriteBeatmapMsdUnrateable(hash, Guid.NewGuid());
+
+                Assert.That(store.GetCompleteBeatmapMsdHashes(), Does.Not.Contain(hash));
+                Assert.That(store.GetSettledBeatmapMsdHashes(), Does.Contain(hash));
+
+                var skills = store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD);
+                Assert.That(EzBeatmapMsdComputer.IsUnrateableMsd(skills), Is.True);
+                Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(skills), Is.False);
+
+                // Successful MSD write replaces the marker.
+                store.WriteBeatmapMsd(hash, new EzSkillsetVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
+                Assert.That(store.GetCompleteBeatmapMsdHashes(), Does.Contain(hash));
+                Assert.That(EzBeatmapMsdComputer.IsUnrateableMsd(store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD)), Is.False);
+            });
+        }
+
+        [Test]
         public void Join_parse_skillset_labels_round_trip()
         {
             var labels = new Dictionary<string, string>

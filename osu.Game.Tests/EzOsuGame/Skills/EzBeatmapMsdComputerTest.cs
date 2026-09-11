@@ -32,6 +32,30 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void TestIsCurrentMsdCacheAcceptsCompleteCurrentIds()
         {
             Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(buildCompleteSkills()), Is.True);
+            Assert.That(EzBeatmapMsdComputer.IsSettledMsdCache(buildCompleteSkills()), Is.True);
+        }
+
+        [Test]
+        public void TestUnrateableMarkerIsSettledButNotCurrent()
+        {
+            var skills = new Dictionary<string, double>
+            {
+                [EzSkillSystems.MsdUnrateableSkillId] = 1,
+            };
+
+            Assert.That(EzBeatmapMsdComputer.IsUnrateableMsd(skills), Is.True);
+            Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(skills), Is.False);
+            Assert.That(EzBeatmapMsdComputer.IsSettledMsdCache(skills), Is.True);
+        }
+
+        [Test]
+        public void TestEmptySkillsAreNeitherCurrentNorSettled()
+        {
+            var skills = new Dictionary<string, double>();
+
+            Assert.That(EzBeatmapMsdComputer.IsCurrentMsdCache(skills), Is.False);
+            Assert.That(EzBeatmapMsdComputer.IsUnrateableMsd(skills), Is.False);
+            Assert.That(EzBeatmapMsdComputer.IsSettledMsdCache(skills), Is.False);
         }
 
         private static Dictionary<string, double> buildCompleteSkills()

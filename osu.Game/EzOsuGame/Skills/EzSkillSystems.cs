@@ -31,7 +31,16 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Persisted beside MSD axes when computed (not a Mina axis).</summary>
         public const string HOLD_RATIO = "__hold_ratio";
 
+        /// <summary>
+        /// Settled miss for charts MinaCalc rates as a zero vector on a supported keymode.
+        /// Keyed by beatmap content hash — editing the chart changes the hash and allows recompute.
+        /// Not a valid MSD cache (<see cref="EzBeatmapMsdComputer.IsCurrentMsdCache"/> stays false).
+        /// </summary>
+        public const string UNRATEABLE = "__unrateable";
+
         public static string MsdHoldRatioSkillId => $"{BEATMAP_MSD}.{HOLD_RATIO}";
+
+        public static string MsdUnrateableSkillId => $"{BEATMAP_MSD}.{UNRATEABLE}";
 
         public static string DanSkillId(int keyCount, EzDanSide side)
             => $"{DAN}.{keyCount}k.{side.ToId()}";
