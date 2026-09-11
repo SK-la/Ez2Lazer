@@ -1005,10 +1005,7 @@ namespace osu.Game.Database
 
                     var info = skillProvider.TryGetOrComputeChartSkillInfo(beatmap);
 
-                    // Unavailable stubs return null from the provider but are persisted so the
-                    // hash leaves the missing set next launch — count them as processed.
-                    if (info != null
-                        || (skillStore.TryGetChartSkillInfo(beatmap.Hash, out var stub) && stub != null))
+                    if (info != null)
                         ++processedCount;
                     else
                         ++failedCount;

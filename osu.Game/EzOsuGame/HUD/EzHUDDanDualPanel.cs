@@ -241,10 +241,12 @@ namespace osu.Game.EzOsuGame.HUD
 
                 if (keys > 0)
                 {
+                    IBeatmap? playable = null;
+
                     // Warm chart skill info for filing tags (current map DualPanel).
                     try
                     {
-                        var playable = beatmap.Value.GetPlayableBeatmap(info.Ruleset, modsList);
+                        playable = beatmap.Value.GetPlayableBeatmap(info.Ruleset, modsList);
                         skillProvider.TryGetOrComputeChartSkillInfo(info, playable, modsList);
                     }
                     catch
@@ -252,8 +254,8 @@ namespace osu.Game.EzOsuGame.HUD
                         skillProvider.TryGetOrComputeChartSkillInfo(info, mods: modsList);
                     }
 
-                    chartSkillsetLabelsRc = skillProvider.GetChartDanSkillsetLabels(info, keys, EzDanSide.Rc, modsList);
-                    chartSkillsetLabelsLn = skillProvider.GetChartDanSkillsetLabels(info, keys, EzDanSide.Ln, modsList);
+                    chartSkillsetLabelsRc = skillProvider.GetChartDanSkillsetLabels(info, keys, EzDanSide.Rc, modsList, playable);
+                    chartSkillsetLabelsLn = skillProvider.GetChartDanSkillsetLabels(info, keys, EzDanSide.Ln, modsList, playable);
                 }
             }
 

@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -103,19 +104,60 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void Skillset_empty_verdicts_write_sentinel_so_has_cache_is_true()
+        public void Skillset_empty_verdicts_do_not_write_sentinel()
         {
             RunTestWithRealm((realm, _) =>
             {
                 var store = new EzSkillStore(realm);
 
-                store.WriteDanSkillsetVerdicts("tester", 7, DanSkillSystem.SIDE_LN, new Dictionary<string, EzDanSkillsetVerdict>());
+                store.WriteDanSkillsetVerdicts("tester", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>
+                {
+                    [EzDanSkillsetBuckets.JACK] = new EzDanSkillsetVerdict(EzDanSkillsetBuckets.JACK, 10, "Shodan", 4),
+                });
+                Assert.That(store.HasDanSkillsetCache("tester", 4, DanSkillSystem.SIDE_RC), Is.True);
 
-                Assert.That(store.HasDanSkillsetCache("tester", 7, DanSkillSystem.SIDE_LN), Is.True);
-                Assert.That(store.GetDanSkillsetValues("tester", 7, DanSkillSystem.SIDE_LN), Is.Empty);
+                store.WriteDanSkillsetVerdicts("tester", 4, DanSkillSystem.SIDE_RC, new Dictionary<string, EzDanSkillsetVerdict>());
 
-                store.ClearDanSkillsetValues("tester");
-                Assert.That(store.HasDanSkillsetCache("tester", 7, DanSkillSystem.SIDE_LN), Is.False);
+                Assert.That(store.HasDanSkillsetCache("tester", 4, DanSkillSystem.SIDE_RC), Is.False);
+                Assert.That(store.GetDanSkillsetValues("tester", 4, DanSkillSystem.SIDE_RC), Is.Empty);
+
+                realm.Run(r =>
+                {
+                    Assert.That(r.All<EzPlayerDanSkillsetValue>().Any(v =>
+                        v.Username == "tester" && v.SkillsetId == EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL), Is.False);
+                });
+            });
+        }
+
+        [Test]
+        public void Skillset_legacy_empty_sentinel_is_purged_as_miss()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzPlayerDanSkillsetValue
+                    {
+                        Username = "legacy",
+                        KeyCount = 7,
+                        Side = DanSkillSystem.SIDE_LN,
+                        SkillsetId = EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL,
+                        RawDan = -1,
+                        AlgorithmVersion = EzDanAlgorithm.VERSION,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    });
+                });
+
+                Assert.That(store.HasDanSkillsetCache("legacy", 7, DanSkillSystem.SIDE_LN), Is.False);
+                Assert.That(store.GetDanSkillsetValues("legacy", 7, DanSkillSystem.SIDE_LN), Is.Empty);
+
+                realm.Run(r =>
+                {
+                    Assert.That(r.All<EzPlayerDanSkillsetValue>().Any(v =>
+                        v.Username == "legacy" && v.SkillsetId == EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL), Is.False);
+                });
             });
         }
 
@@ -136,6 +178,59 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(verdicts, Has.Count.EqualTo(1));
                 Assert.That(verdicts[EzDanSkillsetBuckets.TECH].RawDan, Is.EqualTo(9.1).Within(1e-9));
                 Assert.That(verdicts[EzDanSkillsetBuckets.TECH].Label, Is.EqualTo("Shodan"));
+            });
+        }
+
+        [Test]
+        public void Provider_GetDanSkillsets_miss_with_no_clears_does_not_write_empty()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+                var provider = new EzSkillProvider(store);
+
+                var verdicts = provider.GetDanSkillsets("no-clears-user", 4, DanSkillSystem.SIDE_RC);
+
+                Assert.That(verdicts, Is.Empty);
+                Assert.That(store.HasDanSkillsetCache("no-clears-user", 4, DanSkillSystem.SIDE_RC), Is.False);
+            });
+        }
+
+        [Test]
+        public void Unavailable_csi_is_not_persisted_and_excluded_from_hash_set()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+                const string stub_hash = "unavailable-stub-hash";
+                const string real_hash = "real-csi-hash";
+
+                store.UpsertChartSkillInfo(stub_hash, EzChartSkillInfo.Unavailable);
+                Assert.That(store.TryGetChartSkillInfo(stub_hash, out var missing), Is.False);
+                Assert.That(missing, Is.Null);
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzBeatmapChartSkillInfo
+                    {
+                        BeatmapHash = stub_hash,
+                        InfoVersion = EzChartSkillInfo.VERSION,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                        KeyCount = -1,
+                        DanEligible = false,
+                    });
+                });
+
+                store.UpsertChartSkillInfo(real_hash, new EzChartSkillInfo
+                {
+                    Patterns = new[] { "jack" },
+                    DanEligible = true,
+                    KeyCount = 4,
+                });
+
+                var hashes = store.GetPersistedChartSkillInfoHashes();
+                Assert.That(hashes.Contains(real_hash), Is.True);
+                Assert.That(hashes.Contains(stub_hash), Is.False);
             });
         }
 

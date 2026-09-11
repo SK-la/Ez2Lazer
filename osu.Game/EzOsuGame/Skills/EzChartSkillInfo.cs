@@ -14,9 +14,8 @@ namespace osu.Game.EzOsuGame.Skills
         public const int VERSION = 2;
 
         /// <summary>
-        /// Persisted placeholder when the chart could not be loaded/analyzed.
-        /// <see cref="KeyCount"/> is negative so startup backfill treats the hash as done
-        /// without retrying every launch; readers must treat <see cref="IsUnavailable"/> as miss.
+        /// In-memory miss marker only — must not be upserted to Realm.
+        /// Legacy rows with negative <see cref="KeyCount"/> are treated as miss and excluded from persisted-hash sets.
         /// </summary>
         public static EzChartSkillInfo Unavailable { get; } = new EzChartSkillInfo
         {
@@ -24,7 +23,7 @@ namespace osu.Game.EzOsuGame.Skills
             DanEligible = false,
         };
 
-        /// <summary>True when this row is an unavailable stub (see <see cref="Unavailable"/>).</summary>
+        /// <summary>True when this is an unavailable stub (see <see cref="Unavailable"/>).</summary>
         public bool IsUnavailable => KeyCount is < 0;
 
         public string[] Patterns { get; init; } = [];

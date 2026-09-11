@@ -42,8 +42,7 @@ namespace osu.Game.EzOsuGame.Skills
         public const string LN_RELEASE = "lnrelease";
 
         /// <summary>
-        /// Persisted when a key×side was recomputed but produced no skillset tiles
-        /// (so readers can distinguish cache hit-empty from never cached).
+        /// Legacy empty-cache stamp (<c>__empty__</c>). No longer written; readers purge it and treat as miss.
         /// </summary>
         public const string CACHE_EMPTY_SENTINEL = "__empty__";
 

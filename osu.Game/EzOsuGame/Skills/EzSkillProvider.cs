@@ -26,6 +26,9 @@ namespace osu.Game.EzOsuGame.Skills
         private readonly EzAnalysisDatabase? analysisDatabase;
         private readonly BeatmapManager? beatmapManager;
 
+        /// <summary>Session-only CSI compute failures — keep miss in Realm so BDSP can retry next launch.</summary>
+        private readonly HashSet<string> chartSkillInfoSessionMisses = new HashSet<string>(StringComparer.Ordinal);
+
         public EzSkillProvider(
             EzSkillStore store,
             EzSkillRegistry? registry = null,
@@ -157,12 +160,13 @@ namespace osu.Game.EzOsuGame.Skills
             => GetDanSkillsetSlots(keyCount, EzDanSideExtensions.ParseOrRc(sideId));
 
         /// <summary>
-        /// Skillset dan verdicts (clear-bucket averages). Prefers Realm cache; miss → compute, write skillsets + side headline, return.
-        /// Missing keys = under quorum / no filing data yet.
+        /// Skillset dan verdicts (clear-bucket averages). Prefers Realm cache; miss → compute when clears exist.
+        /// Only positive verdicts are persisted (no empty sentinel). Missing keys = under quorum / no filing data yet.
         /// </summary>
         public IReadOnlyDictionary<string, EzDanSkillsetVerdict> GetDanSkillsets(string username, int keyCount, string side)
         {
             string resolvedUser = resolveSkillsUsername(username);
+            var clears = GetDanClears(resolvedUser, keyCount, side, EzDanAlgorithm.VERSION);
 
             if (store.HasDanSkillsetCache(resolvedUser, keyCount, side))
                 return danSkillsetsFromCache(resolvedUser, keyCount, side);
@@ -174,11 +178,17 @@ namespace osu.Game.EzOsuGame.Skills
                 return danSkillsetsFromCache(username, keyCount, side);
             }
 
-            var verdicts = computeDanSkillsets(resolvedUser, keyCount, side, allowComputeChart: true);
-            store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, side, verdicts);
+            // No clears for current EzDanAlgorithm.VERSION → keep miss (do not write empty).
+            if (clears.Count == 0)
+                return new Dictionary<string, EzDanSkillsetVerdict>(StringComparer.Ordinal);
 
-            var clears = GetDanClears(resolvedUser, keyCount, side, EzDanAlgorithm.VERSION);
-            writeSideHeadline(resolvedUser, keyCount, EzDanSideExtensions.ParseOrRc(side), clears, verdicts);
+            var verdicts = computeDanSkillsets(resolvedUser, keyCount, side, allowComputeChart: true);
+
+            if (verdicts.Count > 0)
+            {
+                store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, side, verdicts);
+                writeSideHeadline(resolvedUser, keyCount, EzDanSideExtensions.ParseOrRc(side), clears, verdicts);
+            }
 
             return verdicts;
         }
@@ -187,6 +197,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// Recompute and persist skillset caches for a user after dan clears are replaced.
         /// Prefetches play SSR (axis evidence = hub <c>play.values</c>) and ChartSkillInfo for clear hashes.
         /// Missing ChartSkillInfo is computed (hub load + heal), not left permanently null.
+        /// Empty verdicts leave a miss (no empty sentinel write).
         /// </summary>
         public void RefreshDanSkillsets(string username, Action? tick = null)
         {
@@ -221,7 +232,6 @@ namespace osu.Game.EzOsuGame.Skills
 
                     if (clears.Count == 0 && EzDanSkillsetBuckets.Slots(keyCount, side).Count == 0)
                     {
-                        // No evidence and no UI slots — skip writing a cache stamp.
                         tick?.Invoke();
                         continue;
                     }
@@ -233,8 +243,12 @@ namespace osu.Game.EzOsuGame.Skills
                         playSsr.Resolve,
                         chartByHash.GetValueOrDefault);
 
-                    store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, sideId, verdicts);
-                    writeSideHeadline(resolvedUser, keyCount, side, clears, verdicts);
+                    if (verdicts.Count > 0)
+                    {
+                        store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, sideId, verdicts);
+                        writeSideHeadline(resolvedUser, keyCount, side, clears, verdicts);
+                    }
+
                     tick?.Invoke();
                 }
             }
@@ -396,7 +410,8 @@ namespace osu.Game.EzOsuGame.Skills
             BeatmapInfo beatmapInfo,
             int keyCount,
             EzDanSide side,
-            IReadOnlyList<Mod>? mods = null)
+            IReadOnlyList<Mod>? mods = null,
+            IBeatmap? playable = null)
         {
             var result = new Dictionary<string, string>(StringComparer.Ordinal);
             if (keyCount <= 0 || beatmapInfo.Ruleset.OnlineID != 3)
@@ -435,7 +450,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (string.IsNullOrEmpty(aggregateLabel))
                 return result;
 
-            var chartInfo = TryGetOrComputeChartSkillInfo(beatmapInfo, playable: null, mods);
+            var chartInfo = TryGetOrComputeChartSkillInfo(beatmapInfo, playable, mods);
             double? length = chartInfo?.LengthSeconds ?? (beatmapInfo.Length > 0 ? beatmapInfo.Length / 1000.0 : null);
 
             var buckets = EzDanSkillsetFiling.BucketsForValues(keyCount, side, msd, length, rate, chartInfo);
@@ -457,6 +472,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Stored chart skill info, or compute+upsert when a playable (or WorkingBeatmap) is available.
+        /// Failures stay Realm miss (no Unavailable stub). Session set skips hot-path retries without playable.
         /// </summary>
         public EzChartSkillInfo? TryGetOrComputeChartSkillInfo(
             BeatmapInfo beatmapInfo,
@@ -466,11 +482,12 @@ namespace osu.Game.EzOsuGame.Skills
             if (beatmapInfo.Ruleset.OnlineID != 3)
                 return null;
 
-            if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
-            {
-                // Unavailable stubs satisfy backfill completeness but are misses for filing/UI.
-                return stored.IsUnavailable ? null : stored;
-            }
+            if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null && !stored.IsUnavailable)
+                return stored;
+
+            // Existing Unavailable stub (or miss): retry when caller supplies playable; otherwise leave miss.
+            if (playable == null && chartSkillInfoSessionMisses.Contains(beatmapInfo.Hash))
+                return null;
 
             try
             {
@@ -485,7 +502,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 if (map == null)
                 {
-                    store.UpsertChartSkillInfo(beatmapInfo.Hash, EzChartSkillInfo.Unavailable, beatmapInfo.ID);
+                    chartSkillInfoSessionMisses.Add(beatmapInfo.Hash);
                     return null;
                 }
 
@@ -494,20 +511,12 @@ namespace osu.Game.EzOsuGame.Skills
                 // Motion / pattern shares are rate-invariant; always measure at 1.0x like hub.
                 var info = EzChartSkillInfoComputer.Compute(input, msd.Count > 0 ? msd : null, rate: 1);
                 store.UpsertChartSkillInfo(beatmapInfo.Hash, info, beatmapInfo.ID);
+                chartSkillInfoSessionMisses.Remove(beatmapInfo.Hash);
                 return info;
             }
             catch
             {
-                // Persist a stub so startup backfill does not retry this hash every launch.
-                try
-                {
-                    store.UpsertChartSkillInfo(beatmapInfo.Hash, EzChartSkillInfo.Unavailable, beatmapInfo.ID);
-                }
-                catch
-                {
-                    // ignore secondary failure
-                }
-
+                chartSkillInfoSessionMisses.Add(beatmapInfo.Hash);
                 return null;
             }
         }

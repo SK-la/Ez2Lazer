@@ -8,8 +8,8 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Cached player skillset-dan tile (EZ≥9). Written by <see cref="EzSkillProvider.RefreshDanSkillsets"/> /
-    /// <see cref="EzSkillProvider.GetDanSkillsets"/>; DualPanel prefers cache hits.
-    /// Empty buckets use <see cref="EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL"/> so “computed empty” ≠ “never cached”.
+    /// <see cref="EzSkillProvider.GetDanSkillsets"/> only when there is at least one positive verdict.
+    /// DualPanel prefers cache hits; miss (no rows) means recompute when clears exist.
     /// </summary>
     [MapTo("EzPlayerDanSkillsetValue")]
     public class EzPlayerDanSkillsetValue : RealmObject
