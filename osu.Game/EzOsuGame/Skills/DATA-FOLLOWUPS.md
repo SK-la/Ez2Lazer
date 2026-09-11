@@ -19,7 +19,7 @@ Do **not** re-encode lasting follow-ups as only `// TODO(data)` in product code 
 | — | DATA-Dan-Skillset-EmptySlots | User: DualPanel 4K jack / 6–7K speed empty; other tiles + radar OK. Local `All` clears×CSI: 4K jack-like SSR argmax≈1 / chordjack tags≈2; 6K&7K delay-tagged clears=1 each (CSI has 133 delay charts but almost none in clear set). primary≪4 → **legal quorum**, no filing code change. Detail: gitignored `artifacts/skills-evidence-map.md` Pass B–D. | **Done** (docs only) |
 | — | DATA-Dan-Skillset-CsiQueue | Hub `enqueueMissingChartAnalyses` async next-pass; Ez currently sync-heals in Refresh. Optional queue if sync cost hurts rebuild. | Wish-list |
 | 1 | DATA-LeoBlack-ChartDan | Full LeoBlack chart-side aggregate dan (optional). Also fills cluster columns if still null. | Wish-list |
-| — | DATA-LeoBlack-Clusters | Fill `JackShare` / `StreamShare` / `TechCategory` / `ClusterTrill` / `HandstreamCluster`; revive filing branches that need them. Overlaps row 1. | Wish-list |
+| — | DATA-LeoBlack-Clusters | Fill `JackShare` / `StreamShare` / `TechCategory` / `ClusterTrill` / `HandstreamCluster` via C# LeoBlack patterns thin port (`Skills/LeoBlack`); feed clusters into `JackDemand`. CSI `VERSION=2`. 6/7K DualPanel **speed** still delay-tag only. | **Done** |
 | — | DATA-SSR-VibroExclude | Hub `chart_vibro` / `rate_vibro` eviction from SSR pool (`Vibro` currently always false) | Wish-list |
 | — | DATA-SSR-GoalExtrapolate | Hub `runMsdAtGoal` log-linear extrapolate past calc 0.965 | Wish-list |
 | — | DATA-SSR-LnTailBlend | Hub `LN_TAIL_BLEND_BY_KEYMODE` (`EzMinaNoteConverter` lnTailTaps=false) | Wish-list |

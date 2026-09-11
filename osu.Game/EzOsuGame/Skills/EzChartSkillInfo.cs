@@ -10,7 +10,8 @@ namespace osu.Game.EzOsuGame.Skills
     /// </summary>
     public sealed class EzChartSkillInfo
     {
-        public const int VERSION = 1;
+        /// <summary>Bump when CSI production changes (e.g. LeoBlack clusters). Invalidates Realm rows via InfoVersion.</summary>
+        public const int VERSION = 2;
 
         /// <summary>
         /// Persisted placeholder when the chart could not be loaded/analyzed.

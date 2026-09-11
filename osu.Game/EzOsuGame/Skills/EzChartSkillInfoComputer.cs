@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Skills.LeoBlack;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -12,7 +13,7 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Builds <see cref="EzChartSkillInfo"/> from note data (hub chart-analysis lean filing subset).
-    /// Cluster fields stay null until LeoBlack lands.
+    /// LeoBlack patterns fill cluster columns; failure falls back to analyzer tags only.
     /// </summary>
     public static class EzChartSkillInfoComputer
     {
@@ -38,10 +39,17 @@ namespace osu.Game.EzOsuGame.Skills
                     patternScores[hit.Id] = hit.Score;
             }
 
+            var leo = EzLeoBlackPatternAnalyzer.TryAnalyze(chart);
+            IReadOnlyList<EzLeoBlackCluster> leoClusters = leo?.Clusters ?? [];
+            double? jackShare = leo != null ? EzLeoBlackClusterMetrics.JackShare(leoClusters) : null;
+            double? streamShare = leo != null ? EzLeoBlackClusterMetrics.StreamShare(leoClusters) : null;
+            bool? techCategory = leo != null ? EzLeoBlackClusterMetrics.TechCategory(leo.Category) : null;
+            bool? clusterTrill = leo != null ? EzLeoBlackClusterMetrics.ClusterTrill(leo.Category) : null;
+            bool? handstreamCluster = leo != null ? EzLeoBlackClusterMetrics.HandstreamCluster(leo.Category) : null;
+
             int keyCount = chart.KeyCount;
             double chordjackScore = patternScores.GetValueOrDefault("chordjack");
             double jackScore = patternScores.GetValueOrDefault("jack");
-            double? jackShare = null;
             bool isJack = EzDanSkillsetFiling.ChartIsJack(keyCount, chordjackScore, jackScore, jackShare);
             bool vetoesTech = EzDanSkillsetFiling.JackVetoesTech(keyCount, chordjackScore, jackScore, jackShare);
             double lnRatio = features.Metrics.HoldRatio;
@@ -58,6 +66,19 @@ namespace osu.Game.EzOsuGame.Skills
             if (EzDanSkillsetFiling.UsesPatternSkillAxes(keyCount) && isJack && !patternIds.Contains("jack"))
                 patternIds.Add("jack");
 
+            var jackDemandClusters = new List<EzFourKeyJackDemand.Cluster>(leoClusters.Count);
+
+            foreach (var cluster in leoClusters)
+            {
+                jackDemandClusters.Add(new EzFourKeyJackDemand.Cluster
+                {
+                    Label = cluster.Label,
+                    Pattern = cluster.Pattern,
+                    Bpm = cluster.Bpm,
+                    Importance = cluster.Importance,
+                });
+            }
+
             var jackDemand = EzFourKeyJackDemand.Classify(new EzFourKeyJackDemand.Input
             {
                 KeyCount = keyCount,
@@ -69,7 +90,7 @@ namespace osu.Game.EzOsuGame.Skills
                 Patterns = patterns.AllPatterns
                                    .Select(p => new EzFourKeyJackDemand.PatternScore { Id = p.Id, Score = p.Score })
                                    .ToList(),
-                Clusters = [],
+                Clusters = jackDemandClusters,
             });
 
             var mina = EzDanSkillsetFiling.NormalizeMsdValues(msdValues);
@@ -80,11 +101,11 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 Patterns = patternIds.ToArray(),
                 JackDemand = jackDemand.Detected,
-                JackShare = null,
-                StreamShare = null,
-                TechCategory = null,
-                ClusterTrill = null,
-                HandstreamCluster = null,
+                JackShare = jackShare,
+                StreamShare = streamShare,
+                TechCategory = techCategory,
+                ClusterTrill = clusterTrill,
+                HandstreamCluster = handstreamCluster,
                 HandstreamEndurance = handstreamEndurance,
                 TechScore = vetoesTech ? 0 : patternScores.GetValueOrDefault("tech"),
                 ChordjackScore = chordjackScore,
