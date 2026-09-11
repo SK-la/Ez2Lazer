@@ -405,6 +405,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// Chart-side skillset labels for one DualPanel side via hub filing
         /// (<see cref="EzDanSkillsetFiling.BucketsForValues"/>). Same aggregate label on every hit bucket
         /// (hub DualPanel-style chart half; not primary-only).
+        /// TODO(data): DATA-DualPanel-ChartSkillsetDans — idea: independent chart skillset dans (MSD→SrToRawDan / LeoBlack).
         /// </summary>
         public IReadOnlyDictionary<string, string> GetChartDanSkillsetLabels(
             BeatmapInfo beatmapInfo,

@@ -55,7 +55,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         {
             AddStep("seed mania + skills", seedPopulatedScene);
             AddUntilStep("skillset chips visible", () =>
-                wedge.ChildrenOfType<EzDisplaySkillsDan>().Count(c => c.Alpha > 0) >= 3);
+                wedge.ChildrenOfType<EzDisplaySkillName>().Count(c => c.Alpha > 0 && c.IsPresent) >= 3);
             AddAssert("aggregate dan visible", () =>
                 wedge.ChildrenOfType<EzDisplayDan>().Any(c => c.Alpha > 0 && Precision.AlmostEquals(c.Scale.X, 1.5f)));
         }
@@ -67,7 +67,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             AddStep("hide wedge", () => wedge.Hide());
             AddStep("show wedge", () => wedge.Show());
             AddUntilStep("chips still visible", () =>
-                wedge.ChildrenOfType<EzDisplaySkillsDan>().Any(c => c.Alpha > 0));
+                wedge.ChildrenOfType<EzDisplaySkillName>().Any(c => c.Alpha > 0 && c.IsPresent));
         }
 
         [Test]
@@ -78,11 +78,10 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             AddAssert("dan panel visible width", () => wedge.DanPanel.DrawWidth > 0);
 
             AddUntilStep("skillset chips loaded", () =>
-                wedge.ChildrenOfType<EzDisplaySkillsDan>().Any(c => c.Alpha > 0));
+                wedge.ChildrenOfType<EzDisplaySkillName>().Any(c => c.Alpha > 0 && c.IsPresent));
 
-            AddAssert("display chips scaled 1.5", () =>
-                wedge.ChildrenOfType<EzDisplaySkillsDan>().Where(c => c.Alpha > 0).All(c =>
-                    Precision.AlmostEquals(c.Scale.X, 1.5f) && Precision.AlmostEquals(c.Scale.Y, 1.5f)));
+            AddAssert("skill name chips present", () =>
+                wedge.ChildrenOfType<EzDisplaySkillName>().Count(c => c.Alpha > 0 && c.IsPresent) >= 3);
 
             AddAssert("header aggregate dan uses 1.5 scale", () =>
                 wedge.ChildrenOfType<EzDisplayDan>().Any(c =>
@@ -109,11 +108,11 @@ namespace osu.Game.Tests.Visual.EzOsuGame
 
             AddStep("source Chart", () => wedge.DanPanel.DataSource.Value = EzDanPanelDataSource.Chart);
             AddUntilStep("chart chips visible", () =>
-                wedge.ChildrenOfType<EzDisplaySkillsDan>().Any(c => c.Alpha > 0));
+                wedge.ChildrenOfType<EzDisplaySkillName>().Any(c => c.Alpha > 0 && c.IsPresent));
 
             AddStep("source Player", () => wedge.DanPanel.DataSource.Value = EzDanPanelDataSource.Player);
             AddUntilStep("player chips visible", () =>
-                wedge.ChildrenOfType<EzDisplaySkillsDan>().Any(c => c.Alpha > 0));
+                wedge.ChildrenOfType<EzDisplaySkillName>().Any(c => c.Alpha > 0 && c.IsPresent));
 
             AddStep("source Both", () => wedge.DanPanel.DataSource.Value = EzDanPanelDataSource.Both);
 
@@ -129,14 +128,14 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             AddUntilStep("rc has four skillset chips", () =>
                 wedge.ChildrenOfType<EzDanLabeledStatList>()
                      .Where(l => l.Side == EzDanSide.Rc)
-                     .SelectMany(l => l.ChildrenOfType<EzDisplaySkillsDan>())
-                     .Count(c => c.Alpha > 0) == 4);
+                     .SelectMany(l => l.ChildrenOfType<EzDisplaySkillName>())
+                     .Count(c => c.Alpha > 0 && c.IsPresent) == 4);
 
             AddAssert("ln 4k has no skillset chips", () =>
                 wedge.ChildrenOfType<EzDanLabeledStatList>()
                      .Where(l => l.Side == EzDanSide.Ln)
-                     .SelectMany(l => l.ChildrenOfType<EzDisplaySkillsDan>())
-                     .All(c => c.Alpha <= 0));
+                     .SelectMany(l => l.ChildrenOfType<EzDisplaySkillName>())
+                     .All(c => c.Alpha <= 0 || !c.IsPresent));
 
             AddAssert("slot table is four for 4k rc", () =>
                 EzDanSkillsetBuckets.Slots(test_keys, EzDanSide.Rc).Count == 4

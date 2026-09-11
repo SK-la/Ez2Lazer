@@ -21,6 +21,7 @@ Do **not** re-encode lasting follow-ups as only `// TODO(data)` in product code 
 | 1 | DATA-LeoBlack-ChartDan | Full LeoBlack chart-side aggregate dan (optional). Also fills cluster columns if still null. | Wish-list |
 | — | DATA-Dan-ClearWindow-v3 | Hub `weightedDanClearWindow` (window=20, family 0.9^rank, stray ignore); aggregator fail/EZ reject + (hash,rate) dedupe; `EzDanAlgorithm.VERSION=3`. SSR history = rolling Aggregate (not career prefix). Chart DualPanel labels = same aggregate on every hit bucket (Sunny priority matches headline). UI Speed label kept (hub display). | **Done** |
 | — | DATA-No-Empty-Fillers | Ban skillset `__empty__` sentinel + CSI `Unavailable` persistence; miss stays miss so VERSION bump / transient load fail can recompute. DualPanel passes playable into chart labels. | **Done** |
+| — | DATA-DualPanel-ChartSkillsetDans | Idea: DualPanel chart column shows independent per-skillset chart dans (MSD→`SrToRawDan` or LeoBlack), not hub aggregate stamps. Current UI is 3-col grid (label\|player\|chart) with hub filing stamps only. | Wish-list |
 | — | DATA-SSR-VibroExclude | Hub `chart_vibro` / `rate_vibro` eviction from SSR pool (`Vibro` currently always false) | Wish-list |
 | — | DATA-SSR-GoalExtrapolate | Hub `runMsdAtGoal` log-linear extrapolate past calc 0.965 | Wish-list |
 | — | DATA-SSR-LnTailBlend | Hub `LN_TAIL_BLEND_BY_KEYMODE` (`EzMinaNoteConverter` lnTailTaps=false) | Wish-list |

@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -16,27 +17,33 @@ using osuTK;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// One RC/LN side: aggregate dans + hub skillset chips (slots from <see cref="EzDanSkillsetBuckets"/>).
-    /// Clear score lists live on Local Profile (<see cref="LocalProfile.EzLocalProfileDanClearsPanel"/>), not here.
-    /// UI never invents per-skill dans via <c>SrToRawDan</c> — only Provider verdicts / chart labels.
+    /// One RC/LN side as a fixed 3-column grid: label | player | chart.
+    /// Skill rows stack vertically. Chart labels stay hub filing stamps (not per-axis chart dan).
+    /// Clear score lists live on Local Profile, not here.
     /// </summary>
     public partial class EzDanLabeledStatList : CompositeDrawable
     {
-        private float displayScale => 1.5f;
+        private const float display_scale = 1.5f;
+        private const float row_height = 28f;
+
+        private static readonly Dimension[] column_dimensions =
+        {
+            new Dimension(GridSizeMode.Relative, size: 0.38f),
+            new Dimension(GridSizeMode.Relative, size: 0.31f),
+            new Dimension(GridSizeMode.Relative, size: 0.31f),
+        };
 
         private readonly Colour4 accent;
 
         /// <summary>RC or LN column this list represents.</summary>
         public EzDanSide Side { get; }
 
+        private GridContainer grid = null!;
         private OsuSpriteText sideLabel = null!;
-        private EzDisplayDan chartAggregateDan = null!;
         private EzDisplayDan playerAggregateDan = null!;
-        private FillFlowContainer cellsFlow = null!;
+        private EzDisplayDan chartAggregateDan = null!;
 
-        private FillDirection cellsDirection = FillDirection.Horizontal;
-
-        private readonly Dictionary<string, EzDisplaySkillsDan> skillsetChips = new Dictionary<string, EzDisplaySkillsDan>(StringComparer.Ordinal);
+        private readonly Dictionary<string, SkillsetGridRow> rows = new Dictionary<string, SkillsetGridRow>(StringComparer.Ordinal);
 
         public EzDanLabeledStatList(EzDanSide side, Colour4 accent)
         {
@@ -52,70 +59,54 @@ namespace osu.Game.EzOsuGame.Skills
         [BackgroundDependencyLoader]
         private void load()
         {
-            InternalChild = new FillFlowContainer
+            sideLabel = new OsuSpriteText
+            {
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                Font = OsuFont.GetFont(size: 16, weight: FontWeight.Bold),
+                Colour = accent,
+                Text = Side == EzDanSide.Ln
+                    ? EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_LN
+                    : EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_RC,
+            };
+
+            // Player column before chart — DualPanel is player-primary.
+            playerAggregateDan = new EzDisplayDan
+            {
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                BadgeSize = 18,
+                PreferImage = true,
+                Scale = new Vector2(display_scale),
+                Alpha = 0,
+            };
+
+            chartAggregateDan = new EzDisplayDan
+            {
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
+                BadgeSize = 20,
+                PreferImage = true,
+                Scale = new Vector2(display_scale),
+                Alpha = 0,
+            };
+
+            InternalChild = grid = new GridContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Spacing = new Vector2(0, 8),
-                Children = new Drawable[]
+                ColumnDimensions = column_dimensions,
+                RowDimensions = [new Dimension(GridSizeMode.Absolute, row_height)],
+                Content = new[]
                 {
-                    new FillFlowContainer
+                    new Drawable[]
                     {
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Direction = FillDirection.Horizontal,
-                        Spacing = new Vector2(8, 0),
-                        Children = new Drawable[]
-                        {
-                            sideLabel = new OsuSpriteText
-                            {
-                                Anchor = Anchor.CentreLeft,
-                                Origin = Anchor.CentreLeft,
-                                Font = OsuFont.GetFont(size: 16, weight: FontWeight.Bold),
-                                Colour = accent,
-                            },
-                            chartAggregateDan = new EzDisplayDan
-                            {
-                                Anchor = Anchor.CentreLeft,
-                                Origin = Anchor.CentreLeft,
-                                BadgeSize = 20,
-                                PreferImage = true,
-                                Scale = new Vector2(displayScale),
-                                Alpha = 0,
-                            },
-                            playerAggregateDan = new EzDisplayDan
-                            {
-                                Anchor = Anchor.CentreLeft,
-                                Origin = Anchor.CentreLeft,
-                                BadgeSize = 18,
-                                PreferImage = true,
-                                Scale = new Vector2(displayScale),
-                                Alpha = 0,
-                            },
-                        },
-                    },
-                    cellsFlow = new FillFlowContainer
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Direction = cellsDirection,
-                        Spacing = new Vector2(10, 8),
+                        sideLabel,
+                        playerAggregateDan,
+                        chartAggregateDan,
                     },
                 },
             };
-
-            sideLabel.Text = Side == EzDanSide.Ln
-                ? EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_LN
-                : EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_RC;
-        }
-
-        public void SetCellsDirection(FillDirection direction)
-        {
-            cellsDirection = direction;
-
-            if (LoadState >= LoadState.Ready)
-                cellsFlow.Direction = direction;
         }
 
         public void UpdateContent(
@@ -135,57 +126,38 @@ namespace osu.Game.EzOsuGame.Skills
                 return;
             }
 
-            cellsFlow.Direction = cellsDirection;
-
             sideLabel.Text = Side == EzDanSide.Ln
                 ? EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_LN
                 : EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_RC;
 
-            setAggregate(chartAggregateDan, chartAggregateLabel, keyCount, Side);
             setAggregate(playerAggregateDan, playerAggregateLabel, keyCount, Side);
+            setAggregate(chartAggregateDan, chartAggregateLabel, keyCount, Side);
 
-            rebuildSkillsetChips(keyCount, slots, chartLabelsBySkillset, playerSkillsets, showClearCounts);
+            rebuildRows(keyCount, slots, chartLabelsBySkillset, playerSkillsets, showClearCounts);
         }
 
-        private void rebuildSkillsetChips(
+        private void rebuildRows(
             int keyCount,
             IReadOnlyList<EzDanSkillsetSlot> slots,
             IReadOnlyDictionary<string, string> chartLabelsBySkillset,
             IReadOnlyDictionary<string, EzDanSkillsetVerdict> playerSkillsets,
             bool showClearCounts)
         {
-            if (slots.Count == 0)
-            {
-                cellsFlow.Clear();
-                skillsetChips.Clear();
-                cellsFlow.Hide();
-                return;
-            }
-
-            cellsFlow.Show();
-
             var keep = new HashSet<string>(StringComparer.Ordinal);
+            var content = new List<Drawable[]>
+            {
+                new Drawable[] { sideLabel, playerAggregateDan, chartAggregateDan },
+            };
+            var rowDims = new List<Dimension> { new Dimension(GridSizeMode.Absolute, row_height) };
 
             foreach (var slot in slots)
             {
                 keep.Add(slot.Id);
 
-                if (!skillsetChips.TryGetValue(slot.Id, out var chip))
+                if (!rows.TryGetValue(slot.Id, out var row))
                 {
-                    chip = new EzDisplaySkillsDan
-                    {
-                        PreferDanImage = true,
-                        ShowValue = showClearCounts,
-                        Anchor = Anchor.TopLeft,
-                        Origin = Anchor.TopLeft,
-                        Scale = new Vector2(displayScale),
-                    };
-                    skillsetChips[slot.Id] = chip;
-                    cellsFlow.Add(chip);
-                }
-                else
-                {
-                    chip.ShowValue = showClearCounts;
+                    row = new SkillsetGridRow(display_scale);
+                    rows[slot.Id] = row;
                 }
 
                 chartLabelsBySkillset.TryGetValue(slot.Id, out string? chartLabel);
@@ -200,22 +172,16 @@ namespace osu.Game.EzOsuGame.Skills
                         playerClears = verdict.Clears;
                 }
 
-                chip.SetSkillset(slot, chartLabel, playerLabel, playerClears, keyCount, Side);
+                row.Update(slot, playerLabel, chartLabel, playerClears, showClearCounts, keyCount, Side);
+                content.Add(row.Cells);
+                rowDims.Add(new Dimension(GridSizeMode.Absolute, row_height));
             }
 
-            foreach (string id in skillsetChips.Keys.Where(id => !keep.Contains(id)).ToList())
-            {
-                cellsFlow.Remove(skillsetChips[id], true);
-                skillsetChips.Remove(id);
-            }
+            foreach (string id in rows.Keys.Where(id => !keep.Contains(id)).ToList())
+                rows.Remove(id);
 
-            // Keep visual order = slots order.
-            for (int i = 0; i < slots.Count; i++)
-            {
-                var chip = skillsetChips[slots[i].Id];
-                if (cellsFlow.GetLayoutPosition(chip) != i)
-                    cellsFlow.SetLayoutPosition(chip, i);
-            }
+            grid.RowDimensions = rowDims.ToArray();
+            grid.Content = content.ToArray();
         }
 
         private static void setAggregate(EzDisplayDan display, string? label, int keyCount, EzDanSide side)
@@ -228,6 +194,122 @@ namespace osu.Game.EzOsuGame.Skills
             else
             {
                 display.Hide();
+            }
+        }
+
+        /// <summary>One skillset row: name | player dan | chart dan (hub stamp).</summary>
+        private partial class SkillsetGridRow
+        {
+            public Drawable[] Cells { get; }
+
+            private readonly EzDisplaySkillName name;
+            private readonly EzDisplayDan playerDan;
+            private readonly OsuSpriteText playerClearsText;
+            private readonly EzDisplayDan chartDan;
+            private readonly Container playerCell;
+
+            public SkillsetGridRow(float displayScale)
+            {
+                name = new EzDisplaySkillName
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                };
+
+                playerDan = new EzDisplayDan
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    BadgeSize = 20,
+                    PreferImage = true,
+                    Scale = new Vector2(displayScale),
+                    Alpha = 0,
+                };
+
+                playerClearsText = new OsuSpriteText
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Font = OsuFont.GetFont(size: 11, weight: FontWeight.SemiBold),
+                    Colour = Colour4.FromHex("#50dc78").Opacity(0.9f),
+                    Alpha = 0,
+                };
+
+                // Horizontal FillFlow: all children CentreLeft (same RelativeAnchorPosition.X).
+                playerCell = new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Child = new FillFlowContainer
+                    {
+                        Anchor = Anchor.CentreLeft,
+                        Origin = Anchor.CentreLeft,
+                        AutoSizeAxes = Axes.Both,
+                        Direction = FillDirection.Horizontal,
+                        Spacing = new Vector2(4, 0),
+                        Children = new Drawable[]
+                        {
+                            playerDan,
+                            playerClearsText,
+                        },
+                    },
+                };
+
+                chartDan = new EzDisplayDan
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    BadgeSize = 22,
+                    PreferImage = true,
+                    Scale = new Vector2(displayScale),
+                    Alpha = 0,
+                };
+
+                Cells = new Drawable[] { name, playerCell, chartDan };
+            }
+
+            public void Update(
+                EzDanSkillsetSlot slot,
+                string? playerLabel,
+                string? chartLabel,
+                int? playerClears,
+                bool showClearCounts,
+                int keyCount,
+                EzDanSide side)
+            {
+                name.Set(slot.DisplayName, slot.AccentHex);
+
+                if (!string.IsNullOrEmpty(playerLabel))
+                {
+                    playerDan.SetLabel(playerLabel, keyCount, side);
+                    playerDan.Show();
+
+                    if (showClearCounts && playerClears is int clears && clears > 0)
+                    {
+                        playerClearsText.Text = $"({clears.ToString(CultureInfo.InvariantCulture)})";
+                        playerClearsText.Show();
+                    }
+                    else
+                    {
+                        playerClearsText.Text = string.Empty;
+                        playerClearsText.Hide();
+                    }
+                }
+                else
+                {
+                    playerDan.Hide();
+                    playerClearsText.Text = string.Empty;
+                    playerClearsText.Hide();
+                }
+
+                if (!string.IsNullOrEmpty(chartLabel))
+                {
+                    chartDan.SetLabel(chartLabel, keyCount, side);
+                    chartDan.Show();
+                }
+                else
+                {
+                    chartDan.Hide();
+                }
             }
         }
     }

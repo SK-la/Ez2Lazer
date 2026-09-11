@@ -161,6 +161,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void applyLayoutMode()
         {
+            // RC|LN groups may sit side-by-side or stack; skill rows stay a vertical 3-column grid.
             bool wide = DualLayout.Value switch
             {
                 EzDanPanelDualLayout.Horizontal => true,
@@ -172,12 +173,10 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 dualFlow.Direction = FillDirection.Horizontal;
                 dualFlow.Spacing = Vector2.Zero;
-                rcList.Width = 0.45f;
-                lnList.Width = 0.45f;
-                rcList.SetLayoutInset(new MarginPadding { Right = 4 });
-                lnList.SetLayoutInset(new MarginPadding { Left = 4 });
-                rcList.SetCellsDirection(FillDirection.Vertical);
-                lnList.SetCellsDirection(FillDirection.Vertical);
+                rcList.Width = 0.5f;
+                lnList.Width = 0.5f;
+                rcList.SetLayoutInset(new MarginPadding { Right = 6 });
+                lnList.SetLayoutInset(new MarginPadding { Left = 6 });
             }
             else
             {
@@ -187,8 +186,6 @@ namespace osu.Game.EzOsuGame.HUD
                 lnList.Width = 1;
                 rcList.SetLayoutInset(new MarginPadding());
                 lnList.SetLayoutInset(new MarginPadding());
-                rcList.SetCellsDirection(FillDirection.Horizontal);
-                lnList.SetCellsDirection(FillDirection.Horizontal);
             }
         }
 
