@@ -112,7 +112,6 @@ namespace osu.Game.EzOsuGame.Overlays
 
             DanPanel.DataSource.Value = EzDanPanelDataSource.Both;
             DanPanel.DualLayout.Value = EzDanPanelDualLayout.Auto;
-            DanPanel.ShowEvidence.Value = false;
 
             beatmap.BindValueChanged(_ => updateDanKeyCount(), true);
             mods.BindValueChanged(_ => updateDanKeyCount());

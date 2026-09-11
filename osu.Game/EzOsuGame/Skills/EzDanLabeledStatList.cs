@@ -7,26 +7,21 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Layout;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Overlays;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// One RC/LN side: aggregate dans + hub skillset chips (slots from <see cref="EzDanSkillsetBuckets"/>) + clear evidence.
+    /// One RC/LN side: aggregate dans + hub skillset chips (slots from <see cref="EzDanSkillsetBuckets"/>).
+    /// Clear score lists live on Local Profile (<see cref="LocalProfile.EzLocalProfileDanClearsPanel"/>), not here.
     /// UI never invents per-skill dans via <c>SrToRawDan</c> — only Provider verdicts / chart labels.
     /// </summary>
     public partial class EzDanLabeledStatList : CompositeDrawable
     {
-        /// <summary>Max clear-evidence cards under this side (player clears only).</summary>
-        private const int clears_top_n = 15;
-
         private float displayScale => 1.5f;
 
         private readonly Colour4 accent;
@@ -38,12 +33,8 @@ namespace osu.Game.EzOsuGame.Skills
         private EzDisplayDan chartAggregateDan = null!;
         private EzDisplayDan playerAggregateDan = null!;
         private FillFlowContainer cellsFlow = null!;
-        private FillFlowContainer evidenceFlow = null!;
-        private OsuSpriteText emptyEvidence = null!;
-        private Container evidenceSection = null!;
 
         private FillDirection cellsDirection = FillDirection.Horizontal;
-        private readonly LayoutValue sizeLayout = new LayoutValue(Invalidation.DrawSize);
 
         private readonly Dictionary<string, EzDisplaySkillsDan> skillsetChips = new Dictionary<string, EzDisplaySkillsDan>(StringComparer.Ordinal);
 
@@ -54,13 +45,12 @@ namespace osu.Game.EzOsuGame.Skills
 
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
-            AddLayout(sizeLayout);
         }
 
         public void SetLayoutInset(MarginPadding padding) => Padding = padding;
 
         [BackgroundDependencyLoader]
-        private void load(OverlayColourProvider colours)
+        private void load()
         {
             InternalChild = new FillFlowContainer
             {
@@ -112,29 +102,6 @@ namespace osu.Game.EzOsuGame.Skills
                         Direction = cellsDirection,
                         Spacing = new Vector2(10, 8),
                     },
-                    evidenceSection = new Container
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Children = new Drawable[]
-                        {
-                            emptyEvidence = new OsuSpriteText
-                            {
-                                RelativeSizeAxes = Axes.X,
-                                Font = OsuFont.GetFont(size: 12),
-                                Colour = colours.Content2,
-                                Text = EzSettingsProfile.LOCAL_PROFILE_DAN_CLEARS_EMPTY,
-                                Alpha = 0,
-                            },
-                            evidenceFlow = new FillFlowContainer
-                            {
-                                RelativeSizeAxes = Axes.X,
-                                AutoSizeAxes = Axes.Y,
-                                Direction = FillDirection.Full,
-                                Spacing = new Vector2(8),
-                            },
-                        },
-                    },
                 },
             };
 
@@ -158,17 +125,13 @@ namespace osu.Game.EzOsuGame.Skills
             IReadOnlyList<EzDanSkillsetSlot> slots,
             IReadOnlyDictionary<string, string> chartLabelsBySkillset,
             IReadOnlyDictionary<string, EzDanSkillsetVerdict> playerSkillsets,
-            IReadOnlyList<EzDanClearEvidenceRow> clears,
-            Func<string, string> resolveTitle,
-            Action<EzDanClearEvidenceRow>? onSelectClear,
-            bool showEvidence)
+            bool showClearCounts = false)
         {
             if (LoadState < LoadState.Ready)
             {
                 Schedule(() => UpdateContent(
                     keyCount, chartAggregateLabel, playerAggregateLabel,
-                    slots, chartLabelsBySkillset, playerSkillsets,
-                    clears, resolveTitle, onSelectClear, showEvidence));
+                    slots, chartLabelsBySkillset, playerSkillsets, showClearCounts));
                 return;
             }
 
@@ -181,23 +144,15 @@ namespace osu.Game.EzOsuGame.Skills
             setAggregate(chartAggregateDan, chartAggregateLabel, keyCount, Side);
             setAggregate(playerAggregateDan, playerAggregateLabel, keyCount, Side);
 
-            rebuildSkillsetChips(keyCount, slots, chartLabelsBySkillset, playerSkillsets);
-
-            if (!showEvidence)
-            {
-                evidenceSection.Hide();
-                return;
-            }
-
-            evidenceSection.Show();
-            rebuildEvidence(clears, resolveTitle, onSelectClear);
+            rebuildSkillsetChips(keyCount, slots, chartLabelsBySkillset, playerSkillsets, showClearCounts);
         }
 
         private void rebuildSkillsetChips(
             int keyCount,
             IReadOnlyList<EzDanSkillsetSlot> slots,
             IReadOnlyDictionary<string, string> chartLabelsBySkillset,
-            IReadOnlyDictionary<string, EzDanSkillsetVerdict> playerSkillsets)
+            IReadOnlyDictionary<string, EzDanSkillsetVerdict> playerSkillsets,
+            bool showClearCounts)
         {
             if (slots.Count == 0)
             {
@@ -220,13 +175,17 @@ namespace osu.Game.EzOsuGame.Skills
                     chip = new EzDisplaySkillsDan
                     {
                         PreferDanImage = true,
-                        ShowValue = true,
+                        ShowValue = showClearCounts,
                         Anchor = Anchor.TopLeft,
                         Origin = Anchor.TopLeft,
                         Scale = new Vector2(displayScale),
                     };
                     skillsetChips[slot.Id] = chip;
                     cellsFlow.Add(chip);
+                }
+                else
+                {
+                    chip.ShowValue = showClearCounts;
                 }
 
                 chartLabelsBySkillset.TryGetValue(slot.Id, out string? chartLabel);
@@ -237,7 +196,8 @@ namespace osu.Game.EzOsuGame.Skills
                 if (playerSkillsets.TryGetValue(slot.Id, out var verdict))
                 {
                     playerLabel = verdict.Label;
-                    playerClears = verdict.Clears;
+                    if (showClearCounts)
+                        playerClears = verdict.Clears;
                 }
 
                 chip.SetSkillset(slot, chartLabel, playerLabel, playerClears, keyCount, Side);
@@ -269,78 +229,6 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 display.Hide();
             }
-        }
-
-        private void rebuildEvidence(
-            IReadOnlyList<EzDanClearEvidenceRow> clears,
-            Func<string, string> resolveTitle,
-            Action<EzDanClearEvidenceRow>? onSelectClear)
-        {
-            evidenceFlow.Clear();
-
-            var top = clears.Take(clears_top_n).ToList();
-
-            if (top.Count == 0)
-            {
-                emptyEvidence.Show();
-                evidenceFlow.Hide();
-                return;
-            }
-
-            emptyEvidence.Hide();
-            evidenceFlow.Show();
-
-            float colWidth = resolveEvidenceColumnWidth();
-
-            foreach (var clear in top)
-            {
-                evidenceFlow.Add(new EzEvidenceScoreRow(
-                    resolveTitle(clear.BeatmapHash),
-                    EzEvidenceScoreRow.FormatDanMeta(clear.CreditedDan, clear.Accuracy, clear.Rate, clear.ScoredAt),
-                    onSelectClear != null ? () => onSelectClear(clear) : null)
-                {
-                    Width = colWidth,
-                    RelativeSizeAxes = Axes.None,
-                    AutoSizeAxes = Axes.Y,
-                });
-            }
-        }
-
-        protected override void Update()
-        {
-            base.Update();
-
-            if (!sizeLayout.IsValid)
-            {
-                sizeLayout.Validate();
-                reflowEvidenceWidths();
-            }
-        }
-
-        private void reflowEvidenceWidths()
-        {
-            float colWidth = resolveEvidenceColumnWidth();
-
-            foreach (var child in evidenceFlow)
-                child.Width = colWidth;
-        }
-
-        private float resolveEvidenceColumnWidth()
-        {
-            float width = DrawWidth;
-            if (width <= 0)
-                width = 400;
-
-            int cols = width switch
-            {
-                < 280 => 1,
-                < 420 => 2,
-                < 560 => 3,
-                _ => 4,
-            };
-
-            const float gap = 8f;
-            return Math.Max(80, (width - gap * (cols - 1)) / cols);
         }
     }
 }

@@ -42,6 +42,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private Container headerSlot = null!;
         private Container radarSlot = null!;
         private EzHUDDanDualPanel danPanel = null!;
+        private EzLocalProfileDanClearsPanel danClearsPanel = null!;
         private FillFlowContainer skillBarsFlow = null!;
         private Container detailContainer = null!;
         private OsuSpriteText emptyHint = null!;
@@ -120,6 +121,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 {
                     RelativeSizeAxes = Axes.X,
                 },
+                danClearsPanel = new EzLocalProfileDanClearsPanel(
+                    username,
+                    selectedKeyCount,
+                    preloadedDrillScores,
+                    selectDrillScore != null
+                        ? drill => selectDrillScore.Value = drill
+                        : null)
+                {
+                    RelativeSizeAxes = Axes.X,
+                },
                 skillBarsFlow = new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,
@@ -145,13 +156,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             danPanel.KeyCount.BindTo(selectedKeyCount);
             danPanel.DataSource.Value = EzDanPanelDataSource.Player;
             danPanel.DualLayout.Value = EzDanPanelDualLayout.Auto;
-            danPanel.ShowEvidence.Value = true;
-            danPanel.ConfigureEvidence(
-                preloadedDrillScores,
-                drill =>
-                {
-                    selectDrillScore?.Value = drill;
-                });
+            danPanel.ShowClearCounts.Value = true;
 
             selectedKeyCount.BindValueChanged(_ =>
             {
@@ -199,12 +204,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 emptyHint.Show();
                 overviewContainer.Hide();
                 danPanel.Hide();
+                danClearsPanel.Hide();
                 return;
             }
 
             emptyHint.Hide();
             overviewContainer.Show();
             danPanel.Show();
+            danClearsPanel.Show();
+            danClearsPanel.Refresh();
 
             foreach (int key in keyCounts)
             {

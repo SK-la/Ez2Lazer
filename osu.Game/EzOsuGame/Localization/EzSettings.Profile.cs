@@ -174,8 +174,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_CHIP_HINT =
             new EzLocalizationManager.EzLocalisableString(
-                "点击查看 Clear · 启发式非 LeoBlack",
-                "Tap for Clear · heuristic, not LeoBlack");
+                "技能段位见下方 Clear 列表",
+                "See Clear list below for skillset evidence");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DAN_CLEARS_FOR =
             new EzLocalizationManager.EzLocalisableString("Clear · {0}", "Clear · {0}");

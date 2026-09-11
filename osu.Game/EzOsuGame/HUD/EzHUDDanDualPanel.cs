@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -13,7 +12,6 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Graphics;
@@ -50,10 +48,13 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.DAN_PANEL_DUAL_LAYOUT), nameof(EzHUDStrings.DAN_PANEL_DUAL_LAYOUT_TOOLTIP))]
         public Bindable<EzDanPanelDualLayout> DualLayout { get; } = new Bindable<EzDanPanelDualLayout>(EzDanPanelDualLayout.Auto);
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.DAN_PANEL_SHOW_EVIDENCE), nameof(EzHUDStrings.DAN_PANEL_SHOW_EVIDENCE_TOOLTIP))]
-        public BindableBool ShowEvidence { get; } = new BindableBool(false);
+        /// <summary>
+        /// When true, skillset chips show clear counts (Local Profile only). HUD keeps this false —
+        /// clear lists are a separate profile component, not DualPanel.
+        /// </summary>
+        public BindableBool ShowClearCounts { get; } = new BindableBool(false);
 
-        /// <summary>Target player for SSR / dan / clear evidence. Externally bindable (EzAnalysis header).</summary>
+        /// <summary>Target player for SSR / dan. Externally bindable (EzAnalysis header).</summary>
         public Bindable<string?> TargetUsername { get; } = new Bindable<string?>();
 
         public BindableInt KeyCount { get; } = new BindableInt();
@@ -62,9 +63,6 @@ namespace osu.Game.EzOsuGame.HUD
         private EzDanLabeledStatList rcList = null!;
         private EzDanLabeledStatList lnList = null!;
         private OsuSpriteText emptyHint = null!;
-
-        private IReadOnlyList<EzLocalProfileDrillScoreRow>? drillScores;
-        private Action<EzLocalProfileDrillScoreRow>? onSelectDrill;
 
         private readonly LayoutValue sizeLayout = new LayoutValue(Invalidation.DrawSize);
 
@@ -85,16 +83,6 @@ namespace osu.Game.EzOsuGame.HUD
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
             AddLayout(sizeLayout);
-        }
-
-        /// <summary>Optional Local Profile drill wiring for clear-evidence click-through.</summary>
-        public void ConfigureEvidence(
-            IReadOnlyList<EzLocalProfileDrillScoreRow>? drills = null,
-            Action<EzLocalProfileDrillScoreRow>? selectDrill = null)
-        {
-            drillScores = drills;
-            onSelectDrill = selectDrill;
-            Schedule(refresh);
         }
 
         [BackgroundDependencyLoader]
@@ -140,7 +128,7 @@ namespace osu.Game.EzOsuGame.HUD
             KeyCount.BindValueChanged(_ => refresh());
             DataSource.BindValueChanged(_ => refresh());
             DualLayout.BindValueChanged(_ => applyLayoutMode(), true);
-            ShowEvidence.BindValueChanged(_ => refresh());
+            ShowClearCounts.BindValueChanged(_ => refresh());
 
             beatmap?.BindValueChanged(_ => refresh());
             mods?.BindValueChanged(_ => refresh());
@@ -285,10 +273,10 @@ namespace osu.Game.EzOsuGame.HUD
             emptyHint.Hide();
             dualFlow.Show();
 
-            bool showEvidence = ShowEvidence.Value && wantPlayer && hasUser;
+            bool showClearCounts = ShowClearCounts.Value && wantPlayer && hasUser;
 
-            updateSide(rcList, EzDanSide.Rc, user, keys, chartSkillsetLabelsRc, wantChart, wantPlayer, showEvidence);
-            updateSide(lnList, EzDanSide.Ln, user, keys, chartSkillsetLabelsLn, wantChart, wantPlayer, showEvidence);
+            updateSide(rcList, EzDanSide.Rc, user, keys, chartSkillsetLabelsRc, wantChart, wantPlayer, showClearCounts);
+            updateSide(lnList, EzDanSide.Ln, user, keys, chartSkillsetLabelsLn, wantChart, wantPlayer, showClearCounts);
         }
 
         private void showEmpty(LocalisableString text)
@@ -306,11 +294,10 @@ namespace osu.Game.EzOsuGame.HUD
             IReadOnlyDictionary<string, string> chartSkillsetLabels,
             bool wantChart,
             bool wantPlayer,
-            bool showEvidence)
+            bool showClearCounts)
         {
             string? chartLabel = null;
             string? playerLabel = null;
-            IReadOnlyList<EzDanClearEvidenceRow> clears = Array.Empty<EzDanClearEvidenceRow>();
             IReadOnlyDictionary<string, EzDanSkillsetVerdict> playerSkillsets =
                 new Dictionary<string, EzDanSkillsetVerdict>();
 
@@ -323,9 +310,6 @@ namespace osu.Game.EzOsuGame.HUD
                     playerLabel = estimate.Label;
 
                 playerSkillsets = skillProvider.GetDanSkillsets(user, keys, side.ToId());
-
-                if (showEvidence)
-                    clears = skillProvider.GetDanClears(user, keys, side.ToId(), EzDanAlgorithm.VERSION);
             }
 
             if (wantChart && beatmap?.Value.BeatmapInfo != null && skillProvider != null)
@@ -338,10 +322,7 @@ namespace osu.Game.EzOsuGame.HUD
                 slots,
                 wantChart ? chartSkillsetLabels : new Dictionary<string, string>(),
                 wantPlayer ? playerSkillsets : new Dictionary<string, EzDanSkillsetVerdict>(),
-                clears,
-                resolveTitle,
-                onSelectClear,
-                showEvidence);
+                showClearCounts);
         }
 
         /// <summary>
@@ -384,47 +365,6 @@ namespace osu.Game.EzOsuGame.HUD
                 return chart.Label;
 
             return null;
-        }
-
-        private string resolveTitle(string beatmapHash)
-        {
-            if (string.IsNullOrEmpty(beatmapHash) || drillScores == null)
-                return EzSettingsProfile.LOCAL_PROFILE_AXIS_UNKNOWN_MAP.ToString();
-
-            var drill = drillScores
-                        .Where(r => string.Equals(r.BeatmapHash, beatmapHash, StringComparison.Ordinal))
-                        .OrderByDescending(r => r.PpResolved)
-                        .ThenByDescending(r => r.Date)
-                        .FirstOrDefault();
-
-            if (drill == null)
-                return EzSettingsProfile.LOCAL_PROFILE_AXIS_UNKNOWN_MAP.ToString();
-
-            if (string.IsNullOrEmpty(drill.Artist))
-            {
-                return string.IsNullOrEmpty(drill.DifficultyName)
-                    ? drill.Title
-                    : $"{drill.Title} [{drill.DifficultyName}]";
-            }
-
-            return string.IsNullOrEmpty(drill.DifficultyName)
-                ? $"{drill.Artist} - {drill.Title}"
-                : $"{drill.Artist} - {drill.Title} [{drill.DifficultyName}]";
-        }
-
-        private void onSelectClear(EzDanClearEvidenceRow clear)
-        {
-            if (onSelectDrill == null || drillScores == null)
-                return;
-
-            var drill = drillScores
-                        .Where(r => string.Equals(r.BeatmapHash, clear.BeatmapHash, StringComparison.Ordinal))
-                        .OrderByDescending(r => r.PpResolved)
-                        .ThenByDescending(r => r.Date)
-                        .FirstOrDefault();
-
-            if (drill != null)
-                onSelectDrill(drill);
         }
     }
 }
