@@ -743,8 +743,8 @@ LIMIT 1;";
                 using (var delete = connection.CreateCommand())
                 {
                     delete.Transaction = transaction;
-                    // Intentionally clear all roots before replacing with new list
-                    delete.CommandText = $"DELETE FROM {table_roots};";
+                    // Intentionally clear all roots before replacing with new list; WHERE TRUE makes the full clear explicit.
+                    delete.CommandText = $"DELETE FROM {table_roots} WHERE TRUE;";
                     delete.ExecuteNonQuery();
                 }
 
@@ -1675,7 +1675,8 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;";
             using (var delete = connection.CreateCommand())
             {
                 delete.Transaction = transaction;
-                delete.CommandText = $"DELETE FROM {table_roots};";
+                // Intentionally clear all roots before replacing with the new list; WHERE TRUE makes the full clear explicit.
+                delete.CommandText = $"DELETE FROM {table_roots} WHERE TRUE;";
                 delete.ExecuteNonQuery();
             }
 

@@ -1266,7 +1266,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 ensureInitialised();
                 using var connection = openConnection();
                 using var cmd = connection.CreateCommand();
-                cmd.CommandText = "DELETE FROM insights_cache;";
+                // WHERE TRUE keeps the intentional full clear explicit (a bare DELETE FROM would be read as an oversight).
+                cmd.CommandText = "DELETE FROM insights_cache WHERE TRUE;";
                 cmd.ExecuteNonQuery();
             }
         }
