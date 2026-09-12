@@ -49,7 +49,10 @@ namespace osu.Game.EzOsuGame.HUD
         XxySrPattern,
 
         [Description("Skill")]
-        Skill
+        Skill,
+
+        [Description("Beatmap")]
+        Beatmap
     }
 
     /// <summary>
@@ -272,7 +275,7 @@ namespace osu.Game.EzOsuGame.HUD
             UseAbsoluteValue.BindValueChanged(_ => refreshRadarPresentation(), true);
             TargetUsername.BindValueChanged(_ =>
             {
-                if (RadarDisplayMode.Value == EzRadarDisplayMode.Skill)
+                if (isMinaSkillRadarMode())
                     updateSkillRadarPresentation();
             });
 
@@ -332,7 +335,7 @@ namespace osu.Game.EzOsuGame.HUD
                 chart?.ClearSecondaryData();
                 updateParameterRatios(difficultyBindable?.Value ?? default);
             }
-            else if (RadarDisplayMode.Value == EzRadarDisplayMode.Skill)
+            else if (isMinaSkillRadarMode())
                 updateSkillRadarPresentation();
             else
             {
@@ -362,7 +365,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateParameterRatios(StarDifficulty difficulty)
         {
-            if (RadarDisplayMode.Value == EzRadarDisplayMode.Skill)
+            if (isMinaSkillRadarMode())
             {
                 updateSkillRadarPresentation();
                 return;
@@ -378,7 +381,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateRulesetSpecificRadarPresentation()
         {
-            if (RadarDisplayMode.Value is EzRadarDisplayMode.Metadate or EzRadarDisplayMode.Skill)
+            if (RadarDisplayMode.Value is EzRadarDisplayMode.Metadate or EzRadarDisplayMode.Skill or EzRadarDisplayMode.Beatmap)
                 return;
 
             if (cachedRulesetSpecificRadarResult is EzRulesetSpecificRadarResult cachedResult)
@@ -419,7 +422,7 @@ namespace osu.Game.EzOsuGame.HUD
             IReadOnlyDictionary<string, double> msd = skillProvider?.GetBeatmapMsd(beatmapInfo.Hash)
                                                       ?? new Dictionary<string, double>();
 
-            applySkillRadarLayers(keyCount, username, msd);
+            applySkillRadarLayers(keyCount, username, msd, live: null);
 
             // Always live-recompute selected chart MSD (xxySR analysis rhythm), including nomod.
             if (skillProvider == null)
@@ -445,92 +448,161 @@ namespace osu.Game.EzOsuGame.HUD
                         if (snap == null || snap.Msd.Count == 0)
                             return;
 
-                        applySkillRadarLayers(snap.KeyCount > 0 ? snap.KeyCount : keyCount, TargetUsername.Value, snap.Msd);
+                        applySkillRadarLayers(
+                            snap.KeyCount > 0 ? snap.KeyCount : keyCount,
+                            TargetUsername.Value,
+                            snap.Msd,
+                            snap);
                     });
                 }, token);
         }
 
-        private void applySkillRadarLayers(int keyCount, string? username, IReadOnlyDictionary<string, double> msd)
+        private void applySkillRadarLayers(
+            int keyCount,
+            string? username,
+            IReadOnlyDictionary<string, double> msd,
+            EzLiveChartSkillSnapshot? live)
         {
-            // RC skill (6/7/8K): fixed pattern Meta axes — independent of whether the player has ratings.
-            // LN skill radar axes are deferred (separate follow-up).
-            if (keyCount > 0 && EzDanSkillsetFiling.UsesPatternSkillAxes(keyCount))
+            // LN skill: same gate as DualPanel / ChartDan LN half (hold count > 100 OR hub ratio).
+            if (live?.LnMetrics != null
+                && keyCount > 0
+                && EzDanAlgorithm.AllowsPersistedChartLnHalf(keyCount, live.HoldRatio, live.HoldCount))
             {
-                IReadOnlyList<EzPatternRating> patterns = Array.Empty<EzPatternRating>();
-
-                if (!string.IsNullOrWhiteSpace(username) && skillProvider != null)
-                    patterns = skillProvider.GetPlayerPatternRatings(username, keyCount);
-
-                var modeEntries = EzPatternRatings.FixedPatternRadarEntries(patterns);
-                AxisCount = modeEntries.Count;
-                activeAxisLabels = modeEntries.Select(static e => e.DisplayName.ToString()).ToArray();
-                activeAxisFormats = Enumerable.Repeat("0.00", modeEntries.Count).ToArray();
-
-                double max = modeEntries.Max(static e => e.Value);
-                if (max <= 0)
-                    max = 1;
-
-                float[] beatmapRatios = new float[modeEntries.Count];
-                float[] playerRatios = new float[modeEntries.Count];
-
-                for (int i = 0; i < modeEntries.Count; i++)
-                {
-                    double playerValue = modeEntries[i].Value;
-                    // Axis labels show player RC skill floats; chart (yellow) stays empty until CSI layer lands.
-                    parameterValues[i] = (float)playerValue;
-                    playerRatios[i] = (float)(playerValue / max);
-                }
-
-                chart?.SetData(beatmapRatios);
-                chart?.SetSecondaryData(playerRatios);
-                updateAxisTexts();
-                applyChartColours();
+                applyLnSkillRadar(live.LnMetrics, live.LnSubtypeScores, keyCount);
                 return;
             }
 
-            var axes = skill_radar_axes;
-            AxisCount = axes.Length;
-            activeAxisLabels = axes.Select(skillAxisDisplayName).ToArray();
-            activeAxisFormats = Enumerable.Repeat("0.00", axes.Length).ToArray();
-
+            // All keys: Mina SSR ↔ MSD (same algorithm). No fabricated pattern yellow.
             IReadOnlyDictionary<string, double> ssr = new Dictionary<string, double>();
 
             if (!string.IsNullOrWhiteSpace(username) && keyCount > 0 && skillProvider != null)
                 ssr = skillProvider.GetPlayerSsrSnapshot(username, keyCount).Values;
 
-            double maxMina = 0;
+            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.Beatmap;
 
-            for (int i = 0; i < axes.Length; i++)
+            var selected = new List<EzMinaSkillAxis>(skill_radar_axes.Length);
+
+            foreach (var axis in skill_radar_axes)
             {
-                var axis = axes[i];
-                double beatmapValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
+                double chartValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
+                if (!double.IsFinite(chartValue) || chartValue <= 0)
+                    continue;
+
+                if (beatmapOnly)
+                {
+                    selected.Add(axis);
+                    continue;
+                }
+
                 double playerValue = ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0);
+                if (!double.IsFinite(playerValue) || playerValue < EzPatternRatings.DISPLAY_MIN)
+                    continue;
+
+                // Dual: commonality only — both chart MSD and player SSR present.
+                selected.Add(axis);
+            }
+
+            // Beatmap: show every real MSD axis (pad to 3 for RadarChart). Dual with no overlap: fall back to chart axes.
+            if (selected.Count == 0 && !beatmapOnly)
+            {
+                foreach (var axis in skill_radar_axes)
+                {
+                    double chartValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
+                    if (double.IsFinite(chartValue) && chartValue > 0)
+                        selected.Add(axis);
+                }
+            }
+
+            if (selected.Count == 0)
+            {
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            AxisCount = Math.Max(3, selected.Count);
+            activeAxisLabels = new string[AxisCount];
+            activeAxisFormats = Enumerable.Repeat("0.00", AxisCount).ToArray();
+
+            double maxMina = 0;
+            var chartValues = new double[AxisCount];
+            var playerValues = new double[AxisCount];
+
+            for (int i = 0; i < selected.Count; i++)
+            {
+                var axis = selected[i];
+                activeAxisLabels[i] = skillAxisDisplayName(axis);
+                double beatmapValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
+                double playerValue = beatmapOnly ? 0 : ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0);
                 if (playerValue < EzPatternRatings.DISPLAY_MIN)
                     playerValue = 0;
+
+                chartValues[i] = beatmapValue;
+                playerValues[i] = playerValue;
                 parameterValues[i] = (float)beatmapValue;
                 maxMina = Math.Max(maxMina, Math.Max(beatmapValue, playerValue));
+            }
+
+            for (int i = selected.Count; i < AxisCount; i++)
+            {
+                activeAxisLabels[i] = string.Empty;
+                chartValues[i] = 0;
+                playerValues[i] = 0;
+                parameterValues[i] = 0;
             }
 
             if (maxMina <= 0)
                 maxMina = 1;
 
-            float[] playerRatiosMina = new float[axes.Length];
+            float[] beatmapRatios = new float[AxisCount];
+            float[] playerRatios = new float[AxisCount];
 
-            for (int i = 0; i < axes.Length; i++)
+            for (int i = 0; i < AxisCount; i++)
             {
-                var axis = axes[i];
-                parameterRatios[i] = (float)(parameterValues[i] / maxMina);
-                double playerValue = ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0);
-                if (playerValue < EzPatternRatings.DISPLAY_MIN)
-                    playerValue = 0;
-                playerRatiosMina[i] = (float)(playerValue / maxMina);
+                beatmapRatios[i] = (float)(chartValues[i] / maxMina);
+                playerRatios[i] = (float)(playerValues[i] / maxMina);
             }
 
-            chart?.SetData(parameterRatios);
-            chart?.SetSecondaryData(playerRatiosMina);
+            chart?.SetData(beatmapRatios);
+
+            if (beatmapOnly)
+                chart?.ClearSecondaryData();
+            else
+                chart?.SetSecondaryData(playerRatios);
+
             updateAxisTexts();
             applyChartColours();
         }
+
+        private void applyLnSkillRadar(
+            EzDanFeatureMetrics metrics,
+            IReadOnlyDictionary<string, double>? subtypeScores,
+            int keyCount)
+        {
+            var lnAxes = EzLnSkillRadar.BuildAxes(metrics, subtypeScores, keyCount);
+            AxisCount = lnAxes.Count;
+            activeAxisLabels = lnAxes.Select(static a => a.Label.ToString()).ToArray();
+            activeAxisFormats = Enumerable.Repeat("0.00", lnAxes.Count).ToArray();
+
+            float[] beatmapRatios = new float[lnAxes.Count];
+            float[] playerRatios = new float[lnAxes.Count];
+
+            for (int i = 0; i < lnAxes.Count; i++)
+            {
+                // Labels show per-axis normalized floats (comparable across different raw scales).
+                parameterValues[i] = lnAxes[i].Normalized;
+                beatmapRatios[i] = lnAxes[i].Normalized;
+                playerRatios[i] = 0;
+            }
+
+            chart?.SetData(beatmapRatios);
+            chart?.SetSecondaryData(playerRatios);
+            updateAxisTexts();
+            applyChartColours();
+        }
+
+        private bool isMinaSkillRadarMode()
+            => RadarDisplayMode.Value is EzRadarDisplayMode.Skill or EzRadarDisplayMode.Beatmap;
 
         private static readonly EzMinaSkillAxis[] skill_radar_axes = EzMinaSkillAxisExtensions.RadarAxes;
 

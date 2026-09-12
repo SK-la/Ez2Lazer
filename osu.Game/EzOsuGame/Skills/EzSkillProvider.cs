@@ -616,6 +616,9 @@ namespace osu.Game.EzOsuGame.Skills
                         HoldCount = snap.HoldCount,
                         XxySr = xxySr,
                         IsLiveFromMods = true,
+                        LnMetrics = snap.LnMetrics,
+                        LnSubtypeScores = snap.LnSubtypeScores,
+                        RcPatternScores = snap.RcPatternScores,
                     };
                 }
             }
@@ -692,6 +695,21 @@ namespace osu.Game.EzOsuGame.Skills
                 keyCount = 4;
 
             return GetChartDanSkillsetLabels(beatmapInfo, keyCount, EzDanSide.Rc, mods);
+        }
+
+        /// <summary>Realm ChartSkillInfo only (no playable / compute). Miss stays null.</summary>
+        public bool TryGetStoredChartSkillInfo(BeatmapInfo beatmapInfo, out EzChartSkillInfo? info)
+        {
+            info = null;
+
+            if (beatmapInfo.Ruleset.OnlineID != 3)
+                return false;
+
+            if (!store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) || stored == null || stored.IsUnavailable)
+                return false;
+
+            info = stored;
+            return true;
         }
 
         /// <summary>

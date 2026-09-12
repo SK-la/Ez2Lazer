@@ -163,6 +163,12 @@ namespace osu.Game.EzOsuGame.Skills
                 holdCount,
                 allowMsdHeuristicLabels: xxySr != null);
 
+            var chartInput = EzChartSkillInfoComputer.FromPlayable(playable);
+            var features = EzDanFeatureExtractor.Extract(chartInput, rate);
+            var patternAnalysis = EzManiaPatternAnalyzer.Analyze(chartInput, rate, features);
+            var lnSubtypeScores = collectLnSubtypeScores(patternAnalysis);
+            var rcPatternScores = collectRcPatternScores(patternAnalysis);
+
             return new EzLiveChartSkillSnapshot
             {
                 Msd = msd,
@@ -172,7 +178,52 @@ namespace osu.Game.EzOsuGame.Skills
                 HoldCount = holdCount,
                 XxySr = xxySr,
                 IsLiveFromMods = true,
+                LnMetrics = features.Metrics,
+                LnSubtypeScores = lnSubtypeScores,
+                RcPatternScores = rcPatternScores,
             };
+        }
+
+        private static IReadOnlyDictionary<string, double> collectLnSubtypeScores(EzManiaPatternAnalysis analysis)
+        {
+            var result = new Dictionary<string, double>(StringComparer.Ordinal);
+
+            foreach (var hit in analysis.AllPatterns)
+            {
+                if (hit.Id is not ("lngeneral" or "lntech" or "lninverse" or "lnrelease"))
+                    continue;
+
+                if (!double.IsFinite(hit.Score) || hit.Score <= 0)
+                    continue;
+
+                result[hit.Id] = hit.Score;
+            }
+
+            return result;
+        }
+
+        private static IReadOnlyDictionary<string, double> collectRcPatternScores(EzManiaPatternAnalysis analysis)
+        {
+            var result = new Dictionary<string, double>(StringComparer.Ordinal);
+
+            foreach (var axis in EzPlayerPatternAxisExtensions.All)
+            {
+                string id = axis.ToId();
+
+                foreach (var hit in analysis.AllPatterns)
+                {
+                    if (!string.Equals(hit.Id, id, StringComparison.Ordinal))
+                        continue;
+
+                    if (!double.IsFinite(hit.Score) || hit.Score <= 0)
+                        continue;
+
+                    result[id] = hit.Score;
+                    break;
+                }
+            }
+
+            return result;
         }
 
         private static IReadOnlyDictionary<string, double> withHoldRatio(IReadOnlyDictionary<string, double> msd, double holdRatio)

@@ -6,7 +6,7 @@ using System.Collections.Generic;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Song-select display snapshot for chart MSD / ChartDan.
+    /// Song-select display snapshot for chart MSD / ChartDan / LN skill radar.
     /// Temporary mod-aware compute for the selected chart (never written to Realm).
     /// </summary>
     public sealed class EzLiveChartSkillSnapshot
@@ -27,5 +27,18 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>True when built from playable (selected-chart live overlay; not Realm).</summary>
         public bool IsLiveFromMods { get; init; }
+
+        /// <summary>LN structure floats for Skill radar (from <see cref="EzDanFeatureExtractor"/>).</summary>
+        public EzDanFeatureMetrics? LnMetrics { get; init; }
+
+        /// <summary>
+        /// Pattern subtype scores (lngeneral / lntech / lninverse / lnrelease) for 7K LN skill axis replacement.
+        /// </summary>
+        public IReadOnlyDictionary<string, double>? LnSubtypeScores { get; init; }
+
+        /// <summary>
+        /// RC Meta pattern-analyzer scores (chordstream / bracket / … / ln) for Skill radar yellow layer.
+        /// </summary>
+        public IReadOnlyDictionary<string, double>? RcPatternScores { get; init; }
     }
 }
