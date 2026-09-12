@@ -30,7 +30,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly EzPlayerDanAggregator? danAggregator;
         private readonly EzSkillProvider? skillProvider;
         private readonly Lock computeLock = new Lock();
+        private readonly Lock sessionCacheLock = new Lock();
         private CancellationTokenSource? computeCts;
+
+        private readonly Dictionary<string, IReadOnlyList<EzLocalProfileDrillScoreRow>> drillCache =
+            new Dictionary<string, IReadOnlyList<EzLocalProfileDrillScoreRow>>(StringComparer.Ordinal);
+
+        private readonly Dictionary<string, EzLocalProfileSnapshot> displaySnapshotCache =
+            new Dictionary<string, EzLocalProfileSnapshot>(StringComparer.Ordinal);
+
+        private readonly Dictionary<string, EzLocalProfileInsights> insightsMemoryCache =
+            new Dictionary<string, EzLocalProfileInsights>(StringComparer.Ordinal);
 
         public Bindable<EzLocalProfileSnapshot> Snapshot { get; } = new Bindable<EzLocalProfileSnapshot>(new EzLocalProfileSnapshot());
 
@@ -71,23 +81,105 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// </summary>
         public EzLocalProfileSnapshot LoadDisplaySnapshot(string? usernameFilter)
         {
-            if (EzLocalProfileConstants.IsAllPlayersFilter(usernameFilter))
-                return Store.LoadSnapshotForUsername(usernameFilter);
+            string key = displaySnapshotCacheKey(usernameFilter);
 
-            if (EzLocalProfileConstants.IsGuestUsername(usernameFilter))
+            lock (sessionCacheLock)
             {
-                var guest = Store.LoadSnapshotForUsername(EzLocalProfileConstants.GUEST_USERNAME);
-                if (guest.HasData)
-                    return guest;
-
-                return Store.LoadSnapshotForUsername(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME);
+                if (displaySnapshotCache.TryGetValue(key, out var cached))
+                    return cached;
             }
 
-            return Store.LoadSnapshotForUsername(usernameFilter);
+            EzLocalProfileSnapshot snapshot;
+
+            if (EzLocalProfileConstants.IsAllPlayersFilter(usernameFilter))
+                snapshot = Store.LoadSnapshotForUsername(usernameFilter);
+            else if (EzLocalProfileConstants.IsGuestUsername(usernameFilter))
+            {
+                var guest = Store.LoadSnapshotForUsername(EzLocalProfileConstants.GUEST_USERNAME);
+                snapshot = guest.HasData
+                    ? guest
+                    : Store.LoadSnapshotForUsername(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME);
+            }
+            else
+                snapshot = Store.LoadSnapshotForUsername(usernameFilter);
+
+            lock (sessionCacheLock)
+                displaySnapshotCache[key] = snapshot;
+
+            return snapshot;
         }
 
         public IReadOnlyList<EzLocalProfileDrillScoreRow> LoadDrillScores(int rulesetId, string? usernameFilter = null)
-            => Store.LoadDrillScores(rulesetId, usernameFilter);
+        {
+            string key = drillCacheKey(rulesetId, usernameFilter);
+
+            lock (sessionCacheLock)
+            {
+                if (drillCache.TryGetValue(key, out var cached))
+                    return cached;
+            }
+
+            var loaded = Store.LoadDrillScores(rulesetId, usernameFilter);
+
+            lock (sessionCacheLock)
+                drillCache[key] = loaded;
+
+            return loaded;
+        }
+
+        public bool TryGetCachedInsights(string? usernameFilter, out EzLocalProfileInsights? insights)
+        {
+            string key = insightsCacheKey(usernameFilter);
+
+            lock (sessionCacheLock)
+            {
+                if (insightsMemoryCache.TryGetValue(key, out insights))
+                    return true;
+            }
+
+            insights = Store.TryLoadInsightsCache(usernameFilter);
+            if (insights == null)
+                return false;
+
+            lock (sessionCacheLock)
+                insightsMemoryCache[key] = insights;
+
+            return true;
+        }
+
+        public void SetCachedInsights(string? usernameFilter, EzLocalProfileInsights insights)
+        {
+            string key = insightsCacheKey(usernameFilter);
+
+            lock (sessionCacheLock)
+                insightsMemoryCache[key] = insights;
+
+            Store.SaveInsightsCache(usernameFilter, insights);
+        }
+
+        /// <summary>Drop session + SQLite insights caches after compute / partition writes.</summary>
+        public void InvalidateSessionCaches()
+        {
+            lock (sessionCacheLock)
+            {
+                drillCache.Clear();
+                displaySnapshotCache.Clear();
+                insightsMemoryCache.Clear();
+            }
+
+            Store.ClearInsightsCache();
+        }
+
+        private static string displaySnapshotCacheKey(string? usernameFilter)
+            => EzLocalProfileConstants.IsAllPlayersFilter(usernameFilter)
+                ? EzLocalProfileConstants.ALL_PLAYERS
+                : EzLocalProfileConstants.NormaliseUsername(usernameFilter);
+
+        private static string drillCacheKey(int rulesetId, string? usernameFilter)
+            => $"{rulesetId}|{displaySnapshotCacheKey(usernameFilter)}";
+
+        private static string insightsCacheKey(string? usernameFilter)
+            => displaySnapshotCacheKey(usernameFilter);
 
         public bool HasOnlineScoreContributions() => Store.LoadOnlineScoreContributions().Count > 0;
 
@@ -148,6 +240,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                         if (selected.Count > 0)
                             writePlayerSkills(maniaScores, progress, token);
+
+                        InvalidateSessionCaches();
+                        Snapshot.Value = Store.LoadSnapshot();
                     }
                     catch (OperationCanceledException)
                     {
@@ -293,6 +388,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public void ReloadFromDisk()
         {
+            // Keep session drill/insights caches; only refresh archive snapshot bindable.
+            lock (sessionCacheLock)
+                displaySnapshotCache.Clear();
+
             Snapshot.Value = Store.LoadSnapshot();
         }
 

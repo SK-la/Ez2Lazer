@@ -37,6 +37,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private OsuDropdown<string> playerDropdown = null!;
         private CancellationTokenSource? contentLoadCts;
 
+        private string? lastContentKey;
+        private DateTimeOffset? lastSnapshotComputedAt;
+
         [Resolved]
         private EzLocalProfileService profileService { get; set; } = null!;
 
@@ -325,24 +328,42 @@ namespace osu.Game.EzOsuGame.LocalProfile
             contentLoadCts = new CancellationTokenSource();
             var token = contentLoadCts.Token;
 
+            int rulesetId = ruleset.Value?.OnlineID ?? 0;
+            string player = selectedPlayer.Value;
+            var analysis = analysisSystem.Value;
+            var archiveSnapshot = profileService.Snapshot.Value;
+
+            string contentKey = $"{rulesetId}|{player}|{(int)analysis}|{archiveSnapshot.LastComputedAt?.ToUnixTimeMilliseconds() ?? 0}";
+
+            // Re-entering overlay with unchanged filters: keep built UI (session drill cache still applies).
+            if (contentKey == lastContentKey
+                && archiveSnapshot.LastComputedAt == lastSnapshotComputedAt
+                && contentFlow.Count > 0)
+            {
+                emptyStateContainer.Hide();
+                return;
+            }
+
             contentFlow.Clear();
             currentDrillScore.Value = null;
 
-            var snapshot = profileService.LoadDisplaySnapshot(selectedPlayer.Value);
+            var snapshot = profileService.LoadDisplaySnapshot(player);
 
             if (!snapshot.HasData)
             {
                 emptyStateContainer.Show();
+                lastContentKey = null;
+                lastSnapshotComputedAt = null;
                 return;
             }
 
             emptyStateContainer.Hide();
+            lastContentKey = contentKey;
+            lastSnapshotComputedAt = archiveSnapshot.LastComputedAt;
 
-            int rulesetId = ruleset.Value?.OnlineID ?? 0;
-            string player = selectedPlayer.Value;
             var rulesetStats = snapshot.RulesetStats.FirstOrDefault(s => s.RulesetId == rulesetId);
             bool mania = rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID;
-            bool trackMode = mania && analysisSystem.Value == EzLocalProfileAnalysisSystem.Track;
+            bool trackMode = mania && analysis == EzLocalProfileAnalysisSystem.Track;
 
             contentFlow.Add(new EzLocalProfileSection(
                 EzSettingsProfile.LOCAL_PROFILE_SECTION_CAREER,
@@ -354,7 +375,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     EzSettingsProfile.LOCAL_PROFILE_SECTION_MODE_DATA,
                     new EzLocalProfileModeDataBody(snapshot, rulesetId)));
 
-                // Non-mania drill is usually small; still load off UI thread.
                 var drillHost = createDeferredSectionHost();
                 contentFlow.Add(new EzLocalProfileSection(EzSettingsProfile.LOCAL_PROFILE_SECTION_SCORE_DRILL, drillHost));
                 contentFlow.Add(new EzLocalProfileSection(
@@ -408,12 +428,25 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 var drills = task.GetResultSafely();
 
+                // Stage heavy panels across frames to protect audio / frame time.
                 insightsHost.Child = new EzLocalProfileInsightsBody(player, currentDrillScore, drills);
 
-                if (trackMode)
-                    skillsOrModeHost.Child = new EzLocalProfileTrackSkillsBody(player, currentDrillScore, drills);
+                Scheduler.AddDelayed(() =>
+                {
+                    if (token.IsCancellationRequested)
+                        return;
 
-                drillHostMania.Child = new EzLocalProfileScoreDrillPanel(currentDrillScore, drillSearchQuery, drills);
+                    if (trackMode)
+                        skillsOrModeHost.Child = new EzLocalProfileTrackSkillsBody(player, currentDrillScore, drills);
+
+                    Scheduler.AddDelayed(() =>
+                    {
+                        if (token.IsCancellationRequested)
+                            return;
+
+                        drillHostMania.Child = new EzLocalProfileScoreDrillPanel(currentDrillScore, drillSearchQuery, drills);
+                    }, 0);
+                }, 0);
             }), token);
         }
 

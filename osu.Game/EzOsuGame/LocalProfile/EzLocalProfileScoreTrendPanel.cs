@@ -62,7 +62,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 Spacing = new Vector2(0, 12),
             };
 
-            currentScore.BindValueChanged(_ => Schedule(reloadTrends), true);
+            // Defer first HitEvents load one frame so drill list staging can settle (avoids open-time audio hitch).
+            currentScore.BindValueChanged(_ => Schedule(() => Scheduler.AddDelayed(reloadTrends, 0)));
+            Scheduler.AddDelayed(reloadTrends, 0);
         }
 
         private void reloadTrends()

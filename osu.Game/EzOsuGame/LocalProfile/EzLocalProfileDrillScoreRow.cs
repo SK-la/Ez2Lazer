@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
@@ -50,7 +51,30 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public bool HasStoryboard { get; init; }
         public DateTimeOffset Date { get; init; }
 
+        /// <summary>Persisted Insights inputs (avoid Realm beatmap scans on overlay open).</summary>
+        public double Bpm { get; init; }
+
+        public int KeyCount { get; init; }
+        public bool IsConvert { get; init; }
+        public double Rate { get; init; } = 1;
+        public string ModAcronymsJson { get; init; } = "[]";
+
+        public bool HasInsightMeta => KeyCount > 0 || Bpm > 0 || IsConvert || Math.Abs(Rate - 1) > 0.001
+                                      || (!string.IsNullOrEmpty(ModAcronymsJson) && ModAcronymsJson != "[]");
+
         public string FormatPpText() => PpResolved > 0 ? $"{EzLocalProfileFormat.FormatPp(PpResolved)}pp" : "—";
+
+        public IReadOnlyList<string> ReadModAcronyms()
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<List<string>>(ModAcronymsJson) ?? new List<string>();
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+        }
 
         public IReadOnlyList<double> ReadKpsList()
         {
@@ -97,6 +121,36 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                      ? analysisXxy
                                      : beatmap.XxyStarRating);
 
+            int keyCount = 0;
+
+            if (maniaSummary?.ColumnCounts is { Count: > 0 } columns)
+                keyCount = columns.Keys.Max() + 1;
+            else
+            {
+                int fromCs = (int)Math.Round(beatmap.Difficulty.CircleSize);
+                if (fromCs > 0)
+                    keyCount = fromCs;
+            }
+
+            double rate = 1;
+
+            foreach (var mod in score.Mods)
+            {
+                if (mod is ModRateAdjust rateAdjust)
+                    rate *= rateAdjust.SpeedChange.Value;
+            }
+
+            if (!double.IsFinite(rate) || rate <= 0)
+                rate = 1;
+            else
+                rate = Math.Clamp(rate, 0.5, 2.0);
+
+            var modAcronyms = score.Mods
+                                   .Select(m => m.Acronym)
+                                   .Where(a => !string.IsNullOrEmpty(a))
+                                   .Distinct(StringComparer.Ordinal)
+                                   .ToList();
+
             return new EzLocalProfileDrillScoreRow
             {
                 ScoreId = score.ID,
@@ -131,6 +185,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 HasVideo = beatmap.HasVideo == true,
                 HasStoryboard = beatmap.HasStoryboard == true,
                 Date = score.Date,
+                Bpm = beatmap.BPM > 0 && double.IsFinite(beatmap.BPM) ? beatmap.BPM : 0,
+                KeyCount = keyCount,
+                IsConvert = beatmap.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID,
+                Rate = rate,
+                ModAcronymsJson = JsonSerializer.Serialize(modAcronyms),
             };
         }
 

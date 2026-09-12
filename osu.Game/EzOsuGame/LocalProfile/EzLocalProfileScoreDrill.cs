@@ -228,7 +228,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
     public partial class EzLocalProfileScoreSelector : CompositeDrawable
     {
-        private const int entries_per_frame = 24;
+        private const int entries_per_frame = 8;
 
         public Bindable<EzLocalProfileDrillScoreRow?> Current { get; } = new Bindable<EzLocalProfileDrillScoreRow?>();
 

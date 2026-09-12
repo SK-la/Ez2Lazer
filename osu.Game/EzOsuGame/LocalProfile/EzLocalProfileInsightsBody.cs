@@ -15,7 +15,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
-using osu.Game.Database;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -62,9 +61,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         [Resolved]
         private RulesetStore rulesets { get; set; } = null!;
-
-        [Resolved]
-        private RealmAccess realm { get; set; } = null!;
 
         public EzLocalProfileInsightsBody(
             string username,
@@ -156,16 +152,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var localProfileService = profileService;
             string localUsername = username;
             var localPreloaded = preloadedDrillScores;
-            var localRealm = realm;
             var localBeatmaps = beatmapManager;
             var localRulesets = rulesets;
 
             Task.Run(() =>
             {
+                if (localProfileService.TryGetCachedInsights(localUsername, out var cached) && cached != null)
+                    return cached;
+
                 var rows = localPreloaded
                            ?? localProfileService.LoadDrillScores(EzLocalProfileConstants.MANIA_RULESET_ID, localUsername);
-                var plays = EzLocalProfileInsightScoreBuilder.Build(rows, localBeatmaps, localRulesets, localRealm);
-                return EzLocalProfileInsightsCalculator.Calculate(plays);
+                // Prefer drill insight columns; only QueryBeatmap for legacy rows missing meta.
+                var plays = EzLocalProfileInsightScoreBuilder.Build(rows, localBeatmaps, localRulesets);
+                var calculated = EzLocalProfileInsightsCalculator.Calculate(plays);
+                localProfileService.SetCachedInsights(localUsername, calculated);
+                return calculated;
             }, token).ContinueWith(task => Schedule(() =>
             {
                 if (token.IsCancellationRequested || task.IsCanceled)

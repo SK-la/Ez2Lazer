@@ -11,7 +11,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     /// </summary>
     public sealed class EzLocalProfileInsightPlay
     {
-        public required EzLocalProfileDrillScoreRow Row { get; init; }
+        public EzLocalProfileDrillScoreRow Row { get; init; } = null!;
         public double Pp { get; init; }
         public int KeyCount { get; init; }
         public int BeatmapOnlineId { get; init; }

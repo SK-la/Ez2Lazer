@@ -6,24 +6,22 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using osu.Game.Beatmaps;
-using osu.Game.Database;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using Realms;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
-    /// Builds Insight plays from archived drill rows + live beatmap metadata (BPM / CS / convert).
+    /// Builds Insight plays from archived drill rows + optional live beatmap metadata (BPM / CS / convert).
+    /// Prefers persisted drill insight columns when present to avoid Realm full-table scans.
     /// </summary>
     public static class EzLocalProfileInsightScoreBuilder
     {
         public static IReadOnlyList<EzLocalProfileInsightPlay> Build(
             IEnumerable<EzLocalProfileDrillScoreRow> drillScores,
             BeatmapManager beatmapManager,
-            RulesetStore rulesets,
-            RealmAccess? realm = null)
+            RulesetStore rulesets)
         {
             var rows = drillScores
                        .Where(r => r.RulesetId == EzLocalProfileConstants.MANIA_RULESET_ID && r.PpResolved > 0)
@@ -31,7 +29,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                        .ThenByDescending(r => r.Date)
                        .ToList();
 
-            var beatmapsByHash = loadBeatmapsByHash(rows, beatmapManager, realm);
+            var needsLookup = rows.Where(static r => !r.HasInsightMeta).ToList();
+            var beatmapsByHash = loadBeatmapsByHash(needsLookup, beatmapManager);
             var rulesetCache = new Dictionary<int, Ruleset?>();
 
             var plays = new List<EzLocalProfileInsightPlay>(rows.Count);
@@ -39,16 +38,24 @@ namespace osu.Game.EzOsuGame.LocalProfile
             foreach (var row in rows)
             {
                 BeatmapInfo? beatmap = null;
-                if (!string.IsNullOrEmpty(row.BeatmapHash))
+                if (!row.HasInsightMeta && !string.IsNullOrEmpty(row.BeatmapHash))
                     beatmapsByHash.TryGetValue(row.BeatmapHash, out beatmap);
 
                 var ruleset = getRuleset(row.RulesetId, rulesets, rulesetCache);
-                var mods = EzLocalProfileDrillMods.Resolve(row, ruleset);
-                var acronyms = resolveModAcronyms(row, mods);
-                double rate = resolveRate(mods);
-                int keyCount = resolveKeyCount(row, beatmap, mods, ruleset);
-                bool isConvert = beatmap != null && beatmap.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID;
-                double bpm = beatmap is { BPM: > 0 } ? beatmap.BPM : 0;
+                var mods = row.HasInsightMeta ? Array.Empty<Mod>() : EzLocalProfileDrillMods.Resolve(row, ruleset);
+                var acronyms = row.HasInsightMeta ? row.ReadModAcronyms() : resolveModAcronyms(row, mods);
+                double rate = row.HasInsightMeta
+                    ? (row.Rate > 0 && double.IsFinite(row.Rate) ? row.Rate : 1)
+                    : resolveRate(mods);
+                int keyCount = row.KeyCount > 0
+                    ? row.KeyCount
+                    : resolveKeyCount(row, beatmap, mods, ruleset);
+                bool isConvert = row.HasInsightMeta
+                    ? row.IsConvert
+                    : beatmap != null && beatmap.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID;
+                double bpm = row.Bpm > 0
+                    ? row.Bpm
+                    : beatmap is { BPM: > 0 } ? beatmap.BPM : 0;
                 int onlineId = beatmap is { OnlineID: > 0 } ? beatmap.OnlineID : 0;
 
                 plays.Add(new EzLocalProfileInsightPlay
@@ -75,8 +82,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private static Dictionary<string, BeatmapInfo> loadBeatmapsByHash(
             IReadOnlyList<EzLocalProfileDrillScoreRow> rows,
-            BeatmapManager beatmapManager,
-            RealmAccess? realm)
+            BeatmapManager beatmapManager)
         {
             var hashes = rows
                          .Select(r => r.BeatmapHash)
@@ -86,37 +92,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             var result = new Dictionary<string, BeatmapInfo>(hashes.Count, StringComparer.Ordinal);
 
-            if (hashes.Count == 0)
-                return result;
-
-            if (realm != null)
-            {
-                var hashSet = new HashSet<string>(hashes, StringComparer.Ordinal);
-
-                realm.Run(r =>
-                {
-                    foreach (var beatmap in r.All<BeatmapInfo>()
-                                             .Filter($"{nameof(BeatmapInfo.BeatmapSet)}.{nameof(BeatmapSetInfo.DeletePending)} == false"))
-                    {
-                        if (!hashSet.Contains(beatmap.Hash))
-                            continue;
-
-                        var detached = beatmap.Detach();
-                        if (string.IsNullOrEmpty(detached.Hash))
-                            continue;
-
-                        result[detached.Hash] = detached;
-
-                        if (result.Count >= hashes.Count)
-                            break;
-                    }
-                });
-
-                return result;
-            }
-
             foreach (string hash in hashes)
             {
+                // Indexed lookup — never scan All<BeatmapInfo>().
                 var beatmap = beatmapManager.QueryBeatmap(b => b.Hash == hash);
                 if (beatmap != null)
                     result[hash] = beatmap;
