@@ -74,7 +74,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             foreach ((double overall, IReadOnlyList<string> patterns) in plays)
             {
-                if (patterns == null || patterns.Count == 0)
+                if (patterns.Count == 0)
                     continue;
 
                 foreach (string pattern in patterns)
@@ -98,6 +98,33 @@ namespace osu.Game.EzOsuGame.Skills
                    .Where(static entry => entry.Rating > 0)
                    .OrderByDescending(static entry => entry.Rating)
                    .ToList();
+        }
+
+        /// <summary>
+        /// Fixed pattern-axis set for song-select / HUD Skill radar (6/7/8K):
+        /// full <see cref="Meta"/> order, including zeros — does not filter or re-sort by player.
+        /// </summary>
+        public static IReadOnlyList<EzSkillModeEntry> FixedPatternRadarEntries(
+            IReadOnlyList<EzPatternRating> patterns)
+        {
+            var byId = new Dictionary<string, EzPatternRating>(StringComparer.Ordinal);
+
+            foreach (var entry in patterns)
+                byId[entry.Id] = entry;
+
+            var result = new List<EzSkillModeEntry>(Meta.Count);
+
+            foreach (var meta in Meta)
+            {
+                double value = byId.TryGetValue(meta.Id, out var rating) ? rating.Rating : 0;
+                result.Add(new EzSkillModeEntry(
+                    ToSkillId(meta.Id),
+                    meta.DisplayName,
+                    value,
+                    meta.AccentHex));
+            }
+
+            return result;
         }
 
         /// <summary>Hub <c>skillModeEntries</c>.</summary>

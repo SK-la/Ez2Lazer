@@ -18,6 +18,8 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -34,6 +36,9 @@ namespace osu.Game.EzOsuGame.HUD
         /// Song-select wedge content is often ~450–550px; keep Auto on Horizontal RC|LN there.
         /// Vertical dual stacks both sides and clips under BeatmapDetailsArea height.
         /// </summary>
+        /// <summary>LN chart dan badge shows when hold (LN) object count exceeds this.</summary>
+        public const int LN_CHART_DAN_MIN_HOLD_OBJECTS = 100;
+
         private float wideThreshold => 420f;
 
         public static readonly Colour4 RC_ACCENT = Colour4.FromHex("#e0b04c");
@@ -236,12 +241,13 @@ namespace osu.Game.EzOsuGame.HUD
                 // Realm first; miss → memory compute + session cache only (no Upsert).
                 skillProvider.TryGetChartDanForUi(info, out persistedChartDan, allowMemoryCompute: true);
 
-                if (keys <= 0)
+                if (keys <= 0 && info.Difficulty.CircleSize > 0)
+                    keys = (int)Math.Round(info.Difficulty.CircleSize);
+
+                if (keys <= 0
+                    && persistedChartDan is { KeyCount: > 0 })
                 {
-                    if (persistedChartDan is { KeyCount: > 0 })
-                        keys = persistedChartDan.KeyCount;
-                    else if (info.Difficulty.CircleSize > 0)
-                        keys = (int)info.Difficulty.CircleSize;
+                    keys = persistedChartDan.KeyCount;
                 }
 
                 if (keys > 0 && persistedChartDan != null)
@@ -299,8 +305,9 @@ namespace osu.Game.EzOsuGame.HUD
                 }
             }
 
+            // Overall Rating is RC-column only — LN column must not reuse the same Overall numbers.
             updateSide(rcList, EzDanSide.Rc, user, keys, chartSkillsetLabelsRc, wantChart, wantPlayer, showClearCounts, playerOverall, chartOverall, persistedChartDan);
-            updateSide(lnList, EzDanSide.Ln, user, keys, chartSkillsetLabelsLn, wantChart, wantPlayer, showClearCounts, playerOverall, chartOverall, persistedChartDan);
+            updateSide(lnList, EzDanSide.Ln, user, keys, chartSkillsetLabelsLn, wantChart, wantPlayer, showClearCounts, null, null, persistedChartDan);
         }
 
         private void showEmpty(LocalisableString text)
@@ -342,12 +349,15 @@ namespace osu.Game.EzOsuGame.HUD
             if (wantChart && beatmap?.Value.BeatmapInfo != null && skillProvider != null)
                 chartLabel = resolveChartAggregateLabel(side, keys, persistedChartDan);
 
+            // Danskill name rows always render; chart LN dan badges only when hold count gate passes.
+            bool showChartDanBadges = side != EzDanSide.Ln || countHoldObjects() > LN_CHART_DAN_MIN_HOLD_OBJECTS;
+
             list.UpdateContent(
                 keys,
-                wantChart ? chartLabel : null,
+                wantChart && showChartDanBadges ? chartLabel : null,
                 wantPlayer ? playerLabel : null,
                 slots,
-                wantChart ? chartSkillsetLabels : new Dictionary<string, string>(),
+                wantChart && showChartDanBadges ? chartSkillsetLabels : new Dictionary<string, string>(),
                 wantPlayer ? playerSkillsets : new Dictionary<string, EzDanSkillsetVerdict>(),
                 showClearCounts,
                 wantPlayer ? playerOverallRating : null,
@@ -355,7 +365,8 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         /// <summary>
-        /// Hub-style RC|LN chart halves. Uses DualPanel-resolved ChartDan row (Realm or session memory).
+        /// Chart RC|LN aggregate labels. Ez may show both sides (not hub-exclusive).
+        /// LN chart dan badge visibility is gated separately by hold object count.
         /// </summary>
         private string? resolveChartAggregateLabel(EzDanSide side, int keys, EzPersistedChartDan? persisted)
         {
@@ -369,25 +380,39 @@ namespace osu.Game.EzOsuGame.HUD
             if (persisted == null)
                 return null;
 
-            double holdRatio = double.IsFinite(persisted.HoldRatio)
-                ? Math.Clamp(persisted.HoldRatio, 0, 1)
-                : 0;
-
-            int gateKeys = keys > 0 ? keys : persisted.KeyCount;
-            if (gateKeys > 0 && !EzDanAlgorithm.AllowsChartSideHalf(side, gateKeys, holdRatio))
-                return null;
-
             var info = beatmap.Value.BeatmapInfo;
             double xxy = info.XxyStarRating;
+            int lookupKeys = keys > 0 ? keys : persisted.KeyCount;
 
-            if (keys > 0 && xxy >= 0 && double.IsFinite(xxy)
-                && EzSunnyDanIntervals.TryLookup(keys, side.ToId(), xxy, out var sunny)
+            if (lookupKeys > 0 && xxy >= 0 && double.IsFinite(xxy)
+                && EzSunnyDanIntervals.TryLookup(lookupKeys, side.ToId(), xxy, out var sunny)
                 && !string.IsNullOrEmpty(sunny.DisplayLabel))
             {
                 return sunny.DisplayLabel;
             }
 
             return null;
+        }
+
+        /// <summary>Hold (LN) objects on the loaded working beatmap; 0 if unavailable.</summary>
+        private int countHoldObjects()
+        {
+            var loaded = beatmap?.Value?.Beatmap;
+            if (loaded?.HitObjects == null)
+                return 0;
+
+            int holds = 0;
+
+            foreach (HitObject obj in loaded.HitObjects)
+            {
+                if (obj is not IHasColumn)
+                    continue;
+
+                if (obj is IHasDuration duration && duration.Duration > 0)
+                    holds++;
+            }
+
+            return holds;
         }
     }
 }

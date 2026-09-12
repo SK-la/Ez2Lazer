@@ -400,7 +400,8 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
-            // Metadata / persisted ChartDan only — never GetPlayable or Mina on song-select hot path.
+            // Key locked to current beatmap CS (same-beatmap ChartDan only if CS missing).
+            // Never fall back to another keymode's player vectors.
             int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
 
             if (keyCount <= 0
@@ -412,17 +413,17 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             string? username = TargetUsername.Value;
-            IReadOnlyList<EzSkillModeEntry>? modeEntries = null;
 
-            if (!string.IsNullOrWhiteSpace(username) && keyCount > 0 && skillProvider != null)
-                modeEntries = skillProvider.GetSkillModeEntries(username, keyCount);
-
-            // Hub Skills card: 6/7/8K with pattern ratings — player axes only (not Mina Technical).
-            if (modeEntries != null
-                && modeEntries.Count >= 3
-                && EzDanSkillsetFiling.UsesPatternSkillAxes(keyCount)
-                && modeEntries.Any(static e => EzPatternRatings.TryParseSkillId(e.SkillId, out _)))
+            // RC skill (6/7/8K): fixed pattern Meta axes — independent of whether the player has ratings.
+            // LN skill radar axes are deferred (separate follow-up).
+            if (keyCount > 0 && EzDanSkillsetFiling.UsesPatternSkillAxes(keyCount))
             {
+                IReadOnlyList<EzPatternRating> patterns = Array.Empty<EzPatternRating>();
+
+                if (!string.IsNullOrWhiteSpace(username) && skillProvider != null)
+                    patterns = skillProvider.GetPlayerPatternRatings(username, keyCount);
+
+                var modeEntries = EzPatternRatings.FixedPatternRadarEntries(patterns);
                 AxisCount = modeEntries.Count;
                 activeAxisLabels = modeEntries.Select(static e => e.DisplayName.ToString()).ToArray();
                 activeAxisFormats = Enumerable.Repeat("0.00", modeEntries.Count).ToArray();
@@ -436,8 +437,10 @@ namespace osu.Game.EzOsuGame.HUD
 
                 for (int i = 0; i < modeEntries.Count; i++)
                 {
-                    parameterValues[i] = 0;
-                    playerRatios[i] = (float)(modeEntries[i].Value / max);
+                    double playerValue = modeEntries[i].Value;
+                    // Axis labels show player RC skill floats; chart (yellow) stays empty until CSI layer lands.
+                    parameterValues[i] = (float)playerValue;
+                    playerRatios[i] = (float)(playerValue / max);
                 }
 
                 chart?.SetData(beatmapRatios);
