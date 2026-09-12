@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Objects;
@@ -11,6 +10,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.BMS.Mods
@@ -55,9 +55,9 @@ namespace osu.Game.Rulesets.BMS.Mods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            Seed.Value ??= RNG.Next();
+            int seed = EzModSeed.Resolve(Seed);
 
-            var rng = new Random((int)Seed.Value);
+            var rng = new Random(seed);
 
             foreach (int[] group in BMSStageModHelper.GetRegularLaneGroups(beatmap))
             {

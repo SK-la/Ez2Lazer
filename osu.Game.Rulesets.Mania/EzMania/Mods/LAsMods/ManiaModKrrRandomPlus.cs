@@ -8,7 +8,6 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
@@ -16,6 +15,7 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.EzOsuGame.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
@@ -172,8 +172,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 if (totalKeys < 1 || totalKeys > 18) return;
 
                 // 初始化随机器
-                Seed.Value ??= RNG.Next();
-                int seed = Seed.Value.Value;
+                int seed = EzModSeed.Resolve(Seed);
                 var rng = new Random(seed);
 
                 // 第一步：结构层 - 最先执行 Flip 逻辑（优先于固定轨道）

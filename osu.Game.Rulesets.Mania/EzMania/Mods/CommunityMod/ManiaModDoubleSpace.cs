@@ -7,7 +7,6 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
@@ -15,6 +14,7 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.EzOsuGame.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
@@ -75,8 +75,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             int newColumnCount = currentKeys + 1;
 
-            Seed.Value ??= RNG.Next();
-            var rng = new Random((int)Seed.Value);
+            int seed = EzModSeed.Resolve(Seed);
+            var rng = new Random(seed);
 
             var sColumnHitObjects = maniaBeatmap.HitObjects
                                                 .Where(h => h.Column == sColumnIndex)

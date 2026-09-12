@@ -19,6 +19,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania.Mods.ModHelp;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.EzOsuGame.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
@@ -535,8 +536,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         private void applyToBeatmapInternal(ManiaBeatmap maniaBeatmap)
         {
-            Seed.Value ??= RNG.Next();
-            var rng = new Random(Seed.Value.Value);
+            int seed = EzModSeed.Resolve(Seed);
+            var rng = new Random(seed);
 
             int targetColumns = Math.Clamp(KeyCount.Value, 2, ManiaRuleset.MAX_STAGE_KEYS);
             int maxChord = Math.Clamp(MaxChord.Value, 1, targetColumns);

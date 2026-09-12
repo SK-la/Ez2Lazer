@@ -5,11 +5,11 @@ using System;
 using System.Linq;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.EzOsuGame.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods
 {
@@ -19,8 +19,8 @@ namespace osu.Game.Rulesets.Mania.Mods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            Seed.Value ??= RNG.Next();
-            var rng = new Random((int)Seed.Value);
+            int seed = EzModSeed.Resolve(Seed);
+            var rng = new Random(seed);
 
             int availableColumns = ((ManiaBeatmap)beatmap).TotalColumns;
             var shuffledColumns = Enumerable.Range(0, availableColumns).OrderBy(_ => rng.Next()).ToList();

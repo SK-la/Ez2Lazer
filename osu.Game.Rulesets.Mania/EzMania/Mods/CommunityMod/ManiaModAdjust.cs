@@ -18,6 +18,7 @@ using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 #if DEBUG
@@ -366,8 +367,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             }
 # endif
 
-            Seed.Value ??= RNG.Next();
-            var rng = new Random((int)Seed.Value);
+            int seed = EzModSeed.Resolve(Seed);
+            var rng = new Random(seed);
             int availableColumns = maniaBeatmap.TotalColumns;
 
             if (RandomColumn.Value)
@@ -391,8 +392,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             if (TrueRandom.Value)
             {
-                Seed.Value ??= RNG.Next();
-
                 foreach (var obj in beatmap.HitObjects.OfType<ManiaHitObject>().GroupBy(c => c.StartTime))
                 {
                     var columnList = new List<int>();

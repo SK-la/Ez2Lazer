@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -7,7 +7,6 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -16,6 +15,7 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
@@ -88,8 +88,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            Seed.Value ??= RNG.Next();
-            var rng = new Random((int)Seed.Value);
+            int seed = EzModSeed.Resolve(Seed);
+            var rng = new Random(seed);
             if (rng == null) throw new ArgumentNullException(nameof(rng));
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;

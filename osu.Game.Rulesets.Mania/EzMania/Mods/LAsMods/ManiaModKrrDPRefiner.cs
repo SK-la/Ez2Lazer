@@ -7,7 +7,6 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Configuration;
@@ -16,6 +15,7 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.EzOsuGame.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
@@ -474,8 +474,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 }
 
                 // 初始化随机数生成器
-                Seed.Value ??= RNG.Next();
-                int seed = Seed.Value.Value;
+                int seed = EzModSeed.Resolve(Seed);
                 var random = new Random(seed);
 
                 int timeWindowLevel = TimeWindowLevel.Value;
