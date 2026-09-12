@@ -23,8 +23,9 @@ namespace osu.Game.EzOsuGame.Skills
         string AccentHex);
 
     /// <summary>
-    /// Hub <c>PATTERN_RATING_META</c> + <c>aggregateModePatternRatings</c> + <c>skillModeEntries</c>
+    /// Hub <c>aggregateModePatternRatings</c> + <c>skillModeEntries</c>
     /// (mania-hub <c>skill-axes.ts</c> / <c>player-skills.ts</c>).
+    /// Axis catalog: <see cref="EzPlayerPatternAxis"/>.
     /// </summary>
     public static class EzPatternRatings
     {
@@ -34,22 +35,13 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Hub display floor in <c>skillModeEntries</c> (<c>value &gt;= 1</c>).</summary>
         public const double DISPLAY_MIN = 1;
 
-        /// <summary>
-        /// Hub <c>PATTERN_RATING_META</c> family ids (no chordjack row — jack absorbs it).
-        /// </summary>
-        public static IReadOnlyList<EzPatternRatingMeta> Meta { get; } = new[]
-        {
-            new EzPatternRatingMeta("chordstream", "大切", "Chordstream", "#5ab2f2"),
-            new EzPatternRatingMeta("bracket", "衩", "Bracket", "#f3c24a"),
-            new EzPatternRatingMeta("delay", "延迟", "Delay", "#46c7b8"),
-            new EzPatternRatingMeta("stream", "切", "Stream", "#8f6bd8"),
-            new EzPatternRatingMeta("jack", "叠", "Jack", "#ec6a9c"),
-            new EzPatternRatingMeta("tech", "技", "Tech", "#83cf6b"),
-            new EzPatternRatingMeta("ln", "LN", "LN", "#f07474"),
-        };
+        /// <summary>Hub <c>PATTERN_RATING_META</c> order (from <see cref="EzPlayerPatternAxis"/>).</summary>
+        public static IReadOnlyList<EzPlayerPatternAxis> Meta { get; } = EzPlayerPatternAxisExtensions.All;
 
         public static string ToSkillId(string patternId)
             => $"{EzSkillSystems.PLAYER_PATTERN}.{patternId}";
+
+        public static string ToSkillId(EzPlayerPatternAxis axis) => axis.ToSkillId();
 
         public static bool TryParseSkillId(string? skillId, out string patternId)
         {
@@ -114,11 +106,12 @@ namespace osu.Game.EzOsuGame.Skills
 
             var result = new List<EzSkillModeEntry>(Meta.Count);
 
-            foreach (var meta in Meta)
+            foreach (var axis in Meta)
             {
+                var meta = axis.Meta();
                 double value = byId.TryGetValue(meta.Id, out var rating) ? rating.Rating : 0;
                 result.Add(new EzSkillModeEntry(
-                    ToSkillId(meta.Id),
+                    axis.ToSkillId(),
                     meta.DisplayName,
                     value,
                     meta.AccentHex));
@@ -142,14 +135,15 @@ namespace osu.Game.EzOsuGame.Skills
 
                 var patternEntries = new List<EzSkillModeEntry>(Meta.Count);
 
-                foreach (var meta in Meta)
+                foreach (var axis in Meta)
                 {
+                    var meta = axis.Meta();
                     double value = byId.TryGetValue(meta.Id, out var rating) ? rating.Rating : 0;
                     if (value < DISPLAY_MIN)
                         continue;
 
                     patternEntries.Add(new EzSkillModeEntry(
-                        ToSkillId(meta.Id),
+                        axis.ToSkillId(),
                         meta.DisplayName,
                         value,
                         meta.AccentHex));
@@ -176,13 +170,13 @@ namespace osu.Game.EzOsuGame.Skills
             }
 
             // Hub: graft LN pattern axis onto non-pattern keymodes (same Overall-SSR scale).
-            var ln = patterns.FirstOrDefault(static p => p.Id == "ln");
+            var ln = patterns.FirstOrDefault(static p => p.Id == EzPlayerPatternAxis.Ln.ToId());
 
             if (ln.Rating >= DISPLAY_MIN)
             {
-                var lnMeta = Meta.First(static m => m.Id == "ln");
+                var lnMeta = EzPlayerPatternAxis.Ln.Meta();
                 entries.Add(new EzSkillModeEntry(
-                    ToSkillId("ln"),
+                    EzPlayerPatternAxis.Ln.ToSkillId(),
                     lnMeta.DisplayName,
                     ln.Rating,
                     lnMeta.AccentHex));
@@ -191,10 +185,4 @@ namespace osu.Game.EzOsuGame.Skills
             return entries.OrderByDescending(static e => e.Value).ToList();
         }
     }
-
-    public readonly record struct EzPatternRatingMeta(
-        string Id,
-        LocalisableString DisplayName,
-        string EnglishLabel,
-        string AccentHex);
 }

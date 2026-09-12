@@ -7,7 +7,7 @@ namespace osu.Game.EzOsuGame.Skills
     /// Realm <c>SystemId</c> namespaces and meta skill ids (not Mina axes).
     /// Topology (lean hybrid C):
     /// <list type="number">
-    /// <item><b>Skills now</b> — <see cref="EzMinaSkillAxis"/> (RcMina). LN pattern skills are a future separate module.</item>
+    /// <item><b>Skills now</b> — <see cref="EzMinaSkillAxis"/> (RcMina) and <see cref="EzPlayerPatternAxis"/> (6/7/8K pattern ratings).</item>
     /// <item><b>Dan</b> — parallel to metrics: <c>key×</c><see cref="EzDanSide"/> → <see cref="Dan.IEzDanLadder"/> + estimator;
     /// not under skills. Profile dan uses its own estimate table/algorithm.</item>
     /// <item><b>Chip</b> — optional UX axis (<see cref="EzChartDanVerdict.DominantAxis"/>); do not invent a parallel family enum.</item>

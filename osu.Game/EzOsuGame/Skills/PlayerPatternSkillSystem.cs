@@ -14,13 +14,17 @@ namespace osu.Game.EzOsuGame.Skills
         public string SystemId => EzSkillSystems.PLAYER_PATTERN;
 
         public IReadOnlyList<EzSkillDefinition> Skills { get; } =
-            EzPatternRatings.Meta
-                            .Select(static m => new EzSkillDefinition(
-                                EzSkillSystems.PLAYER_PATTERN,
-                                EzPatternRatings.ToSkillId(m.Id),
-                                m.DisplayName,
-                                EzSkillScope.Player,
-                                m.AccentHex))
-                            .ToList();
+            EzPlayerPatternAxisExtensions.All
+                                         .Select(static axis =>
+                                         {
+                                             var meta = axis.Meta();
+                                             return new EzSkillDefinition(
+                                                 EzSkillSystems.PLAYER_PATTERN,
+                                                 axis.ToSkillId(),
+                                                 meta.DisplayName,
+                                                 EzSkillScope.Player,
+                                                 meta.AccentHex);
+                                         })
+                                         .ToList();
     }
 }
