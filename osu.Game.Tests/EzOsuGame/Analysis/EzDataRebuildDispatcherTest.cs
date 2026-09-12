@@ -13,9 +13,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [TestCase(EzDataRebuildTarget.RealmTags, EzRealmMetadataScope.Tags)]
         [TestCase(EzDataRebuildTarget.RealmXxy, EzRealmMetadataScope.Xxy)]
         [TestCase(EzDataRebuildTarget.RealmPp, EzRealmMetadataScope.Pp)]
-        [TestCase(EzDataRebuildTarget.RealmMsd, EzRealmMetadataScope.Msd)]
-        [TestCase(EzDataRebuildTarget.RealmChartSkillInfo, EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan)]
-        [TestCase(EzDataRebuildTarget.RealmChartDan, EzRealmMetadataScope.Msd | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan)]
+        [TestCase(EzDataRebuildTarget.RealmChartMSD, EzRealmMetadataScope.Msd)]
+        [TestCase(EzDataRebuildTarget.RealmChartCSIAndDan, EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan)]
+        [TestCase(EzDataRebuildTarget.RealmChartSkillChain, EzRealmMetadataScope.Msd | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan)]
         [TestCase(EzDataRebuildTarget.RealmAll, EzRealmMetadataScope.All)]
         public void TestRealmTargetsDispatchWithCorrectScope(EzDataRebuildTarget target, EzRealmMetadataScope expectedScope)
         {
@@ -139,7 +139,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [TestCase(EzDataRebuildTarget.RealmTags)]
         [TestCase(EzDataRebuildTarget.RealmXxy)]
         [TestCase(EzDataRebuildTarget.RealmPp)]
-        [TestCase(EzDataRebuildTarget.RealmMsd)]
+        [TestCase(EzDataRebuildTarget.RealmChartMSD)]
         [TestCase(EzDataRebuildTarget.RealmAll)]
         public void TestRealmTargetsUnavailableWhenProcessorMissing(EzDataRebuildTarget target)
         {
@@ -169,7 +169,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         [TestCase(EzDataRebuildTarget.RealmTags, true, false, false)]
-        [TestCase(EzDataRebuildTarget.RealmMsd, true, false, false)]
+        [TestCase(EzDataRebuildTarget.RealmChartMSD, true, false, false)]
         [TestCase(EzDataRebuildTarget.RealmAll, true, false, false)]
         [TestCase(EzDataRebuildTarget.SqliteMain, false, true, false)]
         [TestCase(EzDataRebuildTarget.SqliteSongsBranches, false, false, true)]
@@ -184,7 +184,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         [TestCase(EzDataRebuildTarget.RealmTags)]
-        [TestCase(EzDataRebuildTarget.RealmMsd)]
+        [TestCase(EzDataRebuildTarget.RealmChartMSD)]
         [TestCase(EzDataRebuildTarget.RealmAll)]
         public void TestCanDispatchFalseWhenRealmProcessorMissing(EzDataRebuildTarget target)
         {

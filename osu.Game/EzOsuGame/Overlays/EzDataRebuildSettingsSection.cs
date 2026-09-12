@@ -20,7 +20,7 @@ namespace osu.Game.EzOsuGame.Overlays
             IDialogOverlay? dialogOverlay,
             INotificationOverlay? notifications)
         {
-            var rebuildTarget = new Bindable<EzDataRebuildTarget>(EzDataRebuildTarget.RealmAll);
+            var rebuildTarget = new Bindable<EzDataRebuildTarget>(EzDataRebuildTarget.RealmChartSkillChain);
             var maintenanceHandler = new EzDataRebuildMaintenanceHandler(backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
 
             var executeButton = new DangerousSettingsButtonV2

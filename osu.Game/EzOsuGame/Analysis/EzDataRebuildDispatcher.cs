@@ -45,9 +45,9 @@ namespace osu.Game.EzOsuGame.Analysis
                 case EzDataRebuildTarget.RealmTags:
                 case EzDataRebuildTarget.RealmXxy:
                 case EzDataRebuildTarget.RealmPp:
-                case EzDataRebuildTarget.RealmMsd:
-                case EzDataRebuildTarget.RealmChartSkillInfo:
-                case EzDataRebuildTarget.RealmChartDan:
+                case EzDataRebuildTarget.RealmChartMSD:
+                case EzDataRebuildTarget.RealmChartCSIAndDan:
+                case EzDataRebuildTarget.RealmChartSkillChain:
                 case EzDataRebuildTarget.RealmAll:
                     return queueRealm != null;
 
@@ -78,14 +78,14 @@ namespace osu.Game.EzOsuGame.Analysis
                 case EzDataRebuildTarget.RealmPp:
                     return dispatchRealm(EzRealmMetadataScope.Pp, forceAll);
 
-                case EzDataRebuildTarget.RealmMsd:
+                case EzDataRebuildTarget.RealmChartMSD:
                     return dispatchRealm(EzRealmMetadataScope.Msd, forceAll);
 
-                case EzDataRebuildTarget.RealmChartSkillInfo:
+                case EzDataRebuildTarget.RealmChartCSIAndDan:
                     // DualPanel chart scene: CSI + ChartDan (Rating stays on MSD).
                     return dispatchRealm(EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan, forceAll);
 
-                case EzDataRebuildTarget.RealmChartDan:
+                case EzDataRebuildTarget.RealmChartSkillChain:
                     // Full chart skill chain: MSD → CSI → ChartDan.
                     return dispatchRealm(
                         EzRealmMetadataScope.Msd | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan,
