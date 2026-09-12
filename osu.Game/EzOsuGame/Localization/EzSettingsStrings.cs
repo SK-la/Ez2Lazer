@@ -281,10 +281,16 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_TARGET_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "选择要维护的数据范围。SQLite 在已有匹配的最新版文件时不会自动预热；Realm 缺失项仍会在启动时自动补算。"
             + "\n成绩全量重算：有 replay 的 mania 成绩走 Session 原始环境重算（与选歌右键一致）；stable 旧成绩无 replay 时重走官方转换。"
-            + "\n「尝试补算」仅处理 mania 成绩；「完全重算」处理全部游戏模式。",
+            + "\n「尝试补算」仅处理 mania 成绩；「完全重算」处理全部游戏模式。"
+            + "\n技能场景：Realm MSD = 4K 雷达黄层 + DualPanel Rating + Dan 供料；"
+            + "DualPanel谱面 = CSI 分格 + ChartDan（不含 Rating）；"
+            + "谱面技能链 = MSD+CSI+Dan 一键。雷达绿层（玩家 SSR/图案）只走 Local Profile 重算。",
             "Choose which data to maintain. SQLite is not auto-warmed when a matching current database exists; Realm missing values are still filled at startup."
             + "\nFull score recalculation: mania scores with replays are recalculated via Session in their stored environment (same as the song select context menu); legacy scores without replays are re-converted officially."
-            + "\n\"Backfill\" processes mania scores only; \"Force rebuild\" processes all rulesets.");
+            + "\n\"Backfill\" processes mania scores only; \"Force rebuild\" processes all rulesets."
+            + "\nSkill scenes: Realm MSD = 4K radar yellow + DualPanel Rating + Dan feed; "
+            + "DualPanel chart = CSI slots + ChartDan (no Rating); "
+            + "chart skill chain = MSD+CSI+Dan. Radar green (player SSR/patterns) is Local Profile recalc only.");
 
         public static readonly EzLocalizationManager.EzLocalisableString DATA_REBUILD_EXECUTE =
             new EzLocalizationManager.EzLocalisableString("执行", "Execute");

@@ -46,11 +46,21 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_PP = new EzLocalizationManager.EzLocalisableString("Realm PP", "Realm PP");
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_ALL = new EzLocalizationManager.EzLocalisableString("Realm 全部元数据", "Realm all metadata");
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_SCORES = new EzLocalizationManager.EzLocalisableString("Realm 成绩全量重算", "Realm full score recalculation");
+
         public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_MAIN = new EzLocalizationManager.EzLocalisableString("SQLite 主库 kps/KPC", "SQLite main kps/KPC");
         public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_BRANCHES = new EzLocalizationManager.EzLocalisableString("SQLite 分支曲库 xxy/PP", "SQLite songs branches xxy/PP");
-        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_MSD = new EzLocalizationManager.EzLocalisableString("Realm MSD", "Realm MSD");
-        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_SKILL_INFO = new EzLocalizationManager.EzLocalisableString("Realm ChartSkillInfo", "Realm ChartSkillInfo");
-        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_DAN = new EzLocalizationManager.EzLocalisableString("Realm ChartDan", "Realm ChartDan");
+
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_MSD = new EzLocalizationManager.EzLocalisableString(
+            "Realm MSD",
+            "Realm MSD");
+
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_SKILL_INFO = new EzLocalizationManager.EzLocalisableString(
+            "Realm DualPanel谱面 (CSI+Dan)",
+            "Realm DualPanel chart (CSI+Dan)");
+
+        public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_CHART_DAN = new EzLocalizationManager.EzLocalisableString(
+            "Realm 谱面技能链 (MSD+CSI+Dan)",
+            "Realm chart skill chain (MSD+CSI+Dan)");
 
         public static readonly LocalisableString LOGO_VIS_BARS = new EzLocalizationManager.EzLocalisableString("柱状", "Bars");
         public static readonly LocalisableString LOGO_VIS_POLYLINE = new EzLocalizationManager.EzLocalisableString("折线", "Polyline");

@@ -522,7 +522,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     labelLayer,
                 };
 
-                chart.SetData(ratios);
+                // Yellow = chart (none on Local Profile); green = player skills.
+                chart.SetData(Enumerable.Repeat(0f, ratios.Count).ToList());
+                chart.SetSecondaryData(ratios);
             }
 
             /// <summary>

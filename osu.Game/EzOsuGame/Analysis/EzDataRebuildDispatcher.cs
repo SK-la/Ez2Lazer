@@ -82,10 +82,14 @@ namespace osu.Game.EzOsuGame.Analysis
                     return dispatchRealm(EzRealmMetadataScope.Msd, forceAll);
 
                 case EzDataRebuildTarget.RealmChartSkillInfo:
-                    return dispatchRealm(EzRealmMetadataScope.ChartSkillInfo, forceAll);
+                    // DualPanel chart scene: CSI + ChartDan (Rating stays on MSD).
+                    return dispatchRealm(EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan, forceAll);
 
                 case EzDataRebuildTarget.RealmChartDan:
-                    return dispatchRealm(EzRealmMetadataScope.ChartDan, forceAll);
+                    // Full chart skill chain: MSD → CSI → ChartDan.
+                    return dispatchRealm(
+                        EzRealmMetadataScope.Msd | EzRealmMetadataScope.ChartSkillInfo | EzRealmMetadataScope.ChartDan,
+                        forceAll);
 
                 case EzDataRebuildTarget.RealmAll:
                     return dispatchRealm(EzRealmMetadataScope.All, forceAll);

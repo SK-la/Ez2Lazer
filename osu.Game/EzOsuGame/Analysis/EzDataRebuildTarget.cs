@@ -33,12 +33,25 @@ namespace osu.Game.EzOsuGame.Analysis
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_SQLITE_BRANCHES))]
         SqliteSongsBranches = 6,
 
+        /// <summary>
+        /// Scene: beatmap MSD (4K Skill yellow, DualPanel Rating feed, ChartDan inputs).
+        /// Scope: <see cref="Database.EzRealmMetadataScope.Msd"/> only.
+        /// </summary>
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_REALM_MSD))]
         RealmMsd = 7,
 
+        /// <summary>
+        /// Scene: DualPanel chart side — CSI tags + ChartDan (no Rating).
+        /// Scope: <see cref="Database.EzRealmMetadataScope.ChartSkillInfo"/> | <see cref="Database.EzRealmMetadataScope.ChartDan"/>.
+        /// Assumes MSD already present; ChartDan defers maps still waiting on MSD.
+        /// </summary>
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_REALM_CHART_SKILL_INFO))]
         RealmChartSkillInfo = 8,
 
+        /// <summary>
+        /// Scene: full chart skill chain — MSD + CSI + ChartDan (includes Rating feed).
+        /// Scope: <see cref="Database.EzRealmMetadataScope.Msd"/> | ChartSkillInfo | ChartDan.
+        /// </summary>
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_REALM_CHART_DAN))]
         RealmChartDan = 9,
     }

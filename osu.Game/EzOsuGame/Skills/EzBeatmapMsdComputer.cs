@@ -20,6 +20,12 @@ namespace osu.Game.EzOsuGame.Skills
         private readonly BeatmapManager beatmapManager;
         private readonly EzSkillStore skillStore;
 
+        /// <summary>
+        /// When true, <see cref="ComputeAndStore"/> skips side-effect ChartDan upsert so a same-job
+        /// CSI → ChartDan pass can write stamped rows. Hot-path / MSD-only jobs leave this false.
+        /// </summary>
+        public bool SuppressChartDanSideUpsert { get; set; }
+
         public EzBeatmapMsdComputer(BeatmapManager beatmapManager, EzSkillStore skillStore)
         {
             this.beatmapManager = beatmapManager;
@@ -108,7 +114,9 @@ namespace osu.Game.EzOsuGame.Skills
                 result[EzSkillSystems.MsdHoldRatioSkillId] = Math.Clamp(holdRatio, 0, 1);
 
             // Same as xxy import hot-write: when MSD lands, persist ChartDan so select can read Realm.
-            tryUpsertChartDanFromMsd(beatmapInfo, result, keyCount, holdRatio);
+            // Skipped when BDSP will run ChartDan after CSI in the same job (stamp-complete rows).
+            if (!SuppressChartDanSideUpsert)
+                tryUpsertChartDanFromMsd(beatmapInfo, result, keyCount, holdRatio);
 
             return result;
         }

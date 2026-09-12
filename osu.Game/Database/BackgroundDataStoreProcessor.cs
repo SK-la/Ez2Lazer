@@ -577,14 +577,46 @@ namespace osu.Game.Database
 
             // MSD before ChartSkillInfo — filing prefers stored axes when present.
             // ChartDan after MSD (+ CSI when available) — FromMsd + BucketsForValues, no playable.
+            // When CSI (and typically ChartDan) share this job, defer MSD's early ChartDan upsert
+            // so stamps can include CSI; skill-scene scopes also refresh existing ChartDan rows.
+            bool deferChartDanSideUpsert = scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
+                                           || scope.HasFlag(EzRealmMetadataScope.ChartDan);
+            bool refreshExistingChartDan = isSkillsChartSceneScope(scope);
+
             if (scope.HasFlag(EzRealmMetadataScope.Msd))
-                populateMissingBeatmapMsd();
+            {
+                beatmapMsdComputer.SuppressChartDanSideUpsert = deferChartDanSideUpsert;
+
+                try
+                {
+                    populateMissingBeatmapMsd();
+                }
+                finally
+                {
+                    beatmapMsdComputer.SuppressChartDanSideUpsert = false;
+                }
+            }
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo))
                 populateMissingChartSkillInfo();
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartDan))
-                populateMissingChartDan();
+                populateMissingChartDan(refreshExistingChartDan);
+        }
+
+        /// <summary>
+        /// DualPanel (CSI|Dan) or skill chain (MSD|CSI|Dan) — not RealmAll (which also has Tags/Xxy/Pp).
+        /// </summary>
+        private static bool isSkillsChartSceneScope(EzRealmMetadataScope scope)
+        {
+            const EzRealmMetadataScope skills_bits = EzRealmMetadataScope.Msd
+                                                     | EzRealmMetadataScope.ChartSkillInfo
+                                                     | EzRealmMetadataScope.ChartDan;
+
+            if (!scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo) || !scope.HasFlag(EzRealmMetadataScope.ChartDan))
+                return false;
+
+            return (scope & ~skills_bits) == 0;
         }
 
         private void clearEzRealmMetadata(EzRealmMetadataScope scope)
@@ -1049,9 +1081,15 @@ namespace osu.Game.Database
         /// Candidate set mirrors MSD: skip unsupported keymodes; only attempt hashes with complete MSD
         /// (missing MSD is deferred, not counted as ChartDan failure).
         /// </summary>
-        private void populateMissingChartDan()
+        /// <param name="refreshExisting">
+        /// When true (DualPanel / skill-chain scenes), recompute even if a ChartDan row already exists
+        /// so CSI stamps land after an earlier MSD-only side upsert.
+        /// </param>
+        private void populateMissingChartDan(bool refreshExisting = false)
         {
-            Logger.Log("Querying for mania beatmaps with missing ChartDan...");
+            Logger.Log(refreshExisting
+                ? "Querying for mania beatmaps needing ChartDan refresh (skill scene)..."
+                : "Querying for mania beatmaps with missing ChartDan...");
 
             List<(Guid Id, string Hash)> candidates = new List<(Guid, string)>();
             int skippedUnsupportedKeyCount = 0;
@@ -1089,7 +1127,9 @@ namespace osu.Game.Database
             if (candidates.Count == 0)
                 return;
 
-            var completeChartDan = skillStore.GetPersistedChartDanHashes();
+            var completeChartDan = refreshExisting
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : skillStore.GetPersistedChartDanHashes();
             var settledMsd = skillStore.GetSettledBeatmapMsdHashes();
             var completeMsd = skillStore.GetCompleteBeatmapMsdHashes();
 
@@ -1130,7 +1170,9 @@ namespace osu.Game.Database
                 return;
             }
 
-            Logger.Log($"Found {missing.Count} beatmaps which require ChartDan reprocessing (have complete MSD).");
+            Logger.Log(refreshExisting
+                ? $"Found {missing.Count} beatmaps which require ChartDan refresh (have complete MSD)."
+                : $"Found {missing.Count} beatmaps which require ChartDan reprocessing (have complete MSD).");
 
             var notification = showProgressNotification(missing.Count, "Reprocessing ChartDan", "beatmaps' ChartDan have been updated");
 
@@ -1649,8 +1691,7 @@ namespace osu.Game.Database
                         realmAccess.Write(r =>
                         {
                             var s = r.Find<ScoreInfo>(id);
-                            if (s != null)
-                                s.MaximumStatisticsJson = JsonConvert.SerializeObject(score.MaximumStatistics);
+                            s?.MaximumStatisticsJson = JsonConvert.SerializeObject(score.MaximumStatistics);
                         });
 
                         ++processedCount;
@@ -1665,8 +1706,7 @@ namespace osu.Game.Database
                             realmAccess.Write(r =>
                             {
                                 var s = r.Find<ScoreInfo>(id);
-                                if (s != null)
-                                    s.BackgroundReprocessingFailed = true;
+                                s?.BackgroundReprocessingFailed = true;
                             });
                         }
                         catch (Exception ex)
@@ -1690,8 +1730,7 @@ namespace osu.Game.Database
                         realmAccess.Write(r =>
                         {
                             var s = r.Find<ScoreInfo>(id);
-                            if (s != null)
-                                s.BackgroundReprocessingFailed = true;
+                            s?.BackgroundReprocessingFailed = true;
                         });
                     }
                     catch (Exception ex)
@@ -1744,8 +1783,7 @@ namespace osu.Game.Database
                     foreach (var id in batch)
                     {
                         var s = r.Find<ScoreInfo>(id);
-                        if (s != null)
-                            s.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
+                        s?.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
                     }
                 });
             }
@@ -1897,8 +1935,7 @@ namespace osu.Game.Database
                         realmAccess.Write(r =>
                         {
                             var s = r.Find<ScoreInfo>(id);
-                            if (s != null)
-                                s.BackgroundReprocessingFailed = true;
+                            s?.BackgroundReprocessingFailed = true;
                         });
                     }
                     catch (Exception ex)
@@ -1986,8 +2023,7 @@ namespace osu.Game.Database
                         realmAccess.Write(r =>
                         {
                             var s = r.Find<ScoreInfo>(id);
-                            if (s != null)
-                                s.BackgroundReprocessingFailed = true;
+                            s?.BackgroundReprocessingFailed = true;
                         });
                     }
                     catch (Exception ex)
