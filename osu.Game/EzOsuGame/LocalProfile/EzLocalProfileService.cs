@@ -42,6 +42,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly Dictionary<string, EzLocalProfileInsights> insightsMemoryCache =
             new Dictionary<string, EzLocalProfileInsights>(StringComparer.Ordinal);
 
+        private readonly Dictionary<Guid, IReadOnlyList<double>> kpsCache = new Dictionary<Guid, IReadOnlyList<double>>();
+
         public Bindable<EzLocalProfileSnapshot> Snapshot { get; } = new Bindable<EzLocalProfileSnapshot>(new EzLocalProfileSnapshot());
 
         public BindableBool IsComputing { get; } = new BindableBool();
@@ -127,6 +129,23 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return loaded;
         }
 
+        /// <summary>KPS series for a single score, cached per session (only the selected drill row needs it).</summary>
+        public IReadOnlyList<double> LoadKpsList(Guid scoreId)
+        {
+            lock (sessionCacheLock)
+            {
+                if (kpsCache.TryGetValue(scoreId, out var cached))
+                    return cached;
+            }
+
+            var loaded = Store.LoadKpsList(scoreId);
+
+            lock (sessionCacheLock)
+                kpsCache[scoreId] = loaded;
+
+            return loaded;
+        }
+
         public bool TryGetCachedInsights(string? usernameFilter, out EzLocalProfileInsights? insights)
         {
             string key = insightsCacheKey(usernameFilter);
@@ -165,6 +184,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 drillCache.Clear();
                 displaySnapshotCache.Clear();
                 insightsMemoryCache.Clear();
+                kpsCache.Clear();
             }
 
             Store.ClearInsightsCache();

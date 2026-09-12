@@ -172,6 +172,35 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
+        /// Per-second KPS series for one drill score. Kept out of <see cref="LoadDrillScores"/> (the widest column)
+        /// and fetched only for the currently selected score.
+        /// </summary>
+        public IReadOnlyList<double> LoadKpsList(Guid scoreId)
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT kps_list_json FROM drill_scores WHERE score_id = $score_id;";
+                cmd.Parameters.AddWithValue("$score_id", scoreId.ToString("N"));
+
+                if (cmd.ExecuteScalar() is not string json || string.IsNullOrEmpty(json))
+                    return Array.Empty<double>();
+
+                try
+                {
+                    return JsonSerializer.Deserialize<List<double>>(json) ?? (IReadOnlyList<double>)Array.Empty<double>();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[EzLocalProfile] Failed to parse kps list for {scoreId}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
+                    return Array.Empty<double>();
+                }
+            }
+        }
+
+        /// <summary>
         /// Previously stored average abs hit offsets for drill rows (non-null only).
         /// Used to avoid re-running replay sessions during bulk score analysis.
         /// </summary>
@@ -1103,7 +1132,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                          max_combo, max_achievable_combo, total_score, mods_json, total_keys,
                          beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
                          mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
-                         kps_avg, kps_max, kps_list_json, column_counts_json, hold_counts_json,
+                         kps_avg, kps_max, '[]' AS kps_list_json, column_counts_json, hold_counts_json,
                          avg_abs_offset_ms, has_video, has_storyboard, date_ms,
                          bpm, key_count, is_convert, rate, mod_acronyms_json
                   FROM drill_scores
@@ -1115,7 +1144,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                          max_combo, max_achievable_combo, total_score, mods_json, total_keys,
                          beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
                          mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
-                         kps_avg, kps_max, kps_list_json, column_counts_json, hold_counts_json,
+                         kps_avg, kps_max, '[]' AS kps_list_json, column_counts_json, hold_counts_json,
                          avg_abs_offset_ms, has_video, has_storyboard, date_ms,
                          bpm, key_count, is_convert, rate, mod_acronyms_json
                   FROM drill_scores
@@ -1507,6 +1536,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                               DELETE FROM drill_scores WHERE TRUE;
                               DELETE FROM dan_clear_evidence WHERE TRUE;
                               DELETE FROM axis_play_evidence WHERE TRUE;
+                              DELETE FROM insights_cache WHERE TRUE;
                               """;
             cmd.ExecuteNonQuery();
         }

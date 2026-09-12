@@ -171,7 +171,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 refreshSkillBarSelection();
                 refreshDetailPanel();
             }, false);
-            rebuild();
+
+            // Defer first build one frame so Track mount does not hitch the same frame as Insights/drill staging.
+            Scheduler.AddDelayed(rebuild, 0);
         }
 
         private void clearDetailSelection()
@@ -215,7 +217,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             overviewContainer.Show();
             danPanel.Show();
             danClearsPanel.Show();
-            danClearsPanel.Refresh();
+            Scheduler.AddDelayed(() => danClearsPanel.Refresh(), 0);
 
             foreach (int key in keyCounts)
             {

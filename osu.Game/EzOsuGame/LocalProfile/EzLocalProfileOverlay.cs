@@ -444,7 +444,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         if (token.IsCancellationRequested)
                             return;
 
-                        drillHostMania.Child = new EzLocalProfileScoreDrillPanel(currentDrillScore, drillSearchQuery, drills);
+                        drillHostMania.Child = new EzLocalProfileScoreDrillPanel(currentDrillScore, drillSearchQuery, drills, profileService.LoadKpsList);
                     }, 0);
                 }, 0);
             }), token);
@@ -463,7 +463,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     return;
                 }
 
-                drillHost.Child = new EzLocalProfileScoreDrillPanel(currentDrillScore, drillSearchQuery, task.GetResultSafely());
+                drillHost.Child = new EzLocalProfileScoreDrillPanel(currentDrillScore, drillSearchQuery, task.GetResultSafely(), profileService.LoadKpsList);
             }), token);
         }
 

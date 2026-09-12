@@ -117,6 +117,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly Bindable<EzLocalProfileDrillScoreRow?> currentScore;
         private readonly Bindable<string> searchQuery;
         private readonly IReadOnlyList<EzLocalProfileDrillScoreRow> allScores;
+        private readonly Func<Guid, IReadOnlyList<double>>? kpsLoader;
 
         private EzLocalProfileScoreSelector selector = null!;
         private OsuSpriteText noMatchesText = null!;
@@ -125,11 +126,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public EzLocalProfileScoreDrillPanel(
             Bindable<EzLocalProfileDrillScoreRow?> currentScore,
             Bindable<string> searchQuery,
-            IReadOnlyList<EzLocalProfileDrillScoreRow> allScores)
+            IReadOnlyList<EzLocalProfileDrillScoreRow> allScores,
+            Func<Guid, IReadOnlyList<double>>? kpsLoader = null)
         {
             this.currentScore = currentScore;
             this.searchQuery = searchQuery;
             this.allScores = allScores;
+            this.kpsLoader = kpsLoader;
 
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -179,7 +182,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                             RelativeSizeAxes = Axes.X,
                             AutoSizeAxes = Axes.Y,
                             Margin = new MarginPadding { Left = 12 },
-                            Child = new EzLocalProfileScoreDetailColumn(currentScore, allScores),
+                            Child = new EzLocalProfileScoreDetailColumn(currentScore, allScores, kpsLoader),
                         },
                     },
                 },

@@ -1,10 +1,13 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -96,6 +99,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private EzDisplayTag ezDisplayTag = null!;
         private EzDisplaySkillsDan ezDisplaySkillsDan = null!;
         private Box accentStrip = null!;
+
+        private double lastKpsAvg;
+        private double lastKpsMax;
+        private EzManiaSummary lastManiaSummary = EzManiaSummary.EMPTY;
 
         [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
@@ -279,7 +286,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             ezDisplayKpsGraph = new EzDisplayKpsGraph();
         }
 
-        public void Update(EzLocalProfileDrillScoreRow row)
+        public void Update(EzLocalProfileDrillScoreRow row, IReadOnlyList<double> kpsList)
         {
             rankDisplay.Rank = row.Rank;
             rankDisplay.Alpha = 1;
@@ -314,8 +321,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             ezDisplayTag.Beatmap = beatmap;
             ezDisplayKps.SetPp(row.MapPerformancePoints > 0 ? row.MapPerformancePoints : null);
 
-            var metrics = new EzSongSelectAnalysisDisplay.PanelMetrics(row.KpsAvg, row.KpsMax, row.ReadKpsList().ToArray(), maniaSummary);
-            applyPanelKps(metrics);
+            lastKpsAvg = row.KpsAvg;
+            lastKpsMax = row.KpsMax;
+            lastManiaSummary = maniaSummary;
+            UpdateKps(kpsList);
 
             if (showXxy && maniaSummary.ColumnCounts.Count > 0)
             {
@@ -327,6 +336,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 ezDisplayKpc.ManiaSummary = null;
                 ezDisplayKpc.Hide();
             }
+        }
+
+        /// <summary>
+        /// Applies the (lazily loaded) per-second KPS series without re-reading the rest of the card.
+        /// </summary>
+        public void UpdateKps(IReadOnlyList<double> kpsList)
+        {
+            applyPanelKps(new EzSongSelectAnalysisDisplay.PanelMetrics(lastKpsAvg, lastKpsMax, kpsList.ToArray(), lastManiaSummary));
         }
 
         public void Clear()
@@ -427,6 +444,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     {
         private readonly Bindable<EzLocalProfileDrillScoreRow?> scoreSource;
         private readonly IReadOnlyList<EzLocalProfileDrillScoreRow> allScores;
+        private readonly Func<Guid, IReadOnlyList<double>>? kpsLoader;
 
         private EzLocalProfileScoreBeatmapCard beatmapCard = null!;
         private EzLocalProfileScoreDetailRow scoreRow = null!;
@@ -436,10 +454,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
         [Resolved]
         private RulesetStore rulesets { get; set; } = null!;
 
-        public EzLocalProfileScoreDetailColumn(Bindable<EzLocalProfileDrillScoreRow?> scoreSource, IReadOnlyList<EzLocalProfileDrillScoreRow> allScores)
+        public EzLocalProfileScoreDetailColumn(Bindable<EzLocalProfileDrillScoreRow?> scoreSource, IReadOnlyList<EzLocalProfileDrillScoreRow> allScores,
+                                               Func<Guid, IReadOnlyList<double>>? kpsLoader = null)
         {
             this.scoreSource = scoreSource;
             this.allScores = allScores;
+            this.kpsLoader = kpsLoader;
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
             // Match OsuTextBox inner text inset (LeftRightPadding 10 + margin) on the drill search row.
@@ -484,7 +504,31 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             this.FadeIn(200);
-            beatmapCard.Update(row);
+            beatmapCard.Update(row, Array.Empty<double>());
+
+            // KPS series is lazily read from SQLite off the update thread: the store lock may be held by a running
+            // aggregate, so never block the update thread on it.
+            var scoreId = row.ScoreId;
+
+            if (kpsLoader != null)
+            {
+                Task.Run(() => kpsLoader(scoreId)).ContinueWith(task =>
+                {
+                    if (task.IsFaulted || task.IsCanceled)
+                        return;
+
+                    var kps = task.GetResultSafely();
+
+                    Schedule(() =>
+                    {
+                        if (scoreSource.Value?.ScoreId == scoreId)
+                            beatmapCard.UpdateKps(kps);
+                    });
+                });
+            }
+            else
+                beatmapCard.UpdateKps(row.ReadKpsList());
+
             var displayData = EzLocalProfileScoreDisplayData.From(row, EzLocalProfileDrillMods.Resolve(row, rulesets));
             scoreRow.Update(displayData);
 
