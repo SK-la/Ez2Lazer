@@ -276,8 +276,24 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             double barMax = modeEntries.Select(static e => e.Value).DefaultIfEmpty(0).Max();
+            barMax = Math.Max(barMax, snapshot.Overall);
             if (barMax <= 0)
-                barMax = Math.Max(snapshot.Overall, 1);
+                barMax = 1;
+
+            if (snapshot.Overall >= EzPatternRatings.DISPLAY_MIN)
+            {
+                var overallMeta = EzMinaSkillAxis.Overall.Meta();
+                string overallSkillId = EzMinaSkillAxis.Overall.ToSsrSkillId();
+
+                skillBarsFlow.Add(new SkillBarRow(
+                    overallSkillId,
+                    overallMeta.DisplayName,
+                    snapshot.Overall,
+                    (float)(snapshot.Overall / barMax),
+                    Colour4.FromHex(overallMeta.AccentHex),
+                    selectedSkillId,
+                    () => toggleSkill(overallSkillId)));
+            }
 
             foreach (var entry in modeEntries)
             {
