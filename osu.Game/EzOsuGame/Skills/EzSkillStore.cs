@@ -822,13 +822,18 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>
         /// True when at least one non-sentinel skillset tile exists for this username/key/side/version.
         /// Legacy <see cref="EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL"/> rows are removed and treated as miss.
+        /// <para>
+        /// Hot path is read-only: this runs on every DualPanel refresh (twice per side), and a write transaction
+        /// per call was measurable update-thread cost. Sentinel cleanup only happens when such rows exist.
+        /// </para>
         /// </summary>
         public bool HasDanSkillsetCache(string username, int keyCount, string side, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzDanAlgorithm.VERSION;
             bool hasReal = false;
+            List<Guid>? legacySentinelIds = null;
 
-            realmAccess.Write(r =>
+            realmAccess.Run(r =>
             {
                 var rows = r.All<EzPlayerDanSkillsetValue>()
                             .Where(v => v.Username == username
@@ -842,13 +847,31 @@ namespace osu.Game.EzOsuGame.Skills
                 foreach (var row in rows)
                 {
                     if (row.SkillsetId == EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL)
-                        r.Remove(row);
+                        (legacySentinelIds ??= new List<Guid>()).Add(row.ID);
                     else
                         hasReal = true;
                 }
             });
 
+            if (legacySentinelIds != null)
+                removeDanSkillsetSentinels(legacySentinelIds);
+
             return hasReal;
+        }
+
+        /// <summary>One-off cleanup of legacy empty-sentinel rows found on the read path.</summary>
+        private void removeDanSkillsetSentinels(List<Guid> ids)
+        {
+            realmAccess.Write(r =>
+            {
+                foreach (Guid id in ids)
+                {
+                    var row = r.Find<EzPlayerDanSkillsetValue>(id);
+
+                    if (row != null && row.SkillsetId == EzDanSkillsetBuckets.CACHE_EMPTY_SENTINEL)
+                        r.Remove(row);
+                }
+            });
         }
 
         /// <summary>Cached skillset tiles (excludes legacy empty sentinel). Empty list means miss.</summary>
