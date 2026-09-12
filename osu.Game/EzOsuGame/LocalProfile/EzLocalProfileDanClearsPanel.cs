@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -19,6 +20,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
+using osu.Game.Rulesets;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.LocalProfile
@@ -42,6 +44,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         [Resolved]
         private EzSkillProvider skillProvider { get; set; } = null!;
+
+        [Resolved]
+        private RulesetStore rulesets { get; set; } = null!;
 
         public EzLocalProfileDanClearsPanel(
             string username,
@@ -161,19 +166,40 @@ namespace osu.Game.EzOsuGame.LocalProfile
             foreach (var clear in clears.Take(clears_top_n))
             {
                 var drill = findDrill(clear.BeatmapHash);
-                rows.Add(new EzEvidenceScoreRow(
-                    resolveTitle(drill),
-                    EzEvidenceScoreRow.FormatDanMeta(clear.CreditedDan, clear.Accuracy, clear.Rate, clear.ScoredAt),
-                    drill != null && onSelectDrill != null ? () => onSelectDrill(drill) : null)
+                string highlight = clear.CreditedDan.ToString("0.00", CultureInfo.InvariantCulture);
+
+                Drawable row;
+
+                if (drill != null)
                 {
-                    Width = 160,
-                    RelativeSizeAxes = Axes.None,
-                    AutoSizeAxes = Axes.Y,
-                });
+                    row = new EzLocalProfileScoreNarrowCard(
+                        drill,
+                        EzLocalProfileDrillMods.Resolve(drill, rulesets),
+                        onSelectDrill != null ? () => onSelectDrill(drill) : null,
+                        highlightValue: highlight)
+                    {
+                        Width = 160,
+                        RelativeSizeAxes = Axes.None,
+                        AutoSizeAxes = Axes.Y,
+                    };
+                }
+                else
+                {
+                    row = new EzEvidenceScoreRow(
+                        resolveTitle(null),
+                        EzEvidenceScoreRow.FormatDanMeta(clear.CreditedDan, clear.Accuracy, clear.Rate, clear.ScoredAt))
+                    {
+                        Width = 160,
+                        RelativeSizeAxes = Axes.None,
+                        AutoSizeAxes = Axes.Y,
+                    };
+                }
+
+                rows.Add(row);
             }
 
             return new CollapsibleClearSide(
-                EzSettingsProfile.LOCAL_PROFILE_DAN_CLEARS_FOR.Format(sideName).ToString(),
+                EzSettingsProfile.LOCAL_PROFILE_DAN_CLEARS_FOR.Format(sideName),
                 shown,
                 accent,
                 rows);
@@ -187,9 +213,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             int cols = width switch
             {
-                < 280 => 1,
-                < 420 => 2,
-                < 560 => 3,
+                < 340 => 1,
+                < 560 => 2,
+                < 780 => 3,
                 _ => 4,
             };
 
@@ -238,20 +264,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
             private readonly string title;
             private readonly int clearCount;
             private readonly Colour4 accent;
-            private readonly FillFlowContainer rows;
 
             private Container detailFlow = null!;
             private SpriteIcon chevron = null!;
             private bool expanded;
 
-            public FillFlowContainer RowsFlow => rows;
+            public FillFlowContainer RowsFlow { get; }
 
             public CollapsibleClearSide(string title, int clearCount, Colour4 accent, FillFlowContainer rows)
             {
                 this.title = title;
                 this.clearCount = clearCount;
                 this.accent = accent;
-                this.rows = rows;
+                this.RowsFlow = rows;
 
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
@@ -319,7 +344,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                             AutoSizeAxes = Axes.Y,
                             Alpha = 0,
                             Padding = new MarginPadding { Left = 4, Right = 4, Bottom = 4 },
-                            Child = rows,
+                            Child = RowsFlow,
                         },
                     },
                 };

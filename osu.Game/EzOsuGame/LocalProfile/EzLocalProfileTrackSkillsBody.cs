@@ -19,6 +19,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
+using osu.Game.Rulesets;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.LocalProfile
@@ -50,10 +51,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
         [Resolved]
         private EzSkillProvider skillProvider { get; set; } = null!;
 
-        public EzLocalProfileTrackSkillsBody(
-            string username,
-            Bindable<EzLocalProfileDrillScoreRow?>? selectDrillScore = null,
-            IReadOnlyList<EzLocalProfileDrillScoreRow>? preloadedDrillScores = null)
+        [Resolved]
+        private RulesetStore rulesets { get; set; } = null!;
+
+        public EzLocalProfileTrackSkillsBody(string username,
+                                             Bindable<EzLocalProfileDrillScoreRow?>? selectDrillScore = null,
+                                             IReadOnlyList<EzLocalProfileDrillScoreRow>? preloadedDrillScores = null)
         {
             this.username = username;
             this.selectDrillScore = selectDrillScore;
@@ -100,26 +103,26 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                     RelativeSizeAxes = Axes.X,
                                     AutoSizeAxes = Axes.Y,
                                 },
+                                danPanel = new EzHUDDanDualPanel
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                },
+                                emptyHint = new OsuSpriteText
+                                {
+                                    RelativeSizeAxes = Axes.X,
+                                    Font = OsuFont.GetFont(size: 14),
+                                    Alpha = 0,
+                                },
                             },
                         },
                         radarSlot = new Container
                         {
-                            Anchor = Anchor.CentreRight,
-                            Origin = Anchor.CentreRight,
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
                             RelativeSizeAxes = Axes.Both,
                             Width = 0.58f,
                         },
                     },
-                },
-                emptyHint = new OsuSpriteText
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Font = OsuFont.GetFont(size: 14),
-                    Alpha = 0,
-                },
-                danPanel = new EzHUDDanDualPanel
-                {
-                    RelativeSizeAxes = Axes.X,
                 },
                 danClearsPanel = new EzLocalProfileDanClearsPanel(
                     username,
@@ -394,14 +397,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
             foreach (var play in plays)
             {
                 var drill = findDrillRow(play.BeatmapHash);
-                string title = formatPlayTitle(drill);
+                string highlight = play.AxisValue.ToString("0.00", CultureInfo.InvariantCulture);
 
-                list.Add(new EzEvidenceScoreRow(
-                    title,
-                    EzEvidenceScoreRow.FormatAxisMeta(play.AxisValue, play.Accuracy, play.Rate, play.ScoredAt),
-                    drill != null && selectDrillScore != null
-                        ? () => selectDrillScore.Value = drill
-                        : null));
+                if (drill != null)
+                {
+                    list.Add(new EzLocalProfileScoreNarrowCard(
+                        drill,
+                        EzLocalProfileDrillMods.Resolve(drill, rulesets),
+                        selectDrillScore != null ? () => selectDrillScore.Value = drill : null,
+                        highlightValue: highlight));
+                }
+                else
+                {
+                    list.Add(new EzEvidenceScoreRow(
+                        formatPlayTitle(null),
+                        EzEvidenceScoreRow.FormatAxisMeta(play.AxisValue, play.Accuracy, play.Rate, play.ScoredAt)));
+                }
             }
 
             return new EzLocalProfileChartCard(
