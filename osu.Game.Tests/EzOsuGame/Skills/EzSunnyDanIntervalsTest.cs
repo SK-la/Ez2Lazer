@@ -99,31 +99,28 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void RateMergeKeepsSunnyLabelsAndUpdatesMsd()
+        public void LiveXxyFeedsSunnyLabelsUnderConvertedKeys()
         {
-            var baseline = new EzPersistedChartDan
+            var msd = new Dictionary<string, double>
             {
-                BeatmapHash = "h",
-                RcRawDan = 6.8,
-                RcLabel = "7-",
-                OverallMsd = 18,
-                KeyCount = 6,
-            };
-            var live = new EzPersistedChartDan
-            {
-                BeatmapHash = "h",
-                RcRawDan = 14,
-                RcLabel = "finish",
-                OverallMsd = 24,
-                KeyCount = 6,
-                HoldRatio = 0.2,
+                [EzMinaSkillAxis.Overall.ToMsdSkillId()] = 20.5,
+                [EzMinaSkillAxis.Technical.ToMsdSkillId()] = 22.0,
             };
 
-            var merged = EzPersistedChartDan.MergeKeepSunnyLabelsUpdateMsd(baseline, live);
-            Assert.That(merged.RcLabel, Is.EqualTo("7-"));
-            Assert.That(merged.RcRawDan, Is.EqualTo(6.8).Within(0.001));
-            Assert.That(merged.OverallMsd, Is.EqualTo(24).Within(0.001));
-            Assert.That(merged.HoldRatio, Is.EqualTo(0.2).Within(0.001));
+            var live = EzPersistedChartDan.TryComputeFromStored(
+                "hash",
+                Guid.NewGuid(),
+                msd,
+                keyCount: 6,
+                holdRatio: 0.1,
+                xxySr: 7.03,
+                chartInfo: null,
+                holdCount: 0,
+                allowMsdHeuristicLabels: false);
+
+            Assert.That(live, Is.Not.Null);
+            Assert.That(live!.RcLabel, Is.EqualTo("7-"));
+            Assert.That(live.RcRawDan, Is.EqualTo(6.8).Within(0.001));
         }
 
         [Test]

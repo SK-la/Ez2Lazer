@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
@@ -45,8 +46,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             "azimuth", "zenith", "stellium", "terra", "celestial", "mystery", "nihility", "finish"
         };
 
-        private static readonly object level_maps_gate = new();
-        private static readonly Dictionary<(int KeyCount, string Side), Dictionary<string, int>> level_maps = new();
+        private static readonly Lock level_maps_gate = new Lock();
+        private static readonly Dictionary<(int KeyCount, string Side), Dictionary<string, int>> level_maps = new Dictionary<(int KeyCount, string Side), Dictionary<string, int>>();
 
         public static bool SupportsKeyCount(int keyCount)
         {
@@ -253,6 +254,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
             // e.g. "Something LN 3" → keep trailing portion after " LN ".
             int firstSpace = s.IndexOf(' ');
+
             if (firstSpace > 0)
             {
                 int lnIdx = s.IndexOf(" LN ", StringComparison.OrdinalIgnoreCase);

@@ -588,10 +588,10 @@ namespace osu.Game.EzOsuGame.Skills
 
             if (chartInfo != null && csKeys > 0 && snap.KeyCount == csKeys)
             {
-                double? xxySr = null;
-
-                if (EzModRate.CanUsePersistedXxy(mods) && beatmapInfo.XxyStarRating >= 0)
-                    xxySr = beatmapInfo.XxyStarRating;
+                double? xxySr = snap.XxySr
+                                ?? (EzModRate.CanUsePersistedXxy(mods) && beatmapInfo.XxyStarRating >= 0
+                                    ? beatmapInfo.XxyStarRating
+                                    : null);
 
                 var stamped = EzPersistedChartDan.TryComputeFromStored(
                     beatmapInfo.Hash,
@@ -613,6 +613,7 @@ namespace osu.Game.EzOsuGame.Skills
                         KeyCount = snap.KeyCount,
                         HoldRatio = snap.HoldRatio,
                         HoldCount = snap.HoldCount,
+                        XxySr = xxySr,
                         IsLiveFromMods = true,
                     };
                 }

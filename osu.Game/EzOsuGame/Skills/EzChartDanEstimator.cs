@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.EzOsuGame.Analysis;
@@ -138,14 +139,20 @@ namespace osu.Game.EzOsuGame.Skills
             double holdRatio = ComputeHoldRatio(playable);
             int holdCount = ComputeHoldCount(playable);
 
-            // Nomod (no rate / key convert): keep Sunny via persisted xxy — same as Realm ChartDan.
+            // Same live xxy as song-select analysis panel (playable + rate/key mods). Fallback to Realm nomod xxy only when usable.
             double? xxySr = null;
 
-            if (EzModRate.CanUsePersistedXxy(localMods) && beatmapInfo.XxyStarRating >= 0)
+            if (EzAnalysisComputation.TryComputeXxySrFromPlayable(playable, beatmapInfo.Ruleset, localMods, CancellationToken.None, out double liveXxy)
+                && liveXxy > 0)
+            {
+                xxySr = liveXxy;
+            }
+            else if (EzModRate.CanUsePersistedXxy(localMods) && beatmapInfo.XxyStarRating >= 0)
+            {
                 xxySr = beatmapInfo.XxyStarRating;
+            }
 
-            // Without Sunny, MSD→SrToRawDan uses reform (~12) means on Mina Overall (~20) → 6/7K finish/stellium.
-            // Live DualPanel must not invent those badges; persist/backfill may still use the heuristic.
+            // Without Sunny/xxy, MSD→SrToRawDan invents finish/stellium — never for live DualPanel.
             var chartDan = EzPersistedChartDan.TryComputeFromStored(
                 beatmapInfo.Hash,
                 beatmapInfo.ID,
@@ -164,6 +171,7 @@ namespace osu.Game.EzOsuGame.Skills
                 KeyCount = keyCount,
                 HoldRatio = holdRatio,
                 HoldCount = holdCount,
+                XxySr = xxySr,
                 IsLiveFromMods = true,
             };
         }

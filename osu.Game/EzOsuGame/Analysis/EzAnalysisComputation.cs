@@ -54,6 +54,38 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
+        /// Same xxy path as song-select analysis panel, but reuses an already-built playable
+        /// (e.g. live ChartDan after key/rate mods). Does not write Realm.
+        /// </summary>
+        public static bool TryComputeXxySrFromPlayable(
+            IBeatmap playable,
+            IRulesetInfo ruleset,
+            IReadOnlyList<Mod> mods,
+            CancellationToken cancellationToken,
+            out double xxySr)
+        {
+            xxySr = 0;
+
+            if (!EzXxyStarRatingSupport.SupportsBeatmap(playable, ruleset))
+                return false;
+
+            if (playable.HitObjects.Count == 0)
+                return true;
+
+            double rate = getRateAdjustMultiplier(mods);
+
+            if (!EzAnalysisProviderBridge.TryGetValue(ruleset, new EzAnalysisRequest(playable, rate), EzAnalysisFields.XXY_SR, cancellationToken, out double sr)
+                || !double.IsFinite(sr)
+                || sr < 0)
+            {
+                return false;
+            }
+
+            xxySr = sr;
+            return true;
+        }
+
+        /// <summary>
         /// Computes baseline NoMod xxy SR for persisting to <see cref="BeatmapInfo.XxyStarRating"/>.
         /// Returns -1 when unsupported or failed, 0 for empty beatmaps.
         /// </summary>
@@ -185,13 +217,13 @@ namespace osu.Game.EzOsuGame.Analysis
                 cancellationToken, out radarResult);
         }
 
-        private static double getRateAdjustMultiplier(Mod[] mods)
+        private static double getRateAdjustMultiplier(IReadOnlyList<Mod> mods)
         {
             try
             {
                 double rate = 1.0;
 
-                for (int i = 0; i < mods.Length; i++)
+                for (int i = 0; i < mods.Count; i++)
                 {
                     if (mods[i] is IApplicableToRate applicableToRate)
                         rate = applicableToRate.ApplyToRate(0, rate);

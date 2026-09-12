@@ -278,18 +278,15 @@ namespace osu.Game.EzOsuGame.HUD
 
             applyPanelContent(keys, user, hasUser, wantChart, wantPlayer, chartSkillsetLabelsRc, chartSkillsetLabelsLn, persistedChartDan);
 
-            // Live recompute (xxySR rhythm). ChartDan overlay:
-            // - key convert → live keys + MSD Rating; dan badges only if Sunny available for that key
-            // - rate (DT/HT) → keep Realm Sunny badges; refresh Overall MSD
+            // Live recompute (same rhythm as analysis-panel xxy): MSD + ChartDan from playable.
+            // - key/rate mods → full live ChartDan (Sunny via live xxy when available)
             // - nomod → merge: keep Realm Sunny halves; only fill missing LN/RC
             if (!wantChart || beatmap?.Value.BeatmapInfo == null || skillProvider == null)
                 return;
 
             var beatmapInfo = beatmap.Value.BeatmapInfo;
             var baselineChartDan = persistedChartDan;
-            bool keyConvert = EzModRate.ChangesPlayableKeys(localMods);
-            bool rateAffects = EzModRate.AffectsChartSkills(localMods) && !keyConvert;
-            bool canSunny = EzModRate.CanUsePersistedXxy(localMods) && beatmapInfo.XxyStarRating >= 0;
+            bool modsAffect = EzModRate.AffectsChartSkills(localMods);
             liveChartCancellation = new CancellationTokenSource();
             CancellationToken token = liveChartCancellation.Token;
             var provider = skillProvider;
@@ -312,23 +309,18 @@ namespace osu.Game.EzOsuGame.HUD
 
                         EzPersistedChartDan? displayDan = snap.ChartDan;
 
-                        if (keyConvert)
+                        if (modsAffect)
                         {
-                            // Live snapshot already strips MSD-heuristic badges when no Sunny.
-                            // Unsupported keys (e.g. 8K Mina): ChartDan null — still apply live keys + MSD if present.
+                            // Live Sunny from playable xxy; if xxy unavailable, labels stay empty (no MSD stellium).
                             if (displayDan == null && snap.Msd.Count == 0 && snap.KeyCount <= 0)
                                 return;
                         }
-                        else if (rateAffects && baselineChartDan != null && displayDan != null)
-                        {
-                            displayDan = EzPersistedChartDan.MergeKeepSunnyLabelsUpdateMsd(baselineChartDan, displayDan);
-                        }
                         else if (baselineChartDan != null && displayDan != null)
                         {
-                            // Nomod with baseline: merge missing halves only.
                             displayDan = EzPersistedChartDan.MergeNomodBaselineWithLive(baselineChartDan, displayDan);
 
-                            if (!canSunny
+                            // Without live/persisted xxy, do not take MSD-heuristic LN into the overlay.
+                            if (snap.XxySr is null
                                 && !baselineChartDan.HasSide(EzDanSide.Ln)
                                 && snap.ChartDan!.HasSide(EzDanSide.Ln))
                             {

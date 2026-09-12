@@ -7,7 +7,7 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Song-select display snapshot for chart MSD / ChartDan.
-    /// Realm baseline when <see cref="IsLiveFromMods"/> is false; temporary mod-aware compute otherwise (never written to Realm).
+    /// Temporary mod-aware compute for the selected chart (never written to Realm).
     /// </summary>
     public sealed class EzLiveChartSkillSnapshot
     {
@@ -21,6 +21,9 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>Playable hold object count used for the LN ChartDan gate.</summary>
         public int HoldCount { get; init; } = -1;
+
+        /// <summary>Live xxySR from playable + mods (same path as analysis panel), when available.</summary>
+        public double? XxySr { get; init; }
 
         /// <summary>True when built from playable (selected-chart live overlay; not Realm).</summary>
         public bool IsLiveFromMods { get; init; }

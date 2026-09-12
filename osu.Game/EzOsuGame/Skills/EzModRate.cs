@@ -61,7 +61,7 @@ namespace osu.Game.EzOsuGame.Skills
             return mods.Any(static m => m is IApplicableToBeatmapConverter or IApplicableAfterBeatmapConversion);
         }
 
-        /// <summary>Whether BeatmapInfo.XxyStarRating may feed Sunny ChartDan for this mod set.</summary>
+        /// <summary>Whether BeatmapInfo.XxyStarRating (nomod baseline) may be reused without live recompute.</summary>
         public static bool CanUsePersistedXxy(IEnumerable<Mod>? mods)
             => IsNomodRate(Resolve(mods)) && !ChangesPlayableKeys(mods);
     }

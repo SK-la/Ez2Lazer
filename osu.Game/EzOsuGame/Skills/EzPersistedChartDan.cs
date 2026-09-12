@@ -85,29 +85,6 @@ namespace osu.Game.EzOsuGame.Skills
             };
         }
 
-        /// <summary>
-        /// Rate (DT/HT) DualPanel overlay: keep Sunny RC/LN labels from baseline; refresh Overall MSD / hold from live.
-        /// </summary>
-        public static EzPersistedChartDan MergeKeepSunnyLabelsUpdateMsd(EzPersistedChartDan baseline, EzPersistedChartDan live)
-        {
-            return new EzPersistedChartDan
-            {
-                BeatmapHash = baseline.BeatmapHash,
-                BeatmapId = baseline.BeatmapId,
-                AlgorithmVersion = baseline.AlgorithmVersion,
-                KeyCount = baseline.KeyCount > 0 ? baseline.KeyCount : live.KeyCount,
-                HoldRatio = live.HoldRatio > 0 ? live.HoldRatio : baseline.HoldRatio,
-                OverallMsd = live.OverallMsd > 0 ? live.OverallMsd : baseline.OverallMsd,
-                RcRawDan = baseline.RcRawDan,
-                RcLabel = baseline.RcLabel,
-                RcSkillsetLabels = baseline.RcSkillsetLabels,
-                LnRawDan = baseline.LnRawDan,
-                LnLabel = baseline.LnLabel,
-                LnSkillsetLabels = baseline.LnSkillsetLabels,
-                ComputedAt = DateTimeOffset.UtcNow,
-            };
-        }
-
         public EzChartDanVerdict? ToVerdict(EzDanSide side)
         {
             string? label = LabelFor(side);
