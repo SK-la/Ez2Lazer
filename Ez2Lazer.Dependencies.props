@@ -21,5 +21,6 @@
 
     <!-- Resources 包含 Crowdin 的 tg-TJ；SDK 会规范为 tg-Cyrl-TJ 并告警，忽略即可。 -->
     <NoWarn>$(NoWarn);NETSDK1187</NoWarn>
+    <NoWarn>CS1573</NoWarn>
   </PropertyGroup>
 </Project>

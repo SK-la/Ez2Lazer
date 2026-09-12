@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Overlays;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.Overlays
