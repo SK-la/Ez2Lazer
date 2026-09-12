@@ -1227,6 +1227,9 @@ namespace osu.Game.Database
 
                     double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
 
+                    // Same Realm int as song-select ln> (EndTimeObjectCount) — no MSD hold_count / GetPlayable.
+                    int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmap);
+
                     var persisted = EzPersistedChartDan.TryComputeFromStored(
                         hash,
                         beatmap.ID,
@@ -1234,7 +1237,8 @@ namespace osu.Game.Database
                         keyCount,
                         holdRatio,
                         xxySr,
-                        chartInfo);
+                        chartInfo,
+                        holdCount);
 
                     if (persisted == null)
                     {

@@ -58,6 +58,33 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyDictionary<string, string> SkillsetLabelsFor(EzDanSide side)
             => side == EzDanSide.Ln ? LnSkillsetLabels : RcSkillsetLabels;
 
+        /// <summary>
+        /// Nomod DualPanel overlay: keep baseline Sunny RC/LN when present; only take missing halves from <paramref name="live"/>.
+        /// Avoids MSD <c>SrToRawDan</c> clamping to stellium (star badge) overwriting good Realm labels.
+        /// </summary>
+        public static EzPersistedChartDan MergeNomodBaselineWithLive(EzPersistedChartDan baseline, EzPersistedChartDan live)
+        {
+            bool keepRc = baseline.HasSide(EzDanSide.Rc);
+            bool keepLn = baseline.HasSide(EzDanSide.Ln);
+
+            return new EzPersistedChartDan
+            {
+                BeatmapHash = baseline.BeatmapHash,
+                BeatmapId = baseline.BeatmapId,
+                AlgorithmVersion = baseline.AlgorithmVersion,
+                KeyCount = baseline.KeyCount > 0 ? baseline.KeyCount : live.KeyCount,
+                HoldRatio = live.HoldRatio > 0 ? live.HoldRatio : baseline.HoldRatio,
+                OverallMsd = baseline.OverallMsd > 0 ? baseline.OverallMsd : live.OverallMsd,
+                RcRawDan = keepRc ? baseline.RcRawDan : live.RcRawDan,
+                RcLabel = keepRc ? baseline.RcLabel : live.RcLabel,
+                RcSkillsetLabels = keepRc ? baseline.RcSkillsetLabels : live.RcSkillsetLabels,
+                LnRawDan = keepLn ? baseline.LnRawDan : live.LnRawDan,
+                LnLabel = keepLn ? baseline.LnLabel : live.LnLabel,
+                LnSkillsetLabels = keepLn ? baseline.LnSkillsetLabels : live.LnSkillsetLabels,
+                ComputedAt = DateTimeOffset.UtcNow,
+            };
+        }
+
         public EzChartDanVerdict? ToVerdict(EzDanSide side)
         {
             string? label = LabelFor(side);
@@ -80,7 +107,10 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Build nomod persisted chart dan from stored MSD (+ optional CSI / xxy). No playable / Mina / LeoBlack.
+        /// RC and LN halves may both be written (Ez DualPanel). LN when
+        /// <see cref="EzDanAlgorithm.AllowsPersistedChartLnHalf"/>; RC always attempted.
         /// </summary>
+        /// <param name="holdCount">Column hold objects; pass &lt; 0 when unknown (ratio-only LN gate).</param>
         public static EzPersistedChartDan? TryComputeFromStored(
             string beatmapHash,
             Guid beatmapId,
@@ -88,7 +118,8 @@ namespace osu.Game.EzOsuGame.Skills
             int keyCount,
             double holdRatio,
             double? xxySr,
-            EzChartSkillInfo? chartInfo)
+            EzChartSkillInfo? chartInfo,
+            int holdCount = -1)
         {
             if (string.IsNullOrEmpty(beatmapHash) || keyCount <= 0 || msd.Count == 0)
                 return null;
@@ -98,6 +129,7 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
 
             double? lengthSeconds = chartInfo?.LengthSeconds;
+            var dominantAxis = primary.DominantAxis;
 
             double rcRaw = -1;
             string rcLabel = string.Empty;
@@ -108,8 +140,11 @@ namespace osu.Game.EzOsuGame.Skills
 
             foreach (EzDanSide side in new[] { EzDanSide.Rc, EzDanSide.Ln })
             {
-                if (!EzDanAlgorithm.AllowsChartSideHalf(side, keyCount, holdRatio))
+                if (side == EzDanSide.Ln
+                    && !EzDanAlgorithm.AllowsPersistedChartLnHalf(keyCount, holdRatio, holdCount))
+                {
                     continue;
+                }
 
                 double rawDan = -1;
                 string? aggregateLabel = null;
@@ -126,6 +161,12 @@ namespace osu.Game.EzOsuGame.Skills
                 {
                     rawDan = primary.RawDan;
                     aggregateLabel = primary.Label;
+                }
+                else if (primary.OverallMsd > 0 && double.IsFinite(primary.OverallMsd))
+                {
+                    // Other side: same MSD overall on that side's ladder (Ez dual halves).
+                    rawDan = EzDanLabels.SrToRawDan(primary.OverallMsd, dominantAxis);
+                    aggregateLabel = EzDanLadders.For(keyCount, side).ParseLabel(rawDan);
                 }
 
                 if (string.IsNullOrEmpty(aggregateLabel) || rawDan < 0)
@@ -176,8 +217,8 @@ namespace osu.Game.EzOsuGame.Skills
                 return string.Empty;
 
             return string.Join(ENTRY_SEPARATOR, labels
-                .Where(static kvp => !string.IsNullOrEmpty(kvp.Key) && !string.IsNullOrEmpty(kvp.Value))
-                .Select(static kvp => kvp.Key + FIELD_SEPARATOR + kvp.Value));
+                                                .Where(static kvp => !string.IsNullOrEmpty(kvp.Key) && !string.IsNullOrEmpty(kvp.Value))
+                                                .Select(static kvp => kvp.Key + FIELD_SEPARATOR + kvp.Value));
         }
 
         public static IReadOnlyDictionary<string, string> ParseSkillsetLabels(string? joined)

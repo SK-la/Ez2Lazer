@@ -102,6 +102,10 @@ namespace osu.Game.EzOsuGame.Skills
             }
 
             double holdRatio = EzChartDanEstimator.ComputeHoldRatio(playable);
+            int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmapInfo);
+            if (holdCount < 0)
+                holdCount = EzChartDanEstimator.ComputeHoldCount(playable);
+
             skillStore.WriteBeatmapMsd(beatmapInfo.Hash, vector, beatmapInfo.ID, holdRatio: holdRatio);
 
             // Return the just-written values without a second Realm round-trip.
@@ -116,7 +120,7 @@ namespace osu.Game.EzOsuGame.Skills
             // Same as xxy import hot-write: when MSD lands, persist ChartDan so select can read Realm.
             // Skipped when BDSP will run ChartDan after CSI in the same job (stamp-complete rows).
             if (!SuppressChartDanSideUpsert)
-                tryUpsertChartDanFromMsd(beatmapInfo, result, keyCount, holdRatio);
+                tryUpsertChartDanFromMsd(beatmapInfo, result, keyCount, holdRatio, holdCount);
 
             return result;
         }
@@ -125,7 +129,8 @@ namespace osu.Game.EzOsuGame.Skills
             BeatmapInfo beatmapInfo,
             IReadOnlyDictionary<string, double> msd,
             int keyCount,
-            double holdRatio)
+            double holdRatio,
+            int holdCount)
         {
             try
             {
@@ -141,7 +146,8 @@ namespace osu.Game.EzOsuGame.Skills
                     keyCount > 0 ? keyCount : 4,
                     holdRatio,
                     xxySr,
-                    chartInfo);
+                    chartInfo,
+                    holdCount);
 
                 if (persisted != null)
                     skillStore.UpsertChartDan(persisted);

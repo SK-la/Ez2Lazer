@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -29,5 +30,39 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         public static bool IsNomodRate(float rate) => Math.Abs(rate - 1f) < 0.001f;
+
+        /// <summary>
+        /// Mods that change playable layout, rate, or difficulty — song-select Skill radar / DualPanel
+        /// should live-recompute chart MSD/ChartDan (same idea as xxySR analysis).
+        /// </summary>
+        public static bool AffectsChartSkills(IEnumerable<Mod>? mods)
+        {
+            if (mods == null)
+                return false;
+
+            return mods.Any(AffectsChartSkills);
+        }
+
+        public static bool AffectsChartSkills(Mod mod)
+            => mod is IApplicableToRate
+                      or IApplicableToBeatmapConverter
+                      or IApplicableAfterBeatmapConversion
+                      or IApplicableToDifficulty
+                      or IApplicableToBeatmapProcessor
+                      or IApplicableToHitObject
+                      or IApplicableToBeatmap;
+
+        /// <summary>Key-conversion / post-convert mods — persisted xxySR must not be reused.</summary>
+        public static bool ChangesPlayableKeys(IEnumerable<Mod>? mods)
+        {
+            if (mods == null)
+                return false;
+
+            return mods.Any(static m => m is IApplicableToBeatmapConverter or IApplicableAfterBeatmapConversion);
+        }
+
+        /// <summary>Whether BeatmapInfo.XxyStarRating may feed Sunny ChartDan for this mod set.</summary>
+        public static bool CanUsePersistedXxy(IEnumerable<Mod>? mods)
+            => IsNomodRate(Resolve(mods)) && !ChangesPlayableKeys(mods);
     }
 }

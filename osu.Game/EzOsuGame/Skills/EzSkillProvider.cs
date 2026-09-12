@@ -455,13 +455,21 @@ namespace osu.Game.EzOsuGame.Skills
             if (holdRatio <= 0 && chartVerdict != null && double.IsFinite(chartVerdict.HoldRatio))
                 holdRatio = Math.Clamp(chartVerdict.HoldRatio, 0, 1);
 
-            if (!EzDanAlgorithm.AllowsChartSideHalf(side, keyCount, holdRatio))
+            int holdCount = playable != null
+                ? EzChartDanEstimator.ComputeHoldCount(playable)
+                : EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmapInfo);
+
+            if (side == EzDanSide.Ln
+                && !EzDanAlgorithm.AllowsPersistedChartLnHalf(keyCount, holdRatio, holdCount))
+            {
                 return result;
+            }
 
             // Same priority as DualPanel headline: Sunny/xxy first, then chart verdict label.
             string? aggregateLabel = null;
             double xxy = beatmapInfo.XxyStarRating;
 
+            // Prefer Sunny for the requested side; primary-side verdict only when sides match.
             if (xxy >= 0 && double.IsFinite(xxy)
                          && EzSunnyDanIntervals.TryLookup(keyCount, side.ToId(), xxy, out var sunny)
                          && !string.IsNullOrEmpty(sunny.DisplayLabel))
@@ -471,6 +479,13 @@ namespace osu.Game.EzOsuGame.Skills
             else if (chartVerdict != null && chartVerdict.Side == side && !string.IsNullOrEmpty(chartVerdict.Label))
             {
                 aggregateLabel = chartVerdict.Label;
+            }
+            else if (chartVerdict != null
+                     && chartVerdict.OverallMsd > 0
+                     && double.IsFinite(chartVerdict.OverallMsd))
+            {
+                double raw = EzDanLabels.SrToRawDan(chartVerdict.OverallMsd, chartVerdict.DominantAxis);
+                aggregateLabel = EzDanLadders.For(keyCount, side).ParseLabel(raw);
             }
 
             if (string.IsNullOrEmpty(aggregateLabel))
@@ -488,10 +503,12 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Song-select / DualPanel chart dan for UI.
-        /// Order: Realm (updates session) → session memory → optional in-memory compute from MSD+CSI (no disk write).
+        /// Order: Realm → session → optional in-memory recompute from MSD+CSI (no disk write).
+        /// With <paramref name="allowMemoryCompute"/>, a Realm/session row that is missing an LN/RC half
+        /// the current gate would allow is replaced by a fresh memory compute (stale ChartDan after gate changes).
         /// </summary>
         /// <param name="allowMemoryCompute">
-        /// When true (DualPanel), miss may FromMsd+filing into <see cref="chartDanSessionCache"/> only.
+        /// When true (DualPanel), miss or incomplete halves may FromMsd+filing into <see cref="chartDanSessionCache"/> only.
         /// When false (carousel panel), never compute — Realm/session hit or empty.
         /// </param>
         public bool TryGetChartDanForUi(BeatmapInfo beatmapInfo, out EzPersistedChartDan? chartDan, bool allowMemoryCompute = false)
@@ -502,29 +519,105 @@ namespace osu.Game.EzOsuGame.Skills
 
             string hash = beatmapInfo.Hash;
 
+            EzPersistedChartDan? existing = null;
+
             if (store.TryGetChartDan(hash, out var fromRealm) && fromRealm != null)
+                existing = fromRealm;
+            else if (chartDanSessionCache.TryGetValue(hash, out var fromSession))
+                existing = fromSession;
+
+            if (allowMemoryCompute)
             {
-                chartDanSessionCache[hash] = fromRealm;
-                chartDan = fromRealm;
+                var computed = tryComputeChartDanMemoryOnly(beatmapInfo);
+
+                if (computed != null && shouldPreferMemoryChartDanForUi(existing, computed))
+                {
+                    chartDanSessionCache[hash] = computed;
+                    chartDan = computed;
+                    return true;
+                }
+            }
+
+            if (existing != null)
+            {
+                chartDanSessionCache[hash] = existing;
+                chartDan = existing;
                 return true;
             }
 
-            if (chartDanSessionCache.TryGetValue(hash, out var fromSession))
-            {
-                chartDan = fromSession;
+            return false;
+        }
+
+        /// <summary>
+        /// Prefer a memory recompute when it fills an LN/RC half that the cached row lacks
+        /// (e.g. ChartDan written under the old ratio-only LN gate).
+        /// </summary>
+        private static bool shouldPreferMemoryChartDanForUi(EzPersistedChartDan? existing, EzPersistedChartDan computed)
+        {
+            if (existing == null)
                 return true;
+
+            if (computed.HasSide(EzDanSide.Ln) && !existing.HasSide(EzDanSide.Ln))
+                return true;
+
+            if (computed.HasSide(EzDanSide.Rc) && !existing.HasSide(EzDanSide.Rc))
+                return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Temporary chart MSD + ChartDan from playable for the selected beatmap (xxySR-style live overlay).
+        /// Always computes — including empty mods. Never writes Realm.
+        /// </summary>
+        public EzLiveChartSkillSnapshot? TryComputeLiveChartSkills(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods)
+        {
+            if (chartDanEstimator == null || beatmapInfo.Ruleset.OnlineID != 3)
+                return null;
+
+            int csKeys = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
+            EzChartSkillInfo? chartInfo = null;
+
+            if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored is { IsUnavailable: false })
+                chartInfo = stored;
+
+            // First pass without CSI if we cannot know key match yet — compute then stamp.
+            var snap = chartDanEstimator.TryComputeLiveSnapshot(beatmapInfo, mods, chartInfo: null);
+            if (snap == null)
+                return null;
+
+            if (chartInfo != null && csKeys > 0 && snap.KeyCount == csKeys)
+            {
+                double? xxySr = null;
+
+                if (EzModRate.CanUsePersistedXxy(mods) && beatmapInfo.XxyStarRating >= 0)
+                    xxySr = beatmapInfo.XxyStarRating;
+
+                var stamped = EzPersistedChartDan.TryComputeFromStored(
+                    beatmapInfo.Hash,
+                    beatmapInfo.ID,
+                    snap.Msd,
+                    snap.KeyCount,
+                    snap.HoldRatio,
+                    xxySr,
+                    chartInfo,
+                    snap.HoldCount);
+
+                if (stamped != null)
+                {
+                    return new EzLiveChartSkillSnapshot
+                    {
+                        Msd = snap.Msd,
+                        ChartDan = stamped,
+                        KeyCount = snap.KeyCount,
+                        HoldRatio = snap.HoldRatio,
+                        HoldCount = snap.HoldCount,
+                        IsLiveFromMods = true,
+                    };
+                }
             }
 
-            if (!allowMemoryCompute)
-                return false;
-
-            var computed = tryComputeChartDanMemoryOnly(beatmapInfo);
-            if (computed == null)
-                return false;
-
-            chartDanSessionCache[hash] = computed;
-            chartDan = computed;
-            return true;
+            return snap;
         }
 
         /// <summary>Current-version Realm ChartDan row (nomod). Also warms session cache. Miss when absent or algorithm mismatch.</summary>
@@ -575,6 +668,8 @@ namespace osu.Game.EzOsuGame.Skills
 
             double? xxySr = beatmapInfo.XxyStarRating >= 0 ? beatmapInfo.XxyStarRating : null;
 
+            int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmapInfo);
+
             return EzPersistedChartDan.TryComputeFromStored(
                 beatmapInfo.Hash,
                 beatmapInfo.ID,
@@ -582,7 +677,8 @@ namespace osu.Game.EzOsuGame.Skills
                 keyCount,
                 holdRatio,
                 xxySr,
-                chartInfo);
+                chartInfo,
+                holdCount);
         }
 
         /// <summary>Backward-compatible overload: RC-side labels only.</summary>

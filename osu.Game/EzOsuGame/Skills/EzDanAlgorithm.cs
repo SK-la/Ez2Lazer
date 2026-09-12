@@ -31,22 +31,38 @@ namespace osu.Game.EzOsuGame.Skills
 
         public const double ROUNDING_EPSILON = 1e-9;
 
-        // --- Chart side classification by hold ratio ---
+        // --- Chart side classification by hold ratio (hub primary identity / player filing) ---
         public const double LN_PRIMARY_MIN_RATIO = 0.45;
         public const double LN_PRIMARY_7K_MIN_RATIO = 0.375;
+
+        /// <summary>Ez ChartDan LN half write gate (count OR hub ratio). Not hub exclusive primary.</summary>
+        public const int LN_CHART_MIN_HOLD_OBJECTS = 100;
 
         public static double LnPrimaryMinRatioFor(int keyCount)
             => keyCount == 7 ? LN_PRIMARY_7K_MIN_RATIO : LN_PRIMARY_MIN_RATIO;
 
         /// <summary>
-        /// Whether DualPanel / Sunny may print a chart aggregate for <paramref name="side"/>.
-        /// Matches primary identity: LN only when hold ratio reaches <see cref="LnPrimaryMinRatioFor"/>;
-        /// RC when below that line (or hold unknown — callers should pass 0 when missing).
+        /// Hub-style exclusive primary: LN only when hold ratio reaches <see cref="LnPrimaryMinRatioFor"/>;
+        /// RC when below that line. Used for player clear filing / CSI LN tag strip — not Ez DualPanel persist.
         /// </summary>
         public static bool AllowsChartSideHalf(EzDanSide side, int keyCount, double holdRatio)
         {
             bool lnPrimary = holdRatio >= LnPrimaryMinRatioFor(keyCount);
             return side == EzDanSide.Ln ? lnPrimary : !lnPrimary;
+        }
+
+        /// <summary>
+        /// Ez ChartDan / DualPanel LN half: write when hold count &gt; <see cref="LN_CHART_MIN_HOLD_OBJECTS"/>
+        /// or hold ratio reaches hub primary line. RC half is always eligible (callers skip this for RC).
+        /// Pass <paramref name="holdCount"/> &lt; 0 when unknown (ratio-only).
+        /// Prefer <see cref="EzChartDanEstimator.TryHoldCountFromBeatmapInfo"/> (same Realm ints as song-select <c>ln&gt;</c>).
+        /// </summary>
+        public static bool AllowsPersistedChartLnHalf(int keyCount, double holdRatio, int holdCount = -1)
+        {
+            if (holdCount > LN_CHART_MIN_HOLD_OBJECTS)
+                return true;
+
+            return holdRatio >= LnPrimaryMinRatioFor(keyCount);
         }
 
         public static double AccuracyBarFor(EzDanSide side, int keyCount)

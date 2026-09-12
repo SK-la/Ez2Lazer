@@ -401,7 +401,7 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             // Key locked to current beatmap CS (same-beatmap ChartDan only if CS missing).
-            // Never fall back to another keymode's player vectors.
+            // Live mods may override after async compute.
             int keyCount = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
 
             if (keyCount <= 0
@@ -413,7 +413,42 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             string? username = TargetUsername.Value;
+            IReadOnlyList<Mod> localMods = mods.Value;
 
+            // Instant: Realm MSD (xxy L1).
+            IReadOnlyDictionary<string, double> msd = skillProvider?.GetBeatmapMsd(beatmapInfo.Hash)
+                                                      ?? new Dictionary<string, double>();
+
+            applySkillRadarLayers(keyCount, username, msd);
+
+            // Always live-recompute selected chart MSD (xxySR analysis rhythm), including nomod.
+            if (skillProvider == null)
+                return;
+
+            var provider = skillProvider;
+            radarAnalysisCancellationSource = new CancellationTokenSource();
+            CancellationToken token = radarAnalysisCancellationSource.Token;
+
+            Task.Factory.StartNew(() => provider.TryComputeLiveChartSkills(beatmapInfo, localMods), token,
+                    TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, TaskScheduler.Default)
+                .ContinueWith(task =>
+                {
+                    Schedule(() =>
+                    {
+                        if (token.IsCancellationRequested)
+                            return;
+
+                        var snap = task.GetResultSafely();
+                        if (snap == null || snap.Msd.Count == 0)
+                            return;
+
+                        applySkillRadarLayers(snap.KeyCount > 0 ? snap.KeyCount : keyCount, TargetUsername.Value, snap.Msd);
+                    });
+                }, token);
+        }
+
+        private void applySkillRadarLayers(int keyCount, string? username, IReadOnlyDictionary<string, double> msd)
+        {
             // RC skill (6/7/8K): fixed pattern Meta axes — independent of whether the player has ratings.
             // LN skill radar axes are deferred (separate follow-up).
             if (keyCount > 0 && EzDanSkillsetFiling.UsesPatternSkillAxes(keyCount))
@@ -455,10 +490,6 @@ namespace osu.Game.EzOsuGame.HUD
             activeAxisLabels = axes.Select(skillAxisDisplayName).ToArray();
             activeAxisFormats = Enumerable.Repeat("0.00", axes.Length).ToArray();
 
-            // Read-only Realm MSD; miss stays empty until BDSP / Realm MSD maintenance.
-            IReadOnlyDictionary<string, double> msd = skillProvider?.GetBeatmapMsd(beatmapInfo.Hash)
-                                                      ?? new Dictionary<string, double>();
-
             IReadOnlyDictionary<string, double> ssr = new Dictionary<string, double>();
 
             if (!string.IsNullOrWhiteSpace(username) && keyCount > 0 && skillProvider != null)
@@ -471,7 +502,6 @@ namespace osu.Game.EzOsuGame.HUD
                 var axis = axes[i];
                 double beatmapValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
                 double playerValue = ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0);
-                // Hub skillModeEntries: hide sub-1 Mina noise (e.g. 6/7K Technical ~0.x).
                 if (playerValue < EzPatternRatings.DISPLAY_MIN)
                     playerValue = 0;
                 parameterValues[i] = (float)beatmapValue;

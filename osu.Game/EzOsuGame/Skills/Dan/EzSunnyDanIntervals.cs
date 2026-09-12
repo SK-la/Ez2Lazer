@@ -3,7 +3,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
+using System.Globalization;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
@@ -14,8 +14,6 @@ namespace osu.Game.EzOsuGame.Skills.Dan
     public static class EzSunnyDanIntervals
     {
         public readonly record struct LookupResult(string DisplayLabel, double RawDan, string IntervalName);
-
-        private static readonly Regex tier_pattern = new Regex(@"^(?<base>.+?) (?<tier>low|mid/low|mid/high|mid|high)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         private static readonly Dictionary<string, string?> tier_variants = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
@@ -35,11 +33,20 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             ["high"] = 0.4
         };
 
+        /// <summary>Longest-first so <c>mid/low</c> wins over <c>low</c>.</summary>
+        private static readonly string[] tier_suffixes_longest_first =
+        {
+            "mid/low", "mid/high", "low", "mid", "high"
+        };
+
         private static readonly string[] greek_tails =
         {
             "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa",
             "azimuth", "zenith", "stellium", "terra", "celestial", "mystery", "nihility", "finish"
         };
+
+        private static readonly object level_maps_gate = new();
+        private static readonly Dictionary<(int KeyCount, string Side), Dictionary<string, int>> level_maps = new();
 
         public static bool SupportsKeyCount(int keyCount)
         {
@@ -58,7 +65,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 return false;
 
             string intervalName = lookupIntervalName(xxySr, table);
-            if (!tryParseInterval(intervalName, table, out string displayLabel, out double rawDan))
+            if (!tryParseInterval(intervalName, keyCount, side, table, out string displayLabel, out double rawDan))
                 return false;
 
             result = new LookupResult(displayLabel, rawDan, intervalName);
@@ -94,7 +101,13 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             return table[0].Name;
         }
 
-        private static bool tryParseInterval(string text, (double Lower, double Upper, string Name)[] table, out string displayLabel, out double rawDan)
+        private static bool tryParseInterval(
+            string text,
+            int keyCount,
+            string side,
+            (double Lower, double Upper, string Name)[] table,
+            out string displayLabel,
+            out double rawDan)
         {
             displayLabel = string.Empty;
             rawDan = 0;
@@ -114,14 +127,10 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 body = body[2..].Trim();
             }
 
-            var match = tier_pattern.Match(body);
-            if (!match.Success)
+            if (!trySplitBaseAndTier(body, out string baseName, out string tier))
                 return false;
 
-            string baseName = match.Groups["base"].Value;
-            string tier = match.Groups["tier"].Value;
-
-            if (!tryResolveLevel(baseName, table, out int level))
+            if (!tryResolveLevel(keyCount, side, table, baseName, out int level))
                 return false;
 
             string bare = toBareLabel(baseName);
@@ -138,52 +147,135 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             return !string.IsNullOrEmpty(bare);
         }
 
-        private static bool tryResolveLevel(string baseName, (double Lower, double Upper, string Name)[] table, out int level)
+        /// <summary>
+        /// Split <c>Intro 1 mid/low</c> → base + tier without Regex.
+        /// Avoids <see cref="System.Text.RegularExpressions.RegexMatchTimeoutException"/> on the live ChartDan path
+        /// (table scans previously ran <c>tier_pattern.Match</c> per row).
+        /// </summary>
+        private static bool trySplitBaseAndTier(string body, out string baseName, out string tier)
         {
-            level = 0;
-            int lastNumeric = 0;
-            var seen = new HashSet<string>(StringComparer.Ordinal);
+            baseName = string.Empty;
+            tier = string.Empty;
 
-            foreach (var row in table)
+            foreach (string suffix in tier_suffixes_longest_first)
             {
-                var match = tier_pattern.Match(row.Name);
-                string baseOfRow = match.Success ? match.Groups["base"].Value : row.Name;
-                if (!seen.Add(baseOfRow))
+                string needle = " " + suffix;
+                if (!body.EndsWith(needle, StringComparison.Ordinal))
                     continue;
 
-                var numberMatch = Regex.Match(baseOfRow, @"(\d+)$");
-                if (numberMatch.Success)
-                    lastNumeric = int.Parse(numberMatch.Groups[1].Value);
-                else
-                    lastNumeric += 1;
+                baseName = body[..^needle.Length];
+                if (string.IsNullOrWhiteSpace(baseName))
+                    return false;
 
-                if (string.Equals(baseOfRow, baseName, StringComparison.Ordinal))
-                {
-                    level = lastNumeric;
-                    return true;
-                }
+                tier = suffix;
+                return true;
             }
 
             return false;
         }
 
+        private static bool tryResolveLevel(
+            int keyCount,
+            string side,
+            (double Lower, double Upper, string Name)[] table,
+            string baseName,
+            out int level)
+        {
+            return getOrBuildLevelMap(keyCount, side, table).TryGetValue(baseName, out level);
+        }
+
+        private static Dictionary<string, int> getOrBuildLevelMap(
+            int keyCount,
+            string side,
+            (double Lower, double Upper, string Name)[] table)
+        {
+            var key = (keyCount, side);
+
+            lock (level_maps_gate)
+            {
+                if (level_maps.TryGetValue(key, out var existing))
+                    return existing;
+            }
+
+            var built = new Dictionary<string, int>(StringComparer.Ordinal);
+            int lastNumeric = 0;
+
+            foreach (var row in table)
+            {
+                if (!trySplitBaseAndTier(row.Name, out string baseOfRow, out _))
+                    baseOfRow = row.Name;
+
+                if (built.ContainsKey(baseOfRow))
+                    continue;
+
+                if (tryParseTrailingNumber(baseOfRow, out int n))
+                    lastNumeric = n;
+                else
+                    lastNumeric += 1;
+
+                built[baseOfRow] = lastNumeric;
+            }
+
+            lock (level_maps_gate)
+            {
+                level_maps[key] = built;
+                return built;
+            }
+        }
+
+        private static bool tryParseTrailingNumber(string text, out int number)
+        {
+            number = 0;
+            int i = text.Length - 1;
+
+            if (i < 0 || !char.IsDigit(text[i]))
+                return false;
+
+            while (i >= 0 && char.IsDigit(text[i]))
+                i--;
+
+            // Require a boundary before digits when more text precedes (e.g. "Reform 10", not "Alpha10").
+            if (i >= 0 && text[i] != ' ')
+                return false;
+
+            return int.TryParse(text.AsSpan(i + 1), NumberStyles.None, CultureInfo.InvariantCulture, out number);
+        }
+
         /// <summary>Maps interval base names onto Ez ladder / texture bare ids.</summary>
         private static string toBareLabel(string baseName)
         {
-            string s = Regex.Replace(baseName, @"^(Regular|LN)\s+", string.Empty, RegexOptions.IgnoreCase);
-            s = Regex.Replace(s, @"^\S+\s+LN\s+", string.Empty, RegexOptions.IgnoreCase);
+            string s = baseName.Trim();
 
-            var reform = Regex.Match(s, @"^Reform\s+(\d+)$", RegexOptions.IgnoreCase);
-            if (reform.Success)
-                return reform.Groups[1].Value;
+            if (s.StartsWith("Regular ", StringComparison.OrdinalIgnoreCase))
+                s = s[8..].TrimStart();
+            else if (s.StartsWith("LN ", StringComparison.OrdinalIgnoreCase))
+                s = s[3..].TrimStart();
 
-            var intro = Regex.Match(s, @"^Intro\s+(\d+)$", RegexOptions.IgnoreCase);
-            if (intro.Success)
-                return $"intro{intro.Groups[1].Value}";
+            // e.g. "Something LN 3" → keep trailing portion after " LN ".
+            int firstSpace = s.IndexOf(' ');
+            if (firstSpace > 0)
+            {
+                int lnIdx = s.IndexOf(" LN ", StringComparison.OrdinalIgnoreCase);
+                if (lnIdx == firstSpace)
+                    s = s[(lnIdx + 4)..].TrimStart();
+            }
 
-            var regularNum = Regex.Match(s, @"^(\d+)$");
-            if (regularNum.Success)
-                return regularNum.Groups[1].Value;
+            if (s.StartsWith("Reform ", StringComparison.OrdinalIgnoreCase))
+            {
+                string rest = s[7..].TrimStart();
+                if (int.TryParse(rest, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+                    return rest;
+            }
+
+            if (s.StartsWith("Intro ", StringComparison.OrdinalIgnoreCase))
+            {
+                string rest = s[6..].TrimStart();
+                if (int.TryParse(rest, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+                    return $"intro{rest}";
+            }
+
+            if (int.TryParse(s, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+                return s;
 
             string lower = s.ToLowerInvariant();
 
