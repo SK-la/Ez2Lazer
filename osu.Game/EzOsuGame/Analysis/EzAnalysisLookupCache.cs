@@ -32,16 +32,20 @@ namespace osu.Game.EzOsuGame.Analysis
             ModsSignature = computeModsSignature(OrderedMods);
         }
 
-        private static int computeModsSignature(Mod[] orderedMods)
+        /// <summary>
+        /// Cheap mods signature for UI cache keys: same value as <see cref="ModsSignature"/>, but reads the
+        /// live mods directly instead of deep-cloning a storage snapshot. The clone exists to freeze what gets
+        /// persisted; a cache key only needs the type + setting values.
+        /// </summary>
+        public static int ComputeModsSignature(IEnumerable<Mod>? mods)
         {
-            unchecked
-            {
-                var hash = new HashCode();
+            var hash = new HashCode();
 
+            if (mods != null)
+            {
                 // 包含顺序。顺序对转换和游戏很重要。
-                for (int i = 0; i < orderedMods.Length; i++)
+                foreach (var mod in mods)
                 {
-                    var mod = orderedMods[i];
                     hash.Add(mod.GetType());
 
                     // 镜像 Mod.GetHashCode() 语义，但在计算签名后与 mod 实例变异解耦。
@@ -49,10 +53,13 @@ namespace osu.Game.EzOsuGame.Analysis
                     foreach (var setting in mod.SettingsBindables)
                         hash.Add(setting.GetUnderlyingSettingValue());
                 }
-
-                return hash.ToHashCode();
             }
+
+            return hash.ToHashCode();
         }
+
+        private static int computeModsSignature(Mod[] orderedMods)
+            => ComputeModsSignature(orderedMods);
 
         private static Mod[] createModSnapshot(IEnumerable<Mod>? mods)
         {

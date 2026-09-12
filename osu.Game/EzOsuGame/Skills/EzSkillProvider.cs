@@ -4,8 +4,12 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills.Dan;
@@ -38,6 +42,35 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         private readonly ConcurrentDictionary<string, EzPersistedChartDan> chartDanSessionCache
             = new ConcurrentDictionary<string, EzPersistedChartDan>(StringComparer.Ordinal);
+
+        private const int live_chart_skills_cache_limit = 128;
+
+        /// <summary>
+        /// Short-lived player SSR memo (see <see cref="GetPlayerSsrSnapshot"/>). Keyed by (username, keyCount).
+        /// </summary>
+        private readonly ConcurrentDictionary<(string Username, int KeyCount), SsrSnapshotMemo> ssrSnapshotMemo
+            = new ConcurrentDictionary<(string Username, int KeyCount), SsrSnapshotMemo>();
+
+        private readonly record struct SsrSnapshotMemo(EzPlayerSsrSnapshot Snapshot, long Timestamp);
+
+        /// <summary>Short-lived dan label/rating memo (see <see cref="GetDanDisplay"/>); plain values only.</summary>
+        private readonly ConcurrentDictionary<(string Username, int KeyCount, string Side), DanDisplayMemo> danDisplayMemo
+            = new ConcurrentDictionary<(string Username, int KeyCount, string Side), DanDisplayMemo>();
+
+        private readonly record struct DanDisplayMemo(string Label, double RawDan, long Timestamp);
+
+        private const double display_memo_seconds = 2;
+
+        /// <summary>
+        /// Session live-chart-skills dedupe. The value is the in-flight task (not a finished result) so that
+        /// surfaces which all kick on the same song switch (Skill radar + DualPanel) share one playable +
+        /// Mina/xxy + pattern pass instead of each racing an identical one. Keyed by inputs that determine
+        /// the result; keyCount is deliberately not part of it (it is derived from the playable, not an input).
+        /// </summary>
+        private readonly ConcurrentDictionary<EzLiveChartSkillsKey, Task<EzLiveChartSkillSnapshot?>> liveChartSkillsCache
+            = new ConcurrentDictionary<EzLiveChartSkillsKey, Task<EzLiveChartSkillSnapshot?>>();
+
+        private readonly record struct EzLiveChartSkillsKey(string BeatmapHash, int RulesetOnlineId, int ModsSignature);
 
         public EzSkillProvider(
             EzSkillStore store,
@@ -85,6 +118,25 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// Drop session live-chart-skills entries. Pass a hash after CSI heal / ChartDan upsert so a snapshot
+        /// stamped before the heal is not served as a cache hit; omit to clear everything.
+        /// </summary>
+        public void InvalidateLiveChartSkillsCache(string? beatmapHash = null)
+        {
+            if (string.IsNullOrEmpty(beatmapHash))
+            {
+                liveChartSkillsCache.Clear();
+                return;
+            }
+
+            foreach (var key in liveChartSkillsCache.Keys)
+            {
+                if (string.Equals(key.BeatmapHash, beatmapHash, StringComparison.Ordinal))
+                    liveChartSkillsCache.TryRemove(key, out _);
+            }
+        }
+
+        /// <summary>
         /// Chart dan from persisted MSD (+ Realm xxy when present). No MSD compute / no beatmap note load.
         /// Hold ratio uses MSD <c>hold_ratio</c> only (no analysis SQLite on this path).
         /// </summary>
@@ -120,7 +172,27 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyDictionary<string, double> GetPlayerSsr(string username, int keyCount)
             => GetPlayerSsrSnapshot(username, keyCount).Values;
 
+        /// <summary>
+        /// Player SSR snapshot with a short-lived memo. Song select re-reads this several times per switch
+        /// (once per bindable-driven DualPanel/radar refresh); the TTL collapses those into one Realm read.
+        /// Mirrors the other session caches here — a fresh compute becomes visible within the TTL at worst.
+        /// </summary>
         public EzPlayerSsrSnapshot GetPlayerSsrSnapshot(string username, int keyCount)
+        {
+            var key = (username, keyCount);
+
+            if (ssrSnapshotMemo.TryGetValue(key, out var memo)
+                && Stopwatch.GetElapsedTime(memo.Timestamp).TotalSeconds < display_memo_seconds)
+            {
+                return memo.Snapshot;
+            }
+
+            var snapshot = loadPlayerSsrSnapshot(username, keyCount);
+            ssrSnapshotMemo[key] = new SsrSnapshotMemo(snapshot, Stopwatch.GetTimestamp());
+            return snapshot;
+        }
+
+        private EzPlayerSsrSnapshot loadPlayerSsrSnapshot(string username, int keyCount)
         {
             var snapshot = store.GetPlayerSsrSnapshot(username, keyCount);
             if (snapshot.Values.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
@@ -128,6 +200,10 @@ namespace osu.Game.EzOsuGame.Skills
 
             return store.GetPlayerSsrSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
         }
+
+        /// <summary>Drop the SSR snapshot memo (after a recompute / write).</summary>
+        public void InvalidatePlayerSsrSnapshot()
+            => ssrSnapshotMemo.Clear();
 
         public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount)
         {
@@ -175,6 +251,34 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// Dan label + rating for DualPanel display, with a short-lived snapshot memo. The Realm row itself must
+        /// not outlive its transaction, so only the two plain values the caller renders are cached. Same TTL as
+        /// the SSR memo — a switch only needs to read this once instead of once per bindable-driven refresh.
+        /// </summary>
+        public (string Label, double RawDan) GetDanDisplay(string username, int keyCount, string side)
+        {
+            var key = (username, keyCount, side);
+
+            if (danDisplayMemo.TryGetValue(key, out var memo)
+                && Stopwatch.GetElapsedTime(memo.Timestamp).TotalSeconds < display_memo_seconds)
+            {
+                return (memo.Label, memo.RawDan);
+            }
+
+            var estimate = GetDan(username, keyCount, side);
+            var display = estimate != null
+                ? (estimate.Label, estimate.RawDan)
+                : (string.Empty, -1d);
+
+            danDisplayMemo[key] = new DanDisplayMemo(display.Item1, display.Item2, Stopwatch.GetTimestamp());
+            return display;
+        }
+
+        /// <summary>Drop the dan display memo (after a recompute / write).</summary>
+        public void InvalidateDanDisplay()
+            => danDisplayMemo.Clear();
+
+        /// <summary>
         /// Ordered DualPanel skillset slots for <paramref name="keyCount"/>×<paramref name="side"/> (hub table; may be empty).
         /// </summary>
         public IReadOnlyList<EzDanSkillsetSlot> GetDanSkillsetSlots(int keyCount, EzDanSide side)
@@ -213,6 +317,7 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 store.WriteDanSkillsetVerdicts(resolvedUser, keyCount, side, verdicts);
                 writeSideHeadline(resolvedUser, keyCount, EzDanSideExtensions.ParseOrRc(side), clears, verdicts);
+                InvalidateDanDisplay();
             }
 
             return verdicts;
@@ -277,6 +382,8 @@ namespace osu.Game.EzOsuGame.Skills
                     tick?.Invoke();
                 }
             }
+
+            InvalidateDanDisplay();
         }
 
         /// <summary>
@@ -570,10 +677,75 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>
         /// Temporary chart MSD + ChartDan from playable for the selected beatmap (xxySR-style live overlay).
         /// Always computes — including empty mods. Never writes Realm.
+        /// <para>
+        /// Session-deduped: the heavy pass (playable + Mina/xxy + pattern) is shared per
+        /// (beatmap, ruleset, mods) for the session, so the Skill radar and the DualPanel no longer each run an
+        /// identical compute on the same song switch. Prefer <see cref="GetOrComputeLiveChartSkillsAsync"/>;
+        /// this blocking overload exists for callers already on a background thread.
+        /// </para>
         /// </summary>
         public EzLiveChartSkillSnapshot? TryComputeLiveChartSkills(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods)
+            => GetOrComputeLiveChartSkillsAsync(beatmapInfo, mods, CancellationToken.None).GetAwaiter().GetResult();
+
+        /// <summary>
+        /// Asynchronous, session-deduped live chart skills. Concurrent callers for the same chart + mods await a
+        /// single in-flight compute; <paramref name="cancellationToken"/> only abandons this caller's wait (the
+        /// shared compute is owned by whichever caller created it, so cancelling one surface cannot tear down
+        /// work another is still waiting on).
+        /// </summary>
+        public async Task<EzLiveChartSkillSnapshot?> GetOrComputeLiveChartSkillsAsync(
+            BeatmapInfo beatmapInfo,
+            IReadOnlyList<Mod>? mods,
+            CancellationToken cancellationToken = default)
         {
             if (chartDanEstimator == null || beatmapInfo.Ruleset.OnlineID != 3)
+                return null;
+
+            var key = new EzLiveChartSkillsKey(beatmapInfo.Hash, beatmapInfo.Ruleset.OnlineID, EzAnalysisLookupCache.ComputeModsSignature(mods));
+
+            if (!liveChartSkillsCache.TryGetValue(key, out var task))
+            {
+                // The compute runs with the creator's token so a chart that is switched away from does not keep
+                // burning CPU; it never writes Realm, so an abandoned run is harmless.
+                var created = Task.Run(() => computeLiveChartSkills(beatmapInfo, mods, cancellationToken), CancellationToken.None);
+                task = liveChartSkillsCache.GetOrAdd(key, created);
+
+                if (ReferenceEquals(task, created))
+                {
+                    trimLiveChartSkillsCache();
+
+                    // A failed / cancelled compute must not be served as a cache hit later.
+                    // NotOnRanToCompletion covers both faults and cancellations (the OnlyOn* options are
+                    // mutually exclusive and cannot be OR-ed together). TryRemove(KeyValuePair) also only
+                    // drops the entry if it is still this exact task.
+                    _ = task.ContinueWith(
+                        completed =>
+                        {
+                            // Read the aggregate so an abandoned failure/cancellation is marked observed
+                            // instead of surfacing as UnobservedTaskException when no surface awaits it.
+                            _ = completed.Exception;
+
+                            liveChartSkillsCache.TryRemove(new KeyValuePair<EzLiveChartSkillsKey, Task<EzLiveChartSkillSnapshot?>>(key, task));
+                        },
+                        CancellationToken.None, TaskContinuationOptions.NotOnRanToCompletion, TaskScheduler.Default);
+                }
+            }
+
+            return await task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        private void trimLiveChartSkillsCache()
+        {
+            // Song select walks a very large number of charts; the cache only needs to cover the recent swing.
+            if (liveChartSkillsCache.Count > live_chart_skills_cache_limit)
+                liveChartSkillsCache.Clear();
+        }
+
+        private EzLiveChartSkillSnapshot? computeLiveChartSkills(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods, CancellationToken cancellationToken)
+        {
+            var estimator = chartDanEstimator;
+
+            if (estimator == null)
                 return null;
 
             int csKeys = (int)Math.Round(beatmapInfo.Difficulty.CircleSize);
@@ -583,7 +755,7 @@ namespace osu.Game.EzOsuGame.Skills
                 chartInfo = stored;
 
             // First pass without CSI if we cannot know key match yet — compute then stamp.
-            var snap = chartDanEstimator.TryComputeLiveSnapshot(beatmapInfo, mods, chartInfo: null);
+            var snap = estimator.TryComputeLiveSnapshot(beatmapInfo, mods, chartInfo: null, cancellationToken);
             if (snap == null)
                 return null;
 
@@ -754,6 +926,8 @@ namespace osu.Game.EzOsuGame.Skills
                 var info = EzChartSkillInfoComputer.Compute(input, msd.Count > 0 ? msd : null, rate: 1);
                 store.UpsertChartSkillInfo(beatmapInfo.Hash, info, beatmapInfo.ID);
                 chartSkillInfoSessionMisses.Remove(beatmapInfo.Hash);
+                // Stamped live snapshots built before this CSI existed must not be served as cache hits.
+                InvalidateLiveChartSkillsCache(beatmapInfo.Hash);
                 return info;
             }
             catch

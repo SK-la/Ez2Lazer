@@ -82,7 +82,8 @@ namespace osu.Game.EzOsuGame.Skills
         public EzLiveChartSkillSnapshot? TryComputeLiveSnapshot(
             BeatmapInfo beatmapInfo,
             IReadOnlyList<Mod>? mods = null,
-            EzChartSkillInfo? chartInfo = null)
+            EzChartSkillInfo? chartInfo = null,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
@@ -95,6 +96,8 @@ namespace osu.Game.EzOsuGame.Skills
 
             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
             var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
             if (keyCount <= 0)
@@ -130,6 +133,10 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 return null;
             }
+
+            // The Mina pass above is not interruptible; bail before the (also expensive) xxy/pattern work
+            // if the caller already moved on to another chart.
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (vector.Overall <= 0 && vector.Stream <= 0)
                 return null;
