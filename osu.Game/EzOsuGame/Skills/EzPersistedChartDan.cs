@@ -85,6 +85,29 @@ namespace osu.Game.EzOsuGame.Skills
             };
         }
 
+        /// <summary>
+        /// Rate (DT/HT) DualPanel overlay: keep Sunny RC/LN labels from baseline; refresh Overall MSD / hold from live.
+        /// </summary>
+        public static EzPersistedChartDan MergeKeepSunnyLabelsUpdateMsd(EzPersistedChartDan baseline, EzPersistedChartDan live)
+        {
+            return new EzPersistedChartDan
+            {
+                BeatmapHash = baseline.BeatmapHash,
+                BeatmapId = baseline.BeatmapId,
+                AlgorithmVersion = baseline.AlgorithmVersion,
+                KeyCount = baseline.KeyCount > 0 ? baseline.KeyCount : live.KeyCount,
+                HoldRatio = live.HoldRatio > 0 ? live.HoldRatio : baseline.HoldRatio,
+                OverallMsd = live.OverallMsd > 0 ? live.OverallMsd : baseline.OverallMsd,
+                RcRawDan = baseline.RcRawDan,
+                RcLabel = baseline.RcLabel,
+                RcSkillsetLabels = baseline.RcSkillsetLabels,
+                LnRawDan = baseline.LnRawDan,
+                LnLabel = baseline.LnLabel,
+                LnSkillsetLabels = baseline.LnSkillsetLabels,
+                ComputedAt = DateTimeOffset.UtcNow,
+            };
+        }
+
         public EzChartDanVerdict? ToVerdict(EzDanSide side)
         {
             string? label = LabelFor(side);
@@ -111,6 +134,10 @@ namespace osu.Game.EzOsuGame.Skills
         /// <see cref="EzDanAlgorithm.AllowsPersistedChartLnHalf"/>; RC always attempted.
         /// </summary>
         /// <param name="holdCount">Column hold objects; pass &lt; 0 when unknown (ratio-only LN gate).</param>
+        /// <param name="allowMsdHeuristicLabels">
+        /// When false and Sunny/xxy is unavailable, keep Overall MSD but leave RC/LN labels empty
+        /// (avoids live DualPanel stellium/finish from Mina Overall on reform means).
+        /// </param>
         public static EzPersistedChartDan? TryComputeFromStored(
             string beatmapHash,
             Guid beatmapId,
@@ -119,7 +146,8 @@ namespace osu.Game.EzOsuGame.Skills
             double holdRatio,
             double? xxySr,
             EzChartSkillInfo? chartInfo,
-            int holdCount = -1)
+            int holdCount = -1,
+            bool allowMsdHeuristicLabels = true)
         {
             if (string.IsNullOrEmpty(beatmapHash) || keyCount <= 0 || msd.Count == 0)
                 return null;
@@ -157,12 +185,12 @@ namespace osu.Game.EzOsuGame.Skills
                     rawDan = sunny.RawDan;
                     aggregateLabel = sunny.DisplayLabel;
                 }
-                else if (primary.Side == side && !string.IsNullOrEmpty(primary.Label))
+                else if (allowMsdHeuristicLabels && primary.Side == side && !string.IsNullOrEmpty(primary.Label))
                 {
                     rawDan = primary.RawDan;
                     aggregateLabel = primary.Label;
                 }
-                else if (primary.OverallMsd > 0 && double.IsFinite(primary.OverallMsd))
+                else if (allowMsdHeuristicLabels && primary.OverallMsd > 0 && double.IsFinite(primary.OverallMsd))
                 {
                     // Other side: same MSD overall on that side's ladder (Ez dual halves).
                     rawDan = EzDanLabels.SrToRawDan(primary.OverallMsd, dominantAxis);

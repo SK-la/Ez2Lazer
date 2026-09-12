@@ -601,7 +601,8 @@ namespace osu.Game.EzOsuGame.Skills
                     snap.HoldRatio,
                     xxySr,
                     chartInfo,
-                    snap.HoldCount);
+                    snap.HoldCount,
+                    allowMsdHeuristicLabels: xxySr != null);
 
                 if (stamped != null)
                 {

@@ -279,14 +279,16 @@ namespace osu.Game.EzOsuGame.HUD
             applyPanelContent(keys, user, hasUser, wantChart, wantPlayer, chartSkillsetLabelsRc, chartSkillsetLabelsLn, persistedChartDan);
 
             // Live recompute (xxySR rhythm). ChartDan overlay:
-            // - mods that change chart → full live replace
-            // - nomod → merge: keep Realm Sunny halves; only fill missing LN/RC (never wipe RC with MSD stellium)
+            // - key convert → live keys + MSD Rating; dan badges only if Sunny available for that key
+            // - rate (DT/HT) → keep Realm Sunny badges; refresh Overall MSD
+            // - nomod → merge: keep Realm Sunny halves; only fill missing LN/RC
             if (!wantChart || beatmap?.Value.BeatmapInfo == null || skillProvider == null)
                 return;
 
             var beatmapInfo = beatmap.Value.BeatmapInfo;
             var baselineChartDan = persistedChartDan;
-            bool modsAffect = EzModRate.AffectsChartSkills(localMods);
+            bool keyConvert = EzModRate.ChangesPlayableKeys(localMods);
+            bool rateAffects = EzModRate.AffectsChartSkills(localMods) && !keyConvert;
             bool canSunny = EzModRate.CanUsePersistedXxy(localMods) && beatmapInfo.XxyStarRating >= 0;
             liveChartCancellation = new CancellationTokenSource();
             CancellationToken token = liveChartCancellation.Token;
@@ -301,27 +303,35 @@ namespace osu.Game.EzOsuGame.HUD
                         if (token.IsCancellationRequested)
                             return;
 
-                        var snap = task.GetResultSafely();
-                        if (snap?.ChartDan == null)
+                        if (task.IsCanceled || task.IsFaulted)
                             return;
 
-                        EzPersistedChartDan displayDan;
+                        var snap = task.GetResultSafely();
+                        if (snap == null)
+                            return;
 
-                        if (modsAffect || baselineChartDan == null)
+                        EzPersistedChartDan? displayDan = snap.ChartDan;
+
+                        if (keyConvert)
                         {
-                            displayDan = snap.ChartDan;
+                            // Live snapshot already strips MSD-heuristic badges when no Sunny.
+                            // Unsupported keys (e.g. 8K Mina): ChartDan null — still apply live keys + MSD if present.
+                            if (displayDan == null && snap.Msd.Count == 0 && snap.KeyCount <= 0)
+                                return;
                         }
-                        else
+                        else if (rateAffects && baselineChartDan != null && displayDan != null)
+                        {
+                            displayDan = EzPersistedChartDan.MergeKeepSunnyLabelsUpdateMsd(baselineChartDan, displayDan);
+                        }
+                        else if (baselineChartDan != null && displayDan != null)
                         {
                             // Nomod with baseline: merge missing halves only.
-                            // Without xxy, live LN from MSD SrToRawDan is stellium-inflated — skip taking that LN.
-                            displayDan = EzPersistedChartDan.MergeNomodBaselineWithLive(baselineChartDan, snap.ChartDan);
+                            displayDan = EzPersistedChartDan.MergeNomodBaselineWithLive(baselineChartDan, displayDan);
 
                             if (!canSunny
                                 && !baselineChartDan.HasSide(EzDanSide.Ln)
-                                && snap.ChartDan.HasSide(EzDanSide.Ln))
+                                && snap.ChartDan!.HasSide(EzDanSide.Ln))
                             {
-                                // Revert LN take — leave empty rather than star badges / 虚高 LnRawDan.
                                 displayDan = new EzPersistedChartDan
                                 {
                                     BeatmapHash = displayDan.BeatmapHash,
@@ -344,10 +354,29 @@ namespace osu.Game.EzOsuGame.HUD
                                               || displayDan.HasSide(EzDanSide.Rc) && !baselineChartDan.HasSide(EzDanSide.Rc);
 
                             if (!filledHalf)
+                            {
+                                if (snap.Msd.Count == 0)
+                                    return;
+
+                                applyPanelContent(
+                                    KeyCount.Value > 0 ? KeyCount.Value : baselineChartDan.KeyCount,
+                                    TargetUsername.Value,
+                                    !string.IsNullOrWhiteSpace(TargetUsername.Value),
+                                    wantChart,
+                                    wantPlayer,
+                                    baselineChartDan.SkillsetLabelsFor(EzDanSide.Rc),
+                                    baselineChartDan.SkillsetLabelsFor(EzDanSide.Ln),
+                                    baselineChartDan,
+                                    snap.Msd);
                                 return;
+                            }
+                        }
+                        else if (displayDan == null)
+                        {
+                            return;
                         }
 
-                        int liveKeys = displayDan.KeyCount > 0
+                        int liveKeys = displayDan is { KeyCount: > 0 }
                             ? displayDan.KeyCount
                             : (snap.KeyCount > 0 ? snap.KeyCount : KeyCount.Value);
 
@@ -357,8 +386,8 @@ namespace osu.Game.EzOsuGame.HUD
                             !string.IsNullOrWhiteSpace(TargetUsername.Value),
                             wantChart,
                             wantPlayer,
-                            displayDan.SkillsetLabelsFor(EzDanSide.Rc),
-                            displayDan.SkillsetLabelsFor(EzDanSide.Ln),
+                            displayDan?.SkillsetLabelsFor(EzDanSide.Rc) ?? new Dictionary<string, string>(),
+                            displayDan?.SkillsetLabelsFor(EzDanSide.Ln) ?? new Dictionary<string, string>(),
                             displayDan,
                             snap.Msd);
                     });

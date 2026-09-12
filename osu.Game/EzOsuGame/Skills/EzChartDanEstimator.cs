@@ -88,10 +88,13 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
 
             mods ??= Array.Empty<Mod>();
-            float rate = EzModRate.Resolve(mods);
+            // Clone: ApplyToBeatmap may mutate Seed/settings on the same instances SelectedMods uses;
+            // that fires FooterButtonMods ModSettingChangeTracker off the update thread.
+            var localMods = cloneMods(mods);
+            float rate = EzModRate.Resolve(localMods);
 
             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-            var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
+            var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, localMods);
 
             int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
             if (keyCount <= 0)
@@ -138,9 +141,11 @@ namespace osu.Game.EzOsuGame.Skills
             // Nomod (no rate / key convert): keep Sunny via persisted xxy — same as Realm ChartDan.
             double? xxySr = null;
 
-            if (EzModRate.CanUsePersistedXxy(mods) && beatmapInfo.XxyStarRating >= 0)
+            if (EzModRate.CanUsePersistedXxy(localMods) && beatmapInfo.XxyStarRating >= 0)
                 xxySr = beatmapInfo.XxyStarRating;
 
+            // Without Sunny, MSD→SrToRawDan uses reform (~12) means on Mina Overall (~20) → 6/7K finish/stellium.
+            // Live DualPanel must not invent those badges; persist/backfill may still use the heuristic.
             var chartDan = EzPersistedChartDan.TryComputeFromStored(
                 beatmapInfo.Hash,
                 beatmapInfo.ID,
@@ -149,7 +154,8 @@ namespace osu.Game.EzOsuGame.Skills
                 holdRatio,
                 xxySr,
                 chartInfo,
-                holdCount);
+                holdCount,
+                allowMsdHeuristicLabels: xxySr != null);
 
             return new EzLiveChartSkillSnapshot
             {
@@ -160,6 +166,19 @@ namespace osu.Game.EzOsuGame.Skills
                 HoldCount = holdCount,
                 IsLiveFromMods = true,
             };
+        }
+
+        private static Mod[] cloneMods(IReadOnlyList<Mod> mods)
+        {
+            if (mods.Count == 0)
+                return Array.Empty<Mod>();
+
+            var copy = new Mod[mods.Count];
+
+            for (int i = 0; i < mods.Count; i++)
+                copy[i] = mods[i].DeepClone();
+
+            return copy;
         }
 
         private static IReadOnlyDictionary<string, double> withHoldRatio(IReadOnlyDictionary<string, double> msd, double holdRatio)

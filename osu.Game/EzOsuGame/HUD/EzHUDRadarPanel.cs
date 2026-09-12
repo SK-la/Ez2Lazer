@@ -438,6 +438,9 @@ namespace osu.Game.EzOsuGame.HUD
                         if (token.IsCancellationRequested)
                             return;
 
+                        if (task.IsCanceled || task.IsFaulted)
+                            return;
+
                         var snap = task.GetResultSafely();
                         if (snap == null || snap.Msd.Count == 0)
                             return;
