@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Formats;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Skills

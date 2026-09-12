@@ -10,6 +10,7 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;

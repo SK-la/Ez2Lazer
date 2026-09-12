@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.EzOsuGame.Skills
+namespace osu.Game.EzOsuGame.Mods
 {
     /// <summary>
     /// Shared DT/HT rate resolution for MSD/SSR/Dan (clamp matches lazer ModRateAdjust bounds).
@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame.Skills
             return (float)Math.Clamp(rate, 0.5, 2.0);
         }
 
-        public static bool IsNomodRate(float rate) => Math.Abs(rate - 1f) < 0.001f;
+        public static bool IsNoModRate(float rate) => Math.Abs(rate - 1f) < 0.001f;
 
         /// <summary>
         /// Mods that change playable layout, rate, or difficulty — song-select Skill radar / DualPanel
@@ -63,6 +63,6 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>Whether BeatmapInfo.XxyStarRating (nomod baseline) may be reused without live recompute.</summary>
         public static bool CanUsePersistedXxy(IEnumerable<Mod>? mods)
-            => IsNomodRate(Resolve(mods)) && !ChangesPlayableKeys(mods);
+            => IsNoModRate(Resolve(mods)) && !ChangesPlayableKeys(mods);
     }
 }

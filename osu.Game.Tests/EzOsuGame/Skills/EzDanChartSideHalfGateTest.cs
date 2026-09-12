@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Rulesets.Mods;
 
