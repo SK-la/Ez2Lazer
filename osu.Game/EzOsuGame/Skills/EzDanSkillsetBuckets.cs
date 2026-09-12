@@ -25,8 +25,8 @@ namespace osu.Game.EzOsuGame.Skills
     ///         Capability matrix (always call <see cref="Slots(int, EzDanSide)"/> for layout):
         ///         4K RC: jack/tech/speed/stamina (play SSR + chart overrides);
         ///         6/7K RC: jack/tech/speed/stream (pattern tags; LeoBlack clusters when filled — see DATA-LeoBlack-Clusters);
-    ///         4K/6K LN: empty slots (side aggregate only);
-    ///         7K LN: lngeneral/lntech/lninverse/lnrelease (LN pattern tags when chart present).
+        ///         4K/6K LN: DualPanel still shows LN danskill name column (layout); hub filing remains 7K-only;
+        ///         7K LN: lngeneral/lntech/lninverse/lnrelease (LN pattern tags when chart present).
     ///     </para>
     /// </summary>
     public static class EzDanSkillsetBuckets
@@ -70,13 +70,17 @@ namespace osu.Game.EzOsuGame.Skills
             new EzDanSkillsetSlot(LN_RELEASE, "Release", "#46c7b8")
         };
 
-        /// <summary>Ordered slots for DualPanel layout — returned even when verdicts are empty.</summary>
+        /// <summary>
+        /// Ordered slots for DualPanel layout — name column always returned for both RC and LN
+        /// (even when verdicts / chart stamps are empty). Filing still only credits 7K LN buckets.
+        /// </summary>
         public static IReadOnlyList<EzDanSkillsetSlot> Slots(int keyCount, EzDanSide side)
         {
             if (side == EzDanSide.Ln)
             {
-                // Hub: only 7K LN publishes skillset tiles.
-                return keyCount == 7 ? ln_7k : Array.Empty<EzDanSkillsetSlot>();
+                // Always show LN danskill names (General/Tech/Inverse/Release) in DualPanel column 1.
+                // Hub only files 7K LN clears into these buckets; other keys keep empty verdicts.
+                return ln_7k;
             }
 
             return keyCount == 4 ? rc_4k : rc_pattern;

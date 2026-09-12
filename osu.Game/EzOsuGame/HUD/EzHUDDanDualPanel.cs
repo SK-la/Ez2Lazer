@@ -335,7 +335,7 @@ namespace osu.Game.EzOsuGame.HUD
             IReadOnlyDictionary<string, EzDanSkillsetVerdict> playerSkillsets =
                 new Dictionary<string, EzDanSkillsetVerdict>();
 
-            var slots = skillProvider?.GetDanSkillsetSlots(keys, side) ?? Array.Empty<EzDanSkillsetSlot>();
+            var slots = EzDanSkillsetBuckets.Slots(keys, side);
 
             if (wantPlayer && !string.IsNullOrWhiteSpace(user) && keys > 0 && skillProvider != null)
             {

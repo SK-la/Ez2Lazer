@@ -148,6 +148,9 @@ namespace osu.Game.EzOsuGame.Skills
             setRatingValue(playerRatingText, playerOverallRating);
             setRatingValue(chartRatingText, chartOverallRating);
 
+            // First column labels are always visible (Rating + RC/LN + danskill names).
+            ratingLabel.Show();
+            sideLabel.Show();
             sideLabel.Text = Side == EzDanSide.Ln
                 ? EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_LN
                 : EzSettingsProfile.LOCAL_PROFILE_DAN_SIDE_RC;

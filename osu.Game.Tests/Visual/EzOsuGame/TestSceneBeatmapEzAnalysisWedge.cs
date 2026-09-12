@@ -131,15 +131,15 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                      .SelectMany(l => l.ChildrenOfType<EzDisplaySkillName>())
                      .Count(c => c.Alpha > 0 && c.IsPresent) == 4);
 
-            AddAssert("ln 4k has no skillset chips", () =>
+            AddUntilStep("ln has four danskill name chips", () =>
                 wedge.ChildrenOfType<EzDanLabeledStatList>()
                      .Where(l => l.Side == EzDanSide.Ln)
                      .SelectMany(l => l.ChildrenOfType<EzDisplaySkillName>())
-                     .All(c => c.Alpha <= 0 || !c.IsPresent));
+                     .Count(c => c.Alpha > 0 && c.IsPresent) == 4);
 
-            AddAssert("slot table is four for 4k rc", () =>
+            AddAssert("slot table is four for 4k rc and ln layout", () =>
                 EzDanSkillsetBuckets.Slots(test_keys, EzDanSide.Rc).Count == 4
-                && EzDanSkillsetBuckets.Slots(test_keys, EzDanSide.Ln).Count == 0);
+                && EzDanSkillsetBuckets.Slots(test_keys, EzDanSide.Ln).Count == 4);
         }
 
         [Test]
