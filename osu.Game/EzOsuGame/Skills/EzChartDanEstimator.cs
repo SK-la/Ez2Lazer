@@ -62,7 +62,7 @@ namespace osu.Game.EzOsuGame.Skills
                 if (snap == null)
                     return null;
 
-                return FromMsdAndPlayable(snap.Msd, playable, xxySr: null);
+                return FromMsdAndPlayable(snap.Msd, playable, xxySr: snap.XxySr);
             }
 
             if (msd == null || msd.Count == 0)
@@ -89,13 +89,11 @@ namespace osu.Game.EzOsuGame.Skills
                 return null;
 
             mods ??= Array.Empty<Mod>();
-            // Clone: ApplyToBeatmap may mutate Seed/settings on the same instances SelectedMods uses;
-            // that fires FooterButtonMods ModSettingChangeTracker off the update thread.
-            var localMods = cloneMods(mods);
-            float rate = EzModRate.Resolve(localMods);
+            // EzModSeed.Resolve makes Seed writes update-thread safe; use SelectedMods as-is so UI seed matches.
+            float rate = EzModRate.Resolve(mods);
 
             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-            var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, localMods);
+            var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
 
             int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
             if (keyCount <= 0)
@@ -142,12 +140,12 @@ namespace osu.Game.EzOsuGame.Skills
             // Same live xxy as song-select analysis panel (playable + rate/key mods). Fallback to Realm nomod xxy only when usable.
             double? xxySr = null;
 
-            if (EzAnalysisComputation.TryComputeXxySrFromPlayable(playable, beatmapInfo.Ruleset, localMods, CancellationToken.None, out double liveXxy)
+            if (EzAnalysisComputation.TryComputeXxySrFromPlayable(playable, beatmapInfo.Ruleset, mods, CancellationToken.None, out double liveXxy)
                 && liveXxy > 0)
             {
                 xxySr = liveXxy;
             }
-            else if (EzModRate.CanUsePersistedXxy(localMods) && beatmapInfo.XxyStarRating >= 0)
+            else if (EzModRate.CanUsePersistedXxy(mods) && beatmapInfo.XxyStarRating >= 0)
             {
                 xxySr = beatmapInfo.XxyStarRating;
             }
@@ -174,19 +172,6 @@ namespace osu.Game.EzOsuGame.Skills
                 XxySr = xxySr,
                 IsLiveFromMods = true,
             };
-        }
-
-        private static Mod[] cloneMods(IReadOnlyList<Mod> mods)
-        {
-            if (mods.Count == 0)
-                return Array.Empty<Mod>();
-
-            var copy = new Mod[mods.Count];
-
-            for (int i = 0; i < mods.Count; i++)
-                copy[i] = mods[i].DeepClone();
-
-            return copy;
         }
 
         private static IReadOnlyDictionary<string, double> withHoldRatio(IReadOnlyDictionary<string, double> msd, double holdRatio)

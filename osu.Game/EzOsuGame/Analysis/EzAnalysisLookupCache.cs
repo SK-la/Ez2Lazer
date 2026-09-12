@@ -26,13 +26,9 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             BeatmapInfo = beatmapInfo;
             Ruleset = (rulesetInfo as RulesetInfo) ?? BeatmapInfo.Ruleset;
-            // 重要：mod 应用顺序对谱面转换很重要。
+            // Clone so wedge analysis does not share setting instances with SelectedMods while hashing.
+            // Nullable Seed fill uses EzModSeed.Resolve during GetPlayable (update-thread safe).
             OrderedMods = createModSnapshot(mods);
-            // 重要：一些自定义 mods会在 ApplyToBeatmap 期间懒惰地分配随机种子
-            //（例如 Seed.Value ??= RNG.Next()）。因为我们的缓存键包含 mod 设置，这种变异会在计算过程中改变
-            // Mod.GetHashCode()/Equals() 并破坏字典使用。
-            // 在克隆的快照上确定性地预填充缺失的种子以保持缓存键稳定。
-            initialiseDeterministicSeedsIfRequired(OrderedMods, beatmapInfo);
             ModsSignature = computeModsSignature(OrderedMods);
         }
 
@@ -58,40 +54,6 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        private static void initialiseDeterministicSeedsIfRequired(Mod[] orderedMods, BeatmapInfo beatmapInfo)
-        {
-            if (orderedMods.Length == 0)
-                return;
-
-            unchecked
-            {
-                // 基础种子来源于谱面身份。
-                int baseSeed = 17;
-                baseSeed = baseSeed * 31 + beatmapInfo.ID.GetHashCode();
-                baseSeed = baseSeed * 31 + (beatmapInfo.Hash.GetHashCode(StringComparison.Ordinal));
-
-                for (int i = 0; i < orderedMods.Length; i++)
-                {
-                    if (orderedMods[i] is not IHasSeed hasSeed)
-                        continue;
-
-                    if (hasSeed.Seed.Value != null)
-                        continue;
-
-                    // 混合 mod 类型以避免所有带种子的 mods 共享相同的种子。
-                    int seed = baseSeed;
-                    seed = seed * 31 + orderedMods[i].GetType().FullName!.GetHashCode(StringComparison.Ordinal);
-                    seed = seed * 31 + i;
-
-                    // 确保非空。
-                    if (seed == 0)
-                        seed = 1;
-
-                    hasSeed.Seed.Value = seed;
-                }
-            }
-        }
-
         private static Mod[] createModSnapshot(IEnumerable<Mod>? mods)
         {
             if (mods == null)
@@ -107,11 +69,11 @@ namespace osu.Game.EzOsuGame.Analysis
                 }
                 catch
                 {
-                    // 如果克隆失败，则回退到使用原始实例。
-                    // 这对缓存来说并不理想，但比完全破坏分析要好。
                     if (Interlocked.Increment(ref modSnapshotFailCount) <= 10)
                     {
-                        Logger.Log($"[EzBeatmapManiaAnalysisCache] Mod.DeepClone() failed for {mod.GetType().FullName}. Falling back to original instance.", Ez2ConfigManager.LOGGER_NAME,
+                        Logger.Log(
+                            $"[EzAnalysis] Mod.DeepClone() failed for {mod.GetType().FullName}. Falling back to original instance.",
+                            Ez2ConfigManager.LOGGER_NAME,
                             LogLevel.Important);
                     }
 
