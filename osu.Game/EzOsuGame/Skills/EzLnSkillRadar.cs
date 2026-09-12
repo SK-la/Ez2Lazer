@@ -56,28 +56,30 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>
         /// Six LN structure axes; 7K subtype scores replace Hold / Overlap / Release / Chord when ≥ <see cref="SUBTYPE_REPLACE_MIN"/>.
         /// </summary>
+        /// <param name="metrics">
+        /// null renders a zeroed LN frame (structure labels, no data) — used to pre-empt the radar
+        /// before the async LN compute lands, so the panel never paints the RC radar first and morphs.
+        /// </param>
         public static IReadOnlyList<Axis> BuildAxes(
-            EzDanFeatureMetrics metrics,
+            EzDanFeatureMetrics? metrics,
             IReadOnlyDictionary<string, double>? subtypeScores,
             int keyCount)
         {
-            ArgumentNullException.ThrowIfNull(metrics);
-
             subtypeScores ??= new Dictionary<string, double>(StringComparer.Ordinal);
 
             var hold = axisOrSubtype(
                 label_hold,
-                metrics.HoldRatio,
+                metrics?.HoldRatio ?? 0,
                 cap: 1,
                 subtypeScores,
                 "lngeneral",
                 label_lngeneral);
 
-            var density = structureOnly(label_density, metrics.LnDensity, cap: 1);
+            var density = structureOnly(label_density, metrics?.LnDensity ?? 0, cap: 1);
 
             var overlap = axisOrSubtype(
                 label_overlap,
-                metrics.LnOverlapPressure,
+                metrics?.LnOverlapPressure ?? 0,
                 cap: 5,
                 subtypeScores,
                 "lninverse",
@@ -86,22 +88,22 @@ namespace osu.Game.EzOsuGame.Skills
             var release = keyCount == 7
                 ? axisOrSubtype(
                     label_release,
-                    metrics.LnReleasePressure,
+                    metrics?.LnReleasePressure ?? 0,
                     cap: 46,
                     subtypeScores,
                     "lnrelease",
                     label_lnrelease)
-                : structureOnly(label_release, metrics.LnReleasePressure, cap: 46);
+                : structureOnly(label_release, metrics?.LnReleasePressure ?? 0, cap: 46);
 
             var chord = axisOrSubtype(
                 label_chord,
-                metrics.LnChordPressure,
+                metrics?.LnChordPressure ?? 0,
                 cap: 1,
                 subtypeScores,
                 "lntech",
                 label_lntech);
 
-            var holdP90 = structureOnly(label_hold_p90, metrics.LnHoldDurationP90, cap: 800);
+            var holdP90 = structureOnly(label_hold_p90, metrics?.LnHoldDurationP90 ?? 0, cap: 800);
 
             return new[] { hold, density, overlap, release, chord, holdP90 };
         }

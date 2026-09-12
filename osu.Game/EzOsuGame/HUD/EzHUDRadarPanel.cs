@@ -186,6 +186,11 @@ namespace osu.Game.EzOsuGame.HUD
         private string[] activeAxisFormats = default_axis_formats;
         private EzRulesetSpecificRadarResult? cachedRulesetSpecificRadarResult;
 
+        /// <summary>Last successful live (beatmap, mods) chart snapshot, so a re-present keeps LN/RC without a flash.</summary>
+        private EzLiveChartSkillSnapshot? cachedLiveSkillSnapshot;
+
+        private EzAnalysisLookupCache? cachedLiveSkillSnapshotKey;
+
         public EzHUDRadarPanel()
         {
             AutoSizeAxes = Axes.Both;
@@ -422,7 +427,25 @@ namespace osu.Game.EzOsuGame.HUD
             IReadOnlyDictionary<string, double> msd = skillProvider?.GetBeatmapMsd(beatmapInfo.Hash)
                                                       ?? new Dictionary<string, double>();
 
-            applySkillRadarLayers(keyCount, username, msd, live: null);
+            var liveCacheKey = new EzAnalysisLookupCache(beatmapInfo, ruleset.Value, localMods);
+            bool hasCachedLive = cachedLiveSkillSnapshotKey is { } cachedKey
+                                 && cachedKey.Equals(liveCacheKey)
+                                 && cachedLiveSkillSnapshot != null;
+
+            // Decide LN vs RC *before* painting: the live LN compute lands a few frames later, and painting the RC
+            // radar first visibly morphs into the LN radar (different axis count + labels).
+            bool lnExpected = expectsLnSkillRadar(beatmapInfo, keyCount, msd);
+
+            if (hasCachedLive)
+            {
+                // Known result for this exact (beatmap, mods): paint it directly, no LN/RC frame to correct.
+                var cachedSnap = cachedLiveSkillSnapshot!;
+                applySkillRadarLayers(cachedSnap.KeyCount > 0 ? cachedSnap.KeyCount : keyCount, username, cachedSnap.Msd, cachedSnap);
+            }
+            else if (lnExpected)
+                applyLnSkillRadar(EzLnSkillRadar.BuildAxes(null, null, keyCount));
+            else
+                applySkillRadarLayers(keyCount, username, msd, live: null);
 
             // Always live-recompute selected chart MSD (xxySR analysis rhythm), including nomod.
             if (skillProvider == null)
@@ -445,8 +468,18 @@ namespace osu.Game.EzOsuGame.HUD
                             return;
 
                         var snap = task.GetResultSafely();
+
                         if (snap == null || snap.Msd.Count == 0)
+                        {
+                            // Live compute unavailable: never leave the pre-judged LN frame empty — fall back to RC.
+                            if (lnExpected)
+                                applySkillRadarLayers(keyCount, TargetUsername.Value, msd, live: null);
+
                             return;
+                        }
+
+                        cachedLiveSkillSnapshotKey = liveCacheKey;
+                        cachedLiveSkillSnapshot = snap;
 
                         applySkillRadarLayers(
                             snap.KeyCount > 0 ? snap.KeyCount : keyCount,
@@ -455,6 +488,44 @@ namespace osu.Game.EzOsuGame.HUD
                             snap);
                     });
                 }, token);
+        }
+
+        /// <summary>
+        /// Synchronous LN/RC pre-judgement. Realm-persisted ChartDan with an LN half is authoritative
+        /// (written through the same hold gate); otherwise fall back to that gate using Realm MSD hold ratio
+        /// and the stored hold-object count.
+        /// </summary>
+        private bool expectsLnSkillRadar(BeatmapInfo beatmapInfo, int keyCount, IReadOnlyDictionary<string, double> msd)
+        {
+            if (keyCount <= 0)
+                return false;
+
+            if (skillProvider != null
+                && skillProvider.TryGetPersistedChartDan(beatmapInfo, out var chartDan)
+                && chartDan != null
+                && chartDan.HasSide(EzDanSide.Ln))
+            {
+                return true;
+            }
+
+            double holdRatio = 0;
+
+            if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
+                holdRatio = Math.Clamp(cachedHold, 0, 1);
+
+            // MSD may pre-date the hold-ratio skill id; stored CSI carries the chart LN ratio.
+            if (holdRatio <= 0
+                && skillProvider != null
+                && skillProvider.TryGetStoredChartSkillInfo(beatmapInfo, out var chartInfo)
+                && chartInfo?.LnRatio is double lnRatio
+                && double.IsFinite(lnRatio))
+            {
+                holdRatio = Math.Clamp(lnRatio, 0, 1);
+            }
+
+            int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmapInfo);
+
+            return EzDanAlgorithm.AllowsPersistedChartLnHalf(keyCount, holdRatio, holdCount);
         }
 
         private void applySkillRadarLayers(
@@ -525,8 +596,8 @@ namespace osu.Game.EzOsuGame.HUD
             activeAxisFormats = Enumerable.Repeat("0.00", AxisCount).ToArray();
 
             double maxMina = 0;
-            var chartValues = new double[AxisCount];
-            var playerValues = new double[AxisCount];
+            double[] chartValues = new double[AxisCount];
+            double[] playerValues = new double[AxisCount];
 
             for (int i = 0; i < selected.Count; i++)
             {
@@ -578,8 +649,10 @@ namespace osu.Game.EzOsuGame.HUD
             EzDanFeatureMetrics metrics,
             IReadOnlyDictionary<string, double>? subtypeScores,
             int keyCount)
+            => applyLnSkillRadar(EzLnSkillRadar.BuildAxes(metrics, subtypeScores, keyCount));
+
+        private void applyLnSkillRadar(IReadOnlyList<EzLnSkillRadar.Axis> lnAxes)
         {
-            var lnAxes = EzLnSkillRadar.BuildAxes(metrics, subtypeScores, keyCount);
             AxisCount = lnAxes.Count;
             activeAxisLabels = lnAxes.Select(static a => a.Label.ToString()).ToArray();
             activeAxisFormats = Enumerable.Repeat("0.00", lnAxes.Count).ToArray();
