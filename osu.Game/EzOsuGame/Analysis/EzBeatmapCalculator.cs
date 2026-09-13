@@ -81,9 +81,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// 标签里 s = scratch、p = pedal，e 见 9k 行；数字相加等于 N。
         /// </para>
         /// <para>
-        /// 10k 及以下在上述结果之后还会叠加空列规则：存在 e 个空列时输出 <c>[N-e k _e[]]</c>
-        /// （例 7k 末列为空 → <c>[6k_1[]]</c>）。<br/>
-        /// 11k 不判别首尾列，恒为 <c>[11k]</c>；12k 及以上不套空列规则。
+        /// 11k 不判别首尾列，恒为 <c>[11k]</c>；12k 及以上不做空列合并，尾列为空（列统计已补 0 到 N）时落回 <c>[Nk]</c>。
         /// </para>
         /// </summary>
         public const string SCRATCH_LABEL_TABLE = """
@@ -110,14 +108,14 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// 复用外部已经计算好的 列统计与 KPS 数据，生成 Scratch 标签。
         /// 用于选歌面板：避免重复遍历 HitObjects / 重复计算 KPS。
-        /// keyCount 从 columnCounts 推断。
+        /// columnCounts 已由 <see cref="EzAnalysisComputation"/> 补 0 到真实 N，故 <c>maxKey + 1</c> 即真实列数。
         /// </summary>
         public static string? GetScratchFromPrecomputed(Dictionary<int, int>? columnCounts, double maxKps)
         {
             if (columnCounts == null || columnCounts.Count == 0)
                 return null;
 
-            // 从 columnCounts 的最大 key + 1 推断列数
+            // 列统计为 dense（末尾空列已补 0），最大 key + 1 即真实列数 N。
             int keyCount = 0;
 
             foreach (int k in columnCounts.Keys)
@@ -138,14 +136,6 @@ namespace osu.Game.EzOsuGame.Analysis
             }
 
             string result = resolveEdgeLabel(keyCount, countsByColumn) ?? $"[{keyCount}k] ";
-
-            // // 10k 及以下：空列规则覆盖其它标签（12k 及以上不再套用，见 SCRATCH_LABEL_TABLE 文档）。
-            // if (keyCount <= 10)
-            // {
-            //     int emptyColumns = countsByColumn.Count(c => c == 0);
-            //     if (emptyColumns > 0)
-            //         result = $"[{keyCount - emptyColumns}k_{emptyColumns}[]] ";
-            // }
 
             return result;
         }
@@ -215,7 +205,10 @@ namespace osu.Game.EzOsuGame.Analysis
                     return skipEmptyEdgeColumns ? "[10k2s1p] " : "[13k] ";
 
                 case 14:
-                    return skipEmptyEdgeColumns ? "[10k2s1p] " : "[14k] ";
+                    // 14k 特例：10k2s1p 开启时看第 14 列（索引 13，ez2ac 的 alpha 列）是否为空。
+                    if (!skipEmptyEdgeColumns) return "[14k] ";
+
+                    return countsByColumn.Length > 13 && countsByColumn[13] == 0 ? "[10k2s1p] " : "[14k] ";
 
                 case 16:
                     if (bothSignificant && skipEmptyEdgeColumns) return "[10k2s4e] ";
