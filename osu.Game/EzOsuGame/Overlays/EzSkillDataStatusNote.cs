@@ -13,6 +13,7 @@ using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.Overlays
@@ -46,10 +47,16 @@ namespace osu.Game.EzOsuGame.Overlays
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
 
-            InternalChild = new SettingsNote
+            InternalChild = new Container
             {
                 RelativeSizeAxes = Axes.X,
-                Current = { BindTarget = statusNote },
+                AutoSizeAxes = Axes.Y,
+                Padding = SettingsPanel.CONTENT_PADDING,
+                Child = new SettingsNote
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Current = { BindTarget = statusNote },
+                },
             };
         }
 
@@ -112,7 +119,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private static SettingsNote.Data describe(EzSkillDataStatus status, int stalePlayerCount, bool backfillRunning)
         {
             string describeFacet(string name, EzFacetStatus facet)
-                => $"{name} {EzSettingsStrings.SKILL_DATA_STATUS_READY} {facet.Ready}"
+                => $"{name} {EzSettingsStrings.SKILL_DATA_STATUS_READY} {facet.Ready}\n"
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_UNRATEABLE} {facet.Unrateable}"
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_STALE} {facet.Stale}"
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_MISSING} {facet.Missing}";
@@ -129,10 +136,10 @@ namespace osu.Game.EzOsuGame.Overlays
 
             string line = $"{EzSettingsStrings.SKILL_DATA_STATUS_CHARTS} {status.TotalCharts}"
                           + $" · {describeFacet("MSD", status.Msd)}"
-                          + $" · {describeFacet("CSI", status.ChartSkillInfo)}"
-                          + $" · {describeFacet("Dan", status.ChartDan)}"
-                          + $" · {pending}"
-                          + $" · {players}";
+                          + $"\n · {describeFacet("CSI", status.ChartSkillInfo)}"
+                          + $"\n · {describeFacet("Dan", status.ChartDan)}"
+                          + $"\n · {pending}"
+                          + $"\n · {players}";
 
             if (backfillRunning)
                 line += EzSettingsStrings.SKILL_DATA_STATUS_RUNNING;
