@@ -219,10 +219,11 @@ jobs:
         arch: ${{ fromJson(github.event.inputs.arch_index == '' && '["x64","arm64"]' || github.event.inputs.arch_index == '1' && '["x64"]' || github.event.inputs.arch_index == '2' && '["arm64"]') }}
     runs-on: ${{ matrix.platform == 'windows' && matrix.arch == 'arm64' && 'windows-11-arm' || matrix.platform == 'windows' && 'windows-latest' || matrix.platform == 'linux' && matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'macos' && matrix.arch == 'arm64' && 'macos-26' || 'macos-26-intel' }}
     steps:
+      # 版本号来自 ReleaseVersion 属性（见 publish.py），构建过程不读 git 历史，浅检出即可。
       - name: Checkout main repo into osu/
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           path: osu
 
       - name: Checkout osu-resources (resources) as sibling
@@ -230,16 +231,8 @@ jobs:
         with:
           repository: SK-la/osu-resources
           path: osu-resources
-          fetch-depth: 0
+          fetch-depth: 1
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Validate osu-resources checkout
-        shell: pwsh
-        run: |
-          if (-not (Test-Path 'osu-resources\.git')) {
-            Write-Error 'osu-resources checkout missing'
-            exit 1
-          }
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
@@ -266,19 +259,10 @@ jobs:
           path: osu/.vpk-tools
           key: vpk-${{ runner.os }}-${{ matrix.platform }}-${{ matrix.arch }}-${{ hashFiles('osu/publish.py') }}
 
-      - name: Dotnet restore (desktop project)
-        working-directory: osu
-        shell: pwsh
-        run: |
-          dotnet --info
-          dotnet restore ./osu.Desktop/osu.Desktop.csproj /p:Configuration=Release
-
-      - name: Dotnet build (desktop project)
-        working-directory: osu
-        shell: pwsh
-        run: |
-          dotnet build ./osu.Desktop/osu.Desktop.csproj -c Release -p:GenerateFullPaths=true --no-restore --verbosity minimal
-
+      # publish.py 内部的 dotnet publish 会自行 restore + 编译；且它带 -r <rid>，
+      # 中间目录为 bin|obj/Release/<tfm>/<rid>/（AppendRuntimeIdentifierToOutputPath=true），
+      # 与去 RID 构建的目录不同，产物无法复用。因此这里不再单独 restore/build，
+      # 避免每个 job 重复一次完整编译。
       - name: Run publish script (release only)
         working-directory: osu
         shell: pwsh
