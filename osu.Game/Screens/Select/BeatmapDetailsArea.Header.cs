@@ -66,7 +66,7 @@ namespace osu.Game.Screens.Select
 
             public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.XxySrPattern);
 
-            public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.Skill);
+            public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.SkillDual);
 
             [Resolved]
             private EzLocalProfileService? localProfileService { get; set; }
@@ -408,7 +408,7 @@ namespace osu.Game.Screens.Select
 
                 protected override LocalisableString GenerateItemText(EzRadarDisplayMode item)
                 {
-                    if (item == EzRadarDisplayMode.Skill)
+                    if (item == EzRadarDisplayMode.SkillDual)
                         return EzSongSelectStrings.RADAR_MODE_SKILL;
 
                     var attr = typeof(EzRadarDisplayMode).GetField(item.ToString())

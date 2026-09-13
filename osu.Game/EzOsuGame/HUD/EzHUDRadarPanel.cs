@@ -50,11 +50,11 @@ namespace osu.Game.EzOsuGame.HUD
         [Description("XxySR Pattern")]
         XxySrPattern,
 
-        [Description("Skill")]
-        Skill,
+        [Description("SkillDual")]
+        SkillDual,
 
-        [Description("Beatmap")]
-        Beatmap
+        [Description("SkillChart")]
+        SkillChart
     }
 
     /// <summary>
@@ -424,7 +424,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateRulesetSpecificRadarPresentation()
         {
-            if (RadarDisplayMode.Value is EzRadarDisplayMode.Metadate or EzRadarDisplayMode.Skill or EzRadarDisplayMode.Beatmap)
+            if (RadarDisplayMode.Value is EzRadarDisplayMode.Metadate or EzRadarDisplayMode.SkillDual or EzRadarDisplayMode.SkillChart)
                 return;
 
             if (beatmap.Value.BeatmapInfo is BeatmapInfo beatmapInfo && isRulesetRadarCacheValid(beatmapInfo))
@@ -617,7 +617,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (!string.IsNullOrWhiteSpace(username) && keyCount > 0 && skillProvider != null)
                 ssr = skillProvider.GetPlayerSsrSnapshot(username, keyCount).Values;
 
-            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.Beatmap;
+            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.SkillChart;
 
             var selected = new List<EzMinaSkillAxis>(skill_radar_axes.Length);
 
@@ -747,7 +747,7 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         private bool isMinaSkillRadarMode()
-            => RadarDisplayMode.Value is EzRadarDisplayMode.Skill or EzRadarDisplayMode.Beatmap;
+            => RadarDisplayMode.Value is EzRadarDisplayMode.SkillDual or EzRadarDisplayMode.SkillChart;
 
         private static readonly EzMinaSkillAxis[] skill_radar_axes = EzMinaSkillAxisExtensions.RadarAxes;
 
