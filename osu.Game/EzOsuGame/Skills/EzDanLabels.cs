@@ -58,6 +58,51 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Reform ladder length used by SR→rawDan means tables (1…kappa).</summary>
         private const int reform_means_levels = 20;
 
+        /// <summary>
+        /// Keymodes that have a community xxy→dan interval table (<see cref="EzSunnyDanIntervals"/>).
+        /// Outside these the 4K-calibrated <c>means</c> tables below are off-scale: the n-key
+        /// MinaCalc engine rates 5K / 8K–18K on a different curve, so feeding its Overall MSD
+        /// straight into <see cref="SrToRawDan(double, EzMinaSkillAxis, bool)"/> inflates the label by several levels.
+        /// </summary>
+        public static bool HasXxyDanTable(int keyCount) => EzSunnyDanIntervals.SupportsKeyCount(keyCount);
+
+        /// <summary>
+        /// Fitting factor for keymodes with no xxy table: <c>Overall MSD × xxySR × 0.05</c>.
+        /// The star rating carries the absolute difficulty MSD loses across keymodes, and the
+        /// factor lands the product back on the Reform ladder's 1…20 rawDan scale.
+        /// </summary>
+        public const double TABLELESS_MSD_XXY_FACTOR = 0.05;
+
+        /// <summary>
+        /// Star-fitted rawDan for a keymode without an xxy table. Null when the star rating (or
+        /// the MSD) is missing — callers must leave the dan empty rather than invent one.
+        /// </summary>
+        public static double? FitTablelessRawDan(double overallMsd, double? xxySr)
+        {
+            if (!double.IsFinite(overallMsd) || overallMsd <= 0)
+                return null;
+
+            if (xxySr is not double sr || !double.IsFinite(sr) || sr <= 0)
+                return null;
+
+            return overallMsd * sr * TABLELESS_MSD_XXY_FACTOR;
+        }
+
+        /// <summary>
+        /// MSD→rawDan fallback used whenever no Sunny interval matched. 4/6/7K keep the
+        /// calibrated means table (the "other side" half of a dual-half row); every other
+        /// keymode uses the star-fitted value. Null = no trustworthy dan for this chart.
+        /// </summary>
+        public static double? TryFallbackRawDan(int keyCount, double overallMsd, EzMinaSkillAxis axis, double? xxySr)
+        {
+            if (!double.IsFinite(overallMsd) || overallMsd <= 0)
+                return null;
+
+            return HasXxyDanTable(keyCount)
+                ? SrToRawDan(overallMsd, axis)
+                : FitTablelessRawDan(overallMsd, xxySr);
+        }
+
         public static double SrToRawDan(double sr, EzMinaSkillAxis axis = EzMinaSkillAxis.Stream, bool calibrate = true)
         {
             if (!double.IsFinite(sr) || sr <= 0)

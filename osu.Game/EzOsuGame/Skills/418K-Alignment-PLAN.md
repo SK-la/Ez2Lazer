@@ -9,8 +9,9 @@ Goal: move the current Ez skill pipeline toward mania-hub-style 4–18K support,
 - **Phase 2 (compute)** — done: NuGet `MinaCalc 0.4.2` was replaced by the mania-hub n-key
   build (`minaclac-74.0.wasm`, Wasmtime host). MSD and SSR share one note-array path, so
   beatmap-side and play-side axes come from the same engine.
-- **Phase 3 (downstream)** — open: see the `DATA-ChartDan-Keymode-Routing`,
-  `DATA-PatternAxis-KeymodeSet` and `DATA-Skillset-Dan-Coverage-10K+` rows in
+- **Phase 3 (downstream)** — partially done: `DATA-ChartDan-Keymode-Routing` is closed
+  (5K / 8K–18K chart dan is star-fitted; the radar no longer draws the engine's 0.18 sliver).
+  Still open: `DATA-PatternAxis-KeymodeSet` and `DATA-Skillset-Dan-Coverage-10K+` in
   `DATA-FOLLOWUPS.md`.
 - **Phase 4 (regression coverage)** — engine-level done (4–18K routing, zero vector for
   unsupported keys, chord masks, negative-time shift, trap recovery); chart-dan /

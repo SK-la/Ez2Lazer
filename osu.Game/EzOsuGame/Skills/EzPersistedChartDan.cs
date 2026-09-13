@@ -167,10 +167,11 @@ namespace osu.Game.EzOsuGame.Skills
                     rawDan = primary.RawDan;
                     aggregateLabel = primary.Label;
                 }
-                else if (allowMsdHeuristicLabels && primary.OverallMsd > 0 && double.IsFinite(primary.OverallMsd))
+                else if (allowMsdHeuristicLabels
+                         && EzDanLabels.TryFallbackRawDan(keyCount, primary.OverallMsd, dominantAxis, xxySr) is double fallbackRawDan)
                 {
-                    // Other side: same MSD overall on that side's ladder (Ez dual halves).
-                    rawDan = EzDanLabels.SrToRawDan(primary.OverallMsd, dominantAxis);
+                    // Other side: same fitted value on that side's ladder (Ez dual halves).
+                    rawDan = fallbackRawDan;
                     aggregateLabel = EzDanLadders.For(keyCount, side).ParseLabel(rawDan);
                 }
 
