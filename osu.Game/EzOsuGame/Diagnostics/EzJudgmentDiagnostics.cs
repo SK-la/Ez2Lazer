@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
+using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Diagnostics
 {
@@ -107,11 +108,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     try
                     {
                         await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
-                        Logger.Log($"[EzJudgmentDiag] flushed to {path}");
+                        Logger.Log($"[EzJudgmentDiag] flushed to {path}", Ez2ConfigManager.LOGGER_NAME);
                     }
                     catch (Exception ex)
                     {
-                        try { Logger.Log($"[EzJudgmentDiag] flush failed: {ex.Message}", level: LogLevel.Error); }
+                        try { Logger.Log($"[EzJudgmentDiag] flush failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, level: LogLevel.Error); }
                         catch { }
                     }
                 });

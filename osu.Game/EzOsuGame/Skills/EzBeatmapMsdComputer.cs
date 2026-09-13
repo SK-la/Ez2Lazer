@@ -8,6 +8,7 @@ using System.Text;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Formats;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.IO;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -81,7 +82,7 @@ namespace osu.Game.EzOsuGame.Skills
             }
             catch (Exception e)
             {
-                Logger.Log($"MSD compute failed for {beatmapInfo} (keys={keyCount}): {e.Message}");
+                Logger.Log($"[EzSkills] MSD compute failed for {beatmapInfo} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return null;
             }
 
@@ -92,11 +93,11 @@ namespace osu.Game.EzOsuGame.Skills
 
                 if (supportedKeymode)
                 {
-                    Logger.Log($"MSD zero vector for {beatmapInfo} (keys={keyCount})");
+                    Logger.Log($"[EzSkills] MSD zero vector for {beatmapInfo} (keys={keyCount})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
                 }
                 // else
-                //     Logger.Log($"MSD skip unsupported keymode {keyCount}K for {beatmapInfo}");
+                //     Logger.Log($"[EzSkills] MSD skip unsupported keymode {keyCount}K for {beatmapInfo}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 return null;
             }
@@ -154,7 +155,7 @@ namespace osu.Game.EzOsuGame.Skills
             }
             catch (Exception e)
             {
-                Logger.Log($"ChartDan upsert after MSD failed for {beatmapInfo}: {e.Message}");
+                Logger.Log($"[EzSkills] ChartDan upsert after MSD failed for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
             }
         }
 
@@ -203,7 +204,7 @@ namespace osu.Game.EzOsuGame.Skills
             }
             catch (Exception e)
             {
-                Logger.Log($"MSD: failed reading .osu for {beatmapInfo}: {e.Message}");
+                Logger.Log($"[EzSkills] MSD: failed reading .osu for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return null;
             }
         }
@@ -220,7 +221,7 @@ namespace osu.Game.EzOsuGame.Skills
             }
             catch (Exception e)
             {
-                Logger.Log($"MSD: failed encoding playable: {e.Message}");
+                Logger.Log($"[EzSkills] MSD: failed encoding playable: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return null;
             }
         }

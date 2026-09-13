@@ -83,7 +83,7 @@ namespace osu.Game.EzOsuGame.Performance
                 // 已被别处锁住（例如某个 BeginLease）的项写不进去，整项跳过而不是让它抛。
                 if (!setting.TryCaptureCurrent(out string captured))
                 {
-                    Logger.Log($"[Ez] 极速模式跳过 {setting.Key}：该设置当前被其它逻辑锁定。", level: LogLevel.Debug);
+                    Logger.Log($"[Ez] 极速模式跳过 {setting.Key}：该设置当前被其它逻辑锁定。", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     continue;
                 }
 
@@ -131,7 +131,7 @@ namespace osu.Game.EzOsuGame.Performance
             }
             catch (Exception e)
             {
-                Logger.Log($"[Ez] 极速模式快照无法解析，已丢弃：{e.Message}", level: LogLevel.Important);
+                Logger.Log($"[Ez] 极速模式快照无法解析，已丢弃：{e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
             }
 
             if (snapshot?.Count > 0)
@@ -150,7 +150,7 @@ namespace osu.Game.EzOsuGame.Performance
                 }
 
                 if (recovery)
-                    Logger.Log($"[Ez] 极速模式上次未正常退出，已还原 {restored}/{snapshot.Count} 项设置。");
+                    Logger.Log($"[Ez] 极速模式上次未正常退出，已还原 {restored}/{snapshot.Count} 项设置。", Ez2ConfigManager.LOGGER_NAME);
             }
 
             ezConfig.SetValue(Ez2Setting.TurboModeSnapshot, string.Empty);
@@ -263,7 +263,7 @@ namespace osu.Game.EzOsuGame.Performance
 
                 if (!tryDeserialise(serialised, out TValue value))
                 {
-                    Logger.Log($"[Ez] 极速模式无法还原 {Key}（快照值 \"{serialised}\"）。", level: LogLevel.Important);
+                    Logger.Log($"[Ez] 极速模式无法还原 {Key}（快照值 \"{serialised}\"）。", Ez2ConfigManager.LOGGER_NAME, level: LogLevel.Important);
                     return false;
                 }
 

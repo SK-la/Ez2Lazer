@@ -20,6 +20,7 @@ using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
@@ -861,7 +862,7 @@ namespace osu.Game.EzOsuGame.HUD
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, $"[EzComRadarPanel] Failed to compute ruleset radar for beatmapId={beatmapInfo.ID}.");
+                Logger.Error(ex, $"[EzComRadarPanel] Failed to compute ruleset radar for beatmapId={beatmapInfo.ID}.", Ez2ConfigManager.LOGGER_NAME);
                 return null;
             }
         }

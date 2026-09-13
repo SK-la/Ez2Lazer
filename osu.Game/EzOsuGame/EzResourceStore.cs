@@ -210,8 +210,7 @@ namespace osu.Game.EzOsuGame
             }
             catch (Exception ex)
             {
-                Logger.Log($"[EzTextureStore] Error calculating ratio: {ex.Message}",
-                    level: LogLevel.Debug);
+                Logger.Log($"[EzTextureStore] Error calculating ratio: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, level: LogLevel.Debug);
             }
 
             return 1.0f;

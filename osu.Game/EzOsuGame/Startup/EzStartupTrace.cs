@@ -3,6 +3,7 @@
 
 using System.Diagnostics;
 using osu.Framework.Logging;
+using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Startup
 {
@@ -19,7 +20,7 @@ namespace osu.Game.EzOsuGame.Startup
 
         public static void Log(string message)
         {
-            Logger.Log($"[EzStartupTrace] +{stopwatch.ElapsedMilliseconds}ms {message}", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log($"[EzStartupTrace] +{stopwatch.ElapsedMilliseconds}ms {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
         }
     }
 }
