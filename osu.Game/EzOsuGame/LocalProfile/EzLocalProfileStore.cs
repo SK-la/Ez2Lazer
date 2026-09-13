@@ -23,7 +23,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
     public class EzLocalProfileStore : IDisposable
     {
         public const string DATABASE_FILENAME = "ez-local-profile.sqlite";
-        public const int SCHEMA_VERSION = 1;
+
+        /// <summary>v2: per-play SSR / Dan caches for incremental (backfill) compute.</summary>
+        public const int SCHEMA_VERSION = 2;
 
         /// <summary>
         /// Logic version for aggregated stats (independent of table schema).
@@ -764,23 +766,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 long updatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
                 foreach (var (username, result) in recomputedByUsername)
-                {
-                    var payload = EzLocalProfilePartitionPayload.FromAggregation(result);
-                    string json = JsonSerializer.Serialize(payload);
-
-                    using var upsert = connection.CreateCommand();
-                    upsert.CommandText = """
-                                         INSERT INTO username_partitions (username, payload_json, updated_at)
-                                         VALUES ($username, $payload_json, $updated_at)
-                                         ON CONFLICT(username) DO UPDATE SET
-                                             payload_json = excluded.payload_json,
-                                             updated_at = excluded.updated_at;
-                                         """;
-                    upsert.Parameters.AddWithValue("$username", username);
-                    upsert.Parameters.AddWithValue("$payload_json", json);
-                    upsert.Parameters.AddWithValue("$updated_at", updatedAt);
-                    upsert.ExecuteNonQuery();
-                }
+                    writePartition(connection, username, EzLocalProfilePartitionPayload.FromAggregation(result), updatedAt);
 
                 var merged = new EzLocalProfileAggregationResult
                 {
@@ -857,6 +843,309 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 transaction.Commit();
             }
+        }
+
+        /// <summary>
+        /// Single partition payload used as the incremental compute cache, or <see langword="null"/> when absent/unreadable.
+        /// </summary>
+        public EzLocalProfilePartitionPayload? TryLoadPartitionPayload(string username)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                string? json = tryReadPartitionJson(connection, username);
+
+                if (string.IsNullOrEmpty(json))
+                    return null;
+
+                try
+                {
+                    return JsonSerializer.Deserialize<EzLocalProfilePartitionPayload>(json);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[EzLocalProfile] Failed to parse partition for {username}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
+                    return null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Persist one partition without rebuilding archive totals.
+        /// Used to flush progress during a long compute so cancelling keeps what was already analysed.
+        /// </summary>
+        public void SavePartitionPayload(string username, EzLocalProfilePartitionPayload payload)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentNullException.ThrowIfNull(payload);
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                writePartition(connection, username, payload, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+            }
+        }
+
+        /// <summary>True when stored stats came from an older analysis content version and must be rebuilt from scratch.</summary>
+        public bool NeedsRecompute()
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                return readNeedsRecompute(connection);
+            }
+        }
+
+        /// <summary>Per-play SSR cache for one algorithm version, keyed by score id (score id is globally unique).</summary>
+        public Dictionary<Guid, EzSsrPlayCacheRow> LoadSsrPlayCache(int? algorithmVersion = null)
+        {
+            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  SELECT score_id, username, beatmap_hash, key_count, rate, scored_at_ms, has_ssr, vector_json, algorithm_version
+                                  FROM ssr_score_cache
+                                  WHERE algorithm_version = $algorithm_version;
+                                  """;
+                cmd.Parameters.AddWithValue("$algorithm_version", version);
+
+                var result = new Dictionary<Guid, EzSsrPlayCacheRow>();
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    if (!Guid.TryParse(reader.GetString(0), out var scoreId))
+                        continue;
+
+                    result[scoreId] = new EzSsrPlayCacheRow(
+                        scoreId,
+                        reader.GetString(1),
+                        reader.GetString(2),
+                        reader.GetInt32(3),
+                        reader.GetDouble(4),
+                        DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(5)),
+                        reader.GetInt32(6) != 0,
+                        deserializeVector(reader.GetString(7)),
+                        reader.GetInt32(8));
+                }
+
+                return result;
+            }
+        }
+
+        public void UpsertSsrPlayCache(IReadOnlyList<EzSsrPlayCacheRow> rows)
+        {
+            if (rows.Count == 0)
+                return;
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var transaction = connection.BeginTransaction();
+
+                foreach (var row in rows)
+                {
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = """
+                                      INSERT INTO ssr_score_cache
+                                          (score_id, username, beatmap_hash, key_count, rate, scored_at_ms, has_ssr, vector_json, algorithm_version)
+                                      VALUES
+                                          ($score_id, $username, $beatmap_hash, $key_count, $rate, $scored_at_ms, $has_ssr, $vector_json, $algorithm_version)
+                                      ON CONFLICT(score_id) DO UPDATE SET
+                                          username = excluded.username,
+                                          beatmap_hash = excluded.beatmap_hash,
+                                          key_count = excluded.key_count,
+                                          rate = excluded.rate,
+                                          scored_at_ms = excluded.scored_at_ms,
+                                          has_ssr = excluded.has_ssr,
+                                          vector_json = excluded.vector_json,
+                                          algorithm_version = excluded.algorithm_version;
+                                      """;
+                    cmd.Parameters.AddWithValue("$score_id", row.ScoreId.ToString("N"));
+                    cmd.Parameters.AddWithValue("$username", row.Username);
+                    cmd.Parameters.AddWithValue("$beatmap_hash", row.BeatmapHash);
+                    cmd.Parameters.AddWithValue("$key_count", row.KeyCount);
+                    cmd.Parameters.AddWithValue("$rate", row.Rate);
+                    cmd.Parameters.AddWithValue("$scored_at_ms", row.ScoredAt.ToUnixTimeMilliseconds());
+                    cmd.Parameters.AddWithValue("$has_ssr", row.HasSsr ? 1 : 0);
+                    cmd.Parameters.AddWithValue("$vector_json", serializeVector(row.Vector));
+                    cmd.Parameters.AddWithValue("$algorithm_version", row.AlgorithmVersion);
+                    cmd.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+            }
+        }
+
+        /// <summary>Per-play Dan cache for one algorithm version, keyed by score id.</summary>
+        public Dictionary<Guid, EzDanPlayCacheRow> LoadDanPlayCache(int? algorithmVersion = null)
+        {
+            int version = algorithmVersion ?? EzDanAlgorithm.VERSION;
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = """
+                                  SELECT score_id, username, beatmap_hash, algorithm_version, credited, key_count, side, rate, credited_dan, accuracy, scored_at_ms
+                                  FROM dan_score_cache
+                                  WHERE algorithm_version = $algorithm_version;
+                                  """;
+                cmd.Parameters.AddWithValue("$algorithm_version", version);
+
+                var result = new Dictionary<Guid, EzDanPlayCacheRow>();
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    if (!Guid.TryParse(reader.GetString(0), out var scoreId))
+                        continue;
+
+                    result[scoreId] = new EzDanPlayCacheRow(
+                        scoreId,
+                        reader.GetString(1),
+                        reader.GetString(2),
+                        reader.GetInt32(3),
+                        reader.GetInt32(4) != 0,
+                        reader.GetInt32(5),
+                        reader.GetString(6),
+                        reader.GetDouble(7),
+                        reader.GetDouble(8),
+                        reader.GetDouble(9),
+                        DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(10)));
+                }
+
+                return result;
+            }
+        }
+
+        public void UpsertDanPlayCache(IReadOnlyList<EzDanPlayCacheRow> rows)
+        {
+            if (rows.Count == 0)
+                return;
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var transaction = connection.BeginTransaction();
+
+                foreach (var row in rows)
+                {
+                    using var cmd = connection.CreateCommand();
+                    cmd.CommandText = """
+                                      INSERT INTO dan_score_cache
+                                          (score_id, username, beatmap_hash, credited, key_count, side, rate, credited_dan, accuracy, scored_at_ms, algorithm_version)
+                                      VALUES
+                                          ($score_id, $username, $beatmap_hash, $credited, $key_count, $side, $rate, $credited_dan, $accuracy, $scored_at_ms, $algorithm_version)
+                                      ON CONFLICT(score_id) DO UPDATE SET
+                                          username = excluded.username,
+                                          beatmap_hash = excluded.beatmap_hash,
+                                          credited = excluded.credited,
+                                          key_count = excluded.key_count,
+                                          side = excluded.side,
+                                          rate = excluded.rate,
+                                          credited_dan = excluded.credited_dan,
+                                          accuracy = excluded.accuracy,
+                                          scored_at_ms = excluded.scored_at_ms,
+                                          algorithm_version = excluded.algorithm_version;
+                                      """;
+                    cmd.Parameters.AddWithValue("$score_id", row.ScoreId.ToString("N"));
+                    cmd.Parameters.AddWithValue("$username", row.Username);
+                    cmd.Parameters.AddWithValue("$beatmap_hash", row.BeatmapHash);
+                    cmd.Parameters.AddWithValue("$credited", row.Credited ? 1 : 0);
+                    cmd.Parameters.AddWithValue("$key_count", row.KeyCount);
+                    cmd.Parameters.AddWithValue("$side", row.Side);
+                    cmd.Parameters.AddWithValue("$rate", row.Rate);
+                    cmd.Parameters.AddWithValue("$credited_dan", row.CreditedDan);
+                    cmd.Parameters.AddWithValue("$accuracy", row.Accuracy);
+                    cmd.Parameters.AddWithValue("$scored_at_ms", row.ScoredAt.ToUnixTimeMilliseconds());
+                    cmd.Parameters.AddWithValue("$algorithm_version", row.AlgorithmVersion);
+                    cmd.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+            }
+        }
+
+        /// <summary>Drop both per-play skill caches (clear-and-rebuild path).</summary>
+        public void ClearSkillCaches()
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                // WHERE TRUE keeps the intentional full clear explicit (a bare DELETE FROM would be read as an oversight).
+                cmd.CommandText = """
+                                  DELETE FROM ssr_score_cache WHERE TRUE;
+                                  DELETE FROM dan_score_cache WHERE TRUE;
+                                  """;
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        private static void writePartition(SqliteConnection connection, string username, EzLocalProfilePartitionPayload payload, long updatedAt)
+        {
+            string json = JsonSerializer.Serialize(payload);
+
+            using var upsert = connection.CreateCommand();
+            upsert.CommandText = """
+                                 INSERT INTO username_partitions (username, payload_json, updated_at)
+                                 VALUES ($username, $payload_json, $updated_at)
+                                 ON CONFLICT(username) DO UPDATE SET
+                                     payload_json = excluded.payload_json,
+                                     updated_at = excluded.updated_at;
+                                 """;
+            upsert.Parameters.AddWithValue("$username", username);
+            upsert.Parameters.AddWithValue("$payload_json", json);
+            upsert.Parameters.AddWithValue("$updated_at", updatedAt);
+            upsert.ExecuteNonQuery();
+        }
+
+        private static string serializeVector(EzSkillsetVector vector)
+            => JsonSerializer.Serialize(new[]
+            {
+                vector.Overall,
+                vector.Stream,
+                vector.Jumpstream,
+                vector.Handstream,
+                vector.Stamina,
+                vector.JackSpeed,
+                vector.Chordjack,
+                vector.Technical,
+            });
+
+        private static EzSkillsetVector deserializeVector(string json)
+        {
+            try
+            {
+                double[]? values = JsonSerializer.Deserialize<double[]>(json);
+
+                if (values is { Length: >= EzSkillsetVector.RAW_LENGTH })
+                {
+                    return new EzSkillsetVector(
+                        values[0], values[1], values[2], values[3],
+                        values[4], values[5], values[6], values[7]);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[EzLocalProfile] Failed to parse SSR vector cache: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
+            }
+
+            return default;
         }
 
         private static void writeAggregationTables(SqliteConnection connection, EzLocalProfileAggregationResult result, bool writeDrills = true)
@@ -1450,6 +1739,34 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       ON dan_clear_evidence(username, key_count, side, credited_dan DESC);
                                   CREATE INDEX IF NOT EXISTS idx_axis_play_evidence_user
                                       ON axis_play_evidence(username, key_count, skill_id, axis_value DESC);
+                                  CREATE TABLE IF NOT EXISTS ssr_score_cache (
+                                      score_id TEXT PRIMARY KEY NOT NULL,
+                                      username TEXT NOT NULL,
+                                      beatmap_hash TEXT NOT NULL,
+                                      key_count INTEGER NOT NULL,
+                                      rate REAL NOT NULL,
+                                      scored_at_ms INTEGER NOT NULL,
+                                      has_ssr INTEGER NOT NULL,
+                                      vector_json TEXT NOT NULL,
+                                      algorithm_version INTEGER NOT NULL
+                                  );
+                                  CREATE INDEX IF NOT EXISTS idx_ssr_score_cache_user
+                                      ON ssr_score_cache(username, algorithm_version);
+                                  CREATE TABLE IF NOT EXISTS dan_score_cache (
+                                      score_id TEXT PRIMARY KEY NOT NULL,
+                                      username TEXT NOT NULL,
+                                      beatmap_hash TEXT NOT NULL,
+                                      credited INTEGER NOT NULL,
+                                      key_count INTEGER NOT NULL,
+                                      side TEXT NOT NULL,
+                                      rate REAL NOT NULL,
+                                      credited_dan REAL NOT NULL,
+                                      accuracy REAL NOT NULL,
+                                      scored_at_ms INTEGER NOT NULL,
+                                      algorithm_version INTEGER NOT NULL
+                                  );
+                                  CREATE INDEX IF NOT EXISTS idx_dan_score_cache_user
+                                      ON dan_score_cache(username, algorithm_version);
                                   """;
                 cmd.ExecuteNonQuery();
             }

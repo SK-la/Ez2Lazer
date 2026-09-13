@@ -38,8 +38,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void Persisted_ln_half_allows_hold_count_over_100_even_below_ratio()
         {
-            Assert.That(EzDanAlgorithm.AllowsPersistedChartLnHalf(4, holdRatio: 0.1, holdCount: 100), Is.False);
-            Assert.That(EzDanAlgorithm.AllowsPersistedChartLnHalf(4, holdRatio: 0.1, holdCount: 101), Is.True);
+            // Pin the threshold instead of relying on the default: the configurable-threshold test
+            // below mutates the shared config, so without this the two tests pass or fail by order.
+            using (new HoldThresholdScope(100))
+            {
+                Assert.That(EzDanAlgorithm.AllowsPersistedChartLnHalf(4, holdRatio: 0.1, holdCount: 100), Is.False);
+                Assert.That(EzDanAlgorithm.AllowsPersistedChartLnHalf(4, holdRatio: 0.1, holdCount: 101), Is.True);
+            }
         }
 
         [Test]
@@ -72,6 +77,27 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             {
                 config.SetValue(Ez2Setting.SkillLnChartMinHoldObjects, 150);
             }
+        }
+
+        /// <summary>
+        /// Sets the shared LN hold threshold and restores the previous value on dispose, so a fixture
+        /// that asserts the default does not depend on the order its tests run in.
+        /// </summary>
+        private sealed class HoldThresholdScope : IDisposable
+        {
+            private readonly int previous;
+
+            public HoldThresholdScope(int value)
+            {
+                var config = GlobalConfigStore.EzConfig;
+                GlobalConfigStore.EzConfig = config;
+
+                previous = config.Get<int>(Ez2Setting.SkillLnChartMinHoldObjects);
+                config.SetValue(Ez2Setting.SkillLnChartMinHoldObjects, value);
+            }
+
+            public void Dispose()
+                => GlobalConfigStore.EzConfig.SetValue(Ez2Setting.SkillLnChartMinHoldObjects, previous);
         }
 
         [Test]

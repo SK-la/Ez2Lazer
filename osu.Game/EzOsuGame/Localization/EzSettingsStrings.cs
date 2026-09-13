@@ -352,6 +352,59 @@ namespace osu.Game.EzOsuGame.Localization
             "Marks all beatmaps' Tag / XxySR / PP as uncomputed, then runs a full backfill."
             + "\nMay take a long time for large libraries; watch the progress notification in the top-right corner.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS =
+            new EzLocalizationManager.EzLocalisableString("技能数据状态", "Skill data status");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "统计谱面技能链（MSD → CSI → Dan）当前版本的覆盖情况，用来判断数据是否有缺失或过期。"
+            + "\n就绪 = 已是当前版本；不可评分 = 该谱面确定算不出，已结算不再重试；"
+            + "过期 = 旧版本留下的行（改过算法后会出现）；缺失 = 还没算过。"
+            + "\n健康 = 过期 + 缺失；三项独立统计，上游换版会使其下游整体变为过期。",
+            "Counts chart-skill-chain coverage (MSD -> CSI -> Dan) at the current revision, so you can tell whether data is missing or outdated."
+            + "\nready = already at the current revision; unrateable = deterministically unratable and settled (no longer retried);"
+            + " stale = a row left by an older revision (appears after an algorithm change); missing = never computed."
+            + "\nPending = stale + missing. The three facets are counted independently; bumping an upstream one turns its downstream facets stale.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_REFRESH =
+            new EzLocalizationManager.EzLocalisableString("刷新技能数据状态", "Refresh skill data status");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_REFRESH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "在后台统计一次，完成后写入上方状态行。大库可能耗时数秒。",
+            "Measures once in the background and writes the result to the status row above. May take a few seconds on a large library.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_UNMEASURED =
+            new EzLocalizationManager.EzLocalisableString("尚未统计，点下方按钮刷新。", "Not measured yet - use the button below.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_MEASURING =
+            new EzLocalizationManager.EzLocalisableString("正在统计…", "Measuring...");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_FAILED =
+            new EzLocalizationManager.EzLocalisableString("统计失败，详见日志。", "Measurement failed - see the logs.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_RUNNING =
+            new EzLocalizationManager.EzLocalisableString("（补算进行中）", " (backfill running)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_CHARTS =
+            new EzLocalizationManager.EzLocalisableString("谱面", "charts");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_READY =
+            new EzLocalizationManager.EzLocalisableString("就绪", "ready");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_UNRATEABLE =
+            new EzLocalizationManager.EzLocalisableString("不可评分", "unrateable");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_STALE =
+            new EzLocalizationManager.EzLocalisableString("过期", "stale");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_MISSING =
+            new EzLocalizationManager.EzLocalisableString("缺失", "missing");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_PENDING =
+            new EzLocalizationManager.EzLocalisableString("待补算", "pending");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_ALL_CURRENT =
+            new EzLocalizationManager.EzLocalisableString("无待补算", "nothing pending");
+
         #region 机制类
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez Mania 设置", "Ez Mania Settings");

@@ -205,15 +205,24 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string stub_hash = "unavailable-stub-hash";
                 const string real_hash = "real-csi-hash";
 
+                // Implicit stub upsert is a no-op: an Unavailable DTO must never fake "already processed".
                 store.UpsertChartSkillInfo(stub_hash, EzChartSkillInfo.Unavailable);
                 Assert.That(store.TryGetChartSkillInfo(stub_hash, out var missing), Is.False);
                 Assert.That(missing, Is.Null);
+
+                // The explicit settle write is the only way a stub lands, and it is keyed to the
+                // settled set (so BDSP stops retrying) but stays out of the "complete" set.
+                store.WriteChartSkillInfoUnavailable(stub_hash, Guid.NewGuid());
+
+                Assert.That(store.TryGetChartSkillInfo(stub_hash, out var settled), Is.True);
+                Assert.That(settled, Is.Not.Null);
+                Assert.That(settled!.IsUnavailable, Is.True);
 
                 realm.Write(r =>
                 {
                     r.Add(new EzBeatmapChartSkillInfo
                     {
-                        BeatmapHash = stub_hash,
+                        BeatmapHash = "legacy-wrong-version-stub",
                         InfoVersion = EzChartSkillInfo.VERSION,
                         ComputedAt = DateTimeOffset.UtcNow,
                         KeyCount = -1,
@@ -231,6 +240,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 var hashes = store.GetPersistedChartSkillInfoHashes();
                 Assert.That(hashes.Contains(real_hash), Is.True);
                 Assert.That(hashes.Contains(stub_hash), Is.False);
+
+                var settledHashes = store.GetSettledChartSkillInfoHashes();
+                Assert.That(settledHashes.Contains(real_hash), Is.True);
+                Assert.That(settledHashes.Contains(stub_hash), Is.True);
+                // A row stamped with the bare CSI constant (pre-revision / upstream-bumped) is not settled.
+                Assert.That(settledHashes.Contains("legacy-wrong-version-stub"), Is.False);
             });
         }
 

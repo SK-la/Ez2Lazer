@@ -14,6 +14,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
@@ -30,6 +31,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private void load(Ez2ConfigManager ezConfig,
                           BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
                           EzAnalysisWarmupProcessor? analysisWarmupProcessor,
+                          EzSkillStore? skillStore,
                           IDialogOverlay? dialogOverlay,
                           INotificationOverlay? notifications,
                           EzLocalProfileService? localProfileService,
@@ -37,7 +39,7 @@ namespace osu.Game.EzOsuGame.Overlays
                           RulesetStore? rulesetStore,
                           EzExternalRulesetManagerDialog? externalRulesetManager)
         {
-            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
+            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, skillStore, dialogOverlay, notifications, action => Scheduler.Add(action));
 
             Add(new SettingsButtonV2
             {
@@ -159,35 +161,36 @@ namespace osu.Game.EzOsuGame.Overlays
                     return;
                 }
 
-                runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), replaceIncludedUsernames: false, notifications);
+                runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), clearRebuild: false, notifications);
                 return;
             }
 
             dialogOverlay.Push(new EzLocalProfileImportDialog(
                 counts,
                 localProfileService.GetPreviouslyIncludedUsernames(),
-                (selected, replaceMode) =>
+                (selected, clearRebuild) =>
                 {
                     if (selected.Count == 0 && !localProfileService.HasOnlineScoreContributions()
-                                            && (replaceMode || localProfileService.GetPreviouslyIncludedUsernames().Count == 0))
+                                            && (clearRebuild || localProfileService.GetPreviouslyIncludedUsernames().Count == 0))
                     {
                         notifications?.Post(new SimpleNotification { Text = EzSettingsProfile.LOCAL_PROFILE_NONE_SELECTED });
                         return;
                     }
 
-                    runCompute(localProfileService, selected, replaceMode, notifications);
+                    runCompute(localProfileService, selected, clearRebuild, notifications);
                 }));
         }
 
         private void runCompute(
             EzLocalProfileService localProfileService,
             IReadOnlyCollection<string> selected,
-            bool replaceIncludedUsernames,
+            bool clearRebuild,
             INotificationOverlay? notifications)
         {
             if (notifications == null)
             {
-                localProfileService.ComputeAsync(selected, replaceIncludedUsernames).ContinueWith(t => Schedule(() =>
+                // Clear & rebuild also prunes unchecked names; the incremental backfill leaves them alone.
+                localProfileService.ComputeAsync(selected, clearRebuild, clearRebuild).ContinueWith(t => Schedule(() =>
                 {
                     if (!t.IsFaulted && !t.IsCanceled)
                         localProfileService.ReloadFromDisk();
@@ -209,7 +212,7 @@ namespace osu.Game.EzOsuGame.Overlays
             // which keeps running even if the settings panel is closed.
             var progress = new DirectLocalProfileComputeProgress(notification);
 
-            localProfileService.ComputeAsync(selected, replaceIncludedUsernames, progress, notification.CancellationToken)
+            localProfileService.ComputeAsync(selected, clearRebuild, clearRebuild, progress, notification.CancellationToken)
                                .ContinueWith(t => finishComputeNotification(t, localProfileService, notification, notifications));
         }
 
@@ -372,7 +375,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         });
 
                         if (result.StatsRecorded > 0 && localProfileService is not null && !localProfileService.IsComputing.Value)
-                            runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), replaceIncludedUsernames: false, notifications);
+                            runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), clearRebuild: false, notifications);
                     }));
                 }));
         }

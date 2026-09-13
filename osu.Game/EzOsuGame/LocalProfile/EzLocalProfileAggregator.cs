@@ -10,6 +10,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -59,61 +60,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
-        /// Detached mania scores for SSR skill aggregation, keyed by normalised username.
+        /// All valid detached scores for the given usernames (one Realm pass), keyed by normalised username.
+        /// The caller filters already-cached scores and re-chunks what is left for incremental compute.
         /// </summary>
-        public Dictionary<string, List<ScoreInfo>> CollectDetachedManiaScores(IReadOnlyCollection<string> usernames)
+        public Dictionary<string, List<ScoreInfo>> CollectDetachedScoresByUsername(
+            IReadOnlyCollection<string> usernames,
+            CancellationToken cancellationToken = default)
         {
             var includeSet = new HashSet<string>(usernames.Select(normaliseUsername), StringComparer.Ordinal);
             var byUser = new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
-
-            realm.Run(r =>
-            {
-                if (includeSet.Count == 0)
-                    return;
-
-                foreach (var score in queryValidScores(r))
-                {
-                    if (score.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
-                        continue;
-
-                    string username = normaliseUsername(score.RealmUser.Username);
-                    if (!includeSet.Contains(username))
-                        continue;
-
-                    if (score.BeatmapInfo == null)
-                        continue;
-
-                    if (!byUser.TryGetValue(username, out var list))
-                        byUser[username] = list = new List<ScoreInfo>();
-
-                    list.Add(score.DeepClone());
-                }
-            });
-
-            return byUser;
-        }
-
-        /// <summary>
-        /// Aggregate only the given usernames, returning one result slice per username (all scores counted).
-        /// Also returns detached mania scores from the same Realm pass (for skill/dan compute).
-        /// Does not merge online contributions — that happens when rebuilding display totals.
-        /// </summary>
-        /// <param name="usernames">The usernames to aggregate.</param>
-        /// <param name="progress">The progress reporter.</param>
-        /// <param name="cancellationToken">The cancellation token.</param>
-        /// <param name="cachedAvgAbsOffsets">
-        /// Previously stored drill offsets keyed by score id (HitEvents are not in Realm; bulk compute must not re-run sessions).
-        /// </param>
-        public (Dictionary<string, EzLocalProfileAggregationResult> Results, Dictionary<string, List<ScoreInfo>> ManiaScoresByUser)
-            AggregateByUsername(
-                IReadOnlyCollection<string> usernames,
-                IProgress<EzLocalProfileComputeProgress>? progress = null,
-                CancellationToken cancellationToken = default,
-                IReadOnlyDictionary<Guid, double>? cachedAvgAbsOffsets = null)
-        {
-            var includeSet = new HashSet<string>(usernames.Select(normaliseUsername), StringComparer.Ordinal);
-            var byUser = new Dictionary<string, EzLocalProfileAggregationResult>(StringComparer.Ordinal);
-            var detachedScores = new List<(string Username, ScoreInfo Score)>();
 
             realm.Run(r =>
             {
@@ -131,114 +86,146 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     if (score.BeatmapInfo == null)
                         continue;
 
-                    detachedScores.Add((username, score.DeepClone()));
+                    if (!byUser.TryGetValue(username, out var list))
+                        byUser[username] = list = new List<ScoreInfo>();
+
+                    list.Add(score.DeepClone());
                 }
             });
 
             foreach (string username in includeSet)
             {
-                byUser[username] = new EzLocalProfileAggregationResult
-                {
-                    IncludedUsernames = new[] { username },
-                    ComputedAt = DateTimeOffset.UtcNow,
-                };
+                if (!byUser.ContainsKey(username))
+                    byUser[username] = new List<ScoreInfo>();
             }
 
-            int total = Math.Max(1, detachedScores.Count);
-            int reportEvery = Math.Max(1, Math.Min(yield_every, Math.Max(1, total) / 100));
-            var attributeCache = ppResolver.CreateAttributeCache();
-            var analysisCache = new Dictionary<string, CachedAnalysis>(StringComparer.Ordinal);
-            var maniaScoresByUser = new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
-            int ppFailures = 0;
-            int ppLoggedFailures = 0;
+            return byUser;
+        }
 
-            progress?.Report(new EzLocalProfileComputeProgress(0, total, EzLocalProfileComputePhase.Analysing));
+        /// <summary>Shared per-run caches for chunked aggregation (difficulty attributes, playable analysis, failure counters).</summary>
+        public EzLocalProfileAggregationState CreateState() => new EzLocalProfileAggregationState();
 
-            for (int i = 0; i < detachedScores.Count; i++)
+        public sealed class EzLocalProfileAggregationState
+        {
+            internal Dictionary<string, DifficultyAttributes?> AttributeCache { get; } = new Dictionary<string, DifficultyAttributes?>(StringComparer.Ordinal);
+            internal Dictionary<string, CachedAnalysis> AnalysisCache { get; } = new Dictionary<string, CachedAnalysis>(StringComparer.Ordinal);
+            internal int PpFailures;
+            internal int PpLoggedFailures;
+        }
+
+        /// <summary>
+        /// Aggregate one chunk of scores into per-username result slices (all scores counted).
+        /// Reuse one <see cref="EzLocalProfileAggregationState"/> across chunks so the difficulty / playable-analysis
+        /// caches survive; only not-yet-cached scores should be passed in (incremental backfill).
+        /// Does not merge online contributions — that happens when rebuilding display totals.
+        /// </summary>
+        public Dictionary<string, EzLocalProfileAggregationResult> AggregateScores(
+            IReadOnlyList<(string Username, ScoreInfo Score)> scores,
+            EzLocalProfileAggregationState state,
+            IReadOnlyDictionary<Guid, double>? cachedAvgAbsOffsets = null,
+            Action? afterEachScore = null,
+            CancellationToken cancellationToken = default)
+        {
+            var byUser = new Dictionary<string, EzLocalProfileAggregationResult>(StringComparer.Ordinal);
+
+            for (int i = 0; i < scores.Count; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var (username, score) = detachedScores[i];
-                var result = byUser[username];
-                int rulesetId = score.Ruleset.OnlineID;
-                var beatmap = score.BeatmapInfo!;
-                bool modsAffect = EzLocalProfileModAffects.AffectsPlayableAnalysis(score.Mods);
+                var (username, score) = scores[i];
 
-                var resolved = ppResolver.Resolve(score, attributeCache, ref ppFailures, ref ppLoggedFailures);
-                double pp = resolved.Pp;
-                double starRating = resolved.StarRating >= 0 ? resolved.StarRating : beatmap.StarRating;
-
-                long keys = countKeys(score);
-                var cached = resolveAnalysis(score, modsAffect, analysisCache, cancellationToken);
-                bool hasKps = cached.HasKps;
-                var analysis = cached.Result;
-                double avgKps = hasKps ? analysis.AverageKps : 0;
-                double maxKps = hasKps ? analysis.MaxKps : 0;
-                double xxyStarRating = resolveXxyStarRating(beatmap, analysis, hasKps, modsAffect, starRating);
-                long durationMs = resolveDurationMs(score, beatmap);
-
-                double? avgAbsOffsetMs = null;
-                if (cachedAvgAbsOffsets != null && cachedAvgAbsOffsets.TryGetValue(score.ID, out double storedOffset))
-                    avgAbsOffsetMs = storedOffset;
-
-                result.DrillScores.Add(EzLocalProfileDrillScoreRow.FromScore(
-                    score,
-                    username,
-                    pp,
-                    hasKps ? analysis : default,
-                    hasKps,
-                    avgAbsOffsetMs,
-                    starRating,
-                    xxyStarRating));
-
-                var rulesetStats = getOrCreate(result.RulesetStats, rulesetId, () => new EzLocalProfileAggregationResult.MutableRulesetStats());
-                rulesetStats.TotalKeys += keys;
-                rulesetStats.ScoreCount++;
-                rulesetStats.TotalPp += pp;
-                rulesetStats.TotalDurationMs += durationMs;
-
-                if (hasKps)
+                if (!byUser.TryGetValue(username, out var result))
                 {
-                    rulesetStats.KpsSum += avgKps;
-                    rulesetStats.KpsSampleCount++;
-                    if (maxKps > rulesetStats.MaxKps)
-                        rulesetStats.MaxKps = maxKps;
+                    byUser[username] = result = new EzLocalProfileAggregationResult
+                    {
+                        IncludedUsernames = new[] { username },
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    };
                 }
 
-                incrementGrade(result, rulesetId, score.Rank);
-                incrementStar(result, rulesetId, starRating);
-                incrementXxy(result, rulesetId, xxyStarRating);
+                accumulateScore(result, username, score, state, cachedAvgAbsOffsets, cancellationToken);
 
-                if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
-                {
-                    int keyCount = resolveManiaKeyCount(score, analysis, hasKps);
-                    accumulateMania(result, keyCount, analysis, hasKps, keys, avgKps, maxKps, pp, durationMs);
+                afterEachScore?.Invoke();
 
-                    if (!maniaScoresByUser.TryGetValue(username, out var maniaList))
-                        maniaScoresByUser[username] = maniaList = new List<ScoreInfo>();
-
-                    maniaList.Add(score);
-                }
-
-                if (rulesetId == EzLocalProfileConstants.OSU_RULESET_ID)
-                    accumulateStdAttr(result, beatmap, score);
-
-                int processed = i + 1;
-                if (processed == detachedScores.Count || processed % reportEvery == 0)
-                    progress?.Report(new EzLocalProfileComputeProgress(processed, total, EzLocalProfileComputePhase.Analysing));
-
-                if (processed % yield_every == 0)
+                if ((i + 1) % yield_every == 0)
                     Thread.Sleep(1);
             }
 
-            if (ppFailures > 0)
+            if (state.PpFailures > 0)
             {
                 Logger.Log(
-                    $"[EzLocalProfile] Score analysis PP failures: {ppFailures} of {detachedScores.Count}.",
+                    $"[EzLocalProfile] Score analysis PP failures: {state.PpFailures} of {scores.Count} (this chunk).",
                     Ez2ConfigManager.LOGGER_NAME);
             }
 
-            return (byUser, maniaScoresByUser);
+            return byUser;
+        }
+
+        private void accumulateScore(
+            EzLocalProfileAggregationResult result,
+            string username,
+            ScoreInfo score,
+            EzLocalProfileAggregationState state,
+            IReadOnlyDictionary<Guid, double>? cachedAvgAbsOffsets,
+            CancellationToken cancellationToken)
+        {
+            int rulesetId = score.Ruleset.OnlineID;
+            var beatmap = score.BeatmapInfo!;
+            bool modsAffect = EzLocalProfileModAffects.AffectsPlayableAnalysis(score.Mods);
+
+            var resolved = ppResolver.Resolve(score, state.AttributeCache, ref state.PpFailures, ref state.PpLoggedFailures);
+            double pp = resolved.Pp;
+            double starRating = resolved.StarRating >= 0 ? resolved.StarRating : beatmap.StarRating;
+
+            long keys = countKeys(score);
+            var cached = resolveAnalysis(score, modsAffect, state.AnalysisCache, cancellationToken);
+            bool hasKps = cached.HasKps;
+            var analysis = cached.Result;
+            double avgKps = hasKps ? analysis.AverageKps : 0;
+            double maxKps = hasKps ? analysis.MaxKps : 0;
+            double xxyStarRating = resolveXxyStarRating(beatmap, analysis, hasKps, modsAffect, starRating);
+            long durationMs = resolveDurationMs(score, beatmap);
+
+            double? avgAbsOffsetMs = null;
+            if (cachedAvgAbsOffsets != null && cachedAvgAbsOffsets.TryGetValue(score.ID, out double storedOffset))
+                avgAbsOffsetMs = storedOffset;
+
+            result.DrillScores.Add(EzLocalProfileDrillScoreRow.FromScore(
+                score,
+                username,
+                pp,
+                hasKps ? analysis : default,
+                hasKps,
+                avgAbsOffsetMs,
+                starRating,
+                xxyStarRating));
+
+            var rulesetStats = getOrCreate(result.RulesetStats, rulesetId, () => new EzLocalProfileAggregationResult.MutableRulesetStats());
+            rulesetStats.TotalKeys += keys;
+            rulesetStats.ScoreCount++;
+            rulesetStats.TotalPp += pp;
+            rulesetStats.TotalDurationMs += durationMs;
+
+            if (hasKps)
+            {
+                rulesetStats.KpsSum += avgKps;
+                rulesetStats.KpsSampleCount++;
+                if (maxKps > rulesetStats.MaxKps)
+                    rulesetStats.MaxKps = maxKps;
+            }
+
+            incrementGrade(result, rulesetId, score.Rank);
+            incrementStar(result, rulesetId, starRating);
+            incrementXxy(result, rulesetId, xxyStarRating);
+
+            if (rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID)
+            {
+                int keyCount = resolveManiaKeyCount(score, analysis, hasKps);
+                accumulateMania(result, keyCount, analysis, hasKps, keys, avgKps, maxKps, pp, durationMs);
+            }
+
+            if (rulesetId == EzLocalProfileConstants.OSU_RULESET_ID)
+                accumulateStdAttr(result, beatmap, score);
         }
 
         /// <summary>
@@ -612,6 +599,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return created;
         }
 
-        private readonly record struct CachedAnalysis(EzAnalysisResult Result, bool HasKps);
+        internal readonly record struct CachedAnalysis(EzAnalysisResult Result, bool HasKps);
     }
 }

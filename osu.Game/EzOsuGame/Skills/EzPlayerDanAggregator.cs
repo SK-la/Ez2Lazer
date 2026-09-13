@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -20,13 +21,19 @@ namespace osu.Game.EzOsuGame.Skills
     /// </summary>
     public sealed class EzPlayerDanAggregator
     {
+        private const int cache_flush_batch = 64;
+
         private readonly BeatmapManager beatmapManager;
         private readonly EzChartDanEstimator chartDanEstimator;
+        private readonly EzSkillStore skillStore;
+        private readonly EzLocalProfileStore? profileStore;
 
-        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzChartDanEstimator chartDanEstimator)
+        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzChartDanEstimator chartDanEstimator, EzSkillStore skillStore, EzLocalProfileStore? profileStore = null)
         {
             this.beatmapManager = beatmapManager;
             this.chartDanEstimator = chartDanEstimator;
+            this.skillStore = skillStore;
+            this.profileStore = profileStore;
         }
 
         /// <summary>Credited clears collected during the last <see cref="ComputeAndStore"/> (for evidence).</summary>
@@ -43,77 +50,174 @@ namespace osu.Game.EzOsuGame.Skills
             // Best credited clear per (beatmap hash, rate) — hub collectDanClears dedupe.
             var bestByChartRate = new Dictionary<(string Hash, double Rate), EzDanClearEvidenceRow>();
 
-            foreach (var score in scores)
+            // Per-play Dan cache: an already-evaluated play skips the chart-dan estimate (incremental backfill).
+            var cachedPlays = profileStore?.LoadDanPlayCache() ?? new Dictionary<Guid, EzDanPlayCacheRow>();
+            var pendingCacheWrites = new List<EzDanPlayCacheRow>();
+
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                try
+                foreach (var score in scores)
                 {
-                    if (score.Ruleset.OnlineID != 3)
-                        continue;
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                    if (!score.Passed || score.Rank == ScoreRank.F)
-                        continue;
-
-                    if (score.Accuracy <= 0 || !double.IsFinite(score.Accuracy))
-                        continue;
-
-                    // Hub ez_windows: EZ widened hit windows — no dan credit.
-                    if (score.Mods.Any(static m => m is ModEasy))
-                        continue;
-
-                    var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == score.BeatmapHash);
-                    if (beatmapInfo == null)
-                        continue;
-
-                    if (beatmapInfo.Ruleset.OnlineID != 3)
-                        continue;
-
-                    var chart = chartDanEstimator.TryEstimate(beatmapInfo, score.Mods);
-                    if (chart == null)
-                        continue;
-
-                    double? credited = EzDanCredit.CreditedDanFor(chart.RawDan, score.Accuracy, chart.Side, chart.KeyCount);
-                    if (credited is not double value)
-                        continue;
-
-                    string hash = score.BeatmapHash;
-                    if (string.IsNullOrWhiteSpace(hash))
-                        hash = beatmapInfo.Hash;
-
-                    double rate = EzModRate.Resolve(score.Mods);
-                    var key = (hash, Math.Round(rate, 4));
-
-                    var row = new EzDanClearEvidenceRow
+                    try
                     {
-                        Username = username,
-                        KeyCount = chart.KeyCount,
-                        Side = chart.Side.ToId(),
-                        BeatmapHash = hash,
-                        Rate = rate,
-                        CreditedDan = value,
-                        Accuracy = score.Accuracy,
-                        ScoredAt = score.Date,
-                        AlgorithmVersion = EzDanAlgorithm.VERSION,
-                    };
+                        if (score.Ruleset.OnlineID != 3)
+                            continue;
 
-                    if (!bestByChartRate.TryGetValue(key, out var existing)
-                        || value > existing.CreditedDan
-                        || (Math.Abs(value - existing.CreditedDan) < 1e-9 && score.Date > existing.ScoredAt))
+                        if (!score.Passed || score.Rank == ScoreRank.F)
+                            continue;
+
+                        if (score.Accuracy <= 0 || !double.IsFinite(score.Accuracy))
+                            continue;
+
+                        // Hub ez_windows: EZ widened hit windows — no dan credit.
+                        if (score.Mods.Any(static m => m is ModEasy))
+                            continue;
+
+                        bool hasCachedPlay = cachedPlays.TryGetValue(score.ID, out var cachedPlay)
+                                             && string.Equals(cachedPlay.BeatmapHash, score.BeatmapHash, StringComparison.Ordinal);
+
+                        if (hasCachedPlay)
+                        {
+                            if (cachedPlay.Credited)
+                                mergeCachedCredit(bestByChartRate, username, cachedPlay);
+
+                            continue;
+                        }
+
+                        var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == score.BeatmapHash);
+                        if (beatmapInfo == null)
+                            continue;
+
+                        if (beatmapInfo.Ruleset.OnlineID != 3)
+                            continue;
+
+                        string hash = score.BeatmapHash;
+                        if (string.IsNullOrWhiteSpace(hash))
+                            hash = beatmapInfo.Hash;
+
+                        double rate = EzModRate.Resolve(score.Mods);
+
+                        // Fast path: with no chart-affecting mod, the persisted nomod ChartDan baseline is
+                        // exactly what TryEstimate would derive, so credit straight off it and skip the
+                        // WorkingBeatmap/playable build. Anything whole-chart (rate / key conversion /
+                        // difficulty) still needs the live estimate.
+                        EzChartDanVerdict? chart = null;
+
+                        if (!EzModRate.AffectsChartSkills(score.Mods)
+                            && skillStore.TryGetChartDan(hash, out var persisted) && persisted != null)
+                        {
+                            var side = persisted.HoldRatio >= EzDanAlgorithm.LnPrimaryMinRatioFor(persisted.KeyCount)
+                                ? EzDanSide.Ln
+                                : EzDanSide.Rc;
+
+                            chart = persisted.ToVerdict(side);
+                        }
+
+                        chart ??= chartDanEstimator.TryEstimate(beatmapInfo, score.Mods);
+
+                        if (chart == null)
+                        {
+                            // Do not cache: a missing chart-dan estimate may be transient
+                            // (beatmap analysis not computed yet), so retry it on the next run.
+                            continue;
+                        }
+
+                        double? credited = EzDanCredit.CreditedDanFor(chart.RawDan, score.Accuracy, chart.Side, chart.KeyCount);
+
+                        if (credited is not double value)
+                        {
+                            cacheNoCredit(score, username, hash, rate, pendingCacheWrites);
+                            continue;
+                        }
+
+                        var cacheRow = new EzDanPlayCacheRow(
+                            score.ID,
+                            username,
+                            hash,
+                            EzDanAlgorithm.VERSION,
+                            true,
+                            chart.KeyCount,
+                            chart.Side.ToId(),
+                            rate,
+                            value,
+                            score.Accuracy,
+                            score.Date);
+                        pendingCacheWrites.Add(cacheRow);
+                        mergeCachedCredit(bestByChartRate, username, cacheRow);
+                    }
+                    finally
                     {
-                        bestByChartRate[key] = row;
+                        if (pendingCacheWrites.Count >= cache_flush_batch)
+                            flushCache(pendingCacheWrites);
+
+                        afterEachScore?.Invoke();
                     }
                 }
-                finally
-                {
-                    afterEachScore?.Invoke();
-                }
+            }
+            finally
+            {
+                flushCache(pendingCacheWrites);
             }
 
             PendingEvidence = bestByChartRate.Values
                                              .OrderByDescending(r => r.CreditedDan)
                                              .ThenByDescending(r => r.ScoredAt)
                                              .ToList();
+        }
+
+        private static void mergeCachedCredit(
+            Dictionary<(string Hash, double Rate), EzDanClearEvidenceRow> bestByChartRate,
+            string username,
+            EzDanPlayCacheRow cachedPlay)
+        {
+            var key = (cachedPlay.BeatmapHash, Math.Round(cachedPlay.Rate, 4));
+
+            var row = new EzDanClearEvidenceRow
+            {
+                Username = username,
+                KeyCount = cachedPlay.KeyCount,
+                Side = cachedPlay.Side,
+                BeatmapHash = cachedPlay.BeatmapHash,
+                Rate = cachedPlay.Rate,
+                CreditedDan = cachedPlay.CreditedDan,
+                Accuracy = cachedPlay.Accuracy,
+                ScoredAt = cachedPlay.ScoredAt,
+                AlgorithmVersion = cachedPlay.AlgorithmVersion,
+            };
+
+            if (!bestByChartRate.TryGetValue(key, out var existing)
+                || row.CreditedDan > existing.CreditedDan
+                || (Math.Abs(row.CreditedDan - existing.CreditedDan) < 1e-9 && row.ScoredAt > existing.ScoredAt))
+            {
+                bestByChartRate[key] = row;
+            }
+        }
+
+        private static void cacheNoCredit(ScoreInfo score, string username, string hash, double rate, List<EzDanPlayCacheRow> pending)
+        {
+            pending.Add(new EzDanPlayCacheRow(
+                score.ID,
+                username,
+                hash,
+                EzDanAlgorithm.VERSION,
+                false,
+                0,
+                string.Empty,
+                rate,
+                0,
+                score.Accuracy,
+                score.Date));
+        }
+
+        private void flushCache(List<EzDanPlayCacheRow> pending)
+        {
+            if (profileStore == null || pending.Count == 0)
+                return;
+
+            profileStore.UpsertDanPlayCache(pending);
+            pending.Clear();
         }
     }
 }

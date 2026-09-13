@@ -16,13 +16,13 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("选择要导入的玩家名", "Select player names to import");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_BODY = new EzLocalizationManager.EzLocalisableString(
-            "勾选要【重新分析】的玩家名：只覆盖这些名称对应的统计切片，其它已计算名称不受影响。打开「替换模式」会删除未勾选名称的旧切片。",
-            "Check names to re-analyse: only those players’ stat slices are overwritten; other computed names stay. Enable replace mode to drop unchecked names’ old slices.");
+            "默认只补算未分析的成绩：中断后再点会接着算，已算过的成绩和技能不再重算。勾选「清空重建」会先清掉所选玩家的旧统计与缓存再整段重算，并删除未勾选玩家的旧统计。",
+            "By default only un-analysed scores are backfilled: a cancelled run resumes where it stopped, and already-analysed scores/skills are not redone. Enable “Clear & rebuild” to wipe the checked players’ stats/caches and recompute from scratch, and delete unchecked players’ old stats.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_REPLACE =
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_CLEAR_REBUILD =
             new EzLocalizationManager.EzLocalisableString(
-                "替换模式：删除未勾选名称的旧统计（不保留）",
-                "Replace mode: delete old stats for unchecked names");
+                "清空重建：清掉所选玩家旧统计并整段重算，同时删除未勾选玩家的旧统计",
+                "Clear & rebuild: wipe checked players’ stats and recompute, delete unchecked players’ stats");
 
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_CONFIRM =
             new EzLocalizationManager.EzLocalisableString("开始分析", "Analyse");

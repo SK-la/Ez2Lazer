@@ -22,7 +22,11 @@ namespace osu.Game.EzOsuGame.Skills
         [Indexed]
         public Guid BeatmapId { get; set; } = Guid.Empty;
 
-        /// <summary><see cref="EzDanAlgorithm.VERSION"/> at compute time.</summary>
+        /// <summary>
+        /// <see cref="Analysis.EzAnalysisRevision.ChartDan"/> at compute time - the composed dan
+        /// algorithm version plus its upstream facets (CSI, MSD). Filtered as an equality test by
+        /// <see cref="EzSkillStore.TryGetChartDan"/>, so any upstream bump reads old rows as a miss.
+        /// </summary>
         public int AlgorithmVersion { get; set; }
 
         public int KeyCount { get; set; }

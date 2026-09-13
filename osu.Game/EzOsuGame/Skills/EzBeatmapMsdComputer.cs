@@ -127,8 +127,13 @@ namespace osu.Game.EzOsuGame.Skills
             try
             {
                 skillStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var chartInfo);
-                if (chartInfo is { IsUnavailable: true })
-                    chartInfo = null;
+
+                // A ChartDan row is only complete together with its CSI input. Without a CSI row the
+                // resulting stamps would be missing while still carrying the current
+                // EzAnalysisRevision.ChartDan, so the incremental pass would never revisit the hash.
+                // Leave it to the chain-end ChartDan pass, which runs after CSI.
+                if (chartInfo == null || chartInfo.IsUnavailable)
+                    return;
 
                 double? xxySr = beatmapInfo.XxyStarRating >= 0 ? beatmapInfo.XxyStarRating : null;
                 var persisted = EzPersistedChartDan.TryComputeFromStored(

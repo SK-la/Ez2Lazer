@@ -121,6 +121,16 @@ namespace osu.Game.Database
         private readonly Lock ezRealmMetadataBackfillLock = new Lock();
         private bool ezRealmMetadataBackfillQueued;
 
+        /// <summary>
+        /// Request that arrived while a backfill was already running. Kept (rather than dropped) so
+        /// "a version bump is recomputed on the next launch" holds even when the startup pass loses the
+        /// race with a manual queue. Merged with any earlier deferred request; drained by the running
+        /// task before it releases the slot.
+        /// </summary>
+        private EzRealmMetadataScope? deferredEzRealmMetadataScope;
+
+        private bool deferredEzRealmMetadataForceAll;
+
         protected virtual int TimeToSleepDuringGameplay => 30000;
 
         /// <summary>
@@ -163,30 +173,88 @@ namespace osu.Game.Database
         {
             if (!tryBeginEzRealmMetadataBackfill())
             {
-                Logger.Log("Ez Realm metadata backfill is already running; ignoring duplicate request.");
+                deferEzRealmMetadataRebuild(scope, forceAll);
+                Logger.Log($"Ez Realm metadata backfill is already running; deferring {scope} (forceAll={forceAll}) to the end of that run.");
                 return EzDataRebuildDispatchResult.AlreadyRunning;
             }
 
-            Task.Factory.StartNew(() =>
-            {
-                try
-                {
-                    if (forceAll)
-                        clearEzRealmMetadata(scope);
-
-                    runEzRealmMetadataBackfill(scope);
-                }
-                catch (Exception e)
-                {
-                    Logger.Log($"Ez Realm metadata backfill failed: {e}");
-                }
-                finally
-                {
-                    endEzRealmMetadataBackfill();
-                }
-            }, TaskCreationOptions.LongRunning);
+            Task.Factory.StartNew(() => runEzRealmMetadataBackfillTask(scope, forceAll), TaskCreationOptions.LongRunning);
 
             return EzDataRebuildDispatchResult.Queued;
+        }
+
+        /// <summary>
+        /// Runs one scoped backfill, then drains anything deferred while it ran, repeating until nothing
+        /// is pending. Requests therefore pile up as a union of scopes instead of being discarded.
+        /// </summary>
+        private void runEzRealmMetadataBackfillTask(EzRealmMetadataScope scope, bool forceAll)
+        {
+            try
+            {
+                while (true)
+                {
+                    try
+                    {
+                        if (forceAll)
+                            clearEzRealmMetadata(scope);
+
+                        runEzRealmMetadataBackfill(scope);
+                    }
+                    catch (Exception e)
+                    {
+                        // A failing scope must not strand the ones deferred behind it.
+                        Logger.Log($"Ez Realm metadata backfill failed: {e}");
+                    }
+
+                    if (!finishEzRealmMetadataBackfillOrTakeDeferred(out scope, out forceAll))
+                        return;
+                }
+            }
+            finally
+            {
+                endEzRealmMetadataBackfill();
+            }
+        }
+
+        /// <summary>
+        /// Records <paramref name="scope"/> as the deferred request, unioned with any already deferred.
+        /// Caller must not hold <see cref="ezRealmMetadataBackfillLock"/>.
+        /// </summary>
+        private void deferEzRealmMetadataRebuild(EzRealmMetadataScope scope, bool forceAll)
+        {
+            lock (ezRealmMetadataBackfillLock)
+            {
+                deferredEzRealmMetadataScope = deferredEzRealmMetadataScope == null
+                    ? scope
+                    : deferredEzRealmMetadataScope.Value | scope;
+
+                deferredEzRealmMetadataForceAll |= forceAll;
+            }
+        }
+
+        /// <summary>
+        /// Atomically takes the deferred request if there is one. Otherwise releases the running slot as
+        /// part of the same lock, so a request arriving right now starts a fresh task instead of being
+        /// deferred into a task that is already exiting.
+        /// </summary>
+        private bool finishEzRealmMetadataBackfillOrTakeDeferred(out EzRealmMetadataScope scope, out bool forceAll)
+        {
+            lock (ezRealmMetadataBackfillLock)
+            {
+                if (deferredEzRealmMetadataScope == null)
+                {
+                    ezRealmMetadataBackfillQueued = false;
+                    scope = default;
+                    forceAll = false;
+                    return false;
+                }
+
+                scope = deferredEzRealmMetadataScope.Value;
+                forceAll = deferredEzRealmMetadataForceAll;
+                deferredEzRealmMetadataScope = null;
+                deferredEzRealmMetadataForceAll = false;
+                return true;
+            }
         }
 
         private bool tryBeginEzRealmMetadataBackfill()
@@ -415,7 +483,10 @@ namespace osu.Game.Database
                     }
                     else
                     {
-                        Logger.Log("Skipping startup Ez Realm metadata backfill because another backfill is already running.");
+                        // Another pass (manual queue) holds the slot. Defer instead of dropping, so a
+                        // version bump is still recomputed on this launch once that pass finishes.
+                        deferEzRealmMetadataRebuild(EzRealmMetadataScope.All, forceAll: false);
+                        Logger.Log("Startup Ez Realm metadata backfill deferred: another backfill is running; it will run again when that one finishes.");
                     }
 
                     populateMissingStarRatings();
@@ -520,6 +591,17 @@ namespace osu.Game.Database
                         r.Find<RulesetInfo>(ruleset.ShortName)!.LastAppliedXxySrVersion = currentVersion;
                     });
 
+                    // Mania ChartDan is read off xxy SR (the 4K Sunny intervals lookup), so a new xxy
+                    // version retires those rows. Unlike the MSD chain, the chart-chain revisions do not
+                    // fold the xxy version in (xxy lives on BeatmapInfo and this ruleset scalar), so the
+                    // stale rows have to be dropped explicitly - otherwise the incremental ChartDan pass
+                    // keeps skipping hashes that already have a row.
+                    if (ruleset.OnlineID == 3)
+                    {
+                        Logger.Log($"Resetting mania ChartDan for xxy version {ruleset.LastAppliedXxySrVersion} -> {currentVersion}");
+                        skillStore.ClearChartDan();
+                    }
+
                     Logger.Log($"Finished resetting {countReset} beatmaps for xxy {ruleset.Name}");
                 }
             }
@@ -550,13 +632,11 @@ namespace osu.Game.Database
 
             Logger.Log($"Resetting beatmap MSD for mania (mania skill version updated from {liveState.Item2} to {current_version})");
 
+            // Only MSD is cleared here. ChartSkillInfo and ChartDan rows read MSD, but both are stamped
+            // with EzAnalysisRevision.ChartSkillInfo/ChartDan, which fold EzManiaSkillAlgorithm.VERSION -
+            // so they already read as stale and the ordinary incremental passes recompute them. Bulk
+            // clearing them would erase the "stale" evidence the status UI reports.
             skillStore.ClearBeatmapMsd();
-
-            // MSD-derived caches must fall with it: ChartSkillInfo (HandstreamEndurance) and
-            // ChartDan both read MSD, and populateMissingChartDan skips hashes that already have
-            // a row — leaving them would keep DualPanel chart halves on the previous engine.
-            skillStore.ClearChartSkillInfo();
-            skillStore.ClearChartDan();
 
             realmAccess.Write(r =>
             {
@@ -581,13 +661,41 @@ namespace osu.Game.Database
             if (scope.HasFlag(EzRealmMetadataScope.Tags))
                 populateMissingBeatmapTagFlags();
 
-            // MSD before ChartSkillInfo — filing prefers stored axes when present.
-            // ChartDan after MSD (+ CSI when available) — FromMsd + BucketsForValues, no playable.
-            // When CSI (and typically ChartDan) share this job, defer MSD's early ChartDan upsert
-            // so stamps can include CSI; skill-scene scopes also refresh existing ChartDan rows.
+            // Chart chain in dependency order: MSD -> CSI -> ChartDan. Every stage is a true
+            // incremental pass keyed on its facet revision (EzAnalysisRevision), so bumping a stage
+            // version (or an upstream one) retires exactly the affected rows and this job recomputes
+            // them - no bulk clearing, and "stale" stays observable.
+            bool chartChainScope = scope.HasFlag(EzRealmMetadataScope.Msd)
+                                   || scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
+                                   || scope.HasFlag(EzRealmMetadataScope.ChartDan);
+
+            List<ManiaChartCandidate>? candidates = null;
+
+            if (chartChainScope)
+            {
+                candidates = collectManiaChartCandidates();
+
+                if (candidates.Count == 0)
+                    return;
+
+                // Names the revisions in force, so a version bump reads as an explanation for the
+                // recompute instead of the job appearing to act for no reason. Rows stamped with an
+                // older revision are simply "missing" to the incremental passes below (nothing is
+                // bulk-cleared), so this line plus the per-stage progress notifications are the
+                // whole startup signal.
+                Logger.Log("Ez chart chain revisions: "
+                           + $"MSD v{EzAnalysisRevision.Msd}, "
+                           + $"CSI v{EzAnalysisRevision.ChartSkillInfo} ({EzAnalysisRevision.DescribeChartSkillInfo(EzAnalysisRevision.ChartSkillInfo)}), "
+                           + $"Dan v{EzAnalysisRevision.ChartDan} ({EzAnalysisRevision.DescribeChartDan(EzAnalysisRevision.ChartDan)}); "
+                           + $"{candidates.Count} candidate charts.");
+            }
+
+            // Defer the MSD side-upsert whenever CSI shares this job: the chain-end Dan pass owns the
+            // write then, so the row is stamped with CSI included. EzBeatmapMsdComputer independently
+            // refuses to stamp a Dan row while CSI is unsettled, so a MSD-only job cannot produce a
+            // CSI-less Dan row either.
             bool deferChartDanSideUpsert = scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
                                            || scope.HasFlag(EzRealmMetadataScope.ChartDan);
-            bool refreshExistingChartDan = isSkillsChartSceneScope(scope);
 
             if (scope.HasFlag(EzRealmMetadataScope.Msd))
             {
@@ -595,7 +703,7 @@ namespace osu.Game.Database
 
                 try
                 {
-                    populateMissingBeatmapMsd();
+                    populateMissingBeatmapMsd(candidates!);
                 }
                 finally
                 {
@@ -604,26 +712,45 @@ namespace osu.Game.Database
             }
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo))
-                populateMissingChartSkillInfo();
+                populateMissingChartSkillInfo(candidates!);
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartDan))
-                populateMissingChartDan(refreshExistingChartDan);
+                populateMissingChartDan(candidates!);
         }
 
         /// <summary>
-        /// DualPanel (CSI|Dan) or skill chain (MSD|CSI|Dan) — not RealmAll (which also has Tags/Xxy/Pp).
+        /// One mania candidate list for the whole chart chain, so a full job scans
+        /// <see cref="BeatmapInfo"/> once instead of once per stage.
         /// </summary>
-        private static bool isSkillsChartSceneScope(EzRealmMetadataScope scope)
+        private List<ManiaChartCandidate> collectManiaChartCandidates()
         {
-            const EzRealmMetadataScope skills_bits = EzRealmMetadataScope.Msd
-                                                     | EzRealmMetadataScope.ChartSkillInfo
-                                                     | EzRealmMetadataScope.ChartDan;
+            var candidates = new List<ManiaChartCandidate>();
 
-            if (!scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo) || !scope.HasFlag(EzRealmMetadataScope.ChartDan))
-                return false;
+            realmAccess.Run(r =>
+            {
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null)
+                        continue;
 
-            return (scope & ~skills_bits) == 0;
+                    if (b.Ruleset.OnlineID != 3)
+                        continue;
+
+                    if (string.IsNullOrEmpty(b.Hash))
+                        continue;
+
+                    candidates.Add(new ManiaChartCandidate(b.ID, b.Hash, (int)Math.Round(b.Difficulty.CircleSize)));
+                }
+            });
+
+            return candidates;
         }
+
+        /// <summary>
+        /// A mania chart the chain may rate. <paramref name="KeyCount"/> is the raw CS-derived column
+        /// count; stages apply their own supported-keymode gate.
+        /// </summary>
+        private readonly record struct ManiaChartCandidate(Guid Id, string Hash, int KeyCount);
 
         private void clearEzRealmMetadata(EzRealmMetadataScope scope)
         {
@@ -887,54 +1014,39 @@ namespace osu.Game.Database
         /// Backfill NoMod 1.0x beatmap MSD axes into <see cref="EzBeatmapSkillValue"/>.
         /// Behaviour mirrors <see cref="populateMissingXxyStarRatings"/>: beatmap-level query, compute and write.
         /// </summary>
-        private void populateMissingBeatmapMsd()
+        private void populateMissingBeatmapMsd(List<ManiaChartCandidate> candidates)
         {
             Logger.Log("Querying for mania beatmaps with missing MSD...");
 
-            List<(Guid Id, string Hash)> candidates = new List<(Guid, string)>();
+            // Exclude keymodes the n-key engine cannot rate at candidate time so they never enter
+            // the missing set (a loop-only skip left them as perpetual false-missing every launch).
             int skippedUnsupportedKeyCount = 0;
+            var supported = new List<ManiaChartCandidate>(candidates.Count);
 
-            realmAccess.Run(r =>
+            foreach (var candidate in candidates)
             {
-                foreach (var b in r.All<BeatmapInfo>())
+                if (candidate.KeyCount > 0 && !EzNKeyMsdEngine.IsSupportedKeyCount(candidate.KeyCount))
                 {
-                    if (b.BeatmapSet == null)
-                        continue;
-
-                    if (b.Ruleset.OnlineID != 3)
-                        continue;
-
-                    if (string.IsNullOrEmpty(b.Hash))
-                        continue;
-
-                    // Exclude keymodes the n-key engine cannot rate at candidate time so they
-                    // never enter the missing set (loop-only skip left them as perpetual
-                    // false-missing every launch).
-                    int keyCount = (int)Math.Round(b.Difficulty.CircleSize);
-
-                    if (keyCount > 0 && !EzNKeyMsdEngine.IsSupportedKeyCount(keyCount))
-                    {
-                        ++skippedUnsupportedKeyCount;
-                        continue;
-                    }
-
-                    candidates.Add((b.ID, b.Hash));
+                    ++skippedUnsupportedKeyCount;
+                    continue;
                 }
-            });
+
+                supported.Add(candidate);
+            }
 
             if (skippedUnsupportedKeyCount > 0)
                 Logger.Log($"Skipping {skippedUnsupportedKeyCount} mania beatmaps with unsupported keycounts for MSD.");
 
-            if (candidates.Count == 0)
+            if (supported.Count == 0)
                 return;
 
             var completeHashes = skillStore.GetSettledBeatmapMsdHashes();
-            var missing = candidates.Where(c => !completeHashes.Contains(c.Hash)).ToList();
+            var missing = supported.Where(c => !completeHashes.Contains(c.Hash)).ToList();
 
             if (missing.Count == 0)
                 return;
 
-            Logger.Log($"Found {missing.Count} beatmaps which require MSD reprocessing.");
+            Logger.Log($"Found {missing.Count} beatmaps which require MSD reprocessing (revision {EzAnalysisRevision.Msd}).");
 
             var notification = showProgressNotification(missing.Count, "Reprocessing beatmap MSD", "beatmaps' MSD have been updated");
 
@@ -943,14 +1055,14 @@ namespace osu.Game.Database
             int attemptedCount = 0;
             const int log_every = 25;
 
-            foreach (var (id, _) in missing)
+            foreach (var candidate in missing)
             {
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
 
                 sleepIfRequired();
 
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(candidate.Id)?.Detach());
 
                 if (beatmap == null)
                 {
@@ -992,41 +1104,45 @@ namespace osu.Game.Database
 
         /// <summary>
         /// Backfill typed <see cref="EzBeatmapChartSkillInfo"/> for mania beatmaps (EZ9 debt: schema without warm).
-        /// Prefer running after <see cref="populateMissingBeatmapMsd"/> so Compute can read stored axes.
+        /// Requires the chart's MSD to be settled first: <c>HandstreamEndurance</c> is derived from the
+        /// stored axes, so a CSI row computed without MSD would silently stamp a wrong value. Candidates
+        /// whose MSD is still pending are deferred to a later run rather than analysed on partial input.
         /// </summary>
-        private void populateMissingChartSkillInfo()
+        private void populateMissingChartSkillInfo(List<ManiaChartCandidate> candidates)
         {
             Logger.Log("Querying for mania beatmaps with missing ChartSkillInfo...");
 
-            List<(Guid Id, string Hash)> candidates = new List<(Guid, string)>();
+            var settledMsd = skillStore.GetSettledBeatmapMsdHashes();
 
-            realmAccess.Run(r =>
+            int waitingOnMsd = 0;
+            var ready = new List<ManiaChartCandidate>(candidates.Count);
+
+            foreach (var candidate in candidates)
             {
-                foreach (var b in r.All<BeatmapInfo>())
+                if (!settledMsd.Contains(candidate.Hash))
                 {
-                    if (b.BeatmapSet == null)
-                        continue;
-
-                    if (b.Ruleset.OnlineID != 3)
-                        continue;
-
-                    if (string.IsNullOrEmpty(b.Hash))
-                        continue;
-
-                    candidates.Add((b.ID, b.Hash));
+                    ++waitingOnMsd;
+                    continue;
                 }
-            });
 
-            if (candidates.Count == 0)
-                return;
+                ready.Add(candidate);
+            }
 
-            var completeHashes = skillStore.GetPersistedChartSkillInfoHashes();
-            var missing = candidates.Where(c => !completeHashes.Contains(c.Hash)).ToList();
+            if (waitingOnMsd > 0)
+                Logger.Log($"Deferring {waitingOnMsd} ChartSkillInfo candidates until MSD is complete (run Realm MSD first).");
+
+            // Settled includes a stamped unavailable stub: that stub exists precisely so a chart which
+            // cannot be loaded is not re-converted on every run.
+            var settled = skillStore.GetSettledChartSkillInfoHashes();
+            var missing = ready.Where(c => !settled.Contains(c.Hash)).ToList();
 
             if (missing.Count == 0)
+            {
+                Logger.Log($"ChartSkillInfo backfill: nothing ready (have CSI or waiting on MSD). waitingOnMsd={waitingOnMsd}");
                 return;
+            }
 
-            Logger.Log($"Found {missing.Count} beatmaps which require ChartSkillInfo reprocessing.");
+            Logger.Log($"Found {missing.Count} beatmaps which require ChartSkillInfo reprocessing (revision {EzAnalysisRevision.ChartSkillInfo}).");
 
             var notification = showProgressNotification(missing.Count, "Reprocessing ChartSkillInfo", "beatmaps' ChartSkillInfo have been updated");
 
@@ -1035,14 +1151,14 @@ namespace osu.Game.Database
             int attemptedCount = 0;
             const int log_every = 25;
 
-            foreach (var (id, _) in missing)
+            foreach (var candidate in missing)
             {
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
 
                 sleepIfRequired();
 
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(candidate.Id)?.Detach());
 
                 if (beatmap == null)
                 {
@@ -1057,9 +1173,9 @@ namespace osu.Game.Database
                     if (!beatmap.Ruleset.Available)
                         beatmap.Ruleset.Available = true;
 
-                    var info = skillProvider.TryGetOrComputeChartSkillInfo(beatmap);
-
-                    if (info != null)
+                    // True = settled afterwards (computed now, or stamped unavailable because the
+                    // chart cannot be loaded). False = transient failure, retried on a later run.
+                    if (skillProvider.TryEnsureChartSkillInfoForBackfill(beatmap))
                         ++processedCount;
                     else
                         ++failedCount;
@@ -1083,64 +1199,47 @@ namespace osu.Game.Database
         /// <summary>
         /// Backfill nomod <see cref="EzBeatmapChartDan"/> from stored MSD (+ CSI / xxy when present).
         /// Prefer no <c>GetPlayable</c> — hold from MSD <c>hold_ratio</c> or CSI <c>LnRatio</c>.
-        /// Candidate set mirrors MSD: skip unsupported keymodes; only attempt hashes with complete MSD
-        /// (missing MSD is deferred, not counted as ChartDan failure).
+        /// <para>
+        /// True incremental pass: candidate set mirrors MSD (supported keymodes, complete MSD) and a row
+        /// is skipped when <see cref="EzAnalysisRevision.ChartDan"/> already matches. When the dan
+        /// algorithm, CSI, or MSD version changes, the revision changes and those rows fall back into the
+        /// missing set — there is no separate "refresh everything" mode, which is what made the manual
+        /// backfill recompute the whole library.
+        /// </para>
         /// </summary>
-        /// <param name="refreshExisting">
-        /// When true (DualPanel / skill-chain scenes), recompute even if a ChartDan row already exists
-        /// so CSI stamps land after an earlier MSD-only side upsert.
-        /// </param>
-        private void populateMissingChartDan(bool refreshExisting = false)
+        private void populateMissingChartDan(List<ManiaChartCandidate> candidates)
         {
-            Logger.Log(refreshExisting
-                ? "Querying for mania beatmaps needing ChartDan refresh (skill scene)..."
-                : "Querying for mania beatmaps with missing ChartDan...");
+            Logger.Log("Querying for mania beatmaps with missing ChartDan...");
 
-            List<(Guid Id, string Hash)> candidates = new List<(Guid, string)>();
             int skippedUnsupportedKeyCount = 0;
+            var supported = new List<ManiaChartCandidate>(candidates.Count);
 
-            realmAccess.Run(r =>
+            foreach (var candidate in candidates)
             {
-                foreach (var b in r.All<BeatmapInfo>())
+                if (candidate.KeyCount > 0 && !EzNKeyMsdEngine.IsSupportedKeyCount(candidate.KeyCount))
                 {
-                    if (b.BeatmapSet == null)
-                        continue;
-
-                    if (b.Ruleset.OnlineID != 3)
-                        continue;
-
-                    if (string.IsNullOrEmpty(b.Hash))
-                        continue;
-
-                    int keyCount = (int)Math.Round(b.Difficulty.CircleSize);
-
-                    if (keyCount > 0 && !EzNKeyMsdEngine.IsSupportedKeyCount(keyCount))
-                    {
-                        ++skippedUnsupportedKeyCount;
-                        continue;
-                    }
-
-                    candidates.Add((b.ID, b.Hash));
+                    ++skippedUnsupportedKeyCount;
+                    continue;
                 }
-            });
+
+                supported.Add(candidate);
+            }
 
             if (skippedUnsupportedKeyCount > 0)
                 Logger.Log($"Skipping {skippedUnsupportedKeyCount} mania beatmaps with unsupported keycounts for ChartDan (same as MSD).");
 
-            if (candidates.Count == 0)
+            if (supported.Count == 0)
                 return;
 
-            var completeChartDan = refreshExisting
-                ? new HashSet<string>(StringComparer.Ordinal)
-                : skillStore.GetPersistedChartDanHashes();
+            var completeChartDan = skillStore.GetPersistedChartDanHashes();
             var settledMsd = skillStore.GetSettledBeatmapMsdHashes();
             var completeMsd = skillStore.GetCompleteBeatmapMsdHashes();
 
             int waitingOnMsd = 0;
             int skippedUnrateableMsd = 0;
-            var missing = new List<(Guid Id, string Hash)>();
+            var missing = new List<ManiaChartCandidate>();
 
-            foreach (var candidate in candidates)
+            foreach (var candidate in supported)
             {
                 if (completeChartDan.Contains(candidate.Hash))
                     continue;
@@ -1173,9 +1272,7 @@ namespace osu.Game.Database
                 return;
             }
 
-            Logger.Log(refreshExisting
-                ? $"Found {missing.Count} beatmaps which require ChartDan refresh (have complete MSD)."
-                : $"Found {missing.Count} beatmaps which require ChartDan reprocessing (have complete MSD).");
+            Logger.Log($"Found {missing.Count} beatmaps which require ChartDan reprocessing (revision {EzAnalysisRevision.ChartDan}, have complete MSD).");
 
             var notification = showProgressNotification(missing.Count, "Reprocessing ChartDan", "beatmaps' ChartDan have been updated");
 
@@ -1184,14 +1281,14 @@ namespace osu.Game.Database
             int attemptedCount = 0;
             const int log_every = 25;
 
-            foreach (var (id, hash) in missing)
+            foreach (var candidate in missing)
             {
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
 
                 sleepIfRequired();
 
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(candidate.Id)?.Detach());
 
                 if (beatmap == null)
                 {
@@ -1203,7 +1300,7 @@ namespace osu.Game.Database
 
                 try
                 {
-                    var msd = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD);
+                    var msd = skillStore.GetBeatmapSkills(candidate.Hash, EzSkillSystems.BEATMAP_MSD);
 
                     // completeMsd already filtered; re-check guards races / version drift mid-run.
                     if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
@@ -1221,10 +1318,11 @@ namespace osu.Game.Database
                     double holdRatio = 0;
                     if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
                         holdRatio = Math.Clamp(cachedHold, 0, 1);
-                    else if (skillStore.TryGetChartSkillInfo(hash, out var csiHold) && csiHold?.LnRatio is double lnRatio && double.IsFinite(lnRatio))
+                    else if (skillStore.TryGetChartSkillInfo(candidate.Hash, out var csiHold) && csiHold?.LnRatio is double lnRatio && double.IsFinite(lnRatio))
                         holdRatio = Math.Clamp(lnRatio, 0, 1);
 
-                    skillStore.TryGetChartSkillInfo(hash, out var chartInfo);
+                    // An unavailable stub is not usable input; fall back to the MSD-derived values.
+                    skillStore.TryGetChartSkillInfo(candidate.Hash, out var chartInfo);
                     if (chartInfo is { IsUnavailable: true })
                         chartInfo = null;
 
@@ -1234,7 +1332,7 @@ namespace osu.Game.Database
                     int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmap);
 
                     var persisted = EzPersistedChartDan.TryComputeFromStored(
-                        hash,
+                        candidate.Hash,
                         beatmap.ID,
                         msd,
                         keyCount,
