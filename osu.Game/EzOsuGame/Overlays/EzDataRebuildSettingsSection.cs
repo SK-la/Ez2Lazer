@@ -1,13 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
-using System.Threading.Tasks;
 using osu.Framework.Bindables;
-using osu.Framework.Logging;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -30,8 +26,7 @@ namespace osu.Game.EzOsuGame.Overlays
             EzAnalysisWarmupProcessor? analysisWarmupProcessor,
             EzSkillStore? skillStore,
             IDialogOverlay? dialogOverlay,
-            INotificationOverlay? notifications,
-            Action<Action> runOnUpdateThread)
+            INotificationOverlay? notifications)
         {
             var rebuildTarget = new Bindable<EzDataRebuildTarget>(EzDataRebuildTarget.RealmChartSkillChain);
             var maintenanceHandler = new EzDataRebuildMaintenanceHandler(backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
@@ -63,21 +58,19 @@ namespace osu.Game.EzOsuGame.Overlays
 
             subsection.Add(executeButton);
 
-            addSkillDataStatus(subsection, backgroundDataStoreProcessor, skillStore, runOnUpdateThread);
+            addSkillDataStatus(subsection, backgroundDataStoreProcessor, skillStore);
         }
 
         /// <summary>
-        /// Read-only status row + refresh button for the chart skill chain. The measurement enumerates
-        /// every mania chart plus the three facet tables, so it runs on a background task and only the
-        /// formatted line is marshalled back to the update thread.
+        /// Note readout + refresh button for the chart skill chain. The readout measures itself as soon as the
+        /// settings panel is shown; the button only re-measures on demand (e.g. once a backfill has finished).
         /// </summary>
         private static void addSkillDataStatus(
             SettingsSubsection subsection,
             BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
-            EzSkillStore? skillStore,
-            Action<Action> runOnUpdateThread)
+            EzSkillStore? skillStore)
         {
-            var statusText = new Bindable<string>(EzSettingsStrings.SKILL_DATA_STATUS_UNMEASURED);
+            var statusNote = new EzSkillDataStatusNote(skillStore, backgroundDataStoreProcessor);
 
             var refreshButton = new SettingsButtonV2
             {
@@ -87,76 +80,14 @@ namespace osu.Game.EzOsuGame.Overlays
             };
 
             refreshButton.Enabled.Value = skillStore != null;
-            refreshButton.Action = () =>
-            {
-                if (skillStore == null)
-                    return;
+            refreshButton.Action = statusNote.Measure;
 
-                refreshButton.Enabled.Value = false;
-                statusText.Value = EzSettingsStrings.SKILL_DATA_STATUS_MEASURING;
-
-                Task.Run(() =>
-                {
-                    string line;
-
-                    try
-                    {
-                        line = describeSkillDataStatus(skillStore.GetSkillDataStatus(),
-                            backgroundDataStoreProcessor?.IsEzRealmMetadataBackfillRunning == true);
-                    }
-                    catch (Exception e)
-                    {
-                        Logger.Log($"[EzSkills] Skill data status measurement failed: {e}",
-                            Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-                        line = EzSettingsStrings.SKILL_DATA_STATUS_FAILED;
-                    }
-
-                    // Marshalled back to the update thread: Realm reads are fine off-thread but the
-                    // bindable feeds a drawable.
-                    runOnUpdateThread(() =>
-                    {
-                        statusText.Value = line;
-                        refreshButton.Enabled.Value = true;
-                    });
-                });
-            };
+            // The note also measures on load; keep the button disabled while a measurement is in flight so the
+            // manual pass cannot stack on top of it.
+            statusNote.Measuring.BindValueChanged(m => refreshButton.Enabled.Value = skillStore != null && !m.NewValue);
 
             subsection.Add(refreshButton);
-
-            subsection.Add(new SettingsItemV2(new FormTextBox
-            {
-                Caption = EzSettingsStrings.SKILL_DATA_STATUS,
-                HintText = EzSettingsStrings.SKILL_DATA_STATUS_TOOLTIP,
-                ReadOnly = true,
-                Current = statusText,
-            })
-            {
-                Keywords = skill_data_keywords,
-            });
-        }
-
-        private static string describeSkillDataStatus(EzSkillDataStatus status, bool backfillRunning)
-        {
-            string describeFacet(string name, EzFacetStatus facet)
-                => $"{name} {EzSettingsStrings.SKILL_DATA_STATUS_READY} {facet.Ready}"
-                   + $" {EzSettingsStrings.SKILL_DATA_STATUS_UNRATEABLE} {facet.Unrateable}"
-                   + $" {EzSettingsStrings.SKILL_DATA_STATUS_STALE} {facet.Stale}"
-                   + $" {EzSettingsStrings.SKILL_DATA_STATUS_MISSING} {facet.Missing}";
-
-            string pending = status.HasWorkToDo
-                ? $"{EzSettingsStrings.SKILL_DATA_STATUS_PENDING} {status.TotalPending}"
-                : EzSettingsStrings.SKILL_DATA_STATUS_ALL_CURRENT;
-
-            string line = $"{EzSettingsStrings.SKILL_DATA_STATUS_CHARTS} {status.TotalCharts}"
-                          + $" · {describeFacet("MSD", status.Msd)}"
-                          + $" · {describeFacet("CSI", status.ChartSkillInfo)}"
-                          + $" · {describeFacet("Dan", status.ChartDan)}"
-                          + $" · {pending}";
-
-            if (backfillRunning)
-                line += EzSettingsStrings.SKILL_DATA_STATUS_RUNNING;
-
-            return line;
+            subsection.Add(statusNote);
         }
     }
 }

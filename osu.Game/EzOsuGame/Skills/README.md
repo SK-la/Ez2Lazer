@@ -101,7 +101,8 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
 - 启动日志：`Ez chart chain revisions: MSD v…, CSI v… (policy=… …), Dan v… (…)`。
 - 每一段补算仍各自 `showProgressNotification`；因为过期行对增量集合就是"缺失"，换版后启动会自动弹进度。
 - 设置 → Ez → 实验性 → **技能数据状态**：`EzSkillStore.GetSkillDataStatus()` 的
-  ready / unrateable / stale / missing，回答"数据有没有缺、有没有过期"。
+  ready / unrateable / stale / missing，回答"数据有没有缺、有没有过期"；同一行末尾附带玩家链的
+  「玩家技能 过期 N」（`GetStalePlayerSkillUsernames()`），所以两条链的状态在一个地方能看完。
 - 玩家侧另有一套可见性：`EzPlayerSkillValue.Stale` 在个人主页显示为「待更新」
   （`LOCAL_PROFILE_SKILL_STALE`），启动补算则弹「启动补算：…」进度通知。
 
