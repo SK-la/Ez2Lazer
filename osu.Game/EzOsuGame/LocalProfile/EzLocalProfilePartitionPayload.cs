@@ -12,6 +12,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
     /// </summary>
     public sealed class EzLocalProfilePartitionPayload
     {
+        /// <summary>
+        /// Analysis content version (<see cref="EzLocalProfileStore.CONTENT_VERSION"/>) this slice was computed with.
+        /// A slice from an older version is stale and cannot be reused as an incremental cache.
+        /// Missing/0 means pre-versioning data.
+        /// </summary>
+        public int ContentVersion { get; set; }
+
         public List<PartitionRulesetStats> RulesetStats { get; set; } = new List<PartitionRulesetStats>();
         public List<PartitionManiaKeyStats> ManiaKeyStats { get; set; } = new List<PartitionManiaKeyStats>();
         public List<PartitionManiaColumnStats> ManiaColumnStats { get; set; } = new List<PartitionManiaColumnStats>();
@@ -23,7 +30,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public static EzLocalProfilePartitionPayload FromAggregation(EzLocalProfileAggregationResult result)
         {
-            var payload = new EzLocalProfilePartitionPayload();
+            var payload = new EzLocalProfilePartitionPayload
+            {
+                ContentVersion = EzLocalProfileStore.CONTENT_VERSION,
+            };
 
             foreach (var (rulesetId, stats) in result.RulesetStats)
             {

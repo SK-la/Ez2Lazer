@@ -292,8 +292,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
             IProgress<EzLocalProfileComputeProgress>? progress,
             CancellationToken token)
         {
-            bool contentCurrent = !clearRebuild && !Store.NeedsRecompute();
-
             var collected = aggregator.CollectDetachedScoresByUsername(selected, token);
             var cachedOffsets = Store.LoadAvgAbsOffsets(selected);
 
@@ -304,13 +302,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 var current = collected.TryGetValue(username, out var list) ? list : new List<ScoreInfo>();
                 var currentIds = new HashSet<Guid>(current.Select(s => s.ID));
 
-                EzLocalProfilePartitionPayload? existing = contentCurrent
-                    ? Store.TryLoadPartitionPayload(username)
-                    : null;
+                // Clear-and-rebuild ignores the stored slice; a backfill reuses it as the incremental cache.
+                EzLocalProfilePartitionPayload? existing = clearRebuild
+                    ? null
+                    : Store.TryLoadPartitionPayload(username);
 
-                // A partition is only reusable when every stored drill still maps to a live score;
-                // a leftover (deleted score) forces that name to rebuild so stale rows do not linger.
-                bool reusable = existing != null && existing.DrillScores.All(d => currentIds.Contains(d.ScoreId));
+                // Reusable only when the slice was computed with the current analysis logic AND every stored
+                // drill still maps to a live score (a leftover from a deleted score forces that name to rebuild).
+                bool reusable = existing != null
+                                && existing.ContentVersion == EzLocalProfileStore.CONTENT_VERSION
+                                && existing.DrillScores.All(d => currentIds.Contains(d.ScoreId));
 
                 var merged = new EzLocalProfileAggregationResult { IncludedUsernames = new[] { username } };
                 var done = new HashSet<Guid>();
