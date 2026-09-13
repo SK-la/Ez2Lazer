@@ -59,6 +59,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
+        public void File_hint_prefers_hash_over_path()
+        {
+            Assert.That(EzMinaCalcFacade.BuildOsuFileHint("abc123", 6), Is.EqualTo("abc123.osu"));
+            Assert.That(EzMinaCalcFacade.BuildOsuFileHint(string.Empty, 4), Is.EqualTo("4k.osu"));
+        }
+
+        [Test]
         public void Msd_from_osu_text_rates_7k()
         {
             string chart = buildManiaChart(keyCount: 7, rows: 40);

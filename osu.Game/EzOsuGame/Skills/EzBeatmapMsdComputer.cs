@@ -172,7 +172,7 @@ namespace osu.Game.EzOsuGame.Skills
                 string? osuText = tryReadOsuText(working, beatmapInfo) ?? tryEncodePlayable(working, playable);
 
                 if (!string.IsNullOrWhiteSpace(osuText))
-                    return calc.CalculateMsdFromOsuText(osuText, beatmapInfo.Path ?? $"{keyCount}k.osu");
+                    return calc.CalculateMsdFromOsuText(osuText, EzMinaCalcFacade.BuildOsuFileHint(beatmapInfo.Hash, keyCount));
             }
 
             // Note-array path: 4K only on this package.

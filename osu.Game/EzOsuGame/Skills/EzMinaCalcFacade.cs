@@ -31,6 +31,13 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Keymodes <c>CalculateAtRateFromString</c> accepts on MinaCalc 0.4.2.</summary>
         public static bool SupportsOsuTextKeyCount(int keyCount) => keyCount is 4 or 6 or 7;
 
+        /// <summary>
+        /// Builds a stable pseudo filename for MinaCalc's .osu text parser.
+        /// Prefer the beatmap hash over the on-disk path so parsing is not affected by directory layout.
+        /// </summary>
+        public static string BuildOsuFileHint(string? beatmapHash, int keyCount)
+            => !string.IsNullOrWhiteSpace(beatmapHash) ? $"{beatmapHash}.osu" : $"{keyCount}k.osu";
+
         /// <summary>Chart difficulty (MSD). Goal is ignored by the engine in this mode.</summary>
         public EzSkillsetVector CalculateMsd(MinaCalcNote[] notes, float rate = 1f)
         {

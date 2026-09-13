@@ -122,7 +122,7 @@ namespace osu.Game.EzOsuGame.Skills
                     if (string.IsNullOrWhiteSpace(osuText))
                         return null;
 
-                    vector = calc.CalculateMsdFromOsuText(osuText, beatmapInfo.Path ?? $"{keyCount}k.osu", rate);
+                    vector = calc.CalculateMsdFromOsuText(osuText, EzMinaCalcFacade.BuildOsuFileHint(beatmapInfo.Hash, keyCount), rate);
                 }
                 else
                 {
