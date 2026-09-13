@@ -30,8 +30,28 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly EzPlayerDanAggregator? danAggregator;
         private readonly EzSkillProvider? skillProvider;
         private readonly Lock computeLock = new Lock();
+
+        /// <summary>
+        /// Serialises the incremental single-play fold against a running compute. A compute holds it for its whole run,
+        /// because <see cref="runIncrementalAggregation"/> reads a partition and its drill ledger up-front and flushes
+        /// the merged totals later: an append landing in between would be overwritten (leaving a drill row that the
+        /// next diff then skips, i.e. a permanently missing score).
+        /// </summary>
+        /// <remarks>
+        /// Only the SQLite side is guarded. The fold's Realm reads and its one-play aggregation happen outside the
+        /// lock and take it only around <c>AppendScores</c>, so this never serialises work that does not touch the
+        /// archive (and a settled play never waits on another one's analysis).
+        /// </remarks>
+        private readonly Lock ingestLock = new Lock();
+
         private readonly Lock sessionCacheLock = new Lock();
         private CancellationTokenSource? computeCts;
+
+        /// <summary>
+        /// Handle of the running <see cref="ComputeAsync"/> task, so a delete can wait for it instead of racing
+        /// its per-chunk partition flushes. Always non-null once a compute has started.
+        /// </summary>
+        private Task? inFlightCompute;
 
         private readonly Dictionary<string, IReadOnlyList<EzLocalProfileDrillScoreRow>> drillCache =
             new Dictionary<string, IReadOnlyList<EzLocalProfileDrillScoreRow>>(StringComparer.Ordinal);
@@ -229,54 +249,358 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 IsComputing.Value = true;
 
-                return Task.Run(() =>
+                Task task = Task.Run(() =>
                 {
-                    try
+                    // Realm-only read, so it stays outside the gate below; the gate serialises SQLite writes, not Realm reads.
+                    var localOnlineIds = aggregator.CollectLocalOnlineScoreIds();
+
+                    // Held for the whole run so a settled play cannot append to a partition this compute is mid-way
+                    // through re-deriving; see ingestLock.
+                    lock (ingestLock)
                     {
-                        token.ThrowIfCancellationRequested();
+                        try
+                        {
+                            token.ThrowIfCancellationRequested();
 
-                        var selected = usernamesToRecompute
-                                       .Where(n => !string.IsNullOrWhiteSpace(n))
-                                       .Distinct(StringComparer.Ordinal)
-                                       .ToList();
+                            var selected = usernamesToRecompute
+                                           .Where(n => !string.IsNullOrWhiteSpace(n))
+                                           .Distinct(StringComparer.Ordinal)
+                                           .ToList();
 
-                        if (clearRebuild)
-                            Store.ClearSkillCaches();
+                            if (clearRebuild)
+                                Store.ClearSkillCaches();
 
-                        // Online-only refresh path: no local usernames selected, just rebuild display from existing partitions + online.
-                        var byUser = selected.Count > 0
-                            ? runIncrementalAggregation(selected, clearRebuild, progress, token)
-                            : new Dictionary<string, EzLocalProfileAggregationResult>(StringComparer.Ordinal);
+                            // Online-only refresh path: no local usernames selected, just rebuild display from existing partitions + online.
+                            var byUser = selected.Count > 0
+                                ? runIncrementalAggregation(selected, clearRebuild, progress, token)
+                                : new Dictionary<string, EzLocalProfileAggregationResult>(StringComparer.Ordinal);
 
-                        token.ThrowIfCancellationRequested();
+                            token.ThrowIfCancellationRequested();
 
-                        progress?.Report(new EzLocalProfileComputeProgress(0, 1, EzLocalProfileComputePhase.Saving));
+                            progress?.Report(new EzLocalProfileComputeProgress(0, 1, EzLocalProfileComputePhase.Saving));
 
-                        var online = Store.LoadOnlineScoreContributions();
-                        var localOnlineIds = aggregator.CollectLocalOnlineScoreIds();
-                        Store.ApplyUsernamePartitions(byUser, replaceOtherUsernames, online, localOnlineIds);
+                            var online = Store.LoadOnlineScoreContributions();
+                            Store.ApplyUsernamePartitions(byUser, replaceOtherUsernames, online, localOnlineIds);
 
-                        if (selected.Count > 0)
-                            writePlayerSkills(selected, progress, token);
+                            if (selected.Count > 0)
+                                writePlayerSkills(selected, progress, token);
 
-                        InvalidateSessionCaches();
-                        Snapshot.Value = Store.LoadSnapshot();
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error(ex, "[EzLocalProfile] Failed to compute local score analysis.", Ez2ConfigManager.LOGGER_NAME);
-                        throw;
-                    }
-                    finally
-                    {
-                        IsComputing.Value = false;
+                            InvalidateSessionCaches();
+                            Snapshot.Value = Store.LoadSnapshot();
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error(ex, "[EzLocalProfile] Failed to compute local score analysis.", Ez2ConfigManager.LOGGER_NAME);
+                            throw;
+                        }
+                        finally
+                        {
+                            IsComputing.Value = false;
+                        }
                     }
                 }, token);
+
+                inFlightCompute = task;
+                return task;
             }
+        }
+
+        /// <summary>
+        /// Fence players out of the analysed archive: their partition — and with it every per-play skill cache —
+        /// is kept, but stops feeding the totals and <see cref="EzLocalProfileStore.LoadIncludedUsernames"/>, so the archive-wide
+        /// <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> view no longer counts them. Re-selecting a player later
+        /// only clears the flag and re-aggregates, so the expensive per-play results survive.
+        /// </summary>
+        /// <remarks>
+        /// Cancels and awaits any in-flight compute first: a compute still flushing a chunk would otherwise
+        /// re-write the partition that was just fenced. The excluded player's own Realm skill rows are left alone;
+        /// only the archive-wide <c>All</c> sentinel is re-derived from the players that remain.
+        /// </remarks>
+        /// <returns>Usernames that were newly excluded.</returns>
+        public async Task<IReadOnlyList<string>> ExcludeUsernamesAsync(
+            IReadOnlyCollection<string> usernames,
+            CancellationToken cancellationToken = default)
+        {
+            var names = usernames
+                        .Select(EzLocalProfileConstants.NormaliseUsername)
+                        .Where(n => !string.IsNullOrEmpty(n) && !EzLocalProfileConstants.IsAllPlayersFilter(n))
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(n => n, StringComparer.Ordinal)
+                        .ToList();
+
+            if (names.Count == 0)
+                return Array.Empty<string>();
+
+            Task? pending;
+
+            lock (computeLock)
+            {
+                pending = inFlightCompute;
+                computeCts?.Cancel();
+            }
+
+            if (pending != null)
+            {
+                try
+                {
+                    await pending.ConfigureAwait(false);
+                }
+                catch
+                {
+                    // A cancelled / faulted compute is irrelevant to the exclusion; its flushed chunks are re-derived below.
+                }
+            }
+
+            return await Task.Run<IReadOnlyList<string>>(() =>
+            {
+                // Only worth the whole-library scan when there is something to de-duplicate against. Realm-only read,
+                // so it stays outside the gate below (the gate serialises SQLite writes, not Realm reads).
+                var online = Store.LoadOnlineScoreContributions();
+                var localOnlineIds = online.Count > 0 ? aggregator.CollectLocalOnlineScoreIds() : new HashSet<long>();
+                var excluded = new List<string>();
+
+                // No ingest may append to a partition we are fencing out; see ingestLock.
+                lock (ingestLock)
+                {
+                    foreach (string name in names)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        if (Store.ExcludeUsernames(name, online, localOnlineIds))
+                            excluded.Add(name);
+                    }
+                }
+
+                // Outside the gate: an append that settled meanwhile is either rejected (the player is now fenced)
+                // or belongs to a player who is still included, which is what All should count anyway.
+                if (excluded.Count > 0)
+                    refreshAllPlayerSkills();
+
+                InvalidateSessionCaches();
+                Snapshot.Value = Store.LoadSnapshot();
+
+                Logger.Log(
+                    $"[EzLocalProfile] Excluded {excluded.Count} player(s) from the archive: {(excluded.Count > 0 ? string.Join(", ", excluded) : "(none matched)")}.",
+                    Ez2ConfigManager.LOGGER_NAME);
+
+                return excluded;
+            }, cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Fold a play that has just settled into the local analysis, at the same point its score reaches Realm —
+        /// no polling and no process-level watcher.
+        /// </summary>
+        /// <remarks>
+        /// Only the SQLite slice is written here (drill row + partition + archive totals); the player's Realm skill
+        /// rows are flagged stale rather than recomputed, so the hot path stays proportional to one score and the
+        /// startup warmup does the expensive skill aggregation. The call is fire-and-forget and idempotent: the drill
+        /// table is the ledger, and a play whose online id was already pulled as a contribution retires that row first
+        /// so the two cannot both be counted. Replays the same id are a no-op.
+        /// <para>
+        /// A play that settles while a compute is running waits for it instead of being dropped: only the append takes
+        /// <see cref="ingestLock"/>, which the compute holds for its whole run, so the append lands either before the
+        /// compute read the partition or after it flushed — never in between.
+        /// </para>
+        /// </remarks>
+        /// <param name="scoreId">Realm id of the score that was just imported.</param>
+        /// <returns><see langword="true"/> when the score was newly folded in.</returns>
+        public Task<bool> IngestSettledScoreAsync(Guid scoreId, CancellationToken cancellationToken = default)
+        {
+            return Task.Run(() =>
+            {
+                var score = aggregator.LoadManagedScore(scoreId);
+
+                // Not a mania/std play with a matching beatmap, or already gone: nothing for the archive to fold.
+                if (score == null)
+                    return false;
+
+                string username = EzLocalProfileConstants.NormaliseUsername(score.RealmUser.Username);
+
+                if (string.IsNullOrEmpty(username) || EzLocalProfileConstants.IsAllPlayersFilter(username))
+                    return false;
+
+                // Only players already part of the analysis are maintained; a new player still has to be selected.
+                if (!Store.LoadIncludedUsernames().Contains(username, StringComparer.Ordinal))
+                    return false;
+
+                if (Store.ContainsDrillScore(scoreId))
+                    return false;
+
+                // Reading Realm and aggregating one play touches no SQLite state, so it stays outside the gate: only
+                // the append below has to be serialised against a compute (see ingestLock).
+                var cachedOffsets = Store.LoadAvgAbsOffsets(new[] { username });
+                var state = aggregator.CreateState();
+                var byUser = aggregator.AggregateScores(new[] { (username, score) }, state, cachedOffsets);
+
+                if (!byUser.TryGetValue(username, out var delta))
+                    return false;
+
+                // Which pulled contributions a local score supersedes. The whole-library Realm scan is only worth it
+                // when there is something to de-duplicate against, and it reads no SQLite state, so it stays outside
+                // the gate below.
+                var localOnlineIds = Store.LoadOnlineScoreContributions().Count > 0
+                    ? aggregator.CollectLocalOnlineScoreIds()
+                    : new HashSet<long>();
+
+                lock (ingestLock)
+                {
+                    // A pulled online summary of the same play must not be counted alongside its detailed local score.
+                    if (score.OnlineID > 0 && Store.RemoveOnlineScoreContribution(score.OnlineID))
+                    {
+                        Logger.Log($"[EzLocalProfile] Local import of score {score.OnlineID} superseded its pulled online contribution.",
+                            Ez2ConfigManager.LOGGER_NAME);
+                    }
+
+                    // Read the contributions inside the gate: they are merged into the same rebuild, so a row another
+                    // append retired meanwhile must not sneak back in through a list read before the lock.
+                    var online = Store.LoadOnlineScoreContributions();
+
+                    if (!Store.AppendScores(username, delta, online, localOnlineIds))
+                        return false;
+                }
+
+                // The Realm-side skill rows now trail the SQLite slice: flag them and let the startup warmup refresh.
+                skillProvider?.MarkPlayerSkillStale(username);
+                skillProvider?.MarkPlayerSkillStale(EzLocalProfileConstants.ALL_PLAYERS);
+
+                InvalidateSessionCaches();
+                Snapshot.Value = Store.LoadSnapshot();
+
+                return true;
+            }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Fire-and-forget form of <see cref="IngestSettledScoreAsync"/> for the gameplay import path: it never blocks
+        /// the caller and never faults at it. A failure is harmless — the score stays unanalysed and the startup
+        /// backfill picks it up from the drill ledger.
+        /// </summary>
+        public void IngestSettledScore(Guid scoreId)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await IngestSettledScoreAsync(scoreId).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "[EzLocalProfile] Incremental fold of a settled score failed.", Ez2ConfigManager.LOGGER_NAME);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Reconcile the archive against Realm without recomputing anything: which of the already-selected players
+        /// have plays the SQLite slice never folded in, and which have Realm skill rows trailing that slice. This is
+        /// what makes the startup backfill automatic and cheap to skip — no work means a quiet, costless launch.
+        /// </summary>
+        /// <remarks>
+        /// Both halves come from persisted state rather than a bookkeeping flag: the drill ledger diff catches plays
+        /// that settled after the last successful fold (crash, force close), and the stale flag catches plays that
+        /// were folded in but whose skills were not refreshed yet.
+        /// </remarks>
+        public EzLocalProfileStartupAlignPlan PlanStartupAlign(CancellationToken cancellationToken = default)
+        {
+            var included = Store.LoadIncludedUsernames()
+                                .Select(EzLocalProfileConstants.NormaliseUsername)
+                                .Where(n => !string.IsNullOrEmpty(n) && !EzLocalProfileConstants.IsAllPlayersFilter(n))
+                                .Distinct(StringComparer.Ordinal)
+                                .ToList();
+
+            if (included.Count == 0)
+                return EzLocalProfileStartupAlignPlan.Empty;
+
+            var ledger = new Dictionary<string, IReadOnlyCollection<Guid>>(StringComparer.Ordinal);
+
+            foreach (string username in included)
+                ledger[username] = Store.GetAnalyzedScoreIds(username);
+
+            var collect = aggregator.CollectIncrementalScoresByUsername(ledger, cancellationToken);
+            var pending = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            foreach (string username in included)
+            {
+                int missing = collect.NewScores.TryGetValue(username, out var fresh) ? fresh.Count : 0;
+
+                // A drill pointing at a score that no longer exists also needs a rebuild; count it as one unit of work.
+                var live = collect.LiveScoreIds.GetValueOrDefault(username);
+
+                if (live != null && ledger[username].Any(id => !live.Contains(id)))
+                    missing = Math.Max(missing, 1);
+
+                if (missing > 0)
+                    pending[username] = missing;
+            }
+
+            var stale = skillProvider?.GetStalePlayerSkillUsernames() ?? Array.Empty<string>();
+            var includedSet = new HashSet<string>(included, StringComparer.Ordinal);
+            var staleIncluded = stale.Where(includedSet.Contains).ToList();
+
+            return new EzLocalProfileStartupAlignPlan(included, pending, staleIncluded, Store.NeedsRecompute());
+        }
+
+        /// <summary>
+        /// Run the reconcile described by <see cref="PlanStartupAlign"/>: one incremental compute over the players the
+        /// archive already covers, which folds in missing plays and refreshes the skill rows that were flagged stale.
+        /// Deleted plays, older content versions and per-play skill caches are all handled inside the compute.
+        /// </summary>
+        public Task AlignOnStartupAsync(
+            EzLocalProfileStartupAlignPlan plan,
+            IProgress<EzLocalProfileComputeProgress>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(plan);
+
+            if (!plan.HasWork || plan.IncludedUsernames.Count == 0)
+                return Task.CompletedTask;
+
+            Logger.Log(
+                $"[EzLocalProfile] Startup align: {plan.TotalPendingPlays} pending play(s) across {plan.PendingPlaysByUser.Count} player(s), "
+                + $"{plan.StaleSkillUsernames.Count} with stale skills, contentVersionStale={plan.ContentVersionStale}.",
+                Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+
+            // Incremental by construction: the ledger only yields plays that were never analysed, and the skills pass
+            // reuses the per-play caches. Never a clear-rebuild — a launch must not throw away good work.
+            return ComputeAsync(plan.IncludedUsernames, replaceOtherUsernames: false, clearRebuild: false, progress, cancellationToken);
+        }
+
+        /// <summary>
+        /// Re-derive the archive-wide <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> skill rows from whatever
+        /// players remain included. Without this, <c>All</c> would keep serving the snapshot it had while the fenced
+        /// player was still part of it. With nobody left, the stale sentinel rows are dropped instead.
+        /// </summary>
+        private void refreshAllPlayerSkills()
+        {
+            if (ssrAggregator == null && danAggregator == null)
+                return;
+
+            var included = Store.LoadIncludedUsernames()
+                                .Select(EzLocalProfileConstants.NormaliseUsername)
+                                .Where(n => !string.IsNullOrEmpty(n) && !EzLocalProfileConstants.IsAllPlayersFilter(n))
+                                .Distinct(StringComparer.Ordinal)
+                                .ToList();
+
+            var combined = new List<ScoreInfo>();
+
+            if (included.Count > 0)
+            {
+                foreach (var list in aggregator.CollectManiaScoresByUsername(included, CancellationToken.None).Values)
+                    combined.AddRange(list);
+            }
+
+            if (combined.Count == 0)
+            {
+                skillProvider?.DeletePlayerSkillData(EzLocalProfileConstants.ALL_PLAYERS);
+                return;
+            }
+
+            persistUserSkills(EzLocalProfileConstants.ALL_PLAYERS, combined, () => { }, CancellationToken.None);
         }
 
         /// <summary>How many not-yet-cached scores are analysed before progress is flushed to disk.</summary>
@@ -292,49 +616,93 @@ namespace osu.Game.EzOsuGame.LocalProfile
             IProgress<EzLocalProfileComputeProgress>? progress,
             CancellationToken token)
         {
-            var collected = aggregator.CollectDetachedScoresByUsername(selected, token);
+            // Ledger first: a reusable slice supplies the counters to carry over, while drill_scores supplies the
+            // score ids that must not be analysed again. No usable slice -> empty ledger -> every live play is new.
+            var existingByUser = new Dictionary<string, EzLocalProfilePartitionPayload>(StringComparer.Ordinal);
+            var ledgerByUser = new Dictionary<string, IReadOnlyCollection<Guid>>(StringComparer.Ordinal);
+
+            foreach (string username in selected)
+            {
+                var existing = clearRebuild ? null : Store.TryLoadPartitionPayload(username);
+
+                if (existing != null && existing.ContentVersion == EzLocalProfileStore.CONTENT_VERSION)
+                {
+                    existingByUser[username] = existing;
+                    ledgerByUser[username] = Store.GetAnalyzedScoreIds(username);
+                }
+                else
+                {
+                    ledgerByUser[username] = Array.Empty<Guid>();
+                }
+            }
+
+            // One Realm pass; only the plays the ledger is missing get cloned. Live ids come back for free.
+            var collect = aggregator.CollectIncrementalScoresByUsername(ledgerByUser, token);
             var cachedOffsets = Store.LoadAvgAbsOffsets(selected);
+
+            // A stored drill whose score no longer exists cannot be merged with a fresh aggregate, so those names
+            // rebuild from every live play. Rare (score deletion) — only then do we pay for a second cloning pass.
+            var rebuildUsers = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (string username in selected)
+            {
+                // An empty ledger already means "collect returned every play", so there is nothing extra to clone.
+                if (ledgerByUser[username].Count == 0)
+                    continue;
+
+                var liveIds = collect.LiveScoreIds.GetValueOrDefault(username);
+
+                // A stored drill whose score is no longer live (deleted) cannot be merged with a fresh aggregate.
+                if (liveIds == null || ledgerByUser[username].Any(id => !liveIds.Contains(id)))
+                    rebuildUsers.Add(username);
+            }
+
+            Dictionary<string, List<ScoreInfo>> rebuildScores = rebuildUsers.Count > 0
+                ? aggregator.CollectDetachedScoresByUsername(rebuildUsers, token)
+                : new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
+
+            // Names whose drill rows must be rewritten rather than added to: a clear-and-rebuild, a slice from an
+            // older content version, or a stored drill pointing at a score that is gone.
+            var replaceDrills = new HashSet<string>(rebuildUsers, StringComparer.Ordinal);
+
+            foreach (string username in selected)
+            {
+                if (clearRebuild || !existingByUser.ContainsKey(username))
+                    replaceDrills.Add(username);
+            }
 
             var plan = new List<(string Username, EzLocalProfileAggregationResult Merged, List<ScoreInfo> Missing)>();
 
             foreach (string username in selected)
             {
-                var current = collected.TryGetValue(username, out var list) ? list : new List<ScoreInfo>();
-                var currentIds = new HashSet<Guid>(current.Select(s => s.ID));
-
-                // Clear-and-rebuild ignores the stored slice; a backfill reuses it as the incremental cache.
-                EzLocalProfilePartitionPayload? existing = clearRebuild
-                    ? null
-                    : Store.TryLoadPartitionPayload(username);
-
-                // Reusable only when the slice was computed with the current analysis logic AND every stored
-                // drill still maps to a live score (a leftover from a deleted score forces that name to rebuild).
-                bool reusable = existing != null
-                                && existing.ContentVersion == EzLocalProfileStore.CONTENT_VERSION
-                                && existing.DrillScores.All(d => currentIds.Contains(d.ScoreId));
+                bool rebuild = rebuildUsers.Contains(username);
 
                 var merged = new EzLocalProfileAggregationResult { IncludedUsernames = new[] { username } };
-                var done = new HashSet<Guid>();
 
-                if (reusable)
-                {
-                    existing!.MergeInto(merged);
+                if (!rebuild && existingByUser.TryGetValue(username, out var existing))
+                    existing.MergeInto(merged);
 
-                    foreach (var drill in existing.DrillScores)
-                        done.Add(drill.ScoreId);
-                }
+                var missing = rebuild
+                    ? (rebuildScores.TryGetValue(username, out var all) ? all : new List<ScoreInfo>())
+                    : (collect.NewScores.TryGetValue(username, out var fresh) ? fresh : new List<ScoreInfo>());
 
-                plan.Add((username, merged, current.Where(s => !done.Contains(s.ID)).ToList()));
+                plan.Add((username, merged, missing));
             }
 
             int total = plan.Sum(p => p.Missing.Count);
             int processed = 0;
             var state = aggregator.CreateState();
+            var clearedDrills = new HashSet<string>(StringComparer.Ordinal);
 
             progress?.Report(new EzLocalProfileComputeProgress(0, Math.Max(1, total), EzLocalProfileComputePhase.Analysing));
 
             foreach (var (username, merged, missing) in plan)
             {
+                // A rewrite must drop the name's old drill rows first, or leftovers from deleted scores survive.
+                // A plain backfill never clears: appending is what keeps an interrupted run resumable.
+                if (replaceDrills.Contains(username) && clearedDrills.Add(username))
+                    Store.DeleteUserDrillScores(username);
+
                 for (int offset = 0; offset < missing.Count; offset += compute_chunk_size)
                 {
                     token.ThrowIfCancellationRequested();
@@ -357,7 +725,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         token);
 
                     if (partial.TryGetValue(username, out var partialResult))
-                        EzLocalProfilePartitionPayload.FromAggregation(partialResult).MergeInto(merged);
+                    {
+                        EzLocalProfilePartitionPayload.FromAggregation(partialResult).MergeStatsInto(merged);
+
+                        // Drill detail lands in its own table; the slice only keeps the fixed-size counters.
+                        Store.AppendDrills(partialResult.DrillScores);
+                    }
 
                     // Flush after each chunk so a cancelled run resumes from here instead of starting over.
                     Store.SavePartitionPayload(username, EzLocalProfilePartitionPayload.FromAggregation(merged));
@@ -515,8 +888,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public void Dispose()
         {
-            computeCts?.Cancel();
-            computeCts?.Dispose();
+            // computeCts is only ever touched under computeLock, so Dispose has to take it too.
+            lock (computeLock)
+            {
+                computeCts?.Cancel();
+                computeCts?.Dispose();
+                computeCts = null;
+            }
+
             Store.Dispose();
         }
     }

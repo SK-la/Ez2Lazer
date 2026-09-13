@@ -207,6 +207,49 @@ namespace osu.Game.EzOsuGame.Skills
         public void InvalidatePlayerSsrSnapshot()
             => ssrSnapshotMemo.Clear();
 
+        /// <summary>
+        /// Delete every persisted skill row for one player (SSR / pattern / history / Dan / Dan skillset) and drop
+        /// the memos that would otherwise keep serving it. Used to clear the archive-wide <c>All</c> sentinel when
+        /// the players it summarised change.
+        /// </summary>
+        /// <returns>Total number of Realm rows removed.</returns>
+        public int DeletePlayerSkillData(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return 0;
+
+            int removed = store.DeletePlayerSkillData(username);
+
+            InvalidatePlayerSsrSnapshot();
+            InvalidateDanDisplay();
+
+            return removed;
+        }
+
+        /// <summary>
+        /// Flag a player's stored skill rows (SSR / pattern) as stale and drop the memos that would otherwise keep
+        /// serving them. Called after a settled play was folded into the SQLite slice but before the Realm-side
+        /// skill rows have been recomputed.
+        /// </summary>
+        /// <returns>Total number of rows newly flagged.</returns>
+        public int MarkPlayerSkillStale(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return 0;
+
+            int flagged = store.MarkPlayerSkillStale(username);
+
+            InvalidatePlayerSsrSnapshot();
+
+            return flagged;
+        }
+
+        /// <summary>
+        /// Players whose stored skill rows are flagged stale — their SQLite slice has moved on since the Realm-side
+        /// skills were written, so the startup reconcile refreshes them.
+        /// </summary>
+        public IReadOnlyList<string> GetStalePlayerSkillUsernames() => store.GetStalePlayerSkillUsernames();
+
         public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount)
         {
             var ratings = store.GetPlayerPatternRatings(username, keyCount);

@@ -101,7 +101,48 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
 - 启动日志：`Ez chart chain revisions: MSD v…, CSI v… (policy=… …), Dan v… (…)`。
 - 每一段补算仍各自 `showProgressNotification`；因为过期行对增量集合就是"缺失"，换版后启动会自动弹进度。
 - 设置 → Ez → 实验性 → **技能数据状态**：`EzSkillStore.GetSkillDataStatus()` 的
-  ready / unrateable / stale / missing，回答"数据有没有缺、有没有过期"。
+  ready / unrateable / stale / missing，回答"数据有没有缺、有没有过期"；同一行末尾附带玩家链的
+  「玩家技能 过期 N」（`GetStalePlayerSkillUsernames()`），所以两条链的状态在一个地方能看完。
+- 玩家侧另有一套可见性：`EzPlayerSkillValue.Stale` 在个人主页显示为「待更新」
+  （`LOCAL_PROFILE_SKILL_STALE`），启动补算则弹「启动补算：…」进度通知。
+
+## 玩家链（成绩分析）：与图表链不同的第二套失效机制
+
+图表链（上面那套）失效靠**组合修订号**；玩家链（SSR / pattern / Dan 的玩家侧汇总）失效靠
+**账本对账 + 脏位**，因为它的"上游"是 Realm 里不断新增的成绩，而不是磁盘上的一批谱面行。
+
+两级、各有一个真源：
+
+| 阶段 | 真源 | 写点 |
+|---|---|---|
+| SQLite 切片：`drill_scores`（每局明细 + 账本）+ `username_partitions`（每玩家计数器） | `drill_scores` 就是"已分析"账本 | 一局结算入库时立即追加（`Player.ImportScore` → `EzLocalProfileService.IngestSettledScore`） |
+| Realm 技能行：`EzPlayerSkillValue`（SSR / pattern）、`EzDanEstimate` / `EzPlayerDanSkillsetValue` | 从上一步的切片聚合而来 | 只在整段 compute 里写（`writePlayerSkills`） |
+
+一局结算只做第一步，然后把该玩家（和 `All`）的 Realm 技能行置 `Stale`——**不**在结算路径上重算，
+否则每局都要做一次玩家级聚合。第二步由启动补算收口。
+
+### 启动补算怎么知道"有东西要做"
+
+三个信号，全部来自持久化状态，不需要额外记账列：
+
+| 信号 | 来源 | 覆盖的场景 |
+|---|---|---|
+| 账本缺成绩 | `drill_scores` 里的 score id vs Realm 当前成绩清单（`CollectIncrementalScoresByUsername` 一次 Realm 遍历） | 崩溃/强杀导致结算了但没写进切片 |
+| 脏位 | `EzPlayerSkillValue.Stale`（`MarkPlayerSkillStale`） | 已写进切片、技能行还没跟上 |
+| 内容版本 | `EzLocalProfileStore.NeedsRecompute()` | 分析逻辑换版（`CONTENT_VERSION`） |
+
+`EzLocalProfileService.PlanStartupAlign()` 汇总这三项，`EzLocalProfileStartupAlign`（每次启动挂载一次，
+BDSP 收工后跑）只在 `HasWork` 时执行一次增量 compute 并弹进度通知；没有活可干时**零开销、零通知**。
+它不是常驻轮询组件——结算路径已经写完了，启动只是兜底对账。
+
+### 为什么玩家链不复用组合修订号
+
+- 上游不是"一批会被整体换版的谱面行"，而是**可增可删的成绩**：新成绩天然是"账本里没有"，
+  删除的成绩则要让对应玩家整段重算（drill 明细删掉后计数必须一起扣）。
+- 因此账本 diff 本身就是最精确的失效判据，"过期"与"新增"是同一个判据的两个方向；
+  再加一层组合号只会多一份会和账本漂移的簿记。
+- 代价：Realm 技能行的**删除**没有脏位可用（Dan 行无 `Stale` 字段），只能靠实际重算修正；
+  这也是启动补算选增量而非清库重建的原因——增量足够精确，清库会把每局缓存一起废掉。
 
 ## Key entry points
 
@@ -111,6 +152,11 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
 - `EzChartDanEstimator`: chart dan calculation and live snapshot flow.
 - `EzDanSkillsetFiling`: skillset bucketing and quorum logic.
 - `EzPlayerSsrAggregator`: player-side SSR aggregation.
+- `EzLocalProfileService` (`LocalProfile/`): the SQLite slice + Realm skill writer; `IngestSettledScore`
+  is the per-play hook, `PlanStartupAlign` / `AlignOnStartupAsync` are the launch reconcile.
+- `EzLocalProfileStartupAlign` (`LocalProfile/`): the once-per-launch component that runs it.
+- `EzLocalProfileComputeNotification` (`LocalProfile/`): the progress notification every compute entry
+  point shares (settings dialog + startup align), so long runs are never invisible.
 
 ## Relevant supporting docs
 

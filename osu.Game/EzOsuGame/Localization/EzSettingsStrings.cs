@@ -355,25 +355,26 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS =
             new EzLocalizationManager.EzLocalisableString("技能数据状态", "Skill data status");
 
-        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "统计谱面技能链（MSD → CSI → Dan）当前版本的覆盖情况，用来判断数据是否有缺失或过期。"
-            + "\n就绪 = 已是当前版本；不可评分 = 该谱面确定算不出，已结算不再重试；"
-            + "过期 = 旧版本留下的行（改过算法后会出现）；缺失 = 还没算过。"
-            + "\n健康 = 过期 + 缺失；三项独立统计，上游换版会使其下游整体变为过期。",
-            "Counts chart-skill-chain coverage (MSD -> CSI -> Dan) at the current revision, so you can tell whether data is missing or outdated."
-            + "\nready = already at the current revision; unrateable = deterministically unratable and settled (no longer retried);"
-            + " stale = a row left by an older revision (appears after an algorithm change); missing = never computed."
-            + "\nPending = stale + missing. The three facets are counted independently; bumping an upstream one turns its downstream facets stale.");
-
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_REFRESH =
             new EzLocalizationManager.EzLocalisableString("刷新技能数据状态", "Refresh skill data status");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_REFRESH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "在后台统计一次，完成后写入上方状态行。大库可能耗时数秒。",
-            "Measures once in the background and writes the result to the status row above. May take a few seconds on a large library.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_UNMEASURED =
-            new EzLocalizationManager.EzLocalisableString("尚未统计，点下方按钮刷新。", "Not measured yet - use the button below.");
+            "重新统计谱面技能链（MSD → CSI → Dan）当前版本的覆盖情况并刷新状态标记。"
+            + "\n打开设置页时会自动统计一次；补算完成后可用此按钮再查。大库可能耗时数秒。"
+            + "\n就绪 = 已是当前版本；不可评分 = 该谱面确定算不出，已结算不再重试；"
+            + "过期 = 旧版本留下的行（改过算法后会出现）；缺失 = 还没算过。"
+            + "\n健康 = 过期 + 缺失；三项独立统计，上游换版会使其下游整体变为过期。"
+            + "\n玩家技能 = 玩家链（成绩 → SSR/Dan），没有组合版本号：一局结算后其技能行会被标为过期，"
+            + "由启动补算自动刷新；这里显示还有多少玩家待刷新。"
+            + "\n蓝色 = 已对齐；橙色 = 仍有待补算；红色 = 统计失败。",
+            "Re-measures chart-skill-chain coverage (MSD -> CSI -> Dan) at the current revision and refreshes the status marker."
+            + "\nIt is also measured automatically when the settings panel opens; use this button only to re-check after a backfill. May take a few seconds on a large library."
+            + "\nready = already at the current revision; unrateable = deterministically unratable and settled (no longer retried);"
+            + " stale = a row left by an older revision (appears after an algorithm change); missing = never computed."
+            + "\nPending = stale + missing. The three facets are counted independently; bumping an upstream one turns its downstream facets stale."
+            + "\nPlayer skills = the player chain (plays -> SSR/Dan), which has no composed revision: a settled play flags the player's"
+            + " rows and the startup align refreshes them. This shows how many players are still waiting."
+            + "\nBlue = in sync; orange = work still pending; red = measurement failed.");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_MEASURING =
             new EzLocalizationManager.EzLocalisableString("正在统计…", "Measuring...");
@@ -404,6 +405,12 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_ALL_CURRENT =
             new EzLocalizationManager.EzLocalisableString("无待补算", "nothing pending");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_PLAYERS =
+            new EzLocalizationManager.EzLocalisableString("玩家技能", "player skills");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_PLAYERS_ALL_CURRENT =
+            new EzLocalizationManager.EzLocalisableString("已对齐", "in sync");
 
         #region 机制类
 

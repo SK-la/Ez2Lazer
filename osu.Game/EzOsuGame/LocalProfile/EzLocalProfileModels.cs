@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.LocalProfile
@@ -71,6 +72,30 @@ namespace osu.Game.EzOsuGame.LocalProfile
         int Processed,
         int Total,
         EzLocalProfileComputePhase Phase = EzLocalProfileComputePhase.Analysing);
+
+    /// <summary>
+    /// What a startup reconcile found: the players the archive already covers, how many of their plays never made it
+    /// into the SQLite slice (a crash or force close before the write landed), and which players' Realm skill rows
+    /// trail that slice. Nothing is recomputed to produce this — it is the decision input for the startup align.
+    /// </summary>
+    /// <param name="IncludedUsernames">Players already part of the archive; an empty list means nothing to align.</param>
+    /// <param name="PendingPlaysByUser">Plays the drill ledger is missing, per player.</param>
+    /// <param name="StaleSkillUsernames">Included players whose skill rows were flagged stale.</param>
+    /// <param name="ContentVersionStale">The stored archive was produced by an older analysis logic version.</param>
+    public sealed record EzLocalProfileStartupAlignPlan(
+        IReadOnlyList<string> IncludedUsernames,
+        IReadOnlyDictionary<string, int> PendingPlaysByUser,
+        IReadOnlyList<string> StaleSkillUsernames,
+        bool ContentVersionStale)
+    {
+        public static EzLocalProfileStartupAlignPlan Empty { get; } =
+            new(Array.Empty<string>(), new Dictionary<string, int>(StringComparer.Ordinal), Array.Empty<string>(), false);
+
+        public int TotalPendingPlays => PendingPlaysByUser.Values.Sum();
+
+        /// <summary>True when a reconcile would actually change something; false keeps startup quiet and cheap.</summary>
+        public bool HasWork => TotalPendingPlays > 0 || StaleSkillUsernames.Count > 0 || ContentVersionStale;
+    }
 
     public sealed class EzLocalProfileSnapshot
     {
@@ -145,6 +170,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
     /// <summary>
     /// Online API score metadata persisted for profile stats when local .osr import is unavailable.
+    /// <paramref name="Username"/> is the account the score was pulled for: the archive counts a pulled score as
+    /// that player's, so excluding the player also drops it. An empty value is a legacy unattributed row.
     /// </summary>
     public readonly record struct EzLocalProfileOnlineScoreContribution(
         long OnlineId,
@@ -155,7 +182,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
         float ApproachRate,
         long KeyCount,
         double Pp,
-        long DurationMs);
+        long DurationMs,
+        string Username = "");
 
     /// <summary>
     /// In-memory aggregation buffer written atomically to SQLite.

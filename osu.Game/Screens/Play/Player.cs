@@ -29,6 +29,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.IO.Archives;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Performance;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Screens.Play;
@@ -197,6 +198,10 @@ namespace osu.Game.Screens.Play
 
         [Resolved(canBeNull: true)]
         private INotificationOverlay notificationOverlay { get; set; }
+
+        // [Ez] Local score analysis: a settled play is folded in at the same point its score reaches Realm.
+        [Resolved(canBeNull: true)]
+        private EzLocalProfileService ezLocalProfileService { get; set; }
 
         public GameplayState GameplayState { get; private set; }
 
@@ -1605,6 +1610,11 @@ namespace osu.Game.Screens.Play
                         s.ManiaHealthMode = maniaHealthMode;
                     });
                 }
+
+                // [Ez] The score is now in Realm, so fold it into the local profile analysis here — the same place the
+                // score lands. Fire-and-forget: the call only touches SQLite and returns, and it is idempotent, while
+                // the startup warmup re-derives the Realm-side skill rows from whatever the slice now holds.
+                ezLocalProfileService?.IngestSettledScore(score.ScoreInfo.ID);
             }
 
             return Task.CompletedTask;

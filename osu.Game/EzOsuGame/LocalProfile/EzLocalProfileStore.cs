@@ -24,8 +24,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
     {
         public const string DATABASE_FILENAME = "ez-local-profile.sqlite";
 
-        /// <summary>v2: per-play SSR / Dan caches for incremental (backfill) compute.</summary>
-        public const int SCHEMA_VERSION = 2;
+        /// <summary>
+        /// v2: per-play SSR / Dan caches for incremental (backfill) compute.
+        /// v3: <c>drill_scores</c> is the detail source of truth (a partition payload no longer carries its drills),
+        /// <c>username_partitions.excluded</c> marks a player left out of the archive, and
+        /// <c>online_score_contributions.username</c> attributes pulled scores to the account that pulled them.
+        /// </summary>
+        public const int SCHEMA_VERSION = 3;
 
         /// <summary>
         /// Logic version for aggregated stats (independent of table schema).
@@ -41,6 +46,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private bool initialised;
         private string dbPath = string.Empty;
         private bool isDisposed;
+
+        /// <summary>Legacy unattributed online rows are attributed to the pulling account once per session.</summary>
+        private bool onlineContributionsAdopted;
 
         public EzLocalProfileStore(Storage storage)
         {
@@ -261,6 +269,179 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
 
                 return result;
+            }
+        }
+
+        /// <summary>
+        /// Score ids already analysed for one player: the reconciliation ledger, shaped like
+        /// <c>EzSkillStore.GetPersistedChartDanHashes</c>. The compute path diffs this against the live score ids
+        /// and analyses only the difference, so an interrupted run resumes instead of starting over.
+        /// </summary>
+        public HashSet<Guid> GetAnalyzedScoreIds(string username)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT score_id FROM drill_scores WHERE username = $username;";
+                cmd.Parameters.AddWithValue("$username", username);
+
+                var ids = new HashSet<Guid>();
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    if (Guid.TryParse(reader.GetString(0), out var id))
+                        ids.Add(id);
+                }
+
+                return ids;
+            }
+        }
+
+        /// <summary>Idempotency gate for the per-play ingest: a score whose drill row already exists is counted.</summary>
+        public bool ContainsDrillScore(Guid scoreId)
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT 1 FROM drill_scores WHERE score_id = $score_id LIMIT 1;";
+                cmd.Parameters.AddWithValue("$score_id", scoreId.ToString("N"));
+                return cmd.ExecuteScalar() != null;
+            }
+        }
+
+        /// <summary>
+        /// Append drill detail rows without touching the aggregate tables (idempotent by score id).
+        /// The compute path flushes these per chunk, so a cancelled run keeps everything it had analysed.
+        /// </summary>
+        public void AppendDrills(IReadOnlyList<EzLocalProfileDrillScoreRow> rows)
+        {
+            if (rows.Count == 0)
+                return;
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var transaction = connection.BeginTransaction();
+                writeDrillScores(connection, rows, transaction);
+                transaction.Commit();
+            }
+        }
+
+        /// <summary>
+        /// Drop one player's drill detail rows. Used when that player is recomputed from every live score
+        /// (clear-and-rebuild, or a stored drill that no longer maps to a live score), so leftovers from
+        /// deleted scores cannot survive the rewrite.
+        /// </summary>
+        public void DeleteUserDrillScores(string username)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM drill_scores WHERE username = $username;";
+                cmd.Parameters.AddWithValue("$username", username);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Fold one newly analysed score into the archive: append its drill row, add its counters to the player's
+        /// partition, then re-derive the merged archive tables.
+        /// </summary>
+        /// <remarks>
+        /// The rebuild is reused on purpose. A hand-written per-table delta would be a second implementation of the
+        /// same arithmetic (notably the weighted-average <c>avg_kps</c>) and the two could drift; with drills no
+        /// longer stored in the payload every partition is small, so re-merging them costs almost nothing.
+        /// </remarks>
+        /// <returns>
+        /// <see langword="true"/> when the score was added; <see langword="false"/> when it was already stored or when
+        /// the player was fenced out of the analysis (an excluded partition is never re-included by an append).
+        /// </returns>
+        public bool AppendScores(
+            string username,
+            EzLocalProfileAggregationResult delta,
+            IReadOnlyList<EzLocalProfileOnlineScoreContribution> onlineContributions,
+            IReadOnlyCollection<long> localOnlineScoreIds)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentNullException.ThrowIfNull(delta);
+            ArgumentNullException.ThrowIfNull(onlineContributions);
+            ArgumentNullException.ThrowIfNull(localOnlineScoreIds);
+
+            lock (sync)
+            {
+                ensureInitialised();
+
+                using var connection = openConnection();
+                using var transaction = connection.BeginTransaction();
+
+                // An excluded player is not part of the analysis: a play settling for them must not pull them back in.
+                using (var probeExcluded = connection.CreateCommand())
+                {
+                    probeExcluded.Transaction = transaction;
+                    probeExcluded.CommandText = "SELECT excluded FROM username_partitions WHERE username = $username;";
+                    probeExcluded.Parameters.AddWithValue("$username", username);
+
+                    if (probeExcluded.ExecuteScalar() is long excludedFlag && excludedFlag != 0)
+                        return false;
+                }
+
+                // drill_scores is the ledger, so a score that already has a row must not be counted a second time.
+                foreach (var drill in delta.DrillScores)
+                {
+                    using var probe = connection.CreateCommand();
+                    probe.Transaction = transaction;
+                    probe.CommandText = "SELECT 1 FROM drill_scores WHERE score_id = $score_id LIMIT 1;";
+                    probe.Parameters.AddWithValue("$score_id", drill.ScoreId.ToString("N"));
+
+                    if (probe.ExecuteScalar() != null)
+                        return false;
+                }
+
+                writeDrillScores(connection, delta.DrillScores, transaction);
+
+                var merged = new EzLocalProfileAggregationResult();
+
+                if (tryReadPartitionJson(connection, username) is { Length: > 0 } json)
+                {
+                    try
+                    {
+                        JsonSerializer.Deserialize<EzLocalProfilePartitionPayload>(json)?.MergeStatsInto(merged);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"[EzLocalProfile] Bad partition for {username} while appending (totals rebuilt): {ex.Message}",
+                            Ez2ConfigManager.LOGGER_NAME);
+                        merged = new EzLocalProfileAggregationResult();
+                    }
+                }
+
+                EzLocalProfilePartitionPayload.FromAggregation(delta).MergeStatsInto(merged);
+
+                writePartition(connection, username, EzLocalProfilePartitionPayload.FromAggregation(merged),
+                    DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), reinclude: false);
+
+                rebuildArchiveFromPartitions(
+                    connection,
+                    includePlayerEvidence: false,
+                    markContentVersionCurrent: false,
+                    onlineContributions,
+                    localOnlineScoreIds);
+
+                transaction.Commit();
+
+                return true;
             }
         }
 
@@ -533,10 +714,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = """
                                   INSERT INTO online_score_contributions
-                                      (online_id, ruleset_id, rank, star_rating, circle_size, approach_rate, key_count, pp, duration_ms)
+                                      (online_id, username, ruleset_id, rank, star_rating, circle_size, approach_rate, key_count, pp, duration_ms)
                                   VALUES
-                                      ($online_id, $ruleset_id, $rank, $star_rating, $circle_size, $approach_rate, $key_count, $pp, $duration_ms)
+                                      ($online_id, $username, $ruleset_id, $rank, $star_rating, $circle_size, $approach_rate, $key_count, $pp, $duration_ms)
                                   ON CONFLICT(online_id) DO UPDATE SET
+                                      username = excluded.username,
                                       ruleset_id = excluded.ruleset_id,
                                       rank = excluded.rank,
                                       star_rating = excluded.star_rating,
@@ -547,6 +729,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       duration_ms = excluded.duration_ms;
                                   """;
                 cmd.Parameters.AddWithValue("$online_id", contribution.OnlineId);
+                cmd.Parameters.AddWithValue("$username", contribution.Username);
                 cmd.Parameters.AddWithValue("$ruleset_id", contribution.RulesetId);
                 cmd.Parameters.AddWithValue("$rank", (int)contribution.Rank);
                 cmd.Parameters.AddWithValue("$star_rating", contribution.StarRating);
@@ -556,6 +739,32 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 cmd.Parameters.AddWithValue("$pp", contribution.Pp);
                 cmd.Parameters.AddWithValue("$duration_ms", contribution.DurationMs);
                 cmd.ExecuteNonQuery();
+
+                adoptOrphanOnlineContributions(connection, contribution.Username);
+            }
+        }
+
+        /// <summary>
+        /// Attribute legacy unattributed rows (<c>username = ''</c>) to the account now pulling. They can only ever
+        /// have come from the same login (a pull only fetches the logged-in user's scores), so the pulling account is
+        /// the only defensible owner. Runs once per session, and only for a named contribution.
+        /// </summary>
+        private void adoptOrphanOnlineContributions(SqliteConnection connection, string username)
+        {
+            if (onlineContributionsAdopted || string.IsNullOrEmpty(username))
+                return;
+
+            onlineContributionsAdopted = true;
+
+            using var adopt = connection.CreateCommand();
+            adopt.CommandText = "UPDATE online_score_contributions SET username = $username WHERE username = '';";
+            adopt.Parameters.AddWithValue("$username", username);
+            int adopted = adopt.ExecuteNonQuery();
+
+            if (adopted > 0)
+            {
+                Logger.Log($"[EzLocalProfile] Attributed {adopted} previously unattributed online score contribution(s) to {username}.",
+                    Ez2ConfigManager.LOGGER_NAME);
             }
         }
 
@@ -568,7 +777,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 var list = new List<EzLocalProfileOnlineScoreContribution>();
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = """
-                                  SELECT online_id, ruleset_id, rank, star_rating, circle_size, approach_rate, key_count, pp, duration_ms
+                                  SELECT online_id, ruleset_id, rank, star_rating, circle_size, approach_rate, key_count, pp, duration_ms, username
                                   FROM online_score_contributions;
                                   """;
                 using var reader = cmd.ExecuteReader();
@@ -584,7 +793,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         (float)reader.GetDouble(5),
                         reader.GetInt64(6),
                         reader.GetDouble(7),
-                        reader.GetInt64(8)));
+                        reader.GetInt64(8),
+                        reader.GetString(9)));
                 }
 
                 return list;
@@ -601,6 +811,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 using var transaction = connection.BeginTransaction();
 
                 clearTables(connection);
+
+                // drill_scores is the detail source of truth and is not part of clearTables; a full replace owns its rows.
+                using (var clearDrills = connection.CreateCommand())
+                {
+                    clearDrills.Transaction = transaction;
+                    clearDrills.CommandText = "DELETE FROM drill_scores WHERE TRUE;";
+                    clearDrills.ExecuteNonQuery();
+                }
+
                 // Recreate column table so the current single-version schema is always applied on recompute.
                 recreateManiaColumnTable(connection);
 
@@ -760,6 +979,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         del.CommandText = "DELETE FROM username_partitions WHERE username = $username;";
                         del.Parameters.AddWithValue("$username", name);
                         del.ExecuteNonQuery();
+
+                        // A dropped slice takes its detail rows with it, so a removed player leaves no drills behind.
+                        using var delDrills = connection.CreateCommand();
+                        delDrills.CommandText = "DELETE FROM drill_scores WHERE username = $username;";
+                        delDrills.Parameters.AddWithValue("$username", name);
+                        delDrills.ExecuteNonQuery();
                     }
                 }
 
@@ -768,80 +993,152 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 foreach (var (username, result) in recomputedByUsername)
                     writePartition(connection, username, EzLocalProfilePartitionPayload.FromAggregation(result), updatedAt);
 
-                var merged = new EzLocalProfileAggregationResult
-                {
-                    ComputedAt = DateTimeOffset.UtcNow,
-                };
-
-                var included = new List<string>();
-                var partitionJsonByUser = new List<(string Username, string Json)>();
-
-                using (var read = connection.CreateCommand())
-                {
-                    read.CommandText = "SELECT username, payload_json FROM username_partitions ORDER BY username;";
-                    using var reader = read.ExecuteReader();
-
-                    while (reader.Read())
-                    {
-                        string username = reader.GetString(0);
-                        string json = reader.GetString(1);
-                        included.Add(username);
-                        partitionJsonByUser.Add((username, json));
-                    }
-                }
-
-                // Clear aggregation tables before streaming drills so we never hold every partition's drills in memory.
-                clearTables(connection);
-                recreateManiaColumnTable(connection);
-
-                foreach (var (username, json) in partitionJsonByUser)
-                {
-                    EzLocalProfilePartitionPayload payload;
-
-                    try
-                    {
-                        payload = JsonSerializer.Deserialize<EzLocalProfilePartitionPayload>(json)
-                                  ?? throw new InvalidOperationException("Partition payload deserialized to null.");
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new InvalidOperationException(
-                            $"[EzLocalProfile] Bad partition for {username}: {ex.Message}", ex);
-                    }
-
-                    payload.MergeStatsInto(merged);
-                    writeDrillScores(connection, payload.DrillScores);
-                }
-
-                merged.IncludedUsernames = included;
-
-                var partitionScoreCounts = merged.RulesetStats.ToDictionary(
-                    kv => kv.Key,
-                    kv => kv.Value.ScoreCount);
-
-                EzLocalProfileAggregator.MergeOnlineContributions(merged, onlineContributions, localOnlineScoreIds);
-
-                foreach (var (rulesetId, partitionCount) in partitionScoreCounts)
-                {
-                    int allCount = merged.RulesetStats.TryGetValue(rulesetId, out var stats) ? stats.ScoreCount : 0;
-
-                    if (allCount < partitionCount)
-                    {
-                        throw new InvalidOperationException(
-                            $"[EzLocalProfile] All ScoreCount for ruleset {rulesetId} ({allCount}) is less than partition sum ({partitionCount}).");
-                    }
-                }
-
-                writeAggregationTables(connection, merged, writeDrills: false);
-
-                setMeta(connection, "schema_version", SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
-                // Only mark logic current when local partitions were rebuilt with the new aggregator.
-                if (recomputedByUsername.Count > 0)
-                    setMeta(connection, meta_content_version, CONTENT_VERSION.ToString(CultureInfo.InvariantCulture));
-                setMeta(connection, "last_computed_at", merged.ComputedAt.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture));
-                setMeta(connection, "included_usernames_json", JsonSerializer.Serialize(included));
+                rebuildArchiveFromPartitions(
+                    connection,
+                    includePlayerEvidence: true,
+                    markContentVersionCurrent: recomputedByUsername.Count > 0,
+                    onlineContributions,
+                    localOnlineScoreIds);
 
                 transaction.Commit();
+            }
+        }
+
+        /// <summary>
+        /// Re-derive the merged archive tables from the stored partitions. Drill rows are not touched: they live in
+        /// <c>drill_scores</c> only, which the compute path and the per-play ingest append to directly.
+        /// Shared by incremental compute (<see cref="ApplyUsernamePartitions"/>) and player exclusion
+        /// (<see cref="ExcludeUsernames"/>).
+        /// </summary>
+        /// <param name="includePlayerEvidence">
+        /// When true, also wipes the per-player evidence tables (<c>dan_clear_evidence</c> / <c>axis_play_evidence</c>),
+        /// which the caller is expected to repopulate in a full skills pass. Excluding a player must pass
+        /// <see langword="false"/>, otherwise fencing one player would silently drop every other player's
+        /// Dan / axis evidence (those tables are only written by <c>writePlayerSkills</c>).
+        /// </param>
+        /// <param name="markContentVersionCurrent">
+        /// True only when the local partitions were just rebuilt with the current aggregator logic; an exclusion
+        /// must not stamp the content version, or a later compute would trust slices it never re-analysed.
+        /// </param>
+        private static void rebuildArchiveFromPartitions(
+            SqliteConnection connection,
+            bool includePlayerEvidence,
+            bool markContentVersionCurrent,
+            IReadOnlyList<EzLocalProfileOnlineScoreContribution> onlineContributions,
+            IReadOnlyCollection<long> localOnlineScoreIds)
+        {
+            var merged = new EzLocalProfileAggregationResult
+            {
+                ComputedAt = DateTimeOffset.UtcNow,
+            };
+
+            var included = new List<string>();
+            var partitionJsonByUser = new List<(string Username, string Json)>();
+
+            // Excluded players keep their partition (and its per-play caches) but are left out of the archive totals.
+            using (var read = connection.CreateCommand())
+            {
+                read.CommandText = "SELECT username, payload_json FROM username_partitions WHERE excluded = 0 ORDER BY username;";
+                using var reader = read.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    string username = reader.GetString(0);
+                    string json = reader.GetString(1);
+                    included.Add(username);
+                    partitionJsonByUser.Add((username, json));
+                }
+            }
+
+            // Clear aggregation tables before streaming drills so we never hold every partition's drills in memory.
+            clearTables(connection, includePlayerEvidence);
+            recreateManiaColumnTable(connection);
+
+            foreach (var (username, json) in partitionJsonByUser)
+            {
+                EzLocalProfilePartitionPayload payload;
+
+                try
+                {
+                    payload = JsonSerializer.Deserialize<EzLocalProfilePartitionPayload>(json)
+                              ?? throw new InvalidOperationException("Partition payload deserialized to null.");
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"[EzLocalProfile] Bad partition for {username}: {ex.Message}", ex);
+                }
+
+                payload.MergeStatsInto(merged);
+            }
+
+            merged.IncludedUsernames = included;
+
+            var partitionScoreCounts = merged.RulesetStats.ToDictionary(
+                kv => kv.Key,
+                kv => kv.Value.ScoreCount);
+
+            EzLocalProfileAggregator.MergeOnlineContributions(merged, filterOnlineContributions(onlineContributions, included), new HashSet<long>(localOnlineScoreIds));
+
+            foreach (var (rulesetId, partitionCount) in partitionScoreCounts)
+            {
+                int allCount = merged.RulesetStats.TryGetValue(rulesetId, out var stats) ? stats.ScoreCount : 0;
+
+                if (allCount < partitionCount)
+                {
+                    throw new InvalidOperationException(
+                        $"[EzLocalProfile] All ScoreCount for ruleset {rulesetId} ({allCount}) is less than partition sum ({partitionCount}).");
+                }
+            }
+
+            writeAggregationTables(connection, merged, writeDrills: false);
+
+            setMeta(connection, "schema_version", SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
+            // Only mark logic current when local partitions were rebuilt with the new aggregator.
+            if (markContentVersionCurrent)
+                setMeta(connection, meta_content_version, CONTENT_VERSION.ToString(CultureInfo.InvariantCulture));
+            setMeta(connection, "last_computed_at", merged.ComputedAt.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture));
+            setMeta(connection, "included_usernames_json", JsonSerializer.Serialize(included));
+        }
+
+        /// <summary>
+        /// Contributions whose owning player is not part of the archive (excluded, or never selected) do not count:
+        /// <c>All</c> is the sum over the players in <paramref name="included"/>, nothing else. A legacy unattributed
+        /// row stays counted, though — it has no owner to exclude, and dropping it would silently change existing
+        /// numbers before the next pull attributes it.
+        /// </summary>
+        private static IReadOnlyList<EzLocalProfileOnlineScoreContribution> filterOnlineContributions(
+            IReadOnlyList<EzLocalProfileOnlineScoreContribution> contributions,
+            IReadOnlyCollection<string> included)
+        {
+            if (contributions.Count == 0)
+                return contributions;
+
+            var includedSet = new HashSet<string>(
+                included.Select(EzLocalProfileConstants.NormaliseUsername),
+                StringComparer.Ordinal);
+
+            return contributions
+                   .Where(c => string.IsNullOrEmpty(c.Username)
+                               || includedSet.Contains(EzLocalProfileConstants.NormaliseUsername(c.Username)))
+                   .ToList();
+        }
+
+        /// <summary>
+        /// Drop one online contribution. Used when the very same play is later imported locally: the detailed local
+        /// score supersedes the pulled summary, and keeping both would count the play twice.
+        /// </summary>
+        /// <returns><see langword="true"/> when a row was removed.</returns>
+        public bool RemoveOnlineScoreContribution(long onlineId)
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM online_score_contributions WHERE online_id = $online_id;";
+                cmd.Parameters.AddWithValue("$online_id", onlineId);
+                return cmd.ExecuteNonQuery() > 0;
             }
         }
 
@@ -1096,18 +1393,95 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        private static void writePartition(SqliteConnection connection, string username, EzLocalProfilePartitionPayload payload, long updatedAt)
+        /// <summary>
+        /// Fences <paramref name="username"/> out of the merged archive: the partition (and with it every per-play
+        /// skill cache) is kept, but the row is flagged excluded, so it stops feeding the aggregate tables and
+        /// <see cref="LoadIncludedUsernames"/>. Re-selecting the player later only has to clear the flag and
+        /// re-aggregate — the expensive MinaCalc per-play results survive.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately does not stamp <see cref="CONTENT_VERSION"/>: the remaining slices were not re-analysed,
+        /// so marking the archive current would let a later incremental compute trust stale numbers.
+        /// The player's own Realm skill rows are left alone; only the archive-wide <c>All</c> sentinel needs
+        /// refreshing, which the caller does from the remaining included players.
+        /// </remarks>
+        /// <returns><see langword="true"/> when the player was newly excluded; false when absent or already excluded.</returns>
+        public bool ExcludeUsernames(
+            string username,
+            IReadOnlyList<EzLocalProfileOnlineScoreContribution> onlineContributions,
+            IReadOnlyCollection<long> localOnlineScoreIds)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentNullException.ThrowIfNull(onlineContributions);
+            ArgumentNullException.ThrowIfNull(localOnlineScoreIds);
+
+            lock (sync)
+            {
+                ensureInitialised();
+
+                using var connection = openConnection();
+
+                using (var probe = connection.CreateCommand())
+                {
+                    probe.CommandText = "SELECT excluded FROM username_partitions WHERE username = $username;";
+                    probe.Parameters.AddWithValue("$username", username);
+
+                    if (probe.ExecuteScalar() is not long excluded)
+                        return false;
+
+                    if (excluded != 0)
+                        return false;
+                }
+
+                using var transaction = connection.BeginTransaction();
+
+                using (var update = connection.CreateCommand())
+                {
+                    update.Transaction = transaction;
+                    update.CommandText = "UPDATE username_partitions SET excluded = 1 WHERE username = $username;";
+                    update.Parameters.AddWithValue("$username", username);
+                    update.ExecuteNonQuery();
+                }
+
+                rebuildArchiveFromPartitions(
+                    connection,
+                    includePlayerEvidence: false,
+                    markContentVersionCurrent: false,
+                    onlineContributions,
+                    localOnlineScoreIds);
+
+                transaction.Commit();
+
+                return true;
+            }
+        }
+
+        /// <param name="reinclude">
+        /// A full recompute (re-)includes the player: an excluded name that gets recomputed is back in the archive.
+        /// The incremental single-play append passes <see langword="false"/>, because a play settling for a player who
+        /// was fenced out must not silently pull them back into the totals.
+        /// </param>
+        private static void writePartition(SqliteConnection connection, string username, EzLocalProfilePartitionPayload payload, long updatedAt, bool reinclude = true)
         {
             string json = JsonSerializer.Serialize(payload);
 
             using var upsert = connection.CreateCommand();
-            upsert.CommandText = """
-                                 INSERT INTO username_partitions (username, payload_json, updated_at)
-                                 VALUES ($username, $payload_json, $updated_at)
-                                 ON CONFLICT(username) DO UPDATE SET
-                                     payload_json = excluded.payload_json,
-                                     updated_at = excluded.updated_at;
-                                 """;
+            upsert.CommandText = reinclude
+                ? """
+                  INSERT INTO username_partitions (username, payload_json, updated_at, excluded)
+                  VALUES ($username, $payload_json, $updated_at, 0)
+                  ON CONFLICT(username) DO UPDATE SET
+                      payload_json = excluded.payload_json,
+                      updated_at = excluded.updated_at,
+                      excluded = 0;
+                  """
+                : """
+                  INSERT INTO username_partitions (username, payload_json, updated_at, excluded)
+                  VALUES ($username, $payload_json, $updated_at, 0)
+                  ON CONFLICT(username) DO UPDATE SET
+                      payload_json = excluded.payload_json,
+                      updated_at = excluded.updated_at;
+                  """;
             upsert.Parameters.AddWithValue("$username", username);
             upsert.Parameters.AddWithValue("$payload_json", json);
             upsert.Parameters.AddWithValue("$updated_at", updatedAt);
@@ -1260,13 +1634,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 writeDrillScores(connection, result.DrillScores);
         }
 
-        private static void writeDrillScores(SqliteConnection connection, IReadOnlyList<EzLocalProfileDrillScoreRow> rows)
+        private static void writeDrillScores(SqliteConnection connection, IReadOnlyList<EzLocalProfileDrillScoreRow> rows, SqliteTransaction? transaction = null)
         {
             foreach (var row in rows)
             {
                 using var cmd = connection.CreateCommand();
+
+                // Only bind when a transaction is supplied: explicitly assigning null stops Microsoft.Data.Sqlite
+                // from falling back to the connection's pending transaction, and the insert then throws.
+                if (transaction != null)
+                    cmd.Transaction = transaction;
+
                 cmd.CommandText = """
-                                  INSERT INTO drill_scores (
+                                  INSERT OR REPLACE INTO drill_scores (
                                       score_id, score_hash, username, ruleset_id, rank, pp_resolved, accuracy,
                                       max_combo, max_achievable_combo, total_score, mods_json, total_keys,
                                       beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
@@ -1656,6 +2036,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                   );
                                   CREATE TABLE IF NOT EXISTS online_score_contributions (
                                       online_id INTEGER PRIMARY KEY NOT NULL,
+                                      username TEXT NOT NULL DEFAULT '',
                                       ruleset_id INTEGER NOT NULL,
                                       rank INTEGER NOT NULL,
                                       star_rating REAL NOT NULL,
@@ -1668,7 +2049,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                   CREATE TABLE IF NOT EXISTS username_partitions (
                                       username TEXT PRIMARY KEY NOT NULL,
                                       payload_json TEXT NOT NULL,
-                                      updated_at INTEGER NOT NULL
+                                      updated_at INTEGER NOT NULL,
+                                      excluded INTEGER NOT NULL DEFAULT 0
                                   );
                                   CREATE TABLE IF NOT EXISTS drill_scores (
                                       score_id TEXT PRIMARY KEY NOT NULL,
@@ -1711,6 +2093,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                   );
                                   CREATE INDEX IF NOT EXISTS idx_drill_scores_ruleset_pp
                                       ON drill_scores(ruleset_id, pp_resolved DESC, date_ms DESC);
+                                  CREATE INDEX IF NOT EXISTS idx_drill_scores_user
+                                      ON drill_scores(username, score_id);
                                   CREATE TABLE IF NOT EXISTS dan_clear_evidence (
                                       id INTEGER PRIMARY KEY AUTOINCREMENT,
                                       username TEXT NOT NULL,
@@ -1777,6 +2161,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             ensureColumn(connection, "mania_key_stats", "total_duration_ms", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "online_score_contributions", "pp", "REAL NOT NULL DEFAULT 0");
             ensureColumn(connection, "online_score_contributions", "duration_ms", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(connection, "online_score_contributions", "username", "TEXT NOT NULL DEFAULT ''");
+            ensureColumn(connection, "username_partitions", "excluded", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "dan_clear_evidence", "algorithm_version", "INTEGER NOT NULL DEFAULT 1");
             ensureColumn(connection, "axis_play_evidence", "algorithm_version", "INTEGER NOT NULL DEFAULT 1");
             ensureColumn(connection, "drill_scores", "bpm", "REAL NOT NULL DEFAULT 0");
@@ -1784,6 +2170,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
             ensureColumn(connection, "drill_scores", "is_convert", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "drill_scores", "rate", "REAL NOT NULL DEFAULT 1");
             ensureColumn(connection, "drill_scores", "mod_acronyms_json", "TEXT NOT NULL DEFAULT '[]'");
+
+            // Indexes over columns that a pre-existing file does not have must wait for ensureColumn above.
+            // CREATE TABLE IF NOT EXISTS does not extend an existing table, so an index in the batch would run
+            // against a table that is still missing the column and fail with "no such column".
+            using (var lateIndexes = connection.CreateCommand())
+            {
+                lateIndexes.CommandText = """
+                                          CREATE INDEX IF NOT EXISTS idx_online_score_contributions_user
+                                              ON online_score_contributions(username);
+                                          """;
+                lateIndexes.ExecuteNonQuery();
+            }
 
             using (var insightsTable = connection.CreateCommand())
             {
@@ -1841,22 +2239,36 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// <summary>
         /// Full wipe before <see cref="ReplaceAll"/> rewrite. <c>WHERE TRUE</c> keeps the intentional clear explicit for SQL analyzers.
         /// </summary>
-        private static void clearTables(SqliteConnection connection)
+        /// <param name="includePlayerEvidence">
+        /// When true, also clear the per-player evidence tables, which a full skills pass then repopulates.
+        /// An exclusion passes false so other players keep their evidence; nothing but the excluded flag changes
+        /// for the player being fenced.
+        /// </param>
+        private static void clearTables(SqliteConnection connection, bool includePlayerEvidence = true)
         {
+            // drill_scores is deliberately absent: it is the detail source of truth (the partition payload no longer
+            // carries a copy), so a rebuild of the aggregate tables must not wipe it. ReplaceAll clears it explicitly.
+            string sql = """
+                         DELETE FROM ruleset_stats WHERE TRUE;
+                         DELETE FROM mania_key_stats WHERE TRUE;
+                         DELETE FROM mania_column_stats WHERE TRUE;
+                         DELETE FROM grade_counts WHERE TRUE;
+                         DELETE FROM star_play_counts WHERE TRUE;
+                         DELETE FROM xxy_play_counts WHERE TRUE;
+                         DELETE FROM std_attr_affinity WHERE TRUE;
+                         DELETE FROM insights_cache WHERE TRUE;
+                         """;
+
+            if (includePlayerEvidence)
+            {
+                sql += """
+                       DELETE FROM dan_clear_evidence WHERE TRUE;
+                       DELETE FROM axis_play_evidence WHERE TRUE;
+                       """;
+            }
+
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = """
-                              DELETE FROM ruleset_stats WHERE TRUE;
-                              DELETE FROM mania_key_stats WHERE TRUE;
-                              DELETE FROM mania_column_stats WHERE TRUE;
-                              DELETE FROM grade_counts WHERE TRUE;
-                              DELETE FROM star_play_counts WHERE TRUE;
-                              DELETE FROM xxy_play_counts WHERE TRUE;
-                              DELETE FROM std_attr_affinity WHERE TRUE;
-                              DELETE FROM drill_scores WHERE TRUE;
-                              DELETE FROM dan_clear_evidence WHERE TRUE;
-                              DELETE FROM axis_play_evidence WHERE TRUE;
-                              DELETE FROM insights_cache WHERE TRUE;
-                              """;
+            cmd.CommandText = sql;
             cmd.ExecuteNonQuery();
         }
 

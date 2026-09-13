@@ -102,6 +102,78 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return byUser;
         }
 
+        /// <summary>Result of one incremental Realm pass — see <see cref="CollectIncrementalScoresByUsername"/>.</summary>
+        /// <param name="LiveScoreIds">Every valid live score id per username (the reconciliation side of the diff).</param>
+        /// <param name="NewScores">Only the plays a username's ledger did not already contain (already cloned).</param>
+        public readonly record struct EzIncrementalScoreCollect(
+            Dictionary<string, HashSet<Guid>> LiveScoreIds,
+            Dictionary<string, List<ScoreInfo>> NewScores);
+
+        /// <summary>
+        /// Incremental variant of <see cref="CollectDetachedScoresByUsername"/>: one Realm pass that records every
+        /// live score id but only <em>clones</em> the plays a username's ledger does not already contain. This is
+        /// what keeps a backfill proportional to the missing scores instead of the whole library.
+        /// </summary>
+        /// <param name="storedDrillScoreIdsByUser">
+        /// The "already analysed" ledger per username (see <c>EzLocalProfileStore.GetAnalyzedScoreIds</c>).
+        /// An empty entry means nothing is cached, so every play comes back as new.
+        /// </param>
+        public EzIncrementalScoreCollect CollectIncrementalScoresByUsername(
+            IReadOnlyDictionary<string, IReadOnlyCollection<Guid>> storedDrillScoreIdsByUser,
+            CancellationToken cancellationToken = default)
+        {
+            var ledger = new Dictionary<string, HashSet<Guid>>(StringComparer.Ordinal);
+
+            foreach (var (username, ids) in storedDrillScoreIdsByUser)
+                ledger[normaliseUsername(username)] = ids as HashSet<Guid> ?? new HashSet<Guid>(ids);
+
+            var live = new Dictionary<string, HashSet<Guid>>(StringComparer.Ordinal);
+            var fresh = new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
+
+            realm.Run(r =>
+            {
+                if (ledger.Count == 0)
+                    return;
+
+                foreach (var score in queryValidScores(r))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    string username = normaliseUsername(score.RealmUser.Username);
+                    if (!ledger.TryGetValue(username, out var stored))
+                        continue;
+
+                    // Mirrors CollectDetachedScoresByUsername: an unplayable score is not part of the aggregation.
+                    if (score.BeatmapInfo == null)
+                        continue;
+
+                    if (!live.TryGetValue(username, out var liveIds))
+                        live[username] = liveIds = new HashSet<Guid>();
+
+                    liveIds.Add(score.ID);
+
+                    if (stored.Contains(score.ID))
+                        continue;
+
+                    if (!fresh.TryGetValue(username, out var list))
+                        fresh[username] = list = new List<ScoreInfo>();
+
+                    list.Add(score.DeepClone());
+                }
+            });
+
+            foreach (string username in ledger.Keys)
+            {
+                if (!live.ContainsKey(username))
+                    live[username] = new HashSet<Guid>();
+
+                if (!fresh.ContainsKey(username))
+                    fresh[username] = new List<ScoreInfo>();
+            }
+
+            return new EzIncrementalScoreCollect(live, fresh);
+        }
+
         /// <summary>Shared per-run caches for chunked aggregation (difficulty attributes, playable analysis, failure counters).</summary>
         public EzLocalProfileAggregationState CreateState() => new EzLocalProfileAggregationState();
 
@@ -278,6 +350,26 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     ids.Add(score.OnlineID);
 
                 return ids;
+            });
+        }
+
+        /// <summary>
+        /// Load one just-settled score the way the full compute would see it: the managed instance, with its persisted
+        /// beatmap (and the Ez ratings stored on it) rather than the working copy gameplay still holds. Without this
+        /// the incremental fold could persist a different slice than a rebuild of the same score.
+        /// </summary>
+        /// <returns>The detached score, or <see langword="null"/> when it is not a valid play.</returns>
+        public ScoreInfo? LoadManagedScore(Guid scoreId)
+        {
+            return realm.Run(r =>
+            {
+                var score = r.Find<ScoreInfo>(scoreId);
+
+                // Same validity gate as the bulk collector; anything it would skip must not be folded in either.
+                if (score == null || score.DeletePending || score.BeatmapInfo?.Hash != score.BeatmapHash)
+                    return null;
+
+                return score.DeepClone();
             });
         }
 

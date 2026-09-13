@@ -365,7 +365,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             if (includeInStatsWithoutImport)
             {
-                store.UpsertOnlineScoreContribution(CreateContribution(solo));
+                store.UpsertOnlineScoreContribution(CreateContribution(solo, pulledByUsername));
                 result.StatsRecorded++;
             }
 
@@ -433,7 +433,20 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        public static EzLocalProfileOnlineScoreContribution CreateContribution(SoloScoreInfo solo)
+        /// <summary>
+        /// The account a pull is attributed to. Pulls only ever fetch the logged-in user's scores, so the logged-in
+        /// name is the only defensible owner for a stat contributed without a local .osr.
+        /// </summary>
+        private string pulledByUsername
+        {
+            get
+            {
+                string name = api.LocalUser.Value.Username;
+                return string.IsNullOrWhiteSpace(name) ? string.Empty : EzLocalProfileConstants.NormaliseUsername(name);
+            }
+        }
+
+        public static EzLocalProfileOnlineScoreContribution CreateContribution(SoloScoreInfo solo, string username)
         {
             var beatmap = solo.Beatmap;
             long keys = countKeysFromStatistics(solo.MaximumStatistics);
@@ -451,7 +464,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 beatmap?.ApproachRate ?? 0,
                 keys,
                 solo.PP ?? 0,
-                durationMs);
+                durationMs,
+                username);
         }
 
         private static long countKeysFromStatistics(IReadOnlyDictionary<HitResult, int> statistics)
