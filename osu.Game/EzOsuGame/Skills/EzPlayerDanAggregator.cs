@@ -39,19 +39,36 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Credited clears collected during the last <see cref="ComputeAndStore"/> (for evidence).</summary>
         public IReadOnlyList<EzDanClearEvidenceRow> PendingEvidence { get; private set; } = Array.Empty<EzDanClearEvidenceRow>();
 
+        /// <summary>
+        /// Chart hashes this pass needed a persisted <see cref="EzPersistedChartDan"/> for but found none. The
+        /// caller hands them to the chart-side chain instead of rating them here; see
+        /// <see cref="EzLocalProfileService.ChartSideBackfillRequested"/>.
+        /// </summary>
+        public IReadOnlyCollection<string> MissingChartHashes { get; private set; } = Array.Empty<string>();
+
+        /// <summary>
+        /// One load of the per-play cache for a whole pass, so a multi-player run does not re-read the table once per
+        /// player. Pass the result to <see cref="ComputeAndStore"/>.
+        /// </summary>
+        public IReadOnlyDictionary<Guid, EzDanPlayCacheRow> LoadPlayCache()
+            => profileStore?.LoadDanPlayCache() ?? new Dictionary<Guid, EzDanPlayCacheRow>();
+
         public void ComputeAndStore(
             string username,
             IEnumerable<ScoreInfo> scores,
             CancellationToken cancellationToken = default,
-            Action? afterEachScore = null)
+            Action? afterEachScore = null,
+            IReadOnlyDictionary<Guid, EzDanPlayCacheRow>? loadedPlayCache = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
             // Best credited clear per (beatmap hash, rate) — hub collectDanClears dedupe.
             var bestByChartRate = new Dictionary<(string Hash, double Rate), EzDanClearEvidenceRow>();
+            var missingCharts = new HashSet<string>(StringComparer.Ordinal);
 
             // Per-play Dan cache: an already-evaluated play skips the chart-dan estimate (incremental backfill).
-            var cachedPlays = profileStore?.LoadDanPlayCache() ?? new Dictionary<Guid, EzDanPlayCacheRow>();
+            // The caller can hand one in so a multi-player pass loads the table once instead of once per player.
+            var cachedPlays = loadedPlayCache ?? profileStore?.LoadDanPlayCache() ?? new Dictionary<Guid, EzDanPlayCacheRow>();
             var pendingCacheWrites = new List<EzDanPlayCacheRow>();
 
             try
@@ -98,6 +115,7 @@ namespace osu.Game.EzOsuGame.Skills
                             hash = beatmapInfo.Hash;
 
                         double rate = EzModRate.Resolve(score.Mods);
+                        bool chartAffectingMods = EzModRate.AffectsChartSkills(score.Mods);
 
                         // Fast path: with no chart-affecting mod, the persisted nomod ChartDan baseline is
                         // exactly what TryEstimate would derive, so credit straight off it and skip the
@@ -105,7 +123,7 @@ namespace osu.Game.EzOsuGame.Skills
                         // difficulty) still needs the live estimate.
                         EzChartDanVerdict? chart = null;
 
-                        if (!EzModRate.AffectsChartSkills(score.Mods)
+                        if (!chartAffectingMods
                             && skillStore.TryGetChartDan(hash, out var persisted) && persisted != null)
                         {
                             var side = persisted.HoldRatio >= EzDanAlgorithm.LnPrimaryMinRatioFor(persisted.KeyCount)
@@ -115,7 +133,22 @@ namespace osu.Game.EzOsuGame.Skills
                             chart = persisted.ToVerdict(side);
                         }
 
-                        chart ??= chartDanEstimator.TryEstimate(beatmapInfo, score.Mods);
+                        if (chart == null)
+                        {
+                            if (!chartAffectingMods)
+                            {
+                                // This pass never rates a chart: it reads the chart-side row or the play simply
+                                // waits. A missing row is reported so the chain computes it, and the next pass
+                                // folds the play in with its credit.
+                                missingCharts.Add(hash);
+                                continue;
+                            }
+
+                            // A rate / key-conversion mod yields a chart variant no persisted NoMod row can answer,
+                            // so the live estimate is the only correct source. It reads the playable and writes
+                            // nothing (see EzChartDanEstimator.TryComputeLiveSnapshot).
+                            chart = chartDanEstimator.TryEstimate(beatmapInfo, score.Mods);
+                        }
 
                         if (chart == null)
                         {
@@ -165,6 +198,7 @@ namespace osu.Game.EzOsuGame.Skills
                                              .OrderByDescending(r => r.CreditedDan)
                                              .ThenByDescending(r => r.ScoredAt)
                                              .ToList();
+            MissingChartHashes = missingCharts;
         }
 
         private static void mergeCachedCredit(
