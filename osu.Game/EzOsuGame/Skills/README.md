@@ -42,6 +42,9 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
   has no separate MSD/SSR switch.
 - The vendored module aborts on a chord wider than 16 columns. The engine discards the
   instance and rebuilds, so one bad chart costs a rebuild rather than poisoning the batch.
+- Wasmtime ships native libraries for desktop RIDs only (win/linux/osx, x64 + arm64).
+  On Android/iOS `EzNKeyMsdEngine` cannot instantiate; the failure surfaces as
+  `EzMsdEngineException`, which the callers already treat as "this chart has no MSD/SSR".
 - `EzManiaSkillAlgorithm.VERSION` gates the derived caches: bumping it clears MSD and, via
   `BackgroundDataStoreProcessor`, ChartSkillInfo + ChartDan as well.
 - Downstream coverage is not yet uniform above 9K — see `DATA-FOLLOWUPS.md`.
