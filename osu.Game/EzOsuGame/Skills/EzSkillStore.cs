@@ -7,6 +7,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
+using Realms;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -352,49 +353,95 @@ namespace osu.Game.EzOsuGame.Skills
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = EzManiaSkillAlgorithm.VERSION;
 
+            realmAccess.Write(r => addPlayerSsr(r, username, keyCount, vector, analyzedPlays, provisional, stale, at, version, appendHistory));
+        }
+
+        /// <summary>
+        /// Write one player×keymode's SSR values, history samples and pattern ratings in a single transaction.
+        /// </summary>
+        /// <remarks>
+        /// The individual writers each open their own Realm transaction, and a per-player skill refresh touches
+        /// several keymodes; grouping them here keeps the write traffic proportional to the player, not to
+        /// (keymodes × tables).
+        /// </remarks>
+        public void WritePlayerSkillBundle(
+            string username,
+            int keyCount,
+            EzSkillsetVector ssr,
+            int analyzedPlays,
+            bool provisional,
+            IReadOnlyList<(DateTimeOffset RecordedAt, EzSkillsetVector Vector)> historySamples,
+            IReadOnlyList<EzPatternRating> patternRatings)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentNullException.ThrowIfNull(historySamples);
+            ArgumentNullException.ThrowIfNull(patternRatings);
+
+            DateTimeOffset at = DateTimeOffset.UtcNow;
+            int version = EzManiaSkillAlgorithm.VERSION;
+
             realmAccess.Write(r =>
             {
-                var existing = r.All<EzPlayerSkillValue>()
-                                .Where(v => v.Username == username
-                                            && v.KeyCount == keyCount
-                                            && v.SystemId == EzSkillSystems.PLAYER_SSR)
-                                .ToList();
+                // SSR values without the per-axis history points: the curve is replaced below from the sampled
+                // chronological series, so the UtcNow stamping an append would do is exactly what we must not keep.
+                addPlayerSsr(r, username, keyCount, ssr, analyzedPlays, provisional, stale: false, at, version, appendHistory: false);
+                replacePlayerSkillHistory(r, username, keyCount, historySamples, version);
+                writePlayerPatternRatings(r, username, keyCount, patternRatings, provisional, stale: false, at, version);
+            });
+        }
 
-                foreach (var row in existing)
-                    r.Remove(row);
+        private static void addPlayerSsr(
+            Realm r,
+            string username,
+            int keyCount,
+            EzSkillsetVector vector,
+            int analyzedPlays,
+            bool provisional,
+            bool stale,
+            DateTimeOffset at,
+            int version,
+            bool appendHistory)
+        {
+            var existing = r.All<EzPlayerSkillValue>()
+                            .Where(v => v.Username == username
+                                        && v.KeyCount == keyCount
+                                        && v.SystemId == EzSkillSystems.PLAYER_SSR)
+                            .ToList();
 
-                foreach (var (axis, value) in vector.Enumerate())
+            foreach (var row in existing)
+                r.Remove(row);
+
+            foreach (var (axis, value) in vector.Enumerate())
+            {
+                string skillId = axis.ToSsrSkillId();
+
+                r.Add(new EzPlayerSkillValue
                 {
-                    string skillId = axis.ToSsrSkillId();
+                    Username = username,
+                    KeyCount = keyCount,
+                    SystemId = EzSkillSystems.PLAYER_SSR,
+                    SkillId = skillId,
+                    Value = value,
+                    AnalyzedPlays = analyzedPlays,
+                    Provisional = provisional,
+                    Stale = stale,
+                    AlgorithmVersion = version,
+                    ComputedAt = at,
+                });
 
-                    r.Add(new EzPlayerSkillValue
+                if (appendHistory && value > 0)
+                {
+                    r.Add(new EzPlayerSkillHistoryPoint
                     {
                         Username = username,
                         KeyCount = keyCount,
-                        SystemId = EzSkillSystems.PLAYER_SSR,
                         SkillId = skillId,
                         Value = value,
-                        AnalyzedPlays = analyzedPlays,
-                        Provisional = provisional,
-                        Stale = stale,
+                        RecordedAt = at,
                         AlgorithmVersion = version,
-                        ComputedAt = at,
                     });
-
-                    if (appendHistory && value > 0)
-                    {
-                        r.Add(new EzPlayerSkillHistoryPoint
-                        {
-                            Username = username,
-                            KeyCount = keyCount,
-                            SkillId = skillId,
-                            Value = value,
-                            RecordedAt = at,
-                            AlgorithmVersion = version,
-                        });
-                    }
                 }
-            });
+            }
         }
 
         public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount, int? algorithmVersion = null)
@@ -442,37 +489,47 @@ namespace osu.Game.EzOsuGame.Skills
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = EzManiaSkillAlgorithm.VERSION;
 
-            realmAccess.Write(r =>
+            realmAccess.Write(r => writePlayerPatternRatings(r, username, keyCount, ratings, provisional, stale, at, version));
+        }
+
+        private static void writePlayerPatternRatings(
+            Realm r,
+            string username,
+            int keyCount,
+            IReadOnlyList<EzPatternRating> ratings,
+            bool provisional,
+            bool stale,
+            DateTimeOffset at,
+            int version)
+        {
+            var existing = r.All<EzPlayerSkillValue>()
+                            .Where(v => v.Username == username
+                                        && v.KeyCount == keyCount
+                                        && v.SystemId == EzSkillSystems.PLAYER_PATTERN)
+                            .ToList();
+
+            foreach (var row in existing)
+                r.Remove(row);
+
+            foreach (var rating in ratings)
             {
-                var existing = r.All<EzPlayerSkillValue>()
-                                .Where(v => v.Username == username
-                                            && v.KeyCount == keyCount
-                                            && v.SystemId == EzSkillSystems.PLAYER_PATTERN)
-                                .ToList();
+                if (string.IsNullOrWhiteSpace(rating.Id) || !(rating.Rating > 0))
+                    continue;
 
-                foreach (var row in existing)
-                    r.Remove(row);
-
-                foreach (var rating in ratings)
+                r.Add(new EzPlayerSkillValue
                 {
-                    if (string.IsNullOrWhiteSpace(rating.Id) || !(rating.Rating > 0))
-                        continue;
-
-                    r.Add(new EzPlayerSkillValue
-                    {
-                        Username = username,
-                        KeyCount = keyCount,
-                        SystemId = EzSkillSystems.PLAYER_PATTERN,
-                        SkillId = EzPatternRatings.ToSkillId(rating.Id),
-                        Value = rating.Rating,
-                        AnalyzedPlays = rating.Plays,
-                        Provisional = provisional,
-                        Stale = stale,
-                        AlgorithmVersion = version,
-                        ComputedAt = at,
-                    });
-                }
-            });
+                    Username = username,
+                    KeyCount = keyCount,
+                    SystemId = EzSkillSystems.PLAYER_PATTERN,
+                    SkillId = EzPatternRatings.ToSkillId(rating.Id),
+                    Value = rating.Rating,
+                    AnalyzedPlays = rating.Plays,
+                    Provisional = provisional,
+                    Stale = stale,
+                    AlgorithmVersion = version,
+                    ComputedAt = at,
+                });
+            }
         }
 
         /// <summary>
@@ -489,34 +546,41 @@ namespace osu.Game.EzOsuGame.Skills
 
             int version = EzManiaSkillAlgorithm.VERSION;
 
-            realmAccess.Write(r =>
+            realmAccess.Write(r => replacePlayerSkillHistory(r, username, keyCount, samples, version));
+        }
+
+        private static void replacePlayerSkillHistory(
+            Realm r,
+            string username,
+            int keyCount,
+            IReadOnlyList<(DateTimeOffset RecordedAt, EzSkillsetVector Vector)> samples,
+            int version)
+        {
+            var existing = r.All<EzPlayerSkillHistoryPoint>()
+                            .Where(v => v.Username == username && v.KeyCount == keyCount)
+                            .ToList();
+
+            foreach (var row in existing)
+                r.Remove(row);
+
+            foreach (var (recordedAt, vector) in samples)
             {
-                var existing = r.All<EzPlayerSkillHistoryPoint>()
-                                .Where(v => v.Username == username && v.KeyCount == keyCount)
-                                .ToList();
-
-                foreach (var row in existing)
-                    r.Remove(row);
-
-                foreach (var (recordedAt, vector) in samples)
+                foreach (var (axis, value) in vector.Enumerate())
                 {
-                    foreach (var (axis, value) in vector.Enumerate())
-                    {
-                        if (value <= 0 || !double.IsFinite(value))
-                            continue;
+                    if (value <= 0 || !double.IsFinite(value))
+                        continue;
 
-                        r.Add(new EzPlayerSkillHistoryPoint
-                        {
-                            Username = username,
-                            KeyCount = keyCount,
-                            SkillId = axis.ToSsrSkillId(),
-                            Value = value,
-                            RecordedAt = recordedAt,
-                            AlgorithmVersion = version,
-                        });
-                    }
+                    r.Add(new EzPlayerSkillHistoryPoint
+                    {
+                        Username = username,
+                        KeyCount = keyCount,
+                        SkillId = axis.ToSsrSkillId(),
+                        Value = value,
+                        RecordedAt = recordedAt,
+                        AlgorithmVersion = version,
+                    });
                 }
-            });
+            }
         }
 
         public IReadOnlyList<EzPlayerSkillHistoryPoint> GetPlayerSkillHistory(
