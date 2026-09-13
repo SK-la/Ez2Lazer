@@ -624,7 +624,10 @@ namespace osu.Game.EzOsuGame.HUD
             foreach (var axis in skill_radar_axes)
             {
                 double chartValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
-                if (!double.IsFinite(chartValue) || chartValue <= 0)
+                // Same floor as the player SSR side / hub skillModeEntries: the generic n-key
+                // engine returns a ~0.18 sliver for skillsets it does not rate (Technical on
+                // 5K and 8K+), which is noise next to a real 10+ bar — not a spoke.
+                if (!double.IsFinite(chartValue) || chartValue < EzPatternRatings.DISPLAY_MIN)
                     continue;
 
                 if (beatmapOnly)
@@ -641,13 +644,14 @@ namespace osu.Game.EzOsuGame.HUD
                 selected.Add(axis);
             }
 
-            // Beatmap: show every real MSD axis (pad to 3 for RadarChart). Dual with no overlap: fall back to chart axes.
+            // Beatmap: show every real MSD axis above the hub display floor (pad to 3 for RadarChart).
+            // Dual with no overlap: fall back to chart axes.
             if (selected.Count == 0 && !beatmapOnly)
             {
                 foreach (var axis in skill_radar_axes)
                 {
                     double chartValue = msd.GetValueOrDefault(axis.ToMsdSkillId(), 0);
-                    if (double.IsFinite(chartValue) && chartValue > 0)
+                    if (double.IsFinite(chartValue) && chartValue >= EzPatternRatings.DISPLAY_MIN)
                         selected.Add(axis);
                 }
             }
