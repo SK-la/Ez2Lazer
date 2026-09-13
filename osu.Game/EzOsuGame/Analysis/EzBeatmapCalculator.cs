@@ -174,7 +174,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     return null;
 
                 case 7:
-                    return bothSignificant ? "[5k1s1p] " : null;
+                    return (mixed || bothLow) ? "[5k1s1p] " : null;
 
                 case 8:
                     if (bothHigh) return "[6k2s] ";
