@@ -171,7 +171,7 @@ namespace osu.Game.EzOsuGame.Skills
                 {
                     // A trap (or a failed compute) leaves the instance mid-compute: its globals and
                     // allocator state may be inconsistent. Drop it so the next call rebuilds.
-                    InvalidateInstance();
+                    invalidateInstanceLocked();
                     throw;
                 }
             }
@@ -259,6 +259,13 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Drops the current instance; the next compute builds a fresh one.</summary>
         private void InvalidateInstance()
         {
+            lock (syncRoot)
+                invalidateInstanceLocked();
+        }
+
+        /// <summary>Lock-held variant of <see cref="InvalidateInstance"/>.</summary>
+        private void invalidateInstanceLocked()
+        {
             store?.Dispose();
 
             store = null;
@@ -277,7 +284,7 @@ namespace osu.Game.EzOsuGame.Skills
                     return;
 
                 disposed = true;
-                InvalidateInstance();
+                invalidateInstanceLocked();
             }
         }
     }
