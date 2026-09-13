@@ -473,7 +473,7 @@ namespace osu.Game.Screens.Select
 
             applyPanelKpc(maniaSummary);
 
-            string? scratch = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, metrics.MaxKps, metrics.KpsList);
+            string? scratch = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, metrics.MaxKps);
 
             if (scratch != null)
                 scratchText = scratch;
@@ -581,11 +581,19 @@ namespace osu.Game.Screens.Select
 
             if (rulesetInstance.GameplayVariants.Count() > 1)
             {
+                if (scratchText != null)
+                {
+                    variantText.Alpha = 1;
+                    variantText.Text = LocalisableString.Interpolate($"[{scratchText}] ");
+                    variantText.Colour = Colour4.LightPink.ToLinear();
+                    return;
+                }
+
                 int variant = rulesetInstance.GetVariantForBeatmap(beatmap, mods.Value);
                 var variantName = rulesetInstance.GetVariantName(variant);
 
                 variantText.Alpha = 1;
-                variantText.Text = scratchText ?? LocalisableString.Interpolate($"[{variantName}] ");
+                variantText.Text = LocalisableString.Interpolate($"[{variantName}] ");
                 variantText.Colour = Colour4.LightPink.ToLinear();
             }
             else
