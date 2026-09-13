@@ -10,7 +10,11 @@ namespace osu.Game.EzOsuGame.Skills
     /// </summary>
     public sealed class EzChartSkillInfo
     {
-        /// <summary>Bump when CSI production changes (e.g. LeoBlack clusters). Invalidates Realm rows via InfoVersion.</summary>
+        /// <summary>
+        /// Bump when CSI production changes (e.g. LeoBlack clusters). Realm rows are invalidated via
+        /// <see cref="Analysis.EzAnalysisRevision.ChartSkillInfo"/>, which folds this value together with
+        /// its upstream facet (MSD) into the stored <c>InfoVersion</c> - bumping this value alone is enough.
+        /// </summary>
         public const int VERSION = 2;
 
         /// <summary>

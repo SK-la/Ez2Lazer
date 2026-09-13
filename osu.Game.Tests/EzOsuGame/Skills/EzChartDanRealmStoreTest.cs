@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
@@ -85,6 +86,45 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(store.TryGetChartDan(hash, out var missing), Is.False);
                 Assert.That(missing, Is.Null);
                 Assert.That(store.GetPersistedChartDanHashes(), Does.Not.Contain(hash));
+            });
+        }
+
+        [Test]
+        public void Upstream_facets_retire_a_chart_dan_row()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+
+                // A bare-constant stamp is what a pre-revision (or MSD-only side-upsert) row carries.
+                // Both it and a CSI-only stamp must read as a miss, because Dan folds CSI and MSD.
+                foreach ((string hash, int stamp) in new[]
+                         {
+                             ("chart-dan-bare-dan-version", EzDanAlgorithm.VERSION),
+                             ("chart-dan-missing-csi", EzAnalysisRevision.ChartSkillInfo),
+                             ("chart-dan-missing-msd-upstream", EzChartSkillInfo.VERSION),
+                         })
+                {
+                    realm.Write(r =>
+                    {
+                        r.Add(new EzBeatmapChartDan
+                        {
+                            BeatmapHash = hash,
+                            AlgorithmVersion = stamp,
+                            KeyCount = 4,
+                            HoldRatio = 0.1,
+                            OverallMsd = 10,
+                            RcRawDan = 5,
+                            RcLabel = "Stale",
+                            LnRawDan = -1,
+                            ComputedAt = DateTimeOffset.UtcNow,
+                        });
+                    });
+
+                    Assert.That(store.TryGetChartDan(hash, out var stale), Is.False, $"revision {stamp} should be stale");
+                    Assert.That(stale, Is.Null);
+                    Assert.That(store.GetPersistedChartDanHashes(), Does.Not.Contain(hash));
+                }
             });
         }
 
