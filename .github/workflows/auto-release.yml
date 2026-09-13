@@ -217,7 +217,9 @@ jobs:
       matrix:
         platform: ${{ fromJson(github.event.inputs.platform_index == '' && '["windows","linux","macos"]' || github.event.inputs.platform_index == '1' && '["windows"]' || github.event.inputs.platform_index == '2' && '["linux"]' || github.event.inputs.platform_index == '3' && '["macos"]') }}
         arch: ${{ fromJson(github.event.inputs.arch_index == '' && '["x64","arm64"]' || github.event.inputs.arch_index == '1' && '["x64"]' || github.event.inputs.arch_index == '2' && '["arm64"]') }}
-    runs-on: ${{ matrix.platform == 'windows' && matrix.arch == 'arm64' && 'windows-11-arm' || matrix.platform == 'windows' && 'windows-latest' || matrix.platform == 'linux' && matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'macos' && matrix.arch == 'arm64' && 'macos-26' || 'macos-26-intel' }}
+    # macos 两种架构都在 macos-26(arm64) runner 上构建：publish 为框架依赖（--self-contained false），
+    # 唯一原生件是由 RID 决定的预编译 apphost，支持交叉发布；下方有 lipo 架构断言兜底。
+    runs-on: ${{ matrix.platform == 'windows' && matrix.arch == 'arm64' && 'windows-11-arm' || matrix.platform == 'windows' && 'windows-latest' || matrix.platform == 'linux' && matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || matrix.platform == 'linux' && 'ubuntu-latest' || 'macos-26' }}
     steps:
       # 版本号来自 ReleaseVersion 属性（见 publish.py），构建过程不读 git 历史，浅检出即可。
       - name: Checkout main repo into osu/
@@ -314,6 +316,32 @@ jobs:
             $publishArgs += @('--no-velopack')
           }
           python @publishArgs
+
+      # macos 两种架构同在 arm64 runner 上构建，这里断言产物自带的 apphost 架构正确，
+      # 防止交叉发布出现「架构标签与二进制不符」而无人察觉。
+      - name: Assert apphost architecture (macos)
+        if: matrix.platform == 'macos'
+        working-directory: osu
+        shell: pwsh
+        run: |
+          $dir = 'artifacts/Ez2Lazer_release_macos_${{ matrix.arch }}'
+          $exe = $null
+          foreach ($candidate in @('Ez2osu!', 'osu.Desktop')) {
+            $candidatePath = Join-Path $dir $candidate
+            if (Test-Path $candidatePath) { $exe = $candidatePath; break }
+          }
+          if (-not $exe) {
+            Write-Error "apphost not found under $dir"
+            exit 1
+          }
+
+          $expected = if ('${{ matrix.arch }}' -eq 'x64') { 'x86_64' } else { 'arm64' }
+          $archs = (& lipo -archs $exe).Trim()
+          Write-Output "apphost '$exe' architectures: $archs (expected to contain '$expected')"
+          if ($archs -notmatch $expected) {
+            Write-Error "apphost architecture mismatch: expected '$expected', got '$archs'"
+            exit 1
+          }
 
       # 与安装包共用同一份 osu.Game.dll，保证 NuGet 哈希可与 Release zip 校验一致
       - name: Pack ez2lazer.Game NuGet (linux x64 only)
