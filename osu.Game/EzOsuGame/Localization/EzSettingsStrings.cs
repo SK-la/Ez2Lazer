@@ -618,5 +618,31 @@ namespace osu.Game.EzOsuGame.Localization
             "OnlineID must be -1 or ≥4 (0~3 are reserved).");
 
         #endregion
+
+        #region Ez 技能
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_SKILL_SECTION_HEADER =
+            new EzLocalizationManager.EzLocalisableString("Ez 技能", "Ez Skill");
+
+        public static readonly LocalisableString SKILL_LN_CHART_MIN_HOLD_OBJECTS = new EzLocalizationManager.EzLocalisableString(
+            "LN 谱面最小 Hold 数",
+            "LN chart min hold objects");
+
+        public static readonly LocalisableString SKILL_LN_CHART_MIN_HOLD_OBJECTS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "ChartDan「LN 半」的绝对门槛：hold 物件数大于此值时，即使 hold 占比未达比例线也认定为 LN。"
+            + "\n与比例线 LnPrimaryMinRatioFor 是「或」关系：hold 数 > 本阈值，或 hold 占比 ≥ 比例线"
+            + "（4K 及其它键数 = 45%，7K = 37.5%）。"
+            + "\n降低 → 更多 hold 多但占比低的谱面获得 LN 半；提高 → 更依赖比例线，低占比谱面退回 RC。"
+            + "\n影响：Ez ChartDan / DualPanel、选歌面板与 HUD 雷达的 LN 标签，以及 Realm 中持久化的 ChartDan LN half。"
+            + "\n已落盘的 ChartDan / CSI 不会自动追溯更新，需重算（数据重建 → Realm 谱面技能链）后生效。",
+            "Absolute gate for the ChartDan LN half: when hold objects exceed this value the chart counts as LN "
+            + "even if its hold ratio is below the ratio line."
+            + "\nOR relationship with the ratio line LnPrimaryMinRatioFor: hold count > this threshold, OR hold ratio >= the ratio line "
+            + "(45% for 4K and other key counts, 37.5% for 7K)."
+            + "\nLower = more hold-heavy but low-ratio charts get an LN half; higher = the ratio line dominates and low-ratio charts fall back to RC."
+            + "\nAffects: Ez ChartDan / DualPanel, song-select and HUD radar LN labels, and the persisted ChartDan LN half in Realm."
+            + "\nAlready-persisted ChartDan / CSI is not retroactively updated; rebuild (Data rebuild -> Realm chart skill chain) to apply.");
+
+        #endregion
     }
 }
