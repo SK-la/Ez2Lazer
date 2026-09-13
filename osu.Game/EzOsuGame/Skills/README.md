@@ -144,6 +144,31 @@ BDSP 收工后跑）只在 `HasWork` 时执行一次增量 compute 并弹进度�
 - 代价：Realm 技能行的**删除**没有脏位可用（Dan 行无 `Stale` 字段），只能靠实际重算修正；
   这也是启动补算选增量而非清库重建的原因——增量足够精确，清库会把每局缓存一起废掉。
 
+### 玩家链只读图表侧数据，缺失的交回图表链
+
+玩家段需要图表侧三样东西：SSR 的 pattern 标签（CSI）、Dan 的 `EzPersistedChartDan`、以及
+mod 影响谱面时的现场估算。前两样**只读不写**：读不到就跳到下一局，并把该谱面记进
+`MissingChartHashes`，由 `EzLocalProfileService.ChartSideBackfillRequested` 交给图表链
+（`QueueEzRealmMetadataRebuild`，scope = MSD | CSI | ChartDan）。受影响玩家与 `All` 同时被置
+`Stale`，所以图表链跑完后 `EzLocalProfileStartupAlign` 会再折一次，把这些局真正计入。
+
+这样切开的理由：图表侧一行 MSD/CSI/Dan 是**谱面属性**，与玩家无关。玩家段顺手算一份，就会在
+每个玩家、每次 compute 上重复同一张谱面的 MinaCalc 计算，而且写的是临时值——正是这轮性能问题的来源。
+
+判定"该不该报缺"要对着图表链自己的候选门槛，不能只看有没有行，否则会给永不补的谱面反复排队：
+
+| 情况 | 图表链会补吗 | 玩家段视为 |
+|---|---|---|
+| 行存在但版本旧 | 会（增量重算） | 缺失，排队 |
+| 行不存在，MSD 未结算 | 会（同一轮里 MSD → CSI → Dan） | 缺失，排队 |
+| 键数不在引擎 `4–18` 范围 | **不会**（候选期就被丢弃） | 已结算，不报缺 |
+| MSD 结算为 unrateable | **不会**（Dan 阶段显式跳过） | 已结算，不报缺 |
+| CSI 结算为 unavailable stub | 不会 | 已结算，不报缺 |
+
+前两类由 `EzChartChainCoverage.IsRateableChart` / `EzSkillStore.GetUnrateableChartDanHashes` 区分。
+同一套口径也用在 `GetSkillDataStatus()` 上：不可评的键数不计入图表总数，MSD unrateable 的谱面在
+Dan 一栏记 `unrateable` 而不是 `missing`——否则"全部最新"永远达不到，状态行会一直报警。
+
 ## Key entry points
 
 - `IEzMsdEngine` / `EzNKeyMsdEngine`: the difficulty engine abstraction and its 4–18K implementation.

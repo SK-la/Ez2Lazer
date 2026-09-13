@@ -80,12 +80,18 @@ namespace osu.Game.EzOsuGame.Analysis
         /// Counts one facet's rows against <paramref name="currentRevision"/>. Rows for hashes outside
         /// <paramref name="chartHashes"/> are ignored (a removed beatmap's stale row is not "work").
         /// </summary>
+        /// <param name="settledByUpstream">
+        /// Hashes this facet will never produce a row for because an upstream one already settled them as
+        /// unrateable. They count as <see cref="EzFacetStatus.Unrateable"/> - settled, so not work - which keeps
+        /// "Pending &gt; 0" meaning "the next pass has something to do".
+        /// </param>
         public static EzFacetStatus Count<T>(
             IReadOnlyCollection<string> chartHashes,
             IEnumerable<IGrouping<string, T>> rowsByHash,
             int currentRevision,
             Func<T, int> revisionOf,
-            Func<T, bool> isSettledStub)
+            Func<T, bool> isSettledStub,
+            IReadOnlyCollection<string>? settledByUpstream = null)
         {
             int ready = 0;
             int unrateable = 0;
@@ -113,13 +119,24 @@ namespace osu.Game.EzOsuGame.Analysis
                     ++ready;
             }
 
+            int settledWithoutRow = 0;
+
+            if (settledByUpstream != null)
+            {
+                foreach (string hash in settledByUpstream)
+                {
+                    if (chartHashes.Contains(hash) && !seen.Contains(hash))
+                        ++settledWithoutRow;
+                }
+            }
+
             return new EzFacetStatus
             {
                 CurrentRevision = currentRevision,
                 Ready = ready,
-                Unrateable = unrateable,
+                Unrateable = unrateable + settledWithoutRow,
                 Stale = stale,
-                Missing = Math.Max(0, chartHashes.Count - seen.Count),
+                Missing = Math.Max(0, chartHashes.Count - seen.Count - settledWithoutRow),
             };
         }
 

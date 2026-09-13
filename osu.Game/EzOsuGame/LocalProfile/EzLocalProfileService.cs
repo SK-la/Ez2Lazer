@@ -896,6 +896,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var ssrPlayCache = ssrAggregator?.LoadPlayCache();
             var danPlayCache = danAggregator?.LoadPlayCache();
 
+            // New pass: drop anything the dan aggregator memoised against the previous one.
+            danAggregator?.BeginSkillPass();
+
             void tick()
             {
                 skillsProcessed++;

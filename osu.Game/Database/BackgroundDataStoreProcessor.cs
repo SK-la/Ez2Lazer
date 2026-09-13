@@ -273,7 +273,17 @@ namespace osu.Game.Database
         {
             lock (ezRealmMetadataBackfillLock)
                 ezRealmMetadataBackfillQueued = false;
+
+            // Raised off the update thread, after the whole drain loop (including deferred scopes) has finished.
+            // Consumers use it to notice that chart-side rows they were waiting on now exist.
+            EzRealmMetadataBackfillFinished?.Invoke();
         }
+
+        /// <summary>
+        /// Raised once an Ez Realm metadata backfill (startup or queued) has fully drained, including any scopes
+        /// deferred into that run. Fires on the worker thread.
+        /// </summary>
+        public event Action? EzRealmMetadataBackfillFinished;
 
         private readonly Lock ezScoreRecalculationLock = new Lock();
         private bool ezScoreRecalculationQueued;

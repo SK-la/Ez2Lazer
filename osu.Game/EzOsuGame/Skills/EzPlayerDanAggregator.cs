@@ -46,6 +46,21 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         public IReadOnlyCollection<string> MissingChartHashes { get; private set; } = Array.Empty<string>();
 
+        private HashSet<string>? unrateableChartDanHashes;
+
+        /// <summary>
+        /// Charts whose MSD settled as unrateable, so no ChartDan row can ever arrive for them. Loaded on first
+        /// need (a ChartDan row that is otherwise missing) and reused for the rest of the pass, because it is only
+        /// ever consulted after such a miss and a chart that later gains a row is answered by that row instead.
+        /// </summary>
+        private HashSet<string> unrateableChartsForPass
+            => unrateableChartDanHashes ??= skillStore.GetUnrateableChartDanHashes();
+
+        /// <summary>
+        /// Marks the start of a new skills pass, dropping lookups that were memoised against the previous one.
+        /// </summary>
+        public void BeginSkillPass() => unrateableChartDanHashes = null;
+
         /// <summary>
         /// One load of the per-play cache for a whole pass, so a multi-player run does not re-read the table once per
         /// player. Pass the result to <see cref="ComputeAndStore"/>.
@@ -139,8 +154,11 @@ namespace osu.Game.EzOsuGame.Skills
                             {
                                 // This pass never rates a chart: it reads the chart-side row or the play simply
                                 // waits. A missing row is reported so the chain computes it, and the next pass
-                                // folds the play in with its credit.
-                                missingCharts.Add(hash);
+                                // folds the play in with its credit - except where the chain will never produce
+                                // one, which is settled rather than missing (see EzChartChainCoverage).
+                                if (EzChartChainCoverage.IsRateableChart(beatmapInfo) && !unrateableChartsForPass.Contains(hash))
+                                    missingCharts.Add(hash);
+
                                 continue;
                             }
 

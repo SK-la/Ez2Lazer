@@ -276,6 +276,28 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        /// <summary>
+        /// Charts whose MSD settled as unrateable at the current revision. The chain derives no ChartDan from
+        /// them (see <c>BackgroundDataStoreProcessor.populateMissingChartDan</c>), so a play waiting on a ChartDan
+        /// row for one of these is settled rather than missing - reporting it would re-queue the chain forever.
+        /// </summary>
+        /// <remarks>
+        /// Scans the MSD table, so callers should treat the result as a per-pass value and only ask for it when a
+        /// ChartDan row is otherwise missing (the steady state has none).
+        /// </remarks>
+        public HashSet<string> GetUnrateableChartDanHashes()
+        {
+            int version = EzManiaSkillAlgorithm.VERSION;
+
+            return realmAccess.Run(r => r.All<EzBeatmapSkillValue>()
+                                         .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD
+                                                     && v.AlgorithmVersion == version
+                                                     && v.SkillId == EzSkillSystems.MsdUnrateableSkillId)
+                                         .AsEnumerable()
+                                         .Select(v => v.BeatmapHash)
+                                         .ToHashSet(StringComparer.Ordinal));
+        }
+
         public IReadOnlyDictionary<string, double> GetPlayerSkills(string username, int keyCount, string systemId, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
@@ -942,6 +964,11 @@ namespace osu.Game.EzOsuGame.Skills
                     if (b.BeatmapSet == null || b.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(b.Hash))
                         continue;
 
+                    // The chain drops keymodes its engine cannot rate at candidate time, so those charts are not
+                    // pending work and must not be counted as missing - otherwise "all current" is unreachable.
+                    if (!EzChartChainCoverage.IsRateableKeyCount((int)Math.Round(b.Difficulty.CircleSize)))
+                        continue;
+
                     chartHashes.Add(b.Hash);
                 }
 
@@ -958,13 +985,29 @@ namespace osu.Game.EzOsuGame.Skills
                                  .AsEnumerable()
                                  .GroupBy(v => v.BeatmapHash, StringComparer.Ordinal);
 
+                // No MSD means no ChartDan, so a chart whose MSD settled as unrateable is settled for Dan too.
+                // Counting it as missing would leave the Dan facet permanently pending, because the chain skips
+                // those on purpose (see BackgroundDataStoreProcessor.populateMissingChartDan).
+                var unrateableDanHashes = new HashSet<string>(StringComparer.Ordinal);
+
+                foreach (var group in msdByHash)
+                {
+                    if (!group.Any(v => v.AlgorithmVersion == msdRevision))
+                        continue;
+
+                    var skills = group.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
+
+                    if (EzBeatmapMsdComputer.IsUnrateableMsd(skills))
+                        unrateableDanHashes.Add(group.Key);
+                }
+
                 return new EzSkillDataStatus
                 {
                     TotalCharts = chartHashes.Count,
                     Msd = EzSkillDataStatusCounting.Count(chartHashes, msdByHash, msdRevision, static v => v.AlgorithmVersion, EzSkillDataStatusCounting.IsMsdStub),
                     ChartSkillInfo = EzSkillDataStatusCounting.Count(chartHashes, csiByHash, csiRevision, static v => v.InfoVersion, EzSkillDataStatusCounting.IsChartSkillInfoStub),
-                    // ChartDan has no settled-miss form: a row exists only when a dan was resolved.
-                    ChartDan = EzSkillDataStatusCounting.Count(chartHashes, danByHash, danRevision, static v => v.AlgorithmVersion, static _ => false),
+                    // ChartDan has no settled-miss row form: a row exists only when a dan was resolved.
+                    ChartDan = EzSkillDataStatusCounting.Count(chartHashes, danByHash, danRevision, static v => v.AlgorithmVersion, static _ => false, unrateableDanHashes),
                     MeasuredAt = measuredAt ?? DateTimeOffset.UtcNow,
                 };
             });

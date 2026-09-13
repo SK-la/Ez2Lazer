@@ -395,7 +395,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 foreach (long id in candidates)
                 {
-                    if (r.All<ScoreInfo>().Filter($"{nameof(ScoreInfo.OnlineID)} == $0", id).Count() > 0)
+                    if (r.All<ScoreInfo>().Filter($"{nameof(ScoreInfo.OnlineID)} == $0", id).Any())
                         ids.Add(id);
                 }
 

@@ -244,13 +244,27 @@ namespace osu.Game.EzOsuGame.Skills
                 if (chart is { IsUnavailable: false })
                     patterns = chart.Patterns;
             }
-            else
+            else if (isChartChainRateable(beatmapHash))
             {
                 missing.Add(beatmapHash);
             }
 
             memo[beatmapHash] = patterns;
             return patterns;
+        }
+
+        /// <summary>
+        /// Whether the chain will ever produce a CSI row for this chart. A chart whose CS-derived keymode the engine
+        /// cannot rate is dropped by the chain before MSD, so its CSI stage never runs for it - a play on it is
+        /// settled, and reporting the chart would re-queue the chain on every pass (see
+        /// <see cref="EzChartChainCoverage"/>).
+        /// </summary>
+        private bool isChartChainRateable(string beatmapHash)
+        {
+            var beatmapInfo = beatmapManager.QueryBeatmap(b => b.Hash == beatmapHash);
+
+            // No beatmap left to rate either.
+            return beatmapInfo != null && EzChartChainCoverage.IsRateableChart(beatmapInfo);
         }
 
         private static void cacheNegative(ScoreInfo score, string username, int keyCount, float rate, List<EzSsrPlayCacheRow> pending)
