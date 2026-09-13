@@ -47,11 +47,11 @@ namespace osu.Game.EzOsuGame.Skills
     }
 
     /// <summary>
-    /// Pre-release: corrective formula fixes keep this at 1 (no client shipped yet).
-    /// After public release, bump when MinaCalc note conversion or aggregation semantics change.
+    /// Bump when MinaCalc note conversion or aggregation semantics change.
+    /// 2: unified onto the 4-18K n-key MinaCalc wasm (was NuGet MinaCalc 0.4.2, 4/6/7K only).
     /// </summary>
     public static class EzManiaSkillAlgorithm
     {
-        public const int VERSION = 1;
+        public const int VERSION = 2;
     }
 }

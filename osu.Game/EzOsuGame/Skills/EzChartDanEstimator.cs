@@ -3,12 +3,9 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.Formats;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills.Dan;
@@ -103,31 +100,15 @@ namespace osu.Game.EzOsuGame.Skills
             if (keyCount <= 0)
                 return null;
 
-            using var calc = new EzMinaCalcFacade();
+            using var calc = new EzNKeyMsdEngine();
             EzSkillsetVector vector;
+
+            if (!calc.SupportsKeyCount(keyCount))
+                return null;
 
             try
             {
-                if (EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount))
-                {
-                    vector = calc.CalculateMsd(playable, rate);
-                }
-                else if (EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount))
-                {
-                    var sb = new StringBuilder();
-                    using (var writer = new StringWriter(sb))
-                        new LegacyBeatmapEncoder(playable, working.Skin, null).Encode(writer);
-
-                    string osuText = sb.ToString();
-                    if (string.IsNullOrWhiteSpace(osuText))
-                        return null;
-
-                    vector = calc.CalculateMsdFromOsuText(osuText, EzMinaCalcFacade.BuildOsuFileHint(beatmapInfo.Hash, keyCount), rate);
-                }
-                else
-                {
-                    return null;
-                }
+                vector = calc.CalculateMsd(EzMinaNoteConverter.Convert(playable), keyCount, rate);
             }
             catch (Exception)
             {
@@ -292,10 +273,16 @@ namespace osu.Game.EzOsuGame.Skills
                 rawDan = sunny.RawDan;
                 label = sunny.DisplayLabel;
             }
+            else if (EzDanLabels.TryResolveFallbackDan(keyCount, side, overall, dominantAxis, xxySr) is EzDanLabels.DanLookup fallback)
+            {
+                rawDan = fallback.RawDan;
+                label = fallback.Label;
+            }
             else
             {
-                rawDan = EzDanLabels.SrToRawDan(overall, dominantAxis);
-                label = EzDanLadders.For(keyCount, side).ParseLabel(rawDan);
+                // 5K / 8K+ without a star rating: no table of its own and nothing to read it off
+                // → no invented dan.
+                return null;
             }
 
             return new EzChartDanVerdict

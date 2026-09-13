@@ -589,11 +589,9 @@ namespace osu.Game.EzOsuGame.Skills
                 aggregateLabel = chartVerdict.Label;
             }
             else if (chartVerdict != null
-                     && chartVerdict.OverallMsd > 0
-                     && double.IsFinite(chartVerdict.OverallMsd))
+                     && EzDanLabels.TryResolveFallbackDan(keyCount, side, chartVerdict.OverallMsd, chartVerdict.DominantAxis, xxy >= 0 ? xxy : null) is EzDanLabels.DanLookup fallback)
             {
-                double raw = EzDanLabels.SrToRawDan(chartVerdict.OverallMsd, chartVerdict.DominantAxis);
-                aggregateLabel = EzDanLadders.For(keyCount, side).ParseLabel(raw);
+                aggregateLabel = fallback.Label;
             }
 
             if (string.IsNullOrEmpty(aggregateLabel))

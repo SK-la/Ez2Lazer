@@ -9,10 +9,12 @@ namespace osu.Game.EzOsuGame.Skills
     /// Independent from <see cref="EzManiaSkillAlgorithm.VERSION"/>. Reads via <see cref="EzSkillStore.GetDanEstimate"/> filter on this value.
     /// v2: side <c>GetDan</c> uses hub anchor/mean fold (<see cref="EzDanSideHeadline"/>).
     /// v3: hub clear gates + (hash,rate) dedupe; <see cref="CLEAR_WINDOW"/>=20 + <see cref="EzDanClearWindow"/> weighting.
+    /// v4: 5K / 8K–18K chart dan comes from the 4K xxy interval table (<see cref="EzDanLabels.TryResolveFallbackDan"/>)
+    /// instead of the raw 4K MSD means table, which inflated those keymodes by several levels.
     /// </summary>
     public static class EzDanAlgorithm
     {
-        public const int VERSION = 3;
+        public const int VERSION = 4;
 
         // --- Player clear aggregation (hub clear window) ---
         public const int CLEAR_QUORUM = 4;

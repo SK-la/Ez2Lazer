@@ -58,6 +58,52 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Reform ladder length used by SR→rawDan means tables (1…kappa).</summary>
         private const int reform_means_levels = 20;
 
+        /// <summary>
+        /// Keymodes that have their own community xxy→dan interval table (<see cref="EzSunnyDanIntervals"/>).
+        /// </summary>
+        public static bool HasXxyDanTable(int keyCount) => EzSunnyDanIntervals.SupportsKeyCount(keyCount);
+
+        /// <summary>Keymode whose interval table a tableless keymode reads instead: 4K, same side.</summary>
+        private const int tableless_borrowed_key_count = 4;
+
+        /// <summary>A resolved chart dan: the value the ladder prints and its display label.</summary>
+        public readonly record struct DanLookup(double RawDan, string Label);
+
+        /// <summary>
+        /// Dan used when the chart's own keymode table did not answer.
+        /// 4/6/7K have a table, so this is their no-xxy path: the calibrated MSD means table
+        /// (and the "other side" half of an Ez dual-half row).
+        /// 5K / 8K–18K have no community table at all, and the <c>means</c> tables below are
+        /// calibrated on 4K MSD — the n-key engine rates those keymodes on a different curve, so
+        /// feeding it their Overall MSD inflated the label by several levels. Their star rating is
+        /// the only community-calibrated number they have, so it is read off the 4K curve (same
+        /// side) instead of inventing a new MSD→dan constant.
+        /// Null = no trustworthy dan; callers must leave the label empty rather than invent one.
+        /// </summary>
+        public static DanLookup? TryResolveFallbackDan(int keyCount, EzDanSide side, double overallMsd, EzMinaSkillAxis axis, double? xxySr)
+        {
+            string sideId = side.ToId();
+
+            if (!HasXxyDanTable(keyCount))
+            {
+                if (xxySr is double sr
+                    && double.IsFinite(sr)
+                    && EzSunnyDanIntervals.TryLookup(tableless_borrowed_key_count, sideId, sr, out var borrowed)
+                    && !string.IsNullOrEmpty(borrowed.DisplayLabel))
+                {
+                    return new DanLookup(borrowed.RawDan, borrowed.DisplayLabel);
+                }
+
+                return null;
+            }
+
+            if (!double.IsFinite(overallMsd) || overallMsd <= 0)
+                return null;
+
+            double rawDan = SrToRawDan(overallMsd, axis);
+            return new DanLookup(rawDan, EzDanLadders.For(keyCount, side).ParseLabel(rawDan));
+        }
+
         public static double SrToRawDan(double sr, EzMinaSkillAxis axis = EzMinaSkillAxis.Stream, bool calibrate = true)
         {
             if (!double.IsFinite(sr) || sr <= 0)
