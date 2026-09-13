@@ -47,11 +47,11 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
   `EzMsdEngineException`, which the callers already treat as "this chart has no MSD/SSR".
 - `EzManiaSkillAlgorithm.VERSION` gates the derived caches: bumping it clears MSD and, via
   `BackgroundDataStoreProcessor`, ChartSkillInfo + ChartDan as well.
-- Chart dan routing: 4/6/7K use the community xxy→dan interval tables (`EzSunnyDanIntervals`),
-  with the calibrated MSD means table only as the dual-half fallback. No other keymode has a
-  table, so its dan is star-fitted from the chart's Overall MSD and star rating
-  (`EzDanLabels.FitTablelessRawDan`, `MSD × xxySR × 0.05`): the raw 4K MSD means table is
-  off-scale above 4K and inflated those labels by several levels. No star rating = no invented dan.
+- Chart dan routing: 4/6/7K use their own community xxy→dan interval tables (`EzSunnyDanIntervals`),
+  with the calibrated MSD means table only as the no-xxy / dual-half fallback. No other keymode has
+  a table, so it borrows the 4K table on the same side (`EzDanLabels.TryResolveFallbackDan`): the raw
+  4K MSD means table is off-scale above 4K and inflated those labels by several levels, and the star
+  rating is the only community-calibrated number those keymodes have. No star rating = no invented dan.
 - `EzDanAlgorithm.VERSION` gates player clears / chart dan rows; bump it when the dan mapping
   changes (currently `4`) so old rows are filtered out rather than read as stale.
 - Downstream coverage is not yet uniform above 9K — see `DATA-FOLLOWUPS.md`.

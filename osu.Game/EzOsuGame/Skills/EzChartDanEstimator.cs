@@ -273,14 +273,15 @@ namespace osu.Game.EzOsuGame.Skills
                 rawDan = sunny.RawDan;
                 label = sunny.DisplayLabel;
             }
-            else if (EzDanLabels.TryFallbackRawDan(keyCount, overall, dominantAxis, xxySr) is double fallbackRawDan)
+            else if (EzDanLabels.TryResolveFallbackDan(keyCount, side, overall, dominantAxis, xxySr) is EzDanLabels.DanLookup fallback)
             {
-                rawDan = fallbackRawDan;
-                label = EzDanLadders.For(keyCount, side).ParseLabel(rawDan);
+                rawDan = fallback.RawDan;
+                label = fallback.Label;
             }
             else
             {
-                // 5K / 8K+: no xxy table and no star rating to fit → no invented dan.
+                // 5K / 8K+ without a star rating: no table of its own and nothing to read it off
+                // → no invented dan.
                 return null;
             }
 
