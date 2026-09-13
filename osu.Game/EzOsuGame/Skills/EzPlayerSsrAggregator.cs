@@ -155,7 +155,7 @@ namespace osu.Game.EzOsuGame.Skills
                                 EzManiaSkillAlgorithm.VERSION));
                         }
 
-                        addScoredPlay(username, score, playable, keyCount, rate, vector, byKey, patternPlaysByKey, evidence);
+                        addScoredPlay(username, score, beatmapInfo, playable, keyCount, rate, vector, byKey, patternPlaysByKey, evidence);
                     }
                     finally
                     {
@@ -222,6 +222,7 @@ namespace osu.Game.EzOsuGame.Skills
         private void addScoredPlay(
             string username,
             ScoreInfo score,
+            BeatmapInfo beatmapInfo,
             IBeatmap playable,
             int keyCount,
             float rate,
@@ -238,9 +239,8 @@ namespace osu.Game.EzOsuGame.Skills
             string[] patterns = Array.Empty<string>();
 
             // Hub pattern ratings need chart pattern tags (ChartSkillInfo). Prefer stored rows
-            // (DATA-ChartSkillInfo-Batch). On miss, compute in-memory for this play only —
-            // TODO(DATA-Skills-PatternRatings): do not Upsert per-score here; if SSR recompute
-            // still races empty ChartSkillInfo in the wild, batch-ensure hashes before Aggregate.
+            // (DATA-ChartSkillInfo-Batch). On miss, compute once and persist, so every later play of
+            // this chart - and every other reader - hits Realm instead of re-running the analysis.
             if (skillStore.TryGetChartSkillInfo(score.BeatmapHash, out var chart) && chart is { IsUnavailable: false })
             {
                 patterns = chart.Patterns;
@@ -250,10 +250,15 @@ namespace osu.Game.EzOsuGame.Skills
                 try
                 {
                     var msd = skillStore.GetBeatmapSkills(score.BeatmapHash, EzSkillSystems.BEATMAP_MSD);
+
+                    // rate: 1 to match how CSI is produced everywhere else (pattern shares are
+                    // rate-invariant), so the persisted row is the same value a backfill would write.
                     var computed = EzChartSkillInfoComputer.Compute(
                         EzChartSkillInfoComputer.FromPlayable(playable),
                         msd,
-                        rate);
+                        rate: 1);
+
+                    skillStore.UpsertChartSkillInfo(score.BeatmapHash, computed, beatmapInfo.ID);
                     patterns = computed.Patterns;
                 }
                 catch

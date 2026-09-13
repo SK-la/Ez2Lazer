@@ -424,7 +424,7 @@ namespace osu.Game
             var localProfileStore = new EzLocalProfileStore(Storage);
             // Skill aggregators reuse localProfileStore as the per-play SSR / Dan cache (incremental backfill).
             var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore, localProfileStore);
-            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, localProfileStore);
+            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, skillStore, localProfileStore);
             var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, BeatmapManager);
 
             dependencies.Cache(skillRegistry);

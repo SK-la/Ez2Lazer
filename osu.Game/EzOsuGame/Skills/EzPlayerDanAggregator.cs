@@ -25,12 +25,14 @@ namespace osu.Game.EzOsuGame.Skills
 
         private readonly BeatmapManager beatmapManager;
         private readonly EzChartDanEstimator chartDanEstimator;
+        private readonly EzSkillStore skillStore;
         private readonly EzLocalProfileStore? profileStore;
 
-        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzChartDanEstimator chartDanEstimator, EzLocalProfileStore? profileStore = null)
+        public EzPlayerDanAggregator(BeatmapManager beatmapManager, EzChartDanEstimator chartDanEstimator, EzSkillStore skillStore, EzLocalProfileStore? profileStore = null)
         {
             this.beatmapManager = beatmapManager;
             this.chartDanEstimator = chartDanEstimator;
+            this.skillStore = skillStore;
             this.profileStore = profileStore;
         }
 
@@ -91,13 +93,29 @@ namespace osu.Game.EzOsuGame.Skills
                         if (beatmapInfo.Ruleset.OnlineID != 3)
                             continue;
 
-                        var chart = chartDanEstimator.TryEstimate(beatmapInfo, score.Mods);
-
                         string hash = score.BeatmapHash;
                         if (string.IsNullOrWhiteSpace(hash))
                             hash = beatmapInfo.Hash;
 
                         double rate = EzModRate.Resolve(score.Mods);
+
+                        // Fast path: with no chart-affecting mod, the persisted nomod ChartDan baseline is
+                        // exactly what TryEstimate would derive, so credit straight off it and skip the
+                        // WorkingBeatmap/playable build. Anything whole-chart (rate / key conversion /
+                        // difficulty) still needs the live estimate.
+                        EzChartDanVerdict? chart = null;
+
+                        if (!EzModRate.AffectsChartSkills(score.Mods)
+                            && skillStore.TryGetChartDan(hash, out var persisted) && persisted != null)
+                        {
+                            var side = persisted.HoldRatio >= EzDanAlgorithm.LnPrimaryMinRatioFor(persisted.KeyCount)
+                                ? EzDanSide.Ln
+                                : EzDanSide.Rc;
+
+                            chart = persisted.ToVerdict(side);
+                        }
+
+                        chart ??= chartDanEstimator.TryEstimate(beatmapInfo, score.Mods);
 
                         if (chart == null)
                         {
