@@ -81,17 +81,18 @@ namespace osu.Game.EzOsuGame.Analysis
         private const int songs_branch_schema_version = 3;
 
         /// <summary>
-        /// 主分析库文件版本。仅 kps / KPC 表结构或 kps 算法变更时递增；v7 自 v6 继承 kps 数据并移除 legacy 列。
+        /// 主分析库文件版本。仅 kps / KPC 表结构或列统计口径变更时递增。
+        /// v7 自 v6 继承 kps 数据并移除 legacy 列；v8 只继承 kps（mania 列统计改为 dense 补列，旧 sparse 行不带过去，之后按谱面懒回填）。
         /// 分支库 schema v1 迁移后需全量重算 xxy/PP；v2 及以后迁移时保留既有版本 meta 并复用结果。
         /// </summary>
-        public const int ANALYSIS_VERSION = 7;
+        public const int ANALYSIS_VERSION = 8;
 
         public static string DatabaseFilename => $"{LEGACY_DATABASE_FILENAME_PREFIX}{ANALYSIS_VERSION}.sqlite";
 
         public string GetMainDatabasePath() => storage.GetFullPath(DatabaseFilename, true);
 
         /// <summary>
-        /// 旧版稳定文件名（中间分支）；v7 启动时会从此文件迁移一次。
+        /// 旧版稳定文件名（中间分支）；任何新版主库首次启动时会从此文件迁移一次。
         /// </summary>
         public const string LEGACY_STABLE_DATABASE_FILENAME = "ez-analysis.sqlite";
 

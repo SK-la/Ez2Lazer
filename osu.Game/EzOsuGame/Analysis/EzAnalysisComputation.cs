@@ -154,9 +154,13 @@ namespace osu.Game.EzOsuGame.Analysis
             kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
 
             var commonSummary = new KpsSummary(averageKps, maxKps, kpsList);
-            EzManiaSummary? maniaSummary = onlyKps
-                ? null
-                : new EzManiaSummary(columnCounts, holdNoteCounts, xxySr: null);
+            EzManiaSummary? maniaSummary = null;
+
+            if (!onlyKps)
+            {
+                padColumnCounts(lookup, columnCounts, holdNoteCounts);
+                maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts, xxySr: null);
+            }
 
             return new EzAnalysisResult(commonSummary, pp: null, maniaSummary);
         }
@@ -194,11 +198,24 @@ namespace osu.Game.EzOsuGame.Analysis
             kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
 
             var commonSummary = new KpsSummary(averageKps, maxKps, kpsList);
-            EzManiaSummary? maniaSummary = onlyKps
-                ? null
-                : new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
+            EzManiaSummary? maniaSummary = null;
+
+            if (!onlyKps)
+            {
+                padColumnCounts(lookup, columnCounts, holdNoteCounts);
+                maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
+            }
 
             return new EzAnalysisResult(commonSummary, pp: null, maniaSummary);
+        }
+
+        /// <summary>
+        /// 把稀疏列统计补 0 到真实列数（仅 Mania 分析路径；0 note 谱面的空字典不补）。
+        /// </summary>
+        private static void padColumnCounts(in EzAnalysisLookupCache lookup, Dictionary<int, int> columnCounts, Dictionary<int, int> holdNoteCounts)
+        {
+            int realColumnCount = EzManiaColumnLayout.ResolveRealColumnCount(lookup.Ruleset, lookup.BeatmapInfo, lookup.OrderedMods);
+            EzManiaColumnLayout.PadToRealColumnCount(columnCounts, holdNoteCounts, realColumnCount);
         }
 
         public static bool TryComputeRulesetSpecificRadarData(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
