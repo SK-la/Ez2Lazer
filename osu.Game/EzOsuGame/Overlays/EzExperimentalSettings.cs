@@ -178,6 +178,48 @@ namespace osu.Game.EzOsuGame.Overlays
                     }
 
                     runCompute(localProfileService, selected, clearRebuild, notifications);
+                },
+                selected => requestDeleteLocalProfile(localProfileService, dialogOverlay, notifications, selected)));
+        }
+
+        /// <summary>
+        /// Confirm then run the exclusion. The import dialog has already closed by the time this is invoked
+        /// (its button hides it), so cancelling the confirmation means reopening the dialog.
+        /// </summary>
+        private void requestDeleteLocalProfile(
+            EzLocalProfileService localProfileService,
+            IDialogOverlay dialogOverlay,
+            INotificationOverlay? notifications,
+            IReadOnlyList<string> selected)
+        {
+            if (selected.Count == 0)
+                return;
+
+            dialogOverlay.Push(new EzLocalProfileDeleteConfirmDialog(selected,
+                () =>
+                {
+                    notifications?.Post(new SimpleNotification { Text = EzSettingsProfile.LOCAL_PROFILE_DELETE_BUSY });
+
+                    localProfileService.ExcludeUsernamesAsync(selected).ContinueWith(t =>
+                    {
+                        if (t.IsFaulted)
+                        {
+                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsProfile.LOCAL_PROFILE_DELETE_FAILED });
+                            return;
+                        }
+
+                        if (t.IsCanceled)
+                            return;
+
+                        var deleted = t.GetResultSafely();
+
+                        notifications?.Post(new SimpleNotification
+                        {
+                            Text = deleted.Count > 0
+                                ? LocalisableString.Format(EzSettingsProfile.LOCAL_PROFILE_DELETE_DONE.ToString(), string.Join(", ", deleted))
+                                : EzSettingsProfile.LOCAL_PROFILE_DELETE_NONE,
+                        });
+                    });
                 }));
         }
 

@@ -1104,6 +1104,50 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        /// <summary>
+        /// Drop every Realm-side player skill row for <paramref name="username"/> — SSR / pattern values,
+        /// skill history, side Dan estimates and Dan skillset tiles, across all keymodes and versions.
+        /// Used to clear the archive-wide <c>All</c> sentinel when the players it summarised change (an exclusion,
+        /// or a re-derivation from a now-empty included set). The SQLite counterpart is
+        /// <c>EzLocalProfileStore</c>, which is not touched here.
+        /// </summary>
+        /// <returns>Total number of rows removed.</returns>
+        public int DeletePlayerSkillData(string username)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
+            int removed = 0;
+
+            realmAccess.Write(r =>
+            {
+                foreach (var row in r.All<EzPlayerSkillValue>().Where(v => v.Username == username).ToList())
+                {
+                    r.Remove(row);
+                    removed++;
+                }
+
+                foreach (var row in r.All<EzPlayerSkillHistoryPoint>().Where(v => v.Username == username).ToList())
+                {
+                    r.Remove(row);
+                    removed++;
+                }
+
+                foreach (var row in r.All<EzDanEstimate>().Where(v => v.Username == username).ToList())
+                {
+                    r.Remove(row);
+                    removed++;
+                }
+
+                foreach (var row in r.All<EzPlayerDanSkillsetValue>().Where(v => v.Username == username).ToList())
+                {
+                    r.Remove(row);
+                    removed++;
+                }
+            });
+
+            return removed;
+        }
+
         /// <summary>Legacy row writer; prefer <see cref="WriteDanSkillsetVerdicts"/>.</summary>
         public void WriteDanSkillsetValues(string username, int keyCount, string side, IEnumerable<EzPlayerDanSkillsetValue> values)
         {

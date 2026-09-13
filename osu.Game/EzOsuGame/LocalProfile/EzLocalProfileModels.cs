@@ -145,6 +145,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
     /// <summary>
     /// Online API score metadata persisted for profile stats when local .osr import is unavailable.
+    /// <paramref name="Username"/> is the account the score was pulled for: the archive counts a pulled score as
+    /// that player's, so excluding the player also drops it. An empty value is a legacy unattributed row.
     /// </summary>
     public readonly record struct EzLocalProfileOnlineScoreContribution(
         long OnlineId,
@@ -155,7 +157,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
         float ApproachRate,
         long KeyCount,
         double Pp,
-        long DurationMs);
+        long DurationMs,
+        string Username = "");
 
     /// <summary>
     /// In-memory aggregation buffer written atomically to SQLite.

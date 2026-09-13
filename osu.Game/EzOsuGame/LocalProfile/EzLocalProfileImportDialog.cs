@@ -25,10 +25,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly Dictionary<string, BindableBool> selections = new Dictionary<string, BindableBool>(StringComparer.Ordinal);
         private readonly BindableBool clearRebuild = new BindableBool();
 
+        /// <summary>True while at least one player is checked; drives the delete button's enabled state.</summary>
+        private readonly BindableBool hasSelection = new BindableBool();
+
         public EzLocalProfileImportDialog(
             IReadOnlyList<EzLocalProfileUsernameCount> usernameCounts,
             IReadOnlyCollection<string> previouslyIncluded,
-            Action<IReadOnlyList<string>, bool> onConfirm)
+            Action<IReadOnlyList<string>, bool> onConfirm,
+            Action<IReadOnlyList<string>>? onDeleteRequested = null)
         {
             HeaderText = EzSettingsProfile.LOCAL_PROFILE_IMPORT_HEADER;
             BodyText = EzSettingsProfile.LOCAL_PROFILE_IMPORT_BODY;
@@ -51,12 +55,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 var bindable = new BindableBool(selected);
                 selections[entry.Username] = bindable;
 
+                bindable.ValueChanged += _ => updateHasSelection();
+
                 flow.Add(new OsuCheckbox
                 {
                     LabelText = $"{entry.Username}  ({entry.ScoreCount})",
                     Current = { BindTarget = bindable },
                 });
             }
+
+            updateHasSelection();
 
             float listHeight = Math.Clamp(
                 usernameCounts.Count * row_height + Math.Max(0, usernameCounts.Count - 1) * 4,
@@ -103,11 +111,25 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         onConfirm(chosen, clearRebuild.Value);
                     }
                 },
+                new PopupDialogDangerousButton
+                {
+                    Text = EzSettingsProfile.LOCAL_PROFILE_IMPORT_DELETE,
+                    Enabled = { BindTarget = hasSelection },
+                    Action = () =>
+                    {
+                        var chosen = selections.Where(kv => kv.Value.Value).Select(kv => kv.Key).ToList();
+
+                        if (chosen.Count > 0)
+                            onDeleteRequested?.Invoke(chosen);
+                    }
+                },
                 new PopupDialogCancelButton
                 {
                     Text = EzSettingsProfile.LOCAL_PROFILE_IMPORT_CANCEL,
                 }
             };
         }
+
+        private void updateHasSelection() => hasSelection.Value = selections.Values.Any(b => b.Value);
     }
 }

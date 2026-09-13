@@ -30,6 +30,32 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_CANCEL =
             new EzLocalizationManager.EzLocalisableString("取消", "Cancel");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_IMPORT_DELETE =
+            new EzLocalizationManager.EzLocalisableString("从All分析中排除所选玩家", "Exclude checked players from All analysis");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DELETE_CONFIRM_HEADER =
+            new EzLocalizationManager.EzLocalisableString("从All分析中排除玩家", "Exclude players from All analysis");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DELETE_CONFIRM_BODY =
+            new EzLocalizationManager.EzLocalisableString(
+                "以下玩家将不再计入「All」聚合与其它统计：\n{0}\n\n数据不会删除，只是不再参与统计；重新勾选并分析即可恢复。",
+                "These players will stop counting towards “All” and the other archive stats:\n{0}\n\nNothing is deleted — their data simply stops contributing. Re-checking and analysing them restores it.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DELETE_CONFIRM =
+            new EzLocalizationManager.EzLocalisableString("排除", "Exclude");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DELETE_DONE =
+            new EzLocalizationManager.EzLocalisableString("已从分析中排除：{0}", "Excluded from analysis: {0}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DELETE_NONE =
+            new EzLocalizationManager.EzLocalisableString("所选玩家本来就不在分析中。", "The selected players were not part of the analysis.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DELETE_FAILED =
+            new EzLocalizationManager.EzLocalisableString("排除玩家失败。", "Failed to exclude the players.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_DELETE_BUSY =
+            new EzLocalizationManager.EzLocalisableString("正在排除玩家…", "Excluding players…");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_STARTED =
             new EzLocalizationManager.EzLocalisableString("正在计算成绩分析…", "Computing score analysis…");
 
