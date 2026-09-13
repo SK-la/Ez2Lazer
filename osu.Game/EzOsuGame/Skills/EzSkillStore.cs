@@ -521,14 +521,18 @@ namespace osu.Game.EzOsuGame.Skills
             string username,
             int keyCount,
             string skillId,
-            int maxPoints = 64)
+            int maxPoints = 64,
+            int? algorithmVersion = null)
         {
+            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+
             return realmAccess.Run(r =>
             {
                 return r.All<EzPlayerSkillHistoryPoint>()
                         .Where(v => v.Username == username
                                     && v.KeyCount == keyCount
-                                    && v.SkillId == skillId)
+                                    && v.SkillId == skillId
+                                    && v.AlgorithmVersion == version)
                         .ToList()
                         .OrderByDescending(v => v.RecordedAt)
                         .Take(maxPoints)

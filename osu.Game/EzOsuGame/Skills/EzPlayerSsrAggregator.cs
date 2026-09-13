@@ -3,12 +3,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.Formats;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.Scoring;
 
@@ -57,7 +56,7 @@ namespace osu.Game.EzOsuGame.Skills
             var patternPlaysByKey = new Dictionary<int, List<PatternPlay>>();
             var evidence = new List<EzAxisPlayEvidenceRow>();
 
-            using var calc = new EzMinaCalcFacade();
+            using var calc = new EzNKeyMsdEngine();
 
             foreach (var score in scores)
             {
@@ -89,25 +88,18 @@ namespace osu.Game.EzOsuGame.Skills
                     var notes = EzMinaNoteConverter.Convert(playable);
                     EzSkillsetVector vector;
 
-                    if (EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount) && notes.Length > 0)
-                    {
-                        vector = calc.CalculateSsr(notes, rate, goalValue);
-                    }
-                    else if (EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount))
-                    {
-                        // Note-array API is 4K-only; encode playable (mods applied) for 6K/7K.
-                        var sb = new StringBuilder();
-                        using (var writer = new StringWriter(sb))
-                            new LegacyBeatmapEncoder(playable, working.Skin, null).Encode(writer);
+                    if (!calc.SupportsKeyCount(keyCount) || notes.Length < EzNKeyMsdEngine.MIN_RATEABLE_ROWS)
+                        continue;
 
-                        string osuText = sb.ToString();
-                        if (string.IsNullOrWhiteSpace(osuText))
-                            continue;
-
-                        vector = calc.CalculateSsrFromOsuText(osuText, score.BeatmapHash + ".osu", rate, goalValue);
-                    }
-                    else
+                    try
                     {
+                        vector = calc.CalculateSsr(notes, keyCount, rate, goalValue);
+                    }
+                    catch (EzMsdEngineException e)
+                    {
+                        // A chart the engine cannot rate (e.g. a chord wider than its column
+                        // limit) simply contributes no SSR; the engine rebuilds itself for the next play.
+                        Logger.Log($"[EzSkills] SSR compute failed for {score.BeatmapHash} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                         continue;
                     }
 

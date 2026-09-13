@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using MinaCalc;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -12,21 +11,26 @@ using osu.Game.Rulesets.Objects.Types;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Converts a playable mania <see cref="IBeatmap"/> into MinaCalc note rows
-    /// (column bitmask + absolute time in seconds). Hold notes contribute their head only
-    /// (lnTailTaps = false), matching mania-hub default.
+    /// Converts a playable mania <see cref="IBeatmap"/> into MinaCalc rows
+    /// (column bitmask + row time in seconds). Hold notes contribute their head only
+    /// (lnTailTaps = false), matching mania-hub's default.
     /// </summary>
     public static class EzMinaNoteConverter
     {
         /// <summary>
-        /// Builds MinaCalc rows. Returns empty when there are no column objects.
+        /// Builds MinaCalc rows, or empty when there are no column objects.
         /// </summary>
-        public static MinaCalcNote[] Convert(IBeatmap beatmap)
+        /// <remarks>
+        /// Rows are keyed by whole milliseconds (same as mania-hub) so a chord shares one bitmask.
+        /// osu! charts may start before the audio lead-in; a negative row time walks MinaCalc's
+        /// interval index out of bounds and traps the wasm, so such charts are shifted to start at 0
+        /// (only inter-row gaps carry difficulty, so the offset is value-preserving).
+        /// </remarks>
+        public static EzCalcNote[] Convert(IBeatmap beatmap)
         {
             ArgumentNullException.ThrowIfNull(beatmap);
 
-            // Group by start time (ms → seconds row). Same-time chords share one bitmask.
-            var byTime = new SortedDictionary<double, uint>();
+            var byTimeMs = new SortedDictionary<long, uint>();
 
             foreach (HitObject obj in beatmap.HitObjects)
             {
@@ -37,22 +41,26 @@ namespace osu.Game.EzOsuGame.Skills
                 if (column < 0 || column >= 32)
                     continue;
 
-                double timeSec = obj.StartTime / 1000.0;
-                // Snap near-equal times so floating chord members stay one row.
-                double key = Math.Round(timeSec, 6);
+                long timeMs = (long)Math.Round(obj.StartTime);
 
-                byTime.TryGetValue(key, out uint mask);
-                byTime[key] = mask | (1u << column);
+                byTimeMs.TryGetValue(timeMs, out uint mask);
+                byTimeMs[timeMs] = mask | (1u << column);
             }
 
-            if (byTime.Count == 0)
-                return Array.Empty<MinaCalcNote>();
+            if (byTimeMs.Count == 0)
+                return Array.Empty<EzCalcNote>();
 
-            return byTime.Select(kvp => new MinaCalcNote
-            {
-                Notes = kvp.Value,
-                RowTime = (float)kvp.Key,
-            }).ToArray();
+            // Rows are sorted, so the first entry decides the shift.
+            long firstTimeMs = byTimeMs.Keys.First();
+            long offsetMs = firstTimeMs < 0 ? -firstTimeMs : 0;
+
+            var rows = new EzCalcNote[byTimeMs.Count];
+            int index = 0;
+
+            foreach (var (timeMs, mask) in byTimeMs)
+                rows[index++] = new EzCalcNote(mask, (timeMs + offsetMs) / 1000f);
+
+            return rows;
         }
 
         public static int ResolveKeyCount(IBeatmap beatmap)

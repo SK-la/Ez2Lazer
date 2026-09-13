@@ -3,13 +3,9 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.Formats;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.IO;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -73,12 +69,12 @@ namespace osu.Game.EzOsuGame.Skills
 
             int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
 
-            using var calc = new EzMinaCalcFacade();
+            using var calc = new EzNKeyMsdEngine();
             EzSkillsetVector vector;
 
             try
             {
-                vector = calculateMsd(calc, working, playable, beatmapInfo, keyCount);
+                vector = calc.CalculateMsd(EzMinaNoteConverter.Convert(playable), keyCount, rate: 1f);
             }
             catch (Exception e)
             {
@@ -88,16 +84,11 @@ namespace osu.Game.EzOsuGame.Skills
 
             if (vector.Overall <= 0 && vector.Stream <= 0)
             {
-                bool supportedKeymode = EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount)
-                                        || EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount);
-
-                if (supportedKeymode)
+                if (calc.SupportsKeyCount(keyCount))
                 {
                     Logger.Log($"[EzSkills] MSD zero vector for {beatmapInfo} (keys={keyCount})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
                 }
-                // else
-                //     Logger.Log($"[EzSkills] MSD skip unsupported keymode {keyCount}K for {beatmapInfo}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 return null;
             }
@@ -156,73 +147,6 @@ namespace osu.Game.EzOsuGame.Skills
             catch (Exception e)
             {
                 Logger.Log($"[EzSkills] ChartDan upsert after MSD failed for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-            }
-        }
-
-        private static EzSkillsetVector calculateMsd(
-            EzMinaCalcFacade calc,
-            WorkingBeatmap working,
-            IBeatmap playable,
-            BeatmapInfo beatmapInfo,
-            int keyCount)
-        {
-            // Prefer .osu text so MinaCalc reads CircleSize (required for 6K/7K on 0.4.2).
-            if (EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount))
-            {
-                string? osuText = tryReadOsuText(working, beatmapInfo) ?? tryEncodePlayable(working, playable);
-
-                if (!string.IsNullOrWhiteSpace(osuText))
-                    return calc.CalculateMsdFromOsuText(osuText, EzMinaCalcFacade.BuildOsuFileHint(beatmapInfo.Hash, keyCount));
-            }
-
-            // Note-array path: 4K only on this package.
-            return calc.CalculateMsd(playable);
-        }
-
-        private static string? tryReadOsuText(WorkingBeatmap working, BeatmapInfo beatmapInfo)
-        {
-            string? chartPath = beatmapInfo.Path;
-            if (string.IsNullOrEmpty(chartPath))
-                return null;
-
-            try
-            {
-                string? storagePath = beatmapInfo.BeatmapSet?.GetPathForFile(chartPath);
-                Stream? stream = null;
-
-                if (!string.IsNullOrEmpty(storagePath))
-                    stream = working.GetStream(storagePath);
-
-                stream ??= working.GetStream(chartPath);
-
-                if (stream == null)
-                    return null;
-
-                using (stream)
-                using (var reader = new LineBufferedReader(stream))
-                    return reader.ReadToEnd();
-            }
-            catch (Exception e)
-            {
-                Logger.Log($"[EzSkills] MSD: failed reading .osu for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-                return null;
-            }
-        }
-
-        private static string? tryEncodePlayable(WorkingBeatmap working, IBeatmap playable)
-        {
-            try
-            {
-                var sb = new StringBuilder();
-                using (var writer = new StringWriter(sb))
-                    new LegacyBeatmapEncoder(playable, working.Skin, null).Encode(writer);
-
-                return sb.ToString();
-            }
-            catch (Exception e)
-            {
-                Logger.Log($"[EzSkills] MSD: failed encoding playable: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-                return null;
             }
         }
 

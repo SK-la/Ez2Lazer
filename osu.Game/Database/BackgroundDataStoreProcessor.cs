@@ -552,6 +552,12 @@ namespace osu.Game.Database
 
             skillStore.ClearBeatmapMsd();
 
+            // MSD-derived caches must fall with it: ChartSkillInfo (HandstreamEndurance) and
+            // ChartDan both read MSD, and populateMissingChartDan skips hashes that already have
+            // a row — leaving them would keep DualPanel chart halves on the previous engine.
+            skillStore.ClearChartSkillInfo();
+            skillStore.ClearChartDan();
+
             realmAccess.Write(r =>
             {
                 if (r.Find<RulesetInfo>(liveState.Item1) is RulesetInfo live)
@@ -901,13 +907,12 @@ namespace osu.Game.Database
                     if (string.IsNullOrEmpty(b.Hash))
                         continue;
 
-                    // Exclude 5K / 8K+ at candidate time so they never enter the missing set
-                    // (loop-only skip left them as perpetual false-missing every launch).
+                    // Exclude keymodes the n-key engine cannot rate at candidate time so they
+                    // never enter the missing set (loop-only skip left them as perpetual
+                    // false-missing every launch).
                     int keyCount = (int)Math.Round(b.Difficulty.CircleSize);
 
-                    if (keyCount > 0
-                        && !EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount)
-                        && !EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount))
+                    if (keyCount > 0 && !EzNKeyMsdEngine.IsSupportedKeyCount(keyCount))
                     {
                         ++skippedUnsupportedKeyCount;
                         continue;
@@ -1109,9 +1114,7 @@ namespace osu.Game.Database
 
                     int keyCount = (int)Math.Round(b.Difficulty.CircleSize);
 
-                    if (keyCount > 0
-                        && !EzMinaCalcFacade.SupportsOsuTextKeyCount(keyCount)
-                        && !EzMinaCalcFacade.SupportsNoteArrayKeyCount(keyCount))
+                    if (keyCount > 0 && !EzNKeyMsdEngine.IsSupportedKeyCount(keyCount))
                     {
                         ++skippedUnsupportedKeyCount;
                         continue;

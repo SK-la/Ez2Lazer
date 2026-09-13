@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using MinaCalc;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -20,9 +19,6 @@ namespace osu.Game.EzOsuGame.Skills
         double Chordjack,
         double Technical)
     {
-        public static EzSkillsetVector FromMina(MinaCalcScores scores)
-            => new EzSkillsetVector(scores.Overall, scores.Stream, scores.Jumpstream, scores.Handstream, scores.Stamina, scores.JackSpeed, scores.Chordjack, scores.Technical);
-
         /// <summary>
         /// Number of <c>f32</c> values the MinaCalc n-key engine writes, in
         /// <see cref="RawOutputOrder"/> order.
