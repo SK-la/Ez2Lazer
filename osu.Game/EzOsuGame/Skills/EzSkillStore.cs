@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 
@@ -850,6 +851,58 @@ namespace osu.Game.EzOsuGame.Skills
 
                 foreach (var row in rows)
                     r.Remove(row);
+            });
+        }
+
+        /// <summary>
+        /// Snapshot of the chart skill chain's completeness, counted over every mania chart in Realm.
+        /// <para>
+        /// Reads all three facet tables in one run, so call it off the UI thread; it is meant for an
+        /// explicit status refresh, not a hot path. Results come straight from the persisted
+        /// <see cref="EzAnalysisRevision"/> stamps, which is also exactly what the backfill filters on,
+        /// so "Pending &gt; 0" and "the next backfill has work" cannot disagree.
+        /// </para>
+        /// </summary>
+        public EzSkillDataStatus GetSkillDataStatus(DateTimeOffset? measuredAt = null)
+        {
+            int msdRevision = EzAnalysisRevision.Msd;
+            int csiRevision = EzAnalysisRevision.ChartSkillInfo;
+            int danRevision = EzAnalysisRevision.ChartDan;
+
+            return realmAccess.Run(r =>
+            {
+                var chartHashes = new HashSet<string>(StringComparer.Ordinal);
+
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    if (b.BeatmapSet == null || b.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(b.Hash))
+                        continue;
+
+                    chartHashes.Add(b.Hash);
+                }
+
+                var msdByHash = r.All<EzBeatmapSkillValue>()
+                                 .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD)
+                                 .AsEnumerable()
+                                 .GroupBy(v => v.BeatmapHash, StringComparer.Ordinal);
+
+                var csiByHash = r.All<EzBeatmapChartSkillInfo>()
+                                 .AsEnumerable()
+                                 .GroupBy(v => v.BeatmapHash, StringComparer.Ordinal);
+
+                var danByHash = r.All<EzBeatmapChartDan>()
+                                 .AsEnumerable()
+                                 .GroupBy(v => v.BeatmapHash, StringComparer.Ordinal);
+
+                return new EzSkillDataStatus
+                {
+                    TotalCharts = chartHashes.Count,
+                    Msd = EzSkillDataStatusCounting.Count(chartHashes, msdByHash, msdRevision, static v => v.AlgorithmVersion, EzSkillDataStatusCounting.IsMsdStub),
+                    ChartSkillInfo = EzSkillDataStatusCounting.Count(chartHashes, csiByHash, csiRevision, static v => v.InfoVersion, EzSkillDataStatusCounting.IsChartSkillInfoStub),
+                    // ChartDan has no settled-miss form: a row exists only when a dan was resolved.
+                    ChartDan = EzSkillDataStatusCounting.Count(chartHashes, danByHash, danRevision, static v => v.AlgorithmVersion, static _ => false),
+                    MeasuredAt = measuredAt ?? DateTimeOffset.UtcNow,
+                };
             });
         }
 

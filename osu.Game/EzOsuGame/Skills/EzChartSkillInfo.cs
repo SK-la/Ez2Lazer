@@ -18,8 +18,10 @@ namespace osu.Game.EzOsuGame.Skills
         public const int VERSION = 2;
 
         /// <summary>
-        /// In-memory miss marker only — must not be upserted to Realm.
-        /// Legacy rows with negative <see cref="KeyCount"/> are treated as miss and excluded from persisted-hash sets.
+        /// Unavailable stub (<c>KeyCount = -1</c>). Never written by <see cref="EzSkillStore.UpsertChartSkillInfo"/>
+        /// (which rejects it) - only by the explicit <see cref="EzSkillStore.WriteChartSkillInfoUnavailable"/>
+        /// settle path, and only from the BDSP backfill, so a transient hot-path miss cannot retire a chart.
+        /// Legacy rows with a negative <see cref="KeyCount"/> read back as the same stub.
         /// </summary>
         public static EzChartSkillInfo Unavailable { get; } = new EzChartSkillInfo
         {

@@ -8,8 +8,10 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills.Dan;
@@ -884,7 +886,12 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Stored chart skill info, or compute+upsert when a playable (or WorkingBeatmap) is available.
-        /// Failures stay Realm miss (no Unavailable stub). Session set skips hot-path retries without playable.
+        /// <para>
+        /// A settled stub (<see cref="EzChartSkillInfo.IsUnavailable"/>, written by the BDSP backfill for
+        /// a chart that cannot be converted) is respected: with no playable in hand the read path returns
+        /// miss rather than re-attempting the conversion. A caller that already has a playable may still
+        /// self-heal it. Transient compute failures stay Realm miss.
+        /// </para>
         /// </summary>
         public EzChartSkillInfo? TryGetOrComputeChartSkillInfo(
             BeatmapInfo beatmapInfo,
@@ -894,10 +901,16 @@ namespace osu.Game.EzOsuGame.Skills
             if (beatmapInfo.Ruleset.OnlineID != 3)
                 return null;
 
-            if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null && !stored.IsUnavailable)
-                return stored;
+            if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
+            {
+                if (!stored.IsUnavailable)
+                    return stored;
 
-            // Existing Unavailable stub (or miss): retry when caller supplies playable; otherwise leave miss.
+                if (playable == null)
+                    return null;
+            }
+
+            // Session miss: retry when caller supplies playable; otherwise leave miss.
             if (playable == null && chartSkillInfoSessionMisses.Contains(beatmapInfo.Hash))
                 return null;
 
@@ -932,6 +945,66 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 chartSkillInfoSessionMisses.Add(beatmapInfo.Hash);
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// BDSP-facing CSI ensure for one chart. Returns true when the hash is settled afterwards
+        /// (a current-revision row, a fresh compute, or a stub because the chart cannot be loaded),
+        /// false when the failure is transient and should be retried on a later run.
+        /// <para>
+        /// This is deliberately the only path that stamps a stub: a hot-path read never persists a
+        /// failure, so a transient miss from song select cannot permanently retire a chart.
+        /// </para>
+        /// </summary>
+        public bool TryEnsureChartSkillInfoForBackfill(BeatmapInfo beatmapInfo)
+        {
+            if (beatmapInfo.Ruleset.OnlineID != 3)
+                return true;
+
+            // Complete row, or a stub a previous backfill already settled.
+            if (store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
+                return true;
+
+            IBeatmap map;
+
+            try
+            {
+                if (beatmapManager == null)
+                    return false;
+
+                map = beatmapManager.GetWorkingBeatmap(beatmapInfo).GetPlayableBeatmap(beatmapInfo.Ruleset, Array.Empty<Mod>());
+            }
+            catch (Exception e)
+            {
+                // Content-addressed: the file backing this hash will not become loadable on its own, so
+                // settle it rather than re-converting it on every backfill. Re-importing the chart
+                // produces a new hash, and 「完全重算」 clears the stub, so this is recoverable.
+                Logger.Log($"[EzSkills] CSI backfill cannot load {beatmapInfo} ({e.Message}); settling as unavailable.",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                store.WriteChartSkillInfoUnavailable(beatmapInfo.Hash, beatmapInfo.ID);
+                return true;
+            }
+
+            try
+            {
+                var input = EzChartSkillInfoComputer.FromPlayable(map);
+                var msd = GetBeatmapMsd(beatmapInfo.Hash);
+                // Motion / pattern shares are rate-invariant; always measure at 1.0x like hub.
+                var info = EzChartSkillInfoComputer.Compute(input, msd.Count > 0 ? msd : null, rate: 1);
+                store.UpsertChartSkillInfo(beatmapInfo.Hash, info, beatmapInfo.ID);
+                chartSkillInfoSessionMisses.Remove(beatmapInfo.Hash);
+                // Stamped live snapshots built before this CSI existed must not be served as cache hits.
+                InvalidateLiveChartSkillsCache(beatmapInfo.Hash);
+                return true;
+            }
+            catch (Exception e)
+            {
+                // Analysis-side failure: leave it unstamped so the next backfill retries it.
+                Logger.Log($"[EzSkills] CSI backfill analysis failed for {beatmapInfo} ({e.Message}); will retry.",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
+                chartSkillInfoSessionMisses.Add(beatmapInfo.Hash);
+                return false;
             }
         }
 
