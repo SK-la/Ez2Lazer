@@ -226,6 +226,24 @@ namespace osu.Game.EzOsuGame.Skills
             return removed;
         }
 
+        /// <summary>
+        /// Flag a player's stored skill rows (SSR / pattern) as stale and drop the memos that would otherwise keep
+        /// serving them. Called after a settled play was folded into the SQLite slice but before the Realm-side
+        /// skill rows have been recomputed.
+        /// </summary>
+        /// <returns>Total number of rows newly flagged.</returns>
+        public int MarkPlayerSkillStale(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return 0;
+
+            int flagged = store.MarkPlayerSkillStale(username);
+
+            InvalidatePlayerSsrSnapshot();
+
+            return flagged;
+        }
+
         public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount)
         {
             var ratings = store.GetPlayerPatternRatings(username, keyCount);

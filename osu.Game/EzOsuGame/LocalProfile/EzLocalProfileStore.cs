@@ -364,7 +364,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// same arithmetic (notably the weighted-average <c>avg_kps</c>) and the two could drift; with drills no
         /// longer stored in the payload every partition is small, so re-merging them costs almost nothing.
         /// </remarks>
-        /// <returns><see langword="true"/> when the score was added; <see langword="false"/> when it was already stored.</returns>
+        /// <returns>
+        /// <see langword="true"/> when the score was added; <see langword="false"/> when it was already stored or when
+        /// the player was fenced out of the analysis (an excluded partition is never re-included by an append).
+        /// </returns>
         public bool AppendScores(
             string username,
             EzLocalProfileAggregationResult delta,
@@ -382,6 +385,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 using var connection = openConnection();
                 using var transaction = connection.BeginTransaction();
+
+                // An excluded player is not part of the analysis: a play settling for them must not pull them back in.
+                using (var probeExcluded = connection.CreateCommand())
+                {
+                    probeExcluded.Transaction = transaction;
+                    probeExcluded.CommandText = "SELECT excluded FROM username_partitions WHERE username = $username;";
+                    probeExcluded.Parameters.AddWithValue("$username", username);
+
+                    if (probeExcluded.ExecuteScalar() is long excludedFlag && excludedFlag != 0)
+                        return false;
+                }
 
                 // drill_scores is the ledger, so a score that already has a row must not be counted a second time.
                 foreach (var drill in delta.DrillScores)
@@ -416,7 +430,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 EzLocalProfilePartitionPayload.FromAggregation(delta).MergeStatsInto(merged);
 
                 writePartition(connection, username, EzLocalProfilePartitionPayload.FromAggregation(merged),
-                    DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+                    DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), reinclude: false);
 
                 rebuildArchiveFromPartitions(
                     connection,
@@ -1111,6 +1125,24 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
+        /// Drop one online contribution. Used when the very same play is later imported locally: the detailed local
+        /// score supersedes the pulled summary, and keeping both would count the play twice.
+        /// </summary>
+        /// <returns><see langword="true"/> when a row was removed.</returns>
+        public bool RemoveOnlineScoreContribution(long onlineId)
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM online_score_contributions WHERE online_id = $online_id;";
+                cmd.Parameters.AddWithValue("$online_id", onlineId);
+                return cmd.ExecuteNonQuery() > 0;
+            }
+        }
+
+        /// <summary>
         /// Single partition payload used as the incremental compute cache, or <see langword="null"/> when absent/unreadable.
         /// </summary>
         public EzLocalProfilePartitionPayload? TryLoadPartitionPayload(string username)
@@ -1424,20 +1456,32 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        private static void writePartition(SqliteConnection connection, string username, EzLocalProfilePartitionPayload payload, long updatedAt)
+        /// <param name="reinclude">
+        /// A full recompute (re-)includes the player: an excluded name that gets recomputed is back in the archive.
+        /// The incremental single-play append passes <see langword="false"/>, because a play settling for a player who
+        /// was fenced out must not silently pull them back into the totals.
+        /// </param>
+        private static void writePartition(SqliteConnection connection, string username, EzLocalProfilePartitionPayload payload, long updatedAt, bool reinclude = true)
         {
             string json = JsonSerializer.Serialize(payload);
 
             using var upsert = connection.CreateCommand();
-            // Writing a partition (re-)includes the player: an excluded name that gets recomputed is back in the archive.
-            upsert.CommandText = """
-                                 INSERT INTO username_partitions (username, payload_json, updated_at, excluded)
-                                 VALUES ($username, $payload_json, $updated_at, 0)
-                                 ON CONFLICT(username) DO UPDATE SET
-                                     payload_json = excluded.payload_json,
-                                     updated_at = excluded.updated_at,
-                                     excluded = 0;
-                                 """;
+            upsert.CommandText = reinclude
+                ? """
+                  INSERT INTO username_partitions (username, payload_json, updated_at, excluded)
+                  VALUES ($username, $payload_json, $updated_at, 0)
+                  ON CONFLICT(username) DO UPDATE SET
+                      payload_json = excluded.payload_json,
+                      updated_at = excluded.updated_at,
+                      excluded = 0;
+                  """
+                : """
+                  INSERT INTO username_partitions (username, payload_json, updated_at, excluded)
+                  VALUES ($username, $payload_json, $updated_at, 0)
+                  ON CONFLICT(username) DO UPDATE SET
+                      payload_json = excluded.payload_json,
+                      updated_at = excluded.updated_at;
+                  """;
             upsert.Parameters.AddWithValue("$username", username);
             upsert.Parameters.AddWithValue("$payload_json", json);
             upsert.Parameters.AddWithValue("$updated_at", updatedAt);
@@ -2002,8 +2046,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       pp REAL NOT NULL DEFAULT 0,
                                       duration_ms INTEGER NOT NULL DEFAULT 0
                                   );
-                                  CREATE INDEX IF NOT EXISTS idx_online_score_contributions_user
-                                      ON online_score_contributions(username);
                                   CREATE TABLE IF NOT EXISTS username_partitions (
                                       username TEXT PRIMARY KEY NOT NULL,
                                       payload_json TEXT NOT NULL,
@@ -2128,6 +2170,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
             ensureColumn(connection, "drill_scores", "is_convert", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "drill_scores", "rate", "REAL NOT NULL DEFAULT 1");
             ensureColumn(connection, "drill_scores", "mod_acronyms_json", "TEXT NOT NULL DEFAULT '[]'");
+
+            // Indexes over columns that a pre-existing file does not have must wait for ensureColumn above.
+            // CREATE TABLE IF NOT EXISTS does not extend an existing table, so an index in the batch would run
+            // against a table that is still missing the column and fail with "no such column".
+            using (var lateIndexes = connection.CreateCommand())
+            {
+                lateIndexes.CommandText = """
+                                          CREATE INDEX IF NOT EXISTS idx_online_score_contributions_user
+                                              ON online_score_contributions(username);
+                                          """;
+                lateIndexes.ExecuteNonQuery();
+            }
 
             using (var insightsTable = connection.CreateCommand())
             {

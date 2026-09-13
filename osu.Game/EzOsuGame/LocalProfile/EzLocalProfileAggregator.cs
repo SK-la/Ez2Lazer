@@ -353,6 +353,26 @@ namespace osu.Game.EzOsuGame.LocalProfile
             });
         }
 
+        /// <summary>
+        /// Load one just-settled score the way the full compute would see it: the managed instance, with its persisted
+        /// beatmap (and the Ez ratings stored on it) rather than the working copy gameplay still holds. Without this
+        /// the incremental fold could persist a different slice than a rebuild of the same score.
+        /// </summary>
+        /// <returns>The detached score, or <see langword="null"/> when it is not a valid play.</returns>
+        public ScoreInfo? LoadManagedScore(Guid scoreId)
+        {
+            return realm.Run(r =>
+            {
+                var score = r.Find<ScoreInfo>(scoreId);
+
+                // Same validity gate as the bulk collector; anything it would skip must not be folded in either.
+                if (score == null || score.DeletePending || score.BeatmapInfo?.Hash != score.BeatmapHash)
+                    return null;
+
+                return score.DeepClone();
+            });
+        }
+
         public static void MergeOnlineContributions(
             EzLocalProfileAggregationResult result,
             IReadOnlyList<EzLocalProfileOnlineScoreContribution> contributions,

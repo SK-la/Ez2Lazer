@@ -1148,6 +1148,35 @@ namespace osu.Game.EzOsuGame.Skills
             return removed;
         }
 
+        /// <summary>
+        /// Flag every stored <see cref="EzPlayerSkillValue"/> row for one player (SSR / pattern) as stale without
+        /// changing any value. Used when a newly settled play has been folded into the SQLite slice but the player's
+        /// Realm-side skill rows have not been recomputed yet: the UI keeps showing the old numbers and marks them
+        /// stale, and the startup warmup refreshes them.
+        /// </summary>
+        /// <remarks>
+        /// Dan rows (<see cref="EzDanEstimate"/> / <see cref="EzPlayerDanSkillsetValue"/>) carry no stale flag, so
+        /// they can only be corrected by an actual recompute.
+        /// </remarks>
+        /// <returns>Number of rows newly flagged.</returns>
+        public int MarkPlayerSkillStale(string username)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
+            int flagged = 0;
+
+            realmAccess.Write(r =>
+            {
+                foreach (var row in r.All<EzPlayerSkillValue>().Where(v => v.Username == username && !v.Stale).ToList())
+                {
+                    row.Stale = true;
+                    flagged++;
+                }
+            });
+
+            return flagged;
+        }
+
         /// <summary>Legacy row writer; prefer <see cref="WriteDanSkillsetVerdicts"/>.</summary>
         public void WriteDanSkillsetValues(string username, int keyCount, string side, IEnumerable<EzPlayerDanSkillsetValue> values)
         {
