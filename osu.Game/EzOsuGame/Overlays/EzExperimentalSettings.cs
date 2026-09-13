@@ -14,6 +14,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
@@ -30,6 +31,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private void load(Ez2ConfigManager ezConfig,
                           BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
                           EzAnalysisWarmupProcessor? analysisWarmupProcessor,
+                          EzSkillStore? skillStore,
                           IDialogOverlay? dialogOverlay,
                           INotificationOverlay? notifications,
                           EzLocalProfileService? localProfileService,
@@ -37,7 +39,7 @@ namespace osu.Game.EzOsuGame.Overlays
                           RulesetStore? rulesetStore,
                           EzExternalRulesetManagerDialog? externalRulesetManager)
         {
-            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
+            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, skillStore, dialogOverlay, notifications, action => Scheduler.Add(action));
 
             Add(new SettingsButtonV2
             {
