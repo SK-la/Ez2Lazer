@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private const float list_max_height = 180;
 
         private readonly Dictionary<string, BindableBool> selections = new Dictionary<string, BindableBool>(StringComparer.Ordinal);
-        private readonly BindableBool replaceMode = new BindableBool();
+        private readonly BindableBool clearRebuild = new BindableBool();
 
         public EzLocalProfileImportDialog(
             IReadOnlyList<EzLocalProfileUsernameCount> usernameCounts,
@@ -86,8 +86,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     },
                     new OsuCheckbox
                     {
-                        LabelText = EzSettingsProfile.LOCAL_PROFILE_IMPORT_REPLACE,
-                        Current = { BindTarget = replaceMode },
+                        LabelText = EzSettingsProfile.LOCAL_PROFILE_IMPORT_CLEAR_REBUILD,
+                        Current = { BindTarget = clearRebuild },
                     },
                 }
             };
@@ -100,7 +100,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     Action = () =>
                     {
                         var chosen = selections.Where(kv => kv.Value.Value).Select(kv => kv.Key).ToList();
-                        onConfirm(chosen, replaceMode.Value);
+                        onConfirm(chosen, clearRebuild.Value);
                     }
                 },
                 new PopupDialogCancelButton
