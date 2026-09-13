@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Rulesets.Mods;
@@ -47,6 +48,30 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(EzDanAlgorithm.AllowsPersistedChartLnHalf(4, holdRatio: 0.45, holdCount: -1), Is.True);
             Assert.That(EzDanAlgorithm.AllowsPersistedChartLnHalf(4, holdRatio: 0.44, holdCount: -1), Is.False);
             Assert.That(EzDanAlgorithm.AllowsPersistedChartLnHalf(7, holdRatio: 0.375, holdCount: -1), Is.True);
+        }
+
+        [Test]
+        public void Persisted_ln_half_uses_configurable_hold_threshold()
+        {
+            var config = GlobalConfigStore.EzConfig;
+            GlobalConfigStore.EzConfig = config;
+
+            try
+            {
+                config.SetValue(Ez2Setting.SkillLnChartMinHoldObjects, 50);
+                Assert.That(EzDanAlgorithm.AllowsPersistedChartLnHalf(4, holdRatio: 0.1, holdCount: 51), Is.True);
+                Assert.That(EzDanAlgorithm.AllowsPersistedChartLnHalf(4, holdRatio: 0.1, holdCount: 50), Is.False);
+
+                config.SetValue(Ez2Setting.SkillLnChartMinHoldObjects, 500);
+                Assert.That(EzDanAlgorithm.AllowsPersistedChartLnHalf(4, holdRatio: 0.1, holdCount: 101), Is.False);
+
+                // 或关系：比例线不受阈值影响，7K 用 37.5% 线。
+                Assert.That(EzDanAlgorithm.AllowsPersistedChartLnHalf(7, holdRatio: 0.375, holdCount: 0), Is.True);
+            }
+            finally
+            {
+                config.SetValue(Ez2Setting.SkillLnChartMinHoldObjects, 150);
+            }
         }
 
         [Test]

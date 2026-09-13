@@ -1,6 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Game.EzOsuGame.Configuration;
+
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
@@ -37,8 +39,11 @@ namespace osu.Game.EzOsuGame.Skills
         public const double LN_PRIMARY_MIN_RATIO = 0.45;
         public const double LN_PRIMARY_7K_MIN_RATIO = 0.375;
 
-        /// <summary>Ez ChartDan LN half write gate (count OR hub ratio). Not hub exclusive primary.</summary>
-        public const int LN_CHART_MIN_HOLD_OBJECTS = 100;
+        /// <summary>
+        /// Configurable absolute gate for the ChartDan LN half: hold objects above this value count as LN
+        /// without reaching the ratio line. Backed by <see cref="Ez2Setting.SkillLnChartMinHoldObjects"/>
+        /// </summary>
+        public static int LnChartMinHoldObjects => GlobalConfigStore.EzConfig.Get<int>(Ez2Setting.SkillLnChartMinHoldObjects);
 
         public static double LnPrimaryMinRatioFor(int keyCount)
             => keyCount == 7 ? LN_PRIMARY_7K_MIN_RATIO : LN_PRIMARY_MIN_RATIO;
@@ -54,14 +59,14 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Ez ChartDan / DualPanel LN half: write when hold count &gt; <see cref="LN_CHART_MIN_HOLD_OBJECTS"/>
+        /// Ez ChartDan / DualPanel LN half: write when hold count &gt; <see cref="LnChartMinHoldObjects"/>
         /// or hold ratio reaches hub primary line. RC half is always eligible (callers skip this for RC).
         /// Pass <paramref name="holdCount"/> &lt; 0 when unknown (ratio-only).
         /// Prefer <see cref="EzChartDanEstimator.TryHoldCountFromBeatmapInfo"/> (same Realm ints as song-select <c>ln&gt;</c>).
         /// </summary>
         public static bool AllowsPersistedChartLnHalf(int keyCount, double holdRatio, int holdCount = -1)
         {
-            if (holdCount > LN_CHART_MIN_HOLD_OBJECTS)
+            if (holdCount > LnChartMinHoldObjects)
                 return true;
 
             return holdRatio >= LnPrimaryMinRatioFor(keyCount);

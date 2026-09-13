@@ -155,6 +155,9 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.EzSelectCsMode, string.Empty);
             SetDefault(Ez2Setting.ColumnTypeListSelect, 4);
 
+            // Ez 技能：默认与 EzDanAlgorithm.LN_CHART_MIN_HOLD_OBJECTS 一致。
+            SetDefault(Ez2Setting.SkillLnChartMinHoldObjects, 150, 0, 1000);
+
             #endregion
 
             #region 音频与输入
@@ -1177,6 +1180,13 @@ namespace osu.Game.EzOsuGame.Configuration
 
         /// <summary>角逐 timeline 喂入：BatchAllEvents=进局前预建；StreamByClock=进局不阻塞，后台按时钟就绪。</summary>
         EzScoreRaceFeedMode,
+
+        // Ez 技能
+        /// <summary>
+        /// ChartDan「LN 半」判定的绝对门槛（hold 物件数）：大于此值即认定 LN，无需达到比例线。
+        /// 与 <c>EzDanAlgorithm.LnPrimaryMinRatioFor</c> 为「或」关系。
+        /// </summary>
+        SkillLnChartMinHoldObjects,
     }
 
     public enum EzColumnType : byte
