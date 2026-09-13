@@ -12,13 +12,15 @@ namespace osu.Game.Tests.EzOsuGame.Skills
     [TestFixture]
     public class EzDanSkillsetBucketsTest
     {
+        // RC rows are the hub filing table; the LN row is the DualPanel layout, which always shows
+        // the four LN slot names for every keymode (only 7K credits them) — see EzDanSkillsetBuckets.Slots.
         [TestCase(4, EzDanSide.Rc, 4, new[] { "jack", "tech", "speed", "stamina" })]
         [TestCase(6, EzDanSide.Rc, 4, new[] { "jack", "tech", "speed", "stream" })]
         [TestCase(7, EzDanSide.Rc, 4, new[] { "jack", "tech", "speed", "stream" })]
-        [TestCase(4, EzDanSide.Ln, 0, new string[0])]
-        [TestCase(6, EzDanSide.Ln, 0, new string[0])]
+        [TestCase(4, EzDanSide.Ln, 4, new[] { "lngeneral", "lntech", "lninverse", "lnrelease" })]
+        [TestCase(6, EzDanSide.Ln, 4, new[] { "lngeneral", "lntech", "lninverse", "lnrelease" })]
         [TestCase(7, EzDanSide.Ln, 4, new[] { "lngeneral", "lntech", "lninverse", "lnrelease" })]
-        public void SlotsMatchHubTable(int keyCount, EzDanSide side, int expectedCount, string[] expectedIds)
+        public void SlotsMatchDualPanelLayout(int keyCount, EzDanSide side, int expectedCount, string[] expectedIds)
         {
             var slots = EzDanSkillsetBuckets.Slots(keyCount, side);
             Assert.That(slots.Count, Is.EqualTo(expectedCount));
