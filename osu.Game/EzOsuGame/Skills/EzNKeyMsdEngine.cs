@@ -143,7 +143,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         private static bool isFloorOutput(ReadOnlySpan<float> raw)
         {
-            if (raw.Length < EzSkillsetVector.RawLength)
+            if (raw.Length < EzSkillsetVector.RAW_LENGTH)
                 return false;
 
             float stream = raw[1];
@@ -184,7 +184,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             int ptrMasks = malloc!(count * sizeof(uint));
             int ptrTimes = malloc!(count * sizeof(float));
-            int ptrOut = malloc!(EzSkillsetVector.RawLength * sizeof(float));
+            int ptrOut = malloc!(EzSkillsetVector.RAW_LENGTH * sizeof(float));
 
             if (ptrMasks == 0 || ptrTimes == 0 || ptrOut == 0)
                 throw new EzMsdEngineException("MinaCalc n-key malloc returned a null pointer.");
@@ -198,15 +198,15 @@ namespace osu.Game.EzOsuGame.Skills
                 timeSpan[i] = notes[i].RowTime;
             }
 
-            wasmMemory.GetSpan<float>(ptrOut, EzSkillsetVector.RawLength).Clear();
+            wasmMemory.GetSpan<float>(ptrOut, EzSkillsetVector.RAW_LENGTH).Clear();
 
             int rc = compute!(keyCount, rate, goal, ptrMasks, ptrTimes, count, ptrOut);
 
             if (rc == 0)
                 throw new EzMsdEngineException("MinaCalc n-key compute reported failure.");
 
-            var raw = new float[EzSkillsetVector.RawLength];
-            wasmMemory.GetSpan<float>(ptrOut, EzSkillsetVector.RawLength).CopyTo(raw);
+            var raw = new float[EzSkillsetVector.RAW_LENGTH];
+            wasmMemory.GetSpan<float>(ptrOut, EzSkillsetVector.RAW_LENGTH).CopyTo(raw);
 
             Action<int> release = free!;
             release(ptrMasks);

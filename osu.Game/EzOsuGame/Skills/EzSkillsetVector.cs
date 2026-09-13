@@ -21,15 +21,15 @@ namespace osu.Game.EzOsuGame.Skills
     {
         /// <summary>
         /// Number of <c>f32</c> values the MinaCalc n-key engine writes, in
-        /// <see cref="RawOutputOrder"/> order.
+        /// <see cref="RAW_OUTPUT_ORDER"/> order.
         /// </summary>
-        public const int RawLength = 8;
+        public const int RAW_LENGTH = 8;
 
         /// <summary>
         /// Fixed engine output order. Do <b>not</b> reorder — it mirrors MinaCalc's
         /// <c>minacalc_compute</c> out-pointer layout.
         /// </summary>
-        public static readonly EzMinaSkillAxis[] RawOutputOrder =
+        public static readonly EzMinaSkillAxis[] RAW_OUTPUT_ORDER =
         [
             EzMinaSkillAxis.Overall,
             EzMinaSkillAxis.Stream,
@@ -43,11 +43,11 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Builds a vector from the engine's raw eight-value output
-        /// (<see cref="RawOutputOrder"/> order). Shorter spans yield the zero vector.
+        /// (<see cref="RAW_OUTPUT_ORDER"/> order). Shorter spans yield the zero vector.
         /// </summary>
         public static EzSkillsetVector FromRaw(ReadOnlySpan<float> raw)
         {
-            if (raw.Length < RawLength)
+            if (raw.Length < RAW_LENGTH)
                 return default;
 
             return new EzSkillsetVector(raw[0], raw[1], raw[2], raw[3], raw[4], raw[5], raw[6], raw[7]);
