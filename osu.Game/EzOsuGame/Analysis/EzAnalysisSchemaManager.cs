@@ -15,7 +15,8 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     internal static class EzAnalysisSchemaManager
     {
-        // Note: main sqlite v7 stores kps/KPC only (slim schema). Legacy pp/tag/xxy_sr columns removed at schema v3.
+        // Note: main sqlite v8 stores kps/KPC only (slim schema). Legacy pp/tag/xxy_sr columns removed at schema v3.
+        // v8: mania column stats became dense (trailing empty columns padded to the real N); migration inherits kps but not mania.
         // Schema v4 briefly added chart_skill_info JSON; abandoned without migration — ChartSkillInfo lives in Realm (EZ≥9).
         // Schema v5: stop creating chart_skill_info; orphaned tables in old DBs are ignored.
         public const int ANALYSIS_VERSION = EzAnalysisPersistentStore.ANALYSIS_VERSION;
@@ -103,7 +104,8 @@ WHERE {COL_UPDATED_AT} <> 0;
         }
 
         /// <summary>
-        /// 从旧版 <c>ez-analysis_v*.sqlite</c>（或中间版 <c>ez-analysis.sqlite</c>）复制 kps / mania 列统计到当前版本文件。
+        /// 从旧版 <c>ez-analysis_v*.sqlite</c>（或中间版 <c>ez-analysis.sqlite</c>）继承 kps（+ 合集隐藏状态）到当前版本文件。
+        /// 不继承 mania 列统计（当前版本为 dense，旧 sparse 行留给懒回填）。
         /// </summary>
         public static bool TryMigrateFromPreviousMainDatabase(string targetDatabasePath)
         {
@@ -547,48 +549,10 @@ VALUES (
                 }
             }
 
-            if (!tableExists(source, TABLE_MANIA))
-                return;
-
-            using (var selectMania = source.CreateCommand())
-            {
-                selectMania.CommandText = $@"
-SELECT
-    {COL_BEATMAP_ID},
-    {COL_UPDATED_AT},
-    {COL_COLUMN_COUNTS_JSON},
-    {COL_HOLD_NOTE_COUNTS_JSON}
-FROM {TABLE_MANIA}
-WHERE {COL_UPDATED_AT} > 0;
-";
-
-                using var reader = selectMania.ExecuteReader();
-                using var insertMania = destination.CreateCommand();
-                insertMania.CommandText = $@"
-INSERT OR REPLACE INTO {TABLE_MANIA} (
-    {COL_BEATMAP_ID},
-    {COL_UPDATED_AT},
-    {COL_COLUMN_COUNTS_JSON},
-    {COL_HOLD_NOTE_COUNTS_JSON}
-)
-VALUES (
-    $id,
-    $updated_at,
-    $column_counts_json,
-    $hold_note_counts_json
-);
-";
-
-                while (reader.Read())
-                {
-                    insertMania.Parameters.Clear();
-                    insertMania.Parameters.AddWithValue("$id", reader.GetString(0));
-                    insertMania.Parameters.AddWithValue("$updated_at", reader.GetInt64(1));
-                    insertMania.Parameters.AddWithValue("$column_counts_json", reader.GetString(2));
-                    insertMania.Parameters.AddWithValue("$hold_note_counts_json", reader.GetString(3));
-                    insertMania.ExecuteNonQuery();
-                }
-            }
+            // 不迁移 ez_analysis_mania（KPC 列统计）：
+            // v8 起列统计为 dense（末尾空列补 0、键数 = 真实 N），旧库写的是 sparse 行，
+            // 直接抄过去会让 maxKey+1 继续低估列数。留空后由 GetMissingData -> MissingDataKind.Mania 按谱面懒回填。
+            // kps（entry）口径未变，照常继承，避免全量重算。
         }
 
         private static void copyCollectionHideTables(SqliteConnection source, SqliteConnection destination)

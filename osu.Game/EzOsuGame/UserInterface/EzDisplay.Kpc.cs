@@ -220,7 +220,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 return;
             }
 
-            // 从 columnNoteCounts 的最大 key + 1 推断列数
+            // 列统计为 dense（末尾空列已补 0），最大 key + 1 即真实列数 N。
             int maxKey = 0;
 
             foreach (int k in columnNoteCounts.Keys)
@@ -267,13 +267,17 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// <summary>
         /// 根据当前模式和列数重建 UI 并渲染数值
         /// </summary>
-        private void rebuildAndRender(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
+        private void rebuildAndRender(int[] columnNoteCounts, int[]? holdNoteCounts, int realColumns)
         {
+            // 数据侧用真实列数 N（缓存身份 / tooltip），渲染侧用显示列数：
+            // 10k2s1p 开启时 14k 只画 13 根柱（第 14 列是 ez2ac 的 alpha 列）。
+            int displayColumns = EzManiaColumnLayout.GetDisplayColumnCount(realColumns);
+
             // 步骤 1: 确保 UI 元素数量与列数匹配
-            ensureColumnEntries(columns);
+            ensureColumnEntries(displayColumns);
 
             // 步骤 2: 更新数值显示
-            renderValues(columnNoteCounts, holdNoteCounts, columns);
+            renderValues(columnNoteCounts, holdNoteCounts, displayColumns);
         }
 
         /// <summary>

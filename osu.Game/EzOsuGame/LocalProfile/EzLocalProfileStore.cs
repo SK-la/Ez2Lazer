@@ -28,8 +28,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// <summary>
         /// Logic version for aggregated stats (independent of table schema).
         /// Bump when recompute is required for correct numbers (e.g. playable-mod analysis).
+        /// v4: ManiaSummary 列统计 dense 化（末尾空列补 0，键数 = 真实 N），修正 7k 被当 6k 等列数错误。
         /// </summary>
-        public const int CONTENT_VERSION = 3;
+        public const int CONTENT_VERSION = 4;
 
         private const string meta_content_version = "content_version";
 
