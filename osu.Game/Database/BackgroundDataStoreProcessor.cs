@@ -677,6 +677,17 @@ namespace osu.Game.Database
 
                 if (candidates.Count == 0)
                     return;
+
+                // Names the revisions in force, so a version bump reads as an explanation for the
+                // recompute instead of the job appearing to act for no reason. Rows stamped with an
+                // older revision are simply "missing" to the incremental passes below (nothing is
+                // bulk-cleared), so this line plus the per-stage progress notifications are the
+                // whole startup signal.
+                Logger.Log("Ez chart chain revisions: "
+                           + $"MSD v{EzAnalysisRevision.Msd}, "
+                           + $"CSI v{EzAnalysisRevision.ChartSkillInfo} ({EzAnalysisRevision.DescribeChartSkillInfo(EzAnalysisRevision.ChartSkillInfo)}), "
+                           + $"Dan v{EzAnalysisRevision.ChartDan} ({EzAnalysisRevision.DescribeChartDan(EzAnalysisRevision.ChartDan)}); "
+                           + $"{candidates.Count} candidate charts.");
             }
 
             // Defer the MSD side-upsert whenever CSI shares this job: the chain-end Dan pass owns the
@@ -1035,7 +1046,7 @@ namespace osu.Game.Database
             if (missing.Count == 0)
                 return;
 
-            Logger.Log($"Found {missing.Count} beatmaps which require MSD reprocessing.");
+            Logger.Log($"Found {missing.Count} beatmaps which require MSD reprocessing (revision {EzAnalysisRevision.Msd}).");
 
             var notification = showProgressNotification(missing.Count, "Reprocessing beatmap MSD", "beatmaps' MSD have been updated");
 
@@ -1131,7 +1142,7 @@ namespace osu.Game.Database
                 return;
             }
 
-            Logger.Log($"Found {missing.Count} beatmaps which require ChartSkillInfo reprocessing.");
+            Logger.Log($"Found {missing.Count} beatmaps which require ChartSkillInfo reprocessing (revision {EzAnalysisRevision.ChartSkillInfo}).");
 
             var notification = showProgressNotification(missing.Count, "Reprocessing ChartSkillInfo", "beatmaps' ChartSkillInfo have been updated");
 
@@ -1261,7 +1272,7 @@ namespace osu.Game.Database
                 return;
             }
 
-            Logger.Log($"Found {missing.Count} beatmaps which require ChartDan reprocessing (have complete MSD).");
+            Logger.Log($"Found {missing.Count} beatmaps which require ChartDan reprocessing (revision {EzAnalysisRevision.ChartDan}, have complete MSD).");
 
             var notification = showProgressNotification(missing.Count, "Reprocessing ChartDan", "beatmaps' ChartDan have been updated");
 
