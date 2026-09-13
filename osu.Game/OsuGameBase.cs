@@ -421,9 +421,10 @@ namespace osu.Game
             var skillStore = new EzSkillStore(realm);
             var beatmapMsdComputer = new EzBeatmapMsdComputer(BeatmapManager, skillStore);
             var chartDanEstimator = new EzChartDanEstimator(BeatmapManager, beatmapMsdComputer);
-            var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore);
-            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator);
             var localProfileStore = new EzLocalProfileStore(Storage);
+            // Skill aggregators reuse localProfileStore as the per-play SSR / Dan cache (incremental backfill).
+            var playerSsrAggregator = new EzPlayerSsrAggregator(BeatmapManager, skillStore, localProfileStore);
+            var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, chartDanEstimator, localProfileStore);
             var skillProvider = new EzSkillProvider(skillStore, skillRegistry, chartDanEstimator, localProfileStore, BeatmapManager);
 
             dependencies.Cache(skillRegistry);

@@ -8,6 +8,7 @@ using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.Scoring;
 
@@ -28,13 +29,17 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         public const int HISTORY_ROLLING_PLAYS = 50;
 
+        private const int cache_flush_batch = 64;
+
         private readonly BeatmapManager beatmapManager;
         private readonly EzSkillStore skillStore;
+        private readonly EzLocalProfileStore? profileStore;
 
-        public EzPlayerSsrAggregator(BeatmapManager beatmapManager, EzSkillStore skillStore)
+        public EzPlayerSsrAggregator(BeatmapManager beatmapManager, EzSkillStore skillStore, EzLocalProfileStore? profileStore = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
+            this.profileStore = profileStore;
         }
 
         /// <summary>Per-play axis rows collected during the last <see cref="ComputeAndStore"/> (for DATA-3 evidence).</summary>
@@ -56,138 +61,114 @@ namespace osu.Game.EzOsuGame.Skills
             var patternPlaysByKey = new Dictionary<int, List<PatternPlay>>();
             var evidence = new List<EzAxisPlayEvidenceRow>();
 
+            // Per-play SSR cache: an already-rated play skips the MinaCalc engine (incremental backfill, not full recompute).
+            var cachedPlays = profileStore?.LoadSsrPlayCache() ?? new Dictionary<Guid, EzSsrPlayCacheRow>();
+            var pendingCacheWrites = new List<EzSsrPlayCacheRow>();
+
             using var calc = new EzNKeyMsdEngine();
 
-            foreach (var score in scores)
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                try
+                foreach (var score in scores)
                 {
-                    if (score.Ruleset.OnlineID != 3)
-                        continue;
-
-                    if (string.IsNullOrWhiteSpace(score.BeatmapHash))
-                        continue;
-
-                    var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == score.BeatmapHash);
-                    if (beatmapInfo == null)
-                        continue;
-
-                    var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                    var playable = working.GetPlayableBeatmap(score.Ruleset, score.Mods);
-                    int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
-                    float rate = EzModRate.Resolve(score.Mods);
-                    double holdRatio = EzChartDanEstimator.ComputeHoldRatio(playable);
-                    double od = beatmapInfo.Difficulty.OverallDifficulty;
-
-                    float? goal = EzSsrGoal.ForScore(score, holdRatio, od);
-                    if (goal is not float goalValue)
-                        continue;
-
-                    var notes = EzMinaNoteConverter.Convert(playable);
-                    EzSkillsetVector vector;
-
-                    if (!calc.SupportsKeyCount(keyCount) || notes.Length < EzNKeyMsdEngine.MIN_RATEABLE_ROWS)
-                        continue;
+                    cancellationToken.ThrowIfCancellationRequested();
 
                     try
                     {
-                        vector = calc.CalculateSsr(notes, keyCount, rate, goalValue);
-                    }
-                    catch (EzMsdEngineException e)
-                    {
-                        // A chart the engine cannot rate (e.g. a chord wider than its column
-                        // limit) simply contributes no SSR; the engine rebuilds itself for the next play.
-                        Logger.Log($"[EzSkills] SSR compute failed for {score.BeatmapHash} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                        continue;
-                    }
-
-                    if (vector.Overall <= 0)
-                        continue;
-
-                    if (!byKey.TryGetValue(keyCount, out var list))
-                        byKey[keyCount] = list = new List<TimedPlay>();
-
-                    list.Add(new TimedPlay(score.Date, vector));
-
-                    string[] patterns = Array.Empty<string>();
-
-                    // Hub pattern ratings need chart pattern tags (ChartSkillInfo). Prefer stored rows
-                    // (DATA-ChartSkillInfo-Batch). On miss, compute in-memory for this play only —
-                    // TODO(DATA-Skills-PatternRatings): do not Upsert per-score here; if SSR recompute
-                    // still races empty ChartSkillInfo in the wild, batch-ensure hashes before Aggregate.
-                    if (skillStore.TryGetChartSkillInfo(score.BeatmapHash, out var chart) && chart is { IsUnavailable: false })
-                    {
-                        patterns = chart.Patterns;
-                    }
-                    else
-                    {
-                        try
-                        {
-                            var msd = skillStore.GetBeatmapSkills(score.BeatmapHash, EzSkillSystems.BEATMAP_MSD);
-                            var computed = EzChartSkillInfoComputer.Compute(
-                                EzChartSkillInfoComputer.FromPlayable(playable),
-                                msd,
-                                rate);
-                            patterns = computed.Patterns;
-                        }
-                        catch
-                        {
-                            // leave empty — play contributes no pattern axes
-                        }
-                    }
-
-                    if (patterns.Length > 0)
-                    {
-                        if (!patternPlaysByKey.TryGetValue(keyCount, out var patternList))
-                            patternPlaysByKey[keyCount] = patternList = new List<PatternPlay>();
-
-                        patternList.Add(new PatternPlay(vector.Overall, patterns));
-
-                        foreach (string patternId in patterns.Distinct(StringComparer.Ordinal))
-                        {
-                            if (string.IsNullOrWhiteSpace(patternId))
-                                continue;
-
-                            evidence.Add(new EzAxisPlayEvidenceRow
-                            {
-                                Username = username,
-                                KeyCount = keyCount,
-                                SkillId = EzPatternRatings.ToSkillId(patternId),
-                                BeatmapHash = score.BeatmapHash,
-                                AxisValue = vector.Overall,
-                                Accuracy = score.Accuracy,
-                                Rate = rate,
-                                ScoredAt = score.Date,
-                                AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
-                            });
-                        }
-                    }
-
-                    foreach (var (axis, axisValue) in vector.Enumerate())
-                    {
-                        if (axisValue <= 0 || !double.IsFinite(axisValue))
+                        if (score.Ruleset.OnlineID != 3)
                             continue;
 
-                        evidence.Add(new EzAxisPlayEvidenceRow
+                        if (string.IsNullOrWhiteSpace(score.BeatmapHash))
+                            continue;
+
+                        bool hasCachedPlay = cachedPlays.TryGetValue(score.ID, out var cachedPlay)
+                                             && string.Equals(cachedPlay.BeatmapHash, score.BeatmapHash, StringComparison.Ordinal);
+
+                        // A cached negative marks a play the engine deliberately produced nothing for; never retry it.
+                        if (hasCachedPlay && !cachedPlay.HasSsr)
+                            continue;
+
+                        var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == score.BeatmapHash);
+                        if (beatmapInfo == null)
+                            continue;
+
+                        var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+                        var playable = working.GetPlayableBeatmap(score.Ruleset, score.Mods);
+                        int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
+                        float rate = EzModRate.Resolve(score.Mods);
+
+                        EzSkillsetVector vector;
+
+                        if (hasCachedPlay)
                         {
-                            Username = username,
-                            KeyCount = keyCount,
-                            SkillId = axis.ToSsrSkillId(),
-                            BeatmapHash = score.BeatmapHash,
-                            AxisValue = axisValue,
-                            Accuracy = score.Accuracy,
-                            Rate = rate,
-                            ScoredAt = score.Date,
-                            AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
-                        });
+                            vector = cachedPlay.Vector;
+                        }
+                        else
+                        {
+                            double holdRatio = EzChartDanEstimator.ComputeHoldRatio(playable);
+                            double od = beatmapInfo.Difficulty.OverallDifficulty;
+
+                            float? goal = EzSsrGoal.ForScore(score, holdRatio, od);
+
+                            if (goal is not float goalValue)
+                            {
+                                cacheNegative(score, username, keyCount, rate, pendingCacheWrites);
+                                continue;
+                            }
+
+                            var notes = EzMinaNoteConverter.Convert(playable);
+
+                            if (!calc.SupportsKeyCount(keyCount) || notes.Length < EzNKeyMsdEngine.MIN_RATEABLE_ROWS)
+                            {
+                                cacheNegative(score, username, keyCount, rate, pendingCacheWrites);
+                                continue;
+                            }
+
+                            try
+                            {
+                                vector = calc.CalculateSsr(notes, keyCount, rate, goalValue);
+                            }
+                            catch (EzMsdEngineException e)
+                            {
+                                // A chart the engine cannot rate (e.g. a chord wider than its column
+                                // limit) simply contributes no SSR; the engine rebuilds itself for the next play.
+                                Logger.Log($"[EzSkills] SSR compute failed for {score.BeatmapHash} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                                cacheNegative(score, username, keyCount, rate, pendingCacheWrites);
+                                continue;
+                            }
+
+                            if (vector.Overall <= 0)
+                            {
+                                cacheNegative(score, username, keyCount, rate, pendingCacheWrites);
+                                continue;
+                            }
+
+                            pendingCacheWrites.Add(new EzSsrPlayCacheRow(
+                                score.ID,
+                                username,
+                                score.BeatmapHash,
+                                keyCount,
+                                rate,
+                                score.Date,
+                                true,
+                                vector,
+                                EzManiaSkillAlgorithm.VERSION));
+                        }
+
+                        addScoredPlay(username, score, playable, keyCount, rate, vector, byKey, patternPlaysByKey, evidence);
+                    }
+                    finally
+                    {
+                        if (pendingCacheWrites.Count >= cache_flush_batch)
+                            flushCache(pendingCacheWrites);
+
+                        afterEachScore?.Invoke();
                     }
                 }
-                finally
-                {
-                    afterEachScore?.Invoke();
-                }
+            }
+            finally
+            {
+                flushCache(pendingCacheWrites);
             }
 
             foreach ((int keyCount, List<TimedPlay> timed) in byKey)
@@ -213,6 +194,119 @@ namespace osu.Game.EzOsuGame.Skills
             }
 
             PendingEvidence = evidence;
+        }
+
+        private static void cacheNegative(ScoreInfo score, string username, int keyCount, float rate, List<EzSsrPlayCacheRow> pending)
+        {
+            pending.Add(new EzSsrPlayCacheRow(
+                score.ID,
+                username,
+                score.BeatmapHash,
+                keyCount,
+                rate,
+                score.Date,
+                false,
+                default,
+                EzManiaSkillAlgorithm.VERSION));
+        }
+
+        private void flushCache(List<EzSsrPlayCacheRow> pending)
+        {
+            if (profileStore == null || pending.Count == 0)
+                return;
+
+            profileStore.UpsertSsrPlayCache(pending);
+            pending.Clear();
+        }
+
+        private void addScoredPlay(
+            string username,
+            ScoreInfo score,
+            IBeatmap playable,
+            int keyCount,
+            float rate,
+            EzSkillsetVector vector,
+            Dictionary<int, List<TimedPlay>> byKey,
+            Dictionary<int, List<PatternPlay>> patternPlaysByKey,
+            List<EzAxisPlayEvidenceRow> evidence)
+        {
+            if (!byKey.TryGetValue(keyCount, out var list))
+                byKey[keyCount] = list = new List<TimedPlay>();
+
+            list.Add(new TimedPlay(score.Date, vector));
+
+            string[] patterns = Array.Empty<string>();
+
+            // Hub pattern ratings need chart pattern tags (ChartSkillInfo). Prefer stored rows
+            // (DATA-ChartSkillInfo-Batch). On miss, compute in-memory for this play only —
+            // TODO(DATA-Skills-PatternRatings): do not Upsert per-score here; if SSR recompute
+            // still races empty ChartSkillInfo in the wild, batch-ensure hashes before Aggregate.
+            if (skillStore.TryGetChartSkillInfo(score.BeatmapHash, out var chart) && chart is { IsUnavailable: false })
+            {
+                patterns = chart.Patterns;
+            }
+            else
+            {
+                try
+                {
+                    var msd = skillStore.GetBeatmapSkills(score.BeatmapHash, EzSkillSystems.BEATMAP_MSD);
+                    var computed = EzChartSkillInfoComputer.Compute(
+                        EzChartSkillInfoComputer.FromPlayable(playable),
+                        msd,
+                        rate);
+                    patterns = computed.Patterns;
+                }
+                catch
+                {
+                    // leave empty — play contributes no pattern axes
+                }
+            }
+
+            if (patterns.Length > 0)
+            {
+                if (!patternPlaysByKey.TryGetValue(keyCount, out var patternList))
+                    patternPlaysByKey[keyCount] = patternList = new List<PatternPlay>();
+
+                patternList.Add(new PatternPlay(vector.Overall, patterns));
+
+                foreach (string patternId in patterns.Distinct(StringComparer.Ordinal))
+                {
+                    if (string.IsNullOrWhiteSpace(patternId))
+                        continue;
+
+                    evidence.Add(new EzAxisPlayEvidenceRow
+                    {
+                        Username = username,
+                        KeyCount = keyCount,
+                        SkillId = EzPatternRatings.ToSkillId(patternId),
+                        BeatmapHash = score.BeatmapHash,
+                        AxisValue = vector.Overall,
+                        Accuracy = score.Accuracy,
+                        Rate = rate,
+                        ScoredAt = score.Date,
+                        AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
+                    });
+                }
+            }
+
+            foreach (var (axis, axisValue) in vector.Enumerate())
+            {
+                if (axisValue <= 0 || !double.IsFinite(axisValue))
+                    continue;
+
+                evidence.Add(new EzAxisPlayEvidenceRow
+                {
+                    Username = username,
+                    KeyCount = keyCount,
+                    SkillId = axis.ToSsrSkillId(),
+                    BeatmapHash = score.BeatmapHash,
+                    AxisValue = axisValue,
+                    Accuracy = score.Accuracy,
+                    Rate = rate,
+                    ScoredAt = score.Date,
+                    AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
+                });
+            }
         }
 
         /// <summary>
