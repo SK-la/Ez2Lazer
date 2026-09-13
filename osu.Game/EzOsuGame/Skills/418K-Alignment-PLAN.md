@@ -2,6 +2,21 @@
 
 Goal: move the current Ez skill pipeline toward mania-hub-style 4–18K support, while keeping the codebase stable and testable.
 
+## Status
+
+- **Phase 1 (abstraction)** — done: `IEzMsdEngine` + `EzCalcNote`; `SupportsKeyCount` is the
+  single capability check; `.osu` file-hint plumbing is gone with the text path.
+- **Phase 2 (compute)** — done: NuGet `MinaCalc 0.4.2` was replaced by the mania-hub n-key
+  build (`minaclac-74.0.wasm`, Wasmtime host). MSD and SSR share one note-array path, so
+  beatmap-side and play-side axes come from the same engine.
+- **Phase 3 (downstream)** — open: see the `DATA-ChartDan-Keymode-Routing`,
+  `DATA-PatternAxis-KeymodeSet` and `DATA-Skillset-Dan-Coverage-10K+` rows in
+  `DATA-FOLLOWUPS.md`.
+- **Phase 4 (regression coverage)** — engine-level done (4–18K routing, zero vector for
+  unsupported keys, chord masks, negative-time shift, trap recovery); chart-dan /
+  player-aggregation end-to-end coverage still open.
+- **Phase 5 (extraction)** — not started, still optional.
+
 ## Scope
 
 This plan focuses on the skill pipeline under `osu.Game/EzOsuGame/Skills`:

@@ -25,9 +25,15 @@ Do **not** re-encode lasting follow-ups as only `// TODO(data)` in product code 
 | — | DATA-DualPanel-ChartSkillsetDans | Idea: DualPanel chart column shows independent per-skillset chart dans (MSD→`SrToRawDan` or LeoBlack), not hub aggregate stamps. Current UI is 3-col grid (label\|player\|chart) with hub filing stamps only. | Wish-list |
 | — | DATA-SSR-VibroExclude | Hub `chart_vibro` / `rate_vibro` eviction from SSR pool (`Vibro` currently always false) | Wish-list |
 | — | DATA-SSR-GoalExtrapolate | Hub `runMsdAtGoal` log-linear extrapolate past calc 0.965 | Wish-list |
-| — | DATA-SSR-LnTailBlend | Hub `LN_TAIL_BLEND_BY_KEYMODE` (`EzMinaNoteConverter` lnTailTaps=false) | Wish-list |
-| — | MinaCalc 5K / 8K+ MSD | Hub rates **4–18K** (vendored MinaCalc). Ez NuGet **0.4.2** only 4/6/7 (`FromString`) / 4K (note-array); backfill skips 5/8+. Align engine separately. | Blocked on engine upgrade |
+| — | DATA-SSR-LnTailBlend | Hub `LN_TAIL_BLEND_BY_KEYMODE` (`EzMinaNoteConverter` lnTailTaps=false). Per-keymode blend weights also unported; the converter still treats every keymode identically. | Wish-list |
+| — | Engine unify 4–18K | Replaced NuGet `MinaCalc 0.4.2` (4K note-array / 4/6/7K `.osu` text) with the mania-hub n-key build `minaclac-74.0.wasm` hosted by Wasmtime (`IEzMsdEngine` / `EzNKeyMsdEngine`). One note-array path for 4–18K; `.osu`-text branch and every per-keymode gate removed; 5K/8K+ now backfill. `EzManiaSkillAlgorithm.VERSION` 1→2, and MSD version loss now also clears ChartSkillInfo + ChartDan. Values change — full recompute required. | **Done** |
+| — | Engine 17/18-column chord trap | The vendored module aborts on a chord wider than 16 columns (verified at 17). `EzNKeyMsdEngine` discards the instance and rebuilds, and the callers skip that chart, so it costs a rebuild + a retried pass — not a crash. No mitigation planned unless real charts hit it. | Known limit |
+| — | DATA-ChartDan-Keymode-Routing | ChartDan still assumes the 4/6/7 ladder; 5K and 8K+ charts now have MSD but their chart-dan routing / unsupported handling was not revisited. | Wish-list |
+| — | DATA-PatternAxis-KeymodeSet | Pattern axes (hub `skillModeEntries`) were shaped for 6/7/8K; the narrower/wider keymode sets (5K, 9K, 10–18K) have not been re-derived. | Wish-list |
+| — | DATA-Skillset-Dan-Coverage-10K+ | `tracked_skillset_key_counts = {4,5,6,7,8,9}`, so 10–18K produce MSD/SSR but stay out of DualPanel段位格, filing and ladders. | Wish-list |
 
 UI read path (all of HUD DualPanel/Radar, Analysis Wedge, LocalProfile Track, display tags): **`EzSkillProvider` only**. Song-select DualPanel chart half: Realm ChartDan / MSD / CSI **read-only** (`GetChartDanSkillsetLabelsReadOnly`); cold miss stays empty until BDSP / 「Realm ChartDan」 maintenance.
+
+Recompute after an `EzManiaSkillAlgorithm.VERSION` bump: data maintenance → 「Realm 谱面技能链 (MSD+CSI+Dan)」 (or let the startup BDSP backfill run), then Local Profile → Skills for player SSR. Old-version rows are filtered out, not migrated, so a skipped recompute reads as empty rather than stale.
 
 When starting any of the above, check this file and the matching Cursor/plan todos, then tick or remove the row here in the same PR.
