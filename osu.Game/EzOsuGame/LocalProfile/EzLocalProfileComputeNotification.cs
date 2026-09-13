@@ -32,7 +32,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// </summary>
         public sealed class Forwarder : IProgress<EzLocalProfileComputeProgress>
         {
+            /// <summary>
+            /// Minimum gap between UI updates. A bulk pass reports hundreds of times; each accepted report sets text
+            /// and geometry on the notification, so dropping everything inside this window keeps the update thread
+            /// free without the user noticing (they only read whole percentages anyway).
+            /// </summary>
+            private const int min_report_interval_ms = 100;
+
             private readonly ProgressNotification notification;
+            private readonly System.Diagnostics.Stopwatch sinceLastReport = System.Diagnostics.Stopwatch.StartNew();
+
+            private EzLocalProfileComputePhase lastPhase = (EzLocalProfileComputePhase)(-1);
+            private int lastBasisPoints = -1;
 
             public Forwarder(ProgressNotification notification)
             {
@@ -46,6 +57,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 int total = Math.Max(1, value.Total);
                 int processed = Math.Clamp(value.Processed, 0, total);
+
+                int basisPoints = (int)(10000L * processed / total);
+                bool phaseChanged = value.Phase != lastPhase;
+                bool finished = processed >= total;
+
+                if (!phaseChanged && !finished
+                    && !(basisPoints / 100 != lastBasisPoints / 100 && sinceLastReport.ElapsedMilliseconds >= min_report_interval_ms))
+                    return;
+
+                lastPhase = value.Phase;
+                lastBasisPoints = basisPoints;
+                sinceLastReport.Restart();
 
                 switch (value.Phase)
                 {

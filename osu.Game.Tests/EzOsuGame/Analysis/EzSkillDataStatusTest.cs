@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
@@ -144,6 +145,57 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             LnRawDan = -1,
             ComputedAt = DateTimeOffset.UtcNow,
         };
+
+        /// <summary>
+        /// The chain drops keymodes its engine cannot rate before MSD, so those charts are never work for it and
+        /// must not be counted as missing - otherwise "all current" can never be reached.
+        /// </summary>
+        [Test]
+        public void Charts_outside_the_engine_keymode_range_are_not_counted()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                seedCharts(realm);
+
+                realm.Write(r =>
+                {
+                    var maniaRuleset = r.All<RulesetInfo>().First(s => s.OnlineID == 3);
+                    addChart(r, "status-mania-2k", maniaRuleset, circleSize: 2);
+                    addChart(r, "status-mania-20k", maniaRuleset, circleSize: 20);
+                });
+
+                var store = new EzSkillStore(realm);
+                var status = store.GetSkillDataStatus();
+
+                Assert.That(status.TotalCharts, Is.EqualTo(3));
+                Assert.That(status.Msd.Missing, Is.EqualTo(3));
+                Assert.That(status.TotalPending, Is.EqualTo(9));
+            });
+        }
+
+        /// <summary>
+        /// A chart whose MSD settled as unrateable can never produce a ChartDan, so it is settled for that facet
+        /// too rather than permanently pending.
+        /// </summary>
+        [Test]
+        public void Msd_unrateable_chart_is_settled_for_dan()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                seedCharts(realm);
+                var store = new EzSkillStore(realm);
+
+                store.WriteBeatmapMsdUnrateable(mania_b, Guid.NewGuid());
+
+                var status = store.GetSkillDataStatus();
+
+                Assert.That(status.Msd.Unrateable, Is.EqualTo(1));
+                Assert.That(status.ChartDan.Ready, Is.EqualTo(0));
+                Assert.That(status.ChartDan.Unrateable, Is.EqualTo(1));
+                Assert.That(status.ChartDan.Missing, Is.EqualTo(2));
+                Assert.That(status.HasWorkToDo, Is.True);
+            });
+        }
 
         private static void seedCharts(RealmAccess realm)
         {

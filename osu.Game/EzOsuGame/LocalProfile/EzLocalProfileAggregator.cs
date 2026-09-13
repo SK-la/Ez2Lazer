@@ -175,14 +175,34 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>Shared per-run caches for chunked aggregation (difficulty attributes, playable analysis, failure counters).</summary>
-        public EzLocalProfileAggregationState CreateState() => new EzLocalProfileAggregationState();
+        public EzLocalProfileAggregationState CreateState() => new EzLocalProfileAggregationState(analysisStore);
 
-        public sealed class EzLocalProfileAggregationState
+        /// <summary>
+        /// Carries the per-run caches, plus one memoising analysis read session so a chart encountered by many
+        /// scores is read and parsed once for the whole run instead of once per score.
+        /// </summary>
+        public sealed class EzLocalProfileAggregationState : IDisposable
         {
+            private readonly EzAnalysisPersistentStore analysisStore;
+            private EzAnalysisPersistentStore.ReadSession? analysisSession;
+
+            internal EzLocalProfileAggregationState(EzAnalysisPersistentStore analysisStore)
+            {
+                this.analysisStore = analysisStore;
+            }
+
             internal Dictionary<string, DifficultyAttributes?> AttributeCache { get; } = new Dictionary<string, DifficultyAttributes?>(StringComparer.Ordinal);
             internal Dictionary<string, CachedAnalysis> AnalysisCache { get; } = new Dictionary<string, CachedAnalysis>(StringComparer.Ordinal);
             internal int PpFailures;
             internal int PpLoggedFailures;
+
+            /// <summary>
+            /// The run's shared analysis read session, opened on first use so a state that never reads the
+            /// analysis store pays nothing. <see langword="null"/> when the store is disabled.
+            /// </summary>
+            internal EzAnalysisPersistentStore.ReadSession? AnalysisSession => analysisSession ??= analysisStore.OpenReadSession();
+
+            public void Dispose() => analysisSession?.Dispose();
         }
 
         /// <summary>
@@ -220,7 +240,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 afterEachScore?.Invoke();
 
                 if ((i + 1) % yield_every == 0)
-                    Thread.Sleep(1);
+                    EzLocalProfileCooperativeYield.MaybeYield();
             }
 
             if (state.PpFailures > 0)
@@ -250,7 +270,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             double starRating = resolved.StarRating >= 0 ? resolved.StarRating : beatmap.StarRating;
 
             long keys = countKeys(score);
-            var cached = resolveAnalysis(score, modsAffect, state.AnalysisCache, cancellationToken);
+            var cached = resolveAnalysis(score, modsAffect, state, cancellationToken);
             bool hasKps = cached.HasKps;
             var analysis = cached.Result;
             double avgKps = hasKps ? analysis.AverageKps : 0;
@@ -354,6 +374,36 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
+        /// The subset of <paramref name="candidateIds"/> that also exists as a local score — all the online-contribution
+        /// merge ever asks ("is this pulled summary superseded by a local play?").
+        /// </summary>
+        /// <remarks>
+        /// <see cref="ScoreInfo.OnlineID"/> is indexed, so this is one point lookup per candidate instead of the
+        /// whole-library scan <see cref="CollectLocalOnlineScoreIds()"/> performs. The per-play ingest path used to
+        /// pay that scan on every settlement as soon as a single pulled contribution existed.
+        /// </remarks>
+        public HashSet<long> CollectLocalOnlineScoreIds(IReadOnlyCollection<long> candidateIds)
+        {
+            var candidates = candidateIds.Where(static id => id > 0).Distinct().ToList();
+
+            if (candidates.Count == 0)
+                return new HashSet<long>();
+
+            return realm.Run(r =>
+            {
+                var ids = new HashSet<long>();
+
+                foreach (long id in candidates)
+                {
+                    if (r.All<ScoreInfo>().Filter($"{nameof(ScoreInfo.OnlineID)} == $0", id).Any())
+                        ids.Add(id);
+                }
+
+                return ids;
+            });
+        }
+
+        /// <summary>
         /// Load one just-settled score the way the full compute would see it: the managed instance, with its persisted
         /// beatmap (and the Ez ratings stored on it) rather than the working copy gameplay still holds. Without this
         /// the incremental fold could persist a different slice than a rebuild of the same score.
@@ -384,17 +434,27 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private CachedAnalysis resolveAnalysis(
             ScoreInfo score,
             bool modsAffect,
-            Dictionary<string, CachedAnalysis> cache,
+            EzLocalProfileAggregationState state,
             CancellationToken cancellationToken)
         {
             var beatmap = score.BeatmapInfo!;
 
             if (!modsAffect)
             {
-                bool hasKps = analysisStore.TryGet(beatmap, out var stored);
-                return new CachedAnalysis(hasKps ? stored : default, hasKps);
+                // Read through the run's session: repeated scores of one chart hit the memo, not SQLite.
+                var session = state.AnalysisSession;
+
+                if (session != null)
+                {
+                    bool hasCachedKps = session.TryGet(beatmap, out var stored);
+                    return new CachedAnalysis(hasCachedKps ? stored : default, hasCachedKps);
+                }
+
+                bool hasKps = analysisStore.TryGet(beatmap, out var fallback);
+                return new CachedAnalysis(hasKps ? fallback : default, hasKps);
             }
 
+            var cache = state.AnalysisCache;
             string cacheKey = $"{beatmap.ID:N}|{score.Ruleset.ShortName}|{score.ModsJson}";
 
             if (cache.TryGetValue(cacheKey, out var cached))

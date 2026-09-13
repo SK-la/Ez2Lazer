@@ -16,6 +16,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using static System.String;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
@@ -109,7 +110,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private static readonly IReadOnlyDictionary<Guid, double> empty_pp_values = new Dictionary<Guid, double>();
 
         private bool initialised;
-        private string dbPath = string.Empty;
+        private string dbPath = Empty;
 
         private record PendingWrite(Guid Id, string Hash, string Md5, int RulesetOnlineId, EzAnalysisResult Analysis, long Timestamp);
 
@@ -117,6 +118,12 @@ namespace osu.Game.EzOsuGame.Analysis
         private CancellationTokenSource? writeCts;
         private Task? backgroundWriterTask;
         private bool isDisposed;
+
+        /// <summary>
+        /// Bumped whenever a pending write actually lands in SQLite. A <see cref="ReadSession"/> memoises stored
+        /// rows for the length of one aggregation, so it watches this to drop its memo when the data moved under it.
+        /// </summary>
+        private long writeGeneration;
 
         // 常量化的表名与 meta key，避免在代码中散落硬编码字符串。
         private const string meta_key_requires_post_migration_refresh = "requires_post_migration_refresh";
@@ -150,7 +157,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private static bool getMetaBool(SqliteConnection connection, string key)
         {
             string? v = tryGetMeta(connection, key);
-            return string.Equals(v, "1", StringComparison.Ordinal);
+            return String.Equals(v, "1", StringComparison.Ordinal);
         }
 
         public EzAnalysisPersistentStore(Storage storage)
@@ -194,7 +201,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
                     try
                     {
-                        if (!string.IsNullOrEmpty(dbPath) && File.Exists(dbPath))
+                        if (!IsNullOrEmpty(dbPath) && File.Exists(dbPath))
                         {
                             string backup = dbPath + ".bak";
                             File.Copy(dbPath, backup, overwrite: true);
@@ -230,7 +237,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 if (!tryGetRawData(connection, beatmap, out var storedAnalysis))
                 {
-                    if (pending is not null && string.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal))
+                    if (pending is not null && String.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal))
                     {
                         result = pending.Analysis;
                         return true;
@@ -239,7 +246,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     return false;
                 }
 
-                result = pending is not null && string.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal)
+                result = pending is not null && String.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal)
                     ? mergeAnalysisResult(storedAnalysis, pending.Analysis)
                     : storedAnalysis;
 
@@ -259,6 +266,117 @@ namespace osu.Game.EzOsuGame.Analysis
                 Logger.Error(e, "EzManiaAnalysisPersistentStore TryGet failed.", Ez2ConfigManager.LOGGER_NAME);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Open a memoising read scope over the analysis database, or <see langword="null"/> when the store is
+        /// disabled. The caller owns the returned session and must dispose it.
+        /// </summary>
+        /// <remarks>
+        /// A bulk aggregation walks thousands of scores but only a fraction of distinct charts. Without a session
+        /// each score re-opens the database and re-parses that chart's KPS columns/JSON; with one, each chart is
+        /// read and parsed once for the whole run. Not thread-safe: one session belongs to one worker.
+        /// </remarks>
+        public ReadSession? OpenReadSession()
+        {
+            if (!Enabled)
+                return null;
+
+            Initialise();
+            return new ReadSession(this, openConnection());
+        }
+
+        /// <summary>
+        /// One connection + a per-chart memo for a single aggregation pass. Mirrors <see cref="TryGet"/>'s
+        /// validation (hash / md5 / ruleset identity, pending-write overlay, validity gate) so a memo hit is
+        /// indistinguishable from an uncached read.
+        /// </summary>
+        public sealed class ReadSession : IDisposable
+        {
+            private readonly EzAnalysisPersistentStore owner;
+            private readonly SqliteConnection connection;
+            private readonly Dictionary<Guid, MemoEntry> memo = new Dictionary<Guid, MemoEntry>();
+            private long observedGeneration;
+
+            internal ReadSession(EzAnalysisPersistentStore owner, SqliteConnection connection)
+            {
+                this.owner = owner;
+                this.connection = connection;
+                observedGeneration = Interlocked.Read(ref owner.writeGeneration);
+            }
+
+            /// <summary>
+            /// Memoised counterpart of <see cref="TryGet"/>. A negative is memoised too, because on a large library
+            /// the un-analysed charts are exactly the ones hit repeatedly by chart-blind score ordering.
+            /// </summary>
+            public bool TryGet(BeatmapInfo beatmap, out EzAnalysisResult result)
+            {
+                result = default;
+                ArgumentNullException.ThrowIfNull(beatmap);
+
+                try
+                {
+                    long generation = Interlocked.Read(ref owner.writeGeneration);
+
+                    // A flushed batch can add or replace a row the memo already answered from; drop it.
+                    if (generation != observedGeneration)
+                    {
+                        memo.Clear();
+                        observedGeneration = generation;
+                    }
+
+                    string hash = beatmap.Hash;
+                    string md5 = beatmap.MD5Hash;
+                    int rulesetOnlineId = beatmap.Ruleset.OnlineID;
+
+                    if (!memo.TryGetValue(beatmap.ID, out var entry)
+                        || !String.Equals(entry.Hash, hash, StringComparison.Ordinal)
+                        || !String.Equals(entry.Md5, md5, StringComparison.Ordinal)
+                        || entry.RulesetOnlineId != rulesetOnlineId)
+                    {
+                        bool found = owner.tryGetRawData(connection, beatmap, out var stored);
+                        entry = new MemoEntry(found, hash, md5, rulesetOnlineId, stored);
+                        memo[beatmap.ID] = entry;
+                    }
+
+                    if (!entry.Found)
+                    {
+                        // A pending write may exist for a chart with no stored row yet (the uncached TryGet path
+                        // serves exactly this case). Checked on every read, never memoised, so it cannot be missed.
+                        if (owner.pendingWrites.TryGetValue(beatmap.ID, out var pending)
+                            && String.Equals(pending.Hash, hash, StringComparison.Ordinal))
+                        {
+                            result = pending.Analysis;
+                            return true;
+                        }
+
+                        return false;
+                    }
+
+                    result = entry.Result;
+
+                    if (owner.pendingWrites.TryGetValue(beatmap.ID, out var overlay)
+                        && String.Equals(overlay.Hash, hash, StringComparison.Ordinal))
+                        result = mergeAnalysisResult(result, overlay.Analysis);
+
+                    if (!isValidAnalysisResult(result))
+                    {
+                        Logger.Log($"[EzManiaAnalysisPersistentStore] Invalid analysis result for {beatmap.ID}, ignoring cached data.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                        return false;
+                    }
+
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "EzManiaAnalysisPersistentStore ReadSession.TryGet failed.", Ez2ConfigManager.LOGGER_NAME);
+                    return false;
+                }
+            }
+
+            public void Dispose() => connection.Dispose();
+
+            private readonly record struct MemoEntry(bool Found, string Hash, string Md5, int RulesetOnlineId, EzAnalysisResult Result);
         }
 
         /// <summary>
@@ -370,7 +488,7 @@ LIMIT 1;
 
                     if (!reader.Read())
                     {
-                        if (pending is not null && string.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal))
+                        if (pending is not null && String.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal))
                         {
                             result = pending.Analysis;
                             return true;
@@ -384,10 +502,10 @@ LIMIT 1;
                     int storedRulesetOnlineId = reader.GetInt32(2);
                     long commonUpdatedAt = reader.GetInt64(3);
 
-                    if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
+                    if (!String.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
                         return false;
 
-                    if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
+                    if (!IsNullOrEmpty(storedMd5) && !String.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
                         return false;
 
                     if (storedRulesetOnlineId != beatmap.Ruleset.OnlineID)
@@ -415,7 +533,7 @@ LIMIT 1;
 
                     result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), pp: null, maniaSummary);
 
-                    if (pending is not null && string.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal))
+                    if (pending is not null && String.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal))
                         result = mergeAnalysisResult(result, pending.Analysis);
 
                     return true;
@@ -520,6 +638,7 @@ LIMIT 1;
                     Initialise();
                     using var connection = openConnection();
                     writePendingEntryToConnection(connection, snapshotPendingWrite(beatmap, analysis));
+                    Interlocked.Increment(ref writeGeneration);
                 }
                 catch (Exception ex)
                 {
@@ -617,7 +736,7 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
 
                     MissingDataKind missingData = getMissingData(row.commonUpdatedAt, maniaUpdated.Contains(id), rulesetOnlineId);
 
-                    if (!string.Equals(row.hash, hash, StringComparison.Ordinal)
+                    if (!String.Equals(row.hash, hash, StringComparison.Ordinal)
                         || row.rulesetOnlineId != rulesetOnlineId
                         || missingData != MissingDataKind.None)
                         needing.Add(id);
@@ -672,7 +791,7 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
 
         public string CreateSongsBranchDatabasePath(string rulesetShortName)
         {
-            string safeRulesetName = string.IsNullOrWhiteSpace(rulesetShortName) ? "ruleset" : rulesetShortName.Trim();
+            string safeRulesetName = IsNullOrWhiteSpace(rulesetShortName) ? "ruleset" : rulesetShortName.Trim();
             string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
             string uniqueSuffix = Guid.NewGuid().ToString("N")[..8];
 
@@ -681,7 +800,7 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
 
         public string CreateSongsBranchDatabasePath(SongsBranchMetadata metadata)
         {
-            string safeCollectionName = createSafeBranchDisplayName(string.IsNullOrWhiteSpace(metadata.SourceCollectionName) ? "collection" : metadata.SourceCollectionName);
+            string safeCollectionName = createSafeBranchDisplayName(IsNullOrWhiteSpace(metadata.SourceCollectionName) ? "collection" : metadata.SourceCollectionName);
             string safeModsDisplay = createSafeBranchModsDisplay(metadata.ModsDisplay);
             string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture);
             string uniqueSuffix = Guid.NewGuid().ToString("N")[..8];
@@ -765,7 +884,7 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
                 setMeta(connection, meta_key_display_name, metadata.DisplayName);
                 setMeta(connection, meta_key_mods_json, metadata.ModsJson);
                 setMeta(connection, meta_key_hidden_applied, metadata.HiddenApplied ? "1" : "0");
-                setMeta(connection, meta_key_source_collection_id, metadata.SourceCollectionId == Guid.Empty ? string.Empty : metadata.SourceCollectionId.ToString());
+                setMeta(connection, meta_key_source_collection_id, metadata.SourceCollectionId == Guid.Empty ? Empty : metadata.SourceCollectionId.ToString());
                 setMeta(connection, meta_key_source_collection_name, metadata.SourceCollectionName);
                 setMeta(connection, meta_key_source_collection_last_modified, sourceCollectionLastModified.ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, meta_key_source_collection_beatmap_count, sourceCollectionBeatmapCount.ToString(CultureInfo.InvariantCulture));
@@ -786,7 +905,7 @@ ON CONFLICT({col_beatmap_md5}) DO NOTHING;
                     sourceCollectionMd5Param.ParameterName = "$md5";
                     insertSourceCollection.Parameters.Add(sourceCollectionMd5Param);
 
-                    foreach (string beatmapMd5 in sourceCollectionSnapshot.BeatmapMd5Hashes.Where(hash => !string.IsNullOrWhiteSpace(hash)).Distinct(StringComparer.OrdinalIgnoreCase))
+                    foreach (string beatmapMd5 in sourceCollectionSnapshot.BeatmapMd5Hashes.Where(hash => !IsNullOrWhiteSpace(hash)).Distinct(StringComparer.OrdinalIgnoreCase))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         sourceCollectionMd5Param.Value = beatmapMd5;
@@ -873,7 +992,7 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
 
         public IReadOnlyDictionary<Guid, double> GetSongsBranchValues(string databasePath, IEnumerable<BeatmapInfo> beatmaps)
         {
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return empty_xxy_sr_values;
 
             try
@@ -909,7 +1028,7 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
                     cmd.CommandText = $@"
 SELECT beatmap_id, beatmap_hash, beatmap_md5, xxy_sr
 FROM {table_songs_branch_entry}
-WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
+WHERE beatmap_id IN ({Join(", ", parameterNames)});
 ";
 
                     using var reader = cmd.ExecuteReader();
@@ -925,10 +1044,10 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
                         string storedHash = reader.GetString(1);
                         string storedMd5 = reader.GetString(2);
 
-                        if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
+                        if (!String.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
                             continue;
 
-                        if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
+                        if (!IsNullOrEmpty(storedMd5) && !String.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
                             continue;
 
                         resolvedValues[beatmapId] = reader.IsDBNull(3) ? 0 : reader.GetDouble(3);
@@ -946,7 +1065,7 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
 
         public IReadOnlyDictionary<Guid, double> GetSongsBranchPpValues(string databasePath, IEnumerable<BeatmapInfo> beatmaps)
         {
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return empty_pp_values;
 
             try
@@ -982,7 +1101,7 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
                     cmd.CommandText = $@"
 SELECT beatmap_id, beatmap_hash, beatmap_md5, {col_pp}
 FROM {table_songs_branch_entry}
-WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
+WHERE beatmap_id IN ({Join(", ", parameterNames)});
 ";
 
                     using var reader = cmd.ExecuteReader();
@@ -998,10 +1117,10 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
                         string storedHash = reader.GetString(1);
                         string storedMd5 = reader.GetString(2);
 
-                        if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
+                        if (!String.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
                             continue;
 
-                        if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
+                        if (!IsNullOrEmpty(storedMd5) && !String.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
                             continue;
 
                         if (!reader.IsDBNull(3))
@@ -1022,7 +1141,7 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
         {
             var beatmapMd5Hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return beatmapMd5Hashes;
 
             try
@@ -1046,7 +1165,7 @@ FROM {table_songs_branch_source_collection};
                     {
                         string beatmapMd5 = collectionReader.GetString(0);
 
-                        if (!string.IsNullOrWhiteSpace(beatmapMd5))
+                        if (!IsNullOrWhiteSpace(beatmapMd5))
                             beatmapMd5Hashes.Add(beatmapMd5);
                     }
                 }
@@ -1069,7 +1188,7 @@ FROM {table_songs_branch_entry};
                 {
                     string beatmapMd5 = branchReader.GetString(0);
 
-                    if (!string.IsNullOrWhiteSpace(beatmapMd5))
+                    if (!IsNullOrWhiteSpace(beatmapMd5))
                         beatmapMd5Hashes.Add(beatmapMd5);
                 }
 
@@ -1086,10 +1205,10 @@ FROM {table_songs_branch_entry};
         {
             var matchedMd5Hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return matchedMd5Hashes;
 
-            var candidates = candidateMd5Hashes.Where(hash => !string.IsNullOrWhiteSpace(hash))
+            var candidates = candidateMd5Hashes.Where(hash => !IsNullOrWhiteSpace(hash))
                                                .Distinct(StringComparer.OrdinalIgnoreCase)
                                                .ToList();
 
@@ -1145,7 +1264,7 @@ FROM {table_songs_branch_entry};
                 command.CommandText = $@"
 SELECT {col_beatmap_md5}
 FROM {tableName}
-WHERE {col_beatmap_md5} IN ({string.Join(", ", parameterNames)});
+WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
 ";
 
                 using var reader = command.ExecuteReader();
@@ -1154,7 +1273,7 @@ WHERE {col_beatmap_md5} IN ({string.Join(", ", parameterNames)});
                 {
                     string beatmapMd5 = reader.GetString(0);
 
-                    if (!string.IsNullOrWhiteSpace(beatmapMd5))
+                    if (!IsNullOrWhiteSpace(beatmapMd5))
                         output.Add(beatmapMd5);
                 }
             }
@@ -1195,7 +1314,7 @@ WHERE {col_beatmap_md5} IN ({string.Join(", ", parameterNames)});
         {
             storedVersion = 0;
 
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
 
             try
@@ -1222,7 +1341,7 @@ WHERE {col_beatmap_md5} IN ({string.Join(", ", parameterNames)});
         /// </summary>
         public void EnsureSongsBranchVersionMeta(string databasePath, int currentXxyVersion, int currentPpVersion)
         {
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return;
 
             if (currentXxyVersion <= 0 && currentPpVersion <= 0)
@@ -1235,10 +1354,10 @@ WHERE {col_beatmap_md5} IN ({string.Join(", ", parameterNames)});
                 if (!prepareSongsBranchConnection(connection))
                     return;
 
-                if (currentXxyVersion > 0 && string.IsNullOrEmpty(tryGetMeta(connection, meta_key_xxy_sr_version)))
+                if (currentXxyVersion > 0 && IsNullOrEmpty(tryGetMeta(connection, meta_key_xxy_sr_version)))
                     setMeta(connection, meta_key_xxy_sr_version, currentXxyVersion.ToString(CultureInfo.InvariantCulture));
 
-                if (currentPpVersion > 0 && string.IsNullOrEmpty(tryGetMeta(connection, meta_key_pp_version)))
+                if (currentPpVersion > 0 && IsNullOrEmpty(tryGetMeta(connection, meta_key_pp_version)))
                     setMeta(connection, meta_key_pp_version, currentPpVersion.ToString(CultureInfo.InvariantCulture));
 
                 setMeta(connection, meta_key_analysis_version, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
@@ -1271,7 +1390,7 @@ WHERE {col_beatmap_md5} IN ({string.Join(", ", parameterNames)});
         {
             requiresRefresh = false;
 
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
 
             try
@@ -1293,7 +1412,7 @@ WHERE {col_beatmap_md5} IN ({string.Join(", ", parameterNames)});
 
         public void ClearSongsBranchPostMigrationRefresh(string databasePath)
         {
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return;
 
             try
@@ -1313,7 +1432,7 @@ WHERE {col_beatmap_md5} IN ({string.Join(", ", parameterNames)});
 
         public IReadOnlyList<SongsBranchRow> ReadAllSongsBranchRows(string databasePath)
         {
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return Array.Empty<SongsBranchRow>();
 
             try
@@ -1369,7 +1488,7 @@ FROM {table_songs_branch_entry};";
         {
             storedVersion = 0;
 
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
 
             try
@@ -1393,7 +1512,7 @@ FROM {table_songs_branch_entry};";
 
         public bool UpdateSongsBranchRows(string databasePath, IEnumerable<SongsBranchRow> rows, int? newXxySrAlgorithmVersion, int? newPpAlgorithmVersion)
         {
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
 
             try
@@ -1585,7 +1704,7 @@ ON CONFLICT(collection_id, beatmap_md5) DO NOTHING;
                     beatmapMd5Param.ParameterName = "$beatmap_md5";
                     insertMd5.Parameters.Add(beatmapMd5Param);
 
-                    foreach (string beatmapMd5 in beatmapMd5Hashes.Where(hash => !string.IsNullOrWhiteSpace(hash)).Distinct(StringComparer.OrdinalIgnoreCase))
+                    foreach (string beatmapMd5 in beatmapMd5Hashes.Where(hash => !IsNullOrWhiteSpace(hash)).Distinct(StringComparer.OrdinalIgnoreCase))
                     {
                         beatmapMd5Param.Value = beatmapMd5;
                         insertMd5.ExecuteNonQuery();
@@ -1751,7 +1870,7 @@ WHERE collection_id = $collection_id;
                 {
                     string beatmapMd5 = reader.GetString(0);
 
-                    if (!string.IsNullOrWhiteSpace(beatmapMd5))
+                    if (!IsNullOrWhiteSpace(beatmapMd5))
                         beatmapMd5Hashes.Add(beatmapMd5);
                 }
 
@@ -1768,7 +1887,7 @@ WHERE collection_id = $collection_id;
         {
             var beatmapIds = new HashSet<Guid>();
 
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return beatmapIds;
 
             try
@@ -1805,7 +1924,7 @@ FROM hidden_preexisting_beatmap;
 
         public bool DeleteSongsBranch(string databasePath)
         {
-            if (!Enabled || string.IsNullOrEmpty(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath))
                 return false;
 
             try
@@ -1830,7 +1949,7 @@ FROM hidden_preexisting_beatmap;
         {
             descriptor = default;
 
-            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
 
             if (!isCurrentSongsBranchPath(databasePath))
@@ -1935,8 +2054,8 @@ LIMIT 1;
         {
             string? kind = tryGetMeta(connection, meta_key_kind);
 
-            if (string.Equals(kind, songs_branch_kind, StringComparison.Ordinal)
-                || string.Equals(kind, legacy_xxy_sr_branch_kind, StringComparison.Ordinal))
+            if (String.Equals(kind, songs_branch_kind, StringComparison.Ordinal)
+                || String.Equals(kind, legacy_xxy_sr_branch_kind, StringComparison.Ordinal))
                 return true;
 
             return songsBranchEntryTableExists(connection, legacy_table_xxy_sr_branch)
@@ -2081,7 +2200,7 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
         {
             string? kind = tryGetMeta(connection, meta_key_kind);
 
-            if (!string.Equals(kind, songs_branch_kind, StringComparison.Ordinal))
+            if (!String.Equals(kind, songs_branch_kind, StringComparison.Ordinal))
                 return false;
 
             if (!int.TryParse(tryGetMeta(connection, meta_key_schema_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out int schemaVersion)
@@ -2112,7 +2231,7 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
 
             while (reader.Read())
             {
-                if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                if (String.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
                     return true;
             }
 
@@ -2147,14 +2266,14 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
                 createdAtUnixMilliseconds = 0;
 
             rulesetShortName ??= "ruleset";
-            modsFingerprint ??= string.Empty;
+            modsFingerprint ??= Empty;
             modsDisplay ??= "NoMod";
-            sourceCollectionName ??= string.Empty;
-            displayName ??= string.IsNullOrWhiteSpace(sourceCollectionName)
+            sourceCollectionName ??= Empty;
+            displayName ??= IsNullOrWhiteSpace(sourceCollectionName)
                 ? $"songs | {modsDisplay}"
                 : $"{sourceCollectionName} | {modsDisplay}";
-            modsJson ??= string.Empty;
-            bool hiddenApplied = string.Equals(hiddenAppliedText, "1", StringComparison.Ordinal);
+            modsJson ??= Empty;
+            bool hiddenApplied = String.Equals(hiddenAppliedText, "1", StringComparison.Ordinal);
             Guid sourceCollectionId = Guid.TryParse(sourceCollectionIdText, out Guid parsedSourceCollectionId) ? parsedSourceCollectionId : Guid.Empty;
             long sourceCollectionLastModifiedUnixMilliseconds = long.TryParse(sourceCollectionLastModifiedText, NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsedSourceCollectionLastModified)
                 ? parsedSourceCollectionLastModified
@@ -2221,7 +2340,7 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
             string branchRoot = storage.GetFullPath(SONGS_BRANCH_DATABASE_DIRECTORY, true);
             string relativePath = Path.GetRelativePath(branchRoot, fullPath);
 
-            if (string.IsNullOrEmpty(relativePath))
+            if (IsNullOrEmpty(relativePath))
                 return false;
 
             return !relativePath.StartsWith("..", StringComparison.Ordinal)
@@ -2231,7 +2350,7 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
         private SongsBranchDescriptor createSongsBranchDescriptor(string databasePath, SongsBranchMetadata metadata)
         {
             string fullPath = Path.GetFullPath(databasePath);
-            string rootPath = storage.GetFullPath(string.Empty, true);
+            string rootPath = storage.GetFullPath(Empty, true);
             string relativePath = Path.GetRelativePath(rootPath, fullPath).Replace('\\', '/');
 
             return new SongsBranchDescriptor(fullPath, relativePath, metadata);
@@ -2239,7 +2358,7 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
 
         private static string createSafeBranchModsDisplay(string? value)
         {
-            if (string.IsNullOrWhiteSpace(value))
+            if (IsNullOrWhiteSpace(value))
                 return "NoMod";
 
             var builder = new StringBuilder(value.Length);
@@ -2261,14 +2380,14 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
             while (result.Contains("++", StringComparison.Ordinal))
                 result = result.Replace("++", "+", StringComparison.Ordinal);
 
-            return string.IsNullOrEmpty(result) ? "NoMod" : result;
+            return IsNullOrEmpty(result) ? "NoMod" : result;
         }
 
         private static string createSafeBranchDisplayName(string value)
         {
             string trimmed = value.Trim();
 
-            if (string.IsNullOrEmpty(trimmed))
+            if (IsNullOrEmpty(trimmed))
                 return "songs_branch";
 
             char[] invalidChars = Path.GetInvalidFileNameChars();
@@ -2283,7 +2402,7 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
             }
 
             string result = builder.ToString().Trim().TrimEnd('.');
-            return string.IsNullOrEmpty(result) ? "songs_branch" : result;
+            return IsNullOrEmpty(result) ? "songs_branch" : result;
         }
 
         private void startBackgroundWriter()
@@ -2345,6 +2464,7 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
                         }
 
                         transaction.Commit();
+                        Interlocked.Increment(ref writeGeneration);
                     }
                     catch (Exception e)
                     {

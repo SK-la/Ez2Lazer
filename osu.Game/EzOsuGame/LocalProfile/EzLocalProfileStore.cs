@@ -434,7 +434,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 rebuildArchiveFromPartitions(
                     connection,
-                    includePlayerEvidence: false,
                     markContentVersionCurrent: false,
                     onlineContributions,
                     localOnlineScoreIds);
@@ -985,6 +984,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         delDrills.CommandText = "DELETE FROM drill_scores WHERE username = $username;";
                         delDrills.Parameters.AddWithValue("$username", name);
                         delDrills.ExecuteNonQuery();
+
+                        // ...and no orphaned evidence either: those tables have no partition to point at any more.
+                        using var delEvidence = connection.CreateCommand();
+                        delEvidence.CommandText = """
+                                                  DELETE FROM dan_clear_evidence WHERE username = $username;
+                                                  DELETE FROM axis_play_evidence WHERE username = $username;
+                                                  """;
+                        delEvidence.Parameters.AddWithValue("$username", name);
+                        delEvidence.ExecuteNonQuery();
                     }
                 }
 
@@ -993,9 +1001,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 foreach (var (username, result) in recomputedByUsername)
                     writePartition(connection, username, EzLocalProfilePartitionPayload.FromAggregation(result), updatedAt);
 
+                // Evidence tables are deliberately not wiped here. WritePlayerSkills replaces each rewritten player's
+                // rows wholesale (ReplaceAxisPlays / ReplaceDanClears), so a player this compute skipped keeps the
+                // evidence it already had instead of being silently emptied.
                 rebuildArchiveFromPartitions(
                     connection,
-                    includePlayerEvidence: true,
                     markContentVersionCurrent: recomputedByUsername.Count > 0,
                     onlineContributions,
                     localOnlineScoreIds);
@@ -1010,19 +1020,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// Shared by incremental compute (<see cref="ApplyUsernamePartitions"/>) and player exclusion
         /// (<see cref="ExcludeUsernames"/>).
         /// </summary>
-        /// <param name="includePlayerEvidence">
-        /// When true, also wipes the per-player evidence tables (<c>dan_clear_evidence</c> / <c>axis_play_evidence</c>),
-        /// which the caller is expected to repopulate in a full skills pass. Excluding a player must pass
-        /// <see langword="false"/>, otherwise fencing one player would silently drop every other player's
-        /// Dan / axis evidence (those tables are only written by <c>writePlayerSkills</c>).
-        /// </param>
+        /// <remarks>
+        /// Per-player evidence (<c>dan_clear_evidence</c> / <c>axis_play_evidence</c>) is not touched either: only
+        /// <c>writePlayerSkills</c> writes it, and it replaces each rewritten player's rows wholesale. Wiping the
+        /// tables here would silently empty the evidence of every player a given compute skipped.
+        /// </remarks>
         /// <param name="markContentVersionCurrent">
         /// True only when the local partitions were just rebuilt with the current aggregator logic; an exclusion
         /// must not stamp the content version, or a later compute would trust slices it never re-analysed.
         /// </param>
         private static void rebuildArchiveFromPartitions(
             SqliteConnection connection,
-            bool includePlayerEvidence,
             bool markContentVersionCurrent,
             IReadOnlyList<EzLocalProfileOnlineScoreContribution> onlineContributions,
             IReadOnlyCollection<long> localOnlineScoreIds)
@@ -1051,7 +1059,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             // Clear aggregation tables before streaming drills so we never hold every partition's drills in memory.
-            clearTables(connection, includePlayerEvidence);
+            clearTables(connection);
             recreateManiaColumnTable(connection);
 
             foreach (var (username, json) in partitionJsonByUser)
@@ -1445,7 +1453,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 rebuildArchiveFromPartitions(
                     connection,
-                    includePlayerEvidence: false,
                     markContentVersionCurrent: false,
                     onlineContributions,
                     localOnlineScoreIds);
@@ -1636,73 +1643,126 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private static void writeDrillScores(SqliteConnection connection, IReadOnlyList<EzLocalProfileDrillScoreRow> rows, SqliteTransaction? transaction = null)
         {
+            if (rows.Count == 0)
+                return;
+
+            // One command, re-bound per row. Creating (and re-parsing) it for every one of a few thousand detail rows
+            // was pure overhead on the hot path; SQLite keeps the prepared statement between executions.
+            using var cmd = connection.CreateCommand();
+
+            // Only bind when a transaction is supplied: explicitly assigning null stops Microsoft.Data.Sqlite
+            // from falling back to the connection's pending transaction, and the insert then throws.
+            if (transaction != null)
+                cmd.Transaction = transaction;
+
+            cmd.CommandText = """
+                              INSERT OR REPLACE INTO drill_scores (
+                                  score_id, score_hash, username, ruleset_id, rank, pp_resolved, accuracy,
+                                  max_combo, max_achievable_combo, total_score, mods_json, total_keys,
+                                  beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
+                                  mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
+                                  kps_avg, kps_max, kps_list_json, column_counts_json, hold_counts_json,
+                                  avg_abs_offset_ms, has_video, has_storyboard, date_ms,
+                                  bpm, key_count, is_convert, rate, mod_acronyms_json)
+                              VALUES (
+                                  $score_id, $score_hash, $username, $ruleset_id, $rank, $pp_resolved, $accuracy,
+                                  $max_combo, $max_achievable_combo, $total_score, $mods_json, $total_keys,
+                                  $beatmap_hash, $beatmap_id, $beatmap_set_id, $title, $artist, $difficulty_name,
+                                  $mapper_username, $beatmap_status, $star_rating, $xxy_star_rating, $map_performance_points,
+                                  $kps_avg, $kps_max, $kps_list_json, $column_counts_json, $hold_counts_json,
+                                  $avg_abs_offset_ms, $has_video, $has_storyboard, $date_ms,
+                                  $bpm, $key_count, $is_convert, $rate, $mod_acronyms_json);
+                              """;
+
+            foreach ((string name, SqliteType type) in drillParameters)
+                cmd.Parameters.Add(name, type);
+
+            cmd.Prepare();
+
             foreach (var row in rows)
             {
-                using var cmd = connection.CreateCommand();
-
-                // Only bind when a transaction is supplied: explicitly assigning null stops Microsoft.Data.Sqlite
-                // from falling back to the connection's pending transaction, and the insert then throws.
-                if (transaction != null)
-                    cmd.Transaction = transaction;
-
-                cmd.CommandText = """
-                                  INSERT OR REPLACE INTO drill_scores (
-                                      score_id, score_hash, username, ruleset_id, rank, pp_resolved, accuracy,
-                                      max_combo, max_achievable_combo, total_score, mods_json, total_keys,
-                                      beatmap_hash, beatmap_id, beatmap_set_id, title, artist, difficulty_name,
-                                      mapper_username, beatmap_status, star_rating, xxy_star_rating, map_performance_points,
-                                      kps_avg, kps_max, kps_list_json, column_counts_json, hold_counts_json,
-                                      avg_abs_offset_ms, has_video, has_storyboard, date_ms,
-                                      bpm, key_count, is_convert, rate, mod_acronyms_json)
-                                  VALUES (
-                                      $score_id, $score_hash, $username, $ruleset_id, $rank, $pp_resolved, $accuracy,
-                                      $max_combo, $max_achievable_combo, $total_score, $mods_json, $total_keys,
-                                      $beatmap_hash, $beatmap_id, $beatmap_set_id, $title, $artist, $difficulty_name,
-                                      $mapper_username, $beatmap_status, $star_rating, $xxy_star_rating, $map_performance_points,
-                                      $kps_avg, $kps_max, $kps_list_json, $column_counts_json, $hold_counts_json,
-                                      $avg_abs_offset_ms, $has_video, $has_storyboard, $date_ms,
-                                      $bpm, $key_count, $is_convert, $rate, $mod_acronyms_json);
-                                  """;
-                cmd.Parameters.AddWithValue("$score_id", row.ScoreId.ToString("N"));
-                cmd.Parameters.AddWithValue("$score_hash", row.ScoreHash);
-                cmd.Parameters.AddWithValue("$username", row.Username);
-                cmd.Parameters.AddWithValue("$ruleset_id", row.RulesetId);
-                cmd.Parameters.AddWithValue("$rank", (int)row.Rank);
-                cmd.Parameters.AddWithValue("$pp_resolved", row.PpResolved);
-                cmd.Parameters.AddWithValue("$accuracy", row.Accuracy);
-                cmd.Parameters.AddWithValue("$max_combo", row.MaxCombo);
-                cmd.Parameters.AddWithValue("$max_achievable_combo", row.MaxAchievableCombo);
-                cmd.Parameters.AddWithValue("$total_score", row.TotalScore);
-                cmd.Parameters.AddWithValue("$mods_json", row.ModsJson);
-                cmd.Parameters.AddWithValue("$total_keys", row.TotalKeys);
-                cmd.Parameters.AddWithValue("$beatmap_hash", row.BeatmapHash);
-                cmd.Parameters.AddWithValue("$beatmap_id", row.BeatmapId.ToString("N"));
-                cmd.Parameters.AddWithValue("$beatmap_set_id", row.BeatmapSetId?.ToString("N") ?? (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("$title", row.Title);
-                cmd.Parameters.AddWithValue("$artist", row.Artist);
-                cmd.Parameters.AddWithValue("$difficulty_name", row.DifficultyName);
-                cmd.Parameters.AddWithValue("$mapper_username", row.MapperUsername);
-                cmd.Parameters.AddWithValue("$beatmap_status", (int)row.BeatmapStatus);
-                cmd.Parameters.AddWithValue("$star_rating", row.StarRating);
-                cmd.Parameters.AddWithValue("$xxy_star_rating", row.XxyStarRating);
-                cmd.Parameters.AddWithValue("$map_performance_points", row.MapPerformancePoints);
-                cmd.Parameters.AddWithValue("$kps_avg", row.KpsAvg);
-                cmd.Parameters.AddWithValue("$kps_max", row.KpsMax);
-                cmd.Parameters.AddWithValue("$kps_list_json", row.KpsListJson);
-                cmd.Parameters.AddWithValue("$column_counts_json", row.ColumnCountsJson);
-                cmd.Parameters.AddWithValue("$hold_counts_json", row.HoldCountsJson);
-                cmd.Parameters.AddWithValue("$avg_abs_offset_ms", row.AvgAbsOffsetMs ?? (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("$has_video", row.HasVideo ? 1 : 0);
-                cmd.Parameters.AddWithValue("$has_storyboard", row.HasStoryboard ? 1 : 0);
-                cmd.Parameters.AddWithValue("$date_ms", row.Date.ToUnixTimeMilliseconds());
-                cmd.Parameters.AddWithValue("$bpm", row.Bpm);
-                cmd.Parameters.AddWithValue("$key_count", row.KeyCount);
-                cmd.Parameters.AddWithValue("$is_convert", row.IsConvert ? 1 : 0);
-                cmd.Parameters.AddWithValue("$rate", row.Rate);
-                cmd.Parameters.AddWithValue("$mod_acronyms_json", row.ModAcronymsJson);
+                cmd.Parameters["$score_id"].Value = row.ScoreId.ToString("N");
+                cmd.Parameters["$score_hash"].Value = row.ScoreHash;
+                cmd.Parameters["$username"].Value = row.Username;
+                cmd.Parameters["$ruleset_id"].Value = row.RulesetId;
+                cmd.Parameters["$rank"].Value = (int)row.Rank;
+                cmd.Parameters["$pp_resolved"].Value = row.PpResolved;
+                cmd.Parameters["$accuracy"].Value = row.Accuracy;
+                cmd.Parameters["$max_combo"].Value = row.MaxCombo;
+                cmd.Parameters["$max_achievable_combo"].Value = row.MaxAchievableCombo;
+                cmd.Parameters["$total_score"].Value = row.TotalScore;
+                cmd.Parameters["$mods_json"].Value = row.ModsJson;
+                cmd.Parameters["$total_keys"].Value = row.TotalKeys;
+                cmd.Parameters["$beatmap_hash"].Value = row.BeatmapHash;
+                cmd.Parameters["$beatmap_id"].Value = row.BeatmapId.ToString("N");
+                cmd.Parameters["$beatmap_set_id"].Value = row.BeatmapSetId?.ToString("N") ?? (object)DBNull.Value;
+                cmd.Parameters["$title"].Value = row.Title;
+                cmd.Parameters["$artist"].Value = row.Artist;
+                cmd.Parameters["$difficulty_name"].Value = row.DifficultyName;
+                cmd.Parameters["$mapper_username"].Value = row.MapperUsername;
+                cmd.Parameters["$beatmap_status"].Value = (int)row.BeatmapStatus;
+                cmd.Parameters["$star_rating"].Value = row.StarRating;
+                cmd.Parameters["$xxy_star_rating"].Value = row.XxyStarRating;
+                cmd.Parameters["$map_performance_points"].Value = row.MapPerformancePoints;
+                cmd.Parameters["$kps_avg"].Value = row.KpsAvg;
+                cmd.Parameters["$kps_max"].Value = row.KpsMax;
+                cmd.Parameters["$kps_list_json"].Value = row.KpsListJson;
+                cmd.Parameters["$column_counts_json"].Value = row.ColumnCountsJson;
+                cmd.Parameters["$hold_counts_json"].Value = row.HoldCountsJson;
+                cmd.Parameters["$avg_abs_offset_ms"].Value = row.AvgAbsOffsetMs ?? (object)DBNull.Value;
+                cmd.Parameters["$has_video"].Value = row.HasVideo ? 1 : 0;
+                cmd.Parameters["$has_storyboard"].Value = row.HasStoryboard ? 1 : 0;
+                cmd.Parameters["$date_ms"].Value = row.Date.ToUnixTimeMilliseconds();
+                cmd.Parameters["$bpm"].Value = row.Bpm;
+                cmd.Parameters["$key_count"].Value = row.KeyCount;
+                cmd.Parameters["$is_convert"].Value = row.IsConvert ? 1 : 0;
+                cmd.Parameters["$rate"].Value = row.Rate;
+                cmd.Parameters["$mod_acronyms_json"].Value = row.ModAcronymsJson;
                 cmd.ExecuteNonQuery();
             }
         }
+
+        /// <summary>Names and SQLite types of the <c>drill_scores</c> insert; kept next to the SQL it has to match.</summary>
+        private static readonly (string Name, SqliteType Type)[] drillParameters =
+        {
+            ("$score_id", SqliteType.Text),
+            ("$score_hash", SqliteType.Text),
+            ("$username", SqliteType.Text),
+            ("$ruleset_id", SqliteType.Integer),
+            ("$rank", SqliteType.Integer),
+            ("$pp_resolved", SqliteType.Real),
+            ("$accuracy", SqliteType.Real),
+            ("$max_combo", SqliteType.Integer),
+            ("$max_achievable_combo", SqliteType.Integer),
+            ("$total_score", SqliteType.Integer),
+            ("$mods_json", SqliteType.Text),
+            ("$total_keys", SqliteType.Integer),
+            ("$beatmap_hash", SqliteType.Text),
+            ("$beatmap_id", SqliteType.Text),
+            ("$beatmap_set_id", SqliteType.Text),
+            ("$title", SqliteType.Text),
+            ("$artist", SqliteType.Text),
+            ("$difficulty_name", SqliteType.Text),
+            ("$mapper_username", SqliteType.Text),
+            ("$beatmap_status", SqliteType.Integer),
+            ("$star_rating", SqliteType.Real),
+            ("$xxy_star_rating", SqliteType.Real),
+            ("$map_performance_points", SqliteType.Real),
+            ("$kps_avg", SqliteType.Real),
+            ("$kps_max", SqliteType.Real),
+            ("$kps_list_json", SqliteType.Text),
+            ("$column_counts_json", SqliteType.Text),
+            ("$hold_counts_json", SqliteType.Text),
+            ("$avg_abs_offset_ms", SqliteType.Real),
+            ("$has_video", SqliteType.Integer),
+            ("$has_storyboard", SqliteType.Integer),
+            ("$date_ms", SqliteType.Integer),
+            ("$bpm", SqliteType.Real),
+            ("$key_count", SqliteType.Integer),
+            ("$is_convert", SqliteType.Integer),
+            ("$rate", SqliteType.Real),
+            ("$mod_acronyms_json", SqliteType.Text),
+        };
 
         private static string? tryReadPartitionJson(SqliteConnection connection, string username)
         {
@@ -2239,15 +2299,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// <summary>
         /// Full wipe before <see cref="ReplaceAll"/> rewrite. <c>WHERE TRUE</c> keeps the intentional clear explicit for SQL analyzers.
         /// </summary>
-        /// <param name="includePlayerEvidence">
-        /// When true, also clear the per-player evidence tables, which a full skills pass then repopulates.
-        /// An exclusion passes false so other players keep their evidence; nothing but the excluded flag changes
-        /// for the player being fenced.
-        /// </param>
-        private static void clearTables(SqliteConnection connection, bool includePlayerEvidence = true)
+        /// <summary>
+        /// Clear the archive-wide aggregation tables, which a rebuild then repopulates from the partitions.
+        /// </summary>
+        /// <remarks>
+        /// Neither <c>drill_scores</c> nor the per-player evidence tables are listed: the former is the detail
+        /// source of truth (<see cref="ReplaceAll"/> owns it explicitly), the latter are owned per player by
+        /// <c>writePlayerSkills</c>.
+        /// </remarks>
+        private static void clearTables(SqliteConnection connection)
         {
-            // drill_scores is deliberately absent: it is the detail source of truth (the partition payload no longer
-            // carries a copy), so a rebuild of the aggregate tables must not wipe it. ReplaceAll clears it explicitly.
             string sql = """
                          DELETE FROM ruleset_stats WHERE TRUE;
                          DELETE FROM mania_key_stats WHERE TRUE;
@@ -2258,14 +2319,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                          DELETE FROM std_attr_affinity WHERE TRUE;
                          DELETE FROM insights_cache WHERE TRUE;
                          """;
-
-            if (includePlayerEvidence)
-            {
-                sql += """
-                       DELETE FROM dan_clear_evidence WHERE TRUE;
-                       DELETE FROM axis_play_evidence WHERE TRUE;
-                       """;
-            }
 
             using var cmd = connection.CreateCommand();
             cmd.CommandText = sql;
