@@ -14,6 +14,11 @@ using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
 {
+    /// <summary>
+    /// TODO: BMS 分析结果未携带真实 key count（N），<see cref="ColumnCountsJson"/> 仍是稀疏字典，
+    /// 消费方只能按 <c>maxKey + 1</c> 推断列数 —— 末列为空时会低估。
+    /// BMS 的分析 playable 不是 <c>ManiaBeatmap</c>，N 的取法待日后单独处理（不随 EzAnalysisComputation 的 dense 补列一起改）。
+    /// </summary>
     public readonly record struct BmsChartAnalyticsResult(
         double? Pp,
         double? XxySr,
@@ -86,6 +91,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
             if (kpsList.Count > 0)
                 kpsListJson = JsonSerializer.Serialize(kpsList);
 
+            // TODO: 稀疏列统计，未按真实 N 补列；消费方 maxKey+1 在末列为空时会低估（见 BmsChartAnalyticsResult 注释）。
             var columnCounts = OptimizedBeatmapCalculator.GetColumnNoteCountsOptimized(maniaBeatmap);
             columnJson = JsonSerializer.Serialize(columnCounts);
 
