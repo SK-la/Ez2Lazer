@@ -1177,6 +1177,22 @@ namespace osu.Game.EzOsuGame.Skills
             return flagged;
         }
 
+        /// <summary>
+        /// Players with at least one skill row flagged stale, i.e. their SQLite slice has moved on since the
+        /// Realm-side skills were written. This is what the startup reconcile looks at to decide whose skills need
+        /// refreshing (a play folded in after the last successful skill pass).
+        /// </summary>
+        public IReadOnlyList<string> GetStalePlayerSkillUsernames()
+        {
+            return realmAccess.Run(r => r.All<EzPlayerSkillValue>()
+                                        .Where(v => v.Stale)
+                                        .AsEnumerable()
+                                        .Select(v => v.Username)
+                                        .Where(n => !string.IsNullOrEmpty(n))
+                                        .Distinct(StringComparer.Ordinal)
+                                        .ToList());
+        }
+
         /// <summary>Legacy row writer; prefer <see cref="WriteDanSkillsetVerdicts"/>.</summary>
         public void WriteDanSkillsetValues(string username, int keyCount, string side, IEnumerable<EzPlayerDanSkillsetValue> values)
         {

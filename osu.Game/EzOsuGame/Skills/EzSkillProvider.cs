@@ -244,6 +244,12 @@ namespace osu.Game.EzOsuGame.Skills
             return flagged;
         }
 
+        /// <summary>
+        /// Players whose stored skill rows are flagged stale — their SQLite slice has moved on since the Realm-side
+        /// skills were written, so the startup reconcile refreshes them.
+        /// </summary>
+        public IReadOnlyList<string> GetStalePlayerSkillUsernames() => store.GetStalePlayerSkillUsernames();
+
         public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount)
         {
             var ratings = store.GetPlayerPatternRatings(username, keyCount);

@@ -59,6 +59,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_STARTED =
             new EzLocalizationManager.EzLocalisableString("正在计算成绩分析…", "Computing score analysis…");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_STARTUP_ALIGN =
+            new EzLocalizationManager.EzLocalisableString("启动补算：有新增或过期的成绩分析数据…", "Startup catch-up: score analysis has new or outdated data…");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_COMPUTE_PROGRESS =
             new EzLocalizationManager.EzLocalisableString("正在分析成绩… {0}/{1}", "Analysing scores… {0}/{1}");
 

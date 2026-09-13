@@ -186,9 +186,66 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
             Assert.That(store.LoadDrillScores(0), Has.Count.EqualTo(2));
         }
 
-        /// <summary>Write slices the way the compute path does: partition + archive rebuild, then the drill rows.</summary>
-        private static void seed(EzLocalProfileStore store, params EzLocalProfileAggregationResult[] results)
+        [Test]
+        public void Append_does_not_resurrect_an_excluded_player()
         {
+            using var storage = new TemporaryNativeStorage($"ez-append-excluded-{Guid.NewGuid():N}");
+            using var store = new EzLocalProfileStore(storage);
+
+            seed(store, aggregation("alpha", 0, pp: 100, drills: 1), aggregation("beta", 0, pp: 40, drills: 1));
+
+            store.ExcludeUsernames("alpha", Array.Empty<EzLocalProfileOnlineScoreContribution>(), new HashSet<long>());
+
+            // A play settling for a fenced-out player must not silently pull them back into the archive totals.
+            var delta = aggregation("alpha", 0, pp: 20, drills: 1);
+
+            Assert.That(store.AppendScores("alpha", delta, Array.Empty<EzLocalProfileOnlineScoreContribution>(), new HashSet<long>()), Is.False);
+
+            Assert.That(store.LoadIncludedUsernames(), Is.EquivalentTo(new[] { "beta" }));
+            Assert.That(store.LoadSnapshot().RulesetStats.Single(s => s.RulesetId == 0).ScoreCount, Is.EqualTo(1));
+
+            // Nor may the ledger claim a score the slice never counted, or the next diff would skip it forever.
+            Assert.That(store.ContainsDrillScore(delta.DrillScores[0].ScoreId), Is.False);
+            Assert.That(store.LoadDrillScores(0), Has.Count.EqualTo(2));
+        }
+
+        [Test]
+        public void Append_keeps_the_archive_content_version_unset()
+        {
+            using var storage = new TemporaryNativeStorage($"ez-append-content-{Guid.NewGuid():N}");
+            using var store = new EzLocalProfileStore(storage);
+
+            // Partitions written directly (no archive rebuild) leave content_version unset, i.e. stale.
+            var initial = aggregation("alpha", 0, pp: 100, drills: 1);
+            store.SavePartitionPayload("alpha", EzLocalProfilePartitionPayload.FromAggregation(initial));
+            store.AppendDrills(initial.DrillScores);
+
+            Assert.That(store.NeedsRecompute(), Is.True);
+
+            // A single-play append must not claim the whole archive is at the current logic version: other
+            // players' slices may still be behind, and only a compute over them may stamp it current.
+            Assert.That(store.AppendScores("alpha", aggregation("alpha", 0, pp: 20, drills: 1),
+                Array.Empty<EzLocalProfileOnlineScoreContribution>(), new HashSet<long>()), Is.True);
+
+            Assert.That(store.NeedsRecompute(), Is.True);
+        }
+
+        [Test]
+        public void Remove_online_contribution_drops_only_that_row()
+        {
+            using var storage = new TemporaryNativeStorage($"ez-online-remove-{Guid.NewGuid():N}");
+            using var store = new EzLocalProfileStore(storage);
+
+            store.UpsertOnlineScoreContribution(new EzLocalProfileOnlineScoreContribution(11, 0, ScoreRank.S, 5, 4, 9, 500, 30, 60000, "alpha"));
+            store.UpsertOnlineScoreContribution(new EzLocalProfileOnlineScoreContribution(12, 0, ScoreRank.S, 5, 4, 9, 500, 30, 60000, "alpha"));
+
+            Assert.That(store.RemoveOnlineScoreContribution(11), Is.True);
+            Assert.That(store.RemoveOnlineScoreContribution(11), Is.False);
+            Assert.That(store.LoadOnlineScoreContributions().Select(c => c.OnlineId), Is.EquivalentTo(new long[] { 12 }));
+        }
+
+        /// <summary>Write slices the way the compute path does: partition + archive rebuild, then the drill rows.</summary>
+        private static void seed(EzLocalProfileStore store, params EzLocalProfileAggregationResult[] results)        {
             store.ApplyUsernamePartitions(
                 results.ToDictionary(r => r.IncludedUsernames.Single(), r => r, StringComparer.Ordinal),
                 replaceOtherUsernames: true,

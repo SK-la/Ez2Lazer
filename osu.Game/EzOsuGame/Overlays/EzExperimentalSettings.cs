@@ -1,9 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
@@ -240,98 +238,14 @@ namespace osu.Game.EzOsuGame.Overlays
                 return;
             }
 
-            var notification = new ProgressNotification
-            {
-                Text = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_STARTED,
-                CompletionText = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_DONE,
-                State = ProgressNotificationState.Active,
-            };
+            var notification = EzLocalProfileComputeNotification.Create();
 
             notifications.Post(notification);
 
-            // Do not use Progress<T> (SyncContext flood). Update the notification directly —
-            // its Text/Progress/State setters marshal via the notification's own Scheduler,
-            // which keeps running even if the settings panel is closed.
-            var progress = new DirectLocalProfileComputeProgress(notification);
+            var progress = new EzLocalProfileComputeNotification.Forwarder(notification);
 
             localProfileService.ComputeAsync(selected, clearRebuild, clearRebuild, progress, notification.CancellationToken)
-                               .ContinueWith(t => finishComputeNotification(t, localProfileService, notification, notifications));
-        }
-
-        /// <summary>
-        /// Forwards compute progress to a <see cref="ProgressNotification"/> from any thread.
-        /// </summary>
-        private sealed class DirectLocalProfileComputeProgress : IProgress<EzLocalProfileComputeProgress>
-        {
-            private readonly ProgressNotification notification;
-
-            public DirectLocalProfileComputeProgress(ProgressNotification notification)
-            {
-                this.notification = notification;
-            }
-
-            public void Report(EzLocalProfileComputeProgress value)
-            {
-                if (notification.State is ProgressNotificationState.Cancelled or ProgressNotificationState.Completed)
-                    return;
-
-                int total = Math.Max(1, value.Total);
-                int processed = Math.Clamp(value.Processed, 0, total);
-
-                switch (value.Phase)
-                {
-                    case EzLocalProfileComputePhase.Saving:
-                        notification.Text = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_SAVING;
-                        notification.Progress = 0.99f;
-                        return;
-
-                    case EzLocalProfileComputePhase.Skills:
-                        notification.Text = LocalisableString.Format(
-                            EzSettingsProfile.LOCAL_PROFILE_COMPUTE_SKILLS.ToString(),
-                            processed,
-                            total);
-                        // Keep under 100% until finishComputeNotification Completes.
-                        notification.Progress = Math.Min(0.99f, 0.85f + 0.14f * processed / total);
-                        return;
-
-                    default:
-                        notification.Text = LocalisableString.Format(
-                            EzSettingsProfile.LOCAL_PROFILE_COMPUTE_PROGRESS.ToString(),
-                            processed,
-                            total);
-                        // Cap analysing phase so Saving/Skills still have visual room.
-                        notification.Progress = Math.Min(0.85f, 0.85f * processed / total);
-                        return;
-                }
-            }
-        }
-
-        private static void finishComputeNotification(
-            Task computeTask,
-            EzLocalProfileService localProfileService,
-            ProgressNotification notification,
-            INotificationOverlay notifications)
-        {
-            if (notification.State == ProgressNotificationState.Cancelled)
-                return;
-
-            if (computeTask.IsFaulted)
-            {
-                notification.State = ProgressNotificationState.Cancelled;
-                notifications.Post(new SimpleErrorNotification { Text = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_FAILED });
-                return;
-            }
-
-            if (computeTask.IsCanceled)
-            {
-                notification.State = ProgressNotificationState.Cancelled;
-                return;
-            }
-
-            localProfileService.ReloadFromDisk();
-            notification.Progress = 1f;
-            notification.CompletionText = EzSettingsProfile.LOCAL_PROFILE_COMPUTE_DONE;
-            notification.State = ProgressNotificationState.Completed;
+                               .ContinueWith(t => EzLocalProfileComputeNotification.Finish(t, localProfileService, notification, notifications));
         }
 
         private void requestOnlinePull(
