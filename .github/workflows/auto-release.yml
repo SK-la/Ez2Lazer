@@ -466,11 +466,15 @@ jobs:
       - name: Checkout main repo into osu/
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           path: osu
 
+      # 通过 gh api 建 tag，避免把 GITHUB_TOKEN 拼进 remote URL。
+      # matching-refs 对不存在的 tag 也返回 200/空数组，可安全地按精确 ref 比对。
       - name: Check remote tag existence and create if missing
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = '${{ needs.prepare.outputs.release_tag }}'
           if ([string]::IsNullOrWhiteSpace($tag)) {
@@ -478,19 +482,24 @@ jobs:
             exit 1
           }
 
-          $remote = 'https://github.com/${{ github.repository }}.git'
-          $authRemote = 'https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git'
-          $found = git ls-remote --tags $authRemote refs/tags/$tag | Select-String -Pattern $tag
-          if ($found) {
+          $repo = '${{ github.repository }}'
+          $ref = "refs/tags/$tag"
+
+          $existingRefs = & gh api "repos/$repo/git/matching-refs/tags/$tag" --jq '.[].ref'
+          if (@($existingRefs) -contains $ref) {
             Write-Output "Tag $tag exists remotely"
             exit 0
           }
 
-          git -C osu config user.name 'github-actions[bot]'
-          git -C osu config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          $commit = git -C osu rev-parse HEAD
-          git -C osu tag $tag $commit
-          git -C osu push $authRemote refs/tags/$tag
+          $commit = (& git -C osu rev-parse HEAD).Trim()
+          if ([string]::IsNullOrWhiteSpace($commit)) {
+            Write-Error 'could not resolve HEAD commit'
+            exit 1
+          }
+
+          # 轻量 tag，等价于 git tag <tag> <commit> 后 push
+          & gh api --method POST "repos/$repo/git/refs" -f "ref=$ref" -f "sha=$commit" | Out-Null
+          Write-Output "Created tag $tag -> $commit"
 
       - name: Download built assets
         uses: actions/download-artifact@v7
