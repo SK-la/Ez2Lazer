@@ -646,6 +646,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             // The excluded player is gone from the included set, so anything the pass cannot read is reported here too.
+            danAggregator?.BeginSkillPass();
+
             persistUserSkills(
                 EzLocalProfileConstants.ALL_PLAYERS,
                 combined,
