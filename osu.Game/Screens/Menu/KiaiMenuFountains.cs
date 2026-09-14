@@ -3,9 +3,11 @@
 
 using System;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Platform;
 using osu.Framework.Utils;
+using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 
 namespace osu.Game.Screens.Menu
@@ -20,9 +22,13 @@ namespace osu.Game.Screens.Menu
 
         private StarFountainSounds sounds = null!;
 
+        private Bindable<bool> starFountains = null!;
+
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuConfigManager config)
         {
+            starFountains = config.GetBindable<bool>(OsuSetting.StarFountains);
+
             RelativeSizeAxes = Axes.Both;
 
             Children = new Drawable[]
@@ -48,6 +54,9 @@ namespace osu.Game.Screens.Menu
         protected override void Update()
         {
             base.Update();
+
+            if (!starFountains.Value)
+                return;
 
             if (EffectPoint.KiaiMode && !isTriggered)
             {
