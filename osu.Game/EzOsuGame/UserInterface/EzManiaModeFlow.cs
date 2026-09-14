@@ -6,7 +6,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Layout;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
@@ -23,7 +22,6 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         private const float min_gap = 10f;
         private const float label_value_spacing = 4f;
-        private const float layout_hysteresis = 20f;
         private const float stacked_row_spacing = 2f;
         private static readonly float block_row_height = OsuFont.Style.Caption1.Size;
 
@@ -32,10 +30,9 @@ namespace osu.Game.EzOsuGame.UserInterface
         private readonly ModeBlock blockB;
         private readonly OsuSpriteText widthMeasureText;
 
-        private readonly LayoutValue drawSizeLayout = new LayoutValue(Invalidation.DrawSize);
-
         private float availableWidth;
         private bool displayedHorizontal = true;
+        private float lastAppliedWidth = -1f;
 
         private IBindable<EzEnumHitMode> maniaHitModeBindable = null!;
         private IBindable<EzEnumHealthMode> maniaHealthModeBindable = null!;
@@ -77,8 +74,6 @@ namespace osu.Game.EzOsuGame.UserInterface
                     Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
                 },
             };
-
-            AddLayout(drawSizeLayout);
         }
 
         [BackgroundDependencyLoader]
@@ -97,26 +92,36 @@ namespace osu.Game.EzOsuGame.UserInterface
             maniaHealthModeBindable.BindValueChanged(_ => updateDisplay(), true);
 
             updateBlockWidth();
+            // Defer layout application to the scheduler to avoid interacting with
+            // the calling measurement pass. This prevents measurement -> layout
+            // loops when callers perform measurements and immediately call
+            // SetAvailableWidth.
+            Scheduler.AddOnce(updateLayout);
         }
 
-        public void SetAvailableWidth(float width)
-        {
-            if (availableWidth == width)
-                return;
-
-            availableWidth = width;
-            drawSizeLayout.Invalidate();
-        }
+        // The flow measures its available width directly from its parent each
+        // frame in `Update()`. Previously an external caller would provide the
+        // available width via `SetAvailableWidth`, which introduced synchronous
+        // measurement->layout coupling and could lead to feedback loops. By
+        // owning the measurement we simplify usage and avoid needing an
+        // external API.
 
         protected override void Update()
         {
             base.Update();
 
-            if (!drawSizeLayout.IsValid)
-            {
-                updateLayout();
-                drawSizeLayout.Validate();
-            }
+            float parentAvailable = 0f;
+            if (Parent is Container c)
+                parentAvailable = Math.Max(0, c.DrawWidth - c.Padding.TotalHorizontal);
+            else
+                parentAvailable = DrawWidth;
+
+            const float epsilon = 0.05f;
+            if (Math.Abs(availableWidth - parentAvailable) < epsilon)
+                return;
+
+            availableWidth = parentAvailable;
+            Scheduler.AddOnce(updateLayout);
         }
 
         private void updateDisplay()
@@ -138,7 +143,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             }
 
             updateBlockWidth();
-            drawSizeLayout.Invalidate();
         }
 
         private void updateBlockWidth()
@@ -177,7 +181,8 @@ namespace osu.Game.EzOsuGame.UserInterface
             VerticalLayoutWidth = newBlockWidth;
             blockA.Width = VerticalLayoutWidth;
             blockB.Width = VerticalLayoutWidth;
-            drawSizeLayout.Invalidate();
+            // When the block width changes, schedule a layout recalculation.
+            Scheduler.AddOnce(updateLayout);
         }
 
         private void updateLayout()
@@ -185,7 +190,13 @@ namespace osu.Game.EzOsuGame.UserInterface
             if (VerticalLayoutWidth <= 0)
                 return;
 
-            bool horizontal = availableWidth >= HorizontalLayoutWidth - layout_hysteresis;
+            bool horizontal = availableWidth >= HorizontalLayoutWidth - 20f;
+
+            // Avoid reapplying layout if nothing significant changed. This
+            // reduces churn in the draw/measure passes.
+            float targetWidth = horizontal ? HorizontalLayoutWidth : VerticalLayoutWidth;
+            if (displayedHorizontal == horizontal && Math.Abs(lastAppliedWidth - targetWidth) < 0.1f)
+                return;
 
             if (horizontal != displayedHorizontal)
             {
@@ -202,23 +213,30 @@ namespace osu.Game.EzOsuGame.UserInterface
                 layoutGrid.ColumnDimensions = new[] { new Dimension(GridSizeMode.Absolute, VerticalLayoutWidth) };
 
             applyComponentSize();
+            lastAppliedWidth = targetWidth;
         }
 
         private void applyHorizontalLayout()
         {
-            layoutGrid.RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) };
+            layoutGrid.RowDimensions = new[]
+            {
+                new Dimension(GridSizeMode.AutoSize)
+            };
             layoutGrid.ColumnDimensions = createHorizontalColumns(VerticalLayoutWidth);
             layoutGrid.Content = createHorizontalContent();
         }
 
         private void applyVerticalLayout()
         {
-            layoutGrid.ColumnDimensions = new[] { new Dimension(GridSizeMode.Absolute, VerticalLayoutWidth) };
             layoutGrid.RowDimensions = new[]
             {
                 new Dimension(GridSizeMode.AutoSize),
                 new Dimension(GridSizeMode.Absolute, stacked_row_spacing),
                 new Dimension(GridSizeMode.AutoSize),
+            };
+            layoutGrid.ColumnDimensions = new[]
+            {
+                new Dimension(GridSizeMode.Absolute, VerticalLayoutWidth)
             };
             layoutGrid.Content = createVerticalContent();
         }
@@ -273,7 +291,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 {
                     RelativeSizeAxes = Axes.Both,
                     Direction = FillDirection.Horizontal,
-                    Spacing = new Vector2(label_value_spacing, 0f),
+                    Spacing = new Vector2(label_value_spacing),
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
                     Children = new Drawable[]
@@ -300,13 +318,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 labelText.Colour = colourProvider.Content2;
                 valueText.Colour = colourProvider.Content1;
-            }
-
-            protected override void Update()
-            {
-                base.Update();
-
-                valueText.MaxWidth = Math.Max(Width - labelText.DrawWidth - label_value_spacing, 0);
             }
 
             public void SetValues(string label, string value)
