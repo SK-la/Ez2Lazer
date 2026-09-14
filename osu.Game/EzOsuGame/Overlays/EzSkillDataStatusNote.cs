@@ -119,13 +119,13 @@ namespace osu.Game.EzOsuGame.Overlays
         private static SettingsNote.Data describe(EzSkillDataStatus status, int stalePlayerCount, bool backfillRunning)
         {
             string describeFacet(string name, EzFacetStatus facet)
-                => $"{name} {EzSettingsStrings.SKILL_DATA_STATUS_READY} {facet.Ready}\n"
+                => $"{name} {EzSettingsStrings.SKILL_DATA_STATUS_READY} {facet.Ready}"
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_UNRATEABLE} {facet.Unrateable}"
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_STALE} {facet.Stale}"
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_MISSING} {facet.Missing}";
 
             string pending = status.HasWorkToDo
-                ? $"{EzSettingsStrings.SKILL_DATA_STATUS_PENDING} {status.TotalPending}"
+                ? $"    {EzSettingsStrings.SKILL_DATA_STATUS_PENDING} {status.TotalPending}"
                 : EzSettingsStrings.SKILL_DATA_STATUS_ALL_CURRENT;
 
             // Player-side chain: it has no revision to count against — a play settling after the last skills pass
@@ -135,7 +135,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 : $"{EzSettingsStrings.SKILL_DATA_STATUS_PLAYERS} {EzSettingsStrings.SKILL_DATA_STATUS_PLAYERS_ALL_CURRENT}";
 
             string line = $"{EzSettingsStrings.SKILL_DATA_STATUS_CHARTS} {status.TotalCharts}"
-                          + $" · {describeFacet("MSD", status.Msd)}"
+                          + $"\n · {describeFacet("MSD", status.Msd)}"
                           + $"\n · {describeFacet("CSI", status.ChartSkillInfo)}"
                           + $"\n · {describeFacet("Dan", status.ChartDan)}"
                           + $"\n · {pending}"
