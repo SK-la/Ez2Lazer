@@ -365,7 +365,7 @@ namespace osu.Game.EzOsuGame.Localization
             + "过期 = 旧版本留下的行（改过算法后会出现）；缺失 = 还没算过。"
             + "\n健康 = 过期 + 缺失；三项独立统计，上游换版会使其下游整体变为过期。"
             + "\n玩家技能 = 玩家链（成绩 → SSR/Dan），没有组合版本号：一局结算后其技能行会被标为过期，"
-            + "由启动补算自动刷新；这里显示还有多少玩家待刷新。"
+            + "由手动「计算本地成绩」（及图表链回折）刷新；这里显示还有多少玩家待刷新。"
             + "\n蓝色 = 已对齐；橙色 = 仍有待补算；红色 = 统计失败。",
             "Re-measures chart-skill-chain coverage (MSD -> CSI -> Dan) at the current revision and refreshes the status marker."
             + "\nIt is also measured automatically when the settings panel opens; use this button only to re-check after a backfill. May take a few seconds on a large library."
@@ -373,7 +373,7 @@ namespace osu.Game.EzOsuGame.Localization
             + " stale = a row left by an older revision (appears after an algorithm change); missing = never computed."
             + "\nPending = stale + missing. The three facets are counted independently; bumping an upstream one turns its downstream facets stale."
             + "\nPlayer skills = the player chain (plays -> SSR/Dan), which has no composed revision: a settled play flags the player's"
-            + " rows and the startup align refreshes them. This shows how many players are still waiting."
+            + " rows and the manual compute / chart-chain follow-up refreshes them. This shows how many players are still waiting."
             + "\nBlue = in sync; orange = work still pending; red = measurement failed.");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_MEASURING =

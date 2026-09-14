@@ -601,7 +601,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return Task.CompletedTask;
 
             Logger.Log(
-                $"[EzLocalProfile] Startup align: {plan.TotalPendingPlays} pending play(s) across {plan.PendingPlaysByUser.Count} player(s), "
+                $"[EzLocalProfile] Score analysis reconcile: {plan.TotalPendingPlays} pending play(s) across {plan.PendingPlaysByUser.Count} player(s), "
                 + $"{plan.StaleSkillUsernames.Count} with stale skills, contentVersionStale={plan.ContentVersionStale}.",
                 Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 

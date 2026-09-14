@@ -18,24 +18,23 @@ using osu.Game.Screens.Play;
 namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
-    /// Startup backfill for the local score analysis.
+    /// Chart-chain follow-up for the local score analysis.
     /// </summary>
     /// <remarks>
     /// <para>
     /// A play is folded into the SQLite slice the moment it settles into Realm (see
     /// <see cref="EzLocalProfileService.IngestSettledScore"/>), while the Realm-side skill rows are only flagged
-    /// stale. This component closes that gap once per launch, after <see cref="BackgroundDataStoreProcessor"/> has
-    /// finished its own startup work: it folds in plays that never made it into the slice (a crash or force close
-    /// before the write landed) and refreshes the players whose skills were flagged.
+    /// stale, so the archive stays correct without a launch-time recompute.
     /// </para>
     /// <para>
-    /// It also owns the other half of that contract: the player pass reads chart-side data (MSD / CSI / ChartDan)
-    /// but never computes it, so when it reports charts the chain has not rated yet this component asks the chain
-    /// for them and re-runs the affected players once it has finished.
+    /// This component <b>no longer auto-runs at launch</b>. It only owns the other half of the contract: the
+    /// player pass reads chart-side data (MSD / CSI / ChartDan) but never computes it, so when a user-initiated
+    /// compute reports charts the chain has not rated yet, this component asks the chain for them and re-runs the
+    /// affected players once it has finished.
     /// </para>
     /// <para>
-    /// It is a launch-time reconcile, not a process-level watcher — nothing runs while the game is idle, and a
-    /// launch with nothing out of date does no work and posts nothing.
+    /// It is not a process-level watcher — nothing runs while the game is idle, and a launch with nothing out of
+    /// date does no work and posts nothing.
     /// </para>
     /// </remarks>
     public partial class EzLocalProfileStartupAlign : Component
@@ -62,7 +61,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
         [Resolved(CanBeNull = true)]
         private ILocalUserPlayInfo? localUserPlayInfo { get; set; }
 
-        private Action? onBdspFinished;
         private Action? onChartBackfillFinished;
         private readonly Lock chartFollowUpLock = new Lock();
         private bool chartBackfillRequested;
@@ -77,23 +75,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             localProfileService.ChartSideBackfillRequested = requestChartSideBackfill;
 
-            if (backgroundDataStoreProcessor == null)
+            // 启动不再自动补算成绩分析：此前这里会在 BDSP 收工后自动跑一次对账，
+            // 并因图表链回折连续触发多轮分析。现在只保留图表链回折——用户手动「计算本地成绩」
+            // 报缺时排队补算，补完后再回头折一次受影响玩家（见 followUpAfterChartBackfill）。
+            if (backgroundDataStoreProcessor != null)
             {
-                startAlign();
-                return;
+                onChartBackfillFinished = followUpAfterChartBackfill;
+                backgroundDataStoreProcessor.EzRealmMetadataBackfillFinished += onChartBackfillFinished;
             }
-
-            onChartBackfillFinished = followUpAfterChartBackfill;
-            backgroundDataStoreProcessor.EzRealmMetadataBackfillFinished += onChartBackfillFinished;
-
-            if (backgroundDataStoreProcessor.IsStartupProcessingFinished)
-            {
-                startAlign();
-                return;
-            }
-
-            onBdspFinished = startAlign;
-            backgroundDataStoreProcessor.StartupProcessingFinished += onBdspFinished;
         }
 
         /// <summary>
@@ -142,7 +131,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private void startAlign()
         {
-            unsubscribeBdsp();
             Task.Factory.StartNew(runAlign, TaskCreationOptions.LongRunning);
         }
 
@@ -156,11 +144,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 var plan = localProfileService.PlanStartupAlign();
 
-                // Nothing out of date: stay silent so a normal launch costs nothing and says nothing.
+                // Nothing out of date: stay silent, so a follow-up with no affected rows costs nothing and says nothing.
                 if (!plan.HasWork)
                     return;
 
-                var notification = EzLocalProfileComputeNotification.Create(EzSettingsProfile.LOCAL_PROFILE_STARTUP_ALIGN);
+                var notification = EzLocalProfileComputeNotification.Create(EzSettingsProfile.LOCAL_PROFILE_ALIGN);
                 notificationOverlay?.Post(notification);
 
                 var progress = new EzLocalProfileComputeNotification.Forwarder(notification);
@@ -170,16 +158,16 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
             catch (Exception e)
             {
-                Logger.Error(e, "[EzLocalProfile] Startup align failed.", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Error(e, "[EzLocalProfile] Score analysis reconcile failed.", Ez2ConfigManager.LOGGER_NAME);
             }
         }
 
-        private void unsubscribeBdsp()
+        private void unsubscribeChartBackfill()
         {
-            if (backgroundDataStoreProcessor != null && onBdspFinished != null)
+            if (backgroundDataStoreProcessor != null && onChartBackfillFinished != null)
             {
-                backgroundDataStoreProcessor.StartupProcessingFinished -= onBdspFinished;
-                onBdspFinished = null;
+                backgroundDataStoreProcessor.EzRealmMetadataBackfillFinished -= onChartBackfillFinished;
+                onChartBackfillFinished = null;
             }
         }
 
@@ -187,13 +175,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             if (isDisposing)
             {
-                unsubscribeBdsp();
-
-                if (backgroundDataStoreProcessor != null && onChartBackfillFinished != null)
-                {
-                    backgroundDataStoreProcessor.EzRealmMetadataBackfillFinished -= onChartBackfillFinished;
-                    onChartBackfillFinished = null;
-                }
+                unsubscribeChartBackfill();
 
                 localProfileService.ChartSideBackfillRequested = null;
             }

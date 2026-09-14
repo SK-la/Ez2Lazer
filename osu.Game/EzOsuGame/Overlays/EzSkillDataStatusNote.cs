@@ -129,7 +129,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 : EzSettingsStrings.SKILL_DATA_STATUS_ALL_CURRENT;
 
             // Player-side chain: it has no revision to count against — a play settling after the last skills pass
-            // flags the player's rows instead, and the startup align refreshes them.
+            // flags the player's rows instead, and the manual compute / chart-chain follow-up refreshes them.
             string players = stalePlayerCount > 0
                 ? $"{EzSettingsStrings.SKILL_DATA_STATUS_PLAYERS} {EzSettingsStrings.SKILL_DATA_STATUS_STALE} {stalePlayerCount}"
                 : $"{EzSettingsStrings.SKILL_DATA_STATUS_PLAYERS} {EzSettingsStrings.SKILL_DATA_STATUS_PLAYERS_ALL_CURRENT}";

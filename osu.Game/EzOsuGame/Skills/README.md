@@ -104,7 +104,7 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
   ready / unrateable / stale / missing，回答"数据有没有缺、有没有过期"；同一行末尾附带玩家链的
   「玩家技能 过期 N」（`GetStalePlayerSkillUsernames()`），所以两条链的状态在一个地方能看完。
 - 玩家侧另有一套可见性：`EzPlayerSkillValue.Stale` 在个人主页显示为「待更新」
-  （`LOCAL_PROFILE_SKILL_STALE`），启动补算则弹「启动补算：…」进度通知。
+  （`LOCAL_PROFILE_SKILL_STALE`），对账（手动计算 / 图表链回折）则弹「成绩分析对账：…」进度通知。
 
 ## 玩家链（成绩分析）：与图表链不同的第二套失效机制
 
@@ -119,9 +119,9 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
 | Realm 技能行：`EzPlayerSkillValue`（SSR / pattern）、`EzDanEstimate` / `EzPlayerDanSkillsetValue` | 从上一步的切片聚合而来 | 只在整段 compute 里写（`writePlayerSkills`） |
 
 一局结算只做第一步，然后把该玩家（和 `All`）的 Realm 技能行置 `Stale`——**不**在结算路径上重算，
-否则每局都要做一次玩家级聚合。第二步由启动补算收口。
+否则每局都要做一次玩家级聚合。第二步由手动「计算本地成绩」触发的对账收口（启动时不再自动补算）。
 
-### 启动补算怎么知道"有东西要做"
+### 对账怎么知道"有东西要做"
 
 三个信号，全部来自持久化状态，不需要额外记账列：
 
@@ -131,9 +131,10 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
 | 脏位 | `EzPlayerSkillValue.Stale`（`MarkPlayerSkillStale`） | 已写进切片、技能行还没跟上 |
 | 内容版本 | `EzLocalProfileStore.NeedsRecompute()` | 分析逻辑换版（`CONTENT_VERSION`） |
 
-`EzLocalProfileService.PlanStartupAlign()` 汇总这三项，`EzLocalProfileStartupAlign`（每次启动挂载一次，
-BDSP 收工后跑）只在 `HasWork` 时执行一次增量 compute 并弹进度通知；没有活可干时**零开销、零通知**。
-它不是常驻轮询组件——结算路径已经写完了，启动只是兜底对账。
+`EzLocalProfileService.PlanStartupAlign()` 汇总这三项，`EzLocalProfileStartupAlign` 只在 `HasWork` 时
+执行一次增量 compute 并弹进度通知；没有活可干时**零开销、零通知**。它**不再在启动时自动跑**：
+只在用户手动「计算本地成绩」报缺、图表链补完后回头折一次受影响玩家。它不是常驻轮询组件——
+结算路径已经写完了，对账只是兜底。
 
 ### 为什么玩家链不复用组合修订号
 
@@ -142,7 +143,7 @@ BDSP 收工后跑）只在 `HasWork` 时执行一次增量 compute 并弹进度�
 - 因此账本 diff 本身就是最精确的失效判据，"过期"与"新增"是同一个判据的两个方向；
   再加一层组合号只会多一份会和账本漂移的簿记。
 - 代价：Realm 技能行的**删除**没有脏位可用（Dan 行无 `Stale` 字段），只能靠实际重算修正；
-  这也是启动补算选增量而非清库重建的原因——增量足够精确，清库会把每局缓存一起废掉。
+  这也是对账选增量而非清库重建的原因——增量足够精确，清库会把每局缓存一起废掉。
 
 ### 玩家链只读图表侧数据，缺失的交回图表链
 
@@ -178,10 +179,11 @@ Dan 一栏记 `unrateable` 而不是 `missing`——否则"全部最新"永远�
 - `EzDanSkillsetFiling`: skillset bucketing and quorum logic.
 - `EzPlayerSsrAggregator`: player-side SSR aggregation.
 - `EzLocalProfileService` (`LocalProfile/`): the SQLite slice + Realm skill writer; `IngestSettledScore`
-  is the per-play hook, `PlanStartupAlign` / `AlignOnStartupAsync` are the launch reconcile.
-- `EzLocalProfileStartupAlign` (`LocalProfile/`): the once-per-launch component that runs it.
+  is the per-play hook, `PlanStartupAlign` / `AlignOnStartupAsync` are the reconcile used by the
+  manual compute / chart-chain follow-up.
+- `EzLocalProfileStartupAlign` (`LocalProfile/`): owns the chart-chain follow-up; **no longer auto-runs at launch**.
 - `EzLocalProfileComputeNotification` (`LocalProfile/`): the progress notification every compute entry
-  point shares (settings dialog + startup align), so long runs are never invisible.
+  point shares (settings dialog + chart-chain follow-up), so long runs are never invisible.
 
 ## Relevant supporting docs
 

@@ -76,7 +76,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
     /// <summary>
     /// What a startup reconcile found: the players the archive already covers, how many of their plays never made it
     /// into the SQLite slice (a crash or force close before the write landed), and which players' Realm skill rows
-    /// trail that slice. Nothing is recomputed to produce this — it is the decision input for the startup align.
+    /// trail that slice. Nothing is recomputed to produce this — it is the decision input for the reconcile.
     /// </summary>
     /// <param name="IncludedUsernames">Players already part of the archive; an empty list means nothing to align.</param>
     /// <param name="PendingPlaysByUser">Plays the drill ledger is missing, per player.</param>
