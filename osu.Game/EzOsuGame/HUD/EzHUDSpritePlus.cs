@@ -21,6 +21,7 @@ using osu.Game.EzOsuGame.Screens;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Difficulty.Utils;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Skinning;
 using osu.Game.Utils;
 using osuTK;
@@ -88,7 +89,33 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
+        [Resolved(canBeNull: true)]
+        private IBindable<IReadOnlyList<Mod>>? mods { get; set; }
+
         private Drawable? currentDrawable;
+
+        /// <summary>
+        /// The currently displayed animation, if the sprite resolved to a frame animation.
+        /// </summary>
+        private TextureAnimation? currentAnimation;
+
+        /// <summary>
+        /// Textures backing <see cref="currentAnimation"/>, kept so frame timing can be refreshed without reloading them.
+        /// </summary>
+        private readonly List<Texture> currentAnimationFrames = new List<Texture>();
+
+        /// <summary>
+        /// The frame length (in milliseconds) currently baked into <see cref="currentAnimation"/>'s frames.
+        /// </summary>
+        private double currentAnimationFrameLength;
+
+        /// <summary>
+        /// Subscriptions backing beat-synced frame timing. They only exist while <see cref="UseBeatmapBPM"/> is
+        /// enabled, so an ordinary sprite holds no bound copies and receives no callbacks whatsoever.
+        /// </summary>
+        private IBindable<WorkingBeatmap>? trackedBeatmap;
+        private IBindable<IReadOnlyList<Mod>>? trackedMods;
+        private ModSettingChangeTracker? modSettingTracker;
 
         public EzHUDSpritePlus()
         {
@@ -103,9 +130,16 @@ namespace osu.Game.EzOsuGame.HUD
             ModifyPath.BindValueChanged(_ => scheduleReload());
             SpriteName.BindValueChanged(_ => scheduleReload());
             FrameTemplate.BindValueChanged(_ => scheduleReload());
-            FPS.BindValueChanged(_ => scheduleReload());
-            UseBeatmapBPM.BindValueChanged(_ => scheduleReload());
-            BeatDivision.BindValueChanged(_ => scheduleReload());
+
+            // These only affect frame timing, so they can be re-applied in place instead of rebuilding the animation.
+            FPS.BindValueChanged(_ => scheduleTimingUpdate());
+            BeatDivision.BindValueChanged(_ => scheduleTimingUpdate());
+
+            // Beat-synced timing follows the globally selected beatmap and the selected mods, but only while enabled.
+            // The subscriptions are also what make the sprite follow a song change (e.g. picking another map in song
+            // select) instead of keeping the BPM it saw when it was first loaded.
+            UseBeatmapBPM.BindValueChanged(_ => updateTimingSubscription(), true);
+
             TextureScale.BindValueChanged(_ => applyVisualSettings(), true);
             AccentColour.BindValueChanged(_ => applyVisualSettings(), true);
             Blend.BindValueChanged(_ => applyVisualSettings(), true);
@@ -127,11 +161,15 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 ClearInternal();
                 currentDrawable = null;
+                currentAnimation = null;
+                currentAnimationFrames.Clear();
+                currentAnimationFrameLength = 0;
                 return;
             }
 
             string baseLookup = buildBaseLookup(spriteName);
-            Drawable? newDrawable = createAnimatedDrawable(baseLookup) ?? createSingleDrawable(baseLookup);
+            var animationFrames = new List<Texture>();
+            Drawable? newDrawable = createAnimatedDrawable(baseLookup, animationFrames) ?? createSingleDrawable(baseLookup);
 
             // Keep the current drawable if a transient settings state cannot resolve a texture.
             // This avoids flickering/reset when dropdowns are rebuilding their item sources.
@@ -140,11 +178,134 @@ namespace osu.Game.EzOsuGame.HUD
 
             ClearInternal();
             currentDrawable = newDrawable;
+            currentAnimation = newDrawable as TextureAnimation;
+            currentAnimationFrames.Clear();
+            currentAnimationFrameLength = 0;
+
+            if (currentAnimation != null)
+            {
+                currentAnimationFrames.AddRange(animationFrames);
+                currentAnimationFrameLength = currentAnimation.DefaultFrameLength;
+            }
+
             AddInternal(newDrawable);
             applyVisualSettings();
         }
 
-        private Drawable? createAnimatedDrawable(string baseLookup)
+        private void scheduleTimingUpdate() => Schedule(updateAnimationFrameLength);
+
+        /// <summary>
+        /// (Re-)establishes the subscriptions which keep beat-synced frame timing up to date.
+        /// </summary>
+        /// <remarks>
+        /// Subscriptions only exist while <see cref="UseBeatmapBPM"/> is enabled, so a sprite which does not use
+        /// beatmap BPM holds no bound copies and receives no callbacks at all.
+        /// </remarks>
+        private void updateTimingSubscription()
+        {
+            if (UseBeatmapBPM.Value)
+            {
+                if (trackedBeatmap != null)
+                    return;
+
+                // Own copies, so disabling the feature can genuinely unbind everything again.
+                trackedBeatmap = beatmap.GetBoundCopy();
+                trackedBeatmap.BindValueChanged(_ => scheduleTimingUpdate());
+
+                if (mods != null)
+                {
+                    trackedMods = mods.GetBoundCopy();
+                    trackedMods.BindValueChanged(selectedMods =>
+                    {
+                        rebuildModSettingTracker(selectedMods.NewValue);
+                        scheduleTimingUpdate();
+                    });
+
+                    rebuildModSettingTracker(trackedMods.Value);
+                }
+            }
+            else
+            {
+                modSettingTracker?.Dispose();
+                modSettingTracker = null;
+
+                trackedMods?.UnbindAll();
+                trackedMods = null;
+
+                trackedBeatmap?.UnbindAll();
+                trackedBeatmap = null;
+            }
+
+            scheduleTimingUpdate();
+        }
+
+        /// <summary>
+        /// Tracks changes to the settings of individual mods (e.g. dragging the DT rate slider), which change the
+        /// effective rate without changing the selected mod list itself.
+        /// </summary>
+        private void rebuildModSettingTracker(IReadOnlyList<Mod> selectedMods)
+        {
+            modSettingTracker?.Dispose();
+            modSettingTracker = new ModSettingChangeTracker(selectedMods);
+            modSettingTracker.SettingChanged += _ => scheduleTimingUpdate();
+        }
+
+        /// <summary>
+        /// The rate multiplier of the currently selected mods, matching the value the song select beatmap title uses
+        /// for its displayed BPM.
+        /// </summary>
+        private double getModRateMultiplier()
+        {
+            if (mods == null)
+                return 1;
+
+            try
+            {
+                double rate = 1.0;
+                IReadOnlyList<Mod> selectedMods = mods.Value;
+
+                for (int i = 0; i < selectedMods.Count; i++)
+                {
+                    if (selectedMods[i] is IApplicableToRate applicableToRate)
+                        rate = applicableToRate.ApplyToRate(0, rate);
+                }
+
+                return double.IsNaN(rate) || double.IsInfinity(rate) || rate <= 0 ? 1.0 : rate;
+            }
+            catch
+            {
+                return 1.0;
+            }
+        }
+
+        /// <summary>
+        /// Re-applies frame timing to the currently displayed animation without reloading textures or restarting playback.
+        /// </summary>
+        private void updateAnimationFrameLength()
+        {
+            if (currentAnimation == null || currentAnimationFrames.Count == 0)
+                return;
+
+            double newFrameLength = getFrameLengthFromSettings();
+
+            if (Math.Abs(newFrameLength - currentAnimationFrameLength) < 0.001)
+                return;
+
+            // Preserve the visible playback position across the frame length change.
+            double progress = currentAnimation.Duration > 0 ? currentAnimation.PlaybackPosition / currentAnimation.Duration : 0;
+
+            currentAnimation.ClearFrames();
+
+            foreach (Texture frame in currentAnimationFrames)
+                currentAnimation.AddFrame(frame, newFrameLength);
+
+            currentAnimation.DefaultFrameLength = newFrameLength;
+            currentAnimation.PlaybackPosition = progress * currentAnimation.Duration;
+
+            currentAnimationFrameLength = newFrameLength;
+        }
+
+        private Drawable? createAnimatedDrawable(string baseLookup, List<Texture> frames)
         {
             string template = FrameTemplate.Value?.Trim() ?? string.Empty;
             if (!tryParseAnimationTemplate(template, out int start, out int width))
@@ -167,6 +328,7 @@ namespace osu.Game.EzOsuGame.HUD
                     break;
 
                 animation.AddFrame(texture);
+                frames.Add(texture);
             }
 
             return animation.FrameCount > 0 ? animation : null;
@@ -176,7 +338,9 @@ namespace osu.Game.EzOsuGame.HUD
         {
             if (UseBeatmapBPM.Value && beatmap.Value?.BeatmapInfo != null)
             {
-                double bpm = beatmap.Value.BeatmapInfo.BPM;
+                // Rate-changing mods (DT/HT/nightcore and friends) speed the audio up without changing the beatmap's
+                // BPM, so they have to be folded in here to stay in sync with what is actually being played.
+                double bpm = beatmap.Value.BeatmapInfo.BPM * getModRateMultiplier();
 
                 if (bpm > 0)
                 {
