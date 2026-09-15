@@ -22,6 +22,8 @@ using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Difficulty.Utils;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.UI;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osu.Game.Utils;
 using osuTK;
@@ -81,6 +83,9 @@ namespace osu.Game.EzOsuGame.HUD
             Precision = 1
         };
 
+        [SettingSource("Live BPM (follow timing changes)")]
+        public Bindable<bool> UseLiveBPM { get; } = new Bindable<bool>(false);
+
         public bool UsesFixedAnchor { get; set; }
 
         [Resolved]
@@ -91,6 +96,19 @@ namespace osu.Game.EzOsuGame.HUD
 
         [Resolved(canBeNull: true)]
         private IBindable<IReadOnlyList<Mod>>? mods { get; set; }
+
+        /// <summary>
+        /// Only available while playing, which is where live BPM tracking can read the chart's timing points from.
+        /// </summary>
+        [Resolved(canBeNull: true)]
+        private GameplayState? gameplayState { get; set; }
+
+        /// <summary>
+        /// The clock of the currently playing chart. The HUD itself is clocked in real time, so song time has to be
+        /// obtained from here explicitly.
+        /// </summary>
+        [Resolved(canBeNull: true)]
+        private IFrameStableClock? frameStableClock { get; set; }
 
         private Drawable? currentDrawable;
 
@@ -117,6 +135,17 @@ namespace osu.Game.EzOsuGame.HUD
         private IBindable<IReadOnlyList<Mod>>? trackedMods;
         private ModSettingChangeTracker? modSettingTracker;
 
+        /// <summary>
+        /// Whether live BPM tracking is active, i.e. the setting is enabled and a playing chart is available.
+        /// </summary>
+        private bool liveTimingActive;
+
+        /// <summary>
+        /// The beat length of the timing point in effect as of the last <see cref="Update"/>, used to notice when the
+        /// chart moves on to another BPM section.
+        /// </summary>
+        private double lastLiveBeatLength = double.NaN;
+
         public EzHUDSpritePlus()
         {
             RelativeSizeAxes = Axes.None;
@@ -139,6 +168,7 @@ namespace osu.Game.EzOsuGame.HUD
             // The subscriptions are also what make the sprite follow a song change (e.g. picking another map in song
             // select) instead of keeping the BPM it saw when it was first loaded.
             UseBeatmapBPM.BindValueChanged(_ => updateTimingSubscription(), true);
+            UseLiveBPM.BindValueChanged(_ => updateTimingSubscription(), true);
 
             TextureScale.BindValueChanged(_ => applyVisualSettings(), true);
             AccentColour.BindValueChanged(_ => applyVisualSettings(), true);
@@ -149,6 +179,35 @@ namespace osu.Game.EzOsuGame.HUD
         private void load()
         {
             scheduleReload();
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            // Live BPM tracking: one binary search per frame, with the (much heavier) frame rebuild only happening
+            // when the chart actually moves on to another timing point.
+            if (!liveTimingActive || currentAnimation == null)
+                return;
+
+            double beatLength = getLiveBeatLength();
+
+            if (beatLength <= 0 || Math.Abs(beatLength - lastLiveBeatLength) < 0.001)
+                return;
+
+            lastLiveBeatLength = beatLength;
+            scheduleTimingUpdate();
+        }
+
+        /// <summary>
+        /// The beat length of the timing point in effect right now, or 0 if it cannot be determined.
+        /// </summary>
+        private double getLiveBeatLength()
+        {
+            if (!liveTimingActive || gameplayState == null || frameStableClock == null)
+                return 0;
+
+            return gameplayState.Beatmap.ControlPointInfo.TimingPointAt(frameStableClock.CurrentTime).BeatLength;
         }
 
         private void scheduleReload() => Schedule(reloadDrawable);
@@ -204,39 +263,49 @@ namespace osu.Game.EzOsuGame.HUD
         private void updateTimingSubscription()
         {
             if (UseBeatmapBPM.Value)
-            {
-                if (trackedBeatmap != null)
-                    return;
-
-                // Own copies, so disabling the feature can genuinely unbind everything again.
-                trackedBeatmap = beatmap.GetBoundCopy();
-                trackedBeatmap.BindValueChanged(_ => scheduleTimingUpdate());
-
-                if (mods != null)
-                {
-                    trackedMods = mods.GetBoundCopy();
-                    trackedMods.BindValueChanged(selectedMods =>
-                    {
-                        rebuildModSettingTracker(selectedMods.NewValue);
-                        scheduleTimingUpdate();
-                    });
-
-                    rebuildModSettingTracker(trackedMods.Value);
-                }
-            }
+                subscribeTimingSources();
             else
-            {
-                modSettingTracker?.Dispose();
-                modSettingTracker = null;
+                unsubscribeTimingSources();
 
-                trackedMods?.UnbindAll();
-                trackedMods = null;
-
-                trackedBeatmap?.UnbindAll();
-                trackedBeatmap = null;
-            }
+            // Live BPM tracking follows the chart's timing points, which are only available while playing.
+            liveTimingActive = UseBeatmapBPM.Value && UseLiveBPM.Value && gameplayState != null && frameStableClock != null;
+            lastLiveBeatLength = double.NaN;
 
             scheduleTimingUpdate();
+        }
+
+        private void subscribeTimingSources()
+        {
+            if (trackedBeatmap != null)
+                return;
+
+            // Own copies, so disabling the feature can genuinely unbind everything again.
+            trackedBeatmap = beatmap.GetBoundCopy();
+            trackedBeatmap.BindValueChanged(_ => scheduleTimingUpdate());
+
+            if (mods == null)
+                return;
+
+            trackedMods = mods.GetBoundCopy();
+            trackedMods.BindValueChanged(selectedMods =>
+            {
+                rebuildModSettingTracker(selectedMods.NewValue);
+                scheduleTimingUpdate();
+            });
+
+            rebuildModSettingTracker(trackedMods.Value);
+        }
+
+        private void unsubscribeTimingSources()
+        {
+            modSettingTracker?.Dispose();
+            modSettingTracker = null;
+
+            trackedMods?.UnbindAll();
+            trackedMods = null;
+
+            trackedBeatmap?.UnbindAll();
+            trackedBeatmap = null;
         }
 
         /// <summary>
@@ -336,20 +405,36 @@ namespace osu.Game.EzOsuGame.HUD
 
         private double getFrameLengthFromSettings()
         {
-            if (UseBeatmapBPM.Value && beatmap.Value?.BeatmapInfo != null)
+            if (UseBeatmapBPM.Value)
             {
-                // Rate-changing mods (DT/HT/nightcore and friends) speed the audio up without changing the beatmap's
-                // BPM, so they have to be folded in here to stay in sync with what is actually being played.
-                double bpm = beatmap.Value.BeatmapInfo.BPM * getModRateMultiplier();
+                double bpm = getEffectiveBpm();
 
                 if (bpm > 0)
                 {
+                    // This HUD is clocked in real time (it is not under the ruleset's frame-stable clock), so
+                    // rate-changing mods have to be folded in here - the animation does not speed up on its own.
                     int division = Math.Clamp(BeatDivision.Value, 1, 32);
-                    return DiffUtils.BPMToMilliseconds(bpm, division);
+                    return DiffUtils.BPMToMilliseconds(bpm * getModRateMultiplier(), division);
                 }
             }
 
             return 1000.0 / Math.Clamp(FPS.Value, 1f, 240f);
+        }
+
+        /// <summary>
+        /// The BPM currently driving frame timing, or 0 if none could be determined.
+        /// </summary>
+        private double getEffectiveBpm()
+        {
+            if (liveTimingActive)
+            {
+                double liveBeatLength = getLiveBeatLength();
+
+                if (liveBeatLength > 0)
+                    return 60000 / liveBeatLength;
+            }
+
+            return beatmap.Value?.BeatmapInfo?.BPM ?? 0;
         }
 
         private Drawable? createSingleDrawable(string baseLookup)
