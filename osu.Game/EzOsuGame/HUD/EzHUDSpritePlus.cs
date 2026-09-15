@@ -17,10 +17,10 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
-using osu.Game.Rulesets.Difficulty.Utils;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
@@ -83,9 +83,6 @@ namespace osu.Game.EzOsuGame.HUD
             Precision = 1
         };
 
-        [SettingSource("Live BPM (follow timing changes)")]
-        public Bindable<bool> UseLiveBPM { get; } = new Bindable<bool>(false);
-
         public bool UsesFixedAnchor { get; set; }
 
         [Resolved]
@@ -97,54 +94,31 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved(canBeNull: true)]
         private IBindable<IReadOnlyList<Mod>>? mods { get; set; }
 
-        /// <summary>
-        /// Only available while playing, which is where live BPM tracking can read the chart's timing points from.
-        /// </summary>
+        // Only available while playing, which is where the chart's timing points can be read from. The HUD itself is
+        // clocked in real time, so the song time has to be obtained via the frame-stable clock as well.
         [Resolved(canBeNull: true)]
         private GameplayState? gameplayState { get; set; }
 
-        /// <summary>
-        /// The clock of the currently playing chart. The HUD itself is clocked in real time, so song time has to be
-        /// obtained from here explicitly.
-        /// </summary>
         [Resolved(canBeNull: true)]
         private IFrameStableClock? frameStableClock { get; set; }
 
         private Drawable? currentDrawable;
-
-        /// <summary>
-        /// The currently displayed animation, if the sprite resolved to a frame animation.
-        /// </summary>
         private TextureAnimation? currentAnimation;
 
-        /// <summary>
-        /// Textures backing <see cref="currentAnimation"/>, kept so frame timing can be refreshed without reloading them.
-        /// </summary>
-        private readonly List<Texture> currentAnimationFrames = new List<Texture>();
+        // Frames are baked once at this length; every playback speed influence is applied on top of it.
+        private const double base_frame_length = 1000.0 / 60.0;
 
-        /// <summary>
-        /// The frame length (in milliseconds) currently baked into <see cref="currentAnimation"/>'s frames.
-        /// </summary>
-        private double currentAnimationFrameLength;
+        // Beat length (ms per beat) of the selected beatmap, and the rate multiplier of the selected mods.
+        private double beatLength;
+        private float modRate = 1;
 
-        /// <summary>
-        /// Subscriptions backing beat-synced frame timing. They only exist while <see cref="UseBeatmapBPM"/> is
-        /// enabled, so an ordinary sprite holds no bound copies and receives no callbacks whatsoever.
-        /// </summary>
-        private IBindable<WorkingBeatmap>? trackedBeatmap;
-        private IBindable<IReadOnlyList<Mod>>? trackedMods;
+        // A dynamic speed mod changes the rate while playing, so it reports the live value itself.
+        private ILinkedDynamicSpeedHUD? dynamicSpeedMod;
+
         private ModSettingChangeTracker? modSettingTracker;
 
-        /// <summary>
-        /// Whether live BPM tracking is active, i.e. the setting is enabled and a playing chart is available.
-        /// </summary>
-        private bool liveTimingActive;
-
-        /// <summary>
-        /// The beat length of the timing point in effect as of the last <see cref="Update"/>, used to notice when the
-        /// chart moves on to another BPM section.
-        /// </summary>
-        private double lastLiveBeatLength = double.NaN;
+        // Accumulated playback position, in animation time.
+        private double playbackTime;
 
         public EzHUDSpritePlus()
         {
@@ -160,15 +134,17 @@ namespace osu.Game.EzOsuGame.HUD
             SpriteName.BindValueChanged(_ => scheduleReload());
             FrameTemplate.BindValueChanged(_ => scheduleReload());
 
-            // These only affect frame timing, so they can be re-applied in place instead of rebuilding the animation.
-            FPS.BindValueChanged(_ => scheduleTimingUpdate());
-            BeatDivision.BindValueChanged(_ => scheduleTimingUpdate());
+            // Beat-synced playback follows the selected beatmap and the selected mods, so both are tracked directly
+            // (no extra copies) and only reflected in the private beat length / rate values.
+            beatmap.BindValueChanged(_ => updateBeatLength(), true);
 
-            // Beat-synced timing follows the globally selected beatmap and the selected mods, but only while enabled.
-            // The subscriptions are also what make the sprite follow a song change (e.g. picking another map in song
-            // select) instead of keeping the BPM it saw when it was first loaded.
-            UseBeatmapBPM.BindValueChanged(_ => updateTimingSubscription(), true);
-            UseLiveBPM.BindValueChanged(_ => updateTimingSubscription(), true);
+            mods?.BindValueChanged(selectedMods =>
+            {
+                updateModSettingTracker(selectedMods.NewValue);
+                updateModRate();
+            }, true);
+
+            dynamicSpeedMod = gameplayState?.Mods.OfType<ILinkedDynamicSpeedHUD>().FirstOrDefault();
 
             TextureScale.BindValueChanged(_ => applyVisualSettings(), true);
             AccentColour.BindValueChanged(_ => applyVisualSettings(), true);
@@ -185,29 +161,52 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.Update();
 
-            // Live BPM tracking: one binary search per frame, with the (much heavier) frame rebuild only happening
-            // when the chart actually moves on to another timing point.
-            if (!liveTimingActive || currentAnimation == null)
+            if (currentAnimation == null)
                 return;
 
-            double beatLength = getLiveBeatLength();
+            double duration = currentAnimation.Duration;
 
-            if (beatLength <= 0 || Math.Abs(beatLength - lastLiveBeatLength) < 0.001)
+            if (duration <= 0)
                 return;
 
-            lastLiveBeatLength = beatLength;
-            scheduleTimingUpdate();
+            // Playback is driven here instead of by the framework's own advance (see createAnimatedDrawable), so
+            // every speed influence only has to end up in getPlaybackSpeed().
+            playbackTime = Math.Max(0, playbackTime + Clock.ElapsedFrameTime * getPlaybackSpeed());
+            currentAnimation.PlaybackPosition = playbackTime % duration;
         }
 
-        /// <summary>
-        /// The beat length of the timing point in effect right now, or 0 if it cannot be determined.
-        /// </summary>
-        private double getLiveBeatLength()
+        // 1 means one reference frame per base frame length; FPS, beat division and mod rate all feed into it.
+        private double getPlaybackSpeed()
         {
-            if (!liveTimingActive || gameplayState == null || frameStableClock == null)
-                return 0;
+            if (UseBeatmapBPM.Value)
+            {
+                double currentBeatLength = getCurrentBeatLength();
 
-            return gameplayState.Beatmap.ControlPointInfo.TimingPointAt(frameStableClock.CurrentTime).BeatLength;
+                if (currentBeatLength > 0)
+                    return base_frame_length * BeatDivision.Value * getRate() / currentBeatLength;
+            }
+
+            return FPS.Value * base_frame_length / 1000;
+        }
+
+        private double getCurrentBeatLength()
+        {
+            // While playing, follow the chart's timing points so the animation tracks every BPM section.
+            if (gameplayState != null && frameStableClock != null)
+            {
+                double liveBeatLength = gameplayState.Beatmap.ControlPointInfo.TimingPointAt(frameStableClock.CurrentTime).BeatLength;
+
+                if (liveBeatLength > 0)
+                    return liveBeatLength;
+            }
+
+            return beatLength;
+        }
+
+        private float getRate()
+        {
+            ILinkedDynamicSpeedHUD? liveMod = dynamicSpeedMod;
+            return liveMod != null ? (float)liveMod.SpeedChange.Value : modRate;
         }
 
         private void scheduleReload() => Schedule(reloadDrawable);
@@ -221,14 +220,11 @@ namespace osu.Game.EzOsuGame.HUD
                 ClearInternal();
                 currentDrawable = null;
                 currentAnimation = null;
-                currentAnimationFrames.Clear();
-                currentAnimationFrameLength = 0;
                 return;
             }
 
             string baseLookup = buildBaseLookup(spriteName);
-            var animationFrames = new List<Texture>();
-            Drawable? newDrawable = createAnimatedDrawable(baseLookup, animationFrames) ?? createSingleDrawable(baseLookup);
+            Drawable? newDrawable = createAnimatedDrawable(baseLookup) ?? createSingleDrawable(baseLookup);
 
             // Keep the current drawable if a transient settings state cannot resolve a texture.
             // This avoids flickering/reset when dropdowns are rebuilding their item sources.
@@ -238,143 +234,29 @@ namespace osu.Game.EzOsuGame.HUD
             ClearInternal();
             currentDrawable = newDrawable;
             currentAnimation = newDrawable as TextureAnimation;
-            currentAnimationFrames.Clear();
-            currentAnimationFrameLength = 0;
-
-            if (currentAnimation != null)
-            {
-                currentAnimationFrames.AddRange(animationFrames);
-                currentAnimationFrameLength = currentAnimation.DefaultFrameLength;
-            }
+            playbackTime = 0;
 
             AddInternal(newDrawable);
             applyVisualSettings();
         }
 
-        private void scheduleTimingUpdate() => Schedule(updateAnimationFrameLength);
-
-        /// <summary>
-        /// (Re-)establishes the subscriptions which keep beat-synced frame timing up to date.
-        /// </summary>
-        /// <remarks>
-        /// Subscriptions only exist while <see cref="UseBeatmapBPM"/> is enabled, so a sprite which does not use
-        /// beatmap BPM holds no bound copies and receives no callbacks at all.
-        /// </remarks>
-        private void updateTimingSubscription()
+        private void updateBeatLength()
         {
-            if (UseBeatmapBPM.Value)
-                subscribeTimingSources();
-            else
-                unsubscribeTimingSources();
-
-            // Live BPM tracking follows the chart's timing points, which are only available while playing.
-            liveTimingActive = UseBeatmapBPM.Value && UseLiveBPM.Value && gameplayState != null && frameStableClock != null;
-            lastLiveBeatLength = double.NaN;
-
-            scheduleTimingUpdate();
+            double bpm = beatmap.Value.BeatmapInfo.BPM;
+            beatLength = bpm > 0 ? 60000 / bpm : 0;
         }
 
-        private void subscribeTimingSources()
-        {
-            if (trackedBeatmap != null)
-                return;
+        private void updateModRate() => modRate = EzModRate.Resolve(mods?.Value);
 
-            // Own copies, so disabling the feature can genuinely unbind everything again.
-            trackedBeatmap = beatmap.GetBoundCopy();
-            trackedBeatmap.BindValueChanged(_ => scheduleTimingUpdate());
-
-            if (mods == null)
-                return;
-
-            trackedMods = mods.GetBoundCopy();
-            trackedMods.BindValueChanged(selectedMods =>
-            {
-                rebuildModSettingTracker(selectedMods.NewValue);
-                scheduleTimingUpdate();
-            });
-
-            rebuildModSettingTracker(trackedMods.Value);
-        }
-
-        private void unsubscribeTimingSources()
+        // Only rate-changing mods can affect playback speed, so nothing else needs to be watched.
+        private void updateModSettingTracker(IReadOnlyList<Mod> selectedMods)
         {
             modSettingTracker?.Dispose();
-            modSettingTracker = null;
-
-            trackedMods?.UnbindAll();
-            trackedMods = null;
-
-            trackedBeatmap?.UnbindAll();
-            trackedBeatmap = null;
+            modSettingTracker = new ModSettingChangeTracker(selectedMods.Where(mod => mod is IApplicableToRate));
+            modSettingTracker.SettingChanged += _ => updateModRate();
         }
 
-        /// <summary>
-        /// Tracks changes to the settings of individual mods (e.g. dragging the DT rate slider), which change the
-        /// effective rate without changing the selected mod list itself.
-        /// </summary>
-        private void rebuildModSettingTracker(IReadOnlyList<Mod> selectedMods)
-        {
-            modSettingTracker?.Dispose();
-            modSettingTracker = new ModSettingChangeTracker(selectedMods);
-            modSettingTracker.SettingChanged += _ => scheduleTimingUpdate();
-        }
-
-        /// <summary>
-        /// The rate multiplier of the currently selected mods, matching the value the song select beatmap title uses
-        /// for its displayed BPM.
-        /// </summary>
-        private double getModRateMultiplier()
-        {
-            if (mods == null)
-                return 1;
-
-            try
-            {
-                double rate = 1.0;
-                IReadOnlyList<Mod> selectedMods = mods.Value;
-
-                for (int i = 0; i < selectedMods.Count; i++)
-                {
-                    if (selectedMods[i] is IApplicableToRate applicableToRate)
-                        rate = applicableToRate.ApplyToRate(0, rate);
-                }
-
-                return double.IsNaN(rate) || double.IsInfinity(rate) || rate <= 0 ? 1.0 : rate;
-            }
-            catch
-            {
-                return 1.0;
-            }
-        }
-
-        /// <summary>
-        /// Re-applies frame timing to the currently displayed animation without reloading textures or restarting playback.
-        /// </summary>
-        private void updateAnimationFrameLength()
-        {
-            if (currentAnimation == null || currentAnimationFrames.Count == 0)
-                return;
-
-            double newFrameLength = getFrameLengthFromSettings();
-
-            if (Math.Abs(newFrameLength - currentAnimationFrameLength) < 0.001)
-                return;
-
-            // Preserve the visible playback position across the frame length change.
-            double progress = currentAnimation.Duration > 0 ? currentAnimation.PlaybackPosition / currentAnimation.Duration : 0;
-
-            currentAnimation.ClearFrames();
-
-            foreach (Texture frame in currentAnimationFrames)
-                currentAnimation.AddFrame(frame, newFrameLength);
-
-            currentAnimation.DefaultFrameLength = newFrameLength;
-            currentAnimation.PlaybackPosition = progress * currentAnimation.Duration;
-
-            currentAnimationFrameLength = newFrameLength;
-        }
-
-        private Drawable? createAnimatedDrawable(string baseLookup, List<Texture> frames)
+        private Drawable? createAnimatedDrawable(string baseLookup)
         {
             string template = FrameTemplate.Value?.Trim() ?? string.Empty;
             if (!tryParseAnimationTemplate(template, out int start, out int width))
@@ -385,7 +267,11 @@ namespace osu.Game.EzOsuGame.HUD
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Loop = true,
-                DefaultFrameLength = (float)getFrameLengthFromSettings(),
+                DefaultFrameLength = base_frame_length,
+
+                // Playback speed is driven by the owning drawable instead, so that it can change at any time
+                // without having to clear and re-add every frame.
+                IsPlaying = false,
             };
 
             for (int i = 0; i < max_animation_frames; i++)
@@ -397,44 +283,9 @@ namespace osu.Game.EzOsuGame.HUD
                     break;
 
                 animation.AddFrame(texture);
-                frames.Add(texture);
             }
 
             return animation.FrameCount > 0 ? animation : null;
-        }
-
-        private double getFrameLengthFromSettings()
-        {
-            if (UseBeatmapBPM.Value)
-            {
-                double bpm = getEffectiveBpm();
-
-                if (bpm > 0)
-                {
-                    // This HUD is clocked in real time (it is not under the ruleset's frame-stable clock), so
-                    // rate-changing mods have to be folded in here - the animation does not speed up on its own.
-                    int division = Math.Clamp(BeatDivision.Value, 1, 32);
-                    return DiffUtils.BPMToMilliseconds(bpm * getModRateMultiplier(), division);
-                }
-            }
-
-            return 1000.0 / Math.Clamp(FPS.Value, 1f, 240f);
-        }
-
-        /// <summary>
-        /// The BPM currently driving frame timing, or 0 if none could be determined.
-        /// </summary>
-        private double getEffectiveBpm()
-        {
-            if (liveTimingActive)
-            {
-                double liveBeatLength = getLiveBeatLength();
-
-                if (liveBeatLength > 0)
-                    return 60000 / liveBeatLength;
-            }
-
-            return beatmap.Value?.BeatmapInfo?.BPM ?? 0;
         }
 
         private Drawable? createSingleDrawable(string baseLookup)
