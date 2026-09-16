@@ -74,6 +74,14 @@ namespace osu.Game.EzOsuGame.Analysis
             => $"{name} v{facet.CurrentRevision}: ready {facet.Ready}, unrateable {facet.Unrateable}, stale {facet.Stale}, missing {facet.Missing}";
     }
 
+    /// <summary>
+    /// One player whose stored skill rows are flagged stale, summarised for the status readout. The flag means the
+    /// player's SQLite slice moved on after these rows were written, so the numbers on screen are the previous pass's.
+    /// </summary>
+    /// <param name="Rows">Flagged rows the player holds (SSR / pattern rows across their keymodes).</param>
+    /// <param name="ComputedAt">Newest write time among those rows.</param>
+    public readonly record struct EzStalePlayerSkill(string Username, int Rows, DateTimeOffset ComputedAt);
+
     internal static class EzSkillDataStatusCounting
     {
         /// <summary>

@@ -319,17 +319,20 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                     }
                                     else
                                     {
-                                        // No caller-supplied scope (the manual compute): fall back to the persisted
-                                        // flag. A settled play is folded into the SQLite slice by the ingest path, so
-                                        // the ledger diff cannot tell that player apart from one with nothing to do -
-                                        // the flag is the only record that their Realm rows still trail the slice.
-                                        // Without this, a manual compute would leave it set until that player happened
-                                        // to gain a play the ledger is missing, i.e. the status readout would report
-                                        // them stale for good.
+                                        // No caller-supplied scope (the manual compute): cover both reasons a player's
+                                        // Realm rows can be behind. A settled play is folded into the SQLite slice by
+                                        // the ingest path, so the ledger diff cannot tell that player apart from one with
+                                        // nothing to do — the flag is the only record that their rows trail the slice.
+                                        // Plays the chain has not rated yet are the other reason: the skills pass skips
+                                        // them, so re-deriving that player is what folds them in once the chain is done.
+                                        // Without both, a manual compute would leave the readout reporting work for good.
                                         IReadOnlyList<string> stale = skillProvider?.GetStalePlayerSkillUsernames() ?? Array.Empty<string>();
 
                                         foreach (string staleUsername in stale)
                                             skillsScope.Add(EzLocalProfileConstants.NormaliseUsername(staleUsername));
+
+                                        foreach (string debtUsername in CollectChartChainDebt().Usernames)
+                                            skillsScope.Add(EzLocalProfileConstants.NormaliseUsername(debtUsername));
                                     }
                                 }
 
@@ -600,8 +603,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var includedSet = new HashSet<string>(included, StringComparer.Ordinal);
             var staleIncluded = stale.Where(includedSet.Contains).ToList();
 
-            return new EzLocalProfileStartupAlignPlan(included, pending, staleIncluded, Store.NeedsRecompute());
+            // The other reason a reconcile has work: plays the chain has not rated, so the skills pass skipped them.
+            // Derived from the ledger against the chain's own coverage, so it needs no flag on the player's rows and
+            // is empty again as soon as the chain catches up.
+            var debtIncluded = CollectChartChainDebt().Usernames.Where(includedSet.Contains).ToList();
+
+            return new EzLocalProfileStartupAlignPlan(included, pending, staleIncluded, debtIncluded, Store.NeedsRecompute());
         }
+
+        /// <summary>
+        /// Plays the chart-side chain still owes a result for, joined from the drill ledger against the chain's own
+        /// coverage. Reads SQLite and Realm, so call it off the UI thread.
+        /// </summary>
+        public EzChartChainDebt CollectChartChainDebt()
+            => skillProvider == null
+                ? EzChartChainDebt.Empty
+                : EzChartChainDebt.Collect(Store.LoadManiaDrillChartPlays(), skillProvider.Store);
 
         /// <summary>
         /// Run the reconcile described by <see cref="PlanStartupAlign"/>: one incremental compute over the players the
@@ -620,15 +637,17 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             Logger.Log(
                 $"[EzLocalProfile] Score analysis reconcile: {plan.TotalPendingPlays} pending play(s) across {plan.PendingPlaysByUser.Count} player(s), "
-                + $"{plan.StaleSkillUsernames.Count} with stale skills, contentVersionStale={plan.ContentVersionStale}.",
+                + $"{plan.StaleSkillUsernames.Count} with stale skills, {plan.ChartDebtUsernames.Count} waiting on the chart chain, "
+                + $"contentVersionStale={plan.ContentVersionStale}.",
                 Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
             // Incremental by construction: the ledger only yields plays that were never analysed, and the skills pass
             // reuses the per-play caches. Never a clear-rebuild — a launch must not throw away good work.
-            // Skills are narrowed to the players with pending plays plus the ones flagged stale; the rest keep their
-            // rows (the skill pass re-derives nothing for a player nothing changed for).
+            // Skills are narrowed to the three groups that can have moved — pending plays, flagged players and players
+            // waiting on the chain; the rest keep their rows (the skill pass re-derives nothing for an untouched player).
             var skillsScope = new HashSet<string>(plan.PendingPlaysByUser.Keys, StringComparer.Ordinal);
             skillsScope.UnionWith(plan.StaleSkillUsernames);
+            skillsScope.UnionWith(plan.ChartDebtUsernames);
 
             return ComputeAsync(plan.IncludedUsernames, replaceOtherUsernames: false, clearRebuild: false, progress, cancellationToken, skillsScope);
         }
@@ -673,7 +692,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 CancellationToken.None,
                 ssrAggregator?.LoadPlayCache(),
                 danAggregator?.LoadPlayCache(),
-                new HashSet<string>(StringComparer.Ordinal));
+                new HashSet<string>(StringComparer.Ordinal),
+                out _);
         }
 
         /// <summary>How many not-yet-cached scores are analysed before progress is flushed to disk.</summary>
@@ -866,9 +886,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
             // per-play caches are also left intact, so a later pass still only pays for what changed.
             var refreshScope = skillsUsernames?.Select(EzLocalProfileConstants.NormaliseUsername).ToHashSet(StringComparer.Ordinal);
 
-            var refreshReal = refreshScope == null
-                ? selectedReal
-                : selectedReal.Where(refreshScope.Contains).ToList();
+            // All: always re-collect from the included set so incremental recomputes still materialise a complete
+            // archive-wide bag (AggregateSSRs is a fixed-point over the individual plays, so it cannot be merged
+            // from per-player results).
+            var included = Store.LoadIncludedUsernames()
+                                .Select(EzLocalProfileConstants.NormaliseUsername)
+                                .Where(n => !string.IsNullOrEmpty(n) && !EzLocalProfileConstants.IsAllPlayersFilter(n))
+                                .Distinct(StringComparer.Ordinal)
+                                .ToList();
+
+            var (refreshReal, orphaned) = EzPlayerSkillRefreshScope.Resolve(selectedReal, refreshScope, included);
+
+            foreach (string orphanUsername in orphaned)
+                skillProvider?.DeletePlayerSkillData(orphanUsername);
 
             // The archive-wide bag is re-derived whenever a real player is. It is also refreshed on its own when the
             // scope names it: a settled play flags All alongside the player, so a pass that covers no real player
@@ -881,15 +911,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 // Nothing changed: do not touch the skill tables at all (the default skip of a quiet re-run).
                 return;
             }
-
-            // All: always re-collect from the included set so incremental recomputes still materialise a complete
-            // archive-wide bag (AggregateSSRs is a fixed-point over the individual plays, so it cannot be merged
-            // from per-player results).
-            var included = Store.LoadIncludedUsernames()
-                                .Select(EzLocalProfileConstants.NormaliseUsername)
-                                .Where(n => !string.IsNullOrEmpty(n) && !EzLocalProfileConstants.IsAllPlayersFilter(n))
-                                .Distinct(StringComparer.Ordinal)
-                                .ToList();
 
             // One Realm pass for the union: the per-player slices and the All bag come from the same detached set,
             // instead of a second full scan + second clone pass for All.
@@ -939,6 +960,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             progress?.Report(new EzLocalProfileComputeProgress(0, skillsTotal, EzLocalProfileComputePhase.Skills));
 
+            var missedChartsByUser = new HashSet<string>(StringComparer.Ordinal);
+
             foreach (string username in refreshReal)
             {
                 token.ThrowIfCancellationRequested();
@@ -954,15 +977,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     continue;
                 }
 
-                if (persistUserSkills(username, scores, tick, token, ssrPlayCache, danPlayCache, missingCharts))
-                    skillProvider?.ClearPlayerSkillStale(username);
+                bool persisted = persistUserSkills(username, scores, tick, token, ssrPlayCache, danPlayCache, missingCharts, out var missedCharts);
+
+                if (!persisted)
+                    continue;
+
+                skillProvider?.ClearPlayerSkillStale(username);
+
+                if (missedCharts.Count > 0)
+                    missedChartsByUser.Add(username);
             }
 
             if (materializeAll)
             {
                 token.ThrowIfCancellationRequested();
 
-                if (persistUserSkills(EzLocalProfileConstants.ALL_PLAYERS, allBag, tick, token, ssrPlayCache, danPlayCache, missingCharts))
+                if (persistUserSkills(EzLocalProfileConstants.ALL_PLAYERS, allBag, tick, token, ssrPlayCache, danPlayCache, missingCharts, out _))
                     skillProvider?.ClearPlayerSkillStale(EzLocalProfileConstants.ALL_PLAYERS);
             }
             else if (refreshAll)
@@ -975,22 +1005,34 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (skillsProcessed < skillsTotal)
                 progress?.Report(new EzLocalProfileComputeProgress(skillsTotal, skillsTotal, EzLocalProfileComputePhase.Skills));
 
-            // The chart-side chain owns MSD / CSI / ChartDan. Anything this pass could not read is handed to it
-            // rather than rated here, and the players it affects are flagged so a later pass folds them back in.
+            // The chart-side chain owns MSD / CSI / ChartDan. Anything this pass could not read is handed to it rather
+            // than rated here, and the players it left a hole for are flagged: their rows are missing those plays, so
+            // they do trail the slice until a later pass can fold them in. Only the players whose own plays hit an
+            // unrated chart are named — one chart's answer must not put every other player back into the queue.
             if (missingCharts.Count > 0)
             {
                 Logger.Log(
                     $"[EzLocalProfile] {missingCharts.Count} chart(s) have no chart-side skill data yet; requesting chart-chain backfill.",
                     Ez2ConfigManager.LOGGER_NAME);
 
-                foreach (string username in refreshReal)
-                    skillProvider?.MarkPlayerSkillStale(username);
+                // All aggregates the same plays, so it has the same hole the moment any real player does.
+                if (missedChartsByUser.Count > 0)
+                    skillProvider?.MarkPlayerSkillStale(EzLocalProfileConstants.ALL_PLAYERS);
 
-                skillProvider?.MarkPlayerSkillStale(EzLocalProfileConstants.ALL_PLAYERS);
+                foreach (string missingUsername in missedChartsByUser)
+                    skillProvider?.MarkPlayerSkillStale(missingUsername);
+
                 ChartSideBackfillRequested?.Invoke();
             }
         }
 
+        /// <summary>
+        /// Re-derive one player's skill rows and record what the pass could not read.
+        /// </summary>
+        /// <param name="missedCharts">
+        /// Charts this pass needed a chart-side row for and found none, so the plays on them are not in the rows that
+        /// were just written. Empty for the archive-wide bag, whose holes are its players' holes.
+        /// </param>
         /// <returns>
         /// <see langword="true"/> when at least one aggregator ran without throwing, i.e. this pass did cover the
         /// player's slice and the caller may stop treating their rows as stale.
@@ -1002,9 +1044,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
             CancellationToken token,
             IReadOnlyDictionary<Guid, EzSsrPlayCacheRow>? ssrPlayCache,
             IReadOnlyDictionary<Guid, EzDanPlayCacheRow>? danPlayCache,
-            HashSet<string> missingCharts)
+            HashSet<string> missingCharts,
+            out HashSet<string> missedCharts)
         {
             bool allPlayers = EzLocalProfileConstants.IsAllPlayersFilter(username);
+            var playerMissed = new HashSet<string>(StringComparer.Ordinal);
 
             bool persisted = tryComputeAndPersist(
                 username,
@@ -1017,7 +1061,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                         allPlayers ? Array.Empty<EzAxisPlayEvidenceRow>() : ssrAggregator.PendingEvidence);
 
                     if (!allPlayers)
-                        missingCharts.UnionWith(ssrAggregator.MissingChartHashes);
+                        playerMissed.UnionWith(ssrAggregator.MissingChartHashes);
                 },
                 ssrAggregator != null,
                 "[EzLocalProfile] Failed to compute/persist player SSR skills after profile save.");
@@ -1034,10 +1078,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     skillProvider?.RefreshDanSkillsets(username, tick);
 
                     if (!allPlayers)
-                        missingCharts.UnionWith(danAggregator.MissingChartHashes);
+                        playerMissed.UnionWith(danAggregator.MissingChartHashes);
                 },
                 danAggregator != null,
                 "[EzLocalProfile] Failed to compute/persist player Dan estimates after profile save.");
+
+            missedCharts = playerMissed;
+            missingCharts.UnionWith(playerMissed);
 
             return persisted;
         }

@@ -941,6 +941,33 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// Mania chart hashes the chart-side chain will rate at all. MSD is gated on the CS-derived column count and
+        /// both later stages wait on MSD, so a chart outside the engine's keymode range is skipped by the whole chain
+        /// and can never be something a play is "waiting" on.
+        /// </summary>
+        public HashSet<string> GetRateableChartHashes() => realmAccess.Run(collectRateableChartHashes);
+
+        private static HashSet<string> collectRateableChartHashes(Realm r)
+        {
+            var hashes = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var b in r.All<BeatmapInfo>())
+            {
+                if (b.BeatmapSet == null || b.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(b.Hash))
+                    continue;
+
+                // The chain drops keymodes its engine cannot rate at candidate time, so those charts are not
+                // pending work and must not be counted as missing - otherwise "all current" is unreachable.
+                if (!EzChartChainCoverage.IsRateableKeyCount((int)Math.Round(b.Difficulty.CircleSize)))
+                    continue;
+
+                hashes.Add(b.Hash);
+            }
+
+            return hashes;
+        }
+
+        /// <summary>
         /// Snapshot of the chart skill chain's completeness, counted over every mania chart in Realm.
         /// <para>
         /// Reads all three facet tables in one run, so call it off the UI thread; it is meant for an
@@ -957,20 +984,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             return realmAccess.Run(r =>
             {
-                var chartHashes = new HashSet<string>(StringComparer.Ordinal);
-
-                foreach (var b in r.All<BeatmapInfo>())
-                {
-                    if (b.BeatmapSet == null || b.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(b.Hash))
-                        continue;
-
-                    // The chain drops keymodes its engine cannot rate at candidate time, so those charts are not
-                    // pending work and must not be counted as missing - otherwise "all current" is unreachable.
-                    if (!EzChartChainCoverage.IsRateableKeyCount((int)Math.Round(b.Difficulty.CircleSize)))
-                        continue;
-
-                    chartHashes.Add(b.Hash);
-                }
+                var chartHashes = collectRateableChartHashes(r);
 
                 var msdByHash = r.All<EzBeatmapSkillValue>()
                                  .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD)
@@ -1332,6 +1346,23 @@ namespace osu.Game.EzOsuGame.Skills
                                         .Select(v => v.Username)
                                         .Where(n => !string.IsNullOrEmpty(n))
                                         .Distinct(StringComparer.Ordinal)
+                                        .ToList());
+        }
+
+        /// <summary>
+        /// The stale players with the row count and newest write time behind the flag. Same rows
+        /// <see cref="GetStalePlayerSkillUsernames"/> reports; this shape exists so the status readout can show why a
+        /// player is listed (how much is flagged, and how far back the values it is showing were written).
+        /// </summary>
+        public IReadOnlyList<EzStalePlayerSkill> GetStalePlayerSkillDetails()
+        {
+            return realmAccess.Run(r => r.All<EzPlayerSkillValue>()
+                                        .Where(v => v.Stale)
+                                        .AsEnumerable()
+                                        .Where(v => !string.IsNullOrEmpty(v.Username))
+                                        .GroupBy(v => v.Username, StringComparer.Ordinal)
+                                        .Select(g => new EzStalePlayerSkill(g.Key, g.Count(), g.Max(v => v.ComputedAt)))
+                                        .OrderBy(s => s.Username, StringComparer.Ordinal)
                                         .ToList());
         }
 

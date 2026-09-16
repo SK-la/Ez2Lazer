@@ -28,6 +28,12 @@ namespace osu.Game.EzOsuGame.Skills
     public sealed class EzSkillProvider
     {
         private readonly EzSkillStore store;
+
+        /// <summary>
+        /// The store behind this provider. Exposed for callers that need a table-level read the provider's own facade
+        /// does not shape — e.g. joining chart-side coverage against the drill ledger for <see cref="EzChartChainDebt"/>.
+        /// </summary>
+        public EzSkillStore Store => store;
         private readonly EzChartDanEstimator? chartDanEstimator;
         private readonly EzLocalProfileStore? localProfileStore;
         private readonly BeatmapManager? beatmapManager;

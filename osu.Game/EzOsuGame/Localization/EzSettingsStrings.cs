@@ -412,6 +412,18 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_PLAYERS_ALL_CURRENT =
             new EzLocalizationManager.EzLocalisableString("已对齐", "in sync");
 
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_BEHIND =
+            new EzLocalizationManager.EzLocalisableString("落后账本", "behind the ledger");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WRITTEN_AT =
+            new EzLocalizationManager.EzLocalisableString("值写于", "values written");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WAITING_CHART =
+            new EzLocalizationManager.EzLocalisableString("等图表链", "waiting on chart chain");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_WAITING_MSD =
+            new EzLocalizationManager.EzLocalisableString("其中卡在 MSD", "of which stuck on MSD");
+
         #region 机制类
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez Mania 设置", "Ez Mania Settings");
