@@ -248,7 +248,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// <param name="skillsUsernames">
         /// Players whose Realm-side skill rows additionally need re-deriving, e.g. the ones a caller found flagged
         /// stale. Players with no new plays and no flag are skipped — unless <paramref name="clearRebuild"/> is set,
-        /// which discards the per-play caches and therefore forces a full re-derive.
+        /// which discards the per-play caches and therefore forces a full re-derive. When omitted, the persisted
+        /// stale flag is used as the fallback scope, so a bare compute still refreshes exactly the rows a settled
+        /// play left trailing its slice.
         /// </param>
         public Task ComputeAsync(
             IReadOnlyCollection<string> usernamesToRecompute,
@@ -312,7 +314,23 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                     skillsScope = changedUsers ?? new HashSet<string>(StringComparer.Ordinal);
 
                                     if (skillsUsernames != null)
+                                    {
                                         skillsScope.UnionWith(skillsUsernames);
+                                    }
+                                    else
+                                    {
+                                        // No caller-supplied scope (the manual compute): fall back to the persisted
+                                        // flag. A settled play is folded into the SQLite slice by the ingest path, so
+                                        // the ledger diff cannot tell that player apart from one with nothing to do -
+                                        // the flag is the only record that their Realm rows still trail the slice.
+                                        // Without this, a manual compute would leave it set until that player happened
+                                        // to gain a play the ledger is missing, i.e. the status readout would report
+                                        // them stale for good.
+                                        IReadOnlyList<string> stale = skillProvider?.GetStalePlayerSkillUsernames() ?? Array.Empty<string>();
+
+                                        foreach (string staleUsername in stale)
+                                            skillsScope.Add(EzLocalProfileConstants.NormaliseUsername(staleUsername));
+                                    }
                                 }
 
                                 writePlayerSkills(selected, progress, token, skillsScope);
@@ -846,12 +864,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             // Narrow to the players that actually need it. The rest keep their Realm rows and evidence rows; their
             // per-play caches are also left intact, so a later pass still only pays for what changed.
-            var refreshReal = skillsUsernames == null
-                ? selectedReal
-                : selectedReal.Where(new HashSet<string>(skillsUsernames.Select(EzLocalProfileConstants.NormaliseUsername), StringComparer.Ordinal).Contains)
-                              .ToList();
+            var refreshScope = skillsUsernames?.Select(EzLocalProfileConstants.NormaliseUsername).ToHashSet(StringComparer.Ordinal);
 
-            if (refreshReal.Count == 0)
+            var refreshReal = refreshScope == null
+                ? selectedReal
+                : selectedReal.Where(refreshScope.Contains).ToList();
+
+            // The archive-wide bag is re-derived whenever a real player is. It is also refreshed on its own when the
+            // scope names it: a settled play flags All alongside the player, so a pass that covers no real player
+            // must not leave All flagged with nothing to pick it up.
+            bool refreshAll = refreshReal.Count > 0
+                              || refreshScope?.Contains(EzLocalProfileConstants.ALL_PLAYERS) == true;
+
+            if (!refreshAll)
             {
                 // Nothing changed: do not touch the skill tables at all (the default skip of a quiet re-run).
                 return;
@@ -887,7 +912,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
 
             int perUserTotal = maniaScoresByUser.Values.Sum(list => list.Count);
-            bool materializeAll = allBag.Count > 0;
+            bool materializeAll = refreshAll && allBag.Count > 0;
             int skillsTotal = Math.Max(1, (perUserTotal + (materializeAll ? allBag.Count : 0)) * passCount);
             int skillsProcessed = 0;
 
@@ -919,16 +944,32 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 token.ThrowIfCancellationRequested();
 
                 if (!maniaScoresByUser.TryGetValue(username, out var scores) || scores.Count == 0)
+                {
+                    // The slice holds no mania play for this player, so no pass can ever re-derive the rows the stale
+                    // flag points at. Drop them instead of leaving a flag the status readout can never clear - the
+                    // same rule the archive-wide bag follows (see refreshAllPlayerSkills). Self-healing: a play that
+                    // becomes readable again leaves a drill the ledger can no longer match, so the next compute
+                    // rebuilds this player's slice and re-derives the rows.
+                    skillProvider?.DeletePlayerSkillData(username);
                     continue;
+                }
 
-                persistUserSkills(username, scores, tick, token, ssrPlayCache, danPlayCache, missingCharts);
+                if (persistUserSkills(username, scores, tick, token, ssrPlayCache, danPlayCache, missingCharts))
+                    skillProvider?.ClearPlayerSkillStale(username);
             }
 
             if (materializeAll)
             {
                 token.ThrowIfCancellationRequested();
 
-                persistUserSkills(EzLocalProfileConstants.ALL_PLAYERS, allBag, tick, token, ssrPlayCache, danPlayCache, missingCharts);
+                if (persistUserSkills(EzLocalProfileConstants.ALL_PLAYERS, allBag, tick, token, ssrPlayCache, danPlayCache, missingCharts))
+                    skillProvider?.ClearPlayerSkillStale(EzLocalProfileConstants.ALL_PLAYERS);
+            }
+            else if (refreshAll)
+            {
+                // Nothing to build an archive-wide bag from: drop the sentinel rows rather than leave a stale flag
+                // no pass can clear (mirrors refreshAllPlayerSkills' empty-bag case).
+                skillProvider?.DeletePlayerSkillData(EzLocalProfileConstants.ALL_PLAYERS);
             }
 
             if (skillsProcessed < skillsTotal)
@@ -950,7 +991,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        private void persistUserSkills(
+        /// <returns>
+        /// <see langword="true"/> when at least one aggregator ran without throwing, i.e. this pass did cover the
+        /// player's slice and the caller may stop treating their rows as stale.
+        /// </returns>
+        private bool persistUserSkills(
             string username,
             List<ScoreInfo> scores,
             Action tick,
@@ -961,7 +1006,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             bool allPlayers = EzLocalProfileConstants.IsAllPlayersFilter(username);
 
-            tryComputeAndPersist(
+            bool persisted = tryComputeAndPersist(
                 username,
                 () =>
                 {
@@ -977,7 +1022,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 ssrAggregator != null,
                 "[EzLocalProfile] Failed to compute/persist player SSR skills after profile save.");
 
-            tryComputeAndPersist(
+            persisted |= tryComputeAndPersist(
                 username,
                 () =>
                 {
@@ -993,20 +1038,24 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 },
                 danAggregator != null,
                 "[EzLocalProfile] Failed to compute/persist player Dan estimates after profile save.");
+
+            return persisted;
         }
 
-        private static void tryComputeAndPersist(string username, Action action, bool enabled, string errorMessage)
+        private static bool tryComputeAndPersist(string username, Action action, bool enabled, string errorMessage)
         {
             if (!enabled)
-                return;
+                return false;
 
             try
             {
                 action();
+                return true;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Logger.Error(ex, $"{errorMessage} ({username})", Ez2ConfigManager.LOGGER_NAME);
+                return false;
             }
         }
 
