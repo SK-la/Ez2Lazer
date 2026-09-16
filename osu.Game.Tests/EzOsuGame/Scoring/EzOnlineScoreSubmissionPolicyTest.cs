@@ -40,6 +40,17 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         }
 
         [Test]
+        public void TestAllowsLegacyNegativeModesAsLazer()
+        {
+            var score = createManiaScore(-1, -1);
+            score.SessionOffsetPlusMania = 0;
+            score.SessionAccuracyCutoffA = EzOnlineScoreSubmissionPolicy.DEFAULT_ACCURACY_CUTOFF_A;
+            score.SessionAccuracyCutoffS = EzOnlineScoreSubmissionPolicy.DEFAULT_ACCURACY_CUTOFF_S;
+
+            Assert.That(EzOnlineScoreSubmissionPolicy.AllowsOfficialSubmission(score), Is.True);
+        }
+
+        [Test]
         public void TestBlocksSessionOffsetEvenIfGlobalConfigWouldBeZero()
         {
             var score = createManiaScore((int)EzEnumHitMode.Lazer, (int)EzEnumHealthMode.Lazer);

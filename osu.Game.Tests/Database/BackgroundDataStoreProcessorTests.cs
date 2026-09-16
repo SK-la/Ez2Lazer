@@ -261,7 +261,7 @@ INSERT INTO schema_version (number) VALUES (3);";
         }
 
         /// <summary>
-        /// [Ez] 局内双 Lazer 成绩落库为 ManiaHitMode=0/HealthMode=0（官方语义，未归一为 -1），
+        /// [Ez] 局内双 Lazer 成绩落库为 ManiaHitMode=0/HealthMode=0（官方语义），
         /// 必须跟随 ppy 上游正常升级，不得被 Ez 豁免批次跳过。
         /// </summary>
         [Test]

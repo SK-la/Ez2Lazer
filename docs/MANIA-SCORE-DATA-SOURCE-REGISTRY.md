@@ -55,7 +55,7 @@
 | ⛔ \| list 经 `GetStatisticsForDisplay()` **根据realm-score的hitmode切换HitResult列表行过滤/命名**，**不改 Statistics 字典计数**。                                                         |
 | ⛔ \| 观看回放 **不写 Realm**（除非再次手动重算）。                                                                                                                                    |
 | ✎ \| **观看回放后**同一 `ScoreInfo` 引用会被 `PopulateScore` **覆写**为 Drawable 统计。                                                                                               |
-| ⛔ \| 在ScoreInfo中，HitMode/HealthMode 双Lazer 等于双为空。举例场景：重算成绩时，如果ScoreInfo中HitMode/HealthMode为空，则视为双Lazer，且重写realm时依然保持HM/HM为空。并且，重算成绩如果发现ScoreInfo HM/HM是双lazer，也要改成双空 |
+| ⛔ \| **HitMode/HealthMode 没有"未设置"这一档**：`0` = Lazer = 默认，`1..8` = Ez 私有模式；新写入不再产生 `-1`。存量 `-1`（EZ1 迁移、`.osr` 导入）在**读取时**钳为 Lazer，不升版、不写迁移。展示层只在至少一个是 Ez 私有模式时画 `HIT/HP`（双 Lazer 与存量 `-1` 都不画）。重算沿用成绩内嵌值（`ForStored`）或当前环境（`ForLive`），不再做双 Lazer 归一 |
 | ❓ \| 重算后直接进入：**list ≈ Now**（你已测，offset=0）。                                                                                                                           |
 | ✎ \| 观看回放后：**list（M）优于 Now/list（N）**；列路由修复后仍残留 Perfect 计数差。                                                                                                      |
 | ✎ \| 上述残留分叉根因仍为 **Drawable（M）≠ Session（N）**；**不是** Now 误读 Realm。                                                                                                        |
@@ -266,3 +266,4 @@ flowchart TD
 | ✎ \| 2026-07-12 | ✎ \| BMS Session：KPoor 门控 + Earliest note-lock parity；扩 Lazer HM 小谱/叠键测试 |
 | ✎ \| 2026-08-01 | ✎ \| Session 断连 LN parity：持有中提早松手且未判定尾键时，模拟器在**断连时刻**立即产出 Body ComboBreak（对齐局内 `EzTriggerBodyAfterTailRelease`，不受候选窗口限制；`LaneTargetState.BodyJudged` 防尾判/结算重复补判；Malody 例外走 IgnoreHit）。修复「断连后重按到尾」场景 N 比 M 少 ComboBreak |
 | ✎ \| 2026-08-01 | ✎ \| `ManiaScoreProcessor` 无头默认 **Lazer 官方语义**（不再回读全局 HitMode；gameplay 经 `ApplyEzGameplayEnvironment` 开局冻结注入，Session 经 `HitModeOverride`）；官方分数升级批次（legacy 转换 / rank / mod 倍率）豁免**非官方判定语义**成绩（`stampEzGameplayModeScores`，判据 `ManiaHitMode > Lazer(0)`——局内双 Lazer 落库为 0/0 未归一，属官方语义须跟随 ppy 升级；HealthMode 与计分无关不参与判断）。背景：30000019 全量重转换曾用被全局 EZ2AC 污染的处理器错转 stable 成绩为 D + 超低分 |
+| ✎ \| 2026-09-16 | ✎ \| **删除 `UNSET_MODE(-1)`**：`ScoreInfo` 两个字段默认 `0`，读侧 `TryGetManiaGameplayModes` 对 mania 恒真并把负值钳为 Lazer；移除重算的 `normalizeLazerGameplayModes` 与 `Player.ImportScore` 的 `>=0` 写回判据（不再产生 -1）；`CreateDisplayDrawable` 对双 Lazer 不画 `HIT/HP`；EzRealmSync 剥离 Ez 列时写 `0`。不升 `EZ_REALM_SCHEMA_VERSION`、不加迁移 |
