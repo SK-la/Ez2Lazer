@@ -326,7 +326,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                         // Plays the chain has not rated yet are the other reason: the skills pass skips
                                         // them, so re-deriving that player is what folds them in once the chain is done.
                                         // Without both, a manual compute would leave the readout reporting work for good.
-                                        IReadOnlyList<string> stale = skillProvider?.GetStalePlayerSkillUsernames() ?? Array.Empty<string>();
+                                        IReadOnlyList<string> stale = skillProvider?.PlayerSkills.StaleUsernames ?? Array.Empty<string>();
 
                                         foreach (string staleUsername in stale)
                                             skillsScope.Add(EzLocalProfileConstants.NormaliseUsername(staleUsername));
@@ -526,8 +526,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
 
                 // The Realm-side skill rows now trail the SQLite slice: flag them and let the startup warmup refresh.
-                skillProvider?.MarkPlayerSkillStale(username);
-                skillProvider?.MarkPlayerSkillStale(EzLocalProfileConstants.ALL_PLAYERS);
+                skillProvider?.PlayerSkills.SetStale(username, true);
+                skillProvider?.PlayerSkills.SetStale(EzLocalProfileConstants.ALL_PLAYERS, true);
 
                 InvalidateSessionCaches();
                 Snapshot.Value = Store.LoadSnapshot();
@@ -599,7 +599,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     pending[username] = missing;
             }
 
-            var stale = skillProvider?.GetStalePlayerSkillUsernames() ?? Array.Empty<string>();
+            var stale = skillProvider?.PlayerSkills.StaleUsernames ?? Array.Empty<string>();
             var includedSet = new HashSet<string>(included, StringComparer.Ordinal);
             var staleIncluded = stale.Where(includedSet.Contains).ToList();
 
@@ -678,7 +678,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             if (combined.Count == 0)
             {
-                skillProvider?.DeletePlayerSkillData(EzLocalProfileConstants.ALL_PLAYERS);
+                skillProvider?.PlayerSkills.Delete(EzLocalProfileConstants.ALL_PLAYERS);
                 return;
             }
 
@@ -898,7 +898,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var (refreshReal, orphaned) = EzPlayerSkillRefreshScope.Resolve(selectedReal, refreshScope, included);
 
             foreach (string orphanUsername in orphaned)
-                skillProvider?.DeletePlayerSkillData(orphanUsername);
+                skillProvider?.PlayerSkills.Delete(orphanUsername);
 
             // The archive-wide bag is re-derived whenever a real player is. It is also refreshed on its own when the
             // scope names it: a settled play flags All alongside the player, so a pass that covers no real player
@@ -973,7 +973,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     // same rule the archive-wide bag follows (see refreshAllPlayerSkills). Self-healing: a play that
                     // becomes readable again leaves a drill the ledger can no longer match, so the next compute
                     // rebuilds this player's slice and re-derives the rows.
-                    skillProvider?.DeletePlayerSkillData(username);
+                    skillProvider?.PlayerSkills.Delete(username);
                     continue;
                 }
 
@@ -982,7 +982,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 if (!persisted)
                     continue;
 
-                skillProvider?.ClearPlayerSkillStale(username);
+                skillProvider?.PlayerSkills.SetStale(username, false);
 
                 if (missedCharts.Count > 0)
                     missedChartsByUser.Add(username);
@@ -993,13 +993,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 token.ThrowIfCancellationRequested();
 
                 if (persistUserSkills(EzLocalProfileConstants.ALL_PLAYERS, allBag, tick, token, ssrPlayCache, danPlayCache, missingCharts, out _))
-                    skillProvider?.ClearPlayerSkillStale(EzLocalProfileConstants.ALL_PLAYERS);
+                    skillProvider?.PlayerSkills.SetStale(EzLocalProfileConstants.ALL_PLAYERS, false);
             }
             else if (refreshAll)
             {
                 // Nothing to build an archive-wide bag from: drop the sentinel rows rather than leave a stale flag
                 // no pass can clear (mirrors refreshAllPlayerSkills' empty-bag case).
-                skillProvider?.DeletePlayerSkillData(EzLocalProfileConstants.ALL_PLAYERS);
+                skillProvider?.PlayerSkills.Delete(EzLocalProfileConstants.ALL_PLAYERS);
             }
 
             if (skillsProcessed < skillsTotal)
@@ -1017,10 +1017,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 // All aggregates the same plays, so it has the same hole the moment any real player does.
                 if (missedChartsByUser.Count > 0)
-                    skillProvider?.MarkPlayerSkillStale(EzLocalProfileConstants.ALL_PLAYERS);
+                    skillProvider?.PlayerSkills.SetStale(EzLocalProfileConstants.ALL_PLAYERS, true);
 
                 foreach (string missingUsername in missedChartsByUser)
-                    skillProvider?.MarkPlayerSkillStale(missingUsername);
+                    skillProvider?.PlayerSkills.SetStale(missingUsername, true);
 
                 ChartSideBackfillRequested?.Invoke();
             }

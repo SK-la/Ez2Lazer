@@ -215,16 +215,20 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 Assert.That(store.GetStalePlayerSkillUsernames(), Is.Empty);
 
-                Assert.That(store.MarkPlayerSkillStale("alpha"), Is.GreaterThan(0));
-                Assert.That(store.MarkPlayerSkillStale("beta"), Is.GreaterThan(0));
+                Assert.That(store.SetPlayerSkillStale("alpha", true), Is.GreaterThan(0));
+                Assert.That(store.SetPlayerSkillStale("beta", true), Is.GreaterThan(0));
                 Assert.That(store.GetStalePlayerSkillUsernames(), Is.EquivalentTo(new[] { "alpha", "beta" }));
 
                 // One player's pass must not un-flag another's rows.
-                Assert.That(store.ClearPlayerSkillStale("alpha"), Is.GreaterThan(0));
+                Assert.That(store.SetPlayerSkillStale("alpha", false), Is.GreaterThan(0));
                 Assert.That(store.GetStalePlayerSkillUsernames(), Is.EquivalentTo(new[] { "beta" }));
 
                 // Flag already gone: nothing to write.
-                Assert.That(store.ClearPlayerSkillStale("alpha"), Is.EqualTo(0));
+                Assert.That(store.SetPlayerSkillStale("alpha", false), Is.EqualTo(0));
+                Assert.That(store.SetPlayerSkillStale("alpha", true), Is.GreaterThan(0));
+                Assert.That(store.SetPlayerSkillStale("alpha", true), Is.EqualTo(0), "flag already set: nothing to write");
+
+                store.SetPlayerSkillStale("alpha", false);
 
                 var snapshot = store.GetPlayerSsrSnapshot("alpha", 4);
                 Assert.That(snapshot.Stale, Is.False);
@@ -250,7 +254,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);
 
-                store.MarkPlayerSkillStale("alpha");
+                store.SetPlayerSkillStale("alpha", true);
 
                 var details = store.GetStalePlayerSkillDetails();
 
@@ -261,7 +265,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(details[0].Rows, Is.EqualTo(alphaRows));
                 Assert.That(details[0].ComputedAt, Is.GreaterThan(DateTimeOffset.UtcNow.AddMinutes(-5)));
 
-                store.ClearPlayerSkillStale("alpha");
+                store.SetPlayerSkillStale("alpha", false);
 
                 Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);
             });

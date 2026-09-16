@@ -1270,67 +1270,47 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Flag every stored <see cref="EzPlayerSkillValue"/> row for one player (SSR / pattern) as stale without
-        /// changing any value. Used when a newly settled play has been folded into the SQLite slice but the player's
-        /// Realm-side skill rows have not been recomputed yet: the UI keeps showing the old numbers and marks them
-        /// stale, and the startup warmup refreshes them.
-        /// </summary>
-        /// <remarks>
+        /// Set or clear the stale flag on every stored <see cref="EzPlayerSkillValue"/> row for one player without
+        /// changing any value.
+        /// <para>
+        /// The flag means the player's SQLite slice has moved on since these rows were written - a settled play was
+        /// folded in, or the skills pass had to skip one because the chart chain had not rated its chart yet - so the
+        /// numbers on screen are still the previous pass's. It is player-scoped rather than per-row because the pass
+        /// that clears it re-derives that player wholesale: a row it could not re-derive (SSR values for a keymode
+        /// whose plays are gone, say) must not keep reporting work no later pass will pick up.
+        /// </para>
+        /// <para>
         /// Dan rows (<see cref="EzDanEstimate"/> / <see cref="EzPlayerDanSkillsetValue"/>) carry no stale flag, so
         /// they can only be corrected by an actual recompute.
-        /// </remarks>
-        /// <returns>Number of rows newly flagged.</returns>
-        public int MarkPlayerSkillStale(string username)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(username);
-
-            int flagged = 0;
-
-            realmAccess.Write(r =>
-            {
-                foreach (var row in r.All<EzPlayerSkillValue>().Where(v => v.Username == username && !v.Stale).ToList())
-                {
-                    row.Stale = true;
-                    flagged++;
-                }
-            });
-
-            return flagged;
-        }
-
-        /// <summary>
-        /// Clear the stale flag on every stored row for one player without changing any value. Called once a refresh
-        /// pass has covered that player's slice: the flag is player-scoped, so a row the pass could not re-derive
-        /// (SSR/pattern values for a keymode whose plays are gone, say) must not keep reporting work that no later
-        /// pass will ever pick up.
+        /// </para>
         /// </summary>
-        /// <returns>Number of rows newly un-flagged.</returns>
-        public int ClearPlayerSkillStale(string username)
+        /// <returns>Number of rows whose flag changed.</returns>
+        public int SetPlayerSkillStale(string username, bool stale)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
-            // Read first: a refresh pass rewrites its rows unstale, so the usual call has nothing to clear, and the
+            // Read first: a refresh pass rewrites its rows unflagged, so the usual clear has nothing to do, and the
             // write transaction (which wakes every change-notification subscriber) is the expensive half.
-            bool anyStale = realmAccess.Run(r => r.All<EzPlayerSkillValue>()
-                                                  .Where(v => v.Username == username && v.Stale)
-                                                  .AsEnumerable()
-                                                  .Any());
+            bool any = realmAccess.Run(r => r.All<EzPlayerSkillValue>()
+                                             .Where(v => v.Username == username && v.Stale != stale)
+                                             .AsEnumerable()
+                                             .Any());
 
-            if (!anyStale)
+            if (!any)
                 return 0;
 
-            int cleared = 0;
+            int changed = 0;
 
             realmAccess.Write(r =>
             {
-                foreach (var row in r.All<EzPlayerSkillValue>().Where(v => v.Username == username && v.Stale).ToList())
+                foreach (var row in r.All<EzPlayerSkillValue>().Where(v => v.Username == username && v.Stale != stale).ToList())
                 {
-                    row.Stale = false;
-                    cleared++;
+                    row.Stale = stale;
+                    changed++;
                 }
             });
 
-            return cleared;
+            return changed;
         }
 
         /// <summary>
