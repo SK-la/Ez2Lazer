@@ -197,6 +197,80 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             });
         }
 
+        /// <summary>
+        /// The player-chain flag is per player, and it is what a manual compute reads to decide whose Realm rows to
+        /// re-derive. A pass that covered a player must therefore be able to clear it wholesale: a row the pass could
+        /// not re-derive (SSR values for a keymode whose plays are gone, say) has no later pass to pick it up, so
+        /// leaving it set would keep the status readout warning forever.
+        /// </summary>
+        [Test]
+        public void Stale_player_skill_flag_is_cleared_per_player_without_touching_values()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+
+                store.WritePlayerSsr("alpha", 4, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerSsr("beta", 4, new EzSkillsetVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+
+                Assert.That(store.GetStalePlayerSkillUsernames(), Is.Empty);
+
+                Assert.That(store.SetPlayerSkillStale("alpha", true), Is.GreaterThan(0));
+                Assert.That(store.SetPlayerSkillStale("beta", true), Is.GreaterThan(0));
+                Assert.That(store.GetStalePlayerSkillUsernames(), Is.EquivalentTo(new[] { "alpha", "beta" }));
+
+                // One player's pass must not un-flag another's rows.
+                Assert.That(store.SetPlayerSkillStale("alpha", false), Is.GreaterThan(0));
+                Assert.That(store.GetStalePlayerSkillUsernames(), Is.EquivalentTo(new[] { "beta" }));
+
+                // Flag already gone: nothing to write.
+                Assert.That(store.SetPlayerSkillStale("alpha", false), Is.EqualTo(0));
+                Assert.That(store.SetPlayerSkillStale("alpha", true), Is.GreaterThan(0));
+                Assert.That(store.SetPlayerSkillStale("alpha", true), Is.EqualTo(0), "flag already set: nothing to write");
+
+                store.SetPlayerSkillStale("alpha", false);
+
+                var snapshot = store.GetPlayerSsrSnapshot("alpha", 4);
+                Assert.That(snapshot.Stale, Is.False);
+                Assert.That(snapshot.Values, Is.Not.Empty);
+                Assert.That(snapshot.Values.Values.Max(), Is.EqualTo(10).Within(1e-9));
+            });
+        }
+
+        /// <summary>
+        /// The readout lists the stale players with what the flag actually means: how much of their row set is flagged
+        /// and when the values it is showing were written. A count alone cannot tell "behind by one play" from "values
+        /// from a week ago", and the note has to be able to say which.
+        /// </summary>
+        [Test]
+        public void Stale_player_details_carry_the_row_count_and_newest_write_time()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+
+                store.WritePlayerSsr("alpha", 4, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerSsr("beta", 4, new EzSkillsetVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+
+                Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);
+
+                store.SetPlayerSkillStale("alpha", true);
+
+                var details = store.GetStalePlayerSkillDetails();
+
+                Assert.That(details.Count, Is.EqualTo(1));
+                Assert.That(details[0].Username, Is.EqualTo("alpha"));
+
+                int alphaRows = realm.Run(r => r.All<EzPlayerSkillValue>().Count(v => v.Username == "alpha"));
+                Assert.That(details[0].Rows, Is.EqualTo(alphaRows));
+                Assert.That(details[0].ComputedAt, Is.GreaterThan(DateTimeOffset.UtcNow.AddMinutes(-5)));
+
+                store.SetPlayerSkillStale("alpha", false);
+
+                Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);
+            });
+        }
+
         private static void seedCharts(RealmAccess realm)
         {
             realm.Write(r =>

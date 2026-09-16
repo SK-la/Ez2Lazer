@@ -86,8 +86,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
-        /// The player pass hit charts with no chart-side rows: hand them to the chain that owns them, and remember
-        /// that the players it affects (already flagged stale) want another fold once the chain is done.
+        /// The player pass hit charts with no chart-side rows: hand them to the chain that owns them, and leave the
+        /// players whose own plays hit one flagged so the follow-up below re-derives exactly them.
         /// </summary>
         private void requestChartSideBackfill()
         {
@@ -125,7 +125,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 chartFollowUpsRemaining--;
             }
 
-            // The affected players and All are already flagged stale, so the plan picks up exactly them.
+            // The plan covers both halves of "behind": rows flagged for a play that could not be folded in yet, and
+            // whatever the ledger shows the chain still owes - so the re-derive happens even if the flag was already
+            // cleared by an earlier pass.
             startAlign();
         }
 

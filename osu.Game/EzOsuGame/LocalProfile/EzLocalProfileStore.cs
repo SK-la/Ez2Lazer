@@ -302,6 +302,37 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
+        /// <summary>
+        /// Every (player, chart) pair the mania drill ledger holds. Which charts a player's plays are still waiting
+        /// on is derived from this against the chart chain's own coverage, so that debt needs no persisted flag of its
+        /// own and disappears by construction once the chain catches up.
+        /// </summary>
+        public IReadOnlyList<(string Username, string BeatmapHash)> LoadManiaDrillChartPlays()
+        {
+            lock (sync)
+            {
+                ensureInitialised();
+                using var connection = openConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT DISTINCT username, beatmap_hash FROM drill_scores WHERE ruleset_id = $ruleset_id;";
+                cmd.Parameters.AddWithValue("$ruleset_id", EzLocalProfileConstants.MANIA_RULESET_ID);
+
+                var plays = new List<(string, string)>();
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    string username = reader.GetString(0);
+                    string hash = reader.GetString(1);
+
+                    if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(hash))
+                        plays.Add((username, hash));
+                }
+
+                return plays;
+            }
+        }
+
         /// <summary>Idempotency gate for the per-play ingest: a score whose drill row already exists is counted.</summary>
         public bool ContainsDrillScore(Guid scoreId)
         {

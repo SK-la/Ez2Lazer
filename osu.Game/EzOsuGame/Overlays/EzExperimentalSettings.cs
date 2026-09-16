@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.Overlays
                           RulesetStore? rulesetStore,
                           EzExternalRulesetManagerDialog? externalRulesetManager)
         {
-            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, skillStore, dialogOverlay, notifications);
+            EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, analysisWarmupProcessor, skillStore, dialogOverlay, notifications, localProfileService?.Store);
 
             Add(new SettingsButtonV2
             {

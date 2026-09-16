@@ -5,6 +5,7 @@ using osu.Framework.Bindables;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
@@ -26,7 +27,8 @@ namespace osu.Game.EzOsuGame.Overlays
             EzAnalysisWarmupProcessor? analysisWarmupProcessor,
             EzSkillStore? skillStore,
             IDialogOverlay? dialogOverlay,
-            INotificationOverlay? notifications)
+            INotificationOverlay? notifications,
+            EzLocalProfileStore? localProfileStore = null)
         {
             var rebuildTarget = new Bindable<EzDataRebuildTarget>(EzDataRebuildTarget.RealmChartSkillChain);
             var maintenanceHandler = new EzDataRebuildMaintenanceHandler(backgroundDataStoreProcessor, analysisWarmupProcessor, dialogOverlay, notifications);
@@ -58,7 +60,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             subsection.Add(executeButton);
 
-            addSkillDataStatus(subsection, backgroundDataStoreProcessor, skillStore);
+            addSkillDataStatus(subsection, backgroundDataStoreProcessor, skillStore, localProfileStore);
         }
 
         /// <summary>
@@ -68,9 +70,10 @@ namespace osu.Game.EzOsuGame.Overlays
         private static void addSkillDataStatus(
             SettingsSubsection subsection,
             BackgroundDataStoreProcessor? backgroundDataStoreProcessor,
-            EzSkillStore? skillStore)
+            EzSkillStore? skillStore,
+            EzLocalProfileStore? localProfileStore)
         {
-            var statusNote = new EzSkillDataStatusNote(skillStore, backgroundDataStoreProcessor);
+            var statusNote = new EzSkillDataStatusNote(skillStore, backgroundDataStoreProcessor, localProfileStore);
 
             var refreshButton = new SettingsButtonV2
             {

@@ -941,6 +941,33 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// Mania chart hashes the chart-side chain will rate at all. MSD is gated on the CS-derived column count and
+        /// both later stages wait on MSD, so a chart outside the engine's keymode range is skipped by the whole chain
+        /// and can never be something a play is "waiting" on.
+        /// </summary>
+        public HashSet<string> GetRateableChartHashes() => realmAccess.Run(collectRateableChartHashes);
+
+        private static HashSet<string> collectRateableChartHashes(Realm r)
+        {
+            var hashes = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var b in r.All<BeatmapInfo>())
+            {
+                if (b.BeatmapSet == null || b.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(b.Hash))
+                    continue;
+
+                // The chain drops keymodes its engine cannot rate at candidate time, so those charts are not
+                // pending work and must not be counted as missing - otherwise "all current" is unreachable.
+                if (!EzChartChainCoverage.IsRateableKeyCount((int)Math.Round(b.Difficulty.CircleSize)))
+                    continue;
+
+                hashes.Add(b.Hash);
+            }
+
+            return hashes;
+        }
+
+        /// <summary>
         /// Snapshot of the chart skill chain's completeness, counted over every mania chart in Realm.
         /// <para>
         /// Reads all three facet tables in one run, so call it off the UI thread; it is meant for an
@@ -957,20 +984,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             return realmAccess.Run(r =>
             {
-                var chartHashes = new HashSet<string>(StringComparer.Ordinal);
-
-                foreach (var b in r.All<BeatmapInfo>())
-                {
-                    if (b.BeatmapSet == null || b.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(b.Hash))
-                        continue;
-
-                    // The chain drops keymodes its engine cannot rate at candidate time, so those charts are not
-                    // pending work and must not be counted as missing - otherwise "all current" is unreachable.
-                    if (!EzChartChainCoverage.IsRateableKeyCount((int)Math.Round(b.Difficulty.CircleSize)))
-                        continue;
-
-                    chartHashes.Add(b.Hash);
-                }
+                var chartHashes = collectRateableChartHashes(r);
 
                 var msdByHash = r.All<EzBeatmapSkillValue>()
                                  .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD)
@@ -1256,38 +1270,53 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Flag every stored <see cref="EzPlayerSkillValue"/> row for one player (SSR / pattern) as stale without
-        /// changing any value. Used when a newly settled play has been folded into the SQLite slice but the player's
-        /// Realm-side skill rows have not been recomputed yet: the UI keeps showing the old numbers and marks them
-        /// stale, and the startup warmup refreshes them.
-        /// </summary>
-        /// <remarks>
+        /// Set or clear the stale flag on every stored <see cref="EzPlayerSkillValue"/> row for one player without
+        /// changing any value.
+        /// <para>
+        /// The flag means the player's SQLite slice has moved on since these rows were written - a settled play was
+        /// folded in, or the skills pass had to skip one because the chart chain had not rated its chart yet - so the
+        /// numbers on screen are still the previous pass's. It is player-scoped rather than per-row because the pass
+        /// that clears it re-derives that player wholesale: a row it could not re-derive (SSR values for a keymode
+        /// whose plays are gone, say) must not keep reporting work no later pass will pick up.
+        /// </para>
+        /// <para>
         /// Dan rows (<see cref="EzDanEstimate"/> / <see cref="EzPlayerDanSkillsetValue"/>) carry no stale flag, so
         /// they can only be corrected by an actual recompute.
-        /// </remarks>
-        /// <returns>Number of rows newly flagged.</returns>
-        public int MarkPlayerSkillStale(string username)
+        /// </para>
+        /// </summary>
+        /// <returns>Number of rows whose flag changed.</returns>
+        public int SetPlayerSkillStale(string username, bool stale)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
-            int flagged = 0;
+            // Read first: a refresh pass rewrites its rows unflagged, so the usual clear has nothing to do, and the
+            // write transaction (which wakes every change-notification subscriber) is the expensive half.
+            bool any = realmAccess.Run(r => r.All<EzPlayerSkillValue>()
+                                             .Where(v => v.Username == username && v.Stale != stale)
+                                             .AsEnumerable()
+                                             .Any());
+
+            if (!any)
+                return 0;
+
+            int changed = 0;
 
             realmAccess.Write(r =>
             {
-                foreach (var row in r.All<EzPlayerSkillValue>().Where(v => v.Username == username && !v.Stale).ToList())
+                foreach (var row in r.All<EzPlayerSkillValue>().Where(v => v.Username == username && v.Stale != stale).ToList())
                 {
-                    row.Stale = true;
-                    flagged++;
+                    row.Stale = stale;
+                    changed++;
                 }
             });
 
-            return flagged;
+            return changed;
         }
 
         /// <summary>
         /// Players with at least one skill row flagged stale, i.e. their SQLite slice has moved on since the
-        /// Realm-side skills were written. This is what the startup reconcile looks at to decide whose skills need
-        /// refreshing (a play folded in after the last successful skill pass).
+        /// Realm-side skills were written. This is the scope a reconcile reads to decide whose skills need refreshing
+        /// (a play folded in after the last successful skill pass); it is also the manual compute's default scope.
         /// </summary>
         public IReadOnlyList<string> GetStalePlayerSkillUsernames()
         {
@@ -1297,6 +1326,23 @@ namespace osu.Game.EzOsuGame.Skills
                                         .Select(v => v.Username)
                                         .Where(n => !string.IsNullOrEmpty(n))
                                         .Distinct(StringComparer.Ordinal)
+                                        .ToList());
+        }
+
+        /// <summary>
+        /// The stale players with the row count and newest write time behind the flag. Same rows
+        /// <see cref="GetStalePlayerSkillUsernames"/> reports; this shape exists so the status readout can show why a
+        /// player is listed (how much is flagged, and how far back the values it is showing were written).
+        /// </summary>
+        public IReadOnlyList<EzStalePlayerSkill> GetStalePlayerSkillDetails()
+        {
+            return realmAccess.Run(r => r.All<EzPlayerSkillValue>()
+                                        .Where(v => v.Stale)
+                                        .AsEnumerable()
+                                        .Where(v => !string.IsNullOrEmpty(v.Username))
+                                        .GroupBy(v => v.Username, StringComparer.Ordinal)
+                                        .Select(g => new EzStalePlayerSkill(g.Key, g.Count(), g.Max(v => v.ComputedAt)))
+                                        .OrderBy(s => s.Username, StringComparer.Ordinal)
                                         .ToList());
         }
 
