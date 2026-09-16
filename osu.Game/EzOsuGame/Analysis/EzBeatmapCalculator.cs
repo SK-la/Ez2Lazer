@@ -10,7 +10,7 @@ using osu.Game.Rulesets.Objects.Types;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
-    public class EzBeatmapCalculator
+    public static class EzBeatmapCalculator
     {
         public static (double averageKps, double maxKps, List<double> kpsList) GetKps(IBeatmap beatmap)
         {
@@ -124,7 +124,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     keyCount = k + 1;
             }
 
-            if (maxKps == 0) return $"[{keyCount}k] ";
+            if (maxKps == 0) return $"{keyCount}k";
 
             // 将列统计映射为固定长度数组，方便计算空列与首尾列高低。
             int[] countsByColumn = new int[keyCount];
@@ -135,7 +135,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     countsByColumn[column] = count;
             }
 
-            string result = resolveEdgeLabel(keyCount, countsByColumn) ?? $"[{keyCount}k] ";
+            string result = resolveEdgeLabel(keyCount, countsByColumn) ?? $"{keyCount}k";
 
             return result;
         }
@@ -167,56 +167,56 @@ namespace osu.Game.EzOsuGame.Analysis
             switch (keyCount)
             {
                 case 6:
-                    if (bothLow) return "[4+2k] ";
-                    if (singleLow) return "[5+1k] ";
-                    if (singleHigh || mixed) return "[5k1s] ";
+                    if (bothLow) return "4+2k";
+                    if (singleLow) return "5+1k";
+                    if (singleHigh || mixed) return "5k1s";
 
                     return null;
 
                 case 7:
-                    return (mixed || bothLow) ? "[5k1s1p] " : null;
+                    return (mixed || bothLow) ? "5k1s1p" : null;
 
                 case 8:
-                    if (bothHigh) return "[6k2s] ";
-                    if (bothLow) return "[6+2k] ";
-                    if (singleHigh || mixed) return "[7k1s] ";
-                    if (singleLow) return "[7+1k] ";
+                    if (bothHigh) return "6k2s";
+                    if (bothLow) return "6+2k";
+                    if (singleHigh || mixed) return "7k1s";
+                    if (singleLow) return "7+1k";
 
                     return null;
 
                 case 9:
                     if (!bothSignificant) return null;
 
-                    if (skipEmptyEdgeColumns) return "[5k1s2e1p] ";
+                    if (skipEmptyEdgeColumns) return "5k1s2e1p";
 
-                    return bothLow ? "[7+2k] " : "[7k2s] ";
+                    return bothLow ? "7+2k" : "7k2s";
 
                 case 10:
 
-                    if (bothHigh) return "[8k2s] ";
-                    if (bothLow) return "[8+2k] ";
+                    if (bothHigh) return "8k2s";
+                    if (bothLow) return "8+2k";
 
                     return null;
 
                 case 12:
-                    return anySignificant ? "[10k2s] " : null;
+                    return anySignificant ? "10k2s" : null;
 
                 case 13:
-                    return skipEmptyEdgeColumns ? "[10k2s1p] " : "[13k] ";
+                    return skipEmptyEdgeColumns ? "10k2s1p" : "13k";
 
                 case 14:
                     // 14k 特例：10k2s1p 开启时看第 14 列（索引 13，ez2ac 的 alpha 列）是否为空。
-                    if (!skipEmptyEdgeColumns) return "[14k] ";
+                    if (!skipEmptyEdgeColumns) return "14k";
 
-                    return countsByColumn.Length > 13 && countsByColumn[13] == 0 ? "[10k2s1p] " : "[14k] ";
+                    return countsByColumn.Length > 13 && countsByColumn[13] == 0 ? "10k2s1p" : "14k";
 
                 case 16:
-                    if (bothSignificant && skipEmptyEdgeColumns) return "[10k2s4e] ";
+                    if (bothSignificant && skipEmptyEdgeColumns) return "10k2s4e";
 
-                    return anySignificant ? "[14k2s] " : null;
+                    return anySignificant ? "14k2s" : null;
 
                 case 18:
-                    return anySignificant ? "[16k2s] " : null;
+                    return anySignificant ? "16k2s" : null;
 
                 default:
                     return null;

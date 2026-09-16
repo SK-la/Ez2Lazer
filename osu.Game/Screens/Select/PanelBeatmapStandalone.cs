@@ -566,7 +566,7 @@ namespace osu.Game.Screens.Select
                 if (scratchText != null)
                 {
                     keyCountText.Alpha = 1;
-                    keyCountText.Text = scratchText;
+                    keyCountText.Text =LocalisableString.Interpolate($"[{scratchText}] ");
                     keyCountText.Colour = Colour4.LightPink.ToLinear();
                     return;
                 }
