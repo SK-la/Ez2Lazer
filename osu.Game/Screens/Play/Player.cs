@@ -1590,32 +1590,26 @@ namespace osu.Game.Screens.Play
             var imported = scoreManager.Import(importableScore, replayReader);
             Debug.Assert(imported != null);
 
-            if (imported != null)
+            imported.PerformRead(s =>
             {
-                imported.PerformRead(s =>
-                {
-                    // because of the clone above, it's required that we copy back the post-import hash/ID to use for availability matching.
-                    score.ScoreInfo.Hash = s.Hash;
-                    score.ScoreInfo.ID = s.ID;
-                    score.ScoreInfo.Files.AddRange(s.Files.Detach());
-                    score.ScoreInfo.ManiaHitMode = s.ManiaHitMode;
-                    score.ScoreInfo.ManiaHealthMode = s.ManiaHealthMode;
-                });
+                // because of the clone above, it's required that we copy back the post-import hash/ID to use for availability matching.
+                score.ScoreInfo.Hash = s.Hash;
+                score.ScoreInfo.ID = s.ID;
+                score.ScoreInfo.Files.AddRange(s.Files.Detach());
+                score.ScoreInfo.ManiaHitMode = s.ManiaHitMode;
+                score.ScoreInfo.ManiaHealthMode = s.ManiaHealthMode;
+            });
 
-                if (maniaHitMode >= 0 && maniaHealthMode >= 0)
-                {
-                    imported.PerformWrite(s =>
-                    {
-                        s.ManiaHitMode = maniaHitMode;
-                        s.ManiaHealthMode = maniaHealthMode;
-                    });
-                }
+            imported.PerformWrite(s =>
+            {
+                s.ManiaHitMode = maniaHitMode;
+                s.ManiaHealthMode = maniaHealthMode;
+            });
 
-                // [Ez] The score is now in Realm, so fold it into the local profile analysis here — the same place the
-                // score lands. Fire-and-forget: the call only touches SQLite and returns, and it is idempotent, while
-                // the startup warmup re-derives the Realm-side skill rows from whatever the slice now holds.
-                ezLocalProfileService?.IngestSettledScore(score.ScoreInfo.ID);
-            }
+            // [Ez] The score is now in Realm, so fold it into the local profile analysis here — the same place the
+            // score lands. Fire-and-forget: the call only touches SQLite and returns, and it is idempotent, while
+            // the startup warmup re-derives the Realm-side skill rows from whatever the slice now holds.
+            ezLocalProfileService?.IngestSettledScore(score.ScoreInfo.ID);
 
             return Task.CompletedTask;
         }

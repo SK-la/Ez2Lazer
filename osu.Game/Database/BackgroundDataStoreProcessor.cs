@@ -1865,7 +1865,7 @@ namespace osu.Game.Database
         /// 不参与官方分数升级：官方 legacy 转换 / rank 重算 / mod 倍率升级都不理解 Ez 判定与计分语义
         /// （曾把成绩错转为 D + 超低分）。这里直接把 TotalScoreVersion 盖到最新，避免每次启动重查；
         /// 此类成绩仅能通过 Ez Session 重算刷新。
-        /// 注意：局内双 Lazer 成绩落库为 ManiaHitMode=0（未归一），它们是官方语义，必须跟随 ppy 上游升级，
+        /// 注意：Lazer（0，含存量 -1 的旧行）是官方语义，必须跟随 ppy 上游升级，
         /// 因此判据只看 HitMode &gt; 0；HealthMode 只影响血量、与计分无关，不参与判断。
         /// </summary>
         private void stampEzGameplayModeScores()

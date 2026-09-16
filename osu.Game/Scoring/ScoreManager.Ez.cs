@@ -4,7 +4,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring.Legacy;
@@ -101,23 +100,11 @@ namespace osu.Game.Scoring
                 scoreInfo.ManiaHealthMode = (int)environment.ManiaHealthMode;
             }
 
-            normalizeLazerGameplayModes(scoreInfo);
-
             if (scoreInfo.OnlineID > 0 || scoreInfo.LegacyOnlineID > 0)
             {
                 scoreInfo.OnlineID = -1;
                 scoreInfo.LegacyOnlineID = -1;
             }
-        }
-
-        private static void normalizeLazerGameplayModes(ScoreInfo scoreInfo)
-        {
-            if (scoreInfo.ManiaHitMode != (int)EzEnumHitMode.Lazer
-                || scoreInfo.ManiaHealthMode != (int)EzEnumHealthMode.Lazer)
-                return;
-
-            scoreInfo.ManiaHitMode = EzManiaScoreModeExtensions.UNSET_MODE;
-            scoreInfo.ManiaHealthMode = EzManiaScoreModeExtensions.UNSET_MODE;
         }
     }
 }

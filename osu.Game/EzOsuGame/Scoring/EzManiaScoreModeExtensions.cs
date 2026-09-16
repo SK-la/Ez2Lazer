@@ -18,17 +18,13 @@ namespace osu.Game.EzOsuGame.Scoring
 {
     public static class EzManiaScoreModeExtensions
     {
-        public const int UNSET_MODE = -1;
-
-        public static bool HasManiaGameplayModes(this ScoreInfo score)
-        {
-            if (score.Ruleset.OnlineID != 3)
-                return false;
-
-            return score.ManiaHitMode >= 0
-                   && score.ManiaHealthMode >= 0;
-        }
-
+        /// <summary>
+        /// 成绩上的 Mania 判定/血量模式。Mania 成绩恒为 true：没有"未设置"这一档，Lazer(0) 即默认。
+        /// </summary>
+        /// <remarks>
+        /// 存量负值（EZ1 迁移、<c>.osr</c> 导入当年写入的 -1）按默认 Lazer 处理，不视为"无模式"。
+        /// 判定为"非默认"只能靠值本身是否 != Lazer，不能靠是否有值。
+        /// </remarks>
         public static bool TryGetManiaGameplayModes(this ScoreInfo score, out int hitMode, out int healthMode)
         {
             hitMode = score.ManiaHitMode;
@@ -37,12 +33,13 @@ namespace osu.Game.EzOsuGame.Scoring
             if (score.Ruleset.OnlineID != 3)
                 return false;
 
-            if (hitMode >= 0 && healthMode >= 0)
-                return true;
+            if (hitMode < 0)
+                hitMode = (int)EzEnumHitMode.Lazer;
 
-            hitMode = UNSET_MODE;
-            healthMode = UNSET_MODE;
-            return false;
+            if (healthMode < 0)
+                healthMode = (int)EzEnumHealthMode.Lazer;
+
+            return true;
         }
 
         /// <summary>
@@ -76,10 +73,12 @@ namespace osu.Game.EzOsuGame.Scoring
 
         /// <summary>
         /// Creates a vertical mode label block for use outside <see cref="FillDirection.Full"/> containers.
+        /// 双 Lazer（含存量 -1）等同"无 Ez 私有模式"，返回透明占位，不画 HIT/HP。
         /// </summary>
         public static Drawable CreateDisplayDrawable(ScoreInfo score, float fontSize = 11, Anchor anchor = Anchor.TopLeft)
         {
-            if (!score.TryGetManiaGameplayModes(out int hitMode, out int healthMode))
+            if (!score.TryGetManiaGameplayModes(out int hitMode, out int healthMode)
+                || (hitMode == (int)EzEnumHitMode.Lazer && healthMode == (int)EzEnumHealthMode.Lazer))
             {
                 return new Container
                 {

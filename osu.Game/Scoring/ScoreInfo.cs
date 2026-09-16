@@ -273,14 +273,18 @@ namespace osu.Game.Scoring
         public bool IsLegacyScore { get; set; }
 
         /// <summary>
-        /// Ez2Lazer: Mania hit mode used when this score was set. <see cref="EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE"/> when unknown or not mania.
+        /// Ez2Lazer: Mania hit mode used when this score was set. Lazer (0) is the default and the only value
+        /// for anything but an Ez-private mode; negative values exist only on scores written before the field
+        /// had a default and read back as Lazer.
         /// </summary>
-        public int ManiaHitMode { get; set; } = EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE;
+        public int ManiaHitMode { get; set; }
 
         /// <summary>
-        /// Ez2Lazer: Mania health mode used when this score was set. <see cref="EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE"/> when unknown or not mania.
+        /// Ez2Lazer: Mania health mode used when this score was set. Lazer (0) is the default and the only value
+        /// for anything but an Ez-private mode; negative values exist only on scores written before the field
+        /// had a default and read back as Lazer.
         /// </summary>
-        public int ManiaHealthMode { get; set; } = EzOsuGame.Scoring.EzManiaScoreModeExtensions.UNSET_MODE;
+        public int ManiaHealthMode { get; set; }
 
         /// <summary>
         /// Ez2Lazer: Mania offset-plus setting at gameplay start (submission eligibility snapshot).
