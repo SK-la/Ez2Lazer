@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -12,7 +13,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Utils;
-using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.EzMania.HUD;
 using osu.Game.Rulesets.Mania.UI;
@@ -42,10 +43,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private Column column { get; set; } = null!;
 
         [Resolved]
-        private IBeatmap beatmap { get; set; } = null!;
-
-        [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
+
+        /// <summary>
+        /// Drives the blink on the icon. Taken from the shared tracker, so the blink follows every timing section and
+        /// any live rate change instead of a repeating schedule set up once at load.
+        /// </summary>
+        private EzBeatmapSpeedTracker speedTracker = null!;
+
+        private double beatPhase;
 
         public Ez2KeyAreaPlus()
         {
@@ -165,11 +171,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             directionLocal.BindTo(scrollingInfo.Direction);
             directionLocal.BindValueChanged(onDirectionChanged, true);
 
-            // double bpm = beatmap.BeatmapInfo.BPM;
-            double bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
-            // cache inner box once to avoid repeated LINQ allocation inside scheduled callback
+            AddInternal(speedTracker = new EzBeatmapSpeedTracker());
+
+            // cache inner box once to avoid repeated LINQ allocation inside Update
             topIconBox = topIcon.Children.OfType<Box>().FirstOrDefault();
-            applyBlinkingEffect(topIconBox, bpm);
 
             // Use a local bindable bound to the column's shared bindable so we can safely unbind later.
             accentColourLocal.BindTo(column.AccentColour);
@@ -187,16 +192,34 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             column.TopLevelContainer.Add(CreateProxy());
         }
 
-        private void applyBlinkingEffect(Box? box, double bpm)
+        protected override void Update()
         {
-            if (box == null) return;
+            base.Update();
 
-            double interval = 60000 / bpm;
+            if (topIconBox == null)
+                return;
 
-            Scheduler.AddDelayed(() =>
+            double beatLength = speedTracker.BeatLength.Value;
+
+            if (beatLength <= 0)
+                return;
+
+            double elapsed = gameplayClock.ElapsedFrameTime;
+            double previousPhase = beatPhase;
+
+            // Elapsed time on the gameplay clock is already song time (it advances at the audible rate), so the beat
+            // length alone converts it into beats.
+            beatPhase = EzBeatmapSpeedTracker.AdvanceBeatPhase(beatPhase, elapsed, beatLength);
+
+            // A phase that went backwards wrapped, i.e. a beat just passed. The fade durations are song time too, which
+            // is the clock the transform runs on.
+            if (elapsed > 0 && beatPhase < previousPhase)
             {
-                box.FadeTo(1, interval / 2).Then().FadeTo(0, interval / 2);
-            }, interval, true);
+                double fadeTime = Math.Max(1, beatLength / 2);
+                var box = topIconBox;
+
+                box.FadeTo(1, fadeTime).Then().FadeTo(0, fadeTime);
+            }
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)

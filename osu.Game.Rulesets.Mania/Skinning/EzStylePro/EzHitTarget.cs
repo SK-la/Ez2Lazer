@@ -5,8 +5,8 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Screens.Play;
 using osu.Framework.Platform;
 using osu.Framework.Timing;
@@ -22,13 +22,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<double> hitTargetAlpha = new Bindable<double>();
 
         [Resolved]
-        private IBeatmap beatmap { get; set; } = null!;
-
-        [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
 
-        private double beatInterval;
-        private bool requiresUpdate;
+        /// <summary>
+        /// The beat this bobs to. Taking it from the shared tracker (rather than the metadata BPM captured at load)
+        /// is what makes it follow every timing section and any live rate change.
+        /// </summary>
+        private EzBeatmapSpeedTracker speedTracker = null!;
+
+        private double beatPhase;
 
         private IFrameBasedClock? hostClock;
 
@@ -48,47 +50,37 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // 使用 host 的 update 线程时钟作为独立时间源，从而在暂停时仍能继续动画。
             hostClock = host.UpdateThread.Clock;
 
-            calculateBeatInterval();
+            AddInternal(speedTracker = new EzBeatmapSpeedTracker());
 
             hitTargetFloatFixed.BindTo(ezSkinInfo.HitTargetFloatFixed);
-            hitTargetFloatFixed.BindValueChanged(_ =>
-            {
-                updatePosition();
-            }, true);
-
             hitTargetAlpha.BindTo(ezSkinInfo.HitTargetAlpha);
-            hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
 
-            requiresUpdate = true;
+            hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
         }
 
         protected override void Update()
         {
             base.Update();
 
-            if (requiresUpdate)
-            {
-                updatePosition();
-            }
-        }
-
-        private void calculateBeatInterval()
-        {
-            double bpm = beatmap.BeatmapInfo.BPM * gameplayClock.GetTrueGameplayRate();
-            beatInterval = 60000 / bpm;
+            updatePosition();
         }
 
         private void updatePosition()
         {
+            double beatLength = speedTracker.BeatLength.Value;
+
+            if (beatLength <= 0)
+                return;
+
             // 平滑正弦波效果
-            if (beatInterval > 0)
-            {
-                // 优先使用主机时钟（不会被 gameplay pause 停止），若不可用再回退到 gameplayClock。
-                double time = hostClock?.CurrentTime ?? gameplayClock.CurrentTime;
-                double progress = (time % beatInterval) / beatInterval;
-                double smoothValue = 0.3 * Math.Sin(progress * 2 * Math.PI);
-                Y = (float)(smoothValue * hitTargetFloatFixed.Value);
-            }
+            // The host clock is real time (it deliberately keeps running while gameplay is paused), so the audible
+            // rate has to convert it into song time; the gameplay clock's elapsed time would already carry it.
+            beatPhase = hostClock != null
+                ? EzBeatmapSpeedTracker.AdvanceBeatPhase(beatPhase, hostClock.ElapsedFrameTime, beatLength, speedTracker.Rate.Value)
+                : EzBeatmapSpeedTracker.AdvanceBeatPhase(beatPhase, gameplayClock.ElapsedFrameTime, beatLength);
+
+            double smoothValue = 0.3 * Math.Sin(beatPhase * 2 * Math.PI);
+            Y = (float)(smoothValue * hitTargetFloatFixed.Value);
         }
     }
 }

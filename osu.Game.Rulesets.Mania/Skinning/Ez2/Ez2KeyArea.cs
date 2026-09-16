@@ -13,9 +13,9 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Utils;
-using osu.Game.Beatmaps;
-using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Mods;
+using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
@@ -41,10 +41,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private Column column { get; set; } = null!;
 
         [Resolved]
-        private IBeatmap beatmap { get; set; } = null!;
-
-        [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
+
+        /// <summary>
+        /// Drives the beat flash on the icon. Taken from the shared tracker, so the flash follows every timing section
+        /// and any live rate change instead of a beat interval frozen at load.
+        /// </summary>
+        private EzBeatmapSpeedTracker speedTracker = null!;
+
+        private double beatPhase;
 
         public Ez2KeyArea()
         {
@@ -130,6 +135,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             applyAccent(accentColourLocal.Value);
             accentColourLocal.BindValueChanged(e => applyAccent(e.NewValue), true);
 
+            AddInternal(speedTracker = new EzBeatmapSpeedTracker());
+
             column.TopLevelContainer.Add(CreateProxy());
         }
 
@@ -138,14 +145,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             directionContainer.Height = (float)hitPositionLocal.Value;
         }
 
-        private double beatInterval;
-
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            double bpm = beatmap.BeatmapInfo.BPM * gameplayClock.GetTrueGameplayRate();
-            beatInterval = 60000 / bpm;
             // cache reference to inner box to avoid LINQ allocations during Update
             topIconBox = topIcon?.Children.OfType<Box>().FirstOrDefault();
         }
@@ -157,11 +160,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             if (topIconBox == null)
                 return;
 
-            double progress = (gameplayClock.CurrentTime % beatInterval) / beatInterval;
+            double beatLength = speedTracker.BeatLength.Value;
 
-            if (progress < gameplayClock.ElapsedFrameTime / beatInterval)
+            if (beatLength <= 0)
+                return;
+
+            double elapsed = gameplayClock.ElapsedFrameTime;
+            double previousPhase = beatPhase;
+
+            // Elapsed time on the gameplay clock is already song time (it advances at the audible rate), so the beat
+            // length alone converts it into beats.
+            beatPhase = EzBeatmapSpeedTracker.AdvanceBeatPhase(beatPhase, elapsed, beatLength);
+
+            // A phase that went backwards wrapped, i.e. a beat just passed. The fade durations are song time too, which
+            // is the clock the transform runs on.
+            if (elapsed > 0 && beatPhase < previousPhase)
             {
-                double fadeTime = Math.Max(1, beatInterval / 2);
+                double fadeTime = Math.Max(1, beatLength / 2);
                 var box = topIconBox;
 
                 box?.FadeTo(1, fadeTime)

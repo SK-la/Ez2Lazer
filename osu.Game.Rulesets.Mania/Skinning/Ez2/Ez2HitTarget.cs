@@ -5,7 +5,7 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
 using osuTK.Graphics;
@@ -16,13 +16,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     {
         private IBindable<ScrollingDirection> direction = null!;
 
-        private double bpm;
-
-        [Resolved]
-        private IBeatmap beatmap { get; set; } = null!;
+        private double beatPhase;
 
         [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
+
+        /// <summary>
+        /// The beat this bobs to. Taking it from the shared tracker (rather than a BPM captured once at load) is what
+        /// makes it follow every timing section and any live rate change.
+        /// </summary>
+        private EzBeatmapSpeedTracker speedTracker = null!;
 
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
@@ -38,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             direction = scrollingInfo.Direction;
             direction.BindValueChanged(onDirectionChanged, true);
 
-            bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
+            AddInternal(speedTracker = new EzBeatmapSpeedTracker());
         }
 
         protected override void Update()
@@ -46,12 +49,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             base.Update();
             Height = DrawWidth;
 
-            double interval = 60000 / bpm;
-            const double amplitude = 6.0;
-            double progress = (gameplayClock.CurrentTime % interval) / interval;
+            double beatLength = speedTracker.BeatLength.Value;
 
-            double smoothValue = smoothSineWave(progress);
-            Y = (float)(smoothValue * amplitude);
+            if (beatLength <= 0)
+                return;
+
+            // Elapsed time on the gameplay clock is already song time (it advances at the audible rate), so the beat
+            // length alone converts it into beats.
+            beatPhase = EzBeatmapSpeedTracker.AdvanceBeatPhase(beatPhase, gameplayClock.ElapsedFrameTime, beatLength);
+
+            const double amplitude = 6.0;
+            Y = (float)(smoothSineWave(beatPhase) * amplitude);
         }
 
         private double smoothSineWave(double t)
