@@ -1285,9 +1285,44 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// Clear the stale flag on every stored row for one player without changing any value. Called once a refresh
+        /// pass has covered that player's slice: the flag is player-scoped, so a row the pass could not re-derive
+        /// (SSR/pattern values for a keymode whose plays are gone, say) must not keep reporting work that no later
+        /// pass will ever pick up.
+        /// </summary>
+        /// <returns>Number of rows newly un-flagged.</returns>
+        public int ClearPlayerSkillStale(string username)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+
+            // Read first: a refresh pass rewrites its rows unstale, so the usual call has nothing to clear, and the
+            // write transaction (which wakes every change-notification subscriber) is the expensive half.
+            bool anyStale = realmAccess.Run(r => r.All<EzPlayerSkillValue>()
+                                                  .Where(v => v.Username == username && v.Stale)
+                                                  .AsEnumerable()
+                                                  .Any());
+
+            if (!anyStale)
+                return 0;
+
+            int cleared = 0;
+
+            realmAccess.Write(r =>
+            {
+                foreach (var row in r.All<EzPlayerSkillValue>().Where(v => v.Username == username && v.Stale).ToList())
+                {
+                    row.Stale = false;
+                    cleared++;
+                }
+            });
+
+            return cleared;
+        }
+
+        /// <summary>
         /// Players with at least one skill row flagged stale, i.e. their SQLite slice has moved on since the
-        /// Realm-side skills were written. This is what the startup reconcile looks at to decide whose skills need
-        /// refreshing (a play folded in after the last successful skill pass).
+        /// Realm-side skills were written. This is the scope a reconcile reads to decide whose skills need refreshing
+        /// (a play folded in after the last successful skill pass); it is also the manual compute's default scope.
         /// </summary>
         public IReadOnlyList<string> GetStalePlayerSkillUsernames()
         {

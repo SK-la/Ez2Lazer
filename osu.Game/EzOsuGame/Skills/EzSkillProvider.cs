@@ -245,6 +245,23 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// Clear the stale flag on a player's stored rows once a refresh pass has covered their slice. A row the pass
+        /// could not re-derive keeps its value, but stops reporting work that no later pass will pick up.
+        /// </summary>
+        /// <returns>Number of rows newly un-flagged.</returns>
+        public int ClearPlayerSkillStale(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return 0;
+
+            int cleared = store.ClearPlayerSkillStale(username);
+
+            InvalidatePlayerSsrSnapshot();
+
+            return cleared;
+        }
+
+        /// <summary>
         /// Players whose stored skill rows are flagged stale — their SQLite slice has moved on since the Realm-side
         /// skills were written, so the startup reconcile refreshes them.
         /// </summary>
