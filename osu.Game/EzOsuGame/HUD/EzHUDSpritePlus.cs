@@ -17,10 +17,13 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
-using osu.Game.Rulesets.Difficulty.Utils;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.UI;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osu.Game.Utils;
 using osuTK;
@@ -88,7 +91,34 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
+        [Resolved(canBeNull: true)]
+        private IBindable<IReadOnlyList<Mod>>? mods { get; set; }
+
+        // Only available while playing, which is where the chart's timing points can be read from. The HUD itself is
+        // clocked in real time, so the song time has to be obtained via the frame-stable clock as well.
+        [Resolved(canBeNull: true)]
+        private GameplayState? gameplayState { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private IFrameStableClock? frameStableClock { get; set; }
+
         private Drawable? currentDrawable;
+        private TextureAnimation? currentAnimation;
+
+        // Frames are baked once at this length; every playback speed influence is applied on top of it.
+        private const double base_frame_length = 1000.0 / 60.0;
+
+        // Beat length (ms per beat) of the selected beatmap, and the rate multiplier of the selected mods.
+        private double beatLength;
+        private float modRate = 1;
+
+        // A dynamic speed mod changes the rate while playing, so it reports the live value itself.
+        private ILinkedDynamicSpeedHUD? dynamicSpeedMod;
+
+        private ModSettingChangeTracker? modSettingTracker;
+
+        // Accumulated playback position, in animation time.
+        private double playbackTime;
 
         public EzHUDSpritePlus()
         {
@@ -103,9 +133,19 @@ namespace osu.Game.EzOsuGame.HUD
             ModifyPath.BindValueChanged(_ => scheduleReload());
             SpriteName.BindValueChanged(_ => scheduleReload());
             FrameTemplate.BindValueChanged(_ => scheduleReload());
-            FPS.BindValueChanged(_ => scheduleReload());
-            UseBeatmapBPM.BindValueChanged(_ => scheduleReload());
-            BeatDivision.BindValueChanged(_ => scheduleReload());
+
+            // Beat-synced playback follows the selected beatmap and the selected mods, so both are tracked directly
+            // (no extra copies) and only reflected in the private beat length / rate values.
+            beatmap.BindValueChanged(_ => updateBeatLength(), true);
+
+            mods?.BindValueChanged(selectedMods =>
+            {
+                updateModSettingTracker(selectedMods.NewValue);
+                updateModRate();
+            }, true);
+
+            dynamicSpeedMod = gameplayState?.Mods.OfType<ILinkedDynamicSpeedHUD>().FirstOrDefault();
+
             TextureScale.BindValueChanged(_ => applyVisualSettings(), true);
             AccentColour.BindValueChanged(_ => applyVisualSettings(), true);
             Blend.BindValueChanged(_ => applyVisualSettings(), true);
@@ -115,6 +155,58 @@ namespace osu.Game.EzOsuGame.HUD
         private void load()
         {
             scheduleReload();
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (currentAnimation == null)
+                return;
+
+            double duration = currentAnimation.Duration;
+
+            if (duration <= 0)
+                return;
+
+            // Playback is driven here instead of by the framework's own advance (see createAnimatedDrawable), so
+            // every speed influence only has to end up in getPlaybackSpeed().
+            playbackTime = Math.Max(0, playbackTime + Clock.ElapsedFrameTime * getPlaybackSpeed());
+            currentAnimation.PlaybackPosition = playbackTime % duration;
+        }
+
+        // 1 means one reference frame per base frame length; FPS, beat division and mod rate all feed into it.
+        private double getPlaybackSpeed()
+        {
+            if (UseBeatmapBPM.Value)
+            {
+                double currentBeatLength = getCurrentBeatLength();
+
+                if (currentBeatLength > 0)
+                    return base_frame_length * BeatDivision.Value * getRate() / currentBeatLength;
+            }
+
+            return FPS.Value * base_frame_length / 1000;
+        }
+
+        private double getCurrentBeatLength()
+        {
+            // While playing, follow the chart's timing points so the animation tracks every BPM section.
+            if (gameplayState != null && frameStableClock != null)
+            {
+                double liveBeatLength = gameplayState.Beatmap.ControlPointInfo.TimingPointAt(frameStableClock.CurrentTime).BeatLength;
+
+                if (liveBeatLength > 0)
+                    return liveBeatLength;
+            }
+
+            return beatLength;
+        }
+
+        private float getRate()
+        {
+            ILinkedDynamicSpeedHUD? liveMod = dynamicSpeedMod;
+            return liveMod != null ? (float)liveMod.SpeedChange.Value : modRate;
         }
 
         private void scheduleReload() => Schedule(reloadDrawable);
@@ -127,6 +219,7 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 ClearInternal();
                 currentDrawable = null;
+                currentAnimation = null;
                 return;
             }
 
@@ -140,8 +233,27 @@ namespace osu.Game.EzOsuGame.HUD
 
             ClearInternal();
             currentDrawable = newDrawable;
+            currentAnimation = newDrawable as TextureAnimation;
+            playbackTime = 0;
+
             AddInternal(newDrawable);
             applyVisualSettings();
+        }
+
+        private void updateBeatLength()
+        {
+            double bpm = beatmap.Value.BeatmapInfo.BPM;
+            beatLength = bpm > 0 ? 60000 / bpm : 0;
+        }
+
+        private void updateModRate() => modRate = EzModRate.Resolve(mods?.Value);
+
+        // Only rate-changing mods can affect playback speed, so nothing else needs to be watched.
+        private void updateModSettingTracker(IReadOnlyList<Mod> selectedMods)
+        {
+            modSettingTracker?.Dispose();
+            modSettingTracker = new ModSettingChangeTracker(selectedMods.Where(mod => mod is IApplicableToRate));
+            modSettingTracker.SettingChanged += _ => updateModRate();
         }
 
         private Drawable? createAnimatedDrawable(string baseLookup)
@@ -155,7 +267,11 @@ namespace osu.Game.EzOsuGame.HUD
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Loop = true,
-                DefaultFrameLength = (float)getFrameLengthFromSettings(),
+                DefaultFrameLength = base_frame_length,
+
+                // Playback speed is driven by the owning drawable instead, so that it can change at any time
+                // without having to clear and re-add every frame.
+                IsPlaying = false,
             };
 
             for (int i = 0; i < max_animation_frames; i++)
@@ -170,22 +286,6 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             return animation.FrameCount > 0 ? animation : null;
-        }
-
-        private double getFrameLengthFromSettings()
-        {
-            if (UseBeatmapBPM.Value && beatmap.Value?.BeatmapInfo != null)
-            {
-                double bpm = beatmap.Value.BeatmapInfo.BPM;
-
-                if (bpm > 0)
-                {
-                    int division = Math.Clamp(BeatDivision.Value, 1, 32);
-                    return DiffUtils.BPMToMilliseconds(bpm, division);
-                }
-            }
-
-            return 1000.0 / Math.Clamp(FPS.Value, 1f, 240f);
         }
 
         private Drawable? createSingleDrawable(string baseLookup)
