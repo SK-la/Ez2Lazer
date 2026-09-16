@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Bindables;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Mods
@@ -13,7 +14,10 @@ namespace osu.Game.EzOsuGame.Mods
     /// </summary>
     public static class EzModRate
     {
-        public static float Resolve(IEnumerable<Mod>? mods)
+        /// <summary>
+        /// Resolves the effective rate multiplier from a set of mods, optionally clamping the result to a specified range.
+        /// </summary>
+        public static float Resolve(IEnumerable<Mod>? mods, bool clamp = true, double min = 0.5, double max = 2.0)
         {
             double rate = 1;
 
@@ -26,7 +30,23 @@ namespace osu.Game.EzOsuGame.Mods
                 }
             }
 
-            return (float)Math.Clamp(rate, 0.5, 2.0);
+            return clamp ? (float)Math.Clamp(rate, min, max) : (float)rate;
+        }
+
+        /// <summary>
+        /// Resolves the effective rate multiplier from a set of mods, returning a bindable value that stays in sync with live rate changes.
+        /// </summary>
+        public static Bindable<float> ResolveBindable(IEnumerable<Mod>? mods, bool clamp = true, double min = 0.5, double max = 2.0)
+        {
+            var rateAdjustMods = mods?.OfType<ModRateAdjust>().ToArray() ?? Array.Empty<ModRateAdjust>();
+            var bindable = new Bindable<float>(Resolve(rateAdjustMods, clamp, min, max));
+
+            void updateValue() => bindable.Value = Resolve(rateAdjustMods, clamp, min, max);
+
+            foreach (var mod in rateAdjustMods)
+                mod.SpeedChange.BindValueChanged(_ => updateValue(), true);
+
+            return bindable;
         }
 
         public static bool IsNoModRate(float rate) => Math.Abs(rate - 1f) < 0.001f;

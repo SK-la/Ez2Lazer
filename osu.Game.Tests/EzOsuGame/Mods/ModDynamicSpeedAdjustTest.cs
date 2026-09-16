@@ -34,6 +34,21 @@ namespace osu.Game.Tests.EzOsuGame.Mods
             Assert.That(new ModHealthAdaptive().LinkSpeedHUD.Value, Is.True);
         }
 
+        [Test]
+        public void TestResolveBindableTracksLiveDynamicSpeedChanges()
+        {
+            var mod = new ModNiceBPM();
+            var resolved = EzModRate.ResolveBindable(new[] { mod });
+
+            Assert.That(resolved.Value, Is.EqualTo(1f).Within(0.001f));
+
+            mod.GameplaySpeed.Value = 1.25;
+            Assert.That(resolved.Value, Is.EqualTo(1.25f).Within(0.001f));
+
+            mod.GameplaySpeed.Value = 0.9;
+            Assert.That(resolved.Value, Is.EqualTo(0.9f).Within(0.001f));
+        }
+
         [TestCase(typeof(ModNiceBPM))]
         [TestCase(typeof(ModAccuracyAdaptive))]
         [TestCase(typeof(ModHealthAdaptive))]
