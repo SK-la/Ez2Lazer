@@ -233,6 +233,40 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             });
         }
 
+        /// <summary>
+        /// The readout lists the stale players with what the flag actually means: how much of their row set is flagged
+        /// and when the values it is showing were written. A count alone cannot tell "behind by one play" from "values
+        /// from a week ago", and the note has to be able to say which.
+        /// </summary>
+        [Test]
+        public void Stale_player_details_carry_the_row_count_and_newest_write_time()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+
+                store.WritePlayerSsr("alpha", 4, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerSsr("beta", 4, new EzSkillsetVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+
+                Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);
+
+                store.MarkPlayerSkillStale("alpha");
+
+                var details = store.GetStalePlayerSkillDetails();
+
+                Assert.That(details.Count, Is.EqualTo(1));
+                Assert.That(details[0].Username, Is.EqualTo("alpha"));
+
+                int alphaRows = realm.Run(r => r.All<EzPlayerSkillValue>().Count(v => v.Username == "alpha"));
+                Assert.That(details[0].Rows, Is.EqualTo(alphaRows));
+                Assert.That(details[0].ComputedAt, Is.GreaterThan(DateTimeOffset.UtcNow.AddMinutes(-5)));
+
+                store.ClearPlayerSkillStale("alpha");
+
+                Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);
+            });
+        }
+
         private static void seedCharts(RealmAccess realm)
         {
             realm.Write(r =>
