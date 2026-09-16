@@ -224,6 +224,37 @@ namespace osu.Game.EzOsuGame.Mods
         public static double ResolveTrackRate(IBindable<double>? frequency, IBindable<double>? tempo)
             => (frequency?.Value ?? 1) * (tempo?.Value ?? 1);
 
+        /// <summary>
+        /// Advances a beat phase by one frame, returning it wrapped into [0, 1).
+        /// </summary>
+        /// <param name="phase">The phase to advance, as returned by a previous call.</param>
+        /// <param name="elapsedTime">Milliseconds elapsed since the last frame, in the clock the caller animates on.</param>
+        /// <param name="beatLength">Milliseconds per beat, as reported by <see cref="BeatLength"/>.</param>
+        /// <param name="rate">The multiplier to apply to <paramref name="elapsedTime"/>; see the remarks.</param>
+        /// <remarks>
+        /// A beat-synced animation should advance a phase like this instead of taking the song time modulo a beat
+        /// length: a modulo of the absolute time re-derives the phase from the song's origin, so any change of beat
+        /// length makes the animation visibly jump, whereas an accumulated phase carries straight through a section
+        /// change. Wrapping every call also keeps the value too small to lose precision in a long song.
+        /// <para>
+        /// Whether <paramref name="rate"/> should be the audible rate depends on where <paramref name="elapsedTime"/>
+        /// comes from, not on this helper: a gameplay clock's elapsed time is already expressed in song time (it
+        /// advances at the audible rate), so it needs no multiplier and passing one would double-count it. A
+        /// real-time clock — a host or overlay clock that keeps running while gameplay is paused — does need
+        /// <see cref="Rate"/> to convert its elapsed time into song time.
+        /// </para>
+        /// </remarks>
+        public static double AdvanceBeatPhase(double phase, double elapsedTime, double beatLength, double rate = 1)
+        {
+            if (!(beatLength > 0) || !double.IsFinite(beatLength) || !double.IsFinite(elapsedTime) || !double.IsFinite(rate))
+                return phase;
+
+            double wrapped = (phase + elapsedTime * rate / beatLength) % 1;
+
+            // A rewind (negative elapsed) would otherwise leave the phase negative.
+            return wrapped < 0 ? wrapped + 1 : wrapped;
+        }
+
         private void updateMods(IReadOnlyList<Mod>? selectedMods)
         {
             // Mods never change timing, and both live rate sources follow the mods on their own. Only the fallback,

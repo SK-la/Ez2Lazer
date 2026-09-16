@@ -243,6 +243,71 @@ namespace osu.Game.Tests.EzOsuGame.Mods
 
         #endregion
 
+        #region AdvanceBeatPhase
+
+        [Test]
+        public void TestAdvanceBeatPhaseAccumulatesOneBeatPerBeatLength()
+        {
+            double phase = 0;
+
+            // 16 ms frames at 120 BPM: a beat is 500 ms, so 500 ms of frames is exactly one full phase.
+            for (int i = 0; i < 31; i++)
+                phase = EzBeatmapSpeedTracker.AdvanceBeatPhase(phase, 16, 500);
+            phase = EzBeatmapSpeedTracker.AdvanceBeatPhase(phase, 4, 500);
+
+            Assert.That(phase, Is.EqualTo(0).Within(0.0001));
+            Assert.That(EzBeatmapSpeedTracker.AdvanceBeatPhase(0, 250, 500), Is.EqualTo(0.5).Within(0.0001));
+        }
+
+        [Test]
+        public void TestAdvanceBeatPhaseCarriesThroughABeatLengthChange()
+        {
+            // The jump this guards against: a phase taken modulo the song time is re-derived from the song origin, so
+            // the moment a section with a different beat length starts, the phase leaps — the same timestamp reads two
+            // different phases depending purely on which section's beat length is used.
+            const double section_start = 1234;
+
+            Assert.That(section_start % 400 / 400, Is.Not.EqualTo(section_start % 500 / 500).Within(0.001));
+
+            // Accumulating carries the phase through the boundary: 1234 ms of 500 ms beats reaches the same phase the
+            // older section reported, and the new beat length only changes the advance from there on.
+            double phase = 0;
+
+            for (int i = 0; i < 123; i++)
+                phase = EzBeatmapSpeedTracker.AdvanceBeatPhase(phase, 10, 500);
+            phase = EzBeatmapSpeedTracker.AdvanceBeatPhase(phase, 4, 500);
+
+            Assert.That(phase, Is.EqualTo(1234 % 500 / 500d).Within(0.0001));
+
+            // Half of the new 400 ms beat, applied on top of the carried phase.
+            Assert.That(EzBeatmapSpeedTracker.AdvanceBeatPhase(phase, 200, 400), Is.EqualTo((phase + 0.5) % 1).Within(0.0001));
+        }
+
+        [Test]
+        public void TestAdvanceBeatPhaseAppliesTheRateOfARealTimeClock()
+        {
+            // A real-time clock (host / overlay) has to be converted into song time, so the audible rate scales the
+            // advance; a gameplay clock's elapsed time is already song time and must be passed with no rate.
+            Assert.That(EzBeatmapSpeedTracker.AdvanceBeatPhase(0, 16, 500, 1.5), Is.EqualTo(0.048).Within(0.0001));
+            Assert.That(EzBeatmapSpeedTracker.AdvanceBeatPhase(0, 16, 500), Is.EqualTo(0.032).Within(0.0001));
+        }
+
+        [Test]
+        public void TestAdvanceBeatPhaseHandlesDegenerateInput()
+        {
+            // No usable beat length: the phase is left alone rather than becoming NaN.
+            Assert.That(EzBeatmapSpeedTracker.AdvanceBeatPhase(0.25, 16, 0), Is.EqualTo(0.25));
+            Assert.That(EzBeatmapSpeedTracker.AdvanceBeatPhase(0.25, 16, double.NaN), Is.EqualTo(0.25));
+            Assert.That(EzBeatmapSpeedTracker.AdvanceBeatPhase(0.25, double.PositiveInfinity, 500), Is.EqualTo(0.25));
+
+            // A rewind stays inside [0, 1) instead of going negative.
+            double rewound = EzBeatmapSpeedTracker.AdvanceBeatPhase(0.25, -500, 500);
+            Assert.That(rewound, Is.EqualTo(0.25).Within(0.0001));
+            Assert.That(rewound, Is.InRange(0, 1));
+        }
+
+        #endregion
+
         #region Helpers
 
         private static Beatmap createBeatmap(params (double time, double beatLength)[] timingPoints)
