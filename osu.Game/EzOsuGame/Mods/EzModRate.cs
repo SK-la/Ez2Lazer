@@ -50,8 +50,8 @@ namespace osu.Game.EzOsuGame.Mods
         /// <para>
         /// A single scalar cannot describe a ramp, so mods whose rate keeps changing (Wind Up, Adaptive Speed, the
         /// adaptive Ez mods) contribute their <b>initial</b> rate here. Consumers that want the rate actually being
-        /// played read it from the audio component's aggregated adjustments instead; this method is the fallback for
-        /// when there is no audio to read at all.
+        /// played should read <see cref="EzBeatmapSpeedTracker.Rate"/>, which follows the live aggregate of the audio
+        /// being played — this method is its fallback for when there is no audio to read at all.
         /// </para>
         /// </remarks>
         public static double ResolvePlaybackRate(IEnumerable<Mod>? mods)
