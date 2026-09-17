@@ -44,6 +44,11 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private ScheduledDelegate? scheduledPushPlayer;
         private ScheduledDelegate? scheduledExit;
 
+        /// <summary>
+        /// The background keysound decode this loader is waiting on before starting gameplay.
+        /// </summary>
+        private Task? pendingPreload;
+
         [Resolved]
         private AudioManager audioManager { get; set; } = null!;
 
@@ -153,15 +158,18 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 bool preload = resolveAutoPreloadFromConfig();
                 workingBeatmap.PrepareAudio(preload);
 
-                // Small delay then push to player
-                scheduledPushPlayer = Scheduler.AddDelayed(() =>
-                {
-                    if (!this.IsCurrentScreen())
-                        return;
+                Task? preloadTask = preload ? workingBeatmap.KeysoundManager?.PreloadTask : null;
 
-                    loadingSpinner.Hide();
-                    pushPlayer();
-                }, 500);
+                if (preloadTask is { IsCompleted: false })
+                {
+                    // Samples are decoded on a background thread. Wait here with the spinner still animating
+                    // instead of freezing the update thread, and hand the chart to the player only once its
+                    // drawables can resolve every keysound from memory.
+                    pendingPreload = preloadTask;
+                    return;
+                }
+
+                schedulePushPlayer();
             }
             catch (Exception ex)
             {
@@ -170,6 +178,37 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 loadingSpinner.Hide();
                 scheduleExit(3000);
             }
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (pendingPreload == null)
+                return;
+
+            if (!pendingPreload.IsCompleted)
+                return;
+
+            pendingPreload = null;
+
+            if (!this.IsCurrentScreen())
+                return;
+
+            schedulePushPlayer();
+        }
+
+        private void schedulePushPlayer()
+        {
+            // Small delay then push to player
+            scheduledPushPlayer = Scheduler.AddDelayed(() =>
+            {
+                if (!this.IsCurrentScreen())
+                    return;
+
+                loadingSpinner.Hide();
+                pushPlayer();
+            }, 500);
         }
 
         private void pushPlayer()

@@ -70,6 +70,11 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private bool playing;
 
         /// <summary>
+        /// Set while the chart's samples are still being decoded off-thread; scheduling starts once they are ready.
+        /// </summary>
+        private Task? pendingPreload;
+
+        /// <summary>
         /// Start a fresh preview for <paramref name="beatmap"/>. Stops any in-flight preview first.
         /// Returns true if the preview successfully started, false if disabled or no events were collected.
         /// </summary>
@@ -102,14 +107,44 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             if (previewStartTime < 0)
                 previewStartTime = 0;
 
-            scheduleAllSamples();
             playing = true;
+
+            // Decoding a chart's whole sample set is too slow to do inline on the update thread, so wait for the
+            // background decode started by PrepareAudio rather than resolving samples one by one during the first loop.
+            Task? preload = previewKeysoundManager?.PreloadTask;
+
+            if (preload is { IsCompleted: false })
+            {
+                pendingPreload = preload;
+                return true;
+            }
+
+            scheduleAllSamples();
             return true;
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (pendingPreload == null)
+                return;
+
+            if (!pendingPreload.IsCompleted)
+                return;
+
+            pendingPreload = null;
+
+            if (!playing || currentBeatmap == null)
+                return;
+
+            scheduleAllSamples();
         }
 
         public void StopPreview()
         {
             playing = false;
+            pendingPreload = null;
 
             foreach (var d in scheduledTriggers)
                 d.Cancel();
@@ -120,6 +155,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             loopRestartDelegate = null;
 
             stopActiveChannels();
+
+            // Release the background decode so scrolling the carousel does not leave a preload running per chart.
+            previewKeysoundManager?.CancelPreload();
 
             timeline.Clear();
             currentBeatmap = null;

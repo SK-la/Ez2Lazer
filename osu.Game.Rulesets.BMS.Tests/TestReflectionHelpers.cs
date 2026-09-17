@@ -20,6 +20,7 @@ namespace osu.Game.Rulesets.BMS.Tests
 #pragma warning restore SYSLIB0050
 
             SetField(manager, "keysoundCache", new Dictionary<string, ISample>());
+            SetField(manager, "syncRoot", new object());
             SetField(manager, "backgroundEvents", new List<BmsBackgroundSoundEvent>());
             SetField(manager, "sampleVolume", 1d);
             SetField(manager, "currentOffset", 0d);
