@@ -26,14 +26,18 @@ namespace osu.Game.Rulesets.BMS.Tests
         }
 
         [Test]
-        public void TestFileHitSampleDoesNotQueryInnerSkin()
+        public void TestUnpreparedFileSampleFallsBackToInnerBeatmapSkin()
         {
             var inner = new TrackingSkin();
             var skin = new BMSExternalSampleSkin(inner);
 
+            // No runtime keysound manager registered: the sample reaches gameplay before
+            // BmsRuntimeAudioContext is populated, so the beatmap skin (BMSSkin) must get a chance.
+            BmsRuntimeAudioContext.Clear();
+
             skin.GetSample(new ConvertHitObjectParser.FileHitSampleInfo("kick.wav", 100));
 
-            Assert.That(inner.SampleLookups, Is.Empty);
+            Assert.That(inner.SampleLookups, Has.Count.EqualTo(1));
         }
 
         [Test]

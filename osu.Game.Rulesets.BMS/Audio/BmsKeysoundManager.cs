@@ -15,8 +15,8 @@ using osu.Game.Rulesets.Objects.Legacy;
 namespace osu.Game.Rulesets.BMS.Audio
 {
     /// <summary>
-    /// Manages BMS chart audio: <see cref="Prepare"/> loads all samples before gameplay;
-    /// runtime only plays from the in-memory cache (no disk IO).
+    /// Manages BMS chart audio: <see cref="Prepare"/> loads all samples before gameplay.
+    /// Runtime plays from the in-memory cache; unresolved samples are loaded once on demand as a fallback.
     /// </summary>
     public class BmsKeysoundManager
     {
@@ -72,23 +72,23 @@ namespace osu.Game.Rulesets.BMS.Audio
                 }
             }
 
-            // int loaded = 0;
-            // int missing = 0;
+            int loaded = 0;
+            int missing = 0;
 
-            // foreach (string filename in keysoundFiles)
-            // {
-            //     if (loadIntoCache(filename) != null)
-            //         loaded++;
-            //     else
-            //         missing++;
-            // }
+            foreach (string filename in keysoundFiles)
+            {
+                if (loadIntoCache(filename) != null)
+                    loaded++;
+                else
+                    missing++;
+            }
 
             if (backgroundEvents != null && backgroundEvents.Count > 0)
                 SetBackgroundSoundEvents(backgroundEvents);
 
             IsPrepared = true;
 
-            // Logger.Log($"{bms_log_prefix} Prepare complete: {loaded} loaded, {missing} missing, folder={bmsFolder}", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log($"{bms_log_prefix} Prepare complete: {loaded} loaded, {missing} missing, folder={bmsFolder}", LoggingTarget.Runtime, LogLevel.Debug);
         }
 
         /// <summary>
@@ -109,7 +109,9 @@ namespace osu.Game.Rulesets.BMS.Audio
         }
 
         /// <summary>
-        /// Returns a prepared sample for skin / drawable <see cref="osu.Game.Skinning.ISkin.GetSample"/> (no IO).
+        /// Returns a prepared sample for skin / drawable <see cref="osu.Game.Skinning.ISkin.GetSample"/>.
+        /// Resolves on demand when preloading was disabled or skipped the sample, so previews and
+        /// background events never go silent purely because <see cref="Prepare"/> didn't cover them.
         /// </summary>
         public ISample? GetPreparedSample(string filename)
         {
@@ -117,7 +119,11 @@ namespace osu.Game.Rulesets.BMS.Audio
                 return null;
 
             string cacheKey = filename.ToLowerInvariant();
-            return keysoundCache.GetValueOrDefault(cacheKey);
+
+            if (keysoundCache.TryGetValue(cacheKey, out var cached))
+                return cached;
+
+            return loadIntoCache(filename);
         }
 
         /// <summary>
