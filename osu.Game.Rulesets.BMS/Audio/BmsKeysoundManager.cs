@@ -86,9 +86,6 @@ namespace osu.Game.Rulesets.BMS.Audio
             if (IsDisposed)
                 return;
 
-            if (backgroundEvents != null && backgroundEvents.Count > 0)
-                SetBackgroundSoundEvents(backgroundEvents);
-
             lock (syncRoot)
             {
                 if (preloadTask is { IsCompleted: false })
@@ -99,6 +96,12 @@ namespace osu.Game.Rulesets.BMS.Audio
 
                 IsPrepared = true;
             }
+
+            // Only on the first prepare: installing the timeline resets background playback position, which a
+            // repeated call (e.g. constructing the mania-converted beatmap after the loader already prepared)
+            // must not do.
+            if (backgroundEvents != null && backgroundEvents.Count > 0)
+                SetBackgroundSoundEvents(backgroundEvents);
 
             var keysoundFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             collectSampleFilenames(hitObjects, keysoundFiles);
