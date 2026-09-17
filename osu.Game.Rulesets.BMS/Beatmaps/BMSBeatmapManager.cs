@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Text;
 using System.Threading.Channels;
 using osu.Framework.Bindables;
 using osu.Framework.Logging;
@@ -34,7 +33,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     /// </summary>
     public class BMSBeatmapManager
     {
-        private static readonly object shared_manager_lock = new object();
+        private static readonly Lock shared_manager_lock = new Lock();
         private static BMSBeatmapManager? sharedManager;
         private static string? sharedStorageDirectory;
 
@@ -489,7 +488,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 }
                 catch
                 {
-                    pipelineCts.Cancel();
+                    await pipelineCts.CancelAsync().ConfigureAwait(false);
                     throw;
                 }
                 finally
@@ -801,19 +800,17 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         {
             try
             {
-                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-                var shiftJis = Encoding.GetEncoding(932);
-                return File.ReadAllLines(filePath, shiftJis);
+                return BmsChartTextEncoding.SplitLines(BmsChartTextEncoding.DecodeFile(filePath));
             }
             catch
             {
                 try
                 {
-                    return File.ReadAllLines(filePath, Encoding.UTF8);
+                    return File.ReadAllLines(filePath);
                 }
                 catch
                 {
-                    return File.ReadAllLines(filePath);
+                    return Array.Empty<string>();
                 }
             }
         }

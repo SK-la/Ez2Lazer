@@ -89,28 +89,28 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         }
 
         protected override void ParseStreamInto(LineBufferedReader stream, bool isPrimaryStream, Beatmap beatmap)
-        {
-            // Reset state
-            wavDefinitions.Clear();
-            bmpDefinitions.Clear();
-            bpmDefinitions.Clear();
-            stopDefinitions.Clear();
-            measureLengths.Clear();
-            events.Clear();
-            lnObjectKeys.Clear();
-            eventSequence = 0;
-            chartHasScrollDirective = false;
-            lnType = 1;
+            => ParseLines(BmsChartTextEncoding.ReadLines(stream), beatmap);
 
-            string? line;
+        /// <summary>
+        /// Parses already-decoded chart lines.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="LineBufferedReader"/> always decodes as UTF-8, which corrupts Shift-JIS/GBK charts and
+        /// with them the <c>#WAV</c>/<c>#BMP</c> filenames that must match the files on disk. Decoding is
+        /// therefore resolved before parsing; callers holding correct text can use this directly.
+        /// </remarks>
+        public void ParseLines(IEnumerable<string> lines, Beatmap beatmap)
+        {
+            resetState();
+
             var scanCancellation = BmsAnalyticsScanContext.ActiveCancellation;
 
-            while ((line = stream.ReadLine()) != null)
+            foreach (string rawLine in lines)
             {
                 if (scanCancellation.IsCancellationRequested)
                     throw new OperationCanceledException(scanCancellation);
 
-                line = line.Trim();
+                string line = rawLine.Trim();
 
                 if (string.IsNullOrEmpty(line) || line.StartsWith('*'))
                     continue;
@@ -121,6 +121,20 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             // Build the beatmap
             buildBeatmap(beatmap);
+        }
+
+        private void resetState()
+        {
+            wavDefinitions.Clear();
+            bmpDefinitions.Clear();
+            bpmDefinitions.Clear();
+            stopDefinitions.Clear();
+            measureLengths.Clear();
+            events.Clear();
+            lnObjectKeys.Clear();
+            eventSequence = 0;
+            chartHasScrollDirective = false;
+            lnType = 1;
         }
 
         private void parseLine(string line)
