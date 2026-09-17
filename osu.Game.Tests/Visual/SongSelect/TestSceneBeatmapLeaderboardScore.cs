@@ -222,7 +222,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         {
             base.UpdateAfterChildren();
 
-            if (drawWidthText != null) drawWidthText.Text = $"DrawWidth: {fillFlow?.DrawWidth}";
+            drawWidthText?.Text = $"DrawWidth: {fillFlow?.DrawWidth}";
         }
 
         private static ScoreInfo[] getTestScores()

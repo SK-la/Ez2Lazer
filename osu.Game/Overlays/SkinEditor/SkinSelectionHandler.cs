@@ -61,8 +61,7 @@ namespace osu.Game.Overlays.SkinEditor
         {
             var usingClosestAnchor = SelectedBlueprints.GetTernaryState(c => !c.Item.UsesFixedAnchor);
 
-            if (closestAnchor != null)
-                closestAnchor.State.Value = usingClosestAnchor;
+            closestAnchor?.State.Value = usingClosestAnchor;
 
             if (fixedAnchors != null)
             {
