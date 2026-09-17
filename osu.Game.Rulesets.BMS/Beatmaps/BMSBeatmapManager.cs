@@ -592,10 +592,14 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             bool hadSnapshot = indexRepository.TryGetChartSnapshot(filePath, out BmsLibraryIndexRepository.ChartFileSnapshot snapshot);
 
+            // A snapshot recorded by older parsing logic is stale even when the file itself is untouched: metadata
+            // already written for it (titles, artists, keysound filenames) has to be rewritten, and re-parsing is
+            // the only way to correct it.
             if (hadSnapshot
                 && snapshot.FileSize == fileSize
                 && snapshot.LastModifiedTicks == modifiedTicks
-                && snapshot.HasContentHash)
+                && snapshot.HasContentHash
+                && snapshot.ParseVersion == BmsLibraryIndexRepository.CHART_PARSE_VERSION)
             {
                 return new BmsLibraryIndexRepository.ScanWriteItem(filePath, fileSize, modifiedTicks, null, null);
             }

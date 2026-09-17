@@ -4,6 +4,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -94,6 +95,94 @@ namespace osu.Game.Rulesets.BMS.Tests
                 if (Directory.Exists(tempDir))
                     Directory.Delete(tempDir, true);
             }
+        }
+
+        [Test]
+        public async Task TestScanReparsesChartsIndexedByOlderParsingLogic()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), $"bms-manager-reparse-{Guid.NewGuid():N}");
+            string storagePath = Path.Combine(tempDir, "storage");
+            string root = Path.Combine(tempDir, "library");
+            Directory.CreateDirectory(storagePath);
+            Directory.CreateDirectory(root);
+
+            try
+            {
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+                const string title = "东方红 幻想曲";
+                string chartPath = createGbkBmsFile(root, "song-a", "a.bms", title);
+                string dbPath = Path.Combine(storagePath, BmsStoragePaths.INDEX_DATABASE_FILE);
+                var manager = new BMSBeatmapManager(storagePath);
+                var repository = new BmsLibraryIndexRepository(dbPath);
+
+                await manager.ScanLibraryAsync(new[] { root }).ConfigureAwait(false);
+                Assert.That(repository.TryLoadChart(chartPath, out var indexed), Is.True);
+                Assert.That(indexed.Title, Is.EqualTo(title));
+
+                // Simulate an index written by the older parser: an untouched file with stale metadata.
+                executeSql(dbPath, "UPDATE charts SET title = 'ｶｫｷｽｺ', parse_version = 1 WHERE chart_path = $path;", chartPath);
+
+                await manager.ScanLibraryAsync(new[] { root }).ConfigureAwait(false);
+
+                Assert.That(repository.TryLoadChart(chartPath, out var reparsed), Is.True);
+                Assert.That(reparsed.Title, Is.EqualTo(title), "a chart indexed by older parsing logic must be re-parsed");
+                Assert.That(readParseVersion(dbPath, chartPath), Is.EqualTo(BmsLibraryIndexRepository.CHART_PARSE_VERSION));
+
+                // Charts already at the current parse version keep being skipped, so the forced re-parse is a
+                // one-time cost rather than a full re-read on every scan.
+                executeSql(dbPath, "UPDATE charts SET title = 'not-reparsed' WHERE chart_path = $path;", chartPath);
+
+                await manager.ScanLibraryAsync(new[] { root }).ConfigureAwait(false);
+
+                Assert.That(repository.TryLoadChart(chartPath, out var skipped), Is.True);
+                Assert.That(skipped.Title, Is.EqualTo("not-reparsed"));
+            }
+            finally
+            {
+                try
+                {
+                    SqliteConnection.ClearAllPools();
+                }
+                catch
+                {
+                    // Best effort.
+                }
+
+                if (Directory.Exists(tempDir))
+                    Directory.Delete(tempDir, true);
+            }
+        }
+
+        private static void executeSql(string dbPath, string sql, string chartPath)
+        {
+            using var connection = new SqliteConnection($"Data Source={dbPath}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.Parameters.AddWithValue("$path", chartPath);
+            Assert.That(command.ExecuteNonQuery(), Is.EqualTo(1));
+        }
+
+        private static int readParseVersion(string dbPath, string chartPath)
+        {
+            using var connection = new SqliteConnection($"Data Source={dbPath}");
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT parse_version FROM charts WHERE chart_path = $path;";
+            command.Parameters.AddWithValue("$path", chartPath);
+            return Convert.ToInt32(command.ExecuteScalar());
+        }
+
+        private static string createGbkBmsFile(string rootPath, string folderName, string fileName, string title)
+        {
+            string folderPath = Path.Combine(rootPath, folderName);
+            Directory.CreateDirectory(folderPath);
+            string filePath = Path.Combine(folderPath, fileName);
+            string chart = $"#TITLE {title}\n#ARTIST 中文作者\n#BPM 120\n#PLAYLEVEL 1\n#WAV01 kick.wav\n#00111:0100\n";
+            File.WriteAllBytes(filePath, Encoding.GetEncoding(936).GetBytes(chart));
+            File.WriteAllBytes(Path.Combine(folderPath, "kick.wav"), new byte[] { 0 });
+            return filePath;
         }
 
         private static string createBmsFile(string rootPath, string folderName, string fileName, string title)

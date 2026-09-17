@@ -10,7 +10,14 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
     public sealed class BmsLibraryIndexRepository
     {
         private const int schema_version = 3;
-        private const int chart_parse_version = 2;
+
+        /// <summary>
+        /// Identifies the chart parsing/metadata extraction logic. Bump it whenever a change alters what a scan
+        /// writes (decoding, title/artist extraction, keysound filenames...): charts recorded by an older version
+        /// are re-parsed on the next scan instead of being skipped as "unchanged", which is the only way already
+        /// imported metadata can be corrected.
+        /// </summary>
+        public const int CHART_PARSE_VERSION = 3;
 
         private const string table_meta = "meta";
         private const string table_roots = "roots";
@@ -84,7 +91,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
         /// Represents a snapshot of a chart file for change detection.
         /// ChartPath is included for data integrity even though the dictionary key already contains the path.
         /// </summary>
-        public record ChartFileSnapshot(string ChartPath, long FileSize, long LastModifiedTicks, bool HasContentHash);
+        public record ChartFileSnapshot(string ChartPath, long FileSize, long LastModifiedTicks, bool HasContentHash, int ParseVersion);
 
         public enum SyncState
         {
@@ -141,7 +148,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps.Persistence
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = $@"
-SELECT file_size, last_modified_ticks, content_sha256
+SELECT file_size, last_modified_ticks, content_sha256, parse_version
 FROM {table_charts}
 WHERE chart_path = $path
 LIMIT 1;";
@@ -153,7 +160,7 @@ LIMIT 1;";
                 return false;
 
             string contentSha = reader.IsDBNull(2) ? string.Empty : reader.GetString(2);
-            snapshot = new ChartFileSnapshot(chartPath, reader.GetInt64(0), reader.GetInt64(1), BmsContentHash.LooksLikeSha256(contentSha));
+            snapshot = new ChartFileSnapshot(chartPath, reader.GetInt64(0), reader.GetInt64(1), BmsContentHash.LooksLikeSha256(contentSha), reader.GetInt32(3));
             return true;
         }
 
@@ -227,7 +234,7 @@ WHERE seen_generation <> $generation;";
 
             using var connection = openConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT chart_path, file_size, last_modified_ticks, content_sha256 FROM charts;";
+            cmd.CommandText = "SELECT chart_path, file_size, last_modified_ticks, content_sha256, parse_version FROM charts;";
 
             using var reader = cmd.ExecuteReader();
 
@@ -238,7 +245,8 @@ WHERE seen_generation <> $generation;";
                     reader.GetString(0),
                     reader.GetInt64(1),
                     reader.GetInt64(2),
-                    BmsContentHash.LooksLikeSha256(contentSha));
+                    BmsContentHash.LooksLikeSha256(contentSha),
+                    reader.GetInt32(4));
             }
 
             return result;
@@ -873,7 +881,7 @@ ON CONFLICT(chart_path) DO UPDATE SET
                 cmd.Parameters.AddWithValue("$contentMd5", chart.ContentMd5);
                 cmd.Parameters.AddWithValue("$contentSha256", chart.ContentSha256);
                 cmd.Parameters.AddWithValue("$seenGeneration", ScanRevision + 1);
-                cmd.Parameters.AddWithValue("$parseVersion", chart_parse_version);
+                cmd.Parameters.AddWithValue("$parseVersion", CHART_PARSE_VERSION);
                 cmd.Parameters.AddWithValue("$title", chart.Title);
                 cmd.Parameters.AddWithValue("$subTitle", chart.SubTitle);
                 cmd.Parameters.AddWithValue("$artist", chart.Artist);
@@ -1910,7 +1918,7 @@ WHERE beatmap_id = $beatmapId;", "$revision", "$syncState", "$beatmapId");
                 set(upsertChart, "$contentMd5", chart.ContentMd5);
                 set(upsertChart, "$contentSha256", chart.ContentSha256);
                 set(upsertChart, "$generation", generation);
-                set(upsertChart, "$parseVersion", chart_parse_version);
+                set(upsertChart, "$parseVersion", CHART_PARSE_VERSION);
                 set(upsertChart, "$title", chart.Title);
                 set(upsertChart, "$subTitle", chart.SubTitle);
                 set(upsertChart, "$artist", chart.Artist);
