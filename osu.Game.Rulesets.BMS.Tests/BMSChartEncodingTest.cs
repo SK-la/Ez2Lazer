@@ -121,6 +121,70 @@ namespace osu.Game.Rulesets.BMS.Tests
         }
 
         [Test]
+        public void TestGbkMixedCjkChartWithAsciiOnlyAudioKeepsChineseReadable()
+        {
+            // Regression guard: reading CP936 text as Shift-JIS renders Chinese as runs of half-width katakana
+            // ("东方红" -> "ｶｫｷｽｺ"), which reads as mangled Japanese while the Chinese is destroyed.
+            const string chart = """
+                                 #TITLE 东方红 幻想曲
+                                 #ARTIST 中文作者
+                                 #GENRE 东方
+                                 #BPM 150
+                                 #WAV01 kick.wav
+                                 #00111:01
+                                 """;
+
+            string folder = createTempFolder();
+
+            try
+            {
+                // ASCII-only audio list leaves no filename evidence, so the fingerprint is the only signal.
+                File.WriteAllBytes(Path.Combine(folder, "kick.wav"), new byte[] { 0 });
+                string path = Path.Combine(folder, "chart.bms");
+                File.WriteAllBytes(path, gbk.GetBytes(chart));
+
+                string decoded = BmsChartTextEncoding.DecodeFile(path);
+
+                Assert.That(decoded, Does.Contain("#TITLE 东方红 幻想曲"));
+                Assert.That(decoded, Does.Contain("#ARTIST 中文作者"));
+                Assert.That(decoded, Does.Not.Contain('\uFF61'), "half-width katakana is a mis-decode fingerprint, not chart text");
+            }
+            finally
+            {
+                Directory.Delete(folder, true);
+            }
+        }
+
+        [Test]
+        public void TestShiftJisChartWithAsciiOnlyAudioStaysShiftJis()
+        {
+            const string chart = """
+                                 #TITLE テスト楽曲
+                                 #ARTIST 作曲者
+                                 #WAV01 kick.wav
+                                 #00111:01
+                                 """;
+
+            string folder = createTempFolder();
+
+            try
+            {
+                File.WriteAllBytes(Path.Combine(folder, "kick.wav"), new byte[] { 0 });
+                string path = Path.Combine(folder, "chart.bms");
+                File.WriteAllBytes(path, shift_jis.GetBytes(chart));
+
+                string decoded = BmsChartTextEncoding.DecodeFile(path);
+
+                Assert.That(decoded, Does.Contain("#TITLE テスト楽曲"));
+                Assert.That(BmsChartTextEncoding.ResolveExistingRelativePath(folder, "kick.wav"), Is.Not.Null);
+            }
+            finally
+            {
+                Directory.Delete(folder, true);
+            }
+        }
+
+        [Test]
         public void TestDecoderReadsShiftJisMetadataFromStream()
         {
             const string chart = "#TITLE テスト楽曲\n#ARTIST 作曲者\n#WAV01 テスト音.wav\n#00111:01\n";

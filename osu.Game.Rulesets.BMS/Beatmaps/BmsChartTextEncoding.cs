@@ -43,8 +43,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public static string[] SplitLines(string text) => LegacyChartStreamDecode.SplitLines(text);
 
-        public static TextReader OpenReader(string path) => LegacyChartTextEncoding.OpenReader(path);
-
         public static string? ResolveExistingRelativePath(string contentRoot, string? relativePath)
             => LegacyChartTextEncoding.ResolveExistingRelativePath(contentRoot, relativePath);
 

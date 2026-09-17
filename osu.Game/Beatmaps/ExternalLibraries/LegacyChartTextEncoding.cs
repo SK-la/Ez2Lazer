@@ -4,27 +4,57 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
 
 namespace osu.Game.Beatmaps.ExternalLibraries
 {
     /// <summary>
-    /// Text encoding detection for legacy chart formats (BMS, ProjectDIVA, ...) that were authored
-    /// before UTF-8 was universal.
+    /// Text encoding detection for legacy chart formats (BMS, ProjectDIVA, ...) that predate UTF-8 being universal.
     /// </summary>
     /// <remarks>
-    /// These charts are typically saved in the authoring machine's ANSI code page. On modern .NET,
-    /// <see cref="Encoding.Default"/> is UTF-8, so reading with it corrupts CJK titles and, more
-    /// importantly, the media filenames a chart references (which then no longer match the files on disk).
-    /// Candidates are scored by decoding quality and by whether the paths a chart references actually
-    /// resolve inside its folder, which is a far stronger signal than byte heuristics alone.
+    /// <para>
+    /// Candidates are ranked by evidence, strongest first: whether the media files a chart references exist once
+    /// decoded, then mis-decode fingerprints, then which code page the machine itself uses. Byte validity alone
+    /// cannot separate the CJK candidates — CP936 and CP932 accept almost any byte pair — so the fingerprints are
+    /// what decide between them.
+    /// </para>
+    /// <para>
+    /// Known limitation: on a CP936 machine a Shift-JIS chart whose <c>#WAV</c> list is pure ASCII leaves no usable
+    /// evidence, and CP936 wins by preference. Positive evidence (a Japanese filename that resolves, or a decode
+    /// that forces artefacts on the alternative) is required before Shift-JIS is chosen.
+    /// </para>
     /// </remarks>
     public static class LegacyChartTextEncoding
     {
-        private static readonly Lock provider_lock = new Lock();
+        // Reference resolution dominates: a filename that visibly matches disk is the one unambiguous signal.
+        private const int reference_hit_score = 50;
+        private const int reference_miss_penalty = 10;
+
+        // Mis-decode fingerprints. GBK text read as Shift-JIS turns Chinese into runs of half-width katakana
+        // (CP932 reads 0xA1-0xDF as single-byte katakana) plus private-use ideographs. The reverse direction
+        // reads as ordinary-looking Chinese, so only these artefacts are usable as evidence.
+        private const int artifact_penalty = 4;
+        private const int max_artifact_penalty = 120;
+        private const int replacement_penalty = 200;
+
+        /// <summary>
+        /// A decode that is strictly valid UTF-8 while carrying non-ASCII is decisive: no legacy CJK code page
+        /// produces a whole file of well-formed multi-byte UTF-8 sequences by accident.
+        /// </summary>
+        private const int valid_utf8_bonus = 100;
+
+        /// <summary>
+        /// Full-width kana is weak evidence of genuine Japanese authorship (the Chinese mis-read above comes out
+        /// half-width), so it only nudges a close call — but it is enough to outvote the system code page.
+        /// </summary>
+        private const int kana_bonus = 4;
+        private const int max_kana_bonus = 20;
+
+        /// <summary>Historical default: prefer the machine's own code page when the CJK candidates tie.</summary>
+        private const int system_codepage_bonus = 10;
+
+        private static readonly object provider_lock = new object();
         private static bool providerRegistered;
         private static int systemAnsiCodePage = 1252;
 
@@ -33,8 +63,8 @@ namespace osu.Game.Beatmaps.ExternalLibraries
             RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         /// <summary>
-        /// Matches a bare filename with one of the media extensions, for chart formats that reference
-        /// assets by name alone rather than as an indexed list entry.
+        /// Matches a bare filename with a media extension, for formats that reference assets by name alone
+        /// (BMS <c>#WAV</c>/<c>#BMP</c> definitions) rather than as an indexed list entry.
         /// </summary>
         private static readonly Regex bare_file_pattern = new Regex(
             @"[^\s<>""|?*]+\.(?:mp3|ogg|wav|flac|jpg|jpeg|png|bmp|mpg|mpeg|avi|mp4|wmv)",
@@ -46,7 +76,7 @@ namespace osu.Game.Beatmaps.ExternalLibraries
         }
 
         /// <summary>
-        /// Decodes a chart file, using its folder for reference-resolution scoring.
+        /// Decodes a chart file, using its folder for reference-resolution evidence.
         /// </summary>
         public static string DecodeFile(string path)
         {
@@ -56,16 +86,50 @@ namespace osu.Game.Beatmaps.ExternalLibraries
         }
 
         /// <summary>
-        /// Decodes raw chart bytes using the candidate encodings and scoring.
+        /// Decodes raw chart bytes using the candidate encodings and their evidence scores.
         /// </summary>
         /// <param name="bytes">Raw file bytes.</param>
         /// <param name="songFolder">
-        /// Folder the chart lives in, used to score whether referenced media actually exists.
-        /// Pass an empty string when the folder is unknown (scoring degrades to byte heuristics).
+        /// Folder the chart lives in, used to check whether referenced media exists. Pass an empty string when the
+        /// folder is unknown; scoring then falls back to mis-decode fingerprints and code page preference.
         /// </param>
         public static string DecodeBytes(byte[] bytes, string songFolder = "")
         {
-            ensureCodePages();
+            var (_, bestText) = detect(bytes, songFolder);
+            return bestText ?? stripByteOrderMark(encoding_utf8_lossy.GetString(bytes));
+        }
+
+        /// <summary>
+        /// Detects the best encoding for a chart file (same evidence as <see cref="DecodeFile"/>).
+        /// </summary>
+        public static Encoding DetectBestEncoding(string path)
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            string songFolder = Path.GetDirectoryName(path) ?? string.Empty;
+            return DetectBestEncoding(bytes, songFolder);
+        }
+
+        /// <summary>
+        /// Detects the best encoding for raw chart bytes (same evidence as <see cref="DecodeBytes"/>).
+        /// </summary>
+        public static Encoding DetectBestEncoding(byte[] bytes, string songFolder = "")
+        {
+            var (best, _) = detect(bytes, songFolder);
+            return best ?? encoding_utf8_lossy;
+        }
+
+        /// <summary>
+        /// Resolves a chart-relative path against <paramref name="contentRoot"/>, tolerating separator and case
+        /// differences, and falling back to a bare filename match.
+        /// </summary>
+        public static string? ResolveExistingRelativePath(string contentRoot, string? relativePath)
+            => ReferenceIndex.TryCreate(contentRoot)?.Resolve(relativePath);
+
+        private static readonly UTF8Encoding encoding_utf8_lossy = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+
+        private static (Encoding? best, string? text) detect(byte[] bytes, string songFolder)
+        {
+            var index = ReferenceIndex.TryCreate(songFolder);
 
             Encoding? best = null;
             string? bestText = null;
@@ -77,15 +141,14 @@ namespace osu.Game.Beatmaps.ExternalLibraries
 
                 try
                 {
-                    text = encoding.GetString(bytes);
+                    text = stripByteOrderMark(encoding.GetString(bytes));
                 }
                 catch
                 {
                     continue;
                 }
 
-                text = stripByteOrderMark(text);
-                int score = scoreDecodedText(text, songFolder, bytes, encoding);
+                int score = scoreDecodedText(text, index, bytes, encoding);
 
                 if (score <= bestScore)
                     continue;
@@ -95,137 +158,11 @@ namespace osu.Game.Beatmaps.ExternalLibraries
                 bestText = text;
             }
 
-            return bestText ?? stripByteOrderMark(Encoding.UTF8.GetString(bytes));
-        }
-
-        public static TextReader OpenReader(string path) => new StringReader(DecodeFile(path));
-
-        /// <summary>
-        /// Detects the best encoding for a chart file (same scoring as <see cref="DecodeFile"/>).
-        /// </summary>
-        public static Encoding DetectBestEncoding(string path)
-        {
-            byte[] bytes = File.ReadAllBytes(path);
-            string songFolder = Path.GetDirectoryName(path) ?? string.Empty;
-            return DetectBestEncoding(bytes, songFolder);
-        }
-
-        /// <summary>
-        /// Detects the best encoding for raw chart bytes (same scoring as <see cref="DecodeBytes"/>).
-        /// </summary>
-        public static Encoding DetectBestEncoding(byte[] bytes, string songFolder = "")
-        {
-            ensureCodePages();
-
-            Encoding? best = null;
-            int bestScore = int.MinValue;
-
-            foreach (Encoding encoding in getCandidates(bytes))
-            {
-                string text;
-
-                try
-                {
-                    text = encoding.GetString(bytes);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                int score = scoreDecodedText(text, songFolder, bytes, encoding);
-
-                if (score <= bestScore)
-                    continue;
-
-                bestScore = score;
-                best = encoding;
-            }
-
-            return best ?? Encoding.UTF8;
-        }
-
-        public static void WriteFile(string path, string text, Encoding encoding)
-        {
-            ensureCodePages();
-            byte[] bytes = encoding.GetBytes(text);
-            File.WriteAllBytes(path, bytes);
-        }
-
-        /// <summary>
-        /// Resolves a chart-relative path against <paramref name="contentRoot"/>, tolerating
-        /// separator differences and falling back to a unique same-extension filename match.
-        /// </summary>
-        public static string? ResolveExistingRelativePath(string contentRoot, string? relativePath)
-        {
-            if (string.IsNullOrWhiteSpace(contentRoot) || string.IsNullOrWhiteSpace(relativePath))
-                return null;
-
-            string normalisedRelative = relativePath.Replace('\\', '/').Trim();
-            string full = Path.GetFullPath(Path.Combine(contentRoot, normalisedRelative.Replace('/', Path.DirectorySeparatorChar)));
-
-            if (File.Exists(full))
-                return Path.GetRelativePath(contentRoot, full).Replace('\\', '/');
-
-            string fileName = Path.GetFileName(normalisedRelative);
-            string direct = Path.Combine(contentRoot, fileName);
-
-            if (File.Exists(direct))
-                return fileName;
-
-            // Common layouts keep media in a dedicated subfolder while charts store bare names.
-            foreach (string folder in new[] { "RES", "res", "WAV", "wav" })
-            {
-                string nested = Path.Combine(contentRoot, folder, fileName);
-
-                if (File.Exists(nested))
-                    return Path.Combine(folder, fileName).Replace('\\', '/');
-            }
-
-            string extension = Path.GetExtension(fileName);
-            if (string.IsNullOrEmpty(extension) || !Directory.Exists(contentRoot))
-                return null;
-
-            string asciiHint = extractAsciiHint(fileName);
-            string[] candidates;
-
-            try
-            {
-                candidates = Directory.GetFiles(contentRoot, "*" + extension, SearchOption.TopDirectoryOnly);
-            }
-            catch
-            {
-                return null;
-            }
-
-            IEnumerable<string> matches = candidates;
-
-            if (!string.IsNullOrEmpty(asciiHint))
-            {
-                string[] hinted = candidates
-                                  .Where(f => Path.GetFileName(f).Contains(asciiHint, StringComparison.OrdinalIgnoreCase))
-                                  .ToArray();
-
-                if (hinted.Length > 0)
-                    matches = hinted;
-            }
-
-            string[] matchList = matches.ToArray();
-
-            if (matchList.Length == 1)
-                return Path.GetFileName(matchList[0]);
-
-            return null;
+            return (best, bestText);
         }
 
         private static void ensureCodePages()
         {
-            lock (provider_lock)
-            {
-                if (providerRegistered)
-                    return;
-            }
-
             lock (provider_lock)
             {
                 if (providerRegistered)
@@ -248,32 +185,42 @@ namespace osu.Game.Beatmaps.ExternalLibraries
 
         private static IEnumerable<Encoding> getCandidates(byte[] bytes)
         {
-            // UTF-8 with BOM is authoritative when present.
+            // A BOM is authoritative; nothing else needs to be considered.
             if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
             {
-                yield return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+                yield return encoding_utf8_lossy;
 
                 yield break;
             }
 
             var seen = new HashSet<int>();
 
-            // Prefer the system ANSI code page — the historical default for these formats.
-            foreach (int codePage in new[] { 0, 936, 932 })
+            // UTF-8 first when it is genuinely UTF-8: this covers UTF-8 charts without a BOM, which the legacy
+            // candidates would otherwise mis-read as plausible-looking CJK.
+            bool validUtf8 = hasNonAscii(bytes) && isValidForEncoding(bytes, encoding_utf8_lossy);
+
+            if (validUtf8 && seen.Add(encoding_utf8_lossy.CodePage))
+                yield return encoding_utf8_lossy;
+
+            // The encodings these charts are actually authored in, ahead of the machine's code page so that a
+            // non-CJK system code page cannot win a tie against them.
+            foreach (int codePage in new[] { 936, 932 })
             {
                 Encoding? encoding = tryGetEncoding(codePage);
 
-                if (encoding == null || !seen.Add(encoding.CodePage))
-                    continue;
-
-                yield return encoding;
+                if (encoding != null && seen.Add(encoding.CodePage))
+                    yield return encoding;
             }
 
-            yield return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-        }
+            Encoding? ansi = tryGetEncoding(systemAnsiCodePage);
 
-        private static string stripByteOrderMark(string text)
-            => text.Length > 0 && text[0] == '\uFEFF' ? text.Substring(1) : text;
+            if (ansi != null && seen.Add(ansi.CodePage))
+                yield return ansi;
+
+            // Always return something, even for a payload no candidate can decode.
+            if (seen.Add(encoding_utf8_lossy.CodePage))
+                yield return encoding_utf8_lossy;
+        }
 
         private static Encoding? tryGetEncoding(int codePage)
         {
@@ -287,9 +234,6 @@ namespace osu.Game.Beatmaps.ExternalLibraries
             }
         }
 
-        /// <summary>
-        /// Decodes strictly, reporting whether every byte sequence is valid for the encoding.
-        /// </summary>
         private static bool isValidForEncoding(byte[] bytes, Encoding encoding)
         {
             try
@@ -304,76 +248,74 @@ namespace osu.Game.Beatmaps.ExternalLibraries
             }
         }
 
-        private static int scoreDecodedText(string text, string songFolder, byte[] bytes, Encoding encoding)
+        private static bool hasNonAscii(byte[] bytes)
         {
-            int score = 0;
-
-            if (!text.Contains('\uFFFD'))
-                score += 20;
-
-            // Bytes that are not valid for this encoding mean it cannot be the authoring encoding.
-            if (!isValidForEncoding(bytes, encoding))
-                score -= 60;
-
-            // Kana is a strong marker of a genuine Japanese decode: byte pairs that decode to kana
-            // almost never appear as incidental output when the bytes were authored in GBK.
-            score += Math.Min(countKana(text), 40) * 4;
-
-            // Valid UTF-8 payload (no invalid sequences) gets a small bonus when not ANSI.
-            if (encoding.CodePage is 65001 or 1200)
+            foreach (byte b in bytes)
             {
-                try
-                {
-                    _ = new UTF8Encoding(false, true).GetString(bytes);
-                    score += 5;
-                }
-                catch
-                {
-                    score -= 40;
-                }
+                if (b >= 0x80)
+                    return true;
             }
 
-            if (encoding.CodePage == systemAnsiCodePage)
-                score += 5; // prefer ACP only as a tie-break — historical authoring behaviour
+            return false;
+        }
 
-            if (string.IsNullOrEmpty(songFolder) || !Directory.Exists(songFolder))
+        private static int scoreDecodedText(string text, ReferenceIndex? index, byte[] bytes, Encoding encoding)
+        {
+            int score = 0;
+            int artifacts = 0;
+            int kana = 0;
+            bool hasReplacement = false;
+
+            foreach (char c in text)
+            {
+                if (c == '\uFFFD')
+                    hasReplacement = true;
+                else if (c is (>= '\uFF61' and <= '\uFF9F') or (>= '\uE000' and <= '\uF8FF'))
+                    artifacts++;
+                else if (c is (>= '\u3041' and <= '\u3096') or (>= '\u30A1' and <= '\u30FA'))
+                    kana++;
+            }
+
+            if (hasReplacement)
+                score -= replacement_penalty;
+
+            score -= Math.Min(artifacts * artifact_penalty, max_artifact_penalty);
+            score += Math.Min(kana * kana_bonus, max_kana_bonus);
+
+            if (isUtf8Family(encoding) && !hasReplacement && isValidForEncoding(bytes, encoding) && hasNonAscii(bytes))
+                score += valid_utf8_bonus;
+
+            if (isCjkCodePage(systemAnsiCodePage) && encoding.CodePage == systemAnsiCodePage)
+                score += system_codepage_bonus;
+
+            if (index == null)
                 return score;
 
             int existing = 0;
             int referenced = 0;
 
-            // Indexed reference lists (e.g. ProjectDIVA) plus bare filenames (e.g. BMS #WAV definitions).
             foreach (string relative in enumerateReferencedPaths(text))
             {
                 referenced++;
 
-                if (ResolveExistingRelativePath(songFolder, relative) != null)
+                if (index.Contains(relative))
                     existing++;
             }
 
             if (referenced > 0)
-                score += existing * 50 - (referenced - existing) * 10;
+                score += existing * reference_hit_score - (referenced - existing) * reference_miss_penalty;
 
             return score;
         }
 
-        private static int countKana(string text)
-        {
-            int count = 0;
+        private static bool isUtf8Family(Encoding encoding)
+            => encoding.CodePage is 65001 or 1200;
 
-            foreach (char c in text)
-            {
-                if (c is (>= '\u3041' and <= '\u3096') or (>= '\u30A1' and <= '\u30FA'))
-                {
-                    count++;
+        private static bool isCjkCodePage(int codePage)
+            => codePage is 936 or 932 or 949 or 950;
 
-                    if (count >= 40)
-                        break;
-                }
-            }
-
-            return count;
-        }
+        private static string stripByteOrderMark(string text)
+            => text.Length > 0 && text[0] == '\uFEFF' ? text.Substring(1) : text;
 
         private static IEnumerable<string> enumerateReferencedPaths(string text)
         {
@@ -399,21 +341,105 @@ namespace osu.Game.Beatmaps.ExternalLibraries
             }
         }
 
-        private static string extractAsciiHint(string fileName)
+        /// <summary>
+        /// One-shot index of a chart folder, so evidence scoring never probes the filesystem per candidate.
+        /// </summary>
+        /// <remarks>
+        /// Lookups are case-insensitive, which is what makes a correct decode visibly "resolve" while a mis-decoded
+        /// name does not.
+        /// </remarks>
+        private sealed class ReferenceIndex
         {
-            var sb = new StringBuilder();
+            private const int max_depth = 8;
 
-            foreach (char c in Path.GetFileNameWithoutExtension(fileName))
+            private readonly string root;
+            private readonly Dictionary<string, string> byRelativePath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            private readonly Dictionary<string, string> byFileName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            private ReferenceIndex(string root)
             {
-                if (c is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or (>= '0' and <= '9'))
-                    sb.Append(c);
-                else if (sb.Length >= 4)
-                    break;
-                else
-                    sb.Clear();
+                this.root = root;
             }
 
-            return sb.Length >= 4 ? sb.ToString() : string.Empty;
+            public static ReferenceIndex? TryCreate(string? folder)
+            {
+                if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+                    return null;
+
+                var index = new ReferenceIndex(folder);
+                index.scan(folder, 0);
+                return index;
+            }
+
+            public bool Contains(string? relativePath) => Resolve(relativePath) != null;
+
+            public string? Resolve(string? relativePath)
+            {
+                if (string.IsNullOrWhiteSpace(relativePath))
+                    return null;
+
+                string normalised = normalise(relativePath);
+
+                if (byRelativePath.TryGetValue(normalised, out string? exact))
+                    return exact;
+
+                string fileName = fileNameOf(normalised);
+
+                if (!string.IsNullOrEmpty(fileName) && byFileName.TryGetValue(fileName, out string? byName))
+                    return byName;
+
+                return null;
+            }
+
+            private void scan(string directory, int depth)
+            {
+                if (depth > max_depth)
+                    return;
+
+                try
+                {
+                    foreach (string file in Directory.EnumerateFiles(directory))
+                    {
+                        string relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+                        byRelativePath.TryAdd(relative, relative);
+
+                        string name = fileNameOf(relative);
+
+                        if (!string.IsNullOrEmpty(name))
+                            byFileName.TryAdd(name, relative);
+                    }
+                }
+                catch
+                {
+                    // Unreadable directory: evidence from it is simply unavailable.
+                }
+
+                try
+                {
+                    foreach (string subdirectory in Directory.EnumerateDirectories(directory))
+                        scan(subdirectory, depth + 1);
+                }
+                catch
+                {
+                    // Unreadable subdirectories are skipped.
+                }
+            }
+
+            private static string normalise(string path)
+            {
+                string normalised = path.Replace('\\', '/').Trim();
+
+                while (normalised.StartsWith("./", StringComparison.Ordinal))
+                    normalised = normalised.Substring(2);
+
+                return normalised.TrimStart('/');
+            }
+
+            private static string fileNameOf(string normalisedPath)
+            {
+                int separator = normalisedPath.LastIndexOf('/');
+                return separator < 0 ? normalisedPath : normalisedPath.Substring(separator + 1);
+            }
         }
     }
 }
