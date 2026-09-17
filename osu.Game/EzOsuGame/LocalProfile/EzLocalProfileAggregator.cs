@@ -22,6 +22,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
     {
         private const int yield_every = 32;
 
+        /// <summary>How many scores one Realm transaction materialises when a skills pass resolves plays on demand.</summary>
+        private const int score_resolve_batch = 128;
+
         private readonly RealmAccess realm;
         private readonly EzAnalysisPersistentStore analysisStore;
         private readonly BeatmapManager beatmapManager;
@@ -59,64 +62,22 @@ namespace osu.Game.EzOsuGame.LocalProfile
             });
         }
 
-        /// <summary>
-        /// All valid detached scores for the given usernames (one Realm pass), keyed by normalised username.
-        /// The caller filters already-cached scores and re-chunks what is left for incremental compute.
-        /// </summary>
-        public Dictionary<string, List<ScoreInfo>> CollectDetachedScoresByUsername(
-            IReadOnlyCollection<string> usernames,
-            CancellationToken cancellationToken = default)
-        {
-            var includeSet = new HashSet<string>(usernames.Select(normaliseUsername), StringComparer.Ordinal);
-            var byUser = new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
-
-            realm.Run(r =>
-            {
-                if (includeSet.Count == 0)
-                    return;
-
-                foreach (var score in queryValidScores(r))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    string username = normaliseUsername(score.RealmUser.Username);
-                    if (!includeSet.Contains(username))
-                        continue;
-
-                    if (score.BeatmapInfo == null)
-                        continue;
-
-                    if (!byUser.TryGetValue(username, out var list))
-                        byUser[username] = list = new List<ScoreInfo>();
-
-                    list.Add(score.DeepClone());
-                }
-            });
-
-            foreach (string username in includeSet)
-            {
-                if (!byUser.ContainsKey(username))
-                    byUser[username] = new List<ScoreInfo>();
-            }
-
-            return byUser;
-        }
-
         /// <summary>Result of one incremental Realm pass — see <see cref="CollectIncrementalScoresByUsername"/>.</summary>
         /// <param name="LiveScoreIds">Every valid live score id per username (the reconciliation side of the diff).</param>
-        /// <param name="NewScores">Only the plays a username's ledger did not already contain (already cloned).</param>
+        /// <param name="MissingScoreIds">Only the plays a username's ledger did not already contain, by id.</param>
         public readonly record struct EzIncrementalScoreCollect(
             Dictionary<string, HashSet<Guid>> LiveScoreIds,
-            Dictionary<string, List<ScoreInfo>> NewScores);
+            Dictionary<string, List<Guid>> MissingScoreIds);
 
         /// <summary>
-        /// Incremental variant of <see cref="CollectDetachedScoresByUsername"/>: one Realm pass that records every
-        /// live score id but only <em>clones</em> the plays a username's ledger does not already contain. This is
-        /// what keeps a backfill proportional to the missing scores instead of the whole library.
+        /// Incremental variant of the per-player fetch: one Realm pass that records every live score id but clones
+        /// nothing. The caller fetches the detached scores for one username at a time, in chunks
+        /// (<see cref="CollectDetachedScoresInto"/>), so a rebuild never holds more than one player's library —
+        /// cloning every player's missing plays up front was the run's largest single allocation.
         /// </summary>
         /// <param name="storedDrillScoreIdsByUser">
         /// The "already analysed" ledger per username (see <c>EzLocalProfileStore.GetAnalyzedScoreIds</c>).
-        /// An empty entry means nothing is cached, so every play comes back as new.
+        /// An empty entry means nothing is cached, so every play comes back as missing.
         /// </param>
         public EzIncrementalScoreCollect CollectIncrementalScoresByUsername(
             IReadOnlyDictionary<string, IReadOnlyCollection<Guid>> storedDrillScoreIdsByUser,
@@ -128,7 +89,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 ledger[normaliseUsername(username)] = ids as HashSet<Guid> ?? new HashSet<Guid>(ids);
 
             var live = new Dictionary<string, HashSet<Guid>>(StringComparer.Ordinal);
-            var fresh = new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
+            var missing = new Dictionary<string, List<Guid>>(StringComparer.Ordinal);
 
             realm.Run(r =>
             {
@@ -143,7 +104,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     if (!ledger.TryGetValue(username, out var stored))
                         continue;
 
-                    // Mirrors CollectDetachedScoresByUsername: an unplayable score is not part of the aggregation.
+                    // An unplayable score is not part of the aggregation.
                     if (score.BeatmapInfo == null)
                         continue;
 
@@ -155,10 +116,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     if (stored.Contains(score.ID))
                         continue;
 
-                    if (!fresh.TryGetValue(username, out var list))
-                        fresh[username] = list = new List<ScoreInfo>();
+                    if (!missing.TryGetValue(username, out var list))
+                        missing[username] = list = new List<Guid>();
 
-                    list.Add(score.DeepClone());
+                    list.Add(score.ID);
                 }
             });
 
@@ -167,11 +128,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 if (!live.ContainsKey(username))
                     live[username] = new HashSet<Guid>();
 
-                if (!fresh.ContainsKey(username))
-                    fresh[username] = new List<ScoreInfo>();
+                if (!missing.ContainsKey(username))
+                    missing[username] = new List<Guid>();
             }
 
-            return new EzIncrementalScoreCollect(live, fresh);
+            return new EzIncrementalScoreCollect(live, missing);
         }
 
         /// <summary>Shared per-run caches for chunked aggregation (difficulty attributes, playable analysis, failure counters).</summary>
@@ -321,18 +282,20 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
-        /// Lightweight mania <see cref="ScoreInfo"/> collect for included usernames (no PP / analysis).
-        /// Used to materialize Track All after an incremental per-user recompute.
+        /// The mania plays of the included usernames reduced to <see cref="EzSkillPlayRow"/> — one Realm pass, no
+        /// per-score clone. Used to materialise the players a skills pass covers (and the archive-wide bag) without
+        /// detaching a whole library: a play the per-play cache answers is folded from the cache row, and only a play
+        /// that cache does not answer is resolved in full, by id.
         /// </summary>
-        public Dictionary<string, List<ScoreInfo>> CollectManiaScoresByUsername(
+        public Dictionary<string, List<EzSkillPlayRow>> CollectManiaPlayRows(
             IReadOnlyCollection<string> usernames,
             CancellationToken cancellationToken = default)
         {
             var includeSet = new HashSet<string>(usernames.Select(normaliseUsername), StringComparer.Ordinal);
-            var maniaScoresByUser = new Dictionary<string, List<ScoreInfo>>(StringComparer.Ordinal);
+            var maniaPlaysByUser = new Dictionary<string, List<EzSkillPlayRow>>(StringComparer.Ordinal);
 
             if (includeSet.Count == 0)
-                return maniaScoresByUser;
+                return maniaPlaysByUser;
 
             realm.Run(r =>
             {
@@ -350,14 +313,78 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     if (score.BeatmapInfo == null)
                         continue;
 
-                    if (!maniaScoresByUser.TryGetValue(username, out var list))
-                        maniaScoresByUser[username] = list = new List<ScoreInfo>();
+                    if (!maniaPlaysByUser.TryGetValue(username, out var list))
+                        maniaPlaysByUser[username] = list = new List<EzSkillPlayRow>();
 
-                    list.Add(score.DeepClone());
+                    list.Add(new EzSkillPlayRow(score.ID, score.BeatmapHash, score.Date, score.Accuracy, score.Passed, score.Rank));
                 }
             });
 
-            return maniaScoresByUser;
+            return maniaPlaysByUser;
+        }
+
+        /// <summary>
+        /// Appends the detached scores of the ids in <c>[offset, offset + count)</c>. One Realm transaction per call,
+        /// so the caller drives a rebuild in chunks and never materialises a whole library at once. Applies the same
+        /// validity gate as <see cref="queryValidScores"/>.
+        /// </summary>
+        public void CollectDetachedScoresInto(
+            List<ScoreInfo> into,
+            IReadOnlyList<Guid> scoreIds,
+            int offset,
+            int count,
+            CancellationToken cancellationToken = default)
+            => fetchDetachedScores(offset, count, i => scoreIds[i], (_, score) => into.Add(score), cancellationToken);
+
+        /// <summary>
+        /// Resolves the plays a per-play cache cannot answer, in bounded windows: one Realm transaction per window,
+        /// holding at most <see cref="score_resolve_batch"/> detached scores, instead of one transaction per play or a
+        /// whole library cloned up front. A pass walks the plays in list order, which is what lets the window be
+        /// filled ahead of the next asks — so make one resolver per pass: a fresh pass restarts at the first play and
+        /// would otherwise walk past the end of the list.
+        /// </summary>
+        public Func<Guid, ScoreInfo?> CreateWindowedScoreResolver(IReadOnlyList<EzSkillPlayRow> plays, CancellationToken cancellationToken = default)
+        {
+            int cursor = 0;
+            var window = new Dictionary<Guid, ScoreInfo>();
+
+            return scoreId =>
+            {
+                if (window.Remove(scoreId, out var hit))
+                    return hit;
+
+                window.Clear();
+
+                // The ask never precedes the cursor, so filling forward reaches it. The list running out first means
+                // the id is not one of these plays at all, which the single-id path answers.
+                while (cursor < plays.Count && !window.ContainsKey(scoreId))
+                {
+                    int end = Math.Min(cursor + score_resolve_batch, plays.Count);
+                    fetchDetachedScores(cursor, end - cursor, i => plays[i].ScoreId, (id, score) => window[id] = score, cancellationToken);
+                    cursor = end;
+                }
+
+                return window.Remove(scoreId, out var found) ? found : LoadManagedScore(scoreId);
+            };
+        }
+
+        private void fetchDetachedScores(int offset, int count, Func<int, Guid> idAt, Action<Guid, ScoreInfo> add, CancellationToken cancellationToken)
+        {
+            realm.Run(r =>
+            {
+                for (int i = offset; i < offset + count; i++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    Guid id = idAt(i);
+                    var score = r.Find<ScoreInfo>(id);
+
+                    if (score == null || score.DeletePending || score.BeatmapInfo?.Hash != score.BeatmapHash)
+                        continue;
+
+                    add(id, score.DeepClone());
+                }
+            });
         }
 
         public HashSet<long> CollectLocalOnlineScoreIds()

@@ -23,6 +23,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         private const string waiting_on_csi_chart = "debt-waiting-csi";
         private const string waiting_on_msd_chart = "debt-waiting-msd";
         private const string unsupported_chart = "debt-unsupported-keymode";
+        private const string unrateable_with_csi_chart = "debt-unrateable-msd-with-csi";
         private const string osu_chart = "debt-osu-chart";
         private const string deleted_chart = "debt-beatmap-deleted";
 
@@ -89,6 +90,31 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
+        public void A_chart_settled_as_unrateable_is_not_debt_even_with_a_leftover_csi_row()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                seedCharts(realm);
+                var store = new EzSkillStore(realm);
+
+                // The shape a pass used to leave behind: a full CSI row derived from the stub MSD axis. The chart
+                // is settled for the whole chain, so reporting it as waiting is what kept re-queueing the chain.
+                store.WriteBeatmapMsdUnrateable(unrateable_with_csi_chart, Guid.NewGuid());
+                store.UpsertChartSkillInfo(unrateable_with_csi_chart, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = false });
+
+                var debt = EzChartChainDebt.Collect(new[]
+                {
+                    ("alpha", unrateable_with_csi_chart),
+                    ("beta", waiting_on_msd_chart),
+                }, store);
+
+                Assert.That(debt.PlaysFor("alpha"), Is.EqualTo(0));
+                Assert.That(debt.Usernames, Is.EquivalentTo(new[] { "beta" }));
+                Assert.That(debt.TotalPlays, Is.EqualTo(1));
+            });
+        }
+
+        [Test]
         public void No_plays_means_no_debt()
         {
             RunTestWithRealm((realm, _) =>
@@ -115,6 +141,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 addChart(r, waiting_on_csi_chart, maniaRuleset, circleSize: 4);
                 addChart(r, waiting_on_msd_chart, maniaRuleset, circleSize: 7);
                 addChart(r, unsupported_chart, maniaRuleset, circleSize: 2);
+                addChart(r, unrateable_with_csi_chart, maniaRuleset, circleSize: 4);
                 addChart(r, osu_chart, osuRuleset, circleSize: 4);
             });
         }

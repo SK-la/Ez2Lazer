@@ -277,15 +277,15 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Charts whose MSD settled as unrateable at the current revision. The chain derives no ChartDan from
-        /// them (see <c>BackgroundDataStoreProcessor.populateMissingChartDan</c>), so a play waiting on a ChartDan
-        /// row for one of these is settled rather than missing - reporting it would re-queue the chain forever.
+        /// Charts whose MSD settled as unrateable at the current revision. Every later facet (CSI included) is
+        /// settled for them too, so anything waiting on one of them is settled rather than missing - reporting it
+        /// would re-queue the chain forever.
         /// </summary>
         /// <remarks>
         /// Scans the MSD table, so callers should treat the result as a per-pass value and only ask for it when a
-        /// ChartDan row is otherwise missing (the steady state has none).
+        /// later facet's row is otherwise missing (the steady state has none).
         /// </remarks>
-        public HashSet<string> GetUnrateableChartDanHashes()
+        public HashSet<string> GetUnrateableMsdHashes()
         {
             int version = EzManiaSkillAlgorithm.VERSION;
 
@@ -941,9 +941,9 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Mania chart hashes the chart-side chain will rate at all. MSD is gated on the CS-derived column count and
-        /// both later stages wait on MSD, so a chart outside the engine's keymode range is skipped by the whole chain
-        /// and can never be something a play is "waiting" on.
+        /// Mania chart hashes the chart-side chain will rate at all, so a play on any other chart is settled rather
+        /// than waiting. Shares <see cref="EzChartChainCoverage"/> with the player pass, or the two would disagree
+        /// about which missing rows are worth waiting for.
         /// </summary>
         public HashSet<string> GetRateableChartHashes() => realmAccess.Run(collectRateableChartHashes);
 
@@ -953,12 +953,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             foreach (var b in r.All<BeatmapInfo>())
             {
-                if (b.BeatmapSet == null || b.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(b.Hash))
-                    continue;
-
-                // The chain drops keymodes its engine cannot rate at candidate time, so those charts are not
-                // pending work and must not be counted as missing - otherwise "all current" is unreachable.
-                if (!EzChartChainCoverage.IsRateableKeyCount((int)Math.Round(b.Difficulty.CircleSize)))
+                if (string.IsNullOrEmpty(b.Hash) || !EzChartChainCoverage.IsRateableChart(b))
                     continue;
 
                 hashes.Add(b.Hash);
@@ -999,29 +994,31 @@ namespace osu.Game.EzOsuGame.Skills
                                  .AsEnumerable()
                                  .GroupBy(v => v.BeatmapHash, StringComparer.Ordinal);
 
-                // No MSD means no ChartDan, so a chart whose MSD settled as unrateable is settled for Dan too.
-                // Counting it as missing would leave the Dan facet permanently pending, because the chain skips
-                // those on purpose (see BackgroundDataStoreProcessor.populateMissingChartDan).
-                var unrateableDanHashes = new HashSet<string>(StringComparer.Ordinal);
+                // No MSD means no derived facet, so a chart whose MSD settled as unrateable is settled for CSI and
+                // Dan alike. Counting it as missing would leave those facets permanently pending, because the
+                // chain settles those on purpose (see BackgroundDataStoreProcessor.populateMissingChartSkillInfo
+                // and populateMissingChartDan) - and a CSI row an earlier pass derived from the stub axis must not
+                // be read as that facet being ready.
+                var unrateableMsdHashes = new HashSet<string>(StringComparer.Ordinal);
 
                 foreach (var group in msdByHash)
                 {
-                    if (!group.Any(v => v.AlgorithmVersion == msdRevision))
+                    if (group.All(v => v.AlgorithmVersion != msdRevision))
                         continue;
 
                     var skills = group.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
 
                     if (EzBeatmapMsdComputer.IsUnrateableMsd(skills))
-                        unrateableDanHashes.Add(group.Key);
+                        unrateableMsdHashes.Add(group.Key);
                 }
 
                 return new EzSkillDataStatus
                 {
                     TotalCharts = chartHashes.Count,
                     Msd = EzSkillDataStatusCounting.Count(chartHashes, msdByHash, msdRevision, static v => v.AlgorithmVersion, EzSkillDataStatusCounting.IsMsdStub),
-                    ChartSkillInfo = EzSkillDataStatusCounting.Count(chartHashes, csiByHash, csiRevision, static v => v.InfoVersion, EzSkillDataStatusCounting.IsChartSkillInfoStub),
+                    ChartSkillInfo = EzSkillDataStatusCounting.Count(chartHashes, csiByHash, csiRevision, static v => v.InfoVersion, EzSkillDataStatusCounting.IsChartSkillInfoStub, unrateableMsdHashes),
                     // ChartDan has no settled-miss row form: a row exists only when a dan was resolved.
-                    ChartDan = EzSkillDataStatusCounting.Count(chartHashes, danByHash, danRevision, static v => v.AlgorithmVersion, static _ => false, unrateableDanHashes),
+                    ChartDan = EzSkillDataStatusCounting.Count(chartHashes, danByHash, danRevision, static v => v.AlgorithmVersion, static _ => false, unrateableMsdHashes),
                     MeasuredAt = measuredAt ?? DateTimeOffset.UtcNow,
                 };
             });
@@ -1321,12 +1318,12 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyList<string> GetStalePlayerSkillUsernames()
         {
             return realmAccess.Run(r => r.All<EzPlayerSkillValue>()
-                                        .Where(v => v.Stale)
-                                        .AsEnumerable()
-                                        .Select(v => v.Username)
-                                        .Where(n => !string.IsNullOrEmpty(n))
-                                        .Distinct(StringComparer.Ordinal)
-                                        .ToList());
+                                         .Where(v => v.Stale)
+                                         .AsEnumerable()
+                                         .Select(v => v.Username)
+                                         .Where(n => !string.IsNullOrEmpty(n))
+                                         .Distinct(StringComparer.Ordinal)
+                                         .ToList());
         }
 
         /// <summary>
@@ -1337,13 +1334,13 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyList<EzStalePlayerSkill> GetStalePlayerSkillDetails()
         {
             return realmAccess.Run(r => r.All<EzPlayerSkillValue>()
-                                        .Where(v => v.Stale)
-                                        .AsEnumerable()
-                                        .Where(v => !string.IsNullOrEmpty(v.Username))
-                                        .GroupBy(v => v.Username, StringComparer.Ordinal)
-                                        .Select(g => new EzStalePlayerSkill(g.Key, g.Count(), g.Max(v => v.ComputedAt)))
-                                        .OrderBy(s => s.Username, StringComparer.Ordinal)
-                                        .ToList());
+                                         .Where(v => v.Stale)
+                                         .AsEnumerable()
+                                         .Where(v => !string.IsNullOrEmpty(v.Username))
+                                         .GroupBy(v => v.Username, StringComparer.Ordinal)
+                                         .Select(g => new EzStalePlayerSkill(g.Key, g.Count(), g.Max(v => v.ComputedAt)))
+                                         .OrderBy(s => s.Username, StringComparer.Ordinal)
+                                         .ToList());
         }
 
         /// <summary>Legacy row writer; prefer <see cref="WriteDanSkillsetVerdicts"/>.</summary>

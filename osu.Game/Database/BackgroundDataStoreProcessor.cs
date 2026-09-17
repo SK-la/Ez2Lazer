@@ -1146,6 +1146,14 @@ namespace osu.Game.Database
             var settled = skillStore.GetSettledChartSkillInfoHashes();
             var missing = ready.Where(c => !settled.Contains(c.Hash)).ToList();
 
+            // A CSI row that a complete row already answers counts as settled, so nothing else would ever revisit
+            // it. When its MSD settled as unrateable that row was derived from the stub axis rather than from real
+            // axes, so it is re-queued here to be replaced by the stub form the chain settles with.
+            var unrateableMsd = skillStore.GetUnrateableMsdHashes();
+            var completeCsi = skillStore.GetPersistedChartSkillInfoHashes();
+
+            missing.AddRange(ready.Where(c => unrateableMsd.Contains(c.Hash) && completeCsi.Contains(c.Hash)));
+
             if (missing.Count == 0)
             {
                 Logger.Log($"ChartSkillInfo backfill: nothing ready (have CSI or waiting on MSD). waitingOnMsd={waitingOnMsd}");

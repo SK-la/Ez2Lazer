@@ -3,9 +3,24 @@
 
 using System;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
+    /// <summary>
+    /// One mania play of a player reduced to what the skill pass reads, instead of the whole-library
+    /// <see cref="ScoreInfo"/> deep clone the pass used to build. A play the per-play cache answers is folded
+    /// entirely from its cache row, so neither its beatmap nor its mods are touched; a play without one is resolved
+    /// by id, in bounded windows, only once the pass actually needs it.
+    /// </summary>
+    public readonly record struct EzSkillPlayRow(
+        Guid ScoreId,
+        string BeatmapHash,
+        DateTimeOffset ScoredAt,
+        double Accuracy,
+        bool Passed,
+        ScoreRank Rank);
+
     /// <summary>
     /// Per-play SSR cache entry in <c>ez-local-profile.sqlite</c>. Mirrors the official star cache:
     /// a play already rated with the current algorithm is reused so a recompute only fills in missing plays.

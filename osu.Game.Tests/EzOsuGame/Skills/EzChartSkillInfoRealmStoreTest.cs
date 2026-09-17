@@ -5,8 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.Rulesets;
 using osu.Game.Tests.Database;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
@@ -283,11 +285,93 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             });
         }
 
+        /// <summary>
+        /// A complete CSI row on a chart whose MSD settled as unrateable is exactly what BDSP re-queues on every
+        /// run: its repair set is "unrateable MSD and still a complete CSI row". The backfill has to replace it
+        /// with the stub form, which both takes it out of the complete set and leaves it in the settled set.
+        /// </summary>
+        [Test]
+        public void Unrateable_msd_settles_a_complete_csi_row_instead_of_requeueing_it()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+                var provider = new EzSkillProvider(store);
+                const string hash = "unrateable-with-complete-csi";
+                var id = Guid.NewGuid();
+
+                // What an earlier pass stamped from the stub axis.
+                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+                store.WriteBeatmapMsdUnrateable(hash, id);
+
+                var beatmap = maniaBeatmap(hash, id);
+
+                Assert.That(provider.TryEnsureChartSkillInfoForBackfill(beatmap), Is.True);
+                Assert.That(store.GetPersistedChartSkillInfoHashes().Contains(hash), Is.False,
+                    "a complete row on an unrateable chart re-queues the backfill forever");
+                Assert.That(store.GetSettledChartSkillInfoHashes().Contains(hash), Is.True);
+
+                // The stub then answers the next run, so the repair set stays empty.
+                Assert.That(provider.TryEnsureChartSkillInfoForBackfill(beatmap), Is.True);
+                Assert.That(store.TryGetChartSkillInfo(hash, out var settled), Is.True);
+                Assert.That(settled!.IsUnavailable, Is.True);
+            });
+        }
+
+        /// <summary>
+        /// The live read path must not rebuild the row the backfill just retired: with a settled unrateable MSD there
+        /// are no axes to compute from, so it declines instead of stamping a full row off the stub marker.
+        /// </summary>
+        [Test]
+        public void Hot_path_does_not_stamp_a_csi_row_for_an_unrateable_chart()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+                var provider = new EzSkillProvider(store);
+                const string hash = "unrateable-hot-path";
+
+                store.WriteBeatmapMsdUnrateable(hash, Guid.NewGuid());
+
+                Assert.That(provider.TryGetOrComputeChartSkillInfo(maniaBeatmap(hash, Guid.NewGuid())), Is.Null);
+                Assert.That(store.TryGetChartSkillInfo(hash, out var hotPathRow), Is.False,
+                    "the stub marker is a verdict, not chart axes: it must not become a full CSI row");
+                Assert.That(hotPathRow, Is.Null);
+            });
+        }
+
+        [Test]
+        public void A_settled_unrateable_msd_is_not_served_as_axis_input()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+                const string dead_hash = "unrateable-msd-hash";
+                const string live_hash = "rated-msd-hash";
+
+                store.WriteBeatmapMsdUnrateable(dead_hash, Guid.NewGuid());
+                store.WriteBeatmapMsd(live_hash, new EzSkillsetVector(10, 1, 2, 3, 4, 5, 6, 7), holdRatio: 0.2);
+
+                var provider = new EzSkillProvider(store);
+
+                Assert.That(provider.GetBeatmapMsd(dead_hash), Is.Empty,
+                    "the settled marker is a verdict, not an axis set: feeding it to the CSI computer is what stamped a row for a chart the engine refused");
+                Assert.That(provider.GetBeatmapMsd(live_hash)[EzMinaSkillAxis.Overall.ToMsdSkillId()], Is.EqualTo(10).Within(1e-9));
+            });
+        }
+
         [Test]
         public void File_schema_version_is_ez10()
         {
             Assert.That(RealmAccess.EZ_REALM_SCHEMA_VERSION, Is.EqualTo(10));
             Assert.That(RealmAccess.EzFileSchemaVersion, Is.EqualTo(RealmAccess.UpstreamSchemaVersion * 1000 + 10));
         }
+
+        private static BeatmapInfo maniaBeatmap(string hash, Guid id)
+            => new BeatmapInfo(new RulesetInfo { OnlineID = 3 }, new BeatmapDifficulty { CircleSize = 4 })
+            {
+                ID = id,
+                Hash = hash,
+            };
     }
 }

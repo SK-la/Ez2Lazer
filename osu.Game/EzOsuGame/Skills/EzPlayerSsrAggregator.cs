@@ -46,9 +46,9 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyList<EzAxisPlayEvidenceRow> PendingEvidence { get; private set; } = Array.Empty<EzAxisPlayEvidenceRow>();
 
         /// <summary>
-        /// Chart hashes this pass needed a stored <see cref="EzChartSkillInfo"/> for but found none. The caller hands
-        /// them to the chart-side chain instead of rating them here; see
-        /// <see cref="EzLocalProfileService.ChartSideBackfillRequested"/>.
+        /// Chart hashes this pass needed a stored <see cref="EzChartSkillInfo"/> for but found none. The caller
+        /// re-derives the players whose own plays hit one once the chart-side chain has rated it; see
+        /// <see cref="EzLocalProfileService.CollectChartChainDebt"/>.
         /// </summary>
         public IReadOnlyCollection<string> MissingChartHashes { get; private set; } = Array.Empty<string>();
 
@@ -63,9 +63,18 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyDictionary<Guid, EzSsrPlayCacheRow> LoadPlayCache()
             => profileStore?.LoadSsrPlayCache() ?? new Dictionary<Guid, EzSsrPlayCacheRow>();
 
+        /// <param name="plays">
+        /// The player's mania plays as reduced rows (the row collector filters to mania). A play the per-play cache
+        /// can answer is folded from its cache row and never resolved as a score.
+        /// </param>
+        /// <param name="resolveScore">
+        /// Resolves a play the per-play cache does not answer — see
+        /// <see cref="EzLocalProfileAggregator.CreateWindowedScoreResolver"/>.
+        /// </param>
         public void ComputeAndStore(
             string username,
-            IEnumerable<ScoreInfo> scores,
+            IEnumerable<EzSkillPlayRow> plays,
+            Func<Guid, ScoreInfo?>? resolveScore,
             CancellationToken cancellationToken = default,
             Action? afterEachScore = null,
             IReadOnlyDictionary<Guid, EzSsrPlayCacheRow>? loadedPlayCache = null)
@@ -87,40 +96,44 @@ namespace osu.Game.EzOsuGame.Skills
 
             try
             {
-                foreach (var score in scores)
+                foreach (var play in plays)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     try
                     {
-                        if (score.Ruleset.OnlineID != 3)
+                        if (string.IsNullOrWhiteSpace(play.BeatmapHash))
                             continue;
 
-                        if (string.IsNullOrWhiteSpace(score.BeatmapHash))
-                            continue;
-
-                        bool hasCachedPlay = cachedPlays.TryGetValue(score.ID, out var cachedPlay)
-                                             && string.Equals(cachedPlay.BeatmapHash, score.BeatmapHash, StringComparison.Ordinal);
+                        bool hasCachedPlay = cachedPlays.TryGetValue(play.ScoreId, out var cachedPlay)
+                                             && string.Equals(cachedPlay.BeatmapHash, play.BeatmapHash, StringComparison.Ordinal);
 
                         // A cached negative marks a play the engine deliberately produced nothing for; never retry it.
                         if (hasCachedPlay && !cachedPlay.HasSsr)
                             continue;
 
-                        float rate = EzModRate.Resolve(score.Mods);
                         int keyCount;
+                        float rate;
                         EzSkillsetVector vector;
 
                         if (hasCachedPlay)
                         {
-                            // The cache row carries everything the fold needs — keymode, rate and vector — so no
-                            // beatmap is built at all. Building one per already-rated play was the single largest
-                            // allocation source of a re-run.
+                            // The cache row carries everything the fold needs — keymode, rate and vector — so an
+                            // already-rated play neither builds a beatmap nor re-parses its mods.
                             keyCount = cachedPlay.KeyCount;
+                            rate = (float)cachedPlay.Rate;
                             vector = cachedPlay.Vector;
                         }
                         else
                         {
-                            var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == score.BeatmapHash);
+                            var score = resolveScore?.Invoke(play.ScoreId);
+
+                            if (score == null)
+                                continue;
+
+                            rate = EzModRate.Resolve(score.Mods);
+
+                            var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == play.BeatmapHash);
                             if (beatmapInfo == null)
                                 continue;
 
@@ -135,7 +148,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                             if (goal is not float goalValue)
                             {
-                                cacheNegative(score, username, keyCount, rate, pendingCacheWrites);
+                                cacheNegative(play, username, keyCount, rate, pendingCacheWrites);
                                 continue;
                             }
 
@@ -143,7 +156,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                             if (!calc.SupportsKeyCount(keyCount) || notes.Length < EzNKeyMsdEngine.MIN_RATEABLE_ROWS)
                             {
-                                cacheNegative(score, username, keyCount, rate, pendingCacheWrites);
+                                cacheNegative(play, username, keyCount, rate, pendingCacheWrites);
                                 continue;
                             }
 
@@ -155,32 +168,32 @@ namespace osu.Game.EzOsuGame.Skills
                             {
                                 // A chart the engine cannot rate (e.g. a chord wider than its column
                                 // limit) simply contributes no SSR; the engine rebuilds itself for the next play.
-                                Logger.Log($"[EzSkills] SSR compute failed for {score.BeatmapHash} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                                cacheNegative(score, username, keyCount, rate, pendingCacheWrites);
+                                Logger.Log($"[EzSkills] SSR compute failed for {play.BeatmapHash} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                                cacheNegative(play, username, keyCount, rate, pendingCacheWrites);
                                 continue;
                             }
 
                             if (vector.Overall <= 0)
                             {
-                                cacheNegative(score, username, keyCount, rate, pendingCacheWrites);
+                                cacheNegative(play, username, keyCount, rate, pendingCacheWrites);
                                 continue;
                             }
 
                             pendingCacheWrites.Add(new EzSsrPlayCacheRow(
-                                score.ID,
+                                play.ScoreId,
                                 username,
-                                score.BeatmapHash,
+                                play.BeatmapHash,
                                 keyCount,
                                 rate,
-                                score.Date,
+                                play.ScoredAt,
                                 true,
                                 vector,
                                 EzManiaSkillAlgorithm.VERSION));
                         }
 
-                        string[] patterns = resolvePatterns(score.BeatmapHash, patternsByHash, missingCharts);
+                        string[] patterns = resolvePatterns(play.BeatmapHash, patternsByHash, missingCharts);
 
-                        addScoredPlay(username, score, keyCount, rate, vector, patterns, byKey, patternPlaysByKey, evidence);
+                        addScoredPlay(username, play, keyCount, rate, vector, patterns, byKey, patternPlaysByKey, evidence);
                     }
                     finally
                     {
@@ -200,9 +213,9 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 timed.Sort(static (a, b) => a.ScoredAt.CompareTo(b.ScoredAt));
 
-                var plays = timed.Select(t => t.Vector).ToList();
-                var aggregated = EzSsrAggregator.AggregateVectors(plays);
-                bool provisional = plays.Count < EzPlayerSsrSnapshot.QUALIFYING_PLAYS;
+                var keymodeVectors = timed.Select(t => t.Vector).ToList();
+                var aggregated = EzSsrAggregator.AggregateVectors(keymodeVectors);
+                bool provisional = keymodeVectors.Count < EzPlayerSsrSnapshot.QUALIFYING_PLAYS;
 
                 IReadOnlyList<PatternPlay> patternPlays = patternPlaysByKey.TryGetValue(keyCount, out var pp)
                     ? pp
@@ -217,7 +230,7 @@ namespace osu.Game.EzOsuGame.Skills
                     username,
                     keyCount,
                     aggregated,
-                    plays.Count,
+                    keymodeVectors.Count,
                     provisional,
                     buildChronologicalHistorySamples(timed),
                     patternRatings);
@@ -234,7 +247,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         private string[] resolvePatterns(string beatmapHash, Dictionary<string, string[]> memo, HashSet<string> missing)
         {
-            if (memo.TryGetValue(beatmapHash, out var cached))
+            if (memo.TryGetValue(beatmapHash, out string[]? cached))
                 return cached;
 
             string[] patterns = Array.Empty<string>();
@@ -254,10 +267,10 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Whether the chain will ever produce a CSI row for this chart. A chart whose CS-derived keymode the engine
-        /// cannot rate is dropped by the chain before MSD, so its CSI stage never runs for it - a play on it is
-        /// settled, and reporting the chart would re-queue the chain on every pass (see
-        /// <see cref="EzChartChainCoverage"/>).
+        /// Whether the chain will ever produce a CSI row for this chart. A chart outside the chain's candidate list -
+        /// keymode the engine cannot rate, no beatmap set, or a convert play - is dropped before its first stage, so
+        /// no stage runs for it: a play on it is settled, and reporting the chart would re-queue the chain on every
+        /// pass (see <see cref="EzChartChainCoverage"/>).
         /// </summary>
         private bool isChartChainRateable(string beatmapHash)
         {
@@ -267,15 +280,15 @@ namespace osu.Game.EzOsuGame.Skills
             return beatmapInfo != null && EzChartChainCoverage.IsRateableChart(beatmapInfo);
         }
 
-        private static void cacheNegative(ScoreInfo score, string username, int keyCount, float rate, List<EzSsrPlayCacheRow> pending)
+        private static void cacheNegative(EzSkillPlayRow play, string username, int keyCount, float rate, List<EzSsrPlayCacheRow> pending)
         {
             pending.Add(new EzSsrPlayCacheRow(
-                score.ID,
+                play.ScoreId,
                 username,
-                score.BeatmapHash,
+                play.BeatmapHash,
                 keyCount,
                 rate,
-                score.Date,
+                play.ScoredAt,
                 false,
                 default,
                 EzManiaSkillAlgorithm.VERSION));
@@ -292,7 +305,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         private void addScoredPlay(
             string username,
-            ScoreInfo score,
+            EzSkillPlayRow play,
             int keyCount,
             float rate,
             EzSkillsetVector vector,
@@ -304,7 +317,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (!byKey.TryGetValue(keyCount, out var list))
                 byKey[keyCount] = list = new List<TimedPlay>();
 
-            list.Add(new TimedPlay(score.Date, vector));
+            list.Add(new TimedPlay(play.ScoredAt, vector));
 
             if (patterns.Length > 0)
             {
@@ -323,11 +336,11 @@ namespace osu.Game.EzOsuGame.Skills
                         Username = username,
                         KeyCount = keyCount,
                         SkillId = EzPatternRatings.ToSkillId(patternId),
-                        BeatmapHash = score.BeatmapHash,
+                        BeatmapHash = play.BeatmapHash,
                         AxisValue = vector.Overall,
-                        Accuracy = score.Accuracy,
+                        Accuracy = play.Accuracy,
                         Rate = rate,
-                        ScoredAt = score.Date,
+                        ScoredAt = play.ScoredAt,
                         AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
                     });
                 }
@@ -343,11 +356,11 @@ namespace osu.Game.EzOsuGame.Skills
                     Username = username,
                     KeyCount = keyCount,
                     SkillId = axis.ToSsrSkillId(),
-                    BeatmapHash = score.BeatmapHash,
+                    BeatmapHash = play.BeatmapHash,
                     AxisValue = axisValue,
-                    Accuracy = score.Accuracy,
+                    Accuracy = play.Accuracy,
                     Rate = rate,
-                    ScoredAt = score.Date,
+                    ScoredAt = play.ScoredAt,
                     AlgorithmVersion = EzManiaSkillAlgorithm.VERSION,
                 });
             }

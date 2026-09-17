@@ -1344,10 +1344,6 @@ namespace osu.Game
             if (Ez2ConfigManager.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled))
                 loadComponentSingleFile(new EzAnalysisWarmupProcessor(), Add, true);
 
-            // 成绩分析图表链回折：结算时已落 SQLite，此处不再在启动时自动补算。
-            // 仅在用户手动「计算本地成绩」报缺时，把缺口交给图表链并在其收工后折一次受影响玩家。
-            loadComponentSingleFile(new EzLocalProfileStartupAlign(), Add, true);
-
             // 角逐服务：仅实验开关开启时注册 DI 并挂载；关闭时 DI 解析为 null，进程内零实例零开销。
             EzScoreRaceService scoreRaceService = null;
 

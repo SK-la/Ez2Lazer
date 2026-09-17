@@ -105,11 +105,26 @@ namespace osu.Game.EzOsuGame.Skills
                 return cached;
 
             var msd = Store.GetBeatmapSkills(beatmapHash, EzSkillSystems.BEATMAP_MSD);
+
+            // A settled unrateable marker is not an axis set: handing it on as MSD input is what let the CSI stage
+            // stamp a full row from a chart the engine refused (see EzChartChainCoverage).
+            if (EzBeatmapMsdComputer.IsUnrateableMsd(msd))
+                return new Dictionary<string, double>(StringComparer.Ordinal);
+
             if (EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
                 msdSessionCache[beatmapHash] = msd;
 
             return msd;
         }
+
+        /// <summary>
+        /// Whether MSD settled this chart as unrateable. Reads the stored rows rather than
+        /// <see cref="GetBeatmapMsd"/>, which withholds the marker on purpose (a verdict is not an axis set): a
+        /// caller asking "has MSD settled it unrateable?" would otherwise always hear no and stamp a full CSI row
+        /// from the stub axis.
+        /// </summary>
+        private bool isSettledUnrateableMsd(string beatmapHash)
+            => EzBeatmapMsdComputer.IsUnrateableMsd(Store.GetBeatmapSkills(beatmapHash, EzSkillSystems.BEATMAP_MSD));
 
         /// <summary>Drop session MSD entry so the next read refreshes from Realm (e.g. after WriteBeatmapMsd).</summary>
         public void InvalidateMsdSession(string beatmapHash)
@@ -985,6 +1000,18 @@ namespace osu.Game.EzOsuGame.Skills
             try
             {
                 mods ??= Array.Empty<Mod>();
+
+                var msd = GetBeatmapMsd(beatmapInfo.Hash);
+
+                // A chart whose MSD settled as unrateable is settled for the whole chain, so no CSI is derived from
+                // it here. BDSP owns replacing a row an earlier pass stamped from the stub axis with the stub form,
+                // which is why this path only declines to compute.
+                if (isSettledUnrateableMsd(beatmapInfo.Hash))
+                {
+                    chartSkillInfoSessionMisses.Add(beatmapInfo.Hash);
+                    return null;
+                }
+
                 IBeatmap? map = playable;
 
                 if (map == null && beatmapManager != null)
@@ -1000,7 +1027,6 @@ namespace osu.Game.EzOsuGame.Skills
                 }
 
                 var input = EzChartSkillInfoComputer.FromPlayable(map);
-                var msd = GetBeatmapMsd(beatmapInfo.Hash);
                 // Motion / pattern shares are rate-invariant; always measure at 1.0x like hub.
                 var info = EzChartSkillInfoComputer.Compute(input, msd.Count > 0 ? msd : null, rate: 1);
                 Store.UpsertChartSkillInfo(beatmapInfo.Hash, info, beatmapInfo.ID);
@@ -1018,8 +1044,8 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// BDSP-facing CSI ensure for one chart. Returns true when the hash is settled afterwards
-        /// (a current-revision row, a fresh compute, or a stub because the chart cannot be loaded),
-        /// false when the failure is transient and should be retried on a later run.
+        /// (a current-revision row, a fresh compute, or a stub because the chart cannot be loaded or its
+        /// MSD settled as unrateable), false when the failure is transient and should be retried on a later run.
         /// <para>
         /// This is deliberately the only path that stamps a stub: a hot-path read never persists a
         /// failure, so a transient miss from song select cannot permanently retire a chart.
@@ -1029,6 +1055,20 @@ namespace osu.Game.EzOsuGame.Skills
         {
             if (beatmapInfo.Ruleset.OnlineID != 3)
                 return true;
+
+            // MSD settled as unrateable: the chart is settled for the whole chain, so the stub form is what belongs
+            // here. A complete row in that state was derived from the stub axis by an earlier pass and is replaced.
+            if (isSettledUnrateableMsd(beatmapInfo.Hash))
+            {
+                if (!Store.TryGetChartSkillInfo(beatmapInfo.Hash, out var settled) || settled == null || !settled.IsUnavailable)
+                {
+                    Logger.Log($"[EzSkills] CSI not derived for {beatmapInfo}: MSD settled as unrateable; settling as unavailable.",
+                        Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                    Store.WriteChartSkillInfoUnavailable(beatmapInfo.Hash, beatmapInfo.ID);
+                }
+
+                return true;
+            }
 
             // Complete row, or a stub a previous backfill already settled.
             if (Store.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)

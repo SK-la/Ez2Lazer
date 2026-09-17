@@ -74,33 +74,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
         EzLocalProfileComputePhase Phase = EzLocalProfileComputePhase.Analysing);
 
     /// <summary>
-    /// What a startup reconcile found: the players the archive already covers, how many of their plays never made it
-    /// into the SQLite slice (a crash or force close before the write landed), which players' Realm skill rows trail
-    /// that slice, and which are waiting on the chart-side chain. Nothing is recomputed to produce this — it is the
-    /// decision input for the reconcile.
-    /// </summary>
-    /// <param name="IncludedUsernames">Players already part of the archive; an empty list means nothing to align.</param>
-    /// <param name="PendingPlaysByUser">Plays the drill ledger is missing, per player.</param>
-    /// <param name="StaleSkillUsernames">Included players whose skill rows were flagged stale.</param>
-    /// <param name="ChartDebtUsernames">Included players with plays the chart-side chain has not rated yet.</param>
-    /// <param name="ContentVersionStale">The stored archive was produced by an older analysis logic version.</param>
-    public sealed record EzLocalProfileStartupAlignPlan(
-        IReadOnlyList<string> IncludedUsernames,
-        IReadOnlyDictionary<string, int> PendingPlaysByUser,
-        IReadOnlyList<string> StaleSkillUsernames,
-        IReadOnlyList<string> ChartDebtUsernames,
-        bool ContentVersionStale)
-    {
-        public static EzLocalProfileStartupAlignPlan Empty { get; } =
-            new(Array.Empty<string>(), new Dictionary<string, int>(StringComparer.Ordinal), Array.Empty<string>(), Array.Empty<string>(), false);
-
-        public int TotalPendingPlays => PendingPlaysByUser.Values.Sum();
-
-        /// <summary>True when a reconcile would actually change something; false keeps startup quiet and cheap.</summary>
-        public bool HasWork => TotalPendingPlays > 0 || StaleSkillUsernames.Count > 0 || ChartDebtUsernames.Count > 0 || ContentVersionStale;
-    }
-
-    /// <summary>
     /// Which players a scoped skills pass re-derives, given the players selected for re-aggregation, the scope the
     /// caller asked for, and the players the archive still covers.
     /// <para>

@@ -93,8 +93,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status.ChartSkillInfo.Missing, Is.EqualTo(1));
                 Assert.That(status.ChartSkillInfo.CurrentRevision, Is.EqualTo(EzAnalysisRevision.ChartSkillInfo));
 
-                Assert.That(status.ChartDan.Ready, Is.EqualTo(2));
-                Assert.That(status.ChartDan.Unrateable, Is.EqualTo(0));
+                // Dan: a is ready, b is settled by its unrateable MSD (the row written for it is not read as a
+                // result), c is left behind by an older revision.
+                Assert.That(status.ChartDan.Ready, Is.EqualTo(1));
+                Assert.That(status.ChartDan.Unrateable, Is.EqualTo(1));
                 Assert.That(status.ChartDan.Stale, Is.EqualTo(1));
                 Assert.That(status.ChartDan.Missing, Is.EqualTo(0));
                 Assert.That(status.ChartDan.CurrentRevision, Is.EqualTo(EzAnalysisRevision.ChartDan));
@@ -268,6 +270,31 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 store.SetPlayerSkillStale("alpha", false);
 
                 Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);
+            });
+        }
+
+        /// <summary>
+        /// A CSI row written for a chart whose MSD later settled as unrateable came from the stub axis rather than
+        /// from real MSD, so it must stop reading as a result the moment the verdict lands: otherwise the facet
+        /// reports "ready" while MSD reports the same chart as unrateable, and the chain never revisits it.
+        /// </summary>
+        [Test]
+        public void Csi_row_that_an_unrateable_msd_invalidates_is_settled_not_ready()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                seedCharts(realm);
+                var store = new EzSkillStore(realm);
+
+                store.WriteBeatmapMsdUnrateable(mania_b, Guid.NewGuid());
+                store.UpsertChartSkillInfo(mania_b, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+
+                var status = store.GetSkillDataStatus();
+
+                Assert.That(status.ChartSkillInfo.Ready, Is.EqualTo(0));
+                Assert.That(status.ChartSkillInfo.Unrateable, Is.EqualTo(1));
+                Assert.That(status.ChartSkillInfo.Missing, Is.EqualTo(2));
+                Assert.That(status.ChartSkillInfo.Pending, Is.EqualTo(2));
             });
         }
 

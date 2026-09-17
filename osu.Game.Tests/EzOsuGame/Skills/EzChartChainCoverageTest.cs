@@ -4,6 +4,7 @@
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.Rulesets;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
@@ -38,7 +39,31 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(EzChartChainCoverage.IsRateableChart(beatmap(circleSize)), Is.True);
         }
 
-        private static BeatmapInfo beatmap(float circleSize)
-            => new BeatmapInfo { Difficulty = new BeatmapDifficulty { CircleSize = circleSize } };
+        /// <summary>
+        /// A mania score on an osu!std beatmap is a convert. The chain's candidate list is mania-only, so no stage
+        /// ever writes a row for it and a play on one must not read as missing.
+        /// </summary>
+        [TestCase(4f)]
+        [TestCase(7f)]
+        public void Convert_beatmap_is_settled(float circleSize)
+        {
+            Assert.That(EzChartChainCoverage.IsRateableChart(beatmap(circleSize, rulesetId: 0)), Is.False);
+        }
+
+        /// <summary>
+        /// The chain walks beatmaps through their set, so a chart without one never enters the candidate list.
+        /// </summary>
+        [TestCase(4f)]
+        [TestCase(7f)]
+        public void Chart_without_a_set_is_settled(float circleSize)
+        {
+            Assert.That(EzChartChainCoverage.IsRateableChart(beatmap(circleSize, hasSet: false)), Is.False);
+        }
+
+        private static BeatmapInfo beatmap(float circleSize, int rulesetId = 3, bool hasSet = true)
+            => new BeatmapInfo(new RulesetInfo { OnlineID = rulesetId }, new BeatmapDifficulty { CircleSize = circleSize })
+            {
+                BeatmapSet = hasSet ? new BeatmapSetInfo() : null
+            };
     }
 }

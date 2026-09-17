@@ -41,12 +41,12 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Chart hashes this pass needed a persisted <see cref="EzPersistedChartDan"/> for but found none. The
-        /// caller hands them to the chart-side chain instead of rating them here; see
-        /// <see cref="EzLocalProfileService.ChartSideBackfillRequested"/>.
+        /// caller re-derives the players whose own plays hit one once the chart-side chain has rated it; see
+        /// <see cref="EzLocalProfileService.CollectChartChainDebt"/>.
         /// </summary>
         public IReadOnlyCollection<string> MissingChartHashes { get; private set; } = Array.Empty<string>();
 
-        private HashSet<string>? unrateableChartDanHashes;
+        private HashSet<string>? unrateableMsdHashes;
 
         /// <summary>
         /// Charts whose MSD settled as unrateable, so no ChartDan row can ever arrive for them. Loaded on first
@@ -54,12 +54,12 @@ namespace osu.Game.EzOsuGame.Skills
         /// ever consulted after such a miss and a chart that later gains a row is answered by that row instead.
         /// </summary>
         private HashSet<string> unrateableChartsForPass
-            => unrateableChartDanHashes ??= skillStore.GetUnrateableChartDanHashes();
+            => unrateableMsdHashes ??= skillStore.GetUnrateableMsdHashes();
 
         /// <summary>
         /// Marks the start of a new skills pass, dropping lookups that were memoised against the previous one.
         /// </summary>
-        public void BeginSkillPass() => unrateableChartDanHashes = null;
+        public void BeginSkillPass() => unrateableMsdHashes = null;
 
         /// <summary>
         /// One load of the per-play cache for a whole pass, so a multi-player run does not re-read the table once per
@@ -68,9 +68,18 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyDictionary<Guid, EzDanPlayCacheRow> LoadPlayCache()
             => profileStore?.LoadDanPlayCache() ?? new Dictionary<Guid, EzDanPlayCacheRow>();
 
+        /// <param name="plays">
+        /// The player's mania plays as reduced rows (the row collector filters to mania). A play the per-play cache
+        /// can answer is folded from its cache row and never resolved as a score.
+        /// </param>
+        /// <param name="resolveScore">
+        /// Resolves a play the per-play cache does not answer — see
+        /// <see cref="EzLocalProfileAggregator.CreateWindowedScoreResolver"/>.
+        /// </param>
         public void ComputeAndStore(
             string username,
-            IEnumerable<ScoreInfo> scores,
+            IEnumerable<EzSkillPlayRow> plays,
+            Func<Guid, ScoreInfo?>? resolveScore,
             CancellationToken cancellationToken = default,
             Action? afterEachScore = null,
             IReadOnlyDictionary<Guid, EzDanPlayCacheRow>? loadedPlayCache = null)
@@ -88,44 +97,48 @@ namespace osu.Game.EzOsuGame.Skills
 
             try
             {
-                foreach (var score in scores)
+                foreach (var play in plays)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     try
                     {
-                        if (score.Ruleset.OnlineID != 3)
+                        if (!play.Passed || play.Rank == ScoreRank.F)
                             continue;
 
-                        if (!score.Passed || score.Rank == ScoreRank.F)
+                        if (play.Accuracy <= 0 || !double.IsFinite(play.Accuracy))
                             continue;
 
-                        if (score.Accuracy <= 0 || !double.IsFinite(score.Accuracy))
-                            continue;
-
-                        // Hub ez_windows: EZ widened hit windows — no dan credit.
-                        if (score.Mods.Any(static m => m is ModEasy))
-                            continue;
-
-                        bool hasCachedPlay = cachedPlays.TryGetValue(score.ID, out var cachedPlay)
-                                             && string.Equals(cachedPlay.BeatmapHash, score.BeatmapHash, StringComparison.Ordinal);
+                        bool hasCachedPlay = cachedPlays.TryGetValue(play.ScoreId, out var cachedPlay)
+                                             && string.Equals(cachedPlay.BeatmapHash, play.BeatmapHash, StringComparison.Ordinal);
 
                         if (hasCachedPlay)
                         {
+                            // The EZ gate is already in the recorded verdict: a credited row cannot come from an EZ
+                            // play, and an uncredited one has nothing to fold in — so a cached play never reads mods.
                             if (cachedPlay.Credited)
                                 mergeCachedCredit(bestByChartRate, username, cachedPlay);
 
                             continue;
                         }
 
-                        var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == score.BeatmapHash);
+                        var score = resolveScore?.Invoke(play.ScoreId);
+
+                        if (score == null)
+                            continue;
+
+                        // Hub ez_windows: EZ widened hit windows — no dan credit.
+                        if (score.Mods.Any(static m => m is ModEasy))
+                            continue;
+
+                        var beatmapInfo = score.BeatmapInfo ?? beatmapManager.QueryBeatmap(b => b.Hash == play.BeatmapHash);
                         if (beatmapInfo == null)
                             continue;
 
                         if (beatmapInfo.Ruleset.OnlineID != 3)
                             continue;
 
-                        string hash = score.BeatmapHash;
+                        string hash = play.BeatmapHash;
                         if (string.IsNullOrWhiteSpace(hash))
                             hash = beatmapInfo.Hash;
 
@@ -175,16 +188,16 @@ namespace osu.Game.EzOsuGame.Skills
                             continue;
                         }
 
-                        double? credited = EzDanCredit.CreditedDanFor(chart.RawDan, score.Accuracy, chart.Side, chart.KeyCount);
+                        double? credited = EzDanCredit.CreditedDanFor(chart.RawDan, play.Accuracy, chart.Side, chart.KeyCount);
 
                         if (credited is not double value)
                         {
-                            cacheNoCredit(score, username, hash, rate, pendingCacheWrites);
+                            cacheNoCredit(play, username, hash, rate, pendingCacheWrites);
                             continue;
                         }
 
                         var cacheRow = new EzDanPlayCacheRow(
-                            score.ID,
+                            play.ScoreId,
                             username,
                             hash,
                             EzDanAlgorithm.VERSION,
@@ -193,8 +206,8 @@ namespace osu.Game.EzOsuGame.Skills
                             chart.Side.ToId(),
                             rate,
                             value,
-                            score.Accuracy,
-                            score.Date);
+                            play.Accuracy,
+                            play.ScoredAt);
                         pendingCacheWrites.Add(cacheRow);
                         mergeCachedCredit(bestByChartRate, username, cacheRow);
                     }
@@ -247,10 +260,10 @@ namespace osu.Game.EzOsuGame.Skills
             }
         }
 
-        private static void cacheNoCredit(ScoreInfo score, string username, string hash, double rate, List<EzDanPlayCacheRow> pending)
+        private static void cacheNoCredit(EzSkillPlayRow play, string username, string hash, double rate, List<EzDanPlayCacheRow> pending)
         {
             pending.Add(new EzDanPlayCacheRow(
-                score.ID,
+                play.ScoreId,
                 username,
                 hash,
                 EzDanAlgorithm.VERSION,
@@ -259,8 +272,8 @@ namespace osu.Game.EzOsuGame.Skills
                 string.Empty,
                 rate,
                 0,
-                score.Accuracy,
-                score.Date));
+                play.Accuracy,
+                play.ScoredAt));
         }
 
         private void flushCache(List<EzDanPlayCacheRow> pending)

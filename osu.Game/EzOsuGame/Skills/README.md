@@ -102,14 +102,16 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
 - 每一段补算仍各自 `showProgressNotification`；因为过期行对增量集合就是"缺失"，换版后启动会自动弹进度。
 - 设置 → Ez → 实验性 → **技能数据状态**：`EzSkillStore.GetSkillDataStatus()` 的
   ready / unrateable / stale / missing，回答"数据有没有缺、有没有过期"；同一行末尾附带玩家链的
-  「玩家技能 过期 N」（`GetStalePlayerSkillUsernames()`），所以两条链的状态在一个地方能看完。
+  「玩家技能 落后账本 N」（`GetStalePlayerSkillUsernames()`）与派生的「等图表链 N」
+  （`EzChartChainDebt`），所以两条链的状态在一个地方能看完。
 - 玩家侧另有一套可见性：`EzPlayerSkillValue.Stale` 在个人主页显示为「待更新」
-  （`LOCAL_PROFILE_SKILL_STALE`），对账（手动计算 / 图表链回折）则弹「成绩分析对账：…」进度通知。
+  （`LOCAL_PROFILE_SKILL_STALE`）；手动「计算成绩分析」弹 `EzLocalProfileComputeNotification` 进度
+  通知（一次点击只弹一轮）。
 
 ## 玩家链（成绩分析）：与图表链不同的第二套失效机制
 
 图表链（上面那套）失效靠**组合修订号**；玩家链（SSR / pattern / Dan 的玩家侧汇总）失效靠
-**账本对账 + 脏位**，因为它的"上游"是 Realm 里不断新增的成绩，而不是磁盘上的一批谱面行。
+**脏位 + 派生债务**，因为它的"上游"是 Realm 里不断新增的成绩，而不是磁盘上的一批谱面行。
 
 两级、各有一个真源：
 
@@ -119,22 +121,22 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
 | Realm 技能行：`EzPlayerSkillValue`（SSR / pattern）、`EzDanEstimate` / `EzPlayerDanSkillsetValue` | 从上一步的切片聚合而来 | 只在整段 compute 里写（`writePlayerSkills`） |
 
 一局结算只做第一步，然后把该玩家（和 `All`）的 Realm 技能行置 `Stale`——**不**在结算路径上重算，
-否则每局都要做一次玩家级聚合。第二步由手动「计算本地成绩」触发的对账收口（启动时不再自动补算）。
+否则每局都要做一次玩家级聚合。第二步只在用户手动「计算成绩分析」时收口：**一次点击 = 一轮**，
+跑完不留任何后台回折（启动时、图表链收工后都不再自动补算）。
 
-### 对账怎么知道"有东西要做"
+### 一轮计算覆盖谁
 
-三个信号，全部来自持久化状态，不需要额外记账列：
+默认技能范围（`ComputeAsync` 未显式传 `skillsUsernames` 时）是两类玩家的并集，判据都从持久化
+状态现读，不需要额外记账列：
 
-| 信号 | 来源 | 覆盖的场景 |
+| 来源 | 判据 | 覆盖的场景 |
 |---|---|---|
-| 账本缺成绩 | `drill_scores` 里的 score id vs Realm 当前成绩清单（`CollectIncrementalScoresByUsername` 一次 Realm 遍历） | 崩溃/强杀导致结算了但没写进切片 |
-| 脏位 | `EzPlayerSkillValue.Stale`（`MarkPlayerSkillStale`） | 已写进切片、技能行还没跟上 |
-| 内容版本 | `EzLocalProfileStore.NeedsRecompute()` | 分析逻辑换版（`CONTENT_VERSION`） |
+| 脏位 | `EzPlayerSkillValue.Stale`（`EzSkillProvider.PlayerSkills.SetStale`） | 已写进切片、技能行还没跟上（只有结算入库会置位；一次覆盖该玩家的 pass 清除） |
+| 图表链债务 | `EzChartChainDebt`：`drill_scores` 的 (玩家, 谱面) 对图表链覆盖现算 | 该谱面还没被图表链评级，这一轮读不到；跑完「重算 Realm」后再点一次即可折入 |
 
-`EzLocalProfileService.PlanStartupAlign()` 汇总这三项，`EzLocalProfileStartupAlign` 只在 `HasWork` 时
-执行一次增量 compute 并弹进度通知；没有活可干时**零开销、零通知**。它**不再在启动时自动跑**：
-只在用户手动「计算本地成绩」报缺、图表链补完后回头折一次受影响玩家。它不是常驻轮询组件——
-结算路径已经写完了，对账只是兜底。
+两类都在同一遍 compute 内收口：覆盖到的玩家按玩家整体清脏位；无法重算的玩家（该切片没有 mania
+成绩）直接删行，避免脏位永远清不掉。`Stale` 只表示"值落后账本"，不再兼表"等图表链"——后者由派生
+债务表达，链一写出行就自己消失。
 
 ### 为什么玩家链不复用组合修订号
 
@@ -149,9 +151,11 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
 
 玩家段需要图表侧三样东西：SSR 的 pattern 标签（CSI）、Dan 的 `EzPersistedChartDan`、以及
 mod 影响谱面时的现场估算。前两样**只读不写**：读不到就跳到下一局，并把该谱面记进
-`MissingChartHashes`，由 `EzLocalProfileService.ChartSideBackfillRequested` 交给图表链
-（`QueueEzRealmMetadataRebuild`，scope = MSD | CSI | ChartDan）。受影响玩家与 `All` 同时被置
-`Stale`，所以图表链跑完后 `EzLocalProfileStartupAlign` 会再折一次，把这些局真正计入。
+`MissingChartHashes`。这一轮**不去排图表链**，也**不写脏位**——缺的局根本没进这一遍写的行，
+说清楚它们少算了是日志（`N chart(s) have no chart-side skill data yet`）和派生的「等图表链」的事：
+`Stale` 只表示"切片领先了这些行"，写上去只有再跑一遍才能清，把它兼给"等图表链"就会让状态行
+在链已补齐之后仍报落后（一次点击要跑两轮才算完）。状态行报「等图表链」时用户跑一次「重算 Realm」
+（scope = MSD | CSI | ChartDan），再点一次「计算成绩分析」就折进去了。
 
 这样切开的理由：图表侧一行 MSD/CSI/Dan 是**谱面属性**，与玩家无关。玩家段顺手算一份，就会在
 每个玩家、每次 compute 上重复同一张谱面的 MinaCalc 计算，而且写的是临时值——正是这轮性能问题的来源。
@@ -163,12 +167,23 @@ mod 影响谱面时的现场估算。前两样**只读不写**：读不到就跳
 | 行存在但版本旧 | 会（增量重算） | 缺失，排队 |
 | 行不存在，MSD 未结算 | 会（同一轮里 MSD → CSI → Dan） | 缺失，排队 |
 | 键数不在引擎 `4–18` 范围 | **不会**（候选期就被丢弃） | 已结算，不报缺 |
-| MSD 结算为 unrateable | **不会**（Dan 阶段显式跳过） | 已结算，不报缺 |
+| 没有 beatmap set / 转谱图（mania 成绩挂在 non-mania 谱面） | **不会**（`collectManiaChartCandidates` 只收 `Ruleset == mania` 且有 set 的谱面） | 已结算，不报缺 |
+| MSD 结算为 unrateable | **不会**（CSI 与 Dan 都显式跳过） | 已结算，不报缺 |
 | CSI 结算为 unavailable stub | 不会 | 已结算，不报缺 |
 
-前两类由 `EzChartChainCoverage.IsRateableChart` / `EzSkillStore.GetUnrateableChartDanHashes` 区分。
+前两类由 `EzChartChainCoverage.IsRateableChart` / `EzSkillStore.GetUnrateableMsdHashes` 区分：前者按图表链
+自己的候选门槛（set 非空 + `Ruleset.OnlineID == 3` + 键数）判断，不只是看有没有行，否则会给链永不看的谱面
+反复排队、把玩家的脏位永久挂住。后两者是**落结算行**的结果，所以"缺行"一定会终止：`EzBeatmapMsdComputer.ComputeAndStore` 把零向量、
+超出引擎列数、内容不可加载都落成 `__unrateable`；唯一允许不落的是引擎自己抛异常的瞬态失败。
+
 同一套口径也用在 `GetSkillDataStatus()` 上：不可评的键数不计入图表总数，MSD unrateable 的谱面在
-Dan 一栏记 `unrateable` 而不是 `missing`——否则"全部最新"永远达不到，状态行会一直报警。
+CSI 与 Dan 一栏都记 `unrateable` 而不是 `missing`——即使它带着一张早先从 `__unrateable` 伪轴算出的
+CSI 行（那种行由 BDSP 的修复集改写为 stub）。否则"全部最新"永远达不到，状态行会一直报警。
+
+这条修复链有个前提：**读 `__unrateable` 标记要读原始行，不能经 `EzSkillProvider.GetBeatmapMsd`**。
+那个读法为了让 CSI 计算拿不到伪轴，会把标记整行吞掉（返回空字典），于是 `IsUnrateableMsd(GetBeatmapMsd(...))`
+恒为假 —— BDSP 的修复集每轮都重排同一批图（`ok=N, fail=0` 却什么都没写），热路径还会把 stub 轴重新算成
+一张完整 CSI 行。两个判断都用 `EzSkillProvider.isSettledUnrateableMsd`（现读 `GetBeatmapSkills(hash, BEATMAP_MSD)`）。
 
 ## Key entry points
 
@@ -177,13 +192,16 @@ Dan 一栏记 `unrateable` 而不是 `missing`——否则"全部最新"永远�
 - `EzChartSkillInfoComputer`: chart metadata, pattern tags, motion, LeoBlack cluster fallback.
 - `EzChartDanEstimator`: chart dan calculation and live snapshot flow.
 - `EzDanSkillsetFiling`: skillset bucketing and quorum logic.
-- `EzPlayerSsrAggregator`: player-side SSR aggregation.
+- `EzPlayerSsrAggregator` / `EzPlayerDanAggregator`: player-side folds. Both take `EzSkillPlayRow` sets plus a
+  resolver rather than scores, so a cached play folds straight from its cache row (no mods re-parse, no beatmap) and
+  only the plays no cache answers are detached — in bounded windows, never a whole library.
 - `EzLocalProfileService` (`LocalProfile/`): the SQLite slice + Realm skill writer; `IngestSettledScore`
-  is the per-play hook, `PlanStartupAlign` / `AlignOnStartupAsync` are the reconcile used by the
-  manual compute / chart-chain follow-up.
-- `EzLocalProfileStartupAlign` (`LocalProfile/`): owns the chart-chain follow-up; **no longer auto-runs at launch**.
-- `EzLocalProfileComputeNotification` (`LocalProfile/`): the progress notification every compute entry
-  point shares (settings dialog + chart-chain follow-up), so long runs are never invisible.
+  is the per-play hook, `ComputeAsync` is the one entry the manual compute drives (the startup /
+  chart-chain reconcile was removed with the automatic follow-up).
+- `EzChartChainDebt`: derives what the chart chain still owes a play, so neither the status readout nor
+  the manual compute's default scope needs a stored flag for it.
+- `EzLocalProfileComputeNotification` (`LocalProfile/`): the progress notification the manual compute
+  uses, so a long run is never invisible.
 
 ## Relevant supporting docs
 

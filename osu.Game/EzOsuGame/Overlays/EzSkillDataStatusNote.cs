@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 bool failed = false;
                 EzSkillDataStatus? status = null;
                 IReadOnlyList<EzStalePlayerSkill> stalePlayers = Array.Empty<EzStalePlayerSkill>();
-                EzChartChainDebt debt = EzChartChainDebt.Empty;
+                EzChartChainDebt debt = EzChartChainDebt.EMPTY;
                 bool backfillRunning = false;
 
                 try

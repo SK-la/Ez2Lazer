@@ -91,7 +91,8 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <param name="settledByUpstream">
         /// Hashes this facet will never produce a row for because an upstream one already settled them as
         /// unrateable. They count as <see cref="EzFacetStatus.Unrateable"/> - settled, so not work - which keeps
-        /// "Pending &gt; 0" meaning "the next pass has something to do".
+        /// "Pending &gt; 0" meaning "the next pass has something to do". A stored row does not override this: a row
+        /// derived from an upstream stub axis is precisely what must not read as ready.
         /// </param>
         public static EzFacetStatus Count<T>(
             IReadOnlyCollection<string> chartHashes,
@@ -105,6 +106,9 @@ namespace osu.Game.EzOsuGame.Analysis
             int unrateable = 0;
             int stale = 0;
             var seen = new HashSet<string>(StringComparer.Ordinal);
+            var upstream = settledByUpstream == null
+                ? null
+                : settledByUpstream as HashSet<string> ?? new HashSet<string>(settledByUpstream, StringComparer.Ordinal);
 
             foreach (var group in rowsByHash)
             {
@@ -112,6 +116,12 @@ namespace osu.Game.EzOsuGame.Analysis
                     continue;
 
                 seen.Add(group.Key);
+
+                if (upstream != null && upstream.Contains(group.Key))
+                {
+                    ++unrateable;
+                    continue;
+                }
 
                 int latest = group.Max(revisionOf);
 
@@ -129,9 +139,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
             int settledWithoutRow = 0;
 
-            if (settledByUpstream != null)
+            if (upstream != null)
             {
-                foreach (string hash in settledByUpstream)
+                foreach (string hash in upstream)
                 {
                     if (chartHashes.Contains(hash) && !seen.Contains(hash))
                         ++settledWithoutRow;

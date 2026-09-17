@@ -60,36 +60,60 @@ namespace osu.Game.EzOsuGame.Skills
             if (!beatmapInfo.Ruleset.Available)
                 beatmapInfo.Ruleset.Available = true;
 
-            var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+            IBeatmap playable;
+            EzCalcNote[] notes;
 
-            if (!working.BeatmapInfo.Ruleset.Available)
-                working.BeatmapInfo.Ruleset.Available = true;
+            try
+            {
+                var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
 
-            var playable = working.GetPlayableBeatmap(working.BeatmapInfo.Ruleset);
+                if (!working.BeatmapInfo.Ruleset.Available)
+                    working.BeatmapInfo.Ruleset.Available = true;
+
+                playable = working.GetPlayableBeatmap(working.BeatmapInfo.Ruleset);
+                notes = EzMinaNoteConverter.Convert(playable);
+            }
+            catch (Exception e)
+            {
+                // Content-addressed: the file backing this hash will not become loadable on its own, so it is
+                // settled rather than retried on every backfill (mirrors the CSI stage). Re-importing produces a
+                // new hash and 「完全重算」 clears the marker.
+                Logger.Log($"[EzSkills] MSD cannot load {beatmapInfo} ({e.Message}); settling as unrateable.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
+                return null;
+            }
 
             int keyCount = EzMinaNoteConverter.ResolveKeyCount(playable);
+
+            // The engine returns a zero vector for a column count outside its range rather than throwing, so the
+            // gate has to be read here: without it those charts stay row-less and every reader counts them as
+            // "still missing" forever.
+            if (!EzNKeyMsdEngine.IsSupportedKeyCount(keyCount))
+            {
+                Logger.Log($"[EzSkills] MSD unsupported keymode {keyCount} for {beatmapInfo}; settling as unrateable.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
+                return null;
+            }
 
             using var calc = new EzNKeyMsdEngine();
             EzSkillsetVector vector;
 
             try
             {
-                vector = calc.CalculateMsd(EzMinaNoteConverter.Convert(playable), keyCount, rate: 1f);
+                vector = calc.CalculateMsd(notes, keyCount, rate: 1f);
             }
             catch (Exception e)
             {
+                // Transient: the engine rebuilds itself and the next pass retries. Settling here would retire a
+                // chart the engine can very likely still rate.
                 Logger.Log($"[EzSkills] MSD compute failed for {beatmapInfo} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return null;
             }
 
             if (vector.Overall <= 0 && vector.Stream <= 0)
             {
-                if (calc.SupportsKeyCount(keyCount))
-                {
-                    Logger.Log($"[EzSkills] MSD zero vector for {beatmapInfo} (keys={keyCount})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                    skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
-                }
-
+                Logger.Log($"[EzSkills] MSD zero vector for {beatmapInfo} (keys={keyCount})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
                 return null;
             }
 
