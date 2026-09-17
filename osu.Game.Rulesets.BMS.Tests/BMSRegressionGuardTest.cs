@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Reflection;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
@@ -44,7 +45,7 @@ namespace osu.Game.Rulesets.BMS.Tests
             var drawable = new DrawableBMSNote(new BMSNote());
             MethodInfo loadMethod = typeof(DrawableBMSNote).GetMethod("load", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
-            TestDelegate action = () => loadMethod.Invoke(drawable, null);
+            Action action = () => loadMethod.Invoke(drawable, null);
 
             Assert.That(action, Throws.Nothing);
         }
@@ -69,7 +70,7 @@ namespace osu.Game.Rulesets.BMS.Tests
             MethodInfo adapter = typeof(BMSRuleset).GetMethod("createManiaSkinBeatmap", BindingFlags.Static | BindingFlags.NonPublic)!;
             var maniaBeatmap = (ManiaBeatmap)adapter.Invoke(null, new object[] { beatmap })!;
 
-            TestDelegate action = () => maniaBeatmap.GetStageForColumnIndex(13);
+            Action action = () => maniaBeatmap.GetStageForColumnIndex(13);
 
             Assert.That(action, Throws.Nothing);
         }
