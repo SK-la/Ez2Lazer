@@ -159,7 +159,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             // The vendored module aborts on a chord wider than 16 columns. The engine must
             // discard that instance instead of staying poisoned for every later chart.
-            using var engine = new EzNKeyMsdEngine();
+            var engine = new EzNKeyMsdEngine();
 
             Assert.Throws<EzMsdEngineException>(() => engine.CalculateMsd(createChordNotes(rows: 8, width: 17), 18));
 
