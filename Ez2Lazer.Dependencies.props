@@ -18,9 +18,9 @@
     <!-- 依赖来源：默认 NuGet；启用本地同级工程时打开下面两个开关，并在 IDE 中打开 osu.Desktop.Local.slnf。 -->
 <!--    <UseEz2LazerLocalFrameworkProject>true</UseEz2LazerLocalFrameworkProject>-->
 <!--    <UseEz2LazerLocalResourcesProject>true</UseEz2LazerLocalResourcesProject>-->
-
-    <!-- Resources 包含 Crowdin 的 tg-TJ；SDK 会规范为 tg-Cyrl-TJ 并告警，忽略即可。 -->
-    <NoWarn>$(NoWarn);NETSDK1187</NoWarn>
-    <NoWarn>CS1573</NoWarn>
+  </PropertyGroup>
+  <!-- Resources 包含 Crowdin 的 tg-TJ；SDK 会规范为 tg-Cyrl-TJ 并告警，忽略即可。 -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);NETSDK1187;CS1573;CS1591</NoWarn>
   </PropertyGroup>
 </Project>
