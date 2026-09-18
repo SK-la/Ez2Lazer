@@ -20,10 +20,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         // [Resolved]
         // protected EzLocalTextureFactory Factory { get; private set; } = null!;
 
-        protected IBindable<double> NoteHeightScaleBindable = new Bindable<double>();
+        // 本地需要始终有实例的 Bindable —— 构造时 new
+        protected readonly Bindable<double> NoteHeightScaleBindable = new Bindable<double>();
+        protected readonly Bindable<double> CornerRadiusBindable = new Bindable<double>();
+
+        // 只依赖外部的 Bindable —— 在 load() 时赋值，不要自己 new
         protected IBindable<bool> EnabledColorBindable = null!;
         protected IBindable<Colour4> NoteColourBindable = null!;
-        protected readonly IBindable<double> CornerRadiusBindable = new Bindable<double>();
 
         protected Container MainContainer { get; private set; } = null!;
 
@@ -40,11 +43,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 }
             };
 
+            // 本地 Bindable 绑定到外部
             NoteHeightScaleBindable.BindTo(ezSkinInfo.NoteHeightScaleToWidth);
+            CornerRadiusBindable.BindTo(ezSkinInfo.NoteCornerRadius);
+
+            // 外部 Bindable 直接赋值
             EnabledColorBindable = Column.ColorSettingsEnabledBindable;
             NoteColourBindable = Column.EzNoteColourBindable;
 
-            CornerRadiusBindable.BindTo(ezSkinInfo.NoteCornerRadius);
+            // 只对本地 Bindable 添加监听
             CornerRadiusBindable.BindValueChanged(_ => UpdateDrawable());
             NoteHeightScaleBindable.BindValueChanged(_ => UpdateDrawable());
         }
