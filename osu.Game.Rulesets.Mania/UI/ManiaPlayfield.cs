@@ -89,7 +89,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 firstColumnIndex += newStage.Columns.Length;
             }
 
-            AddInternal(SampleChannels = new EzManiaSampleChannelPool());
+            AddInternal(SampleChannels = new EzManiaSampleChannelPool(@"Mania"));
         }
 
         [Pure]

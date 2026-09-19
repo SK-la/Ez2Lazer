@@ -7,6 +7,7 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Graphics;
+using osu.Framework.Statistics;
 using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Rulesets.Objects;
@@ -36,8 +37,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
     /// <see cref="ISamplePlaybackDisabler"/>（暂停/跳过 intro/追赶期间不出新声）与
     /// <see cref="DrawableRuleset.Audio"/>（gameplay 级音量，例如 Mute mod）。
     /// </para>
+    /// <para>
+    /// 池自身不建 <c>DrawablePool</c>，所以统计由 <see cref="EzSampleChannelStatistic"/> 自己上报：
+    /// 名字固定、跨局复用同一条目，而不是像上游那样每局新增一批只增不减的条目。
+    /// </para>
     /// </remarks>
-    internal partial class EzManiaSampleChannelPool : Drawable
+    public partial class EzManiaSampleChannelPool : Drawable
     {
         [Resolved]
         private ISkinSource source { get; set; } = null!;
@@ -69,8 +74,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
         /// </summary>
         private readonly Dictionary<ISampleInfo, string> fallbackKeys = new Dictionary<ISampleInfo, string>();
 
+        /// <summary>
+        /// 固定名字的全局统计：同一名字跨局复用同一条目，因此可以逐局对比，
+        /// 不像上游 <c>DrawablePool</c> 那样每局新增一批只增不减的统计项（见类注释）。
+        /// </summary>
+        private readonly GlobalStatistic<EzSampleChannelStatistic> statistic;
+
         private int fallbackKeyCounter;
         private ScheduledDelegate? pendingSourceChange;
+
+        public EzManiaSampleChannelPool(string statisticName)
+        {
+            statistic = GlobalStatistics.Get<EzSampleChannelStatistic>(@"Ez gameplay samples", statisticName);
+            statistic.Value = new EzSampleChannelStatistic();
+        }
 
         [BackgroundDependencyLoader]
         private void load()
@@ -104,9 +121,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
             // 同名再次触发 = 打断上一次。BASS 通道只能从头播一次（播完无法重放，暂停后只能从中途续播），
             // 所以这里换一条新通道，与上游每次触发都取新通道的做法一致。
             if (channels.Remove(resolved.Key, out var previous))
+            {
                 disposeChannel(previous);
+                statistic.Value.Choked++;
+            }
 
             var channel = resolved.Sample.GetChannel();
+            statistic.Value.Created++;
+
             channel.Volume.Value = Math.Max(sampleInfo.Volume, DrawableHitObject.MINIMUM_SAMPLE_VOLUME) / 100.0;
             channel.Balance.Value = balance;
 
@@ -121,6 +143,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
             }
 
             channels[resolved.Key] = channel;
+            statistic.Value.Active = channels.Count;
             channel.Play();
         }
 
@@ -134,6 +157,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
 
             foreach (var hitObject in drawableRuleset.Objects)
                 register(hitObject);
+
+            statistic.Value.Resolved = resolvedSamples.Values.Count(s => s.Sample != null);
         }
 
         private void register(HitObject hitObject)
@@ -196,6 +221,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
             channels.Clear();
             fallbackKeys.Clear();
             resolvedSamples.Clear();
+            statistic.Value.Active = 0;
+            statistic.Value.Resolved = 0;
 
             registerBeatmapSamples();
         }
@@ -231,6 +258,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
                 channels.Clear();
                 fallbackKeys.Clear();
                 resolvedSamples.Clear();
+
+                // 计数按局归零，便于逐局对比（对象本身留在全局统计里，不新增条目）。
+                statistic.Value = new EzSampleChannelStatistic();
             }
 
             base.Dispose(isDisposing);
@@ -248,5 +278,33 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
             /// </summary>
             public string Key = string.Empty;
         }
+    }
+
+    /// <summary>
+    /// 发声池自报的运行时计数（全局统计群组 "Ez gameplay samples"）。
+    /// </summary>
+    public class EzSampleChannelStatistic
+    {
+        /// <summary>
+        /// 开局解析成功的 sample 数（皮肤取不到的 sample 不计入）。
+        /// </summary>
+        public int Resolved;
+
+        /// <summary>
+        /// 当前仍在播的通道数。
+        /// </summary>
+        public int Active;
+
+        /// <summary>
+        /// 本局累计分配的通道数。中途不再增长即说明没有运行时加载。
+        /// </summary>
+        public int Created;
+
+        /// <summary>
+        /// 本局累计打断次数（同名再次触发）。
+        /// </summary>
+        public int Choked;
+
+        public override string ToString() => $"{Active}/{Resolved} ({Created} created, {Choked} choked)";
     }
 }

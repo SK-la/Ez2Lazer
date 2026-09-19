@@ -4,8 +4,11 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Game.Audio;
+using osu.Game.Rulesets.BMS.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.BMS.Objects.Drawables
 {
@@ -56,6 +59,51 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
         }
 
         public virtual void MissForcefully() => ApplyMinResult();
+
+        #region note 音交由 BMSPlayfield 的按文件名通道池统一发声
+
+        [Resolved(canBeNull: true)]
+        private BMSPlayfield? playfield { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private GameplayState? gameplayState { get; set; }
+
+        /// <summary>
+        /// 池可用时不向每条 note 自带的样本容器装载：keysound 由池按文件名发声，
+        /// 逐 note 装载池化采样既浪费，又会在 playfield 上按音频名留下永不释放的
+        /// <c>DrawablePool&lt;PoolableSkinnableSample&gt;</c>。
+        /// 无池场景（未挂载到 BMSPlayfield 的构造）仍走基类装载，否则 <see cref="PlaySamples"/> 的回退路径会无声。
+        /// </summary>
+        protected override void LoadSamples()
+        {
+            if (playfield?.SampleChannels == null)
+                base.LoadSamples();
+        }
+
+        public override void PlaySamples()
+        {
+            var pool = playfield?.SampleChannels;
+
+            if (pool == null)
+            {
+                base.PlaySamples();
+                return;
+            }
+
+            var samples = GetSamples().Cast<ISampleInfo>().ToArray();
+
+            if (samples.Length == 0)
+                return;
+
+            double balance = CalculateSamplePlaybackBalance(SamplePlaybackPosition);
+
+            foreach (var sample in samples)
+                pool.Play(sample, balance);
+
+            gameplayState?.ApplySamples(samples);
+        }
+
+        #endregion
     }
 
     public abstract partial class DrawableBMSHitObject<TObject> : DrawableBMSHitObject

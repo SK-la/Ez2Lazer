@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
 
             // 有 playfield 时共用它的池，避免同一份谱面被预载两次。
             if (playfield == null)
-                AddInternal(fallbackPool = new EzManiaSampleChannelPool());
+                AddInternal(fallbackPool = new EzManiaSampleChannelPool(@"Mania fallback"));
         }
 
         protected override void PlaySamples(ISampleInfo[] samples) => Schedule(() =>

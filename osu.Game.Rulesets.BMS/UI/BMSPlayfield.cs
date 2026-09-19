@@ -8,7 +8,9 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.BMS.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Audio;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
 
@@ -34,6 +36,11 @@ namespace osu.Game.Rulesets.BMS.UI
         private readonly int totalColumns;
         private readonly Container<BMSColumn> columns;
         private readonly BindableDouble dpStageSpacing = new BindableDouble();
+
+        /// <summary>
+        /// note 音（keysound）共用的发声池，随本 playfield 的生命周期创建与释放。
+        /// </summary>
+        public EzManiaSampleChannelPool SampleChannels { get; }
 
         public BMSPlayfield(BMSStageLayout layout)
         {
@@ -68,6 +75,19 @@ namespace osu.Game.Rulesets.BMS.UI
             }
 
             updateColumnLayout();
+
+            AddInternal(SampleChannels = new EzManiaSampleChannelPool(@"BMS"));
+        }
+
+        protected override void OnHitObjectAdded(HitObject hitObject)
+        {
+            // 不调用 base：base 只做 Playfield.preloadSamples，即按音频名为每个 sample 预建
+            // DrawablePool<PoolableSkinnableSample>。BMS 对局的 drawable 由 CreateDrawableRepresentation 直接给出、
+            // 走 Add(DrawableHitObject) 的非池化路径，keysound 改由 SampleChannels 按音频名播放，
+            // 这批池无人取用，且每个池会在全局统计里留下一条永不释放的 PoolableSkinnableSample`N 条目。
+            //
+            // 这里保留覆写是为了堵住「模型对象经 Playfield.Add(HitObject) 进入」这条路径：
+            // 一旦走了它，base 就会重新开始按 sample 建池。
         }
 
         /// <summary>
