@@ -311,6 +311,22 @@ namespace osu.Game.Rulesets.Mania.UI
             return dependencies;
         }
 
+        protected override void OnHitObjectAdded(HitObject hitObject)
+        {
+            // 不调用 base：base 只做 Playfield.preloadSamples，即按音频名为每个 sample 预建一个
+            // DrawablePool<PoolableSkinnableSample>。note 音已全部由 ManiaPlayfield.SampleChannels 按音频名播放，
+            // 这批池没有人取用，且每个池会在全局统计里留下一条永不释放的 PoolableSkinnableSample`N 条目，
+            // 于是每开一局编号就往上累加一段。
+            //
+            // 唯一的例外是转换谱 LN 按住期间的滑动音：它仍走 note 自带的 SkinnableSound（名字由 Samples 派生、
+            // 不在谱面 Samples 列表里），需要在这里预热，否则会在这条 LN 首次出现时才建池。
+            if (hitObject is HoldNote holdNote && holdNote.PlaySlidingSamples)
+            {
+                foreach (var sample in holdNote.CreateSlidingSamples())
+                    GetPooledSample(sample);
+            }
+        }
+
         protected override void OnNewDrawableHitObject(DrawableHitObject drawableHitObject)
         {
             base.OnNewDrawableHitObject(drawableHitObject);
