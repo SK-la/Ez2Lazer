@@ -57,10 +57,10 @@ namespace osu.Game.EzOsuGame.HUD
         private readonly Cached sorting = new Cached();
 
         private IBindableDictionary<string, EzScoreRaceState>? stateLookup;
-        private bool interestRegistered;
         private bool passiveMode;
         private bool passiveSettingsBound;
         private bool sortTimerScheduled;
+        private EzScoreRaceService? interestService;
 
         private LeaderboardEntryState? currentPlayerEntry;
         private double lastUpdateScoreDisplayScroll = double.MinValue;
@@ -122,14 +122,10 @@ namespace osu.Game.EzOsuGame.HUD
             passiveMode = false;
             var service = ScoreRaceService!;
 
+            registerInterest(service);
+
             ModFilterSetting.BindTo(service.ModFilter);
             MaxEntriesSetting.BindTo(service.MaxEntries);
-
-            if (!interestRegistered)
-            {
-                service.RegisterInterest();
-                interestRegistered = true;
-            }
 
             if (stateLookup == null)
             {
@@ -153,11 +149,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             passiveMode = true;
 
-            if (interestRegistered && ScoreRaceService != null)
-            {
-                ScoreRaceService.UnregisterInterest();
-                interestRegistered = false;
-            }
+            unregisterInterest();
 
             stateLookup = null;
 
@@ -576,11 +568,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             if (isDisposing)
             {
-                if (interestRegistered && ScoreRaceService != null)
-                {
-                    ScoreRaceService.UnregisterInterest();
-                    interestRegistered = false;
-                }
+                unregisterInterest();
 
                 foreach (var entry in entryStates)
                     entry.Processor?.Dispose();
@@ -590,6 +578,24 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             base.Dispose(isDisposing);
+        }
+
+        private void registerInterest(EzScoreRaceService service)
+        {
+            if (interestService != null)
+                return;
+
+            service.RegisterInterest();
+            interestService = service;
+        }
+
+        private void unregisterInterest()
+        {
+            if (interestService == null)
+                return;
+
+            interestService.UnregisterInterest();
+            interestService = null;
         }
 
         private sealed class LeaderboardEntryState

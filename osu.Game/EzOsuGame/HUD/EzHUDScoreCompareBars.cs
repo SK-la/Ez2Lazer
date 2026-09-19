@@ -98,7 +98,6 @@ namespace osu.Game.EzOsuGame.HUD
         private const float container_padding = 6;
 
         private readonly AcrylicBackdropDrawable acrylicBackdrop;
-        private readonly Box backgroundTint;
         private readonly Container backgroundLayer;
         private Container barsContainer = null!;
         private readonly CompareBar[] bars = new CompareBar[3];
@@ -115,9 +114,9 @@ namespace osu.Game.EzOsuGame.HUD
         private long lastNowBarScore = long.MinValue;
         private double lastProcessorUpdateTime;
         private bool passiveMode;
+        private EzScoreRaceService? interestService;
 
         private IBindableDictionary<string, EzScoreRaceState>? stateLookup;
-        private bool interestRegistered;
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
@@ -143,7 +142,7 @@ namespace osu.Game.EzOsuGame.HUD
                         EffectEnabled = false,
                         FrameBufferScale = Vector2.One,
                     },
-                    backgroundTint = new Box
+                    new Box
                     {
                         RelativeSizeAxes = Axes.Both,
                         Colour = Color4.White.Opacity(0.12f),
@@ -250,13 +249,9 @@ namespace osu.Game.EzOsuGame.HUD
 
             var service = ScoreRaceService!;
 
-            ensureGhostProcessors();
+            registerInterest(service);
 
-            if (!interestRegistered)
-            {
-                service.RegisterInterest();
-                interestRegistered = true;
-            }
+            ensureGhostProcessors();
 
             if (stateLookup == null)
             {
@@ -273,11 +268,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             passiveMode = true;
 
-            if (interestRegistered && ScoreRaceService != null)
-            {
-                ScoreRaceService.UnregisterInterest();
-                interestRegistered = false;
-            }
+            unregisterInterest();
 
             stateLookup = null;
             bindProcessorToState(ghostProcessor1, ref boundState1, null);
@@ -312,11 +303,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             if (isDisposing)
             {
-                if (interestRegistered && ScoreRaceService != null)
-                {
-                    ScoreRaceService.UnregisterInterest();
-                    interestRegistered = false;
-                }
+                unregisterInterest();
 
                 ghostProcessor1?.Dispose();
                 ghostProcessor2?.Dispose();
@@ -324,6 +311,24 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             base.Dispose(isDisposing);
+        }
+
+        private void registerInterest(EzScoreRaceService service)
+        {
+            if (interestService != null)
+                return;
+
+            service.RegisterInterest();
+            interestService = service;
+        }
+
+        private void unregisterInterest()
+        {
+            if (interestService == null)
+                return;
+
+            interestService.UnregisterInterest();
+            interestService = null;
         }
 
         private void refreshGhostBars()
