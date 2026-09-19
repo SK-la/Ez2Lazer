@@ -16,6 +16,7 @@ using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Audio;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
@@ -187,7 +188,7 @@ namespace osu.Game.Rulesets.Mania.UI
             InternalChildren = new Drawable[]
             {
                 hitExplosionPool = new DrawablePool<PoolableHitExplosion>(5),
-                sampleTriggerSource = new GameplaySampleTriggerSource(HitObjectContainer),
+                sampleTriggerSource = new EzGameplaySampleTriggerSource(HitObjectContainer),
                 HitObjectArea,
                 keyArea = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.KeyArea), _ => new DefaultKeyArea())
                 {
