@@ -171,6 +171,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
         private Ez2ConfigManager ezConfig { get; set; }
 
         private bool autoplaySampleTriggered;
+        private bool autoplayPlusEnabled;
         private bool ownerLifetime;
         private double ezOffset;
 
@@ -233,6 +234,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
             if (ezConfig != null)
             {
                 ownerLifetime = ezConfig.Get<bool>(Ez2Setting.HitObjectLifetimeUsesOwnTime);
+                autoplayPlusEnabled = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode) == KeySoundPreviewMode.AutoPlayPlus;
 
                 if (drawableRuleset != null)
                 {
@@ -509,7 +511,6 @@ namespace osu.Game.Rulesets.Objects.Drawables
             clearExistingStateTransforms();
 
             double initialTransformsTime = HitObject.StartTime - InitialLifetimeOffset;
-            double hitStateUpdateTime = HitStateUpdateTime;
 
             AnimationStartTime.Value = initialTransformsTime;
 
@@ -519,13 +520,13 @@ namespace osu.Game.Rulesets.Objects.Drawables
             using (BeginAbsoluteSequence(StateUpdateTime))
                 UpdateStartTimeStateTransforms();
 
-            using (BeginAbsoluteSequence(hitStateUpdateTime))
+            using (BeginAbsoluteSequence(HitStateUpdateTime))
                 UpdateHitStateTransforms(newState);
 
             state.Value = newState;
 
             if (LifetimeEnd == double.MaxValue && (state.Value != ArmedState.Idle || HitObject.HitWindows == null))
-                LifetimeEnd = Math.Max(LatestTransformEndTime, hitStateUpdateTime + (Samples?.Length ?? 0));
+                LifetimeEnd = Math.Max(LatestTransformEndTime, HitStateUpdateTime + (Samples?.Length ?? 0));
 
             // apply any custom state overrides
             ApplyCustomUpdateState?.Invoke(this, newState);
@@ -671,14 +672,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
         private void updateAutoplaySamplePlayback()
         {
-            if (Entry == null)
+            if (!autoplayPlusEnabled || Entry == null)
                 return;
-
-            if (GlobalConfigStore.EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode) != KeySoundPreviewMode.AutoPlayPlus)
-            {
-                autoplaySampleTriggered = false;
-                return;
-            }
 
             if (Judged)
                 return;
