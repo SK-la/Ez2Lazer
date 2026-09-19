@@ -35,7 +35,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
             double gameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
             JudgementResultTimingHelper.ApplyTiming(Result, timeOffset, gameplayRate);
 
-            autoplaySampleTriggered = true;
+            autoPlayPlusSampleTriggered = true;
 
             if (Result.HasResult)
                 UpdateState(Result.IsHit ? ArmedState.Hit : ArmedState.Miss);

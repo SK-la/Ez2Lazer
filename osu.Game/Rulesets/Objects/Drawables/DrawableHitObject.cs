@@ -170,7 +170,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
         [Resolved(CanBeNull = true)]
         private Ez2ConfigManager ezConfig { get; set; }
 
-        private bool autoplaySampleTriggered;
+        private bool autoPlayPlusSampleTriggered;
+        private bool autoPlayPlusSamplePlayed;
         private bool autoplayPlusEnabled;
         private bool ownerLifetime;
         private double ezOffset;
@@ -349,7 +350,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 UpdateComboColour();
             }
 
-            autoplaySampleTriggered = false;
+            resetAutoPlayPlusSampleState();
         }
 
         private void updateStateFromResult()
@@ -377,7 +378,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
             samplesBindable.UnbindFrom(HitObject.SamplesBindable);
 
             // 回收时一并重置自动播样状态。
-            autoplaySampleTriggered = false;
+            resetAutoPlayPlusSampleState();
 
             // Release the samples for other hitobjects to use.
             samplesLoaded = false;
@@ -441,7 +442,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
         private void onRevertResult()
         {
-            autoplaySampleTriggered = false;
+            resetAutoPlayPlusSampleState();
             UpdateState(ArmedState.Idle);
             OnRevertResult?.Invoke(this, Result);
         }
@@ -531,7 +532,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
             // apply any custom state overrides
             ApplyCustomUpdateState?.Invoke(this, newState);
 
-            if (!force && newState == ArmedState.Hit)
+            // AutoPlayPlus 已在物件时刻为它发过声，命中判定不再重复触发。
+            if (!force && newState == ArmedState.Hit && !autoPlayPlusSamplePlayed)
                 PlaySamples();
         }
 
@@ -670,7 +672,13 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 Samples.Stop();
         }
 
-        private void updateAutoplaySamplePlayback()
+        private void resetAutoPlayPlusSampleState()
+        {
+            autoPlayPlusSampleTriggered = false;
+            autoPlayPlusSamplePlayed = false;
+        }
+
+        private void updateAutoPlayPlusSamplePlayback()
         {
             if (!autoplayPlusEnabled || Entry == null)
                 return;
@@ -680,11 +688,11 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
             if (Time.Current < HitObject.StartTime)
             {
-                autoplaySampleTriggered = false;
+                resetAutoPlayPlusSampleState();
                 return;
             }
 
-            if (autoplaySampleTriggered || Time.Current - Time.Elapsed > HitObject.StartTime)
+            if (autoPlayPlusSampleTriggered || Time.Current - Time.Elapsed > HitObject.StartTime)
                 return;
 
             if (!samplesLoaded)
@@ -693,7 +701,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 LoadSamples();
             }
 
-            autoplaySampleTriggered = true;
+            autoPlayPlusSampleTriggered = true;
+            autoPlayPlusSamplePlayed = true;
             PlaySamples();
         }
 
@@ -723,7 +732,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 LoadSamples();
             }
 
-            updateAutoplaySamplePlayback();
+            updateAutoPlayPlusSamplePlayback();
 
             base.Update();
         }
@@ -822,7 +831,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
             Result.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
 
             // 已命中后不应再触发自动播样。
-            autoplaySampleTriggered = true;
+            autoPlayPlusSampleTriggered = true;
 
             if (Result.HasResult)
                 UpdateState(Result.IsHit ? ArmedState.Hit : ArmedState.Miss);
