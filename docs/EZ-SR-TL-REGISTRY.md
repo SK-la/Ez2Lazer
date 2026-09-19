@@ -189,6 +189,70 @@ bool poorEnabled = IsBMSHealthMode(HealthMode) && BmsPoorHitResultEnable;
 
 ---
 
+## §1.9 角逐消费者门控（预测 + 运行时真相）
+
+角逐是否工作由**消费者判定**决定，判定取两个来源之或：
+
+| 来源 | 内容 | 时机 |
+|---|---|---|
+| 静态预测 `demand` | 皮肤层 / Ez 布局层是否配置了角逐 HUD | 冷启动、进入选歌界面 |
+| 运行时真相 `ConsumerInterestCount` | 实际装载的角逐 HUD 数量（`RegisterInterest` / `UnregisterInterest`） | `PlayerLoader` 内 HUD `LoadComplete` |
+
+取或的理由：预测为真时不必等注册，构建可与 `Player` 装载并行；预测漏判（如规则集漂移）时由注册补救。预测为真而注册为 0 时**不取消**，避免注册晚到被误杀 —— 代价仅为 loading 内一次查询与一次构建，不进入局内。
+
+无消费者时服务与「未加载服务」不可区分：不查 Realm、不建时间线、不阻塞进局、`States` 恒空。
+
+### 判定方式（两段式，优先零构造）
+
+| 段 | 数据源 | 成本 |
+|---|---|---|
+| A | 已保存布局：`Skin.LayoutInfos` 与 `EzLayoutStore` 的 `SkinLayoutInfo`，递归比对 `SerialisedDrawableInfo.Type` | **零构造**，纯 Type 列表 |
+| B | 皮肤代码默认（`EzStyleProSkin` 等硬编码角逐 HUD 的皮肤） | 需构造 → 按 `(皮肤, target, ruleset)` 缓存，容量上限 64 |
+
+- 遍历全部 `GlobalSkinnableContainers`，每个 target 查 global 与 ruleset 专属两个维度。
+- 皮肤层与 `SkinnableContainer` 同序：`UserSkinComponentLookup`（即 `LayoutInfos`）优先，其次代码默认。
+  **用户保存过该 target/ruleset 的布局时，段 B 直接跳过**——布局已由段 A 完整覆盖，代码默认被取代。
+- Ez 层只有已保存布局，永远不需要构造。
+- 扫描包 `try/catch`：异常按「无消费者」处理并记日志，不让异常冒泡进屏幕回调。
+
+### 重扫时机（可达性矩阵）
+
+静态预测只在**两个**入口重算，且重算本身**不驱动**任何查询 / 构建。
+
+| 触发源 | 重算 | 说明 |
+|---|---|---|
+| `LoadComplete` 初始 | ✓ | 冷启动第一次判定 |
+| **`SongSelect` push** | ✓ **force** | 唯一的重算决策点；皮肤 / Ez 布局编辑器保存后在此接住 |
+| 其他换屏（`PlayerLoader` / `Player` / 结算 / 退出） | ✗ | 完全不参与预测重算 |
+| 切换皮肤 | ✗ | `CurrentSkin` 在选歌内切换，无需重扫；换歌走 `SongSelect` |
+| 屏幕规则集变化 | ✗ | 不订阅；规则集只作为预测输入。漂移由 loading 内的运行时真相兜住 |
+| 服务开关打开 | ✓ | 显式启用后重新判定并补拉起查询 / 构建 |
+| 皮肤编辑器 / Ez 布局编辑器保存 | — | 无绑定事件；由 `SongSelect` push 接住 |
+| 局内保存布局 | — | 本次对局不生效（不提供回退，避免局内性能波动） |
+
+### loading 内裁决（补建漏判）
+
+角逐 HUD 在 `SkinnableContainer` 里是**嵌套异步**装载（`LoadComponentAsync` 的回调里才 `AddInternal`），
+注册落地时刻不保证早于进局，故不能在 `PlayerLoader` 一进入就下结论：
+
+1. `beginLoaderPreparation()` 在 `PlayerLoader` 进入时按预测决定是否立即 `refreshMetadata` + `requestTimelineBuild`；
+   预测为假时不预先构建，但**仍保持 loader 准备态**。
+2. `isBlockingPlayerLoaderStart()` 每帧被 `PlayerLoader` 轮询，其中调用 `tryResolveDemandFromConsumers()`：
+   当 `Player.LoadState == Ready`（皮肤组件已定）且存在运行时注册时补做查询与构建，每轮 loading 只裁决一次。
+   该调用在 `StreamByClock` 早退**之前**，因为该模式只是不阻塞进局、仍需要 timeline。
+
+### 边界（硬不变量）
+
+- 查询与构建只发生在 `PlayerLoader` 内；`loaderPreparationActive` 为假时上述裁决不会被调用。
+- 进游戏后角逐唯一的运行时工作是 HUD 卸载的归零释放（`cancelTimelineBuild` + 清 `States`），O(1)，不含 replay 仿真。
+- 预测 `false → true` 只置位，**不**查询、**不**构建；`true → false` 才回到静默态。
+- `RegisterInterest` 的 0→1 **不做**任何查询或构建，只抬高计数供 loading 末尾裁决读取。
+
+- `EzLayoutStore` 由 `EzLayoutLayer` 在 `load(Storage)` 自建（不进 DI）；服务经 `[Resolved] EzLayoutLayer` 取 `.Store`。
+- 单测：`osu.Game.Tests/NonVisual/EzScoreRaceHudDemandTest.cs`（用户布局优先 / 代码默认 / 规则集作用域 / 嵌套 Children / ez 层空与非空 / Type 数据扫描 / 无消费者不做工作 / 双真相来源 / 判定不驱动动作 / loading 末尾裁决真值表）。
+
+---
+
 ## §2 消费场景矩阵
 
 | 消费场景 | 所需出口 | Purpose | Mania | Osu | 原则 |
