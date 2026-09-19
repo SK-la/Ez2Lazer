@@ -492,7 +492,10 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             // Note: base.LoadSamples() isn't called since the slider plays the tail's hitsounds for the time being.
 
-            slidingSample.Samples = HitObject.CreateSlidingSamples().Cast<ISampleInfo>().ToArray();
+            // 按住期间的滑动音只在 PlaySlidingSamples 的谱面（osu! 转换谱）会播；Mania / BMS 的 LN 不播，
+            // 装载了就只是让每条 LN 首次出现时多要一次 sliderslide / sliderwhistle。
+            if (HitObject.PlaySlidingSamples)
+                slidingSample.Samples = HitObject.CreateSlidingSamples().Cast<ISampleInfo>().ToArray();
         }
 
         public override void StopAllSamples()
