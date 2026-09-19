@@ -33,8 +33,6 @@ namespace osu.Game.Rulesets.Mania
         private partial class ManiaKeyBindingContainer : RulesetKeyBindingContainer
         {
             private readonly ManiaInputManager maniaInputManager;
-            private readonly List<Drawable> columnFirstQueue = new List<Drawable>();
-            private readonly List<Drawable> nonColumnQueue = new List<Drawable>();
 
             public ManiaKeyBindingContainer(ManiaInputManager maniaInputManager, RulesetInfo ruleset, int variant, SimultaneousBindingMode unique)
                 : base(ruleset, variant, unique)
@@ -59,22 +57,30 @@ namespace osu.Game.Rulesets.Mania
             {
                 get
                 {
-                    columnFirstQueue.Clear();
-                    nonColumnQueue.Clear();
+                    bool hasColumn = false;
 
                     foreach (var drawable in base.KeyBindingInputQueue)
                     {
                         if (drawable is Column)
-                            columnFirstQueue.Add(drawable);
-                        else
-                            nonColumnQueue.Add(drawable);
+                        {
+                            hasColumn = true;
+                            yield return drawable;
+                        }
                     }
 
-                    if (columnFirstQueue.Count == 0)
-                        return base.KeyBindingInputQueue;
+                    if (!hasColumn)
+                    {
+                        foreach (var drawable in base.KeyBindingInputQueue)
+                            yield return drawable;
 
-                    columnFirstQueue.AddRange(nonColumnQueue);
-                    return columnFirstQueue;
+                        yield break;
+                    }
+
+                    foreach (var drawable in base.KeyBindingInputQueue)
+                    {
+                        if (!(drawable is Column))
+                            yield return drawable;
+                    }
                 }
             }
         }
