@@ -23,6 +23,7 @@ using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Input;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning;
@@ -114,40 +115,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
         internal ManiaLaneController LaneController { get; private set; } = null!;
 
-        private readonly List<double> pressTimes = new List<double>();
-
         private double pressHistoryRetentionMs = 120_000;
 
+        // 环形缓冲，避免在高 KPS 下占用过多内存。4096 个按键记录在 120s 内的 KPS 为 34.1，足够覆盖绝大多数情况。
+        private readonly RingBufferPressTimes pressTimes = new RingBufferPressTimes(4096);
+
         internal IReadOnlyList<double> PressTimes => pressTimes;
-
-        internal void RecordPressTime(double time)
-        {
-            pressTimes.Add(time);
-            trimPressHistory(time);
-            ManiaJudgeHotPathTrace.RecordPressTimesCount(pressTimes.Count);
-        }
-
-        private void trimPressHistory(double time)
-        {
-            if (pressHistoryRetentionMs <= 0)
-                return;
-
-            double cutoff = time - pressHistoryRetentionMs;
-            int removeCount = 0;
-
-            while (removeCount < pressTimes.Count && pressTimes[removeCount] < cutoff)
-                removeCount++;
-
-            if (removeCount > 0)
-                pressTimes.RemoveRange(0, removeCount);
-        }
-
-        [Obsolete("Use PressTimes with zero-alloc ResolveMissStoredOffset overload.")]
-        internal List<double> GetPressTimesSnapshot()
-        {
-            ManiaJudgeHotPathTrace.RecordPressTimesSnapshotAllocation(pressTimes.Count);
-            return new List<double>(pressTimes);
-        }
 
         internal bool TryGetBmsRoute(DrawableNote note, out BmsHitModeJudgement.BmsRouteState route)
         {
@@ -455,26 +428,31 @@ namespace osu.Game.Rulesets.Mania.UI
             if (e.Action != Action.Value)
                 return false;
 
-            ManiaJudgeHotPathTrace.RecordColumnOnPressed();
+            double time = Time.Current;
 
             InputAudioLatencyTracker.Instance?.RecordColumnPress(Index);
 
-            if (e.Action == Action.Value)
-                RecordPressTime(Time.Current);
+            if (ManiaJudgeHotPathTrace.Enabled)
+            {
+                pressTimes.Add(time);
+                pressTimes.Trim(time - pressHistoryRetentionMs);
+                ManiaJudgeHotPathTrace.RecordPressTimesCount(pressTimes.Count);
+                ManiaJudgeHotPathTrace.RecordColumnOnPressed();
+            }
 
             if (drawableRuleset?.ColumnRoutesInput == true)
             {
                 columnRoutedPressTarget = null;
 
                 if (drawableRuleset.JudgementRound is { IsO2Jam: true } round)
-                    round.NotifyO2InputAt(Time.Current);
+                    round.NotifyO2InputAt(time);
 
                 resolvePressRouting(out var precedence);
 
-                var entry = LaneController.SelectPressEntry(Time.Current, precedence);
+                var entry = LaneController.SelectPressEntry(time, precedence);
 
                 if (entry != null)
-                    applyRoutedPress(entry.RoutedObject, Time.Current, e);
+                    applyRoutedPress(entry.RoutedObject, time, e);
             }
 
             if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)

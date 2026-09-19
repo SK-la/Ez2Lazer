@@ -83,15 +83,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
                 Interlocked.Increment(ref missStoredOffsetResolves);
         }
 
-        public static void RecordPressTimesSnapshotAllocation(int count)
-        {
-            if (!Enabled)
-                return;
-
-            Interlocked.Increment(ref pressTimesSnapshotAllocations);
-            updateMaxObservedPressTimesCount(count);
-        }
-
         public static void RecordPressTimesCount(int count) => updateMaxObservedPressTimesCount(count);
 
         private static void updateMaxObservedPressTimesCount(int count)
