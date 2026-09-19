@@ -14,8 +14,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
     /// </summary>
     /// <remarks>
     /// 与 <see cref="osu.Game.Rulesets.Mania.Objects.Drawables.DrawableManiaHitObject"/> 共用 <see cref="ManiaPlayfield.SampleChannels"/>；
-    /// 无 <see cref="ManiaPlayfield"/>（皮肤预览、编辑器等单独构造 <see cref="Column"/> 的场景）时使用自带私有池，
-    /// 使同名音在任何路径下都只占一条通道。
+    /// 无 <see cref="ManiaPlayfield"/>（皮肤预览、编辑器等单独构造 <see cref="Column"/> 的场景）时才自建私有池。
     /// </remarks>
     internal partial class EzGameplaySampleTriggerSource : GameplaySampleTriggerSource
     {
@@ -25,17 +24,28 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
         [Resolved(canBeNull: true)]
         private GameplayState? gameplayState { get; set; }
 
-        private readonly EzManiaSampleChannelPool fallbackPool;
+        private EzManiaSampleChannelPool? fallbackPool;
 
         public EzGameplaySampleTriggerSource(HitObjectContainer hitObjectContainer)
             : base(hitObjectContainer)
         {
-            AudioContainer.Add(fallbackPool = new EzManiaSampleChannelPool());
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            // 有 playfield 时共用它的池，避免同一份谱面被预载两次。
+            if (playfield == null)
+                AddInternal(fallbackPool = new EzManiaSampleChannelPool());
         }
 
         protected override void PlaySamples(ISampleInfo[] samples) => Schedule(() =>
         {
             var pool = playfield?.SampleChannels ?? fallbackPool;
+
+            if (pool == null)
+                return;
 
             foreach (var sample in samples)
                 pool.Play(sample, 0);
