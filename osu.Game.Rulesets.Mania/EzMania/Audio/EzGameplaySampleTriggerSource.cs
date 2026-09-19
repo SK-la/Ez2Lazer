@@ -10,11 +10,12 @@ using osu.Game.Screens.Play;
 namespace osu.Game.Rulesets.Mania.EzMania.Audio
 {
     /// <summary>
-    /// 按键预览（含 Autoplay 触发的 note 音）改用 <see cref="ManiaPlayfield"/> 上的按文件名通道池发声。
+    /// 按键音（含 Autoplay 触发的 note 音）改由按文件名复用通道的发声池播放。
     /// </summary>
     /// <remarks>
-    /// 与 <see cref="osu.Game.Rulesets.Mania.Objects.Drawables.DrawableManiaHitObject"/> 共用同一池，同一次按键命中 note 时同一文件只会重放一次而不会叠成两遍；
-    /// 池不可用（皮肤预览、编辑器等无 gameplay 场景）时回退到基类的独立发声体。
+    /// 与 <see cref="osu.Game.Rulesets.Mania.Objects.Drawables.DrawableManiaHitObject"/> 共用 <see cref="ManiaPlayfield.SampleChannels"/>；
+    /// 无 <see cref="ManiaPlayfield"/>（皮肤预览、编辑器等单独构造 <see cref="Column"/> 的场景）时使用自带私有池，
+    /// 使同名音在任何路径下都只占一条通道。
     /// </remarks>
     internal partial class EzGameplaySampleTriggerSource : GameplaySampleTriggerSource
     {
@@ -24,28 +25,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
         [Resolved(canBeNull: true)]
         private GameplayState? gameplayState { get; set; }
 
+        private readonly EzManiaSampleChannelPool fallbackPool;
+
         public EzGameplaySampleTriggerSource(HitObjectContainer hitObjectContainer)
             : base(hitObjectContainer)
         {
+            AudioContainer.Add(fallbackPool = new EzManiaSampleChannelPool());
         }
 
-        protected override void PlaySamples(ISampleInfo[] samples)
+        protected override void PlaySamples(ISampleInfo[] samples) => Schedule(() =>
         {
-            var pool = playfield?.SampleChannels;
+            var pool = playfield?.SampleChannels ?? fallbackPool;
 
-            if (pool == null)
-            {
-                base.PlaySamples(samples);
-                return;
-            }
+            foreach (var sample in samples)
+                pool.Play(sample, 0);
 
-            Schedule(() =>
-            {
-                foreach (var sample in samples)
-                    pool.Play(sample, 0);
-
-                gameplayState?.ApplySamples(samples);
-            });
-        }
+            gameplayState?.ApplySamples(samples);
+        });
     }
 }
