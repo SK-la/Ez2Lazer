@@ -5,13 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Utils;
 using osu.Game.Audio;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
@@ -41,11 +37,6 @@ namespace osu.Game.Rulesets.UI
 
         [Resolved]
         private GameplayState? gameplayState { get; set; }
-
-        private bool isAutoPlay => GlobalConfigStore.EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode)
-                                   == KeySoundPreviewMode.AutoPlayPlus;
-
-        private HitObject? lastAutoPlayedObject;
 
         protected readonly AudioContainer AudioContainer;
 
@@ -85,16 +76,6 @@ namespace osu.Game.Rulesets.UI
 
         protected virtual void PlaySamples(ISampleInfo[] samples) => Schedule(() =>
         {
-            var existing = hitSounds.FirstOrDefault(h => h.IsPlaying && h.Samples.SequenceEqual(samples));
-
-            if (existing != null)
-            {
-                // 如果相同的音效正在播放，打断并重放
-                existing.Stop();
-                existing.Play();
-                return;
-            }
-
             var hitSound = GetNextSample();
             ApplySampleInfo(hitSound, samples);
             hitSound.Play();
@@ -117,40 +98,7 @@ namespace osu.Game.Rulesets.UI
             base.Update();
 
             if (gameplayClock?.IsRewinding == true)
-            {
                 mostValidObject = null;
-                lastAutoPlayedObject = null;
-            }
-
-            // AutoPlayPlus: match Autoplay hitsound ownership at precise object times (no input / hit-result gating).
-            if (isAutoPlay)
-            {
-                double referenceTime = getReferenceTime();
-                var obj = GetMostValidObject();
-
-                if (obj != null && obj != lastAutoPlayedObject && referenceTime >= obj.StartTime)
-                {
-                    // Parent fallback for IgnoreJudgement duration objects: Autoplay never PlaySamples the parent
-                    // (e.g. HoldNote). Prefer EndTime nested samples; empty tail stays silent — never replay head Samples.
-                    if (obj.NestedHitObjects.Count > 0 && obj.Judgement is IgnoreJudgement)
-                    {
-                        if (obj is IHasDuration duration)
-                        {
-                            var release = obj.NestedHitObjects.FirstOrDefault(n =>
-                                n.Samples.Count > 0 && Precision.AlmostEquals(n.StartTime, duration.EndTime, 1));
-
-                            if (release != null)
-                                PlaySamples(release.Samples.Cast<ISampleInfo>().ToArray());
-                        }
-                    }
-                    else if (obj.Samples.Count > 0)
-                    {
-                        PlaySamples(obj.Samples.Cast<ISampleInfo>().ToArray());
-                    }
-
-                    lastAutoPlayedObject = obj;
-                }
-            }
         }
 
         protected HitObject? GetMostValidObject()
