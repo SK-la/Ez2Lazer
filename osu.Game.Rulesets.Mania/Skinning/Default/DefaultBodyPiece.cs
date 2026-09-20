@@ -118,7 +118,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Default
                 };
 
                 AccentColour.BindValueChanged(onAccentChanged, true);
-                IsHitting.BindValueChanged(_ => onAccentChanged(new ValueChangedEvent<Color4>(AccentColour.Value, AccentColour.Value)), true);
+                IsHitting.BindValueChanged(hitting =>
+                {
+                    onAccentChanged(new ValueChangedEvent<Color4>(AccentColour.Value, AccentColour.Value));
+
+                    // 按住时 body 高度每帧变，两层 cached FBO + EdgeEffect 会 ForceRedraw。
+                    if (hitting.NewValue)
+                        subtractionBuffer.Hide();
+                    else
+                    {
+                        subtractionBuffer.Show();
+                        subtractionCache.Invalidate();
+                    }
+                }, true);
             }
 
             private void onAccentChanged(ValueChangedEvent<Color4> accent)
@@ -143,6 +155,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Default
             protected override void Update()
             {
                 base.Update();
+
+                if (IsHitting.Value)
+                {
+                    subtractionCache.Validate();
+                    return;
+                }
 
                 if (!subtractionCache.IsValid)
                 {
