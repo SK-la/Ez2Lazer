@@ -1,11 +1,8 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Input.Events;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
-using osu.Game.Rulesets.Mania.EzMania.Helper;
-using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using System.Collections.Generic;
+using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -19,106 +16,59 @@ namespace osu.Game.Rulesets.Mania.UI
     public class OrderedHitPolicy
     {
         private readonly HitObjectContainer hitObjectContainer;
-        private readonly OrderedHitPolicyHelper helper;
-        private readonly EzEnumJudgePrecedence judgePrecedence;
-        private readonly ManiaLaneController laneController;
-        private DrawableHitObject? columnRoutedPressTarget;
 
-        public OrderedHitPolicy(HitObjectContainer hitObjectContainer, EzEnumJudgePrecedence judgePrecedence, ManiaLaneController laneController)
+        public OrderedHitPolicy(HitObjectContainer hitObjectContainer)
         {
             this.hitObjectContainer = hitObjectContainer;
-            this.judgePrecedence = judgePrecedence;
-            this.laneController = laneController;
-            helper = new OrderedHitPolicyHelper(hitObjectContainer, laneController);
-        }
-
-        internal void RegisterDrawable(DrawableHitObject drawable, bool scheduleAutoMiss) => laneController.Register(drawable, scheduleAutoMiss);
-
-        internal void EnsureRegistered(DrawableHitObject drawable, bool scheduleAutoMiss) => laneController.RegisterIfNeeded(drawable, scheduleAutoMiss);
-
-        internal void UnregisterDrawable(DrawableHitObject drawable) => laneController.Unregister(drawable);
-
-        internal void UnregisterByHitObject(HitObject hitObject) => laneController.UnregisterByHitObject(hitObject);
-
-        internal void NotifyJudged(DrawableHitObject drawable) => laneController.NotifyJudged(drawable);
-
-        internal bool ShouldSkipDrawablePress(DrawableHitObject drawable)
-            => columnRoutedPressTarget != null;
-
-        /// <summary>
-        /// 列级按键路由：选出本列唯一 press 目标（Combo / Duration / Earliest + BMS post-Bad）。
-        /// </summary>
-        public bool TryRoutePress(double time, EzEnumJudgePrecedence precedence, out DrawableHitObject? target)
-        {
-            columnRoutedPressTarget = null;
-            target = null;
-
-            var entry = laneController.SelectPressEntry(time, precedence);
-
-            if (entry == null)
-                return false;
-
-            target = entry.RoutedObject;
-            return true;
         }
 
         /// <summary>
-        /// 对 <see cref="TryRoutePress"/> 选中的目标执行判定（保留 Ez 判定链）。
+        /// Determines whether a <see cref="DrawableHitObject"/> can be hit at a point in time.
         /// </summary>
-        public bool ApplyRoutedPress(DrawableHitObject target, double time, KeyBindingPressEvent<ManiaAction> e)
+        /// <remarks>
+        /// Only the most recent <see cref="DrawableHitObject"/> can be hit, a previous hitobject's window cannot extend past the next one.
+        /// </remarks>
+        /// <param name="hitObject">The <see cref="DrawableHitObject"/> to check.</param>
+        /// <param name="time">The time to check.</param>
+        /// <returns>Whether <paramref name="hitObject"/> can be hit at the given <paramref name="time"/>.</returns>
+        public bool IsHittable(DrawableHitObject hitObject, double time)
         {
-            switch (target)
-            {
-                case DrawableNote note when ManiaEzDrawableJudgement.TryBmsOnPressed(note, e):
-                    columnRoutedPressTarget = target;
-                    return true;
-
-                case DrawableNote note:
-                    if (!note.ApplyColumnRoutedPress())
-                        return false;
-
-                    columnRoutedPressTarget = target;
-                    return true;
-
-                case DrawableHoldNote hold:
-                    if (!hold.TryBeginHoldPressFromColumn(time))
-                        return false;
-
-                    laneController.SetActiveHold(hold);
-                    columnRoutedPressTarget = target;
-                    return true;
-
-                default:
-                    return false;
-            }
+            var nextObject = hitObjectContainer.AliveObjects.GetNext(hitObject);
+            return nextObject == null || time < nextObject.HitObject.StartTime;
         }
 
-        public bool IsHittable(DrawableHitObject hitObject, double time, EzEnumJudgePrecedence precedence)
-        {
-            ManiaJudgeHotPathTrace.RecordIsHittable();
-
-            if (hitObject is DrawableHoldNoteTail)
-                return helper.IsHittableWithPrecedence(hitObject, time, precedence);
-
-            if (precedence != EzEnumJudgePrecedence.Earliest)
-                return helper.IsHittableWithPrecedence(hitObject, time, precedence);
-
-            return laneController.IsHittableEarliest(hitObject, time);
-        }
-
+        /// <summary>
+        /// Handles a <see cref="HitObject"/> being hit to potentially miss all earlier <see cref="HitObject"/>s.
+        /// </summary>
+        /// <param name="hitObject">The <see cref="HitObject"/> that was hit.</param>
         public void HandleHit(DrawableHitObject hitObject)
         {
-            double judgementTime = hitObject.Result.TimeAbsolute;
-
-            foreach (var entry in laneController.EnumerateForceMissBefore(hitObject.HitObject.StartTime))
+            foreach (var obj in enumerateHitObjectsUpTo(hitObject.HitObject.StartTime))
             {
-                if (OrderedHitPolicyHelper.IsUserTriggerJudgeableNow(entry.RoutedObject, judgementTime))
+                if (obj.Judged)
                     continue;
 
-                ((DrawableManiaHitObject)entry.RoutedObject).MissForcefully();
+                ((DrawableManiaHitObject)obj).MissForcefully();
             }
+        }
 
-            laneController.NotifyJudged(hitObject);
+        private IEnumerable<DrawableHitObject> enumerateHitObjectsUpTo(double targetTime)
+        {
+            foreach (var obj in hitObjectContainer.AliveObjects)
+            {
+                if (obj.HitObject.GetEndTime() >= targetTime)
+                    yield break;
+
+                yield return obj;
+
+                foreach (var nestedObj in obj.NestedHitObjects)
+                {
+                    if (nestedObj.HitObject.GetEndTime() >= targetTime)
+                        break;
+
+                    yield return nestedObj;
+                }
+            }
         }
     }
 }
