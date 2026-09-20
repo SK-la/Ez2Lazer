@@ -66,6 +66,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             LifetimeEnd = double.PositiveInfinity;
         }
 
+        /// <summary>
+        /// LN-INPUT-SLOT：head 的按键由父 <see cref="DrawableHoldNote"/> 处理，空实现不进非位置输入队列。
+        /// </summary>
+        public override bool HandleNonPositionalInput => false;
+
         public override bool OnPressed(KeyBindingPressEvent<ManiaAction> e) => false; // Handled by the hold note
 
         public override void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
