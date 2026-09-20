@@ -26,6 +26,9 @@
 | **O2-PILL-1PASS** | press 路径 `PillCheckWithBpm` + `EvaluatePress(NotePressContext)` | O2Jam |
 | **MISS-STORED-OFFSET** | Drawable 被动 miss / Session end-sweep：`ResolveMissStoredOffset`（列 press 最近邻） | 全部 |
 | **FORCE-MISS-WINDOW** | Session `ForceMissEarlier` 跳过 miss 窗外物件（对齐 `IsUserTriggerJudgeableNow`）；枚举不再预写 `Judged` | Lazer/Classic + Session |
+| **INPUT-QUEUE-FRAME** | `ManiaKeyBindingContainer.KeyBindingInputQueue` 一次枚举分「列/非列」两列表并按帧物化（原先每次枚举都重建整棵子树队列，且同帧每 binding 各建一次） | 全部 |
+| **SAMPLE-NO-LINQ** | 按键预览取样 `GetMostValidObject` 去 LINQ/排序与递归迭代器；`Play()` / `PlaySamples()` 去 `Cast` 迭代器 | 全部 |
+| **FW-BUTTON-QUEUE-REUSE** | `osu-framework` `ButtonEventManager` 按下 / 抬起队列改为每按钮一份复用缓冲（去 `ToList()` 与 `Where().ToList()` 的按次列表分配） | 全部（framework `56e9beb2c`） |
 
 ---
 
@@ -52,7 +55,10 @@
 | **O2-COLUMN-BPM** | [x] `Column.OnPressed` 每列每按键 `NotifyO2InputAt` | O2Jam |
 | **BMS-ROUTE-COL** | [ ] tail `BmsRouteState` 完全列级化 | BMS |
 | **HOLD-TAIL-FAST** | [ ] `Column.OnReleased` → 列级 tail release | LN |
-| **SOUND-DECOUPLE** | [ ] 判定与 `sampleTriggerSource.Play()` 解耦 | 仅 profile 证明阻塞时做 |
+| **SOUND-DECOUPLE** | [ ] 判定与 `sampleTriggerSource.Play()` 解耦（注：`KeySoundPreviewMode.Off` 目前也会触发取样，只有 `AutoPlayPlus` 排除，会与 note 音互相 choke） | 仅 profile 证明阻塞时做 |
+| **INPUT-QUEUE-FW** | [x] 已定案：框架侧共享队列构建**不可做**（`TestSceneInputQueueChange.CombinedClicks` 证伪，drawable 事件中移动后同帧按键必须看到重建队列） | 见 `EZ-PERFORMANCE.md` §2.1 **FW-INPUT-QUEUE-DISPATCH**；去分配部分已落地 |
+| **COLUMN-EARLY-OUT** | [ ] 列路由成功后早退：`PropagatePressed` 的截断会让 `ReplayRecorder` / `KeyCounterActionTrigger` 收不到 Release，须先调派发顺序 | 全部 Ez |
+| **LN-INPUT-SLOT** | [ ] `DrawableHoldNoteHead` / `DrawableHoldNoteTail` 的 `OnPressed` / `OnReleased` 为空实现，可移出非位置输入队列 | LN（先量） |
 | **DRAWABLE-MICRO-BENCH** | [x] PeakKps × alive；alloc；BMS/Poor；Empty gateTrue==0 | gate 主导；valid 表曾 `new[]` |
 | **STORE-FRAME-BUDGET** | [x] `DetachedBeatmapStoreFrameBudget` Drain≤24 + 单测 | 选歌 Replace 风暴 |
 | **BDSP-STARTUP-DELAY** | [x] `StartupBackfillDelay` 5s；测试覆写 0 | 选歌开工掉帧 |
@@ -104,3 +110,4 @@ flowchart LR
 | 2026-07-14 | MICRO-BENCH 加深：alive 扫描；MLC scratch / Select Func；`HitModeHelper` valid 表静态化（ResultFor 零分配） |
 | 2026-07-14 | 可测排除：AutoMissGate / BMS-Poor bench / FrameBudget Drain / BDSP delay 覆写 |
 | 2026-07-14 | 局内 FPS 回归：MissEarly 烘焙 + ShouldDefer 内联 + ResultFor valid O(1)；二分基线 `f161089f75^` |
+| 2026-09-20 | `INPUT-QUEUE-FRAME` + `SAMPLE-NO-LINQ` 落地；新增 P2：`INPUT-QUEUE-FW` / `COLUMN-EARLY-OUT` / `LN-INPUT-SLOT` |
