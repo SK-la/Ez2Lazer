@@ -30,6 +30,8 @@
 | 选歌界面停留 3–5 秒后掉帧 | `BackgroundDataStoreProcessor` 回填 + `RealmDetachedBeatmapStore` 的 Replace 风暴 | `StartupBackfillDelay` = 5s（测试可覆写 0）；`DetachedBeatmapStoreFrameBudget` 每帧 Drain ≤ 24 | `osu` |
 | 打得越久越卡 | `Column.pressTimes` 整局无限增长，被动 Miss 时复制整表查最近邻 | `pressTimes` 有界裁剪 + `ManiaDrawableMissTiming` 零分配 | `osu` |
 | 列数 / LN 越多越卡 | 每个存活 drawable 每帧进 automiss 询问 | automiss 迁到 Column late-deadline 队列，每列每帧一次 poll；删除每 drawable 虚分派 | `osu` |
+| LN 按住时掉帧（Triangles/Default） | `DefaultBodyPiece` 两层减法 FBO：按住缩体每帧 `DrawSize` 失效 → `ForceRedraw` | **LN-HOLD-FBO**：按住隐藏减法层并跳过重绘；未按住仍保留内孔 | `osu` |
+| LN 同屏时每条 hold 的 head/tail 空实现占输入槽 | `OnPressed`/`OnReleased` 为空，父 Hold 已处理按键 | **LN-INPUT-SLOT**：默认不进非位置输入队列 | `osu` |
 | 高 KPS 下 alloc 抬高 | `GetHitModeValidHitResults` 每次 `new[]`，经 `ResultFor` / `SelectFold` 放大 | 改静态表，`ResultFor` 零分配（Combo dense 约 1.8 KB → 45 B/press） | `osu` |
 | 启动期大量谱面时 GC 爆炸、持续卡顿 | 全量 detached beatmap cache + 启动同时做核心分析与标签补算 | 见 [`EZ_ANALYSIS_STORAGE_REDESIGN.md`](./EZ_ANALYSIS_STORAGE_REDESIGN.md)：分析 / 标签 / 写库边界分离 | `osu` |
 | 皮肤交互导致帧率与 GC 抖动 | 热路径创建绑定副本、频繁 `BindTo`/`Unbind`、绑定链上 `SkinInfo.TriggerChange()` | 见 [`EzSkinSystemNotes.md`](./EzSkinSystemNotes.md) 的禁止项 | `osu` |
@@ -45,6 +47,8 @@
 |----|------|------|
 | **INPUT-QUEUE-FRAME** | `ManiaInputManager.ManiaKeyBindingContainer` | 一次枚举分成「列 / 非列」两个复用列表（列优先顺序不变），并在 `Update()` 失效以**按帧缓存**。原先每次读 `base.KeyBindingInputQueue` 都清空重建，一帧内 N 键齐按 = N 次重建；现在一帧一次。`keyBindingQueues[binding]` 的既有语义（仅在空时重建、Release 时清空）未改动 |
 | **SAMPLE-NO-LINQ** | `GameplaySampleTriggerSource` / `DrawableManiaHitObject` | `GetMostValidObject` 去掉 `Where`/`MinBy`/`OrderBy`/`SkipWhile` 与递归 `getAllNested`，改单遍最小扫描 + 显式栈先序（并列取舍规则与上游一致）；`Play()` / `PlaySamples()` 手动填充数组代替 `Cast().ToArray()`。数组仍每次新建，因为 `GameplayState.ApplySamples` 靠引用不等触发绑定变更（`StoryboardTriggerController` 消费 `LastPlayedSamples`） |
+| **LN-INPUT-SLOT** | `DrawableHoldNoteHead` / `DrawableHoldNoteTail` | 空实现移出非位置输入队列。父 Hold 仍处理 press/release |
+| **LN-HOLD-FBO** | `DefaultBodyPiece` | 按住隐藏减法层并跳过 `ForceRedraw`；松手恢复。仅 Default/Triangles |
 | **FW-BUTTON-QUEUE-REUSE** | `osu-framework` `ButtonEventManager<TButton>`（`osu-framework` `56e9beb2c`） | 每个按钮各持一份按下队列缓冲：按下时整体重填（替代 `InputQueue.ToList()`），抬起时就地压缩掉已脱离输入树的项（替代 `Where(...).ToList()`）。队列长度 = 整棵输入子树的非位置输入项，原实现每按一次分配一条等长列表 + 一个 LINQ 迭代器。快照语义不变（仍取本次按下时的队列，抬起按同一快照派发） |
 
 ### 已评估但**不做**（附原因，避免重复讨论）
@@ -131,6 +135,7 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | `ManiaRunHitEventsLatencyTest` | 暖机延迟烟测 |
 | `BenchmarkManiaLaneHotPath` / `ManiaLaneHotPathMicroBenchTest` / `ManiaLaneHotPathWorkload` | 10 列 × PeakKps 20/50/100 × alive 8/24/40；Select + 真实 automiss deadline 队列 + `pressTimes`；**不含** SwapBuffer |
 | `ManiaAutoMissDeadlineTest` | future-deadline `dueVisits == 0` |
+| `TestSceneManiaHoldDrawCost` / `ManiaHoldAblationTest` | **Debug only**。LN 消融：减法描边 / tick 扫描 / tick 生成 / head-tail 入队；滚动 + 模拟按住 |
 | `HitModeValidResultsAllocTest` | `ResultFor` 零分配 |
 | `DetachedBeatmapStoreFrameBudget` 单测 | 每帧 Drain ≤ 24 |
 | `BackgroundDataStoreProcessor` 测试覆写 | `StartupBackfillDelay` 可置 0 |
@@ -164,7 +169,7 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 现象 | 已知线索 | 下一步（先量） |
 |------|---------|---------------|
 | 进局后**首次命中** update 与 draw 同时明显掉帧，随后回升，画面无卡顿 | 单次性 ⇒ 首次执行成本：JIT、判定字形图集首次上传、首个 BASS 通道创建、判定动画首次 `GetAnimation` | 用 `ManiaJudgeHotPathTrace` 标出首次 `CheckForResult` → `ApplyResult` → 爆炸/判定的时间线；对照把 `KeySoundPreviewMode` 关掉再复测（音频侧变量隔离） |
-| **LN 多的场景掉帧尤为明显** | 候选：`DefaultBodyPiece` 两层 `BufferedContainer`（减法混合）被 size/transform 失效重绘；`DrawableHoldNote.Update` 每帧扫 tick；`judgePendingHoldTicks`；LN 的 head/tail 各占一个输入队列槽位（`OnPressed`/`OnReleased` 均为空实现，**可证明是无效槽位**） | 需要 `ManiaCodeSkinDrawAblation` 式的 LN 消融测试场景：分别关闭「减法描边 / 每帧 tick 扫 / head-tail 入队」，逐项对比 |
+| **LN 多的场景掉帧尤为明显** | **已定案（Triangles/Default）**：按住缩体时 `DefaultBodyPiece` 两层减法 FBO 每帧 `ForceRedraw`。静止 / 只滚不按：`ΔBodyFbo→0`。tick 扫描抬 `ΔTickScan`，12 条 LN 下 `updMs` 仍约 1–2ms，不是画侧主项。head/tail 入队已排除 | 生产：`LN-HOLD-FBO` + `LN-INPUT-SLOT`。消融场景仅 Debug。**Argon / Ez2 / Legacy 未改** |
 | 其他显示器播放视频（即使暂停）时帧率掉 200+ | 游戏内代码路径无对应开销 ⇒ 指向桌面合成 / GPU 抢占 / DWM 或驱动侧 | 与 §5 流程同规：另一显示器换静态图、换浏览器硬件加速开关、换输出模式，确认是否与游戏进程无关；结论记入本文件而非改游戏代码 |
 
 **输入侧已排除**：`DrawableHoldNoteBody` / `DrawableHoldNoteTick` 不是 `IKeyBindingHandler`，本就不进输入队列，LN 的 tick 数量不放大按键扫描成本（当前算法扫描列 + note + hold + head/tail）。
@@ -177,3 +182,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 |------|------|
 | 2026-08-08 | 初版：汇总各文档 FPS / 性能测试描述；记录音频后端排查与振幅限频（框架 `e22805587`） |
 | 2026-09-20 | §2.1：输入队列按帧物化、取样去 LINQ、框架侧按键队列去分配（**FW-BUTTON-QUEUE-REUSE**）落地；登记 5 项「评估后不做」的候选与原因（含被 `TestSceneInputQueueChange.CombinedClicks` 证伪的 **FW-INPUT-QUEUE-DISPATCH**）；§9 登记首次命中 / LN / 多显示器三条待排查现象与测量口径 |
+| 2026-09-21 | **LN-HOLD-FBO** / **LN-INPUT-SLOT** 生产落地。消融证实按住才 ForceRedraw；观测代码 `#if DEBUG` 剥离 |
