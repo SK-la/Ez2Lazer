@@ -27,6 +27,9 @@ using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.EzMania;
+#if DEBUG
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
+#endif
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
@@ -253,6 +256,11 @@ namespace osu.Game.Rulesets.Mania.UI
             {
                 Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
             }
+
+#if DEBUG
+            // TRACE-JUDGE 每局归零，使 Dispose 时的读数是本局累计。
+            ManiaJudgeHotPathTrace.Clear();
+#endif
         }
 
         private ManiaTouchInputArea? touchInputArea;
@@ -441,6 +449,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
             if (currentSkin.IsNotNull())
                 currentSkin.SourceChanged -= onSkinChange;
+
+#if DEBUG
+            // TRACE-JUDGE 读数出口：诊断开关打开时，一局结束把热路径计数打到运行日志。
+            if (ManiaJudgeHotPathTrace.Enabled)
+                Logger.Log($"[ManiaJudgeHotPathTrace] {ManiaJudgeHotPathTrace.FormatSummary()}", LoggingTarget.Runtime, LogLevel.Important);
+#endif
         }
     }
 }

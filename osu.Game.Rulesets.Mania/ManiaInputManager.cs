@@ -8,6 +8,10 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Localisation.Mania;
+#if DEBUG
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
+using osu.Game.Rulesets.Mania.Objects.Drawables;
+#endif
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI;
 
@@ -80,10 +84,19 @@ namespace osu.Game.Rulesets.Mania
                 get
                 {
                     if (inputQueueCached)
+                    {
+#if DEBUG
+                        ManiaJudgeHotPathTrace.RecordInputQueueReuse(columnFirstQueue.Count);
+#endif
                         return columnFirstQueue;
+                    }
 
                     columnFirstQueue.Clear();
                     nonColumnQueue.Clear();
+
+#if DEBUG
+                    int holdEnds = 0;
+#endif
 
                     // 只读一次基类队列：读两次就是两次整棵子树重建。
                     foreach (var drawable in base.KeyBindingInputQueue)
@@ -92,11 +105,19 @@ namespace osu.Game.Rulesets.Mania
                             columnFirstQueue.Add(drawable);
                         else
                             nonColumnQueue.Add(drawable);
+
+#if DEBUG
+                        if (drawable is DrawableHoldNoteHead or DrawableHoldNoteTail)
+                            holdEnds++;
+#endif
                     }
 
                     columnFirstQueue.AddRange(nonColumnQueue);
 
                     inputQueueCached = true;
+#if DEBUG
+                    ManiaJudgeHotPathTrace.RecordInputQueueRebuild(columnFirstQueue.Count, holdEnds);
+#endif
 
                     return columnFirstQueue;
                 }
