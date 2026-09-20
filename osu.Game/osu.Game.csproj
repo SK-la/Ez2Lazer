@@ -52,7 +52,7 @@
     <PackageReference Include="TagLibSharp" Version="2.3.0"/>
     <PackageReference Include="Live2DCSharpSDK" Version="1.0.0.6"/>
     <!-- In-process WebAssembly host for the vendored n-key MinaCalc (4-18K mania MSD/SSR). -->
-    <PackageReference Include="Wasmtime" Version="44.0.0"/>
+    <PackageReference Include="Wasmtime" Version="48.0.2" />
 
     <!-- Required since Veldrid references a library that depends on Microsoft.DotNet.PlatformAbstractions (2.0.3), which doesn't play nice with Realm. -->
     <PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0">
