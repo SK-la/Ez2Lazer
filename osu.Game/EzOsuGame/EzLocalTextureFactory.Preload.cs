@@ -3,9 +3,12 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.HUD;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.EzOsuGame
 {
@@ -40,13 +43,32 @@ namespace osu.Game.EzOsuGame
         private static readonly string[] key_components = { "KeyBase", "KeyPress" };
         private static readonly string[] key_suffixes = { "0", "1", "2" };
 
+        /// <summary>判定动画可能用到的全部结果名（各 HitMode 模板的并集，见 <see cref="EzHitResultNameTemplate"/>）。</summary>
+        private static readonly HitResult[] judgement_result_names =
+        {
+            HitResult.Perfect,
+            HitResult.Great,
+            HitResult.Good,
+            HitResult.Ok,
+            HitResult.Meh,
+            HitResult.Miss,
+            HitResult.Poor,
+        };
+
+        private const int max_judgement_frames = 64;
+
+        private static readonly string[] judgement_frame_separators = { "-", "_" };
+
+        /// <summary>帧序号补零宽度（<c>frame_0</c> / <c>frame_00</c> / <c>frame_000</c>）。</summary>
+        private static readonly string[] judgement_frame_number_formats = { "D1", "D2", "D3" };
+
         private volatile bool isPreloading;
         private volatile bool preloadCompleted;
         private string? completedPreloadKey;
         private Task? preloadTask;
 
         /// <summary>
-        /// 当前 NoteSet/Stage 是否已完成解码缓存预热。
+        /// 当前 NoteSet/Stage/GameTheme 是否已完成解码缓存预热。
         /// </summary>
         public bool IsPreloadReadyForCurrentSettings
         {
@@ -76,7 +98,7 @@ namespace osu.Game.EzOsuGame
         }
 
         private string buildPreloadKey()
-            => $"{noteSetName.Value}|{stageName.Value}";
+            => $"{noteSetName.Value}|{stageName.Value}|{gameThemeName.Value}";
 
         private async Task runPreloadAsync(string key)
         {
@@ -165,7 +187,100 @@ namespace osu.Game.EzOsuGame
                 }
             }
 
+            collectJudgementTextures(add);
+
             return frames;
+        }
+
+        /// <summary>
+        /// 预热 <c>EzHUDHitResultScore</c> 的判定动画与全连演出帧。
+        /// </summary>
+        /// <remarks>
+        /// 这些资源位于用户 <c>EzResources/GameTheme/{theme}/judgement/</c> 与 <c>EzResources/FullCombo/</c>，
+        /// 既不在 note/stage 集合里、也没有其它预热入口，因此在**首次**出现该判定时才由 HUD 解码
+        /// （磁盘读 + PNG 解码 + 首次上传），表现为进游戏后第一个 note 判定时 update/draw 各掉一帧。
+        /// 这里按结果名逐一探测，把解码提前到 PlayerLoader 期间的线程池里。
+        /// </remarks>
+        private void collectJudgementTextures(Action<string, EzTextureUsage> add)
+        {
+            string theme = gameThemeName.Value.ToString();
+            string judgementRoot = $"GameTheme/{theme}/judgement";
+
+            foreach (string resultName in enumerateJudgementResourceNames())
+            {
+                string basePath = $"{judgementRoot}/{resultName}";
+
+                collectSeparatedFrames(add, basePath);
+                collectTemplateFrames(add, basePath);
+            }
+
+            // checkFullCombo 直接取 FullCombo/full-combo（不带 GameTheme 前缀），帧名走 -/_ 分隔符。
+            collectSeparatedFrames(add, "FullCombo/full-combo");
+        }
+
+        /// <summary>
+        /// 枚举判定资源名：各 <see cref="EzEnumHitMode"/> 模板的结果名并集，且补齐 HUD 会尝试的大小写变体。
+        /// </summary>
+        private static IEnumerable<string> enumerateJudgementResourceNames()
+        {
+            var yielded = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (EzEnumHitMode mode in Enum.GetValues<EzEnumHitMode>())
+            {
+                foreach (HitResult result in judgement_result_names)
+                {
+                    string name = EzHitResultNameTemplate.GetResourceName(mode, result);
+
+                    if (string.IsNullOrEmpty(name))
+                        continue;
+
+                    // CreateJudgementTexture 依次尝试原名 / 小写 / 大写。
+                    if (yielded.Add(name))
+                        yield return name;
+                    if (yielded.Add(name.ToLowerInvariant()))
+                        yield return name.ToLowerInvariant();
+                    if (yielded.Add(name.ToUpperInvariant()))
+                        yield return name.ToUpperInvariant();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 判定帧有两种命名约定：直接接基名（<c>Kool-0</c> / <c>Kool_0</c>），以及默认帧模板（<c>Kool/frame_0</c>）。
+        /// 两种都探测；不存在的名字在首个帧探测即中断，代价是一次已缓存为 null 的查找。
+        /// 自定义帧模板（如 <c>frame_{000}</c>）无法在此预知，仍留给首次判定时解码。
+        /// </summary>
+        private void collectSeparatedFrames(Action<string, EzTextureUsage> add, string basePath)
+        {
+            foreach (string separator in judgement_frame_separators)
+            {
+                for (int i = 0; i < max_judgement_frames; i++)
+                {
+                    string path = $"{basePath}{separator}{i}";
+
+                    if (resource.Get(path, EzTextureUsage.AnimationSafe) == null)
+                        break;
+
+                    add(path, EzTextureUsage.AnimationSafe);
+                }
+            }
+        }
+
+        private void collectTemplateFrames(Action<string, EzTextureUsage> add, string basePath)
+        {
+            // 默认模板 {result}/frame_{0}；{00}/{000} 是 formatJudgementFrameTemplate 同样支持的补零宽度。
+            foreach (string numberFormat in judgement_frame_number_formats)
+            {
+                for (int i = 0; i < max_judgement_frames; i++)
+                {
+                    string path = $"{basePath}/frame_{i.ToString(numberFormat, CultureInfo.InvariantCulture)}";
+
+                    if (resource.Get(path, EzTextureUsage.AnimationSafe) == null)
+                        break;
+
+                    add(path, EzTextureUsage.AnimationSafe);
+                }
+            }
         }
 
         private void collectIndexedFrames(Action<string, EzTextureUsage> add, string path, EzTextureUsage usage)

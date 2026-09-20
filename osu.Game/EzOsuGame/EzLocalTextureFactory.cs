@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.HUD;
 using osuTK;
 
 namespace osu.Game.EzOsuGame
@@ -35,6 +36,7 @@ namespace osu.Game.EzOsuGame
 
         private readonly Bindable<string> stageName = new Bindable<string>();
         private readonly Bindable<string> noteSetName = new Bindable<string>();
+        private readonly Bindable<EzEnumGameThemeName> gameThemeName = new Bindable<EzEnumGameThemeName>();
 
         private readonly BindableBool colorSettingsEnabled = new BindableBool(true);
         private readonly Bindable<Colour4> columnTypeA = new Bindable<Colour4>();
@@ -75,6 +77,7 @@ namespace osu.Game.EzOsuGame
 
             ezConfig.BindWith(Ez2Setting.NoteSetName, noteSetName);
             ezConfig.BindWith(Ez2Setting.StageName, stageName);
+            gameThemeName.BindTo(ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName));
 
             ezConfig.BindWith(Ez2Setting.ColumnWidth, columnWidth);
             ezConfig.BindWith(Ez2Setting.SpecialFactor, specialFactor);
