@@ -10,7 +10,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
-using osu.Game.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
@@ -147,7 +146,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 return;
             }
 
-            var samples = GetSamples().Cast<ISampleInfo>().ToArray();
+            // [Ez] mania 的 GetSamples() 就是 HitObject.Samples（ICollection），ToArray() 走精确长度快路径，
+            // 不再经过 Cast 迭代器。数组仍每次新建，因为 GameplayState.ApplySamples 靠引用不等触发绑定变更。
+            var samples = GetSamples().ToArray();
 
             if (samples.Length == 0)
                 return;
