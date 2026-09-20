@@ -10,6 +10,9 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
+#if DEBUG
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
+#endif
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
@@ -146,8 +149,14 @@ namespace osu.Game.Rulesets.Mania.Objects
             Ticks = new List<HoldNoteTick>();
 
             // 仅 EZ2AC HitMode 生成 16 分 tick；其它模式保持官方头尾松手语义。
+#if DEBUG
+            if (!ManiaHoldAblation.DisableHoldTickGeneration
+                && (ManiaHoldAblation.ForceHoldTickGeneration || isEz2AcHitMode()))
+                createTicks(cancellationToken);
+#else
             if (isEz2AcHitMode())
                 createTicks(cancellationToken);
+#endif
         }
 
         private static bool isEz2AcHitMode()

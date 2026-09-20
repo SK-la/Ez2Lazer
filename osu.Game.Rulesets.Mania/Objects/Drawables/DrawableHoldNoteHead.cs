@@ -6,6 +6,9 @@
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
+#if DEBUG
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
+#endif
 using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.Mania.Objects.Drawables
@@ -65,6 +68,15 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             // Set `LifetimeEnd` explicitly to a non-`double.MaxValue` because otherwise this DHO is automatically expired.
             LifetimeEnd = double.PositiveInfinity;
         }
+
+        /// <summary>
+        /// LN-INPUT-SLOT：head 的按键由父 <see cref="DrawableHoldNote"/> 处理，空实现不进非位置输入队列。
+        /// </summary>
+#if DEBUG
+        public override bool HandleNonPositionalInput => ManiaHoldAblation.EnqueueHoldEnds && base.HandleNonPositionalInput;
+#else
+        public override bool HandleNonPositionalInput => false;
+#endif
 
         public override bool OnPressed(KeyBindingPressEvent<ManiaAction> e) => false; // Handled by the hold note
 

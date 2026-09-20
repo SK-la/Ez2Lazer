@@ -7,6 +7,9 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Game.EzOsuGame.Configuration;
+#if DEBUG
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
+#endif
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Scoring;
@@ -77,6 +80,15 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             return result;
         }
+
+        /// <summary>
+        /// LN-INPUT-SLOT：tail 的松手由父 <see cref="DrawableHoldNote"/> 处理，空实现不进非位置输入队列。
+        /// </summary>
+#if DEBUG
+        public override bool HandleNonPositionalInput => ManiaHoldAblation.EnqueueHoldEnds && base.HandleNonPositionalInput;
+#else
+        public override bool HandleNonPositionalInput => false;
+#endif
 
         public override bool OnPressed(KeyBindingPressEvent<ManiaAction> e) => false; // Handled by the hold note
 
