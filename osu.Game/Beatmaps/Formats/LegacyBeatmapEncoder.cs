@@ -20,7 +20,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Beatmaps.Formats
 {
-    public class LegacyBeatmapEncoder
+    public class LegacyBeatmapEncoder : IBeatmapEncoder
     {
         public const int FIRST_LAZER_VERSION = 128;
 

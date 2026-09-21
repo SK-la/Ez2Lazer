@@ -15,6 +15,7 @@ using osu.Framework.IO.Stores;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.Formats;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
@@ -34,6 +35,7 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Edit.Setup;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
+using osu.Game.Storyboards;
 using osu.Game.Users;
 using osuTK;
 
@@ -290,6 +292,12 @@ namespace osu.Game.Rulesets
         public virtual PerformanceCalculator? CreatePerformanceCalculator() => null;
 
         public virtual HitObjectComposer? CreateHitObjectComposer() => null;
+
+        /// <summary>
+        /// Optional encoder used by the editor for save and undo snapshots.
+        /// Returning a value enables save/undo without implementing <see cref="ILegacyRuleset"/>.
+        /// </summary>
+        public virtual IBeatmapEncoder? CreateBeatmapEncoder(IBeatmap beatmap, ISkin? skin, Storyboard? storyboard) => null;
 
         public virtual IBeatmapVerifier? CreateBeatmapVerifier() => null;
 

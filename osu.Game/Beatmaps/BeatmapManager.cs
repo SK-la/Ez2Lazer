@@ -550,7 +550,7 @@ namespace osu.Game.Beatmaps
             {
                 using var stream = new MemoryStream();
                 using (var sw = new StreamWriter(stream, Encoding.UTF8, 1024, true))
-                    new LegacyBeatmapEncoder(beatmapContent, beatmapSkin, storyboard).Encode(sw);
+                    BeatmapEncoder.Create(beatmapContent, beatmapSkin, storyboard).Encode(sw);
 
                 stream.Seek(0, SeekOrigin.Begin);
 

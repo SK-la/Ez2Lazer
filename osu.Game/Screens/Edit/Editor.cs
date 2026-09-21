@@ -301,7 +301,9 @@ namespace osu.Game.Screens.Edit
 
             editorBeatmap.UpdateInProgress.BindValueChanged(_ => updateSampleDisabledState());
 
-            canSave = editorBeatmap.BeatmapInfo.Ruleset.CreateInstance() is ILegacyRuleset;
+            var editorRuleset = editorBeatmap.BeatmapInfo.Ruleset.CreateInstance();
+            canSave = editorRuleset is ILegacyRuleset
+                      || editorRuleset.CreateBeatmapEncoder(editorBeatmap, editorBeatmap.BeatmapSkin, editorBeatmap.Storyboard) != null;
 
             if (canSave)
             {
