@@ -277,8 +277,10 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.ManiaPseudo3DRotation, 0.0, 0.0, 75.0, 1.0);
             SetDefault(Ez2Setting.ManiaHoldTailAlpha, 1.0, 0.0, 1.0, 0.01);
-            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 100.0, 1.0);
+            // UI 0-8，除 32 得到节拍；0 关闭投皮额外负担，默认 4 = 4/32 = 2/16。旧存档 >8 的像素值钳回默认 4。
+            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 8.0, 1.0);
             SetDefault(Ez2Setting.ManiaLNGradientEnable, true);
+            SetDefault(Ez2Setting.ManiaHoldTailMaskDynamicEnable, false);
         }
 
         #region 列类型管理
@@ -1110,8 +1112,15 @@ namespace osu.Game.EzOsuGame.Configuration
         ManiaPseudo3DRotation,
 
         ManiaHoldTailAlpha,
-        ManiaHoldTailMaskGradientHeight, // 投皮面尾
+        /// <summary>
+        /// LN 投皮距离档位。UI 0-8，除 32 得到节拍；0 关闭投皮额外负担，默认 4 = 4/32 = 2/16。进局 Get 一次快照。
+        /// </summary>
+        ManiaHoldTailMaskGradientHeight,
         ManiaLNGradientEnable,
+        /// <summary>
+        /// 动态投皮。进局时 Get 一次快照，局内不跟随设置变更；开启后按 tracker 当前拍长调整投皮距离。
+        /// </summary>
+        ManiaHoldTailMaskDynamicEnable,
         NoteCornerRadius,
 
         // 列着色与配色系统

@@ -121,11 +121,22 @@ namespace osu.Game.EzOsuGame.Localization
             + "You must enable this switch to use the true opportunistic tail below.");
 
         public static readonly LocalisableString LN_GRADIENT_TAIL_HEIGHT = new EzLocalizationManager.EzLocalisableString(
-            "调整投皮面尾的幅度", "Adjust LN Tail Gradient Length");
+            "投皮距离档位", "LN Tail Mask Beats");
 
         public static readonly LocalisableString LN_GRADIENT_TAIL_HEIGHT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(投皮) 缩短面条中部, 不改变面尾形状",
-            "(Gradient LN) Shorten the middle of the hold tail without changing its shape");
+            "UI 0~8，x/32 × BPM。"
+            + "\n0 为关闭投皮；进局时确认状态，局内不会动态变化。"
+            + "\n需先开启伪面尾，body 再按此档位判定是否投皮。",
+            "UI 0–8; (x ÷ 32) × BPM."
+            + "\n0 disables tail‑mask projection; the state is confirmed when entering play and will not change during gameplay."
+            + "\nPseudo‑tail must be enabled first; the body then judges based on this level whether to project the mask.");
+
+        public static readonly LocalisableString LN_DYNAMIC_TAIL = new EzLocalizationManager.EzLocalisableString(
+            "动态投皮", "Dynamic LN Tail Mask");
+
+        public static readonly LocalisableString LN_DYNAMIC_TAIL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "进局时确认，局内不跟随设置变更。关闭时整局用主 BPM 拍长；开启后按当前拍长动态调整投皮距离。",
+            "Snapshotted when entering play; in-play setting changes are ignored. Off uses the main BPM beat length for the whole play; on follows the live beat length.");
 
         public static readonly LocalisableString NOTE_TRACK_LINE = new EzLocalizationManager.EzLocalisableString(
             "[EzPro] Note侧轨道线", "EzPro] Note Track Line");
