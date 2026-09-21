@@ -1010,23 +1010,13 @@ namespace osu.Game.EzOsuGame.Overlays
                             sourceCollection.Value.BeatmapMd5Hashes.Count));
                     }
 
-                    // Delete individual difficulties that match the collection, then clean up empty sets.
-                    var affectedSets = new HashSet<BeatmapSetInfo>();
-
-                    foreach (var beatmap in localBeatmaps)
-                    {
-                        beatmapManager.DeleteDifficultyImmediately(beatmap);
-                        if (beatmap.BeatmapSet != null)
-                            affectedSets.Add(beatmap.BeatmapSet);
-                    }
-
-                    var emptySets = affectedSets.Where(set => set.Beatmaps.Count == 0).ToList();
-                    if (emptySets.Count > 0)
-                        beatmapManager.Delete(emptySets, silent: true);
+                    BeatmapManager.BeatmapDifficultyDeletionResult result = beatmapManager.DeleteDifficulties(localBeatmaps.Select(beatmap => beatmap.ID).ToArray());
 
                     return (success: true, message: LocalisableString.Format(
                         EzManageSongsBranchesDialogStrings.COLLECTION_DELETE_COMPLETED,
-                        localBeatmaps.Count,
+                        result.PermanentlyDeletedDifficulties,
+                        result.SoftDeletedDifficulties,
+                        result.SoftDeletedSets,
                         sourceCollection.Value.BeatmapMd5Hashes.Count));
                 }).ConfigureAwait(false);
 
@@ -1414,8 +1404,9 @@ namespace osu.Game.EzOsuGame.Overlays
             internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_RUNNING = new EzLocalizationManager.EzLocalisableString("正在后台删除收藏夹“{0}”命中的本地谱面...",
                 "Deleting local beatmaps matched by collection \"{0}\" in the background...");
 
-            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_COMPLETED = new EzLocalizationManager.EzLocalisableString("已删除 {0:#,0} 张本地谱面；收藏夹记录完整保留（共 {1:#,0} 条）。",
-                "Deleted {0:#,0} local beatmaps; collection records remain intact ({1:#,0} total entries).");
+            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_COMPLETED = new EzLocalizationManager.EzLocalisableString(
+                "已永久删除 {0:#,0} 张部分命中的谱面；另有 {1:#,0} 张谱面（{2:#,0} 个完整谱包）移入最近删除。收藏夹记录完整保留（共 {3:#,0} 条）。无引用文件将在下次启动时清理。",
+                "Permanently deleted {0:#,0} difficulties from partially matched sets; {1:#,0} difficulties ({2:#,0} complete sets) were moved to recently deleted. Collection records remain intact ({3:#,0} total entries). Unreferenced files will be cleaned up on next startup.");
 
             internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_NO_LOCAL_BEATMAPS = new EzLocalizationManager.EzLocalisableString(
                 "本地没有命中可删除谱面；收藏夹记录完整保留（共 {0:#,0} 条）。", "No local beatmaps matched for deletion; collection records remain intact ({0:#,0} total entries).");
@@ -1424,8 +1415,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 "Failed to delete local beatmaps matched by the collection.");
 
             internal static readonly EzLocalizationManager.EzLocalisableString DELETE_COLLECTION_LOCAL_BEATMAPS_CONFIRMATION = new EzLocalizationManager.EzLocalisableString(
-                "危险操作：将删除收藏夹“{0}”命中的本地谱面（不修改收藏夹记录）。可在设置-维护中通过“恢复所有最近删除的谱面”撤销。",
-                "Dangerous operation: this deletes local beatmaps matched by collection \"{0}\" (collection entries remain). You can undo this in Settings > Maintenance via \"Restore all recently deleted beatmaps\".");
+                "危险操作：将处理收藏夹“{0}”命中的本地谱面（不修改收藏夹记录）。部分命中的谱包仅永久删除目标 diff，无法恢复；完整命中的谱包移入最近删除，可在下次启动前于设置-维护中恢复。无引用文件将在下次启动时清理。",
+                "Dangerous operation: this processes local beatmaps matched by collection \"{0}\" without modifying collection entries. For partially matched sets, target difficulties are permanently deleted and cannot be restored. Fully matched sets are moved to recently deleted and can be restored in Settings > Maintenance before the next startup. Unreferenced files are cleaned up on next startup.");
 
             internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_CONFIRMATION_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString(
                 "危险操作需要确认，当前无法显示确认对话框，已取消执行。",

@@ -425,32 +425,81 @@ namespace osu.Game.Beatmaps
         }
 
         /// <summary>
-        /// Delete a beatmap difficulty immediately.
+        /// Deletes a collection of beatmap difficulties using the current Realm state.
+        /// A set is soft-deleted when all of its current difficulties are selected; partially selected sets have their
+        /// selected difficulties permanently removed.
         /// </summary>
-        /// <remarks>
-        /// There's no undoing this operation, as we don't have a soft-deletion flag on <see cref="BeatmapInfo"/>.
-        /// This may be a future consideration if there's a user requirement for undeleting support.
-        /// </remarks>
-        public void DeleteDifficultyImmediately(BeatmapInfo beatmapInfo)
+        public BeatmapDifficultyDeletionResult DeleteDifficulties(IReadOnlyCollection<Guid> beatmapIds)
         {
+            return deleteDifficulties(beatmapIds, softDeleteCompleteSets: true);
+        }
+
+        private BeatmapDifficultyDeletionResult deleteDifficulties(IReadOnlyCollection<Guid> beatmapIds, bool softDeleteCompleteSets)
+        {
+            if (beatmapIds.Count == 0)
+                return new BeatmapDifficultyDeletionResult();
+
+            var result = new BeatmapDifficultyDeletionResult();
+
             Realm.Write(r =>
             {
-                if (!beatmapInfo.IsManaged)
-                    beatmapInfo = r.Find<BeatmapInfo>(beatmapInfo.ID)!;
+                var selectedIds = beatmapIds.ToHashSet();
+                var selectedBeatmaps = selectedIds.Select(id => r.Find<BeatmapInfo>(id))
+                                                  .Where(b => b?.BeatmapSet != null)
+                                                  .Select(b => b!)
+                                                  .ToList();
 
-                Debug.Assert(beatmapInfo.BeatmapSet != null);
-                Debug.Assert(beatmapInfo.File != null);
+                foreach (var setInfo in selectedBeatmaps.Select(b => b.BeatmapSet!).DistinctBy(s => s.ID).ToList())
+                {
+                    if (setInfo.DeletePending || setInfo.Protected)
+                        continue;
 
-                var setInfo = beatmapInfo.BeatmapSet;
+                    var setBeatmaps = setInfo.Beatmaps.ToList();
+                    var selectedInSet = setBeatmaps.Where(b => selectedIds.Contains(b.ID)).ToList();
 
-                DeleteFile(setInfo, beatmapInfo.File);
-                setInfo.Beatmaps.Remove(beatmapInfo);
-                r.Remove(beatmapInfo.Metadata);
-                r.Remove(beatmapInfo);
+                    if (softDeleteCompleteSets && selectedInSet.Count == setBeatmaps.Count)
+                    {
+                        setInfo.DeletePending = true;
+                        result.SoftDeletedSets++;
+                        result.SoftDeletedDifficulties += selectedInSet.Count;
+                    }
+                    else
+                    {
+                        foreach (var beatmap in selectedInSet)
+                        {
+                            RealmNamedFileUsage? file = beatmap.File;
+                            if (file != null)
+                                DeleteFile(setInfo, file);
 
-                updateHashAndMarkDirty(setInfo);
-                workingBeatmapCache.Invalidate(setInfo);
+                            setInfo.Beatmaps.Remove(beatmap);
+                            r.Remove(beatmap.Metadata);
+                            r.Remove(beatmap);
+                            result.PermanentlyDeletedDifficulties++;
+                        }
+
+                        updateHashAndMarkDirty(setInfo);
+                    }
+
+                    workingBeatmapCache.Invalidate(setInfo);
+                }
             });
+
+            return result;
+        }
+
+        /// <summary>
+        /// Delete a beatmap difficulty immediately.
+        /// </summary>
+        public void DeleteDifficultyImmediately(BeatmapInfo beatmapInfo)
+        {
+            deleteDifficulties(new[] { beatmapInfo.ID }, softDeleteCompleteSets: false);
+        }
+
+        public sealed class BeatmapDifficultyDeletionResult
+        {
+            public int PermanentlyDeletedDifficulties { get; internal set; }
+            public int SoftDeletedSets { get; internal set; }
+            public int SoftDeletedDifficulties { get; internal set; }
         }
 
         /// <summary>
