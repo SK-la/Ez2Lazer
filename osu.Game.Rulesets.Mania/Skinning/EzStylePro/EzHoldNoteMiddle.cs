@@ -11,6 +11,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osuTK;
 
@@ -23,7 +24,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private IBindable<bool> isHitting = null!;
         private IBindable<double> tailAlpha = null!;
-        private IBindable<double> tailMaskHeight = null!;
 
         private Container? topContainer;
         private Container? bodyContainer;
@@ -39,8 +39,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private float lastBodyScaleY = float.NaN;
         private float lastTopContainerY = float.NaN;
         private float cachedTailMaskHeight = float.NaN;
+        private double tailMaskLevel;
+        private double cachedBeatLength = double.NaN;
+        private double cachedTimeRange = double.NaN;
+        private float cachedScrollLength = float.NaN;
 
         private bool lnGradient;
+        private DrawableManiaRuleset? drawableRuleset;
 
         public EzHoldNoteMiddle()
         {
@@ -52,9 +57,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             lnGradient = ezConfig.Get<bool>(Ez2Setting.ManiaLNGradientEnable);
 
-            tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
+            drawableRuleset = this.FindClosestParent<DrawableManiaRuleset>();
             tailAlpha = ezSkinInfo.HoldTailAlpha;
-            tailMaskHeight.BindValueChanged(onTailMaskHeightChanged, true);
+            tailMaskLevel = ManiaHoldTailMask.ResolveLevel(drawableRuleset, ezSkinInfo.HoldTailMaskHeight.Value);
             tailAlpha.BindValueChanged(_ =>
             {
                 if (lnGradient)
@@ -67,6 +72,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     return;
 
                 lnGradient = e.NewValue;
+                tailMaskLevel = ManiaHoldTailMask.ResolveLevel(drawableRuleset, ezSkinInfo.HoldTailMaskHeight.Value);
                 OnLoadChanged();
             });
 
@@ -176,7 +182,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 bodyInnerContainer.Y = -halfNoteHeight;
             }
 
-            updateBodyLayout(lnGradient ? getTailMaskHeight() : 0);
+            updateBodyLayout(getTailMaskHeight());
 
             // TODO: V3 版应该增加一个顶部 Dot 标识，以免常规图无法分辨正确的面尾
         }
@@ -209,7 +215,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (halfNoteHeight <= 0)
                 return;
 
-            float moveDown = lnGradient ? getTailMaskHeight() : 0;
+            float moveDown = getTailMaskHeight();
 
             if (lnGradient)
                 updateTopContainerLayout(moveDown);
@@ -246,13 +252,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
 
             topInner.Height = NoteHeight;
-        }
-
-        private void onTailMaskHeightChanged(ValueChangedEvent<double> height)
-        {
-            cachedTailMaskHeight = (float)height.NewValue;
-            resetLayoutCache();
-            OnDrawableChanged();
         }
 
         private void updateBodyLayout(float moveDown)
@@ -313,7 +312,31 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             lastTopContainerY = float.NaN;
         }
 
-        private float getTailMaskHeight() => float.IsNaN(cachedTailMaskHeight) ? 0 : cachedTailMaskHeight;
+        private float getTailMaskHeight()
+        {
+            if (!lnGradient || !ManiaHoldTailMask.IsEnabled(tailMaskLevel))
+                return 0;
+
+            drawableRuleset ??= this.FindClosestParent<DrawableManiaRuleset>();
+
+            var hitObjectContainer = Column.HitObjectContainer;
+            double beatLength = ManiaHoldTailMask.ResolveBeatLength(drawableRuleset);
+            double timeRange = ManiaHoldTailMask.ResolveTimeRange(Column.ScrollingInfo);
+            float scrollLength = hitObjectContainer.DrawHeight;
+
+            if (float.IsNaN(cachedTailMaskHeight)
+                || cachedBeatLength != beatLength
+                || cachedTimeRange != timeRange
+                || cachedScrollLength != scrollLength)
+            {
+                cachedBeatLength = beatLength;
+                cachedTimeRange = timeRange;
+                cachedScrollLength = scrollLength;
+                cachedTailMaskHeight = ManiaHoldTailMask.GetLength(hitObjectContainer, tailMaskLevel, beatLength);
+            }
+
+            return cachedTailMaskHeight;
+        }
 
         private static bool layoutChanged(float oldValue, float newValue) => float.IsNaN(oldValue) || MathF.Abs(oldValue - newValue) > 0.001f;
 

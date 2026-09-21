@@ -46,6 +46,12 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                     TooltipText = EzSkinStrings.MANIA_LN_GRADIENT_ENABLE_TOOLTIP,
                     Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.ManiaLNGradientEnable),
                 },
+                new SettingsCheckbox
+                {
+                    LabelText = EzSkinStrings.LN_DYNAMIC_TAIL,
+                    TooltipText = EzSkinStrings.LN_DYNAMIC_TAIL_TOOLTIP,
+                    Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.ManiaHoldTailMaskDynamicEnable),
+                },
                 new SettingsSlider<double>
                 {
                     LabelText = EzSkinStrings.LN_GRADIENT_TAIL_HEIGHT,
