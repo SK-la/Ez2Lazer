@@ -4,6 +4,7 @@
 using System.Linq;
 using osu.Framework.Graphics;
 using osu.Game.Screens.Play;
+using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.Scoring
 {
