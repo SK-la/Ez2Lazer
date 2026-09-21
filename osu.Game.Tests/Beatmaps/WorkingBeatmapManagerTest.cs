@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
@@ -11,6 +12,7 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Database;
+using osu.Game.Models;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Tests.Resources;
@@ -134,5 +136,81 @@ namespace osu.Game.Tests.Beatmaps
             Assert.That(preserveCollection.BeatmapMD5Hashes, Does.Contain(finalHash));
             Assert.That(noNewCollection.BeatmapMD5Hashes, Does.Not.Contain(finalHash));
         });
+
+        [Test]
+        public void TestDeleteDifficultiesPartiallyMatchedSet() => AddStep("delete one difficulty", () =>
+        {
+            BeatmapSetInfo set = createTwoDifficultySet();
+            var deletedBeatmap = set.Beatmaps[0];
+            var remainingBeatmap = set.Beatmaps[1];
+            string deletedFileHash = deletedBeatmap.Hash;
+            string sharedFileHash = Realm.Run(r => r.Find<BeatmapSetInfo>(set.ID)!.Files.Single(f => f.Filename == "audio.mp3").File.Hash);
+
+            var result = beatmaps.DeleteDifficulties(new[] { deletedBeatmap.ID, deletedBeatmap.ID });
+
+            Assert.That(result.PermanentlyDeletedDifficulties, Is.EqualTo(1));
+            Assert.That(result.SoftDeletedSets, Is.Zero);
+            Assert.That(result.SoftDeletedDifficulties, Is.Zero);
+
+            Realm.Run(r =>
+            {
+                var storedSet = r.Find<BeatmapSetInfo>(set.ID)!;
+                Assert.That(storedSet.DeletePending, Is.False);
+                Assert.That(storedSet.Beatmaps.Select(b => b.ID), Is.EquivalentTo(new[] { remainingBeatmap.ID }));
+                Assert.That(storedSet.Files.Any(f => f.File.Hash == deletedFileHash), Is.False);
+                Assert.That(storedSet.Files.Any(f => f.File.Hash == sharedFileHash), Is.True);
+            });
+        });
+
+        [Test]
+        public void TestDeleteDifficultiesFullyMatchedSetIsRestorable() => AddStep("delete all difficulties", () =>
+        {
+            BeatmapSetInfo set = createTwoDifficultySet();
+            var beatmapIds = set.Beatmaps.Select(b => b.ID).ToArray();
+            int fileCount = Realm.Run(r => r.Find<BeatmapSetInfo>(set.ID)!.Files.Count);
+
+            var result = beatmaps.DeleteDifficulties(beatmapIds);
+
+            Assert.That(result.PermanentlyDeletedDifficulties, Is.Zero);
+            Assert.That(result.SoftDeletedSets, Is.EqualTo(1));
+            Assert.That(result.SoftDeletedDifficulties, Is.EqualTo(beatmapIds.Length));
+
+            Realm.Run(r =>
+            {
+                var storedSet = r.Find<BeatmapSetInfo>(set.ID)!;
+                Assert.That(storedSet.DeletePending, Is.True);
+                Assert.That(storedSet.Beatmaps, Has.Count.EqualTo(beatmapIds.Length));
+                Assert.That(storedSet.Files, Has.Count.EqualTo(fileCount));
+            });
+
+            beatmaps.UndeleteAll();
+
+            Realm.Run(r => Assert.That(r.Find<BeatmapSetInfo>(set.ID)!.DeletePending, Is.False));
+        });
+
+        private BeatmapSetInfo createTwoDifficultySet()
+        {
+            var set = new BeatmapSetInfo();
+
+            Realm.Write(r =>
+            {
+                var fileStore = new RealmFileStore(Realm, LocalStorage);
+                var ruleset = r.All<RulesetInfo>().First();
+                var firstFile = fileStore.Add(new MemoryStream(new byte[] { 1 }), r);
+                var secondFile = fileStore.Add(new MemoryStream(new byte[] { 2 }), r);
+                var sharedFile = fileStore.Add(new MemoryStream(new byte[] { 3 }), r);
+                var first = new BeatmapInfo(ruleset, metadata: new BeatmapMetadata()) { Hash = firstFile.Hash, DifficultyName = "First", BeatmapSet = set };
+                var second = new BeatmapInfo(ruleset, metadata: new BeatmapMetadata()) { Hash = secondFile.Hash, DifficultyName = "Second", BeatmapSet = set };
+
+                set.Beatmaps.Add(first);
+                set.Beatmaps.Add(second);
+                set.Files.Add(new RealmNamedFileUsage(firstFile, "first.osu"));
+                set.Files.Add(new RealmNamedFileUsage(secondFile, "second.osu"));
+                set.Files.Add(new RealmNamedFileUsage(sharedFile, "audio.mp3"));
+                r.Add(set);
+            });
+
+            return Realm.Run(r => r.Find<BeatmapSetInfo>(set.ID)!.Detach());
+        }
     }
 }
