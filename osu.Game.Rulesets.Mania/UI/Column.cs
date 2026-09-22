@@ -457,6 +457,11 @@ namespace osu.Game.Rulesets.Mania.UI
                 ManiaJudgeHotPathTrace.RecordColumnOnPressed();
             }
 
+            // 取样必须先于路由判定：判定一落地，本次 note 即为「已判定」，触发源会改取「下一颗」或回退到
+            // 「上一个已判定对象」，后者会把上一颗的键音再触发一次（同名键音被发声池打断后从头重播）。
+            if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
+                sampleTriggerSource.Play();
+
             if (drawableRuleset?.ColumnRoutesInput == true)
             {
                 columnRoutedPressTarget = null;
@@ -471,9 +476,6 @@ namespace osu.Game.Rulesets.Mania.UI
                 if (entry != null)
                     applyRoutedPress(entry.RoutedObject, time, e);
             }
-
-            if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
-                sampleTriggerSource.Play();
 
             return false;
         }
