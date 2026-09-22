@@ -2,7 +2,7 @@
 <Project>
   <PropertyGroup Label="Ez2Lazer">
     <Ez2LazerFrameworkVersion>2026.921.0-ez2lazer</Ez2LazerFrameworkVersion>
-    <Ez2LazerGameResourcesVersion>2026.918.0-ez2lazer</Ez2LazerGameResourcesVersion>
+    <Ez2LazerGameResourcesVersion>2026.922.0-ez2lazer</Ez2LazerGameResourcesVersion>
 
     <!-- ../ for repo root siblings (osu/, osu-Agent/); ../../ for Agent/osu-Agent worktree. -->
     <_EzFwCandidate1>$(MSBuildThisFileDirectory)..\osu-framework\osu.Framework\osu.Framework.csproj</_EzFwCandidate1>
