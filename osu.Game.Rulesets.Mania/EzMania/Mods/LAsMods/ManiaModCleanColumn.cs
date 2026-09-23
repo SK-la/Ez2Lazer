@@ -79,6 +79,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         public int ApplyOrder => ApplyOrderIndex.Value;
 
+        /// <summary>
+        /// 诊断日志只在真的会被写盘时才构造。
+        /// </summary>
+        /// <remarks>
+        /// 下面这些消息内容是 <c>string.Join</c>、逐列统计与 O(谱面长度 × 列数) 的 <c>Count()</c>，
+        /// 而正式构建里 <see cref="Logger.Level"/> 高于 <see cref="LogLevel.Debug"/>，消息一律被丢弃——
+        /// 不挡掉就等于每次转换白烧一遍 CPU 与 GC。
+        /// </remarks>
+        private static bool DiagnosticLoggingEnabled => Logger.Enabled && Logger.Level <= LogLevel.Debug;
+
         private HashSet<int>? columnsToDelete;
         private int keys1;
         private int keys2;
@@ -161,11 +171,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 }
 
                 // 执行删除操作（后执行删除） —— 一次性过滤以避免大量 Remove 调用导致的 O(n*m) 行为
-                if (columnsToDelete.Any())
+                if (columnsToDelete.Count > 0)
                 {
-                    maniaBeatmap.HitObjects = maniaBeatmap.HitObjects
-                                                          .Where(h => !(h is ManiaHitObject maniaHitObject && columnsToDelete.Contains(maniaHitObject.Column)))
-                                                          .ToList();
+                    var kept = new List<ManiaHitObject>(maniaBeatmap.HitObjects.Count);
+
+                    foreach (var hitObject in maniaBeatmap.HitObjects)
+                    {
+                        if (!columnsToDelete.Contains(hitObject.Column))
+                            kept.Add(hitObject);
+                    }
+
+                    maniaBeatmap.HitObjects = kept;
                 }
             }
             catch
@@ -198,8 +214,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     return;
 
                 // 使用当前（转换后）hit objects作为输入，并按时间重建新谱面（类似 ManiaModNtoM 的做法）
-                var sourceHitObjects = beatmap.HitObjects.ToList();
-                Logger.Log($"[ManiaModCleanColumn] Using {sourceHitObjects.Count} source hit objects for reordering", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                // 不在开头复制一份：beatmap.HitObjects 直到本方法末尾才被整体替换，中途只读。
+                var sourceHitObjects = beatmap.HitObjects;
+
+                if (DiagnosticLoggingEnabled)
+                    Logger.Log($"[ManiaModCleanColumn] Using {sourceHitObjects.Count} source hit objects for reordering", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 // 构建列映射、清空列表和长按列表
                 Dictionary<int, int> columnMapping = new Dictionary<int, int>();
@@ -257,18 +276,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 var newObjects = new List<ManiaHitObject>(sourceHitObjects.Count);
 
                 // 显示实际源列的 note 分布（一次遍历统计以避免每列重复遍历）
-                int[] counts = new int[sourceColumns];
-
-                foreach (var h in sourceHitObjects)
+                if (DiagnosticLoggingEnabled)
                 {
-                    if (h.Column >= 0 && h.Column < sourceColumns)
-                        counts[h.Column]++;
+                    int[] sourceCounts = new int[sourceColumns];
+
+                    foreach (var h in sourceHitObjects)
+                    {
+                        if (h.Column >= 0 && h.Column < sourceColumns)
+                            sourceCounts[h.Column]++;
+                    }
+
+                    for (int i = 0; i < sourceColumns; i++)
+                        Logger.Log($"[ManiaModCleanColumn] Original column {i} has {sourceCounts[i]} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+
+                    Logger.Log($"[ManiaModCleanColumn] Column mapping: {string.Join(", ", columnMapping.Select(kv => $"{kv.Key}->{kv.Value}"))}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 }
-
-                for (int i = 0; i < sourceColumns; i++)
-                    Logger.Log($"[ManiaModCleanColumn] Original column {i} has {counts[i]} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                Logger.Log($"[ManiaModCleanColumn] Column mapping: {string.Join(", ", columnMapping.Select(kv => $"{kv.Key}->{kv.Value}"))}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 // 按时间重建：先把所有源 note 转为时间序列 locations，然后根据反向映射把 note 放到目标列
                 var locations = sourceHitObjects.OfType<Note>().Select(n => (
@@ -333,20 +355,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
                 if (rowRandomColumns.Count > 0)
                 {
-                    Logger.Log($"[ManiaModCleanColumn] Row-random enabled for target columns: {string.Join(", ", rowRandomColumns.OrderBy(c => c))}",
-                        Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                    if (DiagnosticLoggingEnabled)
+                    {
+                        Logger.Log($"[ManiaModCleanColumn] Row-random enabled for target columns: {string.Join(", ", rowRandomColumns.OrderBy(c => c))}",
+                            Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                    }
 
                     // 按每个起始时间作为一行：对每个 ? 目标列，从该行原始 note 随机抽取一个（也可能抽空）。
-                    var rows = locations.GroupBy(x => x.startTime)
-                                        .OrderBy(g => g.Key);
+                    // locations 已按 (startTime, column) 升序，同刻行是连续的一段，单趟扫描即可，
+                    // 不必再 GroupBy + OrderBy + 每行 ToList。
+                    int rowStart = 0;
 
-                    foreach (var row in rows)
+                    while (rowStart < locations.Count)
                     {
-                        var rowObjects = row.ToList();
-                        int rowCount = rowObjects.Count;
+                        double rowTime = locations[rowStart].startTime;
+                        int rowEnd = rowStart + 1;
 
-                        if (rowCount == 0)
-                            continue;
+                        while (rowEnd < locations.Count && locations[rowEnd].startTime == rowTime)
+                            rowEnd++;
+
+                        int rowCount = rowEnd - rowStart;
 
                         foreach (int target in rowRandomColumns)
                         {
@@ -356,7 +384,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                             if (pick == rowCount)
                                 continue;
 
-                            var loc = rowObjects[pick];
+                            var loc = locations[rowStart + pick];
 
                             if (loc.isHold)
                             {
@@ -379,6 +407,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                                 });
                             }
                         }
+
+                        rowStart = rowEnd;
                     }
                 }
 
@@ -395,28 +425,41 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     });
                 }
 
-                Logger.Log($"[ManiaModCleanColumn] Final result: {newObjects.Count} notes in {reorderRule.Length} columns", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                // 记录每个目标列的来源与最终 note 数量，便于调试空列问题
-                for (int t = 0; t < reorderRule.Length; t++)
+                if (DiagnosticLoggingEnabled)
                 {
-                    string info;
-                    if (clearColumns.Contains(t))
-                        info = "cleared (-)";
-                    else if (holdColumns.Contains(t))
-                        info = "hold (|)";
-                    else if (rowRandomColumns.Contains(t))
-                        info = "row-random (?)";
-                    else if (columnMapping.TryGetValue(t, out int value))
-                        info = $"mapped from source {value}";
-                    else
-                        info = "no mapping";
+                    Logger.Log($"[ManiaModCleanColumn] Final result: {newObjects.Count} notes in {reorderRule.Length} columns", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
-                    int count = newObjects.Count(h => h.Column == t);
-                    if (count == 0)
-                        Logger.Log($"[ManiaModCleanColumn] WARNING: target column {t} ({info}) has 0 notes after rebuild", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                    else
-                        Logger.Log($"[ManiaModCleanColumn] target column {t} ({info}) has {count} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                    // 记录每个目标列的来源与最终 note 数量，便于调试空列问题。
+                    // 单趟统计，避免每列各扫一遍 newObjects。
+                    int[] produced = new int[reorderRule.Length];
+
+                    foreach (var o in newObjects)
+                    {
+                        if (o.Column >= 0 && o.Column < produced.Length)
+                            produced[o.Column]++;
+                    }
+
+                    for (int t = 0; t < reorderRule.Length; t++)
+                    {
+                        string info;
+                        if (clearColumns.Contains(t))
+                            info = "cleared (-)";
+                        else if (holdColumns.Contains(t))
+                            info = "hold (|)";
+                        else if (rowRandomColumns.Contains(t))
+                            info = "row-random (?)";
+                        else if (columnMapping.TryGetValue(t, out int value))
+                            info = $"mapped from source {value}";
+                        else
+                            info = "no mapping";
+
+                        int count = produced[t];
+
+                        if (count == 0)
+                            Logger.Log($"[ManiaModCleanColumn] WARNING: target column {t} ({info}) has 0 notes after rebuild", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                        else
+                            Logger.Log($"[ManiaModCleanColumn] target column {t} ({info}) has {count} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                    }
                 }
 
                 // 更新谱面总列数以匹配重排后的列数，避免难度计算中基于 TotalColumns 分配数组时发生越界
