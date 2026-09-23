@@ -4,6 +4,7 @@
 #nullable disable
 
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
@@ -76,6 +77,23 @@ namespace osu.Game.Rulesets.Mania.Objects
         }
 
         public IList<IList<HitSampleInfo>> NodeSamples { get; set; }
+
+        public override HoldNote Clone()
+        {
+            var clone = (HoldNote)base.Clone();
+
+            // 头尾与 tick 是 ApplyDefaults 造出来的、指向原对象嵌套实例的字段：留着它们会让副本的
+            // Column/StartTime 写入传导到原对象的嵌套对象上。置空后由 ApplyDefaults 重建。
+            clone.Head = null;
+            clone.Tail = null;
+            clone.Body = null;
+            clone.Ticks = null;
+
+            // NodeSamples 是普通属性，MemberwiseClone 只复制引用；外层与内层列表都要复制才不共享。
+            clone.NodeSamples = NodeSamples?.Select(static node => (IList<HitSampleInfo>)node.ToList()).ToList();
+
+            return clone;
+        }
 
         /// <summary>
         /// The head note of the hold.

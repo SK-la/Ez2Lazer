@@ -43,7 +43,9 @@ namespace osu.Game.Rulesets.Objects
         // playfield to remain in memory.
         public event Action<HitObject> DefaultsApplied;
 
-        public readonly Bindable<double> StartTimeBindable = new BindableDouble();
+        // 只读属性（private set）而不是 public readonly 字段：Clone() 需要给副本换上自己的 bindable，
+        // 而外部调用方依然无法替换引用——对外保证与 readonly 字段一致。
+        public Bindable<double> StartTimeBindable { get; private set; } = new BindableDouble();
 
         /// <summary>
         /// The time at which the HitObject starts.
@@ -54,7 +56,7 @@ namespace osu.Game.Rulesets.Objects
             set => StartTimeBindable.Value = value;
         }
 
-        public readonly BindableList<HitSampleInfo> SamplesBindable = new BindableList<HitSampleInfo>();
+        public BindableList<HitSampleInfo> SamplesBindable { get; private set; } = new BindableList<HitSampleInfo>();
 
         /// <summary>
         /// The samples to be played when this hit object is hit.
@@ -91,7 +93,9 @@ namespace osu.Game.Rulesets.Objects
         [JsonIgnore]
         public HitWindows HitWindows { get; set; }
 
-        private readonly List<HitObject> nestedHitObjects = new List<HitObject>();
+        // 只读属性（private set）而不是 public readonly 字段：Clone() 需要给副本换上自己的列表，
+        // 而外部调用方依然无法替换引用。
+        private List<HitObject> nestedHitObjects = new List<HitObject>();
 
         [JsonIgnore]
         public SlimReadOnlyListWrapper<HitObject> NestedHitObjects => nestedHitObjects.AsSlimReadOnly();
@@ -159,6 +163,44 @@ namespace osu.Game.Rulesets.Objects
 
             HitWindows ??= CreateHitWindows();
             HitWindows?.SetDifficulty(difficulty.OverallDifficulty);
+        }
+
+        /// <summary>
+        /// Creates a copy of this hit object which owns everything <see cref="ApplyDefaults"/> and post-conversion mods write to.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The copy shares no bindable with the original: <see cref="StartTimeBindable"/> and <see cref="SamplesBindable"/>
+        /// are re-created (the <see cref="HitSampleInfo"/>s themselves are immutable and shared), and
+        /// <see cref="NestedHitObjects"/> is emptied with the cached judgement and hit windows dropped, for
+        /// <see cref="ApplyDefaults"/> to rebuild.
+        /// </para>
+        /// <para>
+        /// Subclass state is carried over as-is, so a subclass that holds its own bindable-backed property (or its own
+        /// nested objects) must override this to reset it — otherwise the copy still writes through to the original.
+        /// See <c>ManiaHitObject.Clone</c> and <c>HoldNote.Clone</c>.
+        /// </para>
+        /// <para>
+        /// Used by converters whose output must own its hit objects. Without it a converted beatmap aliases the decoded
+        /// source, and an in-place post-conversion mod (column or time rewrites, keysound remapping) writes straight
+        /// back into that source.
+        /// </para>
+        /// </remarks>
+        public virtual HitObject Clone()
+        {
+            var clone = (HitObject)MemberwiseClone();
+
+            clone.StartTimeBindable = new BindableDouble(StartTime);
+            clone.SamplesBindable = new BindableList<HitSampleInfo>();
+            clone.Samples = Samples;
+            clone.nestedHitObjects = new List<HitObject>();
+            clone.judgement = null;
+            clone.HitWindows = null;
+
+            // Subscribers belong to the original's lifetime; the copy must not announce itself to them.
+            clone.DefaultsApplied = null;
+
+            return clone;
         }
 
         protected virtual void CreateNestedHitObjects(CancellationToken cancellationToken)

@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Conversion
     /// </summary>
     /// <remarks>
     /// 只覆盖源谱面为官方 ruleset 的路径：该路径的转换产物是新对象，等价性是当前实现本就具备的性质。
-    /// 源谱面已是 mania 的路径（产物与源共享实例）由独立用例单独约束，见 P1a2 的所有权不变量测试。
+    /// 源谱面已是 mania 的路径（产物与源共享实例）由 <c>EzPlayableBeatmapOwnershipTest</c> 单独约束。
     /// </remarks>
     [TestFixture]
     public class EzPlayableBeatmapConversionEquivalenceTest

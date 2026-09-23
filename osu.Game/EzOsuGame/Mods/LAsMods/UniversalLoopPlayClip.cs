@@ -4,6 +4,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using osu.Framework.Bindables;
@@ -19,10 +20,20 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
     public class UniversalLoopPlayClip : ModLoopPlayClip, IApplicableAfterBeatmapConversion, IApplicableToBeatmapConverter
     {
         private static readonly MethodInfo memberwise_clone_method = typeof(object).GetMethod("MemberwiseClone", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        private static readonly FieldInfo? start_time_bindable_field = typeof(HitObject).GetField("StartTimeBindable", BindingFlags.Instance | BindingFlags.Public);
-        private static readonly FieldInfo? samples_bindable_field = typeof(HitObject).GetField("SamplesBindable", BindingFlags.Instance | BindingFlags.Public);
+        // 这两个 bindable 由 readonly 字段改成了只读属性（Clone 需要给副本换实例），反射也要跟着改 Property；
+        // 若仍用 GetField，字段会解析为 null，SetValue 静默失效，克隆对象就会与源对象共享时间轴 bindable。
+        private static readonly PropertyInfo? start_time_bindable_property = typeof(HitObject).GetProperty("StartTimeBindable", BindingFlags.Instance | BindingFlags.Public);
+        private static readonly PropertyInfo? samples_bindable_property = typeof(HitObject).GetProperty("SamplesBindable", BindingFlags.Instance | BindingFlags.Public);
         private static readonly FieldInfo? nested_hit_objects_field = typeof(HitObject).GetField("nestedHitObjects", BindingFlags.Instance | BindingFlags.NonPublic);
         private static readonly FieldInfo? defaults_applied_field = typeof(HitObject).GetField("DefaultsApplied", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        static UniversalLoopPlayClip()
+        {
+            // 反射查不到时 `?.SetValue` 会静默跳过：克隆体与源对象共享时间轴 bindable、不重置 DefaultsApplied，
+            // 表现是循环播放后时间漂移，而不是崩溃。DEBUG 下直接把「找不到」变成断言。
+            Debug.Assert(start_time_bindable_property?.GetSetMethod(true) != null, "HitObject.StartTimeBindable 反射解析失败");
+            Debug.Assert(samples_bindable_property?.GetSetMethod(true) != null, "HitObject.SamplesBindable 反射解析失败");
+        }
 
         private IBeatmap? converterBeatmap;
         private List<HitObject>? originalHitObjects;
@@ -370,10 +381,10 @@ namespace osu.Game.EzOsuGame.Mods.LAsMods
         private static void resetCloneState(HitObject clone, HitObject source)
         {
             var newStartBindable = new BindableDouble(source.StartTime);
-            start_time_bindable_field?.SetValue(clone, newStartBindable);
+            start_time_bindable_property?.SetValue(clone, newStartBindable);
 
             var newSamplesBindable = new BindableList<HitSampleInfo>();
-            samples_bindable_field?.SetValue(clone, newSamplesBindable);
+            samples_bindable_property?.SetValue(clone, newSamplesBindable);
 
             nested_hit_objects_field?.SetValue(clone, new List<HitObject>());
             defaults_applied_field?.SetValue(clone, null);
