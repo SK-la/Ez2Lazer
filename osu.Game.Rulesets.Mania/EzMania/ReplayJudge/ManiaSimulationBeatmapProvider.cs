@@ -3,10 +3,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mods;
@@ -25,8 +25,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     /// 也可能是 Race 里被多个 ghost 共享的实例。副本走与 live 完全相同的转换管线，避免依赖私有字段的反射深拷贝。
     /// </para>
     /// <para>
-    /// 键必须含 mods：随机类 Mod 的 Seed 会被 <c>EzModSeed</c> 写回 bindable，而 <c>Mod.Equals</c> /
-    /// <c>Mod.GetHashCode</c> 把设置纳入比较，所以用户重掷种子会得到新键并重新转换，不会拿到旧谱面。
+    /// 键必须含 mods：随机类 Mod 的 Seed 会被 <c>EzModSeed</c> 写回 bindable，而键在转换前就解析并带上 seed，
+    /// 所以用户重掷种子会得到新键并重新转换，不会拿到旧谱面。
     /// 缓存由 <see cref="ConditionalWeakTable{TKey,TValue}"/> 弱持有，working beatmap 被回收即随之释放。
     /// </para>
     /// <para>
@@ -69,33 +69,42 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             return buckets.GetValue(workingBeatmap, _ => new Bucket()).GetOrCreate(key, () =>
             {
-                var playable = workingBeatmap.GetPlayableBeatmap(scoreInfo.Ruleset, mods, cancellationToken);
+                var playable = workingBeatmap.GetPlayableBeatmap(scoreInfo.Ruleset, key.OrderedMods, cancellationToken);
                 ManiaBeatmapBinding.BindForSimulation(playable, environment.ManiaHitMode, providerOwned: true);
                 return playable;
             });
         }
 
         /// <summary>
-        /// 键的 mods 部分沿用 <c>BeatmapDifficultyCache.DifficultyCacheLookup</c> 的构造（按 Acronym 排序 + 深拷贝），
-        /// 借 <see cref="Mod"/> 自带的设置比较语义，不另发明序列化。
+        /// 键的 mods 部分走与 <c>BeatmapDifficultyCache.DifficultyCacheLookup</c> 相同的口径：
+        /// <see cref="EzModSignature"/>（保序 + 含解析后的 seed），不再按键名排序。
         /// </summary>
+        /// <remarks>
+        /// 快照同时是转换输入：<see cref="TryCreate"/> 拿 <see cref="orderedMods"/> 去转换，键与产物出自同一组设置。
+        /// </remarks>
         private readonly struct SimulationKey : IEquatable<SimulationKey>
         {
             private readonly string rulesetShortName;
             private readonly EzEnumHitMode hitMode;
             private readonly Mod[] orderedMods;
+            private readonly int modsSignature;
 
             public SimulationKey(string rulesetShortName, IReadOnlyList<Mod> mods, EzEnumHitMode hitMode)
             {
                 this.rulesetShortName = rulesetShortName;
                 this.hitMode = hitMode;
-                orderedMods = mods.OrderBy(m => m.Acronym).Select(m => m.DeepClone()).ToArray();
+
+                // 快照带出解析后的 seed（并写回 score 的 mod 实例），键才等于真正参与转换的那组设置。
+                orderedMods = EzModSignature.SnapshotForConversion(mods);
+                modsSignature = EzModSignature.Compute(orderedMods);
             }
+
+            public IReadOnlyList<Mod> OrderedMods => orderedMods;
 
             public bool Equals(SimulationKey other)
                 => hitMode == other.hitMode
                    && string.Equals(rulesetShortName, other.rulesetShortName, StringComparison.Ordinal)
-                   && orderedMods.SequenceEqual(other.orderedMods);
+                   && EzModSignature.SequenceEqual(orderedMods, other.orderedMods);
 
             public override bool Equals(object? obj) => obj is SimulationKey other && Equals(other);
 
@@ -105,9 +114,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                 hashCode.Add(rulesetShortName);
                 hashCode.Add((int)hitMode);
-
-                foreach (var mod in orderedMods)
-                    hashCode.Add(mod);
+                hashCode.Add(modsSignature);
 
                 return hashCode.ToHashCode();
             }

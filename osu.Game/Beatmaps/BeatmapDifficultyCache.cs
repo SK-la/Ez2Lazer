@@ -18,6 +18,7 @@ using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mods;
@@ -67,9 +68,16 @@ namespace osu.Game.Beatmaps
         private ModSettingChangeTracker? modSettingChangeTracker;
         private ScheduledDelegate? debouncedModSettingsChange;
 
+        private bool subscribedToWorkingBeatmapInvalidation;
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            // 谱面模型被换掉时，只订阅这里：BeatmapUpdater 的显式 Invalidate 覆盖不到
+            // ProcessObjectCounts / 外部同步工具等其他 working cache 失效路径。
+            beatmapManager.OnInvalidated += onWorkingBeatmapInvalidated;
+            subscribedToWorkingBeatmapInvalidation = true;
 
             currentRuleset.BindValueChanged(_ => Scheduler.AddOnce(updateTrackedBindables));
 
@@ -377,8 +385,20 @@ namespace osu.Game.Beatmaps
 
             modSettingChangeTracker?.Dispose();
 
+            if (subscribedToWorkingBeatmapInvalidation)
+            {
+                beatmapManager.OnInvalidated -= onWorkingBeatmapInvalidated;
+                subscribedToWorkingBeatmapInvalidation = false;
+            }
+
             cancelTrackedBindableUpdate();
             updateScheduler.Dispose();
+        }
+
+        private void onWorkingBeatmapInvalidated(WorkingBeatmap working)
+        {
+            // 同一份 BeatmapInfo 可能对应多个缓存条目（不同 mods），全部丢弃；键里也有 Hash，这里只是顺手回收内存。
+            Invalidate(lookup => lookup.BeatmapInfo.Equals(working.BeatmapInfo));
         }
 
         public readonly struct DifficultyCacheLookup : IEquatable<DifficultyCacheLookup>
@@ -387,28 +407,43 @@ namespace osu.Game.Beatmaps
             public readonly RulesetInfo Ruleset;
             public readonly Mod[] OrderedMods;
 
+            /// <summary>
+            /// 保序的 mod 指纹（含解析后的 seed），只用于 <see cref="GetHashCode"/>。
+            /// </summary>
+            /// <remarks>
+            /// 相等性不能只看指纹：指纹是 32 位哈希，"设置全为默认/null" 与 "设置为 0" 会撞（见
+            /// <see cref="EzModSignature.SequenceEqual"/>），那样会把一个设置的难度当成另一个设置的难度返回。
+            /// </remarks>
+            private readonly int modsSignature;
+
             public DifficultyCacheLookup(BeatmapInfo beatmapInfo, RulesetInfo? ruleset, IEnumerable<Mod>? mods)
             {
                 BeatmapInfo = beatmapInfo;
                 // In the case that the user hasn't given us a ruleset, use the beatmap's default ruleset.
                 Ruleset = ruleset ?? BeatmapInfo.Ruleset;
-                OrderedMods = mods?.OrderBy(m => m.Acronym).Select(mod => mod.DeepClone()).ToArray() ?? Array.Empty<Mod>();
+
+                var sourceMods = mods as IReadOnlyList<Mod> ?? mods?.ToList();
+
+                // 保留调用方顺序：转换 mod 之间只有 ApplyOrder 相等时才按列表序生效，按键名排序会把两种顺序并成一个键。
+                // 快照带出解析后的 seed，键才等于真正参与转换的那组设置。
+                OrderedMods = EzModSignature.SnapshotForConversion(sourceMods);
+                modsSignature = EzModSignature.Compute(OrderedMods);
             }
 
             public bool Equals(DifficultyCacheLookup other)
                 => BeatmapInfo.Equals(other.BeatmapInfo)
+                   && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
                    && Ruleset.Equals(other.Ruleset)
-                   && OrderedMods.SequenceEqual(other.OrderedMods);
+                   && EzModSignature.SequenceEqual(OrderedMods, other.OrderedMods);
 
             public override int GetHashCode()
             {
                 var hashCode = new HashCode();
 
                 hashCode.Add(BeatmapInfo.ID);
+                hashCode.Add(BeatmapInfo.Hash);
                 hashCode.Add(Ruleset.ShortName);
-
-                foreach (var mod in OrderedMods)
-                    hashCode.Add(mod);
+                hashCode.Add(modsSignature);
 
                 return hashCode.ToHashCode();
             }
