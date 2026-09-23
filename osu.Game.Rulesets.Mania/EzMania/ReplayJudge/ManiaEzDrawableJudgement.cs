@@ -3,10 +3,13 @@
 
 using System;
 using System.Runtime.CompilerServices;
+using osu.Framework.Extensions.TypeExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
+using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings;
 using osu.Game.Rulesets.Mania.Objects;
@@ -37,6 +40,34 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         public static bool CanRouteToKPoor(DrawableNote note) => GetBmsState(note).CanRouteToKPoor;
 
         public static bool CanRouteToKPoor(DrawableHoldNoteTail tail) => GetBmsState(tail).CanRouteToKPoor;
+
+        /// <summary>
+        /// 应用判定结果前的区间校验。判定区间来自 <see cref="osu.Game.Rulesets.Objects.HitObject.Judgement"/> 的绑定，
+        /// 若该实例被异 hitmode 绑定改写过（见 <see cref="ManiaBeatmapBinding"/>），内核给出的结果会落在区间外，
+        /// 直接交给 <c>DrawableHitObject.ApplyResult</c> 会抛 <see cref="InvalidOperationException"/> 中断整局。
+        /// 这里降级为「不计分的合法结果」并计数告警——仿真已在独立副本上判定，这里是 Release 的最后一道兜底，
+        /// 命中即说明上游绑定出了问题，故计数不受诊断开关控制。
+        /// </summary>
+        internal static HitResult SanitizeResult(DrawableManiaHitObject drawable, HitResult result)
+            => SanitizeResult(drawable.Result?.Judgement, result, drawable.EzDrawableManiaRuleset?.JudgementRound?.Environment.ManiaHitMode);
+
+        /// <summary>区间校验与降级决策本体（与 Drawable 解耦，便于单测）。</summary>
+        internal static HitResult SanitizeResult(Judgement? judgement, HitResult result, EzEnumHitMode? hitMode)
+        {
+            if (judgement == null || result.IsValidHitResult(judgement.MinResult, judgement.MaxResult))
+                return result;
+
+            var downgraded = HitResult.IgnoreHit.IsValidHitResult(judgement.MinResult, judgement.MaxResult)
+                ? HitResult.IgnoreHit
+                : judgement.MinResult;
+
+            ManiaJudgeHotPathTrace.RecordJudgementResultDowngrade();
+
+            Logger.Log($"[ManiaJudgeBinding] result {result} outside [{judgement.MinResult} ... {judgement.MaxResult}] "
+                       + $"(judgement={judgement.GetType().ReadableName()}, hitmode={hitMode?.ToString() ?? "unknown"}); downgraded to {downgraded}", Ez2ConfigManager.LOGGER_NAME);
+
+            return downgraded;
+        }
 
         public static bool ShouldHideTailDisplayResult(ManiaJudgementRound? round)
             => round?.Environment.ManiaHitMode == EzEnumHitMode.O2Jam;

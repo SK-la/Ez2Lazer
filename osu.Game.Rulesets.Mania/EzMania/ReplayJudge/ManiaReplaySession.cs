@@ -90,6 +90,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             var simulationEnvironment = createSimulationEnvironment(environment);
 
+            // 本局 live beatmap 不能被仿真原地改写（见 ManiaSimulationBeatmap）：hitmode 不一致时改用脱离副本。
+            beatmap = ManiaSimulationBeatmap.PrepareForSimulation(beatmap, simulationEnvironment);
+
             // 先 Align + 绑定 Judgement，再 ApplyBeatmap，避免 MaximumBaseScore 按官方尾 Perfect 虚高。
             ManiaWindowBaker.Align(beatmap, simulationEnvironment);
             ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, simulationEnvironment.ManiaHitMode);

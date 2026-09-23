@@ -239,6 +239,9 @@ namespace osu.Game.Rulesets.Mania.UI
             ManiaWindowBaker.AlignForLive(Beatmap, JudgementRound.Environment);
             ManiaEnvironmentJudgements.ApplyToBeatmap(Beatmap, JudgementRound.Environment.ManiaHitMode);
 
+            // 本局 live 实例：退出前禁止任何异 hitmode 的仿真原地改写它。
+            ManiaLiveBeatmapRegistry.RegisterLive(Beatmap, JudgementRound.Environment.ManiaHitMode);
+
             hitModeBindable.BindValueChanged(h =>
             {
                 // 仅在“本局本地游玩尚未完成”期间锁定 HitMode，避免中途更改破坏一致性。
@@ -477,6 +480,9 @@ namespace osu.Game.Rulesets.Mania.UI
 
         protected override void Dispose(bool isDisposing)
         {
+            if (isDisposing)
+                ManiaLiveBeatmapRegistry.UnregisterLive(Beatmap);
+
             base.Dispose(isDisposing);
 
             if (currentSkin.IsNotNull())

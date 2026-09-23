@@ -102,6 +102,8 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         internal override void EzApplyFinalResult(HitResult result, EzEnumHitMode hitMode)
         {
+            result = ManiaEzDrawableJudgement.SanitizeResult(this, result);
+
             ApplyResult(static (r, data) =>
             {
                 r.Type = data.result;

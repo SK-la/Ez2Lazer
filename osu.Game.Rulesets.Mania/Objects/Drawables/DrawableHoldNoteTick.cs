@@ -40,7 +40,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         }
 
         internal void EzApplyTickResult(HitResult result)
-            => ApplyResult(static (r, t) => r.Type = t, result);
+            => ApplyResult(static (r, t) => r.Type = t, ManiaEzDrawableJudgement.SanitizeResult(this, result));
 
         internal void UpdateTickResult() => UpdateResult(false);
     }

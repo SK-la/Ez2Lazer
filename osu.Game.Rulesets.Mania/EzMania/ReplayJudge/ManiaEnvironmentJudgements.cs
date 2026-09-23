@@ -39,6 +39,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             foreach (var hitObject in beatmap.HitObjects)
                 applyRecursive(hitObject, hitMode);
+
+            // 登记绑定结果：跨 hitmode 复用同一实例时 ManiaSimulationBeatmap 需要据此判断能否原地改写。
+            ManiaLiveBeatmapRegistry.NotifyBound(beatmap, hitMode);
         }
 
         private static void applyRecursive(HitObject hitObject, EzEnumHitMode hitMode)
