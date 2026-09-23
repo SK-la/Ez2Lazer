@@ -60,6 +60,25 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
             Assert.That(actual.ToString(), Is.EqualTo(golden));
         }
 
+        /// <summary>
+        /// 空谱面（无 note）+ 改键数：矩阵为 0 行，下游所有 span 访问都必须退化成空操作而不是越界。
+        /// </summary>
+        [Test]
+        public void TestEmptyChartWithKeyChangeDoesNotThrow()
+        {
+            foreach (int targetKeys in new[] { 5, 9 })
+            {
+                var beatmap = new ManiaBeatmap(new StageDefinition(7));
+                beatmap.Difficulty.CircleSize = 7;
+                beatmap.BeatmapInfo.Difficulty.CircleSize = 7;
+                beatmap.BeatmapInfo.BPM = 120;
+                beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = 500 });
+
+                Assert.DoesNotThrow(() => KrrN2NcConverter.Transform(beatmap, new KrrOptions { TargetKeys = targetKeys, Seed = 1 }));
+                Assert.That(beatmap.HitObjects, Is.Empty, $"目标键数 {targetKeys}：空谱面不应被补出 note");
+            }
+        }
+
         private static string serialise(ManiaBeatmap beatmap)
         {
             var builder = new StringBuilder();
