@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
@@ -24,6 +25,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         private readonly HitObjectContainer hitObjectContainer;
         private readonly ManiaLaneController? laneController;
         private readonly Ez2ConfigManager ezConfig;
+        private readonly Bindable<EzEnumHitMode> hitMode;
+        private readonly Bindable<bool> judgmentDiagEnabled;
+
+        // 每判定复用同一批缓冲：候选与后判对象只在本次调用内有效，不去分配新的 List。
+        private readonly List<PrecedenceCandidate> candidateBuffer = new List<PrecedenceCandidate>();
+        private readonly List<DrawableHitObject> postJudgedBuffer = new List<DrawableHitObject>();
+        private readonly List<PrecedenceCandidate> sortedBuffer = new List<PrecedenceCandidate>();
+
         private const string log_prefix = "[JudgeDiag][PolicyHelper]";
 
         public OrderedHitPolicyHelper(HitObjectContainer hitObjectContainer, ManiaLaneController? laneController = null)
@@ -31,53 +40,83 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             this.hitObjectContainer = hitObjectContainer;
             this.laneController = laneController;
             ezConfig = GlobalConfigStore.EzConfig;
+
+            // 缓存 bindable：命中模式与诊断开关在一次按键里要被读好几次，没必要每次都走配置查询。
+            hitMode = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            judgmentDiagEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzJudgmentDiagEnabled);
         }
+
+        private bool JudgmentDiagEnabled => judgmentDiagEnabled.Value;
 
         public bool IsHittableWithPrecedence(DrawableHitObject hitObject, double time, EzEnumJudgePrecedence? precedenceOverride = null)
         {
             var judgePrecedence = precedenceOverride ?? ezConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
+            bool isBmsMode = isBMS();
 
             if (laneController != null && hitObject is not (DrawableHoldNoteTail or DrawableHoldNote))
                 return laneController.IsHittable(hitObject, time, judgePrecedence);
 
-            if (isBMS())
+            collectOverlappingCandidates(time, candidateBuffer);
+
+            if (isBmsMode)
             {
-                var postJudged = getPostBadJudgedObjects(time).ToList();
+                collectPostBadJudgedObjects(time, postJudgedBuffer);
 
-                if (postJudged.Count > 0)
+                if (postJudgedBuffer.Count > 0)
                 {
-                    var nearestPostJudged = postJudged
-                                            .OrderBy(o => distanceToNonBadWindow(o, time))
-                                            .ThenBy(o => o.HitObject.StartTime)
-                                            .First();
+                    // 等价于 OrderBy(distance).ThenBy(StartTime).First()：按 (距离, 开始时间) 取最小，并列时保留先出现的。
+                    DrawableHitObject nearestPostJudged = postJudgedBuffer[0];
+                    double nearestPostJudgedDistance = distanceToNonBadWindow(nearestPostJudged, time);
 
-                    double postJudgedDistance = distanceToNonBadWindow(nearestPostJudged, time);
+                    for (int i = 1; i < postJudgedBuffer.Count; i++)
+                    {
+                        var candidate = postJudgedBuffer[i];
+                        double distance = distanceToNonBadWindow(candidate, time);
 
-                    double nearestUnjudgedDistance = getOverlappingCandidates(time)
-                                                     .Where(o => !o.IsJudged)
-                                                     .Select(o => distanceToNonBadWindow(o, time))
-                                                     .DefaultIfEmpty(double.PositiveInfinity)
-                                                     .Min();
+                        if (distance < nearestPostJudgedDistance
+                            || (distance == nearestPostJudgedDistance && candidate.HitObject.StartTime < nearestPostJudged.HitObject.StartTime))
+                        {
+                            nearestPostJudged = candidate;
+                            nearestPostJudgedDistance = distance;
+                        }
+                    }
 
-                    if (postJudgedDistance <= nearestUnjudgedDistance)
+                    double nearestUnjudgedDistance = double.PositiveInfinity;
+
+                    for (int i = 0; i < candidateBuffer.Count; i++)
+                    {
+                        var candidate = candidateBuffer[i];
+
+                        if (candidate.IsJudged)
+                            continue;
+
+                        nearestUnjudgedDistance = Math.Min(nearestUnjudgedDistance, distanceToNonBadWindow(candidate, time));
+                    }
+
+                    if (nearestPostJudgedDistance <= nearestUnjudgedDistance)
                         return hitObject == nearestPostJudged;
                 }
             }
 
             // 获取所有与当前时间重叠的活跃路由候选。
-            var overlappingCandidates = getOverlappingCandidates(time).ToList();
-
-            if (overlappingCandidates.Count == 0)
+            if (candidateBuffer.Count == 0)
             {
-                logDiag($"t={time:F3} no-overlap target={describe(hitObject)}");
+                if (JudgmentDiagEnabled)
+                    logDiag($"t={time:F3} no-overlap target={describe(hitObject)}");
+
                 return true;
             }
 
             // 应用优先级策略来确定哪个对象应该被击中
-            var selected = selectByPrecedence(overlappingCandidates, time, judgePrecedence, allowFallbackToEarliest: isBMS());
-            logDiag(
-                $"t={time:F3} mode={(isBMS() ? "bms" : "non-bms")} precedence={judgePrecedence} target={describe(hitObject)} " +
-                $"overlap=[{string.Join(", ", overlappingCandidates.Select(describe))}] selected={describe(selected)}");
+            var selected = selectByPrecedence(candidateBuffer, time, judgePrecedence, allowFallbackToEarliest: isBmsMode);
+
+            if (JudgmentDiagEnabled)
+            {
+                logDiag(
+                    $"t={time:F3} mode={(isBmsMode ? "bms" : "non-bms")} precedence={judgePrecedence} target={describe(hitObject)} " +
+                    $"overlap=[{string.Join(", ", candidateBuffer.Select(describe))}] selected={describe(selected)}");
+            }
+
             return selected?.RoutedObject == hitObject;
         }
 
@@ -103,12 +142,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             => Math.Abs(t1NoteTime - pressTime) > Math.Abs(t2NoteTime - pressTime);
 
         /// <summary>
-        /// 获取所有判定窗口与给定时间重叠的活跃击打对象。
+        /// 收集所有判定窗口与给定时间重叠的活跃击打对象，写入调用方提供的缓冲（不清空）。
         /// </summary>
         /// <param name="time">检查重叠对象的时间点。</param>
-        /// <returns>重叠的可绘制击打对象的可枚举集合。</returns>
-        private IEnumerable<PrecedenceCandidate> getOverlappingCandidates(double time)
+        /// <param name="buffer">接收候选的缓冲，调用前应已清空。</param>
+        private void collectOverlappingCandidates(double time, List<PrecedenceCandidate> buffer)
         {
+            buffer.Clear();
+
             foreach (var obj in hitObjectContainer.AliveObjects)
             {
                 if (!tryCreatePressCandidate(obj, out var candidate))
@@ -119,7 +160,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
                 // 检查时间是否落在此对象的判定窗口内
                 if (time >= candidate.StartTime - earlyWindow && time <= candidate.StartTime + lateWindow)
-                    yield return candidate;
+                    buffer.Add(candidate);
             }
         }
 
@@ -154,15 +195,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             return true;
         }
 
-        private IEnumerable<DrawableHitObject> getPostBadJudgedObjects(double time)
+        private void collectPostBadJudgedObjects(double time, List<DrawableHitObject> buffer)
         {
+            buffer.Clear();
+
             foreach (var obj in hitObjectContainer.AliveObjects)
             {
                 if (!obj.Judged || !isWithinMissWindow(obj, time))
                     continue;
 
                 if (isPostBadKPoorRoutable(obj))
-                    yield return obj;
+                    buffer.Add(obj);
             }
         }
 
@@ -244,15 +287,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         /// 根据优先级策略选择当前输入应命中的对象。
         /// BMS 模式走折叠比较；其它模式走通用优先级。
         /// </summary>
-        /// <param name="candidates">候选击打对象列表。</param>
+        /// <param name="candidateList">候选击打对象列表（不会被修改）。</param>
         /// <param name="time">当前时间（按键时间）。</param>
         /// <param name="precedence">要使用的优先级策略。</param>
         /// <param name="allowFallbackToEarliest">没有候选能产生常规判定时，是否回退到最早候选。</param>
         /// <returns>选中的击打对象，如果没有候选则返回 null。</returns>
-        private PrecedenceCandidate? selectByPrecedence(IEnumerable<PrecedenceCandidate> candidates, double time, EzEnumJudgePrecedence precedence, bool allowFallbackToEarliest)
+        private PrecedenceCandidate? selectByPrecedence(IReadOnlyList<PrecedenceCandidate> candidateList, double time, EzEnumJudgePrecedence precedence, bool allowFallbackToEarliest)
         {
-            var candidateList = candidates.ToList();
-
             if (candidateList.Count == 0)
                 return null;
 
@@ -263,23 +304,65 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             switch (precedence)
             {
                 case EzEnumJudgePrecedence.Duration:
-                    var orderedD = candidateList.OrderBy(c => c.StartTime).ToList();
+                    var orderedD = sortByStartTime(candidateList);
                     var pickedD = selectFoldCandidate(orderedD, time, comboAlgorithm: false);
                     return pickedD ?? (allowFallbackToEarliest ? orderedD[0] : null);
 
                 case EzEnumJudgePrecedence.Combo:
-                    var orderedC = candidateList.OrderBy(c => c.StartTime).ToList();
+                    var orderedC = sortByStartTime(candidateList);
                     var pickedC = selectFoldCandidate(orderedC, time, comboAlgorithm: true);
                     return pickedC ?? (allowFallbackToEarliest ? orderedC[0] : null);
 
                 case EzEnumJudgePrecedence.Earliest:
                 default:
-                    return candidateList.OrderBy(c => c.StartTime).First();
+                    // 等价于 OrderBy(StartTime).First()：并列时取先出现的。
+                    var earliest = candidateList[0];
+
+                    for (int i = 1; i < candidateList.Count; i++)
+                    {
+                        if (candidateList[i].StartTime < earliest.StartTime)
+                            earliest = candidateList[i];
+                    }
+
+                    return earliest;
             }
         }
 
+        /// <summary>
+        /// 按开始时间稳定排序到内部复用缓冲，等价于 <c>OrderBy(c => c.StartTime).ToList()</c> 但不分配。
+        /// </summary>
+        /// <remarks>返回的列表在下一次调用本方法时被覆写，只可在当前选择流程内使用。</remarks>
+        private IReadOnlyList<PrecedenceCandidate> sortByStartTime(IReadOnlyList<PrecedenceCandidate> source)
+        {
+            sortedBuffer.Clear();
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                var item = source[i];
+                int j = sortedBuffer.Count;
+
+                // 严格大于才后移，保证与 OrderBy 相同的稳定性（等值保持原有先后）。
+                while (j > 0 && sortedBuffer[j - 1].StartTime > item.StartTime)
+                {
+                    if (j == sortedBuffer.Count)
+                        sortedBuffer.Add(sortedBuffer[j - 1]);
+                    else
+                        sortedBuffer[j] = sortedBuffer[j - 1];
+
+                    j--;
+                }
+
+                if (j == sortedBuffer.Count)
+                    sortedBuffer.Add(item);
+                else
+                    sortedBuffer[j] = item;
+            }
+
+            return sortedBuffer;
+        }
+
         private bool isBMS()
-            => HitModeHelper.IsBMSHitMode(ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode));
+            => HitModeHelper.IsBMSHitMode(hitMode.Value);
 
         public static DrawableHitObject? SelectFoldDrawable(IReadOnlyList<DrawableHitObject> sortedByStartTime, double pressTime, bool comboAlgorithm)
         {
