@@ -449,10 +449,13 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InputAudioLatencyTracker.Instance?.RecordColumnPress(Index);
 
+            // 按键历史是 Ez 被动 miss stored TimeOffset 的输入（ManiaDrawableMissTiming → Session parity），
+            // 保留时长也由判定窗口算出，属生产数据；只有计数埋点受 ManiaJudgeHotPathTrace.Enabled 控制。
+            pressTimes.Add(time);
+            pressTimes.Trim(time - pressHistoryRetentionMs);
+
             if (ManiaJudgeHotPathTrace.Enabled)
             {
-                pressTimes.Add(time);
-                pressTimes.Trim(time - pressHistoryRetentionMs);
                 ManiaJudgeHotPathTrace.RecordPressTimesCount(pressTimes.Count);
                 ManiaJudgeHotPathTrace.RecordColumnOnPressed();
             }
