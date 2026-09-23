@@ -20,11 +20,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         {
             var newColumnObjects = new List<ManiaHitObject>();
             var locations = column.OfType<Note>().Select(n => (startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                                  .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
-                                      (startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))
-                                      //(startTime: h.EndTime, samples: h.GetNodeSamples(1))
-                                  }))
+                                  //(startTime: h.EndTime, samples: h.GetNodeSamples(1))
+                                  .Concat(column.OfType<HoldNote>().Select(h => (startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))))
                                   .OrderBy(h => h.startTime).ToList();
 
             for (int i = 0; i < locations.Count; i++)
@@ -71,10 +68,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                                      double mu1Dmu2 = -1)
         {
             var locations = oldObjects.OfType<Note>().Select(n => (column: n.Column, startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                                      .Concat(oldObjects.OfType<HoldNote>().SelectMany(h => new[]
-                                      {
-                                          (column: h.Column, startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))
-                                      }))
+                                      .Concat(oldObjects.OfType<HoldNote>().Select(h => (column: h.Column, startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))))
                                       .OrderBy(h => h.startTime).ToList();
             var maniaBeatmap = (ManiaBeatmap)beatmap;
             int keys = maniaBeatmap.TotalColumns;
@@ -202,10 +196,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             var originalLNObjects = new List<ManiaHitObject>();
             var newColumnObjects = new List<ManiaHitObject>();
             var locations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
-                                  .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
-                                      (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
-                                  }))
+                                  .Concat(column.OfType<HoldNote>().Select(h => (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)))
                                   .OrderBy(h => h.startTime).ToList();
 
             for (int i = 0; i < locations.Count - 1; i++)

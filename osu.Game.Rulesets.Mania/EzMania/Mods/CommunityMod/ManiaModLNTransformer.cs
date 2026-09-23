@@ -60,7 +60,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             var rng = new Random(seed);
 
             var newObjects = new List<ManiaHitObject>();
-            var oldObjects = maniaBeatmap.HitObjects.ToList();
             var originalLNObjects = new List<ManiaHitObject>();
 
             if (Level.Value == -3)
@@ -76,7 +75,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 ManiaModYuModHelper.SelectRandomColumns(rng, keys, transformColumnNum == 0 ? keys : transformColumnNum, randomColumns);
                 int gap = Gap.Value;
 
-                foreach (var timeGroup in oldObjects.GroupBy(x => x.StartTime))
+                // GroupBy 会先把整份 HitObjects 缓冲成查找表再遍历，替换发生在循环之后，所以不必先复制一份列表。
+                foreach (var timeGroup in maniaBeatmap.HitObjects.GroupBy(x => x.StartTime))
                 {
                     foreach (var note in timeGroup)
                     {
@@ -211,11 +211,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public List<ManiaHitObject> Invert(IBeatmap beatmap, List<ManiaHitObject> newObjects, Random rng, IGrouping<int, ManiaHitObject> column)
         {
             var locations = column.OfType<Note>().Select(n => (column: n.Column, startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
-                                  .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
-                                      (column: h.Column, startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
-                                      //(startTime: h.EndTime, samples: h.GetNodeSamples(1)) Invert Mod Bug
-                                  }))
+                                  //(startTime: h.EndTime, samples: h.GetNodeSamples(1)) Invert Mod Bug
+                                  .Concat(column.OfType<HoldNote>().Select(h => (column: h.Column, startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)))
                                   .OrderBy(h => h.startTime).ToList();
 
             var newColumnObjects = new List<ManiaHitObject>();
@@ -287,11 +284,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public List<ManiaHitObject> TrueRandom(IBeatmap beatmap, List<ManiaHitObject> newObjects, Random rng, IGrouping<int, ManiaHitObject> column)
         {
             var locations = column.OfType<Note>().Select(n => (column: n.Column, startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                                  .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
-                                      (column: h.Column, startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))
-                                      //(startTime: h.EndTime, samples: h.GetNodeSamples(1))
-                                  }))
+                                  //(startTime: h.EndTime, samples: h.GetNodeSamples(1))
+                                  .Concat(column.OfType<HoldNote>().Select(h => (column: h.Column, startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))))
                                   .OrderBy(h => h.startTime).ToList();
 
             var newColumnObjects = new List<ManiaHitObject>();

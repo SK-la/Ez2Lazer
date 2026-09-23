@@ -309,10 +309,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 var newColumnObjects = new List<ManiaHitObject>();
 
                 var cleanLocations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
-                                           .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                           {
-                                               (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
-                                           }))
+                                           .Concat(column.OfType<HoldNote>().Select(h => (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)))
                                            .OrderBy(h => h.startTime).ToList();
 
                 // 该列理论上至少有一个 Note/HoldNote；万一没有（前置 mod 残留了其它类型），跳过而不是越界。
