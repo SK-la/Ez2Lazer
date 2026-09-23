@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
@@ -18,10 +19,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     {
         public static void Align(IBeatmap beatmap, IGameplayEnvironment environment)
         {
-            bool isO2Jam = environment.ManiaHitMode == EzEnumHitMode.O2Jam;
+            ArgumentNullException.ThrowIfNull(environment);
+
+            Align(beatmap, environment.ManiaHitMode);
+        }
+
+        /// <summary>
+        /// 烘焙本体：只依赖 hitmode，live / 仿真 / Race 共用同一份实现。
+        /// </summary>
+        public static void Align(IBeatmap beatmap, EzEnumHitMode hitMode)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+
+            bool isO2Jam = hitMode == EzEnumHitMode.O2Jam;
 
             foreach (var hitObject in beatmap.HitObjects)
-                alignRecursive(hitObject, beatmap, environment, isO2Jam);
+                alignRecursive(hitObject, beatmap, hitMode, isO2Jam);
         }
 
         /// <summary>
@@ -29,17 +42,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// </summary>
         public static void AlignForLive(IBeatmap beatmap, IGameplayEnvironment environment)
         {
+            ArgumentNullException.ThrowIfNull(environment);
+
             if (environment.ManiaHitMode == EzEnumHitMode.O2Jam)
                 O2HitModeExtension.InitializeRuntime(beatmap);
 
-            Align(beatmap, environment);
+            Align(beatmap, environment.ManiaHitMode);
         }
 
-        private static void alignRecursive(HitObject hitObject, IBeatmap beatmap, IGameplayEnvironment environment, bool isO2Jam)
+        private static void alignRecursive(HitObject hitObject, IBeatmap beatmap, EzEnumHitMode hitMode, bool isO2Jam)
         {
             if (hitObject.HitWindows is ManiaHitWindows maniaHitWindows)
             {
-                maniaHitWindows.SetHitMode(environment.ManiaHitMode);
+                maniaHitWindows.SetHitMode(hitMode);
 
                 // O2Jam：按物件 StartTime 写入基线 BPM（auto-miss / note-lock 扫描用）。
                 // 用户触发判定走 press-time BPM，不 mutate 物件窗口。
@@ -48,7 +63,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             }
 
             foreach (var nested in hitObject.NestedHitObjects)
-                alignRecursive(nested, beatmap, environment, isO2Jam);
+                alignRecursive(nested, beatmap, hitMode, isO2Jam);
         }
     }
 }

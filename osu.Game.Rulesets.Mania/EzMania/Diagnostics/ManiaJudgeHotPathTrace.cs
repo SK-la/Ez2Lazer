@@ -18,6 +18,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
         private static long columnOnPressedCalls;
         private static long autoMissSkipped;
         private static long missStoredOffsetResolves;
+
+        // 「一个实例一个 hitmode」的缺陷信号：故意不受 EzJudgmentDiagnostics.Enabled 控制，
+        // 否则诊断开关关掉时缺陷会被静默吞掉。
+        private static long beatmapRebindConflicts;
+        private static long judgementResultDowngrades;
+        private static long simulationBeatmapFallbacks;
+
         private static long pressTimesSnapshotAllocations;
         private static long maxObservedPressTimesCount;
 #if DEBUG
@@ -49,6 +56,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
         public static long AutoMissSkipped => Interlocked.Read(ref autoMissSkipped);
 
         public static long MissStoredOffsetResolves => Interlocked.Read(ref missStoredOffsetResolves);
+
+        /// <summary><c>ManiaBeatmapBinding</c> 观察到的「同一实例被绑到不同 hitmode」次数。</summary>
+        public static long BeatmapRebindConflicts => Interlocked.Read(ref beatmapRebindConflicts);
+
+        /// <summary><c>ManiaEzDrawableJudgement.SanitizeResult</c> 实际降级次数。</summary>
+        public static long JudgementResultDowngrades => Interlocked.Read(ref judgementResultDowngrades);
+
+        /// <summary><c>ManiaReplaySessionService</c> 无法产出隔离副本、回退到调用方实例的次数。</summary>
+        public static long SimulationBeatmapFallbacks => Interlocked.Read(ref simulationBeatmapFallbacks);
 
         public static long PressTimesSnapshotAllocations => Interlocked.Read(ref pressTimesSnapshotAllocations);
 
@@ -179,6 +195,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
                 Interlocked.Increment(ref missStoredOffsetResolves);
         }
 
+        public static void RecordBeatmapRebindConflict() => Interlocked.Increment(ref beatmapRebindConflicts);
+
+        public static void RecordJudgementResultDowngrade() => Interlocked.Increment(ref judgementResultDowngrades);
+
+        public static void RecordSimulationBeatmapFallback() => Interlocked.Increment(ref simulationBeatmapFallbacks);
+
         public static void RecordPressTimesCount(int count) => updateMaxObservedPressTimesCount(count);
 
         private static void updateMaxObservedPressTimesCount(int count)
@@ -223,6 +245,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
             Interlocked.Exchange(ref columnOnPressedCalls, 0);
             Interlocked.Exchange(ref autoMissSkipped, 0);
             Interlocked.Exchange(ref missStoredOffsetResolves, 0);
+            Interlocked.Exchange(ref beatmapRebindConflicts, 0);
+            Interlocked.Exchange(ref judgementResultDowngrades, 0);
+            Interlocked.Exchange(ref simulationBeatmapFallbacks, 0);
             Interlocked.Exchange(ref pressTimesSnapshotAllocations, 0);
             Interlocked.Exchange(ref maxObservedPressTimesCount, 0);
 #if DEBUG
@@ -243,13 +268,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
         public static string FormatSummary()
             => $"IsHittable={IsHittableCalls} CheckForResult={CheckForResultCalls} O2Bpm={O2BpmLookups} "
                + $"ColPress={ColumnOnPressedCalls} DPress={DrawableOnPressedCalls} AutoMissSkip={AutoMissSkipped} "
-               + $"MissOffset={MissStoredOffsetResolves} PressSnapAlloc={PressTimesSnapshotAllocations} PressTimesMax={MaxObservedPressTimesCount}"
+               + $"MissOffset={MissStoredOffsetResolves} PressSnapAlloc={PressTimesSnapshotAllocations} PressTimesMax={MaxObservedPressTimesCount} "
+               + $"BindConflict={BeatmapRebindConflicts} ResultDowngrade={JudgementResultDowngrades} SimFallback={SimulationBeatmapFallbacks}"
 #if DEBUG
                + $" HoldUpdate={HoldUpdateCalls} HoldTickScanVisits={HoldTickScanVisits} HoldTickUpdates={HoldTickUpdates} HoldTickScanMax={MaxObservedHoldTickScanVisits} "
                + $"QueueRebuild={InputQueueRebuilds} QueueReuse={InputQueueReuses} QueueScanned={InputQueueScannedDrawables} "
                + $"QueueHoldEnds={InputQueueHoldEnds} QueueLenMax={MaxObservedInputQueueLength} QueueHoldEndsMax={MaxObservedInputQueueHoldEnds} "
                + $"HoldBodyFboRedraw={HoldBodyForceRedraws}"
 #endif
-            ;
+        ;
     }
 }

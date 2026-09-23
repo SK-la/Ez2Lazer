@@ -236,11 +236,9 @@ namespace osu.Game.Rulesets.Mania.UI
             JudgementRound = ManiaJudgementRound.Create(
                 ezConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, ReplayScore?.ScoreInfo, ignoreOffset: ReplayScore != null),
                 Beatmap);
-            ManiaWindowBaker.AlignForLive(Beatmap, JudgementRound.Environment);
-            ManiaEnvironmentJudgements.ApplyToBeatmap(Beatmap, JudgementRound.Environment.ManiaHitMode);
-
-            // 本局 live 实例：退出前禁止任何异 hitmode 的仿真原地改写它。
-            ManiaLiveBeatmapRegistry.RegisterLive(Beatmap, JudgementRound.Environment.ManiaHitMode);
+            // 本局实例的 hitmode 绑定。仿真一律在 ManiaSimulationBeatmapProvider 产出的独立副本上绑定
+            // （见 ManiaReplaySessionService），所以这里不再需要「本局实例」登记。
+            ManiaBeatmapBinding.BindForLive(Beatmap, JudgementRound.Environment);
 
             hitModeBindable.BindValueChanged(h =>
             {
@@ -480,9 +478,6 @@ namespace osu.Game.Rulesets.Mania.UI
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing)
-                ManiaLiveBeatmapRegistry.UnregisterLive(Beatmap);
-
             base.Dispose(isDisposing);
 
             if (currentSkin.IsNotNull())
