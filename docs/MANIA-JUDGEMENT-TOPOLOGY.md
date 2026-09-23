@@ -129,6 +129,8 @@ flowchart TB
 | `parseReplay` / `ManiaReplayFrameEdgeParser` | N | 否 | Session 边沿解析；Batch / Stream 游标共用 |
 | `ManiaFramedReplayInputHandler` | M | 否 | Drawable 回放帧态喂入；与边沿解析分工（不合并成一类） |
 | `ManiaScoreHitEventGenerator` | — | — | **Obsolete**；请用 `RunHitEventsAsync` |
+| `ManiaBeatmapBinding` | M+N | 写前置 | **唯一 hitmode 绑定入口**（HitWindows + Judgement）；一个实例只应承载一个 hitmode，冲突打点可查 |
+| `ManiaSimulationBeatmapProvider` | N | 否 | 仿真副本来源：`(working beatmap, ruleset, mods, hitmode)` → `GetPlayableBeatmap` 产物，弱缓存 |
 | `EzScoreRaceService` | N | 预建 / 流式 | `EzReplayFeedMode`：BatchAllEvents 阻塞进局；StreamByClock 不阻塞 |
 
 **关注**：登记表中 M 专用 / N 专用 多，真正 M+N 少 — 调整拓扑时有意识收拢，不必一次做完。
@@ -141,7 +143,7 @@ flowchart TB
 
 - **MLPS**（可改名 `ManiaLanePressPolicy`）：独立轻量 **press 选目标**；扩全 Earliest / Combo / Duration / BMS post-Bad 后 **够 N 用**。
 - **MLC**：唯一 Live 列状态机，持有 Drawable 注册/游标/ActiveHold/automiss deadline；Column 直接调用，不再经过 `OrderedHitPolicy`。
-- **Session**：保留无 Drawable 的 `LaneTargetState`；不混入 MLC。M/N 只共享 MLPS 与 Kernel 的纯语义。
+- **Session**：保留无 Drawable 的 `LaneTargetState`；不混入 MLC。M/N 只共享 MLPS 与 Kernel 的纯语义。仿真 beatmap 一律由 provider 产出，见 §5.6。
 
 ### 5.2 列路由（Combo/Duration）
 
@@ -168,6 +170,31 @@ flowchart TB
   - Combo/Duration 曾因 (1) 每按 `new List`/Sort/`Func`、(2) `IsHitResultAllowed`→`GetHitModeValidHitResults` **每次 `new[]`**（经 `ResultFor`/`SelectFold` 放大）抬高 alloc；已改为 scratch + **静态表**（`GetHitModeValidHitResults` 常量数组，`IsHitResultAllowed` 直接扫静态表；曾加的 `IsHitResultValidForMode` switch 副本属冗余步骤，已删）。实测 Combo dense ~45 B/press（此前 ~1.8 KB）。
   - 可测排除：`ManiaAutoMissDeadlineTest` + future-deadline dueVisits==0；BMS/Poor Select alloc；`HitModeValidResultsAllocTest`；`DetachedBeatmapStoreFrameBudget` Drain≤24/帧；BDSP `StartupBackfillDelay`=5s（测试覆写 0）。
 
+### 5.6 绑定语义（hitmode 归属）
+
+绑定 hitmode 就是就地写 `HitWindows` 与 `HitObject.Judgement`，所以两条不变量：
+
+1. **一个 beatmap 实例 = 一个 hitmode 绑定**，绑定后只读。
+2. **副本来自转换边界，不是深拷贝**：仿真用的实例由 `ManiaSimulationBeatmapProvider` 经 `IWorkingBeatmap.GetPlayableBeatmap`
+   产出（与 live 同一条管线），按 `(working beatmap, ruleset, mods, hitmode)` 缓存复用；`HitWindows` / `Judgement` 由
+   `ManiaBeatmapBinding` 统一绑定（`BindForLive` / `BindForSimulation` / `BindJudgements`）。
+
+因此**调用方传进 Session 的实例不再被绑定改写**：`ManiaReplaySessionService.AttachBeatmaps` 拿到的 provider 会把实例换掉，
+静态 `ManiaReplaySession.Run*` 直接调用时才绑定调用方实例（测试注入用）。历史身份侧表
+（`ManiaLiveBeatmapRegistry` / `ManiaSimulationBeatmap` 的反射 detach）已删除——那是被动防御，
+换成了「副本一定在转换边界产出」的结构不变量。
+
+违规可见性（都挂在 `ManiaJudgeHotPathTrace`，故意不受诊断开关控制）：
+
+| 计数 | 含义 |
+|------|------|
+| `BeatmapRebindConflicts` | 同一实例被绑到第二个 hitmode。provider 产出的实例出现此计数 ⇒ provider 键/缓存 bug（DEBUG `Debug.Fail`）；其它实例沿用 last-wins |
+| `ResultDowngrade` | `ManiaEzDrawableJudgement.SanitizeResult` 实际降级次数（Release 兜底，命中即说明上游绑定出错） |
+| `SimFallback` | 无法产出隔离副本、回退到调用方实例的次数（DEBUG 直接抛） |
+
+> 已知行为差异：`EzScoreRaceService` 过去用一份 `Array.Empty<Mod>()` 的共享 playable 喂所有 ghost，
+> 现在每个 ghost 按自己的 `ScoreInfo.Mods` 取副本——与 `EzScoreTimelineBuilder` 自己的 mods 缓存键口径一致。
+
 ---
 
 ## 6. 场景喂入对照
@@ -181,6 +208,9 @@ flowchart TB
 | 补 HitEvents | 同 N 全 Session | N（Generator 壳） |
 | Race | N 预建 timeline | 打歌时插值 |
 | Graph offset 拖动 | Rejudge | 非 Session |
+
+所有 N 路径的 beatmap 一律由 `ManiaSimulationBeatmapProvider` 提供（每个 `(谱面, mods, hitmode)` 一份），
+**不得**把 M 侧 live 实例喂进 Session；详见 §5.6。
 
 ---
 
