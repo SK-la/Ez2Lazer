@@ -72,14 +72,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                     transformColumnNum = keys;
                 }
 
-                var randomColumnSet = Enumerable.Range(0, keys).SelectRandom(rng, transformColumnNum == 0 ? keys : transformColumnNum).ToHashSet();
+                var randomColumns = new List<int>();
+                ManiaModYuModHelper.SelectRandomColumns(rng, keys, transformColumnNum == 0 ? keys : transformColumnNum, randomColumns);
                 int gap = Gap.Value;
 
                 foreach (var timeGroup in oldObjects.GroupBy(x => x.StartTime))
                 {
                     foreach (var note in timeGroup)
                     {
-                        if (randomColumnSet.Contains(note.Column) && rng.Next(100) < Percentage.Value)
+                        if (randomColumns.Contains(note.Column) && rng.Next(100) < Percentage.Value)
                         {
                             newObjects.Add(new Note
                             {
@@ -98,7 +99,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
                     if (gap <= 0)
                     {
-                        randomColumnSet = Enumerable.Range(0, keys).SelectRandom(rng, transformColumnNum).ToHashSet();
+                        ManiaModYuModHelper.SelectRandomColumns(rng, keys, transformColumnNum, randomColumns);
                         gap = Gap.Value;
                     }
                 }
