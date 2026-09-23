@@ -102,6 +102,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             var newColumnObjects = new List<ManiaHitObject>();
 
+            // 与 newColumnObjects 同步维护的按列索引：第一轮的重叠判定原本每列都要扫全表。
+            var columnIndex = new ManiaObjectColumnIndex(Key.Value);
+
             var fixedColumnObjects = new List<ManiaHitObject>();
 
             var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n => (
@@ -230,15 +233,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                         if (columnNum > emptyColumn) columnNum++;
                     }
 
-                    bool overlap = ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum, locations[i].startTime, locations[i].endTime);
+                    bool overlap = columnIndex.Overlaps(columnNum, locations[i].startTime);
 
                     if (overlap)
                     {
                         for (int k = 0; k < keyValue; k++)
                         {
-                            if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum - k, locations[i].startTime, locations[i].endTime) && columnNum - k >= 0)
+                            if (!columnIndex.Overlaps(columnNum - k, locations[i].startTime) && columnNum - k >= 0)
                                 columnNum -= k;
-                            else if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum + k, locations[i].startTime, locations[i].endTime)
+                            else if (!columnIndex.Overlaps(columnNum + k, locations[i].startTime)
                                      && columnNum + k <= keyValue - 1) columnNum += k;
                         }
                     }
@@ -262,6 +265,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                             Samples = locations[i].samples
                         });
                     }
+
+                    columnIndex.Add(newColumnObjects[^1]);
                 }
 
                 for (int i = 0; i < newColumnObjects.Count; i++)
@@ -293,13 +298,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                         fixedColumnObjects.Add(newColumnObjects[i]);
                     else
                     {
-                        for (int k = 0; k < keyValue; k++)
+                        // 原来的两次 FindOverlapInList(obj, 过滤到某列的列表) 恒为 true（判定内部按 obj.Column 比较，
+                        // 而列表已按别的列过滤），于是这个循环实际只是在边界内按 k 挪列。删掉每轮 keyValue 次
+                        // 「过滤 + 全表扫描 + 临时列表」，语义不变。
+                        for (int k = 1; k < keyValue; k++)
                         {
-                            if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column - k).ToList())
-                                && newColumnObjects[i].Column - k >= 0)
+                            if (newColumnObjects[i].Column - k >= 0)
                                 newColumnObjects[i].Column -= k;
-                            else if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column + k).ToList())
-                                     && newColumnObjects[i].Column + k <= keyValue - 1) newColumnObjects[i].Column += k;
+                            else if (newColumnObjects[i].Column + k <= keyValue - 1) newColumnObjects[i].Column += k;
                         }
 
                         fixedColumnObjects.Add(newColumnObjects[i]);
@@ -329,6 +335,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                     emptyColumn = -1;
                     fixedColumnObjects.Clear();
                     newColumnObjects.Clear();
+                    columnIndex.Clear();
                 }
                 else
                     break;
