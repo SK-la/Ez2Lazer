@@ -350,9 +350,14 @@ namespace osu.Game.Rulesets.Mania.UI
 
             judgements.Clear(false);
 
-            var drawableJudgement = judgementPooler.Get(result.Type, j => j.Apply(result, judgedObject));
+            // 不用 setup 委托：`Apply` 只做字段赋值，真正的动画在下一帧 PrepareForUse 里跑。
+            // 但 JudgementContainer.Add 会同步读 JudgedHitObject，所以赋值必须在 Add 之前。
+            var drawableJudgement = judgementPooler.Get(result.Type, null);
+
             if (drawableJudgement == null)
                 return;
+
+            drawableJudgement.Apply(result, judgedObject);
 
             judgements.Add(drawableJudgement);
         }

@@ -366,17 +366,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal void SetActiveHold(DrawableHoldNote? hold) => ActiveHold = hold;
 
-        public IEnumerable<ManiaLaneEntry> EnumerateForceMissBefore(double targetStartTime)
+        /// <summary>
+        /// 收集开始时间早于 <paramref name="targetStartTime"/> 且未判定的 press 条目，写入调用方缓冲（不清空）。
+        /// </summary>
+        /// <remarks>
+        /// 命中热路径用的版本：写快照而不是惰性枚举，因此调用方在逐项处理时要自行按实时状态复核
+        /// （处理期间可能已经判掉条目）。
+        /// </remarks>
+        public void CollectForceMissBefore(double targetStartTime, List<ManiaLaneEntry> buffer)
         {
-            foreach (var entry in entries)
+            for (int i = 0; i < entries.Count; i++)
             {
+                var entry = entries[i];
+
                 if (entry.IsPressJudged)
                     continue;
 
                 if (entry.StartTime >= targetStartTime)
                     break;
 
-                yield return entry;
+                buffer.Add(entry);
             }
         }
 
