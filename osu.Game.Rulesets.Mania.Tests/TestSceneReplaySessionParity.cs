@@ -495,6 +495,10 @@ namespace osu.Game.Rulesets.Mania.Tests
                 LoadScreen(currentPlayer = new ScoreAccessibleReplayPlayer(replayScore));
             });
 
+            // 玩家是异步加载的：ScoreProcessor 由 Player 的 [BackgroundDependencyLoader] load() 建出，
+            // 在此之前访问它会 NRE（本夹具当进程首个测试时必现）。LoadedBeatmapSuccessfully 为 true
+            // 即 load() 已跑到 ScoreProcessor 赋值之后。
+            AddUntilStep("wait for player", () => currentPlayer.LoadedBeatmapSuccessfully);
             AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             AddStep("capture drawable hit events", () =>
@@ -542,6 +546,10 @@ namespace osu.Game.Rulesets.Mania.Tests
                 LoadScreen(currentPlayer = new ScoreAccessibleReplayPlayer(replayScore));
             });
 
+            // 玩家是异步加载的：ScoreProcessor 由 Player 的 [BackgroundDependencyLoader] load() 建出，
+            // 在此之前访问它会 NRE（本夹具当进程首个测试时必现）。LoadedBeatmapSuccessfully 为 true
+            // 即 load() 已跑到 ScoreProcessor 赋值之后。
+            AddUntilStep("wait for player", () => currentPlayer.LoadedBeatmapSuccessfully);
             AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             if (assertJudgedHitsComplete)
@@ -643,6 +651,10 @@ namespace osu.Game.Rulesets.Mania.Tests
                 LoadScreen(currentPlayer = new ScoreAccessibleReplayPlayer(replayScore));
             });
 
+            // 玩家是异步加载的：ScoreProcessor 由 Player 的 [BackgroundDependencyLoader] load() 建出，
+            // 在此之前访问它会 NRE（本夹具当进程首个测试时必现）。LoadedBeatmapSuccessfully 为 true
+            // 即 load() 已跑到 ScoreProcessor 赋值之后。
+            AddUntilStep("wait for player", () => currentPlayer.LoadedBeatmapSuccessfully);
             AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
 
             AddAssert("replay result matches recalculated Now", () =>
