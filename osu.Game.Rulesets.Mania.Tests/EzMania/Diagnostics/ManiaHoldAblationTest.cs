@@ -6,40 +6,24 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.Objects;
-using osu.Game.Rulesets.Mania.Objects.Drawables;
 
 #if DEBUG
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
 {
+    /// <summary>
+    /// 消融开关里与绘制无关的部分：tick 生成。
+    /// <para>
+    /// 「head/tail 是否进非位置输入队列」不在此处断言：<c>HandleNonPositionalInput</c> 在框架里由
+    /// <c>Drawable.HandleInputCache.RequestsNonPositionalInput</c> 决定，而该值只在 drawable 完成 load
+    /// 时才写入（未挂树的实例恒为 false），裸 new 出来的 drawable 断言不出开关效果。
+    /// 那三条已由挂树场景 <see cref="TestSceneManiaHoldDrawCost"/> 覆盖。
+    /// </para>
+    /// </summary>
     [TestFixture]
     public class ManiaHoldAblationTest
     {
         [TearDown]
         public void TearDown() => ManiaHoldAblation.Reset();
-
-        [Test]
-        public void TestHoldEndsAreExcludedFromNonPositionalInputByDefault()
-        {
-            var hold = new DrawableHoldNote();
-            var head = new DrawableHoldNoteHead();
-            var tail = new DrawableHoldNoteTail();
-
-            Assert.That(hold.HandleNonPositionalInput, Is.True);
-            Assert.That(head.HandleNonPositionalInput, Is.False);
-            Assert.That(tail.HandleNonPositionalInput, Is.False);
-        }
-
-        [Test]
-        public void TestHoldEndsCanBeRequeuedForAblation()
-        {
-            ManiaHoldAblation.EnqueueHoldEnds = true;
-
-            var head = new DrawableHoldNoteHead();
-            var tail = new DrawableHoldNoteTail();
-
-            Assert.That(head.HandleNonPositionalInput, Is.True);
-            Assert.That(tail.HandleNonPositionalInput, Is.True);
-        }
 
         [Test]
         public void TestForceTickGenerationCreatesSixteenthTicks()
