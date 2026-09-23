@@ -13,6 +13,7 @@ using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Edit.Checks.Components;
 using osu.Game.Rulesets.Objects;
@@ -91,7 +92,7 @@ namespace osu.Game.EzOsuGame.Audio
 
             playback.ResetPlaybackProgress();
 
-            var playableBeatmap = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
+            var playableBeatmap = EzPlayableBeatmapCache.GetShared(beatmap, beatmap.BeatmapInfo.Ruleset);
             previewHitSoundsEnabled = fastCheckShouldPreviewHitSounds(beatmap, hitsound_threshold);
             previewStoryboardEnabled = hasStoryboardSamples(beatmap.Storyboard);
 

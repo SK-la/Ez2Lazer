@@ -8,6 +8,7 @@ using System.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Mods.LAsMods;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
@@ -45,7 +46,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
             if (UsesXxyStarRating(ruleset))
             {
                 var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                var playable = working.GetPlayableBeatmap(ruleset, mods, cancellationToken);
+                var playable = EzPlayableBeatmapCache.GetShared(working, ruleset, mods, cancellationToken);
 
                 if (EzAnalysisProviderBridge.TryGetValue(ruleset, new EzAnalysisRequest(playable, speed), EzAnalysisFields.XXY_SR, cancellationToken, out double xxySr))
                     return xxySr;

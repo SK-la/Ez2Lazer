@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Beatmaps;
@@ -15,8 +14,8 @@ using osu.Game.Scoring;
 namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 {
     /// <summary>
-    /// 为判定仿真提供独立 beatmap 实例：按 <c>(working beatmap, ruleset, mods, hitmode)</c> 缓存
-    /// <c>IWorkingBeatmap.GetPlayableBeatmap</c> 的产物，并已绑定对应 hitmode。
+    /// 为判定仿真取一份独立 beatmap：按 <c>(working beatmap, ruleset, mods, hitmode)</c> 从
+    /// <see cref="EzPlayableBeatmapCache"/> 取本 hitmode 专属的副本，并已绑定对应 hitmode。
     /// </summary>
     /// <remarks>
     /// <para>
@@ -25,19 +24,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     /// 也可能是 Race 里被多个 ghost 共享的实例。副本走与 live 完全相同的转换管线，避免依赖私有字段的反射深拷贝。
     /// </para>
     /// <para>
-    /// 键必须含 mods：随机类 Mod 的 Seed 会被 <c>EzModSeed</c> 写回 bindable，而键在转换前就解析并带上 seed，
-    /// 所以用户重掷种子会得到新键并重新转换，不会拿到旧谱面。
-    /// 缓存由 <see cref="ConditionalWeakTable{TKey,TValue}"/> 弱持有，working beatmap 被回收即随之释放。
+    /// 缓存本身按 working beatmap 实例弱持有，键含谱面内容哈希、保序 mod 指纹（含解析后的 seed）与 hitmode，
+    /// 所以用户重掷种子、或谱面被重新导入，都会自然拿到新键而不是旧谱面。
     /// </para>
     /// <para>
-    /// 线程模型：调用方在后台线程（<c>EzReplaySession.runSessionDirect</c> / Race build）上调用，故键与缓存都按并发访问设计；
-    /// 并发首次转换可能重复一次，但结果确定，且不会缓存失败。
+    /// 线程模型：调用方在后台线程（<c>EzReplaySession.runSessionDirect</c> / Race build）上调用；并发首次转换可能重复一次，
+    /// 但结果确定，且不会缓存失败。
     /// </para>
     /// </remarks>
     internal sealed class ManiaSimulationBeatmapProvider
     {
         private readonly IWorkingBeatmapCache beatmapCache;
-        private readonly ConditionalWeakTable<IWorkingBeatmap, Bucket> buckets = new ConditionalWeakTable<IWorkingBeatmap, Bucket>();
 
         public ManiaSimulationBeatmapProvider(IWorkingBeatmapCache beatmapCache)
         {
@@ -65,81 +62,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return null;
 
             var mods = EzModCompatibility.StripUnknown(scoreInfo.Mods);
-            var key = new SimulationKey(scoreInfo.Ruleset.ShortName, mods, environment.ManiaHitMode);
+            EzEnumHitMode hitMode = environment.ManiaHitMode;
 
-            return buckets.GetValue(workingBeatmap, _ => new Bucket()).GetOrCreate(key, () =>
-            {
-                var playable = workingBeatmap.GetPlayableBeatmap(scoreInfo.Ruleset, key.OrderedMods, cancellationToken);
-                ManiaBeatmapBinding.BindForSimulation(playable, environment.ManiaHitMode, providerOwned: true);
-                return playable;
-            });
+            return EzPlayableBeatmapCache.GetBound(workingBeatmap, scoreInfo.Ruleset, mods, bindingScopeFor(hitMode),
+                playable => ManiaBeatmapBinding.BindForSimulation(playable, hitMode, providerOwned: true), cancellationToken);
         }
 
-        /// <summary>
-        /// 键的 mods 部分走与 <c>BeatmapDifficultyCache.DifficultyCacheLookup</c> 相同的口径：
-        /// <see cref="EzModSignature"/>（保序 + 含解析后的 seed），不再按键名排序。
-        /// </summary>
         /// <remarks>
-        /// 快照同时是转换输入：<see cref="TryCreate"/> 拿 <see cref="orderedMods"/> 去转换，键与产物出自同一组设置。
+        /// <see cref="EzEnumHitMode.Lazer"/> 是 0，而 0 是共享作用域，所以每个 hitmode 偏移 1 后才作为绑定作用域。
         /// </remarks>
-        private readonly struct SimulationKey : IEquatable<SimulationKey>
-        {
-            private readonly string rulesetShortName;
-            private readonly EzEnumHitMode hitMode;
-            private readonly Mod[] orderedMods;
-            private readonly int modsSignature;
-
-            public SimulationKey(string rulesetShortName, IReadOnlyList<Mod> mods, EzEnumHitMode hitMode)
-            {
-                this.rulesetShortName = rulesetShortName;
-                this.hitMode = hitMode;
-
-                // 快照带出解析后的 seed（并写回 score 的 mod 实例），键才等于真正参与转换的那组设置。
-                orderedMods = EzModSignature.SnapshotForConversion(mods);
-                modsSignature = EzModSignature.Compute(orderedMods);
-            }
-
-            public IReadOnlyList<Mod> OrderedMods => orderedMods;
-
-            public bool Equals(SimulationKey other)
-                => hitMode == other.hitMode
-                   && string.Equals(rulesetShortName, other.rulesetShortName, StringComparison.Ordinal)
-                   && EzModSignature.SequenceEqual(orderedMods, other.orderedMods);
-
-            public override bool Equals(object? obj) => obj is SimulationKey other && Equals(other);
-
-            public override int GetHashCode()
-            {
-                var hashCode = new HashCode();
-
-                hashCode.Add(rulesetShortName);
-                hashCode.Add((int)hitMode);
-                hashCode.Add(modsSignature);
-
-                return hashCode.ToHashCode();
-            }
-        }
-
-        private sealed class Bucket
-        {
-            private readonly Dictionary<SimulationKey, IBeatmap> entries = new Dictionary<SimulationKey, IBeatmap>();
-
-            public IBeatmap GetOrCreate(SimulationKey key, Func<IBeatmap> factory)
-            {
-                lock (entries)
-                {
-                    if (entries.TryGetValue(key, out var cached))
-                        return cached;
-                }
-
-                // 转换放在锁外：失败不落缓存，并发重复转换的结果也一致。
-                var created = factory();
-
-                lock (entries)
-                    entries[key] = created;
-
-                return created;
-            }
-        }
+        private static int bindingScopeFor(EzEnumHitMode hitMode) => (int)hitMode + 1;
     }
 }

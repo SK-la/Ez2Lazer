@@ -331,7 +331,8 @@ namespace osu.Game.Screens.Select
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    var playableBeatmap = selectedBeatmap.GetPlayableBeatmap(selectedRuleset, selectedMods, cancellationToken);
+                    // 只读消费者：选歌界面的统计展示与难度/分析/预览共用同一次转换。
+                    var playableBeatmap = EzPlayableBeatmapCache.GetShared(selectedBeatmap, selectedRuleset, selectedMods, cancellationToken);
 
                     cancellationToken.ThrowIfCancellationRequested();
 
