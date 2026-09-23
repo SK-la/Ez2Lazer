@@ -90,12 +90,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             var simulationEnvironment = createSimulationEnvironment(environment);
 
-            // 本局 live beatmap 不能被仿真原地改写（见 ManiaSimulationBeatmap）：hitmode 不一致时改用脱离副本。
-            beatmap = ManiaSimulationBeatmap.PrepareForSimulation(beatmap, simulationEnvironment);
-
-            // 先 Align + 绑定 Judgement，再 ApplyBeatmap，避免 MaximumBaseScore 按官方尾 Perfect 虚高。
-            ManiaWindowBaker.Align(beatmap, simulationEnvironment);
-            ManiaEnvironmentJudgements.ApplyToBeatmap(beatmap, simulationEnvironment.ManiaHitMode);
+            // 副本由 ManiaReplaySessionService 经 ManiaSimulationBeatmapProvider 提供（每个 (谱面, mods, hitmode) 一份），
+            // 静态入口直接调用时用调用方实例；这里只负责绑定，且必须早于 ApplyBeatmap，
+            // 否则 MaximumBaseScore 会按官方尾 Perfect 虚高。
+            ManiaBeatmapBinding.BindForSimulation(beatmap, simulationEnvironment.ManiaHitMode);
 
             scoreProcessor.ApplyBeatmap(beatmap);
 

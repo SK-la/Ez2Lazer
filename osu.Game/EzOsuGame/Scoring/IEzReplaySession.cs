@@ -49,5 +49,11 @@ namespace osu.Game.EzOsuGame.Scoring
         /// 规则集没有 Session 时返回空列表。
         /// </summary>
         Task<List<HitEvent>> RunHitEventsAsync(Score score, IBeatmap beatmap, ReplayRunPurpose purpose = ReplayRunPurpose.ForLive, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 注入 beatmap 来源，供需要「仿真副本」的规则集在判定前取独立实例。
+        /// 不隔离的规则集实现为空操作。
+        /// </summary>
+        void AttachBeatmaps(IWorkingBeatmapCache beatmapCache);
     }
 }

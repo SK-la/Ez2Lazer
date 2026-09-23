@@ -23,6 +23,14 @@ namespace osu.Game.EzOsuGame.Scoring
         protected abstract (Score Score, EzScoreTimeline Timeline) RunWithTimeline(
             Score score, IBeatmap beatmap, IGameplayEnvironment environment, CancellationToken cancellationToken);
 
+        /// <summary>
+        /// 注入 beatmap 来源，供需要「仿真副本」的规则集在 <see cref="RunWithTimeline"/> 里取独立实例。
+        /// 不需要隔离的规则集保持无操作。
+        /// </summary>
+        public virtual void AttachBeatmaps(IWorkingBeatmapCache beatmapCache)
+        {
+        }
+
         public async Task<Score> RunAsync(Score score, IBeatmap beatmap, ReplayRunPurpose purpose, CancellationToken cancellationToken = default)
         {
             var (resultScore, _, _) = await getOrRunSession(score, beatmap, purpose, cancellationToken).ConfigureAwait(false);

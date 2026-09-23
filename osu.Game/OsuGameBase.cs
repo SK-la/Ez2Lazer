@@ -412,7 +412,7 @@ namespace osu.Game
             dependencies.Cache(ezAnalysisPersistentStore);
             dependencies.Cache(ezAnalysisDatabase);
             dependencies.Cache(ezAnalysisCache = new EzAnalysisCache());
-            ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets);
+            ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets, BeatmapManager);
             dependencies.CacheAs<IEzReplaySession>(ReplaySession);
 
             // Skill metrics: MSD (beatmap), SSR + Dan (player). Read via EzSkillProvider; writers stay separate.
