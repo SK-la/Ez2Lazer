@@ -7,9 +7,11 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -153,7 +155,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 blank = Key.Value - keys;
             }
 
-            if (keys > 9 || Key.Value <= keys)
+            if (keys <= 0 || keys > 9 || Key.Value <= keys)
             {
                 return;
             }
@@ -173,6 +175,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                                             samples: h.Samples
                                         ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
 
+            // 没有 Note/HoldNote 可转（空谱面、纯 tick/barline，或已被前置 mod 清空）时直接退出。
+            if (locations.Count == 0)
+                return;
+
             var confirmNull = new List<bool>();
             var nullColumnList = new List<int>();
 
@@ -184,6 +190,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             foreach (var column in maniaBeatmap.HitObjects.GroupBy(h => h.Column))
             {
                 int count = column.Count();
+
+                // 列号可能落在 [0, Key.Value] 之外（源谱面 CircleSize 与实际列数不一致）；
+                // 跳过该列即可，越界访问会把整张图的 SR 计算打崩。
+                if (column.Key < 0 || column.Key > Key.Value)
+                {
+                    Logger.Log($"[ManiaModNtoMAnother] column {column.Key} outside [0, {Key.Value}], skipped", Ez2ConfigManager.LOGGER_NAME);
+                    continue;
+                }
 
                 if (!confirmNull[column.Key] && count != 0)
                 {
@@ -304,6 +318,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                                                (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
                                            }))
                                            .OrderBy(h => h.startTime).ToList();
+
+                // 该列理论上至少有一个 Note/HoldNote；万一没有（前置 mod 残留了其它类型），跳过而不是越界。
+                if (cleanLocations.Count == 0)
+                {
+                    Logger.Log($"[ManiaModNtoMAnother] column {column.Key} has no Note/HoldNote to clean, skipped", Ez2ConfigManager.LOGGER_NAME);
+                    continue;
+                }
 
                 double lastStartTime = cleanLocations[0].startTime;
                 double lastEndTime = cleanLocations[0].endTime;
