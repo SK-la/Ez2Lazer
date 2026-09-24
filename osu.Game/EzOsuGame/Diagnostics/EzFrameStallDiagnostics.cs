@@ -10,7 +10,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.UI;
 
 namespace osu.Game.EzOsuGame.Diagnostics
 {
@@ -19,16 +18,23 @@ namespace osu.Game.EzOsuGame.Diagnostics
     /// <para>
     /// 与 <see cref="EzPressLatencyDiagnostics"/> 的关系：那个探针只采样「有按键的帧」，
     /// 于是在没有按键落下时帧有多慢是看不见的——而按键延迟的上界正是「它落在的那一帧的时长」。
-    /// 本探针补上这条基线：每帧都记一次耗时（定长直方图，零分配），只在超过阈值时留明细。
+    /// 本探针补上这条基线：每帧都记一次耗时，只在超过阈值时留明细。
     /// </para>
     /// <para>
-    /// 明细行里带该帧的 <c>GcPauseDeltaMs</c>（跨该帧的 <c>GC.GetTotalPauseDuration</c> 增量）。
-    /// 这是把 GC 从「嫌疑」定成「因果」的判据：若一次 20ms 的 stall 里 <c>GcPauseDeltaMs</c> 也接近 20ms，
-    /// GC 就是原因；若接近 0，GC 即可排除。
+    /// 直方图分两张：**含按键的帧**与**不含按键的帧**。这是本探针最要紧的一个判据——
+    /// 实测发现含按键的帧占了近半的 stall，而按键帧本身只占全部帧的 0.5%，量级上无法用
+    /// 「按键只多花 0.1ms」解释。只有把两组各自的完整分布摊开，才能读出「一次按键究竟把帧拉长了多少」，
+    /// 而不是靠「≥阈值」这个截断后的条件分布去猜。
     /// </para>
     /// <para>
-    /// 同时记 update 线程的分配增量（<c>GC.GetAllocatedBytesForCurrentThread</c>）与全进程分配增量，
-    /// 两者的比值说明高 gen0 频率（实测 ~24/s）是不是 update 线程自己在分配。
+    /// 明细行里带该帧的 <c>GcPauseDeltaMs</c>（跨该帧的 <c>GC.GetTotalPauseDuration</c> 增量）与
+    /// <c>ThreadAllocDeltaBytes</c>（update 线程在该帧的分配量）。GC 是否为主因靠前者判断：
+    /// 若一次 20ms 的 stall 里 <c>GcPauseDeltaMs</c> 也接近 20ms，GC 就是原因；若接近 0，GC 即可排除。
+    /// 后者则回答「高 gen0 频率（实测 ~24/s）是不是 update 线程自己在分配」。
+    /// </para>
+    /// <para>
+    /// 注意 <c>GcPauseDeltaMs</c> 是**全线程**暂停时长之和（后台 GC 并发时它可能超过帧长），
+    /// 所以它是「update 线程被挂起」的上界：数值远小于帧长时能可靠排除 GC，数值大时只能算强嫌疑。
     /// </para>
     /// 热路径不做 IO、不产生字符串；落盘在局末。
     /// </summary>
@@ -40,11 +46,14 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// <summary>超过该时长的帧才留明细；直方图则覆盖所有帧。可用 <c>EZ_FRAME_PROBE_MS</c> 覆盖。</summary>
         public static double ThresholdMs { get; set; } = 1.5;
 
-        private const double bucket_width_ms = 0.1;
         private const int bucket_count = 1024;
         private const int detail_capacity = 32768;
 
-        private static readonly int[] histogram = new int[bucket_count];
+        // 桶宽 0.1ms，桶数 1024 → 覆盖到 102.3ms；超出者并入末桶。
+        // 用 int 计数：一个 play 的帧数在十万量级，不会溢出。
+        private static readonly Histogram withoutPress = new Histogram();
+        private static readonly Histogram withPress = new Histogram();
+
         private static FrameSample[] details = new FrameSample[detail_capacity];
         private static int detailCursor;
         private static int detailCount;
@@ -59,14 +68,15 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static int lastGen0;
         private static int lastGen1;
         private static int lastGen2;
+
         private static int pressesInFrame;
+        private static double pressColumnMsInFrame;
 
         // 会话累计
-        private static long frames;
+        private static double firstFrameWallMs = double.NaN;
+        private static double lastFrameWallMs;
         private static long stallFrames;
         private static long stallFramesWithPress;
-        private static long framesWithPress;
-        private static double maxElapsedMs;
         private static long threadAllocatedTotal;
         private static long processAllocatedTotal;
         private static double gcPauseTotalMs;
@@ -78,16 +88,23 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double GcPauseDeltaMs,
             long ThreadAllocDeltaBytes,
             int PressesInFrame,
+            double PressColumnMs,
             int FscIterations,
             int Gen0Delta,
             int Gen1Delta,
             int Gen2Delta);
 
-        /// <summary>本帧内已处理（进入列入口）的按键数，由 <c>Column.OnPressed</c> 调用。</summary>
-        public static void NotifyPress()
+        /// <summary>
+        /// 本帧内已处理（进入列入口）的按键，由 <c>Column.OnPressed</c> 调用。
+        /// </summary>
+        /// <param name="columnMs">该次按键在本列花掉的时长；用于把「按键自身的工作」从帧长里分出来。</param>
+        public static void NotifyPress(double columnMs)
         {
-            if (Enabled)
-                pressesInFrame++;
+            if (!Enabled)
+                return;
+
+            pressesInFrame++;
+            pressColumnMsInFrame += columnMs;
         }
 
         /// <summary>
@@ -100,6 +117,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 return;
 
             long now = Stopwatch.GetTimestamp();
+            double wallMs = EzJudgmentDiagnostics.WallClockMs;
 
             long prev = lastFrameTimestamp;
             lastFrameTimestamp = now;
@@ -116,17 +134,18 @@ namespace osu.Game.EzOsuGame.Diagnostics
             {
                 seed(gcPauseTicks, threadAllocated, processAllocated, gen0, gen1, gen2);
                 pressesInFrame = 0;
+                pressColumnMsInFrame = 0;
+                firstFrameWallMs = wallMs;
                 return;
             }
 
             double elapsedMs = (now - prev) * 1000.0 / Stopwatch.Frequency;
+            lastFrameWallMs = wallMs;
 
-            frames++;
-            if (elapsedMs > maxElapsedMs)
-                maxElapsedMs = elapsedMs;
-
-            int bucket = (int)(elapsedMs / bucket_width_ms);
-            histogram[bucket >= bucket_count ? bucket_count - 1 : bucket]++;
+            if (pressesInFrame > 0)
+                withPress.Add(elapsedMs);
+            else
+                withoutPress.Add(elapsedMs);
 
             double gcPauseDeltaMs = (gcPauseTicks - lastGcPauseTicks) / (double)TimeSpan.TicksPerMillisecond;
             long threadAllocDelta = threadAllocated - lastThreadAllocated;
@@ -134,9 +153,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
             gcPauseTotalMs += gcPauseDeltaMs;
             threadAllocatedTotal += threadAllocDelta;
             processAllocatedTotal += processAllocated - lastProcessAllocated;
-
-            if (pressesInFrame > 0)
-                framesWithPress++;
 
             if (elapsedMs >= ThresholdMs)
             {
@@ -146,13 +162,14 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     stallFramesWithPress++;
 
                 details[detailCursor] = new FrameSample(
-                    EzJudgmentDiagnostics.WallClockMs,
+                    wallMs,
                     frameIndex,
                     elapsedMs,
                     gcPauseDeltaMs,
                     threadAllocDelta,
                     pressesInFrame,
-                    FrameStabilityContainer.EzLastUpdateIterations,
+                    pressColumnMsInFrame,
+                    osu.Game.Rulesets.UI.FrameStabilityContainer.EzLastUpdateIterations,
                     gen0 - lastGen0,
                     gen1 - lastGen1,
                     gen2 - lastGen2);
@@ -171,6 +188,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             seed(gcPauseTicks, threadAllocated, processAllocated, gen0, gen1, gen2);
             pressesInFrame = 0;
+            pressColumnMsInFrame = 0;
         }
 
         private static void seed(long gcPauseTicks, long threadAllocated, long processAllocated, int gen0, int gen1, int gen2)
@@ -185,7 +203,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         public static void Clear()
         {
-            Array.Clear(histogram);
+            withoutPress.Reset();
+            withPress.Reset();
 
             Interlocked.Exchange(ref details, new FrameSample[detail_capacity]);
             detailCursor = 0;
@@ -199,12 +218,12 @@ namespace osu.Game.EzOsuGame.Diagnostics
             lastProcessAllocated = 0;
             lastGen0 = lastGen1 = lastGen2 = 0;
             pressesInFrame = 0;
+            pressColumnMsInFrame = 0;
 
-            frames = 0;
+            firstFrameWallMs = double.NaN;
+            lastFrameWallMs = 0;
             stallFrames = 0;
             stallFramesWithPress = 0;
-            framesWithPress = 0;
-            maxElapsedMs = 0;
             threadAllocatedTotal = 0;
             processAllocatedTotal = 0;
             gcPauseTotalMs = 0;
@@ -218,7 +237,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             var snapshot = details;
 
             var sb = new StringBuilder();
-            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,FscIter,Gen0Delta,Gen1Delta,Gen2Delta");
+            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,FscIter,Gen0Delta,Gen1Delta,Gen2Delta");
 
             for (int i = 0; i < sampleCount; i++)
             {
@@ -230,6 +249,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(num(s.GcPauseDeltaMs)).Append(',');
                 sb.Append(s.ThreadAllocDeltaBytes).Append(',');
                 sb.Append(s.PressesInFrame).Append(',');
+                sb.Append(num(s.PressColumnMs)).Append(',');
                 sb.Append(s.FscIterations).Append(',');
                 sb.Append(s.Gen0Delta).Append(',');
                 sb.Append(s.Gen1Delta).Append(',');
@@ -272,73 +292,107 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         private static string FormatSummary()
         {
+            long frames = withoutPress.Count + withPress.Count;
+
             if (frames == 0)
                 return "[EzFrameStall] no frames";
 
-            // 直方图分位数：帧数足够多时，这比只有「有按键的帧」的读数更能代表真实分布。
-            double p50 = percentile(0.50);
-            double p99 = percentile(0.99);
-            double p999 = percentile(0.999);
-
-            long over05 = countOver(0.5);
-            long over1 = countOver(1.0);
-            long over2 = countOver(2.0);
-            long over5 = countOver(5.0);
-            long over10 = countOver(10.0);
-
-            double threadMb = threadAllocatedTotal / 1024.0 / 1024.0;
-            double processMb = processAllocatedTotal / 1024.0 / 1024.0;
-            double wallSeconds = frames * p50 / 1000.0;
+            double wallSeconds = (lastFrameWallMs - firstFrameWallMs) / 1000.0;
 
             var sb = new StringBuilder();
             sb.Append(CultureInfo.InvariantCulture,
-                $"[EzFrameStall] frames={frames} wall~{wallSeconds:F1}s threshold={ThresholdMs:F2}ms "
-                + $"p50={p50:F3} p99={p99:F3} p99.9={p999:F3} max={maxElapsedMs:F3} "
-                + $"over0.5={over05} over1={over1} over2={over2} over5={over5} over10={over10} "
-                + $"stallFrames={stallFrames} (withPress={stallFramesWithPress}) framesWithPress={framesWithPress} "
-                + $"overwritten={Interlocked.Read(ref detailOverwritten)}");
+                $"[EzFrameStall] frames={frames} span={wallSeconds:F1}s threshold={ThresholdMs:F2}ms "
+                + $"stallFrames={stallFrames} (withPress={stallFramesWithPress}) "
+                + $"overwritten={Interlocked.Read(ref detailOverwritten)} ");
 
-            string share = processMb > 0
-                ? string.Create(CultureInfo.InvariantCulture, $" share={(100 * threadMb / processMb):F1}%")
-                : string.Empty;
+            sb.Append(CultureInfo.InvariantCulture, $"alloc(updateThread)={threadAllocatedTotal / 1024.0 / 1024.0:F1}MB ");
+            sb.Append(CultureInfo.InvariantCulture, $"process={processAllocatedTotal / 1024.0 / 1024.0:F1}MB ");
+            sb.Append(CultureInfo.InvariantCulture, $"gcPause={gcPauseTotalMs:F0}ms");
 
-            string pauseShare = wallSeconds > 0
-                ? string.Create(CultureInfo.InvariantCulture, $" ({100 * gcPauseTotalMs / (wallSeconds * 1000):F2}%)")
-                : string.Empty;
+            if (wallSeconds > 0)
+                sb.Append(CultureInfo.InvariantCulture, $" ({100 * gcPauseTotalMs / (wallSeconds * 1000):F2}%)");
 
-            sb.Append(CultureInfo.InvariantCulture, $" | alloc(updateThread)={threadMb:F1}MB process={processMb:F1}MB");
-            sb.Append(share);
-            sb.Append(CultureInfo.InvariantCulture, $" gcPause={gcPauseTotalMs:F0}ms");
-            sb.Append(pauseShare);
+            // 两组分布并排，是「一次按键把帧拉长了多少」的直接答案。
+            sb.Append(Environment.NewLine);
+            sb.Append("noPress  ").Append(withoutPress.Format());
+            sb.Append(Environment.NewLine);
+            sb.Append("withPress").Append(withPress.Format());
 
             return sb.ToString();
         }
 
-        private static double percentile(double p)
+        /// <summary>定长直方图：只做加法与读数，热路径零分配。</summary>
+        private sealed class Histogram
         {
-            long target = (long)Math.Floor((frames - 1) * p);
-            long cumulative = 0;
+            private const double bucket_width_ms = 0.1;
+            private const int bucket_count = 1024;
 
-            for (int i = 0; i < bucket_count; i++)
+            private readonly int[] buckets = new int[bucket_count];
+
+            public long Count { get; private set; }
+            public double Sum { get; private set; }
+            public double Max { get; private set; }
+
+            public void Add(double ms)
             {
-                cumulative += histogram[i];
+                Count++;
+                Sum += ms;
 
-                if (cumulative > target)
-                    return (i + 0.5) * bucket_width_ms;
+                if (ms > Max)
+                    Max = ms;
+
+                int bucket = (int)(ms / bucket_width_ms);
+                buckets[bucket >= bucket_count ? bucket_count - 1 : bucket < 0 ? 0 : bucket]++;
             }
 
-            return bucket_count * bucket_width_ms;
-        }
+            public void Reset()
+            {
+                Array.Clear(buckets);
+                Count = 0;
+                Sum = 0;
+                Max = 0;
+            }
 
-        private static long countOver(double ms)
-        {
-            int firstBucket = (int)Math.Ceiling(ms / bucket_width_ms);
-            long count = 0;
+            public double Mean => Count == 0 ? double.NaN : Sum / Count;
 
-            for (int i = firstBucket; i < bucket_count; i++)
-                count += histogram[i];
+            public double Percentile(double p)
+            {
+                if (Count == 0)
+                    return double.NaN;
 
-            return count;
+                long target = (long)Math.Floor((Count - 1) * p);
+                long cumulative = 0;
+
+                for (int i = 0; i < bucket_count; i++)
+                {
+                    cumulative += buckets[i];
+
+                    if (cumulative > target)
+                        return (i + 0.5) * bucket_width_ms;
+                }
+
+                return bucket_count * bucket_width_ms;
+            }
+
+            public long CountOver(double ms)
+            {
+                int first = (int)Math.Ceiling(ms / bucket_width_ms);
+                long count = 0;
+
+                for (int i = first < 0 ? 0 : first; i < bucket_count; i++)
+                    count += buckets[i];
+
+                return count;
+            }
+
+            /// <summary>该组的占比：P(帧耗时 &gt; 阈值)。两组对比即可知道按键是否真的把帧推过了阈值。</summary>
+            public double FractionOver(double ms) => Count == 0 ? double.NaN : CountOver(ms) / (double)Count;
+
+            public string Format()
+                => string.Create(CultureInfo.InvariantCulture,
+                    $" n={Count} mean={Mean:F3} p50={Percentile(0.5):F3} p90={Percentile(0.9):F3} "
+                    + $"p99={Percentile(0.99):F3} p99.9={Percentile(0.999):F3} max={Max:F3} "
+                    + $"over0.5={CountOver(0.5)} over1={CountOver(1.0)} over2={CountOver(2.0)} over5={CountOver(5.0)}");
         }
     }
 }
