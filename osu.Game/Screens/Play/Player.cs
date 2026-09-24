@@ -342,6 +342,12 @@ namespace osu.Game.Screens.Play
 
             // [Ez] Wire judgment diagnostics, sub-frame correction, and timing trace to config toggles.
             EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
+            EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Enabled = EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled;
+
+            // 消融开关走环境变量，避免为探针新增可持久化设置项。
+            EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.SkipForceMiss =
+                Environment.GetEnvironmentVariable("EZ_PRESS_PROBE_SKIP_FORCE_MISS") == "1";
+
             EzOsuGame.Timing.EzSubFrameCorrection.Enabled = ez2Config.Get<bool>(Ez2Setting.EzSubFrameCorrectionEnabled);
             EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
 
@@ -1453,7 +1459,10 @@ namespace osu.Game.Screens.Play
 
             // [Ez] Clear any stale diagnostic samples from a previous play.
             if (EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled)
+            {
                 EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Clear();
+                EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Clear();
+            }
 
             if (EzOsuGame.Diagnostics.EzTimingTrace.Enabled)
             {
@@ -1520,6 +1529,8 @@ namespace osu.Game.Screens.Play
                 {
                     EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Flush();
                     EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Clear();
+                    EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Flush();
+                    EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Clear();
                 });
             }
 

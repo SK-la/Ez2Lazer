@@ -108,8 +108,12 @@ namespace osu.Game.Rulesets.UI
         {
             stopwatch.Restart();
 
+            int iterations = 0;
+
             do
             {
+                iterations++;
+
                 // update clock is always trying to approach the aim time.
                 // it should be provided as the original value each loop.
                 updateClock();
@@ -121,8 +125,17 @@ namespace osu.Game.Rulesets.UI
                 UpdateSubTreeMasking();
             } while (state == PlaybackState.RequiresCatchUp && stopwatch.ElapsedMilliseconds < max_catchup_milliseconds);
 
+            // [Ez] Catch-up loop count of this pass, read by the press-latency probe.
+            EzLastUpdateIterations = iterations;
+
             return true;
         }
+
+        /// <summary>
+        /// [Ez] Number of subtree passes performed by the last <see cref="UpdateSubTree"/> call.
+        /// Values above 1 mean the pass was a catch-up. Probe only; never read for gameplay logic.
+        /// </summary>
+        public static int EzLastUpdateIterations;
 
         private void updateClock()
         {
