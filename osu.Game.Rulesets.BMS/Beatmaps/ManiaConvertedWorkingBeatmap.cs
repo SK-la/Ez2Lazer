@@ -19,14 +19,16 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     /// <summary>
     /// Wraps a BMS chart as a pre-converted Mania beatmap, so gameplay uses full mania pipelines.
     /// </summary>
+    /// <remarks>
+    /// <see cref="GetBeatmap"/> exposes the display copy built in the constructor, and
+    /// <see cref="GetPlayableBeatmap"/> derives a fresh working copy from the BMS source on every call.
+    /// The two never share mutable state: conversion mods, difficulty mods, processors and
+    /// <see cref="HitObject.ApplyDefaults"/> all rewrite the beatmap in place, so applying them to the
+    /// display copy would stack their effect across calls (mirroring twice restores the original, a
+    /// reshuffle reshuffles again) and leak it into every other consumer of this working beatmap.
+    /// </remarks>
     public class ManiaConvertedWorkingBeatmap : WorkingBeatmap
     {
-        /// <summary>
-        /// Gameplay, previews, and Ez analysis may call <see cref="GetPlayableBeatmap"/> concurrently on the same
-        /// instance; in-place ApplyDefaults mutates shared lists → lock for thread safety.
-        /// </summary>
-        private readonly object playableMutationLock = new object();
-
         private readonly ManiaBeatmap maniaBeatmap;
         private readonly AudioManager audioManager;
         private readonly double beatmapLength;
@@ -64,6 +66,10 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 beatmapLength = maniaBeatmap.HitObjects.Max(h => h.GetEndTime()) + 2000;
         }
 
+        /// <remarks>
+        /// Idempotent: an input that is already a <see cref="ManiaBeatmap"/> is returned unchanged, so a caller that
+        /// intends to mutate the result must derive its own copy first.
+        /// </remarks>
         public static ManiaBeatmap ConvertToManiaBeatmap(IBeatmap bmsBeatmap)
         {
             if (bmsBeatmap is ManiaBeatmap existing)
@@ -89,7 +95,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 {
                     CircleSize = columnCount
                 },
-                ControlPointInfo = bmsBeatmap.ControlPointInfo
+                // 产物自己持有一份 control points：mod、processor 与 ApplyDefaults 都会就地改写它，
+                // 共享源的实例等于把 mania 侧的改写写回 BMS 源谱面。
+                ControlPointInfo = bmsBeatmap.ControlPointInfo.DeepClone()
             };
 
             foreach (var hitObject in bmsBeatmap.HitObjects.OfType<BMSHitObject>())
@@ -126,61 +134,72 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return maniaBeatmap;
         }
 
-        protected override IBeatmap GetBeatmap()
-        {
-            lock (playableMutationLock)
-            {
-                return maniaBeatmap;
-            }
-        }
+        protected override IBeatmap GetBeatmap() => maniaBeatmap;
 
         public override IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
+            => CreatePlayableFromSource(SourceBeatmap.Beatmap, ruleset, mods, token);
+
+        /// <summary>
+        /// Derives a fresh playable mania beatmap from a BMS source chart, applying the mods and defaults pipeline.
+        /// </summary>
+        /// <remarks>
+        /// Every call builds a brand-new copy. Conversion mods, difficulty mods, processors and
+        /// <see cref="HitObject.ApplyDefaults"/> all rewrite the beatmap in place, so reusing one instance across
+        /// calls would stack their effect (mirroring twice restores the original, a reshuffle reshuffles again)
+        /// and leak it into every other consumer — including the display copy returned by <see cref="GetBeatmap"/>.
+        /// <para>
+        /// <paramref name="source"/> is expected to be a BMS chart. An already-mania source is handed back
+        /// unchanged by <see cref="ConvertToManiaBeatmap"/> and would therefore be rewritten in place, so such a
+        /// caller must derive its own copy first.
+        /// </para>
+        /// </remarks>
+        internal static ManiaBeatmap CreatePlayableFromSource(IBeatmap source, IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
         {
-            lock (playableMutationLock)
+            // ConvertToManiaBeatmap 已经为产物深拷贝了 control points，这里不再重复拷贝。
+            ManiaBeatmap playable = ConvertToManiaBeatmap(source);
+
+            var rulesetInstance = ruleset.CreateInstance();
+
+            foreach (var mod in mods.OfType<IApplicableToDifficulty>())
             {
-                var rulesetInstance = ruleset.CreateInstance();
-
-                foreach (var mod in mods.OfType<IApplicableToDifficulty>())
-                {
-                    token.ThrowIfCancellationRequested();
-                    mod.ApplyToDifficulty(maniaBeatmap.Difficulty);
-                }
-
-                foreach (var mod in mods.OfType<IApplicableAfterBeatmapConversion>())
-                {
-                    token.ThrowIfCancellationRequested();
-                    mod.ApplyToBeatmap(maniaBeatmap);
-                }
-
-                var processor = rulesetInstance.CreateBeatmapProcessor(maniaBeatmap);
-
-                if (processor != null)
-                {
-                    foreach (var mod in mods.OfType<IApplicableToBeatmapProcessor>())
-                        mod.ApplyToBeatmapProcessor(processor);
-
-                    processor.PreProcess();
-                }
-
-                foreach (var obj in maniaBeatmap.HitObjects)
-                {
-                    token.ThrowIfCancellationRequested();
-                    obj.ApplyDefaults(maniaBeatmap.ControlPointInfo, maniaBeatmap.Difficulty, token);
-                }
-
-                processor?.PostProcess();
-
-                foreach (var mod in mods.OfType<IApplicableToHitObject>())
-                {
-                    foreach (var obj in maniaBeatmap.HitObjects)
-                    {
-                        token.ThrowIfCancellationRequested();
-                        mod.ApplyToHitObject(obj);
-                    }
-                }
-
-                return maniaBeatmap;
+                token.ThrowIfCancellationRequested();
+                mod.ApplyToDifficulty(playable.Difficulty);
             }
+
+            foreach (var mod in mods.OfType<IApplicableAfterBeatmapConversion>())
+            {
+                token.ThrowIfCancellationRequested();
+                mod.ApplyToBeatmap(playable);
+            }
+
+            var processor = rulesetInstance.CreateBeatmapProcessor(playable);
+
+            if (processor != null)
+            {
+                foreach (var mod in mods.OfType<IApplicableToBeatmapProcessor>())
+                    mod.ApplyToBeatmapProcessor(processor);
+
+                processor.PreProcess();
+            }
+
+            foreach (var obj in playable.HitObjects)
+            {
+                token.ThrowIfCancellationRequested();
+                obj.ApplyDefaults(playable.ControlPointInfo, playable.Difficulty, token);
+            }
+
+            processor?.PostProcess();
+
+            foreach (var mod in mods.OfType<IApplicableToHitObject>())
+            {
+                foreach (var obj in playable.HitObjects)
+                {
+                    token.ThrowIfCancellationRequested();
+                    mod.ApplyToHitObject(obj);
+                }
+            }
+
+            return playable;
         }
 
         public override Texture? GetBackground() => SourceBeatmap.GetBackground();

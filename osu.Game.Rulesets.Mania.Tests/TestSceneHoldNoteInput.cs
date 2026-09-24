@@ -14,6 +14,7 @@ using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -531,8 +532,16 @@ namespace osu.Game.Rulesets.Mania.Tests
             AddAssert("body judgement time indicates during hold", () => judgementResults.Single(j => j.HitObject is HoldNoteBody).TimeAbsolute, () => Is.EqualTo(time_during_hold_1).Within(100));
         }
 
+        /// <summary>
+        /// 转换产物拥有自己的 HitObject，所以本用例持有的源对象并不是被判定的那个实例；按类型 / 时间 / 列认同一个对象。
+        /// </summary>
+        private static bool isSameObject(HitObject judged, HitObject source)
+            => judged?.GetType() == source.GetType()
+               && judged.StartTime == source.StartTime
+               && (judged as IHasColumn)?.Column == (source as IHasColumn)?.Column;
+
         private void assertHitObjectJudgement(HitObject hitObject, HitResult result)
-            => AddAssert($"object judged as {result}", () => judgementResults.First(j => j.HitObject == hitObject).Type, () => Is.EqualTo(result));
+            => AddAssert($"object judged as {result}", () => judgementResults.First(j => isSameObject(j.HitObject, hitObject)).Type, () => Is.EqualTo(result));
 
         private void assertHeadJudgement(HitResult result)
             => AddAssert($"head judged as {result}", () => judgementResults.First(j => j.HitObject is Note).Type, () => Is.EqualTo(result));

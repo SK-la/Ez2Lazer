@@ -4,8 +4,10 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
@@ -28,6 +30,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     internal static class ManiaBeatmapBinding
     {
         private const int unbound = -1;
+
+        private static int sharedBindingWarnCount;
 
         private sealed class BindingRecord
         {
@@ -77,6 +81,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         private static void record(IBeatmap beatmap, EzEnumHitMode hitMode, bool owned)
         {
+            warnIfSharedInstanceBound(beatmap, hitMode, owned);
+
             var entry = records.GetValue(beatmap, _ => new BindingRecord());
             bool conflict;
             bool isOwned;
@@ -101,6 +107,28 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             if (isOwned)
                 Debug.Fail(message);
+        }
+
+        /// <summary>
+        /// 共享缓存条目（<see cref="EzPlayableBeatmapCache.GetShared"/>）按契约只读：对它做就地绑定，等于把一个 hitmode 的
+        /// Judgement / HitWindows 泄漏给同进程里拿到同一实例的其它消费者，而且是 last-wins。
+        /// </summary>
+        /// <remarks>
+        /// 只报不改：这是调用方用错了入口（该走 <see cref="EzPlayableBeatmapCache.GetBound"/>），改绑定语义会把问题藏起来。
+        /// </remarks>
+        private static void warnIfSharedInstanceBound(IBeatmap beatmap, EzEnumHitMode hitMode, bool owned)
+        {
+            if (owned || !EzPlayableBeatmapCache.IsSharedInstance(beatmap))
+                return;
+
+            if (Interlocked.Increment(ref sharedBindingWarnCount) > 10)
+                return;
+
+            string message = $"[ManiaJudgeBinding] bound a shared EzPlayableBeatmapCache instance in place (hitmode {hitMode}, "
+                             + $"objects={beatmap.HitObjects.Count}); shared instances are read-only, ask for GetBound instead.";
+
+            Logger.Log(message, Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+            Debug.Fail(message);
         }
     }
 }

@@ -51,6 +51,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                         var ruleset = new ManiaRuleset();
                         var playableBeatmap = ruleset.CreateBeatmapConverter(testBeatmap).Convert();
 
+                        // Convert() 只做转换，不跑 ApplyDefaults。产物现在是独占副本（不再复用源对象上已应用的默认值），
+                        // 判定窗口必须在这里补上，否则仿真拿到的对象没有窗口，整条时间线得 0 分。
+                        foreach (var hitObject in playableBeatmap.HitObjects)
+                            hitObject.ApplyDefaults(playableBeatmap.ControlPointInfo, playableBeatmap.Difficulty);
+
                         var importedSet = beatmapManager.Import(TestResources.CreateTestBeatmapSetInfo(1, rulesets: new[] { ruleset.RulesetInfo }));
                         Assert.That(importedSet, Is.Not.Null);
 

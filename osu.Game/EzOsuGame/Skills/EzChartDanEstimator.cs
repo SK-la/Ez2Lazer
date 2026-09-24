@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Rulesets.Mods;
@@ -46,7 +47,7 @@ namespace osu.Game.EzOsuGame.Skills
             bool live = EzModRate.AffectsChartSkills(mods);
 
             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-            var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
+            var playable = EzPlayableBeatmapCache.GetShared(working, beatmapInfo.Ruleset, mods);
 
             IReadOnlyDictionary<string, double>? msd;
 
@@ -92,7 +93,7 @@ namespace osu.Game.EzOsuGame.Skills
             float rate = EzModRate.Resolve(mods);
 
             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-            var playable = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
+            var playable = EzPlayableBeatmapCache.GetShared(working, beatmapInfo.Ruleset, mods);
 
             cancellationToken.ThrowIfCancellationRequested();
 

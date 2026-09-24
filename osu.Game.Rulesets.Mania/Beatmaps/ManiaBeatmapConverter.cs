@@ -121,6 +121,13 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
             return beatmap;
         }
 
+        /// <summary>
+        /// 源谱面已是 mania 时（.osu mania 解码结果、编辑器构建的谱面、以 mania 谱面为源的转换），
+        /// 产物必须拥有自己的 HitObject：后转换 mod 会就地改 Column/时间，绑定会写 Judgement/HitWindows，
+        /// ApplyDefaults 会重建嵌套对象——复用源实例等于把这些写回解码谱面，并让同一份对象被多次转换共享。
+        /// </summary>
+        protected override ManiaHitObject ConvertCompatibleHitObject(ManiaHitObject obj) => (ManiaHitObject)obj.Clone();
+
         protected override IEnumerable<ManiaHitObject> ConvertHitObject(HitObject original, IBeatmap beatmap, CancellationToken cancellationToken)
         {
             LegacyHitObjectType legacyType;
@@ -129,7 +136,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
             {
                 case ManiaHitObject maniaObj:
                 {
-                    yield return maniaObj;
+                    yield return (ManiaHitObject)maniaObj.Clone();
 
                     yield break;
                 }

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -70,7 +71,7 @@ namespace osu.Game.EzOsuGame.Skills
                 if (!working.BeatmapInfo.Ruleset.Available)
                     working.BeatmapInfo.Ruleset.Available = true;
 
-                playable = working.GetPlayableBeatmap(working.BeatmapInfo.Ruleset);
+                playable = EzPlayableBeatmapCache.GetShared(working, working.BeatmapInfo.Ruleset);
                 notes = EzMinaNoteConverter.Convert(playable);
             }
             catch (Exception e)

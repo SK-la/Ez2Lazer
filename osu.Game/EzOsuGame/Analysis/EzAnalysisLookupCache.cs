@@ -3,11 +3,8 @@
 
 using System;
 using System.Collections.Generic;
-using System.Threading;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
-using osu.Game.Configuration;
-using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 
@@ -20,81 +17,30 @@ namespace osu.Game.EzOsuGame.Analysis
         public readonly Mod[] OrderedMods;
         public readonly int ModsSignature;
 
-        private static int modSnapshotFailCount;
-
         public EzAnalysisLookupCache(BeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, IEnumerable<Mod>? mods)
         {
             BeatmapInfo = beatmapInfo;
             Ruleset = (rulesetInfo as RulesetInfo) ?? BeatmapInfo.Ruleset;
+
             // Clone so wedge analysis does not share setting instances with SelectedMods while hashing.
-            // Nullable Seed fill uses EzModSeed.Resolve during GetPlayable (update-thread safe).
-            OrderedMods = createModSnapshot(mods);
-            ModsSignature = computeModsSignature(OrderedMods);
+            // The snapshot also carries the effective seed, so this key equals what the conversion will use.
+            OrderedMods = EzModSignature.SnapshotForConversion(mods);
+            ModsSignature = EzModSignature.Compute(OrderedMods);
         }
 
         /// <summary>
-        /// Cheap mods signature for UI cache keys: same value as <see cref="ModsSignature"/>, but reads the
-        /// live mods directly instead of deep-cloning a storage snapshot. The clone exists to freeze what gets
-        /// persisted; a cache key only needs the type + setting values.
+        /// Cheap mods signature for conversion-derived cache keys, computed straight off the live mods.
         /// </summary>
-        public static int ComputeModsSignature(IEnumerable<Mod>? mods)
-        {
-            var hash = new HashCode();
-
-            if (mods != null)
-            {
-                // 包含顺序。顺序对转换和游戏很重要。
-                foreach (var mod in mods)
-                {
-                    hash.Add(mod.GetType());
-
-                    // 镜像 Mod.GetHashCode() 语义，但在计算签名后与 mod 实例变异解耦。
-                    // 仅包含通过 [SettingSource] 公开的设置。
-                    foreach (var setting in mod.SettingsBindables)
-                        hash.Add(setting.GetUnderlyingSettingValue());
-                }
-            }
-
-            return hash.ToHashCode();
-        }
-
-        private static int computeModsSignature(Mod[] orderedMods)
-            => ComputeModsSignature(orderedMods);
-
-        private static Mod[] createModSnapshot(IEnumerable<Mod>? mods)
-        {
-            if (mods == null)
-                return Array.Empty<Mod>();
-
-            var list = new List<Mod>();
-
-            foreach (var mod in mods)
-            {
-                try
-                {
-                    list.Add(mod.DeepClone());
-                }
-                catch
-                {
-                    if (Interlocked.Increment(ref modSnapshotFailCount) <= 10)
-                    {
-                        Logger.Log(
-                            $"[EzAnalysis] Mod.DeepClone() failed for {mod.GetType().FullName}. Falling back to original instance.",
-                            Ez2ConfigManager.LOGGER_NAME,
-                            LogLevel.Important);
-                    }
-
-                    list.Add(mod);
-                }
-            }
-
-            return list.ToArray();
-        }
+        /// <remarks>
+        /// Resolves null <see cref="IHasSeed.Seed"/> values as a side effect, so the key equals the conversion
+        /// input rather than the pre-roll user-visible state.
+        /// </remarks>
+        public static int ComputeModsSignature(IEnumerable<Mod>? mods) => EzModSignature.ComputeResolvingSeeds(mods);
 
         public bool Equals(EzAnalysisLookupCache other) => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
                                                            && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
                                                            && Ruleset.Equals(other.Ruleset)
-                                                           && ModsSignature == other.ModsSignature;
+                                                           && EzModSignature.SequenceEqual(OrderedMods, other.OrderedMods);
 
         public override int GetHashCode()
         {

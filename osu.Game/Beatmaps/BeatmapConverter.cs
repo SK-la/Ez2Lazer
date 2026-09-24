@@ -99,7 +99,7 @@ namespace osu.Game.Beatmaps
             {
                 if (obj is T tObj)
                 {
-                    result.Add(tObj);
+                    result.Add(ConvertCompatibleHitObject(tObj));
                     continue;
                 }
 
@@ -125,6 +125,20 @@ namespace osu.Game.Beatmaps
         /// Creates the <see cref="Beatmap{T}"/> that will be returned by this <see cref="BeatmapProcessor"/>.
         /// </summary>
         protected virtual Beatmap<T> CreateBeatmap() => new Beatmap<T>();
+
+        /// <summary>
+        /// Handles a source hit object that is already of the target type <typeparamref name="T"/>, which
+        /// <c>convertHitObjects</c> would otherwise put into the converted beatmap as-is.
+        /// </summary>
+        /// <remarks>
+        /// The default reuse makes the converted beatmap share hit object instances with its source, so every
+        /// in-place write the pipeline performs on a converted object (post-conversion mods, judgement and hit
+        /// window binding, <see cref="HitObject.ApplyDefaults"/>) also lands on the source — and, since the same
+        /// source object is handed out again by the next conversion, on every other converted beatmap as well.
+        /// Override this to return <see cref="HitObject.Clone"/> when the resulting beatmap must own its hit
+        /// objects; see <c>ManiaBeatmapConverter</c>.
+        /// </remarks>
+        protected virtual T ConvertCompatibleHitObject(T obj) => obj;
 
         /// <summary>
         /// Performs the conversion of a hit object.
