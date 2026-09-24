@@ -82,13 +82,13 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static int lastGen2;
 
         private static long pressFrameCount;
-        private static double firstPressAtTotalMs;
+        private static double sincePrevFrameTotalMs;
         private static double pressColumnTotalMs;
 
         private static int pressesInFrame;
         private static double pressColumnMsInFrame;
         private static long currentFrameStartTimestamp;
-        private static double firstPressAtMsInFrame = double.MaxValue;
+        private static double sincePrevFrameMinMs = double.MaxValue;
 
         /// <summary>探针读一次「非位置输入队列」的长度，用于给出键绑定派发的 O(n)。只在整局开始时读一次。</summary>
         public static void ReportInputQueueCount(int count) => inputQueueCount = count;
@@ -112,7 +112,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             long ThreadAllocDeltaBytes,
             int PressesInFrame,
             double PressColumnMs,
-            double FirstPressAtMs,
+            double SincePrevFrameMs,
             int FscIterations,
             int Gen0Delta,
             int Gen1Delta,
@@ -124,11 +124,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// <param name="pressEnterTs">该次按键进入本列的 wall 戳（<c>Stopwatch</c> 计时单位）。</param>
         /// <param name="columnMs">该次按键在本列花掉的时长。</param>
         /// <remarks>
-        /// 有了 <paramref name="pressEnterTs"/> 就能把一次按键帧切成三段：
-        /// <c>FirstPressAtMs</c>（帧起到按键进入本列） + <c>PressColumnMs</c>（本列工时）
-        /// + 余量（<c>ElapsedMs</c> 减前两者，即按键之后的帧内工作）。
-        /// 判读：若 <c>FirstPressAtMs</c> 占了帧长的大头，说明时间花在「按键被派发到本列之前」的机器上；
-        /// 若余量占大头，说明是判定落地**之后**的帧内工作（结果扇出、容器增删、布局失效等）。
+        /// <paramref name="pressEnterTs"/> 只用来算 <c>SincePrevFrameMs</c>（距上一帧边界多远）。
+        /// **它不是「本帧按键前的工作量」**：零点取的是上一帧的 FSC 调用点，所以这个间隔里是
+        /// 上一帧剩余时间、draw、present 与帧间等待。真正属于按键自身工作的只有 <paramref name="columnMs"/>。
         /// </remarks>
         public static void NotifyPress(long pressEnterTs, double columnMs)
         {
@@ -140,10 +138,10 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             if (currentFrameStartTimestamp != 0)
             {
-                double intoFrameMs = (pressEnterTs - currentFrameStartTimestamp) * 1000.0 / Stopwatch.Frequency;
+                double sincePrevFrameMs = (pressEnterTs - currentFrameStartTimestamp) * 1000.0 / Stopwatch.Frequency;
 
-                if (intoFrameMs < firstPressAtMsInFrame)
-                    firstPressAtMsInFrame = intoFrameMs;
+                if (sincePrevFrameMs < sincePrevFrameMinMs)
+                    sincePrevFrameMinMs = sincePrevFrameMs;
             }
         }
 
@@ -185,7 +183,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 seed(gcPauseTicks, threadAllocated, processAllocated, gen0, gen1, gen2);
                 pressesInFrame = 0;
                 pressColumnMsInFrame = 0;
-                firstPressAtMsInFrame = double.MaxValue;
+                sincePrevFrameMinMs = double.MaxValue;
                 firstFrameWallMs = wallMs;
                 return;
             }
@@ -198,8 +196,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 withPress.Add(elapsedMs);
                 pressFrameCount++;
 
-                if (firstPressAtMsInFrame != double.MaxValue)
-                    firstPressAtTotalMs += firstPressAtMsInFrame;
+                if (sincePrevFrameMinMs != double.MaxValue)
+                    sincePrevFrameTotalMs += sincePrevFrameMinMs;
 
                 pressColumnTotalMs += pressColumnMsInFrame;
             }
@@ -231,7 +229,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     threadAllocDelta,
                     pressesInFrame,
                     pressColumnMsInFrame,
-                    pressesInFrame > 0 && firstPressAtMsInFrame != double.MaxValue ? firstPressAtMsInFrame : double.NaN,
+                    pressesInFrame > 0 && sincePrevFrameMinMs != double.MaxValue ? sincePrevFrameMinMs : double.NaN,
                     FrameStabilityContainer.EzLastUpdateIterations,
                     gen0 - lastGen0,
                     gen1 - lastGen1,
@@ -252,7 +250,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             seed(gcPauseTicks, threadAllocated, processAllocated, gen0, gen1, gen2);
             pressesInFrame = 0;
             pressColumnMsInFrame = 0;
-            firstPressAtMsInFrame = double.MaxValue;
+            sincePrevFrameMinMs = double.MaxValue;
         }
 
         private static void seed(long gcPauseTicks, long threadAllocated, long processAllocated, int gen0, int gen1, int gen2)
@@ -283,9 +281,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
             lastGen0 = lastGen1 = lastGen2 = 0;
             pressesInFrame = 0;
             pressColumnMsInFrame = 0;
-            firstPressAtMsInFrame = double.MaxValue;
+            sincePrevFrameMinMs = double.MaxValue;
             pressFrameCount = 0;
-            firstPressAtTotalMs = 0;
+            sincePrevFrameTotalMs = 0;
             pressColumnTotalMs = 0;
             inputQueueCount = -1;
 
@@ -306,7 +304,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             var snapshot = details;
 
             var sb = new StringBuilder();
-            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,FirstPressAtMs,FscIter,Gen0Delta,Gen1Delta,Gen2Delta");
+            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,SincePrevFrameMs,FscIter,Gen0Delta,Gen1Delta,Gen2Delta");
 
             for (int i = 0; i < sampleCount; i++)
             {
@@ -319,7 +317,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(s.ThreadAllocDeltaBytes).Append(',');
                 sb.Append(s.PressesInFrame).Append(',');
                 sb.Append(num(s.PressColumnMs)).Append(',');
-                sb.Append(num(s.FirstPressAtMs)).Append(',');
+                sb.Append(num(s.SincePrevFrameMs)).Append(',');
                 sb.Append(s.FscIterations).Append(',');
                 sb.Append(s.Gen0Delta).Append(',');
                 sb.Append(s.Gen1Delta).Append(',');
@@ -399,15 +397,16 @@ namespace osu.Game.EzOsuGame.Diagnostics
             if (pressFrameCount > 0)
             {
                 double meanElapsed = withPress.Sum / pressFrameCount;
-                double meanFirst = firstPressAtTotalMs / pressFrameCount;
+                double meanSincePrev = sincePrevFrameTotalMs / pressFrameCount;
                 double meanColumn = pressColumnTotalMs / pressFrameCount;
 
-                // 三段切分：帧起→按键进入本列 / 本列工时 / 按键之后到帧尾。
+                // 只有 pressColumnMean 是按键自身的工作量。sincePrevFrameMean 的零点在上一帧边界，
+                // 里面是上一帧剩余时间 + draw/present + 帧间等待，**不是**本帧按键前的工作。
                 sb.Append(Environment.NewLine);
                 sb.Append(CultureInfo.InvariantCulture,
                     $"pressSplit n={pressFrameCount} elapsedMean={meanElapsed:F3}ms "
-                    + $"firstPressAtMean={meanFirst:F3}ms pressColumnMean={meanColumn:F3}ms "
-                    + $"afterPressMean={meanElapsed - meanFirst - meanColumn:F3}ms "
+                    + $"sincePrevFrameMean={meanSincePrev:F3}ms pressColumnMean={meanColumn:F3}ms "
+                    + $"afterPressMean={meanElapsed - meanSincePrev - meanColumn:F3}ms "
                     + $"inputQueue={inputQueueCount}");
             }
 

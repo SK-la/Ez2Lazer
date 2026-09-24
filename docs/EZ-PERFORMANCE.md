@@ -98,6 +98,56 @@
 
 ---
 
+## 2.4 2026-09-24 按键延迟实测（局内 probe：结论是「不是热路径问题」）
+
+工具：`EzPressLatencyDiagnostics`（按键分段）+ `EzFrameStallDiagnostics`（帧级 stall）+ 配套分析脚本
+`AnalyzePressLatency.ps1` / `AnalyzeFrameStall.ps1`。开关：`EZ_JUDGMENT_PROBE`（总开关，落 `diagnostics/`）、
+`EZ_FRAME_PROBE_MS`（stall 阈值）、`EZ_FRAME_PROBE_LIGHT`（关掉每帧 GC/分配读数）、
+`EZ_PRESS_PROBE_SKIP_FORCE_MISS`（消融强制 miss 扫描）。**这些只在诊断开启时生效。**
+
+#### 2.4.1 本局条件（先看这个，否则数字会被误读）
+
+| 项 | 实测 |
+|----|------|
+| 更新帧数 / 跨度 | 194,002 帧 / 98.6 s ≈ **1968 更新帧/s**（`FrameElapsedMs` p50 = 0.474 ms，隐含 p50 **2110 fps**） |
+| 按键 | 1068 次 / 89.2 s ≈ 12 次/s；空按 146（13.7%）；多键帧 102 |
+| 帧耗时 >2 ms / >5 ms | 1 / 0 帧 |
+| GC 暂停累计 | 1565 ms（占 89.2 s 的 1.75%，含后台 GC，是上界）；gen2 = 0 |
+
+**这不是高压场景。** 更新线程相对 16.6 ms 帧预算有约 35× 余量，因此本局任何亚毫秒数字都不能用来解释体感 4 ms。
+
+#### 2.4.2 已定案
+
+| 结论 | 证据 |
+|------|------|
+| **`PreColumnMs` 不是代码开销，是「等下一帧来处理这条输入」** | 空按与真判定的等待**相同**：`routed=0` p50 **0.625 ms** / `routed=1` p50 **0.558 ms**；而两者实际工作量差 20 倍（`ColumnMs` 0.005 vs 0.103 ms）。等待与 `FrameAgeMs` 强相关：age 0–2 ms → `PreColumnMs` p50 **0.557 ms**，age 2–5 ms → **1.830 ms**。结论：随帧节奏变化，不随代码量变化 |
+| **按键自身的 inline 工时极小且不随物量增长** | `ColumnMs`（`OnPressed` 全程，含判定 + 同步结果扇出）p50 **0.101 ms** / p90 0.134 / max 1.127；空按 p50 **0.005 ms**。列内条目 0–5 都有样本，未随 `Entries` 增长 |
+| **按键帧确实更长，但大头不在判定代码里** | 按键帧 p50 1.150 ms vs 非按键帧 0.450 ms（+0.70 ms，P(>1 ms) 27.4×）；而 `PressColumnMs / ElapsedMs` 仅 p50 **6.2%**。差额落在本帧其他位置（判定落地后的 sprite/HUD、`Schedule` 出去的取样播放、draw），不是 `OnPressed` |
+| **大停顿与按键无关，且本局几乎没有** | >8 ms 的帧只有 3 个，全部 `presses=0`，`FrameIdx` = 2、194002、194003 ⇒ **开局首帧与退出帧**。1.5–3 ms 段 GC 占 41–48% |
+| **按键帧的 `max` = 3.851 ms、P(>5 ms) = 0** | 按键造成的帧长有上界，不制造真正的大卡顿 |
+
+#### 2.4.3 埋点自身的两个坑（登记以免重犯）
+
+1. **只在 >阈值的帧上做「按键帧 vs 非按键帧」对比会得出错误结论。** 条件在 `ElapsedMs > 1.5 ms` 上会让两组都被拉平（实测两组 p50 只差 0.02 ms），从而误判「按键与慢帧无关」。正确做法是双直方图 —— 记录**全部**帧并按键存在与否分组（已实现在 `EzFrameStallDiagnostics.FormatSummary`）。
+2. **`SincePrevFrameMs` 的零点在上一帧边界，不是「本帧按键前的工作量」。** 它含上一帧剩余时间、draw/present 与帧间等待。只有 `PressColumnMs` 是按键自身工作。该字段原名为 `FirstPressAtMs` 并曾被误读为派发开销，已改名。
+
+#### 2.4.4 明确不再重开的两个方向
+
+- **输入队列整树重建**：§2.1 的 `INPUT-QUEUE-FRAME` / `FW-BUTTON-QUEUE-REUSE` 已落地；框架侧共享构建被 `TestSceneInputQueueChange.CombinedClicks` 证伪（`FW-INPUT-QUEUE-DISPATCH`），不再提。
+- **lane controller 结构**：§2.3 已实测不改。
+
+#### 2.4.5 下一步（要复现体感，先满足条件）
+
+本局帧率远超体感阈值，所以结论只能是「热路径不是原因」。要解释体感 4 ms，必须先在**能复现的条件**下测，并把条件一并记录（当前 probe 不记录这些）：
+
+- 帧率上限 / 垂直同步 / `FrameSync` 设置、分辨率与皮肤
+- 谱面 KPS 与列数、音频输出模式（共享 / ASIO / 独占）
+- 是否**当场感觉**延迟（否则无法判断指标是否代表体感）
+
+在该条件下 `PreColumnMs` 才是体感延迟的主要成分（它 = 输入线程递送 + 等下一帧），此时该优化的是**帧节奏与输入递送时机**，不是判定代码。
+
+---
+
 ## 3. 2026-08-08 音频后端排查记录
 
 **起点现象**：启动后前 3–5 秒 Upl 极高、约 60 FPS，随后回到数百 FPS；稳定态选歌与局内仍有密集 FBO 峰值；每次启动稳定帧不一致（600 / 900 / 1000+）。
@@ -174,6 +224,8 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | `HitModeValidResultsAllocTest` | `ResultFor` 零分配 |
 | `DetachedBeatmapStoreFrameBudget` 单测 | 每帧 Drain ≤ 24 |
 | `BackgroundDataStoreProcessor` 测试覆写 | `StartupBackfillDelay` 可置 0 |
+| `AnalyzePressLatency.ps1` | 离线读 `diagnostics/presslatency_*.csv`：分 route/空按、FrameAge 分桶、同帧批处理、GC 与缓存命中 |
+| `AnalyzeFrameStall.ps1` | 离线读 `diagnostics/framestall_*.csv` + `.summary.txt`：全帧双直方图（按键帧 vs 非按键帧）、GC 因果判据、慢帧归因、与按键尾部对照。见 §2.4 |
 
 性能改动的黄金标准不变：不得破坏 `TestSceneReplaySessionParity` / `ManiaCrossSourceInvariantTest` / `ManiaJudgePrecedenceParityTest`。
 
@@ -220,3 +272,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-21 | **LN-HOLD-FBO** / **LN-INPUT-SLOT** 生产落地。消融证实按住才 ForceRedraw；观测代码 `#if DEBUG` 剥离 |
 | 2026-09-23 | §2.2/§2.3：局内判定与 HUD 热路径去分配（**HITPOS-CACHE** / **JUDGE-NO-CLOSURE** / **POLICY-SCRATCH** / **FORCEMISS-SNAPSHOT**），并记录 3 项「评估后不做」（samples 数组缓存、transform 序列复用、`moveMarker` 手写插值）与 lane controller 索引维护「实测不改」结论 |
 | 2026-09-24 | §2.2：**MARKER-EASE-FIX**——`EzHUDHitTimingColumns` 的判定标记恢复为真正的缓动（去掉把缓动变成空变换的直接赋值），并补上 `MoveHeight` / `StopMovement` 与在途变换的两处交互；原「`moveMarker` 手写插值」候选按「保留框架缓动」结案，不再列为待办 |
+| 2026-09-24 | §2.4：**按键延迟实测**——新增按键分段 / 帧级 stall 探针与两个分析脚本。结论：`PreColumnMs` 是**等下一帧**（空按与真判定等待相同，且与 `FrameAgeMs` 强相关），不是代码开销；`ColumnMs`（按键自身 inline 工时）p50 0.101 ms；>8 ms 停顿只在开局/退出帧。登记埋点自身的两个误读坑（>阈值上做对比、`SincePrevFrameMs` 零点位置）与「输入队列整树重建 / lane controller 结构」两个不再重开的方向。该局跑在 ≈1968 更新帧/s，**不是高压场景**，故不能解释体感 4 ms；下一步给出复现条件清单 |

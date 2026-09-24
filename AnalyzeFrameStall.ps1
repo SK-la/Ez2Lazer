@@ -211,11 +211,13 @@ if ($SummaryPath -and (Test-Path -LiteralPath $SummaryPath)) {
                 Write-Host ("    按键帧比非按键帧：p50 {0:+#.000;-#.000;0}ms   p90 {1:+#.000;-#.000;0}ms" -f $deltaP50, $deltaP90)
                 Write-Host ("    P(>1ms): {0:P2} vs {1:P2}  → {2:F1}x   （按键帧占全帧 {3:P2}）" -f `
                         $p1yes, $p1no, $ratio, ($parsed['withPress_n'] / ($parsed['withPress_n'] + $parsed['noPress_n'])))
-                Write-Host '    读法：p50 与 p90 同时抬高 → 按键是稳定地给帧加开销，不是只让尾部变长。'
+                Write-Host '    读法：p50 与 p90 同时抬高 → 按键帧确实更长。但先对照下表「按键工时/帧长」：'
+                Write-Host '          若占比很低，帧长的大头不在判定代码里（draw / 取样 / HUD），'
+                Write-Host '          并且要先确认本局帧率是否已远超体感阈值（见 EZ-PERFORMANCE.md §2.4）。'
 
-                # 三段切分（只有新探针会写这行）：帧起→按键进入本列 / 本列工时 / 本列之后。
+                # 切分（只有新探针会写这行）。注意只有「本列工时」是按键自身的工作量。
                 $splitLine = @(Get-Content -LiteralPath $SummaryPath | Where-Object { $_ -match '^pressSplit' })
-                if ($splitLine.Count -gt 0 -and $splitLine[0] -match 'elapsedMean=([\d.]+)ms firstPressAtMean=([\d.]+)ms pressColumnMean=([\d.]+)ms afterPressMean=(-?[\d.]+)ms inputQueue=(-?\d+)') {
+                if ($splitLine.Count -gt 0 -and $splitLine[0] -match 'elapsedMean=([\d.]+)ms sincePrevFrameMean=([\d.]+)ms pressColumnMean=([\d.]+)ms afterPressMean=(-?[\d.]+)ms inputQueue=(-?\d+)') {
                     $el = [double]::Parse($matches[1], $inv)
                     $fp = [double]::Parse($matches[2], $inv)
                     $pc = [double]::Parse($matches[3], $inv)
@@ -223,12 +225,14 @@ if ($SummaryPath -and (Test-Path -LiteralPath $SummaryPath)) {
                     $iq = [int]$matches[5]
 
                     Write-Host ''
-                    Write-Host '    按键帧的三段切分（均值）:' -ForegroundColor Cyan
-                    Write-Host ("      帧起 → 按键进入本列    {0,7}ms   {1,6:P1}   ← 派发机器（输入队列遍历 + 键绑定派发）" -f (Format-F3 $fp), $(if ($el -gt 0) { $fp / $el } else { 0 }))
-                    Write-Host ("      本列工时（OnPressed）  {0,7}ms   {1,6:P1}   ← 本列判定 + 同步结果扇出" -f (Format-F3 $pc), $(if ($el -gt 0) { $pc / $el } else { 0 }))
-                    Write-Host ("      本列之后 → 帧尾        {0,7}ms   {1,6:P1}   ← 判定落地之后的帧内工作" -f (Format-F3 $ap), $(if ($el -gt 0) { $ap / $el } else { 0 }))
-                    Write-Host ("      合计                   {0,7}ms" -f (Format-F3 $el))
-                    Write-Host ("      非位置输入队列长度     {0,7}      ← 每次按下/抬起都要重建并 Reverse 的列表规模" -f $iq)
+                    Write-Host '    按键帧的切分（均值）——只有「本列工时」是按键自身的工作量:' -ForegroundColor Cyan
+                    Write-Host ("      帧长                   {0,7}ms" -f (Format-F3 $el))
+                    Write-Host ("      上一帧边界→按键        {0,7}ms   {1,6:P1}   ← 帧间等待 + 呈现，不是本帧的工作" -f (Format-F3 $fp), $(if ($el -gt 0) { $fp / $el } else { 0 }))
+                    Write-Host ("      本列工时（OnPressed）  {0,7}ms   {1,6:P1}   ← 唯一样本内的按键自身工作" -f (Format-F3 $pc), $(if ($el -gt 0) { $pc / $el } else { 0 }))
+                    Write-Host ("      按键→下一帧边界        {0,7}ms   {1,6:P1}   ← 本帧剩余（draw / 其他 update）" -f (Format-F3 $ap), $(if ($el -gt 0) { $ap / $el } else { 0 }))
+                    Write-Host '    判读：第一段的零点在上一帧边界，随帧率变化而不随代码量变化；它大 = 帧节奏问题，'
+                    Write-Host '          不是优化判定代码能解决的。'
+                    Write-Host ("      非位置输入队列长度     {0,7}      ← 每次按下/抬起要重建并 Reverse 的列表规模" -f $iq)
                 }
             }
         }
@@ -293,9 +297,9 @@ if ($pressStalls.Count -gt 0) {
         Write-Host '  占比高 → 帧是被按键自己的工作拉长的；占比低 → 帧长另有来源，按键只是恰好落在这里。'
     }
 
-    # FirstPressAtMs（新探针）：帧起→首个按键进入本列。有它就能把帧内时间按位置切开，
-    # 而不只是知道「按键自己的工作占多少」。
-    $hasSplit = @($pressStalls | Where-Object { $_.FirstPressAtMs -and -not [double]::IsNaN((ConvertTo-Double $_.FirstPressAtMs)) })
+    # SincePrevFrameMs（新探针）：本帧内首个按键距上一帧边界多远。
+    # 它含帧间等待与呈现，**不是**「按键前的工作量」；只有 PressColumnMs 是按键自身工作。
+    $hasSplit = @($pressStalls | Where-Object { $_.SincePrevFrameMs -and -not [double]::IsNaN((ConvertTo-Double $_.SincePrevFrameMs)) })
 
     if ($hasSplit.Count -gt 0) {
         $fp = New-Object 'System.Collections.Generic.List[double]'
@@ -304,7 +308,7 @@ if ($pressStalls.Count -gt 0) {
 
         foreach ($r in $hasSplit) {
             $e = ConvertTo-Double $r.ElapsedMs
-            $f = ConvertTo-Double $r.FirstPressAtMs
+            $f = ConvertTo-Double $r.SincePrevFrameMs
             $c = ConvertTo-Double $r.PressColumnMs
             if ([double]::IsNaN($e) -or [double]::IsNaN($f)) { continue }
             if ([double]::IsNaN($c)) { $c = 0 }
@@ -313,10 +317,10 @@ if ($pressStalls.Count -gt 0) {
 
         if ($fp.Count -gt 0) {
             Write-Host ''
-            Write-Host '  -- 按键帧的三段切分（只统计超阈值的按键帧） --' -ForegroundColor Cyan
+            Write-Host '  -- 按键帧的切分（只统计超阈值的按键帧） --' -ForegroundColor Cyan
             Write-Host ('    {0,-26} {1,8} {2,8} {3,8} {4,8}' -f '段', 'mean', 'p50', 'p90', 'max')
 
-            foreach ($seg in @(@('帧起 → 按键进入本列', $fp), @('本列工时(OnPressed)', $pc), @('本列之后 → 帧尾', $ap))) {
+            foreach ($seg in @(@('上一帧边界→按键(等待)', $fp), @('本列工时(OnPressed)', $pc), @('按键→下一帧边界', $ap))) {
                 $label = $seg[0]
                 $arr = $seg[1].ToArray()
                 [Array]::Sort($arr)
@@ -330,8 +334,9 @@ if ($pressStalls.Count -gt 0) {
                         (Format-F3 $arr[$arr.Length - 1]))
             }
 
-            Write-Host '    判读：哪一段占大头，就是那一段在制造按键延迟——前段＝输入派发机器，'
-            Write-Host '          中段＝本列判定，后段＝判定落地后的帧内工作（结果扇出／容器增删／布局失效）。'
+            Write-Host '    判读：只有「本列工时」是按键自身的工作量。第一段的零点在上一帧边界，装的是'
+            Write-Host '          帧间等待 + 呈现，随帧率变化而不随代码量变化——它是帧节奏，不是热路径开销。'
+            Write-Host '          若第一段占大头，方向是帧节奏 / 输入递送时机，不是优化判定代码。'
         }
     }
 }
@@ -472,12 +477,12 @@ if ($PressPath) {
 
 Write-Host ''
 Write-Host "== 最慢 $TopN 帧 ==" -ForegroundColor Cyan
-Write-Host ('  {0,10} {1,9} {2,9} {3,11} {4,5} {5,9} {6,9} {7,6} {8,8} {9,7}' -f 'WallMs', 'Elapsed', 'GcPause', 'ThreadAlloc', 'Press', 'PressCol', 'FirstPress', 'Iters', 'Gen0d', 'FrameIdx')
+Write-Host ('  {0,10} {1,9} {2,9} {3,11} {4,5} {5,9} {6,9} {7,6} {8,8} {9,7}' -f 'WallMs', 'Elapsed', 'GcPause', 'ThreadAlloc', 'Press', 'PressCol', 'SincePrev', 'Iters', 'Gen0d', 'FrameIdx')
 
 $stalls | Sort-Object { ConvertTo-Double $_.ElapsedMs } -Descending | Select-Object -First $TopN | ForEach-Object {
     ('  {0,10} {1,9} {2,9} {3,11} {4,5} {5,9} {6,9} {7,6} {8,8} {9,7}' -f `
             $_.WallMs, $_.ElapsedMs, $_.GcPauseDeltaMs, $_.ThreadAllocDeltaBytes,
             $_.PressesInFrame, $(if ($_.PressColumnMs) { $_.PressColumnMs } else { '-' }),
-            $(if ($_.FirstPressAtMs) { $_.FirstPressAtMs } else { '-' }),
+            $(if ($_.SincePrevFrameMs) { $_.SincePrevFrameMs } else { '-' }),
             $_.FscIter, $_.Gen0Delta, $_.FrameIndex)
 }
