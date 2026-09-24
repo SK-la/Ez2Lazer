@@ -414,6 +414,23 @@ B 组 `pressSplit` 的 `sincePrevFrameMean = 1.542 ms`，而帧间隔只有 **1.
 而**解码 mixer 的位置只在 NAudio 拉走一个 buffer 时才前进**（`BassMixerWaveProvider.Read` 每次按整缓冲取数）。
 ⇒ 音频时钟一次跳 **10.000 ms**，即 **100 Hz**。
 
+**实机日志确证（`logs/1790263779.audio.log`，与全帧局同一次会话）**
+
+```
+NAudio default output started: bassDevice=5 ("VoiceMeeter Aux Input (VB-Audio VoiceMeeter AUX VAIO)"),
+wasapi="VoiceMeeter Aux Input (VB-Audio VoiceMeeter AUX VAIO)", 48000Hz/2ch float,
+requestedLatency=10ms, actualLatency=10ms, lowLatency=true
+```
+
+- 48000 Hz × 10 ms = **480 帧**，与实测 10.000 ms 量子精确吻合（不是巧合）。
+- 设备是 **VoiceMeeter 虚拟声卡**，不是物理 DAC。
+- `actualLatency` 不是回显请求值：NAudio 文档明确它是「设备**实际授予**的引擎周期」（低延迟模式下由设备给的
+  period 推导）；`lowLatency=true` 表示 IAudioClient3 低延迟共享模式**确实生效**。
+  ⇒ **低延迟模式开着，这台虚拟设备也只给 10 ms**（物理 DAC 走 IAudioClient3 低延迟通常 ~2.67–3 ms）。
+  所以「把 `DEFAULT_NAUDIO_LATENCY_MS` 调小」不会有用 —— 请求值不是瓶颈，**授予值**才是。
+- 同目录 `ez_runtime.log` 里同时有 `Found 7 ASIO devices` / `Freeing ASIO device`，说明 ASIO 路径也在用，
+  是「换设备/换模式」这条修复方向上的现成选项。
+
 **为什么三次测量都没看到它**：三个探针的采样率都是 **~10 Hz**（判定 / 按键 93–100 ms 一次）。
 100 Hz 信号按 10 Hz 采样只会产生**混叠的低频幻影** —— 它正好**伪装成**「隔几秒一次」的波动，
 而 §3 一直在 0.2–0.6 Hz 带里找周期。**这是测量盲区，不是效应弱。**
@@ -576,3 +593,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-24 | §2.4.10（续）：**38.7 s 全帧局的结果与一次假阳性**——未修剪首跑给出 `ElapsedMs × GcPauseDeltaMs r = +0.998`、`× ColumnMs +0.957`，实为 t=0 那个 **141 ms 首帧**在两个序列里的余振；`--trim 3,3` 后 `ElapsedMs` 带内 RMS **3.294 → 0.026 ms**（129x），全部内部峰落到家族性阈值 0.597 以下，唯一越线的定义性相关（`SpikeRate` := `elapsed ≥ 2×p50`）。**稳态帧长该带内仅 0.026 ms 抖动**（帧长均值 0.503 ms）⇒ §3「2–4 s 周期」前提证伪，下一步换观测维度（交接单 §3.5：note 位置按 update 帧量化 / BASS 缓冲 9.8 ms / 主观锚点定位） |
 | 2026-09-24 | §2.4.11：**音频源时钟 = 精确 10.000 ms 阶梯（定案 §2.1 悬案）**——4 局判定 CSV 里 `BassSource` 的 331–353 个取值 **100% 落在 10.000 ms 网格**（最大残差 22 µs，相邻差只有 9.978/10.000/10.022 及其整数倍），而同批 `GameTime`（== `InterpClock`）无此结构；`Drift == (GameTime − BassSource) − 15.000`。机制：实机走 `NAudioWasapiOutput`（BASS 解码 mixer + NAudio 拉 WASAPI），`DEFAULT_NAUDIO_LATENCY_MS = 10`，而**解码 mixer 的位置只在被拉走一个 buffer 时前进** ⇒ 100 Hz 阶梯。**三个探针均按 ~10 Hz 采样 ⇒ 该结构被混叠，且会伪装成「隔几秒一次」的低频波动**，这正是 §3 在 0.2–0.6 Hz 带里空手而归的结构性原因（测量盲区，非效应弱）。用 1988 fps 真实帧间隔离线复刻 `InterpolatingFramedClock`：仿真 `Drift` 峰峰 **11.7 ms** vs 实测 9.8–19.2 ms（机制确认），每帧速率 std **4%**、**27.9% 的帧偏 >5%**（理想连续源为 0.36% / 0%），但相对匀速的**位置**偏差仅 std 0.11 ms / 峰峰 **2.8 ms**。1988 fps 下每台阶跨 **~24 帧** ⇒ 高帧率把该 100 Hz 纹波采样得更清楚。**保留**：仿真理想化、位置偏差是否够到体感尚未证明 ⇒ 下一步加每帧时钟探针（`RecordFrame()` 处顺带取 `BassSourceCurrentTime` / `InterpolatedDrift`） |
 | 2026-09-24 | §2.4.11（续）：**每帧时钟探针落地**——`FrameStabilityContainer.UpdateSubTree` 帧边界处把 `gcc.BassSourceCurrentTime` / `gcc.CurrentTime` 交给 `RecordFrame(...)`（新增 `AudioSrcMs,InterpMs` 两列），摘要新增 `clockQuant` 行（`audioStep` 非零占比 / 步长主桶 / `interpRate` 的 mean-std-`within1%`-`over5%` / `drift` 范围，速率只在帧长 ≤5ms 的帧上算），`AnalyzePeriod.py` 新增 `AudioStep` / `InterpRate` 两条序列且 `derived_from` 改为元组（`InterpRate` 由两条时钟共同构造，单来源标记盖不住两个定义性对）。**仿真数据端到端验过**：`--band 0.004,0.02 --dt 0.002 --trim 3,3` 下 `InterpRate` 在 0.010s 给出 `ACF r = +0.896`、带内高出均匀背景 914x（`AudioStep` 必被 `RMS/稳健σ` 拒掉 —— 稀疏脉冲列的构造使然）。待实机全帧局验证 |
+| 2026-09-25 | §2.4.11（续）：**实机音频设备确证**——`logs/1790263779.audio.log`（与全帧局同一次会话）：`wasapi="VoiceMeeter Aux Input (VB-Audio VoiceMeeter AUX VAIO)", 48000Hz/2ch float, requestedLatency=10ms, actualLatency=10ms, lowLatency=true`。48000 × 10ms = **480 帧**，与实测 10.000ms 量子精确吻合。`actualLatency` 非回显：NAudio 文档明确它是「设备**实际授予**的引擎周期」，且 `lowLatency=true` 表示 IAudioClient3 低延迟共享模式确实生效 ⇒ **低延迟开着，这台 VoiceMeeter 虚拟声卡也只给 10ms**（物理 DAC 通常 ~2.67–3ms）。**修正确认：调小 `DEFAULT_NAUDIO_LATENCY_MS` 无效（请求值不是瓶颈，授予值才是），要更小周期须换设备/模式**（物理 DAC、独占，或已在用的 ASIO —— 同会话日志有 `Found 7 ASIO devices` / `Freeing ASIO device`） |

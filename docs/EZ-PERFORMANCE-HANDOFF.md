@@ -51,6 +51,15 @@
     `TrackBass.CurrentTime` 取 `BassMix.ChannelGetPosition`，而解码 mixer 的位置**只在 NAudio 拉走一个 buffer 时前进**
     ⇒ 每次正好 10.000 ms。
   - 于是 `BassSource` 是 100 Hz 阶梯，`GameTime`（== `InterpClock`，插值时钟）连续，两者之差就是 `Drift`。
+  - **实机日志（`logs/1790263779.audio.log`，与全帧局同一次会话）**：
+    `NAudio default output started: ... wasapi="VoiceMeeter Aux Input (VB-Audio VoiceMeeter AUX VAIO)",
+    48000Hz/2ch float, requestedLatency=10ms, actualLatency=10ms, lowLatency=true`
+    - **设备是 VoiceMeeter 虚拟声卡**，不是物理 DAC。48000 Hz × 10 ms = **480 帧**，与实测 10.000 ms 量子精确吻合。
+    - `actualLatency` 不是回显：NAudio 文档明确它是「设备**实际授予**的引擎周期」（低延迟模式下由设备给的 period 推导），
+      而 `lowLatency=true` 表示 IAudioClient3 低延迟共享模式**确实生效** —— 也就是说**即使低延迟模式开着，
+      这台虚拟设备也只给 10 ms**（物理 DAC 走 IAudioClient3 低延迟通常给 ~2.67–3 ms）。
+      ⇒ §3.5「缩小缓冲」这条路在这台设备上**大概率谈不下来**，要更小周期得换设备（物理 DAC / 独占 / ASIO；
+      日志里同时有 `Found 7 ASIO devices` 与 `Freeing ASIO device`，说明 ASIO 路径也在用）。
   - **三个探针都按 ~10 Hz 采样 ⇒ 100 Hz 结构被混叠掉。** 这是 §2.1 开头「现象未被测下来」的结构性原因。
 
 ### 2.2 >5 ms 卡顿的三类成因（`framestall_*.csv` 三列可分辨）
@@ -149,7 +158,10 @@
    **下一步：按 §3 抓一局全帧（`EZ_FRAME_PROBE_MS=0`）+ `--trim 3,3`**，看 `InterpRate` 是否在 0.010 s 上有高 `ACF r`：
    是 ⇒ 插值时钟确实带 100 Hz 纹波，接着在第 3 项的三个修复方向里选；否 ⇒ 这套插值其实抹平得不错，要另找体感来源。
    修复方向（**待确认，尚未改代码**）：
-   ① 缩小量子（更小缓冲 / IAudioClient3 更小 period）；② 重调插值 —— 用 50 ms 半衰期的指数逼近去追 10 ms
+   ① 换设备 / 换模式让设备给出更小的引擎周期 —— **注意**：实机日志显示当前是 VoiceMeeter 虚拟声卡，
+      且 `lowLatency=true` 下设备仍只给 10 ms，所以单纯把 `DEFAULT_NAUDIO_LATENCY_MS` 调小**大概率无效**
+      （请求值本来就不是瓶颈，授予值才是）。要动就动设备：物理 DAC、独占模式，或走已在用的 ASIO 路径。
+   ② 重调插值 —— 用 50 ms 半衰期的指数逼近去追 10 ms
    阶梯，本身就会注入 100 Hz 纹波，改成锁相 / 线性外推可消掉；③ 只把音频时钟当**速率**源，位置由与之锁定的平滑时钟驱动。
 3. **换主观锚点**：让用户标出「不顺滑」的具体时刻（录屏 / 秒表 / 按键），再把探针时间轴对上去。
    三次测量都没测到，说明「约 2 s / 4 s」这个描述本身可能不准。
