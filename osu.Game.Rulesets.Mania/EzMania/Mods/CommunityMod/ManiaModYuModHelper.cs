@@ -20,11 +20,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         {
             var newColumnObjects = new List<ManiaHitObject>();
             var locations = column.OfType<Note>().Select(n => (startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                                  .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
-                                      (startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))
-                                      //(startTime: h.EndTime, samples: h.GetNodeSamples(1))
-                                  }))
+                                  //(startTime: h.EndTime, samples: h.GetNodeSamples(1))
+                                  .Concat(column.OfType<HoldNote>().Select(h => (startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))))
                                   .OrderBy(h => h.startTime).ToList();
 
             for (int i = 0; i < locations.Count; i++)
@@ -71,15 +68,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                                      double mu1Dmu2 = -1)
         {
             var locations = oldObjects.OfType<Note>().Select(n => (column: n.Column, startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                                      .Concat(oldObjects.OfType<HoldNote>().SelectMany(h => new[]
-                                      {
-                                          (column: h.Column, startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))
-                                      }))
+                                      .Concat(oldObjects.OfType<HoldNote>().Select(h => (column: h.Column, startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))))
                                       .OrderBy(h => h.startTime).ToList();
             var maniaBeatmap = (ManiaBeatmap)beatmap;
             int keys = maniaBeatmap.TotalColumns;
             int maxGap = gap;
-            var randomColumnList = SelectRandom(Enumerable.Range(0, keys), rng, forTransformColumnNum == 0 ? keys : forTransformColumnNum).ToList();
+            var randomColumnList = new List<int>();
+            SelectRandomColumns(rng, keys, forTransformColumnNum == 0 ? keys : forTransformColumnNum, randomColumnList);
             var noteList = new List<(double lastStartTime, double lastEndTime, bool lastLN, double thisStartTime, double thisEndTime, bool thisLN)>(keys);
             noteList = Enumerable.Repeat((double.NaN, double.NaN, false, double.NaN, double.NaN, false), keys).ToList();
             var sampleList = new List<(IList<HitSampleInfo> lastSample, IList<HitSampleInfo> thisSample)>(keys);
@@ -122,7 +117,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
                 if (gap == 0)
                 {
-                    randomColumnList = SelectRandom(Enumerable.Range(0, keys), rng, forTransformColumnNum).ToList();
+                    SelectRandomColumns(rng, keys, forTransformColumnNum, randomColumnList);
                     gap = maxGap;
                 }
             }
@@ -201,10 +196,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             var originalLNObjects = new List<ManiaHitObject>();
             var newColumnObjects = new List<ManiaHitObject>();
             var locations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
-                                  .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
-                                      (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
-                                  }))
+                                  .Concat(column.OfType<HoldNote>().Select(h => (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)))
                                   .OrderBy(h => h.startTime).ToList();
 
             for (int i = 0; i < locations.Count - 1; i++)
@@ -329,7 +321,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             var originalLNSet = new HashSet<ManiaHitObject>(originalLNObjects);
             int keys = maniaBeatmap.TotalColumns;
             if (transformColumnNum > keys) transformColumnNum = keys;
-            var randomColumnSet = SelectRandom(Enumerable.Range(0, keys), rng, transformColumnNum == 0 ? keys : transformColumnNum).ToHashSet();
+            var randomColumns = new List<int>();
+            SelectRandomColumns(rng, keys, transformColumnNum == 0 ? keys : transformColumnNum, randomColumns);
 
             int maxGap = gap;
 
@@ -339,7 +332,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 {
                     if (originalLNSet.Contains(note) && originalLN)
                         resultObjects.Add(note);
-                    else if (randomColumnSet.Contains(note.Column) && note.StartTime != note.GetEndTime()
+                    else if (randomColumns.Contains(note.Column) && note.StartTime != note.GetEndTime()
                                                                    && (limitDuration > 0 && note.GetEndTime() - note.StartTime <= limitDuration * 1000 || limitDuration == 0))
                         resultObjects.Add(note);
                     else
@@ -350,7 +343,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
                 if (gap == 0)
                 {
-                    randomColumnSet = SelectRandom(Enumerable.Range(0, keys), rng, transformColumnNum).ToHashSet();
+                    SelectRandomColumns(rng, keys, transformColumnNum, randomColumns);
                     gap = maxGap;
                 }
             }
@@ -482,6 +475,63 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public static bool SelectRandomNumberForThis(this List<int> list, Random rng, int maxValue, int times, bool duplicate = false)
         {
             return list.SelectRandomNumberForThis(rng, 0, maxValue, times, duplicate);
+        }
+
+        /// <summary>
+        /// 从 <c>0..columns-1</c> 里不重复地随机取 <paramref name="times"/> 个列号，写进 <paramref name="destination"/>。
+        /// </summary>
+        /// <remarks>
+        /// 与 <c>SelectRandom(Enumerable.Range(0, columns), rng, times)</c> 逐次等价：<see cref="Random"/> 的调用次数与顺序
+        /// 完全一致（每次取样一次 <c>Next(剩余数量)</c>，取走后左移补位等价于 <c>List.RemoveAt</c>），因此同种子下取到的列号序列相同；
+        /// <paramref name="times"/> 大于 <paramref name="columns"/> 时同样在 <c>Next(0)</c> 上抛出。
+        /// 区别只是不再为每次取样分配 Range 列表、结果列表与迭代器。
+        /// </remarks>
+        public static void SelectRandomColumns(Random rng, int columns, int times, List<int> destination)
+        {
+            ArgumentNullException.ThrowIfNull(rng);
+            ArgumentNullException.ThrowIfNull(destination);
+
+            destination.Clear();
+
+            if (times <= 0)
+                return;
+
+            // 取不出这么多不重复列号：与原 List 取样实现一致地抛出，而不是少给几个或给出重复列号。
+            if (times > columns)
+                throw new ArgumentOutOfRangeException(nameof(times), times, $"无法从 {columns} 列中取 {times} 个不重复列号。");
+
+            // 取样池只在本次调用内使用：列数上限来自谱面，异常大时回退堆数组（栈只有 1MB）。
+            const int stack_pool_limit = 64;
+
+            if (columns <= stack_pool_limit)
+            {
+                Span<int> pool = stackalloc int[stack_pool_limit];
+                sampleInto(rng, pool[..columns], times, destination);
+            }
+            else
+            {
+                int[] pool = new int[columns];
+                sampleInto(rng, pool, times, destination);
+            }
+        }
+
+        private static void sampleInto(Random rng, Span<int> pool, int times, List<int> destination)
+        {
+            for (int i = 0; i < pool.Length; i++)
+                pool[i] = i;
+
+            int remaining = pool.Length;
+
+            for (int taken = 0; taken < times; taken++)
+            {
+                int index = rng.Next(remaining);
+
+                destination.Add(pool[index]);
+                remaining--;
+
+                for (int i = index; i < remaining; i++)
+                    pool[i] = pool[i + 1];
+            }
         }
 
         public static IEnumerable<T> SelectRandom<T>(this IEnumerable<T> enumerable, Random rng, int times = 1, bool duplicate = false)

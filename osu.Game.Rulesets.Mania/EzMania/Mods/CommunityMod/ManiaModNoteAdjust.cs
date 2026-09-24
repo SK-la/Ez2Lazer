@@ -250,15 +250,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 foreach (var timingPoint in beatmap.HitObjects.GroupBy(h => h.StartTime))
                 {
                     var locations = timingPoint.OfType<Note>().Select(n => (column: n.Column, startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                                               .Concat(timingPoint.OfType<HoldNote>().SelectMany(h => new[]
-                                               {
-                                                   (
-                                                       column: h.Column,
-                                                       startTime: h.StartTime,
-                                                       endTime: h.EndTime,
-                                                       samples: h.GetNodeSamples(0)
-                                                   )
-                                               }))
+                                               .Concat(timingPoint.OfType<HoldNote>().Select(h => (column: h.Column, startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))))
                                                .OrderBy(h => h.startTime).ToList();
 
                     int quantity = timingPoint.Count();
@@ -322,15 +314,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             foreach (var timingPoint in beatmap.HitObjects.GroupBy(h => h.StartTime))
             {
                 var locations = timingPoint.OfType<Note>().Select(n => (column: n.Column, startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                                           .Concat(timingPoint.OfType<HoldNote>().SelectMany(h => new[]
-                                           {
-                                               (
-                                                   column: h.Column,
-                                                   startTime: h.StartTime,
-                                                   endTime: h.EndTime,
-                                                   samples: h.GetNodeSamples(0)
-                                               )
-                                           }))
+                                           .Concat(timingPoint.OfType<HoldNote>().Select(h => (column: h.Column, startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))))
                                            .OrderBy(h => h.startTime).ToList();
 
                 if (i < 1 + interval * 2)

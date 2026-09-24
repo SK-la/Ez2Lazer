@@ -41,8 +41,8 @@ namespace osu.Game.EzOsuGame.Beatmaps
     /// are never remembered.
     /// </para>
     /// <para>
-    /// Only call sites that were checked to be read-only are wired to this cache; <see cref="WorkingBeatmap.GetPlayableBeatmap"/>
-    /// itself is untouched, so live gameplay keeps converting its own instance. An instance handed out by
+    /// Only call sites that were checked to be read-only are wired to this cache; <see cref="WorkingBeatmap"/>'s own
+    /// conversion path is untouched, so live gameplay keeps converting its own instance. An instance handed out by
     /// <see cref="GetShared"/> must not be written to — see <see cref="IsSharedInstance"/>.
     /// </para>
     /// </remarks>
@@ -77,7 +77,7 @@ namespace osu.Game.EzOsuGame.Beatmaps
         /// <paramref name="mods"/>.
         /// </summary>
         /// <param name="token">
-        /// Passed straight to the conversion. <c>null</c> keeps <see cref="WorkingBeatmap.GetPlayableBeatmap(IWorkingBeatmap, IRulesetInfo, IReadOnlyList{Mod})"/>'s
+        /// Passed straight to the conversion. <c>null</c> keeps <c>WorkingBeatmap.GetPlayableBeatmap</c>'s
         /// own bounded wait, so a caller without a token of its own does not silently lose that bound;
         /// <see cref="CancellationToken.None"/> asks for no bound at all.
         /// </param>

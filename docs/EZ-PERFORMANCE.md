@@ -63,6 +63,41 @@
 
 ---
 
+## 2.2 2026-09-23 局内判定 / HUD 热路径
+
+### 已落地
+
+| 项 | 位置 | 说明 |
+|----|------|------|
+| **HITPOS-CACHE** | `DrawableManiaRuleset` | `updateTimeRange()` 原先**每帧**调 `skinChanged()`，即每帧构造 `ManiaSkinConfigurationLookup` 走一次皮肤配置链。改为 `updateHitPosition()` 只在皮肤 / `HitPosition` / `HitPositionGlobalEnable` 变更时重算并缓存字段，`updateTimeRange()` 只做算术。判定线绑定前置到 `ScrollStyle` 之前，保证首次 `updateTimeRange()` 读到已算好的值 |
+| **JUDGE-NO-CLOSURE** | `Column.OnNewResult` / `Stage.OnNewResult` | `hitExplosionPool.Get(e => e.Apply(result))` 与 `judgementPooler.Get(type, j => j.Apply(result, judgedObject))` 每判定各造一个捕获 `result` 的闭包。两者 `Apply` 都只做字段赋值（真正动画在下一帧 `PrepareForUse`），改为 `Get()` 后再赋值。注意 `JudgementContainer.Add` 会**同步**读 `JudgedHitObject`，赋值必须仍在 `Add` 之前 |
+| **POLICY-SCRATCH** | `OrderedHitPolicyHelper` | 候选 / 后判对象改复用缓冲（去掉每次判定的 `ToList()` 拷贝）；`OrderBy(...).ToList()` 改复用缓冲上的稳定插入排序；诊断串整段门控在 `EzJudgmentDiagEnabled` 之后（关闭时不再执行 `describe` / `string.Join`）；命中模式与诊断开关缓存 bindable，取代一次判定里 3 次 `ezConfig.Get` |
+| **FORCEMISS-SNAPSHOT** | `Column.handleHit` / `ManiaLaneController.CollectForceMissBefore` | 命中时「提前判 miss」的 `yield` 迭代器改为写调用方缓冲（每次命中省一个迭代器对象），处理时按实时 `IsPressJudged` 复核以保持惰性枚举语义；`EnumerateForceMissBefore` 无调用方，已由新方法取代 |
+
+### 已评估但**不做**（附原因，避免重复讨论）
+
+| 候选 | 结论 |
+|------|------|
+| 缓存 `DrawableManiaHitObject.PlaySamples` 的 samples 数组 | **不可行**。`Bindable<T>.Value` setter 在 `EqualityComparer<T>.Default.Equals` 相等时直接 return（数组即引用比较，`osu-framework/…/Bindable.cs:99`），缓存同一实例会让 `GameplayState.LastPlayedSamples` 对重复同音不再触发变更，而 `StoryboardTriggerController` 正消费它。数组必须每次新建（同 **SAMPLE-NO-LINQ**） |
+| HUD / 皮肤件「复用单个 `TransformSequence`」合并按键、判定动画 | **不可行（框架约束）**。`TransformSequence<T>` 在构造时固化 `startTime`/`currentTime`（`TransformSequence.cs:53`），复用实例再 `Append` 会把 transform 排到过去时刻 ⇒ 变成瞬跳而非动画；且 `PopulateTransform` 对同一 `Transform` 实例二次调用直接抛异常（`TransformableExtensions.cs:154`），即 transform 天然一次性、框架无池。单次 `MoveToY` 约 3 个小对象（`TransformSequence` + 其 1 槽 list + `TransformCustom`；`TransformID` 是 `ulong`，不产生字符串），`Ez2KeyAreaPlus` 里对 `Container<Circle>` 的 `foreach` 走结构体枚举器、本就不分配 |
+| `EzHUDHitTimingColumns.moveMarker` 顺带改成手动插值（自持 start/target 每帧写 `Y`） | 能省掉每判定 × 列数的 transform，但 `moveMarker` 目前是 `marker.Y = targetY` 紧接着 `MoveToY(同一个 targetY)`——直接赋值与 800ms 缓动叠加，插值接管会改变「瞬跳 / 续动」观感。属视觉语义决策，需先定「标记到底该不该缓动」再动 |
+
+---
+
+## 2.3 lane controller 索引维护是否需要改结构（2026-09-23 实测结论：不改）
+
+口径：`ManiaLaneHotPathMicroBenchTest`（跑真实 `ManiaLaneController`，10 列 × PeakKps 100 × alive 40 × 2000 帧，含 Select + automiss deadline 队列 + `pressTimes`）。
+
+| 指标 | 实测 | 判读 |
+|------|------|------|
+| 总耗时 | 21–33 ms / 2000 帧（Earliest / Combo / Duration 分别 33 / 28 / 27 ms） | ≈ 10–16 µs/帧，约为 16.6 ms 帧预算的 0.1% |
+| 分配 | 15–128 B/press，`gen0=0` | 不构成 GC 压力 |
+| automiss 队列 | 每帧每列 1 次 poll，`dueVisits` ≈ 22/poll（alive 40） | 已含在上面耗时里，不是瓶颈 |
+
+结论：`insertEntryAt` / `Unregister` / `autoMissEntries` 的 O(n) 维护即使在 100 KPS / 40 存活每列的极端设定下也不进热榜，**不为它改数据结构**。BMS poor-select（`AllowBmsFallbackToEarliest` + `PoorEnabled`）同样 30 ms 量级、128 B/press，无需单独优化。
+
+---
+
 ## 3. 2026-08-08 音频后端排查记录
 
 **起点现象**：启动后前 3–5 秒 Upl 极高、约 60 FPS，随后回到数百 FPS；稳定态选歌与局内仍有密集 FBO 峰值；每次启动稳定帧不一致（600 / 900 / 1000+）。
@@ -183,3 +218,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-08-08 | 初版：汇总各文档 FPS / 性能测试描述；记录音频后端排查与振幅限频（框架 `e22805587`） |
 | 2026-09-20 | §2.1：输入队列按帧物化、取样去 LINQ、框架侧按键队列去分配（**FW-BUTTON-QUEUE-REUSE**）落地；登记 5 项「评估后不做」的候选与原因（含被 `TestSceneInputQueueChange.CombinedClicks` 证伪的 **FW-INPUT-QUEUE-DISPATCH**）；§9 登记首次命中 / LN / 多显示器三条待排查现象与测量口径 |
 | 2026-09-21 | **LN-HOLD-FBO** / **LN-INPUT-SLOT** 生产落地。消融证实按住才 ForceRedraw；观测代码 `#if DEBUG` 剥离 |
+| 2026-09-23 | §2.2/§2.3：局内判定与 HUD 热路径去分配（**HITPOS-CACHE** / **JUDGE-NO-CLOSURE** / **POLICY-SCRATCH** / **FORCEMISS-SNAPSHOT**），并记录 3 项「评估后不做」（samples 数组缓存、transform 序列复用、`moveMarker` 手写插值）与 lane controller 索引维护「实测不改」结论 |

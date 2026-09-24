@@ -65,6 +65,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private EzEnumJudgePrecedence judgePrecedence;
         private EzEnumHitMode? configuredMissCollectionHitMode;
 
+        /// <summary>命中时「提前判定为 miss」的条目缓冲，避免每次命中分配一个迭代器。</summary>
+        private readonly List<ManiaLaneEntry> forceMissScratch = new List<ManiaLaneEntry>();
+
         public Container UnderlayElements => HitObjectArea.UnderlayElements;
 
         private GameplaySampleTriggerSource sampleTriggerSource = null!;
@@ -375,7 +378,11 @@ namespace osu.Game.Rulesets.Mania.UI
             if (!result.IsHit || !judgedObject.DisplayResult || !DisplayJudgements.Value)
                 return;
 
-            HitObjectArea.Explosions.Add(hitExplosionPool.Get(e => e.Apply(result)));
+            // 不用 setup 委托：`Apply` 只是记录 Result，而 `PrepareForUse`（真正读它的地方）在下一帧 Update 才跑，
+            // 所以拿到实例后再赋值等价，且省掉每次判定一个捕获 result 的闭包。
+            var explosion = hitExplosionPool.Get();
+            explosion.Apply(result);
+            HitObjectArea.Explosions.Add(explosion);
         }
 
         private bool isHittable(DrawableHitObject drawable, double time, EzEnumJudgePrecedence precedence)
@@ -429,8 +436,18 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             double judgementTime = hitObject.Result.TimeAbsolute;
 
-            foreach (var entry in LaneController.EnumerateForceMissBefore(hitObject.HitObject.StartTime))
+            forceMissScratch.Clear();
+            LaneController.CollectForceMissBefore(hitObject.HitObject.StartTime, forceMissScratch);
+
+            for (int i = 0; i < forceMissScratch.Count; i++)
             {
+                var entry = forceMissScratch[i];
+
+                // 走快照而不是实时枚举：其间 MissForcefully 会判掉条目（含其它条目），
+                // 这里按实时状态再确认一次，语义与原来的惰性枚举一致。
+                if (entry.IsPressJudged)
+                    continue;
+
                 if (OrderedHitPolicyHelper.IsUserTriggerJudgeableNow(entry.RoutedObject, judgementTime))
                     continue;
 

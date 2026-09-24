@@ -233,37 +233,33 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> area = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
             List<ManiaHitObject> checkList = new List<ManiaHitObject>();
 
-            var tempObjects = locations.OrderBy(h => h.startTime).ToList();
+            // locations 已经按 (开始时间, 列) 排好序（上面的列号修正不动开始时间），这里不必再排一遍；原实现多了一次 OrderBy + ToList。
+            var tempObjects = locations;
+
+            // gap 只取决于 Gap 设置，原实现每个时间点都重算一次 Math.Pow。
+            double areaGap = Gap.Value == 0 ? double.MaxValue : 29998.8584 * Math.Pow(Math.E, -0.3176 * Gap.Value) + 347.7248;
 
             double sumTime = 0;
             double lastTime = 0;
 
-            foreach (var timingPoint in tempObjects.GroupBy(h => h.startTime))
+            // 原来是 GroupBy(startTime)：每个时间点分配一个分组对象与内部列表。tempObjects 按开始时间非降序，
+            // 等值分组与连续段扫描等价，段内顺序（列升序）也已经是原 OrderBy(Column) 的结果。
+            for (int i = 0; i < tempObjects.Count;)
             {
-                var newLocations = timingPoint.Select(n => (Column: n.column, StartTime: n.startTime, EndTime: n.endTime, Samples: n.samples)).OrderBy(h => h.Column).ToList();
+                double timingPoint = tempObjects[i].startTime;
+                int runEnd = i + 1;
 
-                List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> line = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
+                while (runEnd < tempObjects.Count && tempObjects[runEnd].startTime.Equals(timingPoint))
+                    runEnd++;
 
-                foreach (var note in newLocations)
-                {
-                    line.Add((note.Column, note.StartTime, note.EndTime, note.Samples));
-                }
+                for (int j = i; j < runEnd; j++)
+                    area.Add(tempObjects[j]);
 
-                //manyLine.Add(line);
+                sumTime += timingPoint - lastTime;
+                lastTime = timingPoint;
+                i = runEnd;
 
-                sumTime += timingPoint.Key - lastTime;
-                lastTime = timingPoint.Key;
-
-                area.AddRange(line);
-
-                double gap = 29998.8584 * Math.Pow(Math.E, -0.3176 * Gap.Value) + 347.7248;
-
-                if (Gap.Value == 0)
-                {
-                    gap = double.MaxValue;
-                }
-
-                if (sumTime >= gap)
+                if (sumTime >= areaGap)
                 {
                     sumTime = 0;
                     // Process area
@@ -281,7 +277,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
                     var processed = ProcessArea(maniaBeatmap, rng, area, keys, Key.Value, blank, cleanDivide, ERROR, checkList);
                     newObjects.AddRange(processed.result);
-                    checkList = processed.checkList.ToList();
+                    checkList = processed.checkList;
                     area.Clear();
                 }
             }
@@ -313,10 +309,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 var newColumnObjects = new List<ManiaHitObject>();
 
                 var cleanLocations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
-                                           .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                           {
-                                               (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
-                                           }))
+                                           .Concat(column.OfType<HoldNote>().Select(h => (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)))
                                            .OrderBy(h => h.startTime).ToList();
 
                 // 该列理论上至少有一个 Note/HoldNote；万一没有（前置 mod 残留了其它类型），跳过而不是越界。
@@ -330,20 +323,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 double lastEndTime = cleanLocations[0].endTime;
                 var lastSample = cleanLocations[0].samples;
 
-                for (int i = 0; i < cleanLocations.Count; i++)
+                // 原来对被删元素做 RemoveAt(i)（每次搬移整条尾部）后再 i-- 重读同一下标，
+                // 等价于「单纯按顺序跳过被删元素」，而 cleanLocations 在循环后不再被使用，
+                // 因此这里不再真的删除，只保留同一套判定顺序。
+                for (int i = 1; i < cleanLocations.Count; i++)
                 {
-                    if (i == 0)
-                    {
-                        lastStartTime = cleanLocations[0].startTime;
-                        lastEndTime = cleanLocations[0].endTime;
-                        lastSample = cleanLocations[0].samples;
-                        continue;
-                    }
-
                     if (cleanLocations[i].startTime >= lastStartTime && cleanLocations[i].startTime <= lastEndTime)
                     {
-                        cleanLocations.RemoveAt(i);
-                        i--;
                         continue;
                     } // if the note in a LN
 
@@ -352,8 +338,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                         lastStartTime = cleanLocations[i].startTime;
                         lastEndTime = cleanLocations[i].endTime;
                         lastSample = cleanLocations[i].samples;
-                        cleanLocations.RemoveAt(i);
-                        i--;
                         continue;
                     } // interval judgement
 
@@ -362,8 +346,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                         lastStartTime = cleanLocations[i].startTime;
                         lastEndTime = cleanLocations[i].endTime;
                         lastSample = cleanLocations[i].samples;
-                        cleanLocations.RemoveAt(i);
-                        i--;
                         continue;
                     } // LN interval judgement
 
@@ -384,7 +366,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             }
             else
             {
-                maniaBeatmap.HitObjects = newObjects.OrderBy(h => h.StartTime).ToList();
+                // newObjects 在上面已经按开始时间排过序，这里再排一次是多余的。
+                maniaBeatmap.HitObjects = newObjects;
             }
         }
 
