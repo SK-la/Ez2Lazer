@@ -152,7 +152,6 @@ namespace osu.Game.Rulesets.UI
             clockProbeMs = clockTicks * tickToMs;
             subtreeProbeAllocBytes = subtreeAlloc;
             loopAllocProbeBytes = DeepAlloc ? GC.GetAllocatedBytesForCurrentThread() - allocBefore : 0;
-            probeFrameValid = true;
 
             // [Ez] Frame boundary for the frame-stall probe. Must stay at the same position in every
             // pass, otherwise the delta between two calls is not a whole frame.
@@ -177,7 +176,6 @@ namespace osu.Game.Rulesets.UI
         private static double clockProbeMs;
         private static long subtreeProbeAllocBytes;
         private static long loopAllocProbeBytes;
-        private static bool probeFrameValid;
 
         /// <summary>[Ez] 分配读数只在 Deep 模式开启，light 模式下这里必须为 false，否则每帧两次 GC 查询会污染帧长。</summary>
         private static bool DeepAlloc => EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Deep && EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Enabled;

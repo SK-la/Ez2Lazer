@@ -92,6 +92,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         // 「FSC 子树 vs 其余」归因用的累计量（仅 Deep 模式）。
         private static double subtreeMsTotal;
+        private static double clockMsTotal;
         private static long subtreeAllocTotal;
         private static long loopAllocTotal;
         private static long probeFrames;
@@ -227,6 +228,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 threadAllocatedTotal += threadAllocDelta;
                 processAllocatedTotal += processAllocated - lastProcessAllocated;
                 subtreeMsTotal += FrameStabilityContainer.SubtreeProbeMs;
+                clockMsTotal += FrameStabilityContainer.ClockProbeMs;
                 subtreeAllocTotal += FrameStabilityContainer.SubtreeProbeAllocBytes;
                 loopAllocTotal += FrameStabilityContainer.LoopAllocProbeBytes;
                 probeFrames++;
@@ -307,6 +309,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             sincePrevFrameTotalMs = 0;
             pressColumnTotalMs = 0;
             subtreeMsTotal = 0;
+            clockMsTotal = 0;
             subtreeAllocTotal = 0;
             loopAllocTotal = 0;
             probeFrames = 0;
@@ -421,13 +424,17 @@ namespace osu.Game.EzOsuGame.Diagnostics
             if (probeFrames > 0)
             {
                 double meanElapsedAll = (withoutPress.Sum + withPress.Sum) / (withoutPress.Count + withPress.Count);
+                double meanSubtree = subtreeMsTotal / probeFrames;
+                double meanClock = clockMsTotal / probeFrames;
+                double meanRest = meanElapsedAll - meanSubtree - meanClock;
 
                 sb.Append(Environment.NewLine);
                 sb.Append(CultureInfo.InvariantCulture,
                     $"frameSplit frames={probeFrames} elapsedMean={meanElapsedAll:F3}ms "
-                    + $"subtreeMsMean={subtreeMsTotal / probeFrames:F3}ms "
-                    + $"restMsMean={meanElapsedAll - subtreeMsTotal / probeFrames:F3}ms "
-                    + $"subtreeShareMs={100 * (subtreeMsTotal / probeFrames) / meanElapsedAll:F1}% "
+                    + $"subtreeMsMean={meanSubtree:F3}ms "
+                    + $"clockMsMean={meanClock:F3}ms "
+                    + $"restMsMean={meanRest:F3}ms "
+                    + $"subtreeShareMs={100 * meanSubtree / meanElapsedAll:F1}% "
                     + $"subtreeAllocMean={subtreeAllocTotal / (double)probeFrames:F0}B loopAllocMean={loopAllocTotal / (double)probeFrames:F0}B");
             }
 
