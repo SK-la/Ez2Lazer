@@ -28,10 +28,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             for (int i = index + 1; i < column.Count; i++)
             {
-                if (isJudged(column[i]))
-                    continue;
+                // 列按 StartTime 升序（调用方均以二分维护该序）：一旦越过 time，其后不再有 `time >= startTime` 的阻挡者。
+                if (startTime(column[i]) > time)
+                    break;
 
-                if (time >= startTime(column[i]))
+                if (!isJudged(column[i]))
                     return false;
             }
 

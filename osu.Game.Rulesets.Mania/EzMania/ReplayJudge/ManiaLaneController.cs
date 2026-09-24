@@ -330,22 +330,68 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// Find the first entry from cursor that is within its miss window and not blocked by a later note.
+        /// 首个可击条目的列内下标（-1 表示无可击条目）。
         /// </summary>
+        /// <remarks>
+        /// 等价于原先「从 cursor 起逐个检查未判定 + 在 miss 窗内 + 不被更晚物件阻挡」，但只扫一遍：
+        /// 「不被更晚物件阻挡」即 <c>i &gt;= blocker</c>（blocker = StartTime &lt;= time 的最大未判定下标），
+        /// 因此起始位置直接跳到 <c>max(cursor, blocker)</c>，不再对每个候选重扫其后缀。
+        /// </remarks>
         private int computeEffectiveEarliestIndex(double time)
         {
-            for (int i = cursor; i < entries.Count; i++)
+            if (entries.Count == 0)
+                return -1;
+
+            ensureOverlapSearchBounds();
+
+            int blocker = findEarliestBlocker(time);
+            int start = cursor > blocker ? cursor : blocker;
+
+            if (start < 0)
+                start = 0;
+
+            for (int i = start; i < entries.Count; i++)
             {
+                // StartTime 升序：越过 miss 早窗上界的条目，其后都不可能在窗内。
+                if (entries[i].StartTime > time + cachedMaxMissEarly)
+                    break;
+
                 if (entries[i].IsPressJudged)
                     continue;
 
                 if (!isWithinMissWindow(entries[i], time))
                     continue;
 
-                if (!IsHittableEarliestIndex(i, time))
-                    continue;
-
                 return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// 满足 <c>StartTime &lt;= time</c> 的最大未判定条目下标；不存在时返回 -1。
+        /// 即「更晚物件阻挡」判定的下界：任何 <c>i &lt; blocker</c> 的条目都会被它挡下。
+        /// </summary>
+        private int findEarliestBlocker(double time)
+        {
+            // StartTime 升序 → 先二分出 StartTime <= time 的前缀长度，再在该前缀内向前找未判定。
+            int lo = 0;
+            int hi = entries.Count;
+
+            while (lo < hi)
+            {
+                int mid = lo + (hi - lo) / 2;
+
+                if (entries[mid].StartTime <= time)
+                    lo = mid + 1;
+                else
+                    hi = mid;
+            }
+
+            for (int j = lo - 1; j >= 0; j--)
+            {
+                if (!entries[j].IsPressJudged)
+                    return j;
             }
 
             return -1;
