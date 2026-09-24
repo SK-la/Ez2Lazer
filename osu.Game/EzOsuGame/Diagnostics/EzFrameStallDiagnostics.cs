@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.UI;
 
 namespace osu.Game.EzOsuGame.Diagnostics
 {
@@ -45,6 +46,17 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         /// <summary>超过该时长的帧才留明细；直方图则覆盖所有帧。可用 <c>EZ_FRAME_PROBE_MS</c> 覆盖。</summary>
         public static double ThresholdMs { get; set; } = 1.5;
+
+        /// <summary>
+        /// 是否每帧读取 GC 计数与分配量。可用 <c>EZ_FRAME_PROBE_LIGHT=1</c> 关掉。
+        /// <para>
+        /// 那几个 GC API（尤其 <c>GetTotalPauseDuration</c> / <c>GetTotalAllocatedBytes</c>）不是免费的，
+        /// 而 <c>RecordFrame</c> 跑在输入派发**之前**，所以它的开销会落进同帧按键的 <c>PreColumnMs</c>。
+        /// 直方图（按键膨胀的判据）不需要这些读数，于是给出这个开关：
+        /// 关掉后 <c>PreColumnMs</c> 若回到无探针时的水平，就说明开销确实在这里。
+        /// </para>
+        /// </summary>
+        public static bool Deep { get; set; } = true;
 
         private const int bucket_count = 1024;
         private const int detail_capacity = 32768;
@@ -123,12 +135,21 @@ namespace osu.Game.EzOsuGame.Diagnostics
             lastFrameTimestamp = now;
             frameIndex++;
 
-            long gcPauseTicks = GC.GetTotalPauseDuration().Ticks;
-            long threadAllocated = GC.GetAllocatedBytesForCurrentThread();
-            long processAllocated = GC.GetTotalAllocatedBytes(false);
-            int gen0 = GC.CollectionCount(0);
-            int gen1 = GC.CollectionCount(1);
-            int gen2 = GC.CollectionCount(2);
+            // light 模式只留直方图，跳掉每帧的 GC/分配读数（那几个 API 会落在同帧按键的等待里）。
+            long gcPauseTicks = 0;
+            long threadAllocated = 0;
+            long processAllocated = 0;
+            int gen0 = 0, gen1 = 0, gen2 = 0;
+
+            if (Deep)
+            {
+                gcPauseTicks = GC.GetTotalPauseDuration().Ticks;
+                threadAllocated = GC.GetAllocatedBytesForCurrentThread();
+                processAllocated = GC.GetTotalAllocatedBytes(false);
+                gen0 = GC.CollectionCount(0);
+                gen1 = GC.CollectionCount(1);
+                gen2 = GC.CollectionCount(2);
+            }
 
             if (prev == 0)
             {
@@ -147,12 +168,15 @@ namespace osu.Game.EzOsuGame.Diagnostics
             else
                 withoutPress.Add(elapsedMs);
 
-            double gcPauseDeltaMs = (gcPauseTicks - lastGcPauseTicks) / (double)TimeSpan.TicksPerMillisecond;
-            long threadAllocDelta = threadAllocated - lastThreadAllocated;
+            double gcPauseDeltaMs = Deep ? (gcPauseTicks - lastGcPauseTicks) / (double)TimeSpan.TicksPerMillisecond : 0;
+            long threadAllocDelta = Deep ? threadAllocated - lastThreadAllocated : 0;
 
-            gcPauseTotalMs += gcPauseDeltaMs;
-            threadAllocatedTotal += threadAllocDelta;
-            processAllocatedTotal += processAllocated - lastProcessAllocated;
+            if (Deep)
+            {
+                gcPauseTotalMs += gcPauseDeltaMs;
+                threadAllocatedTotal += threadAllocDelta;
+                processAllocatedTotal += processAllocated - lastProcessAllocated;
+            }
 
             if (elapsedMs >= ThresholdMs)
             {
@@ -169,7 +193,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     threadAllocDelta,
                     pressesInFrame,
                     pressColumnMsInFrame,
-                    osu.Game.Rulesets.UI.FrameStabilityContainer.EzLastUpdateIterations,
+                    FrameStabilityContainer.EzLastUpdateIterations,
                     gen0 - lastGen0,
                     gen1 - lastGen1,
                     gen2 - lastGen2);
@@ -302,15 +326,23 @@ namespace osu.Game.EzOsuGame.Diagnostics
             var sb = new StringBuilder();
             sb.Append(CultureInfo.InvariantCulture,
                 $"[EzFrameStall] frames={frames} span={wallSeconds:F1}s threshold={ThresholdMs:F2}ms "
+                + $"mode={(Deep ? "deep" : "light")} "
                 + $"stallFrames={stallFrames} (withPress={stallFramesWithPress}) "
                 + $"overwritten={Interlocked.Read(ref detailOverwritten)} ");
 
-            sb.Append(CultureInfo.InvariantCulture, $"alloc(updateThread)={threadAllocatedTotal / 1024.0 / 1024.0:F1}MB ");
-            sb.Append(CultureInfo.InvariantCulture, $"process={processAllocatedTotal / 1024.0 / 1024.0:F1}MB ");
-            sb.Append(CultureInfo.InvariantCulture, $"gcPause={gcPauseTotalMs:F0}ms");
+            if (!Deep)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $" (light mode: GC/alloc readings skipped)");
+            }
+            else
+            {
+                sb.Append(CultureInfo.InvariantCulture, $"alloc(updateThread)={threadAllocatedTotal / 1024.0 / 1024.0:F1}MB ");
+                sb.Append(CultureInfo.InvariantCulture, $"process={processAllocatedTotal / 1024.0 / 1024.0:F1}MB ");
+                sb.Append(CultureInfo.InvariantCulture, $"gcPause={gcPauseTotalMs:F0}ms");
 
-            if (wallSeconds > 0)
-                sb.Append(CultureInfo.InvariantCulture, $" ({100 * gcPauseTotalMs / (wallSeconds * 1000):F2}%)");
+                if (wallSeconds > 0)
+                    sb.Append(CultureInfo.InvariantCulture, $" ({100 * gcPauseTotalMs / (wallSeconds * 1000):F2}%)");
+            }
 
             // 两组分布并排，是「一次按键把帧拉长了多少」的直接答案。
             sb.Append(Environment.NewLine);

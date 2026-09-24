@@ -361,6 +361,10 @@ namespace osu.Game.Screens.Play
                 EzOsuGame.Diagnostics.EzFrameStallDiagnostics.ThresholdMs = frameProbeThreshold;
             }
 
+            // light 模式：只留直方图，跳过每帧的 GC/分配读数。
+            EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Deep =
+                Environment.GetEnvironmentVariable("EZ_FRAME_PROBE_LIGHT") != "1";
+
             EzOsuGame.Timing.EzSubFrameCorrection.Enabled = ez2Config.Get<bool>(Ez2Setting.EzSubFrameCorrectionEnabled);
             EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
 
