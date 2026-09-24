@@ -101,9 +101,11 @@
 ## 2.4 2026-09-24 按键延迟实测（局内 probe：结论是「不是热路径问题」）
 
 工具：`EzPressLatencyDiagnostics`（按键分段）+ `EzFrameStallDiagnostics`（帧级 stall）+ 配套分析脚本
-`AnalyzePressLatency.ps1` / `AnalyzeFrameStall.ps1`。开关：`EZ_JUDGMENT_PROBE`（总开关，落 `diagnostics/`）、
-`EZ_FRAME_PROBE_MS`（stall 阈值）、`EZ_FRAME_PROBE_LIGHT`（关掉每帧 GC/分配读数）、
-`EZ_PRESS_PROBE_SKIP_FORCE_MISS`（消融强制 miss 扫描）。**这些只在诊断开启时生效。**
+`AnalyzePressLatency.ps1` / `AnalyzeFrameStall.ps1` / `AnalyzePeriod.py`（周期性 / 跨探针相位）。
+总开关是 **ini 设置 `Ez2Setting.EzJudgmentDiagEnabled`**（`EzExperimentalSettings` 里的「判定诊断」，
+不是环境变量），它同时打开三个探针；其余走环境变量：`EZ_FRAME_PROBE_MS`（stall 阈值，**0 = 抓全集**）、
+`EZ_FRAME_PROBE_LIGHT`（关掉每帧 GC/分配读数）、`EZ_PRESS_PROBE_SKIP_FORCE_MISS`（消融强制 miss 扫描）。
+**这些只在诊断开启时生效。**
 
 #### 2.4.1 本局条件（先看这个，否则数字会被误读）
 
@@ -341,6 +343,34 @@ B 组 `pressSplit` 的 `sincePrevFrameMean = 1.542 ms`，而帧间隔只有 **1.
 
 **下一步优先级**：① **开局约 2 s 的突发**（占 >5 ms 卡顿的 64–82%，机制已切到 GC / 单帧大分配 / 子树内 5–43 ms 三类）；② **均匀背景里的 GC**（约占 >2 ms 帧的一半，且 62–69% 的 GC 时间集中在慢帧）；③ 给探针补**每帧 CPU 时间**，区分「真算得慢」与「线程被抢占」。
 
+#### 2.4.10 周期性 / 相位分析工具（`AnalyzePeriod.py`）与「2–4 s 周期」的现状（2026-09-24）
+
+§2.1 那两个 ACF 数字（`Drift` 3.10 s / 0.135、9.47 s / 0.164）当时是临时算的，**仓库里从来没有对应工具**，
+所以既不可复现也无法核对。新增 `AnalyzePeriod.py`（numpy，可选 matplotlib）补上这条腿：
+
+- 三探针的 `WallMs` 同源（`EzJudgmentDiagnostics.WallClockMs`），所以**同一局**的三份 CSV 可直接跨探针对齐做互相关 ——
+  这是回答「相位来源」的前提。
+- 输出：逐序列的 ACF 主峰 + Welch 谱主峰 + 带内主周期（Welch 分辨率不够时用细扫定准）+ 滑窗幅度/相位，
+  最后一张跨序列滞后表（只报唯一对、只报带内一个周期以内的滞后）。
+- 显著性用两个可比读数：`ACF r` 与「带内主周期占带内能量 / 均匀背景」，**不用**「峰 / 中位」——
+  在 1/f² 型背景上后者恒为几百倍，会把噪声报成显著。
+
+工具自带两条防误读的自检，都是实测踩出来的：
+
+1. **事件型序列有滞后下限。** judgment / press 都是 ~10 次/s，线性插值到 20 ms 网格后，
+   滞后小于约 3 倍采样间隔的 ACF 是插值自己造出来的（读数恒偏高），故打印时会标 `~`。
+2. **尾部 frame 数据必须排除。** 阈值 > 0 的 `framestall_*.csv` 只有慢帧，块均值桶大量靠插值填补，
+   会伪造出极强虚相关 —— 实测它给出 `TimeOffset × ElapsedMs r = −0.874 @ 420 ms`，看着像定案，
+   其实是纯伪影。现在非全集 frame 序列被标 `⚠` 并**不参与相位表**。
+
+**在现有三局（各 ~34 s）上的结果：测不出 1.5–5 s 带内的稳定周期。** 全部序列 `ACF r ≤ 0.20`、
+带内占比不超过均匀背景 2.8 倍；`Drift` 的峰散在 2.1–2.8 s 但 r 只有 0.07–0.14，三局位置互不相同。
+跨探针最强的一对是 `Drift × TimeOffset r = +0.396 @ 20 ms`（唯一一对两侧都有效的组合），33 s 样本不足以下结论。
+
+⇒ 与 §2.1 的「现象未被测下来」一致。**结论仍待 §3 的长时全帧捕获**；另外 18xxxx 那两局 CSV 已不在
+`diagnostics/`，§2.1 引用的数字无法再用现有数据复算（不排除仍有其它算法能复现，故不据此推翻结论，
+只登记「不可复现」这一事实）。
+
 ---
 
 ## 3. 2026-08-08 音频后端排查记录
@@ -421,6 +451,7 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | `BackgroundDataStoreProcessor` 测试覆写 | `StartupBackfillDelay` 可置 0 |
 | `AnalyzePressLatency.ps1` | 离线读 `diagnostics/presslatency_*.csv`：分 route/空按、FrameAge 分桶、同帧批处理、GC 与缓存命中 |
 | `AnalyzeFrameStall.ps1` | 离线读 `diagnostics/framestall_*.csv` + `.summary.txt`：全帧双直方图（按键帧 vs 非按键帧）、GC 因果判据、慢帧归因、与按键尾部对照。见 §2.4 |
+| `AnalyzePeriod.py` | 离线读判定的 `Drift`/`TimeOffset`/`AudioLag`、帧的 `ElapsedMs`/`SpikeRate`/`GcPauseDeltaMs`、按键的 `PreColumnMs`/`FrameAgeMs`：ACF + Welch 谱 + 带内主周期细扫 + 滑窗幅度/相位 + 跨序列滞后表。拒绝在尾部 frame 数据上出结论。见 §2.4.10 |
 
 性能改动的黄金标准不变：不得破坏 `TestSceneReplaySessionParity` / `ManiaCrossSourceInvariantTest` / `ManiaJudgePrecedenceParityTest`。
 
@@ -471,3 +502,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-24 | §2.4.6：**提帧与顺滑同源**——`Unlimited` 被夹在 8000 Hz 而实得 1968 帧/s，`throttle()` 一次都没 sleep ⇒ 帧数上限就是每帧工作量（0.450 ms，其中判定 <3%）；每帧持续分配 ~2 KB ⇒ gen0 每 41 ms 一次、单次 ~0.77 ms，与卡顿间隔鼓包（20–60 ms）吻合；`ScrollingHitObjectContainer` 每帧用 FSC 的 `framedClock` 采样一次音频时钟 ⇒ **note 位置按 update 帧量化，帧间隔抖动即下落抖动**（`InterpolatingFramedClock` 不改 `ProcessFrame` 语义，此路不通）。新增 `frameSplit` 归因（子树 / 时钟 / 其余 + 子树内分配），据此决定优化方向 |
 | 2026-09-24 | §2.4.8：**帧率上限对比实测**——`base 500/Limit4x`（1979 fps）vs `base 250/Limit4x`（998 fps）。两局 `elapsedMean` ≈ 帧间隔 ⇒ 均为限制器接管，非 CPU 瓶颈；`restMsMean` 增量 0.485 ms ≈ 帧间隔增量 0.496 ms ⇒ **§2.4.7「72.6% 在 FSC 之外」绝大部分是节流 sleep**，真实逐帧恒定成本只有 `subtreeMsMean`（0.105 / 0.116 ms，跨倍帧率不变）。1000 fps 帧间隔规整度 p90/p50 1.89→1.19、超 2× 目标的帧 3.07%→0.65%、按键尾部 `PreColumnMs` p99 35.4→6.8 ms（中位 +0.29 ms）；稳态 >5 ms 卡顿两组都是 11 个（≈0.33 次/s，帧率无关地板），仅幅度更浅。另修正探针语义：`SincePrevFrameMs` 含一个整帧，真实相位 = 该值 − 帧间隔，两速率下均 ≈0.55 ms ⇒ 提出**帧率无关的输入投递地板**待证假设。操作点定为 base 250 |
 | 2026-09-24 | §2.4.9：**GC 归因分辨「造成」vs「同帧」（修正 §2.4.8）**——deep CSV 逐帧 `GcPauseDeltaMs / ElapsedMs` 判据（无需 profiler），稳态（`FrameIndex≥1000`）：GC 暂停 62–69% 落在 stall 帧内（stall 帧 <3%）⇒ 平均 2.5% 墙钟会低估其与卡顿的关系；>2 ms 帧约半数 GC 与帧长同量级。**关键分歧：>5 ms 帧 A 组 0% 与帧长同量级（GC 排除，72.7% 连 10% 不到，明细 5–44 ms、GC 仅 0–2.3 ms），B 组 81.8% 是 GC 但 `FrameIdx` 全在 1040–1977（歌曲头 2 秒）** ⇒ §2.4.8「两组都 11 个」是同数不同因的巧合，**那组无 GC 的重卡顿优先级高于 GC**。另登记分配 92–93% 在 FSC 之外、**acrylic 实测排除**（`EzBoxElement` / `Stage` 毛玻璃开关对 draw 帧数无可见差别，并注明限帧下量具不敏感）。补充 stall 帧时间分布：**2–5 ms 类整局均匀（占 stall 帧 95–97%），>5 ms 类集中在歌曲首 2 s（占 >5 ms 的 64–82%）**；>5 ms 帧逐帧归因为三类（子树内 5–43 ms / GC 主导 / 126 KB–1.54 MB 单帧分配），并提出补「每帧 CPU 时间」以区分真算得慢与线程被抢占 |
+| 2026-09-24 | §2.4.10：**周期性分析工具 `AnalyzePeriod.py`**——补上 §2.1 起就缺的 ACF/谱/相位这条腿（此前那两个 ACF 数字无脚本、不可复现）。同一局三份 CSV 的 `WallMs` 同源故可跨探针做互相关。两条实测踩出的防误读自检：事件型序列有插值滞后下限（<3 倍采样间隔的 ACF 恒偏高）、**尾部 frame 数据必须排除**（实测伪造 `TimeOffset × ElapsedMs r = −0.874`）。现有三局（各 ~34 s）**测不出 1.5–5 s 带内稳定周期**（`ACF r ≤ 0.20`，带内占比 ≤ 均匀背景 2.8 倍），与 §2.1 一致；结论待 §3 长时全帧捕获。另修正 §2.4 写错的开关名（总开关是 ini 的 `EzJudgmentDiagEnabled`，不是 `EZ_JUDGMENT_PROBE`） |

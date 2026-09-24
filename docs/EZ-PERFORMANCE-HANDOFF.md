@@ -31,6 +31,9 @@
   - `Drift` 自相关主峰 3.10 s (0.135) / 9.47 s (0.164) —— **弱，且两组不一致**
   - 卡顿爆发点平均间隔 **0.57–0.63 s**，不是 2–4 s
 - ⇒ **现象未被测下来**。可能：探针时长太短、现象只在特定配置/曲目出现、或用户看的是另一个量。
+- ⚠ 上面那两个 ACF 数字是**当时临时算的，仓库里没有对应脚本**；18xxxx 那两局 CSV 也已不在 `diagnostics/`。
+  2026-09-24 补齐工具（`AnalyzePeriod.py`，见 §3.4）后，在现有三局（各 ~34 s）上**复现不出**这两个周期
+  （`Drift` 全部 `ACF r ≤ 0.20`）。不据此推翻结论，只登记「引用值不可复算」。
 - 已知的可信信号：`BassSource − GameTime` 峰峰 **9.8–9.9 ms**（`Drift` 是同一信号反号）。是音频时钟抖动还是缓冲量化，未定。
 
 ### 2.2 >5 ms 卡顿的三类成因（`framestall_*.csv` 三列可分辨）
@@ -54,8 +57,17 @@
 
 1. 打开 `EzExperimentalSettings` 的判定诊断开关（`Ez2Setting.EzJudgmentDiagEnabled`）——它**同时**开启 frame-stall / press-latency / judgment 三个探针。
 2. 环境变量 `EZ_FRAME_PROBE_MS=0`（抓全集；默认 `1.5` 只留超阈值帧）。可选 `EZ_FRAME_PROBE_LIGHT=1` 降探针自身开销。
+    - **`0` 是硬要求，不是优化**：阈值 > 0 时 `framestall_*.csv` 只有慢帧，把这种尾部数据插值到均匀网格会伪造
+      极强虚相关（实测给出过 `r = −0.874`）。`AnalyzePeriod.py` 会识别并拒绝这类序列，于是这一局就白跑了。
 3. 跑 **2–3 分钟**同一张图；三个 CSV 会同时产出。
-4. 产出后做周期分析（自相关 / 滑窗）：判定的 `Drift`、`TimeOffset`，帧的 `ElapsedMs` 全序列，确认是否存在 2–4 s 周期及其相位来源。
+4. 产出后跑 **`python AnalyzePeriod.py`**（在 `diagnostics/` 目录下执行，默认读最新的那一局；`--plot` 出图、
+   `--windows` 看滑窗明细、`--file <名>` 指定文件）。它按 ① 判定的 `Drift` / `TimeOffset`、② 帧的 `ElapsedMs`、
+   ③ 按键的 `PreColumnMs` / `FrameAgeMs` 做 ACF + Welch 谱 + 带内主周期细扫 + 滑窗幅度/相位，
+   并因同局三份 CSV 的 `WallMs` 同源（`EzJudgmentDiagnostics.WallClockMs`）而给出**跨探针滞后表** ——
+   这是回答「相位来源（音频时钟 / 帧节奏 / 输入投递）」的关键。判读口径：
+    - 先看 `ACF r` 与「带内主周期占带内能量 / 均匀背景」两个读数是否同时明显（单看 PSD「峰 / 中位」会被 1/f² 噪声骗成几百倍）。
+    - 事件型序列（judgment / press，~10 次/s）的短滞后 ACF 是插值造的，输出里带 `~` 的一律不算。
+    - 跨探针只认「两侧都有效」的组合；滞后超过带内一个周期即无意义（周期性信号到处都有峰）。
 5. 若确认存在「子树内」类 >5 ms 帧，再加**「每帧 CPU 时间 vs 墙钟」**读数，区分真算得慢与线程被抢占。
 
 ## 4. 代码锚点
@@ -67,8 +79,9 @@
 | 判定诊断 | `osu.Game/EzOsuGame/Diagnostics/EzJudgmentDiagnostics.cs` |
 | 探针接线 + 环境变量 | `osu.Game/Screens/Play/Player.cs`（约 344–368 行） |
 | 子树 / 时钟 / 其余 归因 | `osu.Game/Rulesets/UI/FrameStabilityContainer.cs`（`UpdateSubTree`） |
-| 分析脚本 | `AnalyzeFrameStall.ps1` |
-| 活文档 | `docs/EZ-PERFORMANCE.md` §2.4 |
+| 分析脚本 | `AnalyzeFrameStall.ps1`、`AnalyzePressLatency.ps1` |
+| 周期 / 跨探针相位分析 | `AnalyzePeriod.py`（numpy；`--plot` 出图） |
+| 活文档 | `docs/EZ-PERFORMANCE.md` §2.4（周期性部分见 §2.4.10） |
 
 ## 5. 环境要点
 
