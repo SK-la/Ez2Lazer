@@ -17,11 +17,20 @@
     （Envelope 保留、逐帧噪声被平均掉），再对齐网格。
   * `--frame` 传进来的若不是全集（阈值 > 0），周期结论无效（尾部截断会伪造周期性）。脚本会读同名
     `.summary.txt` 检查并在这种情况下明确警告。
+  * 两条会被**自动拒绝**的情况，不要试图绕过：
+      ① 序列的 `RMS / 稳健σ(MAD) > 5` —— 方差由开局加载 / 退出那几个离群帧独占，带内「周期」其实是
+         它们的余振（实测同一局 `ElapsedMs` 全段 15.7x、去掉首尾各 3s 后 2.6x，带内 RMS 3.294 → 0.026 ms）。
+      ② 跨序列相位表的读数未越过**偶然水平阈值** —— 带通到 1.5–5 s 后独立样本只有约「跨度/周期」个，
+         |r| 的偶然峰很高（零分布实测 p95 0.503）；工具按 0.05/对数反解家族性阈值并逐行标注。
+      另外「定义性派生」的对（如 SpikeRate := elapsed ≥ 2×p50、AudioLag = −Drift − 常数）直接剔除。
 
 用法：
     python AnalyzePeriod.py diagnostics/judgment_20260924_222233.csv
     python AnalyzePeriod.py --judgment diagnostics/judgment_X.csv --frame diagnostics/framestall_X.csv --press diagnostics/presslatency_X.csv
-    python AnalyzePeriod.py diagnostics/*.csv --dt 0.02 --band 1.5,5 --max-lag 12 --plot
+    python AnalyzePeriod.py diagnostics/*.csv --trim 3,3 --band 1.5,5 --plot
+
+    --trim A,B  先裁掉首尾各 A / B 秒再分析。找稳态周期**基本都该加**：开局加载与退出帧是已知的大离群点。
+    --plot      输出 PNG；--windows 打印所有序列的滑窗明细；--only 只分析指定序列。
 
 依赖：numpy（必需）、matplotlib（仅 --plot）。
 """
@@ -33,11 +42,15 @@ import csv
 import math
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
 SPARK = "▁▂▃▄▅▆▇█"
+
+# 去趋势后「普通 RMS / 稳健 σ(MAD)」超过这个倍数，就认定方差由少数离群帧独占，带内结论不可用。
+# 实测同一局的 `ElapsedMs`：全段 15.7x（被首个 141ms 帧占死），去掉首尾各 3s 后 3.2x。
+OUTLIER_RATIO = 5.0
 
 
 # --------------------------------------------------------------------------- 读入
@@ -92,6 +105,18 @@ class Series:
     unit: str
     source: str
     valid: bool = True
+    # 若本条由另一条序列**按定义派生**（例如 SpikeRate 就是 ElapsedMs >= 2*p50 的指示函数），
+    # 记下来源名：它们之间的相关性是构造出来的，不是发现，相位表必须跳过。
+    derived_from: str = ""
+
+
+def trim_series(series: Series, lo: float, hi: float) -> Series | None:
+    """按绝对时间裁掉首尾过渡段。开局加载与退出帧是**已知**的大离群点（且不是用户抱怨的对象），
+    但它们会让整段带内能量变成同一个脉冲的余振，因此周期/相位分析应把它们排除在外。"""
+    keep = (series.t >= lo) & (series.t <= hi)
+    if int(keep.sum()) < 8:
+        return None
+    return replace(series, t=series.t[keep], y=series.y[keep])
 
 
 def build_series(path: str, table, full_capture: bool = True) -> list[Series]:
@@ -110,7 +135,9 @@ def build_series(path: str, table, full_capture: bool = True) -> list[Series]:
         out += [
             Series("Drift", t, drift, "interp", "ms", src),
             Series("TimeOffset", t, offset, "interp", "ms", src),
-            Series("AudioLag", t, audio_lag, "interp", "ms", src),
+            # Drift = -(BassSource - GameTime) - 15（实测偏移恰为常数 15.000ms）⇒ 同一信号加常数，
+            # 去趋势后必然 r = -1.000。它同 Drift 的「相关」是恒等式，不是发现。
+            Series("AudioLag", t, audio_lag, "interp", "ms", src, derived_from="Drift"),
             Series("FrameElapsed", t, col(header, "FrameElapsed", rows), "interp", "ms", src),
         ]
     elif kind == "press":
@@ -127,7 +154,8 @@ def build_series(path: str, table, full_capture: bool = True) -> list[Series]:
         spike = (elapsed >= 2.0 * p50).astype(float) if finite.size else elapsed * np.nan
         out += [
             Series("ElapsedMs", t, elapsed, "block", "ms", src, full_capture),
-            Series("SpikeRate", t, spike, "block", "1", src, full_capture),
+            Series("SpikeRate", t, spike, "block", "1", src, full_capture,
+                   derived_from="ElapsedMs"),
             Series("GcPauseDeltaMs", t, gc, "block", "ms", src, full_capture),
         ]
     return out
@@ -352,6 +380,15 @@ class Analyzed:
     # 不报毫秒数——带通后 20ms 与 0 在数值上不可分。注意是**降级表述**，不是排除：真峰落在这里时，
     # 若把该段排除，argmax 会退到周期旁瓣上（实测两个完全相同的信号会被报到 −1.06s）。
     min_lag: float = 0.0
+    # 普通 RMS / 稳健 σ 的比值。> `OUTLIER_RATIO` 说明方差由少数离群帧（开局加载、退出）主导，
+    # 带内周期与相位结论此时全是那个脉冲的余振，必须拒绝 —— 实测同一个 141ms 首帧让
+    # `ElapsedMs × GcPauseDeltaMs` 得到 r=+0.998 这种不可能成立的读数。
+    outlier_ratio: float = 0.0
+
+    @property
+    def phase_usable(self) -> bool:
+        """能否参与带内周期 / 相位结论：既要抓全（非尾部），又不能是离群帧主导。"""
+        return self.series.valid and self.outlier_ratio <= OUTLIER_RATIO
 
 
 def analyze(series: Series, grid_t0: float, dt: float, count: int, band: tuple[float, float],
@@ -364,6 +401,11 @@ def analyze(series: Series, grid_t0: float, dt: float, count: int, band: tuple[f
     rms = float(np.sqrt(np.mean(detrended ** 2)))
     if rms <= 0:
         return None
+
+    # 稳健尺度：MAD 对离群帧不敏感。两者差距大 = 方差由少数帧（开局加载、退出）独占。
+    mad = float(np.median(np.abs(detrended - np.median(detrended))))
+    robust = 1.4826 * mad
+    outlier_ratio = rms / robust if robust > 1e-12 else float("inf")
 
     max_lag = min(int(round(max_lag_s / dt)), len(values) // 3)
     ac = autocorr(detrended, max_lag)
@@ -398,8 +440,12 @@ def analyze(series: Series, grid_t0: float, dt: float, count: int, band: tuple[f
     significant = acf_peak >= 0.2 and excess >= 5.0
 
     tag = "" if series.valid else "  ⚠ 尾部数据：下面的周期/相位读数无效，只可看分布"
+    if series.valid and outlier_ratio > OUTLIER_RATIO:
+        tag = (f"  ⚠ 方差由离群帧主导（RMS/稳健σ = {outlier_ratio:.1f}x）：带内周期与相位结论"
+               "全是开局加载/退出那几帧的余振，不参与相位表；用 --trim 去掉首尾过渡段重跑")
     print(f"\n  [{series.name}]  ← {series.source}  单位 {series.unit}  模式 {series.mode}{tag}")
-    print(f"    去趋势后 RMS = {rms:.4g} {series.unit}，跨度 {len(values) * dt:.1f}s，网格 {dt * 1000:.0f}ms")
+    print(f"    去趋势后 RMS = {rms:.4g} {series.unit}（稳健σ = {robust:.4g}，比值 {outlier_ratio:.1f}x），"
+          f"跨度 {len(values) * dt:.1f}s，网格 {dt * 1000:.0f}ms")
 
     # 事件型序列是插值上网格的：插值把相邻两点之间填成直线，于是滞后小于一个采样间隔的那段，
     # 两条曲线在数值上无法分辨（对 1.5–5 s 的带内成分，20 ms 与 0 的平坦度差异约 0.2%）。
@@ -433,11 +479,13 @@ def analyze(series: Series, grid_t0: float, dt: float, count: int, band: tuple[f
     band_wave = bandpass(detrended, dt, band_lo, band_hi)
     print(f"    带内成分（{band[0]:.1f}–{band[1]:.1f}s）：{sparkline(band_wave)}")
     return Analyzed(series, values, dt, f_dom, 1.0 / f_dom, acf_peak, excess, significant,
-                    min_lag=min_lag)
+                    min_lag=min_lag, outlier_ratio=outlier_ratio)
 
 
 def sliding_windows(item: Analyzed, band: tuple[float, float], verbose: bool) -> None:
     analyzed = item
+    if not analyzed.phase_usable:
+        return  # 带内结论本身不可用，滑窗只会放大那个脉冲的余振
     dt = analyzed.dt
     wave = bandpass(detrend(analyzed.grid), dt, 1.0 / band[1], 1.0 / band[0])
     window_s = max(4.0, 3.0 * analyzed.p_dom)
@@ -482,6 +530,32 @@ def sliding_windows(item: Analyzed, band: tuple[float, float], verbose: bool) ->
             print(f"      t={start:8.2f}s  幅度={amp:8.4g}  相位={phase:+.3f} rad")
 
 
+def null_max_r_threshold(count: int, dt: float, band: tuple[float, float], max_lag: int,
+                         pair_count: int, family: float = 0.05, draws: int = 400,
+                         seed: int = 20260924) -> tuple[float, float]:
+    """独立带通噪声下「单对在滞后扫描内的最大 |r|」的分位数。返回 (家族性阈值, 单对 p95)。
+
+    **为什么必须有这个**：把序列带通到 1.5–5 s 后，独立样本数只有约「跨度 / 周期」≈ 13 个，
+    于是 |r| 的偶然水平极高。实测（同 span、同 dt，2000+ 次独立对）：单对 |r| ≥ 0.47 的概率 7.1%、
+    ≥ 0.50 约 4%、p99.9 = 0.66。而一张表有几十对、每对还扫上百个滞后 ⇒ **出现 0.5–0.6 的「显著」
+    读数几乎是必然的**（66 对里至少一对 ≥0.47 的概率 99.2%）。没有这条基线，看表的人一定会把
+    偶然峰当成相位来源。
+
+    零模型用「白噪过同一带通」，与「该带内没有任何真实结构」等价；它只依赖 (count, dt, band, max_lag)，
+    与具体是哪一对无关，因此一次抽样对全表通用。
+    """
+    rng = np.random.default_rng(seed)
+    f_lo, f_hi = 1.0 / band[1], 1.0 / band[0]
+    maxes = np.empty(draws)
+    for i in range(draws):
+        a = bandpass(rng.normal(size=count), dt, f_lo, f_hi)
+        b = bandpass(rng.normal(size=count), dt, f_lo, f_hi)
+        curve = corr_curve(a, b, max_lag)
+        maxes[i] = max((abs(v) for v in curve.values()), default=0.0)
+    per_pair = family / max(1, pair_count)
+    return float(np.quantile(maxes, 1.0 - per_pair)), float(np.percentile(maxes, 95))
+
+
 def print_phase_table(items: list[Analyzed], band: tuple[float, float]) -> None:
     """只报唯一对、只报带内一个周期以内的滞后。
 
@@ -495,11 +569,16 @@ def print_phase_table(items: list[Analyzed], band: tuple[float, float]) -> None:
     lag_limit = band[0]
     rows = []
     blind = []
-    skipped = [a for a in items if not a.series.valid]
+    derived = []
+    skipped = [a for a in items if not a.phase_usable]
     for i in range(len(items)):
         for j in range(i + 1, len(items)):
             a, b = items[i], items[j]
-            if not (a.series.valid and b.series.valid):
+            if not (a.phase_usable and b.phase_usable):
+                continue
+            # 定义性派生对（SpikeRate 由 ElapsedMs 按阈值构造）之间必然高相关，不是发现。
+            if a.series.derived_from == b.series.name or b.series.derived_from == a.series.name:
+                derived.append((a.series.name, b.series.name))
                 continue
             if a.dt != b.dt or len(a.grid) != len(b.grid):
                 continue
@@ -517,15 +596,35 @@ def print_phase_table(items: list[Analyzed], band: tuple[float, float]) -> None:
 
     print(f"\n== 跨序列相位关系（同一带内成分；滞后搜索限 ±{lag_limit:.2f}s = 最短周期内） ==")
     if skipped:
-        print(f"  已排除 {len(skipped)} 条无效序列（尾部 frame 数据会伪造极强虚相关）："
-              f" {', '.join(sorted({a.series.name for a in skipped}))}")
+        reasons = []
+        tails = sorted({a.series.name for a in skipped if not a.series.valid})
+        spikes = sorted({a.series.name for a in skipped if a.series.valid})
+        if tails:
+            reasons.append(f"尾部 frame 数据（会伪造极强虚相关）：{', '.join(tails)}")
+        if spikes:
+            reasons.append(f"离群帧主导方差（RMS/稳健σ > {OUTLIER_RATIO:.0f}x）：{', '.join(spikes)}")
+        print(f"  已排除 {len(skipped)} 条序列 —— " + "；".join(reasons) +
+              "\n      后者请用 --trim 去掉开局/退出过渡段后重跑，否则它们之间的高相关只是同一个脉冲的余振")
     if blind:
         print(f"  另有 {len(blind)} 对完全搜不出峰（重叠不足）而略过，例如 {blind[0][0]} × {blind[0][1]}")
     rows = [row for row in sorted(rows, key=lambda row: -row[0]) if row[4] and abs(row[4]) >= 0.25]
     if not rows:
         print("  没有任何一对 |r| >= 0.25：这一带内各路信号彼此不锁相。")
         return
+
+    # 偶然水平基线：带通后的独立样本太少，|r| 的偶然峰很高（见 null_max_r_threshold 的说明）。
+    sample = rows[0][1]
+    threshold, p95 = null_max_r_threshold(len(sample.grid), sample.dt, band,
+                                          int(round(lag_limit / sample.dt)), len(rows))
+    print(f"  偶然水平基准（{len(rows)} 对 × 独立带通噪声，{len(sample.grid)} 点同网格）："
+          f"单对 p95 = {p95:.3f}，家族性 5% 阈值 = **{threshold:.3f}**"
+          f" ⇒ 低于它的行无法与偶然区分")
+    if derived:
+        print(f"  已跳过 {len(derived)} 对定义性派生关系（构造相关，非发现）："
+              f" {', '.join(f'{x}×{y}' for x, y in derived)}")
+
     print(f"  {'A':<15} {'B':<15} {'A 相对 B':>13}  {'r':>7}  滞后可信性")
+    survivors = 0
     for _, a, b, lag, r, kind in rows[:20]:
         offset = lag * a.dt * 1000.0
         when = "晚" if offset > 0 else "早"
@@ -539,7 +638,13 @@ def print_phase_table(items: list[Analyzed], band: tuple[float, float]) -> None:
         else:
             cell = f"贴边{abs(offset):.0f}ms"
             note = f"峰贴 ±{lag_limit * 1000:.0f}ms（最短周期）⇒ 被截断，**滞后不可定**，只可读 r"
+        if abs(r) < threshold:
+            note += "；**未越偶然阈值**"
+        else:
+            survivors += 1
         print(f"  {a.series.name:<15} {b.series.name:<15} {cell:>13}  {r:+7.3f}  {note}")
+    if survivors == 0:
+        print(f"  ⇒ 这一带内**没有任何一对越过偶然阈值**：表中所有相关性都可由噪声解释。")
 
 
 def plot(items: list[Analyzed], band: tuple[float, float], out_dir: str) -> None:
@@ -589,6 +694,8 @@ def main() -> int:
     parser.add_argument("--dt", type=float, default=0.02, help="重采样网格步长（秒），默认 0.02")
     parser.add_argument("--band", default="1.5,5.0", help="关注的周期带（秒，lo,hi），默认 1.5,5.0")
     parser.add_argument("--max-lag", type=float, default=12.0, help="滞后 / ACF 搜索上限（秒），默认 12")
+    parser.add_argument("--trim", help="先裁掉首尾过渡段（秒，A,B），如 --trim 3,3。"
+                                       "开局加载 / 退出帧是已知的大离群点，会把带内能量变成同一个脉冲的余振")
     parser.add_argument("--only", default="", help="只分析逗号分隔的这些序列名")
     parser.add_argument("--windows", action="store_true", help="对所有序列都打印滑窗明细（默认只打印显著的）")
     parser.add_argument("--plot", action="store_true", help="额外输出 matplotlib PNG")
@@ -598,6 +705,17 @@ def main() -> int:
     if len(band) != 2:
         parser.error("--band 需要 lo,hi")
     only = {name.strip() for name in args.only.split(",") if name.strip()}
+
+    if args.trim:
+        parts = [p for p in args.trim.split(",")]
+        if len(parts) != 2:
+            parser.error("--trim 需要 A,B")
+        try:
+            args.trim = (float(parts[0]), float(parts[1]))
+        except ValueError:
+            parser.error("--trim 需要两个数字（秒），如 --trim 3,3")
+        if min(args.trim) < 0:
+            parser.error("--trim 不接受负数")
 
     paths = list(args.paths) + list(args.judgment) + list(args.frame) + list(args.press)
     if not paths:
@@ -634,6 +752,20 @@ def main() -> int:
     if only:
         collected = [s for s in collected if s.name in only]
 
+    if args.trim:
+        head, tail = args.trim
+        raw0 = min(float(np.nanmin(s.t)) for s in collected)
+        raw1 = max(float(np.nanmax(s.t)) for s in collected)
+        lo, hi = raw0 + head, raw1 - tail
+        if hi - lo < 8 * args.dt:
+            parser.error(f"--trim {head},{tail} 把可分析区间削到 {hi - lo:.1f}s，不足 8 个网格点")
+        kept = [trim_series(s, lo, hi) for s in collected]
+        collected = [s for s in kept if s is not None]
+        print(f"\n== 裁剪过渡段 ==\n  掉首 {head:.1f}s + 尾 {tail:.1f}s ⇒ "
+              f"分析区间 {lo - raw0:.1f}s–{hi - raw0:.1f}s（相对原始起点）")
+        if not collected:
+            parser.error("--trim 后没有序列剩下")
+
     t0 = min(float(np.nanmin(s.t)) for s in collected)
     t1 = max(float(np.nanmax(s.t)) for s in collected)
     dt = args.dt
@@ -652,7 +784,6 @@ def main() -> int:
     for item in analyzed:
         print()
         sliding_windows(item, band, verbose=item.significant or args.windows)
-
     print_phase_table(analyzed, band)
 
     if args.plot:
@@ -660,8 +791,9 @@ def main() -> int:
         print("\n== 画图 ==")
         plot(analyzed, band, out_dir)
 
-    print("\n提示：判读顺序 = ① frame 的 summary 必须 threshold=0（否则只看分布） → ② 看目标带内主周期的 "
-          "ACF r 与「带内高出均匀背景的倍数」 → ③ 再看跨序列滞后定相位来源。"
+    print("\n提示：判读顺序 = ① frame 的 summary 必须 threshold=0（否则只看分布） → ② 各序列的 "
+          "RMS/稳健σ 比值要在 5x 以内（否则带内结论是开局加载帧的余振，用 --trim 去掉首尾各 3s） → "
+          "③ 看目标带内主周期的 ACF r 与「带内高出均匀背景的倍数」 → ④ 再看跨序列滞后定相位来源。"
           "ACF r < 0.2 或高出 < 5x 基本可判为「没有稳定周期」。"
           "相位表只有「内部峰」那几行能给出先后关系；「同时」只说明两者锁相（先后在采样分辨率内不可分），"
           "「贴边」说明峰被搜索区间截断、滞后数值不可信 —— 这两类都只看 r。")
