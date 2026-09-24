@@ -274,14 +274,10 @@ def refine_freq(y: np.ndarray, t: np.ndarray, coarse: float, steps: int = 600) -
     return float(grid[int(np.argmax(powers))])
 
 
-def lag_correlation(a: np.ndarray, b: np.ndarray, max_lag: int) -> tuple[int, float]:
-    """扫描整数滞后：返回使 |Pearson r| 最大的 lag（样本）。lag>0 ⇒ A 落后 B 该样本数。
-
-    按 |lag| 从小到大扫描并只在**严格更大**时更新，避免周期信号在 k 倍周期处产生等价峰时
-    选中一个毫无信息量的远滞后（±3 s 周期在 ±12 s 内有 8 个 r≈1 的位置）。
-    """
-    best = (0, 0.0)
-    for lag in sorted(range(-max_lag, max_lag + 1), key=abs):
+def corr_curve(a: np.ndarray, b: np.ndarray, max_lag: int) -> dict[int, float]:
+    """全部整数滞后的 Pearson r（lag>0 ⇒ A 落后 B）。落在两端重叠不足 16 点的滞后不入表。"""
+    curve = {}
+    for lag in range(-max_lag, max_lag + 1):
         if lag >= 0:
             x, y = a[lag:], b[: len(b) - lag]
         else:
@@ -290,12 +286,36 @@ def lag_correlation(a: np.ndarray, b: np.ndarray, max_lag: int) -> tuple[int, fl
             continue
         xs, ys = x - x.mean(), y - y.mean()
         denom = math.sqrt(float(xs @ xs) * float(ys @ ys))
-        if denom <= 0:
-            continue
-        r = float(xs @ ys) / denom
-        if abs(r) > abs(best[1]) + 1e-9:
-            best = (lag, r)
-    return best
+        if denom > 0:
+            curve[lag] = float(xs @ ys) / denom
+    return curve
+
+
+def locate_lag(curve: dict[int, float], max_lag: int, resolution: int) -> tuple[str, int, float] | None:
+    """定位相关峰并判它属于哪一类：'simultaneous' / 'interior' / 'edge'。返回 (类, lag, r)。
+
+    三类分别对应「能说什么」：
+
+    * `simultaneous` —— 峰落在**一个采样间隔内**。这些序列先被 1.5–5 s 带通，相关长度本就是秒级，
+        互相关系数在 0 附近又宽又平；把 20 ms 与 0 区分开在数值上不可能（平坦度差异约 0.2%）。
+        此时唯一诚实的表述是「两者同相位（在采样分辨率内）」，报一个具体毫秒数就是假精度。
+        **不能把这一段直接排除**：真峰在这里时，剩下的 argmax 会停到周期旁瓣上（实测两个完全相同的
+        信号会被报到 −1.06 s），比不设限更错。
+    * `interior` —— 峰**严格落在区间内部** ⇒ 先后关系可读，这是唯一能给出「谁领先」的情况。
+    * `edge` —— 峰贴在 ±`max_lag`（最短周期）上 ⇒ 被搜索区间截断，滞后**数值**无意义，只有 r 有意义。
+    """
+    usable = {lag: r for lag, r in curve.items() if abs(lag) <= max_lag}
+    if not usable:
+        return None
+    # 升序遍历 ⇒ 并列时取 |lag| 较小者，于是「内部峰与边界同高」会判成 interior（保守方向相反时更可取）。
+    best_lag = max(sorted(usable, key=abs), key=lambda lag: abs(usable[lag]))
+    if abs(best_lag) < resolution:
+        return ("simultaneous", best_lag, usable[best_lag])
+    if abs(best_lag) >= max_lag:
+        # 峰就落在搜索上限上 ⇒ 真峰可能在被截断的另一侧，滞后**数值**不可信。
+        # 不能因为「有个内部峰只低 0.2%」就改判 interior：那只是平顶，不构成定位。
+        return ("edge", best_lag, usable[best_lag])
+    return ("interior", best_lag, usable[best_lag])
 
 
 def sparkline(values: np.ndarray, width: int = 100) -> str:
@@ -328,6 +348,10 @@ class Analyzed:
     r_acf: float
     excess: float
     significant: bool
+    # 该序列的滞后分辨率（秒）：插值序列取采样间隔中位，帧块均值序列为 0。小于它的滞后只报「同时」，
+    # 不报毫秒数——带通后 20ms 与 0 在数值上不可分。注意是**降级表述**，不是排除：真峰落在这里时，
+    # 若把该段排除，argmax 会退到周期旁瓣上（实测两个完全相同的信号会被报到 −1.06s）。
+    min_lag: float = 0.0
 
 
 def analyze(series: Series, grid_t0: float, dt: float, count: int, band: tuple[float, float],
@@ -377,25 +401,26 @@ def analyze(series: Series, grid_t0: float, dt: float, count: int, band: tuple[f
     print(f"\n  [{series.name}]  ← {series.source}  单位 {series.unit}  模式 {series.mode}{tag}")
     print(f"    去趋势后 RMS = {rms:.4g} {series.unit}，跨度 {len(values) * dt:.1f}s，网格 {dt * 1000:.0f}ms")
 
-    # 事件型序列是插值上网格的：插值把相邻两点之间填成直线，于是滞后小于采样间隔的那段 ACF
-    # 是插值本身造出来的（读数恒偏高）。必须把这条可读下限印出来，否则会把 0.3 s 的假峰当真。
-    min_readable_lag = 0.0
+    # 事件型序列是插值上网格的：插值把相邻两点之间填成直线，于是滞后小于一个采样间隔的那段，
+    # 两条曲线在数值上无法分辨（对 1.5–5 s 的带内成分，20 ms 与 0 的平坦度差异约 0.2%）。
+    # 这不是「必须排除」，而是「只能表述为同时」——见 locate_lag。
+    min_lag = 0.0
     sample_times = series.t[np.isfinite(series.t) & np.isfinite(series.y)]
     if series.mode == "interp" and sample_times.size >= 8:
         gaps = np.diff(np.sort(sample_times))
         median_gap = float(np.median(gaps))
-        min_readable_lag = 3.0 * median_gap
+        min_lag = median_gap
         print(f"    采样 {1.0 / median_gap:.1f} 次/s（间隔中位 {median_gap * 1000:.0f}ms）⇒ "
-              f"滞后 < {min_readable_lag * 1000:.0f}ms 的 ACF/相位不可读（插值产物）")
+              f"滞后 < {min_lag * 1000:.0f}ms 只能表述为「同时」（分辨率内）")
 
     print(f"    目标带 {band[0]:.2f}–{band[1]:.2f}s 内主周期 = {1.0 / f_dom:.3f}s "
           f"（{f_dom * 1000:.1f} mHz，Welch 分辨率 {1.0 / used_segment * 1000:.1f} mHz）")
     print(f"    该周期处 ACF r = {acf_peak:+.3f}   带内占比 = {band_share:.1%}（均匀背景 {1.0 / band_bins:.1%}"
           f" ⇒ 高出 {excess:.1f}x）   {'← 显著' if significant else '← 弱/不显著'}")
 
-    print("    ACF 主峰（lag → r；~ = 落在不可读区）：", end="")
+    print("    ACF 主峰（lag → r；~ = 落在分辨率内，与「同时」不可区分）：", end="")
     for lag, value in local_peaks(ac, int(0.05 / dt), max_lag)[:6]:
-        mark = "~" if lag * dt < min_readable_lag else " "
+        mark = "~" if lag * dt < min_lag else " "
         print(f" {mark}{lag * dt:.2f}s→{value:+.3f}", end="")
     print()
 
@@ -407,7 +432,8 @@ def analyze(series: Series, grid_t0: float, dt: float, count: int, band: tuple[f
     print(f"    波形（去趋势，按时间）：{sparkline(detrended)}")
     band_wave = bandpass(detrended, dt, band_lo, band_hi)
     print(f"    带内成分（{band[0]:.1f}–{band[1]:.1f}s）：{sparkline(band_wave)}")
-    return Analyzed(series, values, dt, f_dom, 1.0 / f_dom, acf_peak, excess, significant)
+    return Analyzed(series, values, dt, f_dom, 1.0 / f_dom, acf_peak, excess, significant,
+                    min_lag=min_lag)
 
 
 def sliding_windows(item: Analyzed, band: tuple[float, float], verbose: bool) -> None:
@@ -468,6 +494,7 @@ def print_phase_table(items: list[Analyzed], band: tuple[float, float]) -> None:
 
     lag_limit = band[0]
     rows = []
+    blind = []
     skipped = [a for a in items if not a.series.valid]
     for i in range(len(items)):
         for j in range(i + 1, len(items)):
@@ -478,22 +505,41 @@ def print_phase_table(items: list[Analyzed], band: tuple[float, float]) -> None:
                 continue
             wave_a = bandpass(detrend(a.grid), a.dt, 1.0 / band[1], 1.0 / band[0])
             wave_b = bandpass(detrend(b.grid), b.dt, 1.0 / band[1], 1.0 / band[0])
-            lag, r = lag_correlation(wave_a, wave_b, int(round(lag_limit / a.dt)))
-            rows.append((abs(r), a, b, lag, r))
+            # 两侧的分辨率取大者：任一侧分辨不出更小的滞后，这一对就给不出更细的先后。
+            resolution = int(round(max(a.min_lag, b.min_lag) / a.dt))
+            curve = corr_curve(wave_a, wave_b, int(round(lag_limit / a.dt)))
+            located = locate_lag(curve, int(round(lag_limit / a.dt)), resolution)
+            if located is None:
+                blind.append((a.series.name, b.series.name))
+                continue
+            kind, lag, r = located
+            rows.append((abs(r), a, b, lag, r, kind))
 
     print(f"\n== 跨序列相位关系（同一带内成分；滞后搜索限 ±{lag_limit:.2f}s = 最短周期内） ==")
     if skipped:
         print(f"  已排除 {len(skipped)} 条无效序列（尾部 frame 数据会伪造极强虚相关）："
               f" {', '.join(sorted({a.series.name for a in skipped}))}")
+    if blind:
+        print(f"  另有 {len(blind)} 对完全搜不出峰（重叠不足）而略过，例如 {blind[0][0]} × {blind[0][1]}")
     rows = [row for row in sorted(rows, key=lambda row: -row[0]) if row[4] and abs(row[4]) >= 0.25]
     if not rows:
         print("  没有任何一对 |r| >= 0.25：这一带内各路信号彼此不锁相。")
         return
-    print(f"  {'A':<15} {'B':<15} {'A 相对 B':>12}  {'r':>7}")
-    for _, a, b, lag, r in rows[:20]:
+    print(f"  {'A':<15} {'B':<15} {'A 相对 B':>13}  {'r':>7}  滞后可信性")
+    for _, a, b, lag, r, kind in rows[:20]:
         offset = lag * a.dt * 1000.0
         when = "晚" if offset > 0 else "早"
-        print(f"  {a.series.name:<15} {b.series.name:<15} {when}{abs(offset):8.0f}ms  {r:+7.3f}")
+        res_ms = max(a.min_lag, b.min_lag) * 1000.0
+        if kind == "simultaneous":
+            cell = "同时"
+            note = f"峰在分辨率内（±{res_ms:.0f}ms，采样间隔）⇒ **先后关系不可定**，只可读 r（符号即正负相关）"
+        elif kind == "interior":
+            cell = f"{when}{abs(offset):.0f}ms"
+            note = "内部峰 ⇒ 先后关系可读"
+        else:
+            cell = f"贴边{abs(offset):.0f}ms"
+            note = f"峰贴 ±{lag_limit * 1000:.0f}ms（最短周期）⇒ 被截断，**滞后不可定**，只可读 r"
+        print(f"  {a.series.name:<15} {b.series.name:<15} {cell:>13}  {r:+7.3f}  {note}")
 
 
 def plot(items: list[Analyzed], band: tuple[float, float], out_dir: str) -> None:
@@ -616,7 +662,9 @@ def main() -> int:
 
     print("\n提示：判读顺序 = ① frame 的 summary 必须 threshold=0（否则只看分布） → ② 看目标带内主周期的 "
           "ACF r 与「带内高出均匀背景的倍数」 → ③ 再看跨序列滞后定相位来源。"
-          "ACF r < 0.2 或高出 < 5x 基本可判为「没有稳定周期」；事件序列还要看那个可读滞后下限。")
+          "ACF r < 0.2 或高出 < 5x 基本可判为「没有稳定周期」。"
+          "相位表只有「内部峰」那几行能给出先后关系；「同时」只说明两者锁相（先后在采样分辨率内不可分），"
+          "「贴边」说明峰被搜索区间截断、滞后数值不可信 —— 这两类都只看 r。")
     return 0
 
 
