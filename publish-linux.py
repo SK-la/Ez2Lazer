@@ -10,7 +10,7 @@ import hashlib
 from datetime import datetime
 
 
-def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str,os: str) -> int:
+def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str, os: str, self_contained: bool = False) -> int:
     # Map simple os identifiers to runtime identifiers (RID) and pass via -r
     rid = None
     if os:
@@ -31,7 +31,7 @@ def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str
             # if caller passed a full RID already, use it
             rid = os
 
-    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir, "--self-contained", "false"]
+    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir, "--self-contained", "true" if self_contained else "false"]
     if rid:
         cmd.extend(["-r", rid])
     print("Running:", " ".join(cmd))
@@ -202,6 +202,24 @@ def _dir_has_files(path: str) -> bool:
     return False
 
 
+def _find_apphost_name(release_dir: str) -> str | None:
+    """Return the published apphost's filename.
+
+    Forks commonly override <AssemblyName> (e.g. Ez2Lazer builds 'Ez2osu!' instead of
+    'osu.Desktop'), so AppRun/.desktop must not hardcode the upstream binary name.
+    The apphost is the only top-level file with no extension and the executable bit set.
+    """
+    candidates = []
+    try:
+        for entry in os.listdir(release_dir):
+            full = os.path.join(release_dir, entry)
+            if os.path.isfile(full) and '.' not in entry and os.access(full, os.X_OK):
+                candidates.append(entry)
+    except Exception:
+        return None
+    return candidates[0] if candidates else None
+
+
 def _find_best_publish_candidate(search_root: str) -> str | None:
     import glob
     candidates = []
@@ -244,6 +262,7 @@ def main():
     parser.add_argument('--no-zip', action='store_true', help='Do not create zip files')
     parser.add_argument('--release-only', action='store_true', default=True, help='Only publish the release package and skip debug output')
     parser.add_argument('--appimage', action='store_true', help='Build AppImage for linux from release output')
+    parser.add_argument('--self-contained', dest='self_contained', action='store_true', help='Publish a self-contained build that bundles the .NET runtime. Forced on when --appimage is set.')
     parser.add_argument('--tag', default=None, help='Optional tag to include in asset name')
     parser.add_argument('--deps-path', default=None, help='Path to folder containing dependency DLLs to include')
     parser.add_argument('--deps-pattern', default='*.dll', help='Glob pattern for dependency files to copy')
@@ -321,9 +340,17 @@ def main():
     else:
         arch_name = 'x64'
     print("building for platform", target_platform, "arch", arch_name)
+
+    # AppImages are expected to run without any system-wide .NET install, so force a
+    # self-contained publish whenever we're building one, regardless of what was passed in.
+    self_contained = args.self_contained
+    if args.appimage and target_platform.startswith('linux') and not self_contained:
+        print('AppImage build requested: forcing --self-contained to bundle the .NET runtime.')
+        self_contained = True
+
     # publish
     print('Publishing Release...')
-    rc = run_publish(args.project, args.workdir, 'Release', release_dir,target_platform)
+    rc = run_publish(args.project, args.workdir, 'Release', release_dir, target_platform, self_contained=self_contained)
     if rc != 0:
         print('Release publish failed with code', rc)
     else:
@@ -350,7 +377,7 @@ def main():
 
     if not args.release_only:
         print('Publishing Debug...')
-        rc2 = run_publish(args.project, args.workdir, 'Debug', debug_dir,target_platform)
+        rc2 = run_publish(args.project, args.workdir, 'Debug', debug_dir, target_platform, self_contained=self_contained)
         if rc2 != 0:
             print('Debug publish failed with code', rc2)
         else:
@@ -521,12 +548,15 @@ def main():
                         else:
                             shutil.copy2(s, d)
 
+                    exe_name = _find_apphost_name(release_dir) or 'osu.Desktop'
+                    print('Detected apphost executable:', exe_name)
+
                     # AppRun
                     apprun_path = os.path.join(appdir, 'AppRun')
                     with open(apprun_path, 'w', encoding='utf-8') as f:
                         f.write('#!/bin/sh\n')
                         f.write('HERE="$(dirname "$(readlink -f "$0")")"\n')
-                        f.write('exec "$HERE"/usr/bin/osu.Desktop "$@"\n')
+                        f.write(f'exec "$HERE"/usr/bin/{exe_name} "$@"\n')
                     try:
                         os.chmod(apprun_path, 0o755)
                     except Exception:
@@ -538,10 +568,15 @@ def main():
                         f.write('[Desktop Entry]\n')
                         f.write('Type=Application\n')
                         f.write('Name=Ez2Lazer\n')
-                        f.write('Exec=osu.Desktop %u\n')
+                        f.write(f'Exec={exe_name} %u\n')
                         f.write('Icon=ez2lazer\n')
                         f.write('Categories=Game;\n')
                         f.write('Terminal=false\n')
+
+                    # appimagetool requires the .desktop file (and icon, below) to also exist
+                    # directly at the AppDir root, not just under usr/share/applications.
+                    root_desktop_path = os.path.join(appdir, 'ez2lazer.desktop')
+                    shutil.copy2(desktop_path, root_desktop_path)
 
                     # copy icon if available
                     icon_src = None
@@ -552,8 +587,25 @@ def main():
                         candidate = os.path.join(os.path.dirname(__file__), 'resources', 'Icons', 'ez2lazer-256.png')
                         if os.path.exists(candidate):
                             icon_src = candidate
+
+                    root_icon_path = os.path.join(appdir, 'ez2lazer.png')
                     if icon_src:
                         shutil.copy2(icon_src, os.path.join(appdir, 'usr', 'share', 'icons', 'hicolor', '256x256', 'apps', 'ez2lazer.png'))
+                        shutil.copy2(icon_src, root_icon_path)
+                    else:
+                        # appimagetool also aborts if no icon is present at the AppDir root at all.
+                        # Fall back to a tiny placeholder so the build can still complete; pass
+                        # --resources-path pointing at osu-resources' Icons folder for a real icon.
+                        print('No icon found (pass --resources-path to use a real one); '
+                              'writing a placeholder icon so appimagetool does not abort.')
+                        import base64
+                        placeholder_png = base64.b64decode(
+                            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk'
+                            '+A8AAQUBAScY42YAAAAASUVORK5CYII='
+                        )
+                        with open(root_icon_path, 'wb') as f:
+                            f.write(placeholder_png)
+
 
                     # download appimagetool
                     import urllib.request
