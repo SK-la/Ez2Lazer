@@ -44,6 +44,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         private double cachedEarliestEffectiveTime = double.NaN;
         private long cachedEarliestEffectiveGeneration = -1;
 
+        /// <summary>[探针] Earliest 有效索引缓存命中/未命中次数（单调递增，分析时取按键间差值）。</summary>
+        internal static long EarliestCacheHits;
+
+        /// <summary>[探针] <see cref="EarliestCacheHits"/> 的未命中计数。</summary>
+        internal static long EarliestCacheMisses;
+
         private HitModeHelper? missWindowHelper;
         private double cachedMaxMissEarly;
         private double cachedMaxMissLate;
@@ -317,8 +323,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 // Result.HasResult 先于 OnNewResult 置位，极窄窗口内条目已判定但代次尚未自增；
                 // 条目「变已判定」只会让 blocker 前移（可击性约束只会更容易满足），故只需复核该条目自身。
                 if (cached < 0 || !entries[cached].IsPressJudged)
+                {
+                    EarliestCacheHits++;
                     return cached;
+                }
             }
+
+            EarliestCacheMisses++;
 
             int computed = computeEffectiveEarliestIndex(time);
 

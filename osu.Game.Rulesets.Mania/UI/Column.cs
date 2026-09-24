@@ -3,12 +3,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
+using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
@@ -16,6 +18,8 @@ using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Diagnostics;
+using osu.Game.EzOsuGame.Timing;
 using osu.Game.Rulesets.Mania.EzMania.Audio;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
@@ -437,7 +441,13 @@ namespace osu.Game.Rulesets.Mania.UI
             double judgementTime = hitObject.Result.TimeAbsolute;
 
             forceMissScratch.Clear();
-            LaneController.CollectForceMissBefore(hitObject.HitObject.StartTime, forceMissScratch);
+
+            // [Ez] 探针消融开关：跳过「提前判 miss」的收集与判定，用于确认它是否属于延迟尾部。
+            if (!EzPressLatencyDiagnostics.SkipForceMiss)
+                LaneController.CollectForceMissBefore(hitObject.HitObject.StartTime, forceMissScratch);
+
+            if (EzPressLatencyDiagnostics.Enabled)
+                pressForceMissScan = forceMissScratch.Count;
 
             for (int i = 0; i < forceMissScratch.Count; i++)
             {
@@ -457,10 +467,18 @@ namespace osu.Game.Rulesets.Mania.UI
             LaneController.NotifyJudged(hitObject);
         }
 
+        /// <summary>本次按键在 <see cref="handleHit"/> 中扫描的强制 miss 候选数（探针，跨按键在按键入口清零）。</summary>
+        private int pressForceMissScan;
+
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
             if (e.Action != Action.Value)
                 return false;
+
+            bool probe = EzPressLatencyDiagnostics.Enabled;
+            long pressEnterTs = probe ? Stopwatch.GetTimestamp() : 0;
+
+            pressForceMissScan = 0;
 
             double time = Time.Current;
 
@@ -482,6 +500,9 @@ namespace osu.Game.Rulesets.Mania.UI
             if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
                 sampleTriggerSource.Play();
 
+            bool routed = false;
+            bool judged = false;
+
             if (drawableRuleset?.ColumnRoutesInput == true)
             {
                 columnRoutedPressTarget = null;
@@ -494,10 +515,58 @@ namespace osu.Game.Rulesets.Mania.UI
                 var entry = LaneController.SelectPressEntry(time, precedence);
 
                 if (entry != null)
-                    applyRoutedPress(entry.RoutedObject, time, e);
+                {
+                    routed = applyRoutedPress(entry.RoutedObject, time, e);
+                    judged = entry.IsPressJudged;
+                }
             }
 
+            if (probe)
+                recordPressLatency(pressEnterTs, time, routed, judged);
+
             return false;
+        }
+
+        /// <summary>
+        /// 写一条按键延迟样本：<c>PreColumnMs</c>（事件入队→本列入口）、<c>ColumnMs</c>（本列全程）、
+        /// <c>FrameAgeMs</c>（处理时当前游戏帧有多旧）。空按同样采样，因为它不经过任何 <c>UpdateResult</c>。
+        /// </summary>
+        private void recordPressLatency(long pressEnterTs, double gameTime, bool routed, bool judged)
+        {
+            long now = Stopwatch.GetTimestamp();
+            double tickToMs = 1000.0 / Stopwatch.Frequency;
+
+            long keyTs = InputManager.EzSubFrameTimestamp;
+            long frameTs = EzSubFrameCorrection.LastUpdateTimestamp;
+            long frameId = EzSubFrameCorrection.UpdateCount;
+
+            double preColumnMs = keyTs > 0 ? (pressEnterTs - keyTs) * tickToMs : double.NaN;
+            double columnMs = (now - pressEnterTs) * tickToMs;
+            double frameAgeMs = frameTs > 0 ? (pressEnterTs - frameTs) * tickToMs : double.NaN;
+
+            EzPressLatencyDiagnostics.Record(new EzPressLatencyDiagnostics.PressSample(
+                EzJudgmentDiagnostics.WallClockMs,
+                gameTime,
+                double.IsNaN(preColumnMs) ? double.NaN : preColumnMs + columnMs,
+                preColumnMs,
+                columnMs,
+                frameAgeMs,
+                Index,
+                frameId,
+                EzPressLatencyDiagnostics.BeginPress(frameId),
+                routed,
+                judged,
+                LaneController.Entries.Count,
+                pressForceMissScan,
+                Clock.ElapsedFrameTime,
+                drawableRuleset?.FrameStableClock?.IsCatchingUp.Value ?? false,
+                FrameStabilityContainer.EzLastUpdateIterations,
+                GC.CollectionCount(0),
+                GC.CollectionCount(1),
+                GC.CollectionCount(2),
+                GC.GetTotalPauseDuration().TotalMilliseconds,
+                ManiaLaneController.EarliestCacheHits,
+                ManiaLaneController.EarliestCacheMisses));
         }
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
