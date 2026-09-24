@@ -155,6 +155,68 @@ if ($SummaryPath -and (Test-Path -LiteralPath $SummaryPath)) {
     Get-Content -LiteralPath $SummaryPath |
         Where-Object { $_ -match '\[EzFrameStall\]' } |
         ForEach-Object { Write-Host "  $_" }
+
+    # 双直方图对比：这是「一次按键把帧拉长了多少」的直接答案。
+    $lines = @(Get-Content -LiteralPath $SummaryPath | Where-Object { $_ -match '^(noPress|withPress)' })
+
+    if ($lines.Count -ge 2) {
+        Write-Host ''
+        Write-Host '  -- 按键帧 vs 非按键帧 --' -ForegroundColor Cyan
+
+        $parsed = @{}
+        foreach ($line in $lines) {
+            $name = if ($line -match '^noPress') { 'noPress' } else { 'withPress' }
+
+            if ($line -match '\bn=(\d+)') { $parsed[$name + '_n'] = [double]$matches[1] }
+            if ($line -match 'mean=([\d.]+)') { $parsed[$name + '_mean'] = [double]::Parse($matches[1], $inv) }
+            if ($line -match 'p50=([\d.]+)') { $parsed[$name + '_p50'] = [double]::Parse($matches[1], $inv) }
+            if ($line -match 'p90=([\d.]+)') { $parsed[$name + '_p90'] = [double]::Parse($matches[1], $inv) }
+            if ($line -match 'p99=([\d.]+)') { $parsed[$name + '_p99'] = [double]::Parse($matches[1], $inv) }
+            if ($line -match 'max=([\d.]+)') { $parsed[$name + '_max'] = [double]::Parse($matches[1], $inv) }
+            if ($line -match 'over0\.5=(\d+)') { $parsed[$name + '_o05'] = [double]$matches[1] }
+            if ($line -match 'over1=(\d+)') { $parsed[$name + '_o1'] = [double]$matches[1] }
+            if ($line -match 'over2=(\d+)') { $parsed[$name + '_o2'] = [double]$matches[1] }
+            if ($line -match 'over5=(\d+)') { $parsed[$name + '_o5'] = [double]$matches[1] }
+        }
+
+        if ($parsed.ContainsKey('noPress_n') -and $parsed['noPress_n'] -gt 0) {
+            Write-Host ('    {0,-10} {1,9} {2,8} {3,8} {4,8} {5,9} {6,9} {7,9} {8,9}' -f `
+                    '组', 'n', 'mean', 'p50', 'p90', 'P(>1ms)', 'P(>2ms)', 'P(>5ms)', 'max')
+
+            foreach ($name in 'noPress', 'withPress') {
+                $n = $parsed[$name + '_n']
+                if ($n -le 0) { continue }
+
+                Write-Host ('    {0,-10} {1,9:N0} {2,8} {3,8} {4,8} {5,9:P2} {6,9:P2} {7,9:P2} {8,9}' -f `
+                        $name, $n,
+                        (Format-F3 $parsed[$name + '_mean']),
+                        (Format-F3 $parsed[$name + '_p50']),
+                        (Format-F3 $parsed[$name + '_p90']),
+                        ($parsed[$name + '_o1'] / $n),
+                        ($parsed[$name + '_o2'] / $n),
+                        ($parsed[$name + '_o5'] / $n),
+                        (Format-F3 $parsed[$name + '_max']))
+            }
+
+            if ($parsed.ContainsKey('withPress_n') -and $parsed['withPress_n'] -gt 0) {
+                $deltaP50 = $parsed['withPress_p50'] - $parsed['noPress_p50']
+                $deltaP90 = $parsed['withPress_p90'] - $parsed['noPress_p90']
+
+                # 归一化后的尾部概率之比才是「按键是否把帧推过阈值」的正确读法。
+                $p1no = $parsed['noPress_o1'] / $parsed['noPress_n']
+                $p1yes = $parsed['withPress_o1'] / $parsed['withPress_n']
+                $ratio = if ($p1no -gt 0) { $p1yes / $p1no } else { [double]::NaN }
+
+                Write-Host ''
+                Write-Host ("    按键帧比非按键帧：p50 {0:+#.000;-#.000;0}ms   p90 {1:+#.000;-#.000;0}ms" -f $deltaP50, $deltaP90)
+                Write-Host ("    P(>1ms): {0:P2} vs {1:P2}  → {2:F1}x   （按键帧占全帧 {3:P2}）" -f `
+                        $p1yes, $p1no, $ratio, ($parsed['withPress_n'] / ($parsed['withPress_n'] + $parsed['noPress_n'])))
+                Write-Host '    读法：p50 增量小、而尾部概率之比大 → 按键不是稳定地加固定开销，'
+                Write-Host '          而是让少数帧变长。此时要看 PressColumnMs 是否也大：'
+                Write-Host '          大 = 按键自己的工作；小 = 按键只是落在慢帧上，帧长另有来源。'
+            }
+        }
+    }
 }
 else {
     Write-Host '  未找到摘要文件（framestall_*.summary.txt）。全帧分布只能从游戏日志的 [EzFrameStall] 行读。'
@@ -186,6 +248,37 @@ foreach ($band in @(@('2-3ms', 2, 3), @('3-5ms', 3, 5), @('5-10ms', 5, 10), @('>
 
     Write-Host ("  Elapsed {0,-7} n={1,-6} mean={2,8}  meanGcPause={3,8}  GC占比={4,7:P0}" -f `
             $name, $inBand.Length, (Format-F3 $meanElapsed), (Format-F3 $meanPause), $(if ($meanElapsed -gt 0) { $meanPause / $meanElapsed } else { 0 }))
+}
+
+# ---------------------------------------------------------------- 按键自身工时 vs 帧长
+
+Write-Host ''
+Write-Host '== 按键自身的工时 vs 帧长 ==' -ForegroundColor Cyan
+
+$pressStalls = @($stalls | Where-Object { [int]$_.PressesInFrame -gt 0 -and $_.PressColumnMs })
+
+if ($pressStalls.Count -gt 0) {
+    Write-Stats $pressStalls '  PressColumnMs（本列工时）' 'PressColumnMs'
+    Write-Stats $pressStalls '  ElapsedMs（该帧总长）' 'ElapsedMs'
+
+    # 按键工时占帧长的比例：比例低说明帧长不是按键自己的工作造成的。
+    $ratios = New-Object 'System.Collections.Generic.List[double]'
+    foreach ($r in $pressStalls) {
+        $e = ConvertTo-Double $r.ElapsedMs
+        $c = ConvertTo-Double $r.PressColumnMs
+        if ($e -gt 0 -and -not [double]::IsNaN($c)) { $ratios.Add($c / $e) }
+    }
+
+    if ($ratios.Count -gt 0) {
+        $sorted = $ratios.ToArray(); [Array]::Sort($sorted)
+        $sum = 0.0; foreach ($v in $sorted) { $sum += $v }
+        Write-Host ("  按键工时 / 帧长: p50={0:P1} p90={1:P1} mean={2:P1}" -f `
+                (Get-Percentile $sorted 0.5), (Get-Percentile $sorted 0.9), ($sum / $sorted.Length))
+        Write-Host '  占比高 → 帧是被按键自己的工作拉长的；占比低 → 帧长另有来源，按键只是恰好落在这里。'
+    }
+}
+else {
+    Write-Host '  （无含按键的 stall 帧，或 CSV 缺少 PressColumnMs 列）'
 }
 
 # ---------------------------------------------------------------- 判据 1：GC 因果
@@ -321,9 +414,11 @@ if ($PressPath) {
 
 Write-Host ''
 Write-Host "== 最慢 $TopN 帧 ==" -ForegroundColor Cyan
-Write-Host ('  {0,10} {1,9} {2,9} {3,11} {4,7} {5,6} {6,8} {7,7} {8,8}' -f 'WallMs', 'Elapsed', 'GcPause', 'ThreadAlloc', 'Presses', 'Iters', 'Gen0d', 'Gen1d', 'FrameIdx')
+Write-Host ('  {0,10} {1,9} {2,9} {3,11} {4,5} {5,9} {6,6} {7,8} {8,7}' -f 'WallMs', 'Elapsed', 'GcPause', 'ThreadAlloc', 'Press', 'PressCol', 'Iters', 'Gen0d', 'FrameIdx')
 
 $stalls | Sort-Object { ConvertTo-Double $_.ElapsedMs } -Descending | Select-Object -First $TopN | ForEach-Object {
-    ('  {0,10} {1,9} {2,9} {3,11} {4,7} {5,6} {6,8} {7,7} {8,8}' -f `
-            $_.WallMs, $_.ElapsedMs, $_.GcPauseDeltaMs, $_.ThreadAllocDeltaBytes, $_.PressesInFrame, $_.FscIter, $_.Gen0Delta, $_.Gen1Delta, $_.FrameIndex)
+    ('  {0,10} {1,9} {2,9} {3,11} {4,5} {5,9} {6,6} {7,8} {8,7}' -f `
+            $_.WallMs, $_.ElapsedMs, $_.GcPauseDeltaMs, $_.ThreadAllocDeltaBytes,
+            $_.PressesInFrame, $(if ($_.PressColumnMs) { $_.PressColumnMs } else { '-' }),
+            $_.FscIter, $_.Gen0Delta, $_.FrameIndex)
 }
