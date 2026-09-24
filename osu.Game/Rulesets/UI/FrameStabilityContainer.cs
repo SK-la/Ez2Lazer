@@ -110,23 +110,49 @@ namespace osu.Game.Rulesets.UI
 
             int iterations = 0;
 
+            // [Ez] 把一轮 update 切成「时钟推进」「drawable 子树」「其余」三段，供帧探针归因。
+            // 子树是 FSC 之下的整个 ruleset 层级（播放区、物件、判定线），HUD 与框架调度在它之外。
+            double clockTicks = 0;
+            double subtreeTicks = 0;
+            long allocBefore = DeepAlloc ? GC.GetAllocatedBytesForCurrentThread() : 0;
+            long subtreeAlloc = 0;
+
             do
             {
                 iterations++;
+
+                long beforeClock = Stopwatch.GetTimestamp();
 
                 // update clock is always trying to approach the aim time.
                 // it should be provided as the original value each loop.
                 updateClock();
 
+                clockTicks += Stopwatch.GetTimestamp() - beforeClock;
+
                 if (state == PlaybackState.NotValid)
                     break;
 
+                long beforeSubtree = Stopwatch.GetTimestamp();
+                long allocAtSubtreeStart = DeepAlloc ? GC.GetAllocatedBytesForCurrentThread() : 0;
+
                 base.UpdateSubTree();
                 UpdateSubTreeMasking();
+
+                subtreeTicks += Stopwatch.GetTimestamp() - beforeSubtree;
+
+                if (DeepAlloc)
+                    subtreeAlloc += GC.GetAllocatedBytesForCurrentThread() - allocAtSubtreeStart;
             } while (state == PlaybackState.RequiresCatchUp && stopwatch.ElapsedMilliseconds < max_catchup_milliseconds);
 
             // [Ez] Catch-up loop count of this pass, read by the press-latency probe.
             EzLastUpdateIterations = iterations;
+
+            double tickToMs = 1000.0 / Stopwatch.Frequency;
+            subtreeProbeMs = subtreeTicks * tickToMs;
+            clockProbeMs = clockTicks * tickToMs;
+            subtreeProbeAllocBytes = subtreeAlloc;
+            loopAllocProbeBytes = DeepAlloc ? GC.GetAllocatedBytesForCurrentThread() - allocBefore : 0;
+            probeFrameValid = true;
 
             // [Ez] Frame boundary for the frame-stall probe. Must stay at the same position in every
             // pass, otherwise the delta between two calls is not a whole frame.
@@ -134,6 +160,27 @@ namespace osu.Game.Rulesets.UI
 
             return true;
         }
+
+        /// <summary>[Ez] 上一轮 FSC 子树（<c>base.UpdateSubTree</c>）耗时；探针用，不参与游戏逻辑。</summary>
+        public static double SubtreeProbeMs => subtreeProbeMs;
+
+        /// <summary>[Ez] 上一轮 FSC 子树内分配字节数；仅 Deep 模式有值。</summary>
+        public static long SubtreeProbeAllocBytes => subtreeProbeAllocBytes;
+
+        /// <summary>[Ez] 上一轮 <see cref="UpdateSubTree"/> 全程（时钟 + 子树 + masking）的分配字节数；仅 Deep 模式有值。</summary>
+        public static long LoopAllocProbeBytes => loopAllocProbeBytes;
+
+        /// <summary>[Ez] 上一轮 <see cref="updateClock"/> 累计耗时（catch-up 时为多次之和）。</summary>
+        public static double ClockProbeMs => clockProbeMs;
+
+        private static double subtreeProbeMs;
+        private static double clockProbeMs;
+        private static long subtreeProbeAllocBytes;
+        private static long loopAllocProbeBytes;
+        private static bool probeFrameValid;
+
+        /// <summary>[Ez] 分配读数只在 Deep 模式开启，light 模式下这里必须为 false，否则每帧两次 GC 查询会污染帧长。</summary>
+        private static bool DeepAlloc => EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Deep && EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Enabled;
 
         /// <summary>
         /// [Ez] Number of subtree passes performed by the last <see cref="UpdateSubTree"/> call.

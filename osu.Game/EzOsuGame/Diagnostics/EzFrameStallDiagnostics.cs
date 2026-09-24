@@ -90,6 +90,12 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static double sincePrevFrameTotalMs;
         private static double pressColumnTotalMs;
 
+        // 「FSC 子树 vs 其余」归因用的累计量（仅 Deep 模式）。
+        private static double subtreeMsTotal;
+        private static long subtreeAllocTotal;
+        private static long loopAllocTotal;
+        private static long probeFrames;
+
         private static int pressesInFrame;
         private static double pressColumnMsInFrame;
         private static long currentFrameStartTimestamp;
@@ -121,7 +127,10 @@ namespace osu.Game.EzOsuGame.Diagnostics
             int FscIterations,
             int Gen0Delta,
             int Gen1Delta,
-            int Gen2Delta);
+            int Gen2Delta,
+            double SubtreeMs,
+            long SubtreeAllocBytes,
+            long LoopAllocBytes);
 
         /// <summary>
         /// 本帧内已处理（进入列入口）的按键，由 <c>Column.OnPressed</c> 调用。
@@ -217,6 +226,10 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 gcPauseTotalMs += gcPauseDeltaMs;
                 threadAllocatedTotal += threadAllocDelta;
                 processAllocatedTotal += processAllocated - lastProcessAllocated;
+                subtreeMsTotal += FrameStabilityContainer.SubtreeProbeMs;
+                subtreeAllocTotal += FrameStabilityContainer.SubtreeProbeAllocBytes;
+                loopAllocTotal += FrameStabilityContainer.LoopAllocProbeBytes;
+                probeFrames++;
             }
 
             if (elapsedMs >= ThresholdMs)
@@ -238,7 +251,10 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     FrameStabilityContainer.EzLastUpdateIterations,
                     gen0 - lastGen0,
                     gen1 - lastGen1,
-                    gen2 - lastGen2);
+                    gen2 - lastGen2,
+                    FrameStabilityContainer.SubtreeProbeMs,
+                    FrameStabilityContainer.SubtreeProbeAllocBytes,
+                    FrameStabilityContainer.LoopAllocProbeBytes);
 
                 detailCursor++;
 
@@ -290,6 +306,10 @@ namespace osu.Game.EzOsuGame.Diagnostics
             pressFrameCount = 0;
             sincePrevFrameTotalMs = 0;
             pressColumnTotalMs = 0;
+            subtreeMsTotal = 0;
+            subtreeAllocTotal = 0;
+            loopAllocTotal = 0;
+            probeFrames = 0;
             inputQueueCount = -1;
 
             firstFrameWallMs = double.NaN;
@@ -309,7 +329,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             var snapshot = details;
 
             var sb = new StringBuilder();
-            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,SincePrevFrameMs,FscIter,Gen0Delta,Gen1Delta,Gen2Delta");
+            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,SincePrevFrameMs,FscIter,Gen0Delta,Gen1Delta,Gen2Delta,SubtreeMs,SubtreeAllocBytes,LoopAllocBytes");
 
             for (int i = 0; i < sampleCount; i++)
             {
@@ -326,7 +346,10 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(s.FscIterations).Append(',');
                 sb.Append(s.Gen0Delta).Append(',');
                 sb.Append(s.Gen1Delta).Append(',');
-                sb.Append(s.Gen2Delta);
+                sb.Append(s.Gen2Delta).Append(',');
+                sb.Append(num(s.SubtreeMs)).Append(',');
+                sb.Append(s.SubtreeAllocBytes).Append(',');
+                sb.Append(s.LoopAllocBytes);
                 sb.AppendLine();
             }
 
@@ -391,6 +414,21 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
                 if (wallSeconds > 0)
                     sb.Append(CultureInfo.InvariantCulture, $" ({100 * gcPauseTotalMs / (wallSeconds * 1000):F2}%)");
+            }
+
+            // 「FSC 子树 vs 其余」：帧长的大头在 ruleset 的 drawable 层级里，还是在 HUD / 框架调度里。
+            // 这是决定往哪优化的一行——子树占比低就说明问题不在 mania playfield 内。
+            if (probeFrames > 0)
+            {
+                double meanElapsedAll = (withoutPress.Sum + withPress.Sum) / (withoutPress.Count + withPress.Count);
+
+                sb.Append(Environment.NewLine);
+                sb.Append(CultureInfo.InvariantCulture,
+                    $"frameSplit frames={probeFrames} elapsedMean={meanElapsedAll:F3}ms "
+                    + $"subtreeMsMean={subtreeMsTotal / probeFrames:F3}ms "
+                    + $"restMsMean={meanElapsedAll - subtreeMsTotal / probeFrames:F3}ms "
+                    + $"subtreeShareMs={100 * (subtreeMsTotal / probeFrames) / meanElapsedAll:F1}% "
+                    + $"subtreeAllocMean={subtreeAllocTotal / (double)probeFrames:F0}B loopAllocMean={loopAllocTotal / (double)probeFrames:F0}B");
             }
 
             // 两组分布并排，是「一次按键把帧拉长了多少」的直接答案。

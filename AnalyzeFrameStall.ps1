@@ -379,6 +379,35 @@ else {
     Write-Host '  （无含按键的 stall 帧，或 CSV 缺少 PressColumnMs 列）'
 }
 
+# ---------------------------------------------------------------- 一轮 update 的归属
+
+# frameSplit（新探针）：把一轮 update 切成 FSC 之下的 drawable 子树 vs 其余
+# （HUD / 框架调度 / 时钟）。这一行决定该往哪优化，所以单独成节、只要有摘要就跑。
+if ($SummaryPath -and (Test-Path -LiteralPath $SummaryPath)) {
+    $frameSplit = @(Get-Content -LiteralPath $SummaryPath | Where-Object { $_ -match '^frameSplit' })
+
+    if ($frameSplit.Count -gt 0 -and $frameSplit[0] -match 'elapsedMean=([\d.]+)ms subtreeMsMean=([\d.]+)ms restMsMean=([\d.]+)ms subtreeShareMs=([\d.]+)% subtreeAllocMean=(-?\d+)B loopAllocMean=(-?\d+)B') {
+        Write-Host ''
+        Write-Host '== 一轮 update 的归属（均值） ==' -ForegroundColor Cyan
+
+        $el = [double]::Parse($matches[1], $inv)
+        $sub = [double]::Parse($matches[2], $inv)
+        $rest = [double]::Parse($matches[3], $inv)
+        $sharePct = [double]::Parse($matches[4], $inv)
+        $restPct = 100.0 - $sharePct
+        $subAlloc = [long]$matches[5]
+        $loopAlloc = [long]$matches[6]
+
+        Write-Host ("  帧长                       {0,8}ms" -f (Format-F3 $el))
+        Write-Host ("  FSC 子树（ruleset 层级）   {0,8}ms   {1,6:F1}%   ← mania 播放区 / 物件 / 判定线" -f (Format-F3 $sub), $sharePct)
+        Write-Host ("  其余（HUD / 框架 / 时钟）  {0,8}ms   {1,6:F1}%" -f (Format-F3 $rest), $restPct)
+        Write-Host ("  子树内分配                 {0,8} B/帧" -f $subAlloc)
+        Write-Host ("  FSC 全程分配               {0,8} B/帧" -f $loopAlloc)
+        Write-Host '  判读：子树占比高 ⇒ 优化点在 mania 的 drawable 层级；占比低 ⇒ 在 HUD / 框架。'
+        Write-Host '        分配同理：子树内分配不是大头，就去查 HUD 与框架的每帧分配。'
+    }
+}
+
 # ---------------------------------------------------------------- 判据 1：GC 因果
 
 Write-Host ''
