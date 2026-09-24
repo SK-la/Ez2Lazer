@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.UI;
 
 namespace osu.Game.EzOsuGame.Diagnostics
 {
@@ -151,7 +152,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     gcPauseDeltaMs,
                     threadAllocDelta,
                     pressesInFrame,
-                    osu.Game.Rulesets.UI.FrameStabilityContainer.EzLastUpdateIterations,
+                    FrameStabilityContainer.EzLastUpdateIterations,
                     gen0 - lastGen0,
                     gen1 - lastGen1,
                     gen2 - lastGen2);
@@ -236,8 +237,13 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.AppendLine();
             }
 
+            string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string dir = EzJudgmentDiagnostics.GetDiagnosticsDirectory();
-            string path = Path.Combine(dir, $"framestall_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+            string path = Path.Combine(dir, $"framestall_{stamp}.csv");
+
+            // 全帧分布只存在于摘要里（CSV 按定义只有尾部），所以摘要必须和 CSV 一起落盘，
+            // 不能只丢进日志——日志路径随运行方式变化，分析脚本没法可靠地找到它。
+            string summaryPath = Path.Combine(dir, $"framestall_{stamp}.summary.txt");
 
             string summary = FormatSummary();
             string content = sb.ToString();
@@ -247,6 +253,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 try
                 {
                     await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
+                    await File.WriteAllTextAsync(summaryPath, summary + Environment.NewLine).ConfigureAwait(false);
                     Logger.Log($"[EzFrameStall] flushed {sampleCount} samples to {path}", Ez2ConfigManager.LOGGER_NAME);
                     Logger.Log(summary, Ez2ConfigManager.LOGGER_NAME);
                 }
@@ -285,7 +292,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             var sb = new StringBuilder();
             sb.Append(CultureInfo.InvariantCulture,
-                $"[EzFrameStall] frames={frames} wall≈{wallSeconds:F1}s threshold={ThresholdMs:F2}ms "
+                $"[EzFrameStall] frames={frames} wall~{wallSeconds:F1}s threshold={ThresholdMs:F2}ms "
                 + $"p50={p50:F3} p99={p99:F3} p99.9={p999:F3} max={maxElapsedMs:F3} "
                 + $"over0.5={over05} over1={over1} over2={over2} over5={over5} over10={over10} "
                 + $"stallFrames={stallFrames} (withPress={stallFramesWithPress}) framesWithPress={framesWithPress} "

@@ -48,6 +48,8 @@ param(
 
     [string] $PressPath,
 
+    [string] $SummaryPath,
+
     [double] $PressThresholdMs = 1.0,
 
     [double] $CoverageRatio = 0.6,
@@ -131,8 +133,32 @@ Write-Host ''
 Write-Host "文件: $Path" -ForegroundColor Green
 Write-Host ("stall 明细: {0} 条，覆盖墙钟 {1:F1}s（约 {2:F2} 次/s）" -f `
         $stalls.Length, $spanSeconds, $(if ($spanSeconds -gt 0) { $stalls.Length / $spanSeconds } else { 0 }))
-Write-Host '注意：这里只有超过阈值的帧，全帧分布看日志里的 [EzFrameStall] 摘要行。'
+Write-Host '注意：下面的幅度统计只覆盖超过阈值的帧（即尾部）。'
 
+# ---------------------------------------------------------------- 全帧分布（摘要）
+
+# 全帧直方图只在探针写的摘要文件里；默认取与 CSV 同名的兄弟文件。
+if (-not $SummaryPath) {
+    $csvFull = (Resolve-Path -LiteralPath $Path).Path
+    $candidate = [System.IO.Path]::Combine(
+        [System.IO.Path]::GetDirectoryName($csvFull),
+        ([System.IO.Path]::GetFileNameWithoutExtension($csvFull) + '.summary.txt'))
+
+    if (Test-Path -LiteralPath $candidate) { $SummaryPath = $candidate }
+}
+
+Write-Host ''
+Write-Host '== 全帧分布（含未超阈值的帧） ==' -ForegroundColor Cyan
+
+if ($SummaryPath -and (Test-Path -LiteralPath $SummaryPath)) {
+    Write-Host "  来源: $SummaryPath"
+    Get-Content -LiteralPath $SummaryPath |
+        Where-Object { $_ -match '\[EzFrameStall\]' } |
+        ForEach-Object { Write-Host "  $_" }
+}
+else {
+    Write-Host '  未找到摘要文件（framestall_*.summary.txt）。全帧分布只能从游戏日志的 [EzFrameStall] 行读。'
+}
 # ---------------------------------------------------------------- 尾部幅度
 
 Write-Host ''
