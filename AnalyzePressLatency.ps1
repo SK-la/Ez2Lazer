@@ -186,12 +186,84 @@ $multiPressFrames = @($frames | Where-Object { $_.Count -gt 1 })
 Write-Host ("帧数={0}  其中多键帧={1}  单帧最大按键数={2}" -f `
         $frames.Count, $multiPressFrames.Count, (($frames | Measure-Object Count -Maximum).Maximum))
 
+# ---------------------------------------------------------------- 帧与 stall
+
+Write-Host ''
+Write-Host '== 帧耗时与 stall ==' -ForegroundColor Cyan
+
+$frameElapsed = Get-Sorted $samples 'FrameElapsed'
+
+if ($frameElapsed.Length -gt 0) {
+    $median = Get-Percentile $frameElapsed 0.5
+
+    Write-Stats $samples 'FrameElapsedMs' 'FrameElapsed'
+    Write-Host ("  隐含帧率        p50={0:N0} fps  p90={1:N0} fps" -f (1000.0 / $median), (1000.0 / (Get-Percentile $frameElapsed 0.9)))
+
+    $over2 = @($frameElapsed | Where-Object { $_ -gt 2 })
+    $over5 = @($frameElapsed | Where-Object { $_ -gt 5 })
+    Write-Host ("  帧耗时>2ms: {0} ({1:P2})   >5ms: {2} ({3:P2})" -f `
+            $over2.Length, ($over2.Length / $frameElapsed.Length), $over5.Length, ($over5.Length / $frameElapsed.Length))
+}
+
+# 列内条目数分布：真实局内的车道占用（决定列内扫描到底有多长）
+Write-Host ''
+Write-Host '== 列内条目数（车道占用） ==' -ForegroundColor Cyan
+
+$entryGroups = @($samples | Group-Object Entries | Sort-Object { [int]$_.Name })
+
+foreach ($group in $entryGroups) {
+    Write-Host ("  Entries={0,-4} n={1,-6} ({2:P1})" -f $group.Name, $group.Count, ($group.Count / $samples.Length))
+}
+
+# ---------------------------------------------------------------- 缓存与 GC
+
+Write-Host ''
+Write-Host '== 缓存与 GC ==' -ForegroundColor Cyan
+
+$hits = Get-Delta $samples 'CacheHits'
+$misses = Get-Delta $samples 'CacheMisses'
+$hitDelta = ($hits | Measure-Object -Sum).Sum
+$missDelta = ($misses | Measure-Object -Sum).Sum
+$totalLookups = $hitDelta + $missDelta
+
+if ($totalLookups -gt 0) {
+    Write-Host ("Earliest 缓存: hits={0} misses={1} 命中率={2:P1}" -f $hitDelta, $missDelta, ($hitDelta / $totalLookups))
+    Write-Host '  注意：计数器是进程级，IsHittableEarliest 也由非按键路径（CheckHittable）调用，'
+    Write-Host '        因此该命中率不能读成「按键是否命中缓存」。'
+} else {
+    Write-Host 'Earliest 缓存: 无查询（未走 Earliest 路径？）'
+}
+
+$wallSeconds = ((ConvertTo-Double $samples[-1].WallMs) - (ConvertTo-Double $samples[0].WallMs)) / 1000.0
+
+foreach ($generation in 0, 1, 2) {
+    $collected = Get-Delta $samples "Gen$generation"
+    $total = ($collected | Measure-Object -Sum).Sum
+
+    if ($wallSeconds -gt 0) {
+        Write-Host ("gen{0} 回收: {1} ({2:F2}/s)" -f $generation, $total, ($total / $wallSeconds))
+    }
+}
+
+$gcPause = Get-Delta $samples 'GcPauseMs'
+$gcTotal = ($gcPause | Measure-Object -Sum).Sum
+
+if ($wallSeconds -gt 0) {
+    Write-Host ("GcPause 累计: {0:F0}ms，占采样跨度 {1:F1}s 的 {2:P2}（含后台 GC，是上界）" -f `
+            $gcTotal, $wallSeconds, ($gcTotal / ($wallSeconds * 1000)))
+}
+
+$gen0Deltas = Get-Delta $samples 'Gen0'
+$gen0Collections = @($gen0Deltas | Where-Object { $_ -gt 0 })
+
+Write-Host ("按键之间发生 gen0 回收的按键占比: {0} / {1}" -f $gen0Collections.Length, $gen0Deltas.Length)
+
 # ---------------------------------------------------------------- 总体
 
 Write-Host ''
 Write-Host '== 总体分段（ms） ==' -ForegroundColor Cyan
 
-foreach ($column in 'PreColumnMs', 'ColumnMs', 'TotalMs', 'FrameAgeMs') {
+foreach ($column in 'PreColumnMs', 'ColumnMs', 'TotalMs', 'FrameElapsed') {
     Write-Stats $samples $column $column
 }
 
@@ -241,35 +313,6 @@ Show-Distribution $samples 'CatchingUp / 多遍子树' `
         else { 'steady     ' }
     } `
     'PreColumnMs', 'ColumnMs'
-
-# ---------------------------------------------------------------- 缓存与 GC
-
-Write-Host ''
-Write-Host '== 缓存与 GC ==' -ForegroundColor Cyan
-
-$hits = Get-Delta $samples 'CacheHits'
-$misses = Get-Delta $samples 'CacheMisses'
-$hitDelta = ($hits | Measure-Object -Sum).Sum
-$missDelta = ($misses | Measure-Object -Sum).Sum
-$totalLookups = $hitDelta + $missDelta
-
-if ($totalLookups -gt 0) {
-    Write-Host ("Earliest 缓存: hits={0} misses={1} 命中率={2:P1}" -f $hitDelta, $missDelta, ($hitDelta / $totalLookups))
-} else {
-    Write-Host 'Earliest 缓存: 无查询（未走 Earliest 路径？）'
-}
-
-$gen0Deltas = Get-Delta $samples 'Gen0'
-$gen0Collections = @($gen0Deltas | Where-Object { $_ -gt 0 })
-
-Write-Host ("按键之间发生 gen0 回收的次数: {0} / {1}" -f $gen0Collections.Length, $gen0Deltas.Length)
-
-$gcPause = Get-Sorted $samples 'GcPauseMs'
-
-if ($gcPause.Length -gt 0) {
-    Write-Host ("GcPauseMs: first={0} last={1} delta={2}" -f `
-            (Format-F3 $gcPause[0]), (Format-F3 $gcPause[-1]), (Format-F3 ($gcPause[-1] - $gcPause[0])))
-}
 
 # ---------------------------------------------------------------- 尾部对照
 
