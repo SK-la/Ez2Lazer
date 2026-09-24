@@ -93,6 +93,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         // 「FSC 子树 vs 其余」归因用的累计量（仅 Deep 模式）。
         private static double subtreeMsTotal;
         private static double clockMsTotal;
+        private static double elapsedProbeTotalMs;
         private static long subtreeAllocTotal;
         private static long loopAllocTotal;
         private static long probeFrames;
@@ -227,11 +228,18 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 gcPauseTotalMs += gcPauseDeltaMs;
                 threadAllocatedTotal += threadAllocDelta;
                 processAllocatedTotal += processAllocated - lastProcessAllocated;
-                subtreeMsTotal += FrameStabilityContainer.SubtreeProbeMs;
-                clockMsTotal += FrameStabilityContainer.ClockProbeMs;
-                subtreeAllocTotal += FrameStabilityContainer.SubtreeProbeAllocBytes;
-                loopAllocTotal += FrameStabilityContainer.LoopAllocProbeBytes;
-                probeFrames++;
+
+                // 暂停帧没有子树，算进来会把子树占比拉低。
+                if (FrameStabilityContainer.ProbeFrameValid)
+                {
+                    subtreeMsTotal += FrameStabilityContainer.SubtreeProbeMs;
+                    clockMsTotal += FrameStabilityContainer.ClockProbeMs;
+                    subtreeAllocTotal += FrameStabilityContainer.SubtreeProbeAllocBytes;
+                    loopAllocTotal += FrameStabilityContainer.LoopAllocProbeBytes;
+                    // 帧长必须用同一批帧，否则子树占比的分子分母不同源。
+                    elapsedProbeTotalMs += elapsedMs;
+                    probeFrames++;
+                }
             }
 
             if (elapsedMs >= ThresholdMs)
@@ -310,6 +318,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             pressColumnTotalMs = 0;
             subtreeMsTotal = 0;
             clockMsTotal = 0;
+            elapsedProbeTotalMs = 0;
             subtreeAllocTotal = 0;
             loopAllocTotal = 0;
             probeFrames = 0;
@@ -423,7 +432,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             // 这是决定往哪优化的一行——子树占比低就说明问题不在 mania playfield 内。
             if (probeFrames > 0)
             {
-                double meanElapsedAll = (withoutPress.Sum + withPress.Sum) / (withoutPress.Count + withPress.Count);
+                double meanElapsedAll = elapsedProbeTotalMs / probeFrames;
                 double meanSubtree = subtreeMsTotal / probeFrames;
                 double meanClock = clockMsTotal / probeFrames;
                 double meanRest = meanElapsedAll - meanSubtree - meanClock;
