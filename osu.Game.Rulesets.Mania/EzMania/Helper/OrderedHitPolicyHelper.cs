@@ -33,6 +33,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         private readonly List<DrawableHitObject> postJudgedBuffer = new List<DrawableHitObject>();
         private readonly List<PrecedenceCandidate> sortedBuffer = new List<PrecedenceCandidate>();
 
+        // 候选对象同样复用：LN 兜底路径下每个存活对象各造一个候选，是每次按键唯一的 O(alive) 分配来源。
+        private readonly List<PrecedenceCandidate> candidatePool = new List<PrecedenceCandidate>();
+        private int candidatePoolCursor;
+
         private const string log_prefix = "[JudgeDiag][PolicyHelper]";
 
         public OrderedHitPolicyHelper(HitObjectContainer hitObjectContainer, ManiaLaneController? laneController = null)
@@ -149,6 +153,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         private void collectOverlappingCandidates(double time, List<PrecedenceCandidate> buffer)
         {
             buffer.Clear();
+            candidatePoolCursor = 0;
 
             foreach (var obj in hitObjectContainer.AliveObjects)
             {
@@ -164,7 +169,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             }
         }
 
-        private static bool tryCreatePressCandidate(DrawableHitObject obj, out PrecedenceCandidate candidate)
+        private PrecedenceCandidate rentCandidate(DrawableHitObject routedObject, DrawableHitObject judgementObject, double startTime, ManiaHitWindows windows)
+        {
+            PrecedenceCandidate candidate;
+
+            if (candidatePoolCursor < candidatePool.Count)
+            {
+                candidate = candidatePool[candidatePoolCursor];
+            }
+            else
+            {
+                candidate = new PrecedenceCandidate();
+                candidatePool.Add(candidate);
+            }
+
+            candidatePoolCursor++;
+            candidate.Set(routedObject, judgementObject, startTime, windows);
+            return candidate;
+        }
+
+        private bool tryCreatePressCandidate(DrawableHitObject obj, out PrecedenceCandidate candidate)
         {
             candidate = null!;
 
@@ -181,7 +205,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 if (hold.Head.HitObject.HitWindows is not ManiaHitWindows headWindows || headWindows.WindowFor(HitResult.Miss) == 0)
                     return false;
 
-                candidate = new PrecedenceCandidate(hold, hold.Head, hold.Head.HitObject.StartTime, headWindows);
+                candidate = rentCandidate(hold, hold.Head, hold.Head.HitObject.StartTime, headWindows);
                 return true;
             }
 
@@ -191,7 +215,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             if (obj.HitObject.HitWindows is not ManiaHitWindows windows || windows.WindowFor(HitResult.Miss) == 0)
                 return false;
 
-            candidate = new PrecedenceCandidate(obj, obj, obj.HitObject.StartTime, windows);
+            candidate = rentCandidate(obj, obj, obj.HitObject.StartTime, windows);
             return true;
         }
 
@@ -227,13 +251,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 return false;
 
             double startTime = obj.HitObject.StartTime;
-            double earlyWindow = hitWindow.WindowFor(HitResult.Miss);
-            double lateWindow = hitWindow.WindowFor(HitResult.Miss);
+            double earlyWindow;
+            double lateWindow;
 
             if (hitWindow is ManiaHitWindows maniaHitWindow)
             {
                 earlyWindow = maniaHitWindow.WindowFor(HitResult.Miss, true);
                 lateWindow = maniaHitWindow.WindowFor(HitResult.Miss, false);
+            }
+            else
+            {
+                earlyWindow = hitWindow.WindowFor(HitResult.Miss);
+                lateWindow = hitWindow.WindowFor(HitResult.Miss);
             }
 
             return time >= startTime - earlyWindow && time <= startTime + lateWindow;
@@ -544,12 +573,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         private sealed class PrecedenceCandidate
         {
-            public readonly DrawableHitObject RoutedObject;
-            public readonly DrawableHitObject JudgementObject;
-            public readonly double StartTime;
-            public readonly ManiaHitWindows Windows;
+            public DrawableHitObject RoutedObject = null!;
+            public DrawableHitObject JudgementObject = null!;
+            public double StartTime;
+            public ManiaHitWindows Windows = null!;
 
-            public PrecedenceCandidate(DrawableHitObject routedObject, DrawableHitObject judgementObject, double startTime, ManiaHitWindows windows)
+            /// <summary>复用池租用时写入本次候选内容。</summary>
+            public void Set(DrawableHitObject routedObject, DrawableHitObject judgementObject, double startTime, ManiaHitWindows windows)
             {
                 RoutedObject = routedObject;
                 JudgementObject = judgementObject;

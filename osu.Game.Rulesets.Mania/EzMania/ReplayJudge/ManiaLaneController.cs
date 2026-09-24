@@ -33,6 +33,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         private EzEnumJudgePrecedence lastSelectPrecedence;
         private ManiaLaneEntry? lastSelectResult;
 
+        /// <summary>
+        /// 判定状态代次：任何会改变列内「未判定/可击」集合的写入都自增。
+        /// 时间键控的缓存（Earliest 有效索引、press 目标）据此在状态变化后必然失效，
+        /// 避免同帧内「先判定后按键」读到旧 cursor 的结果。
+        /// </summary>
+        private long judgeGeneration;
+
+        private int cachedEarliestEffectiveIndex = -1;
+        private double cachedEarliestEffectiveTime = double.NaN;
+        private long cachedEarliestEffectiveGeneration = -1;
+
         private HitModeHelper? missWindowHelper;
         private double cachedMaxMissEarly;
         private double cachedMaxMissLate;
@@ -266,6 +277,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 return;
 
             advanceCursor();
+            invalidateSelectPressCache();
         }
 
         private static DrawableHitObject resolveJudgedDrawable(DrawableHitObject drawable)
@@ -279,29 +291,48 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// <summary>
         /// Earliest note-lock：仅游标处未判定物件可击打，且不得越过更晚物件的 StartTime。
         /// </summary>
+        /// <remarks>
+        /// <see cref="findEffectiveEarliestIndex"/> 的返回值已保证「未判定 + 在 miss 窗内 + 不被更晚物件阻挡」，
+        /// 因此下标相等即等价于原先的三项复核，无需重复扫描。
+        /// </remarks>
         public bool IsHittableEarliest(DrawableHitObject drawable, double time)
         {
             if (!drawableIndices.TryGetValue(drawable, out int index))
                 return false;
 
-            // Scan forward from cursor to find the first entry that can actually be hit.
-            // This handles the case where the cursor note is past its hit window (IsHittableEarliestIndex
-            // returns false because a later note has already started) but hasn't been auto-missed yet.
-            int effectiveIndex = findEffectiveEarliestIndex(time);
+            return index == findEffectiveEarliestIndex(time);
+        }
 
-            if (index != effectiveIndex)
-                return false;
+        /// <summary>
+        /// 首个可击条目的列内下标（-1 表示无可击条目）。
+        /// 结果按 <c>(time, judgeGeneration)</c> 缓存：同一帧内本列每条 note 都会问一次，
+        /// 未缓存时该查询是 O(alive)（内层再 O(alive)），缓存后同列后续 note 为 O(1)。
+        /// </summary>
+        private int findEffectiveEarliestIndex(double time)
+        {
+            if (cachedEarliestEffectiveGeneration == judgeGeneration && cachedEarliestEffectiveTime == time)
+            {
+                int cached = cachedEarliestEffectiveIndex;
 
-            if (entries[index].IsPressJudged)
-                return false;
+                // Result.HasResult 先于 OnNewResult 置位，极窄窗口内条目已判定但代次尚未自增；
+                // 条目「变已判定」只会让 blocker 前移（可击性约束只会更容易满足），故只需复核该条目自身。
+                if (cached < 0 || !entries[cached].IsPressJudged)
+                    return cached;
+            }
 
-            return IsHittableEarliestIndex(index, time);
+            int computed = computeEffectiveEarliestIndex(time);
+
+            cachedEarliestEffectiveTime = time;
+            cachedEarliestEffectiveGeneration = judgeGeneration;
+            cachedEarliestEffectiveIndex = computed;
+
+            return computed;
         }
 
         /// <summary>
         /// Find the first entry from cursor that is within its miss window and not blocked by a later note.
         /// </summary>
-        private int findEffectiveEarliestIndex(double time)
+        private int computeEffectiveEarliestIndex(double time)
         {
             for (int i = cursor; i < entries.Count; i++)
             {
@@ -647,6 +678,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         private void invalidateSelectPressCache()
         {
+            // 代次自增覆盖所有调用点（注册/注销/判定/窗口重配），使时间键控缓存一并失效。
+            judgeGeneration++;
             lastSelectPressTime = double.NaN;
             lastSelectResult = null;
         }
