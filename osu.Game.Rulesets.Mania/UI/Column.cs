@@ -533,6 +533,9 @@ namespace osu.Game.Rulesets.Mania.UI
         /// </summary>
         private void recordPressLatency(long pressEnterTs, double gameTime, bool routed, bool judged)
         {
+            // 本帧处理的按键数，供帧级 stall 探针判断「这次 stall 吞掉了几个按键」。
+            EzFrameStallDiagnostics.NotifyPress();
+
             long now = Stopwatch.GetTimestamp();
             double tickToMs = 1000.0 / Stopwatch.Frequency;
 

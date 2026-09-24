@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -343,10 +344,22 @@ namespace osu.Game.Screens.Play
             // [Ez] Wire judgment diagnostics, sub-frame correction, and timing trace to config toggles.
             EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
             EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Enabled = EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled;
+            EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Enabled = EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled;
 
             // 消融开关走环境变量，避免为探针新增可持久化设置项。
             EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.SkipForceMiss =
                 Environment.GetEnvironmentVariable("EZ_PRESS_PROBE_SKIP_FORCE_MISS") == "1";
+
+            // 帧明细阈值同样走环境变量：想看「接近一帧」的次尖峰就调低（如 0.8）。
+            if (double.TryParse(
+                    Environment.GetEnvironmentVariable("EZ_FRAME_PROBE_MS"),
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out double frameProbeThreshold)
+                && frameProbeThreshold > 0)
+            {
+                EzOsuGame.Diagnostics.EzFrameStallDiagnostics.ThresholdMs = frameProbeThreshold;
+            }
 
             EzOsuGame.Timing.EzSubFrameCorrection.Enabled = ez2Config.Get<bool>(Ez2Setting.EzSubFrameCorrectionEnabled);
             EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
@@ -1462,6 +1475,7 @@ namespace osu.Game.Screens.Play
             {
                 EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Clear();
                 EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Clear();
+                EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Clear();
             }
 
             if (EzOsuGame.Diagnostics.EzTimingTrace.Enabled)
@@ -1531,6 +1545,8 @@ namespace osu.Game.Screens.Play
                     EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Clear();
                     EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Flush();
                     EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Clear();
+                    EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Flush();
+                    EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Clear();
                 });
             }
 

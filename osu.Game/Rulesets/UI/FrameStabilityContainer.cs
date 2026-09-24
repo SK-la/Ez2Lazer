@@ -128,6 +128,10 @@ namespace osu.Game.Rulesets.UI
             // [Ez] Catch-up loop count of this pass, read by the press-latency probe.
             EzLastUpdateIterations = iterations;
 
+            // [Ez] Frame boundary for the frame-stall probe. Must stay at the same position in every
+            // pass, otherwise the delta between two calls is not a whole frame.
+            EzOsuGame.Diagnostics.EzFrameStallDiagnostics.RecordFrame();
+
             return true;
         }
 
