@@ -130,6 +130,7 @@
 
 1. **只在 >阈值的帧上做「按键帧 vs 非按键帧」对比会得出错误结论。** 条件在 `ElapsedMs > 1.5 ms` 上会让两组都被拉平（实测两组 p50 只差 0.02 ms），从而误判「按键与慢帧无关」。正确做法是双直方图 —— 记录**全部**帧并按键存在与否分组（已实现在 `EzFrameStallDiagnostics.FormatSummary`）。
 2. **`SincePrevFrameMs` 的零点在上一帧边界，不是「本帧按键前的工作量」。** 它含上一帧剩余时间、draw/present 与帧间等待。只有 `PressColumnMs` 是按键自身工作。该字段原名为 `FirstPressAtMs` 并曾被误读为派发开销，已改名。
+3. **`currentFrameStartTimestamp` 曾滞后一整帧。** `RecordFrame()` 在帧末写入它，而 `NotifyPress` 在同一个帧内、`RecordFrame` **之前**执行，因此当时读到的是**上上帧**的边界。修正前 `SincePrevFrameMs` 被虚增约一个帧长（实测 1.330 ms vs 帧长 1.344 ms，并让三段切分出现 **−0.171 ms** 的负值）。修正是把 `= prev` 改成 `= now`：`now` 才是下一次 `NotifyPress` 之前可读到的最新边界。**修好前不要用那一行做结论**（`PreColumnMs`/`FrameAgeMs` 来自另一个探针，不受影响）。
 
 #### 2.4.4 明确不再重开的两个方向
 
@@ -184,6 +185,43 @@
 | `subtreeAllocMean` / `loopAllocMean` | 子树内、FSC 全程的每帧分配字节 |
 
 这一行决定下一步往哪优化：子树占比高就改 mania 的 drawable 层级，占比低就去查 HUD 与框架。分析脚本 `AnalyzeFrameStall.ps1` 已有对应章节。
+
+#### 2.4.7 首次 frameSplit 实测：**73% 的帧时间与 88% 的分配在 FSC 之外**（2026-09-24）
+
+一局 mania，174,587 帧 / 91.0 s ≈ **1918 帧/s**，`mode=deep`，turbo 未确认。
+
+| 项 | 实测 |
+|----|------|
+| 帧长 | 0.522 ms |
+| **FSC 子树**（mania 播放区 / 物件 / 判定线） | **0.142 ms = 27.2%** |
+| FSC 时钟推进（音频时钟采样 + ReplayInput + 子帧校正） | < 0.0005 ms（不可分辨，非瓶颈） |
+| **其余**（HUD / 框架调度 / 掩码 / 其他 screen / overlay） | **0.379 ms = 72.6%** |
+| 子树内分配 | **245 B/帧** |
+| 全进程 update 线程分配 | 363.9 MB / 91 s = 4.0 MB/s ÷ 1918 ≈ **2.1 KB/帧** |
+
+**推论：这 0.379 ms 与其中约 1.8 KB/帧的分配都在 FSC 之外。** 也就是说 mania 的播放区（成千上万个 note / lane / 判定线 drawable）只花 0.142 ms，而 HUD 加框架那部分花的是它的 2.7 倍、分配是它的 7.5 倍。**优化点不在 mania 的 drawable 层级。**
+
+已验证的 FSC 之外每帧开销（框架侧，非主因但确凿）：`TooltipContainer.Update` → `CursorEffectContainer.FindTargets()` 每帧对 `InputManager.PositionalInputQueue` 做一次 `IndexOf` + 一次反向遍历（`findTargetChildren`），并在有候选时 `new List<TTarget>(...)` + `Reverse()`：
+
+```125:142:osu-framework/osu.Framework/Graphics/Cursor/CursorEffectContainer.cs
+        protected SlimReadOnlyListWrapper<TTarget> FindTargets()
+        {
+            findTargetChildren();
+// ...
+            if (targetChildren.Count == 0)
+                return empty_list;
+```
+量级是 O(位置输入队列长度)，无候选时不分配；待 profile 确认它占多少。
+
+**其余症状**（同一局）：
+
+- 每帧 2.1 KB 的持续分配 ⇒ gen0 **≈23 次/s**（约每 43 ms 一次），单次暂停 ~0.8 ms（stall 帧上 `GcPauseDeltaMs` p50 = 0.801 ms）⇒ **1.82% 的时间在 GC 停顿里**，与卡顿间隔鼓包（20–60 ms）吻合。
+- stall 帧（770 个）上 update 线程分配 p50 **32 KB**、p90 163 KB、max 716 KB —— 是平常帧的 16～340 倍，属突发；即「按键落地 → 结果扇出 → `Schedule` 出去的取样 / HUD」这一段。
+- 770 个 stall 帧中 **266 个 GC 占比 ≥50%**、426 个 10–50%、只有 78 个 ≤10%。**GC 是多数 stall 的直接原因。**
+- **GC 之外的较大 stall**：`Elapsed` 7–9 ms 而 `GcPause=0`、`alloc` 从 1.6 KB 到 166 KB 不等（t=88405 那条只有 1.6 KB 分配却卡 8 ms）。这类与分配无关，指向线程外因素（驱动 / 其他线程 / 阻塞）；91 s 内约 6 次，量级 0.07 次/s。
+- 最大的一个 86.257 ms 在 `FrameIdx=2`（开局首帧，`iters=10` catch-up），不是稳态问题。
+
+**下一步**：这 0.379 ms 与 1.8 KB/帧需要按调用栈定位，而不是继续按组件猜。两条路：外部 CPU / 分配 profiler（最快、最确定），或在 Ez 侧加按组件的计时包装。
 
 ---
 

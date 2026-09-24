@@ -175,7 +175,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             long prev = lastFrameTimestamp;
             lastFrameTimestamp = now;
-            currentFrameStartTimestamp = prev;
+            // 必须记 now：NotifyPress 在本帧的 RecordFrame 之前执行，此刻能读到的最新边界就是
+            // 上一次 RecordFrame 写下的值。写 prev 会让它滞后一帧，SincePrevFrameMs 虚增一整个帧长。
+            currentFrameStartTimestamp = now;
             frameIndex++;
 
             // light 模式只留直方图，跳掉每帧的 GC/分配读数（那几个 API 会落在同帧按键的等待里）。
