@@ -73,6 +73,7 @@
 | **JUDGE-NO-CLOSURE** | `Column.OnNewResult` / `Stage.OnNewResult` | `hitExplosionPool.Get(e => e.Apply(result))` 与 `judgementPooler.Get(type, j => j.Apply(result, judgedObject))` 每判定各造一个捕获 `result` 的闭包。两者 `Apply` 都只做字段赋值（真正动画在下一帧 `PrepareForUse`），改为 `Get()` 后再赋值。注意 `JudgementContainer.Add` 会**同步**读 `JudgedHitObject`，赋值必须仍在 `Add` 之前 |
 | **POLICY-SCRATCH** | `OrderedHitPolicyHelper` | 候选 / 后判对象改复用缓冲（去掉每次判定的 `ToList()` 拷贝）；`OrderBy(...).ToList()` 改复用缓冲上的稳定插入排序；诊断串整段门控在 `EzJudgmentDiagEnabled` 之后（关闭时不再执行 `describe` / `string.Join`）；命中模式与诊断开关缓存 bindable，取代一次判定里 3 次 `ezConfig.Get` |
 | **FORCEMISS-SNAPSHOT** | `Column.handleHit` / `ManiaLaneController.CollectForceMissBefore` | 命中时「提前判 miss」的 `yield` 迭代器改为写调用方缓冲（每次命中省一个迭代器对象），处理时按实时 `IsPressJudged` 复核以保持惰性枚举语义；`EnumerateForceMissBefore` 无调用方，已由新方法取代 |
+| **MARKER-EASE-FIX** | `EzHUDHitTimingColumns.moveMarker` | `marker.Y = targetY;` 紧接着 `MoveToY(targetY, 800, OutQuint)`：设值后新变换的 `StartValue` 由 `ReadIntoStartValue` 在首次 `Apply` 时读到（`TransformCustom.cs:186`），即 `start == end`，缓动恒为空变换 ⇒ 标记瞬跳。这行是从上游 `BarHitErrorMeter` 那条**一次性池化判定线**（对象是新的，直接赋值才对）抄过来的，常驻 marker 不该有。删掉后恢复成上游 `arrow`（同一 EMA、同一 `800ms OutQuint`）的「只发缓动」语义。附带两处交互：`MoveHeight` 改高时先 `ClearTransforms(false, "Y")` 再按比例赋值（在途变换每帧回写自己的插值，不清就会覆盖赋值、拖滑块时标记卡在旧范围）；`StopMovement` 开启时 `FinishTransforms(false, "Y")` 收尾到目标，而不是停在中间插值上 |
 
 ### 已评估但**不做**（附原因，避免重复讨论）
 
@@ -80,7 +81,6 @@
 |------|------|
 | 缓存 `DrawableManiaHitObject.PlaySamples` 的 samples 数组 | **不可行**。`Bindable<T>.Value` setter 在 `EqualityComparer<T>.Default.Equals` 相等时直接 return（数组即引用比较，`osu-framework/…/Bindable.cs:99`），缓存同一实例会让 `GameplayState.LastPlayedSamples` 对重复同音不再触发变更，而 `StoryboardTriggerController` 正消费它。数组必须每次新建（同 **SAMPLE-NO-LINQ**） |
 | HUD / 皮肤件「复用单个 `TransformSequence`」合并按键、判定动画 | **不可行（框架约束）**。`TransformSequence<T>` 在构造时固化 `startTime`/`currentTime`（`TransformSequence.cs:53`），复用实例再 `Append` 会把 transform 排到过去时刻 ⇒ 变成瞬跳而非动画；且 `PopulateTransform` 对同一 `Transform` 实例二次调用直接抛异常（`TransformableExtensions.cs:154`），即 transform 天然一次性、框架无池。单次 `MoveToY` 约 3 个小对象（`TransformSequence` + 其 1 槽 list + `TransformCustom`；`TransformID` 是 `ulong`，不产生字符串），`Ez2KeyAreaPlus` 里对 `Container<Circle>` 的 `foreach` 走结构体枚举器、本就不分配 |
-| `EzHUDHitTimingColumns.moveMarker` 顺带改成手动插值（自持 start/target 每帧写 `Y`） | 能省掉每判定 × 列数的 transform，但 `moveMarker` 目前是 `marker.Y = targetY` 紧接着 `MoveToY(同一个 targetY)`——直接赋值与 800ms 缓动叠加，插值接管会改变「瞬跳 / 续动」观感。属视觉语义决策，需先定「标记到底该不该缓动」再动 |
 
 ---
 
@@ -219,3 +219,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-20 | §2.1：输入队列按帧物化、取样去 LINQ、框架侧按键队列去分配（**FW-BUTTON-QUEUE-REUSE**）落地；登记 5 项「评估后不做」的候选与原因（含被 `TestSceneInputQueueChange.CombinedClicks` 证伪的 **FW-INPUT-QUEUE-DISPATCH**）；§9 登记首次命中 / LN / 多显示器三条待排查现象与测量口径 |
 | 2026-09-21 | **LN-HOLD-FBO** / **LN-INPUT-SLOT** 生产落地。消融证实按住才 ForceRedraw；观测代码 `#if DEBUG` 剥离 |
 | 2026-09-23 | §2.2/§2.3：局内判定与 HUD 热路径去分配（**HITPOS-CACHE** / **JUDGE-NO-CLOSURE** / **POLICY-SCRATCH** / **FORCEMISS-SNAPSHOT**），并记录 3 项「评估后不做」（samples 数组缓存、transform 序列复用、`moveMarker` 手写插值）与 lane controller 索引维护「实测不改」结论 |
+| 2026-09-24 | §2.2：**MARKER-EASE-FIX**——`EzHUDHitTimingColumns` 的判定标记恢复为真正的缓动（去掉把缓动变成空变换的直接赋值），并补上 `MoveHeight` / `StopMovement` 与在途变换的两处交互；原「`moveMarker` 手写插值」候选按「保留框架缓动」结案，不再列为待办 |
