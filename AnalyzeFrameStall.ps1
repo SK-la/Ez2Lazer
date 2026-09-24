@@ -211,9 +211,25 @@ if ($SummaryPath -and (Test-Path -LiteralPath $SummaryPath)) {
                 Write-Host ("    按键帧比非按键帧：p50 {0:+#.000;-#.000;0}ms   p90 {1:+#.000;-#.000;0}ms" -f $deltaP50, $deltaP90)
                 Write-Host ("    P(>1ms): {0:P2} vs {1:P2}  → {2:F1}x   （按键帧占全帧 {3:P2}）" -f `
                         $p1yes, $p1no, $ratio, ($parsed['withPress_n'] / ($parsed['withPress_n'] + $parsed['noPress_n'])))
-                Write-Host '    读法：p50 增量小、而尾部概率之比大 → 按键不是稳定地加固定开销，'
-                Write-Host '          而是让少数帧变长。此时要看 PressColumnMs 是否也大：'
-                Write-Host '          大 = 按键自己的工作；小 = 按键只是落在慢帧上，帧长另有来源。'
+                Write-Host '    读法：p50 与 p90 同时抬高 → 按键是稳定地给帧加开销，不是只让尾部变长。'
+
+                # 三段切分（只有新探针会写这行）：帧起→按键进入本列 / 本列工时 / 本列之后。
+                $splitLine = @(Get-Content -LiteralPath $SummaryPath | Where-Object { $_ -match '^pressSplit' })
+                if ($splitLine.Count -gt 0 -and $splitLine[0] -match 'elapsedMean=([\d.]+)ms firstPressAtMean=([\d.]+)ms pressColumnMean=([\d.]+)ms afterPressMean=(-?[\d.]+)ms inputQueue=(-?\d+)') {
+                    $el = [double]::Parse($matches[1], $inv)
+                    $fp = [double]::Parse($matches[2], $inv)
+                    $pc = [double]::Parse($matches[3], $inv)
+                    $ap = [double]::Parse($matches[4], $inv)
+                    $iq = [int]$matches[5]
+
+                    Write-Host ''
+                    Write-Host '    按键帧的三段切分（均值）:' -ForegroundColor Cyan
+                    Write-Host ("      帧起 → 按键进入本列    {0,7}ms   {1,6:P1}   ← 派发机器（输入队列遍历 + 键绑定派发）" -f (Format-F3 $fp), $(if ($el -gt 0) { $fp / $el } else { 0 }))
+                    Write-Host ("      本列工时（OnPressed）  {0,7}ms   {1,6:P1}   ← 本列判定 + 同步结果扇出" -f (Format-F3 $pc), $(if ($el -gt 0) { $pc / $el } else { 0 }))
+                    Write-Host ("      本列之后 → 帧尾        {0,7}ms   {1,6:P1}   ← 判定落地之后的帧内工作" -f (Format-F3 $ap), $(if ($el -gt 0) { $ap / $el } else { 0 }))
+                    Write-Host ("      合计                   {0,7}ms" -f (Format-F3 $el))
+                    Write-Host ("      非位置输入队列长度     {0,7}      ← 每次按下/抬起都要重建并 Reverse 的列表规模" -f $iq)
+                }
             }
         }
     }
@@ -275,6 +291,48 @@ if ($pressStalls.Count -gt 0) {
         Write-Host ("  按键工时 / 帧长: p50={0:P1} p90={1:P1} mean={2:P1}" -f `
                 (Get-Percentile $sorted 0.5), (Get-Percentile $sorted 0.9), ($sum / $sorted.Length))
         Write-Host '  占比高 → 帧是被按键自己的工作拉长的；占比低 → 帧长另有来源，按键只是恰好落在这里。'
+    }
+
+    # FirstPressAtMs（新探针）：帧起→首个按键进入本列。有它就能把帧内时间按位置切开，
+    # 而不只是知道「按键自己的工作占多少」。
+    $hasSplit = @($pressStalls | Where-Object { $_.FirstPressAtMs -and -not [double]::IsNaN((ConvertTo-Double $_.FirstPressAtMs)) })
+
+    if ($hasSplit.Count -gt 0) {
+        $fp = New-Object 'System.Collections.Generic.List[double]'
+        $pc = New-Object 'System.Collections.Generic.List[double]'
+        $ap = New-Object 'System.Collections.Generic.List[double]'
+
+        foreach ($r in $hasSplit) {
+            $e = ConvertTo-Double $r.ElapsedMs
+            $f = ConvertTo-Double $r.FirstPressAtMs
+            $c = ConvertTo-Double $r.PressColumnMs
+            if ([double]::IsNaN($e) -or [double]::IsNaN($f)) { continue }
+            if ([double]::IsNaN($c)) { $c = 0 }
+            $fp.Add($f); $pc.Add($c); $ap.Add($e - $f - $c)
+        }
+
+        if ($fp.Count -gt 0) {
+            Write-Host ''
+            Write-Host '  -- 按键帧的三段切分（只统计超阈值的按键帧） --' -ForegroundColor Cyan
+            Write-Host ('    {0,-26} {1,8} {2,8} {3,8} {4,8}' -f '段', 'mean', 'p50', 'p90', 'max')
+
+            foreach ($seg in @(@('帧起 → 按键进入本列', $fp), @('本列工时(OnPressed)', $pc), @('本列之后 → 帧尾', $ap))) {
+                $label = $seg[0]
+                $arr = $seg[1].ToArray()
+                [Array]::Sort($arr)
+                $sum = 0.0; foreach ($v in $arr) { $sum += $v }
+
+                Write-Host ('    {0,-26} {1,8} {2,8} {3,8} {4,8}' -f `
+                        $label,
+                        (Format-F3 ($sum / $arr.Length)),
+                        (Format-F3 (Get-Percentile $arr 0.5)),
+                        (Format-F3 (Get-Percentile $arr 0.9)),
+                        (Format-F3 $arr[$arr.Length - 1]))
+            }
+
+            Write-Host '    判读：哪一段占大头，就是那一段在制造按键延迟——前段＝输入派发机器，'
+            Write-Host '          中段＝本列判定，后段＝判定落地后的帧内工作（结果扇出／容器增删／布局失效）。'
+        }
     }
 }
 else {
@@ -414,11 +472,12 @@ if ($PressPath) {
 
 Write-Host ''
 Write-Host "== 最慢 $TopN 帧 ==" -ForegroundColor Cyan
-Write-Host ('  {0,10} {1,9} {2,9} {3,11} {4,5} {5,9} {6,6} {7,8} {8,7}' -f 'WallMs', 'Elapsed', 'GcPause', 'ThreadAlloc', 'Press', 'PressCol', 'Iters', 'Gen0d', 'FrameIdx')
+Write-Host ('  {0,10} {1,9} {2,9} {3,11} {4,5} {5,9} {6,9} {7,6} {8,8} {9,7}' -f 'WallMs', 'Elapsed', 'GcPause', 'ThreadAlloc', 'Press', 'PressCol', 'FirstPress', 'Iters', 'Gen0d', 'FrameIdx')
 
 $stalls | Sort-Object { ConvertTo-Double $_.ElapsedMs } -Descending | Select-Object -First $TopN | ForEach-Object {
-    ('  {0,10} {1,9} {2,9} {3,11} {4,5} {5,9} {6,6} {7,8} {8,7}' -f `
+    ('  {0,10} {1,9} {2,9} {3,11} {4,5} {5,9} {6,9} {7,6} {8,8} {9,7}' -f `
             $_.WallMs, $_.ElapsedMs, $_.GcPauseDeltaMs, $_.ThreadAllocDeltaBytes,
             $_.PressesInFrame, $(if ($_.PressColumnMs) { $_.PressColumnMs } else { '-' }),
+            $(if ($_.FirstPressAtMs) { $_.FirstPressAtMs } else { '-' }),
             $_.FscIter, $_.Gen0Delta, $_.FrameIndex)
 }

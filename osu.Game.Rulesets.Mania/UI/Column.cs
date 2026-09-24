@@ -470,6 +470,9 @@ namespace osu.Game.Rulesets.Mania.UI
         /// <summary>本次按键在 <see cref="handleHit"/> 中扫描的强制 miss 候选数（探针，跨按键在按键入口清零）。</summary>
         private int pressForceMissScan;
 
+        /// <summary>探针只在本列首次按键时读一次非位置输入队列长度：读它会触发一次全树重建，不能每次按键都做。</summary>
+        private bool inputQueueCountReported;
+
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
             if (e.Action != Action.Value)
@@ -544,9 +547,16 @@ namespace osu.Game.Rulesets.Mania.UI
             double columnMs = (now - pressEnterTs) * tickToMs;
             double frameAgeMs = frameTs > 0 ? (pressEnterTs - frameTs) * tickToMs : double.NaN;
 
-            // 本帧处理的按键数与它们在本列花掉的总时长，供帧级 stall 探针判断
-            // 「一次按键究竟把这一帧拉长了多少」。
-            EzFrameStallDiagnostics.NotifyPress(columnMs);
+            // 本帧处理的按键数、它们在本列花掉的总时长、以及首个按键进入本列的帧内偏移，
+            // 供帧级 stall 探针把一次按键帧切成「帧起→本列 / 本列工时 / 本列之后」三段。
+            EzFrameStallDiagnostics.NotifyPress(pressEnterTs, columnMs);
+
+            if (!inputQueueCountReported)
+            {
+                inputQueueCountReported = true;
+                var containingInputManager = GetContainingInputManager();
+                EzFrameStallDiagnostics.ReportInputQueueCount(containingInputManager == null ? -1 : containingInputManager.NonPositionalInputQueue.Count);
+            }
 
             EzPressLatencyDiagnostics.Record(new EzPressLatencyDiagnostics.PressSample(
                 EzJudgmentDiagnostics.WallClockMs,

@@ -81,8 +81,19 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static int lastGen1;
         private static int lastGen2;
 
+        private static long pressFrameCount;
+        private static double firstPressAtTotalMs;
+        private static double pressColumnTotalMs;
+
         private static int pressesInFrame;
         private static double pressColumnMsInFrame;
+        private static long currentFrameStartTimestamp;
+        private static double firstPressAtMsInFrame = double.MaxValue;
+
+        /// <summary>探针读一次「非位置输入队列」的长度，用于给出键绑定派发的 O(n)。只在整局开始时读一次。</summary>
+        public static void ReportInputQueueCount(int count) => inputQueueCount = count;
+
+        private static long inputQueueCount = -1;
 
         // 会话累计
         private static double firstFrameWallMs = double.NaN;
@@ -101,6 +112,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             long ThreadAllocDeltaBytes,
             int PressesInFrame,
             double PressColumnMs,
+            double FirstPressAtMs,
             int FscIterations,
             int Gen0Delta,
             int Gen1Delta,
@@ -109,14 +121,30 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// <summary>
         /// 本帧内已处理（进入列入口）的按键，由 <c>Column.OnPressed</c> 调用。
         /// </summary>
-        /// <param name="columnMs">该次按键在本列花掉的时长；用于把「按键自身的工作」从帧长里分出来。</param>
-        public static void NotifyPress(double columnMs)
+        /// <param name="pressEnterTs">该次按键进入本列的 wall 戳（<c>Stopwatch</c> 计时单位）。</param>
+        /// <param name="columnMs">该次按键在本列花掉的时长。</param>
+        /// <remarks>
+        /// 有了 <paramref name="pressEnterTs"/> 就能把一次按键帧切成三段：
+        /// <c>FirstPressAtMs</c>（帧起到按键进入本列） + <c>PressColumnMs</c>（本列工时）
+        /// + 余量（<c>ElapsedMs</c> 减前两者，即按键之后的帧内工作）。
+        /// 判读：若 <c>FirstPressAtMs</c> 占了帧长的大头，说明时间花在「按键被派发到本列之前」的机器上；
+        /// 若余量占大头，说明是判定落地**之后**的帧内工作（结果扇出、容器增删、布局失效等）。
+        /// </remarks>
+        public static void NotifyPress(long pressEnterTs, double columnMs)
         {
             if (!Enabled)
                 return;
 
             pressesInFrame++;
             pressColumnMsInFrame += columnMs;
+
+            if (currentFrameStartTimestamp != 0)
+            {
+                double intoFrameMs = (pressEnterTs - currentFrameStartTimestamp) * 1000.0 / Stopwatch.Frequency;
+
+                if (intoFrameMs < firstPressAtMsInFrame)
+                    firstPressAtMsInFrame = intoFrameMs;
+            }
         }
 
         /// <summary>
@@ -133,6 +161,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             long prev = lastFrameTimestamp;
             lastFrameTimestamp = now;
+            currentFrameStartTimestamp = prev;
             frameIndex++;
 
             // light 模式只留直方图，跳掉每帧的 GC/分配读数（那几个 API 会落在同帧按键的等待里）。
@@ -156,6 +185,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 seed(gcPauseTicks, threadAllocated, processAllocated, gen0, gen1, gen2);
                 pressesInFrame = 0;
                 pressColumnMsInFrame = 0;
+                firstPressAtMsInFrame = double.MaxValue;
                 firstFrameWallMs = wallMs;
                 return;
             }
@@ -164,7 +194,15 @@ namespace osu.Game.EzOsuGame.Diagnostics
             lastFrameWallMs = wallMs;
 
             if (pressesInFrame > 0)
+            {
                 withPress.Add(elapsedMs);
+                pressFrameCount++;
+
+                if (firstPressAtMsInFrame != double.MaxValue)
+                    firstPressAtTotalMs += firstPressAtMsInFrame;
+
+                pressColumnTotalMs += pressColumnMsInFrame;
+            }
             else
                 withoutPress.Add(elapsedMs);
 
@@ -193,6 +231,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     threadAllocDelta,
                     pressesInFrame,
                     pressColumnMsInFrame,
+                    pressesInFrame > 0 && firstPressAtMsInFrame != double.MaxValue ? firstPressAtMsInFrame : double.NaN,
                     FrameStabilityContainer.EzLastUpdateIterations,
                     gen0 - lastGen0,
                     gen1 - lastGen1,
@@ -213,6 +252,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             seed(gcPauseTicks, threadAllocated, processAllocated, gen0, gen1, gen2);
             pressesInFrame = 0;
             pressColumnMsInFrame = 0;
+            firstPressAtMsInFrame = double.MaxValue;
         }
 
         private static void seed(long gcPauseTicks, long threadAllocated, long processAllocated, int gen0, int gen1, int gen2)
@@ -243,6 +283,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
             lastGen0 = lastGen1 = lastGen2 = 0;
             pressesInFrame = 0;
             pressColumnMsInFrame = 0;
+            firstPressAtMsInFrame = double.MaxValue;
+            pressFrameCount = 0;
+            firstPressAtTotalMs = 0;
+            pressColumnTotalMs = 0;
+            inputQueueCount = -1;
 
             firstFrameWallMs = double.NaN;
             lastFrameWallMs = 0;
@@ -261,7 +306,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             var snapshot = details;
 
             var sb = new StringBuilder();
-            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,FscIter,Gen0Delta,Gen1Delta,Gen2Delta");
+            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,FirstPressAtMs,FscIter,Gen0Delta,Gen1Delta,Gen2Delta");
 
             for (int i = 0; i < sampleCount; i++)
             {
@@ -274,6 +319,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(s.ThreadAllocDeltaBytes).Append(',');
                 sb.Append(s.PressesInFrame).Append(',');
                 sb.Append(num(s.PressColumnMs)).Append(',');
+                sb.Append(num(s.FirstPressAtMs)).Append(',');
                 sb.Append(s.FscIterations).Append(',');
                 sb.Append(s.Gen0Delta).Append(',');
                 sb.Append(s.Gen1Delta).Append(',');
@@ -349,6 +395,21 @@ namespace osu.Game.EzOsuGame.Diagnostics
             sb.Append("noPress  ").Append(withoutPress.Format());
             sb.Append(Environment.NewLine);
             sb.Append("withPress").Append(withPress.Format());
+
+            if (pressFrameCount > 0)
+            {
+                double meanElapsed = withPress.Sum / pressFrameCount;
+                double meanFirst = firstPressAtTotalMs / pressFrameCount;
+                double meanColumn = pressColumnTotalMs / pressFrameCount;
+
+                // 三段切分：帧起→按键进入本列 / 本列工时 / 按键之后到帧尾。
+                sb.Append(Environment.NewLine);
+                sb.Append(CultureInfo.InvariantCulture,
+                    $"pressSplit n={pressFrameCount} elapsedMean={meanElapsed:F3}ms "
+                    + $"firstPressAtMean={meanFirst:F3}ms pressColumnMean={meanColumn:F3}ms "
+                    + $"afterPressMean={meanElapsed - meanFirst - meanColumn:F3}ms "
+                    + $"inputQueue={inputQueueCount}");
+            }
 
             return sb.ToString();
         }
