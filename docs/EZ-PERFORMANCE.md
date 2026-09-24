@@ -355,6 +355,10 @@ B 组 `pressSplit` 的 `sincePrevFrameMean = 1.542 ms`，而帧间隔只有 **1.
 - 显著性用两个可比读数：`ACF r` 与「带内主周期占带内能量 / 均匀背景」，**不用**「峰 / 中位」——
   在 1/f² 型背景上后者恒为几百倍，会把噪声报成显著。
 - 选项：`--trim A,B` 去掉首尾过渡段（找周期基本都该加）、`--band`、`--dt`、`--only`、`--windows`、`--plot`。
+- 序列：judgment 的 `Drift` / `TimeOffset` / `AudioLag` / `FrameElapsed`；press 的 `PreColumnMs` / `ColumnMs` /
+  `FrameAgeMs`；frame 的 `ElapsedMs` / `SpikeRate` / `GcPauseDeltaMs`，以及 2026-09-24 随**每帧时钟探针**新增的
+  `AudioStep`（音频源逐帧步进）/ `InterpRate`（插值时钟逐帧速率）。看 100 Hz 量化用 `--band 0.004,0.02 --dt 0.002`。
+- `derived_from` 改成了**元组**：`InterpRate` 由 `InterpMs` 与 `ElapsedMs` 共同构造，单来源标记盖不住那两个定义性对。
 
 工具自带五条防误读的自检，都是实测踩出来的：
 
@@ -427,9 +431,15 @@ B 组 `pressSplit` 的 `sincePrevFrameMean = 1.542 ms`，而帧间隔只有 **1.
 
 ⚠ **两个保留**：① 仿真是理想化的（台阶严格每 10 ms 落一次），实机拉流时刻由音频线程调度，
 且实测 `Drift` 已超过仿真值；② 位置偏差只有 **~±1.4 ms**，够不够成「体感不流畅」**尚未证明**。
-⇒ **下一步必须加每帧时钟探针**：在 `FrameStabilityContainer.UpdateSubTree` 的 `RecordFrame()` 同一处
-记录 `gcc.BassSourceCurrentTime` / `gcc.InterpolatedDrift`（`DrawableHitObject` 已有同样的取法），
-1988 Hz 采样足以 1 ms 分辨率判断插值时钟到底是平滑还是带纹波。修复方向（待确认，未改代码）见交接单 §3.5 第 2 项。
+⇒ **每帧时钟探针已加（2026-09-24）**：`FrameStabilityContainer.UpdateSubTree` 的帧边界处把
+`gcc.BassSourceCurrentTime` / `gcc.CurrentTime` 交给 `EzFrameStallDiagnostics.RecordFrame(...)`，
+帧 CSV 新增 `AudioSrcMs,InterpMs` 两列、摘要新增 `clockQuant` 行、`AnalyzePeriod.py` 新增
+`AudioStep`（音频源逐帧步进）与 `InterpRate`（插值时钟逐帧速率）两条序列。
+**用仿真数据端到端验过**：`--band 0.004,0.02 --dt 0.002 --trim 3,3` 下 `InterpRate` 在 **0.010 s** 给出
+`ACF r = +0.896`、带内高出均匀背景 **914x** ⇒ 只要实机确实存在这个纹波，这套链路就能干净地把它测出来
+（`AudioStep` 会被 `RMS/稳健σ` 护栏拒掉，那是「稀疏脉冲列」的构造使然，不是数据问题）。
+⇒ **下一步：抓一局全帧（`EZ_FRAME_PROBE_MS=0`）跑一次看 `InterpRate` 是否在 0.010 s 上有高 `ACF r`**；
+是 ⇒ 接着在修复方向里选，否 ⇒ 这套插值其实抹平得不错，体感来源要另找。修复方向（待确认，未改代码）见交接单 §3.5 第 2 项。
 
 ---
 
@@ -565,3 +575,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-24 | §2.4.10：**周期性分析工具 `AnalyzePeriod.py`**——补上 §2.1 起就缺的 ACF/谱/相位这条腿（此前那两个 ACF 数字无脚本、不可复现）。同一局三份 CSV 的 `WallMs` 同源故可跨探针做互相关。五条实测踩出的防误读自检：事件型序列的分辨率=采样间隔（该带内只报「同时」，但**不可排除**该段——排除后真峰会退到周期旁瓣，实测两个完全相同信号曾被报到 −1.06 s）、带通后相关峰很宽故**贴边即不可定**（只有内部峰给先后）、**尾部 frame 数据不参与**（实测伪造 `TimeOffset × ElapsedMs r = −0.874`）、**离群帧主导方差时带内结论无效**（`RMS/稳健σ`，实测全段 15.7x → 修剪后 2.6x）、**带通后需家族性偶然阈值**（零分布实测 p95 0.503，66 对里至少一对 ≥0.47 的概率 99.2%；工具按 0.05/对数反解，并剔除定义性派生对）。现有三局（各 ~34 s）**测不出 1.5–5 s 带内稳定周期**，与 §2.1 一致 |
 | 2026-09-24 | §2.4.10（续）：**38.7 s 全帧局的结果与一次假阳性**——未修剪首跑给出 `ElapsedMs × GcPauseDeltaMs r = +0.998`、`× ColumnMs +0.957`，实为 t=0 那个 **141 ms 首帧**在两个序列里的余振；`--trim 3,3` 后 `ElapsedMs` 带内 RMS **3.294 → 0.026 ms**（129x），全部内部峰落到家族性阈值 0.597 以下，唯一越线的定义性相关（`SpikeRate` := `elapsed ≥ 2×p50`）。**稳态帧长该带内仅 0.026 ms 抖动**（帧长均值 0.503 ms）⇒ §3「2–4 s 周期」前提证伪，下一步换观测维度（交接单 §3.5：note 位置按 update 帧量化 / BASS 缓冲 9.8 ms / 主观锚点定位） |
 | 2026-09-24 | §2.4.11：**音频源时钟 = 精确 10.000 ms 阶梯（定案 §2.1 悬案）**——4 局判定 CSV 里 `BassSource` 的 331–353 个取值 **100% 落在 10.000 ms 网格**（最大残差 22 µs，相邻差只有 9.978/10.000/10.022 及其整数倍），而同批 `GameTime`（== `InterpClock`）无此结构；`Drift == (GameTime − BassSource) − 15.000`。机制：实机走 `NAudioWasapiOutput`（BASS 解码 mixer + NAudio 拉 WASAPI），`DEFAULT_NAUDIO_LATENCY_MS = 10`，而**解码 mixer 的位置只在被拉走一个 buffer 时前进** ⇒ 100 Hz 阶梯。**三个探针均按 ~10 Hz 采样 ⇒ 该结构被混叠，且会伪装成「隔几秒一次」的低频波动**，这正是 §3 在 0.2–0.6 Hz 带里空手而归的结构性原因（测量盲区，非效应弱）。用 1988 fps 真实帧间隔离线复刻 `InterpolatingFramedClock`：仿真 `Drift` 峰峰 **11.7 ms** vs 实测 9.8–19.2 ms（机制确认），每帧速率 std **4%**、**27.9% 的帧偏 >5%**（理想连续源为 0.36% / 0%），但相对匀速的**位置**偏差仅 std 0.11 ms / 峰峰 **2.8 ms**。1988 fps 下每台阶跨 **~24 帧** ⇒ 高帧率把该 100 Hz 纹波采样得更清楚。**保留**：仿真理想化、位置偏差是否够到体感尚未证明 ⇒ 下一步加每帧时钟探针（`RecordFrame()` 处顺带取 `BassSourceCurrentTime` / `InterpolatedDrift`） |
+| 2026-09-24 | §2.4.11（续）：**每帧时钟探针落地**——`FrameStabilityContainer.UpdateSubTree` 帧边界处把 `gcc.BassSourceCurrentTime` / `gcc.CurrentTime` 交给 `RecordFrame(...)`（新增 `AudioSrcMs,InterpMs` 两列），摘要新增 `clockQuant` 行（`audioStep` 非零占比 / 步长主桶 / `interpRate` 的 mean-std-`within1%`-`over5%` / `drift` 范围，速率只在帧长 ≤5ms 的帧上算），`AnalyzePeriod.py` 新增 `AudioStep` / `InterpRate` 两条序列且 `derived_from` 改为元组（`InterpRate` 由两条时钟共同构造，单来源标记盖不住两个定义性对）。**仿真数据端到端验过**：`--band 0.004,0.02 --dt 0.002 --trim 3,3` 下 `InterpRate` 在 0.010s 给出 `ACF r = +0.896`、带内高出均匀背景 914x（`AudioStep` 必被 `RMS/稳健σ` 拒掉 —— 稀疏脉冲列的构造使然）。待实机全帧局验证 |

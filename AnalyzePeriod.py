@@ -105,9 +105,10 @@ class Series:
     unit: str
     source: str
     valid: bool = True
-    # 若本条由另一条序列**按定义派生**（例如 SpikeRate 就是 ElapsedMs >= 2*p50 的指示函数），
-    # 记下来源名：它们之间的相关性是构造出来的，不是发现，相位表必须跳过。
-    derived_from: str = ""
+    # 若本条由其它序列**按定义派生**（例如 SpikeRate 就是 ElapsedMs >= 2*p50 的指示函数，
+    # InterpRate 是 ΔInterpMs / ElapsedMs），记下来源名：它们之间的相关性是构造出来的，
+    # 不是发现，相位表必须跳过。可以有多来源。
+    derived_from: tuple[str, ...] = ()
 
 
 def trim_series(series: Series, lo: float, hi: float) -> Series | None:
@@ -137,7 +138,7 @@ def build_series(path: str, table, full_capture: bool = True) -> list[Series]:
             Series("TimeOffset", t, offset, "interp", "ms", src),
             # Drift = -(BassSource - GameTime) - 15（实测偏移恰为常数 15.000ms）⇒ 同一信号加常数，
             # 去趋势后必然 r = -1.000。它同 Drift 的「相关」是恒等式，不是发现。
-            Series("AudioLag", t, audio_lag, "interp", "ms", src, derived_from="Drift"),
+            Series("AudioLag", t, audio_lag, "interp", "ms", src, derived_from=("Drift",)),
             Series("FrameElapsed", t, col(header, "FrameElapsed", rows), "interp", "ms", src),
         ]
     elif kind == "press":
@@ -155,9 +156,30 @@ def build_series(path: str, table, full_capture: bool = True) -> list[Series]:
         out += [
             Series("ElapsedMs", t, elapsed, "block", "ms", src, full_capture),
             Series("SpikeRate", t, spike, "block", "1", src, full_capture,
-                   derived_from="ElapsedMs"),
+                   derived_from=("ElapsedMs",)),
             Series("GcPauseDeltaMs", t, gc, "block", "ms", src, full_capture),
         ]
+
+        # 音频时钟列（2026-09-24 追加；旧 CSV 没有这两列，故先看 header 再取）。
+        if "AudioSrcMs" in header and "InterpMs" in header:
+            audio = col(header, "AudioSrcMs", rows)
+            interp = col(header, "InterpMs", rows)
+            step = np.diff(audio, prepend=np.nan)
+
+            with np.errstate(invalid="ignore", divide="ignore"):
+                rate = np.diff(interp, prepend=np.nan) / elapsed
+
+            # 帧长 >5ms 的帧本身不干净（卡顿 / 加载），其「速率」没有解释力，口径与探针摘要一致。
+            rate = np.where(elapsed > 5, np.nan, rate)
+
+            out += [
+                # 音频源的逐帧步进：阶梯的直接证据（约 96% 的帧应为 0，其余等于一个固定步长）。
+                Series("AudioStep", t, step, "block", "ms", src, full_capture),
+                # InterpRate = ΔInterpMs / ElapsedMs ⇒ 与这两条都是定义性关系，不是发现。
+                Series("InterpRate", t, rate, "block", "1", src, full_capture,
+                       derived_from=("InterpMs", "ElapsedMs")),
+            ]
+
     return out
 
 
@@ -576,8 +598,8 @@ def print_phase_table(items: list[Analyzed], band: tuple[float, float]) -> None:
             a, b = items[i], items[j]
             if not (a.phase_usable and b.phase_usable):
                 continue
-            # 定义性派生对（SpikeRate 由 ElapsedMs 按阈值构造）之间必然高相关，不是发现。
-            if a.series.derived_from == b.series.name or b.series.derived_from == a.series.name:
+            # 定义性派生对（SpikeRate 由 ElapsedMs 按阈值构造、InterpRate 由两条时钟差分构造）之间必然高相关，不是发现。
+            if a.series.name in b.series.derived_from or b.series.name in a.series.derived_from:
                 derived.append((a.series.name, b.series.name))
                 continue
             if a.dt != b.dt or len(a.grid) != len(b.grid):

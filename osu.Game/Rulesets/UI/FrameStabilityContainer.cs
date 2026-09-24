@@ -171,7 +171,18 @@ namespace osu.Game.Rulesets.UI
 
             // [Ez] Frame boundary for the frame-stall probe. Must stay at the same position in every
             // pass, otherwise the delta between two calls is not a whole frame.
-            EzOsuGame.Diagnostics.EzFrameStallDiagnostics.RecordFrame();
+            // 顺带取两个时钟交给探针：音频源时钟（实测是精确 10ms 阶梯）与插值时钟（note 位置实际读的那个）。
+            // 「下落顺不顺滑」取决于后者，而判定/按键探针只有 ~10Hz，看不见 100Hz 的阶梯 —— 这里是唯一能按帧看的地方。
+            double audioSrcMs = double.NaN;
+            double interpMs = double.NaN;
+
+            if (sampling && ParentGameplayClock is GameplayClockContainer gcc)
+            {
+                audioSrcMs = gcc.BassSourceCurrentTime;
+                interpMs = gcc.CurrentTime;
+            }
+
+            EzOsuGame.Diagnostics.EzFrameStallDiagnostics.RecordFrame(audioSrcMs, interpMs);
 
             return true;
         }

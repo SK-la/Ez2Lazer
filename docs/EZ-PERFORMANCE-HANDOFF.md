@@ -83,7 +83,8 @@
 4. 产出后跑 **`python AnalyzePeriod.py`**（在 `diagnostics/` 目录下执行，默认读最新的那一局；`--plot` 出图、
    `--windows` 看滑窗明细，也可直接传路径 / `--judgment|--frame|--press` 指定）。
    它按 ① 判定的 `Drift` / `TimeOffset`、② 帧的 `ElapsedMs`、
-   ③ 按键的 `PreColumnMs` / `FrameAgeMs` 做 ACF + Welch 谱 + 带内主周期细扫 + 滑窗幅度/相位，
+   ③ 按键的 `PreColumnMs` / `FrameAgeMs`、④ 帧的 `AudioStep` / `InterpRate`（音频源逐帧步进 / 插值时钟逐帧速率，
+   2026-09-24 新增列）做 ACF + Welch 谱 + 带内主周期细扫 + 滑窗幅度/相位，
    并因同局三份 CSV 的 `WallMs` 同源（`EzJudgmentDiagnostics.WallClockMs`）而给出**跨探针滞后表** ——
    这是回答「相位来源（音频时钟 / 帧节奏 / 输入投递）」的关键。判读口径：
     - 先看 `ACF r` 与「带内主周期占带内能量 / 均匀背景」两个读数是否同时明显（单看 PSD「峰 / 中位」会被 1/f² 噪声骗成几百倍）。
@@ -94,6 +95,11 @@
       这两类占多数是正常的，不要从中提取「谁领先多少毫秒」。
     - 尾部 frame 序列（`⚠`）完全不能用于周期/相位，先保证第 2 步做对。
     - 想分析「稳态」而不是「含加载/退出的整局」时加 `--trim 3,3`（去掉首尾各 3 s）。**找周期基本都应该加。**
+    - **要看音频时钟量化（§2.1 / §3.5.2）就换带**：`--band 0.004,0.02 --dt 0.002` 看 100 Hz 附近。
+      此时 `InterpRate` 若给出 0.010 s 主周期且 `ACF r` 高，就说明插值时钟带着 100 Hz 纹波；
+      `AudioStep` 会**必然**被 `RMS/稳健σ` 护栏拒掉（它是稀疏脉冲列，本来就是「多数 0 + 少数 10 ms」），
+      那是构造使然，不是数据有问题 —— 有用的读数是 `InterpRate`。
+      帧 CSV 的 `clockQuant` 摘要行给的是同一批数的粗读（`interpRate std` / `within1%` / `over5%` / `audioStepTop`）。
 5. 若确认存在「子树内」类 >5 ms 帧，再加**「每帧 CPU 时间 vs 墙钟」**读数，区分真算得慢与线程被抢占。
 
 > 抓全集用的 `ThresholdMs = 0` 属于**临时本地改动，不要提交**（环境变量是正式口子）。
@@ -137,9 +143,11 @@
    - 但相对理想匀速的**位置**偏差只有 std 0.11 ms / 峰峰 **2.8 ms**（速率抖动在一个 10 ms 窗内零均值抵消）。
    - 1988 fps 下每个台阶跨 **~24 帧** ⇒ 高帧率把这个纹波采样得更清楚，而 60 fps 下它低于 Nyquist。
    ⚠ 仿真是理想化（台阶严格每 10 ms 落一次）；实机拉流时刻由音频线程调度，且实测 `Drift` 已超过仿真值。
-   **要判定「位置偏差 ~1.4 ms 是否就是体感来源」，必须加每帧时钟探针**：在
-   `FrameStabilityContainer.UpdateSubTree` 的 `RecordFrame()` 同一处记录 `gcc.BassSourceCurrentTime` /
-   `gcc.InterpolatedDrift`（`DrawableHitObject` 已有同样的取法），1988 Hz 采样足以 1 ms 分辨率还原阶梯与纹波。
+   **每帧时钟探针已加**（2026-09-24）：`FrameStabilityContainer.UpdateSubTree` 的帧边界处把
+   `gcc.BassSourceCurrentTime` / `gcc.CurrentTime` 传给 `EzFrameStallDiagnostics.RecordFrame(...)`，
+   CSV 新增 `AudioSrcMs,InterpMs` 两列，摘要新增 `clockQuant` 行、`AnalyzePeriod.py` 新增 `AudioStep` / `InterpRate` 两条序列。
+   **下一步：按 §3 抓一局全帧（`EZ_FRAME_PROBE_MS=0`）+ `--trim 3,3`**，看 `InterpRate` 是否在 0.010 s 上有高 `ACF r`：
+   是 ⇒ 插值时钟确实带 100 Hz 纹波，接着在第 3 项的三个修复方向里选；否 ⇒ 这套插值其实抹平得不错，要另找体感来源。
    修复方向（**待确认，尚未改代码**）：
    ① 缩小量子（更小缓冲 / IAudioClient3 更小 period）；② 重调插值 —— 用 50 ms 半衰期的指数逼近去追 10 ms
    阶梯，本身就会注入 100 Hz 纹波，改成锁相 / 线性外推可消掉；③ 只把音频时钟当**速率**源，位置由与之锁定的平滑时钟驱动。

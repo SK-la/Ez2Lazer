@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -45,7 +46,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         public static bool Enabled { get; set; }
 
         /// <summary>超过该时长的帧才留明细；直方图则覆盖所有帧。可用 <c>EZ_FRAME_PROBE_MS</c> 覆盖。</summary>
-        public static double ThresholdMs { get; set; } = 1.5;
+        public static double ThresholdMs { get; set; } = 0;
 
         /// <summary>
         /// 是否每帧读取 GC 计数与分配量。可用 <c>EZ_FRAME_PROBE_LIGHT=1</c> 关掉。
@@ -112,6 +113,24 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static long currentFrameStartTimestamp;
         private static double sincePrevFrameMinMs = double.MaxValue;
 
+        // 「音频时钟量化 / 插值纹波」：note 位置取自插值时钟，而插值时钟追的是音频源时钟。
+        // 实测音频源是精确 10ms 阶梯（见 docs/EZ-PERFORMANCE.md §2.4.11），所以这里逐帧记录两个时钟，
+        // 让「源是不是阶梯」和「插值有没有把阶梯抹平」两件事都能在 1ms 分辨率下被判读。
+        private static double prevAudioSrcMs = double.NaN;
+        private static double prevInterpMs = double.NaN;
+        private static readonly Histogram audioStep = new Histogram();
+        private static long audioStepZeroCount;
+        private static long rateCount;
+        private static double rateSum;
+        private static double rateSqSum;
+        private static long rateWithin1Pct;
+        private static long rateOver5Pct;
+        private static long rateSkipped;
+        private static double driftMin = double.MaxValue;
+        private static double driftMax = double.MinValue;
+        private static double driftSum;
+        private static double driftSqSum;
+
         /// <summary>探针读一次「非位置输入队列」的长度，用于给出键绑定派发的 O(n)。只在整局开始时读一次。</summary>
         public static void ReportInputQueueCount(int count) => inputQueueCount = count;
 
@@ -141,7 +160,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
             int Gen2Delta,
             double SubtreeMs,
             long SubtreeAllocBytes,
-            long LoopAllocBytes);
+            long LoopAllocBytes,
+            double AudioSrcMs,
+            double InterpMs);
 
         /// <summary>
         /// 本帧内已处理（进入列入口）的按键，由 <c>Column.OnPressed</c> 调用。
@@ -174,7 +195,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// 记一次帧边界。调用点必须是每帧同一位置，否则相邻两次之差不是整帧时长。
         /// 首帧只用于播种各计数器基线，不计入统计。
         /// </summary>
-        public static void RecordFrame()
+        /// <param name="audioSrcMs">该帧音频源时钟（<c>GameplayClockContainer.BassSourceCurrentTime</c>）。</param>
+        /// <param name="interpMs">该帧插值时钟（note 位置实际取值）。取不到时钟时两者都传 <see cref="double.NaN"/>。</param>
+        public static void RecordFrame(double audioSrcMs, double interpMs)
         {
             if (!Enabled)
                 return;
@@ -212,11 +235,14 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 pressColumnMsInFrame = 0;
                 sincePrevFrameMinMs = double.MaxValue;
                 firstFrameWallMs = wallMs;
+                prevAudioSrcMs = audioSrcMs;
+                prevInterpMs = interpMs;
                 return;
             }
 
             double elapsedMs = (now - prev) * 1000.0 / Stopwatch.Frequency;
             lastFrameWallMs = wallMs;
+            accumulateClocks(audioSrcMs, interpMs, elapsedMs);
 
             if (pressesInFrame > 0)
             {
@@ -275,7 +301,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     gen2 - lastGen2,
                     FrameStabilityContainer.SubtreeProbeMs,
                     FrameStabilityContainer.SubtreeProbeAllocBytes,
-                    FrameStabilityContainer.LoopAllocProbeBytes);
+                    FrameStabilityContainer.LoopAllocProbeBytes,
+                    audioSrcMs,
+                    interpMs);
 
                 detailCursor++;
 
@@ -293,6 +321,62 @@ namespace osu.Game.EzOsuGame.Diagnostics
             pressesInFrame = 0;
             pressColumnMsInFrame = 0;
             sincePrevFrameMinMs = double.MaxValue;
+        }
+
+        /// <summary>
+        /// 累计三个读数：音频源的**逐帧步进**（阶梯的直接证据）、插值时钟的**逐帧速率**（纹波）、以及
+        /// <c>interp − audioSrc</c> 的**漂移**。拿不到时钟（非 GameplayClockContainer）时传 NaN，跳过。
+        /// </summary>
+        private static void accumulateClocks(double audioSrcMs, double interpMs, double elapsedMs)
+        {
+            if (!double.IsFinite(audioSrcMs) || !double.IsFinite(interpMs))
+            {
+                prevAudioSrcMs = prevInterpMs = double.NaN;
+                return;
+            }
+
+            if (double.IsFinite(prevAudioSrcMs) && double.IsFinite(prevInterpMs))
+            {
+                double step = audioSrcMs - prevAudioSrcMs;
+
+                // 反向步进只可能来自 seek，不计入步长分布（Histogram 会把负值塞进第 0 桶，污染判读）。
+                if (step >= 0)
+                    audioStep.Add(step);
+
+                if (step == 0)
+                    audioStepZeroCount++;
+
+                // 速率只在正常帧上算：>5ms 的帧是卡顿 / 加载，帧长本身不干净，其「速率」没有解释力。
+                // 这些帧的原始时钟值仍在 CSV 里，离线要用可以自己筛。
+                if (elapsedMs > 0 && elapsedMs <= 5)
+                {
+                    double rate = (interpMs - prevInterpMs) / elapsedMs;
+                    rateCount++;
+                    rateSum += rate;
+                    rateSqSum += rate * rate;
+
+                    if (Math.Abs(rate - 1) < 0.01)
+                        rateWithin1Pct++;
+
+                    if (Math.Abs(rate - 1) > 0.05)
+                        rateOver5Pct++;
+                }
+                else
+                    rateSkipped++;
+
+                double drift = interpMs - audioSrcMs;
+                driftSum += drift;
+                driftSqSum += drift * drift;
+
+                if (drift < driftMin)
+                    driftMin = drift;
+
+                if (drift > driftMax)
+                    driftMax = drift;
+            }
+
+            prevAudioSrcMs = audioSrcMs;
+            prevInterpMs = interpMs;
         }
 
         private static void seed(long gcPauseTicks, long threadAllocated, long processAllocated, int gen0, int gen1, int gen2)
@@ -335,6 +419,21 @@ namespace osu.Game.EzOsuGame.Diagnostics
             probeFrames = 0;
             inputQueueCount = -1;
 
+            prevAudioSrcMs = double.NaN;
+            prevInterpMs = double.NaN;
+            audioStep.Reset();
+            audioStepZeroCount = 0;
+            rateCount = 0;
+            rateSum = 0;
+            rateSqSum = 0;
+            rateWithin1Pct = 0;
+            rateOver5Pct = 0;
+            rateSkipped = 0;
+            driftMin = double.MaxValue;
+            driftMax = double.MinValue;
+            driftSum = 0;
+            driftSqSum = 0;
+
             firstFrameWallMs = double.NaN;
             lastFrameWallMs = 0;
             stallFrames = 0;
@@ -352,7 +451,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             var snapshot = details;
 
             var sb = new StringBuilder();
-            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,SincePrevFrameMs,FscIter,Gen0Delta,Gen1Delta,Gen2Delta,SubtreeMs,SubtreeAllocBytes,LoopAllocBytes");
+            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,SincePrevFrameMs,FscIter,Gen0Delta,Gen1Delta,Gen2Delta,SubtreeMs,SubtreeAllocBytes,LoopAllocBytes,AudioSrcMs,InterpMs");
 
             for (int i = 0; i < sampleCount; i++)
             {
@@ -372,7 +471,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(s.Gen2Delta).Append(',');
                 sb.Append(num(s.SubtreeMs)).Append(',');
                 sb.Append(s.SubtreeAllocBytes).Append(',');
-                sb.Append(s.LoopAllocBytes);
+                sb.Append(s.LoopAllocBytes).Append(',');
+                sb.Append(num(s.AudioSrcMs)).Append(',');
+                sb.Append(num(s.InterpMs));
                 sb.AppendLine();
             }
 
@@ -456,6 +557,36 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     + $"restMsMean={meanRest:F3}ms "
                     + $"subtreeShareMs={100 * meanSubtree / meanElapsedAll:F1}% "
                     + $"subtreeAllocMean={subtreeAllocTotal / (double)probeFrames:F0}B loopAllocMean={loopAllocTotal / (double)probeFrames:F0}B");
+            }
+
+            // 音频时钟：源是不是阶梯、插值有没有把阶梯抹平。note 位置取自插值时钟，所以这是「下落顺不顺滑」的直接判据；
+            // 也是 ~10Hz 的判定/按键探针看不见 100Hz 结构的原因（见 docs/EZ-PERFORMANCE.md §2.4.11）。
+            if (rateCount > 0)
+            {
+                double rateMean = rateSum / rateCount;
+                double rateStd = Math.Sqrt(Math.Max(0, rateSqSum / rateCount - rateMean * rateMean));
+                long driftFrames = rateCount + rateSkipped;
+                double driftMean = driftSum / driftFrames;
+                double driftStd = Math.Sqrt(Math.Max(0, driftSqSum / driftFrames - driftMean * driftMean));
+
+                sb.Append(Environment.NewLine);
+                sb.Append(CultureInfo.InvariantCulture,
+                    $"clockQuant frames={driftFrames} rateSkipped={rateSkipped}(帧长>5ms) "
+                    + $"driftMean={driftMean:F3}ms driftRange=[{driftMin:F3},{driftMax:F3}]ms driftStd={driftStd:F3}ms");
+
+                if (audioStep.Count > 0)
+                {
+                    sb.Append(Environment.NewLine);
+                    sb.Append(CultureInfo.InvariantCulture,
+                        $"  audioStep nonzero={100 * (audioStep.Count - audioStepZeroCount) / (double)audioStep.Count:F2}% "
+                        + $"mean={audioStep.Mean:F4}ms top:");
+                    sb.Append(audioStep.FormatBuckets(5));
+                }
+
+                sb.Append(Environment.NewLine);
+                sb.Append(CultureInfo.InvariantCulture,
+                    $"  interpRate mean={rateMean:F5} std={rateStd:F5} "
+                    + $"within1%={100 * rateWithin1Pct / (double)rateCount:F1}% over5%={100 * rateOver5Pct / (double)rateCount:F1}%");
             }
 
             // 两组分布并排，是「一次按键把帧拉长了多少」的直接答案。
@@ -555,6 +686,30 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     $" n={Count} mean={Mean:F3} p50={Percentile(0.5):F3} p90={Percentile(0.9):F3} "
                     + $"p99={Percentile(0.99):F3} p99.9={Percentile(0.999):F3} max={Max:F3} "
                     + $"over0.5={CountOver(0.5)} over1={CountOver(1.0)} over2={CountOver(2.0)} over5={CountOver(5.0)}");
+
+            /// <summary>
+            /// 非空桶按计数降序，用于展示「取值只落在哪几个点上」这类量化特征 ——
+            /// 音频源时钟的逐帧步进就是这种形状（几乎全是 0 与一个固定步长）。
+            /// </summary>
+            public string FormatBuckets(int top)
+            {
+                var nonEmpty = new List<(double ms, int count)>();
+
+                for (int i = 0; i < bucket_count; i++)
+                {
+                    if (buckets[i] > 0)
+                        nonEmpty.Add(((i + 0.5) * bucket_width_ms, buckets[i]));
+                }
+
+                nonEmpty.Sort((a, b) => b.count.CompareTo(a.count));
+
+                var sb = new StringBuilder();
+
+                for (int i = 0; i < nonEmpty.Count && i < top; i++)
+                    sb.Append(CultureInfo.InvariantCulture, $" {nonEmpty[i].ms:F2}ms={nonEmpty[i].count}");
+
+                return sb.ToString();
+            }
         }
     }
 }
