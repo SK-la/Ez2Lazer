@@ -56,9 +56,12 @@
 **长时全帧捕获一次**，让周期可测：
 
 1. 打开 `EzExperimentalSettings` 的判定诊断开关（`Ez2Setting.EzJudgmentDiagEnabled`）——它**同时**开启 frame-stall / press-latency / judgment 三个探针。
-2. 环境变量 `EZ_FRAME_PROBE_MS=0`（抓全集；默认 `1.5` 只留超阈值帧）。可选 `EZ_FRAME_PROBE_LIGHT=1` 降探针自身开销。
-    - **`0` 是硬要求，不是优化**：阈值 > 0 时 `framestall_*.csv` 只有慢帧，把这种尾部数据插值到均匀网格会伪造
-      极强虚相关（实测给出过 `r = −0.874`）。`AnalyzePeriod.py` 会识别并拒绝这类序列，于是这一局就白跑了。
+2. 抓**全集**：环境变量 `EZ_FRAME_PROBE_MS=0`（默认 `1.5` 只留超阈值帧）。若不想动环境变量，
+   临时把 `EzFrameStallDiagnostics.ThresholdMs` 的默认值改为 `0` 等价（本地改、**不提交**，见 §3 末尾）。
+   可选 `EZ_FRAME_PROBE_LIGHT=1` 降探针自身开销。
+    - **抓全集是硬要求，不是优化**：阈值 > 0 时 `framestall_*.csv` 只有慢帧，把这种尾部数据插值到均匀网格会伪造
+      极强虚相关（实测给出过 `r = −0.874`）。`AnalyzePeriod.py` 会读同名 `.summary.txt` 的 `threshold=`
+      识别并拒绝这类序列，于是这一局就白跑了。
 3. 跑 **2–3 分钟**同一张图；三个 CSV 会同时产出。
 4. 产出后跑 **`python AnalyzePeriod.py`**（在 `diagnostics/` 目录下执行，默认读最新的那一局；`--plot` 出图、
    `--windows` 看滑窗明细、`--file <名>` 指定文件）。它按 ① 判定的 `Drift` / `TimeOffset`、② 帧的 `ElapsedMs`、
@@ -69,6 +72,8 @@
     - 事件型序列（judgment / press，~10 次/s）的短滞后 ACF 是插值造的，输出里带 `~` 的一律不算。
     - 跨探针只认「两侧都有效」的组合；滞后超过带内一个周期即无意义（周期性信号到处都有峰）。
 5. 若确认存在「子树内」类 >5 ms 帧，再加**「每帧 CPU 时间 vs 墙钟」**读数，区分真算得慢与线程被抢占。
+
+> 抓全集用的 `ThresholdMs = 0` 属于**临时本地改动，不要提交**（环境变量是正式口子）。
 
 ## 4. 代码锚点
 

@@ -159,7 +159,7 @@ def frame_capture_state(path: str) -> tuple[str, bool]:
     if value <= 0:
         return f"全集（threshold={threshold}）✓", True
     return (f"**尾部**（threshold={threshold}，{threshold}）⇒ 帧序列不参与周期/相位结论，"
-            "需 EZ_FRAME_PROBE_MS=0 重跑"), False
+            "需抓全集重跑（`EZ_FRAME_PROBE_MS=0`，或临时把 `ThresholdMs` 默认改为 0）"), False
 
 
 # --------------------------------------------------------------------------- 网格
