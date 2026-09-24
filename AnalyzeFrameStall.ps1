@@ -119,25 +119,13 @@ if (-not (Test-Path -LiteralPath $Path)) {
     throw "找不到文件: $Path"
 }
 
-$stalls = @(Import-Csv -LiteralPath $Path)
+$captured = @(Import-Csv -LiteralPath $Path)
 
-if ($stalls.Length -eq 0) {
-    throw "没有 stall 明细：本次运行没有任何一帧超过阈值。这本身是好消息，可调低 EZ_FRAME_PROBE_MS 再看次尖峰。"
+if ($captured.Length -eq 0) {
+    throw "没有帧明细：本次运行没有任何一帧超过阈值。这本身是好消息，可调低 EZ_FRAME_PROBE_MS 再看次尖峰。"
 }
 
-$firstWall = ConvertTo-Double $stalls[0].WallMs
-$lastWall = ConvertTo-Double $stalls[-1].WallMs
-$spanSeconds = ($lastWall - $firstWall) / 1000.0
-
-Write-Host ''
-Write-Host "文件: $Path" -ForegroundColor Green
-Write-Host ("stall 明细: {0} 条，覆盖墙钟 {1:F1}s（约 {2:F2} 次/s）" -f `
-        $stalls.Length, $spanSeconds, $(if ($spanSeconds -gt 0) { $stalls.Length / $spanSeconds } else { 0 }))
-Write-Host '注意：下面的幅度统计只覆盖超过阈值的帧（即尾部）。'
-
-# ---------------------------------------------------------------- 全帧分布（摘要）
-
-# 全帧直方图只在探针写的摘要文件里；默认取与 CSV 同名的兄弟文件。
+# 摘要文件与 CSV 同名（兄弟文件），先解析出来以取得本次运行的真实阈值。
 if (-not $SummaryPath) {
     $csvFull = (Resolve-Path -LiteralPath $Path).Path
     $candidate = [System.IO.Path]::Combine(
@@ -146,6 +134,53 @@ if (-not $SummaryPath) {
 
     if (Test-Path -LiteralPath $candidate) { $SummaryPath = $candidate }
 }
+
+$thresholdMs = [double]::NaN
+
+if ($SummaryPath -and (Test-Path -LiteralPath $SummaryPath)) {
+    $header = @(Get-Content -LiteralPath $SummaryPath | Where-Object { $_ -match '\[EzFrameStall\]' })
+
+    if ($header.Count -gt 0 -and $header[0] -match 'threshold=([\d.]+)ms') {
+        $thresholdMs = [double]::Parse($matches[1], $inv)
+    }
+}
+
+# CSV 是「捕获到的帧」：阈值调到 0 时就是全集，默认只含尾部（见 EZ_FRAME_PROBE_MS）。
+# 尾部统计沿用 $stalls（超过阈值者），全集供帧节奏 / 平滑度分析用。
+$allFrames = $captured
+
+if (-not [double]::IsNaN($thresholdMs) -and $thresholdMs -gt 0) {
+    $stalls = @($captured | Where-Object { (ConvertTo-Double $_.ElapsedMs) -ge $thresholdMs })
+}
+else {
+    $stalls = $allFrames
+}
+
+# 「是否全集」只能由探针写下的阈值判定：尾部 CSV 的每一行都 >= 阈值，长度比较恒为相等。
+# 阈值 0 是探针「抓全集」的显式标志（见 EZ_FRAME_PROBE_MS）；摘要缺失时按尾部处理。
+$isFullSequence = (-not [double]::IsNaN($thresholdMs)) -and $thresholdMs -le 0
+
+$firstWall = ConvertTo-Double $allFrames[0].WallMs
+$lastWall = ConvertTo-Double $allFrames[-1].WallMs
+$spanSeconds = ($lastWall - $firstWall) / 1000.0
+
+Write-Host ''
+Write-Host "文件: $Path" -ForegroundColor Green
+Write-Host ("捕获帧明细: {0} 条，覆盖墙钟 {1:F1}s（约 {2:F2} 次/s）" -f `
+        $allFrames.Length, $spanSeconds, $(if ($spanSeconds -gt 0) { $allFrames.Length / $spanSeconds } else { 0 }))
+
+if ([double]::IsNaN($thresholdMs)) {
+    Write-Host '  未找到摘要，无法确定阈值：按「只含尾部」处理，不做帧节奏分析。'
+}
+elseif ($isFullSequence) {
+    Write-Host '  阈值=0 ⇒ 已抓全集，下面的统计覆盖所有帧。'
+}
+else {
+    Write-Host ('  超阈值（{0}ms）: {1} 条 ⇒ 下面的幅度统计只覆盖尾部。' -f $thresholdMs, $stalls.Length)
+    Write-Host '  要分析帧节奏 / 平滑度，用 EZ_FRAME_PROBE_MS=0 重跑一局（抓全集）。'
+}
+
+# ---------------------------------------------------------------- 全帧分布（摘要）
 
 Write-Host ''
 Write-Host '== 全帧分布（含未超阈值的帧） ==' -ForegroundColor Cyan
@@ -471,6 +506,110 @@ if ($PressPath) {
         Write-Host '  未覆盖者的等待发生在帧边界之外：可能是输入线程排队、事件队列积压，'
         Write-Host '  或由若干低于阈值的连续帧叠加（调低 EZ_FRAME_PROBE_MS 可把后者纳入）。'
     }
+}
+
+# ---------------------------------------------------------------- 帧节奏 / 平滑度
+#
+# 视觉上「帧数很高但 note 下落不顺滑」= 帧耗时的**相对抖动**：note 位置按实际流逝时间推进，
+# 一帧耗时是 p50 的 2 倍，这一帧就跳了 2 倍距离。所以要看的是倍率分布与卡顿的周期性，
+# 而不是绝对耗时。只有抓到全集（EZ_FRAME_PROBE_MS=0）才做这节。
+
+if ($isFullSequence -and $allFrames.Length -ge 100) {
+    Write-Host ''
+    Write-Host '== 帧节奏 / 平滑度（全集） ==' -ForegroundColor Cyan
+
+    $elapsed = New-Object 'System.Collections.Generic.List[double]'
+    foreach ($r in $allFrames) { $elapsed.Add((ConvertTo-Double $r.ElapsedMs)) }
+
+    $e = $elapsed.ToArray(); [Array]::Sort($e)
+    $p50 = Get-Percentile $e 0.5
+    $p90 = Get-Percentile $e 0.9
+    $p99 = Get-Percentile $e 0.99
+
+    Write-Host ("  帧耗时 p50={0} p90={1} p99={2} p99.9={3} max={4}（隐含 p50 帧率 {5:N0} fps）" -f `
+            (Format-F3 $p50), (Format-F3 $p90), (Format-F3 $p99), (Format-F3 (Get-Percentile $e 0.999)), (Format-F3 $e[-1]), `
+            $(if ($p50 -gt 0) { 1000 / $p50 } else { 0 }))
+
+    # 相对倍率才是可见性判据：2 倍 = note 本帧跳两倍距离。
+    $disp90 = if ($p50 -gt 0) { $p90 / $p50 } else { [double]::NaN }
+    $disp99 = if ($p50 -gt 0) { $p99 / $p50 } else { [double]::NaN }
+
+    Write-Host ("  相对抖动: p90/p50 = {0:F2}x   p99/p50 = {1:F2}x" -f $disp90, $disp99)
+    Write-Host '  读法：p90/p50 越接近 1 越平滑。无帧率上限时基线帧很短，同一份固定开销（GC / 分配 /'
+    Write-Host '        调度唤醒）在相对倍率上被放大；限帧或开垂直同步会把同一抖动压成看不出的比例。'
+
+    foreach ($mult in 2.0, 3.0, 4.0, 6.0) {
+        $limit = $p50 * $mult
+        $count = 0
+        foreach ($v in $elapsed) { if ($v -ge $limit) { $count++ } }
+
+        Write-Host ("  帧耗时 >= {0:F0}x p50 ({1}ms): {2,7} 帧 = {3,6:P2}  = {4,7:F1} 次/s" -f `
+                $mult, (Format-F3 $limit), $count, ($count / $e.Length), `
+                $(if ($spanSeconds -gt 0) { $count / $spanSeconds } else { 0 }))
+    }
+
+    # 相邻帧的倍率跳变：这是「不顺滑」最直接的形式（这一帧相对上一帧突然加速）。
+    $jumps = New-Object 'System.Collections.Generic.List[double]'
+    $prev = [double]::NaN
+
+    foreach ($r in $allFrames) {
+        $v = ConvertTo-Double $r.ElapsedMs
+        if (-not [double]::IsNaN($prev) -and $prev -gt 0) { $jumps.Add($v / $prev) }
+        $prev = $v
+    }
+
+    if ($jumps.Count -gt 0) {
+        $j = $jumps.ToArray(); [Array]::Sort($j)
+        $over2 = 0
+        foreach ($v in $j) { if ($v -ge 2.0) { $over2++ } }
+
+        Write-Host ''
+        Write-Host ("  相邻帧倍率: p50={0:F2}x p90={1:F2}x p99={2:F2}x max={3:F2}x" -f `
+                (Get-Percentile $j 0.5), (Get-Percentile $j 0.9), (Get-Percentile $j 0.99), $j[-1])
+        Write-Host ("  相邻帧跳变 >= 2x: {0} 次 = {1:F1} 次/s  ← 每次都是肉眼可能看见的一次卡顿" -f `
+                $over2, $(if ($spanSeconds -gt 0) { $over2 / $spanSeconds } else { 0 }))
+    }
+
+    # 卡顿的周期性：等间隔尖峰指向定时源（GC 代回收 / 定时器），成簇则指向突发或外部抢占。
+    $hits = @($allFrames | Where-Object { (ConvertTo-Double $_.ElapsedMs) -ge ($p50 * 2.0) })
+
+    if ($hits.Length -ge 20) {
+        $gaps = New-Object 'System.Collections.Generic.List[double]'
+        for ($i = 1; $i -lt $hits.Length; $i++) {
+            $gaps.Add((ConvertTo-Double $hits[$i].WallMs) - (ConvertTo-Double $hits[$i - 1].WallMs))
+        }
+
+        $g = $gaps.ToArray(); [Array]::Sort($g)
+        $gsum = 0.0; foreach ($v in $g) { $gsum += $v }
+
+        Write-Host ''
+        Write-Host ("  卡顿（>= 2x p50）共 {0} 次；间隔 mean={1:F1}ms median={2:F1}ms" -f `
+                $hits.Length, ($gsum / $g.Length), (Get-Percentile $g 0.5))
+
+        # 周期性看间隔分布：明显的窄峰 = 定时源。
+        $buckets = @{}
+        foreach ($v in $g) {
+            if ($v -gt 200) { continue }
+            $b = [math]::Floor($v / 10) * 10
+            if ($buckets.ContainsKey($b)) { $buckets[$b]++ } else { $buckets[$b] = 1 }
+        }
+
+        $top = $buckets.GetEnumerator() | Sort-Object -Property Value -Descending | Select-Object -First 5
+
+        Write-Host '  间隔分布（10ms 桶）前 5 名 —— 窄峰指向定时源:'
+        foreach ($kv in $top) {
+            Write-Host ("    {0,4}-{1,4}ms : {2,5} 次" -f $kv.Key, ($kv.Key + 10), $kv.Value)
+        }
+
+        Write-Host '  对照：gen0 间隔可由摘要的 gen0 回收速率算出（回收/s ⇒ 1000/该值 ms）。'
+        Write-Host '        若尖峰与该间隔吻合 ⇒ 抖动由代回收驱动，方向是减少 update 线程分配。'
+    }
+}
+elseif (-not $isFullSequence) {
+    Write-Host ''
+    Write-Host '== 帧节奏 / 平滑度 ==' -ForegroundColor Cyan
+    Write-Host '  跳过：本次 CSV 只含超阈值的尾部，无法给出倍率分布与周期性。'
+    Write-Host '  用 EZ_FRAME_PROBE_MS=0 重跑一局抓全集（≈19MB / 100s @2000fps）。'
 }
 
 # ---------------------------------------------------------------- 尾部对照

@@ -350,13 +350,13 @@ namespace osu.Game.Screens.Play
             EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.SkipForceMiss =
                 Environment.GetEnvironmentVariable("EZ_PRESS_PROBE_SKIP_FORCE_MISS") == "1";
 
-            // 帧明细阈值同样走环境变量：想看「接近一帧」的次尖峰就调低（如 0.8）。
+            // 帧明细阈值同样走环境变量：0 = 抓全集（供帧节奏 / 平滑度分析）；想看「接近一帧」的次尖峰就调低（如 0.8）。
             if (double.TryParse(
                     Environment.GetEnvironmentVariable("EZ_FRAME_PROBE_MS"),
                     NumberStyles.Float,
                     CultureInfo.InvariantCulture,
                     out double frameProbeThreshold)
-                && frameProbeThreshold > 0)
+                && frameProbeThreshold >= 0)
             {
                 EzOsuGame.Diagnostics.EzFrameStallDiagnostics.ThresholdMs = frameProbeThreshold;
             }

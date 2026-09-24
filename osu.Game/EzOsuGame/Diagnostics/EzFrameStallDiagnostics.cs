@@ -59,7 +59,12 @@ namespace osu.Game.EzOsuGame.Diagnostics
         public static bool Deep { get; set; } = true;
 
         private const int bucket_count = 1024;
-        private const int detail_capacity = 32768;
+
+        /// <summary>
+        /// 明细容量。<c>EZ_FRAME_PROBE_MS=0</c> 抓全集时需要容纳一局的所有帧
+        /// （2000 fps × 100 s ≈ 20 万帧；单条约 80 B ⇒ 约 21 MB），故留到 26 万。
+        /// </summary>
+        private const int detail_capacity = 262144;
 
         // 桶宽 0.1ms，桶数 1024 → 覆盖到 102.3ms；超出者并入末桶。
         // 用 int 计数：一个 play 的帧数在十万量级，不会溢出。
