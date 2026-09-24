@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -136,11 +137,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
             {
                 var s = samples[(start + i) % capacity];
 
-                sb.Append(s.WallMs.ToString("F3")).Append(',');
-                sb.Append(s.GameTime.ToString("F3")).Append(',');
+                sb.Append(num(s.WallMs)).Append(',');
+                sb.Append(num(s.GameTime)).Append(',');
                 sb.Append(fmt(s.TotalMs)).Append(',');
                 sb.Append(fmt(s.PreColumnMs)).Append(',');
-                sb.Append(s.ColumnMs.ToString("F3")).Append(',');
+                sb.Append(num(s.ColumnMs)).Append(',');
                 sb.Append(fmt(s.FrameAgeMs)).Append(',');
                 sb.Append(s.Column).Append(',');
                 sb.Append(s.FrameId).Append(',');
@@ -150,13 +151,13 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(s.Judged ? 1 : 0).Append(',');
                 sb.Append(s.Entries).Append(',');
                 sb.Append(s.ForceMissScan).Append(',');
-                sb.Append(s.FrameElapsed.ToString("F3")).Append(',');
+                sb.Append(num(s.FrameElapsed)).Append(',');
                 sb.Append(s.CatchingUp ? 1 : 0).Append(',');
                 sb.Append(s.FscIterations).Append(',');
                 sb.Append(s.Gen0).Append(',');
                 sb.Append(s.Gen1).Append(',');
                 sb.Append(s.Gen2).Append(',');
-                sb.Append(s.GcPauseMs.ToString("F3")).Append(',');
+                sb.Append(num(s.GcPauseMs)).Append(',');
                 sb.Append(s.CacheHits).Append(',');
                 sb.Append(s.CacheMisses);
                 sb.AppendLine();
@@ -165,7 +166,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             string dir = EzJudgmentDiagnostics.GetDiagnosticsDirectory();
             string path = Path.Combine(dir, $"presslatency_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
 
-            string summary = FormatSummary(start, sampleCount, frameLengths);
+            string summary = formatSummary(start, sampleCount, frameLengths);
             string content = sb.ToString();
 
             _ = Task.Run(async () =>
@@ -186,12 +187,15 @@ namespace osu.Game.EzOsuGame.Diagnostics
             return path;
         }
 
-        private static string fmt(double value) => double.IsNaN(value) ? string.Empty : value.ToString("F3");
+        /// <summary>CSV 一律用不变区域，避免逗号小数分隔符的地区写出畸形列。</summary>
+        private static string num(double value) => value.ToString("F3", CultureInfo.InvariantCulture);
+
+        private static string fmt(double value) => double.IsNaN(value) ? string.Empty : num(value);
 
         /// <summary>同一帧内处理的按键数（按 FrameId 连续段统计）。</summary>
         private static int[] computeFrameLengths(int start, int sampleCount)
         {
-            var lengths = new int[sampleCount];
+            int[] lengths = new int[sampleCount];
             int i = 0;
 
             while (i < sampleCount)
@@ -211,7 +215,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             return lengths;
         }
 
-        private static string FormatSummary(int start, int sampleCount, int[] frameLengths)
+        private static string formatSummary(int start, int sampleCount, int[] frameLengths)
         {
             if (sampleCount == 0)
                 return "[EzPressLatency] no samples";
@@ -262,14 +266,15 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             double n = sampleCount;
 
-            return $"[EzPressLatency] n={sampleCount} overwritten={Overwritten} routed={routed} judged={judged} "
-                   + $"catchingUp={catchingUp} multiPassFrames={multiPass} maxPressesInFrame={maxPressesInFrame} "
-                   + $"PreColumn avg/max={preSum / n:F3}/{preMax:F3} "
-                   + $"Column avg/max={columnSum / n:F3}/{columnMax:F3} "
-                   + $"Total avg/max={totalSum / n:F3}/{totalMax:F3} "
-                   + $"FrameAge avg/max={frameAgeSum / n:F3}/{frameAgeMax:F3} "
-                   + $"Column(routed) avg={(routed == 0 ? 0 : routedColumnSum / routed):F3} "
-                   + $"Column(unrouted) avg={(unrouted == 0 ? 0 : unroutedColumnSum / unrouted):F3}";
+            return string.Create(CultureInfo.InvariantCulture,
+                $"[EzPressLatency] n={sampleCount} overwritten={Overwritten} routed={routed} judged={judged} "
+                + $"catchingUp={catchingUp} multiPassFrames={multiPass} maxPressesInFrame={maxPressesInFrame} "
+                + $"PreColumn avg/max={preSum / n:F3}/{preMax:F3} "
+                + $"Column avg/max={columnSum / n:F3}/{columnMax:F3} "
+                + $"Total avg/max={totalSum / n:F3}/{totalMax:F3} "
+                + $"FrameAge avg/max={frameAgeSum / n:F3}/{frameAgeMax:F3} "
+                + $"Column(routed) avg={(routed == 0 ? 0 : routedColumnSum / routed):F3} "
+                + $"Column(unrouted) avg={(unrouted == 0 ? 0 : unroutedColumnSum / unrouted):F3}");
         }
     }
 }
