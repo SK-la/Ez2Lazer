@@ -112,49 +112,62 @@ namespace osu.Game.Rulesets.UI
 
             // [Ez] 把一轮 update 切成「时钟推进」「drawable 子树」「其余」三段，供帧探针归因。
             // 子树是 FSC 之下的整个 ruleset 层级（播放区、物件、判定线），HUD 与框架调度在它之外。
+            // 探针关闭时每个计时调用都被跳过，热路径只剩下面对这两个局部 bool 的分支。
+            bool sampling = EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Sampling;
+            bool samplingAlloc = EzOsuGame.Diagnostics.EzFrameStallDiagnostics.SamplingAlloc;
+
             double clockTicks = 0;
             double subtreeTicks = 0;
             bool ranSubtree = false;
-            long allocBefore = DeepAlloc ? GC.GetAllocatedBytesForCurrentThread() : 0;
+            long allocBefore = samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() : 0;
             long subtreeAlloc = 0;
 
             do
             {
                 iterations++;
 
-                long beforeClock = Stopwatch.GetTimestamp();
+                long beforeClock = sampling ? Stopwatch.GetTimestamp() : 0;
 
                 // update clock is always trying to approach the aim time.
                 // it should be provided as the original value each loop.
                 updateClock();
 
-                clockTicks += Stopwatch.GetTimestamp() - beforeClock;
+                if (sampling)
+                    clockTicks += Stopwatch.GetTimestamp() - beforeClock;
 
                 if (state == PlaybackState.NotValid)
                     break;
 
-                long beforeSubtree = Stopwatch.GetTimestamp();
-                long allocAtSubtreeStart = DeepAlloc ? GC.GetAllocatedBytesForCurrentThread() : 0;
+                long beforeSubtree = sampling ? Stopwatch.GetTimestamp() : 0;
+                long allocAtSubtreeStart = samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() : 0;
 
                 base.UpdateSubTree();
                 UpdateSubTreeMasking();
 
                 ranSubtree = true;
-                subtreeTicks += Stopwatch.GetTimestamp() - beforeSubtree;
 
-                if (DeepAlloc)
-                    subtreeAlloc += GC.GetAllocatedBytesForCurrentThread() - allocAtSubtreeStart;
+                if (sampling)
+                {
+                    subtreeTicks += Stopwatch.GetTimestamp() - beforeSubtree;
+
+                    if (samplingAlloc)
+                        subtreeAlloc += GC.GetAllocatedBytesForCurrentThread() - allocAtSubtreeStart;
+                }
             } while (state == PlaybackState.RequiresCatchUp && stopwatch.ElapsedMilliseconds < max_catchup_milliseconds);
 
             // [Ez] Catch-up loop count of this pass, read by the press-latency probe.
+            // 只是一次 int 存储（约 0.3ns），且按键探针可以独立于帧探针开启，所以不随 sampling 闸门。
             EzLastUpdateIterations = iterations;
 
-            double tickToMs = 1000.0 / Stopwatch.Frequency;
-            subtreeProbeMs = subtreeTicks * tickToMs;
-            clockProbeMs = clockTicks * tickToMs;
-            subtreeProbeAllocBytes = subtreeAlloc;
-            loopAllocProbeBytes = DeepAlloc ? GC.GetAllocatedBytesForCurrentThread() - allocBefore : 0;
-            probeFrameValid = ranSubtree;
+            if (sampling)
+            {
+                double tickToMs = 1000.0 / Stopwatch.Frequency;
+                subtreeProbeMs = subtreeTicks * tickToMs;
+                clockProbeMs = clockTicks * tickToMs;
+                subtreeProbeAllocBytes = subtreeAlloc;
+                loopAllocProbeBytes = samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() - allocBefore : 0;
+                probeFrameValid = ranSubtree;
+            }
 
             // [Ez] Frame boundary for the frame-stall probe. Must stay at the same position in every
             // pass, otherwise the delta between two calls is not a whole frame.
@@ -184,9 +197,6 @@ namespace osu.Game.Rulesets.UI
         private static long subtreeProbeAllocBytes;
         private static long loopAllocProbeBytes;
         private static bool probeFrameValid;
-
-        /// <summary>[Ez] 分配读数只在 Deep 模式开启，light 模式下这里必须为 false，否则每帧两次 GC 查询会污染帧长。</summary>
-        private static bool DeepAlloc => EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Deep && EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Enabled;
 
         /// <summary>
         /// [Ez] Number of subtree passes performed by the last <see cref="UpdateSubTree"/> call.

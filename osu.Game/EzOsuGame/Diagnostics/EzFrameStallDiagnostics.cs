@@ -58,6 +58,15 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// </summary>
         public static bool Deep { get; set; } = true;
 
+        /// <summary>
+        /// 帧采样是否开启。热路径（<c>FrameStabilityContainer.UpdateSubTree</c>）只在它上面分一个可预测的分支，
+        /// 关闭时一次 <c>Stopwatch</c> / GC 查询都不发。
+        /// </summary>
+        public static bool Sampling => Enabled;
+
+        /// <summary>是否连分配量一起采样。关闭时跳过每帧两次 <c>GC.GetAllocatedBytesForCurrentThread</c>。</summary>
+        public static bool SamplingAlloc => Enabled && Deep;
+
         private const int bucket_count = 1024;
 
         /// <summary>
