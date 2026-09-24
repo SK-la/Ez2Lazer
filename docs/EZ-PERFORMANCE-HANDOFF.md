@@ -12,6 +12,10 @@
 整段「带内信号」原本就是开局加载帧的余振 —— 去掉首尾各 3 s 后 `ElapsedMs` 的带内 RMS 从 **3.294 ms 掉到 0.026 ms**。
 ⇒ 下一步不是继续优化，也不是继续在同一批探针上找周期，而是**换一个能观测「体感不流畅」的量**（见 §3.5）。
 
+**同一次捕获还顺带定案了一件更基础的事**：驱动 note 位置的音频源时钟是**精确 10.000 ms 的阶梯**
+（4 局判定 CSV 全部落在该网格上，最大残差 22 µs，见 §2.1）。三个探针都在 **~10 Hz（100 ms）** 采样，
+所以这个 **100 Hz** 结构**在设计上就测不到** —— §3 找不到周期是**带了找错**，不是效应本身弱。
+
 ## 1. 已定案（不要再重开）
 
 | 结论 | 依据 |
@@ -39,7 +43,15 @@
   （`Drift` 全部 `ACF r ≤ 0.20`）。不据此推翻结论，只登记「引用值不可复算」。
 - **2026-09-24 晚的 38.7 s 全帧局仍未测出周期**（详见 §3.4 结果），且揭示了这批探针上两个会让「周期」凭空出现的陷阱：
   开局加载帧主导方差、以及带通后独立样本数太少导致的高偶然相关。**在下结论前必须先看这两个读数是否合格。**
-- 已知的可信信号：`BassSource − GameTime` 峰峰 **9.8–9.9 ms**（`Drift` 是同一信号反号；实测两者恰差常数 15.000 ms）。是音频时钟抖动还是缓冲量化，未定。
+- 已知的可信信号：`BassSource − GameTime` 峰峰 **9.8–9.9 ms**（`Drift` 是同一信号反号；实测两者恰差常数 15.000 ms）。
+  **2026-09-24 晚定案：这是音频缓冲量化，不是随机抖动。**
+  - 4 局判定 CSV 里 `BassSource` 的 331–353 个取值 **100% 落在 10.000 ms 网格上**，最大残差 **22 µs**；
+    同一批 `GameTime` 完全无此结构（各 bin 均匀）⇒ 只有音频源被量化。
+  - 机制：实机走 `NAudioWasapiOutput`（BASS 解码 mixer + NAudio WASAPI 拉流），`DEFAULT_NAUDIO_LATENCY_MS = 10`；
+    `TrackBass.CurrentTime` 取 `BassMix.ChannelGetPosition`，而解码 mixer 的位置**只在 NAudio 拉走一个 buffer 时前进**
+    ⇒ 每次正好 10.000 ms。
+  - 于是 `BassSource` 是 100 Hz 阶梯，`GameTime`（== `InterpClock`，插值时钟）连续，两者之差就是 `Drift`。
+  - **三个探针都按 ~10 Hz 采样 ⇒ 100 Hz 结构被混叠掉。** 这是 §2.1 开头「现象未被测下来」的结构性原因。
 
 ### 2.2 >5 ms 卡顿的三类成因（`framestall_*.csv` 三列可分辨）
 
@@ -116,8 +128,21 @@
 1. **note 位置量化**（§2.4.6 已埋的伏笔）：`ScrollingHitObjectContainer` 用 FSC 的 `framedClock` 采样音频时钟
    ⇒ 下落位置按 update 帧量化。**帧间隔抖动即下落抖动**，而帧间隔由限帧器 sleep 决定 ——
    这可能是「不顺滑」的真实来源，但它不是周期性的，而是**每个帧边界一次**。量它需要记录「每帧取了哪个时刻的音频时钟」的差值分布，而不是帧时长。
-2. **音频侧**：`BassSource − GameTime` 峰峰 9.8–9.9 ms 是现有唯一稳定的可信波动。9.8 ms ≈ 一个音频缓冲周期，
-   若体感与它同步，则应去查 BASS 缓冲 / 设备周期设置，而不是游戏逻辑。
+2. **音频时钟量化（本次已实测定位，方向 1 的量它其实来自这里）**：驱动 note 位置的音频源时钟是
+   **精确 10.000 ms 阶梯**（证据 §2.1）。探针都在 ~10 Hz 采样，100 Hz 结构被混叠，**设计上不可见** ——
+   这是 §3 三次空结果的结构性原因，也说明此前把「音频侧」当作待查项是找错了对象（不是 BASS 缓冲设置，是 NAudio 拉流粒度）。
+   用本次 1988 fps 的真实帧间隔离线仿真（`InterpolatingFramedClock` 逐帧逻辑 + `DriftRecoveryHalfLife = 50`）：
+   - `Drift` 峰峰仿真 **11.7 ms** vs 实测 9.8–19.2 ms ⇒ **机制确认**；
+   - 每帧推进速率 std **4%**、**28% 的帧偏离额定速度 >5%**；换成理想连续源则降到 **0.36% / 0%**；
+   - 但相对理想匀速的**位置**偏差只有 std 0.11 ms / 峰峰 **2.8 ms**（速率抖动在一个 10 ms 窗内零均值抵消）。
+   - 1988 fps 下每个台阶跨 **~24 帧** ⇒ 高帧率把这个纹波采样得更清楚，而 60 fps 下它低于 Nyquist。
+   ⚠ 仿真是理想化（台阶严格每 10 ms 落一次）；实机拉流时刻由音频线程调度，且实测 `Drift` 已超过仿真值。
+   **要判定「位置偏差 ~1.4 ms 是否就是体感来源」，必须加每帧时钟探针**：在
+   `FrameStabilityContainer.UpdateSubTree` 的 `RecordFrame()` 同一处记录 `gcc.BassSourceCurrentTime` /
+   `gcc.InterpolatedDrift`（`DrawableHitObject` 已有同样的取法），1988 Hz 采样足以 1 ms 分辨率还原阶梯与纹波。
+   修复方向（**待确认，尚未改代码**）：
+   ① 缩小量子（更小缓冲 / IAudioClient3 更小 period）；② 重调插值 —— 用 50 ms 半衰期的指数逼近去追 10 ms
+   阶梯，本身就会注入 100 Hz 纹波，改成锁相 / 线性外推可消掉；③ 只把音频时钟当**速率**源，位置由与之锁定的平滑时钟驱动。
 3. **换主观锚点**：让用户标出「不顺滑」的具体时刻（录屏 / 秒表 / 按键），再把探针时间轴对上去。
    三次测量都没测到，说明「约 2 s / 4 s」这个描述本身可能不准。
 
@@ -131,6 +156,8 @@
 | 探针接线 + 环境变量 | `osu.Game/Screens/Play/Player.cs`（约 344–368 行） |
 | 子树 / 时钟 / 其余 归因 | `osu.Game/Rulesets/UI/FrameStabilityContainer.cs`（`UpdateSubTree`） |
 | 分析脚本 | `AnalyzeFrameStall.ps1`、`AnalyzePressLatency.ps1` |
+| 音频输出路径（BASS mixer + NAudio WASAPI 拉流） | `osu-framework/osu.Framework/Audio/Wasapi/NAudioWasapiOutput.cs`；缓冲常量在 `Audio/AudioOutputDefaults.cs`（`DEFAULT_NAUDIO_LATENCY_MS = 10`） |
+| 音频源时钟 / 插值 | `osu-framework/osu.Framework/Audio/Track/TrackBass.cs`（`ChannelGetPosition`）、`osu-framework/osu.Framework/Timing/InterpolatingFramedClock.cs` |
 | 周期 / 跨探针相位分析 | `AnalyzePeriod.py`（numpy；`--plot` 出图、`--trim 3,3` 去首尾过渡段） |
 | 活文档 | `docs/EZ-PERFORMANCE.md` §2.4（周期性部分见 §2.4.10） |
 
