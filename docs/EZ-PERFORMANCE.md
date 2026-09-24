@@ -146,6 +146,45 @@
 
 在该条件下 `PreColumnMs` 才是体感延迟的主要成分（它 = 输入线程递送 + 等下一帧），此时该优化的是**帧节奏与输入递送时机**，不是判定代码。
 
+#### 2.4.6 帧数上限与「下落不顺滑」同源（2026-09-24 追加，推翻 2.4.5 的取舍前提）
+
+需求变更为 **不降帧、继续提帧，同时解决下落不顺**。据此重新读同一份数据，得到三条与 §2.4 不冲突但更重要的结论。
+
+**一、没有任何限速器在起作用，1968 fps 就是纯工作量上限。**
+
+`Unlimited` 实际被夹到 8000 Hz（`FrameSyncExtensions.applyLimit` 末行 `Math.Min(8000, limiter)`），而 `ThrottledFrameClock.throttle()` 只在工作量 < 1/8000 s 时才 sleep。实测 0.450 ms/帧 ⇒ `excessFrameTime` 为负 ⇒ `sleepAndUpdateCurrent` 直接返回 0，**一次都没睡过**。
+
+| 项 | 值 | 推论 |
+|----|----|------|
+| 目标 | 8000 Hz（0.125 ms/帧） | 上限高于实得，不构成约束 |
+| 实得 | 1968 帧/s（0.450 ms/帧 p50） | 每轮 update+draw 的实际耗时 |
+| mania 判定 | ~10–16 µs/帧（§2.3 bench） | **占每帧不到 3%** |
+
+⇒ 提帧只能靠砍每帧工作量，改任何设置都无效。同时也说明 §2.4 关心的判定热路径在这 450 µs 里根本不是大头。
+
+**二、每帧持续分配 ~2 KB，与 20–60 ms 的卡顿鼓包吻合。**
+
+`alloc(updateThread)` 388 MB / 98.6 s = **3.9 MB/s**，÷1968 帧 = **~2 KB/帧**（持续量，非突发）；gen0 **24.4 次/s** = 每 41 ms 一次，单次暂停 ~0.77 ms ⇒ **1.9% 的时间在 gen0 停顿里**。这同时解释两件事：帧数被压低，以及卡顿间隔分布的主鼓包落在 20–60 ms。
+
+**三、note 位置按 update 帧量化，所以帧间隔抖动 = 下落抖动。**
+
+`ScrollingHitObjectContainer.UpdateAfterChildrenLife` 每帧执行一次 `updatePosition(obj, Time.Current)`；`Time` 是 FSC 暴露的 `framedClock`，其 `manualClock.CurrentTime` 每轮 update 采样一次音频时钟（`applyFrameStability` 仅在偏差 > 20 ms 时夹取，正常帧不生效）。
+
+⇒ 呈现出来的下落位置 = 音频时钟在**若干个离散 update 时刻**的采样值。帧间隔抖动直接变成下落位置的跳变，幅度 = 抖动 × 下落速度。**提帧数之所以能改善顺滑，正是因为它在缩短这个量化步长**——两个目标是同一个目标。
+
+框架里已有 `InterpolatingFramedClock`，但它 (a) 只用于背景/故事板/Intro，未用于 gameplay；(b) `CurrentTime` 同样只在 `ProcessFrame()` 内更新，因此换成它也解决不了「呈现时刻采样」。故这条路不通，不必再试。
+
+**新增探针**：`frameSplit` 行把一轮 update 切成三段并给出子树内分配 ——
+
+| 段 | 含义 |
+|----|------|
+| `subtreeMsMean` | `base.UpdateSubTree()` 全程 = FSC 之下的 drawable 层级（播放区 / 物件 / 判定线） |
+| `clockMsMean` | `updateClock()` = 音频时钟采样 + `ReplayInput` + 子帧校正 |
+| `restMsMean` | 帧长减去上两者 = HUD / 框架调度 / 掩码 |
+| `subtreeAllocMean` / `loopAllocMean` | 子树内、FSC 全程的每帧分配字节 |
+
+这一行决定下一步往哪优化：子树占比高就改 mania 的 drawable 层级，占比低就去查 HUD 与框架。分析脚本 `AnalyzeFrameStall.ps1` 已有对应章节。
+
 ---
 
 ## 3. 2026-08-08 音频后端排查记录
@@ -273,3 +312,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-23 | §2.2/§2.3：局内判定与 HUD 热路径去分配（**HITPOS-CACHE** / **JUDGE-NO-CLOSURE** / **POLICY-SCRATCH** / **FORCEMISS-SNAPSHOT**），并记录 3 项「评估后不做」（samples 数组缓存、transform 序列复用、`moveMarker` 手写插值）与 lane controller 索引维护「实测不改」结论 |
 | 2026-09-24 | §2.2：**MARKER-EASE-FIX**——`EzHUDHitTimingColumns` 的判定标记恢复为真正的缓动（去掉把缓动变成空变换的直接赋值），并补上 `MoveHeight` / `StopMovement` 与在途变换的两处交互；原「`moveMarker` 手写插值」候选按「保留框架缓动」结案，不再列为待办 |
 | 2026-09-24 | §2.4：**按键延迟实测**——新增按键分段 / 帧级 stall 探针与两个分析脚本。结论：`PreColumnMs` 是**等下一帧**（空按与真判定等待相同，且与 `FrameAgeMs` 强相关），不是代码开销；`ColumnMs`（按键自身 inline 工时）p50 0.101 ms；>8 ms 停顿只在开局/退出帧。登记埋点自身的两个误读坑（>阈值上做对比、`SincePrevFrameMs` 零点位置）与「输入队列整树重建 / lane controller 结构」两个不再重开的方向。该局跑在 ≈1968 更新帧/s，**不是高压场景**，故不能解释体感 4 ms；下一步给出复现条件清单 |
+| 2026-09-24 | §2.4.6：**提帧与顺滑同源**——`Unlimited` 被夹在 8000 Hz 而实得 1968 帧/s，`throttle()` 一次都没 sleep ⇒ 帧数上限就是每帧工作量（0.450 ms，其中判定 <3%）；每帧持续分配 ~2 KB ⇒ gen0 每 41 ms 一次、单次 ~0.77 ms，与卡顿间隔鼓包（20–60 ms）吻合；`ScrollingHitObjectContainer` 每帧用 FSC 的 `framedClock` 采样一次音频时钟 ⇒ **note 位置按 update 帧量化，帧间隔抖动即下落抖动**（`InterpolatingFramedClock` 不改 `ProcessFrame` 语义，此路不通）。新增 `frameSplit` 归因（子树 / 时钟 / 其余 + 子树内分配），据此决定优化方向 |
