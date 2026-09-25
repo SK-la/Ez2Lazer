@@ -961,6 +961,82 @@ judgment `AudioLag` 序列（= `BassSource − GameTime`，与 `Drift` 去趋势
 按 `InputAudioLatencyTracker` 与启动 trace 的现状，它们的开关风格与本节纪律不同，是否一并收进来
 取决于是否值得为它们引入间接层（前者要改用户可见的既有设置项）。
 
+#### 2.4.21 链式延迟汇总：两条链的串联分段与**累计总值**（2026-09-25）
+
+前 20 条都在按环节拆，缺一个「合起来多少毫秒」。本节把两条链补齐，并把已在 CSV 里、但从未被引用的
+累计列 `TotalMs` 取出来。
+
+**两条链的起终点**（必须钉死，否则数不可比）：
+
+| 链 | 起点 | 终点 |
+|---|---|---|
+| A · 按键 → 判定 | `InputManager.EzSubFrameTimestamp`（输入事件被时间戳那一刻） | `Column.OnPressed` 返回（判定已 `ApplyResult` + 同步结果扇出完成） |
+| B · 按键 → 驱动音频 | 同上（`InputAudioLatencyTracker.RecordColumnPress` 就在 `OnPressed` 首行） | 输出路径 PCM 过阈值（`OutputHardwareTime` / acoustic `LatencyDifference`） |
+
+**物理按键 → 子帧时间戳**这一段**两链都没有量具**（`EzSubFrameTimestamp` 已是校正后的戳），下面所有数都不含它。
+
+**链路 A：串联分段 + 累计（仅真判定按键，n = 该局 judged 数）**
+
+| 局（帧率） | ① `PreColumnMs` p50<br>等帧+派发 | ② `ColumnMs` p50<br>列内全程 | **累计 `TotalMs` p50** | 累计 p90 / p99 | 独立探针 `InputToJudgeMs` p50 | 残差<br>Total − In→Judge |
+|---|---|---|---|---|---|---|
+| 233115（2381 fps） | 0.650 | 0.121 | **0.857** | 1.969 / 2.667 | 0.631 | 0.226 |
+| 222233（1089 fps） | 0.981 | 0.116 | **1.247** | 2.366 / 3.291 | 0.935 | 0.312 |
+| 080438（2320 fps） | 0.426 | 0.152 | **0.583** | 0.929 / 1.289 | 0.427 | 0.156 |
+| 084436（2478 fps） | 0.572 | 0.107 | **0.798** | 1.598 / 3.438 | 0.565 | 0.233 |
+| 092213（2410 fps） | 0.543 | 0.110 | **0.724** | 1.534 / 2.261 | 0.536 | 0.188 |
+| 101112（2165 fps） | 0.525 | 0.124 | **0.736** | 1.829 / 3.349 | 0.532 | 0.204 |
+
+`TotalMs` = `PreColumnMs + ColumnMs`，**CSV 里本来就有这一列**（`EzPressLatencyDiagnostics` 的 `PressSample.TotalMs`），
+只是此前一直只引用两段。三点可直接读出：
+
+1. **稳态累计 p50 = 0.58–0.80 ms**（1000 fps 配置 1.25 ms）；两段中 `PreColumnMs` 占 70–88%。
+2. **残差 0.16–0.31 ms 有机制解释，不是测量噪声**：`InputToJudgeMs` 的终点在 `handleHit` 内，
+   `TotalMs` 的终点在 `OnPressed` 返回 ⇒ 差值 = 「判定已落地 → 同步结果扇出结束」。
+   代入即闭合：`PreColumnMs + ColumnMs − 残差 ≈ InputToJudgeMs`（080438：0.426+0.152−0.156 = 0.422 vs 0.427）。
+3. **空按（本列无可判目标）累计 p50 = 0.50–1.28 ms**，其中 `ColumnMs` p50 仅 **0.009–0.019 ms**
+   ⇒ 按键延迟的等待部分与「有没有东西可判」无关，再次证 §2.4.2 的等帧结论。
+
+**链路 B：串联分段（键音 → 出声）**
+
+| 环节 | 量具 | 已记录值 |
+|---|---|---|
+| B0 入列 | `InputAudioLatencyTracker.RecordColumnPress`（`OnPressed` 首行） | 与链路 A 同一起点 |
+| B1 触发入队 | `Column.OnPressed` 调 `sampleTriggerSource.Play()`；`EzGameplaySampleTriggerSource.PlaySamples` 把真正播放包在 `Schedule` 里 | 含在链路 A 的 `ColumnMs`（p50 0.107–0.152 ms）内，本步只是入队 |
+| B2 真正 `Sample.Play` | 下一帧 `Schedule` 排空 = 按键帧切分的 `afterPressMean` | 0.341–0.633 ms（含该帧其余工作，非纯键音） |
+| B3 输出缓冲 / 引擎周期 | `wasapiRead.gapsMs` / `clockQuant.audioStep` / `interpErr.offset` / 音频日志 `actualLatency` | **10.25 ms**（p50，p99 20.25）/ 10.05 ms 量子占 5.8–6.4% 帧 / offset **9.97–10.37 ms** / 授予 **10 ms**（480 帧 @48 kHz，`lowLatency=true`） |
+| **B4 端到端累计** | `EzLatencyStatistics.AvgInputToPlayback`（通知 / `ez_runtime` 日志打印） | **本仓无记录值**：该追踪器不产 CSV，需开 `Ez2Setting.InputAudioLatencyTracker` 跑一局才有 |
+
+按键 → `Sample.Play` ≈ 链路 A 累计 + 按键帧剩余（`afterPressMean`）≈ **1.0–1.6 ms**；
+再加输出缓冲 ≈ **11 ms 量级**，其中 10.25 ms 是**设备授予的恒定周期**（请求值不是瓶颈），
+且被音频偏移在线吸收（`EzSubFrameCorrection` / 判定 `TimeOffset`），不影响判定同步，只影响「听见自己键音」。
+
+**并联支路：同时发生、但不可加进上面任何一条链**
+
+| 支路 | 量 | 值 | 为何不可加 |
+|---|---|---|---|
+| 帧陈旧度 | `FrameAgeMs` p50 | 0.92–1.00（真判定）/ 1.02–1.32（空按） | 探针文档已明确「不是延迟的组成部分」；见下方登记 |
+| 按键帧切分 | `sincePrevFrameMean` / `pressColumnMean` / `afterPressMean` | 0.87–1.08 / 0.18–0.25 / 0.34–0.43（和 = 按键帧长 1.41–1.71） | 量的是「按键落在的那一帧花在哪」，与按键自身延迟并行 |
+| 按键帧 vs 非按键帧 | p50 | 1.25–1.35 vs **0.450** | 因果在帧不在 `OnPressed`（`ColumnMs` 只占按键帧 6–16%） |
+| 视觉支路 | `drawPeriod` p50 / `presentAge` p50 | 0.51–0.57 / 0.87（vsync 关）/ **14.91**（175 Hz borderless） | draw/present 与 update 是两条独立链；175 Hz 下 `presentAge` ≈ 一个刷新周期 |
+
+**新登记的两条读数纪律**
+
+1. **`FrameAgeMs` 的零点不在本帧起点。** 逐按键核算 `FrameAgeMs / FrameElapsed`：比值 p50 = **1.5–2.3**
+   （早期局 9.4），且 75–96% 的按键 `FrameAgeMs > FrameElapsed`。健康读数应在 0–1（按键随机落在帧内）。
+   ⇒ 它只能当**同向观测量**（比大小的相对指标），不能当「本帧已过去多少毫秒」，更不能加进链路。
+   与 §2.4.3 第 3 条（`currentFrameStartTimestamp` 曾滞后一整帧）同源，待用每帧时钟探针复核。
+2. **跨局不可混算。** 各局条件不同（`Limit4x` 倍率、vsync、音频输出模式），p99 / max 只在局内成立；
+   把两段的 p99 相加得不到任何东西。
+
+**唯一一次「按键 → 判定」中位 4 ms 的局（线索，不作结论）**
+
+`20260924_211244`（34.1 s、56576 帧、`stallFrames` 2084）两个**独立**探针给出一致的 4 ms 中位：
+`TotalMs` p50 **4.936** / `InputToJudgeMs` p50 **3.683**。同一局的帧级探针显示原因不在列内：
+`withPress` 帧长 p50 **8.05 ms**（`noPress` 0.450 ms、`over2 = 326/326`），而 `pressColumnMean` 只有 **0.881 ms**
+⇒ 该局 7 ms 停在「载有按键的那一帧被拉长」上，`OnPressed` 本身只占 1/9。
+**但**该局 `FrameAge/FrameElapsed` 比值 p50 = 9.4（详见上条纪律 1），且处于埋点零点缺陷修复之前，
+`FscIter` 全为 1、`inputQueue=21` ⇒ **只作重测线索，不可当稳态结论**。要复现必须重新采集。
+
 ---
 
 ## 3. 2026-08-08 音频后端排查记录
@@ -1104,3 +1180,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-25 | §2.4.19：**删掉 6 个等价列**——判据是「同一行里能被另一个参数精确算出」（恒等或差一个可复原常数），「只是没人读」不算理由。删除：judgment `InterpClock`（≡ `GameTime`，源码里同一属性连读两次）、judgment `BassSource`（≡ `GameTime − Drift − 15.000`，8 局残差 ≤ 0.002）、frame `SubtreeAllocBytes`（≡ `LoopAllocBytes`，373,188 帧逐帧全等，成因是 `updateClock()` 从不分配）、frame `Gen2Delta`（恒 0）、press `Gen2`（增量恒 0）、press `CatchingUp`（恒 0，且被更一般的 `FscIter>1` 完全覆盖）；`AnalyzePeriod.py` 的 `AudioLag` 序列随之删除。**明确保留**：`Gen1`/`FscIter`（有信号）、`PressesInFrame`（内存缓冲算出的值比 CSV 反推更准）、judgment `FrameElapsed` vs frame `ElapsedMs`（时钟增量 vs 墙钟，非同一测量）。顺带修正 `AnalyzePressLatency.ps1` 读错列名（`FscIterations` → `FscIter`）导致的「多遍子树」分桶从未命中。⚠ 旧 CSV / 旧 summary 与新脚本不兼容，`AnalyzeFrameStall.ps1` 的 `frameSplit` 正则已收紧 |
 | 2026-09-25 | §2.4.20：**探针套件收口（不动测量口径）**——启动闸门仍是 ini 总开关 `EzJudgmentDiagEnabled`（只决定启动时整套诊断是否工作）；**跑哪些内容由环境变量 `EZ_DIAG_PROBES` 选择**（`judgment`/`press`/`frame`/`hotpath`/`trace`/`all`，空 = 全部，解析失败即启动失败）。曾把内容选择做成五个 `EzDiagProbe*` 持久化开关 + UI 复选框，**已撤掉**（设置面板不该变实验台）。**采集边界归位**：判定的漂移 / `InputToJudgeMs` / `<0 or >1000 ⇒ NaN` 从 `DrawableHitObject.UpdateResult` 移入 `EzJudgmentDiagnostics.Capture`（调用点只剩一行）；`Column.recordPressLatency` 的 `PreColumnMs` / `ColumnMs` / `FrameAgeMs` 与单位换算移入新文件 `ManiaPressProbe`（放 Mania 侧，因需列号 / 车道计数）；`FrameStabilityContainer` 的 5 个探针静态量撤掉，改为每轮 `ReportLoop` 一次回报（归因闸门 `FrameLoopAttribution = 帧探针 \|\| 按键探针`）。落盘与局生命周期分别收进 `EzProbeOutput` / `EzDiagnosticSession`。**顺带修掉 `hotpath` 子项在 Release 下失效**：`ManiaJudgeHotPathTrace` 的清零与读数出口原先关在 `#if DEBUG` 里，而埋点不在 ⇒ 子项打开后计数器只增不出、还白付 `Interlocked.Increment`；现改由子项闸门控制。**CSV 一列未改**，§2.4.19 之后的数据仍可跨条对比；未覆盖项（音频闭环追踪器、启动 trace、分析聚合计数、子帧校正开关）逐条列在该节末尾 |
 | 2026-09-25 | §2.4.8 七：**补上 Draw 线程成本结构（dotTrace Timeline）**——此前只在会话交接单里留了一行。`CDXGISwapChain::Present` 占 `DrawFrame` **78%** / 全窗口 **25%**，每次 ≈ **0.27 ms 其中 0.25 ms 在 AMD 驱动内** ⇒ **恒定税 × 次数**（2000 fps 下 ≈495 ms/s，降帧率直接减半，故提帧有收益上限）；`GameHost.UpdateFrame` 占 30%，而其中 FSC `UpdateSubTree` 只占 **5%**。并在 §2.4.12 标注「驱动内 Present 成本」与「进程外 DWM / 扫描输出」是同一条 swap chain 的两端、量法不同。另作废「桌宠 `EzPetCubismMeshView` 是局内分配热点」（纯局内窗口不出现，与 `DesktopPetShowOnGameplay = False` 一致） |
+| 2026-09-25 | §2.4.21：**链式延迟汇总，补齐累计总值**——此前 20 条只按环节拆，缺「合起来多少毫秒」。取出**一直在 CSV 里、从未被引用的累计列 `TotalMs`**（`EzPressLatencyDiagnostics.PressSample.TotalMs` = `PreColumnMs + ColumnMs`）：稳态四局「按键 → 判定」p50 **0.583 / 0.798 / 0.724 / 0.736 ms**（1000 fps 配置局 1.247 ms），其中 `PreColumnMs` 占 70–88%；空按累计 p50 0.50–1.28 ms、`ColumnMs` 仅 0.009–0.019 ms。**两个独立探针闭合**：`TotalMs`（终点 `OnPressed` 返回）与判定探针 `InputToJudgeMs`（终点 `handleHit` 内）差 **0.16–0.31 ms**，正是「判定落地 → 同步结果扇出结束」，代入 `PreColumnMs + ColumnMs − 残差 ≈ InputToJudgeMs` 成立。按键 → `Sample.Play` ≈ **1.0–1.6 ms**（键音由 `EzGameplaySampleTriggerSource.PlaySamples` 的 `Schedule` 放到下一帧，落在 `afterPressMean` 0.34–0.63 ms 内），再加**设备授予的 10 ms 输出缓冲**（`wasapiRead` p50 10.25 / `interpErr.offset` 9.97–10.37）≈ **11 ms 量级**，该项被音频偏移在线吸收，不影响判定同步。**两条新登记纪律**：① `FrameAgeMs / FrameElapsed` 比值 p50 = **1.5–2.3**、75–96% 的按键 `FrameAgeMs > FrameElapsed`（健康应为 0–1）⇒ 它的零点不在本帧起点，只能作同向观测量，不得加进链路；② 跨局不可混算 p99 / max。**登记一条重测线索**：`20260924_211244`（34.1 s、56576 帧）是唯一一次「按键 → 判定」中位达 4 ms 的局（`TotalMs` p50 **4.936** 与 `InputToJudgeMs` p50 **3.683** 两个独立探针一致），帧级探针显示 `withPress` 帧长 p50 **8.05 ms**（`noPress` 0.450）而 `pressColumnMean` 仅 0.881 ⇒ 7 ms 停在「按键帧被拉长」而非 `OnPressed`；但该局处于埋点零点缺陷修复前、`FscIter` 全 1、`inputQueue=21` ⇒ 只作线索不作结论 |
