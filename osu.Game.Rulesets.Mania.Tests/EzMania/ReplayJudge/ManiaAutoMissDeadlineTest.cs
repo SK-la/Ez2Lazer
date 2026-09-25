@@ -35,6 +35,39 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 Is.EqualTo(note.StartTime + windows.WindowFor(HitResult.Miss, false)));
         }
 
+        [TestCase(EzEnumHitMode.Lazer)]
+        [TestCase(EzEnumHitMode.Classic)]
+        [TestCase(EzEnumHitMode.O2Jam)]
+        public void HoldTailIsJudgedLaterThanItsQueueDeadline(EzEnumHitMode hitMode)
+        {
+            var tail = new TailNote
+            {
+                StartTime = 2000,
+                HitWindows = new ManiaHitWindows(hitMode),
+            };
+            tail.HitWindows.SetDifficulty(8);
+
+            var drawable = new DrawableHoldNoteTail();
+            drawable.Apply(tail);
+
+            var windows = (ManiaHitWindows)tail.HitWindows;
+
+            // 列级队列在 EndTime + MissLateWindow 就认为尾判到期，但那只是「开始每帧轮询」。
+            // DrawableHoldNoteTail.CheckForResult 会把 offset 除以 RELEASE_WINDOW_LENIENCE，
+            // 所以真正落判要等到 EndTime + 1.5×miss —— 比队列到期时刻更晚。
+            double queueDeadline = ManiaLaneController.GetAutoMissEvaluationTime(drawable);
+
+            Assert.That(queueDeadline, Is.EqualTo(tail.StartTime + windows.WindowFor(HitResult.Miss, false)));
+
+            double actualJudgementTime = tail.StartTime + tail.MaximumJudgementOffset;
+
+            Assert.That(
+                actualJudgementTime,
+                Is.GreaterThan(queueDeadline),
+                "尾判实际落判晚于队列到期；因此 HasCompleted 的时钟条件也必须活到 MaximumJudgementOffset，"
+                + "而不是只活到 GetLastObjectTime() + 固定常量。");
+        }
+
         [Test]
         public void FutureDeadlineIsNotVisited()
         {
