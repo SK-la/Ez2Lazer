@@ -1450,23 +1450,8 @@ namespace osu.Game.Screens.Play
             StartGameplay();
             OnGameplayStarted?.Invoke();
 
-            // [Ez] Clear any stale diagnostic samples from a previous play.
-            if (EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled)
-            {
-                EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Clear();
-                EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Clear();
-                EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Clear();
-
-                // 帧汇总里的 wasapiRead 行靠它：只有诊断打开时才采，平时这条热路径上只有一个 bool 判断。
-                Framework.Audio.Wasapi.WasapiReadStats.Reset();
-                Framework.Audio.Wasapi.WasapiReadStats.Enabled = true;
-            }
-
-            if (EzOsuGame.Diagnostics.EzTimingTrace.Enabled)
-            {
-                EzOsuGame.Diagnostics.EzTimingTrace.Clear();
-                EzOsuGame.Diagnostics.EzTimingTrace.Record("GameplayStarted", $"beatmap={Beatmap.Value?.BeatmapInfo?.ToString() ?? "?"}");
-            }
+            // [Ez] 探针名单与落盘时机都归 EzDiagnosticSession；这里只交代本局的开场事实。
+            EzOsuGame.Diagnostics.EzDiagnosticSession.Begin($"beatmap={Beatmap.Value?.BeatmapInfo?.ToString() ?? "?"}");
         }
 
         /// <summary>
@@ -1518,33 +1503,9 @@ namespace osu.Game.Screens.Play
                     ScoreProcessor.FailScore(Score.ScoreInfo);
             }
 
-            // [Ez] Flush judgment diagnostics data to CSV on gameplay exit.
-            // Perform flush asynchronously to avoid blocking the UI/update thread
-            // in case disk IO is slow (antivirus, network drives, etc.).
-            if (EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled)
-            {
-                _ = Task.Run(() =>
-                {
-                    EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Flush();
-                    EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Clear();
-                    EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Flush();
-                    EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Clear();
-                    EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Flush();
-                    Framework.Audio.Wasapi.WasapiReadStats.Enabled = false;
-                    EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Clear();
-                });
-            }
-
-            // [Ez] Flush timing trace events to CSV on gameplay exit.
-            if (EzOsuGame.Diagnostics.EzTimingTrace.Enabled)
-            {
-                EzOsuGame.Diagnostics.EzTimingTrace.Record("GameplayExited", $"hasPassed={GameplayState.HasPassed} hasFailed={GameplayState.HasFailed} hasQuit={GameplayState.HasQuit}");
-                _ = Task.Run(() =>
-                {
-                    EzOsuGame.Diagnostics.EzTimingTrace.Flush();
-                    EzOsuGame.Diagnostics.EzTimingTrace.Clear();
-                });
-            }
+            // [Ez] 局末落盘。时序追踪的结束事件与整段落盘都在 EzDiagnosticSession 里。
+            EzOsuGame.Diagnostics.EzDiagnosticSession.End(
+                $"hasPassed={GameplayState.HasPassed} hasFailed={GameplayState.HasFailed} hasQuit={GameplayState.HasQuit}");
 
             // GameplayClockContainer performs seeks / start / stop operations on the beatmap's track.
             // as we are no longer the current screen, we cannot guarantee the track is still usable.
