@@ -390,12 +390,90 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
+        /// <summary>
+        /// O2 尾窗内提前松手（尾前 50ms，120BPM 下仍在 Cool 窗内）：局内语义为尾命中 + Body IgnoreHit。
+        /// </summary>
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateO2HoldReleaseInsideTailWindow()
+        {
+            const double head = 1500;
+            const double tail = 4000;
+            const double release_inside_window = tail - 50;
+
+            var ruleset = new ManiaRuleset();
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                },
+                ControlPointInfo = createTiming120(),
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var replay = new Replay
+            {
+                Frames = new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(release_inside_window),
+                },
+            };
+
+            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+            return (createScore(ruleset, replay), beatmap, environment);
+        }
+
+        /// <summary>
+        /// O2 变 BPM：按下在 60BPM 段、尾落在 120BPM 段，且松手晚 100ms。
+        /// 局内尾判用按下时刻的 BPM，故 100ms 仍在 Cool 窗（7500/60=125ms）；
+        /// 若改用松手时刻的 BPM（120BPM）则只会是 Good（Cool 窗 62.5ms）。
+        /// </summary>
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateO2HoldVariableBpmPressTimeWindow()
+        {
+            const double head = 1500;
+            const double tail = 4000;
+            const double late_release = tail + 100;
+
+            var ruleset = new ManiaRuleset();
+
+            var controlPoints = new ControlPointInfo();
+            controlPoints.Add(0, new TimingControlPoint { BeatLength = 1000 });
+            controlPoints.Add(3000, new TimingControlPoint { BeatLength = 500 });
+
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                },
+                ControlPointInfo = controlPoints,
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var replay = new Replay
+            {
+                Frames = new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(late_release),
+                },
+            };
+
+            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+            return (createScore(ruleset, replay), beatmap, environment);
+        }
+
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateO2HoldEarlyRelease()
         {
             const double head = 1500;
             const double tail = 4000;
             const double early_release = 2500;
-
             var ruleset = new ManiaRuleset();
             var beatmap = new TestBeatmap(ruleset.RulesetInfo)
             {

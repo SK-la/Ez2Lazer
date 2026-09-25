@@ -118,7 +118,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 if (!perColumnDict.TryGetValue(input.Column, out var laneStates))
                     continue;
 
-                if (judgementRound.IsO2Jam)
+                // 局内只在按下时刷新 press-time BPM（Column.OnPressed）；松手沿用按下那一刻的值，
+                // 尾判取的是同一份 BPM。
+                if (judgementRound.IsO2Jam && input.IsPress)
                     judgementRound.NotifyO2InputAt(input.Time);
 
                 hitWindowHelper.BPM = resolveSimulationBpm(beatmap, input.Time, environment.ManiaHitMode);
@@ -179,7 +181,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 bool headHit = target is TailNote tailNote && headByTail.TryGetValue(tailNote, out var linkedHead)
                                                            && headWasHit.TryGetValue(linkedHead, out bool wasHit) && wasHit;
 
-                if (!input.IsPress && isTail && headHit && wasHoldingBeforeEvent && rawOffset < 0)
+                // O2 尾判必须与局内同源（OnReleased 先判尾、后写 Body）：提前置 HoldBroken 会让 EvaluateTailJudge
+                // 直接拒绝这一投，尾被推迟到收尾补 Miss 并连带 Body ComboBreak，凭空多出 miss。
+                if (!judgementRound.IsO2Jam && !input.IsPress && isTail && headHit && wasHoldingBeforeEvent && rawOffset < 0)
                     selected.HoldBroken = true;
 
                 if (input.IsPress && target is HeadNote headNote && holdByHead.TryGetValue(headNote, out var hold))
