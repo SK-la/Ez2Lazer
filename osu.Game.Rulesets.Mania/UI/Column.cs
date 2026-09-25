@@ -483,7 +483,8 @@ namespace osu.Game.Rulesets.Mania.UI
             // 首次命中的一次性成本（JIT / 惰性初始化 / 键音通道建立 / 池首次取用）只发生在本局前几次按键上，
             // 所以只在这几次按键上多取几个时间戳，之后不再进入该分支。
             bool breakdown = probe && EzPressLatencyDiagnostics.BreakdownActive;
-            bool routesInput = drawableRuleset?.ColumnRoutesInput == true;
+            // 只在采集时才读本列的路由开关：关闭探针时这一行短路，生产路径仍按原样在下面自行判断。
+            bool routesInput = breakdown && drawableRuleset?.ColumnRoutesInput == true;
             int entriesBefore = breakdown ? LaneController.Entries.Count : 0;
             long bookkeepingTs = pressEnterTs;
             long routeTs = pressEnterTs;
