@@ -174,5 +174,10 @@ namespace osu.Game.Screens.Play.HUD
         }
 
         public void AddAtStart(PlayerSettingsGroup drawable) => content.Insert(-1, drawable);
+
+        /// <summary>
+        /// Appends a settings group to the bottom of the sidebar.
+        /// </summary>
+        public void AddAtEnd(PlayerSettingsGroup drawable) => content.Add(drawable);
     }
 }

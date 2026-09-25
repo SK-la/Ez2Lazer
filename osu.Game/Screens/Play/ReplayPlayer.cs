@@ -12,6 +12,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Screens.Play;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
@@ -107,6 +108,14 @@ namespace osu.Game.Screens.Play
                 playbackSettings.UserPlaybackRate.BindTo(master.UserPlaybackRate);
 
             ReplayOverlay.Settings.AddAtStart(playbackSettings);
+
+            // [Ez] Replay/autoplay playback cannot be paused, so the pause-screen force-results button is unreachable.
+            // Expose the same hold-to-confirm action at the bottom of the sidebar so a replay that never settles can
+            // still be forced through to results.
+            ReplayOverlay.Settings.AddAtEnd(new EzForceResultsSettingsGroup
+            {
+                Action = () => ForceCompleteGameplayAndProgressToResults(GameplayClockContainer.CurrentTime < GameplayState.Beatmap.GetLastObjectTime()),
+            });
 
             OsuTextFlowContainer message = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Style.Body) { AutoSizeAxes = Axes.Both };
             message.AddText("Watching ");
