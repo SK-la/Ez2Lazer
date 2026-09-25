@@ -95,11 +95,11 @@ namespace osu.Game.Rulesets.Mania.Tests
         /// LN 尾之后明显迟松手（松手落在 release lenience 之外）：Drawable 与 Session 必须一致。
         /// </summary>
         /// <remarks>
-        /// 当前失败（Drawable 侧 "wait for completion" 超时）：局内该尾永不被判，HasCompleted 恒为 false；
-        /// Session 侧则把同一尾补成 Miss。两者是同一根因的两个反向症状。
+        /// 局内与 Session 的尾判结果一致（都为 Miss）；当前唯一差异是 <c>HoldNoteBody</c> 的
+        /// <c>TimeOffset</c>（局内取真实 0，Session 取 -1000 哨兵值）。
         /// </remarks>
         [Test]
-        [Ignore("待修：局内 tail 不进列级 auto-miss 队列 → 无窗口内松手边沿时永不被判（无法结算）；Session 侧补成 Miss")]
+        [Ignore("待修：Body TimeOffset 哨兵不一致（drawable=0.00 / session=-1000.00）；尾判本身已一致")]
         public void TestLazerHoldTailReleasedOutsideWindowDrawableMatchesSession()
         {
             parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
@@ -128,7 +128,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         /// 整局按住 LN 不松手（回放结束时仍按住）：Drawable 与 Session 必须一致。
         /// </summary>
         [Test]
-        [Ignore("待修：同 TestLazerHoldTailReleasedOutsideWindowDrawableMatchesSession（局内尾永不被判，Session 补 Miss）")]
+        [Ignore("待修：Body TimeOffset 哨兵不一致（同 TestLazerHoldTailReleasedOutsideWindowDrawableMatchesSession）")]
         public void TestLazerHoldTailNeverReleasedDrawableMatchesSession()
         {
             parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
