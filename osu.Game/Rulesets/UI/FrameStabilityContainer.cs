@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Timing;
+using osu.Game.EzOsuGame.Diagnostics;
 using osu.Game.Input.Handlers;
 using osu.Game.Screens.Play;
 
@@ -112,9 +113,10 @@ namespace osu.Game.Rulesets.UI
 
             // [Ez] 把一轮 update 切成「时钟推进」「drawable 子树」「其余」三段，供帧探针归因。
             // 子树是 FSC 之下的整个 ruleset 层级（播放区、物件、判定线），HUD 与框架调度在它之外。
-            // 探针关闭时每个计时调用都被跳过，热路径只剩下面对这两个局部 bool 的分支。
-            bool sampling = EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Sampling;
-            bool samplingAlloc = EzOsuGame.Diagnostics.EzFrameStallDiagnostics.SamplingAlloc;
+            // 探针关闭时每个计时调用都被跳过，热路径只剩下面对这几个局部 bool 的分支。
+            bool sampling = EzFrameStallDiagnostics.Sampling;
+            bool samplingAlloc = EzFrameStallDiagnostics.SamplingAlloc;
+            bool attribution = EzDiagnosticSwitches.FrameLoopAttribution;
 
             double clockTicks = 0;
             double subtreeTicks = 0;
@@ -148,17 +150,18 @@ namespace osu.Game.Rulesets.UI
                     subtreeTicks += Stopwatch.GetTimestamp() - beforeSubtree;
             } while (state == PlaybackState.RequiresCatchUp && stopwatch.ElapsedMilliseconds < max_catchup_milliseconds);
 
-            // [Ez] Catch-up loop count of this pass, read by the press-latency probe.
-            // 只是一次 int 存储（约 0.3ns），且按键探针可以独立于帧探针开启，所以不随 sampling 闸门。
-            EzLastUpdateIterations = iterations;
-
-            if (sampling)
+            // [Ez] Catch-up loop count of this pass + 每轮归因（子树/时钟耗时、分配量），一次回报给帧探针。
+            // 趟数按键探针也要，所以归因闸门是「帧探针或按键探针任一开启」；两者都关时只剩一次静态 bool 分支。
+            if (attribution)
             {
                 double tickToMs = 1000.0 / Stopwatch.Frequency;
-                subtreeProbeMs = subtreeTicks * tickToMs;
-                clockProbeMs = clockTicks * tickToMs;
-                loopAllocProbeBytes = samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() - allocBefore : 0;
-                probeFrameValid = ranSubtree;
+
+                EzFrameStallDiagnostics.ReportLoop(
+                    sampling ? subtreeTicks * tickToMs : 0,
+                    sampling ? clockTicks * tickToMs : 0,
+                    samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() - allocBefore : 0,
+                    ranSubtree,
+                    iterations);
             }
 
             // [Ez] Frame boundary for the frame-stall probe. Must stay at the same position in every
@@ -176,34 +179,10 @@ namespace osu.Game.Rulesets.UI
 
             // 探针关闭时连这次调用都不发生：热路径上只剩上面那次局部 bool 读取与这个分支。
             if (sampling)
-                EzOsuGame.Diagnostics.EzFrameStallDiagnostics.RecordFrame(audioSrcMs, interpMs);
+                EzFrameStallDiagnostics.RecordFrame(audioSrcMs, interpMs);
 
             return true;
         }
-
-        /// <summary>[Ez] 上一轮 FSC 子树（<c>base.UpdateSubTree</c>）耗时；探针用，不参与游戏逻辑。</summary>
-        public static double SubtreeProbeMs => subtreeProbeMs;
-
-        /// <summary>[Ez] 上一轮 <see cref="UpdateSubTree"/> 全程（时钟 + 子树 + masking）的分配字节数；仅 Deep 模式有值。</summary>
-        public static long LoopAllocProbeBytes => loopAllocProbeBytes;
-
-        /// <summary>[Ez] 上一轮 <see cref="updateClock"/> 累计耗时（catch-up 时为多次之和）。</summary>
-        public static double ClockProbeMs => clockProbeMs;
-
-        /// <summary>[Ez] 上一轮是否真的跑了子树。暂停时 <see cref="updateClock"/> 提前返回、子树不跑，
-        /// 这种帧的耗时不能算进归因均值，否则会把子树占比拉低。</summary>
-        public static bool ProbeFrameValid => probeFrameValid;
-
-        private static double subtreeProbeMs;
-        private static double clockProbeMs;
-        private static long loopAllocProbeBytes;
-        private static bool probeFrameValid;
-
-        /// <summary>
-        /// [Ez] Number of subtree passes performed by the last <see cref="UpdateSubTree"/> call.
-        /// Values above 1 mean the pass was a catch-up. Probe only; never read for gameplay logic.
-        /// </summary>
-        public static int EzLastUpdateIterations;
 
         private void updateClock()
         {

@@ -23,6 +23,12 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// </summary>
         public static bool JudgeHotPathTrace { get; private set; }
 
+        /// <summary>
+        /// FSC 每轮 <c>UpdateSubTree</c> 是否需要把归因数据（子树/时钟耗时、分配量、趟数）回报给帧探针。
+        /// 帧探针要归因与明细，按键探针要趟数，所以任一开启即需要；两者都关时 FSC 热路径上只剩一次静态 bool 分支。
+        /// </summary>
+        public static bool FrameLoopAttribution { get; private set; }
+
         /// <summary>读配置并下发到所有探针。只应在启动时调用一次。</summary>
         public static void Apply(Ez2ConfigManager config)
         {
@@ -33,6 +39,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
             EzFrameStallDiagnostics.SetEnabled(suite && config.Get<bool>(Ez2Setting.EzDiagProbeFrame));
             EzTimingTrace.SetEnabled(suite && config.Get<bool>(Ez2Setting.EzDiagProbeTimingTrace));
             JudgeHotPathTrace = suite && config.Get<bool>(Ez2Setting.EzDiagProbeJudgeHotPath);
+
+            FrameLoopAttribution = EzFrameStallDiagnostics.Enabled || EzPressLatencyDiagnostics.Enabled;
 
             applyPressTuning();
             applyFrameTuning();

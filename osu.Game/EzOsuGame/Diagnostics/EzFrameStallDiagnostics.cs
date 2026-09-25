@@ -9,7 +9,6 @@ using System.Text;
 using System.Threading;
 using osu.Framework.Audio.Wasapi;
 using osu.Framework.Platform;
-using osu.Game.Rulesets.UI;
 
 namespace osu.Game.EzOsuGame.Diagnostics
 {
@@ -74,6 +73,46 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         /// <summary>是否连分配量一起采样。关闭时跳过每帧两次 <c>GC.GetAllocatedBytesForCurrentThread</c>。</summary>
         public static bool SamplingAlloc => Enabled && Deep;
+
+        // 「FSC 子树 vs 其余」归因：FrameStabilityContainer 在每轮 UpdateSubTree 末尾回报一次，
+        // 本探针在随后同帧的 RecordFrame 里读。
+        private static double subtreeMs;
+        private static double clockMs;
+        private static long loopAllocBytes;
+        private static bool frameValid;
+        private static int lastUpdateIterations;
+
+        /// <summary>[Ez] 上一轮 FSC 子树（<c>base.UpdateSubTree</c>）耗时；供帧探针与按键探针读，不参与游戏逻辑。</summary>
+        public static double SubtreeMs => subtreeMs;
+
+        /// <summary>[Ez] 上一轮 <c>FrameStabilityContainer.updateClock</c> 累计耗时（catch-up 时为多次之和）。</summary>
+        public static double ClockMs => clockMs;
+
+        /// <summary>[Ez] 上一轮 FSC 全程（时钟 + 子树 + masking）的分配字节数；仅 Deep 模式有值。</summary>
+        public static long LoopAllocBytes => loopAllocBytes;
+
+        /// <summary>[Ez] 上一轮是否真的跑了子树。暂停时 <c>updateClock</c> 提前返回、子树不跑，
+        /// 这种帧的耗时不能算进归因均值，否则会把子树占比拉低。</summary>
+        public static bool FrameValid => frameValid;
+
+        /// <summary>
+        /// [Ez] 上一轮 FSC <c>UpdateSubTree</c> 的子树趟数；大于 1 表示 catch-up。
+        /// 帧探针写明细、按键探针记按键落在第几趟，都只读不改。不参与游戏逻辑。
+        /// </summary>
+        public static int LastUpdateIterations => lastUpdateIterations;
+
+        /// <summary>
+        /// FSC 每轮 <c>UpdateSubTree</c> 末尾的归因回报（耗时/分配/趟数）。
+        /// 参数里的耗时在帧采样关闭时为 0；趟数与 <paramref name="ranSubtree"/> 任何时候都有效，因为按键探针独立于帧探针。
+        /// </summary>
+        internal static void ReportLoop(double subtree, double clock, long allocBytes, bool ranSubtree, int iterations)
+        {
+            subtreeMs = subtree;
+            clockMs = clock;
+            loopAllocBytes = allocBytes;
+            frameValid = ranSubtree;
+            lastUpdateIterations = iterations;
+        }
 
         private const int bucket_count = 1024;
 
@@ -420,11 +459,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 processAllocatedTotal += processAllocated - lastProcessAllocated;
 
                 // 暂停帧没有子树，算进来会把子树占比拉低。
-                if (FrameStabilityContainer.ProbeFrameValid)
+                if (frameValid)
                 {
-                    subtreeMsTotal += FrameStabilityContainer.SubtreeProbeMs;
-                    clockMsTotal += FrameStabilityContainer.ClockProbeMs;
-                    loopAllocTotal += FrameStabilityContainer.LoopAllocProbeBytes;
+                    subtreeMsTotal += subtreeMs;
+                    clockMsTotal += clockMs;
+                    loopAllocTotal += loopAllocBytes;
                     // 帧长必须用同一批帧，否则子树占比的分子分母不同源。
                     elapsedProbeTotalMs += elapsedMs;
                     probeFrames++;
@@ -447,11 +486,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     pressesInFrame,
                     pressColumnMsInFrame,
                     pressesInFrame > 0 && sincePrevFrameMinMs != double.MaxValue ? sincePrevFrameMinMs : double.NaN,
-                    FrameStabilityContainer.EzLastUpdateIterations,
+                    lastUpdateIterations,
                     gen0 - lastGen0,
                     gen1 - lastGen1,
-                    FrameStabilityContainer.SubtreeProbeMs,
-                    FrameStabilityContainer.LoopAllocProbeBytes,
+                    subtreeMs,
+                    loopAllocBytes,
                     audioSrcMs,
                     interpMs);
 

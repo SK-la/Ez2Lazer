@@ -19,7 +19,6 @@ using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Diagnostics;
-using osu.Game.EzOsuGame.Timing;
 using osu.Game.Rulesets.Mania.EzMania.Audio;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
@@ -525,60 +524,26 @@ namespace osu.Game.Rulesets.Mania.UI
             }
 
             if (probe)
-                recordPressLatency(pressEnterTs, time, routed, judged);
+            {
+                ManiaPressProbe.Capture(this, pressEnterTs, time, routed, judged, pressForceMissScan);
+                reportInputQueueCountOnce();
+            }
 
             return false;
         }
 
         /// <summary>
-        /// 写一条按键延迟样本：<c>PreColumnMs</c>（事件入队→本列入口）、<c>ColumnMs</c>（本列全程）、
-        /// <c>FrameAgeMs</c>（处理时当前游戏帧有多旧）。空按同样采样，因为它不经过任何 <c>UpdateResult</c>。
+        /// 探针只在本列首次按键时读一次非位置输入队列长度，交给帧级 stall 探针做基线；
+        /// 读它会触发一次全树重建，所以不能每次按键都做。取不到输入管理器时记 -1。
         /// </summary>
-        private void recordPressLatency(long pressEnterTs, double gameTime, bool routed, bool judged)
+        private void reportInputQueueCountOnce()
         {
-            long now = Stopwatch.GetTimestamp();
-            double tickToMs = 1000.0 / Stopwatch.Frequency;
+            if (inputQueueCountReported)
+                return;
 
-            long keyTs = InputManager.EzSubFrameTimestamp;
-            long frameTs = EzSubFrameCorrection.LastUpdateTimestamp;
-            long frameId = EzSubFrameCorrection.UpdateCount;
-
-            double preColumnMs = keyTs > 0 ? (pressEnterTs - keyTs) * tickToMs : double.NaN;
-            double columnMs = (now - pressEnterTs) * tickToMs;
-            double frameAgeMs = frameTs > 0 ? (pressEnterTs - frameTs) * tickToMs : double.NaN;
-
-            // 本帧处理的按键数、它们在本列花掉的总时长、以及首个按键进入本列的帧内偏移，
-            // 供帧级 stall 探针把一次按键帧切成「帧起→本列 / 本列工时 / 本列之后」三段。
-            EzFrameStallDiagnostics.NotifyPress(pressEnterTs, columnMs);
-
-            if (!inputQueueCountReported)
-            {
-                inputQueueCountReported = true;
-                var containingInputManager = GetContainingInputManager();
-                EzFrameStallDiagnostics.ReportInputQueueCount(containingInputManager == null ? -1 : containingInputManager.NonPositionalInputQueue.Count);
-            }
-
-            EzPressLatencyDiagnostics.Record(new EzPressLatencyDiagnostics.PressSample(
-                EzProbeOutput.WallClockMs,
-                gameTime,
-                double.IsNaN(preColumnMs) ? double.NaN : preColumnMs + columnMs,
-                preColumnMs,
-                columnMs,
-                frameAgeMs,
-                Index,
-                frameId,
-                EzPressLatencyDiagnostics.BeginPress(frameId),
-                routed,
-                judged,
-                LaneController.Entries.Count,
-                pressForceMissScan,
-                Clock.ElapsedFrameTime,
-                FrameStabilityContainer.EzLastUpdateIterations,
-                GC.CollectionCount(0),
-                GC.CollectionCount(1),
-                GC.GetTotalPauseDuration().TotalMilliseconds,
-                ManiaLaneController.EarliestCacheHits,
-                ManiaLaneController.EarliestCacheMisses));
+            inputQueueCountReported = true;
+            var containingInputManager = GetContainingInputManager();
+            EzFrameStallDiagnostics.ReportInputQueueCount(containingInputManager == null ? -1 : containingInputManager.NonPositionalInputQueue.Count);
         }
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
