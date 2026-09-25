@@ -306,6 +306,24 @@ B 组 `pressSplit` 的 `sincePrevFrameMean = 1.542 ms`，而帧间隔只有 **1.
 - 继续降到 500 fps 收益会收敛：≥5 ms 卡顿次数是帧率无关地板，而中位延迟还要再 +1 ms，**不推荐**。
 - 剩余真实杠杆只有两个、且都与帧率无关：**GC**（见 §2.4.9：它 62–69% 的暂停时间集中在慢帧里，故不能只看 2.5% 墙钟）与那个 **≈0.55 ms 输入地板**。
 
+##### 七、Draw 线程的成本结构：`Present` 是「恒定税 × 次数」（dotTrace Timeline，2026-09-24）
+
+Rider dotTrace 附到 `Ez2osu!.exe`，Timeline 模式，窗口 17–60 s（91,094 ms running）：
+
+| 项 | 占 `DrawFrame` | 占全窗口 |
+|---|---|---|
+| `CDXGISwapChain::Present` | **78%** | **25%** |
+| ├ `amdxx64.dll` `RotateResourceIdentities` | — | 13% |
+| └ `amdxx64.dll` `PresentImpl` | — | 12% |
+| `CompositeDrawable.Draw` / `VertexManager.Draw` | — | ~3% |
+| `WindowsNativeSleep.Sleep`（节流 sleep） | — | 19% |
+| `GameHost.UpdateFrame` 整个更新帧 | — | 30% |
+| └ 其中 **FSC `UpdateSubTree`（mania 规则集全部）** | — | **仅 5%** |
+
+- 按帧摊算（1979 fps ⇒ 86k 帧）：**每次 `Present` ≈ 0.27 ms，其中 0.25 ms 在 AMD 驱动内部**。这是本档帧率下的**固定成本 × 次数** —— 2000 fps 时约 `0.25 ms × 1979 ≈ 495 ms/s`，几乎吃满一个线程；降到 1000 fps 直接减半。⇒ **提帧有收益上限**，且「帧率高但下落不顺」不是被游戏逻辑卡住的（与本条 §二 的帧间隔规整度、§六 的操作点选择互为印证）。
+- **与「送屏 / 扫描输出」是同一条 swap chain 的两端，但量法不同**：驱动内这 0.25 ms 在进程内、可由 profiler 直接量清；`Present` 返回之后的 DWM 组合与扫描输出在进程内量不到，只能实机 A/B（见 §2.4.12 的「不覆盖的部分」与交接单 §3.5 第 6 项）。
+- ⚠ 口径说明：该 profile 的 91 s 窗口含进出图与选歌过渡，桌宠 `EzPetCubismMeshView` 在其中一度占分配 14%；在**纯局内**窗口（25–55 s）它完全不出现，与 `DesktopPetShowOnGameplay = False` 一致。⇒ 早期草稿里「桌宠是局内分配热点」的判断**作废**。
+
 ---
 
 #### 2.4.9 GC 归因：分辨「GC 造成卡顿」与「GC 恰好同帧」（2026-09-24，修正 §2.4.8 的表述）
@@ -564,6 +582,8 @@ requestedLatency=10ms, actualLatency=10ms, lowLatency=true
 
 `DrawFrame` 之后的 **DWM 组合 / 显示器扫描输出**在进程内量不到。若 `present` 行也干净，
 剩下的解释就只有 tearing（Borderless 下 `Renderer.AllowTearing = true`）/ 组合器节拍 / 主观锚定。
+它和 §2.4.8 七里驱动内的 `Present` 成本**是同一条 swap chain 的两端**：那一段在进程内、可用 profiler 量清（0.25 ms/帧）；
+这一段在进程外，两者不要混为一谈。
 **到 2026-09-25 10:11 为止，present 之外的链路都已洗清，这一条成了剩下的唯一进程外环节 —— 判据是 A/B（开 vsync / 钉刷新整数倍），见 §2.4.17 与交接单 §3.5 第 6 项。**
 
 *判读口径*
@@ -1083,3 +1103,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-25 | §2.4.18：**诊断开关改为进程级**——三个判定侧探针 + 时序追踪原先每次进图从配置重读、且 `OrderedHitPolicyHelper` 各持一个 `Bindable<bool>`。改为**启动时读一次**（`OsuGameBase.applyDiagnosticSwitches`）落到四个静态 bool，调用点用局部量先判（`FrameStabilityContainer` 关闭时连 `RecordFrame` 调用都不发生），**改设置必须重启游戏**。理由：这类功能长期关闭，热路径上应当只有一个静态 bool 分支。⚠ 曾试过 `Ez2ConfigManager` 静态属性 + 环境变量 + 链式只读属性的写法，**热路径一分未省、只多了概念，已撤回**，不要重复 |
 | 2026-09-25 | §2.4.19：**删掉 6 个等价列**——判据是「同一行里能被另一个参数精确算出」（恒等或差一个可复原常数），「只是没人读」不算理由。删除：judgment `InterpClock`（≡ `GameTime`，源码里同一属性连读两次）、judgment `BassSource`（≡ `GameTime − Drift − 15.000`，8 局残差 ≤ 0.002）、frame `SubtreeAllocBytes`（≡ `LoopAllocBytes`，373,188 帧逐帧全等，成因是 `updateClock()` 从不分配）、frame `Gen2Delta`（恒 0）、press `Gen2`（增量恒 0）、press `CatchingUp`（恒 0，且被更一般的 `FscIter>1` 完全覆盖）；`AnalyzePeriod.py` 的 `AudioLag` 序列随之删除。**明确保留**：`Gen1`/`FscIter`（有信号）、`PressesInFrame`（内存缓冲算出的值比 CSV 反推更准）、judgment `FrameElapsed` vs frame `ElapsedMs`（时钟增量 vs 墙钟，非同一测量）。顺带修正 `AnalyzePressLatency.ps1` 读错列名（`FscIterations` → `FscIter`）导致的「多遍子树」分桶从未命中。⚠ 旧 CSV / 旧 summary 与新脚本不兼容，`AnalyzeFrameStall.ps1` 的 `frameSplit` 正则已收紧 |
 | 2026-09-25 | §2.4.20：**探针套件收口（不动测量口径）**——启动闸门仍是 ini 总开关 `EzJudgmentDiagEnabled`（只决定启动时整套诊断是否工作）；**跑哪些内容由环境变量 `EZ_DIAG_PROBES` 选择**（`judgment`/`press`/`frame`/`hotpath`/`trace`/`all`，空 = 全部，解析失败即启动失败）。曾把内容选择做成五个 `EzDiagProbe*` 持久化开关 + UI 复选框，**已撤掉**（设置面板不该变实验台）。**采集边界归位**：判定的漂移 / `InputToJudgeMs` / `<0 or >1000 ⇒ NaN` 从 `DrawableHitObject.UpdateResult` 移入 `EzJudgmentDiagnostics.Capture`（调用点只剩一行）；`Column.recordPressLatency` 的 `PreColumnMs` / `ColumnMs` / `FrameAgeMs` 与单位换算移入新文件 `ManiaPressProbe`（放 Mania 侧，因需列号 / 车道计数）；`FrameStabilityContainer` 的 5 个探针静态量撤掉，改为每轮 `ReportLoop` 一次回报（归因闸门 `FrameLoopAttribution = 帧探针 \|\| 按键探针`）。落盘与局生命周期分别收进 `EzProbeOutput` / `EzDiagnosticSession`。**顺带修掉 `hotpath` 子项在 Release 下失效**：`ManiaJudgeHotPathTrace` 的清零与读数出口原先关在 `#if DEBUG` 里，而埋点不在 ⇒ 子项打开后计数器只增不出、还白付 `Interlocked.Increment`；现改由子项闸门控制。**CSV 一列未改**，§2.4.19 之后的数据仍可跨条对比；未覆盖项（音频闭环追踪器、启动 trace、分析聚合计数、子帧校正开关）逐条列在该节末尾 |
+| 2026-09-25 | §2.4.8 七：**补上 Draw 线程成本结构（dotTrace Timeline）**——此前只在会话交接单里留了一行。`CDXGISwapChain::Present` 占 `DrawFrame` **78%** / 全窗口 **25%**，每次 ≈ **0.27 ms 其中 0.25 ms 在 AMD 驱动内** ⇒ **恒定税 × 次数**（2000 fps 下 ≈495 ms/s，降帧率直接减半，故提帧有收益上限）；`GameHost.UpdateFrame` 占 30%，而其中 FSC `UpdateSubTree` 只占 **5%**。并在 §2.4.12 标注「驱动内 Present 成本」与「进程外 DWM / 扫描输出」是同一条 swap chain 的两端、量法不同。另作废「桌宠 `EzPetCubismMeshView` 是局内分配热点」（纯局内窗口不出现，与 `DesktopPetShowOnGameplay = False` 一致） |
