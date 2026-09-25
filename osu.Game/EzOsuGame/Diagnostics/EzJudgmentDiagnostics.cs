@@ -3,8 +3,13 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.UI;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.Diagnostics
 {
@@ -36,28 +41,46 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double InputToJudgeMs);
 
         /// <summary>
-        /// 记录一次判定的完整时序上下文。
+        /// 记录一次判定的完整时序上下文。派生量（插值漂移、按键 → 判定检查的 wall 耗时及其有效性）
+        /// 都在这里算完，调用点只声明「用户刚触发了一次判定」。
         /// </summary>
-        /// <param name="inputToJudgeMs">按键 → 本检查点的 wall 耗时（ms）；未知传 <see cref="double.NaN"/>。</param>
-        public static void Record(
-            double gameTime,
-            double noteStartTime,
-            double timeOffset,
-            double interpDrift,
-            double frameElapsed,
-            double inputToJudgeMs = double.NaN)
+        /// <param name="keyTs">触发本次判定的按键的 wall 戳（<see cref="Stopwatch.GetTimestamp"/> 基准）；无按键传 0。</param>
+        public static void Capture(DrawableHitObject hitObject, double timeOffset, long keyTs)
         {
             if (!Enabled) return;
             if (samples.Count >= max_samples) return;
 
+            // 插值漂移只有经由帧稳定时钟下的 gameplay 时钟才读得到；读不到就记 0（等价于「本帧没有漂移」）。
+            double interpDrift = 0;
+
+            if (hitObject.EzDrawableRuleset?.FrameStableClock is FrameStabilityContainer fsc
+                && fsc.ParentGameplayClock is GameplayClockContainer gcc)
+            {
+                interpDrift = gcc.InterpolatedDrift;
+            }
+
             samples.Enqueue(new JudgmentSample(
                 EzProbeOutput.WallClockMs,
-                gameTime,
-                noteStartTime,
+                hitObject.Time.Current,
+                hitObject.HitObject.GetEndTime(),
                 timeOffset,
                 interpDrift,
-                frameElapsed,
-                inputToJudgeMs));
+                hitObject.Clock.ElapsedFrameTime,
+                resolveInputToJudgeMs(keyTs)));
+        }
+
+        /// <summary>
+        /// 按键 wall 戳到本次判定检查的耗时（ms）；没有有效按键戳时为 <see cref="double.NaN"/>。
+        /// 超过 1s 的一律按陈旧戳 / 无关按键处理，同样记 NaN —— 这种值留在 CSV 里会把尾部分布整个拉开。
+        /// </summary>
+        private static double resolveInputToJudgeMs(long keyTs)
+        {
+            if (keyTs <= 0)
+                return double.NaN;
+
+            double ms = (Stopwatch.GetTimestamp() - keyTs) / (double)Stopwatch.Frequency * 1000.0;
+
+            return ms is < 0 or > 1000 ? double.NaN : ms;
         }
 
         /// <summary>
