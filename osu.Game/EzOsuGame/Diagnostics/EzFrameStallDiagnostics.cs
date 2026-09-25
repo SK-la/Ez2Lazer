@@ -53,7 +53,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         public static void SetEnabled(bool enabled) => Enabled = enabled;
 
         /// <summary>超过该时长的帧才留明细；直方图则覆盖所有帧。可用 <c>EZ_FRAME_PROBE_MS</c> 覆盖。</summary>
-        public static double ThresholdMs { get; set; } = 0;
+        public static double ThresholdMs { get; set; } = 0.5;
 
         /// <summary>
         /// 是否每帧读取 GC 计数与分配量。可用 <c>EZ_FRAME_PROBE_LIGHT=1</c> 关掉。
