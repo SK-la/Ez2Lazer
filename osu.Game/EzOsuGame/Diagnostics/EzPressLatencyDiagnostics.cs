@@ -3,12 +3,8 @@
 
 using System;
 using System.Globalization;
-using System.IO;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using osu.Framework.Logging;
-using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Diagnostics
 {
@@ -135,12 +131,12 @@ namespace osu.Game.EzOsuGame.Diagnostics
             {
                 var s = samples[(start + i) % capacity];
 
-                sb.Append(num(s.WallMs)).Append(',');
-                sb.Append(num(s.GameTime)).Append(',');
-                sb.Append(fmt(s.TotalMs)).Append(',');
-                sb.Append(fmt(s.PreColumnMs)).Append(',');
-                sb.Append(num(s.ColumnMs)).Append(',');
-                sb.Append(fmt(s.FrameAgeMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.WallMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.GameTime)).Append(',');
+                sb.Append(EzProbeOutput.CsvOrEmpty(s.TotalMs)).Append(',');
+                sb.Append(EzProbeOutput.CsvOrEmpty(s.PreColumnMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.ColumnMs)).Append(',');
+                sb.Append(EzProbeOutput.CsvOrEmpty(s.FrameAgeMs)).Append(',');
                 sb.Append(s.Column).Append(',');
                 sb.Append(s.FrameId).Append(',');
                 sb.Append(s.PressOrdinalInFrame).Append(',');
@@ -149,44 +145,23 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(s.Judged ? 1 : 0).Append(',');
                 sb.Append(s.Entries).Append(',');
                 sb.Append(s.ForceMissScan).Append(',');
-                sb.Append(num(s.FrameElapsed)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.FrameElapsed)).Append(',');
                 sb.Append(s.FscIterations).Append(',');
                 sb.Append(s.Gen0).Append(',');
                 sb.Append(s.Gen1).Append(',');
-                sb.Append(num(s.GcPauseMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.GcPauseMs)).Append(',');
                 sb.Append(s.CacheHits).Append(',');
                 sb.Append(s.CacheMisses);
                 sb.AppendLine();
             }
 
-            string dir = EzJudgmentDiagnostics.GetDiagnosticsDirectory();
-            string path = Path.Combine(dir, $"presslatency_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-
-            string summary = formatSummary(start, sampleCount, frameLengths);
-            string content = sb.ToString();
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
-                    Logger.Log($"[EzPressLatency] flushed {sampleCount} samples to {path}", Ez2ConfigManager.LOGGER_NAME);
-                    Logger.Log(summary, Ez2ConfigManager.LOGGER_NAME);
-                }
-                catch (Exception ex)
-                {
-                    try { Logger.Log($"[EzPressLatency] flush failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, level: LogLevel.Error); }
-                    catch { }
-                }
-            });
-
-            return path;
+            return EzProbeOutput.WriteAsync(
+                "presslatency",
+                sb.ToString(),
+                sampleCount,
+                "EzPressLatency",
+                formatSummary(start, sampleCount, frameLengths));
         }
-
-        /// <summary>CSV 一律用不变区域，避免逗号小数分隔符的地区写出畸形列。</summary>
-        private static string num(double value) => value.ToString("F3", CultureInfo.InvariantCulture);
-
-        private static string fmt(double value) => double.IsNaN(value) ? string.Empty : num(value);
 
         /// <summary>同一帧内处理的按键数（按 FrameId 连续段统计）。</summary>
         private static int[] computeFrameLengths(int start, int sampleCount)

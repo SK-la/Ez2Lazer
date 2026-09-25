@@ -5,14 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using osu.Framework.Audio.Wasapi;
-using osu.Framework.Logging;
 using osu.Framework.Platform;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.UI;
 
 namespace osu.Game.EzOsuGame.Diagnostics
@@ -351,7 +347,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 return;
 
             long now = Stopwatch.GetTimestamp();
-            double wallMs = EzJudgmentDiagnostics.WallClockMs;
+            double wallMs = EzProbeOutput.WallClockMs;
 
             long prev = lastFrameTimestamp;
             lastFrameTimestamp = now;
@@ -499,7 +495,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 {
                     if (double.IsFinite(lastAudioStepWallMs))
                     {
-                        double holdMs = EzJudgmentDiagnostics.WallClockMs - lastAudioStepWallMs;
+                        double holdMs = EzProbeOutput.WallClockMs - lastAudioStepWallMs;
 
                         if (holdMs > PULL_MISS_HOLD_MS && holdMs < PULL_MISS_MAX_MS)
                         {
@@ -508,7 +504,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                         }
                     }
 
-                    lastAudioStepWallMs = EzJudgmentDiagnostics.WallClockMs;
+                    lastAudioStepWallMs = EzProbeOutput.WallClockMs;
                 }
 
                 // 插值完全没走 = 时钟停走（歌曲结束 / 暂停），与「走得慢」是两回事，单独计数。
@@ -525,7 +521,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
                 if (interpMs != prevInterpMs && double.IsFinite(lastAudioStepWallMs))
                 {
-                    double age = EzJudgmentDiagnostics.WallClockMs - lastAudioStepWallMs;
+                    double age = EzProbeOutput.WallClockMs - lastAudioStepWallMs;
 
                     // age 只在一个缓冲周期内可信；超出说明中途有跳变没被采到（帧太长），丢弃以免污染。
                     if (age >= 0 && age <= 50)
@@ -677,56 +673,28 @@ namespace osu.Game.EzOsuGame.Diagnostics
             {
                 var s = snapshot[(start + i) % detail_capacity];
 
-                sb.Append(num(s.WallMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.WallMs)).Append(',');
                 sb.Append(s.FrameIndex).Append(',');
-                sb.Append(num(s.ElapsedMs)).Append(',');
-                sb.Append(num(s.GcPauseDeltaMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.ElapsedMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.GcPauseDeltaMs)).Append(',');
                 sb.Append(s.ThreadAllocDeltaBytes).Append(',');
                 sb.Append(s.PressesInFrame).Append(',');
-                sb.Append(num(s.PressColumnMs)).Append(',');
-                sb.Append(num(s.SincePrevFrameMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.PressColumnMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.SincePrevFrameMs)).Append(',');
                 sb.Append(s.FscIterations).Append(',');
                 sb.Append(s.Gen0Delta).Append(',');
                 sb.Append(s.Gen1Delta).Append(',');
-                sb.Append(num(s.SubtreeMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.SubtreeMs)).Append(',');
                 sb.Append(s.LoopAllocBytes).Append(',');
-                sb.Append(num(s.AudioSrcMs)).Append(',');
-                sb.Append(num(s.InterpMs));
+                sb.Append(EzProbeOutput.Csv(s.AudioSrcMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.InterpMs));
                 sb.AppendLine();
             }
 
-            string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            string dir = EzJudgmentDiagnostics.GetDiagnosticsDirectory();
-            string path = Path.Combine(dir, $"framestall_{stamp}.csv");
-
             // 全帧分布只存在于摘要里（CSV 按定义只有尾部），所以摘要必须和 CSV 一起落盘，
             // 不能只丢进日志——日志路径随运行方式变化，分析脚本没法可靠地找到它。
-            string summaryPath = Path.Combine(dir, $"framestall_{stamp}.summary.txt");
-
-            string summary = FormatSummary();
-            string content = sb.ToString();
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
-                    await File.WriteAllTextAsync(summaryPath, summary + Environment.NewLine).ConfigureAwait(false);
-                    Logger.Log($"[EzFrameStall] flushed {sampleCount} samples to {path}", Ez2ConfigManager.LOGGER_NAME);
-                    Logger.Log(summary, Ez2ConfigManager.LOGGER_NAME);
-                }
-                catch (Exception ex)
-                {
-                    try { Logger.Log($"[EzFrameStall] flush failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, level: LogLevel.Error); }
-                    catch { }
-                }
-            });
-
-            return path;
+            return EzProbeOutput.WriteAsync("framestall", sb.ToString(), sampleCount, "EzFrameStall", FormatSummary());
         }
-
-        /// <summary>CSV 一律用不变区域，避免逗号小数分隔符的地区写出畸形列。</summary>
-        private static string num(double value) => value.ToString("F3", CultureInfo.InvariantCulture);
 
         private static long sumBuckets(long[] buckets)
         {

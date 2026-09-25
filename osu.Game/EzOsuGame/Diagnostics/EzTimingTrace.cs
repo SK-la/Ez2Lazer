@@ -1,15 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.IO;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using osu.Framework.Logging;
-using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Diagnostics
 {
@@ -27,9 +21,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// <summary>采样上限，防止 OOM。</summary>
         private const int max_events = 10_000;
 
-        /// <summary>高精度计时器，提供微秒级别 wallclock。</summary>
-        private static readonly Stopwatch wallclock = Stopwatch.StartNew();
-
         public readonly record struct TraceEvent(
             double WallMs,
             string Tag,
@@ -46,14 +37,13 @@ namespace osu.Game.EzOsuGame.Diagnostics
             if (events.Count >= max_events) return;
 
             events.Enqueue(new TraceEvent(
-                wallclock.Elapsed.TotalMilliseconds,
+                EzProbeOutput.WallClockMs,
                 tag ?? string.Empty,
                 extra ?? string.Empty));
         }
 
         /// <summary>
         /// 将当前事件缓冲区写入 CSV 并清空，返回文件路径。
-        /// 在失败时记录日志并返回空字符串。
         /// </summary>
         public static string Flush()
         {
@@ -66,34 +56,12 @@ namespace osu.Game.EzOsuGame.Diagnostics
             while (events.TryDequeue(out var e))
             {
                 count++;
-                sb.Append(e.WallMs.ToString("F3")).Append(',');
-                sb.Append(csvEscape(e.Tag)).Append(',');
-                sb.AppendLine(csvEscape(e.Extra));
+                sb.Append(EzProbeOutput.Csv(e.WallMs)).Append(',');
+                sb.Append(EzProbeOutput.CsvEscape(e.Tag)).Append(',');
+                sb.AppendLine(EzProbeOutput.CsvEscape(e.Extra));
             }
 
-            string dir = getDiagnosticsDirectory();
-            string path = Path.Combine(dir, $"trace_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-
-            try
-            {
-                string content = sb.ToString();
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await File.WriteAllTextAsync(path, content, Encoding.UTF8).ConfigureAwait(false);
-                        Logger.Log($"[EzTimingTrace] flushed {count} events to {path}", Ez2ConfigManager.LOGGER_NAME);
-                    }
-                    catch (Exception ex)
-                    {
-                        try { Logger.Log($"[EzTimingTrace] flush failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, level: LogLevel.Error); }
-                        catch { }
-                    }
-                });
-            }
-            catch { }
-
-            return path;
+            return EzProbeOutput.WriteAsync("trace", sb.ToString(), count, "EzTimingTrace");
         }
 
         /// <summary>丢弃所有待处理事件。</summary>
@@ -101,48 +69,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
         {
             // Atomically replace the queue to avoid long-running dequeue loops on the caller thread.
             Interlocked.Exchange(ref events, new ConcurrentQueue<TraceEvent>());
-        }
-
-        private static string getDiagnosticsDirectory()
-        {
-            try
-            {
-                var di = new DirectoryInfo(AppContext.BaseDirectory);
-
-                for (int i = 0; i < 8 && di != null; i++, di = di.Parent)
-                {
-                    if (di.GetFiles("osu.sln").Length > 0 || di.GetDirectories(".git").Length > 0)
-                    {
-                        string d = Path.Combine(di.FullName, "diagnostics");
-                        Directory.CreateDirectory(d);
-                        return d;
-                    }
-                }
-            }
-            catch { }
-
-            try
-            {
-                string d = Path.Combine(Environment.CurrentDirectory, "diagnostics");
-                Directory.CreateDirectory(d);
-                return d;
-            }
-            catch { }
-
-            string fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "EzDiag");
-
-            try { Directory.CreateDirectory(fallback); }
-            catch { }
-
-            return fallback;
-        }
-
-        private static string csvEscape(string s)
-        {
-            if (s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r'))
-                return '"' + s.Replace("\"", "\"\"") + '"';
-
-            return s;
         }
     }
 }

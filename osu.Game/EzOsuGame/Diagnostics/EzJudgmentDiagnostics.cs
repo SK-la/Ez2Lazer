@@ -3,13 +3,8 @@
 
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.IO;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-using osu.Framework.Logging;
-using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Diagnostics
 {
@@ -28,12 +23,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         /// <summary>采样上限，防止 OOM。</summary>
         private const int max_samples = 8000;
-
-        /// <summary>高精度计时器，提供微秒级别 wallclock。</summary>
-        private static readonly Stopwatch wallclock = Stopwatch.StartNew();
-
-        /// <summary>与判定 CSV 同源的单调 wall 时钟（ms）；用于跨 CSV 对齐按键与判定样本。</summary>
-        public static double WallClockMs => wallclock.Elapsed.TotalMilliseconds;
 
         /// <summary>按键 wall 戳到本条判定检查的耗时（ms）；无有效按键戳时为 NaN。</summary>
         public readonly record struct JudgmentSample(
@@ -61,7 +50,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             if (samples.Count >= max_samples) return;
 
             samples.Enqueue(new JudgmentSample(
-                wallclock.Elapsed.TotalMilliseconds,
+                EzProbeOutput.WallClockMs,
                 gameTime,
                 noteStartTime,
                 timeOffset,
@@ -80,43 +69,23 @@ namespace osu.Game.EzOsuGame.Diagnostics
             // 后者恒等于 GameTime − Drift − 15.000。详见 docs/EZ-PERFORMANCE.md §2.4.19。
             sb.AppendLine("WallMs,GameTime,NoteStart,TimeOffset,Drift,FrameElapsed,InputToJudgeMs");
 
+            int sampleCount = 0;
+
             // Drain current queue snapshot into the CSV builder.
             while (samples.TryDequeue(out var s))
             {
-                sb.Append(s.WallMs.ToString("F3")).Append(',');
-                sb.Append(s.GameTime.ToString("F3")).Append(',');
-                sb.Append(s.NoteStartTime.ToString("F3")).Append(',');
-                sb.Append(s.TimeOffset.ToString("F3")).Append(',');
-                sb.Append(s.InterpolatedDrift.ToString("F3")).Append(',');
-                sb.Append(s.FrameElapsed.ToString("F3")).Append(',');
-                sb.Append(double.IsNaN(s.InputToJudgeMs) ? string.Empty : s.InputToJudgeMs.ToString("F3"));
+                sampleCount++;
+                sb.Append(EzProbeOutput.Csv(s.WallMs)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.GameTime)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.NoteStartTime)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.TimeOffset)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.InterpolatedDrift)).Append(',');
+                sb.Append(EzProbeOutput.Csv(s.FrameElapsed)).Append(',');
+                sb.Append(EzProbeOutput.CsvOrEmpty(s.InputToJudgeMs));
                 sb.AppendLine();
             }
 
-            string dir = GetDiagnosticsDirectory();
-            string path = Path.Combine(dir, $"judgment_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
-
-            // Perform actual disk IO on a background thread to avoid blocking callers.
-            try
-            {
-                string content = sb.ToString();
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
-                        Logger.Log($"[EzJudgmentDiag] flushed to {path}", Ez2ConfigManager.LOGGER_NAME);
-                    }
-                    catch (Exception ex)
-                    {
-                        try { Logger.Log($"[EzJudgmentDiag] flush failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, level: LogLevel.Error); }
-                        catch { }
-                    }
-                });
-            }
-            catch { }
-
-            return path;
+            return EzProbeOutput.WriteAsync("judgment", sb.ToString(), sampleCount, "EzJudgmentDiag");
         }
 
         /// <summary>
@@ -126,42 +95,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
         {
             // Atomically replace the queue to avoid long-running dequeue loops on the caller thread.
             Interlocked.Exchange(ref samples, new ConcurrentQueue<JudgmentSample>());
-        }
-
-        /// <summary>诊断 CSV 的输出目录（仓库内 <c>diagnostics/</c>，找不到仓库则退回桌面）。</summary>
-        internal static string GetDiagnosticsDirectory()
-        {
-            try
-            {
-                // Try to locate repository root by searching upwards for osu.sln or a .git folder.
-                var di = new DirectoryInfo(AppContext.BaseDirectory);
-
-                for (int i = 0; i < 8 && di != null; i++, di = di.Parent)
-                {
-                    if (di.GetFiles("osu.sln").Length > 0 || di.GetDirectories(".git").Length > 0)
-                    {
-                        string d = Path.Combine(di.FullName, "diagnostics");
-                        Directory.CreateDirectory(d);
-                        return d;
-                    }
-                }
-            }
-            catch { }
-
-            try
-            {
-                string d = Path.Combine(Environment.CurrentDirectory, "diagnostics");
-                Directory.CreateDirectory(d);
-                return d;
-            }
-            catch { }
-
-            string fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "EzDiag");
-
-            try { Directory.CreateDirectory(fallback); }
-            catch { }
-
-            return fallback;
         }
     }
 }

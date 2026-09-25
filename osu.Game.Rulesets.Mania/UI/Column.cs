@@ -559,7 +559,7 @@ namespace osu.Game.Rulesets.Mania.UI
             }
 
             EzPressLatencyDiagnostics.Record(new EzPressLatencyDiagnostics.PressSample(
-                EzJudgmentDiagnostics.WallClockMs,
+                EzProbeOutput.WallClockMs,
                 gameTime,
                 double.IsNaN(preColumnMs) ? double.NaN : preColumnMs + columnMs,
                 preColumnMs,
