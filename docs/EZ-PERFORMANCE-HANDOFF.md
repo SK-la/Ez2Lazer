@@ -23,6 +23,9 @@
 其实是抹平阶梯的**必然机制**（位置才是判据）。该指标已从摘要撤掉，换成 `interpErr`（位置误差）。
 ⇒ 更新线程侧的四条链（帧时间 / FSC 子树 / 按键延迟 / 音频时钟）**现在都测不出问题**，体感来源要往**更新线程之外**找（present / 帧节拍），或回到主观锚定（§3.5 第 3 项）。
 
+**2026-09-25 已把 present 侧量具加好（见 §3.5 第 4 项）**：下一局的全帧摘要里会多一行 `present`，
+给的就是「相邻两次 present 的间隔分布」与「上屏那一刻那份内容有多旧」。
+
 ## 1. 已定案（不要再重开）
 
 | 结论 | 依据 |
@@ -191,10 +194,22 @@
    （若将来另有证据指向音频，再回来考虑 ① 换设备/独占/ASIO ② 锁相或线性外推 ③ 只把音频钟当速率源。）
 3. **换主观锚点**：让用户标出「不顺滑」的具体时刻（录屏 / 秒表 / 按键），再把探针时间轴对上去。
    四次测量都没测到，说明「约 2 s / 4 s」这个描述本身可能不准。
-4. **present / 帧节拍**（更新线程之外，目前唯一没量过的环节）—— 四条 update 侧链路全部干净，所以优先查这个：
-   update 线程 1983 fps 平稳，但**呈现**只有显示器刷新率那么多次。需要量的是**相邻两次 present 的间隔分布**
-   （以及 present 用的时钟值是不是滞后的帧边界值）。量具在 draw 线程 / `Present` 侧，现有三探针都在 update 侧，**不覆盖**。
-   这也是 §1 已经知道的事实的延伸：`Present` 是 Draw 线程最大单项（含 AMD 驱动内 0.25 ms/帧）。
+4. **present / 帧节拍**（更新线程之外，唯一没量过的一环）—— **量具已加好（2026-09-25），待抓一局**：
+   update 线程 1983 fps 平稳，但**呈现**只有显示器刷新率那么多次，要量的是**相邻两次 present 的间隔分布**
+   与**上屏那一刻那份内容有多旧**。
+   - **做不到在 draw 线程打点**：这个 fork 里 `Game` 是 `Container` 而不是 `GameHost`，`osu.Game` 无法 override
+     `GameHost.DrawFrame`（它确实是 `protected virtual`，但不在继承链上）。
+   - 改为在 update 侧读 `DrawThread.Clock`：`ElapsedFrameTime` **就是**「相邻两次 present 的间隔」，
+     由 draw 线程自己的时钟测；`CurrentTime` 给出 draw 帧边界（与 update 时钟同源同频，标定一次原点即可）。
+     摘要新增 `present` 行：
+     - `drawPeriod` —— present 间隔分布。**看尾部**（`over0.5/1/2/5`、`max`、`std`）：update 侧帧长恒为 0.5 ms，
+       但 draw 线程单独卡一下 update 探针是看不见的，**那一下就是屏幕上直接的一次跳帧**。
+     - `presentAge` —— 上屏那一刻那份内容的年龄。**分辨率只到一个 update 帧长**（读不到被绘制的 buffer 帧号，
+       零点只能取「上一次 update 帧边界」），所以只用来判**毫秒级以上**的滞后，不用来判亚毫秒抖动。
+     - `clocks` —— 两线程自报的 `fps / jitter / slept / maxHz / throttling` + 窗口态 + 刷新率，
+       用来把「每个刷新显示几个 present」（`refresh / fps`）对上：不是整数就说明每刷新的帧数在抖动。
+   - ⚠ **不覆盖 DWM / 显示器扫描输出**。进程内量不到送屏之后的事；若 `present` 行也干净，
+     剩下的就只可能是 tearing（Borderless 下 `AllowTearing` 是开着的）/ 组合器 / 主观锚定，此时回第 3 项。
 
 ## 4. 代码锚点
 
@@ -205,6 +220,7 @@
 | 判定诊断 | `osu.Game/EzOsuGame/Diagnostics/EzJudgmentDiagnostics.cs` |
 | 探针接线 + 环境变量 | `osu.Game/Screens/Play/Player.cs`（约 344–368 行） |
 | 子树 / 时钟 / 其余 归因 | `osu.Game/Rulesets/UI/FrameStabilityContainer.cs`（`UpdateSubTree`） |
+| present / 帧节拍采样 | `EzFrameStallDiagnostics.samplePresent`（update 侧读 `DrawThread.Clock`）；host 由 `osu.Game/OsuGameBase.cs` 的 `SetHost` 挂上（**`DrawFrame` 无法 override，原因见 §3.5 第 4 项**） |
 | 分析脚本 | `AnalyzeFrameStall.ps1`、`AnalyzePressLatency.ps1` |
 | 音频输出路径（BASS mixer + NAudio WASAPI 拉流） | `osu-framework/osu.Framework/Audio/Wasapi/NAudioWasapiOutput.cs`；缓冲常量在 `Audio/AudioOutputDefaults.cs`（`DEFAULT_NAUDIO_LATENCY_MS = 10`） |
 | 音频源时钟 / 插值 | `osu-framework/osu.Framework/Audio/Track/TrackBass.cs`（`ChannelGetPosition`）、`osu-framework/osu.Framework/Timing/InterpolatingFramedClock.cs` |

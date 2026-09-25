@@ -502,7 +502,56 @@ requestedLatency=10ms, actualLatency=10ms, lowLatency=true
 
 *下一步*：更新线程侧的帧时间、FSC 子树、按键延迟、音频时钟**四条链现在都测不出问题**，
 所以「下落不顺滑」若真实存在，需要在**更新线程之外**找 —— 最可能是 **present / 帧节拍**（本探针只看 update 侧，
-不看呈现时刻的均匀性），其次才是主观锚定。
+不看呈现时刻的均匀性），其次才是主观锚定。该量具已落地，见 §2.4.12。
+
+#### 2.4.12 present 侧量具落地：量「相邻两次 present 的间隔」与「上屏内容的年龄」（2026-09-25）
+
+§2.4.11 把 update 侧四条链全部洗清之后，唯一没量过的就是**呈现**：note 位置在 update 帧边界上就定好了，
+之后只剩渲染与 `Present`。它必须量，因为 update 线程 1983 fps 平稳**并不**代表屏幕每 1/刷新率 秒收到一份均匀的内容。
+
+*为什么不能在 draw 线程打点*
+
+本 fork 里 `osu.Framework.Game` 是 `Container` 而**不是** `GameHost`：
+
+| 事实 | 后果 |
+|---|---|
+| `GameHost.DrawFrame()` / `UpdateFrame()` 确为 `protected virtual`（反射确认 `IsFamily=True, IsVirtual=True, IsFinal=False`） | 只要有继承关系就能 override |
+| `public abstract class Game : Container`（`GameHost` 不在 `Game` 的继承链上） | `OsuGameBase` 没有可 override 的基方法 → **CS0115** |
+
+`OsuGameBase` 只能通过 `Host` 拿到那个 `GameHost`（它自己只是场景图里的一个 drawable）。
+⇒ 只能在 **update 侧读 `DrawThread.Clock`**：`ThrottledFrameClock` 由 draw 线程每帧 `ProcessFrame`，
+但它的属性任何线程都读得到。`osu.Game` 里已有先例（`FPSCounter`、`LatencyCertifierScreen`）。
+
+*量到的三个量*
+
+| 摘要字段 | 来源 | 它回答什么 |
+|---|---|---|
+| `drawPeriod` | `DrawThread.Clock.ElapsedFrameTime` | **相邻两次 present 的间隔分布**。update 侧帧长恒为 0.5 ms 且不抖，但 draw 线程单独卡一下 update 探针是看不见的 |
+| `presentAge` | `drawClock.CurrentTime + 原点偏移 + ElapsedFrameTime − 上一次 update 帧边界` | **上屏那一刻，屏幕上那份内容有多旧**。均值会被输入延迟吸收，**抖动才是眼睛看到的顿挫** |
+| `clocks` | 两线程 `FramesPerSecond / Jitter / TimeSlept / MaximumUpdateHz / Throttling` + 窗口态 + 刷新率 | 限制器实际生效的目标值，以及「每个刷新显示几个 present」（`refresh / fps`） |
+
+两处实现细节不写下来就会误读：
+
+1. **两个时钟原点不同**。`StopwatchClock` 基于 `Stopwatch.ElapsedTicks`，零点是自己 `Start()` 的时刻（= 线程创建），
+   所以 `DrawThread.Clock.CurrentTime` 与 `Stopwatch.GetTimestamp()` 不同源，必须**标定一次**原点偏移；
+   同源同频，标定一次长期有效（换 host 时作废重标）。
+2. **`presentAge` 的分辨率只有一个 update 帧长**。读不到「正被绘制的那个 buffer 的帧号」，只能拿「上一次 update
+   帧边界」当零点，而 draw 线程手上的 buffer 可能是更早一帧的 ⇒ 带 ±1 帧配对不确定度。
+   它只用来判**毫秒级以上的滞后**，不判亚毫秒抖动。`drawPeriod` 没有这个问题（是 draw 线程自己测的）。
+   另外失焦 / 最小化时 draw 线程不画，那些帧按 `IsActive` 剔掉（`skipped` 计数）。
+
+*不覆盖的部分（写下来免得下次又去这里找）*
+
+`DrawFrame` 之后的 **DWM 组合 / 显示器扫描输出**在进程内量不到。若 `present` 行也干净，
+剩下的解释就只有 tearing（Borderless 下 `Renderer.AllowTearing = true`）/ 组合器节拍 / 主观锚定。
+
+*判读口径*
+
+- 先看 `drawPeriod` 的**尾部**：`over0.5 / over1 / over2 / over5` 与 `max`。一次 8 ms 的 draw 帧就是一次可见跳帧，
+  而 update 侧探针对它完全无感 —— 这正是加这个量具的理由。
+- `presentAge` 看 `std` 与 `max`，**跟它自己的分辨率（= 一个 update 帧长）比**：小于分辨率就是「无滞后」。
+- `clocks` 里 `refresh / fps` 不是整数 ⇒ 每个刷新显示的帧数在 1 / 2 之间交替，是结构性 judder，
+  幅度 ≈ 半个 draw 帧的位置误差（2000 fps / 240 Hz 下约 0.2–0.25 ms）—— 小到不构成体感，但可以据此确认或排除。
 
 
 ---
@@ -641,3 +690,5 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-24 | §2.4.11：**音频源时钟 = 精确 10.000 ms 阶梯（定案 §2.1 悬案）**——4 局判定 CSV 里 `BassSource` 的 331–353 个取值 **100% 落在 10.000 ms 网格**（最大残差 22 µs，相邻差只有 9.978/10.000/10.022 及其整数倍），而同批 `GameTime`（== `InterpClock`）无此结构；`Drift == (GameTime − BassSource) − 15.000`。机制：实机走 `NAudioWasapiOutput`（BASS 解码 mixer + NAudio 拉 WASAPI），`DEFAULT_NAUDIO_LATENCY_MS = 10`，而**解码 mixer 的位置只在被拉走一个 buffer 时前进** ⇒ 100 Hz 阶梯。**三个探针均按 ~10 Hz 采样 ⇒ 该结构被混叠，且会伪装成「隔几秒一次」的低频波动**，这正是 §3 在 0.2–0.6 Hz 带里空手而归的结构性原因（测量盲区，非效应弱）。用 1988 fps 真实帧间隔离线复刻 `InterpolatingFramedClock`：仿真 `Drift` 峰峰 **11.7 ms** vs 实测 9.8–19.2 ms（机制确认），每帧速率 std **4%**、**27.9% 的帧偏 >5%**（理想连续源为 0.36% / 0%），但相对匀速的**位置**偏差仅 std 0.11 ms / 峰峰 **2.8 ms**。1988 fps 下每台阶跨 **~24 帧** ⇒ 高帧率把该 100 Hz 纹波采样得更清楚。**保留**：仿真理想化、位置偏差是否够到体感尚未证明 ⇒ 下一步加每帧时钟探针（`RecordFrame()` 处顺带取 `BassSourceCurrentTime` / `InterpolatedDrift`） |
 | 2026-09-24 | §2.4.11（续）：**每帧时钟探针落地**——`FrameStabilityContainer.UpdateSubTree` 帧边界处把 `gcc.BassSourceCurrentTime` / `gcc.CurrentTime` 交给 `RecordFrame(...)`（新增 `AudioSrcMs,InterpMs` 两列），摘要新增 `clockQuant` 行（`audioStep` 非零占比 / 步长主桶 / `interpRate` 的 mean-std-`within1%`-`over5%` / `drift` 范围，速率只在帧长 ≤5ms 的帧上算），`AnalyzePeriod.py` 新增 `AudioStep` / `InterpRate` 两条序列且 `derived_from` 改为元组（`InterpRate` 由两条时钟共同构造，单来源标记盖不住两个定义性对）。**仿真数据端到端验过**：`--band 0.004,0.02 --dt 0.002 --trim 3,3` 下 `InterpRate` 在 0.010s 给出 `ACF r = +0.896`、带内高出均匀背景 914x（`AudioStep` 必被 `RMS/稳健σ` 拒掉 —— 稀疏脉冲列的构造使然）。待实机全帧局验证 |
 | 2026-09-25 | §2.4.11（续）：**实机音频设备确证**——`logs/1790263779.audio.log`（与全帧局同一次会话）：`wasapi="VoiceMeeter Aux Input (VB-Audio VoiceMeeter AUX VAIO)", 48000Hz/2ch float, requestedLatency=10ms, actualLatency=10ms, lowLatency=true`。48000 × 10ms = **480 帧**，与实测 10.000ms 量子精确吻合。`actualLatency` 非回显：NAudio 文档明确它是「设备**实际授予**的引擎周期」，且 `lowLatency=true` 表示 IAudioClient3 低延迟共享模式确实生效 ⇒ **低延迟开着，这台 VoiceMeeter 虚拟声卡也只给 10ms**（物理 DAC 通常 ~2.67–3ms）。**修正确认：调小 `DEFAULT_NAUDIO_LATENCY_MS` 无效（请求值不是瓶颈，授予值才是），要更小周期须换设备/模式**（物理 DAC、独占，或已在用的 ASIO —— 同会话日志有 `Found 7 ASIO devices` / `Freeing ASIO device`） |
+| 2026-09-25 | §2.4.11（结论）：**音频时钟链洗清嫌疑**——36.5 s / 72463 帧全帧局（1983 fps，全程有按键）：`AudioSrcMs` 稳态 100.0 次/s、步长中位 **10.0000 ms**、间隔 std 0.466 ms ⇒ 精确 10 ms 阶梯无第二种量子；`InterpMs` 有 70641 个不同取值 ⇒ **不是阶梯**，量化确实被抹平。**位置判据**（报告值 + 距上次跳变的时长还原成连续位置）稳态 **std 0.408 ms**（整局 0.667），p99/max 2.64/39.0 ms，+10.25 ms 是**音频输出延迟**（被音频偏移吸收，用 500 ms EMA 在线估掉）。**std 0.41 ms 比 10 ms 缓冲量子小一个数量级** ⇒ 不构成体感，§3.5 第 1/2 项的修复方向不再需要动。⚠ 指标陷阱登记：`Δinterp/Δframe` std 0.28、`|rate−1|>5%` 占 **85%**，是抹平阶梯的**必然机制**（位置反而平滑），该序列已从摘要撤掉、`AnalyzePeriod` 侧同样不可用于判「顺不顺滑」；歌曲末 0.9 s 时钟停走单列为 `clockStopped`。**update 侧四条链（帧时间 / FSC 子树 / 按键延迟 / 音频时钟）至此全部测不出问题** |
+| 2026-09-25 | §2.4.12：**present 侧量具落地**——`Game` 在本 fork 是 `Container` 而非 `GameHost`（反射确认 `DrawFrame/UpdateFrame` 是 `protected virtual` 但不在 `Game` 的继承链上），`OsuGameBase` override 直接 CS0115 ⇒ 改为**在 update 侧读 `DrawThread.Clock`**（`osu.Game` 的 `FPSCounter` / `LatencyCertifierScreen` 已有先例；`Clock` 由 draw 线程 `ProcessFrame`，属性任意线程可读）。摘要新增 `present` 行：`drawPeriod`（= `ElapsedFrameTime`，**相邻两次 present 的间隔分布**，看 `over0.5/1/2/5` 与 `max` —— update 侧帧长恒 0.5 ms 且不抖，draw 线程单独卡一下 update 探针看不见）、`presentAge`（上屏那一刻那份内容有多旧，零点取上一次 update 帧边界，受 **±1 帧配对不确定度** 限制，只判毫秒级以上滞后）、`clocks`（两线程 fps/jitter/slept/maxHz/throttling + 窗口态 + 刷新率）。两处实现要点：`StopwatchClock` 零点是自己 `Start()`（线程创建）故需**标定一次原点偏移**；失焦帧按 `IsActive` 剔除（`skipped`）。**不覆盖 DWM 组合 / 显示器扫描输出** |
