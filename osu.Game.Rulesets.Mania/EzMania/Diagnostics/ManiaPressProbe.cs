@@ -68,16 +68,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
 
         /// <summary>
         /// 采集一次按键在 <c>OnPressed</c> 内的分段耗时。调用方只交出各阶段结束的 <see cref="Stopwatch"/> 时间戳
-        /// （它才知道自己走到哪一步），单位换算与建样本在此完成。
+        /// （它才知道自己走到哪一步）与按键前的车道条目数，其余读数与建样本在此完成。
         /// </summary>
         /// <remarks>
-        /// 只在本局前 <see cref="EzPressLatencyDiagnostics.BreakdownCapacity"/> 次按键上调用；未走到的阶段时间戳
-        /// 与上一段相同，差值为 0。
+        /// 只在本局配额未满的按键上调用；未走到的阶段时间戳与上一段相同，差值为 0。
+        /// <paramref name="routeEnabled"/> 与 <paramref name="entriesBefore"/> 用来区分「路由没走」和「走了但很快」。
         /// </remarks>
-        internal static void CaptureBreakdown(Column column, long pressEnterTs, long bookkeepingTs, long routeTs, long selectTs, long applyTs, bool routed, bool judged)
+        internal static void CaptureBreakdown(Column column, long pressEnterTs, long bookkeepingTs, long routeTs, long selectTs, long applyTs,
+                                              bool routeEnabled, int entriesBefore, bool routed, bool judged)
         {
             if (!EzPressLatencyDiagnostics.BreakdownActive)
                 return;
+
+            EzPressLatencyDiagnostics.MarkBreakdownSampled();
 
             long now = Stopwatch.GetTimestamp();
             double tickToMs = 1000.0 / Stopwatch.Frequency;
@@ -85,8 +88,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
             EzPressLatencyDiagnostics.RecordBreakdown(new EzPressLatencyDiagnostics.PressBreakdown(
                 EzProbeOutput.WallClockMs,
                 column.Index,
+                routeEnabled,
                 routed,
                 judged,
+                entriesBefore,
+                column.LaneController.Entries.Count,
                 (bookkeepingTs - pressEnterTs) * tickToMs,
                 (routeTs - bookkeepingTs) * tickToMs,
                 (selectTs - routeTs) * tickToMs,

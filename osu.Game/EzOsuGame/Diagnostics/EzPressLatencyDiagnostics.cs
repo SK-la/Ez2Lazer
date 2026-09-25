@@ -116,15 +116,23 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// <c>CaptureMs</c> = → 采集结束（探针自身的读数与建样本）。
         /// </para>
         /// <para>
-        /// 未走到的阶段差值恒为 0（例如本列不路由输入时 <c>RouteMs</c>…<c>ApplyMs</c> 全为 0）。
+        /// 未走到的阶段差值恒为 0（例如本列不路由输入时 <c>RouteMs</c>…<c>ApplyMs</c> 全为 0），
+        /// 所以 <c>RoutedInput</c> 必须一起读：它为 false 时那三段为 0 是「没走」，不是「走了但很快」。
+        /// <c>EntriesBefore</c> → <c>EntriesAfter</c> 用来识别「本次按键把某个 note 首次注册进车道」这类事件
+        /// （条目数 0 → 1 落在按键内部，说明首次注册的成本记在这次按键上）。
+        /// </para>
+        /// <para>
         /// 每局清零，故同一进程的第 1 局即可看到冷启动曲线，后续局是同进程的对照。
         /// </para>
         /// </summary>
         public readonly record struct PressBreakdown(
             double WallMs,
             int Column,
+            bool RoutedInput,
             bool Routed,
             bool Judged,
+            int EntriesBefore,
+            int EntriesAfter,
             double BookkeepingMs,
             double RouteMs,
             double SelectMs,
@@ -132,23 +140,61 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double CaptureMs,
             double TotalMs);
 
-        /// <summary>分段记录的条数上限（每局，按按键先后顺序取前若干次）。</summary>
-        public const int BreakdownCapacity = 16;
+        /// <summary>「本局前几次按键」配额：输入路径自身的冷成本（键音池、按键历史、路由惰性表）。</summary>
+        public const int BreakdownFirstPressQuota = 16;
 
-        private static readonly PressBreakdown[] breakdown = new PressBreakdown[BreakdownCapacity];
+        /// <summary>
+        /// 「本局前几次已判定按键」配额：按判定与结果扇出（<c>UpdateResult</c> → <c>ApplyResult</c> → 结果订阅者）
+        /// 的冷成本。它必须独立于按键配额——引导期空按可以把按键配额占满，而首个判定恰恰是要看的对象。
+        /// </summary>
+        public const int BreakdownJudgedQuota = 8;
+
+        private const int breakdown_capacity = BreakdownFirstPressQuota + BreakdownJudgedQuota;
+
+        /// <summary>取时间戳的硬上限：判定极少（短局、或整局大量空按）时，防止整局都在取样。</summary>
+        private const int breakdown_sample_cap = 192;
+
+        private static readonly PressBreakdown[] breakdown = new PressBreakdown[breakdown_capacity];
         private static int breakdownCount;
+        private static int firstPressStored;
+        private static int judgedStored;
+        private static int breakdownSampled;
 
-        /// <summary>本局分段记录是否还有空位；调用点用它决定这次按键要不要取时间戳。</summary>
-        public static bool BreakdownActive => Enabled && breakdownCount < BreakdownCapacity;
+        /// <summary>
+        /// 这次按键要不要取分段时间戳。配额只看「已存条数」、不看本次结果，所以会变成判定的那次按键
+        /// 本身一定已经取了时间戳。两份配额都满、或取样次数触顶后恒为 false。
+        /// </summary>
+        public static bool BreakdownActive =>
+            Enabled
+            && breakdownSampled < breakdown_sample_cap
+            && (firstPressStored < BreakdownFirstPressQuota || judgedStored < BreakdownJudgedQuota);
 
-        /// <summary>记一次按键的分段。超出 <see cref="BreakdownCapacity"/> 后静默丢弃。</summary>
+        /// <summary>记一次按键的分段：先按「前几次按键」配额填，超出后只收已判定按键（判定配额）。</summary>
         public static void RecordBreakdown(in PressBreakdown sample)
         {
-            if (!Enabled || breakdownCount >= BreakdownCapacity)
+            if (!Enabled || breakdownCount >= breakdown_capacity)
                 return;
 
-            breakdown[breakdownCount++] = sample;
+            if (firstPressStored < BreakdownFirstPressQuota)
+            {
+                breakdown[breakdownCount++] = sample;
+                firstPressStored++;
+
+                if (sample.Judged)
+                    judgedStored++;
+
+                return;
+            }
+
+            if (sample.Judged && judgedStored < BreakdownJudgedQuota)
+            {
+                breakdown[breakdownCount++] = sample;
+                judgedStored++;
+            }
         }
+
+        /// <summary>本次按键已取过分段时间戳（封顶 <see cref="breakdown_sample_cap"/> 用）。</summary>
+        public static void MarkBreakdownSampled() => breakdownSampled++;
 
         public static void Clear()
         {
@@ -159,6 +205,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
             lastPressFrameId = long.MinValue;
             pressOrdinalInFrame = 0;
             breakdownCount = 0;
+            firstPressStored = 0;
+            judgedStored = 0;
+            breakdownSampled = 0;
         }
 
         /// <summary>把样本写成 CSV，返回文件路径。IO 在后台线程执行；调用方负责随后 <see cref="Clear"/>。</summary>
@@ -218,15 +267,18 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             var sb = new StringBuilder();
             sb.Append("\n[EzPressLatency.firstPress] n=").Append(breakdownCount)
-              .Append(" 段序=bookkeeping/route/select/apply/capture 列码=c<列号>[R=命中路由][J=已判定]");
+              .Append(" 段序=bookkeeping/route/select/apply/capture 单位ms 列码=c<列号>"
+                      + " [route±]=本列是否路由输入 [R]=路由到目标 [J]=已判定 e<前>><后>=车道条目数");
 
             for (int i = 0; i < breakdownCount; i++)
             {
                 var b = breakdown[i];
 
                 sb.Append("\n[EzPressLatency.firstPress] c").Append(b.Column)
-                  .Append(b.Routed ? 'R' : '-')
+                  .Append(" route").Append(b.RoutedInput ? '+' : '-')
+                  .Append(' ').Append(b.Routed ? 'R' : '-')
                   .Append(b.Judged ? 'J' : '-')
+                  .Append(" e").Append(b.EntriesBefore).Append('>').Append(b.EntriesAfter)
                   .Append(" | ").Append(b.BookkeepingMs.ToString("F2", CultureInfo.InvariantCulture))
                   .Append(' ').Append(b.RouteMs.ToString("F2", CultureInfo.InvariantCulture))
                   .Append(' ').Append(b.SelectMs.ToString("F2", CultureInfo.InvariantCulture))
