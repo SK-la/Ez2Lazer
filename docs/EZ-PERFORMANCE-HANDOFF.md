@@ -5,6 +5,13 @@
 
 ## 0. 一句话现状
 
+> **先看这三行，够了就别往下读：**
+> - **已结案（测不出可归因的问题）**：更新线程三条链（帧时间 / FSC 子树 / 按键延迟）、音频时钟链（含源漏拉、含 MMCSS 试验）、present 量具本身。
+> - **已证伪（不要再重开）**：「2–4 s 周期」（当时的信号是开局加载帧的假阳性）、「漏拉根因 = 渲染线程没登记 MMCSS」。
+> - **还在桌上的**：进程内**量不到**的送屏 / 扫描输出（§3.5 第 6 项）、以及主观锚定是否准确（§3.5 第 3 项）。**没有待改的代码。**
+>
+> 下面按时间顺序留证据，供核对。
+
 帧率已到操作点（1000 fps，限帧器接管）；**mania 子树每帧恒定 0.105–0.116 ms，跨倍帧率不变** ⇒ 帧数上限不是游戏逻辑。
 
 **周期性调查已做过长时全帧捕获（2026-09-24，38.7 s / 76985 帧，`EZ_FRAME_PROBE_MS=0`），结论是否定的**：
@@ -36,9 +43,12 @@
 
 **2026-09-25 已把「漏拉」的机制定案（§3.4d）**：稳态里位置跳变只有 10 / 20 ms 两档，
 且「跳变次数 = 周期数 − 超额周期数」两局精确成立 ⇒ 每次都是「**漏掉一次唤醒 → NAudio 一次读两拍**」，
-**距离守恒**（0.004%）、只有**相位**阶跃，不是丢数据。根因：NAudio 只在 `.WithMmcssThreadPriority()`
-时才登记 MMCSS，本 fork 的构造链没调 ⇒ 音频渲染线程与 2000 Hz 的 update / draw 同为 Normal，
-而 Windows 默认时间片（15.6 ms 量级）比 10 ms 周期还长。
+**距离守恒**（0.004%）、只有**相位**阶跃，不是丢数据。机制在源码层已核（读全部空位 + AutoReset）。
+
+⛔ **但当时提出的根因「渲染线程没登记 MMCSS」已被证伪**（§3.4f，10:11 局）：登记了 MMCSS 之后
+`pullMiss` 与 `periods/pull` 分布**一模一样** ⇒ 这条链**结案，不要再从线程优先级方向重开**。
+剩下两种可能（线程晚醒 / `Read` 内部 BASS 解码慢）当前量具分不开，但体感量级只有「位置 std ~1 ms」，
+且应用侧无手段消除。
 
 **⚠ 2026-09-25 09:22 那一局不算 MMCSS 的测试**（细节见 §3.4e）：MMCSS 只进了 framework **源码**，
 而 `osu` 默认从 **NuGet 包**取框架 ⇒ 那一局跑的还是旧 DLL（证据：输出目录 `osu.Framework.dll` 是包的时间戳
@@ -80,13 +90,12 @@
 ### 2.1 用户观察 vs 探针数据不一致（本次最大的坑）
 
 - 用户：不流畅**隔一会一次，约 2 s / 4 s**；判定**全程规律正弦波动**。
-- 数据（两局各 ~31 s，`diagnostics/judgment_*.csv`、`framestall_*.csv`）：
-  - `Drift` 自相关主峰 3.10 s (0.135) / 9.47 s (0.164) —— **弱，且两组不一致**
-  - 卡顿爆发点平均间隔 **0.57–0.63 s**，不是 2–4 s
-- ⇒ **现象未被测下来**。可能：探针时长太短、现象只在特定配置/曲目出现、或用户看的是另一个量。
-- ⚠ 上面那两个 ACF 数字是**当时临时算的，仓库里没有对应脚本**；18xxxx 那两局 CSV 也已不在 `diagnostics/`。
-  2026-09-24 补齐工具（`AnalyzePeriod.py`，见 §3.4）后，在现有三局（各 ~34 s）上**复现不出**这两个周期
-  （`Drift` 全部 `ACF r ≤ 0.20`）。不据此推翻结论，只登记「引用值不可复算」。
+- 数据（两局各 ~31 s，`diagnostics/judgment_*.csv`、`framestall_*.csv`）：卡顿爆发点平均间隔 **0.57–0.63 s**，不是 2–4 s。
+- ⇒ **这个现象到本交接为止始终没有在探针上测下来**（§3.4 的 38.7 s 全帧局、§3.4b 的音频时钟局、§3.4f 的 MMCSS 局都没有）。
+  剩下的解释只有两个：现象只在探针**量不到**的环节（送屏 / 扫描输出，见 §3.5 第 6 项），或者主观锚定不准（第 3 项）。
+- ⛔ **已作废，勿引用**：早期曾记「`Drift` 自相关主峰 3.10 s / 9.47 s」。那两个数是临时粗算——
+  **仓库里没有对应脚本、原始 CSV 已不在 `diagnostics/`、用现有工具在三局上复现不出来**（`Drift` 的 `ACF r` 全部 ≤ 0.20）。
+  一句「找不到周期」的结论旁边挂着一对周期数字，正是以后会被人当证据重新捡起来的污染源，故直接删除该表述。
 - **2026-09-24 晚的 38.7 s 全帧局仍未测出周期**（详见 §3.4 结果），且揭示了这批探针上两个会让「周期」凭空出现的陷阱：
   开局加载帧主导方差、以及带通后独立样本数太少导致的高偶然相关。**在下结论前必须先看这两个读数是否合格。**
 - 已知的可信信号：`BassSource − GameTime` 峰峰 **9.8–9.9 ms**（`Drift` 是同一信号反号；实测两者恰差常数 15.000 ms）。
@@ -125,7 +134,10 @@
 - **2–5 ms 类整局均匀**，占 stall 帧 **95–97%**（GC 约占 >2 ms 帧的一半）。
 - **>5 ms 类 64–82% 集中在歌曲首 2 s**（首 2 s 只占全程 6%）。
 
-## 3. 下一步（唯一动作：先测再改）
+## 3. 采集方法 + 已跑过的各局结果（**下一步只看 §3.5**）
+
+> §3.1–3.3 是方法（照做即可复现一局）；§3.4a–f 是**已经跑完、结论不再变**的历史局，不要当待办；
+> 需要动手的只有 §3.5。
 
 **长时全帧捕获一次**，让周期可测：
 
@@ -220,6 +232,9 @@
 
 ### 3.4c 结果（2026-09-25 08:44：present 局 → 量具要修；且音频链的「干净」有前提）
 
+> **本节的可执行结论只有第 2 条；第 1 条的两处采样缺陷当时就修掉了，这一局的 `present` 数已作废。**
+> 音频链的最终结论在 §3.4f（MMCSS 试过且无效）。
+
 全帧局 `framestall_20260925_084436.csv`（40.5 s / 81006 帧 / 1998 fps，全程有按键）。
 
 **一、`present` 行出来了，但这一局的数不可用（两处采样缺陷，已修）**
@@ -262,6 +277,10 @@
 std ~1 ms / p99 1.4 ms / maxdev 7 ms，14.6% 的帧偏 >1 ms。够不够成体感还没判，但它符合「一顺一不顺」这一现象。
 
 ### 3.4d 「漏一拍、补一拍」的机制定案 + MMCSS 缺口（2026-09-25）
+
+> ⛔ **「MMCSS 缺口」这个根因假设已被 §3.4f 证伪**（登记 MMCSS 后漏拉频率一模一样）。
+> 本节**仍成立**的部分是「漏一拍、补一拍」的**机制**（NAudio 读全部空位、AutoReset、距离守恒）——
+> 那是源代码级事实，与 MMCSS 无关。请只引用机制，不要再引用「根因是没登记 MMCSS」。
 
 细节与源码引用在 `EZ-PERFORMANCE.md` §2.4.14，这里只留结论。
 
@@ -368,7 +387,7 @@ framework 于 9:36:30 重建，音频日志 `logs/1790302201.audio.log` 出现 `
    （若将来另有证据指向音频，再回来考虑 ① 换设备/独占/ASIO ② 锁相或线性外推 ③ 只把音频钟当速率源。）
 3. **换主观锚点**：让用户标出「不顺滑」的具体时刻（录屏 / 秒表 / 按键），再把探针时间轴对上去。
    四次测量都没测到，说明「约 2 s / 4 s」这个描述本身可能不准。
-4. **present / 帧节拍**（更新线程之外，唯一没量过的一环）—— **量具已加，第一局暴露两处采样缺陷、已修（§3.4c）**：
+4. **present / 帧节拍**（更新线程之外的一环）—— **量具已加、两处采样缺陷已修（§3.4c）**，判读前先过下面四条自检：
    update 线程 ~2000 fps 平稳，但**呈现**只有显示器刷新率那么多次，要量的是**相邻两次 present 的间隔分布**
    与**上屏那一刻那份内容有多旧**。
    - **做不到在 draw 线程打点**：这个 fork 里 `Game` 是 `Container` 而不是 `GameHost`，`osu.Game` 无法 override
@@ -414,7 +433,8 @@ framework 于 9:36:30 重建，音频日志 `logs/1790302201.audio.log` 出现 `
 | 帧级 stall 探针 | `osu.Game/EzOsuGame/Diagnostics/EzFrameStallDiagnostics.cs` |
 | 按键延迟分段探针 | `osu.Game/EzOsuGame/Diagnostics/EzPressLatencyDiagnostics.cs` |
 | 判定诊断 | `osu.Game/EzOsuGame/Diagnostics/EzJudgmentDiagnostics.cs` |
-| 探针接线 + 环境变量 | `osu.Game/Screens/Play/Player.cs`（约 344–368 行） |
+| **诊断开关（进程级，读一次）** | `osu.Game/OsuGameBase.cs` 的 `applyDiagnosticSwitches`（在 `Ez2ConfigManager` 建好后调用）。真值落在三个探针的静态 `Enabled` 上；**运行期不再读配置 ⇒ 改设置必须重启**，换来的是关闭时热路径零开销（一个静态 bool 分支）。 |
+| 环境变量（消融 / 抓全集） | `osu.Game/Screens/Play/Player.cs` 每次进图读：`EZ_FRAME_PROBE_MS`（0 = 抓全集）、`EZ_FRAME_PROBE_LIGHT=1`、`EZ_PRESS_PROBE_SKIP_FORCE_MISS=1` |
 | 子树 / 时钟 / 其余 归因 | `osu.Game/Rulesets/UI/FrameStabilityContainer.cs`（`UpdateSubTree`） |
 | present / 帧节拍采样 | `EzFrameStallDiagnostics.samplePresent`（update 侧读 `DrawThread.Clock`，**按 draw 帧去重**，**时钟停走的帧跳过** —— 退场段会把 `coverage` 拉到 0.87，见 §3.4f）；host 由 `osu.Game/OsuGameBase.cs` 的 `SetHost` 挂上（**`DrawFrame` 无法 override，原因见 §3.5 第 4 项**） |
 | 音频源漏拉计数 | 同文件 `accumulateClocks`（`pullMiss` / `pullMissHoldMs`，停走 >15 ms 且 <60 ms 记一次）。⚠ 同代码三次采集 = 1/145/4，**单局不可判**（§3.4e）；MMCSS 已试过无效，该链结案（§3.4f） |
@@ -433,4 +453,7 @@ framework 于 9:36:30 重建，音频日志 `logs/1790302201.audio.log` 出现 `
 - 配置：`F:\MUG OSU\EZ2OSU-lazer\framework.ini`（`ExecutionMode = MultiThreaded`、`FrameSync = Limit4x`）、`EzSkinSettings.ini`（`FrameLimiterBase`、`ColumnBlur`、`TurboMode`）。判 `Stage` 毛玻璃是否开启：`ColumnBlur × 50 > 0.01` 且 `TurboMode = False`。
 - **送屏 A/B（§3.5 第 6 项）改的就是这两个键**：`framework.ini` 的 `FrameSync`（`Limit4x` ⇄ `VSync`）与 `EzSkinSettings.ini` 的 `FrameLimiterBase`（500 → 175 / 350）。改完必须重启游戏。
 - 探针热路径不做 IO、不产字符串，落盘在局末；`RecordFrame()` 跑在输入派发**之前**。
+- **开关语义**：`EzExperimentalSettings` 里的「启用 Ez 判定诊断 / 时序追踪」是**进程级开关**——
+  启动时由 `OsuGameBase.applyDiagnosticSwitches` 读一次，运行期不再查配置。**改完必须重启游戏**；
+  换来的是关闭时热路径上只剩一个静态 bool 分支（没有 bindable、没有 DI、没有配置查询）。
 - 改 Realm schema / 迁移后**不得**擅自启动客户端做验证（见 `.cursor/rules/realm-schema-development.mdc`）。

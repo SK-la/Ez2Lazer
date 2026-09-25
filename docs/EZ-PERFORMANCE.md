@@ -71,7 +71,7 @@
 |----|------|------|
 | **HITPOS-CACHE** | `DrawableManiaRuleset` | `updateTimeRange()` 原先**每帧**调 `skinChanged()`，即每帧构造 `ManiaSkinConfigurationLookup` 走一次皮肤配置链。改为 `updateHitPosition()` 只在皮肤 / `HitPosition` / `HitPositionGlobalEnable` 变更时重算并缓存字段，`updateTimeRange()` 只做算术。判定线绑定前置到 `ScrollStyle` 之前，保证首次 `updateTimeRange()` 读到已算好的值 |
 | **JUDGE-NO-CLOSURE** | `Column.OnNewResult` / `Stage.OnNewResult` | `hitExplosionPool.Get(e => e.Apply(result))` 与 `judgementPooler.Get(type, j => j.Apply(result, judgedObject))` 每判定各造一个捕获 `result` 的闭包。两者 `Apply` 都只做字段赋值（真正动画在下一帧 `PrepareForUse`），改为 `Get()` 后再赋值。注意 `JudgementContainer.Add` 会**同步**读 `JudgedHitObject`，赋值必须仍在 `Add` 之前 |
-| **POLICY-SCRATCH** | `OrderedHitPolicyHelper` | 候选 / 后判对象改复用缓冲（去掉每次判定的 `ToList()` 拷贝）；`OrderBy(...).ToList()` 改复用缓冲上的稳定插入排序；诊断串整段门控在 `EzJudgmentDiagEnabled` 之后（关闭时不再执行 `describe` / `string.Join`）；命中模式与诊断开关缓存 bindable，取代一次判定里 3 次 `ezConfig.Get` |
+| **POLICY-SCRATCH** | `OrderedHitPolicyHelper` | 候选 / 后判对象改复用缓冲（去掉每次判定的 `ToList()` 拷贝）；`OrderBy(...).ToList()` 改复用缓冲上的稳定插入排序；诊断串整段门控在 `EzJudgmentDiagEnabled` 之后（关闭时不再执行 `describe` / `string.Join`）；命中模式缓存 bindable，取代一次判定里 3 次 `ezConfig.Get`（诊断开关本身也已改为进程级静态位，见 §2.4.18） |
 | **FORCEMISS-SNAPSHOT** | `Column.handleHit` / `ManiaLaneController.CollectForceMissBefore` | 命中时「提前判 miss」的 `yield` 迭代器改为写调用方缓冲（每次命中省一个迭代器对象），处理时按实时 `IsPressJudged` 复核以保持惰性枚举语义；`EnumerateForceMissBefore` 无调用方，已由新方法取代 |
 | **MARKER-EASE-FIX** | `EzHUDHitTimingColumns.moveMarker` | `marker.Y = targetY;` 紧接着 `MoveToY(targetY, 800, OutQuint)`：设值后新变换的 `StartValue` 由 `ReadIntoStartValue` 在首次 `Apply` 时读到（`TransformCustom.cs:186`），即 `start == end`，缓动恒为空变换 ⇒ 标记瞬跳。这行是从上游 `BarHitErrorMeter` 那条**一次性池化判定线**（对象是新的，直接赋值才对）抄过来的，常驻 marker 不该有。删掉后恢复成上游 `arrow`（同一 EMA、同一 `800ms OutQuint`）的「只发缓动」语义。附带两处交互：`MoveHeight` 改高时先 `ClearTransforms(false, "Y")` 再按比例赋值（在途变换每帧回写自己的插值，不清就会覆盖赋值、拖滑块时标记卡在旧范围）；`StopMovement` 开启时 `FinishTransforms(false, "Y")` 收尾到目标，而不是停在中间插值上 |
 
@@ -346,7 +346,8 @@ B 组 `pressSplit` 的 `sincePrevFrameMean = 1.542 ms`，而帧间隔只有 **1.
 #### 2.4.10 周期性 / 相位分析工具（`AnalyzePeriod.py`）与「2–4 s 周期」的现状（2026-09-24）
 
 §2.1 那两个 ACF 数字（`Drift` 3.10 s / 0.135、9.47 s / 0.164）当时是临时算的，**仓库里从来没有对应工具**，
-所以既不可复现也无法核对。新增 `AnalyzePeriod.py`（numpy，可选 matplotlib）补上这条腿：
+所以既不可复现也无法核对 —— **⛔ 已作废，不要引用**（交接单 §2.1 已连同原文删除）。
+新增 `AnalyzePeriod.py`（numpy，可选 matplotlib）补上这条腿：
 
 - 三探针的 `WallMs` 同源（`EzJudgmentDiagnostics.WallClockMs`），所以**同一局**的三份 CSV 可直接跨探针对齐做互相关 ——
   这是回答「相位来源」的前提。
@@ -629,7 +630,11 @@ B 局与 A 局 `interpErr` 的 2.6 倍差距**全部**来自这 145 次漏拉（
 （每 4 s 计数 20/10/11/21/17/19/16/11/15/7）⇒ 若它在起作用，表现是**全程低频抖动**而不是「隔一会一次」。
 但它符合「两次游戏一顺一不顺」这一现象，**优先级高于继续在 present 侧找**（present 量具本身刚修，见 §2.4.12）。
 
-#### 2.4.14 「漏一拍、补一拍」的机制已定案：NAudio 读的是「当前全部空位」，而渲染线程没有 MMCSS（2026-09-25）
+#### 2.4.14 「漏一拍、补一拍」的机制已定案：NAudio 读的是「当前全部空位」（2026-09-25）
+
+> ⛔ **标题里原先还有半句「而渲染线程没有 MMCSS」—— 那个根因假设已被 §2.4.17 证伪**
+> （登记 MMCSS 后漏拉分布一模一样）。**本节保留的部分是机制**（下面这些恒等式与源码事实），
+> 与线程优先级无关；**不要再从 MMCSS / 线程优先级方向重开这条链**。
 
 上一节的形状（停走 ~20 ms 再一次性补上）在**稳态**（t > 3 s）里干净得可以当恒等式用：
 
@@ -669,15 +674,16 @@ if (numFramesAvailable > 10) FillBuffer(numFramesAvailable);       // ← 读「
   信号不累积，超额读完之后缓冲重新填满，下一次又对齐 ⇒ 不会一漏一串。
 - **`mmcssTaskName` 默认 `null`**（`WasapiPlayerBuilder`），只有显式 `.WithMmcssThreadPriority(...)` 才设；
   本 fork 的构造链 `osu-framework/osu.Framework/Audio/Wasapi/NAudioWasapiOutput.cs:112`
-  （`.WithDevice().WithSharedMode().WithEventSync().WithLowLatency().WithLatency(10)`）**没有调它**
-  ⇒ 渲染线程跑在默认优先级。框架侧同样没在任何地方设过线程优先级（全仓 `ThreadPriority` 只命中一处 SDL 日志等级）
-  ⇒ 音频线程与 2000 Hz 的 update / draw 线程**同为 Normal**。Windows 默认时间片是 15.6 ms 量级、**长于 10 ms 周期**，
-  竞争下「晚醒一拍」是预期行为而不是异常。
+  原先（`.WithDevice().WithSharedMode().WithEventSync().WithLowLatency().WithLatency(10)`）**没有调它**。
+  ⛔ **但「没登记 MMCSS 就是根因」已于 2026-09-25 被证伪**：登记（`"Pro Audio"`）之后
+  `pullMiss` 仍 142（3.6/s）、`periods/pull max` 仍 2.00，与未登记时（145）相同 —— 见 §2.4.17 与 §2.4.16 的分布量具。
+  所以这段只作为**机制**记录，不要再当作可修复的根因。
 
 *可执行的下一步（都要先确认再改）*
 
-1. ~~**一行候选**：`.WithMmcssThreadPriority("Pro Audio")`~~ → **已落地**（2026-09-25，见下）。判据事先写死：
-   下一局 `pullMiss` 从 3.6/s 级掉到 0.03/s 级即成立；若仍是几十/几百次量级 ⇒ 音频链就地结案，不再为它跑局。
+1. ~~**一行候选**：`.WithMmcssThreadPriority("Pro Audio")`~~ → **已落地并已实测：无效，判据判负**（§2.4.17）。
+   当时写死的判据是「下一局 `pullMiss` 从 3.6/s 级掉到 0.03/s 级即成立；若仍是几十/几百次量级 ⇒ 音频链就地结案」，
+   实测 142 次（3.6/s）⇒ **结案**。
 2. **把推断换成直读**：在 `BassMixerWaveProvider.Read` 记 **(墙壁时间, 请求字节数)**。NAudio 传进来的 `count`
    **就是** `numFramesAvailable × BlockAlign`，所以 `count ≈ 960 帧` 的存在直接证明「本次读吞了两拍」，
    还能顺带读出 `BufferSize`（几拍）与两次读的**真实墙壁间隔**（比帧 CSV 的 0.5 ms 分辨率细）。
@@ -741,7 +747,7 @@ if (numFramesAvailable > 10) FillBuffer(numFramesAvailable);       // ← 读「
 
 `over15=162` 且 `max=2.00 拍` ⇒ 渲染线程确实**每 0.24 s 一次、一次要两整拍**（不是「读一点零头」）。
 
-**结论：MMCSS（`"Pro Audio"`）没有把漏拉拿掉** —— 按 §2.4.16 事先写死的判据，**音频链就此结案**，
+**结论：MMCSS（`"Pro Audio"`）没有把漏拉拿掉** —— 按 §2.4.14 下一步第 1 项事先写死的判据，**音频链就此结案**，
 不再为它安排采集。剩下两种机制（线程晚醒 / `Read` 内部 BASS 解码慢）当前量具分不开，
 但既然它对体感的贡献量级只有「位置误差 std ~1 ms」、且应用侧无手段消除，继续投入没有产出。
 
@@ -775,6 +781,24 @@ if (numFramesAvailable > 10) FillBuffer(numFramesAvailable);       // ← 读「
 `samplePresent` 现在**跳过时钟停走的帧**（新增 `frozenSkipped=` 计数）。理由见上一条：退场段采样者掉速会整段漏掉
 draw 帧、把 `coverage` 拉到 0.87 以下，使这张表在判读前就自检失败。帧耗时直方图**不**动（保持与既有四局可比），
 判读时人工减去退场段。
+
+#### 2.4.18 诊断开关改为**进程级**：关闭时热路径零开销（2026-09-25）
+
+三个判定侧探针 + 时序追踪原先都在 `Player` 每次进图时从配置重读开关，`OrderedHitPolicyHelper` 还各持一个
+`Bindable<bool>` 订阅。这套写法对「永远关着」的功能是纯负担，改法只有一条原则：**关闭时热路径上一个字节都不做**。
+
+- **开关只在启动时读一次**（`OsuGameBase.applyDiagnosticSwitches`，紧接 `Ez2ConfigManager` 构造之后）：
+  真值落到 `EzJudgmentDiagnostics.Enabled` / `EzPressLatencyDiagnostics.Enabled` / `EzFrameStallDiagnostics.Enabled`
+  / `EzTimingTrace.Enabled` 四个**静态 bool** 上；`Player` 与 `OrderedHitPolicyHelper` 不再读配置、不再持 bindable。
+  ⇒ **改设置必须重启游戏**（UI 的 tooltip 已写明）。
+- **调用点自己先判**，让参数求值也省掉：
+  - `FrameStabilityContainer.UpdateSubTree` 用本轮已读好的局部 `sampling` 守卫 `RecordFrame` 调用 ⇒ 关闭时连这次调用都不发生；
+  - `Column.OnPressed` 早已用局部 `probe` 守卫整段采样（含那次会触发全树重建的 `NonPositionalInputQueue.Count`）。
+- **能被 JIT 兑现的部分就到「一次静态加载 + 一次分支」为止**：运行期开关无法再便宜（要真正 0 指令只能 `#if`／
+  `[Conditional]`，那要求重新编译、不能做成设置项）。所以别再从「把它做得更快」这里下手，
+  要验的是**关闭时是否真的一个分支**：`EzJudgmentDiagnostics.Enabled` 为 false 时，上述四处调用点都只做一次 bool 判断。
+- ⚠ 反面教材（已撤）：曾把开关做成 `Ez2ConfigManager` 的静态属性 + 环境变量 + 探针侧链式只读属性，
+  热路径上一分没省、还多了一层概念 —— **不要重复这条路**。
 
 
 
@@ -890,7 +914,7 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 |------|---------|---------------|
 | 进局后**首次命中** update 与 draw 同时明显掉帧，随后回升，画面无卡顿 | 单次性 ⇒ 首次执行成本：JIT、判定字形图集首次上传、首个 BASS 通道创建、判定动画首次 `GetAnimation` | 用 `ManiaJudgeHotPathTrace` 标出首次 `CheckForResult` → `ApplyResult` → 爆炸/判定的时间线；对照把 `KeySoundPreviewMode` 关掉再复测（音频侧变量隔离） |
 | **LN 多的场景掉帧尤为明显** | **已定案（Triangles/Default）**：按住缩体时 `DefaultBodyPiece` 两层减法 FBO 每帧 `ForceRedraw`。静止 / 只滚不按：`ΔBodyFbo→0`。tick 扫描抬 `ΔTickScan`，12 条 LN 下 `updMs` 仍约 1–2ms，不是画侧主项。head/tail 入队已排除 | 生产：`LN-HOLD-FBO` + `LN-INPUT-SLOT`。消融场景仅 Debug。**Argon / Ez2 / Legacy 未改** |
-| 其他显示器播放视频（即使暂停）时帧率掉 200+ | 游戏内代码路径无对应开销 ⇒ 指向桌面合成 / GPU 抢占 / DWM 或驱动侧 | 与 §5 流程同规：另一显示器换静态图、换浏览器硬件加速开关、换输出模式，确认是否与游戏进程无关；结论记入本文件而非改游戏代码 |
+| 其他显示器播放视频（即使暂停）时帧率掉 200+ | 游戏内代码路径无对应开销 ⇒ 指向桌面合成 / GPU 抢占 / DWM 或驱动侧 | 与 §5 流程同规：另一显示器换静态图、换浏览器硬件加速开关、换输出模式，确认是否与游戏进程无关；结论记入本文件而非改游戏代码。**注意这一条与「送屏 / 扫描输出」同源 —— 进程内探针量不到，只能 A/B（交接单 §3.5 第 6 项）** |
 
 **输入侧已排除**：`DrawableHoldNoteBody` / `DrawableHoldNoteTick` 不是 `IKeyBindingHandler`，本就不进输入队列，LN 的 tick 数量不放大按键扫描成本（当前算法扫描列 + note + hold + head/tail）。
 
@@ -916,3 +940,5 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-25 | §2.4.11（续）：**实机音频设备确证**——`logs/1790263779.audio.log`（与全帧局同一次会话）：`wasapi="VoiceMeeter Aux Input (VB-Audio VoiceMeeter AUX VAIO)", 48000Hz/2ch float, requestedLatency=10ms, actualLatency=10ms, lowLatency=true`。48000 × 10ms = **480 帧**，与实测 10.000ms 量子精确吻合。`actualLatency` 非回显：NAudio 文档明确它是「设备**实际授予**的引擎周期」，且 `lowLatency=true` 表示 IAudioClient3 低延迟共享模式确实生效 ⇒ **低延迟开着，这台 VoiceMeeter 虚拟声卡也只给 10ms**（物理 DAC 通常 ~2.67–3ms）。**修正确认：调小 `DEFAULT_NAUDIO_LATENCY_MS` 无效（请求值不是瓶颈，授予值才是），要更小周期须换设备/模式**（物理 DAC、独占，或已在用的 ASIO —— 同会话日志有 `Found 7 ASIO devices` / `Freeing ASIO device`） |
 | 2026-09-25 | §2.4.11（结论）：**音频时钟链洗清嫌疑**——36.5 s / 72463 帧全帧局（1983 fps，全程有按键）：`AudioSrcMs` 稳态 100.0 次/s、步长中位 **10.0000 ms**、间隔 std 0.466 ms ⇒ 精确 10 ms 阶梯无第二种量子；`InterpMs` 有 70641 个不同取值 ⇒ **不是阶梯**，量化确实被抹平。**位置判据**（报告值 + 距上次跳变的时长还原成连续位置）稳态 **std 0.408 ms**（整局 0.667），p99/max 2.64/39.0 ms，+10.25 ms 是**音频输出延迟**（被音频偏移吸收，用 500 ms EMA 在线估掉）。**std 0.41 ms 比 10 ms 缓冲量子小一个数量级** ⇒ 不构成体感，§3.5 第 1/2 项的修复方向不再需要动。⚠ 指标陷阱登记：`Δinterp/Δframe` std 0.28、`|rate−1|>5%` 占 **85%**，是抹平阶梯的**必然机制**（位置反而平滑），该序列已从摘要撤掉、`AnalyzePeriod` 侧同样不可用于判「顺不顺滑」；歌曲末 0.9 s 时钟停走单列为 `clockStopped`。**update 侧四条链（帧时间 / FSC 子树 / 按键延迟 / 音频时钟）至此全部测不出问题** |
 | 2026-09-25 | §2.4.12：**present 侧量具落地**——`Game` 在本 fork 是 `Container` 而非 `GameHost`（反射确认 `DrawFrame/UpdateFrame` 是 `protected virtual` 但不在 `Game` 的继承链上），`OsuGameBase` override 直接 CS0115 ⇒ 改为**在 update 侧读 `DrawThread.Clock`**（`osu.Game` 的 `FPSCounter` / `LatencyCertifierScreen` 已有先例；`Clock` 由 draw 线程 `ProcessFrame`，属性任意线程可读）。摘要新增 `present` 行：`drawPeriod`（= `ElapsedFrameTime`，**相邻两次 present 的间隔分布**，看 `over0.5/1/2/5` 与 `max` —— update 侧帧长恒 0.5 ms 且不抖，draw 线程单独卡一下 update 探针看不见）、`presentAge`（上屏那一刻那份内容有多旧，零点取上一次 update 帧边界，受 **±1 帧配对不确定度** 限制，只判毫秒级以上滞后）、`clocks`（两线程 fps/jitter/slept/maxHz/throttling + 窗口态 + 刷新率）。两处实现要点：`StopwatchClock` 零点是自己 `Start()`（线程创建）故需**标定一次原点偏移**；失焦帧按 `IsActive` 剔除（`skipped`）。**不覆盖 DWM 组合 / 显示器扫描输出** |
+| 2026-09-25 | §2.4.13–2.4.17：**音频源「漏拉」查到底并结案**。① 摘要新增 `interpErr`（位置判据）后立刻发现它会被源停走污染 ⇒ 登记「**判 `interpErr` 必须同时看 `pullMiss`**」（把 ±20 ms 邻域剔掉，std 1.08 → 0.455 ms）。② 稳态跳变只有 10/20 ms 两档、`跳变次数 = 周期数 − 超额周期数` 两局精确成立 ⇒ **机制**是「漏一次唤醒 → NAudio 一次读两拍」（读 `BufferSize − CurrentPadding` = 全部空位，`frameEvent` 是 AutoReset，故距离守恒、只重排相位）。③ 曾假设根因是渲染线程没登记 MMCSS：**先踩到交付陷阱**（MMCSS 只进了 framework 源码，而 `osu` 默认取 NuGet 包 ⇒ 那一局跑的还是旧 DLL；同时同代码三次采集 `pullMiss` = **1/145/4** ⇒ 单局计数不可判），补上 `wasapiRead`/`wasapiPull` 直读量具（拉取间隔 + 请求拍数）后，实测 D 局 `pullMiss=142`、`periods/pull max=2.00`、每 0.24 s 一次两整拍 ⇒ **MMCSS 无效，音频链结案**（应用侧无手段消除；体感量级只有位置 std ~1 ms）。④ 顺带定案「**歌曲结束后的退场段是另一个工况**」（时钟停走、update 掉到 120–192 Hz、子树 = 0、`coverage` 被拉到 0.869）：present 采样改为**跳过时钟停走的帧**（新增 `frozenSkipped`），局内前 33 s 的帧管线判为 pristine。**不成立/已撤回**：早期那两个 `Drift` ACF 周期数字已在交接单删除 |
+| 2026-09-25 | §2.4.18：**诊断开关改为进程级**——三个判定侧探针 + 时序追踪原先每次进图从配置重读、且 `OrderedHitPolicyHelper` 各持一个 `Bindable<bool>`。改为**启动时读一次**（`OsuGameBase.applyDiagnosticSwitches`）落到四个静态 bool，调用点用局部量先判（`FrameStabilityContainer` 关闭时连 `RecordFrame` 调用都不发生），**改设置必须重启游戏**。理由：这类功能长期关闭，热路径上应当只有一个静态 bool 分支。⚠ 曾试过 `Ez2ConfigManager` 静态属性 + 环境变量 + 链式只读属性的写法，**热路径一分未省、只多了概念，已撤回**，不要重复 |
