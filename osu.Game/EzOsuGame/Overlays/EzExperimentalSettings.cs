@@ -92,16 +92,12 @@ namespace osu.Game.EzOsuGame.Overlays
                 new SettingsItemV2(new FormCheckBox
                 {
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.EzJudgmentDiagEnabled),
-                    Caption = EZ_JUDGMENT_DIAG_ENABLED,
-                    HintText = EZ_JUDGMENT_DIAG_ENABLED_TOOLTIP,
-                }),
-
-                new SettingsItemV2(new FormCheckBox
+                    Caption = EZ_DIAG_SUITE_ENABLED,
+                    HintText = EZ_DIAG_SUITE_ENABLED_TOOLTIP,
+                })
                 {
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzTimingTraceEnabled),
-                    Caption = EZ_TIMING_TRACE_ENABLED,
-                    HintText = EZ_TIMING_TRACE_ENABLED_TOOLTIP,
-                }),
+                    Keywords = new[] { "diagnostics", "probe", "csv", "诊断", "探针" }
+                },
                 new SettingsItemV2(new FormCheckBox
                 {
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker),
@@ -350,26 +346,18 @@ namespace osu.Game.EzOsuGame.Overlays
             + "\nThe key was pressed between the last FSC clock update and now; interpolate to the actual press time."
             + "\nThis can be understood as using time relative to the previous frame for judgment, rather than the absolute time of the main timeline.");
 
-        internal static readonly LocalisableString EZ_JUDGMENT_DIAG_ENABLED = new EzLocalizationManager.EzLocalisableString(
-            "启用 Ez 判定诊断", "Enable Ez Judgment Diagnostics");
+        internal static readonly LocalisableString EZ_DIAG_SUITE_ENABLED = new EzLocalizationManager.EzLocalisableString(
+            "启用 Ez 诊断套件", "Enable Ez Diagnostics Suite");
 
-        internal static readonly LocalisableString EZ_JUDGMENT_DIAG_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(研究功能)在游戏结束后，输出本局判定信息到.csv文件（含时钟漂移与 InputToJudgeMs：按键→判定检查耗时）。"
-            + "\n默认输出路径：桌面/EzDiag/",
-            "(Testing feature) Output judgment diagnostics to a .csv after the game ends "
-            + "(clock drift columns + InputToJudgeMs: key → judgment-check latency)."
-            + "\nDefault output path: Desktop/EzDiag/");
-
-        internal static readonly LocalisableString EZ_TIMING_TRACE_ENABLED = new EzLocalizationManager.EzLocalisableString(
-            "启用 Ez 时序追踪", "Enable Ez Timing Trace");
-
-        internal static readonly LocalisableString EZ_TIMING_TRACE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(研究功能)在游戏结束后，输出本局判定信息到.csv文件。"
-            + "\n追踪按键输入与音频的时序关系, 用于检查打击音效的时序。"
-            + "\n默认输出路径：桌面/EzDiag/",
-            "(Testing feature) Output judgment information to a .csv file after the game ends."
-            + "\nTrack the timing relationship between key input and audio, used to check the timing of hit sounds."
-            + "\nDefault output path: Desktop/EzDiag/");
+        internal static readonly LocalisableString EZ_DIAG_SUITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "(研究功能)总开关。开启后整套探针在启动时开始工作，每局结束把本局数据写成 CSV。"
+            + "\n**重启游戏后生效**（关闭时为零开销，热路径上不留任何探针逻辑）。"
+            + "\n跑哪些内容由环境变量 EZ_DIAG_PROBES 选择（judgment / press / frame / hotpath / trace / all；空 = 全部）。"
+            + "\n输出目录：仓库内 diagnostics/（找不到仓库时退回桌面 EzDiag/）。",
+            "(Testing feature) Master switch. When on, the probe suite starts working at launch and writes CSVs after every play."
+            + "\nTakes effect after restarting the game (zero cost while off)."
+            + "\nWhich probes run is chosen by the EZ_DIAG_PROBES environment variable (judgment / press / frame / hotpath / trace / all; empty = all)."
+            + "\nOutput: diagnostics/ inside the repository (falls back to Desktop/EzDiag/).");
 
         internal static readonly LocalisableString INPUT_AUDIO_LATENCY_TRACKER = new EzLocalizationManager.EzLocalisableString(
             "输入音频延迟追踪器", "Input Audio Latency Tracker");

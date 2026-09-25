@@ -17,7 +17,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
     {
         internal static double ResolveStoredOffset(DrawableHitObject drawable)
         {
-            ManiaJudgeHotPathTrace.RecordMissStoredOffsetResolve();
+            if (ManiaJudgeHotPathTrace.Enabled)
+                ManiaJudgeHotPathTrace.RecordMissStoredOffsetResolve();
 
             if (drawable.HitObject is not IHasColumn)
                 return drawable.Time.Current - drawable.HitObject.GetEndTime();

@@ -45,6 +45,7 @@ using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Diagnostics;
 using osu.Game.EzOsuGame.ExternalRulesets;
 using osu.Game.EzOsuGame.Fonts;
 using osu.Game.EzOsuGame.Input;
@@ -340,6 +341,7 @@ namespace osu.Game
             Ez2ConfigManager = new Ez2ConfigManager(Storage);
             GlobalConfigStore.Config = LocalConfig;
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
+            applyDiagnosticSwitches(Ez2ConfigManager);
             dependencies.Cache(Ez2ConfigManager);
             dependencies.Cache(new PixivBackgroundCoordinator(Storage, Ez2ConfigManager));
 
@@ -750,8 +752,19 @@ namespace osu.Game
                 ? new DevelopmentOsuConfigManager(Storage)
                 : new OsuConfigManager(Storage);
 
+            // present 探针靠它读 draw / update 时钟与刷新率。
+            EzFrameStallDiagnostics.AttachHost(host);
+
             host.ExceptionThrown += onExceptionThrown;
         }
+
+        /// <summary>
+        /// 一次性把研究用途的开关（总开关 + 子项 + 探针调参环境变量）落到探针的静态位上。
+        /// 只在启动时读一次：探针关闭时热路径上只许剩一次静态 bool 读取，
+        /// 所以开关值必须是进程级不变的（见 <c>docs/EZ-PERFORMANCE.md</c> §2.4.18）。
+        /// 代价是改设置要重启游戏才生效。
+        /// </summary>
+        private static void applyDiagnosticSwitches(Ez2ConfigManager ezConfig) => EzDiagnosticSwitches.Apply(ezConfig);
 
         private void bindFrameLimiter(Ez2ConfigManager ezConfig, FrameworkConfigManager frameworkConfig)
         {

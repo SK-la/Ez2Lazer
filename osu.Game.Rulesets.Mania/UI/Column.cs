@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
@@ -16,6 +17,7 @@ using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.Audio;
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
@@ -387,7 +389,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private bool isHittable(DrawableHitObject drawable, double time, EzEnumJudgePrecedence precedence)
         {
-            ManiaJudgeHotPathTrace.RecordIsHittable();
+            if (ManiaJudgeHotPathTrace.Enabled)
+                ManiaJudgeHotPathTrace.RecordIsHittable();
 
             if (drawable is DrawableHoldNoteTail)
                 return hitPolicyHelper.IsHittableWithPrecedence(drawable, time, precedence);
@@ -437,7 +440,13 @@ namespace osu.Game.Rulesets.Mania.UI
             double judgementTime = hitObject.Result.TimeAbsolute;
 
             forceMissScratch.Clear();
-            LaneController.CollectForceMissBefore(hitObject.HitObject.StartTime, forceMissScratch);
+
+            // [Ez] 探针消融开关：跳过「提前判 miss」的收集与判定，用于确认它是否属于延迟尾部。
+            if (!EzPressLatencyDiagnostics.SkipForceMiss)
+                LaneController.CollectForceMissBefore(hitObject.HitObject.StartTime, forceMissScratch);
+
+            if (EzPressLatencyDiagnostics.Enabled)
+                pressForceMissScan = forceMissScratch.Count;
 
             for (int i = 0; i < forceMissScratch.Count; i++)
             {
@@ -457,10 +466,32 @@ namespace osu.Game.Rulesets.Mania.UI
             LaneController.NotifyJudged(hitObject);
         }
 
+        /// <summary>本次按键在 <see cref="handleHit"/> 中扫描的强制 miss 候选数（探针，跨按键在按键入口清零）。</summary>
+        private int pressForceMissScan;
+
+        /// <summary>探针只在本列首次按键时读一次非位置输入队列长度：读它会触发一次全树重建，不能每次按键都做。</summary>
+        private bool inputQueueCountReported;
+
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
             if (e.Action != Action.Value)
                 return false;
+
+            bool probe = EzPressLatencyDiagnostics.Enabled;
+            long pressEnterTs = probe ? Stopwatch.GetTimestamp() : 0;
+
+            // 首次命中的一次性成本（JIT / 惰性初始化 / 键音通道建立 / 池首次取用）只发生在本局前几次按键上，
+            // 所以只在这几次按键上多取几个时间戳，之后不再进入该分支。
+            bool breakdown = probe && EzPressLatencyDiagnostics.BreakdownActive;
+            // 只在采集时才读本列的路由开关：关闭探针时这一行短路，生产路径仍按原样在下面自行判断。
+            bool routesInput = breakdown && drawableRuleset?.ColumnRoutesInput == true;
+            int entriesBefore = breakdown ? LaneController.Entries.Count : 0;
+            long bookkeepingTs = pressEnterTs;
+            long routeTs = pressEnterTs;
+            long selectTs = pressEnterTs;
+            long applyTs = pressEnterTs;
+
+            pressForceMissScan = 0;
 
             double time = Time.Current;
 
@@ -482,6 +513,15 @@ namespace osu.Game.Rulesets.Mania.UI
             if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
                 sampleTriggerSource.Play();
 
+            if (breakdown)
+            {
+                bookkeepingTs = Stopwatch.GetTimestamp();
+                routeTs = selectTs = applyTs = bookkeepingTs;
+            }
+
+            bool routed = false;
+            bool judged = false;
+
             if (drawableRuleset?.ColumnRoutesInput == true)
             {
                 columnRoutedPressTarget = null;
@@ -491,13 +531,49 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 resolvePressRouting(out var precedence);
 
+                if (breakdown)
+                    routeTs = Stopwatch.GetTimestamp();
+
                 var entry = LaneController.SelectPressEntry(time, precedence);
 
+                if (breakdown)
+                    selectTs = Stopwatch.GetTimestamp();
+
                 if (entry != null)
-                    applyRoutedPress(entry.RoutedObject, time, e);
+                {
+                    routed = applyRoutedPress(entry.RoutedObject, time, e);
+                    judged = entry.IsPressJudged;
+                }
+
+                if (breakdown)
+                    applyTs = Stopwatch.GetTimestamp();
+            }
+
+            if (probe)
+            {
+                ManiaPressProbe.Capture(this, pressEnterTs, time, routed, judged, pressForceMissScan);
+
+                if (breakdown)
+                    ManiaPressProbe.CaptureBreakdown(this, pressEnterTs, bookkeepingTs, routeTs, selectTs, applyTs, routesInput, entriesBefore, routed, judged);
+
+                reportInputQueueCountOnce();
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// 探针只在本列首次按键时读一次非位置输入队列长度，交给帧级 stall 探针做基线；
+        /// 读它会触发一次全树重建，所以不能每次按键都做。取不到输入管理器时记 -1。
+        /// </summary>
+        private void reportInputQueueCountOnce()
+        {
+            if (inputQueueCountReported)
+                return;
+
+            inputQueueCountReported = true;
+            var containingInputManager = GetContainingInputManager();
+            EzFrameStallDiagnostics.ReportInputQueueCount(containingInputManager == null ? -1 : containingInputManager.NonPositionalInputQueue.Count);
         }
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)

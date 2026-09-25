@@ -259,8 +259,8 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ExperimentalLocalAccount, false);
 
             SetDefault(Ez2Setting.EzJudgmentDiagEnabled, false);
+
             SetDefault(Ez2Setting.EzSubFrameCorrectionEnabled, false);
-            SetDefault(Ez2Setting.EzTimingTraceEnabled, false);
             SetDefault(Ez2Setting.EzScoreRaceServiceEnabled, true);
             SetDefault(Ez2Setting.EzScoreRaceFeedMode, EzReplayFeedMode.BatchAllEvents);
 
@@ -1180,9 +1180,15 @@ namespace osu.Game.EzOsuGame.Configuration
         ExperimentalLocalAccount,
 
         // 判定时序诊断与校正
+        /// <summary>
+        /// 诊断套件总开关：决定启动时整套诊断是否工作。跑哪些内容由 <c>EZ_DIAG_PROBES</c>
+        /// 环境变量在启动时选择（见 <c>EzDiagnosticSwitches.Apply</c>），不落成设置项 ——
+        /// 「这次实验想验什么」是实验意图，不是用户偏好。
+        /// 与子项选择一样是**进程级**的，启动时读一次，之后不再变化。
+        /// </summary>
         EzJudgmentDiagEnabled,
+
         EzSubFrameCorrectionEnabled,
-        EzTimingTraceEnabled,
 
         /// <summary>全局角逐/时间线服务；关闭后不做选歌查询与 PlayerLoader timeline 构建。</summary>
         EzScoreRaceServiceEnabled,

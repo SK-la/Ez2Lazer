@@ -167,6 +167,9 @@ namespace osu.Game.Rulesets.Objects.Drawables
         [Resolved(CanBeNull = true)]
         private DrawableRuleset drawableRuleset { get; set; }
 
+        /// <summary>[Ez] 供判定诊断经此走到帧稳定时钟 / gameplay 时钟读插值漂移；不参与玩法逻辑。</summary>
+        internal DrawableRuleset EzDrawableRuleset => drawableRuleset;
+
         [Resolved(CanBeNull = true)]
         private Ez2ConfigManager ezConfig { get; set; }
 
@@ -814,6 +817,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
             if (Result.HasResult)
                 throw new InvalidOperationException("Cannot apply result on a hitobject that already has a result.");
 
+            EzJudgmentDiagnostics.ChainEnterApplyResult();
+
             application?.Invoke(Result, state);
 
             if (!Result.HasResult)
@@ -837,6 +842,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 UpdateState(Result.IsHit ? ArmedState.Hit : ArmedState.Miss);
 
             OnNewResult?.Invoke(this, Result);
+
+            EzJudgmentDiagnostics.ChainExitApplyResult();
         }
 
         /// <summary>
@@ -887,6 +894,9 @@ namespace osu.Game.Rulesets.Objects.Drawables
         /// <returns>Whether a scoring result has occurred from this <see cref="DrawableHitObject"/> or any nested <see cref="DrawableHitObject"/>.</returns>
         protected bool UpdateResult(bool userTriggered)
         {
+            // 首次命中链分解（探针关闭或已取到样本时为一次静态 bool 读取）。
+            EzJudgmentDiagnostics.ChainEnterUpdateResult();
+
             // It's possible for input to get into a bad state when rewinding gameplay, so results should not be processed
             if ((Clock as IGameplayClock)?.IsRewinding == true)
                 return false;
@@ -911,40 +921,15 @@ namespace osu.Game.Rulesets.Objects.Drawables
             }
 
             // === Ez judgment timing diagnostics ===
+            // 只记 Drift：InterpClock 与 GameTime 是同一属性连读两次，BassSource ≡ GameTime − Drift − 15.000，
+            // 都已在 2026-09-25 从 CSV 删除（docs/EZ-PERFORMANCE.md §2.4.19）。
+            // 闸留在调用点：关闭时这条热路径上只剩一次静态 bool 读取，连调用都不发生。
             if (userTriggered && EzJudgmentDiagnostics.Enabled)
-            {
-                double interpDrift = 0, bassSource = 0, frameElapsed = Clock.ElapsedFrameTime;
+                EzJudgmentDiagnostics.Capture(this, timeOffset, keyTs);
 
-                if (drawableRuleset?.FrameStableClock is FrameStabilityContainer fsc
-                    && fsc.ParentGameplayClock is GameplayClockContainer gcc)
-                {
-                    interpDrift = gcc.InterpolatedDrift;
-                    bassSource = gcc.BassSourceCurrentTime;
-                }
-
-                double inputToJudgeMs = double.NaN;
-
-                if (keyTs > 0)
-                {
-                    inputToJudgeMs = (Stopwatch.GetTimestamp() - keyTs) / (double)Stopwatch.Frequency * 1000.0;
-
-                    // Sanity: ignore absurd gaps (stale key stamp / unrelated press).
-                    if (inputToJudgeMs < 0 || inputToJudgeMs > 1000)
-                        inputToJudgeMs = double.NaN;
-                }
-
-                EzJudgmentDiagnostics.Record(
-                    Time.Current,
-                    HitObject.GetEndTime(),
-                    timeOffset,
-                    Time.Current, // interpClockTime = FSC ManualClock time
-                    bassSource,
-                    interpDrift,
-                    frameElapsed,
-                    inputToJudgeMs);
-            }
-
+            EzJudgmentDiagnostics.ChainEnterCheckForResult();
             CheckForResult(userTriggered, timeOffset);
+            EzJudgmentDiagnostics.ChainExitCheckForResult(Judged);
 
             return Judged;
         }

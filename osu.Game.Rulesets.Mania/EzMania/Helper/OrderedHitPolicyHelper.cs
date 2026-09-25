@@ -7,6 +7,7 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -26,7 +27,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         private readonly ManiaLaneController? laneController;
         private readonly Ez2ConfigManager ezConfig;
         private readonly Bindable<EzEnumHitMode> hitMode;
-        private readonly Bindable<bool> judgmentDiagEnabled;
 
         // 每判定复用同一批缓冲：候选与后判对象只在本次调用内有效，不去分配新的 List。
         private readonly List<PrecedenceCandidate> candidateBuffer = new List<PrecedenceCandidate>();
@@ -45,12 +45,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             this.laneController = laneController;
             ezConfig = GlobalConfigStore.EzConfig;
 
-            // 缓存 bindable：命中模式与诊断开关在一次按键里要被读好几次，没必要每次都走配置查询。
+            // 缓存 bindable：命中模式在一次按键里要被读好几次，没必要每次都走配置查询。
             hitMode = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            judgmentDiagEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzJudgmentDiagEnabled);
         }
 
-        private bool JudgmentDiagEnabled => judgmentDiagEnabled.Value;
+        /// <summary>
+        /// 判定诊断开关是进程级的静态值（启动时由 <c>OsuGameBase</c> 读一次），不持有 bindable：
+        /// 这个开关不常开、也不会在运行期改，没必要为它在每个 helper 上常驻一个订阅。
+        /// </summary>
+        private static bool JudgmentDiagEnabled => EzJudgmentDiagnostics.Enabled;
 
         public bool IsHittableWithPrecedence(DrawableHitObject hitObject, double time, EzEnumJudgePrecedence? precedenceOverride = null)
         {
@@ -549,7 +552,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         private void logDiag(string message)
         {
-            if (!ezConfig.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled))
+            if (!JudgmentDiagEnabled)
                 return;
 
             Logger.Log($"{log_prefix} {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);

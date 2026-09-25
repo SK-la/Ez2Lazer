@@ -340,10 +340,9 @@ namespace osu.Game.Screens.Play
                 LatencyTracker.Start();
             }
 
-            // [Ez] Wire judgment diagnostics, sub-frame correction, and timing trace to config toggles.
-            EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
+            // [Ez] 诊断开关（总开关 + 子项 + 探针调参环境变量）是**进程级**的，启动时由
+            // `EzDiagnosticSwitches.Apply` 一次落地；这里不再重读配置与环境变量，探针也不持有 bindable。
             EzOsuGame.Timing.EzSubFrameCorrection.Enabled = ez2Config.Get<bool>(Ez2Setting.EzSubFrameCorrectionEnabled);
-            EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
 
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
             HealthProcessor ??= ruleset.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
@@ -1105,9 +1104,10 @@ namespace osu.Game.Screens.Play
                 const double fallback_timeout_ms = 5000;
 
                 // [Ez] Trace every delegate tick to diagnose result-screen stalls.
-                EzOsuGame.Diagnostics.EzTimingTrace.Record(
-                    "ResultsDelegate.Tick",
-                    $"taskNull={prepareScoreForDisplayTask == null} taskStatus={prepareScoreForDisplayTask?.Status.ToString() ?? "-"} waitMs={(int)(Time.Current - resultsDisplayQueuedTime)} hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed}");
+                // 刻意不插值：此处每帧执行，插值串会在 Record 判断开关之前就拼好并分配。
+                // 每帧的节奏（相邻行 WallMs 之差）是这里的信号；状态快照由 PrepareAndImport、
+                // ResultsDelegate.ForcedImport 等一次性分支负责。
+                EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.Tick");
 
                 // If prepare task hasn't been started yet, attempt to start it. If it still cannot be
                 // started due to transient conditions (eg. HasCompleted flipping), force a preparation
@@ -1451,15 +1451,8 @@ namespace osu.Game.Screens.Play
             StartGameplay();
             OnGameplayStarted?.Invoke();
 
-            // [Ez] Clear any stale diagnostic samples from a previous play.
-            if (EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled)
-                EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Clear();
-
-            if (EzOsuGame.Diagnostics.EzTimingTrace.Enabled)
-            {
-                EzOsuGame.Diagnostics.EzTimingTrace.Clear();
-                EzOsuGame.Diagnostics.EzTimingTrace.Record("GameplayStarted", $"beatmap={Beatmap.Value?.BeatmapInfo?.ToString() ?? "?"}");
-            }
+            // [Ez] 探针名单与落盘时机都归 EzDiagnosticSession；这里只交代本局的开场事实。
+            EzOsuGame.Diagnostics.EzDiagnosticSession.Begin($"beatmap={Beatmap.Value?.BeatmapInfo?.ToString() ?? "?"}");
         }
 
         /// <summary>
@@ -1511,28 +1504,9 @@ namespace osu.Game.Screens.Play
                     ScoreProcessor.FailScore(Score.ScoreInfo);
             }
 
-            // [Ez] Flush judgment diagnostics data to CSV on gameplay exit.
-            // Perform flush asynchronously to avoid blocking the UI/update thread
-            // in case disk IO is slow (antivirus, network drives, etc.).
-            if (EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled)
-            {
-                _ = Task.Run(() =>
-                {
-                    EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Flush();
-                    EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Clear();
-                });
-            }
-
-            // [Ez] Flush timing trace events to CSV on gameplay exit.
-            if (EzOsuGame.Diagnostics.EzTimingTrace.Enabled)
-            {
-                EzOsuGame.Diagnostics.EzTimingTrace.Record("GameplayExited", $"hasPassed={GameplayState.HasPassed} hasFailed={GameplayState.HasFailed} hasQuit={GameplayState.HasQuit}");
-                _ = Task.Run(() =>
-                {
-                    EzOsuGame.Diagnostics.EzTimingTrace.Flush();
-                    EzOsuGame.Diagnostics.EzTimingTrace.Clear();
-                });
-            }
+            // [Ez] 局末落盘。时序追踪的结束事件与整段落盘都在 EzDiagnosticSession 里。
+            EzOsuGame.Diagnostics.EzDiagnosticSession.End(
+                $"hasPassed={GameplayState.HasPassed} hasFailed={GameplayState.HasFailed} hasQuit={GameplayState.HasQuit}");
 
             // GameplayClockContainer performs seeks / start / stop operations on the beatmap's track.
             // as we are no longer the current screen, we cannot guarantee the track is still usable.

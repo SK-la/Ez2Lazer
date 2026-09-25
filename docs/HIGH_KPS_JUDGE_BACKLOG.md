@@ -3,7 +3,8 @@
 > **定位**：高密度谱面 / 高按键吞吐（社区口径可达 ~90 KPS 量级）下的**全 HitMode**热路径优化清单。  
 > **与主题关系**：依附「局内冻结判定平面」主线（`ManiaJudgementRound` → `ManiaLaneController` → `ManiaJudgementKernel`），**不**替代架构重构；本文件只记录性能专项。  
 > **黄金标准不变**：任何优化不得破坏 `TestSceneReplaySessionParity` / `ManiaCrossSourceInvariantTest` / `ManiaJudgePrecedenceParityTest`。
-> **FPS 现象 / 观测口径 / bench 索引**：统一见 [`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)；本文件只列判定热路径的优化项。
+> **FPS 现象 / 观测口径 / bench 索引**：统一见 [`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)；本文件只列判定热路径的优化项。  
+> **按键延迟实测结论**（`PreColumnMs` 是等帧而非派发开销、`ColumnMs` p50 0.101 ms、>8 ms 停顿只在开局/退出帧）：见 [`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md) §2.4。判定热路径按该结论**不再是按键延迟的嫌疑项**。
 
 ---
 
@@ -59,7 +60,7 @@
 | **BMS-ROUTE-COL** | [ ] tail `BmsRouteState` 完全列级化 | BMS |
 | **HOLD-TAIL-FAST** | [ ] `Column.OnReleased` → 列级 tail release | LN |
 | **SOUND-DECOUPLE** | [ ] 判定与 `sampleTriggerSource.Play()` 解耦（注：`KeySoundPreviewMode.Off` 目前也会触发取样，只有 `AutoPlayPlus` 排除，会与 note 音互相 choke） | 仅 profile 证明阻塞时做 |
-| **INPUT-QUEUE-FW** | [x] 已定案：框架侧共享队列构建**不可做**（`TestSceneInputQueueChange.CombinedClicks` 证伪，drawable 事件中移动后同帧按键必须看到重建队列） | 见 `EZ-PERFORMANCE.md` §2.1 **FW-INPUT-QUEUE-DISPATCH**；去分配部分已落地 |
+| **INPUT-QUEUE-FW** | [x] 已定案：框架侧共享队列构建**不可做**（`TestSceneInputQueueChange.CombinedClicks` 证伪，drawable 事件中移动后同帧按键必须看到重建队列） | 见 `EZ-PERFORMANCE.md` §2.1 **FW-INPUT-QUEUE-DISPATCH**；去分配部分已落地。**按键延迟实测后不再重开**：`PreColumnMs` 已证明是「等下一帧」而非派发开销，见 §2.4 |
 | **COLUMN-EARLY-OUT** | [ ] 列路由成功后早退：`PropagatePressed` 的截断会让 `ReplayRecorder` / `KeyCounterActionTrigger` 收不到 Release，须先调派发顺序 | 全部 Ez |
 | **DRAWABLE-MICRO-BENCH** | [x] PeakKps × alive；alloc；BMS/Poor；Empty gateTrue==0 | gate 主导；valid 表曾 `new[]` |
 | **STORE-FRAME-BUDGET** | [x] `DetachedBeatmapStoreFrameBudget` Drain≤24 + 单测 | 选歌 Replace 风暴 |
