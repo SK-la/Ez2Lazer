@@ -14,10 +14,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
     /// </summary>
     public static class EzJudgmentDiagnostics
     {
-        /// <summary>
-        /// 是否启用采集（运行时可切换）。
-        /// </summary>
-        public static bool Enabled { get; set; }
+        /// <summary>是否采集。启动时由 <see cref="EzDiagnosticSwitches.Apply"/> 写一次；关闭时热路径上只剩一次静态 bool 读取。</summary>
+        public static bool Enabled { get; private set; }
+
+        /// <summary>唯一的生产写入口；测试可直接调用。</summary>
+        public static void SetEnabled(bool enabled) => Enabled = enabled;
 
         private static ConcurrentQueue<JudgmentSample> samples = new ConcurrentQueue<JudgmentSample>();
 

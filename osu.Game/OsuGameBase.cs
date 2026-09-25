@@ -759,23 +759,12 @@ namespace osu.Game
         }
 
         /// <summary>
-        /// 一次性把两个研究用途的开关落到探针的静态位上。
-        /// <para>
-        /// 只在启动时读一次（<c>Player</c> 每次进图不再重读），理由是这些探针在**关闭时必须是零开销**：
-        /// 开关是纯静态 bool，热路径上就只剩一次加载 + 分支，没有 bindable、没有 DI、没有配置查询。
-        /// 代价是改设置要重启游戏才生效 —— 这类不常开的功能可以接受，换来的是运行期零成本。
-        /// </para>
+        /// 一次性把研究用途的开关（总开关 + 子项 + 探针调参环境变量）落到探针的静态位上。
+        /// 只在启动时读一次：探针关闭时热路径上只许剩一次静态 bool 读取，
+        /// 所以开关值必须是进程级不变的（见 <c>docs/EZ-PERFORMANCE.md</c> §2.4.18）。
+        /// 代价是改设置要重启游戏才生效。
         /// </summary>
-        private static void applyDiagnosticSwitches(Ez2ConfigManager ezConfig)
-        {
-            bool judgmentDiagnostics = ezConfig.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
-
-            EzJudgmentDiagnostics.Enabled = judgmentDiagnostics;
-            EzPressLatencyDiagnostics.Enabled = judgmentDiagnostics;
-            EzFrameStallDiagnostics.Enabled = judgmentDiagnostics;
-
-            EzTimingTrace.Enabled = ezConfig.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
-        }
+        private static void applyDiagnosticSwitches(Ez2ConfigManager ezConfig) => EzDiagnosticSwitches.Apply(ezConfig);
 
         private void bindFrameLimiter(Ez2ConfigManager ezConfig, FrameworkConfigManager frameworkConfig)
         {

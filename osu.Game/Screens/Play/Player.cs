@@ -6,7 +6,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -341,27 +340,8 @@ namespace osu.Game.Screens.Play
                 LatencyTracker.Start();
             }
 
-            // [Ez] 诊断开关是**进程级**的，启动时由 `OsuGameBase.applyDiagnosticSwitches` 读一次；
-            // 这里不再重读配置，探针不持有 bindable、不进 DI，关闭时热路径上只剩一个静态 bool 分支。
-            // （消融用的开关仍然走环境变量，避免为探针新增可持久化设置项。）
-            EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.SkipForceMiss =
-                Environment.GetEnvironmentVariable("EZ_PRESS_PROBE_SKIP_FORCE_MISS") == "1";
-
-            // 帧明细阈值同样走环境变量：0 = 抓全集（供帧节奏 / 平滑度分析）；想看「接近一帧」的次尖峰就调低（如 0.8）。
-            if (double.TryParse(
-                    Environment.GetEnvironmentVariable("EZ_FRAME_PROBE_MS"),
-                    NumberStyles.Float,
-                    CultureInfo.InvariantCulture,
-                    out double frameProbeThreshold)
-                && frameProbeThreshold >= 0)
-            {
-                EzOsuGame.Diagnostics.EzFrameStallDiagnostics.ThresholdMs = frameProbeThreshold;
-            }
-
-            // light 模式：只留直方图，跳过每帧的 GC/分配读数。
-            EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Deep =
-                Environment.GetEnvironmentVariable("EZ_FRAME_PROBE_LIGHT") != "1";
-
+            // [Ez] 诊断开关（总开关 + 子项 + 探针调参环境变量）是**进程级**的，启动时由
+            // `EzDiagnosticSwitches.Apply` 一次落地；这里不再重读配置与环境变量，探针也不持有 bindable。
             EzOsuGame.Timing.EzSubFrameCorrection.Enabled = ez2Config.Get<bool>(Ez2Setting.EzSubFrameCorrectionEnabled);
 
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);

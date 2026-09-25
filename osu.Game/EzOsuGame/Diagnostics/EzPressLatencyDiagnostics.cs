@@ -29,8 +29,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
     /// </summary>
     public static class EzPressLatencyDiagnostics
     {
-        /// <summary>是否采集。与 <see cref="EzJudgmentDiagnostics.Enabled"/> 同源，由 <c>Player</c> 统一开关。</summary>
-        public static bool Enabled { get; set; }
+        /// <summary>是否采集。启动时由 <see cref="EzDiagnosticSwitches.Apply"/> 写一次；与判定探针各自独立。</summary>
+        public static bool Enabled { get; private set; }
+
+        /// <summary>唯一的生产写入口；测试可直接调用。</summary>
+        public static void SetEnabled(bool enabled) => Enabled = enabled;
 
         /// <summary>
         /// 消融开关：跳过 <c>Column.handleHit</c> 的「提前判 miss」扫描。

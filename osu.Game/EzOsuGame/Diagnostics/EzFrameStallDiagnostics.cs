@@ -46,8 +46,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
     /// </summary>
     public static class EzFrameStallDiagnostics
     {
-        /// <summary>是否采集。与其它探针同源，由 <c>Player</c> 统一开关。</summary>
-        public static bool Enabled { get; set; }
+        /// <summary>是否采集。启动时由 <see cref="EzDiagnosticSwitches.Apply"/> 写一次。</summary>
+        public static bool Enabled { get; private set; }
+
+        /// <summary>唯一的生产写入口；测试可直接调用。</summary>
+        public static void SetEnabled(bool enabled) => Enabled = enabled;
 
         /// <summary>超过该时长的帧才留明细；直方图则覆盖所有帧。可用 <c>EZ_FRAME_PROBE_MS</c> 覆盖。</summary>
         public static double ThresholdMs { get; set; } = 0;
