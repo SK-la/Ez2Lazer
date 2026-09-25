@@ -156,6 +156,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static long presentFrames;
         private static long presentDuplicates;
         private static long presentSkipped;
+        private static long presentFrozenSkipped;
         private static double drawSleptTotalMs;
 
         /// <summary>落盘前抓一次的 NAudio 拉取统计（<see cref="WasapiReadStats"/> 在该局开测时启用、清空）。</summary>
@@ -185,6 +186,16 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static long rateSkipped;
         private static long clockStoppedFrames;
         private static double clockStoppedMs;
+
+        /// <summary>本帧的 gameplay 时钟是否停走（歌曲结束 / 暂停）。</summary>
+        /// <remarks>
+        /// 歌曲结束后的退场 / 结算段是**另一个工况**：子树已拆（`subtree=0`）、update 掉到 ~120 Hz。
+        /// 实测一次 39 s 的采集里 327 个 >5 ms 帧有 316 个落在这一段。present 采样要排除它，
+        /// 否则 update 采样频率比 draw 还低，会整段整段漏掉 draw 帧，把 `coverage` 拉到 0.87 以下
+        /// （该数只能由 <see cref="FormatSummary"/> 的 present 行自检看出来）。帧耗时直方图不排除
+        /// （跨局可比性优先），但读 `over5` 时要记得减去这 300 帧量级的退场段。
+        /// </remarks>
+        private static bool clockFrozen;
         private static long errCount;
         private static double errSum;
         private static double errSqSum;
@@ -384,7 +395,13 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double elapsedMs = (now - prev) * 1000.0 / Stopwatch.Frequency;
             lastFrameWallMs = wallMs;
             accumulateClocks(audioSrcMs, interpMs, elapsedMs);
-            samplePresent(now, prev);
+
+            // 时钟停走（歌曲结束后的退场段）不采 present：那段 update 会掉到 ~120Hz 而 draw 还在千帧以上，
+            // 逐 update 帧采样会整段漏掉 draw 帧，coverage 自检立刻掉下来（实测 0.869）。
+            if (clockFrozen)
+                presentFrozenSkipped++;
+            else
+                samplePresent(now, prev);
 
             if (pressesInFrame > 0)
             {
@@ -473,6 +490,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             if (!double.IsFinite(audioSrcMs) || !double.IsFinite(interpMs))
             {
                 prevAudioSrcMs = prevInterpMs = double.NaN;
+                clockFrozen = false;
                 return;
             }
 
@@ -506,8 +524,14 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 {
                     clockStoppedFrames++;
                     clockStoppedMs += elapsedMs;
+                    clockFrozen = true;
                 }
-                else if (double.IsFinite(lastAudioStepWallMs))
+                else
+                {
+                    clockFrozen = false;
+                }
+
+                if (interpMs != prevInterpMs && double.IsFinite(lastAudioStepWallMs))
                 {
                     double age = EzJudgmentDiagnostics.WallClockMs - lastAudioStepWallMs;
 
@@ -617,6 +641,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             audioStep.Reset();
             interpErr.Reset();
             wasapiReadSnapshot = null;
+            clockFrozen = false;
             lastAudioStepWallMs = double.NaN;
             pullMissCount = 0;
             pullMissHoldMs = 0;
@@ -826,6 +851,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(Environment.NewLine);
                 sb.Append("present frames=").Append(presentFrames).Append(" skipped=").Append(presentSkipped)
                   .Append(" dup=").Append(presentDuplicates)
+                  .Append(" frozenSkipped=").Append(presentFrozenSkipped)
                   .Append(CultureInfo.InvariantCulture, $" coverage={drawPeriodSumMs / Math.Max(1, presentLastWallMs - presentFirstWallMs):F3}")
                   .Append(" drawPeriod");
                 sb.Append(drawPeriod.Format());
