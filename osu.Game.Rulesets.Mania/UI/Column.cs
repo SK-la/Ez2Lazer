@@ -573,11 +573,9 @@ namespace osu.Game.Rulesets.Mania.UI
                 LaneController.Entries.Count,
                 pressForceMissScan,
                 Clock.ElapsedFrameTime,
-                drawableRuleset?.FrameStableClock?.IsCatchingUp.Value ?? false,
                 FrameStabilityContainer.EzLastUpdateIterations,
                 GC.CollectionCount(0),
                 GC.CollectionCount(1),
-                GC.CollectionCount(2),
                 GC.GetTotalPauseDuration().TotalMilliseconds,
                 ManiaLaneController.EarliestCacheHits,
                 ManiaLaneController.EarliestCacheMisses));

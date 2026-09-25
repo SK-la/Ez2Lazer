@@ -41,8 +41,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double GameTime,
             double NoteStartTime,
             double TimeOffset,
-            double InterpolatedClockTime,
-            double BassSourceTime,
             double InterpolatedDrift,
             double FrameElapsed,
             double InputToJudgeMs);
@@ -55,8 +53,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double gameTime,
             double noteStartTime,
             double timeOffset,
-            double interpClockTime,
-            double bassSourceTime,
             double interpDrift,
             double frameElapsed,
             double inputToJudgeMs = double.NaN)
@@ -69,8 +65,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 gameTime,
                 noteStartTime,
                 timeOffset,
-                interpClockTime,
-                bassSourceTime,
                 interpDrift,
                 frameElapsed,
                 inputToJudgeMs));
@@ -82,7 +76,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
         public static string Flush()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("WallMs,GameTime,NoteStart,TimeOffset,InterpClock,BassSource,Drift,FrameElapsed,InputToJudgeMs");
+            // InterpClock / BassSource 两列已删（2026-09-25）：前者与 GameTime 是同一属性连读两次；
+            // 后者恒等于 GameTime − Drift − 15.000。详见 docs/EZ-PERFORMANCE.md §2.4.19。
+            sb.AppendLine("WallMs,GameTime,NoteStart,TimeOffset,Drift,FrameElapsed,InputToJudgeMs");
 
             // Drain current queue snapshot into the CSV builder.
             while (samples.TryDequeue(out var s))
@@ -91,8 +87,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(s.GameTime.ToString("F3")).Append(',');
                 sb.Append(s.NoteStartTime.ToString("F3")).Append(',');
                 sb.Append(s.TimeOffset.ToString("F3")).Append(',');
-                sb.Append(s.InterpolatedClockTime.ToString("F3")).Append(',');
-                sb.Append(s.BassSourceTime.ToString("F3")).Append(',');
                 sb.Append(s.InterpolatedDrift.ToString("F3")).Append(',');
                 sb.Append(s.FrameElapsed.ToString("F3")).Append(',');
                 sb.Append(double.IsNaN(s.InputToJudgeMs) ? string.Empty : s.InputToJudgeMs.ToString("F3"));

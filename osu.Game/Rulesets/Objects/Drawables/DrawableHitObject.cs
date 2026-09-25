@@ -911,15 +911,16 @@ namespace osu.Game.Rulesets.Objects.Drawables
             }
 
             // === Ez judgment timing diagnostics ===
+            // 只记 Drift：InterpClock 与 GameTime 是同一属性连读两次，BassSource ≡ GameTime − Drift − 15.000，
+            // 都已在 2026-09-25 从 CSV 删除（docs/EZ-PERFORMANCE.md §2.4.19），这里也不再取那两个量。
             if (userTriggered && EzJudgmentDiagnostics.Enabled)
             {
-                double interpDrift = 0, bassSource = 0, frameElapsed = Clock.ElapsedFrameTime;
+                double interpDrift = 0, frameElapsed = Clock.ElapsedFrameTime;
 
                 if (drawableRuleset?.FrameStableClock is FrameStabilityContainer fsc
                     && fsc.ParentGameplayClock is GameplayClockContainer gcc)
                 {
                     interpDrift = gcc.InterpolatedDrift;
-                    bassSource = gcc.BassSourceCurrentTime;
                 }
 
                 double inputToJudgeMs = double.NaN;
@@ -937,8 +938,6 @@ namespace osu.Game.Rulesets.Objects.Drawables
                     Time.Current,
                     HitObject.GetEndTime(),
                     timeOffset,
-                    Time.Current, // interpClockTime = FSC ManualClock time
-                    bassSource,
                     interpDrift,
                     frameElapsed,
                     inputToJudgeMs);

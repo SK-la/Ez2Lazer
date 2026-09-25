@@ -71,11 +71,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
             int Entries,
             int ForceMissScan,
             double FrameElapsed,
-            bool CatchingUp,
             int FscIterations,
             int Gen0,
             int Gen1,
-            int Gen2,
             double GcPauseMs,
             long CacheHits,
             long CacheMisses);
@@ -129,7 +127,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             var sb = new StringBuilder();
             sb.AppendLine(
                 "WallMs,GameTime,TotalMs,PreColumnMs,ColumnMs,FrameAgeMs,Column,FrameId,PressOrdinalInFrame,PressesInFrame,"
-                + "Routed,Judged,Entries,ForceMissScan,FrameElapsed,CatchingUp,FscIter,Gen0,Gen1,Gen2,GcPauseMs,CacheHits,CacheMisses");
+                + "Routed,Judged,Entries,ForceMissScan,FrameElapsed,FscIter,Gen0,Gen1,GcPauseMs,CacheHits,CacheMisses");
 
             int[] frameLengths = computeFrameLengths(start, sampleCount);
 
@@ -152,11 +150,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(s.Entries).Append(',');
                 sb.Append(s.ForceMissScan).Append(',');
                 sb.Append(num(s.FrameElapsed)).Append(',');
-                sb.Append(s.CatchingUp ? 1 : 0).Append(',');
                 sb.Append(s.FscIterations).Append(',');
                 sb.Append(s.Gen0).Append(',');
                 sb.Append(s.Gen1).Append(',');
-                sb.Append(s.Gen2).Append(',');
                 sb.Append(num(s.GcPauseMs)).Append(',');
                 sb.Append(s.CacheHits).Append(',');
                 sb.Append(s.CacheMisses);
@@ -223,7 +219,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double preSum = 0, columnSum = 0, totalSum = 0, frameAgeSum = 0;
             double preMax = 0, columnMax = 0, totalMax = 0, frameAgeMax = 0;
             double unroutedColumnSum = 0, routedColumnSum = 0;
-            int unrouted = 0, routed = 0, judged = 0, catchingUp = 0, multiPass = 0, maxPressesInFrame = 1;
+            int unrouted = 0, routed = 0, judged = 0, multiPass = 0, maxPressesInFrame = 1;
 
             for (int i = 0; i < sampleCount; i++)
             {
@@ -255,9 +251,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 if (s.Judged)
                     judged++;
 
-                if (s.CatchingUp)
-                    catchingUp++;
-
                 if (s.FscIterations > 1)
                     multiPass++;
 
@@ -268,7 +261,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             return string.Create(CultureInfo.InvariantCulture,
                 $"[EzPressLatency] n={sampleCount} overwritten={Overwritten} routed={routed} judged={judged} "
-                + $"catchingUp={catchingUp} multiPassFrames={multiPass} maxPressesInFrame={maxPressesInFrame} "
+                + $"multiPassFrames={multiPass} maxPressesInFrame={maxPressesInFrame} "
                 + $"PreColumn avg/max={preSum / n:F3}/{preMax:F3} "
                 + $"Column avg/max={columnSum / n:F3}/{columnMax:F3} "
                 + $"Total avg/max={totalSum / n:F3}/{totalMax:F3} "

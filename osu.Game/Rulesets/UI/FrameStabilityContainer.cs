@@ -120,7 +120,6 @@ namespace osu.Game.Rulesets.UI
             double subtreeTicks = 0;
             bool ranSubtree = false;
             long allocBefore = samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() : 0;
-            long subtreeAlloc = 0;
 
             do
             {
@@ -139,7 +138,6 @@ namespace osu.Game.Rulesets.UI
                     break;
 
                 long beforeSubtree = sampling ? Stopwatch.GetTimestamp() : 0;
-                long allocAtSubtreeStart = samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() : 0;
 
                 base.UpdateSubTree();
                 UpdateSubTreeMasking();
@@ -147,12 +145,7 @@ namespace osu.Game.Rulesets.UI
                 ranSubtree = true;
 
                 if (sampling)
-                {
                     subtreeTicks += Stopwatch.GetTimestamp() - beforeSubtree;
-
-                    if (samplingAlloc)
-                        subtreeAlloc += GC.GetAllocatedBytesForCurrentThread() - allocAtSubtreeStart;
-                }
             } while (state == PlaybackState.RequiresCatchUp && stopwatch.ElapsedMilliseconds < max_catchup_milliseconds);
 
             // [Ez] Catch-up loop count of this pass, read by the press-latency probe.
@@ -164,7 +157,6 @@ namespace osu.Game.Rulesets.UI
                 double tickToMs = 1000.0 / Stopwatch.Frequency;
                 subtreeProbeMs = subtreeTicks * tickToMs;
                 clockProbeMs = clockTicks * tickToMs;
-                subtreeProbeAllocBytes = subtreeAlloc;
                 loopAllocProbeBytes = samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() - allocBefore : 0;
                 probeFrameValid = ranSubtree;
             }
@@ -192,9 +184,6 @@ namespace osu.Game.Rulesets.UI
         /// <summary>[Ez] 上一轮 FSC 子树（<c>base.UpdateSubTree</c>）耗时；探针用，不参与游戏逻辑。</summary>
         public static double SubtreeProbeMs => subtreeProbeMs;
 
-        /// <summary>[Ez] 上一轮 FSC 子树内分配字节数；仅 Deep 模式有值。</summary>
-        public static long SubtreeProbeAllocBytes => subtreeProbeAllocBytes;
-
         /// <summary>[Ez] 上一轮 <see cref="UpdateSubTree"/> 全程（时钟 + 子树 + masking）的分配字节数；仅 Deep 模式有值。</summary>
         public static long LoopAllocProbeBytes => loopAllocProbeBytes;
 
@@ -207,7 +196,6 @@ namespace osu.Game.Rulesets.UI
 
         private static double subtreeProbeMs;
         private static double clockProbeMs;
-        private static long subtreeProbeAllocBytes;
         private static long loopAllocProbeBytes;
         private static bool probeFrameValid;
 

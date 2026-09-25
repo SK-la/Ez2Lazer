@@ -102,7 +102,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static long lastProcessAllocated;
         private static int lastGen0;
         private static int lastGen1;
-        private static int lastGen2;
 
         private static long pressFrameCount;
         private static double sincePrevFrameTotalMs;
@@ -112,7 +111,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static double subtreeMsTotal;
         private static double clockMsTotal;
         private static double elapsedProbeTotalMs;
-        private static long subtreeAllocTotal;
         private static long loopAllocTotal;
         private static long probeFrames;
 
@@ -238,9 +236,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             int FscIterations,
             int Gen0Delta,
             int Gen1Delta,
-            int Gen2Delta,
             double SubtreeMs,
-            long SubtreeAllocBytes,
             long LoopAllocBytes,
             double AudioSrcMs,
             double InterpMs);
@@ -368,7 +364,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             long gcPauseTicks = 0;
             long threadAllocated = 0;
             long processAllocated = 0;
-            int gen0 = 0, gen1 = 0, gen2 = 0;
+            int gen0 = 0, gen1 = 0;
 
             if (Deep)
             {
@@ -377,12 +373,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 processAllocated = GC.GetTotalAllocatedBytes(false);
                 gen0 = GC.CollectionCount(0);
                 gen1 = GC.CollectionCount(1);
-                gen2 = GC.CollectionCount(2);
             }
 
             if (prev == 0)
             {
-                seed(gcPauseTicks, threadAllocated, processAllocated, gen0, gen1, gen2);
+                seed(gcPauseTicks, threadAllocated, processAllocated, gen0, gen1);
                 pressesInFrame = 0;
                 pressColumnMsInFrame = 0;
                 sincePrevFrameMinMs = double.MaxValue;
@@ -430,7 +425,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 {
                     subtreeMsTotal += FrameStabilityContainer.SubtreeProbeMs;
                     clockMsTotal += FrameStabilityContainer.ClockProbeMs;
-                    subtreeAllocTotal += FrameStabilityContainer.SubtreeProbeAllocBytes;
                     loopAllocTotal += FrameStabilityContainer.LoopAllocProbeBytes;
                     // 帧长必须用同一批帧，否则子树占比的分子分母不同源。
                     elapsedProbeTotalMs += elapsedMs;
@@ -457,9 +451,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     FrameStabilityContainer.EzLastUpdateIterations,
                     gen0 - lastGen0,
                     gen1 - lastGen1,
-                    gen2 - lastGen2,
                     FrameStabilityContainer.SubtreeProbeMs,
-                    FrameStabilityContainer.SubtreeProbeAllocBytes,
                     FrameStabilityContainer.LoopAllocProbeBytes,
                     audioSrcMs,
                     interpMs);
@@ -476,7 +468,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     detailCount++;
             }
 
-            seed(gcPauseTicks, threadAllocated, processAllocated, gen0, gen1, gen2);
+            seed(gcPauseTicks, threadAllocated, processAllocated, gen0, gen1);
             pressesInFrame = 0;
             pressColumnMsInFrame = 0;
             sincePrevFrameMinMs = double.MaxValue;
@@ -585,14 +577,13 @@ namespace osu.Game.EzOsuGame.Diagnostics
             prevInterpMs = interpMs;
         }
 
-        private static void seed(long gcPauseTicks, long threadAllocated, long processAllocated, int gen0, int gen1, int gen2)
+        private static void seed(long gcPauseTicks, long threadAllocated, long processAllocated, int gen0, int gen1)
         {
             lastGcPauseTicks = gcPauseTicks;
             lastThreadAllocated = threadAllocated;
             lastProcessAllocated = processAllocated;
             lastGen0 = gen0;
             lastGen1 = gen1;
-            lastGen2 = gen2;
         }
 
         public static void Clear()
@@ -621,7 +612,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             lastGcPauseTicks = -1;
             lastThreadAllocated = 0;
             lastProcessAllocated = 0;
-            lastGen0 = lastGen1 = lastGen2 = 0;
+            lastGen0 = lastGen1 = 0;
             pressesInFrame = 0;
             pressColumnMsInFrame = 0;
             sincePrevFrameMinMs = double.MaxValue;
@@ -631,7 +622,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
             subtreeMsTotal = 0;
             clockMsTotal = 0;
             elapsedProbeTotalMs = 0;
-            subtreeAllocTotal = 0;
             loopAllocTotal = 0;
             probeFrames = 0;
             inputQueueCount = -1;
@@ -681,7 +671,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             wasapiReadSnapshot = WasapiReadStats.GetSnapshot();
 
             var sb = new StringBuilder();
-            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,SincePrevFrameMs,FscIter,Gen0Delta,Gen1Delta,Gen2Delta,SubtreeMs,SubtreeAllocBytes,LoopAllocBytes,AudioSrcMs,InterpMs");
+            sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,SincePrevFrameMs,FscIter,Gen0Delta,Gen1Delta,SubtreeMs,LoopAllocBytes,AudioSrcMs,InterpMs");
 
             for (int i = 0; i < sampleCount; i++)
             {
@@ -698,9 +688,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(s.FscIterations).Append(',');
                 sb.Append(s.Gen0Delta).Append(',');
                 sb.Append(s.Gen1Delta).Append(',');
-                sb.Append(s.Gen2Delta).Append(',');
                 sb.Append(num(s.SubtreeMs)).Append(',');
-                sb.Append(s.SubtreeAllocBytes).Append(',');
                 sb.Append(s.LoopAllocBytes).Append(',');
                 sb.Append(num(s.AudioSrcMs)).Append(',');
                 sb.Append(num(s.InterpMs));
@@ -841,7 +829,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     + $"clockMsMean={meanClock:F3}ms "
                     + $"restMsMean={meanRest:F3}ms "
                     + $"subtreeShareMs={100 * meanSubtree / meanElapsedAll:F1}% "
-                    + $"subtreeAllocMean={subtreeAllocTotal / (double)probeFrames:F0}B loopAllocMean={loopAllocTotal / (double)probeFrames:F0}B");
+                    + $"loopAllocMean={loopAllocTotal / (double)probeFrames:F0}B");
             }
 
             // present 侧：往屏幕上送的那份内容「多旧」，以及 draw 线程自己的节拍。note 位置在 update 线程里就定好了，
