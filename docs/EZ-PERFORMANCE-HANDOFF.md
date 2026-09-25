@@ -45,6 +45,19 @@
 2026-9-21，且音频日志没有新加的 `mmcss=` 字段）。同时同一份音频路径三次采集的 `pullMiss` 是
 **1 / 145 / 4** ⇒ **单局计数不可判**，改为看 §3.4e 的分布量具。
 
+**2026-09-25 10:11 局（`framestall_20260925_101112`，39.4 s）是真正的 MMCSS 测试 —— 结论：MMCSS 没用，音频链结案（§3.4f）。**
+
+- 交付闭环：本地工程重建（9:36:30）后的 DLL 才带上改动，音频日志出现 `mmcss=Pro Audio (requested)`。
+- 直读量具把「漏一拍」从推断变直读：`wasapiRead … p50=10.25 p99=20.25 over15=162`、
+  `wasapiPull periods/pull max=2.00 over1.5=162 / 3834 (4.2%)` ⇒ 每 0.24 s 一次、一次要**两整拍**。
+- **`pullMiss=142`（3.6/s）—— 与没带 MMCSS 的 B 局（145）一样。按事先写死的判据：音频链就此结案**，不再安排采集。
+- **局内帧管线 pristine**：逐秒看前 33 s 是 1794–2040 帧/s、帧长 0.490–0.558 ms、>5 ms 帧共 11 个、子树 ≈0.10 ms、时钟零停走。
+- 新登记一个**工况陷阱**：歌曲结束后的 4.6 s 退场段里 update 掉到 120–192 Hz、子树 = 0，
+  该局 327 个 >5 ms 帧有 316 个在这里。它同时解释了过去四局 `noPress over5` 的诡异方差（7/10/17/326）
+  与 `present coverage=0.869`。**present 采样现在跳过时钟停走的帧**（`frozenSkipped=`）；帧直方图不动，判读时人工减去。
+⇒ 局内更新线程、音频、present 三条侧链**都没有可归因的问题**了。剩下唯一在进程内**量不到**的环节是
+**送屏 / 扫描输出**（Borderless + 未开 vsync ⇒ draw 以 ~1126 fps 撕裂送屏，每次刷新跨多次 swap），见 §3.5 第 6 项。
+
 ## 1. 已定案（不要再重开）
 
 | 结论 | 依据 |
@@ -58,6 +71,8 @@
 | lane controller 索引维护不改 | 10 列 × 100 KPS × 2000 帧实测 ≈10–16 µs/帧 |
 | `interpErr` 必须和 `pullMiss` 一起读 | 同机两次采集 `pullMiss` 1 → 145 时 `interpErr` std 0.41 → 1.08 ms；剔掉漏拉邻域后回到 0.455（§3.4c） |
 | 漏拉机制 = 漏一次唤醒 → 一次读两拍（距离守恒，只有相位阶跃） | 稳态位置跳变只有 10/20 ms 两档；「跳变次数 = 周期数 − 超额周期数」两局精确成立；NAudio 读 `BufferSize − CurrentPadding`（§3.4d） |
+| **音频源漏拉不可由应用侧消除 ⇒ 音频链结案** | 登记 MMCSS（`"Pro Audio"`）后 `pullMiss` 142（3.6/s）、`periods/pull max=2.00`，与未登记时（145）相同（§3.4f） |
+| **歌曲结束后的退场段是另一个工况** | update 掉到 120–192 Hz、子树 = 0；该局 316/327 个 >5 ms 帧落在此（§3.4f） |
 | 输入队列整树重建不再重开 | 已被 `TestSceneInputQueueChange.CombinedClicks` 证伪 |
 
 ## 2. 未决
@@ -300,6 +315,44 @@ framework 源码（`c86e585e4`），但 09:22 那一局跑的是**旧 DLL**。�
 汇总里输出 `reads/s`、间隔 mean/p50/p90/p99/max/`over15`、`periods/pull` mean/median/max/`over1.5`。
 ⇒ **单局**即可判「渲染线程有没有按时醒」，并顺带读出缓冲相当于几拍（`pullMiss` 那种稀有事件计数做不到）。
 
+### 3.4f 结果（2026-09-25 10:11：真正的 MMCSS 局 → **MMCSS 无效，音频链结案**）
+
+`framestall_20260925_101112`，39.4 s / 72196 帧，deep + 全程按键；本机已打开 `UseEz2LazerLocalFrameworkProject`，
+framework 于 9:36:30 重建，音频日志 `logs/1790302201.audio.log` 出现 `… mmcss=Pro Audio (requested)`。
+
+**一、漏拉：MMCSS 前后完全一样**
+
+| | B 局（包，无 MMCSS） | **D 局（本地源码，有 MMCSS）** |
+|---|---|---|
+| `pullMiss`（位置停走 >15 ms） | 145（3.6/s，hold 2.8 s） | **142（3.6/s，hold 2874 ms）** |
+| `wasapiRead` 间隔 p50 / p99 / max / `over15` | — | 10.25 / 20.25 / 20.71 ms / **162** |
+| `wasapiPull` `periods/pull` max / `over1.5` | — | **2.00** / **162 / 3834（4.2%）** |
+
+直读量具把机制从推断变成直读：渲染线程**每 0.24 s 一次、一次要两整拍**。
+⇒ 按 §3.4e 三节写死的判据（「降到 ≤5 次即成立；仍是几十/几百次 = 与线程优先级无关」），
+**音频链就地结案，不再为它安排采集**。剩下两个机制（线程晚醒 / `Read` 内 BASS 解码慢）当前量具分不开，
+但两者的体感量级都只有「位置 std ~1 ms」，且应用侧无手段消除。
+
+**二、局内帧管线 pristine（逐秒重建，之前被汇总数字掩盖）**
+
+| 秒 | 帧数 | 帧长均值 | >5 ms | 子树均值 | 时钟停走帧 |
+|---|---|---|---|---|---|
+| 0–33 | 1794–2040/s | 0.490–0.558 ms | **除头两秒外全 0** | ≈0.10 ms | **0** |
+| 34 / 35 | 1946 / 2026 | 0.514 / 0.494 | 2 / 0 | 0.048 / 0.000 | 793 / 2025 |
+| **36 / 37** | **192 / 120** | **5.200 / 8.328** | **115 / 120** | 0.000 | 191 / 119 |
+| 38 / 39 | 668 / 408 | 1.501 / 0.470 | 80 / 1 | 0.000 | 667 / 407 |
+
+**该局 327 个 >5 ms 帧里 316 个在这 4.6 s 退场段**（子树已拆、update 掉到 120–192 Hz）；局内 33 s 只有 11 个。
+
+**三、这解释了之前两笔读不懂的账**
+
+- `present coverage = 0.869`：present 在 update 侧采样，退场段 update 掉到 120–190 Hz 而 draw 仍千帧级
+  ⇒ 每秒漏掉近千个 draw 帧。**不是量具坏了，是采样者自己掉速。**
+- 四局 `noPress over5` = 7 / 10 / 17 / **326**：各局在退场屏停留时长不同（`clockStopped` 1.7 s → 4.6 s），与局内无关。
+
+**四、present 采样已加闸**：时钟停走的帧不再采（新增 `frozenSkipped=`），避免下一局同样的 `coverage` 自检失败；
+帧耗时直方图保持不动以维持跨局可比，判读时人工减去退场段。
+
 ### 3.5 下一步（换量，不是继续找周期）
 
 §3.1–3.4 的前提是「体感不流畅 = 某个 2–4 s 周期的帧时长波动」。**这个前提现在被证伪了**：
@@ -324,14 +377,15 @@ framework 源码（`c86e585e4`），但 09:22 那一局跑的是**旧 DLL**。�
      由 draw 线程自己的时钟测；`CurrentTime` 给出 draw 帧边界。
    - **采样口径（下次判读前先确认这四条，否则数全废）**：
      ① **按 draw 帧去重**（`dup=` 有值才对；update 比 draw 快，逐次采样会把长帧少采、均值拉低，实测 0.622 vs 0.826）；
-     ② **`coverage` ≈ 1**（`ΣdrawPeriod / 首末壁钟跨度`；<1 = 有 draw 帧整个落在两次采样之间被漏掉）；
+     ② **`coverage` ≈ 1**（`ΣdrawPeriod / 首末壁钟跨度`；<1 = 有 draw 帧整个落在两次采样之间被漏掉。
+     10:11 局实测 0.869，原因已定位 = 退场段采样者掉速，采样现在跳过时钟停走的帧 —— §3.4f 第四点）；
      ③ `drawPeriod` 的 **mean ≈ 1000 / `clocks` 里的 draw fps**，两个数对不上就是采样还没修对；
      ④ `presentAge` **min 不应为负**（为负 = 原点差标定错）。
    - 修好后的判读顺序：`drawPeriod` 的尾部（`over1/over2/over5`、`max`）→ `presentAge` 的 std / max
      **对照它自己的分辨率（一个 draw 周期）** → `refresh / fps` 是不是整数。
      `drawPeriod` 的 p50 落在 0.510 ms（= 限帧目标 2000 Hz）而 `sleptMean = 0`，说明 draw 是**工作受限**而非限帧受限。
    - ⚠ **不覆盖 DWM / 显示器扫描输出**。进程内量不到送屏之后的事；若 `present` 行也干净，
-     剩下的就只可能是 tearing（Borderless 下 `AllowTearing` 是开着的）/ 组合器 / 主观锚定，此时回第 3 项。
+     剩下的就只可能是 tearing（Borderless 下 `AllowTearing` 是开着的）/ 组合器 / 主观锚定 → **见第 6 项**。
 5. **音频源漏拉**（§3.4d 机制已定案；§3.4e 记录了交付陷阱与判据修正）：
    `interpErr` 一涨就先看摘要里的 `pullMiss`，但**不要用单局计数判断任何改动**（同代码三次采集 = 1 / 145 / 4）。
    - ✅ **MMCSS 已进 framework 源码**（`c86e585e4`：`NAudioWasapiOutput.cs:112` 加
@@ -341,6 +395,17 @@ framework 源码（`c86e585e4`），但 09:22 那一局跑的是**旧 DLL**。�
    - **判读顺序（一局即可判）**：先看音频日志有没有 `mmcss=`（证明跑的是本地 framework build）；
      再看 `wasapiPull periods/pull` 的 median 是否 = 1.0、`over1.5` 占比、以及 `wasapiRead` 间隔的
      p99 / max / `over15`。这些是**分布**，不依赖稀有事件的跨局可比性。
+   - **❌ 结论（2026-09-25 10:11，§3.4f）：条目 5 关闭。** 带上 MMCSS 后 `pullMiss` 142 / `over1.5` 162 = 与不带时相同
+     ⇒ 该漏拉**不是**渲染线程优先级问题，应用侧没有下一步动作。不要再为它排采集局。
+6. **送屏 / 扫描输出（进程内量不到的一环）—— 现在只剩这个和「主观锚定」**
+   - 事实：窗口是 `FullscreenBorderless`（DWM + `AllowTearing`），`FrameSync = Limit4x`、`FrameLimiterBase = 500`
+     ⇒ draw 线程**工作受限**、以 ~1126 fps 送屏（该局 `clocks draw(fps=1126 jitter=0.520ms)`，`slept=0`）。
+     显示器 175 Hz ⇒ **每次刷新期间发生约 6 次 swap**，画面是 6 帧拼起来的（撕裂/combing），
+     而进程内探针永远看不到这一层（它们只看到「帧被交给驱动」）。
+   - **唯一判据是 A/B，不是探针**：① `FrameSync = VSync`（draw 变 175 fps、节拍与刷新一一对应、无撕裂，
+     代价是 +≤5.7 ms 呈现延迟）；② 或把限帧钉在刷新的整数倍（175 / 350）看撕裂是否从「移动的糊线」变成稳定分界。
+     **若两种配置下体感不同 ⇒ 剩下的就是撕裂，不是游戏逻辑；若完全一样 ⇒ 回到第 3 项（主观锚定 / 录屏对时）。**
+   - ⚠ 不要为了这个再动探针：它量不到扫描输出，加多少打点都一样。
 
 ## 4. 代码锚点
 
@@ -351,13 +416,14 @@ framework 源码（`c86e585e4`），但 09:22 那一局跑的是**旧 DLL**。�
 | 判定诊断 | `osu.Game/EzOsuGame/Diagnostics/EzJudgmentDiagnostics.cs` |
 | 探针接线 + 环境变量 | `osu.Game/Screens/Play/Player.cs`（约 344–368 行） |
 | 子树 / 时钟 / 其余 归因 | `osu.Game/Rulesets/UI/FrameStabilityContainer.cs`（`UpdateSubTree`） |
-| present / 帧节拍采样 | `EzFrameStallDiagnostics.samplePresent`（update 侧读 `DrawThread.Clock`，**按 draw 帧去重**）；host 由 `osu.Game/OsuGameBase.cs` 的 `SetHost` 挂上（**`DrawFrame` 无法 override，原因见 §3.5 第 4 项**） |
-| 音频源漏拉计数 | 同文件 `accumulateClocks`（`pullMiss` / `pullMissHoldMs`，停走 >15 ms 且 <60 ms 记一次）。⚠ 同代码三次采集 = 1/145/4，**单局不可判**（§3.4e） |
+| present / 帧节拍采样 | `EzFrameStallDiagnostics.samplePresent`（update 侧读 `DrawThread.Clock`，**按 draw 帧去重**，**时钟停走的帧跳过** —— 退场段会把 `coverage` 拉到 0.87，见 §3.4f）；host 由 `osu.Game/OsuGameBase.cs` 的 `SetHost` 挂上（**`DrawFrame` 无法 override，原因见 §3.5 第 4 项**） |
+| 音频源漏拉计数 | 同文件 `accumulateClocks`（`pullMiss` / `pullMissHoldMs`，停走 >15 ms 且 <60 ms 记一次）。⚠ 同代码三次采集 = 1/145/4，**单局不可判**（§3.4e）；MMCSS 已试过无效，该链结案（§3.4f） |
+| 退场段（时钟停走）判据 | 同文件 `accumulateClocks` 里的 `clockFrozen`（`interpMs == prevInterpMs`）：present 采样跳过它，帧直方图不跳过。逐秒重建见 §3.4f |
 | 音频拉取直读（间隔 + 请求拍数） | `osu-framework/osu.Framework/Audio/Wasapi/WasapiReadStats.cs`（默认关闭；`BassMixerWaveProvider.Read` 里 `Observe`；`Player.cs` 诊断局起止处开关；汇总行 `wasapiRead` / `wasapiPull`） |
 | **framework 改动进不了游戏的陷阱** | `Ez2Lazer.Dependencies.props`：`UseEz2LazerLocalFrameworkProject` 默认注释 ⇒ 走 NuGet 包 `ez2lazer.Framework`；验证办法 = 看输出 `osu.Framework.dll` 时间戳 + 音频日志有没有 `mmcss=` |
 | 分析脚本 | `AnalyzeFrameStall.ps1`、`AnalyzePressLatency.ps1` |
 | 音频输出路径（BASS mixer + NAudio WASAPI 拉流） | `osu-framework/osu.Framework/Audio/Wasapi/NAudioWasapiOutput.cs`；缓冲常量在 `Audio/AudioOutputDefaults.cs`（`DEFAULT_NAUDIO_LATENCY_MS = 10`） |
-| 漏拉成因（NAudio 读法 + MMCSS 缺口） | `NAudio.Wasapi/WasapiPlayer.PlayThread`：读 `BufferSize − CurrentPadding`（**全部空位**，非固定一拍），`frameEvent` 是 AutoReset；`mmcssTaskName` 默认 null，只有 `.WithMmcssThreadPriority()` 才登记 MMCSS。构造链在 `NAudioWasapiOutput.cs:112`（未调） |
+| 漏拉成因（NAudio 读法 + MMCSS 缺口） | `NAudio.Wasapi/WasapiPlayer.PlayThread`：读 `BufferSize − CurrentPadding`（**全部空位**，非固定一拍），`frameEvent` 是 AutoReset；`mmcssTaskName` 默认 null，只有 `.WithMmcssThreadPriority()` 才登记 MMCSS。构造链在 `NAudioWasapiOutput.cs:112`，**现已登记 `"Pro Audio"`，但实测无效**（§3.4f） |
 | 音频源时钟 / 插值 | `osu-framework/osu.Framework/Audio/Track/TrackBass.cs`（`ChannelGetPosition`）、`osu-framework/osu.Framework/Timing/InterpolatingFramedClock.cs` |
 | 周期 / 跨探针相位分析 | `AnalyzePeriod.py`（numpy；`--plot` 出图、`--trim 3,3` 去首尾过渡段） |
 | 活文档 | `docs/EZ-PERFORMANCE.md` §2.4（周期性部分见 §2.4.10） |
@@ -365,5 +431,6 @@ framework 源码（`c86e585e4`），但 09:22 那一局跑的是**旧 DLL**。�
 ## 5. 环境要点
 
 - 配置：`F:\MUG OSU\EZ2OSU-lazer\framework.ini`（`ExecutionMode = MultiThreaded`、`FrameSync = Limit4x`）、`EzSkinSettings.ini`（`FrameLimiterBase`、`ColumnBlur`、`TurboMode`）。判 `Stage` 毛玻璃是否开启：`ColumnBlur × 50 > 0.01` 且 `TurboMode = False`。
+- **送屏 A/B（§3.5 第 6 项）改的就是这两个键**：`framework.ini` 的 `FrameSync`（`Limit4x` ⇄ `VSync`）与 `EzSkinSettings.ini` 的 `FrameLimiterBase`（500 → 175 / 350）。改完必须重启游戏。
 - 探针热路径不做 IO、不产字符串，落盘在局末；`RecordFrame()` 跑在输入派发**之前**。
 - 改 Realm schema / 迁移后**不得**擅自启动客户端做验证（见 `.cursor/rules/realm-schema-development.mdc`）。
