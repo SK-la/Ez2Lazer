@@ -694,6 +694,9 @@ if (numFramesAvailable > 10) FillBuffer(numFramesAvailable);       // ← 读「
 
 ⇒ **9:22 那一局不是 MMCSS 的测试**，它的 `pullMiss=4` 不能算「MMCSS 生效」。要让 framework 改动进游戏，要么打开
 `UseEz2LazerLocalFrameworkProject`（props 注释里就是给这种情况用的，本次已在本机打开、**不提交**），要么走包发布。
+**已做**：9:36 关掉游戏后用本地工程重建 `osu.Desktop`，输出 `osu.Desktop/bin/Release/net10.0/osu.Framework.dll`
+时间戳变为 9:36:30，且内含 `mmcss` / `WasapiReadStats` / `wasapiRead` / `wasapiPull` 标记
+⇒ 下一局才是真正的 MMCSS + 直读量具测试。
 
 **单局判据被证伪**：同一份音频路径（三次采集 framework 都没变）的 `pullMiss` 是 **1（080438）/ 145（084436）/
 4（092213）**。⇒ 「掉到 ≤5 次」这条判据在单局上不成立——**基线自己就在 1–145 之间跳**。要判就得在同局里拿到
