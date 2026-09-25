@@ -134,13 +134,26 @@ namespace osu.Game.EzOsuGame.Diagnostics
         //      是 update 探针看不见的**：那才是屏幕上直接的一次跳帧。
         //   2) presentAge —— present 那一刻，屏幕上那份内容已经多旧（相对它在 update 侧被算出来的时刻）。
         //      均值会被输入延迟吸收，**抖动才是眼睛看到的顿挫**。
-        //      分辨率受限于一个 update 帧长（读不到被绘制的 buffer 帧号，只能拿「上一次 update 帧边界」当零点），
-        //      所以它只用来判「有没有毫秒级的滞后」，不用来判亚毫秒抖动。
+        //
+        // 采样口径（踩过两次坑，改之前先读）：
+        //   * 探针跑在 update 边界上，而 update 比 draw 快，所以**必须按 draw 帧去重**。逐次采样拿到的不是
+        //     「相邻两次 present 的间隔」：某帧的值只在这一帧结束到下一帧结束之间可见，被采到的次数 ∝ **下一帧**
+        //     的长度，于是长帧被少采、短帧被多采，均值与分位一起被拉低（实测 0.622ms vs draw 自报 0.826ms）。
+        //   * CurrentTime 是阶梯式刷新的，wall − CurrentTime 带一个幅度 = 一个 draw 周期的锯齿，一次性标定会
+        //     锁在随机相位上（表现为 presentAge 出现不可能的负值）⇒ 取**运行最小值**。
+        //   * coverage = ΣdrawPeriod / 采样首末壁钟跨度：一次合格的自检，≈1 才说明每个 draw 帧恰好采到一次。
+        //   * presentAge 的分辨率是**一个 draw 周期**（读不到被绘制的 buffer 帧号，只能拿「上一次 update 帧边界」
+        //     当零点，而 draw 手上的 buffer 可能更早），所以它只能判约 1ms 以上的滞后，判不了亚毫秒配对抖动。
         private static GameHost? gameHost;
         private static readonly Histogram drawPeriod = new Histogram(0.02);
         private static readonly Histogram presentAge = new Histogram(0.02);
         private static double drawOriginOffsetMs = double.NaN;
+        private static double lastDrawClockMs = double.NaN;
+        private static double drawPeriodSumMs;
+        private static double presentFirstWallMs = double.NaN;
+        private static double presentLastWallMs;
         private static long presentFrames;
+        private static long presentDuplicates;
         private static long presentSkipped;
         private static double drawSleptTotalMs;
 
@@ -156,6 +169,15 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static readonly Histogram audioStep = new Histogram();
         private static readonly Histogram interpErr = new Histogram(0.01);
         private static double lastAudioStepWallMs = double.NaN;
+
+        /// <summary>源位置「停走超过一个正常步进周期再补上」的次数与停走总时长。NAudio 漏拉一次 buffer 就是这个形状。</summary>
+        private static long pullMissCount;
+        private static double pullMissHoldMs;
+
+        /// <summary>判定漏拉的停走窗口；正常步进周期是 10ms，一次漏拉停 ~20ms，再长的停走是暂停/seek，不算。</summary>
+        private const double PULL_MISS_HOLD_MS = 15;
+        private const double PULL_MISS_MAX_MS = 60;
+
         private static long rateSkipped;
         private static long clockStoppedFrames;
         private static double clockStoppedMs;
@@ -242,23 +264,41 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 return;
             }
 
+            double drawNowMs = drawClock.CurrentTime;
+
+            // 去重：同一个 draw 帧被多个 update 帧读到，只记一次（理由见字段区注释）。
+            if (drawNowMs == lastDrawClockMs)
+            {
+                presentDuplicates++;
+                return;
+            }
+
+            lastDrawClockMs = drawNowMs;
+
             double wallMs = nowTicks * 1000.0 / Stopwatch.Frequency;
 
-            // 两个时钟各自以自己 Start() 的时刻为零点（StopwatchClock 用的是 ElapsedTicks），
-            // 所以要先标定一次原点；同源同频，标定一次长期有效。
-            if (double.IsNaN(drawOriginOffsetMs))
-                drawOriginOffsetMs = wallMs - drawClock.CurrentTime;
+            // 两个时钟各自以自己 Start() 的时刻为零点（StopwatchClock 用的是 ElapsedTicks），要标定原点差；
+            // 而 CurrentTime 只在 draw 帧边界刷新，读数是阶梯的，所以取运行最小值（刚刷新完的那个瞬间）才是真值。
+            double originGapMs = wallMs - drawNowMs;
+
+            if (double.IsNaN(drawOriginOffsetMs) || originGapMs < drawOriginOffsetMs)
+                drawOriginOffsetMs = originGapMs;
 
             presentFrames++;
             drawPeriod.Add(periodMs);
+            drawPeriodSumMs += periodMs;
             drawSleptTotalMs += drawClock.TimeSlept;
+
+            if (double.IsNaN(presentFirstWallMs))
+                presentFirstWallMs = wallMs;
+
+            presentLastWallMs = wallMs;
 
             // 正被绘制的那份内容是上一次 update 帧算出来的（本帧还没发布），它会在本帧的 Swap 处上屏。
             // 「本帧什么时候上屏」估计为「本帧边界 + 本帧自身耗时」，而自身耗时只能拿上一帧的：
             //   ElapsedFrameTime = 上一帧的整周期 = 上一帧耗时 + 上一帧被限制器 sleep 的部分，
             // 所以上一帧耗时 = period − TimeSlept（两个读数恰好都来自上一帧）。用 period 会把它高估一个 sleep。
-            // 零点只能取「上一次 update 帧边界」（读不到被绘制的 buffer 帧号）⇒ 带 ±1 帧配对不确定度。
-            presentAge.Add(drawClock.CurrentTime + drawOriginOffsetMs + periodMs - drawClock.TimeSlept - prevTicks * 1000.0 / Stopwatch.Frequency);
+            presentAge.Add(drawNowMs + drawOriginOffsetMs + periodMs - drawClock.TimeSlept - prevTicks * 1000.0 / Stopwatch.Frequency);
         }
 
         /// <summary>
@@ -442,7 +482,20 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
                 // 音频报告值跳变 ⇒ 一个新的缓冲被播完，缓冲内已播进度清零。
                 if (step != 0)
+                {
+                    if (double.IsFinite(lastAudioStepWallMs))
+                    {
+                        double holdMs = EzJudgmentDiagnostics.WallClockMs - lastAudioStepWallMs;
+
+                        if (holdMs > PULL_MISS_HOLD_MS && holdMs < PULL_MISS_MAX_MS)
+                        {
+                            pullMissCount++;
+                            pullMissHoldMs += holdMs;
+                        }
+                    }
+
                     lastAudioStepWallMs = EzJudgmentDiagnostics.WallClockMs;
+                }
 
                 // 插值完全没走 = 时钟停走（歌曲结束 / 暂停），与「走得慢」是两回事，单独计数。
                 if (interpMs == prevInterpMs)
@@ -530,7 +583,13 @@ namespace osu.Game.EzOsuGame.Diagnostics
             presentAge.Reset();
             presentFrames = 0;
             presentSkipped = 0;
+            presentDuplicates = 0;
             drawSleptTotalMs = 0;
+            drawOriginOffsetMs = double.NaN;
+            lastDrawClockMs = double.NaN;
+            drawPeriodSumMs = 0;
+            presentFirstWallMs = double.NaN;
+            presentLastWallMs = 0;
             lastGcPauseTicks = -1;
             lastThreadAllocated = 0;
             lastProcessAllocated = 0;
@@ -554,6 +613,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
             audioStep.Reset();
             interpErr.Reset();
             lastAudioStepWallMs = double.NaN;
+            pullMissCount = 0;
+            pullMissHoldMs = 0;
             rateSkipped = 0;
             clockStoppedFrames = 0;
             clockStoppedMs = 0;
@@ -701,13 +762,16 @@ namespace osu.Game.EzOsuGame.Diagnostics
             if (presentFrames > 0)
             {
                 sb.Append(Environment.NewLine);
-                sb.Append("present frames=").Append(presentFrames).Append(" skipped=").Append(presentSkipped).Append(" drawPeriod");
+                sb.Append("present frames=").Append(presentFrames).Append(" skipped=").Append(presentSkipped)
+                  .Append(" dup=").Append(presentDuplicates)
+                  .Append(CultureInfo.InvariantCulture, $" coverage={drawPeriodSumMs / Math.Max(1, presentLastWallMs - presentFirstWallMs):F3}")
+                  .Append(" drawPeriod");
                 sb.Append(drawPeriod.Format());
 
                 // 「相邻两次 present 的间隔」由 draw 线程自己的时钟测。update 侧看到的帧一直很稳，
                 // 但 draw 线程单独卡一下 update 探针是看不见的——那一下就是屏幕上的一次跳帧，所以这里要看的是尾部。
                 // presentAge 是上屏那一刻那份内容的年龄；零点只能取「上一次 update 帧边界」（读不到被绘制的
-                // buffer 帧号），所以带一个 update 帧长以内的配对不确定度，只用来判毫秒级以上的滞后。
+                // buffer 帧号），所以带一个 draw 周期量级的配对不确定度，只用来判毫秒级以上的滞后。
                 sb.Append(Environment.NewLine);
                 sb.Append("  presentAge");
                 sb.Append(presentAge.Format());
@@ -757,9 +821,18 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
                     // 位置精度：interp 相对「报告值 + 缓冲内已播时长」的偏差去掉常数后的抖动。这是「顺不顺滑」的判据。
                     // offset ≈ 音频报告位置领先「听到的声音」的时长（约一个缓冲），会被音频偏移吸收，不用管它绝对值。
+                    // pullMiss 必须一起读：漏拉会让源停走 ~20ms 再补上，插值追赶期间的偏差全部计进 std，
+                    // 于是「源在卡」会被误判成「插值不干净」（实测同一台机两次采集 std 0.41 → 1.08，pullMiss 5 → 147）。
+                    double spanS = (lastFrameWallMs - firstFrameWallMs) / 1000.0;
+
                     sb.Append(Environment.NewLine);
+                    sb.Append("  interpErr");
+
+                    if (pullMissCount > 0)
+                        sb.Append(CultureInfo.InvariantCulture, $" pullMiss={pullMissCount}({pullMissCount / Math.Max(1, spanS):F1}/s,hold{pullMissHoldMs:F0}ms)");
+
                     sb.Append(CultureInfo.InvariantCulture,
-                        $"  interpErr std={errStd:F3}ms p99={interpErr.Percentile(0.99):F3}ms maxdev={errMaxAbs:F3}ms "
+                        $" std={errStd:F3}ms p99={interpErr.Percentile(0.99):F3}ms maxdev={errMaxAbs:F3}ms "
                         + $"offset={errMean:F2}ms 超[0.5/1/2]ms={100 * errOver05 / (double)errCount:F2}/{100 * errOver1 / (double)errCount:F2}/{100 * errOver2 / (double)errCount:F2}%");
 
                     // drift 只是 interp − 音频报告值：含音频偏移常数与缓冲锯齿，幅度天然≈缓冲步长，别单独当抖动读。

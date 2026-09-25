@@ -504,6 +504,10 @@ requestedLatency=10ms, actualLatency=10ms, lowLatency=true
 所以「下落不顺滑」若真实存在，需要在**更新线程之外**找 —— 最可能是 **present / 帧节拍**（本探针只看 update 侧，
 不看呈现时刻的均匀性），其次才是主观锚定。该量具已落地，见 §2.4.12。
 
+⚠ **上面这条「音频链干净」有前提（2026-09-25 08:44 测出边界）**：它只在**音频源拉取规整**时成立。
+同机、同音频配置的下一局里源漏拉了 **145 次**，`interpErr` 立刻从 std 0.406 / >1 ms 0.52% 涨到
+**1.084 / 14.56%**；剔掉漏拉邻域后回到 0.455 ms ⇒ **判 `interpErr` 必须同时看 `pullMiss`**，见 §2.4.13。
+
 #### 2.4.12 present 侧量具落地：量「相邻两次 present 的间隔」与「上屏内容的年龄」（2026-09-25）
 
 §2.4.11 把 update 侧四条链全部洗清之后，唯一没量过的就是**呈现**：note 位置在 update 帧边界上就定好了，
@@ -530,15 +534,25 @@ requestedLatency=10ms, actualLatency=10ms, lowLatency=true
 | `presentAge` | `drawClock.CurrentTime + 原点偏移 + ElapsedFrameTime − 上一次 update 帧边界` | **上屏那一刻，屏幕上那份内容有多旧**。均值会被输入延迟吸收，**抖动才是眼睛看到的顿挫** |
 | `clocks` | 两线程 `FramesPerSecond / Jitter / TimeSlept / MaximumUpdateHz / Throttling` + 窗口态 + 刷新率 | 限制器实际生效的目标值，以及「每个刷新显示几个 present」（`refresh / fps`） |
 
-两处实现细节不写下来就会误读：
+两处实现细节不写下来就会误读 —— **第一局实测把这两条都证伪了，已按下面的口径改掉**：
 
-1. **两个时钟原点不同**。`StopwatchClock` 基于 `Stopwatch.ElapsedTicks`，零点是自己 `Start()` 的时刻（= 线程创建），
-   所以 `DrawThread.Clock.CurrentTime` 与 `Stopwatch.GetTimestamp()` 不同源，必须**标定一次**原点偏移；
-   同源同频，标定一次长期有效（换 host 时作废重标）。
-2. **`presentAge` 的分辨率只有一个 update 帧长**。读不到「正被绘制的那个 buffer 的帧号」，只能拿「上一次 update
-   帧边界」当零点，而 draw 线程手上的 buffer 可能是更早一帧的 ⇒ 带 ±1 帧配对不确定度。
-   它只用来判**毫秒级以上的滞后**，不判亚毫秒抖动。`drawPeriod` 没有这个问题（是 draw 线程自己测的）。
-   另外失焦 / 最小化时 draw 线程不画，那些帧按 `IsActive` 剔掉（`skipped` 计数）。
+1. **原点差不能一次性标定。** `StopwatchClock` 基于 `Stopwatch.ElapsedTicks`，零点是自己 `Start()` 的时刻（= 线程创建），
+   与 `Stopwatch.GetTimestamp()` 不同源，要标定原点差。但 `CurrentTime` 只在 draw 帧边界刷新、是**阶梯**的，
+   `wall − CurrentTime` 因此带一个幅度 = 一个 draw 周期的**锯齿**；一次性标定锁在某个随机相位上，
+   后果是 `presentAge` 出现物理上不可能的负值（实测 **min = −6.41 ms**）。⇒ 改为取**运行最小值**（刚刷新完那一瞬即真值）。
+2. **逐 update 帧采样不等于逐 draw 帧采样。** update（2034 fps）比 draw（1210 fps）快，同一个 draw 帧会被读到多次；
+   而某个值在第 i 帧结束时写入、只保持到第 i+1 帧结束，被采到的次数 ∝ **下一帧**的长度。
+   两帧长度负相关时（限帧器自带追赶机制）长帧被少采、短帧被多采 ⇒ 均值与分位一起偏低：
+   实测 `drawPeriod` mean 0.622 ms，而 `DrawThread.Clock.FramesPerSecond = 1210` ⇒ 0.826 ms，
+   且按 p99 = 1.59 / max = 37 **摆不出 0.826 的均值**，两个数不可能同时成立。
+   ⇒ 改为**按 `drawClock.CurrentTime` 变化去重**（update 比 draw 快，每个 draw 帧至少被读到一次），
+   并在摘要里给出自检 `coverage = ΣdrawPeriod / 采样首末壁钟跨度`（≈1 = 每帧恰好采一次；
+   <1 = 有 draw 帧整个落在两次采样之间被漏掉）。
+3. **`presentAge` 的分辨率是**一个 draw 周期**，不是一个 update 帧长**。读不到「正被绘制的那个 buffer 的帧号」，
+   零点只能取「上一次 update 帧边界」，而 draw 线程手上的 buffer 可能是更早一帧的 ⇒ 配对不确定度 ≈ ±1 draw 周期
+   （0.83 ms 量级）。**这个量级和我们追的效应（0.4 ms）同阶**，所以 `presentAge` 只能判约 1 ms 以上的滞后，
+   判不了亚毫秒配对抖动；`drawPeriod` 没有这个问题（是 draw 线程自己测的）。
+   失焦 / 最小化时 draw 线程不画，那些帧按 `IsActive` 剔掉（`skipped` 计数）。
 
 *不覆盖的部分（写下来免得下次又去这里找）*
 
@@ -547,12 +561,67 @@ requestedLatency=10ms, actualLatency=10ms, lowLatency=true
 
 *判读口径*
 
-- 先看 `drawPeriod` 的**尾部**：`over0.5 / over1 / over2 / over5` 与 `max`。一次 8 ms 的 draw 帧就是一次可见跳帧，
+- **先验四条采样自检**（不通过就先修量具，别读结论）：
+  ① `dup=` 有值（去重生效）；② `coverage` ≈ 1；③ `drawPeriod` 的 `mean` ≈ `1000 / clocks 里的 draw fps`；
+  ④ `presentAge.min` 不为负。
+- 再看 `drawPeriod` 的**尾部**：`over1 / over2 / over5` 与 `max`。一次 8 ms 的 draw 帧就是一次可见跳帧，
   而 update 侧探针对它完全无感 —— 这正是加这个量具的理由。
-- `presentAge` 看 `std` 与 `max`，**跟它自己的分辨率（= 一个 update 帧长）比**：小于分辨率就是「无滞后」。
+- `presentAge` 看 `std` 与 `max`，**跟它自己的分辨率（= 一个 draw 周期）比**：小于分辨率就是「无滞后」。
 - `clocks` 里 `refresh / fps` 不是整数 ⇒ 每个刷新显示的帧数在 1 / 2 之间交替，是结构性 judder，
   幅度 ≈ 半个 draw 帧的位置误差（2000 fps / 240 Hz 下约 0.2–0.25 ms）—— 小到不构成体感，但可以据此确认或排除。
 
+*第一局（2026-09-25 08:44，40.5 s / 81006 帧）的数与它的用途*
+
+| 读数 | 值 | 能不能用 |
+|---|---|---|
+| `drawPeriod` | n=80988 mean 0.622 std 0.390 min 0.324 p50 0.510 p90 0.990 p99 1.59 p99.9 3.11 max 36.99 over1=8053 over2=230 over5=28 | **不能**。逐 update 帧采样（见上第 2 条），均值与分位都被拉低 |
+| `presentAge` | mean 14.92 std 0.657 **min −6.412** p99 16.33 p99.9 17.73 max 102.6 | **不能**。负的 min 说明原点差错（见上第 1 条），std 也可能被配对不确定度污染 |
+| `clocks` | draw fps=1210 jitter 0.344 sleptMean 0.000 maxHz 2000 throttling=True；update fps=2034 jitter 0.220 maxHz 2000；FullscreenBorderless refresh=175Hz | 可用。`sleptMean = 0` 而 p50 恰好压在限帧目标 0.510 ms ⇒ draw 是**工作受限**，不是限帧受限 |
+
+唯一可以留下来的一条：`drawPeriod` 的 p50 **正好等于**限帧目标（2000 Hz → 0.500 ms），而 `sleptMean = 0`
+⇒ draw 线程的每帧工时已经贴在 0.5 ms 附近，限制器基本没睡。逐 draw 帧的分布要等修好的那一局。
+
+
+#### 2.4.13 音频源会「漏拉」：`interpErr` 的读数有一个必须同时看的前置量（2026-09-25）
+
+同一台机、**同一份音频配置**（`logs/1790294601.audio.log` 与 `1790297002.audio.log` 逐字段相同：同 VoiceMeeter 端点、
+48000 Hz/2ch float、requested=actual=10 ms、lowLatency=true），相隔 40 分钟的两局全帧采集：
+
+| 量 | A 局 `framestall_20260925_080438` | B 局 `framestall_20260925_084436` |
+|---|---|---|
+| 源停走 >15 ms 再一次性补上（`pullMiss`） | **1** 次（0.03/s） | **145** 次（3.6/s，累计停走 2.8 s） |
+| 漏拉间隔 | — | 中位 0.17 s，min 0.02 / max 1.23 s，**不对齐 100/200/250/500/1000 ms 任何网格** |
+| `interpErr` std（稳态 t∈[5,30)） | 0.406 ms | 1.084 ms |
+| `interpErr` >1 ms | 0.52 % | 14.56 % |
+| 同上，**剔除每次漏拉的 ±20 ms 邻域** | — | **0.455 ms / 5.5 %**（窗口放大到 ±200 ms 不再改善） |
+
+*机制*
+
+`BassMix.ChannelGetPosition` 只在 NAudio 渲染线程拉走一个缓冲时前进。漏拉一拍 ⇒ 位置**停走 ~20 ms**
+（两次跳变间隔 20 ms 而不是 10 ms）再一次性补上。总距离守恒（`ΣΔaudio = ΣΔwall − 停走时长`，误差 < 0.02%）
+⇒ 是**漏拉**，不是时钟走快。这与 §2.4.11 记的「精确 10 ms 阶梯」不矛盾：阶梯仍在，只是偶尔少一级。
+
+*为什么它必须和 `interpErr` 一起读*
+
+插值器要在 ~40 ms 内把这 10 ms 的缺口追掉，追赶期间的位置误差全部计进 `interpErr` 的 std 与超阈值比例。
+B 局与 A 局 `interpErr` 的 2.6 倍差距**全部**来自这 145 次漏拉（剔掉邻域即回到 A 局水平）
+—— 不一起看就会把「源在卡」误判成「插值不干净」。
+
+*另一个必须记住的坑：`audioStep top` 会把它藏掉*
+
+`audioStep` 分布只打 top-5，而 20 ms 级步进只有 146 次，低于第 5 名的 228 次 ⇒ **一次都不会显示**。
+所以摘要里加了独立的 `pullMiss` 计数（停走 >15 ms 且 <60 ms；再长的停走是暂停 / seek，不算）。
+
+*与 update 帧的关系：只弱相关*
+
+漏拉那一帧 `ElapsedMs` 均值 0.831 ms（全体 0.501），±5 帧内出现 >2 ms 帧的比例 4.1%（该窗口偶然水平 1.07%）
+⇒ 4x 富集，不足以断言「update 卡导致音频漏拉」。也没有指向游戏自身逻辑的证据（不对齐任何定时器网格）。
+
+*是否成体感：尚未判定*
+
+量级是 std ~1 ms / p99 1.4 ms / maxdev 7 ms（600 px/s 下 0.6–4 px），且 145 次分布在整局
+（每 4 s 计数 20/10/11/21/17/19/16/11/15/7）⇒ 若它在起作用，表现是**全程低频抖动**而不是「隔一会一次」。
+但它符合「两次游戏一顺一不顺」这一现象，**优先级高于继续在 present 侧找**（present 量具本身刚修，见 §2.4.12）。
 
 ---
 

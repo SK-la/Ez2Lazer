@@ -23,8 +23,16 @@
 其实是抹平阶梯的**必然机制**（位置才是判据）。该指标已从摘要撤掉，换成 `interpErr`（位置误差）。
 ⇒ 更新线程侧的四条链（帧时间 / FSC 子树 / 按键延迟 / 音频时钟）**现在都测不出问题**，体感来源要往**更新线程之外**找（present / 帧节拍），或回到主观锚定（§3.5 第 3 项）。
 
-**2026-09-25 已把 present 侧量具加好（见 §3.5 第 4 项）**：下一局的全帧摘要里会多一行 `present`，
-给的就是「相邻两次 present 的间隔分布」与「上屏那一刻那份内容有多旧」。
+**2026-09-25 的 present 局（40.5 s / 81006 帧，`framestall_20260925_084436`）给出两条结论 —— 见 §3.4c。**
+
+1. **present 量具本身有两处采样缺陷（已修，见 §3.5 第 4 项）**，这一局的 `present` 行**不能**用来判 present：
+   逐 update 帧采样而非逐 draw 帧采样（update 2034 fps > draw 1210 fps ⇒ 同一 draw 帧被采 ~1.7 次，
+   而一个值只在**下一帧**期间可见，采样次数 ∝ 下一帧长度 ⇒ 长帧被少采，均值被拉到 0.622 ms 而 draw 自报 0.826）；
+   以及原点差一次性标定锁在随机锯齿相位上（表现为 `presentAge` 出现不可能的负值 min = −6.41 ms）。
+2. **§3.4b 的「音频时钟链干净」是**有条件的**。** 这一局 `BassSource` 停走一整个 10 ms 周期再补上的次数是
+   **145 次（3.6/s，累计停走 2.8 s）**，上一局只有 **1 次**；而 `interpErr` 就从 **std 0.41 ms / >1 ms 0.52%**
+   涨到 **std 1.08 ms / >1 ms 14.6%**。把每次漏拉的 ±20 ms 邻域剔掉，std 回到 **0.455 ms**（≈上一局水平）
+   ⇒ 那 2.6 倍**全部**来自这 145 次源停走，不是插值变差。**判 `interpErr` 必须同时看 `pullMiss`。**
 
 ## 1. 已定案（不要再重开）
 
@@ -37,6 +45,7 @@
 | Draw 线程最大单项是 `Present` | dotTrace：25% 墙钟、`DrawFrame` 的 78%，含 AMD 驱动内 0.25 ms/帧 |
 | **acrylic 已排除** | `EzBoxElement`（`AcrylicBackdropDrawable`）/ `Stage.stageBackdropBlur`（`BackdropBlurDrawable`）开关对 draw 帧数无可见差别。注意限帧下该量具**不敏感**，此结论不能推广成「每帧分配不重要」 |
 | lane controller 索引维护不改 | 10 列 × 100 KPS × 2000 帧实测 ≈10–16 µs/帧 |
+| `interpErr` 必须和 `pullMiss` 一起读 | 同机两次采集 `pullMiss` 1 → 145 时 `interpErr` std 0.41 → 1.08 ms；剔掉漏拉邻域后回到 0.455（§3.4c） |
 | 输入队列整树重建不再重开 | 已被 `TestSceneInputQueueChange.CombinedClicks` 证伪 |
 
 ## 2. 未决
@@ -121,7 +130,9 @@
       位置其实只偏 0.41 ms。要判位置请直接拿帧 CSV 的 `InterpMs` / `AudioSrcMs` 离线复算（口径见 §3.4b 表）。
       `AudioStep` 会**必然**被 `RMS/稳健σ` 护栏拒掉（稀疏脉冲列，本来就是「多数 0 + 少数 10 ms」），那是构造使然；
       它有用的形态在 `clockQuant` 摘要行里（`audioStep top`）。
-      帧 CSV 的 `clockQuant` 摘要行现在给的是：`audioStep` 分布 + `interpErr`（位置误差 std/p99/maxdev/offset，**这个才是判据**）+ `clockStopped`。
+      帧 CSV 的 `clockQuant` 摘要行现在给的是：`audioStep` 分布 + `interpErr`（位置误差 std/p99/maxdev/offset，**这个才是判据**，
+      ⚠ 必须与同行的 `pullMiss` 一起读，见 §3.4c —— 源漏拉会把 std 从 0.41 抬到 1.08）+ `clockStopped`。
+      另注意 `audioStep top` 只打 top-5，20 ms 级步进会被截断藏掉，只有 `pullMiss` 计数看得见它。
 5. 若确认存在「子树内」类 >5 ms 帧，再加**「每帧 CPU 时间 vs 墙钟」**读数，区分真算得慢与线程被抢占。
 
 > 抓全集用的 `ThresholdMs = 0` 属于**临时本地改动，不要提交**（环境变量是正式口子）。
@@ -178,6 +189,48 @@
    摘要现在把停走单列为 `clockStopped`。
 
 **结论：更新线程侧的四条链（帧时间 / FSC 子树 / 按键延迟 / 音频时钟）全部测不出问题**，§3.5 第 2 项的三个修复方向不再需要动。
+**⚠ 但这条「干净」有前提，2026-09-25 08:44 那一局把它测出了边界，见下。**
+
+### 3.4c 结果（2026-09-25 08:44：present 局 → 量具要修；且音频链的「干净」有前提）
+
+全帧局 `framestall_20260925_084436.csv`（40.5 s / 81006 帧 / 1998 fps，全程有按键）。
+
+**一、`present` 行出来了，但这一局的数不可用（两处采样缺陷，已修）**
+
+| 读数 | 值 | 问题 |
+|---|---|---|
+| `drawPeriod` | n=80988 mean 0.622 std 0.390 p50 0.510 p90 0.990 p99 1.59 p99.9 3.11 max 36.99 | 采样数 = update 帧数（1998/s）> draw 帧数（1210/s）⇒ **不是逐 draw 帧** |
+| `presentAge` | mean 14.92 std 0.657 **min −6.412** p99 16.33 max 102.6 | 负值物理上不可能 ⇒ 一次性标定的原点差锁在了随机锯齿相位上 |
+
+- 偏置方向可推：某个值在第 i 帧结束时写入、只保持到第 i+1 帧结束，被 update 采到的次数 ∝ **下一帧**长度。
+  两帧长度负相关时（限帧器自带追赶）长帧被少采、短帧被多采 ⇒ 均值与分位一起偏低。
+  实测 0.622 ms 对 `DrawThread.Clock.FramesPerSecond = 1210`（⇒ 0.826 ms）：按 p99 = 1.59 / max = 37，
+  **摆不出 0.826 的均值**，两个数不可能同时成立。
+- 修法（已落地）：① 按 `drawClock.CurrentTime` 变化去重（update 比 draw 快，每个 draw 帧至少被读一次）；
+  ② 摘要加自检 `coverage = ΣdrawPeriod / 采样首末壁钟跨度`，≈1 才是「每帧恰好采一次」；
+  ③ 原点差改取**运行最小值**；④ `presentAge` 的分辨率改按**一个 draw 周期**声明，不是「一个 update 帧长」。
+
+**二、音频源这次在漏拉 —— 两次采集唯一的实质差别**
+
+`audioStep top` 把 20 ms 级步进**截断藏掉了**（146 次 < 第 5 名的 228 次），所以只有 `pullMiss` 计数看得见它。
+
+| 量 | A 局 `080438` | B 局 `084436` |
+|---|---|---|
+| 源停走 >15 ms 再补上 | **1** 次（0.03/s） | **145** 次（3.6/s，累计停走 2.8 s） |
+| 漏拉间隔 | — | 中位 0.17 s，min 0.02 / max 1.23 s，**不对齐 100/200/250/500/1000 ms 任何网格** |
+| `interpErr` std（稳态 t∈[5,30)） | 0.406 ms | 1.084 ms |
+| `interpErr` >1 ms | 0.52 % | 14.56 % |
+| 同上一项，**剔除每次漏拉 ±20 ms 邻域** | — | **0.455 ms / 5.5 %**（窗口放大到 ±200 ms 不再改善） |
+
+- 机制：`BassMix.ChannelGetPosition` 只在 NAudio 渲染线程拉走一个 buffer 时前进。漏拉一拍 ⇒ 位置停走 ~20 ms
+  （两次跳变间隔 20 ms 而不是 10 ms）再一次性补上。总距离守恒（`ΣΔaudio = ΣΔwall − 停走时长`，误差 < 0.02%）⇒ 是**漏拉**，不是走快。
+- 与 update 帧只**弱**相关：漏拉那一帧 `ElapsedMs` 均值 0.831 ms（全体 0.501），±5 帧内出现 >2 ms 帧的比例 4.1%
+  （该窗口偶然水平 1.07%）⇒ 4x 富集，不足以断言「update 卡导致音频漏拉」。
+- **两次采集音频配置逐字段相同**（`logs/1790294601.audio.log` vs `1790297002.audio.log`：同端点、48000 Hz/2ch、
+  requested=actual=10 ms、lowLatency=true）⇒ 差别来自运行期，不是配置。
+
+**结论**：§3.4b / §2.4.11 的「插值时钟干净」**只在音频源拉取规整时成立**；源一漏拉，位置误差立刻涨到
+std ~1 ms / p99 1.4 ms / maxdev 7 ms，14.6% 的帧偏 >1 ms。够不够成体感还没判，但它符合「一顺一不顺」这一现象。
 
 ### 3.5 下一步（换量，不是继续找周期）
 
@@ -194,22 +247,29 @@
    （若将来另有证据指向音频，再回来考虑 ① 换设备/独占/ASIO ② 锁相或线性外推 ③ 只把音频钟当速率源。）
 3. **换主观锚点**：让用户标出「不顺滑」的具体时刻（录屏 / 秒表 / 按键），再把探针时间轴对上去。
    四次测量都没测到，说明「约 2 s / 4 s」这个描述本身可能不准。
-4. **present / 帧节拍**（更新线程之外，唯一没量过的一环）—— **量具已加好（2026-09-25），待抓一局**：
-   update 线程 1983 fps 平稳，但**呈现**只有显示器刷新率那么多次，要量的是**相邻两次 present 的间隔分布**
+4. **present / 帧节拍**（更新线程之外，唯一没量过的一环）—— **量具已加，第一局暴露两处采样缺陷、已修（§3.4c）**：
+   update 线程 ~2000 fps 平稳，但**呈现**只有显示器刷新率那么多次，要量的是**相邻两次 present 的间隔分布**
    与**上屏那一刻那份内容有多旧**。
    - **做不到在 draw 线程打点**：这个 fork 里 `Game` 是 `Container` 而不是 `GameHost`，`osu.Game` 无法 override
      `GameHost.DrawFrame`（它确实是 `protected virtual`，但不在继承链上）。
    - 改为在 update 侧读 `DrawThread.Clock`：`ElapsedFrameTime` **就是**「相邻两次 present 的间隔」，
-     由 draw 线程自己的时钟测；`CurrentTime` 给出 draw 帧边界（与 update 时钟同源同频，标定一次原点即可）。
-     摘要新增 `present` 行：
-     - `drawPeriod` —— present 间隔分布。**看尾部**（`over0.5/1/2/5`、`max`、`std`）：update 侧帧长恒为 0.5 ms，
-       但 draw 线程单独卡一下 update 探针是看不见的，**那一下就是屏幕上直接的一次跳帧**。
-     - `presentAge` —— 上屏那一刻那份内容的年龄。**分辨率只到一个 update 帧长**（读不到被绘制的 buffer 帧号，
-       零点只能取「上一次 update 帧边界」），所以只用来判**毫秒级以上**的滞后，不用来判亚毫秒抖动。
-     - `clocks` —— 两线程自报的 `fps / jitter / slept / maxHz / throttling` + 窗口态 + 刷新率，
-       用来把「每个刷新显示几个 present」（`refresh / fps`）对上：不是整数就说明每刷新的帧数在抖动。
+     由 draw 线程自己的时钟测；`CurrentTime` 给出 draw 帧边界。
+   - **采样口径（下次判读前先确认这四条，否则数全废）**：
+     ① **按 draw 帧去重**（`dup=` 有值才对；update 比 draw 快，逐次采样会把长帧少采、均值拉低，实测 0.622 vs 0.826）；
+     ② **`coverage` ≈ 1**（`ΣdrawPeriod / 首末壁钟跨度`；<1 = 有 draw 帧整个落在两次采样之间被漏掉）；
+     ③ `drawPeriod` 的 **mean ≈ 1000 / `clocks` 里的 draw fps**，两个数对不上就是采样还没修对；
+     ④ `presentAge` **min 不应为负**（为负 = 原点差标定错）。
+   - 修好后的判读顺序：`drawPeriod` 的尾部（`over1/over2/over5`、`max`）→ `presentAge` 的 std / max
+     **对照它自己的分辨率（一个 draw 周期）** → `refresh / fps` 是不是整数。
+     `drawPeriod` 的 p50 落在 0.510 ms（= 限帧目标 2000 Hz）而 `sleptMean = 0`，说明 draw 是**工作受限**而非限帧受限。
    - ⚠ **不覆盖 DWM / 显示器扫描输出**。进程内量不到送屏之后的事；若 `present` 行也干净，
      剩下的就只可能是 tearing（Borderless 下 `AllowTearing` 是开着的）/ 组合器 / 主观锚定，此时回第 3 项。
+5. **音频源漏拉**（§3.4c 新开，优先级在 present 之上）：
+   `interpErr` 一涨就先看摘要里的 `pullMiss`。若下一局又是几十/几百次量级，要查的是**谁让 NAudio 渲染线程漏了一拍**：
+   - 进程外因素（DPC / 驱动 / 其它进程）与进程内因素都还没排除。`pullMiss` 不与任何 100–1000 ms 网格对齐，
+     也只看得到与 update 帧的 4x 弱富集 ⇒ 目前没有指向游戏自身逻辑的证据。
+   - 可以在 `osu-framework` 侧加一对计数器（`BassMixerWaveProvider.Read` 每次实际返回的帧数 / 是否补了静音、
+     `WasapiPlayer` 的事件周期），把「位置跳变」与「真的欠载」分开；**这需要动 framework，先确认再改**。
 
 ## 4. 代码锚点
 
@@ -220,7 +280,8 @@
 | 判定诊断 | `osu.Game/EzOsuGame/Diagnostics/EzJudgmentDiagnostics.cs` |
 | 探针接线 + 环境变量 | `osu.Game/Screens/Play/Player.cs`（约 344–368 行） |
 | 子树 / 时钟 / 其余 归因 | `osu.Game/Rulesets/UI/FrameStabilityContainer.cs`（`UpdateSubTree`） |
-| present / 帧节拍采样 | `EzFrameStallDiagnostics.samplePresent`（update 侧读 `DrawThread.Clock`）；host 由 `osu.Game/OsuGameBase.cs` 的 `SetHost` 挂上（**`DrawFrame` 无法 override，原因见 §3.5 第 4 项**） |
+| present / 帧节拍采样 | `EzFrameStallDiagnostics.samplePresent`（update 侧读 `DrawThread.Clock`，**按 draw 帧去重**）；host 由 `osu.Game/OsuGameBase.cs` 的 `SetHost` 挂上（**`DrawFrame` 无法 override，原因见 §3.5 第 4 项**） |
+| 音频源漏拉计数 | 同文件 `accumulateClocks`（`pullMiss` / `pullMissHoldMs`，停走 >15 ms 且 <60 ms 记一次） |
 | 分析脚本 | `AnalyzeFrameStall.ps1`、`AnalyzePressLatency.ps1` |
 | 音频输出路径（BASS mixer + NAudio WASAPI 拉流） | `osu-framework/osu.Framework/Audio/Wasapi/NAudioWasapiOutput.cs`；缓冲常量在 `Audio/AudioOutputDefaults.cs`（`DEFAULT_NAUDIO_LATENCY_MS = 10`） |
 | 音频源时钟 / 插值 | `osu-framework/osu.Framework/Audio/Track/TrackBass.cs`（`ChannelGetPosition`）、`osu-framework/osu.Framework/Timing/InterpolatingFramedClock.cs` |
