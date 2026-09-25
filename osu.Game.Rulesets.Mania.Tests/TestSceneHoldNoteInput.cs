@@ -536,7 +536,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         /// 转换产物拥有自己的 HitObject，所以本用例持有的源对象并不是被判定的那个实例；按类型 / 时间 / 列认同一个对象。
         /// </summary>
         private static bool isSameObject(HitObject judged, HitObject source)
-            => judged?.GetType() == source.GetType()
+            => judged.GetType() == source.GetType()
                && judged.StartTime == source.StartTime
                && (judged as IHasColumn)?.Column == (source as IHasColumn)?.Column;
 

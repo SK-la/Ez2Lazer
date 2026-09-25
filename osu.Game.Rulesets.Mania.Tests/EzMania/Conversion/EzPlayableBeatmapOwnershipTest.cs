@@ -10,7 +10,6 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Objects.Types;
 
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.Conversion
 {
@@ -33,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Conversion
 
             Assert.That(converted.HitObjects.Count, Is.EqualTo(source.HitObjects.Count), "前置条件：转换应保留对象数量");
 
-            foreach (HitObject original in source.HitObjects)
+            foreach (ManiaHitObject original in source.HitObjects)
             {
                 HitObject copy = converted.HitObjects.Single(h => h.StartTime == original.StartTime);
 

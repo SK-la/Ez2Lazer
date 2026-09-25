@@ -153,7 +153,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// caller must derive its own copy first.
         /// </para>
         /// </remarks>
-        internal static ManiaBeatmap CreatePlayableFromSource(IBeatmap source, IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
+        public static ManiaBeatmap CreatePlayableFromSource(IBeatmap source, IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
         {
             // ConvertToManiaBeatmap 已经为产物深拷贝了 control points，这里不再重复拷贝。
             ManiaBeatmap playable = ConvertToManiaBeatmap(source);
