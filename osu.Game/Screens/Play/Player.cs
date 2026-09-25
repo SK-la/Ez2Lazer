@@ -1104,9 +1104,10 @@ namespace osu.Game.Screens.Play
                 const double fallback_timeout_ms = 5000;
 
                 // [Ez] Trace every delegate tick to diagnose result-screen stalls.
-                EzOsuGame.Diagnostics.EzTimingTrace.Record(
-                    "ResultsDelegate.Tick",
-                    $"taskNull={prepareScoreForDisplayTask == null} taskStatus={prepareScoreForDisplayTask?.Status.ToString() ?? "-"} waitMs={(int)(Time.Current - resultsDisplayQueuedTime)} hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed}");
+                // 刻意不插值：此处每帧执行，插值串会在 Record 判断开关之前就拼好并分配。
+                // 每帧的节奏（相邻行 WallMs 之差）是这里的信号；状态快照由 PrepareAndImport、
+                // ResultsDelegate.ForcedImport 等一次性分支负责。
+                EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.Tick");
 
                 // If prepare task hasn't been started yet, attempt to start it. If it still cannot be
                 // started due to transient conditions (eg. HasCompleted flipping), force a preparation
