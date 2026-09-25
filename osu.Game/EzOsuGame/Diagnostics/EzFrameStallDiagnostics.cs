@@ -114,18 +114,31 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static double sincePrevFrameMinMs = double.MaxValue;
 
         // 「音频时钟量化 / 插值纹波」：note 位置取自插值时钟，而插值时钟追的是音频源时钟。
-        // 实测音频源是精确 10ms 阶梯（见 docs/EZ-PERFORMANCE.md §2.4.11），所以这里逐帧记录两个时钟，
-        // 让「源是不是阶梯」和「插值有没有把阶梯抹平」两件事都能在 1ms 分辨率下被判读。
+        // 实测音频源是精确 10ms 阶梯（见 docs/EZ-PERFORMANCE.md §2.4.11），所以这里逐帧记录两个时钟。
+        //
+        // 关键：判「顺不顺滑」要看的是**位置**精度，不是逐帧速率。音频源每 10ms 跳一格，插值器要抹平它
+        // 就必须让逐帧速率上下摆（实测 std 0.28，p25 0.82 / p75 1.17）—— 那是抹平**成功**的表现，
+        // 拿它当「抖动」会得出完全相反的结论。真正的判据是 interp 相对「去量化后的连续音频」的偏差：
+        // 把报告值 + 距上次跳变的时长（缓冲内已播进度）还原成连续位置，再看 interp 离它多远。
         private static double prevAudioSrcMs = double.NaN;
         private static double prevInterpMs = double.NaN;
         private static readonly Histogram audioStep = new Histogram();
-        private static long audioStepZeroCount;
-        private static long rateCount;
-        private static double rateSum;
-        private static double rateSqSum;
-        private static long rateWithin1Pct;
-        private static long rateOver5Pct;
+        private static readonly Histogram interpErr = new Histogram(0.01);
+        private static double lastAudioStepWallMs = double.NaN;
         private static long rateSkipped;
+        private static long clockStoppedFrames;
+        private static double clockStoppedMs;
+        private static long errCount;
+        private static double errSum;
+        private static double errSqSum;
+        private static double errMaxAbs;
+        private static long errOver05;
+        private static long errOver1;
+        private static long errOver2;
+        private static double errBaseline = double.NaN;
+        private static long driftCount;
+        /// <summary>时钟误差基线的 EMA 时间常数：估掉「音频输出延迟」那个常数，只留抖动。</summary>
+        private const double ERR_BASELINE_MS = 500;
         private static double driftMin = double.MaxValue;
         private static double driftMax = double.MinValue;
         private static double driftSum;
@@ -324,8 +337,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         }
 
         /// <summary>
-        /// 累计三个读数：音频源的**逐帧步进**（阶梯的直接证据）、插值时钟的**逐帧速率**（纹波）、以及
-        /// <c>interp − audioSrc</c> 的**漂移**。拿不到时钟（非 GameplayClockContainer）时传 NaN，跳过。
+        /// 累计音频时钟量化相关的读数。拿不到时钟（非 GameplayClockContainer）时传 NaN，跳过。
         /// </summary>
         private static void accumulateClocks(double audioSrcMs, double interpMs, double elapsedMs)
         {
@@ -343,28 +355,56 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 if (step >= 0)
                     audioStep.Add(step);
 
-                if (step == 0)
-                    audioStepZeroCount++;
+                // 音频报告值跳变 ⇒ 一个新的缓冲被播完，缓冲内已播进度清零。
+                if (step != 0)
+                    lastAudioStepWallMs = EzJudgmentDiagnostics.WallClockMs;
 
-                // 速率只在正常帧上算：>5ms 的帧是卡顿 / 加载，帧长本身不干净，其「速率」没有解释力。
-                // 这些帧的原始时钟值仍在 CSV 里，离线要用可以自己筛。
-                if (elapsedMs > 0 && elapsedMs <= 5)
+                // 插值完全没走 = 时钟停走（歌曲结束 / 暂停），与「走得慢」是两回事，单独计数。
+                if (interpMs == prevInterpMs)
                 {
-                    double rate = (interpMs - prevInterpMs) / elapsedMs;
-                    rateCount++;
-                    rateSum += rate;
-                    rateSqSum += rate * rate;
-
-                    if (Math.Abs(rate - 1) < 0.01)
-                        rateWithin1Pct++;
-
-                    if (Math.Abs(rate - 1) > 0.05)
-                        rateOver5Pct++;
+                    clockStoppedFrames++;
+                    clockStoppedMs += elapsedMs;
                 }
-                else
+                else if (double.IsFinite(lastAudioStepWallMs))
+                {
+                    double age = EzJudgmentDiagnostics.WallClockMs - lastAudioStepWallMs;
+
+                    // age 只在一个缓冲周期内可信；超出说明中途有跳变没被采到（帧太长），丢弃以免污染。
+                    if (age >= 0 && age <= 50)
+                    {
+                        double err = interpMs - (audioSrcMs + age);
+                        double abs = Math.Abs(err);
+
+                        errCount++;
+                        errSum += err;
+                        errSqSum += err * err;
+
+                        // err 含一个常数：音频报告位置领先「听到的声音」约一个缓冲，量级 ~10ms。
+                        // 那是输出延迟，会被音频偏移吸收，不是抖动；用慢 EMA 在线估掉它，阈值才判得动。
+                        // std 本来就是平移不变的，所以直接取原始 err 的 std。
+                        if (double.IsNaN(errBaseline))
+                            errBaseline = err;
+                        else
+                            errBaseline += (err - errBaseline) * Math.Min(1.0, elapsedMs / ERR_BASELINE_MS);
+
+                        double dev = Math.Abs(err - errBaseline);
+
+                        if (dev > errMaxAbs)
+                            errMaxAbs = dev;
+
+                        interpErr.Add(dev);
+
+                        if (dev > 0.5) errOver05++;
+                        if (dev > 1) errOver1++;
+                        if (dev > 2) errOver2++;
+                    }
+                }
+
+                if (elapsedMs > 5)
                     rateSkipped++;
 
                 double drift = interpMs - audioSrcMs;
+                driftCount++;
                 driftSum += drift;
                 driftSqSum += drift * drift;
 
@@ -422,13 +462,20 @@ namespace osu.Game.EzOsuGame.Diagnostics
             prevAudioSrcMs = double.NaN;
             prevInterpMs = double.NaN;
             audioStep.Reset();
-            audioStepZeroCount = 0;
-            rateCount = 0;
-            rateSum = 0;
-            rateSqSum = 0;
-            rateWithin1Pct = 0;
-            rateOver5Pct = 0;
+            interpErr.Reset();
+            lastAudioStepWallMs = double.NaN;
             rateSkipped = 0;
+            clockStoppedFrames = 0;
+            clockStoppedMs = 0;
+            errCount = 0;
+            errSum = 0;
+            errSqSum = 0;
+            errMaxAbs = 0;
+            errOver05 = 0;
+            errOver1 = 0;
+            errOver2 = 0;
+            errBaseline = double.NaN;
+            driftCount = 0;
             driftMin = double.MaxValue;
             driftMax = double.MinValue;
             driftSum = 0;
@@ -561,32 +608,41 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             // 音频时钟：源是不是阶梯、插值有没有把阶梯抹平。note 位置取自插值时钟，所以这是「下落顺不顺滑」的直接判据；
             // 也是 ~10Hz 的判定/按键探针看不见 100Hz 结构的原因（见 docs/EZ-PERFORMANCE.md §2.4.11）。
-            if (rateCount > 0)
+            if (audioStep.Count > 0)
             {
-                double rateMean = rateSum / rateCount;
-                double rateStd = Math.Sqrt(Math.Max(0, rateSqSum / rateCount - rateMean * rateMean));
-                long driftFrames = rateCount + rateSkipped;
-                double driftMean = driftSum / driftFrames;
-                double driftStd = Math.Sqrt(Math.Max(0, driftSqSum / driftFrames - driftMean * driftMean));
+                long stepFrames = audioStep.Count;
+                long stepNonZero = audioStep.CountOver(0.1);
 
                 sb.Append(Environment.NewLine);
                 sb.Append(CultureInfo.InvariantCulture,
-                    $"clockQuant frames={driftFrames} rateSkipped={rateSkipped}(帧长>5ms) "
-                    + $"driftMean={driftMean:F3}ms driftRange=[{driftMin:F3},{driftMax:F3}]ms driftStd={driftStd:F3}ms");
+                    $"clockQuant frames={stepFrames} rateSkipped={rateSkipped}(帧长>5ms) "
+                    + $"clockStopped={clockStoppedFrames}帧/{clockStoppedMs:F1}ms");
 
-                if (audioStep.Count > 0)
+                sb.Append(Environment.NewLine);
+                sb.Append(CultureInfo.InvariantCulture,
+                    $"  audioStep nonzero={100 * stepNonZero / (double)stepFrames:F2}% "
+                    + $"mean={audioStep.Mean:F4}ms top:");
+                sb.Append(audioStep.FormatBuckets(5));
+
+                if (errCount > 0)
                 {
+                    double errMean = errSum / errCount;
+                    double errStd = Math.Sqrt(Math.Max(0, errSqSum / errCount - errMean * errMean));
+                    double driftMean = driftSum / driftCount;
+                    double driftStd = Math.Sqrt(Math.Max(0, driftSqSum / driftCount - driftMean * driftMean));
+
+                    // 位置精度：interp 相对「报告值 + 缓冲内已播时长」的偏差去掉常数后的抖动。这是「顺不顺滑」的判据。
+                    // offset ≈ 音频报告位置领先「听到的声音」的时长（约一个缓冲），会被音频偏移吸收，不用管它绝对值。
                     sb.Append(Environment.NewLine);
                     sb.Append(CultureInfo.InvariantCulture,
-                        $"  audioStep nonzero={100 * (audioStep.Count - audioStepZeroCount) / (double)audioStep.Count:F2}% "
-                        + $"mean={audioStep.Mean:F4}ms top:");
-                    sb.Append(audioStep.FormatBuckets(5));
-                }
+                        $"  interpErr std={errStd:F3}ms p99={interpErr.Percentile(0.99):F3}ms maxdev={errMaxAbs:F3}ms "
+                        + $"offset={errMean:F2}ms 超[0.5/1/2]ms={100 * errOver05 / (double)errCount:F2}/{100 * errOver1 / (double)errCount:F2}/{100 * errOver2 / (double)errCount:F2}%");
 
-                sb.Append(Environment.NewLine);
-                sb.Append(CultureInfo.InvariantCulture,
-                    $"  interpRate mean={rateMean:F5} std={rateStd:F5} "
-                    + $"within1%={100 * rateWithin1Pct / (double)rateCount:F1}% over5%={100 * rateOver5Pct / (double)rateCount:F1}%");
+                    // drift 只是 interp − 音频报告值：含音频偏移常数与缓冲锯齿，幅度天然≈缓冲步长，别单独当抖动读。
+                    sb.Append(Environment.NewLine);
+                    sb.Append(CultureInfo.InvariantCulture,
+                        $"  drift(含偏移+锯齿) mean={driftMean:F3}ms range=[{driftMin:F3},{driftMax:F3}]ms std={driftStd:F3}ms");
+                }
             }
 
             // 两组分布并排，是「一次按键把帧拉长了多少」的直接答案。
@@ -617,10 +673,18 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// <summary>定长直方图：只做加法与读数，热路径零分配。</summary>
         private sealed class Histogram
         {
-            private const double bucket_width_ms = 0.1;
             private const int bucket_count = 1024;
 
+            private readonly double bucketWidthMs;
             private readonly int[] buckets = new int[bucket_count];
+
+            /// <param name="bucketWidthMs">
+            /// 桶宽，也就是读数分辨率。默认 0.1ms 够看帧耗时；看亚毫秒级的时钟偏差要传更细的（量程 = 桶宽 × 1024）。
+            /// </param>
+            public Histogram(double bucketWidthMs = 0.1)
+            {
+                this.bucketWidthMs = bucketWidthMs;
+            }
 
             public long Count { get; private set; }
             public double Sum { get; private set; }
@@ -634,7 +698,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 if (ms > Max)
                     Max = ms;
 
-                int bucket = (int)(ms / bucket_width_ms);
+                int bucket = (int)(ms / bucketWidthMs);
                 buckets[bucket >= bucket_count ? bucket_count - 1 : bucket < 0 ? 0 : bucket]++;
             }
 
@@ -661,15 +725,15 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     cumulative += buckets[i];
 
                     if (cumulative > target)
-                        return (i + 0.5) * bucket_width_ms;
+                        return (i + 0.5) * bucketWidthMs;
                 }
 
-                return bucket_count * bucket_width_ms;
+                return bucket_count * bucketWidthMs;
             }
 
             public long CountOver(double ms)
             {
-                int first = (int)Math.Ceiling(ms / bucket_width_ms);
+                int first = (int)Math.Ceiling(ms / bucketWidthMs);
                 long count = 0;
 
                 for (int i = first < 0 ? 0 : first; i < bucket_count; i++)
@@ -698,7 +762,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 for (int i = 0; i < bucket_count; i++)
                 {
                     if (buckets[i] > 0)
-                        nonEmpty.Add(((i + 0.5) * bucket_width_ms, buckets[i]));
+                        nonEmpty.Add(((i + 0.5) * bucketWidthMs, buckets[i]));
                 }
 
                 nonEmpty.Sort((a, b) => b.count.CompareTo(a.count));
