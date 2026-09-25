@@ -109,77 +109,35 @@ namespace osu.Game.Rulesets.UI
         {
             stopwatch.Restart();
 
+            // [Ez] 一轮 update 的三段归因（时钟 / 子树 / 其余）与帧边界采样都收在探针里，这里只标测量点。
+            EzFrameStallDiagnostics.LoopScope loop = EzFrameStallDiagnostics.LoopScope.Begin();
+
             int iterations = 0;
-
-            // [Ez] 把一轮 update 切成「时钟推进」「drawable 子树」「其余」三段，供帧探针归因。
-            // 子树是 FSC 之下的整个 ruleset 层级（播放区、物件、判定线），HUD 与框架调度在它之外。
-            // 探针关闭时每个计时调用都被跳过，热路径只剩下面对这几个局部 bool 的分支。
-            bool sampling = EzFrameStallDiagnostics.Sampling;
-            bool samplingAlloc = EzFrameStallDiagnostics.SamplingAlloc;
-            bool attribution = EzDiagnosticSwitches.FrameLoopAttribution;
-
-            double clockTicks = 0;
-            double subtreeTicks = 0;
-            bool ranSubtree = false;
-            long allocBefore = samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() : 0;
 
             do
             {
                 iterations++;
 
-                long beforeClock = sampling ? Stopwatch.GetTimestamp() : 0;
+                loop.BeforeClock();
 
                 // update clock is always trying to approach the aim time.
                 // it should be provided as the original value each loop.
                 updateClock();
 
-                if (sampling)
-                    clockTicks += Stopwatch.GetTimestamp() - beforeClock;
+                loop.AfterClock();
 
                 if (state == PlaybackState.NotValid)
                     break;
 
-                long beforeSubtree = sampling ? Stopwatch.GetTimestamp() : 0;
+                loop.BeforeSubtree();
 
                 base.UpdateSubTree();
                 UpdateSubTreeMasking();
 
-                ranSubtree = true;
-
-                if (sampling)
-                    subtreeTicks += Stopwatch.GetTimestamp() - beforeSubtree;
+                loop.AfterSubtree();
             } while (state == PlaybackState.RequiresCatchUp && stopwatch.ElapsedMilliseconds < max_catchup_milliseconds);
 
-            // [Ez] Catch-up loop count of this pass + 每轮归因（子树/时钟耗时、分配量），一次回报给帧探针。
-            // 趟数按键探针也要，所以归因闸门是「帧探针或按键探针任一开启」；两者都关时只剩一次静态 bool 分支。
-            if (attribution)
-            {
-                double tickToMs = 1000.0 / Stopwatch.Frequency;
-
-                EzFrameStallDiagnostics.ReportLoop(
-                    sampling ? subtreeTicks * tickToMs : 0,
-                    sampling ? clockTicks * tickToMs : 0,
-                    samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() - allocBefore : 0,
-                    ranSubtree,
-                    iterations);
-            }
-
-            // [Ez] Frame boundary for the frame-stall probe. Must stay at the same position in every
-            // pass, otherwise the delta between two calls is not a whole frame.
-            // 顺带取两个时钟交给探针：音频源时钟（实测是精确 10ms 阶梯）与插值时钟（note 位置实际读的那个）。
-            // 「下落顺不顺滑」取决于后者，而判定/按键探针只有 ~10Hz，看不见 100Hz 的阶梯 —— 这里是唯一能按帧看的地方。
-            double audioSrcMs = double.NaN;
-            double interpMs = double.NaN;
-
-            if (sampling && ParentGameplayClock is GameplayClockContainer gcc)
-            {
-                audioSrcMs = gcc.BassSourceCurrentTime;
-                interpMs = gcc.CurrentTime;
-            }
-
-            // 探针关闭时连这次调用都不发生：热路径上只剩上面那次局部 bool 读取与这个分支。
-            if (sampling)
-                EzFrameStallDiagnostics.RecordFrame(audioSrcMs, interpMs);
+            loop.Complete(iterations, ParentGameplayClock as GameplayClockContainer);
 
             return true;
         }

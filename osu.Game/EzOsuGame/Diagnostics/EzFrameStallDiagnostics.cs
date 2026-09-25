@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using osu.Framework.Audio.Wasapi;
 using osu.Framework.Platform;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.EzOsuGame.Diagnostics
 {
@@ -112,6 +113,108 @@ namespace osu.Game.EzOsuGame.Diagnostics
             loopAllocBytes = allocBytes;
             frameValid = ranSubtree;
             lastUpdateIterations = iterations;
+        }
+
+        /// <summary>
+        /// 一轮 <c>FrameStabilityContainer.UpdateSubTree</c> 的归因脚手架：把「时钟推进」「drawable 子树」
+        /// 分段计时、本趟分配量与帧边界处的两个时钟采样收在这里，使上游文件只留几个 mark 调用。
+        /// <para>
+        /// 关闭时不发 <c>Stopwatch</c> / GC 查询、不产生字符串；每个 mark 至多一次静态 bool 判断。
+        /// 用法：<see cref="Begin"/> → 循环内 <see cref="BeforeClock"/> / <see cref="AfterClock"/> /
+        /// <see cref="BeforeSubtree"/> / <see cref="AfterSubtree"/> → 循环外 <see cref="Complete"/>。
+        /// </para>
+        /// </summary>
+        internal struct LoopScope
+        {
+            private readonly bool sampling;
+            private readonly bool samplingAlloc;
+            private readonly bool report;
+
+            private readonly long allocBefore;
+
+            private long clockStart;
+            private long subtreeStart;
+            private double clockTicks;
+            private double subtreeTicks;
+            private bool ranSubtree;
+
+            private LoopScope(bool sampling, bool samplingAlloc, bool report)
+            {
+                this.sampling = sampling;
+                this.samplingAlloc = samplingAlloc;
+                this.report = report;
+
+                allocBefore = samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() : 0;
+            }
+
+            /// <summary>开始一轮归因；在 <c>UpdateSubTree</c> 最前面调用一次。</summary>
+            public static LoopScope Begin() => new LoopScope(Sampling, SamplingAlloc, EzDiagnosticSwitches.FrameLoopAttribution);
+
+            public void BeforeClock()
+            {
+                if (sampling)
+                    clockStart = Stopwatch.GetTimestamp();
+            }
+
+            public void AfterClock()
+            {
+                if (sampling)
+                    clockTicks += Stopwatch.GetTimestamp() - clockStart;
+            }
+
+            public void BeforeSubtree()
+            {
+                if (sampling)
+                    subtreeStart = Stopwatch.GetTimestamp();
+            }
+
+            public void AfterSubtree()
+            {
+                ranSubtree = true;
+
+                if (sampling)
+                    subtreeTicks += Stopwatch.GetTimestamp() - subtreeStart;
+            }
+
+            /// <summary>
+            /// 本趟结束：回报逐轮归因与趟数，并在帧边界采两个时钟。
+            /// <paramref name="clock"/> 传 <c>FrameStabilityContainer.ParentGameplayClock</c>：
+            /// 取 <c>BassSourceCurrentTime</c>（音频源时钟，实测 10ms 阶梯）与 <c>CurrentTime</c>
+            /// （插值时钟，note 位置实际读的那个）。后者决定「下落顺不顺滑」，而判定/按键探针只有 ~10Hz，
+            /// 看不见 100Hz 的阶梯 —— 这里是唯一能按帧看的地方。
+            /// <para>
+            /// 归因闸门是「帧探针或按键探针任一开启」（趟数按键探针也要）；两者都关时只剩一次静态 bool 判断。
+            /// 帧边界必须落在每一趟的同一位置，否则两次调用之间的差不是一个整帧。
+            /// </para>
+            /// </summary>
+            public void Complete(int iterations, GameplayClockContainer? clock)
+            {
+                if (report)
+                {
+                    double tickToMs = 1000.0 / Stopwatch.Frequency;
+
+                    ReportLoop(
+                        sampling ? subtreeTicks * tickToMs : 0,
+                        sampling ? clockTicks * tickToMs : 0,
+                        samplingAlloc ? GC.GetAllocatedBytesForCurrentThread() - allocBefore : 0,
+                        ranSubtree,
+                        iterations);
+                }
+
+                if (!sampling)
+                    return;
+
+                double audioSrcMs = double.NaN;
+                double interpMs = double.NaN;
+
+                if (clock != null)
+                {
+                    audioSrcMs = clock.BassSourceCurrentTime;
+                    interpMs = clock.CurrentTime;
+                }
+
+                RecordFrame(audioSrcMs, interpMs);
+            }
         }
 
         private const int bucket_count = 1024;
