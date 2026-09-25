@@ -1059,7 +1059,9 @@ namespace osu.Game.Screens.Play
             if (!ScoreProcessor.HasCompleted.Value)
             {
                 ezForceResultsImport = true;
-                EzOsuGame.Diagnostics.EzTimingTrace.Record("ForceResults.BypassHasCompleted", "HasCompleted still false after force completion");
+                EzOsuGame.Diagnostics.EzTimingTrace.Record(
+                    "ForceResults.BypassHasCompleted",
+                    $"judged={ScoreProcessor.JudgedHits}/{ScoreProcessor.MaximumJudgements} hasCompleted={ScoreProcessor.HasCompleted.Value}");
             }
 
             if (forceFailGrade)
@@ -1076,7 +1078,7 @@ namespace osu.Game.Screens.Play
 
             EzOsuGame.Diagnostics.EzTimingTrace.Record(
                 "ForceResults.End",
-                $"hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed} rank={ScoreProcessor.Rank.Value}");
+                $"judged={ScoreProcessor.JudgedHits}/{ScoreProcessor.MaximumJudgements} hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed} bypass={ezForceResultsImport} rank={ScoreProcessor.Rank.Value}");
         }
 
         /// <summary>
