@@ -817,6 +817,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
             if (Result.HasResult)
                 throw new InvalidOperationException("Cannot apply result on a hitobject that already has a result.");
 
+            EzJudgmentDiagnostics.ChainEnterApplyResult();
+
             application?.Invoke(Result, state);
 
             if (!Result.HasResult)
@@ -840,6 +842,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 UpdateState(Result.IsHit ? ArmedState.Hit : ArmedState.Miss);
 
             OnNewResult?.Invoke(this, Result);
+
+            EzJudgmentDiagnostics.ChainExitApplyResult();
         }
 
         /// <summary>
@@ -890,6 +894,9 @@ namespace osu.Game.Rulesets.Objects.Drawables
         /// <returns>Whether a scoring result has occurred from this <see cref="DrawableHitObject"/> or any nested <see cref="DrawableHitObject"/>.</returns>
         protected bool UpdateResult(bool userTriggered)
         {
+            // 首次命中链分解（探针关闭或已取到样本时为一次静态 bool 读取）。
+            EzJudgmentDiagnostics.ChainEnterUpdateResult();
+
             // It's possible for input to get into a bad state when rewinding gameplay, so results should not be processed
             if ((Clock as IGameplayClock)?.IsRewinding == true)
                 return false;
@@ -920,7 +927,9 @@ namespace osu.Game.Rulesets.Objects.Drawables
             if (userTriggered && EzJudgmentDiagnostics.Enabled)
                 EzJudgmentDiagnostics.Capture(this, timeOffset, keyTs);
 
+            EzJudgmentDiagnostics.ChainEnterCheckForResult();
             CheckForResult(userTriggered, timeOffset);
+            EzJudgmentDiagnostics.ChainExitCheckForResult(Judged);
 
             return Judged;
         }

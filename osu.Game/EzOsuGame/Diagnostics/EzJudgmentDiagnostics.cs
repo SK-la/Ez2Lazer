@@ -40,6 +40,118 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double InputToJudgeMs);
 
         /// <summary>
+        /// 本局首次「判定真正落地」那一次的内部构成（ms）。
+        /// <para>
+        /// 按键探针只能把一次命中拆到 <c>apply</c>（<c>UpdateResult</c> 全程），而首次命中那里有 ~13 ms。
+        /// 本结构把它再切三块：<c>UpdatePrologueMs</c>（入口 → <c>CheckForResult</c> 前，含子帧修正与判定探针）、
+        /// <c>CheckForResultMs</c>（含派生类判定的 <c>HitWindows</c> 计算，以及其内的 <c>ApplyResult</c>）、
+        /// <c>ApplyResultMs</c>（结果落地与 <c>OnNewResult</c> 扇出）。
+        /// </para>
+        /// <para>
+        /// 三者嵌套而非并列：<c>ApplyResult</c> 由派生类的 <c>CheckForResult</c> 调用，故
+        /// <c>CheckForResultMs - ApplyResultMs</c> 才是判定计算自身的净耗时。
+        /// </para>
+        /// </summary>
+        public readonly record struct JudgeChain(
+            double WallMs,
+            double UpdatePrologueMs,
+            double CheckForResultMs,
+            double ApplyResultMs);
+
+        private static bool chainRecorded;
+        private static long tEnter;
+        private static long tCheckStart;
+        private static long tCheckEnd;
+        private static long tApplyStart;
+        private static long tApplyEnd;
+
+        /// <summary>首次判定链是否仍在等样本；关闭探针或已取到样本后恒为 false。</summary>
+        public static bool ChainWanted => Enabled && !chainRecorded;
+
+        /// <summary><c>UpdateResult</c> 入口。</summary>
+        public static void ChainEnterUpdateResult()
+        {
+            if (!ChainWanted)
+                return;
+
+            tEnter = Stopwatch.GetTimestamp();
+        }
+
+        /// <summary><c>CheckForResult</c> 入口。</summary>
+        public static void ChainEnterCheckForResult()
+        {
+            if (!ChainWanted || tEnter == 0)
+                return;
+
+            tCheckStart = Stopwatch.GetTimestamp();
+        }
+
+        /// <summary>
+        /// <c>CheckForResult</c> 出口。<paramref name="judged"/> 为 false 表示这次按键没有落地判定，
+        /// 本次链记录作废，等下一次真正落地的判定。
+        /// </summary>
+        public static void ChainExitCheckForResult(bool judged)
+        {
+            if (!ChainWanted || !judged)
+                return;
+
+            tCheckEnd = Stopwatch.GetTimestamp();
+        }
+
+        /// <summary><c>ApplyResult</c> 入口。</summary>
+        public static void ChainEnterApplyResult()
+        {
+            if (!ChainWanted)
+                return;
+
+            if (tApplyStart == 0)
+                tApplyStart = Stopwatch.GetTimestamp();
+        }
+
+        /// <summary><c>ApplyResult</c> 出口（<c>OnNewResult</c> 扇出之后）；在此提交整条链。</summary>
+        public static void ChainExitApplyResult()
+        {
+            if (!ChainWanted)
+                return;
+
+            if (tApplyEnd == 0)
+                tApplyEnd = Stopwatch.GetTimestamp();
+
+            commitChain();
+        }
+
+        private static void commitChain()
+        {
+            if (tEnter == 0 || tCheckStart == 0 || tCheckEnd == 0 || tApplyStart == 0 || tApplyEnd == 0)
+                return;
+
+            double tickToMs = 1000.0 / Stopwatch.Frequency;
+
+            chainRecorded = true;
+
+            chain = new JudgeChain(
+                EzProbeOutput.WallClockMs,
+                (tCheckStart - tEnter) * tickToMs,
+                (tCheckEnd - tCheckStart) * tickToMs,
+                (tApplyEnd - tApplyStart) * tickToMs);
+        }
+
+        private static JudgeChain chain;
+
+        private static string formatChain()
+        {
+            if (!chainRecorded)
+                return "[EzJudgmentDiag.firstJudge] no sample";
+
+            var c = chain;
+
+            return string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"[EzJudgmentDiag.firstJudge] wall={c.WallMs:F1} prologue={c.UpdatePrologueMs:F3} "
+                + $"CheckForResult={c.CheckForResultMs:F3}(own={c.CheckForResultMs - c.ApplyResultMs:F3}) "
+                + $"ApplyResult={c.ApplyResultMs:F3}");
+        }
+
+        /// <summary>
         /// 记录一次判定的完整时序上下文。派生量（插值漂移、按键 → 判定检查的 wall 耗时及其有效性）
         /// 都在这里算完，调用点只声明「用户刚触发了一次判定」。
         /// </summary>
@@ -108,7 +220,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.AppendLine();
             }
 
-            return EzProbeOutput.WriteAsync("judgment", sb.ToString(), sampleCount, "EzJudgmentDiag");
+            return EzProbeOutput.WriteAsync("judgment", sb.ToString(), sampleCount, "EzJudgmentDiag", formatChain());
         }
 
         /// <summary>
@@ -118,6 +230,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
         {
             // Atomically replace the queue to avoid long-running dequeue loops on the caller thread.
             Interlocked.Exchange(ref samples, new ConcurrentQueue<JudgmentSample>());
+
+            // 首次判定链按局清零：同进程第二局起即无一次性成本，需要一个干净的"局内首次"。
+            chainRecorded = false;
+            chain = default;
+            tEnter = tCheckStart = tCheckEnd = tApplyStart = tApplyEnd = 0;
         }
     }
 }
