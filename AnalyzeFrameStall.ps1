@@ -386,7 +386,7 @@ else {
 if ($SummaryPath -and (Test-Path -LiteralPath $SummaryPath)) {
     $frameSplit = @(Get-Content -LiteralPath $SummaryPath | Where-Object { $_ -match '^frameSplit' })
 
-    if ($frameSplit.Count -gt 0 -and $frameSplit[0] -match 'elapsedMean=([\d.]+)ms subtreeMsMean=([\d.]+)ms clockMsMean=([\d.]+)ms restMsMean=([\d.]+)ms subtreeShareMs=([\d.]+)% subtreeAllocMean=(-?\d+)B loopAllocMean=(-?\d+)B') {
+    if ($frameSplit.Count -gt 0 -and $frameSplit[0] -match 'elapsedMean=([\d.]+)ms subtreeMsMean=([\d.]+)ms clockMsMean=([\d.]+)ms restMsMean=([\d.]+)ms subtreeShareMs=([\d.]+)% loopAllocMean=(-?\d+)B') {
         Write-Host ''
         Write-Host '== 一轮 update 的归属（均值） ==' -ForegroundColor Cyan
 
@@ -395,8 +395,7 @@ if ($SummaryPath -and (Test-Path -LiteralPath $SummaryPath)) {
         $clk = [double]::Parse($matches[3], $inv)
         $rest = [double]::Parse($matches[4], $inv)
         $sharePct = [double]::Parse($matches[5], $inv)
-        $subAlloc = [long]$matches[6]
-        $loopAlloc = [long]$matches[7]
+        $loopAlloc = [long]$matches[6]
 
         $subPct = 100.0 * $sub / $el
         $clkPct = 100.0 * $clk / $el
@@ -406,10 +405,9 @@ if ($SummaryPath -and (Test-Path -LiteralPath $SummaryPath)) {
         Write-Host ("  FSC 子树（ruleset 层级）   {0,8}ms   {1,6:F1}%   ← mania 播放区 / 物件 / 判定线" -f (Format-F3 $sub), $subPct)
         Write-Host ("  FSC 时钟推进               {0,8}ms   {1,6:F1}%   ← 音频时钟采样 + ReplayInput + 子帧校正" -f (Format-F3 $clk), $clkPct)
         Write-Host ("  其余（HUD / 框架 / 掩码）  {0,8}ms   {1,6:F1}%" -f (Format-F3 $rest), $restPct)
-        Write-Host ("  子树内分配                 {0,8} B/帧" -f $subAlloc)
         Write-Host ("  FSC 全程分配               {0,8} B/帧" -f $loopAlloc)
         Write-Host '  判读：子树占比高 ⇒ 优化点在 mania 的 drawable 层级；占比低 ⇒ 在 HUD / 框架。'
-        Write-Host '        分配同理：子树内分配不是大头，就去查 HUD 与框架的每帧分配。'
+        Write-Host '        分配同理：FSC 全程分配不是大头，就去查 HUD 与框架的每帧分配。'
     }
 }
 

@@ -75,7 +75,7 @@
 | 帧率操作点 = `FrameLimiterBase = 250` + 两线程 `Limit4x`（1000 fps） | 2000 fps 帧间隔规整度 p90/p50 = 1.89，1000 fps = 1.19；按键尾部 `PreColumnMs` p99 35.4 → 6.8 ms |
 | 帧是**限帧 / Present 受限**，不是工作受限 | 1000 fps 下 `elapsedMean ≈ 1.001 ms`，`restMsMean = 0.884 ms` 绝大部分是节流 sleep |
 | mania 子树每帧恒定 0.105–0.116 ms | `frameSplit subtreeMsMean`，跨倍帧率不变 |
-| 分配 92–93% 在 FSC（ruleset）之外 | `subtreeAllocMean` 168 B / 270 B vs update 线程 2552 B / 3162 B per frame |
+| 分配 92–93% 在 FSC（ruleset）之外 | `subtreeAllocMean` / `loopAllocMean` 168 B / 270 B vs update 线程 2552 B / 3162 B per frame（两列逐帧全等；`subtreeAllocMean` 已于 §2.4.19 删除） |
 | Draw 线程最大单项是 `Present` | dotTrace：25% 墙钟、`DrawFrame` 的 78%，含 AMD 驱动内 0.25 ms/帧 |
 | **acrylic 已排除** | `EzBoxElement`（`AcrylicBackdropDrawable`）/ `Stage.stageBackdropBlur`（`BackdropBlurDrawable`）开关对 draw 帧数无可见差别。注意限帧下该量具**不敏感**，此结论不能推广成「每帧分配不重要」 |
 | lane controller 索引维护不改 | 10 列 × 100 KPS × 2000 帧实测 ≈10–16 µs/帧 |
@@ -106,6 +106,9 @@
     `TrackBass.CurrentTime` 取 `BassMix.ChannelGetPosition`，而解码 mixer 的位置**只在 NAudio 拉走一个 buffer 时前进**
     ⇒ 每次正好 10.000 ms。
   - 于是 `BassSource` 是 100 Hz 阶梯，`GameTime`（== `InterpClock`，插值时钟）连续，两者之差就是 `Drift`。
+  - ⚠ **列没了，读法还在**：`InterpClock` / `BassSource` 两列已于 2026-09-25 删除（`InterpClock` ≡ `GameTime`；
+    `BassSource` ≡ `GameTime − Drift − 15.000`，见 `EZ-PERFORMANCE.md` §2.4.19）。上面这些数字都来自删除前的 CSV，
+    音频源时钟现在要用 `GameTime − Drift − 15.000` 还原，或读帧 CSV 的 `AudioSrcMs`。
   - **实机日志（`logs/1790263779.audio.log`，与全帧局同一次会话）**：
     `NAudio default output started: ... wasapi="VoiceMeeter Aux Input (VB-Audio VoiceMeeter AUX VAIO)",
     48000Hz/2ch float, requestedLatency=10ms, actualLatency=10ms, lowLatency=true`

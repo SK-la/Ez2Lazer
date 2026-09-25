@@ -22,7 +22,7 @@
          它们的余振（实测同一局 `ElapsedMs` 全段 15.7x、去掉首尾各 3s 后 2.6x，带内 RMS 3.294 → 0.026 ms）。
       ② 跨序列相位表的读数未越过**偶然水平阈值** —— 带通到 1.5–5 s 后独立样本只有约「跨度/周期」个，
          |r| 的偶然峰很高（零分布实测 p95 0.503）；工具按 0.05/对数反解家族性阈值并逐行标注。
-      另外「定义性派生」的对（如 SpikeRate := elapsed ≥ 2×p50、AudioLag = −Drift − 常数）直接剔除。
+      另外「定义性派生」的对（如 SpikeRate := elapsed ≥ 2×p50）直接剔除；纯重复的列干脆不采（见 §2.4.19）。
 
 用法：
     python AnalyzePeriod.py diagnostics/judgment_20260924_222233.csv
@@ -84,7 +84,7 @@ def detect_kind(header: list[str]) -> str:
     names = set(header)
     if {"ElapsedMs", "GcPauseDeltaMs", "SubtreeMs"} <= names:
         return "frame"
-    if {"TimeOffset", "Drift", "BassSource"} <= names:
+    if {"TimeOffset", "Drift"} <= names:
         return "judgment"
     if "PreColumnMs" in names and "FrameAgeMs" in names:
         return "press"
@@ -132,13 +132,13 @@ def build_series(path: str, table, full_capture: bool = True) -> list[Series]:
     if kind == "judgment":
         drift = col(header, "Drift", rows)
         offset = col(header, "TimeOffset", rows)
-        audio_lag = col(header, "BassSource", rows) - col(header, "GameTime", rows)
+        # BassSource / InterpClock 两列已删（2026-09-25，docs/EZ-PERFORMANCE.md §2.4.19）：
+        # BassSource ≡ GameTime − Drift − 15.000（常数 15 ms 是音频偏移），InterpClock ≡ GameTime。
+        # 由此 AudioLag = BassSource − GameTime 与 Drift 去趋势后必然 r = −1.000，是恒等式不是发现，
+        # 所以随列一起删掉，而不是继续以 derived 的形式列出来。
         out += [
             Series("Drift", t, drift, "interp", "ms", src),
             Series("TimeOffset", t, offset, "interp", "ms", src),
-            # Drift = -(BassSource - GameTime) - 15（实测偏移恰为常数 15.000ms）⇒ 同一信号加常数，
-            # 去趋势后必然 r = -1.000。它同 Drift 的「相关」是恒等式，不是发现。
-            Series("AudioLag", t, audio_lag, "interp", "ms", src, derived_from=("Drift",)),
             Series("FrameElapsed", t, col(header, "FrameElapsed", rows), "interp", "ms", src),
         ]
     elif kind == "press":

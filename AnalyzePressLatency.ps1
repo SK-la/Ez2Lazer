@@ -6,13 +6,13 @@
     分段定义（全部 wall-clock，ms）：
       PreColumnMs  按键事件入队 -> 本列 OnPressed 入口（输入线程交班 + 等帧 + 派发遍历；列不可控）
       ColumnMs     本列 OnPressed 全程（键音触发 + 列路由 + 判定 + 同步结果扇出；列可控）
-      TotalMs      两者之和
+      TotalMs      两者之和（= PreColumnMs + ColumnMs，仅为对照保留）
       FrameAgeMs   处理该按键时当前游戏帧的时钟已有多旧（帧陈旧度，不是延迟组成部分）
 
     判读要点：
       * PreColumnMs 尾部大而 ColumnMs 平稳 -> 帧等待/派发问题，列内优化已到顶
       * ColumnMs 尾部大且与 ForceMissScan/Entries 相关 -> 提前判 miss 扫描值得继续改
-      * CatchingUp=1 或 FscIter>1 的样本 PreColumnMs 明显更大 -> catch-up 是主因
+      * FscIter>1 的样本 PreColumnMs 明显更大 -> catch-up 是主因
       * Routed=0 的 ColumnMs 不小于 Routed=1 -> 空按不是便宜路径
       * CacheMisses 每按必涨 -> Earliest 缓存没生效
 
@@ -175,10 +175,9 @@ Write-Host ("样本: {0}  谱面时间跨度: {1} -> {2} ms" -f `
 
 $routed = @($samples | Where-Object { $_.Routed -eq '1' })
 $judged = @($samples | Where-Object { $_.Judged -eq '1' })
-$catchingUp = @($samples | Where-Object { $_.CatchingUp -eq '1' })
 
-Write-Host ("routed={0} ({1:P1})  judged={2}  catchingUp={3}  emptyPress={4}" -f `
-        $routed.Length, ($routed.Length / $samples.Length), $judged.Length, $catchingUp.Length, ($samples.Length - $routed.Length))
+Write-Host ("routed={0} ({1:P1})  judged={2}  emptyPress={3}" -f `
+        $routed.Length, ($routed.Length / $samples.Length), $judged.Length, ($samples.Length - $routed.Length))
 
 $frames = @($samples | Group-Object FrameId)
 $multiPressFrames = @($frames | Where-Object { $_.Count -gt 1 })
@@ -236,7 +235,7 @@ if ($totalLookups -gt 0) {
 
 $wallSeconds = ((ConvertTo-Double $samples[-1].WallMs) - (ConvertTo-Double $samples[0].WallMs)) / 1000.0
 
-foreach ($generation in 0, 1, 2) {
+foreach ($generation in 0, 1) {
     $collected = Get-Delta $samples "Gen$generation"
     $total = ($collected | Measure-Object -Sum).Sum
 
@@ -305,11 +304,10 @@ Show-Distribution $samples '列内条目数分桶' `
     } `
     'PreColumnMs', 'ColumnMs'
 
-Show-Distribution $samples 'CatchingUp / 多遍子树' `
+Show-Distribution $samples '多遍子树（FSC iterations）' `
     {
-        $iterations = [int]$_.FscIterations
-        if ($_.CatchingUp -eq '1') { 'catchingUp ' }
-        elseif ($iterations -gt 1) { 'multiPass  ' }
+        $iterations = [int]$_.FscIter
+        if ($iterations -gt 1) { 'multiPass  ' }
         else { 'steady     ' }
     } `
     'PreColumnMs', 'ColumnMs'
@@ -323,17 +321,17 @@ function Show-Outliers([object[]] $rows, [string] $column, [int] $count) {
     $sorted = @($rows | Sort-Object -Property @{ Expression = { ConvertTo-Double $_.$column } } -Descending)
     $top = @($sorted | Select-Object -First $count)
 
-    '  {0,10} {1,10} {2,10} {3,8} {4,6} {5,6} {6,6} {7,7} {8,5} {9,5} {10,6} {11,7} {12,7} {13,10}' -f `
-        $column, 'PreCol', 'Column', 'FrameAge', 'Entr', 'Scan', 'Routed', 'inFrame', 'CU', 'Iter', 'Frame', 'CacheHit', 'CacheMiss', 'GameTime'
+    '  {0,10} {1,10} {2,10} {3,8} {4,6} {5,6} {6,6} {7,7} {8,5} {9,6} {10,7} {11,7} {12,10}' -f `
+        $column, 'PreCol', 'Column', 'FrameAge', 'Entr', 'Scan', 'Routed', 'inFrame', 'Iter', 'Frame', 'CacheHit', 'CacheMiss', 'GameTime'
 
     foreach ($row in $top) {
-        '  {0,10} {1,10} {2,10} {3,8} {4,6} {5,6} {6,6} {7,7} {8,5} {9,5} {10,6} {11,7} {12,7} {13,10}' -f `
+        '  {0,10} {1,10} {2,10} {3,8} {4,6} {5,6} {6,6} {7,7} {8,5} {9,6} {10,7} {11,7} {12,10}' -f `
             (Format-F3 (ConvertTo-Double $row.$column)),
             (Format-F3 (ConvertTo-Double $row.PreColumnMs)),
             (Format-F3 (ConvertTo-Double $row.ColumnMs)),
             (Format-F3 (ConvertTo-Double $row.FrameAgeMs)),
             $row.Entries, $row.ForceMissScan, $row.Routed, $row.PressesInFrame,
-            $row.CatchingUp, $row.FscIterations, $row.FrameId,
+            $row.FscIter, $row.FrameId,
             $row.CacheHits, $row.CacheMisses,
             (Format-F3 (ConvertTo-Double $row.GameTime))
     }

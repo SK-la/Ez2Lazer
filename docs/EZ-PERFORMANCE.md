@@ -184,7 +184,7 @@
 | `subtreeMsMean` | `base.UpdateSubTree()` 全程 = FSC 之下的 drawable 层级（播放区 / 物件 / 判定线） |
 | `clockMsMean` | `updateClock()` = 音频时钟采样 + `ReplayInput` + 子帧校正 |
 | `restMsMean` | 帧长减去上两者 = HUD / 框架调度 / 掩码 |
-| `subtreeAllocMean` / `loopAllocMean` | 子树内、FSC 全程的每帧分配字节 |
+| `subtreeAllocMean` / `loopAllocMean` | 子树内、FSC 全程的每帧分配字节 —— **2026-09-25 起只剩 `loopAllocMean`**：两者实测逐帧全等（§2.4.19），`subtreeAllocMean` 已删 |
 
 这一行决定下一步往哪优化：子树占比高就改 mania 的 drawable 层级，占比低就去查 HUD 与框架。分析脚本 `AnalyzeFrameStall.ps1` 已有对应章节。
 
@@ -330,7 +330,7 @@ B 组 `pressSplit` 的 `sincePrevFrameMean = 1.542 ms`，而帧间隔只有 **1.
 
 ⇒ §2.4.8「稳态 ≥5 ms 卡顿两组都是 11 个」这个吻合**不能当成同一个地板**：一边是开局 GC，另一边是成因未明、5–44 ms、与 GC 和帧率都无关的停顿。**这一组无 GC 的重卡顿，比 GC 更值得优先查。**
 
-**分配归属**：`frameSplit` 显示分配 92–93% 在 FSC 子树之外（`subtreeAllocMean` 仅 168 B / 270 B per frame，而 update 线程每帧 2552 B / 3162 B）⇒ ruleset / 播放区不是分配源。
+**分配归属**：`frameSplit` 显示分配 92–93% 在 FSC 子树之外（`subtreeAllocMean` 仅 168 B / 270 B per frame，而 update 线程每帧 2552 B / 3162 B）⇒ ruleset / 播放区不是分配源。（该列已于 2026-09-25 删除，值与 `loopAllocMean` 逐帧全等，见 §2.4.19。）
 
 **已实测排除**：`EzBoxElement`（`AcrylicBackdropDrawable`）与 mania `Stage.stageBackdropBlur`（`BackdropBlurDrawable`，按 `ColumnBlur = 0.3` → `sigma = 15` 判定为**开启**）的毛玻璃。开关 Acrylic 对局内 draw 帧数无可见差别。**注意量具敏感度**：`FrameSync = Limit4x` 下 FPS 被锁在 1000，该数字本就不动，故此结论只说明「acrylic 不显眼」，**不能**推广成「每帧分配不重要」。
 
@@ -356,7 +356,7 @@ B 组 `pressSplit` 的 `sincePrevFrameMean = 1.542 ms`，而帧间隔只有 **1.
 - 显著性用两个可比读数：`ACF r` 与「带内主周期占带内能量 / 均匀背景」，**不用**「峰 / 中位」——
   在 1/f² 型背景上后者恒为几百倍，会把噪声报成显著。
 - 选项：`--trim A,B` 去掉首尾过渡段（找周期基本都该加）、`--band`、`--dt`、`--only`、`--windows`、`--plot`。
-- 序列：judgment 的 `Drift` / `TimeOffset` / `AudioLag` / `FrameElapsed`；press 的 `PreColumnMs` / `ColumnMs` /
+- 序列：judgment 的 `Drift` / `TimeOffset` / `FrameElapsed`；press 的 `PreColumnMs` / `ColumnMs` /
   `FrameAgeMs`；frame 的 `ElapsedMs` / `SpikeRate` / `GcPauseDeltaMs`，以及 2026-09-24 随**每帧时钟探针**新增的
   `AudioStep`（音频源逐帧步进）/ `InterpRate`（插值时钟逐帧速率）。看 100 Hz 量化用 `--band 0.004,0.02 --dt 0.002`。
 - `derived_from` 改成了**元组**：`InterpRate` 由 `InterpMs` 与 `ElapsedMs` 共同构造，单来源标记盖不住那两个定义性对。
@@ -384,8 +384,8 @@ B 组 `pressSplit` 的 `sincePrevFrameMean = 1.542 ms`，而帧间隔只有 **1.
    实测零分布（同 span / dt / 带，6000 次独立对）：单对 `p95 = 0.503`、`p99 = 0.572`、`p99.9 = 0.664`。
    于是 66 对里「至少一对 ≥ 0.47」的概率是 **99.2%**。工具现在按 `0.05 / 对数` 反解家族性阈值
    （实测 31 对时 = **0.597**）并逐行标注是否越线。**没有这条基线，看表的人必然把偶然峰当相位来源。**
-   另外把**定义性派生**的序列对剔除（`SpikeRate` := `ElapsedMs ≥ 2×p50` 的指示函数；
-   `AudioLag` = `−Drift − 15.000ms` 常数偏移）——它们的高相关是构造出来的。
+  另外把**定义性派生**的序列对剔除（`SpikeRate` := `ElapsedMs ≥ 2×p50` 的指示函数；
+  `AudioLag` = `−Drift − 15.000ms` 常数偏移 —— 这条**已随 `BassSource` 列一起删除**，见 §2.4.19）——它们的高相关是构造出来的。
 
 **在现有三局（各 ~34 s，未含全帧局）上的结果：测不出 1.5–5 s 带内的稳定周期。** 全部序列 `ACF r ≤ 0.20`、
 带内占比不超过均匀背景 2.8 倍；`Drift` 的峰散在 2.1–2.8 s 但 r 只有 0.07–0.14，三局位置互不相同。
@@ -412,6 +412,8 @@ B 组 `pressSplit` 的 `sincePrevFrameMean = 1.542 ms`，而帧间隔只有 **1.
 | `GameTime`（= `InterpClock`） | ~3%（均匀） | 连续，无网格结构 |
 
 - `GameTime == InterpClock`（逐行相等），且 `Drift == (GameTime − BassSource) − 15.000`（常数 15 ms 是音频偏移）。
+  **这两条恒等式就是 `InterpClock` / `BassSource` 两列于 2026-09-25 被删的理由**（§2.4.19）；列没了，读法不变：
+  音频源时钟仍可由 `GameTime − Drift − 15.000` 还原，帧侧则有 `AudioSrcMs` 直读。
 - `Drift` 峰峰：3 局 **9.8 / 9.9 / 11.5 ms**，1 局 **19.2 ms** —— 即插值残差有**整整一个缓冲**那么大。
 
 **机制（代码链）**：实机走 `NAudioWasapiOutput`（BASS 解码 mixer + NAudio 写 WASAPI 共享模式），
@@ -798,7 +800,51 @@ draw 帧、把 `coverage` 拉到 0.87 以下，使这张表在判读前就自检
   `[Conditional]`，那要求重新编译、不能做成设置项）。所以别再从「把它做得更快」这里下手，
   要验的是**关闭时是否真的一个分支**：`EzJudgmentDiagnostics.Enabled` 为 false 时，上述四处调用点都只做一次 bool 判断。
 - ⚠ 反面教材（已撤）：曾把开关做成 `Ez2ConfigManager` 的静态属性 + 环境变量 + 探针侧链式只读属性，
-  热路径上一分没省、还多了一层概念 —— **不要重复这条路**。
+热路径上一分没省、还多了一层概念 —— **不要重复这条路**。
+
+#### 2.4.19 删掉 6 个「拿到也等于另一个参数」的列（2026-09-25）
+
+判据只有一条：**同一行里能被另一个参数精确算出**（恒等，或差一个可复原的常数）。「只是还没人读」不算理由 ——
+这类量以后可能用得上，留着。逐列拿现有 8 局真数据复核（judgment 8×298–375 行；frame 8 局共 373,188 帧；
+press 8×354–478 行），不靠注释推断。
+
+*删除清单*
+
+| 列 | 等价关系 | 证据 |
+|----|---------|------|
+| judgment `InterpClock` | ≡ `GameTime` | 源码里是**同一属性 `Time.Current` 在同一次调用里连读两次**；逐行 `max|差| = 0.000000` |
+| judgment `BassSource` | ≡ `GameTime − Drift − 15.000` | 残差全部落在 `[14.999, 15.001]`（= 3 位小数舍入），带宽 0.002；`Drift` 与 `SourceCurrentTime` 本就同源相减（`InterpolatingFramedClock.cs:60-62`） |
+| frame `SubtreeAllocBytes` | ≡ `LoopAllocBytes` | **逐帧全等，373,188 帧 0 例外**。非定义性相等 ⇒ 成因是 `updateClock()` 从不分配，所以「整轮」与「子树内」必然相同 |
+| frame `Gen2Delta` | ≡ 0 | 8 局（含 72k 帧全帧局）非 0 计数 = **0** |
+| press `Gen2` | 增量 ≡ 0 | 8/8；列值本身是每局一个常数（9/12/15/20…），全是开跑前累计的 gen2 ⇒ 列内无信息 |
+| press `CatchingUp` | ≡ 0 | 8/8 全为 `0`；而更一般的 `FscIter>1` 在 **6/8 局**出现（1/2/3/22/37…）⇒ 被完全覆盖 |
+
+judgment `AudioLag` 序列（= `BassSource − GameTime`，与 `Drift` 去趋势后恒 `r = −1.000`）随列一起从
+`AnalyzePeriod.py` 删掉，不再保留 `derived_from` 标记。
+
+*顺带修掉的一个静默 bug*：`AnalyzePressLatency.ps1` 一直读 `$_.FscIterations`，而 CSV 列名是 `FscIter`
+⇒ PowerShell 取到 `$null`、`[int]$null = 0`，「多遍子树」分桶**从未命中过**。现已改正为 `FscIter`。
+（`CatchingUp` 一直是 0 这件事，自测时被这个 bug 掩盖了一部分：三个桶里 `catchingUp` 与 `multiPass`
+其实都不可能命中，只有 `steady` 有样本。）
+
+*明确**不**删的（已逐条核对，看着像重复其实不是）*
+
+| 项 | 为什么保留 |
+|----|-----------|
+| press `PressesInFrame` | 脚本能按 `FrameId` 数出来，但 flush 时的值来自**完整内存环形缓冲**；CSV 若被环形覆盖，首个 `FrameId` 段会少算 ⇒ 存下来的值比读出来的更准 |
+| frame `Gen1Delta` / press `Gen1` | **有信号**（出现 1/2/3/4/5），不能跟着 `Gen2` 一起删 |
+| press `FscIter` | 有信号（1/2/3/22/37） |
+| press `FrameElapsed` vs frame `ElapsedMs` | 同一帧同一个量，但 frame CSV 在阈值模式下只留慢帧 ⇒ 不能互为替代 |
+| judgment `FrameElapsed` vs frame `ElapsedMs` | **不是同一个测量**：前者 `Clock.ElapsedFrameTime`（时钟增量），后者两次 `Stopwatch` 戳之差（墙钟） |
+| press `GcPauseMs` vs frame `GcPauseDeltaMs` | 前者是按键时刻的累计快照，后者是跨帧增量 |
+| judgment `InputToJudgeMs` | 终点在 `handleHit` 内部，与 press 的 `PreColumnMs`/`ColumnMs`（终点是 `OnPressed` 结束）不是同一终点 |
+
+*未动但成立的红利*：`FrameStabilityContainer` 每次迭代少一次 `GC.GetAllocatedBytesForCurrentThread()`；
+`Column.OnPressed` 少一次 `GC.CollectionCount(2)`；帧摘要少一项、两个 CSV 各少两列。
+
+*副作用*：旧 CSV / 旧 summary 与新脚本**不兼容**（`AnalyzeFrameStall.ps1` 的 `frameSplit` 正则已按新格式收紧，
+旧 summary 那一节会静默不打印；旧 press CSV 的 `CatchingUp` / `Gen2` 列不再被读）。要不要重采一局以留下
+同格式基线，由使用者决定。
 
 
 
@@ -942,3 +988,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-25 | §2.4.12：**present 侧量具落地**——`Game` 在本 fork 是 `Container` 而非 `GameHost`（反射确认 `DrawFrame/UpdateFrame` 是 `protected virtual` 但不在 `Game` 的继承链上），`OsuGameBase` override 直接 CS0115 ⇒ 改为**在 update 侧读 `DrawThread.Clock`**（`osu.Game` 的 `FPSCounter` / `LatencyCertifierScreen` 已有先例；`Clock` 由 draw 线程 `ProcessFrame`，属性任意线程可读）。摘要新增 `present` 行：`drawPeriod`（= `ElapsedFrameTime`，**相邻两次 present 的间隔分布**，看 `over0.5/1/2/5` 与 `max` —— update 侧帧长恒 0.5 ms 且不抖，draw 线程单独卡一下 update 探针看不见）、`presentAge`（上屏那一刻那份内容有多旧，零点取上一次 update 帧边界，受 **±1 帧配对不确定度** 限制，只判毫秒级以上滞后）、`clocks`（两线程 fps/jitter/slept/maxHz/throttling + 窗口态 + 刷新率）。两处实现要点：`StopwatchClock` 零点是自己 `Start()`（线程创建）故需**标定一次原点偏移**；失焦帧按 `IsActive` 剔除（`skipped`）。**不覆盖 DWM 组合 / 显示器扫描输出** |
 | 2026-09-25 | §2.4.13–2.4.17：**音频源「漏拉」查到底并结案**。① 摘要新增 `interpErr`（位置判据）后立刻发现它会被源停走污染 ⇒ 登记「**判 `interpErr` 必须同时看 `pullMiss`**」（把 ±20 ms 邻域剔掉，std 1.08 → 0.455 ms）。② 稳态跳变只有 10/20 ms 两档、`跳变次数 = 周期数 − 超额周期数` 两局精确成立 ⇒ **机制**是「漏一次唤醒 → NAudio 一次读两拍」（读 `BufferSize − CurrentPadding` = 全部空位，`frameEvent` 是 AutoReset，故距离守恒、只重排相位）。③ 曾假设根因是渲染线程没登记 MMCSS：**先踩到交付陷阱**（MMCSS 只进了 framework 源码，而 `osu` 默认取 NuGet 包 ⇒ 那一局跑的还是旧 DLL；同时同代码三次采集 `pullMiss` = **1/145/4** ⇒ 单局计数不可判），补上 `wasapiRead`/`wasapiPull` 直读量具（拉取间隔 + 请求拍数）后，实测 D 局 `pullMiss=142`、`periods/pull max=2.00`、每 0.24 s 一次两整拍 ⇒ **MMCSS 无效，音频链结案**（应用侧无手段消除；体感量级只有位置 std ~1 ms）。④ 顺带定案「**歌曲结束后的退场段是另一个工况**」（时钟停走、update 掉到 120–192 Hz、子树 = 0、`coverage` 被拉到 0.869）：present 采样改为**跳过时钟停走的帧**（新增 `frozenSkipped`），局内前 33 s 的帧管线判为 pristine。**不成立/已撤回**：早期那两个 `Drift` ACF 周期数字已在交接单删除 |
 | 2026-09-25 | §2.4.18：**诊断开关改为进程级**——三个判定侧探针 + 时序追踪原先每次进图从配置重读、且 `OrderedHitPolicyHelper` 各持一个 `Bindable<bool>`。改为**启动时读一次**（`OsuGameBase.applyDiagnosticSwitches`）落到四个静态 bool，调用点用局部量先判（`FrameStabilityContainer` 关闭时连 `RecordFrame` 调用都不发生），**改设置必须重启游戏**。理由：这类功能长期关闭，热路径上应当只有一个静态 bool 分支。⚠ 曾试过 `Ez2ConfigManager` 静态属性 + 环境变量 + 链式只读属性的写法，**热路径一分未省、只多了概念，已撤回**，不要重复 |
+| 2026-09-25 | §2.4.19：**删掉 6 个等价列**——判据是「同一行里能被另一个参数精确算出」（恒等或差一个可复原常数），「只是没人读」不算理由。删除：judgment `InterpClock`（≡ `GameTime`，源码里同一属性连读两次）、judgment `BassSource`（≡ `GameTime − Drift − 15.000`，8 局残差 ≤ 0.002）、frame `SubtreeAllocBytes`（≡ `LoopAllocBytes`，373,188 帧逐帧全等，成因是 `updateClock()` 从不分配）、frame `Gen2Delta`（恒 0）、press `Gen2`（增量恒 0）、press `CatchingUp`（恒 0，且被更一般的 `FscIter>1` 完全覆盖）；`AnalyzePeriod.py` 的 `AudioLag` 序列随之删除。**明确保留**：`Gen1`/`FscIter`（有信号）、`PressesInFrame`（内存缓冲算出的值比 CSV 反推更准）、judgment `FrameElapsed` vs frame `ElapsedMs`（时钟增量 vs 墙钟，非同一测量）。顺带修正 `AnalyzePressLatency.ps1` 读错列名（`FscIterations` → `FscIter`）导致的「多遍子树」分桶从未命中。⚠ 旧 CSV / 旧 summary 与新脚本不兼容，`AnalyzeFrameStall.ps1` 的 `frameSplit` 正则已收紧 |
