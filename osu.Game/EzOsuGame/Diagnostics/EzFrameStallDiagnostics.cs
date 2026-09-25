@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
+using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.UI;
 
@@ -37,6 +38,12 @@ namespace osu.Game.EzOsuGame.Diagnostics
     /// <para>
     /// 注意 <c>GcPauseDeltaMs</c> 是**全线程**暂停时长之和（后台 GC 并发时它可能超过帧长），
     /// 所以它是「update 线程被挂起」的上界：数值远小于帧长时能可靠排除 GC，数值大时只能算强嫌疑。
+    /// </para>
+    /// <para>
+    /// 同一个探针还顺手采 present（draw 线程）侧：本 fork 里 <c>Game</c> 是 <c>Container</c> 而不是 <c>GameHost</c>，
+    /// <c>osu.Game</c> 没法 override <c>GameHost.DrawFrame</c>，所以 draw 线程上放不了打点，
+    /// 只能从 update 线程读 <c>DrawThread.Clock</c>——它的 <c>ElapsedFrameTime</c> 就是「相邻两次 present 的间隔」。
+    /// update 侧的帧一直很稳，但 draw 线程单独卡一下这个探针是看不见的，所以那一行要看的是尾部。
     /// </para>
     /// 热路径不做 IO、不产生字符串；落盘在局末。
     /// </summary>
@@ -113,6 +120,30 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static long currentFrameStartTimestamp;
         private static double sincePrevFrameMinMs = double.MaxValue;
 
+        // present（draw 线程）侧。update 线程内能测的都测干净了，剩下的只有「屏幕上送出去的那份内容」，
+        // 而它只能在 update 侧**读 draw 线程的时钟**来观测：这个 fork 里 Game 是 Container 而不是 GameHost，
+        // osu.Game 无法 override GameHost.DrawFrame，所以 draw 线程上放不了打点。
+        //
+        // 好在 <c>DrawThread.Clock</c> 自己就是 draw 线程的帧时钟，三样东西都直接读得到：
+        //   ElapsedFrameTime —— **上一次 present 的整周期**，也就是「相邻两次 present 的间隔」，正是要量的东西；
+        //   TimeSlept        —— 其中被帧率限制器 sleep 掉的部分；
+        //   CurrentTime      —— draw 线程当前帧的边界时刻（与 update 时钟同源同频，只需标定一个原点偏移）。
+        //
+        // 两个判据：
+        //   1) drawPeriod —— present 间隔的分布。update 侧看到的帧一直很稳，但**draw 线程自己卡一下
+        //      是 update 探针看不见的**：那才是屏幕上直接的一次跳帧。
+        //   2) presentAge —— present 那一刻，屏幕上那份内容已经多旧（相对它在 update 侧被算出来的时刻）。
+        //      均值会被输入延迟吸收，**抖动才是眼睛看到的顿挫**。
+        //      分辨率受限于一个 update 帧长（读不到被绘制的 buffer 帧号，只能拿「上一次 update 帧边界」当零点），
+        //      所以它只用来判「有没有毫秒级的滞后」，不用来判亚毫秒抖动。
+        private static GameHost? gameHost;
+        private static readonly Histogram drawPeriod = new Histogram(0.02);
+        private static readonly Histogram presentAge = new Histogram(0.02);
+        private static double drawOriginOffsetMs = double.NaN;
+        private static long presentFrames;
+        private static long presentSkipped;
+        private static double drawSleptTotalMs;
+
         // 「音频时钟量化 / 插值纹波」：note 位置取自插值时钟，而插值时钟追的是音频源时钟。
         // 实测音频源是精确 10ms 阶梯（见 docs/EZ-PERFORMANCE.md §2.4.11），所以这里逐帧记录两个时钟。
         //
@@ -176,6 +207,59 @@ namespace osu.Game.EzOsuGame.Diagnostics
             long LoopAllocBytes,
             double AudioSrcMs,
             double InterpMs);
+
+        /// <summary>
+        /// [Ez] 挂 host：present 探针靠它读 draw 线程时钟与显示器刷新率。由 <c>OsuGameBase.SetHost</c> 调用。
+        /// </summary>
+        public static void AttachHost(GameHost host)
+        {
+            gameHost = host;
+            // 换了 host 就是换了一组线程时钟，原点标定作废。
+            drawOriginOffsetMs = double.NaN;
+        }
+
+        /// <summary>
+        /// 采一次 present（draw 线程）侧的读数。只从 update 线程调用，读的是 draw 线程时钟的属性；
+        /// 那两个 double 由 draw 线程写、这里读，最坏读到上/下一次的值，但不会读到撕裂值——
+        /// 对这个探针来说那正好是「±1 帧」的噪声，落在它自己的分辨率以内。
+        /// </summary>
+        /// <param name="nowTicks">本帧边界戳。</param>
+        /// <param name="prevTicks">上一帧边界戳，也就是「正被绘制的那份内容」在 update 侧算出来的时刻。</param>
+        private static void samplePresent(long nowTicks, long prevTicks)
+        {
+            var host = gameHost;
+
+            if (host == null)
+                return;
+
+            var drawClock = host.DrawThread.Clock;
+            double periodMs = drawClock.ElapsedFrameTime;
+
+            // 失焦 / 最小化时 draw 线程降频甚至根本不画，那些帧不是 present，算进去只会把分布摊开。
+            if (!host.IsActive.Value || periodMs <= 0 || periodMs > 50)
+            {
+                presentSkipped++;
+                return;
+            }
+
+            double wallMs = nowTicks * 1000.0 / Stopwatch.Frequency;
+
+            // 两个时钟各自以自己 Start() 的时刻为零点（StopwatchClock 用的是 ElapsedTicks），
+            // 所以要先标定一次原点；同源同频，标定一次长期有效。
+            if (double.IsNaN(drawOriginOffsetMs))
+                drawOriginOffsetMs = wallMs - drawClock.CurrentTime;
+
+            presentFrames++;
+            drawPeriod.Add(periodMs);
+            drawSleptTotalMs += drawClock.TimeSlept;
+
+            // 正被绘制的那份内容是上一次 update 帧算出来的（本帧还没发布），它会在本帧的 Swap 处上屏。
+            // 「本帧什么时候上屏」估计为「本帧边界 + 本帧自身耗时」，而自身耗时只能拿上一帧的：
+            //   ElapsedFrameTime = 上一帧的整周期 = 上一帧耗时 + 上一帧被限制器 sleep 的部分，
+            // 所以上一帧耗时 = period − TimeSlept（两个读数恰好都来自上一帧）。用 period 会把它高估一个 sleep。
+            // 零点只能取「上一次 update 帧边界」（读不到被绘制的 buffer 帧号）⇒ 带 ±1 帧配对不确定度。
+            presentAge.Add(drawClock.CurrentTime + drawOriginOffsetMs + periodMs - drawClock.TimeSlept - prevTicks * 1000.0 / Stopwatch.Frequency);
+        }
 
         /// <summary>
         /// 本帧内已处理（进入列入口）的按键，由 <c>Column.OnPressed</c> 调用。
@@ -256,6 +340,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double elapsedMs = (now - prev) * 1000.0 / Stopwatch.Frequency;
             lastFrameWallMs = wallMs;
             accumulateClocks(audioSrcMs, interpMs, elapsedMs);
+            samplePresent(now, prev);
 
             if (pressesInFrame > 0)
             {
@@ -441,6 +526,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             lastFrameTimestamp = 0;
             frameIndex = 0;
+            drawPeriod.Reset();
+            presentAge.Reset();
+            presentFrames = 0;
+            presentSkipped = 0;
+            drawSleptTotalMs = 0;
             lastGcPauseTicks = -1;
             lastThreadAllocated = 0;
             lastProcessAllocated = 0;
@@ -606,6 +696,40 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     + $"subtreeAllocMean={subtreeAllocTotal / (double)probeFrames:F0}B loopAllocMean={loopAllocTotal / (double)probeFrames:F0}B");
             }
 
+            // present 侧：往屏幕上送的那份内容「多旧」，以及 draw 线程自己的节拍。note 位置在 update 线程里就定好了，
+            // 之后只剩渲染与送屏——这是 update 线程之外唯一还没量的一环。
+            if (presentFrames > 0)
+            {
+                sb.Append(Environment.NewLine);
+                sb.Append("present frames=").Append(presentFrames).Append(" skipped=").Append(presentSkipped).Append(" drawPeriod");
+                sb.Append(drawPeriod.Format());
+
+                // 「相邻两次 present 的间隔」由 draw 线程自己的时钟测。update 侧看到的帧一直很稳，
+                // 但 draw 线程单独卡一下 update 探针是看不见的——那一下就是屏幕上的一次跳帧，所以这里要看的是尾部。
+                // presentAge 是上屏那一刻那份内容的年龄；零点只能取「上一次 update 帧边界」（读不到被绘制的
+                // buffer 帧号），所以带一个 update 帧长以内的配对不确定度，只用来判毫秒级以上的滞后。
+                sb.Append(Environment.NewLine);
+                sb.Append("  presentAge");
+                sb.Append(presentAge.Format());
+
+                var host = gameHost;
+
+                if (host != null)
+                {
+                    var dc = host.DrawThread.Clock;
+                    var uc = host.UpdateThread.Clock;
+                    var window = host.Window;
+
+                    sb.Append(Environment.NewLine);
+                    sb.Append(CultureInfo.InvariantCulture,
+                        $"  clocks draw(fps={dc.FramesPerSecond} jitter={dc.Jitter:F3}ms sleptMean={drawSleptTotalMs / presentFrames:F3}ms maxHz={dc.MaximumUpdateHz:F0} throttling={dc.Throttling}) "
+                        + $"update(fps={uc.FramesPerSecond} jitter={uc.Jitter:F3}ms slept={uc.TimeSlept:F3}ms maxHz={uc.MaximumUpdateHz:F0} throttling={uc.Throttling})");
+
+                    if (window != null)
+                        sb.Append(CultureInfo.InvariantCulture, $" window={window.WindowState} refresh={window.CurrentDisplayMode.Value.RefreshRate:F0}Hz");
+                }
+            }
+
             // 音频时钟：源是不是阶梯、插值有没有把阶梯抹平。note 位置取自插值时钟，所以这是「下落顺不顺滑」的直接判据；
             // 也是 ~10Hz 的判定/按键探针看不见 100Hz 结构的原因（见 docs/EZ-PERFORMANCE.md §2.4.11）。
             if (audioStep.Count > 0)
@@ -688,12 +812,18 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             public long Count { get; private set; }
             public double Sum { get; private set; }
+            public double SumSquares { get; private set; }
+            public double Min { get; private set; } = double.MaxValue;
             public double Max { get; private set; }
 
             public void Add(double ms)
             {
                 Count++;
                 Sum += ms;
+                SumSquares += ms * ms;
+
+                if (ms < Min)
+                    Min = ms;
 
                 if (ms > Max)
                     Max = ms;
@@ -707,10 +837,28 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 Array.Clear(buckets);
                 Count = 0;
                 Sum = 0;
+                SumSquares = 0;
+                Min = double.MaxValue;
                 Max = 0;
             }
 
             public double Mean => Count == 0 ? double.NaN : Sum / Count;
+
+            /// <summary>
+            /// 标准差，精确值（不是桶中心近似的）。判「抖不抖」用它，别用分位差——分位差会被量化桶抹平，
+            /// 而这个探针要量的恰恰是亚毫秒级的抖动。
+            /// </summary>
+            public double Std
+            {
+                get
+                {
+                    if (Count < 2)
+                        return double.NaN;
+
+                    double mean = Sum / Count;
+                    return Math.Sqrt(Math.Max(0, SumSquares / Count - mean * mean));
+                }
+            }
 
             public double Percentile(double p)
             {
@@ -747,7 +895,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             public string Format()
                 => string.Create(CultureInfo.InvariantCulture,
-                    $" n={Count} mean={Mean:F3} p50={Percentile(0.5):F3} p90={Percentile(0.9):F3} "
+                    $" n={Count} mean={Mean:F3} std={Std:F3} min={(Count == 0 ? double.NaN : Min):F3} "
+                    + $"p50={Percentile(0.5):F3} p90={Percentile(0.9):F3} "
                     + $"p99={Percentile(0.99):F3} p99.9={Percentile(0.999):F3} max={Max:F3} "
                     + $"over0.5={CountOver(0.5)} over1={CountOver(1.0)} over2={CountOver(2.0)} over5={CountOver(5.0)}");
 
