@@ -9,6 +9,7 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using osu.Framework.Audio.Wasapi;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
@@ -156,6 +157,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static long presentDuplicates;
         private static long presentSkipped;
         private static double drawSleptTotalMs;
+
+        /// <summary>落盘前抓一次的 NAudio 拉取统计（<see cref="WasapiReadStats"/> 在该局开测时启用、清空）。</summary>
+        private static WasapiReadStats.Snapshot? wasapiReadSnapshot;
 
         // 「音频时钟量化 / 插值纹波」：note 位置取自插值时钟，而插值时钟追的是音频源时钟。
         // 实测音频源是精确 10ms 阶梯（见 docs/EZ-PERFORMANCE.md §2.4.11），所以这里逐帧记录两个时钟。
@@ -612,6 +616,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             prevInterpMs = double.NaN;
             audioStep.Reset();
             interpErr.Reset();
+            wasapiReadSnapshot = null;
             lastAudioStepWallMs = double.NaN;
             pullMissCount = 0;
             pullMissHoldMs = 0;
@@ -647,6 +652,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
             int sampleCount = detailCount;
             int start = sampleCount < detail_capacity ? 0 : detailCursor;
             var snapshot = details;
+
+            wasapiReadSnapshot = WasapiReadStats.GetSnapshot();
 
             var sb = new StringBuilder();
             sb.AppendLine("WallMs,FrameIndex,ElapsedMs,GcPauseDeltaMs,ThreadAllocDeltaBytes,PressesInFrame,PressColumnMs,SincePrevFrameMs,FscIter,Gen0Delta,Gen1Delta,Gen2Delta,SubtreeMs,SubtreeAllocBytes,LoopAllocBytes,AudioSrcMs,InterpMs");
@@ -707,6 +714,61 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         /// <summary>CSV 一律用不变区域，避免逗号小数分隔符的地区写出畸形列。</summary>
         private static string num(double value) => value.ToString("F3", CultureInfo.InvariantCulture);
+
+        private static long sumBuckets(long[] buckets)
+        {
+            long total = 0;
+
+            for (int i = 0; i < buckets.Length; i++)
+                total += buckets[i];
+
+            return total;
+        }
+
+        private static double bucketMean(long[] buckets, double bucketSize, long total)
+        {
+            if (total <= 0)
+                return 0;
+
+            double weighted = 0;
+
+            for (int i = 0; i < buckets.Length; i++)
+                weighted += buckets[i] * (i + 0.5) * bucketSize;
+
+            return weighted / total;
+        }
+
+        private static double bucketPercentile(long[] buckets, double bucketSize, long total, double percentile)
+        {
+            if (total <= 0)
+                return 0;
+
+            long target = (long)Math.Ceiling(total * percentile);
+            long seen = 0;
+
+            for (int i = 0; i < buckets.Length; i++)
+            {
+                seen += buckets[i];
+
+                if (seen >= target)
+                    return (i + 0.5) * bucketSize;
+            }
+
+            return buckets.Length * bucketSize;
+        }
+
+        private static long bucketOver(long[] buckets, double bucketSize, double threshold)
+        {
+            long count = 0;
+
+            for (int i = 0; i < buckets.Length; i++)
+            {
+                if ((i + 0.5) * bucketSize >= threshold)
+                    count += buckets[i];
+            }
+
+            return count;
+        }
 
         private static string FormatSummary()
         {
@@ -840,6 +902,29 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     sb.Append(CultureInfo.InvariantCulture,
                         $"  drift(含偏移+锯齿) mean={driftMean:F3}ms range=[{driftMin:F3},{driftMax:F3}]ms std={driftStd:F3}ms");
                 }
+            }
+
+            // NAudio 渲染线程的拉取节拍。位置序列只能看出「源停走过」，看不出是晚醒还是生产慢：
+            // NAudio 每次要的是「当时所有空位」而不是一拍，所以两次拉取的壁钟间隔 + 请求的拍数才能分开这两者。
+            if (wasapiReadSnapshot is { Reads: > 0 } reads)
+            {
+                long gapTotal = sumBuckets(reads.Gaps) + reads.GapOverflow;
+                long periodTotal = sumBuckets(reads.Periods) + reads.PeriodOverflow;
+
+                sb.Append(Environment.NewLine);
+                sb.Append(CultureInfo.InvariantCulture,
+                    $"wasapiRead reads={reads.Reads} ({reads.Reads / Math.Max(0.001, wallSeconds):F1}/s) "
+                    + $"gapsMs mean={bucketMean(reads.Gaps, WasapiReadStats.GAP_BUCKET_MS, gapTotal):F3} "
+                    + $"p50={bucketPercentile(reads.Gaps, WasapiReadStats.GAP_BUCKET_MS, gapTotal, 0.50):F2} "
+                    + $"p90={bucketPercentile(reads.Gaps, WasapiReadStats.GAP_BUCKET_MS, gapTotal, 0.90):F2} "
+                    + $"p99={bucketPercentile(reads.Gaps, WasapiReadStats.GAP_BUCKET_MS, gapTotal, 0.99):F2} "
+                    + $"max={reads.MaxGapMs:F2} over15={bucketOver(reads.Gaps, WasapiReadStats.GAP_BUCKET_MS, 15) + reads.GapOverflow}");
+                sb.Append(Environment.NewLine);
+                sb.Append(CultureInfo.InvariantCulture,
+                    $"  wasapiPull periods/pull mean={reads.TotalPeriods / Math.Max(1, periodTotal):F3} "
+                    + $"median={bucketPercentile(reads.Periods, WasapiReadStats.PERIOD_BUCKET, periodTotal, 0.50):F2} "
+                    + $"max={reads.MaxPeriods:F2} over1.5={bucketOver(reads.Periods, WasapiReadStats.PERIOD_BUCKET, 1.5) + reads.PeriodOverflow}"
+                    + $" totalPeriods={reads.TotalPeriods:F0}");
             }
 
             // 两组分布并排，是「一次按键把帧拉长了多少」的直接答案。

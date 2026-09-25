@@ -678,16 +678,39 @@ if (numFramesAvailable > 10) FillBuffer(numFramesAvailable);       // ← 读「
    **就是** `numFramesAvailable × BlockAlign`，所以 `count ≈ 960 帧` 的存在直接证明「本次读吞了两拍」，
    还能顺带读出 `BufferSize`（几拍）与两次读的**真实墙壁间隔**（比帧 CSV 的 0.5 ms 分辨率细）。
 
-#### 2.4.15 已落地：NAudio 渲染线程登记 MMCSS（2026-09-25）
+#### 2.4.15 MMCSS 已进源码，但**没进那一次游戏**（交付陷阱）+ 单局判据被证伪（2026-09-25）
 
-- `osu-framework/osu.Framework/Audio/Wasapi/NAudioWasapiOutput.cs` 的构造链加了
-  `.WithMmcssThreadPriority(AudioOutputDefaults.DEFAULT_NAUDIO_MMCSS_TASK)`（`"Pro Audio"`），
-  常量与理由写在 `Audio/AudioOutputDefaults.cs`。
-- 启动日志同时加 `mmcss=<task> (requested)` ⇒ **任何一局的 `logs/*.audio.log` 都能证明跑的是哪个 build**，
-  不必再靠「我记得改了」来判断。
-- 它只影响渲染线程的调度优先级，不改缓冲长度、采样率、低延迟路径 ⇒ 判据仍是同一个量（`pullMiss`）；
-  `AvSetMmThreadCharacteristics` 失败是静默的（返回 0 不报错），所以**只有 `pullMiss` 能判它到底有没有生效**，
-  音频日志里的 `mmcss=` 只能证明「请求了」。
+**改了什么**（`osu-framework`，commit `c86e585e4`）：`NAudioWasapiOutput.cs:112` 的构造链加了
+`.WithMmcssThreadPriority(AudioOutputDefaults.DEFAULT_NAUDIO_MMCSS_TASK)`（`"Pro Audio"`，常量与理由在
+`Audio/AudioOutputDefaults.cs`），启动日志同步加 `mmcss=<task> (requested)`。
+
+**交付陷阱（这次踩了）**：`osu` 侧默认从 **NuGet 包 `ez2lazer.Framework 2026.921.0-ez2lazer`** 取框架
+（`Ez2Lazer.Dependencies.props` 里 `UseEz2LazerLocalFrameworkProject` **默认注释掉**），所以**改 `osu-framework`
+源码不会自动进游戏**。证据两条：
+
+- 9:20 那次重建把主程序与全部规则集都刷新了，但 `osu.Desktop/bin/Release/net10.0/osu.Framework.dll`
+  仍是 **2026-9-21 14:52**（包的时间戳），不是 9:27 的本地构建；
+- 9:21 那一局的 `logs/1790299269.audio.log` 里**没有**新加的 `mmcss=` 字段。
+
+⇒ **9:22 那一局不是 MMCSS 的测试**，它的 `pullMiss=4` 不能算「MMCSS 生效」。要让 framework 改动进游戏，要么打开
+`UseEz2LazerLocalFrameworkProject`（props 注释里就是给这种情况用的，本次已在本机打开、**不提交**），要么走包发布。
+
+**单局判据被证伪**：同一份音频路径（三次采集 framework 都没变）的 `pullMiss` 是 **1（080438）/ 145（084436）/
+4（092213）**。⇒ 「掉到 ≤5 次」这条判据在单局上不成立——**基线自己就在 1–145 之间跳**。要判就得在同局里拿到
+**分布**，而不是一个稀有事件计数；为此补了 §2.4.16 的直读量具。
+
+#### 2.4.16 `wasapiRead`：NAudio 拉取的间隔与请求拍数直读（2026-09-25）
+
+- 新类 `osu-framework/osu.Framework/Audio/Wasapi/WasapiReadStats.cs`，在 `BassMixerWaveProvider.Read` 每次记录
+  「距上次拉取的壁钟间隔」与「本次要了几拍」（`count / BlockAlign / (sampleRate/100)`），各进一个定长直方图
+  （间隔 0.5 ms × 80 桶；拍数 0.25 拍 × 16 桶），另存精确 max。
+- **默认关闭**（`Enabled`）：只有诊断打开的那一局由 `Player.cs` 打开并在局末关闭 ⇒ 正常游戏在这条热路径上
+  只多一次 bool 判断。
+- 汇总新增两段：`wasapiRead reads=…(…/s) gapsMs mean/p50/p90/p99/max over15=…` 与
+  `wasapiPull periods/pull mean/median/max over1.5=… totalPeriods=…`。
+- 为什么它比 `pullMiss` 强：`pullMiss` 是「位置停走 >15 ms」的**稀有事件计数**（1/145/4 这种量级跨局不可比），
+  而这里给的是**分布**——`periods/pull` 的 median 是不是 1.0、`over1.5` 占多少、间隔的 p99/max 多少，
+  **单局**就能判「线程有没有按时醒」，也顺便读出 `BufferSize` 相当于几拍。
 
 
 

@@ -1480,6 +1480,10 @@ namespace osu.Game.Screens.Play
                 EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Clear();
                 EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Clear();
                 EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Clear();
+
+                // 帧汇总里的 wasapiRead 行靠它：只有诊断打开时才采，平时这条热路径上只有一个 bool 判断。
+                Framework.Audio.Wasapi.WasapiReadStats.Reset();
+                Framework.Audio.Wasapi.WasapiReadStats.Enabled = true;
             }
 
             if (EzOsuGame.Diagnostics.EzTimingTrace.Enabled)
@@ -1550,6 +1554,7 @@ namespace osu.Game.Screens.Play
                     EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Flush();
                     EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Clear();
                     EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Flush();
+                    Framework.Audio.Wasapi.WasapiReadStats.Enabled = false;
                     EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Clear();
                 });
             }

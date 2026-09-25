@@ -39,8 +39,11 @@
 **距离守恒**（0.004%）、只有**相位**阶跃，不是丢数据。根因：NAudio 只在 `.WithMmcssThreadPriority()`
 时才登记 MMCSS，本 fork 的构造链没调 ⇒ 音频渲染线程与 2000 Hz 的 update / draw 同为 Normal，
 而 Windows 默认时间片（15.6 ms 量级）比 10 ms 周期还长。
-**已落地：加了该调用（`"Pro Audio"`）+ 音频日志加 `mmcss=`；判据是下一局 `pullMiss` 掉到 0.03/s 级，
-仍是几十/几百次即音频链结案。见 §3.5 第 5 项。**
+
+**⚠ 2026-09-25 09:22 那一局不算 MMCSS 的测试**（细节见 §3.4e）：MMCSS 只进了 framework **源码**，
+而 `osu` 默认从 **NuGet 包**取框架 ⇒ 那一局跑的还是旧 DLL（证据：输出目录 `osu.Framework.dll` 是包的时间戳
+2026-9-21，且音频日志没有新加的 `mmcss=` 字段）。同时同一份音频路径三次采集的 `pullMiss` 是
+**1 / 145 / 4** ⇒ **单局计数不可判**，改为看 §3.4e 的分布量具。
 
 ## 1. 已定案（不要再重开）
 
@@ -270,6 +273,33 @@ CV≈1 + 正常 hold `mean 10.004 / std 0.568`（无系统正漂）⇒ 是**随�
 框架侧也从不设线程优先级 ⇒ 音频渲染线程与 2000 Hz 的 update / draw 线程**同为 Normal**，
 而 Windows 默认时间片（15.6 ms 量级）比 10 ms 周期还长。
 
+### 3.4e MMCSS 交付陷阱 + 单局判据被证伪 + 直读量具（2026-09-25 09:30）
+
+**一、交付陷阱：改 `osu-framework` 源码不会自动进游戏**
+
+`osu` 默认从 **NuGet 包 `ez2lazer.Framework 2026.921.0-ez2lazer`** 取框架
+（`Ez2Lazer.Dependencies.props` 的 `UseEz2LazerLocalFrameworkProject` **默认被注释掉**）。所以 MMCSS 虽然已提交进
+framework 源码（`c86e585e4`），但 09:22 那一局跑的是**旧 DLL**。两条证据：
+
+- `osu.Desktop/bin/Release/net10.0/osu.Framework.dll` 时间戳 = **2026-9-21 14:52**（包），而同一目录里主程序与
+  全部规则集是 9:20（当次重建）；
+- `logs/1790299269.audio.log` 里**没有**新加的 `mmcss=` 字段。
+
+⇒ 要让 framework 改动进游戏：打开 `UseEz2LazerLocalFrameworkProject`（props 注释里就是给这种情况用的，
+本次已在本机打开、**不提交**），或走包发布。
+
+**二、单局计数不能当判据**
+
+同一份音频路径、framework 都没改的三次采集：`pullMiss` = **1（080438）/ 145（084436）/ 4（092213）**。
+⇒ 原先写的「降到 ≤5 次即成立」在单局上无意义。
+
+**三、新量具：`wasapiRead` / `wasapiPull`（默认关闭，诊断局才开）**
+
+`osu-framework/osu.Framework/Audio/Wasapi/WasapiReadStats.cs` 在 `BassMixerWaveProvider.Read` 直读
+「距上次拉取的壁钟间隔」与「本次要了几拍」，各进定长直方图；`Player.cs` 在诊断局的起止处开关。
+汇总里输出 `reads/s`、间隔 mean/p50/p90/p99/max/`over15`、`periods/pull` mean/median/max/`over1.5`。
+⇒ **单局**即可判「渲染线程有没有按时醒」，并顺带读出缓冲相当于几拍（`pullMiss` 那种稀有事件计数做不到）。
+
 ### 3.5 下一步（换量，不是继续找周期）
 
 §3.1–3.4 的前提是「体感不流畅 = 某个 2–4 s 周期的帧时长波动」。**这个前提现在被证伪了**：
@@ -302,17 +332,15 @@ CV≈1 + 正常 hold `mean 10.004 / std 0.568`（无系统正漂）⇒ 是**随�
      `drawPeriod` 的 p50 落在 0.510 ms（= 限帧目标 2000 Hz）而 `sleptMean = 0`，说明 draw 是**工作受限**而非限帧受限。
    - ⚠ **不覆盖 DWM / 显示器扫描输出**。进程内量不到送屏之后的事；若 `present` 行也干净，
      剩下的就只可能是 tearing（Borderless 下 `AllowTearing` 是开着的）/ 组合器 / 主观锚定，此时回第 3 项。
-5. **音频源漏拉**（§3.4d 机制已定案，**候选 1 已落地**）：
-   `interpErr` 一涨就先看摘要里的 `pullMiss`。机制不再需要猜：漏一次唤醒 → NAudio 一次读两拍 → 位置 +20 ms，
-   距离守恒、只有相位阶跃。
-   - ✅ **已落地（2026-09-25）**：`NAudioWasapiOutput.cs:112` 加了
-     `.WithMmcssThreadPriority(AudioOutputDefaults.DEFAULT_NAUDIO_MMCSS_TASK)`（`"Pro Audio"`，常量与理由在
-     `Audio/AudioOutputDefaults.cs`）。音频启动日志同步加 `mmcss=` ⇒ 跑的是哪个 build 可直接从 `logs/*.audio.log` 确认。
-     **判据（事先写死）**：下一局 `pullMiss` 从 3.6/s 级掉到 0.03/s 级 = 成立；**仍是几十/几百次 ⇒ 音频链就地结案**，
-     不再为它跑局。⚠ 失败是静默的，`mmcss=` 只证明「请求了」，只有 `pullMiss` 能判有没有生效。
-   - **候选 2（量具，未做）**：在 `BassMixerWaveProvider.Read` 记 **(墙壁时间, 请求字节数)**。传进来的 `count` 就是
-     `numFramesAvailable × BlockAlign`，能把「本次读吞了几拍」与「两次读的真实墙壁间隔」**直读**出来
-     （顺带得到 `BufferSize` 是几拍），用来判候选 1 有没有生效、以及有没有进程外（DPC / 驱动）成分。
+5. **音频源漏拉**（§3.4d 机制已定案；§3.4e 记录了交付陷阱与判据修正）：
+   `interpErr` 一涨就先看摘要里的 `pullMiss`，但**不要用单局计数判断任何改动**（同代码三次采集 = 1 / 145 / 4）。
+   - ✅ **MMCSS 已进 framework 源码**（`c86e585e4`：`NAudioWasapiOutput.cs:112` 加
+     `.WithMmcssThreadPriority(AudioOutputDefaults.DEFAULT_NAUDIO_MMCSS_TASK)`，`"Pro Audio"`）。
+     ⚠ 但**默认进不了游戏**——要打开 `UseEz2LazerLocalFrameworkProject` 或发包。
+   - ✅ **直读量具已加**（`WasapiReadStats` + 汇总里的 `wasapiRead` / `wasapiPull` 两行，诊断局自动开）。
+   - **判读顺序（一局即可判）**：先看音频日志有没有 `mmcss=`（证明跑的是本地 framework build）；
+     再看 `wasapiPull periods/pull` 的 median 是否 = 1.0、`over1.5` 占比、以及 `wasapiRead` 间隔的
+     p99 / max / `over15`。这些是**分布**，不依赖稀有事件的跨局可比性。
 
 ## 4. 代码锚点
 
@@ -324,7 +352,9 @@ CV≈1 + 正常 hold `mean 10.004 / std 0.568`（无系统正漂）⇒ 是**随�
 | 探针接线 + 环境变量 | `osu.Game/Screens/Play/Player.cs`（约 344–368 行） |
 | 子树 / 时钟 / 其余 归因 | `osu.Game/Rulesets/UI/FrameStabilityContainer.cs`（`UpdateSubTree`） |
 | present / 帧节拍采样 | `EzFrameStallDiagnostics.samplePresent`（update 侧读 `DrawThread.Clock`，**按 draw 帧去重**）；host 由 `osu.Game/OsuGameBase.cs` 的 `SetHost` 挂上（**`DrawFrame` 无法 override，原因见 §3.5 第 4 项**） |
-| 音频源漏拉计数 | 同文件 `accumulateClocks`（`pullMiss` / `pullMissHoldMs`，停走 >15 ms 且 <60 ms 记一次） |
+| 音频源漏拉计数 | 同文件 `accumulateClocks`（`pullMiss` / `pullMissHoldMs`，停走 >15 ms 且 <60 ms 记一次）。⚠ 同代码三次采集 = 1/145/4，**单局不可判**（§3.4e） |
+| 音频拉取直读（间隔 + 请求拍数） | `osu-framework/osu.Framework/Audio/Wasapi/WasapiReadStats.cs`（默认关闭；`BassMixerWaveProvider.Read` 里 `Observe`；`Player.cs` 诊断局起止处开关；汇总行 `wasapiRead` / `wasapiPull`） |
+| **framework 改动进不了游戏的陷阱** | `Ez2Lazer.Dependencies.props`：`UseEz2LazerLocalFrameworkProject` 默认注释 ⇒ 走 NuGet 包 `ez2lazer.Framework`；验证办法 = 看输出 `osu.Framework.dll` 时间戳 + 音频日志有没有 `mmcss=` |
 | 分析脚本 | `AnalyzeFrameStall.ps1`、`AnalyzePressLatency.ps1` |
 | 音频输出路径（BASS mixer + NAudio WASAPI 拉流） | `osu-framework/osu.Framework/Audio/Wasapi/NAudioWasapiOutput.cs`；缓冲常量在 `Audio/AudioOutputDefaults.cs`（`DEFAULT_NAUDIO_LATENCY_MS = 10`） |
 | 漏拉成因（NAudio 读法 + MMCSS 缺口） | `NAudio.Wasapi/WasapiPlayer.PlayThread`：读 `BufferSize − CurrentPadding`（**全部空位**，非固定一拍），`frameEvent` 是 AutoReset；`mmcssTaskName` 默认 null，只有 `.WithMmcssThreadPriority()` 才登记 MMCSS。构造链在 `NAudioWasapiOutput.cs:112`（未调） |
