@@ -102,10 +102,12 @@
 
 工具：`EzPressLatencyDiagnostics`（按键分段）+ `EzFrameStallDiagnostics`（帧级 stall）+ 配套分析脚本
 `AnalyzePressLatency.ps1` / `AnalyzeFrameStall.ps1` / `AnalyzePeriod.py`（周期性 / 跨探针相位）。
-总开关是 **ini 设置 `Ez2Setting.EzJudgmentDiagEnabled`**（`EzExperimentalSettings` 里的「判定诊断」，
-不是环境变量），它同时打开三个探针；其余走环境变量：`EZ_FRAME_PROBE_MS`（stall 阈值，**0 = 抓全集**）、
-`EZ_FRAME_PROBE_LIGHT`（关掉每帧 GC/分配读数）、`EZ_PRESS_PROBE_SKIP_FORCE_MISS`（消融强制 miss 扫描）。
-**这些只在诊断开启时生效。**
+总开关是 **ini 设置 `Ez2Setting.EzJudgmentDiagEnabled`**（`EzExperimentalSettings` 里的「启用 Ez 判定诊断」，
+不是环境变量）；它**只决定整套是否启动**，具体跑哪些由 `EzDiagProbe*` 五个子项各自决定（judgment /
+press / frame / Mania 判定热路径 / 时序追踪）。开关、子项与探针调参环境变量都在**启动时读一次**，
+统一入口 `EzDiagnosticSwitches.Apply`（见 §2.4.20）。调参走环境变量：`EZ_FRAME_PROBE_MS`（stall 阈值，
+**0 = 抓全集**）、`EZ_FRAME_PROBE_LIGHT`（关掉每帧 GC/分配读数）、`EZ_PRESS_PROBE_SKIP_FORCE_MISS`
+（消融强制 miss 扫描）。**这些只在诊断开启时生效。**
 
 #### 2.4.1 本局条件（先看这个，否则数字会被误读）
 
@@ -786,6 +788,9 @@ draw 帧、把 `coverage` 拉到 0.87 以下，使这张表在判读前就自检
 
 #### 2.4.18 诊断开关改为**进程级**：关闭时热路径零开销（2026-09-25）
 
+> ⚠ 本条里的「四个静态 bool」开关模型已被 §2.4.20 取代（总开关 + 五个子项 + 启动时一次性下发）。
+> 下面的**原理与反面教材仍然成立**：开关必须进程级、调用点自己先判、不要做链式只读属性。
+
 三个判定侧探针 + 时序追踪原先都在 `Player` 每次进图时从配置重读开关，`OrderedHitPolicyHelper` 还各持一个
 `Bindable<bool>` 订阅。这套写法对「永远关着」的功能是纯负担，改法只有一条原则：**关闭时热路径上一个字节都不做**。
 
@@ -846,7 +851,66 @@ judgment `AudioLag` 序列（= `BassSource − GameTime`，与 `Drift` 去趋势
 旧 summary 那一节会静默不打印；旧 press CSV 的 `CatchingUp` / `Gen2` 列不再被读）。要不要重采一局以留下
 同格式基线，由使用者决定。
 
+#### 2.4.20 探针套件收口：一个总开关 + 五个子项，采集边界归位（2026-09-25）
 
+> 本条改动**不涉及任何测量口径**（CSV 列、阈值、采样率全不变），动的是「谁拥有开关、谁算派生量」。
+> 旧数据仍可比；§2.4.1–§2.4.19 的所有结论不受影响。
+
+##### 一、开关模型（对比 §2.4.18）
+
+| | 旧（§2.4.18） | 新（本条） |
+|---|---|---|
+| 开关数量 | 总开关一个，同时开三个探针 | 总开关**只决定整套是否启动**；`EzDiagProbe*` **五个子项**各自决定跑哪些 |
+| 子项 | 无 | judgment / press / frame / Mania 判定热路径 / 时序追踪 |
+| 谁下发 | 各探针各自 `SetEnabled` | `EzDiagnosticSwitches.Apply(config)` 唯一入口 |
+| 调参 env | 分散读取 | 同一入口内的 `applyPressTuning` / `applyFrameTuning` |
+| 热路径代价 | 一个静态 bool 分支 | **不变**（仍是启动时定死的静态位） |
+
+子项与产物的对应：`EzDiagProbeJudgment`→`judgment_*.csv`、`EzDiagProbePress`→`presslatency_*.csv`、
+`EzDiagProbeFrame`→`framestall_*.csv` + 摘要、`EzDiagProbeJudgeHotPath`→Mania 计数器（只进摘要/日志，
+不落 CSV）、`EzDiagProbeTimingTrace`→`trace_*.csv`。**五个子项默认全 true**，所以行为与旧版「总开关一开
+三个探针全开」等价 —— 新增能力只是「可以只要其中一个」。
+
+##### 二、采集边界归位（这才是本条的主要动机）
+
+判据是一条不变的纪律：**调用点只声明「发生了什么」，派生量、单位换算、健全性上限、NaN 判定全部属于探针。**
+违反时症状是热的玩法代码里出现「先算好再喂进去」的中间量（`UpdateResult` 里的 `Stopwatch` 差值、
+`gcc.InterpolatedDrift` 读取、`<0 || >1000` 的边界检查），改动探针要动玩法文件。
+
+| 位置 | 旧 | 新 |
+|---|---|---|
+| 判定 `DrawableHitObject.UpdateResult` | 自算插值漂移 + 按键 wall 耗时 + 健全性上限，再喂 `Record(...)`（~33 行） | `if (userTriggered && EzJudgmentDiagnostics.Enabled) EzJudgmentDiagnostics.Capture(this, timeOffset, keyTs);` |
+| 判定探针 | `Record(...)` 收已算好的数 | `Capture(...)` 自取 `Time.Current` / `ElapsedFrameTime`，自算漂移与 `InputToJudgeMs`（含 `<0 or >1000 ⇒ NaN`） |
+| 按键 `Column.recordPressLatency` | 自算 `PreColumnMs` / `ColumnMs` / `FrameAgeMs` + 单位换算 + NaN 判定（~45 行，在 `Column` 内） | `ManiaPressProbe.Capture(column, pressEnterTs, time, routed, judged, forceMissScan)`（`EzMania/Diagnostics/ManiaPressProbe.cs`） |
+| 帧归因 `FrameStabilityContainer` | 对外暴露 5 个探针静态量（`SubtreeProbeMs` / `ClockProbeMs` / `LoopAllocProbeBytes` / `ProbeFrameValid` / `EzLastUpdateIterations`），由探针自行读取 | 每轮 `UpdateSubTree` 末尾一次 `ReportLoop(subtreeMs, clockMs, allocBytes, ranSubtree, iterations)`；5 个静态量撤出 FSC，改由帧探针持有 |
+| 帧归因闸门 | `Sampling`（帧探针独有） | `EzDiagnosticSwitches.FrameLoopAttribution = 帧探针 \|\| 按键探针`（按键探针要 `FscIter`，不能只挂 `Sampling`） |
+| 探针共享落盘 | 各探针各自算 wallclock / 目录 / 浮点格式 / 异步写 | `EzProbeOutput`（`WallClockMs` / `Directory` / `Csv` / `CsvOrEmpty` / `WriteAsync`） |
+| 局生命周期 | `Player` 里硬编码探针 clear/flush 名单 + 框架钩子 | `EzDiagnosticSession.Begin(startLabel)` / `End(exitLabel)`，`Player` 不再出现探针名单 |
+
+**唯一刻意留在调用点的是「非位置输入队列长度」**（`Column.reportInputQueueCountOnce`）：它读一次
+`GetContainingInputManager().NonPositionalInputQueue.Count` 会触发一次全树重建，且该 API 是 `protected internal`
+（外部 helper 取不到树），所以它既不是派生量也不能搬走 —— 仍保持「每列首按键才读一次」。
+
+**Mania 适配层为什么放 Mania 侧**：`ManiaPressProbe` 要读列号（`column.Index`）、车道条目数、
+`ManiaLaneController` 的缓存计数，而 `osu.Game` 的探针不能反向依赖规则集，故 `EzPressLatencyDiagnostics`
+留在 `osu.Game`，Mania 侧只做「事实 → 样本」的翻译。
+
+##### 三、零开销自检（关闭时各调用点只剩什么）
+
+| 调用点 | 关闭时执行 |
+|---|---|
+| `DrawableHitObject.UpdateResult` | 一次 `userTriggered && Enabled`（静态 bool） |
+| `Column.OnPressed` | 一次局部 `probe` 判断（`Enabled` 静态读取），`pressEnterTs` 取 0 |
+| `FrameStabilityContainer.UpdateSubTree` | 一次 `attribution` 本地 bool 判断；`sampling` / `samplingAlloc` 同为局部 bool |
+| `EzSubFrameCorrection.RecordFscUpdate` | 一次 `Enabled` 静态读取 |
+
+没有任何一处保留 bindable、DI 查询或运行期配置读取；也没有新增闭包或分配。
+
+##### 四、与 §2.4.19 的关系
+
+§2.4.19 删的是 **CSV 列**（等价列），本条动的是 **代码边界**，两者独立：CSV 格式在本条里**一列未改**，
+所以本条之后与 §2.4.19 之后采的局可直接跨条对比。`AnalyzePressLatency.ps1` / `AnalyzeFrameStall.ps1` /
+`AnalyzePeriod.py` 的读列逻辑也不需要改。
 
 ---
 
@@ -989,3 +1053,4 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-25 | §2.4.13–2.4.17：**音频源「漏拉」查到底并结案**。① 摘要新增 `interpErr`（位置判据）后立刻发现它会被源停走污染 ⇒ 登记「**判 `interpErr` 必须同时看 `pullMiss`**」（把 ±20 ms 邻域剔掉，std 1.08 → 0.455 ms）。② 稳态跳变只有 10/20 ms 两档、`跳变次数 = 周期数 − 超额周期数` 两局精确成立 ⇒ **机制**是「漏一次唤醒 → NAudio 一次读两拍」（读 `BufferSize − CurrentPadding` = 全部空位，`frameEvent` 是 AutoReset，故距离守恒、只重排相位）。③ 曾假设根因是渲染线程没登记 MMCSS：**先踩到交付陷阱**（MMCSS 只进了 framework 源码，而 `osu` 默认取 NuGet 包 ⇒ 那一局跑的还是旧 DLL；同时同代码三次采集 `pullMiss` = **1/145/4** ⇒ 单局计数不可判），补上 `wasapiRead`/`wasapiPull` 直读量具（拉取间隔 + 请求拍数）后，实测 D 局 `pullMiss=142`、`periods/pull max=2.00`、每 0.24 s 一次两整拍 ⇒ **MMCSS 无效，音频链结案**（应用侧无手段消除；体感量级只有位置 std ~1 ms）。④ 顺带定案「**歌曲结束后的退场段是另一个工况**」（时钟停走、update 掉到 120–192 Hz、子树 = 0、`coverage` 被拉到 0.869）：present 采样改为**跳过时钟停走的帧**（新增 `frozenSkipped`），局内前 33 s 的帧管线判为 pristine。**不成立/已撤回**：早期那两个 `Drift` ACF 周期数字已在交接单删除 |
 | 2026-09-25 | §2.4.18：**诊断开关改为进程级**——三个判定侧探针 + 时序追踪原先每次进图从配置重读、且 `OrderedHitPolicyHelper` 各持一个 `Bindable<bool>`。改为**启动时读一次**（`OsuGameBase.applyDiagnosticSwitches`）落到四个静态 bool，调用点用局部量先判（`FrameStabilityContainer` 关闭时连 `RecordFrame` 调用都不发生），**改设置必须重启游戏**。理由：这类功能长期关闭，热路径上应当只有一个静态 bool 分支。⚠ 曾试过 `Ez2ConfigManager` 静态属性 + 环境变量 + 链式只读属性的写法，**热路径一分未省、只多了概念，已撤回**，不要重复 |
 | 2026-09-25 | §2.4.19：**删掉 6 个等价列**——判据是「同一行里能被另一个参数精确算出」（恒等或差一个可复原常数），「只是没人读」不算理由。删除：judgment `InterpClock`（≡ `GameTime`，源码里同一属性连读两次）、judgment `BassSource`（≡ `GameTime − Drift − 15.000`，8 局残差 ≤ 0.002）、frame `SubtreeAllocBytes`（≡ `LoopAllocBytes`，373,188 帧逐帧全等，成因是 `updateClock()` 从不分配）、frame `Gen2Delta`（恒 0）、press `Gen2`（增量恒 0）、press `CatchingUp`（恒 0，且被更一般的 `FscIter>1` 完全覆盖）；`AnalyzePeriod.py` 的 `AudioLag` 序列随之删除。**明确保留**：`Gen1`/`FscIter`（有信号）、`PressesInFrame`（内存缓冲算出的值比 CSV 反推更准）、judgment `FrameElapsed` vs frame `ElapsedMs`（时钟增量 vs 墙钟，非同一测量）。顺带修正 `AnalyzePressLatency.ps1` 读错列名（`FscIterations` → `FscIter`）导致的「多遍子树」分桶从未命中。⚠ 旧 CSV / 旧 summary 与新脚本不兼容，`AnalyzeFrameStall.ps1` 的 `frameSplit` 正则已收紧 |
+| 2026-09-25 | §2.4.20：**探针套件收口（不动测量口径）**——开关从「总开关同时开三个探针」改为**总开关 + 五个 `EzDiagProbe*` 子项**，统一由 `EzDiagnosticSwitches.Apply` 在启动时读一次（子项默认全 true，行为与旧版等价，只是可以只要其中一个）；探针调参 env 也收进同一入口。**采集边界归位**：判定的漂移 / `InputToJudgeMs` / `<0 or >1000 ⇒ NaN` 从 `DrawableHitObject.UpdateResult` 移入 `EzJudgmentDiagnostics.Capture`（调用点只剩一行）；`Column.recordPressLatency` 的 `PreColumnMs` / `ColumnMs` / `FrameAgeMs` 与单位换算移入新文件 `ManiaPressProbe`（放 Mania 侧，因需列号 / 车道计数）；`FrameStabilityContainer` 的 5 个探针静态量撤掉，改为每轮 `ReportLoop` 一次回报（归因闸门 `FrameLoopAttribution = 帧探针 \|\| 按键探针`）。落盘与局生命周期分别收进 `EzProbeOutput` / `EzDiagnosticSession`。**CSV 一列未改**，§2.4.19 之后的数据仍可跨条对比。⚠ 唯一刻意留在调用点的是 `Column` 的非位置输入队列长度（读它会全树重建，且 API 是 `protected internal`） |
