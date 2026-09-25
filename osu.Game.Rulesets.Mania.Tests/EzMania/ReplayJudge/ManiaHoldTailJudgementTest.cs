@@ -47,6 +47,18 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
+        public void TestO2TailUsesPressTimeBpmOnVariableBpm()
+        {
+            var (score, beatmap, environment) = HitModeReplayFixtures.CreateO2HoldVariableBpmPressTimeWindow();
+            var result = ManiaReplaySession.Run(score, beatmap, environment);
+
+            // 按下在 60BPM（Cool 窗 125ms）、尾在 120BPM，松手晚 100ms：只有用按下时刻的 BPM 才是 Cool。
+            var tailEvent = result.ScoreInfo.HitEvents.Single(e => e.HitObject is TailNote);
+            Assert.That(tailEvent.TimeOffset, Is.EqualTo(100).Within(0.01));
+            Assert.That(tailEvent.Result, Is.EqualTo(HitResult.Perfect));
+        }
+
+        [Test]
         public void TestO2ReleaseInsideTailWindowFollowsLiveSemantics()
         {
             var (score, beatmap, environment) = HitModeReplayFixtures.CreateO2HoldReleaseInsideTailWindow();
