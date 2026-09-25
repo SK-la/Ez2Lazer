@@ -105,6 +105,51 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 count++;
         }
 
+        /// <summary>
+        /// 一次按键在 <c>Column.OnPressed</c> 内的分段耗时（ms，wall-clock，均为相邻两段之差）。
+        /// <para>
+        /// <c>ColumnMs</c> 只给整段工时，无法回答「首次命中的一次性成本落在哪一段」。本结构把整段切成五块：
+        /// <c>BookkeepingMs</c> = 入口 → 键音触发之后（输入队列计数、按键历史、采样触发）；
+        /// <c>RouteMs</c> = → 路由配置之后（<c>resolvePressRouting</c>，含首次惰性建表的可能）；
+        /// <c>SelectMs</c> = → 选目标之后（<c>SelectPressEntry</c>）；
+        /// <c>ApplyMs</c> = → 判定落地之后（<c>applyRoutedPress</c> 的判定 + 同步结果扇出）；
+        /// <c>CaptureMs</c> = → 采集结束（探针自身的读数与建样本）。
+        /// </para>
+        /// <para>
+        /// 未走到的阶段差值恒为 0（例如本列不路由输入时 <c>RouteMs</c>…<c>ApplyMs</c> 全为 0）。
+        /// 每局清零，故同一进程的第 1 局即可看到冷启动曲线，后续局是同进程的对照。
+        /// </para>
+        /// </summary>
+        public readonly record struct PressBreakdown(
+            double WallMs,
+            int Column,
+            bool Routed,
+            bool Judged,
+            double BookkeepingMs,
+            double RouteMs,
+            double SelectMs,
+            double ApplyMs,
+            double CaptureMs,
+            double TotalMs);
+
+        /// <summary>分段记录的条数上限（每局，按按键先后顺序取前若干次）。</summary>
+        public const int BreakdownCapacity = 16;
+
+        private static readonly PressBreakdown[] breakdown = new PressBreakdown[BreakdownCapacity];
+        private static int breakdownCount;
+
+        /// <summary>本局分段记录是否还有空位；调用点用它决定这次按键要不要取时间戳。</summary>
+        public static bool BreakdownActive => Enabled && breakdownCount < BreakdownCapacity;
+
+        /// <summary>记一次按键的分段。超出 <see cref="BreakdownCapacity"/> 后静默丢弃。</summary>
+        public static void RecordBreakdown(in PressBreakdown sample)
+        {
+            if (!Enabled || breakdownCount >= BreakdownCapacity)
+                return;
+
+            breakdown[breakdownCount++] = sample;
+        }
+
         public static void Clear()
         {
             Interlocked.Exchange(ref samples, new PressSample[capacity]);
@@ -113,6 +158,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             Interlocked.Exchange(ref overwritten, 0);
             lastPressFrameId = long.MinValue;
             pressOrdinalInFrame = 0;
+            breakdownCount = 0;
         }
 
         /// <summary>把样本写成 CSV，返回文件路径。IO 在后台线程执行；调用方负责随后 <see cref="Clear"/>。</summary>
@@ -159,7 +205,38 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.ToString(),
                 sampleCount,
                 "EzPressLatency",
-                formatSummary(start, sampleCount, frameLengths));
+                formatSummary(start, sampleCount, frameLengths) + formatBreakdown());
+        }
+
+        /// <summary>
+        /// 前若干次按键的分段明细，附在摘要末尾。段序 bookkeeping/route/select/apply/capture，单位 ms。
+        /// </summary>
+        private static string formatBreakdown()
+        {
+            if (breakdownCount == 0)
+                return string.Empty;
+
+            var sb = new StringBuilder();
+            sb.Append("\n[EzPressLatency.firstPress] n=").Append(breakdownCount)
+              .Append(" 段序=bookkeeping/route/select/apply/capture 列码=c<列号>[R=命中路由][J=已判定]");
+
+            for (int i = 0; i < breakdownCount; i++)
+            {
+                var b = breakdown[i];
+
+                sb.Append("\n[EzPressLatency.firstPress] c").Append(b.Column)
+                  .Append(b.Routed ? 'R' : '-')
+                  .Append(b.Judged ? 'J' : '-')
+                  .Append(" | ").Append(b.BookkeepingMs.ToString("F2", CultureInfo.InvariantCulture))
+                  .Append(' ').Append(b.RouteMs.ToString("F2", CultureInfo.InvariantCulture))
+                  .Append(' ').Append(b.SelectMs.ToString("F2", CultureInfo.InvariantCulture))
+                  .Append(' ').Append(b.ApplyMs.ToString("F2", CultureInfo.InvariantCulture))
+                  .Append(' ').Append(b.CaptureMs.ToString("F2", CultureInfo.InvariantCulture))
+                  .Append(" | total ").Append(b.TotalMs.ToString("F2", CultureInfo.InvariantCulture))
+                  .Append(" | wall ").Append(b.WallMs.ToString("F1", CultureInfo.InvariantCulture));
+            }
+
+            return sb.ToString();
         }
 
         /// <summary>同一帧内处理的按键数（按 FrameId 连续段统计）。</summary>

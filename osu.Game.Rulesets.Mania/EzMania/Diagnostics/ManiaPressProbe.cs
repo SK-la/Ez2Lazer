@@ -65,5 +65,34 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
                 GC.CollectionCount(1),
                 GC.GetTotalPauseDuration().TotalMilliseconds));
         }
+
+        /// <summary>
+        /// 采集一次按键在 <c>OnPressed</c> 内的分段耗时。调用方只交出各阶段结束的 <see cref="Stopwatch"/> 时间戳
+        /// （它才知道自己走到哪一步），单位换算与建样本在此完成。
+        /// </summary>
+        /// <remarks>
+        /// 只在本局前 <see cref="EzPressLatencyDiagnostics.BreakdownCapacity"/> 次按键上调用；未走到的阶段时间戳
+        /// 与上一段相同，差值为 0。
+        /// </remarks>
+        internal static void CaptureBreakdown(Column column, long pressEnterTs, long bookkeepingTs, long routeTs, long selectTs, long applyTs, bool routed, bool judged)
+        {
+            if (!EzPressLatencyDiagnostics.BreakdownActive)
+                return;
+
+            long now = Stopwatch.GetTimestamp();
+            double tickToMs = 1000.0 / Stopwatch.Frequency;
+
+            EzPressLatencyDiagnostics.RecordBreakdown(new EzPressLatencyDiagnostics.PressBreakdown(
+                EzProbeOutput.WallClockMs,
+                column.Index,
+                routed,
+                judged,
+                (bookkeepingTs - pressEnterTs) * tickToMs,
+                (routeTs - bookkeepingTs) * tickToMs,
+                (selectTs - routeTs) * tickToMs,
+                (applyTs - selectTs) * tickToMs,
+                (now - applyTs) * tickToMs,
+                (now - pressEnterTs) * tickToMs));
+        }
     }
 }

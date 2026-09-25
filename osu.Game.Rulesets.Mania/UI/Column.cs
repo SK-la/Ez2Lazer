@@ -480,6 +480,14 @@ namespace osu.Game.Rulesets.Mania.UI
             bool probe = EzPressLatencyDiagnostics.Enabled;
             long pressEnterTs = probe ? Stopwatch.GetTimestamp() : 0;
 
+            // 首次命中的一次性成本（JIT / 惰性初始化 / 键音通道建立 / 池首次取用）只发生在本局前几次按键上，
+            // 所以只在这几次按键上多取几个时间戳，之后不再进入该分支。
+            bool breakdown = probe && EzPressLatencyDiagnostics.BreakdownActive;
+            long bookkeepingTs = pressEnterTs;
+            long routeTs = pressEnterTs;
+            long selectTs = pressEnterTs;
+            long applyTs = pressEnterTs;
+
             pressForceMissScan = 0;
 
             double time = Time.Current;
@@ -502,6 +510,12 @@ namespace osu.Game.Rulesets.Mania.UI
             if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
                 sampleTriggerSource.Play();
 
+            if (breakdown)
+            {
+                bookkeepingTs = Stopwatch.GetTimestamp();
+                routeTs = selectTs = applyTs = bookkeepingTs;
+            }
+
             bool routed = false;
             bool judged = false;
 
@@ -514,18 +528,31 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 resolvePressRouting(out var precedence);
 
+                if (breakdown)
+                    routeTs = Stopwatch.GetTimestamp();
+
                 var entry = LaneController.SelectPressEntry(time, precedence);
+
+                if (breakdown)
+                    selectTs = Stopwatch.GetTimestamp();
 
                 if (entry != null)
                 {
                     routed = applyRoutedPress(entry.RoutedObject, time, e);
                     judged = entry.IsPressJudged;
                 }
+
+                if (breakdown)
+                    applyTs = Stopwatch.GetTimestamp();
             }
 
             if (probe)
             {
                 ManiaPressProbe.Capture(this, pressEnterTs, time, routed, judged, pressForceMissScan);
+
+                if (breakdown)
+                    ManiaPressProbe.CaptureBreakdown(this, pressEnterTs, bookkeepingTs, routeTs, selectTs, applyTs, routed, judged);
+
                 reportInputQueueCountOnce();
             }
 
