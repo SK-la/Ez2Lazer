@@ -221,8 +221,84 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             assertMisses(hitObjects, frames, 3, expectTailMiss: true);
         }
 
+        /// <summary>
+        /// 同列前一个物件的松手不得用来判后面那条 LN 的尾：尾的提前侧候选窗约为
+        /// <c>WindowFor(Miss) × RELEASE_WINDOW_LENIENCE</c>，局内松手只判「此刻正按住的那条 LN」
+        /// （Column.OnReleased → LaneController.ActiveHold），不会按时间邻近去够未来的尾。
+        /// </summary>
+        [Test]
+        public void TestEarlierNoteReleaseDoesNotJudgeFutureTail()
+        {
+            var hitObjects = new List<HitObject>
+            {
+                new Note { StartTime = 1000, Column = 0 },
+                new HoldNote { StartTime = 1120, Duration = 100, Column = 0 },
+            };
+
+            var frames = new List<ReplayFrame>
+            {
+                new ManiaReplayFrame(1000, ManiaAction.Key1),
+                new ManiaReplayFrame(1100),
+                new ManiaReplayFrame(1120, ManiaAction.Key1),
+                new ManiaReplayFrame(1220),
+                new ManiaReplayFrame(3000),
+            };
+
+            var events = runEvents(hitObjects, frames);
+            var tail = events.Single(e => e.HitObject is TailNote);
+
+            Assert.That(events.Count(e => e.Result == HitResult.Miss), Is.EqualTo(0),
+                () => $"release of the earlier note must not miss the future tail: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+            Assert.That(tail.Result, Is.EqualTo(HitResult.Perfect),
+                () => $"tail must be judged by its own release: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+        }
+
+        /// <summary>
+        /// 提前松手但落在 release lenience 内：局内 OnReleased 先判尾、后写 Body，这一投看到的 Body 断连仍是 false，
+        /// 因此不得被压成 Meh（<c>HoldNoteBody.HasHoldBreak</c> 只在真的断连后成立）。
+        /// </summary>
+        [Test]
+        public void TestEarlyReleaseWithinLenienceIsNotCappedToMeh()
+        {
+            var hitObjects = new List<HitObject>
+            {
+                new HoldNote { StartTime = 1000, Duration = 400, Column = 0 },
+            };
+
+            var frames = new List<ReplayFrame>
+            {
+                new ManiaReplayFrame(1000, ManiaAction.Key1),
+                new ManiaReplayFrame(1340),
+                new ManiaReplayFrame(3000),
+            };
+
+            var events = runEvents(hitObjects, frames);
+            var tail = events.Single(e => e.HitObject is TailNote);
+
+            Assert.That(tail.Result.IsHit(), Is.True,
+                () => $"early release inside lenience must be a hit: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+            Assert.That(tail.Result, Is.Not.EqualTo(HitResult.Meh),
+                () => $"early release inside lenience must not be capped to Meh: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+        }
+
         private static void assertMisses(List<HitObject> hitObjects, List<ReplayFrame> frames, int expectedMisses,
                                          bool expectTailMiss = false)
+        {
+            var events = runEvents(hitObjects, frames);
+            var missEvents = events.Where(e => e.Result == HitResult.Miss).ToList();
+
+            Assert.That(missEvents.Count, Is.EqualTo(expectedMisses),
+                () => $"expected {expectedMisses} miss(es): [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+
+            if (expectTailMiss)
+            {
+                // 尾必须被结算（有判决），而不是悬空不判——悬空会让局内 HasCompleted 永假。
+                Assert.That(missEvents.Any(e => e.HitObject is TailNote), Is.True,
+                    () => $"tail must be settled as miss: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+            }
+        }
+
+        private static List<HitEvent> runEvents(List<HitObject> hitObjects, List<ReplayFrame> frames)
         {
             var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
             ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
@@ -250,18 +326,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             ReplayJudgeTestConfig.ApplyEmbeddedModes(score, environment);
 
-            var events = ManiaReplaySession.RunHitEvents(score, beatmap, environment);
-            var missEvents = events.Where(e => e.Result == HitResult.Miss).ToList();
-
-            Assert.That(missEvents.Count, Is.EqualTo(expectedMisses),
-                () => $"expected {expectedMisses} miss(es): [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
-
-            if (expectTailMiss)
-            {
-                // 尾必须被结算（有判决），而不是悬空不判——悬空会让局内 HasCompleted 永假。
-                Assert.That(missEvents.Any(e => e.HitObject is TailNote), Is.True,
-                    () => $"tail must be settled as miss: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
-            }
+            return ManiaReplaySession.RunHitEvents(score, beatmap, environment).ToList();
         }
     }
 }

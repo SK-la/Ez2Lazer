@@ -181,9 +181,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 bool headHit = target is TailNote tailNote && headByTail.TryGetValue(tailNote, out var linkedHead)
                                                            && headWasHit.TryGetValue(linkedHead, out bool wasHit) && wasHit;
 
-                // O2 尾判必须与局内同源（OnReleased 先判尾、后写 Body）：提前置 HoldBroken 会让 EvaluateTailJudge
-                // 直接拒绝这一投，尾被推迟到收尾补 Miss 并连带 Body ComboBreak，凭空多出 miss。
-                if (!judgementRound.IsO2Jam && !input.IsPress && isTail && headHit && wasHoldingBeforeEvent && rawOffset < 0)
+                // 局内松手只判「此刻正按住的那条 LN」（Column.OnReleased → LaneController.ActiveHold），
+                // 不会按时间邻近去够一条连头都还没按下的 LN。候选窗口对尾的提前侧是 Miss 窗口×RELEASE_WINDOW_LENIENCE
+                // （OD8 下约 226ms），密集段里前一键/前一条尾的松手会把后面那条 LN 的尾提前判成 Miss，
+                // 等它真正的松手到达时 selected.Judged 已置位而被跳过，于是只剩兜底补判。
+                if (isTail && !input.IsPress && !(headHit && wasHoldingBeforeEvent))
+                {
+                    tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
+                    continue;
+                }
+
+                // 局内 OnReleased 先判尾、后写 Body，因此这一投看到的 Body 断连必然仍是 false：
+                // 由「提前松手」反推 HoldBroken 会把合法的提前松手压成 Meh（Common，Lazer/Classic）或直接否决（O2）。
+                // 仅 BMS 尾语义按自身规则消费 HoldBroken。
+                if (HitModeHelper.IsBMSHitMode(environment.ManiaHitMode) && !input.IsPress && isTail && headHit && wasHoldingBeforeEvent && rawOffset < 0)
                     selected.HoldBroken = true;
 
                 if (input.IsPress && target is HeadNote headNote && holdByHead.TryGetValue(headNote, out var hold))
