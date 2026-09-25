@@ -91,6 +91,68 @@ namespace osu.Game.Rulesets.Mania.Tests
                 });
         }
 
+        /// <summary>
+        /// LN 尾之后明显迟松手（松手落在 release lenience 之外）：Drawable 与 Session 必须一致。
+        /// </summary>
+        /// <remarks>
+        /// 当前失败（Drawable 侧 "wait for completion" 超时）：局内该尾永不被判，HasCompleted 恒为 false；
+        /// Session 侧则把同一尾补成 Miss。两者是同一根因的两个反向症状。
+        /// </remarks>
+        [Test]
+        [Ignore("待修：局内 tail 不进列级 auto-miss 队列 → 无窗口内松手边沿时永不被判（无法结算）；Session 侧补成 Miss")]
+        public void TestLazerHoldTailReleasedOutsideWindowDrawableMatchesSession()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+
+            const double head = 1500;
+            const double tail = 2500;
+
+            runDrawableParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote
+                    {
+                        StartTime = head,
+                        Duration = tail - head,
+                        Column = 0,
+                    },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(tail + 400),
+                });
+        }
+
+        /// <summary>
+        /// 整局按住 LN 不松手（回放结束时仍按住）：Drawable 与 Session 必须一致。
+        /// </summary>
+        [Test]
+        [Ignore("待修：同 TestLazerHoldTailReleasedOutsideWindowDrawableMatchesSession（局内尾永不被判，Session 补 Miss）")]
+        public void TestLazerHoldTailNeverReleasedDrawableMatchesSession()
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+
+            const double head = 1500;
+            const double tail = 2500;
+
+            runDrawableParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote
+                    {
+                        StartTime = head,
+                        Duration = tail - head,
+                        Column = 0,
+                    },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(tail + 2000, ManiaAction.Key1),
+                });
+        }
+
         [Test]
         public void TestIidxTapDrawableMatchesSession()
         {
