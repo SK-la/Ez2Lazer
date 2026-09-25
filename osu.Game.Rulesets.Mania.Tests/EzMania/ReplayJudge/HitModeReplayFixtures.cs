@@ -390,6 +390,42 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
+        /// <summary>
+        /// O2 尾窗内提前松手（尾前 50ms，120BPM 下仍在 Cool 窗内）：局内语义为尾命中 + Body IgnoreHit。
+        /// </summary>
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateO2HoldReleaseInsideTailWindow()
+        {
+            const double head = 1500;
+            const double tail = 4000;
+            const double release_inside_window = tail - 50;
+
+            var ruleset = new ManiaRuleset();
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                },
+                ControlPointInfo = createTiming120(),
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var replay = new Replay
+            {
+                Frames = new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head, ManiaAction.Key1),
+                    new ManiaReplayFrame(release_inside_window),
+                },
+            };
+
+            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.O2Jam, EzEnumHealthMode.O2JamNormal);
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+            return (createScore(ruleset, replay), beatmap, environment);
+        }
+
         public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateO2HoldEarlyRelease()
         {
             const double head = 1500;

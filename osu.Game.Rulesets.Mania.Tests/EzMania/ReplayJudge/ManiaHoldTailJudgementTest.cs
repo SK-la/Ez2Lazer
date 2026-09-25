@@ -47,6 +47,33 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [Test]
+        public void TestO2ReleaseInsideTailWindowFollowsLiveSemantics()
+        {
+            var (score, beatmap, environment) = HitModeReplayFixtures.CreateO2HoldReleaseInsideTailWindow();
+            var result = ManiaReplaySession.Run(score, beatmap, environment);
+
+            // 尾窗内松手：局内 DrawableHoldNote.OnReleased 先判尾（命中）后写 Body IgnoreHit，不应产生 Miss / ComboBreak。
+            Assert.That(result.ScoreInfo.Statistics.TryGetValue(HitResult.ComboBreak, out int comboBreak) ? comboBreak : 0, Is.EqualTo(0));
+            Assert.That(result.ScoreInfo.Statistics.TryGetValue(HitResult.Miss, out int miss) ? miss : 0, Is.EqualTo(0));
+
+            var tailEvent = result.ScoreInfo.HitEvents.Single(e => e.HitObject is TailNote);
+            Assert.That(tailEvent.Result, Is.Not.EqualTo(HitResult.Miss));
+        }
+
+        [Test]
+        public void TestO2ReleaseOutsideTailWindowBreaksCombo()
+        {
+            var (score, beatmap, environment) = HitModeReplayFixtures.CreateO2HoldEarlyRelease();
+            var result = ManiaReplaySession.Run(score, beatmap, environment);
+
+            // 尾窗外松手：局内尾判 Miss 后 Body 补 ComboBreak。
+            Assert.That(result.ScoreInfo.Statistics.TryGetValue(HitResult.ComboBreak, out int comboBreak) ? comboBreak : 0, Is.GreaterThan(0));
+
+            var tailEvent = result.ScoreInfo.HitEvents.Single(e => e.HitObject is TailNote);
+            Assert.That(tailEvent.Result, Is.EqualTo(HitResult.Miss));
+        }
+
+        [Test]
         public void TestTailLateReleaseStoresNonZeroOffset()
         {
             var (score, beatmap, environment) = LazerTapReplayFixtures.CreateSingleHoldLateTailRelease(lateMs: 30);
