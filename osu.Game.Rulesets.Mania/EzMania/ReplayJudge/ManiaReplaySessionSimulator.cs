@@ -118,7 +118,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 if (!perColumnDict.TryGetValue(input.Column, out var laneStates))
                     continue;
 
-                if (judgementRound.IsO2Jam)
+                // 局内只在按下时刷新 press-time BPM（Column.OnPressed）；松手沿用按下那一刻的值，
+                // 尾判取的是同一份 BPM。
+                if (judgementRound.IsO2Jam && input.IsPress)
                     judgementRound.NotifyO2InputAt(input.Time);
 
                 hitWindowHelper.BPM = resolveSimulationBpm(beatmap, input.Time, environment.ManiaHitMode);
