@@ -100,36 +100,6 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzDiagProbeJudgment),
-                    Caption = EZ_DIAG_PROBE_JUDGMENT,
-                    HintText = EZ_DIAG_PROBE_JUDGMENT_TOOLTIP,
-                }),
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzDiagProbePress),
-                    Caption = EZ_DIAG_PROBE_PRESS,
-                    HintText = EZ_DIAG_PROBE_PRESS_TOOLTIP,
-                }),
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzDiagProbeFrame),
-                    Caption = EZ_DIAG_PROBE_FRAME,
-                    HintText = EZ_DIAG_PROBE_FRAME_TOOLTIP,
-                }),
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzDiagProbeJudgeHotPath),
-                    Caption = EZ_DIAG_PROBE_JUDGE_HOT_PATH,
-                    HintText = EZ_DIAG_PROBE_JUDGE_HOT_PATH_TOOLTIP,
-                }),
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzDiagProbeTimingTrace),
-                    Caption = EZ_DIAG_PROBE_TIMING_TRACE,
-                    HintText = EZ_DIAG_PROBE_TIMING_TRACE_TOOLTIP,
-                }),
-                new SettingsItemV2(new FormCheckBox
-                {
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker),
                     Caption = INPUT_AUDIO_LATENCY_TRACKER,
                     HintText = INPUT_AUDIO_LATENCY_TRACKER_TOOLTIP,
@@ -380,59 +350,14 @@ namespace osu.Game.EzOsuGame.Overlays
             "启用 Ez 诊断套件", "Enable Ez Diagnostics Suite");
 
         internal static readonly LocalisableString EZ_DIAG_SUITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(研究功能)总开关。开启后由下面各子项决定跑哪些探针，每局结束把本局数据写成 CSV。"
+            "(研究功能)总开关。开启后整套探针在启动时开始工作，每局结束把本局数据写成 CSV。"
             + "\n**重启游戏后生效**（关闭时为零开销，热路径上不留任何探针逻辑）。"
+            + "\n跑哪些内容由环境变量 EZ_DIAG_PROBES 选择（judgment / press / frame / hotpath / trace / all；空 = 全部）。"
             + "\n输出目录：仓库内 diagnostics/（找不到仓库时退回桌面 EzDiag/）。",
-            "(Testing feature) Master switch. The items below choose which probes run; each enabled probe writes a CSV after every play."
+            "(Testing feature) Master switch. When on, the probe suite starts working at launch and writes CSVs after every play."
             + "\nTakes effect after restarting the game (zero cost while off)."
+            + "\nWhich probes run is chosen by the EZ_DIAG_PROBES environment variable (judgment / press / frame / hotpath / trace / all; empty = all)."
             + "\nOutput: diagnostics/ inside the repository (falls back to Desktop/EzDiag/).");
-
-        internal static readonly LocalisableString EZ_DIAG_PROBE_JUDGMENT = new EzLocalizationManager.EzLocalisableString(
-            "诊断：判定探针", "Diagnostics: judgment probe");
-
-        internal static readonly LocalisableString EZ_DIAG_PROBE_JUDGMENT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "judgment_*.csv：判定的时钟漂移，以及 InputToJudgeMs（按键 → 判定检查的 wall 耗时）。"
-            + "\n需先开启上面的「Ez 诊断套件」。",
-            "judgment_*.csv: clock drift per judgment plus InputToJudgeMs (key → judgment-check wall time)."
-            + "\nRequires the diagnostics suite above.");
-
-        internal static readonly LocalisableString EZ_DIAG_PROBE_PRESS = new EzLocalizationManager.EzLocalisableString(
-            "诊断：按键延迟探针", "Diagnostics: press-latency probe");
-
-        internal static readonly LocalisableString EZ_DIAG_PROBE_PRESS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "presslatency_*.csv：一次按键在 PreColumn（入队 → 本列入口）与 Column（本列全程）两段各花多少 wall 时间；空按同样采样。"
-            + "\n需先开启上面的「Ez 诊断套件」。",
-            "presslatency_*.csv: wall time a press spends in PreColumn (queued → column entry) and Column (the whole column pass); empty presses are sampled too."
-            + "\nRequires the diagnostics suite above.");
-
-        internal static readonly LocalisableString EZ_DIAG_PROBE_FRAME = new EzLocalizationManager.EzLocalisableString(
-            "诊断：帧卡顿探针（最贵）", "Diagnostics: frame-stall probe (most expensive)");
-
-        internal static readonly LocalisableString EZ_DIAG_PROBE_FRAME_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "framestall_*.csv + .summary.txt：每帧耗时直方图，分「含按键的帧」与「不含按键的帧」两组。"
-            + "\n套件里开销最大的一个（每帧两次时钟读取 + GC 读数）；与按键探针同时开启时，这些开销会落进同帧按键的 PreColumnMs。"
-            + "\n需先开启上面的「Ez 诊断套件」。",
-            "framestall_*.csv + .summary.txt: per-frame duration histograms, split into frames with and without presses."
-            + "\nThe heaviest probe in the suite (two clock reads + GC reads per frame); when run alongside the press probe, that cost lands in the same frame's PreColumnMs."
-            + "\nRequires the diagnostics suite above.");
-
-        internal static readonly LocalisableString EZ_DIAG_PROBE_JUDGE_HOT_PATH = new EzLocalizationManager.EzLocalisableString(
-            "诊断：判定热路径计数", "Diagnostics: judgment hot-path counters");
-
-        internal static readonly LocalisableString EZ_DIAG_PROBE_JUDGE_HOT_PATH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "统计判定 / 按键 / LN 扫描等热路径的调用次数，只写进日志与探针摘要，不落 CSV。"
-            + "\n需先开启上面的「Ez 诊断套件」。",
-            "Counts calls of the judgment / press / LN-scan hot paths; goes to the log and the probe summary, no CSV."
-            + "\nRequires the diagnostics suite above.");
-
-        internal static readonly LocalisableString EZ_DIAG_PROBE_TIMING_TRACE = new EzLocalizationManager.EzLocalisableString(
-            "诊断：时序追踪", "Diagnostics: timing trace");
-
-        internal static readonly LocalisableString EZ_DIAG_PROBE_TIMING_TRACE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "trace_*.csv：玩法生命周期关键节点的时序（结算卡住 / HasCompleted 翻转等）。"
-            + "\n需先开启上面的「Ez 诊断套件」。",
-            "trace_*.csv: timing of gameplay lifecycle milestones (stuck results, HasCompleted flips)."
-            + "\nRequires the diagnostics suite above.");
 
         internal static readonly LocalisableString INPUT_AUDIO_LATENCY_TRACKER = new EzLocalizationManager.EzLocalisableString(
             "输入音频延迟追踪器", "Input Audio Latency Tracker");

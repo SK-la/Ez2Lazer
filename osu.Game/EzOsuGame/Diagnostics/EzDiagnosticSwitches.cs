@@ -13,7 +13,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
     /// <remarks>
     /// 必须是「启动时定死」而不是运行期 bindable：探针关闭时热路径上只允许剩下一次静态 bool 读取，
     /// 只有进程级不变的值才让 JIT 有把整段采集消掉的可能（见 <c>docs/EZ-PERFORMANCE.md</c> §2.4.18）。
-    /// 总开关 <see cref="Ez2Setting.EzJudgmentDiagEnabled"/> 决定整个套件是否启动，<c>EzDiagProbe*</c> 子项决定跑哪些。
+    /// 总开关 <see cref="Ez2Setting.EzJudgmentDiagEnabled"/>（设置项）决定启动时整套诊断是否工作；
+    /// 跑哪些内容由 <c>EZ_DIAG_PROBES</c>（环境变量）选择，不进持久化设置。
     /// </remarks>
     public static class EzDiagnosticSwitches
     {
@@ -29,21 +30,83 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// </summary>
         public static bool FrameLoopAttribution { get; private set; }
 
-        /// <summary>读配置并下发到所有探针。只应在启动时调用一次。</summary>
+        /// <summary>
+        /// 内容选择环境变量。逗号 / 分号 / 空格分隔，取值：<c>judgment</c>、<c>press</c>、<c>frame</c>、
+        /// <c>hotpath</c>、<c>trace</c>、<c>all</c>；空 / 未设置 = 全部。
+        /// <para>
+        /// 之所以是环境变量而不是设置项：它回答的是「这次实验想验什么」，不是用户偏好，
+        /// 放持久化设置里只会把设置面板变成实验台。解析失败直接抛异常 ——
+        /// 静默降级会让一整局采集白跑，而这正是本套件最贵的错误。
+        /// </para>
+        /// </summary>
+        private const string probe_selection_env = "EZ_DIAG_PROBES";
+
+        /// <summary>读总开关与内容选择并下发到所有探针。只应在启动时调用一次。</summary>
         public static void Apply(Ez2ConfigManager config)
         {
+            // 总开关决定启动时整套诊断是否工作；子项（内容选择）决定跑哪些。
             bool suite = config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
+            var probes = resolveProbeSelection();
 
-            EzJudgmentDiagnostics.SetEnabled(suite && config.Get<bool>(Ez2Setting.EzDiagProbeJudgment));
-            EzPressLatencyDiagnostics.SetEnabled(suite && config.Get<bool>(Ez2Setting.EzDiagProbePress));
-            EzFrameStallDiagnostics.SetEnabled(suite && config.Get<bool>(Ez2Setting.EzDiagProbeFrame));
-            EzTimingTrace.SetEnabled(suite && config.Get<bool>(Ez2Setting.EzDiagProbeTimingTrace));
-            JudgeHotPathTrace = suite && config.Get<bool>(Ez2Setting.EzDiagProbeJudgeHotPath);
+            EzJudgmentDiagnostics.SetEnabled(suite && probes.Judgment);
+            EzPressLatencyDiagnostics.SetEnabled(suite && probes.Press);
+            EzFrameStallDiagnostics.SetEnabled(suite && probes.Frame);
+            EzTimingTrace.SetEnabled(suite && probes.Trace);
+            JudgeHotPathTrace = suite && probes.JudgeHotPath;
 
             FrameLoopAttribution = EzFrameStallDiagnostics.Enabled || EzPressLatencyDiagnostics.Enabled;
 
             applyPressTuning();
             applyFrameTuning();
+        }
+
+        /// <summary>解析 <see cref="probe_selection_env"/>；未设置时全部开启。</summary>
+        private static (bool Judgment, bool Press, bool Frame, bool JudgeHotPath, bool Trace) resolveProbeSelection()
+        {
+            string? raw = Environment.GetEnvironmentVariable(probe_selection_env);
+
+            if (string.IsNullOrWhiteSpace(raw))
+                return (true, true, true, true, true);
+
+            bool judgment = false, press = false, frame = false, judgeHotPath = false, trace = false;
+
+            foreach (string rawToken in raw.Split(new[] { ',', ';', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                switch (rawToken.Trim().ToLowerInvariant())
+                {
+                    case "judgment":
+                        judgment = true;
+                        break;
+
+                    case "press":
+                        press = true;
+                        break;
+
+                    case "frame":
+                        frame = true;
+                        break;
+
+                    case "hotpath":
+                        judgeHotPath = true;
+                        break;
+
+                    case "trace":
+                        trace = true;
+                        break;
+
+                    case "all":
+                        judgment = press = frame = judgeHotPath = trace = true;
+                        break;
+
+                    default:
+                        throw new InvalidOperationException(
+                            $"{probe_selection_env} 无法识别的子项「{rawToken}」。"
+                            + "可用：judgment, press, frame, hotpath, trace, all（空 = 全部）。"
+                            + " 宁可现在启动失败，也不要静默降级后白跑一整局采集。");
+                }
+            }
+
+            return (judgment, press, frame, judgeHotPath, trace);
         }
 
         /// <summary>

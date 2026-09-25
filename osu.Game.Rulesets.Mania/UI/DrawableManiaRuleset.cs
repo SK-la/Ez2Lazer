@@ -292,10 +292,10 @@ namespace osu.Game.Rulesets.Mania.UI
                 Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
             }
 
-#if DEBUG
-            // TRACE-JUDGE 每局归零，使 Dispose 时的读数是本局累计。
-            ManiaJudgeHotPathTrace.Clear();
-#endif
+            // [Ez] TRACE-JUDGE 每局归零，使 Dispose 时的读数是本局累计。
+            // 闸门是子项本身（不再挂在 #if DEBUG 上）：总开关打开后，Release 构建也要真的采到东西。
+            if (ManiaJudgeHotPathTrace.Enabled)
+                ManiaJudgeHotPathTrace.Clear();
         }
 
         private ManiaTouchInputArea? touchInputArea;
@@ -496,11 +496,9 @@ namespace osu.Game.Rulesets.Mania.UI
             if (currentSkin.IsNotNull())
                 currentSkin.SourceChanged -= onSkinChange;
 
-#if DEBUG
-            // TRACE-JUDGE 读数出口：诊断开关打开时，一局结束把热路径计数打到运行日志。
+            // [Ez] TRACE-JUDGE 读数出口：诊断子项打开时，一局结束把热路径计数打到运行日志。
             if (ManiaJudgeHotPathTrace.Enabled)
                 Logger.Log($"[ManiaJudgeHotPathTrace] {ManiaJudgeHotPathTrace.FormatSummary()}", LoggingTarget.Runtime, LogLevel.Important);
-#endif
         }
     }
 }

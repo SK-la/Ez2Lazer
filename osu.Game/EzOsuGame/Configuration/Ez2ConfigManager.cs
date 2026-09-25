@@ -260,13 +260,6 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.EzJudgmentDiagEnabled, false);
 
-            // 子项默认全开：总开关一开就拿到完整一套，需要减负时再单独关掉（帧探针最贵）。
-            SetDefault(Ez2Setting.EzDiagProbeJudgment, true);
-            SetDefault(Ez2Setting.EzDiagProbePress, true);
-            SetDefault(Ez2Setting.EzDiagProbeFrame, true);
-            SetDefault(Ez2Setting.EzDiagProbeJudgeHotPath, true);
-            SetDefault(Ez2Setting.EzDiagProbeTimingTrace, true);
-
             SetDefault(Ez2Setting.EzSubFrameCorrectionEnabled, false);
             SetDefault(Ez2Setting.EzScoreRaceServiceEnabled, true);
             SetDefault(Ez2Setting.EzScoreRaceFeedMode, EzReplayFeedMode.BatchAllEvents);
@@ -1188,25 +1181,12 @@ namespace osu.Game.EzOsuGame.Configuration
 
         // 判定时序诊断与校正
         /// <summary>
-        /// 诊断套件总开关：只有它为 true 时，<c>EzDiagProbe*</c> 各子项才有意义。
-        /// 与子项一样是**进程级**的，启动时由 <c>EzDiagnosticSwitches.Apply</c> 读一次，之后不再变化。
+        /// 诊断套件总开关：决定启动时整套诊断是否工作。跑哪些内容由 <c>EZ_DIAG_PROBES</c>
+        /// 环境变量在启动时选择（见 <c>EzDiagnosticSwitches.Apply</c>），不落成设置项 ——
+        /// 「这次实验想验什么」是实验意图，不是用户偏好。
+        /// 与子项选择一样是**进程级**的，启动时读一次，之后不再变化。
         /// </summary>
         EzJudgmentDiagEnabled,
-
-        /// <summary>判定探针（<c>judgment_*.csv</c>）。</summary>
-        EzDiagProbeJudgment,
-
-        /// <summary>按键延迟探针（<c>presslatency_*.csv</c>）。</summary>
-        EzDiagProbePress,
-
-        /// <summary>帧卡顿探针（<c>framestall_*.csv</c> + 摘要）；套件里开销最大的一个。</summary>
-        EzDiagProbeFrame,
-
-        /// <summary>Mania 判定热路径计数器；只进探针摘要与日志，不落 CSV。</summary>
-        EzDiagProbeJudgeHotPath,
-
-        /// <summary>玩法生命周期时序追踪（<c>trace_*.csv</c>）。</summary>
-        EzDiagProbeTimingTrace,
 
         EzSubFrameCorrectionEnabled,
 
