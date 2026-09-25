@@ -672,11 +672,23 @@ if (numFramesAvailable > 10) FillBuffer(numFramesAvailable);       // ← 读「
 
 *可执行的下一步（都要先确认再改）*
 
-1. **一行候选**：`.WithMmcssThreadPriority("Pro Audio")`。判据明确——下一局 `pullMiss` 从 3.6/s 级掉到 0.03/s 级；
-   不动它就是「继续按 0.27 s 一次的节拍把相位阶跃喂给插值器」。
+1. ~~**一行候选**：`.WithMmcssThreadPriority("Pro Audio")`~~ → **已落地**（2026-09-25，见下）。判据事先写死：
+   下一局 `pullMiss` 从 3.6/s 级掉到 0.03/s 级即成立；若仍是几十/几百次量级 ⇒ 音频链就地结案，不再为它跑局。
 2. **把推断换成直读**：在 `BassMixerWaveProvider.Read` 记 **(墙壁时间, 请求字节数)**。NAudio 传进来的 `count`
    **就是** `numFramesAvailable × BlockAlign`，所以 `count ≈ 960 帧` 的存在直接证明「本次读吞了两拍」，
    还能顺带读出 `BufferSize`（几拍）与两次读的**真实墙壁间隔**（比帧 CSV 的 0.5 ms 分辨率细）。
+
+#### 2.4.15 已落地：NAudio 渲染线程登记 MMCSS（2026-09-25）
+
+- `osu-framework/osu.Framework/Audio/Wasapi/NAudioWasapiOutput.cs` 的构造链加了
+  `.WithMmcssThreadPriority(AudioOutputDefaults.DEFAULT_NAUDIO_MMCSS_TASK)`（`"Pro Audio"`），
+  常量与理由写在 `Audio/AudioOutputDefaults.cs`。
+- 启动日志同时加 `mmcss=<task> (requested)` ⇒ **任何一局的 `logs/*.audio.log` 都能证明跑的是哪个 build**，
+  不必再靠「我记得改了」来判断。
+- 它只影响渲染线程的调度优先级，不改缓冲长度、采样率、低延迟路径 ⇒ 判据仍是同一个量（`pullMiss`）；
+  `AvSetMmThreadCharacteristics` 失败是静默的（返回 0 不报错），所以**只有 `pullMiss` 能判它到底有没有生效**，
+  音频日志里的 `mmcss=` 只能证明「请求了」。
+
 
 
 ---

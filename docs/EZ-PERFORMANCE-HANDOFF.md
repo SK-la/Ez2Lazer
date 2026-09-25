@@ -36,9 +36,11 @@
 
 **2026-09-25 已把「漏拉」的机制定案（§3.4d）**：稳态里位置跳变只有 10 / 20 ms 两档，
 且「跳变次数 = 周期数 − 超额周期数」两局精确成立 ⇒ 每次都是「**漏掉一次唤醒 → NAudio 一次读两拍**」，
-**距离守恒**（0.004%）、只有**相位**阶跃，不是丢数据。根因候选：NAudio 只在 `.WithMmcssThreadPriority()`
+**距离守恒**（0.004%）、只有**相位**阶跃，不是丢数据。根因：NAudio 只在 `.WithMmcssThreadPriority()`
 时才登记 MMCSS，本 fork 的构造链没调 ⇒ 音频渲染线程与 2000 Hz 的 update / draw 同为 Normal，
-而 Windows 默认时间片（15.6 ms 量级）比 10 ms 周期还长。**一行可改，见 §3.5 第 5 项。**
+而 Windows 默认时间片（15.6 ms 量级）比 10 ms 周期还长。
+**已落地：加了该调用（`"Pro Audio"`）+ 音频日志加 `mmcss=`；判据是下一局 `pullMiss` 掉到 0.03/s 级，
+仍是几十/几百次即音频链结案。见 §3.5 第 5 项。**
 
 ## 1. 已定案（不要再重开）
 
@@ -52,6 +54,7 @@
 | **acrylic 已排除** | `EzBoxElement`（`AcrylicBackdropDrawable`）/ `Stage.stageBackdropBlur`（`BackdropBlurDrawable`）开关对 draw 帧数无可见差别。注意限帧下该量具**不敏感**，此结论不能推广成「每帧分配不重要」 |
 | lane controller 索引维护不改 | 10 列 × 100 KPS × 2000 帧实测 ≈10–16 µs/帧 |
 | `interpErr` 必须和 `pullMiss` 一起读 | 同机两次采集 `pullMiss` 1 → 145 时 `interpErr` std 0.41 → 1.08 ms；剔掉漏拉邻域后回到 0.455（§3.4c） |
+| 漏拉机制 = 漏一次唤醒 → 一次读两拍（距离守恒，只有相位阶跃） | 稳态位置跳变只有 10/20 ms 两档；「跳变次数 = 周期数 − 超额周期数」两局精确成立；NAudio 读 `BufferSize − CurrentPadding`（§3.4d） |
 | 输入队列整树重建不再重开 | 已被 `TestSceneInputQueueChange.CombinedClicks` 证伪 |
 
 ## 2. 未决
@@ -299,12 +302,15 @@ CV≈1 + 正常 hold `mean 10.004 / std 0.568`（无系统正漂）⇒ 是**随�
      `drawPeriod` 的 p50 落在 0.510 ms（= 限帧目标 2000 Hz）而 `sleptMean = 0`，说明 draw 是**工作受限**而非限帧受限。
    - ⚠ **不覆盖 DWM / 显示器扫描输出**。进程内量不到送屏之后的事；若 `present` 行也干净，
      剩下的就只可能是 tearing（Borderless 下 `AllowTearing` 是开着的）/ 组合器 / 主观锚定，此时回第 3 项。
-5. **音频源漏拉**（§3.4d 机制已定案，剩下的只是「选一个去处」，两个候选都要先确认再改）：
+5. **音频源漏拉**（§3.4d 机制已定案，**候选 1 已落地**）：
    `interpErr` 一涨就先看摘要里的 `pullMiss`。机制不再需要猜：漏一次唤醒 → NAudio 一次读两拍 → 位置 +20 ms，
-   距离守恒、只有相位阶跃。二者都动 `osu-framework`：
-   - **候选 1（一行）**：`.WithMmcssThreadPriority("Pro Audio")`（`NAudioWasapiOutput.cs:112`）。判据 = 下一局
-     `pullMiss` 从 3.6/s 级掉到 0.03/s 级。这是「晚醒一拍」的对症下药，成本一行、回滚一行。
-   - **候选 2（量具）**：在 `BassMixerWaveProvider.Read` 记 **(墙壁时间, 请求字节数)**。传进来的 `count` 就是
+   距离守恒、只有相位阶跃。
+   - ✅ **已落地（2026-09-25）**：`NAudioWasapiOutput.cs:112` 加了
+     `.WithMmcssThreadPriority(AudioOutputDefaults.DEFAULT_NAUDIO_MMCSS_TASK)`（`"Pro Audio"`，常量与理由在
+     `Audio/AudioOutputDefaults.cs`）。音频启动日志同步加 `mmcss=` ⇒ 跑的是哪个 build 可直接从 `logs/*.audio.log` 确认。
+     **判据（事先写死）**：下一局 `pullMiss` 从 3.6/s 级掉到 0.03/s 级 = 成立；**仍是几十/几百次 ⇒ 音频链就地结案**，
+     不再为它跑局。⚠ 失败是静默的，`mmcss=` 只证明「请求了」，只有 `pullMiss` 能判有没有生效。
+   - **候选 2（量具，未做）**：在 `BassMixerWaveProvider.Read` 记 **(墙壁时间, 请求字节数)**。传进来的 `count` 就是
      `numFramesAvailable × BlockAlign`，能把「本次读吞了几拍」与「两次读的真实墙壁间隔」**直读**出来
      （顺带得到 `BufferSize` 是几拍），用来判候选 1 有没有生效、以及有没有进程外（DPC / 驱动）成分。
 
