@@ -6,7 +6,6 @@ using System.Diagnostics;
 using osu.Framework.Input;
 using osu.Game.EzOsuGame.Diagnostics;
 using osu.Game.EzOsuGame.Timing;
-using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
@@ -64,9 +63,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
                 EzFrameStallDiagnostics.LastUpdateIterations,
                 GC.CollectionCount(0),
                 GC.CollectionCount(1),
-                GC.GetTotalPauseDuration().TotalMilliseconds,
-                ManiaLaneController.EarliestCacheHits,
-                ManiaLaneController.EarliestCacheMisses));
+                GC.GetTotalPauseDuration().TotalMilliseconds));
         }
     }
 }

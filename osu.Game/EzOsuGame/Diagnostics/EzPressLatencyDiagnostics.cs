@@ -73,9 +73,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             int FscIterations,
             int Gen0,
             int Gen1,
-            double GcPauseMs,
-            long CacheHits,
-            long CacheMisses);
+            double GcPauseMs);
 
         /// <summary>开始记录一次按键，返回它在其所属帧内的序号（1 起）。</summary>
         public static int BeginPress(long frameId)
@@ -126,7 +124,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             var sb = new StringBuilder();
             sb.AppendLine(
                 "WallMs,GameTime,TotalMs,PreColumnMs,ColumnMs,FrameAgeMs,Column,FrameId,PressOrdinalInFrame,PressesInFrame,"
-                + "Routed,Judged,Entries,ForceMissScan,FrameElapsed,FscIter,Gen0,Gen1,GcPauseMs,CacheHits,CacheMisses");
+                + "Routed,Judged,Entries,ForceMissScan,FrameElapsed,FscIter,Gen0,Gen1,GcPauseMs");
 
             int[] frameLengths = computeFrameLengths(start, sampleCount);
 
@@ -152,9 +150,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(s.FscIterations).Append(',');
                 sb.Append(s.Gen0).Append(',');
                 sb.Append(s.Gen1).Append(',');
-                sb.Append(EzProbeOutput.Csv(s.GcPauseMs)).Append(',');
-                sb.Append(s.CacheHits).Append(',');
-                sb.Append(s.CacheMisses);
+                sb.Append(EzProbeOutput.Csv(s.GcPauseMs));
                 sb.AppendLine();
             }
 

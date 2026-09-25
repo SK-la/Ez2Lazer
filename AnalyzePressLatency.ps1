@@ -14,7 +14,6 @@
       * ColumnMs 尾部大且与 ForceMissScan/Entries 相关 -> 提前判 miss 扫描值得继续改
       * FscIter>1 的样本 PreColumnMs 明显更大 -> catch-up 是主因
       * Routed=0 的 ColumnMs 不小于 Routed=1 -> 空按不是便宜路径
-      * CacheMisses 每按必涨 -> Earliest 缓存没生效
 
 .PARAMETER Path
     要分析的 presslatency CSV。
@@ -121,7 +120,7 @@ function Group-Rows([object[]] $rows, [scriptblock] $keySelector) {
     return $buckets
 }
 
-# 单调计数器的相邻差值（用于 GC 次数、缓存命中/未命中）
+# 单调计数器的相邻差值（用于 GC 次数）
 function Get-Delta([object[]] $rows, [string] $column) {
     $deltas = New-Object 'System.Collections.Generic.List[double]'
     $previous = [double]::NaN
@@ -214,24 +213,10 @@ foreach ($group in $entryGroups) {
     Write-Host ("  Entries={0,-4} n={1,-6} ({2:P1})" -f $group.Name, $group.Count, ($group.Count / $samples.Length))
 }
 
-# ---------------------------------------------------------------- 缓存与 GC
+# ---------------------------------------------------------------- GC
 
 Write-Host ''
-Write-Host '== 缓存与 GC ==' -ForegroundColor Cyan
-
-$hits = Get-Delta $samples 'CacheHits'
-$misses = Get-Delta $samples 'CacheMisses'
-$hitDelta = ($hits | Measure-Object -Sum).Sum
-$missDelta = ($misses | Measure-Object -Sum).Sum
-$totalLookups = $hitDelta + $missDelta
-
-if ($totalLookups -gt 0) {
-    Write-Host ("Earliest 缓存: hits={0} misses={1} 命中率={2:P1}" -f $hitDelta, $missDelta, ($hitDelta / $totalLookups))
-    Write-Host '  注意：计数器是进程级，IsHittableEarliest 也由非按键路径（CheckHittable）调用，'
-    Write-Host '        因此该命中率不能读成「按键是否命中缓存」。'
-} else {
-    Write-Host 'Earliest 缓存: 无查询（未走 Earliest 路径？）'
-}
+Write-Host '== GC ==' -ForegroundColor Cyan
 
 $wallSeconds = ((ConvertTo-Double $samples[-1].WallMs) - (ConvertTo-Double $samples[0].WallMs)) / 1000.0
 
@@ -321,18 +306,17 @@ function Show-Outliers([object[]] $rows, [string] $column, [int] $count) {
     $sorted = @($rows | Sort-Object -Property @{ Expression = { ConvertTo-Double $_.$column } } -Descending)
     $top = @($sorted | Select-Object -First $count)
 
-    '  {0,10} {1,10} {2,10} {3,8} {4,6} {5,6} {6,6} {7,7} {8,5} {9,6} {10,7} {11,7} {12,10}' -f `
-        $column, 'PreCol', 'Column', 'FrameAge', 'Entr', 'Scan', 'Routed', 'inFrame', 'Iter', 'Frame', 'CacheHit', 'CacheMiss', 'GameTime'
+    '  {0,10} {1,10} {2,10} {3,8} {4,6} {5,6} {6,6} {7,7} {8,5} {9,6} {10,10}' -f `
+        $column, 'PreCol', 'Column', 'FrameAge', 'Entr', 'Scan', 'Routed', 'inFrame', 'Iter', 'Frame', 'GameTime'
 
     foreach ($row in $top) {
-        '  {0,10} {1,10} {2,10} {3,8} {4,6} {5,6} {6,6} {7,7} {8,5} {9,6} {10,7} {11,7} {12,10}' -f `
+        '  {0,10} {1,10} {2,10} {3,8} {4,6} {5,6} {6,6} {7,7} {8,5} {9,6} {10,10}' -f `
             (Format-F3 (ConvertTo-Double $row.$column)),
             (Format-F3 (ConvertTo-Double $row.PreColumnMs)),
             (Format-F3 (ConvertTo-Double $row.ColumnMs)),
             (Format-F3 (ConvertTo-Double $row.FrameAgeMs)),
             $row.Entries, $row.ForceMissScan, $row.Routed, $row.PressesInFrame,
             $row.FscIter, $row.FrameId,
-            $row.CacheHits, $row.CacheMisses,
             (Format-F3 (ConvertTo-Double $row.GameTime))
     }
 }

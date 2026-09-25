@@ -1019,7 +1019,7 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | `HitModeValidResultsAllocTest` | `ResultFor` 零分配 |
 | `DetachedBeatmapStoreFrameBudget` 单测 | 每帧 Drain ≤ 24 |
 | `BackgroundDataStoreProcessor` 测试覆写 | `StartupBackfillDelay` 可置 0 |
-| `AnalyzePressLatency.ps1` | 离线读 `diagnostics/presslatency_*.csv`：分 route/空按、FrameAge 分桶、同帧批处理、GC 与缓存命中 |
+| `AnalyzePressLatency.ps1` | 离线读 `diagnostics/presslatency_*.csv`：分 route/空按、FrameAge 分桶、同帧批处理、GC |
 | `AnalyzeFrameStall.ps1` | 离线读 `diagnostics/framestall_*.csv` + `.summary.txt`：全帧双直方图（按键帧 vs 非按键帧）、GC 因果判据、慢帧归因、与按键尾部对照。见 §2.4 |
 | `AnalyzePeriod.py` | 离线读判定的 `Drift`/`TimeOffset`/`AudioLag`、帧的 `ElapsedMs`/`SpikeRate`/`GcPauseDeltaMs`、按键的 `PreColumnMs`/`FrameAgeMs`：ACF + Welch 谱 + 带内主周期细扫 + 滑窗幅度/相位 + 跨序列滞后表（含偶然水平标定与派生对剔除）。拒绝在尾部 frame 数据、离群帧主导方差的序列上出结论。见 §2.4.10 |
 
