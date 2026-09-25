@@ -182,7 +182,9 @@ namespace osu.Game.Rulesets.UI
                 interpMs = gcc.CurrentTime;
             }
 
-            EzOsuGame.Diagnostics.EzFrameStallDiagnostics.RecordFrame(audioSrcMs, interpMs);
+            // 探针关闭时连这次调用都不发生：热路径上只剩上面那次局部 bool 读取与这个分支。
+            if (sampling)
+                EzOsuGame.Diagnostics.EzFrameStallDiagnostics.RecordFrame(audioSrcMs, interpMs);
 
             return true;
         }

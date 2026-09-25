@@ -341,12 +341,9 @@ namespace osu.Game.Screens.Play
                 LatencyTracker.Start();
             }
 
-            // [Ez] Wire judgment diagnostics, sub-frame correction, and timing trace to config toggles.
-            EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
-            EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.Enabled = EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled;
-            EzOsuGame.Diagnostics.EzFrameStallDiagnostics.Enabled = EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled;
-
-            // 消融开关走环境变量，避免为探针新增可持久化设置项。
+            // [Ez] 诊断开关是**进程级**的，启动时由 `OsuGameBase.applyDiagnosticSwitches` 读一次；
+            // 这里不再重读配置，探针不持有 bindable、不进 DI，关闭时热路径上只剩一个静态 bool 分支。
+            // （消融用的开关仍然走环境变量，避免为探针新增可持久化设置项。）
             EzOsuGame.Diagnostics.EzPressLatencyDiagnostics.SkipForceMiss =
                 Environment.GetEnvironmentVariable("EZ_PRESS_PROBE_SKIP_FORCE_MISS") == "1";
 
@@ -366,7 +363,6 @@ namespace osu.Game.Screens.Play
                 Environment.GetEnvironmentVariable("EZ_FRAME_PROBE_LIGHT") != "1";
 
             EzOsuGame.Timing.EzSubFrameCorrection.Enabled = ez2Config.Get<bool>(Ez2Setting.EzSubFrameCorrectionEnabled);
-            EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
 
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
             HealthProcessor ??= ruleset.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);

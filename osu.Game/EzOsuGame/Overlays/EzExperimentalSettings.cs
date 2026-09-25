@@ -355,9 +355,13 @@ namespace osu.Game.EzOsuGame.Overlays
 
         internal static readonly LocalisableString EZ_JUDGMENT_DIAG_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "(研究功能)在游戏结束后，输出本局判定信息到.csv文件（含时钟漂移与 InputToJudgeMs：按键→判定检查耗时）。"
+            + "\n同时开启判定 / 按键延迟 / 帧卡顿三个探针。"
+            + "\n**重启游戏后生效**（关闭时为零开销，热路径上不留任何探针逻辑）。"
             + "\n默认输出路径：桌面/EzDiag/",
             "(Testing feature) Output judgment diagnostics to a .csv after the game ends "
             + "(clock drift columns + InputToJudgeMs: key → judgment-check latency)."
+            + "\nAlso enables the press-latency and frame-stall probes."
+            + "\nTakes effect after restarting the game (zero cost while off)."
             + "\nDefault output path: Desktop/EzDiag/");
 
         internal static readonly LocalisableString EZ_TIMING_TRACE_ENABLED = new EzLocalizationManager.EzLocalisableString(
@@ -365,10 +369,12 @@ namespace osu.Game.EzOsuGame.Overlays
 
         internal static readonly LocalisableString EZ_TIMING_TRACE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "(研究功能)在游戏结束后，输出本局判定信息到.csv文件。"
-            + "\n追踪按键输入与音频的时序关系, 用于检查打击音效的时序。"
+            + "\n追踪玩法生命周期关键节点的时序（结算卡住 / HasCompleted 翻转等）。"
+            + "\n**重启游戏后生效**（关闭时为零开销）。"
             + "\n默认输出路径：桌面/EzDiag/",
             "(Testing feature) Output judgment information to a .csv file after the game ends."
-            + "\nTrack the timing relationship between key input and audio, used to check the timing of hit sounds."
+            + "\nTracks the timing of gameplay lifecycle milestones (stuck results, HasCompleted flips)."
+            + "\nTakes effect after restarting the game (zero cost while off)."
             + "\nDefault output path: Desktop/EzDiag/");
 
         internal static readonly LocalisableString INPUT_AUDIO_LATENCY_TRACKER = new EzLocalizationManager.EzLocalisableString(
