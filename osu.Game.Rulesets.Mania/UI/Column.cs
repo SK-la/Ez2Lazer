@@ -389,7 +389,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private bool isHittable(DrawableHitObject drawable, double time, EzEnumJudgePrecedence precedence)
         {
-            ManiaJudgeHotPathTrace.RecordIsHittable();
+            if (ManiaJudgeHotPathTrace.Enabled)
+                ManiaJudgeHotPathTrace.RecordIsHittable();
 
             if (drawable is DrawableHoldNoteTail)
                 return hitPolicyHelper.IsHittableWithPrecedence(drawable, time, precedence);

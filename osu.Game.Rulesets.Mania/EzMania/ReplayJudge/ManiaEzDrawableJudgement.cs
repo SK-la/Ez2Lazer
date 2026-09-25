@@ -334,7 +334,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal static bool TryApplyEzNoteCheckForResult(DrawableNote drawable, bool userTriggered, double timeOffset)
         {
-            ManiaJudgeHotPathTrace.RecordCheckForResult();
+            if (ManiaJudgeHotPathTrace.Enabled)
+                ManiaJudgeHotPathTrace.RecordCheckForResult();
 
             var round = getJudgementRound(drawable);
 
@@ -365,7 +366,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal static bool TryApplyEzHoldTailCheckForResult(DrawableHoldNoteTail drawable, bool userTriggered, double timeOffset)
         {
-            ManiaJudgeHotPathTrace.RecordCheckForResult();
+            if (ManiaJudgeHotPathTrace.Enabled)
+                ManiaJudgeHotPathTrace.RecordCheckForResult();
 
             var round = getJudgementRound(drawable);
 
