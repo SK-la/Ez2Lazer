@@ -144,10 +144,12 @@
 
 **长时全帧捕获一次**，让周期可测：
 
-1. 打开 `EzExperimentalSettings` 的「启用 Ez 判定诊断」总开关（`Ez2Setting.EzJudgmentDiagEnabled`），
-   它下面有五个子项（`EzDiagProbe*`，见 §4 代码锚点）：frame-stall / press-latency / judgment /
-   Mania 判定热路径 / 时序追踪。**子项默认全开**，所以只勾总开关即等同旧行为；要单跑某个探针才去动子项。
-   （开关与子项都是进程级，**改完必须重启游戏**，见 §5 开关语义。）
+1. 打开 `EzExperimentalSettings` 的「启用 Ez 诊断套件」总开关（`Ez2Setting.EzJudgmentDiagEnabled`）——
+   它决定**启动时整套诊断是否工作**。**跑哪些内容**由环境变量 `EZ_DIAG_PROBES` 选择：
+   `judgment` / `press` / `frame` / `hotpath` / `trace` / `all`，**空 = 全部**（等价旧行为）。
+   子项选择刻意不是设置项，见 §4 代码锚点。
+   （总开关是进程级，**改完必须重启游戏**，见 §5 开关语义。`EZ_DIAG_PROBES` 写错会让启动直接失败 ——
+   那是有意的：静默降级会让一整局采集白跑。）
 2. 抓**全集**：环境变量 `EZ_FRAME_PROBE_MS=0`（默认 `1.5` 只留超阈值帧）。若不想动环境变量，
    临时把 `EzFrameStallDiagnostics.ThresholdMs` 的默认值改为 `0` 等价（本地改、**不提交**，见 §3 末尾）。
    可选 `EZ_FRAME_PROBE_LIGHT=1` 降探针自身开销。
@@ -439,8 +441,8 @@ framework 于 9:36:30 重建，音频日志 `logs/1790302201.audio.log` 出现 `
 | 帧级 stall 探针 | `osu.Game/EzOsuGame/Diagnostics/EzFrameStallDiagnostics.cs`（持有 FSC 回报的归因量，见 `ReportLoop`） |
 | 按键延迟分段探针 | `osu.Game/EzOsuGame/Diagnostics/EzPressLatencyDiagnostics.cs`；Mania 侧适配器 `osu.Game.Rulesets.Mania/EzMania/Diagnostics/ManiaPressProbe.cs` |
 | 判定诊断 | `osu.Game/EzOsuGame/Diagnostics/EzJudgmentDiagnostics.cs`（`Capture` 自算漂移 / `InputToJudgeMs`） |
-| **诊断开关（进程级，读一次）** | `osu.Game/EzOsuGame/Diagnostics/EzDiagnosticSwitches.cs` 的 `Apply(config)`，由 `osu.Game/OsuGameBase.cs` 的 `applyDiagnosticSwitches`（在 `Ez2ConfigManager` 建好后）调用。总开关 `EzJudgmentDiagEnabled` 决定整套是否启动，五个 `EzDiagProbe*` 子项决定跑哪些；真值落在各探针的静态 `Enabled` 上；**运行期不再读配置 ⇒ 改设置必须重启**，换来的是关闭时热路径零开销（一个静态 bool 分支）。 |
-| 环境变量（消融 / 抓全集） | `EzDiagnosticSwitches.Apply` 启动时读一次：`EZ_FRAME_PROBE_MS`（0 = 抓全集）、`EZ_FRAME_PROBE_LIGHT=1`、`EZ_PRESS_PROBE_SKIP_FORCE_MISS=1`。**不在每次进图读** |
+| **诊断开关（进程级，读一次）** | 总开关 `Ez2Setting.EzJudgmentDiagEnabled`（ini / 设置项）决定启动时整套诊断是否工作；**跑哪些内容**由环境变量 `EZ_DIAG_PROBES`（`judgment` / `press` / `frame` / `hotpath` / `trace` / `all`；空 = 全部）选择。两者都在 `osu.Game/EzOsuGame/Diagnostics/EzDiagnosticSwitches.cs` 的 `Apply(config)` 里读一次，由 `osu.Game/OsuGameBase.cs` 的 `applyDiagnosticSwitches`（在 `Ez2ConfigManager` 建好后）调用。真值落在各探针的静态 `Enabled` 上；**运行期不再读配置 ⇒ 改设置必须重启**，换来的是关闭时热路径零开销（一个静态 bool 分支）。⚠ 内容选择**刻意不是设置项**（设置面板不该变实验台）；写错的值启动即抛异常 |
+| 环境变量（内容选择 / 消融 / 抓全集） | `EzDiagnosticSwitches.Apply` 启动时读一次：`EZ_DIAG_PROBES`（跑哪些内容，空 = 全部）、`EZ_FRAME_PROBE_MS`（0 = 抓全集）、`EZ_FRAME_PROBE_LIGHT=1`、`EZ_PRESS_PROBE_SKIP_FORCE_MISS=1`。**不在每次进图读** |
 | 探针落盘 / 局生命周期 | `EzProbeOutput`（wallclock / 目录 / F3 / CSV 转义 / 异步写）、`EzDiagnosticSession.Begin/End`（`Player` 里不再有探针名单） |
 | 子树 / 时钟 / 其余 归因 | `osu.Game/Rulesets/UI/FrameStabilityContainer.cs`（`UpdateSubTree`） |
 | present / 帧节拍采样 | `EzFrameStallDiagnostics.samplePresent`（update 侧读 `DrawThread.Clock`，**按 draw 帧去重**，**时钟停走的帧跳过** —— 退场段会把 `coverage` 拉到 0.87，见 §3.4f）；host 由 `osu.Game/OsuGameBase.cs` 的 `SetHost` 挂上（**`DrawFrame` 无法 override，原因见 §3.5 第 4 项**） |
@@ -460,8 +462,9 @@ framework 于 9:36:30 重建，音频日志 `logs/1790302201.audio.log` 出现 `
 - 配置：`F:\MUG OSU\EZ2OSU-lazer\framework.ini`（`ExecutionMode = MultiThreaded`、`FrameSync = Limit4x`）、`EzSkinSettings.ini`（`FrameLimiterBase`、`ColumnBlur`、`TurboMode`）。判 `Stage` 毛玻璃是否开启：`ColumnBlur × 50 > 0.01` 且 `TurboMode = False`。
 - **送屏 A/B（§3.5 第 6 项）改的就是这两个键**：`framework.ini` 的 `FrameSync`（`Limit4x` ⇄ `VSync`）与 `EzSkinSettings.ini` 的 `FrameLimiterBase`（500 → 175 / 350）。改完必须重启游戏。
 - 探针热路径不做 IO、不产字符串，落盘在局末；`RecordFrame()` 跑在输入派发**之前**。
-- **开关语义**：`EzExperimentalSettings` 里的「启用 Ez 判定诊断」是**总开关**，下面五个 `EzDiagProbe*`
-  子项各自决定跑哪个探针 —— 两者都是**进程级开关**，启动时由 `EzDiagnosticSwitches.Apply` 读一次，
-  运行期不再查配置（探针调参环境变量也在同一处读）。**改完必须重启游戏**；
+- **开关语义**：`EzExperimentalSettings` 里的「启用 Ez 诊断套件」是**启动闸门**，决定整套诊断是否工作；
+  **跑哪些内容**由环境变量 `EZ_DIAG_PROBES` 决定（`judgment` / `press` / `frame` / `hotpath` / `trace` / `all`，
+  空 = 全部）—— 内容选择刻意不做成设置项。两者都是**进程级**，启动时由 `EzDiagnosticSwitches.Apply`
+  读一次，运行期不再查配置（其余调参环境变量也在同一处读）。**改完必须重启游戏**；
   换来的是关闭时热路径上只剩一个静态 bool 分支（没有 bindable、没有 DI、没有配置查询）。
 - 改 Realm schema / 迁移后**不得**擅自启动客户端做验证（见 `.cursor/rules/realm-schema-development.mdc`）。
