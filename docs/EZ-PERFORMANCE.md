@@ -598,8 +598,10 @@ requestedLatency=10ms, actualLatency=10ms, lowLatency=true
 *机制*
 
 `BassMix.ChannelGetPosition` 只在 NAudio 渲染线程拉走一个缓冲时前进。漏拉一拍 ⇒ 位置**停走 ~20 ms**
-（两次跳变间隔 20 ms 而不是 10 ms）再一次性补上。总距离守恒（`ΣΔaudio = ΣΔwall − 停走时长`，误差 < 0.02%）
-⇒ 是**漏拉**，不是时钟走快。这与 §2.4.11 记的「精确 10 ms 阶梯」不矛盾：阶梯仍在，只是偶尔少一级。
+（两次跳变间隔 20 ms 而不是 10 ms）再一次性补上。这与 §2.4.11 记的「精确 10 ms 阶梯」不矛盾：
+阶梯仍在，只是偶尔少一级。**「补」是必然的、而且距离不丢**——B 局全段推进 39826.1 ms / 壁钟 39824.5 ms
+（差 1.7 ms，0.004%），所以那 2.8 s 是这 146 次 hold 的**累计停走时间**，不是丢失的音频时长；
+该现象只造成**相位阶跃**，不造成走时差。成因与「一跳吞掉几拍」的定量关系见 §2.4.14。
 
 *为什么它必须和 `interpErr` 一起读*
 
@@ -622,6 +624,60 @@ B 局与 A 局 `interpErr` 的 2.6 倍差距**全部**来自这 145 次漏拉（
 量级是 std ~1 ms / p99 1.4 ms / maxdev 7 ms（600 px/s 下 0.6–4 px），且 145 次分布在整局
 （每 4 s 计数 20/10/11/21/17/19/16/11/15/7）⇒ 若它在起作用，表现是**全程低频抖动**而不是「隔一会一次」。
 但它符合「两次游戏一顺一不顺」这一现象，**优先级高于继续在 present 侧找**（present 量具本身刚修，见 §2.4.12）。
+
+#### 2.4.14 「漏一拍、补一拍」的机制已定案：NAudio 读的是「当前全部空位」，而渲染线程没有 MMCSS（2026-09-25）
+
+上一节的形状（停走 ~20 ms 再一次性补上）在**稳态**（t > 3 s）里干净得可以当恒等式用：
+
+| 读数（稳态 t>3 s） | A 局 `080438` | B 局 `084436` |
+|---|---|---|
+| 位置跳变只出现的档位 | **10.0 / 20.0 / 30.0 / 40.0 ms** | **10.0 / 20.0 ms** |
+| 亚毫秒跳变 | 0（只在开局 3 s 内有 733 次 / 394 ms） | 0（只在开局 3 s 内有 1184 次 / 666 ms） |
+| 位置跳变次数 / 周期数 | 3492 / 3499 | 3761 / 3907 |
+| 差额 | **7** = 20+20+30+40 各自多吞的周期数（1+1+2+3） | **146** = 每次多吞 1 个周期 |
+| 全段推进 / 壁钟跨度 | 35453.7 / 35447.1 ms（+6.7） | 39826.1 / 39824.5 ms（+1.7） |
+| 漏拉间隔 mean / CV | —（n=4） | 264 ms / **0.92**（泊松，20 ms 网格 ACF 全平） |
+| 正常跳变的 hold | — | mean **10.004** std 0.568（无系统正漂） |
+
+- **`跳变次数 = 周期数 − 超额周期数`** 两局都精确成立 ⇒ 每次事件都是「**漏掉一次唤醒，下一次一次读两拍**」，
+  不是丢数据、也不是时钟走快。开局 3 s 那批亚毫秒跳变是启动 / seek 期的连续位置（读的是解码位置），
+  与稳态机制无关，计任何稳态量前必须从 t=3 s 起算。
+- **间隔 CV 0.92 + ACF 全平 + 正常 hold 无系统正漂** ⇒ 不是「固定相位漂移」（那会给近似恒定的间隔、CV ≪ 1），
+  而是**随机抢不到调度**。
+
+*为什么必然是「补一回」（NAudio 源码，已核 `src/NAudio.Wasapi/WasapiPlayer.cs` main）*
+
+```csharp
+if (mmcssTaskName != null)   // ← 只有设了才登记 MMCSS
+    mmcssHandle = NativeMethods.AvSetMmThreadCharacteristics(mmcssTaskName, ref taskIndex);
+
+bufferFrameCount = audioClient.BufferSize;
+...
+WaitHandle.WaitAny(waitHandles, 3 * latencyMilliseconds, false);   // 30 ms 兜底
+int numFramesPadding  = (isUsingEventSync && shareMode == Exclusive) ? 0 : audioClient.CurrentPadding;
+int numFramesAvailable = bufferFrameCount - numFramesPadding;
+if (numFramesAvailable > 10) FillBuffer(numFramesAvailable);       // ← 读「当前所有空位」，不是读一拍
+```
+
+- 线程被引擎每 10 ms 一次的事件唤醒，但读的是 `BufferSize − CurrentPadding`，即**当时所有空位**。
+  所以「一场没被唤醒」的后果必然是**一次读两拍**（960 帧）⇒ 位置一次 +20 ms ⇒ 观测到的 shape。
+  这也解释了为什么 hold 全部落在 19.4–23.3 ms、`>30 ms` 一次都没有：`frameEvent` 是 **AutoReset**，
+  信号不累积，超额读完之后缓冲重新填满，下一次又对齐 ⇒ 不会一漏一串。
+- **`mmcssTaskName` 默认 `null`**（`WasapiPlayerBuilder`），只有显式 `.WithMmcssThreadPriority(...)` 才设；
+  本 fork 的构造链 `osu-framework/osu.Framework/Audio/Wasapi/NAudioWasapiOutput.cs:112`
+  （`.WithDevice().WithSharedMode().WithEventSync().WithLowLatency().WithLatency(10)`）**没有调它**
+  ⇒ 渲染线程跑在默认优先级。框架侧同样没在任何地方设过线程优先级（全仓 `ThreadPriority` 只命中一处 SDL 日志等级）
+  ⇒ 音频线程与 2000 Hz 的 update / draw 线程**同为 Normal**。Windows 默认时间片是 15.6 ms 量级、**长于 10 ms 周期**，
+  竞争下「晚醒一拍」是预期行为而不是异常。
+
+*可执行的下一步（都要先确认再改）*
+
+1. **一行候选**：`.WithMmcssThreadPriority("Pro Audio")`。判据明确——下一局 `pullMiss` 从 3.6/s 级掉到 0.03/s 级；
+   不动它就是「继续按 0.27 s 一次的节拍把相位阶跃喂给插值器」。
+2. **把推断换成直读**：在 `BassMixerWaveProvider.Read` 记 **(墙壁时间, 请求字节数)**。NAudio 传进来的 `count`
+   **就是** `numFramesAvailable × BlockAlign`，所以 `count ≈ 960 帧` 的存在直接证明「本次读吞了两拍」，
+   还能顺带读出 `BufferSize`（几拍）与两次读的**真实墙壁间隔**（比帧 CSV 的 0.5 ms 分辨率细）。
+
 
 ---
 

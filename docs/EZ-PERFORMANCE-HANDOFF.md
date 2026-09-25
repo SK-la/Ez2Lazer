@@ -34,6 +34,12 @@
    涨到 **std 1.08 ms / >1 ms 14.6%**。把每次漏拉的 ±20 ms 邻域剔掉，std 回到 **0.455 ms**（≈上一局水平）
    ⇒ 那 2.6 倍**全部**来自这 145 次源停走，不是插值变差。**判 `interpErr` 必须同时看 `pullMiss`。**
 
+**2026-09-25 已把「漏拉」的机制定案（§3.4d）**：稳态里位置跳变只有 10 / 20 ms 两档，
+且「跳变次数 = 周期数 − 超额周期数」两局精确成立 ⇒ 每次都是「**漏掉一次唤醒 → NAudio 一次读两拍**」，
+**距离守恒**（0.004%）、只有**相位**阶跃，不是丢数据。根因候选：NAudio 只在 `.WithMmcssThreadPriority()`
+时才登记 MMCSS，本 fork 的构造链没调 ⇒ 音频渲染线程与 2000 Hz 的 update / draw 同为 Normal，
+而 Windows 默认时间片（15.6 ms 量级）比 10 ms 周期还长。**一行可改，见 §3.5 第 5 项。**
+
 ## 1. 已定案（不要再重开）
 
 | 结论 | 依据 |
@@ -223,7 +229,9 @@
 | 同上一项，**剔除每次漏拉 ±20 ms 邻域** | — | **0.455 ms / 5.5 %**（窗口放大到 ±200 ms 不再改善） |
 
 - 机制：`BassMix.ChannelGetPosition` 只在 NAudio 渲染线程拉走一个 buffer 时前进。漏拉一拍 ⇒ 位置停走 ~20 ms
-  （两次跳变间隔 20 ms 而不是 10 ms）再一次性补上。总距离守恒（`ΣΔaudio = ΣΔwall − 停走时长`，误差 < 0.02%）⇒ 是**漏拉**，不是走快。
+  （两次跳变间隔 20 ms 而不是 10 ms）再一次性补上，**而且距离不丢**（全段推进 39826.1 ms / 壁钟 39824.5 ms，
+  差 1.7 ms = 0.004%）：2.8 s 是这 146 次 hold 的累计停走时间，全部被双倍读补回 ⇒ 只造成**相位阶跃**，不是走时差。
+  **2026-09-25 已定案机制与「为什么必然补一回」，见 §3.4d。**
 - 与 update 帧只**弱**相关：漏拉那一帧 `ElapsedMs` 均值 0.831 ms（全体 0.501），±5 帧内出现 >2 ms 帧的比例 4.1%
   （该窗口偶然水平 1.07%）⇒ 4x 富集，不足以断言「update 卡导致音频漏拉」。
 - **两次采集音频配置逐字段相同**（`logs/1790294601.audio.log` vs `1790297002.audio.log`：同端点、48000 Hz/2ch、
@@ -231,6 +239,33 @@
 
 **结论**：§3.4b / §2.4.11 的「插值时钟干净」**只在音频源拉取规整时成立**；源一漏拉，位置误差立刻涨到
 std ~1 ms / p99 1.4 ms / maxdev 7 ms，14.6% 的帧偏 >1 ms。够不够成体感还没判，但它符合「一顺一不顺」这一现象。
+
+### 3.4d 「漏一拍、补一拍」的机制定案 + MMCSS 缺口（2026-09-25）
+
+细节与源码引用在 `EZ-PERFORMANCE.md` §2.4.14，这里只留结论。
+
+**稳态（t>3 s）里位置跳变只有两档，且「读次数」守恒**（开局 3 s 那批亚毫秒跳变是启动/seek 的解码位置，必须排除）：
+
+| 稳态 t>3 s | A 局 `080438` | B 局 `084436` |
+|---|---|---|
+| 跳变档位 | 10 / 20 / 30 / 40 ms | **只有 10 / 20 ms** |
+| 跳变次数 / 周期数 | 3492 / 3499（差 7 = 1+1+2+3） | 3761 / 3907（差 **146** = 每次多吞 1 拍） |
+| 推进 / 壁钟 | 35453.7 / 35447.1 ms | 39826.1 / 39824.5 ms |
+| 漏拉间隔 | —（n=4） | mean 264 ms、**CV 0.92**（泊松，20 ms 网格 ACF 全平） |
+
+⇒ `跳变次数 = 周期数 − 超额周期数` 两局都精确成立：每次事件都是「**漏掉一次唤醒 → 下一次一次读两拍**」，
+不是丢数据、不是走快（全段距离守恒到 0.004%，只有**相位**被重新分配）。
+CV≈1 + 正常 hold `mean 10.004 / std 0.568`（无系统正漂）⇒ 是**随机抢不到调度**，不是固定相位漂移。
+
+**为什么必然「补一回」**（NAudio `src/NAudio.Wasapi/WasapiPlayer.cs` 的 `PlayThread`，源码已核）：它读的是
+`BufferSize − CurrentPadding`，也就是**当时所有空位**，不是固定一拍 ⇒ 漏一次唤醒必然读双倍（960 帧）。
+`frameEvent` 是 **AutoReset**、信号不累积 ⇒ 超额读完之后重新对齐，**不会一漏一串**（实测 hold 全在
+19.4–23.3 ms，`>30 ms` 一次都没有）。
+
+**为什么一直在漏**：`WasapiPlayerBuilder.mmcssTaskName` 默认 `null`，只有显式 `.WithMmcssThreadPriority(...)`
+才登记 MMCSS；本 fork 的构造链（`osu-framework/osu.Framework/Audio/Wasapi/NAudioWasapiOutput.cs:112`）没调它，
+框架侧也从不设线程优先级 ⇒ 音频渲染线程与 2000 Hz 的 update / draw 线程**同为 Normal**，
+而 Windows 默认时间片（15.6 ms 量级）比 10 ms 周期还长。
 
 ### 3.5 下一步（换量，不是继续找周期）
 
@@ -264,12 +299,14 @@ std ~1 ms / p99 1.4 ms / maxdev 7 ms，14.6% 的帧偏 >1 ms。够不够成体�
      `drawPeriod` 的 p50 落在 0.510 ms（= 限帧目标 2000 Hz）而 `sleptMean = 0`，说明 draw 是**工作受限**而非限帧受限。
    - ⚠ **不覆盖 DWM / 显示器扫描输出**。进程内量不到送屏之后的事；若 `present` 行也干净，
      剩下的就只可能是 tearing（Borderless 下 `AllowTearing` 是开着的）/ 组合器 / 主观锚定，此时回第 3 项。
-5. **音频源漏拉**（§3.4c 新开，优先级在 present 之上）：
-   `interpErr` 一涨就先看摘要里的 `pullMiss`。若下一局又是几十/几百次量级，要查的是**谁让 NAudio 渲染线程漏了一拍**：
-   - 进程外因素（DPC / 驱动 / 其它进程）与进程内因素都还没排除。`pullMiss` 不与任何 100–1000 ms 网格对齐，
-     也只看得到与 update 帧的 4x 弱富集 ⇒ 目前没有指向游戏自身逻辑的证据。
-   - 可以在 `osu-framework` 侧加一对计数器（`BassMixerWaveProvider.Read` 每次实际返回的帧数 / 是否补了静音、
-     `WasapiPlayer` 的事件周期），把「位置跳变」与「真的欠载」分开；**这需要动 framework，先确认再改**。
+5. **音频源漏拉**（§3.4d 机制已定案，剩下的只是「选一个去处」，两个候选都要先确认再改）：
+   `interpErr` 一涨就先看摘要里的 `pullMiss`。机制不再需要猜：漏一次唤醒 → NAudio 一次读两拍 → 位置 +20 ms，
+   距离守恒、只有相位阶跃。二者都动 `osu-framework`：
+   - **候选 1（一行）**：`.WithMmcssThreadPriority("Pro Audio")`（`NAudioWasapiOutput.cs:112`）。判据 = 下一局
+     `pullMiss` 从 3.6/s 级掉到 0.03/s 级。这是「晚醒一拍」的对症下药，成本一行、回滚一行。
+   - **候选 2（量具）**：在 `BassMixerWaveProvider.Read` 记 **(墙壁时间, 请求字节数)**。传进来的 `count` 就是
+     `numFramesAvailable × BlockAlign`，能把「本次读吞了几拍」与「两次读的真实墙壁间隔」**直读**出来
+     （顺带得到 `BufferSize` 是几拍），用来判候选 1 有没有生效、以及有没有进程外（DPC / 驱动）成分。
 
 ## 4. 代码锚点
 
@@ -284,6 +321,7 @@ std ~1 ms / p99 1.4 ms / maxdev 7 ms，14.6% 的帧偏 >1 ms。够不够成体�
 | 音频源漏拉计数 | 同文件 `accumulateClocks`（`pullMiss` / `pullMissHoldMs`，停走 >15 ms 且 <60 ms 记一次） |
 | 分析脚本 | `AnalyzeFrameStall.ps1`、`AnalyzePressLatency.ps1` |
 | 音频输出路径（BASS mixer + NAudio WASAPI 拉流） | `osu-framework/osu.Framework/Audio/Wasapi/NAudioWasapiOutput.cs`；缓冲常量在 `Audio/AudioOutputDefaults.cs`（`DEFAULT_NAUDIO_LATENCY_MS = 10`） |
+| 漏拉成因（NAudio 读法 + MMCSS 缺口） | `NAudio.Wasapi/WasapiPlayer.PlayThread`：读 `BufferSize − CurrentPadding`（**全部空位**，非固定一拍），`frameEvent` 是 AutoReset；`mmcssTaskName` 默认 null，只有 `.WithMmcssThreadPriority()` 才登记 MMCSS。构造链在 `NAudioWasapiOutput.cs:112`（未调） |
 | 音频源时钟 / 插值 | `osu-framework/osu.Framework/Audio/Track/TrackBass.cs`（`ChannelGetPosition`）、`osu-framework/osu.Framework/Timing/InterpolatingFramedClock.cs` |
 | 周期 / 跨探针相位分析 | `AnalyzePeriod.py`（numpy；`--plot` 出图、`--trim 3,3` 去首尾过渡段） |
 | 活文档 | `docs/EZ-PERFORMANCE.md` §2.4（周期性部分见 §2.4.10） |
