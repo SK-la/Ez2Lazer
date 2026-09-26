@@ -35,6 +35,10 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             Dictionary<HitObject, DrawableHitObject> drawablesByHitObject = collectDrawables(ruleset);
 
+            // final 判定的真值取自 entry：Entry.Result 只在 final 判定落定时写入（transient 走
+            // DispatchNewResult(HitResult) 另开一个结果、不碰 Entry.Result），且 entry 不随 drawable 回收而消失。
+            Dictionary<HitObject, HitObjectLifetimeEntry> entriesByHitObject = collectEntries(ruleset);
+
             // HitEvents 同时收 transient 与 final 结果，只有「在 HitEvents 里 + 无 final 判定」才是 transient-only。
             HashSet<HitObject> reportedToScoreProcessor = new HashSet<HitObject>();
 
@@ -55,7 +59,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             {
                 total++;
 
-                if (scoreProcessor.HasFinalResult(hitObject))
+                if (entriesByHitObject.TryGetValue(hitObject, out HitObjectLifetimeEntry? entry) && entry.Judged)
                 {
                     finalObjects++;
                     continue;
@@ -126,6 +130,29 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             foreach (var nested in drawable.NestedHitObjects)
                 collectDrawableRecursive(nested, result);
+        }
+
+        /// <summary>
+        /// 收集容器内的 <see cref="HitObjectLifetimeEntry"/>（含嵌套），按物件索引。
+        /// entry 不随 drawable 回收而消失，所以它是「本局是否已判」的真值来源；
+        /// <see cref="collectDrawables"/> 只用来回答「现在还有没有活的 drawable」。
+        /// </summary>
+        private static Dictionary<HitObject, HitObjectLifetimeEntry> collectEntries(DrawableRuleset ruleset)
+        {
+            Dictionary<HitObject, HitObjectLifetimeEntry> result = new Dictionary<HitObject, HitObjectLifetimeEntry>();
+
+            foreach (var entry in ruleset.Playfield.HitObjectContainer.Entries)
+                collectEntryRecursive(entry, result);
+
+            return result;
+        }
+
+        private static void collectEntryRecursive(HitObjectLifetimeEntry entry, Dictionary<HitObject, HitObjectLifetimeEntry> result)
+        {
+            result[entry.HitObject] = entry;
+
+            foreach (var nested in entry.NestedEntries)
+                collectEntryRecursive(nested, result);
         }
 
         /// <summary>
