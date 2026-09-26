@@ -39,7 +39,7 @@ namespace osu.Game.EzOsuGame.Screens.Play
             }
 
             if (scoreProcessor.JudgedHits < scoreProcessor.MaximumJudgements)
-                scoreProcessor.ApplyRemainingForcedMisses(healthProcessor);
+                scoreProcessor.ApplyRemainingForcedMisses(healthProcessor, clock.GetTrueGameplayRate());
 
             EzUnjudgedDiagnostics.Capture("after", ruleset, scoreProcessor, beatmap);
 
@@ -97,13 +97,11 @@ namespace osu.Game.EzOsuGame.Screens.Play
                     if (!tryInvokeRulesetMissForcefully(hitObject))
                         return;
                 }
-                catch (InvalidOperationException)
+                catch (Exception ex) when (ex is InvalidOperationException or TargetInvocationException { InnerException: InvalidOperationException })
                 {
-                    // Some objects may already have a result by the time nested misses propagate.
-                }
-                catch (TargetInvocationException ex) when (ex.InnerException is InvalidOperationException)
-                {
-                    // Reflection wrapper around the same already-judged case.
+                    // Nested objects may already be judged by the recursion above (a ruleset MissForcefully can
+                    // cascade into the very objects just judged, eg. BMS hold note -> head/body/tail); the duplicate
+                    // apply is expected. Reflection wraps that InvalidOperationException, hence both shapes.
                 }
             }
         }

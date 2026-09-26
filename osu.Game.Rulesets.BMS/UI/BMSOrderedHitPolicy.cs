@@ -28,7 +28,8 @@ namespace osu.Game.Rulesets.BMS.UI
 
         public bool IsHittable(DrawableHitObject hitObject, double time)
         {
-            if (GlobalConfigStore.EzConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence) != EzEnumJudgePrecedence.Earliest)
+            // 优先级由 helper 在构造时冻结，这里读普通值即可；勿改成每次按键查配置。
+            if (helper.JudgePrecedence != EzEnumJudgePrecedence.Earliest)
                 return helper.IsHittableWithPrecedence(hitObject, time);
 
             var nextObject = hitObjectContainer.AliveObjects.GetNext(hitObject);

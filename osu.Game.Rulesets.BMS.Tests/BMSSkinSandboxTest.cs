@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using osu.Game.Audio;
@@ -74,24 +75,28 @@ namespace osu.Game.Rulesets.BMS.Tests
             Assert.That(wrapper.GetSample(new ConvertHitObjectParser.FileHitSampleInfo("kick.wav", 100)), Is.Null);
         }
 
-        private static string locateSource(string fileName)
+        /// <summary>
+        /// Locates a source file of the BMS ruleset project, for source-level inspection.
+        /// </summary>
+        /// <remarks>
+        /// Anchored on this file's compile-time path rather than the test assembly's runtime location: runners that
+        /// shadow-copy assemblies place the binary outside the repository, where no directory walk finds the sources.
+        /// </remarks>
+        private static string locateSource(string fileName, [CallerFilePath] string testSourceFile = "")
         {
-            string assemblyLocation = typeof(BMSSkinSandboxTest).Assembly.Location;
-            DirectoryInfo? cursor = new FileInfo(assemblyLocation).Directory;
+            string? repositoryRoot = Path.GetDirectoryName(Path.GetDirectoryName(testSourceFile));
 
-            while (cursor != null)
+            if (string.IsNullOrEmpty(repositoryRoot))
+                throw new FileNotFoundException($"Could not resolve the repository root from '{testSourceFile}'.");
+
+            string rulesetProject = Path.Combine(repositoryRoot, "osu.Game.Rulesets.BMS");
+
+            foreach (string subDirectory in new[] { "Audio", "Beatmaps" })
             {
-                string candidate = Path.Combine(cursor.FullName, "osu.Game.Rulesets.BMS", "Audio", fileName);
+                string candidate = Path.Combine(rulesetProject, subDirectory, fileName);
 
                 if (File.Exists(candidate))
                     return candidate;
-
-                candidate = Path.Combine(cursor.FullName, "osu.Game.Rulesets.BMS", "Beatmaps", fileName);
-
-                if (File.Exists(candidate))
-                    return candidate;
-
-                cursor = cursor.Parent;
             }
 
             throw new FileNotFoundException($"Could not locate {fileName} for source-level inspection.");

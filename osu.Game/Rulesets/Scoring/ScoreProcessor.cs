@@ -572,7 +572,13 @@ namespace osu.Game.Rulesets.Scoring
         /// <summary>
         /// [Ez] Applies forced miss judgements for any remaining objects that could not be resolved via drawables.
         /// </summary>
-        public void ApplyRemainingForcedMisses(HealthProcessor? healthProcessor)
+        /// <param name="healthProcessor">Health processor to notify alongside the score processor, if any.</param>
+        /// <param name="gameplayRate">
+        /// Rate to stamp onto the synthetic results. Must be supplied by the caller (the processor has no clock):
+        /// leaving <see cref="JudgementResult.GameplayRate"/> null would emit hit events that
+        /// <see cref="HitEventExtensions.CalculateUnstableRate"/> rejects.
+        /// </param>
+        public void ApplyRemainingForcedMisses(HealthProcessor? healthProcessor, double gameplayRate)
         {
             var beatmap = Beatmap.Value;
             if (beatmap == null)
@@ -592,11 +598,10 @@ namespace osu.Game.Rulesets.Scoring
                         continue;
 
                     var result = CreateResult(hitObject, hitObject.Judgement);
-                    if (result == null)
-                        continue;
 
                     result.Type = result.Judgement.MinResult;
                     result.RawTime = hitObject.GetEndTime();
+                    result.GameplayRate = gameplayRate;
 
                     healthProcessor?.ApplyResult(result);
                     ApplyResult(result);

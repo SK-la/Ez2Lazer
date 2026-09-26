@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
@@ -109,12 +110,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 bpm = value;
                 updateRanges();
             }
-        }
-
-        public HitModeHelper()
-            : this(GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode))
-        {
-            updateRanges();
         }
 
         public HitModeHelper(EzEnumHitMode hitMode)
@@ -614,6 +609,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             HitResult.ComboBreak,
             HitResult.IgnoreMiss,
         };
+
+        /// <summary>
+        /// 任一 hitmode 下可能出现的判定并集（判定池预热用）。
+        /// </summary>
+        /// <remarks>
+        /// 池缺项时 <c>JudgementPooler.Get</c> 返回 null，该判定会被静默跳过不显示；而当局用的
+        /// hitmode / 血量模式取自冻结环境（回放是成绩里嵌入的模式），可能与展示时的当前设置不同，
+        /// 所以池内容不能按当前设置推导。
+        /// </remarks>
+        public static IReadOnlyList<HitResult> AllModeValidHitResults { get; } = Enum.GetValues<EzEnumHitMode>()
+                                                                                     .SelectMany(GetHitModeValidHitResults)
+                                                                                     .Distinct()
+                                                                                     .ToArray();
 
         public static IReadOnlyList<HitResult> GetHitModeValidHitResults(EzEnumHitMode mode)
         {

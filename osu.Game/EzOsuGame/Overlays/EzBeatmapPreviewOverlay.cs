@@ -106,7 +106,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private Drawable? pendingPreviewRoot;
         private DrawableRuleset? drawableRuleset;
         private IManiaStaticPreviewRenderer? maniaStaticRenderer;
-        private PreviewDensityController densityController = null!;
+        private PreviewDensityController? densityController;
         private Bindable<double> previewDensity = null!;
         private Bindable<EzBeatmapPreviewMode> sharedPreviewModeConfig = null!;
         private Bindable<EzBeatmapPreviewMode> maniaPreviewModeConfig = null!;
@@ -813,6 +813,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (e.CurrentState.Keyboard.AltPressed
                 && drawableRuleset is IDrawableScrollingRuleset scrolling
+                && densityController != null
                 && densityController.TryAdjust(scrolling, Math.Sign(e.ScrollDelta.Y), out float displayDensity))
             {
                 string densityText = $"{displayDensity:F2}x";
@@ -954,7 +955,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 Schedule(() =>
                 {
                     if (drawableRuleset is IDrawableScrollingRuleset scrollingRuleset)
-                        densityController.CaptureBaseline(scrollingRuleset);
+                        densityController?.CaptureBaseline(scrollingRuleset);
                 });
             }, cancellationToken);
         }
@@ -1096,7 +1097,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
             drawableRuleset = null;
             maniaStaticRenderer = null;
-            densityController.DisposeSession();
+
+            // densityController 由依赖加载器创建；预览宿主可能在加载前就被拆除，此时它仍为 null。
+            densityController?.DisposeSession();
 
             // Clear synchronously: a scheduled Clear can run after a newer preview is mounted (e.g. switching key count).
             if (stageScaleContainer.Count > 0)

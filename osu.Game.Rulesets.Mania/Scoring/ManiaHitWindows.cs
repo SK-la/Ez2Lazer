@@ -151,14 +151,32 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        public bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
+        private bool? poorEnabled;
+
+        /// <summary>
+        /// KPoor / <see cref="HitResult.Poor"/> 是否可用。与判定同源：BMS 系列血量模式 + BmsPoor 开关
+        /// （<see cref="HealthModeHelper.ComputeKPoorEnabled"/>）。只看开关会让选歌 wedge 等展示在任意模式下都列出 KPoor。
+        /// </summary>
+        /// <remarks>
+        /// 默认惰性取本机当前设置，供没有当局环境的展示路径消费（选歌 wedge、局内误差条）。
+        /// 当局 gameplay 由 <c>ManiaWindowBaker</c> 按冻结环境写入，之后不再跟随设置变更（回放取成绩里嵌入的血量模式）。
+        /// </remarks>
+        public bool PoorEnabled
+        {
+            get => poorEnabled ??= HealthModeHelper.ComputeKPoorEnabled(
+                GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
+                GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable));
+            set => poorEnabled = value;
+        }
 
         /// <summary>
         /// 当前 Mania 判定模式（统计与窗口逻辑会依赖此值）。
         /// </summary>
         public EzEnumHitMode ActiveHitMode { get; private set; }
 
-        private readonly HitModeHelper helper = new HitModeHelper();
+        // 模式的唯一来源是本对象的 ActiveHitMode（构造参数 / SetHitMode）。默认用 Lazer 起步只为满足字段初始化，
+        // 构造体随后立刻用 ActiveHitMode 覆盖；不要让默认值再去回读全局配置。
+        private readonly HitModeHelper helper = new HitModeHelper(EzEnumHitMode.Lazer);
 
         public ManiaHitWindows(EzEnumHitMode? hitModeOverride = null)
         {
@@ -168,7 +186,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         }
 
         /// <summary>
-        /// 仅冷路径消费（GetAllAvailableWindows 显示、Stage 判定池、统计图表）。
+        /// 仅冷路径消费（<see cref="osu.Game.Rulesets.Scoring.HitWindows.GetAllAvailableWindows"/> 展示、选歌 wedge、局内误差条）。
         /// 判定热路径不经过这里：非 Lazer 走 helper.ResultFor 直接比区间；Lazer 下六个标准判定恒有效。
         /// </summary>
         public override bool IsHitResultAllowed(HitResult result)
@@ -193,7 +211,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     return false;
 
                 case HitResult.Poor:
-                    return AllowPoorEnabled;
+                    return PoorEnabled;
 
                 default:
                     return false;

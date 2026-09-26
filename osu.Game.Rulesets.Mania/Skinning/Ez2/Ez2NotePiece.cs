@@ -3,31 +3,38 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
-using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    public partial class Ez2NotePiece : CompositeDrawable
+    public partial class Ez2NotePiece : FastNoteBase
     {
         public static float NoteHeight = 45;
         public const float NOTE_ACCENT_RATIO = 1f;
         public const float CORNER_RADIUS = 0;
 
-        private IBindable<ScrollingDirection> direction = null!;
-        private IBindable<Color4> accentColour = null!;
-
-        private readonly Circle colouredBox;
+        private Circle colouredBox = null!;
         private readonly Drawable iconContainer;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
+        private StageDefinition stageDefinition { get; set; } = null!;
+
+        // 10k2s1p 开启时用 Ez 内置色彩模板，关闭时回到 FastNoteBase 的编辑器列色。
+        protected override IBindable<bool>? BuiltInColourTemplateSwitch => ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
+
+        protected override Colour4 BuiltInColourTemplate => stageDefinition.GetColourForLayout(Column.Index);
 
         public Ez2NotePiece()
         {
@@ -37,8 +44,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             // Masking = true;
 
             iconContainer = CreateIcon();
+        }
 
-            InternalChildren = new[]
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            MainContainer.Children = new[]
             {
                 new Container
                 {
@@ -72,7 +83,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         {
                             RelativeSizeAxes = Axes.Both,
                             BorderThickness = 4,
-                            BorderColour = Color4.White.Opacity(0.7f),
+                            BorderColour = Colour4.White.Opacity(0.7f),
                             // BorderThickness = 2,
                             // Alpha = 0.5f,
                             //Blending = BlendingParameters.Additive,
@@ -89,10 +100,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 iconContainer,
             };
         }
-
-        // private readonly ManiaRulesetConfigManager config;
-        // private float columnWidth;
-        // private float specialFactor;
 
         protected override void Update()
         {
@@ -139,33 +146,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             }
         };
 
-        [BackgroundDependencyLoader(true)]
-        private void load(IScrollingInfo scrollingInfo, DrawableHitObject? drawableObject)
-        {
-            direction = scrollingInfo.Direction;
-            direction.BindValueChanged(onDirectionChanged, true);
-
-            if (drawableObject != null)
-            {
-                accentColour = drawableObject.AccentColour;
-                accentColour.BindValueChanged(onAccentChanged, true);
-            }
-        }
-
-        private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
-        {
-            colouredBox.Anchor = colouredBox.Origin = direction.NewValue == ScrollingDirection.Up
-                ? Anchor.TopCentre
-                : Anchor.BottomCentre;
-
-            Scale = new Vector2(1, direction.NewValue == ScrollingDirection.Up ? -1 : 1);
-        }
-
-        private void onAccentChanged(ValueChangedEvent<Color4> accent)
+        protected override void UpdateColor()
         {
             colouredBox.Colour = ColourInfo.GradientVertical(
-                accent.NewValue.Lighten(0.1f),
-                accent.NewValue
+                NoteColor.Lighten(0.1f),
+                NoteColor
             );
         }
     }

@@ -150,15 +150,29 @@ namespace osu.Game.EzOsuGame.Beatmaps
                 return cached!;
             }
 
-            EzModConversionPerf.RecordCacheMiss();
+            // 同一 working beatmap 的所有键（不同 mods / scope）共享同一批源 HitObject：转换是就地写
+            // （ApplyDefaults 重建 NestedHitObjects、后转换 mod 也会改对象）。两个线程同时转换同一张图，写入
+            // 会落在同一批对象上，与后台难度计算等读者撞车。按 working beatmap 串行，避免同一批对象被并发改写。
+            lock (bucket.ConversionGate)
+            {
+                // 等锁期间别的线程可能已经算完并入库。
+                if (bucket.TryGet(key, out cached))
+                {
+                    markIfShared(cached!, scope);
+                    publishGauges();
+                    return cached!;
+                }
 
-            IBeatmap converted = convert(working, ruleset, snapshot, bind, token);
+                EzModConversionPerf.RecordCacheMiss();
 
-            markIfShared(converted, scope);
-            bucket.Store(key, converted);
-            publishGauges();
+                IBeatmap converted = convert(working, ruleset, snapshot, bind, token);
 
-            return converted;
+                markIfShared(converted, scope);
+                bucket.Store(key, converted);
+                publishGauges();
+
+                return converted;
+            }
         }
 
         private static IBeatmap convert(IWorkingBeatmap working, IRulesetInfo ruleset, Mod[] snapshot, Action<IBeatmap>? bind, CancellationToken? token)
@@ -285,6 +299,12 @@ namespace osu.Game.EzOsuGame.Beatmaps
 
         private sealed class Bucket
         {
+            /// <summary>
+            /// Serialises conversions for this working beatmap. Every key of one working beatmap converts the same
+            /// source hit objects, so two concurrent conversions would rebuild the same nested objects in place.
+            /// </summary>
+            public readonly object ConversionGate = new object();
+
             private readonly Dictionary<BucketKey, Entry> entries = new Dictionary<BucketKey, Entry>();
             private readonly object gate = new object();
 

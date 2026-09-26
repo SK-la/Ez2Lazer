@@ -60,6 +60,7 @@ namespace osu.Game.Overlays.Settings.Sections
         private Ez2ConfigManager ezConfig { get; set; }
 
         private IDisposable realmSubscription;
+        private IBindable<bool> autoApplyOnSkinChangeBindable;
 
         [BackgroundDependencyLoader(permitNulls: true)]
         private void load([CanBeNull] SkinEditorOverlay skinEditor, [CanBeNull] EzLayoutEditorOverlay ezLayoutEditor)
@@ -141,7 +142,9 @@ namespace osu.Game.Overlays.Settings.Sections
                 }
             });
 
-            ezConfig.GetBindable<bool>(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange).BindValueChanged(change =>
+            // 必须持有副本：框架只把绑定副本登记为 WeakReference，副本被 GC 回收后订阅会静默失效。
+            autoApplyOnSkinChangeBindable = ezConfig.GetBindable<bool>(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange);
+            autoApplyOnSkinChangeBindable.BindValueChanged(change =>
             {
                 if (change.OldValue && !change.NewValue)
                     ezConfig.Load();
@@ -185,6 +188,7 @@ namespace osu.Game.Overlays.Settings.Sections
             base.Dispose(isDisposing);
 
             realmSubscription?.Dispose();
+            autoApplyOnSkinChangeBindable?.UnbindAll();
         }
 
         private partial class SkinDropdown : FormDropdown<Live<SkinInfo>>

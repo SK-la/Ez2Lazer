@@ -43,6 +43,19 @@ namespace osu.Game.Rulesets.Scoring
                 HasFailed = true;
         }
 
+        /// <summary>
+        /// [Ez] gameplay 入口调用：将当前全局 Ez 游玩环境（如 mania 血量模式）冻结注入本处理器。
+        /// 必须在 <see cref="JudgementProcessor.ApplyBeatmap"/> 之前调用。
+        /// 无头/转换路径不得调用，以保持 ppy 上游官方行为；未调用时按各规则集的默认模式处理。
+        /// </summary>
+        /// <remarks>
+        /// 与 <see cref="ScoreProcessor.ApplyEzGameplayEnvironment"/> 同源：调用方只看这一处，
+        /// 局内行为一律读注入后的实例状态，不再回读全局配置。
+        /// </remarks>
+        public virtual void ApplyEzGameplayEnvironment()
+        {
+        }
+
         protected override void ApplyResultInternal(JudgementResult result)
         {
             result.HealthAtJudgement = Health.Value;

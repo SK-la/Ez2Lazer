@@ -88,5 +88,28 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Scoring
             ManiaHitMode = hitMode.HasValue ? (int)hitMode.Value : (int)EzEnumHitMode.Lazer,
             ManiaHealthMode = healthMode.HasValue ? (int)healthMode.Value : (int)EzEnumHealthMode.Lazer,
         };
+
+        /// <summary>
+        /// 成绩表格列的集合必须逐份按成绩自身嵌入的 HitMode 取并集，不能看当前全局设置：
+        /// 全局是 Lazer 时 Poor 不在有效集合里，只含 BMS 成绩的 KPoor 列会被整列丢掉。
+        /// </summary>
+        [Test]
+        public void TestScoreSetDisplayUnionsPerScoreHitModes()
+        {
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer));
+
+            var lazerScore = createScore(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
+            var bmsScore = createScore(EzEnumHitMode.IIDX_HD, EzEnumHealthMode.IIDX_HD);
+
+            var ruleset = new ManiaRuleset();
+
+            // 单份重载只看全局：Lazer 下不应出现 Poor。
+            Assert.That(ruleset.GetHitResultsForDisplay().Select(r => r.result), Does.Not.Contain(HitResult.Poor));
+
+            var displayResults = ruleset.GetHitResultsForDisplay(new[] { lazerScore, bmsScore }).ToArray();
+
+            Assert.That(displayResults.Select(r => r.result), Does.Contain(HitResult.Poor));
+            Assert.That(displayResults.First(r => r.result == HitResult.Poor).displayName.ToString(), Is.EqualTo("KPoor"));
+        }
     }
 }

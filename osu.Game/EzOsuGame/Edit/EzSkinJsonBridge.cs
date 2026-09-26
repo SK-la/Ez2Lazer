@@ -129,23 +129,30 @@ namespace osu.Game.EzOsuGame.Edit
 
         public static Type? GetBindableValueType(Ez2Setting setting) => getBindableValueType(setting);
 
-        public static void BindSettingValueChanged(Ez2ConfigManager config, Ez2Setting setting, Action onChanged)
+        /// <summary>
+        /// 订阅设置变化，返回承载该订阅的绑定副本。
+        /// 框架只把 <c>GetBindable</c> 返回的副本登记为 WeakReference，
+        /// 调用方必须持有返回值，否则副本被 GC 回收后订阅会静默失效。
+        /// </summary>
+        public static IBindable? BindSettingValueChanged(Ez2ConfigManager config, Ez2Setting setting, Action onChanged)
         {
             var valueType = getBindableValueType(setting);
 
             if (valueType == null)
-                return;
+                return null;
 
             var method = typeof(EzSkinJsonBridge).GetMethod(nameof(bindSettingValueChangedGeneric), BindingFlags.Static | BindingFlags.NonPublic)!
                                                  .MakeGenericMethod(valueType);
 
-            method.Invoke(null, new object[] { config, setting, onChanged });
+            return (IBindable?)method.Invoke(null, new object[] { config, setting, onChanged });
         }
 
-        private static void bindSettingValueChangedGeneric<T>(Ez2ConfigManager config, Ez2Setting setting, Action onChanged)
+        private static IBindable bindSettingValueChangedGeneric<T>(Ez2ConfigManager config, Ez2Setting setting, Action onChanged)
             where T : notnull
         {
-            config.GetBindable<T>(setting).BindValueChanged(_ => onChanged());
+            var bindable = config.GetBindable<T>(setting);
+            bindable.BindValueChanged(_ => onChanged());
+            return bindable;
         }
 
         private static Type? getBindableValueType(Ez2Setting setting)
@@ -157,11 +164,12 @@ namespace osu.Game.EzOsuGame.Edit
                 Ez2Setting.StageName or Ez2Setting.NoteSetName => typeof(string),
                 Ez2Setting.ManiaPseudo3DRotation or Ez2Setting.ColumnDim or Ez2Setting.ColumnBlur or Ez2Setting.ColumnWidth or Ez2Setting.SpecialFactor
                     or Ez2Setting.HitPosition or Ez2Setting.HitTargetFloatFixed or Ez2Setting.HitTargetAlpha or Ez2Setting.NoteHeightScaleToWidth
-                    or Ez2Setting.NoteCornerRadius or Ez2Setting.ManiaHoldTailAlpha or Ez2Setting.NoteTrackLineHeight => typeof(double),
+                    or Ez2Setting.NoteCornerRadius or Ez2Setting.ManiaHoldTailAlpha or Ez2Setting.NoteTrackLineHeight
+                    or Ez2Setting.ManiaHoldTailMaskGradientHeight => typeof(double),
                 Ez2Setting.StagePanelEnabled or Ez2Setting.HitPositionGlobalEnable or Ez2Setting.ManiaLNGradientEnable
                     or Ez2Setting.ManiaHoldTailMaskDynamicEnable or Ez2Setting.ColorSettingsEnabled => typeof(bool),
                 Ez2Setting.ColumnWidthStyle => typeof(ColumnWidthStyle),
-                Ez2Setting.ColumnTypeListSelect or Ez2Setting.ManiaHoldTailMaskGradientHeight => typeof(int),
+                Ez2Setting.ColumnTypeListSelect => typeof(int),
                 Ez2Setting.ColumnTypeA or Ez2Setting.ColumnTypeB or Ez2Setting.ColumnTypeS or Ez2Setting.ColumnTypeE or Ez2Setting.ColumnTypeP => typeof(Colour4),
                 Ez2Setting.ColumnTypeOf4K or Ez2Setting.ColumnTypeOf5K or Ez2Setting.ColumnTypeOf6K or Ez2Setting.ColumnTypeOf7K or Ez2Setting.ColumnTypeOf8K
                     or Ez2Setting.ColumnTypeOf9K or Ez2Setting.ColumnTypeOf10K or Ez2Setting.ColumnTypeOf12K or Ez2Setting.ColumnTypeOf14K

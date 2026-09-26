@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -103,6 +104,11 @@ namespace osu.Game.EzOsuGame.Edit
         private bool noteSnapshotInitialized;
         private Guid noteSnapshotSkinId;
         private bool configPreviewRefreshBound;
+
+        /// <summary>
+        /// 框架把 <c>GetBindable</c> 返回的绑定副本只登记为 WeakReference；副本若无强引用会被 GC 回收，订阅会静默失效。
+        /// </summary>
+        private readonly List<IBindable> retainedBindingCopies = new List<IBindable>();
 
         private ISkinEditorVirtualProvider? provider;
         private EzSkinEditorSceneContext? sceneContext;
@@ -271,17 +277,7 @@ namespace osu.Game.EzOsuGame.Edit
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             bindConfigPreviewRefresh();
-            bindColumnKeyModePreviewRefresh();
             bindSceneBarPlayback();
-        }
-
-        private void bindColumnKeyModePreviewRefresh()
-        {
-            ezSkinConfig.GetBindable<int>(Ez2Setting.ColumnTypeListSelect).BindValueChanged(_ =>
-            {
-                if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Colour)
-                    Schedule(refreshPreviewContent);
-            });
         }
 
         protected override void Update()
@@ -1167,8 +1163,12 @@ namespace osu.Game.EzOsuGame.Edit
 
             configPreviewRefreshBound = true;
 
+            // 绑定副本必须由本屏幕持有：框架只登记 WeakReference，副本被 GC 回收后订阅会静默失效。
             foreach (var setting in EzSkinJsonSettingCatalog.All)
-                EzSkinJsonBridge.BindSettingValueChanged(ezSkinConfig, setting, () => Schedule(refreshPreviewContent));
+            {
+                if (EzSkinJsonBridge.BindSettingValueChanged(ezSkinConfig, setting, () => Schedule(refreshPreviewContent)) is IBindable bindable)
+                    retainedBindingCopies.Add(bindable);
+            }
         }
 
         private void refreshPreviewContent()
