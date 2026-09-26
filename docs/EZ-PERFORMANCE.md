@@ -106,7 +106,8 @@
 不是环境变量）；它决定**整套诊断是否工作**。**跑哪些内容**由环境变量 `EZ_DIAG_PROBES` 选择
 （`judgment` / `press` / `frame` / `hotpath` / `all`；空 = 全部）——
 子项选择刻意**不落成设置项**：「这次实验想验什么」是实验意图，不是用户偏好（同 §2.4.20）。开关、内容选择与
-其余调参都在**每次进局前读一次**（`Player.load`），统一入口 `EzDiagnosticSwitches.Apply`。**例外**：结算流程时序追踪
+其余调参都在**每次进局前读一次**（`Player.load`），统一写入口是 `EzDiagnosticSwitches.Enabled` 的赋值
+（赋总开关即连带读 `EZ_DIAG_PROBES` 与调参环境变量）。**例外**：结算流程时序追踪
 （`EzTimingTrace`→`trace_*.csv`）不属本套件，走自己的设置项 `Ez2Setting.EzTimingTraceEnabled` ——
 与套件同在 `Player` 进局前读一次，但不受总开关与 `EZ_DIAG_PROBES` 控制（见 §2.4.22）。其余调参环境变量：
 `EZ_FRAME_PROBE_MS`（stall 阈值，**0 = 抓全集**）、`EZ_FRAME_PROBE_LIGHT`（关掉每帧 GC/分配读数）、
@@ -818,7 +819,7 @@ draw 帧、把 `coverage` 拉到 0.87 以下，使这张表在判读前就自检
 三个判定侧探针 + 时序追踪原先都在 `Player` 每次进图时从配置重读开关，`OrderedHitPolicyHelper` 还各持一个
 `Bindable<bool>` 订阅。这套写法对「永远关着」的功能是纯负担，改法只有一条原则：**关闭时热路径上一个字节都不做**。
 
-- **开关只在进局前读一次**（`Player.load` → `EzDiagnosticSwitches.Apply`）：
+- **开关只在进局前读一次**（`Player.load` 里给 `EzDiagnosticSwitches.Enabled` 赋值）：
   真值落到 `EzJudgmentDiagnostics.Enabled` / `EzPressLatencyDiagnostics.Enabled` / `EzFrameStallDiagnostics.Enabled`
   / `EzTimingTrace.Enabled` 四个**静态 bool** 上；`Player` 与 `OrderedHitPolicyHelper` 不再读配置、不再持 bindable。
   ⇒ **改设置下一局生效**（UI 的 tooltip 已写明）。
@@ -886,7 +887,7 @@ judgment `AudioLag` 序列（= `BassSource − GameTime`，与 `Drift` 去趋势
 |---|---|---|
 | 启动闸门 | ini 总开关，一开三个探针全跑 | 仍是 ini 总开关 `EzJudgmentDiagEnabled`，但它**只决定整套诊断是否工作** |
 | 内容选择 | 无（一开就全跑） | 环境变量 `EZ_DIAG_PROBES`：`judgment` / `press` / `frame` / `hotpath` / `all`；**空 = 全部** |
-| 谁下发 | 各探针各自 `SetEnabled` | `EzDiagnosticSwitches.Apply(config)` 唯一入口，由 `Player` **每次进局前**调用（§2.4.22）；**例外**：`EzTimingTrace` 仍由自己的设置项 `EzTimingTraceEnabled` 在同一处读一次（不参与套件、也不进 `EZ_DIAG_PROBES`） |
+| 谁下发 | 各探针各自 `SetEnabled` | `EzDiagnosticSwitches.Enabled` 的赋值是唯一入口（由 `Player` **每次进局前**写入，setter 内完成内容选择与调参下发，§2.4.22）；**例外**：`EzTimingTrace` 仍由自己的设置项 `EzTimingTraceEnabled` 在同一处读一次（不参与套件、也不进 `EZ_DIAG_PROBES`） |
 | 其余调参 env | 分散读取 | 同一入口内的 `applyPressTuning` / `applyFrameTuning` |
 | 热路径代价 | 一个静态 bool 分支 | **不变**（仍是进局前定死、本局内不变的静态位） |
 
@@ -957,7 +958,7 @@ judgment `AudioLag` 序列（= `BassSource − GameTime`，与 `Drift` 去趋势
 |---|---|---|
 | `InputAudioLatencyTracker` + framework `Audio/EzLatency/` | 独立设置项 `Ez2Setting.InputAudioLatencyTracker`，`Player.cs` 每局构造时读一次，类内还持 `Bindable` | 运行期 bindable；产物是局末通知而非 CSV，不经 `EzDiagnosticSession`；位置在 `EzOsuGame/Audio/` 而非 `Diagnostics/` |
 | `EzStartupTrace` / `EzSongSelectEnterTrace` | 注释写 "Debug-only"，但 5 个调用点（`MainMenu` / `SettingsPanel` / `BackgroundDataStoreProcessor` / `SongSelect.EzStartup`）都**没有** `#if DEBUG` | 无闸门；Release 也做字符串插值 + `Logger.Log(Debug)`。只在启动路径，代价小 |
-| `EzManiaAnalysisPerf` / `EzModConversionPerf` | `static` 构造读 `EZ_MANIA_ANALYSIS_PERF` / `EZ_MOD_CONVERSION_PERF` | 第二套环境变量机制，不入 `EzDiagnosticSwitches.Apply`；产物是 logger 聚合行 |
+| `EzManiaAnalysisPerf` / `EzModConversionPerf` | `static` 构造读 `EZ_MANIA_ANALYSIS_PERF` / `EZ_MOD_CONVERSION_PERF` | 第二套环境变量机制，不入 `EzDiagnosticSwitches.Enabled`；产物是 logger 聚合行 |
 | `EzSubFrameCorrection.Enabled` | `Player.cs` 每局从配置读一次 | 它是生产校正开关（不是探针），但其 `LastUpdateTimestamp` / `UpdateCount` 是探针读的静态量 |
 
 判断：核心四探针的「开关 / 生命周期 / 落盘 / 采集边界」已收口；剩下的是「不产 CSV 的诊断」。
@@ -1043,8 +1044,16 @@ judgment `AudioLag` 序列（= `BassSource − GameTime`，与 `Drift` 去趋势
 #### 2.4.22 诊断开关下发点移回**进局前**：一口断定，局内不读配置（2026-09-26）
 
 §2.4.18 把下发点放在启动时（`OsuGameBase.applyDiagnosticSwitches`），§2.4.20 又把「跑哪些内容」并进来。
-代价是改设置必须重启。本条把唯一入口 `EzDiagnosticSwitches.Apply(config)` 搬到 `Player.load` 开头
-（**在 `DrawableRuleset` 创建之前**），并把 `EzTimingTrace.Enabled` 也放在同一块：
+代价是改设置必须重启。本条把唯一写入口搬到 `Player.load` 开头
+（**在 `DrawableRuleset` 创建之前**），形式与旁白探针一致 —— 一行总开关赋值：
+
+```csharp
+EzOsuGame.Diagnostics.EzDiagnosticSwitches.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
+EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
+```
+
+`EzDiagnosticSwitches.Enabled` 的 setter 内完成 `EZ_DIAG_PROBES` 内容选择与 `EZ_*` 调参的下发，
+所以赋值这一处就是整局诊断范围的唯一决定点。
 
 - **不变量**：一局里的「整套诊断用不用、跑哪些」在进局前**一口断定**；局内任何代码只读冻结后的静态 bool，
   不存在「运行到某处才发现现在能不能用」的分支，也没有第二处 `Get<bool>(Ez2Setting.EzJudgmentDiagEnabled)`。
@@ -1194,5 +1203,5 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-09-25 | §2.4.19：**删掉 6 个等价列**——判据是「同一行里能被另一个参数精确算出」（恒等或差一个可复原常数），「只是没人读」不算理由。删除：judgment `InterpClock`（≡ `GameTime`，源码里同一属性连读两次）、judgment `BassSource`（≡ `GameTime − Drift − 15.000`，8 局残差 ≤ 0.002）、frame `SubtreeAllocBytes`（≡ `LoopAllocBytes`，373,188 帧逐帧全等，成因是 `updateClock()` 从不分配）、frame `Gen2Delta`（恒 0）、press `Gen2`（增量恒 0）、press `CatchingUp`（恒 0，且被更一般的 `FscIter>1` 完全覆盖）；`AnalyzePeriod.py` 的 `AudioLag` 序列随之删除。**明确保留**：`Gen1`/`FscIter`（有信号）、`PressesInFrame`（内存缓冲算出的值比 CSV 反推更准）、judgment `FrameElapsed` vs frame `ElapsedMs`（时钟增量 vs 墙钟，非同一测量）。顺带修正 `AnalyzePressLatency.ps1` 读错列名（`FscIterations` → `FscIter`）导致的「多遍子树」分桶从未命中。⚠ 旧 CSV / 旧 summary 与新脚本不兼容，`AnalyzeFrameStall.ps1` 的 `frameSplit` 正则已收紧 |
 | 2026-09-25 | §2.4.20：**探针套件收口（不动测量口径）**——启动闸门仍是 ini 总开关 `EzJudgmentDiagEnabled`（只决定启动时整套诊断是否工作）；**跑哪些内容由环境变量 `EZ_DIAG_PROBES` 选择**（`judgment`/`press`/`frame`/`hotpath`/`trace`/`all`，空 = 全部，解析失败即启动失败）。曾把内容选择做成五个 `EzDiagProbe*` 持久化开关 + UI 复选框，**已撤掉**（设置面板不该变实验台）。**采集边界归位**：判定的漂移 / `InputToJudgeMs` / `<0 or >1000 ⇒ NaN` 从 `DrawableHitObject.UpdateResult` 移入 `EzJudgmentDiagnostics.Capture`（调用点只剩一行）；`Column.recordPressLatency` 的 `PreColumnMs` / `ColumnMs` / `FrameAgeMs` 与单位换算移入新文件 `ManiaPressProbe`（放 Mania 侧，因需列号 / 车道计数）；`FrameStabilityContainer` 的 5 个探针静态量撤掉，改为每轮 `ReportLoop` 一次回报（归因闸门 `FrameLoopAttribution = 帧探针 \|\| 按键探针`）。落盘与局生命周期分别收进 `EzProbeOutput` / `EzDiagnosticSession`。**顺带修掉 `hotpath` 子项在 Release 下失效**：`ManiaJudgeHotPathTrace` 的清零与读数出口原先关在 `#if DEBUG` 里，而埋点不在 ⇒ 子项打开后计数器只增不出、还白付 `Interlocked.Increment`；现改由子项闸门控制。**CSV 一列未改**，§2.4.19 之后的数据仍可跨条对比；未覆盖项（音频闭环追踪器、启动 trace、分析聚合计数、子帧校正开关）逐条列在该节末尾 |
 | 2026-09-25 | §2.4.8 七：**补上 Draw 线程成本结构（dotTrace Timeline）**——此前只在会话交接单里留了一行。`CDXGISwapChain::Present` 占 `DrawFrame` **78%** / 全窗口 **25%**，每次 ≈ **0.27 ms 其中 0.25 ms 在 AMD 驱动内** ⇒ **恒定税 × 次数**（2000 fps 下 ≈495 ms/s，降帧率直接减半，故提帧有收益上限）；`GameHost.UpdateFrame` 占 30%，而其中 FSC `UpdateSubTree` 只占 **5%**。并在 §2.4.12 标注「驱动内 Present 成本」与「进程外 DWM / 扫描输出」是同一条 swap chain 的两端、量法不同。另作废「桌宠 `EzPetCubismMeshView` 是局内分配热点」（纯局内窗口不出现，与 `DesktopPetShowOnGameplay = False` 一致） |
-| 2026-09-26 | §2.4.22：**诊断开关下发点从启动时移回进局前**——唯一入口 `EzDiagnosticSwitches.Apply(config)` 由 `OsuGameBase.applyDiagnosticSwitches`（启动时、紧接 `Ez2ConfigManager` 构造）搬到 `Player.load` 开头、**在 `DrawableRuleset` 创建之前**；`EzTimingTrace.Enabled` 同处读取，`OsuGameBase` 里的包装方法与调用一并删除。不变量：一局里的「整套诊断用不用、跑哪些」**进局前一口断定**，局内任何代码只读冻结后的静态 bool，不存在「运行到某处才发现现在能不能用」的分支；热路径代价与启动时下发完全同类（仍是一静态 bool 分支，关闭时整段采集仍可被消掉）。收益：改设置**下一局生效、无需重启**；`EZ_DIAG_PROBES` 写错从「启动即失败」变为「进局即失败」。因 `RecordFrame` / `samplePresent` / `ManiaJudgeHotPathTrace` 本来就只在局内被调用，下发点后移**不损失任何采集覆盖** |
+| 2026-09-26 | §2.4.22：**诊断开关下发点从启动时移回进局前**——写入口由 `OsuGameBase.applyDiagnosticSwitches`（启动时、紧接 `Ez2ConfigManager` 构造）搬到 `Player.load` 开头、**在 `DrawableRuleset` 创建之前**，形式改为一行总开关赋值 `EzDiagnosticSwitches.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled)`（`EZ_DIAG_PROBES` 内容选择与 `EZ_*` 调参在该属性 setter 内下发），`EzTimingTrace.Enabled` 同处读取；`OsuGameBase` 里的包装方法与调用、以及旧的 `Apply(config)` 一并删除。不变量：一局里的「整套诊断用不用、跑哪些」**进局前一口断定**，局内任何代码只读冻结后的静态 bool，不存在「运行到某处才发现现在能不能用」的分支；热路径代价与启动时下发完全同类（仍是一静态 bool 分支，关闭时整段采集仍可被消掉）。收益：改设置**下一局生效、无需重启**；`EZ_DIAG_PROBES` 写错从「启动即失败」变为「进局即失败」。因 `RecordFrame` / `samplePresent` / `ManiaJudgeHotPathTrace` 本来就只在局内被调用，下发点后移**不损失任何采集覆盖** |
 | 2026-09-25 | §2.4.21：**链式延迟汇总，补齐累计总值**——此前 20 条只按环节拆，缺「合起来多少毫秒」。取出**一直在 CSV 里、从未被引用的累计列 `TotalMs`**（`EzPressLatencyDiagnostics.PressSample.TotalMs` = `PreColumnMs + ColumnMs`）：稳态四局「按键 → 判定」p50 **0.583 / 0.798 / 0.724 / 0.736 ms**（1000 fps 配置局 1.247 ms），其中 `PreColumnMs` 占 70–88%；空按累计 p50 0.50–1.28 ms、`ColumnMs` 仅 0.009–0.019 ms。**两个独立探针闭合**：`TotalMs`（终点 `OnPressed` 返回）与判定探针 `InputToJudgeMs`（终点 `handleHit` 内）差 **0.16–0.31 ms**，正是「判定落地 → 同步结果扇出结束」，代入 `PreColumnMs + ColumnMs − 残差 ≈ InputToJudgeMs` 成立。按键 → `Sample.Play` ≈ **1.0–1.6 ms**（键音由 `EzGameplaySampleTriggerSource.PlaySamples` 的 `Schedule` 放到下一帧，落在 `afterPressMean` 0.34–0.63 ms 内），再加**设备授予的 10 ms 输出缓冲**（`wasapiRead` p50 10.25 / `interpErr.offset` 9.97–10.37）≈ **11 ms 量级**，该项被音频偏移在线吸收，不影响判定同步。**两条新登记纪律**：① `FrameAgeMs / FrameElapsed` 比值 p50 = **1.5–2.3**、75–96% 的按键 `FrameAgeMs > FrameElapsed`（健康应为 0–1）⇒ 它的零点不在本帧起点，只能作同向观测量，不得加进链路；② 跨局不可混算 p99 / max。**登记一条重测线索**：`20260924_211244`（34.1 s、56576 帧）是唯一一次「按键 → 判定」中位达 4 ms 的局（`TotalMs` p50 **4.936** 与 `InputToJudgeMs` p50 **3.683** 两个独立探针一致），帧级探针显示 `withPress` 帧长 p50 **8.05 ms**（`noPress` 0.450）而 `pressColumnMean` 仅 0.881 ⇒ 7 ms 停在「按键帧被拉长」而非 `OnPressed`；但该局处于埋点零点缺陷修复前、`FscIter` 全 1、`inputQueue=21` ⇒ 只作线索不作结论 |

@@ -441,8 +441,8 @@ framework 于 9:36:30 重建，音频日志 `logs/1790302201.audio.log` 出现 `
 | 帧级 stall 探针 | `osu.Game/EzOsuGame/Diagnostics/EzFrameStallDiagnostics.cs`（持有 FSC 回报的归因量，见 `ReportLoop`） |
 | 按键延迟分段探针 | `osu.Game/EzOsuGame/Diagnostics/EzPressLatencyDiagnostics.cs`；Mania 侧适配器 `osu.Game.Rulesets.Mania/EzMania/Diagnostics/ManiaPressProbe.cs` |
 | 判定诊断 | `osu.Game/EzOsuGame/Diagnostics/EzJudgmentDiagnostics.cs`（`Capture` 自算漂移 / `InputToJudgeMs`） |
-| **诊断开关（进局前读一次）** | 总开关 `Ez2Setting.EzJudgmentDiagEnabled`（ini / 设置项）决定整套诊断是否工作；**跑哪些内容**由环境变量 `EZ_DIAG_PROBES`（`judgment` / `press` / `frame` / `hotpath` / `all`；空 = 全部）选择。两者都在 `osu.Game/EzOsuGame/Diagnostics/EzDiagnosticSwitches.cs` 的 `Apply(config)` 里读一次，**由 `osu.Game/Screens/Play/Player.cs` 的 `load` 在创建 `DrawableRuleset` 之前调用**。真值落在各探针的静态 `Enabled` 上；**局内不再读配置 ⇒ 改设置下一局生效**，换来的是关闭时热路径零开销（一个静态 bool 分支）。⚠ 内容选择**刻意不是设置项**（设置面板不该变实验台）；写错的值进局即抛异常。**例外**：结算流程时序追踪 `EzTimingTrace` 不参与套件，由自己的设置项 `Ez2Setting.EzTimingTraceEnabled` 在**同一处**读一次（同样下一局生效） |
-| 环境变量（内容选择 / 消融 / 抓全集） | `EzDiagnosticSwitches.Apply` 每次进局前读一次：`EZ_DIAG_PROBES`（跑哪些内容，空 = 全部）、`EZ_FRAME_PROBE_MS`（0 = 抓全集）、`EZ_FRAME_PROBE_LIGHT=1`、`EZ_PRESS_PROBE_SKIP_FORCE_MISS=1` |
+| **诊断开关（进局前读一次）** | 总开关 `Ez2Setting.EzJudgmentDiagEnabled`（ini / 设置项）决定整套诊断是否工作；**跑哪些内容**由环境变量 `EZ_DIAG_PROBES`（`judgment` / `press` / `frame` / `hotpath` / `all`；空 = 全部）选择。两者都由 `osu.Game/Screens/Play/Player.cs` 的 `load` 在创建 `DrawableRuleset` 之前一行赋值 `EzDiagnosticSwitches.Enabled` 写入（`osu.Game/EzOsuGame/Diagnostics/EzDiagnosticSwitches.cs` 的属性 setter 内完成内容选择与调参下发）。真值落在各探针的静态 `Enabled` 上；**局内不再读配置 ⇒ 改设置下一局生效**，换来的是关闭时热路径零开销（一个静态 bool 分支）。⚠ 内容选择**刻意不是设置项**（设置面板不该变实验台）；写错的值进局即抛异常。**例外**：结算流程时序追踪 `EzTimingTrace` 不参与套件，由自己的设置项 `Ez2Setting.EzTimingTraceEnabled` 在**同一处**读一次（同样下一局生效） |
+| 环境变量（内容选择 / 消融 / 抓全集） | `EzDiagnosticSwitches.Enabled` 赋值时读一次：`EZ_DIAG_PROBES`（跑哪些内容，空 = 全部）、`EZ_FRAME_PROBE_MS`（0 = 抓全集）、`EZ_FRAME_PROBE_LIGHT=1`、`EZ_PRESS_PROBE_SKIP_FORCE_MISS=1` |
 | 探针落盘 / 局生命周期 | `EzProbeOutput`（wallclock / 目录 / F3 / CSV 转义 / 异步写）、`EzDiagnosticSession.Begin/End`（`Player` 里不再有探针名单） |
 | 子树 / 时钟 / 其余 归因 | `osu.Game/Rulesets/UI/FrameStabilityContainer.cs`（`UpdateSubTree`） |
 | present / 帧节拍采样 | `EzFrameStallDiagnostics.samplePresent`（update 侧读 `DrawThread.Clock`，**按 draw 帧去重**，**时钟停走的帧跳过** —— 退场段会把 `coverage` 拉到 0.87，见 §3.4f）；host 由 `osu.Game/OsuGameBase.cs` 的 `SetHost` 挂上（**`DrawFrame` 无法 override，原因见 §3.5 第 4 项**） |
@@ -464,8 +464,9 @@ framework 于 9:36:30 重建，音频日志 `logs/1790302201.audio.log` 出现 `
 - 探针热路径不做 IO、不产字符串，落盘在局末；`RecordFrame()` 跑在输入派发**之前**。
 - **开关语义**：`EzExperimentalSettings` 里的「启用 Ez 诊断套件」是**总闸门**，决定整套诊断是否工作；
   **跑哪些内容**由环境变量 `EZ_DIAG_PROBES` 决定（`judgment` / `press` / `frame` / `hotpath` / `all`，
-  空 = 全部）—— 内容选择刻意不做成设置项。两者都在 `Player` **进局前一口断定**（`EzDiagnosticSwitches.Apply`，
-  创建 `DrawableRuleset` 之前），局内不再查配置（其余调参环境变量也在同一处读）。**改完下一局生效、不需要重启**；
+  空 = 全部）—— 内容选择刻意不做成设置项。两者都在 `Player` **进局前一口断定**（一行 `EzDiagnosticSwitches.Enabled` 赋值，
+  创建 `DrawableRuleset` 之前；内容选择与调参在该属性 setter 内读），局内不再查配置（其余调参环境变量也在同一处读）。
+  **改完下一局生效、不需要重启**；
   换来的是关闭时热路径上只剩一个静态 bool 分支（没有 bindable、没有 DI、没有配置查询）。
   **例外**：结算流程时序追踪（`EzTimingTrace`）不属套件，由自己的设置项 `EzTimingTraceEnabled` 在同一处读一次。
 - 改 Realm schema / 迁移后**不得**擅自启动客户端做验证（见 `.cursor/rules/realm-schema-development.mdc`）。

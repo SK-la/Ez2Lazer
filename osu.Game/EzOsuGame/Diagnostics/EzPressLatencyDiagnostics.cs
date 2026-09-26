@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
     /// </summary>
     public static class EzPressLatencyDiagnostics
     {
-        /// <summary>是否采集。进局前由 <see cref="EzDiagnosticSwitches.Apply"/> 写一次；与判定探针各自独立。</summary>
+        /// <summary>是否采集。进局前由 <see cref="EzDiagnosticSwitches.Enabled"/> 赋值时写一次；与判定探针各自独立。</summary>
         public static bool Enabled { get; private set; }
 
         /// <summary>唯一的生产写入口；测试可直接调用。</summary>

@@ -8,7 +8,8 @@ using osu.Game.EzOsuGame.Configuration;
 namespace osu.Game.EzOsuGame.Diagnostics
 {
     /// <summary>
-    /// 诊断探针开关的唯一写入口：每次进局前读一次配置与环境变量，把结果下发到各探针，本局内不再变化。
+    /// 诊断探针开关的唯一写入口：<c>Player</c> 每次进局前给 <see cref="Enabled"/> 赋一次值，
+    /// 赋值即把总开关连同内容选择与探针调参一起下发，本局内不再变化。
     /// </summary>
     /// <remarks>
     /// 必须是「进局前定死」而不是运行期 bindable：探针关闭时热路径上只允许剩下一次静态 bool 读取。
@@ -18,6 +19,25 @@ namespace osu.Game.EzOsuGame.Diagnostics
     /// </remarks>
     public static class EzDiagnosticSwitches
     {
+        private static bool enabled;
+
+        /// <summary>
+        /// 总开关，取值来自 <see cref="Ez2Setting.EzJudgmentDiagEnabled"/>。
+        /// setter 会一并读内容选择与调参环境变量并下发到各探针 —— 写这一处就等于定下整局的诊断范围。
+        /// </summary>
+        /// <remarks>
+        /// <c>EZ_DIAG_PROBES</c> 解析失败直接抛异常，所以坏值会在进局时炸出来，而不是静默降级白跑一整局。
+        /// </remarks>
+        public static bool Enabled
+        {
+            get => enabled;
+            set
+            {
+                enabled = value;
+                applySelection();
+            }
+        }
+
         /// <summary>
         /// Mania 判定热路径计数器是否采集。该探针在 Mania 程序集，<c>osu.Game</c> 无法直接写它的字段，
         /// 所以由这里持有、探针只读。
@@ -46,17 +66,19 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// </summary>
         private const string probe_selection_env = "EZ_DIAG_PROBES";
 
-        /// <summary>读总开关与内容选择并下发到所有探针。由 <c>Player</c> 每次进局前调用一次。</summary>
-        public static void Apply(Ez2ConfigManager config)
+        /// <summary>
+        /// 按 <see cref="Enabled"/> 与内容选择下发到所有探针，并落地调参。
+        /// 只在 <see cref="Enabled"/> 赋值时走一次。
+        /// </summary>
+        private static void applySelection()
         {
             // 总开关决定整套诊断是否工作；子项（内容选择）决定跑哪些。
-            bool suite = config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
             var probes = resolveProbeSelection();
 
-            EzJudgmentDiagnostics.SetEnabled(suite && probes.Judgment);
-            EzPressLatencyDiagnostics.SetEnabled(suite && probes.Press);
-            EzFrameStallDiagnostics.SetEnabled(suite && probes.Frame);
-            JudgeHotPathTrace = suite && probes.JudgeHotPath;
+            EzJudgmentDiagnostics.SetEnabled(enabled && probes.Judgment);
+            EzPressLatencyDiagnostics.SetEnabled(enabled && probes.Press);
+            EzFrameStallDiagnostics.SetEnabled(enabled && probes.Frame);
+            JudgeHotPathTrace = enabled && probes.JudgeHotPath;
 
             FrameLoopAttribution = EzFrameStallDiagnostics.Enabled || EzPressLatencyDiagnostics.Enabled;
 
