@@ -114,7 +114,18 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private record PendingWrite(Guid Id, string Hash, string Md5, int RulesetOnlineId, EzAnalysisResult Analysis, long Timestamp);
 
+        private readonly record struct MemoEntry(bool Found, string Hash, string Md5, int RulesetOnlineId, EzAnalysisResult Result);
+
         private readonly ConcurrentDictionary<Guid, PendingWrite> pendingWrites = new ConcurrentDictionary<Guid, PendingWrite>();
+
+        /// <summary>
+        /// Upper bound on <see cref="sharedReadMemo"/> entries. Counted, not tracked: a full memo is dropped wholesale,
+        /// which costs a re-read of whatever is on screen rather than an eviction policy no caller depends on.
+        /// </summary>
+        private const int shared_read_memo_capacity = 2048;
+
+        private readonly ConcurrentDictionary<Guid, MemoEntry> sharedReadMemo = new ConcurrentDictionary<Guid, MemoEntry>();
+        private long sharedReadMemoGeneration;
         private CancellationTokenSource? writeCts;
         private Task? backgroundWriterTask;
         private bool isDisposed;
@@ -287,6 +298,115 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
+        /// Memoising counterpart of <see cref="TryGet"/>, for readers that revisit the same charts but cannot hold a
+        /// session: song-select panels re-read a chart's KPS columns and JSON every time a carousel panel is bound,
+        /// and scrolling back re-binds the exact same charts.
+        /// </summary>
+        /// <remarks>
+        /// Thread-safe, and deliberately does not keep a connection open — the database file gets deleted and replaced
+        /// when the user switches songs branch. Shares <see cref="ReadSession"/>'s validity rules, so a memo hit is
+        /// indistinguishable from an uncached read. Bounded, because the key space is whatever the user scrolls past.
+        /// </remarks>
+        public bool TryGetMemoised(BeatmapInfo beatmap, out EzAnalysisResult result)
+        {
+            result = default;
+
+            if (!Enabled)
+                return false;
+
+            try
+            {
+                ArgumentNullException.ThrowIfNull(beatmap);
+
+                if (tryReadMemo(sharedReadMemo, ref sharedReadMemoGeneration, beatmap, out var entry))
+                    return resolveMemoEntry(beatmap, entry, out result);
+
+                Initialise();
+
+                using var connection = openConnection();
+                bool found = tryGetRawData(connection, beatmap, out var stored);
+
+                entry = new MemoEntry(found, beatmap.Hash, beatmap.MD5Hash, beatmap.Ruleset.OnlineID, stored);
+
+                if (sharedReadMemo.Count >= shared_read_memo_capacity)
+                    sharedReadMemo.Clear();
+
+                sharedReadMemo[beatmap.ID] = entry;
+
+                return resolveMemoEntry(beatmap, entry, out result);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGetMemoised failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Looks up a memo entry whose fingerprint still matches the chart, dropping the whole memo first if a pending
+        /// write has since landed. Returns <see langword="false"/> when the caller must read SQLite.
+        /// </summary>
+        private bool tryReadMemo(IDictionary<Guid, MemoEntry> memo, ref long observedGeneration, BeatmapInfo beatmap, out MemoEntry entry)
+        {
+            long generation = Interlocked.Read(ref writeGeneration);
+
+            // A flushed batch can add or replace a row the memo already answered from; drop it.
+            if (generation != observedGeneration)
+            {
+                memo.Clear();
+                observedGeneration = generation;
+            }
+
+            if (memo.TryGetValue(beatmap.ID, out var existing)
+                && String.Equals(existing.Hash, beatmap.Hash, StringComparison.Ordinal)
+                && String.Equals(existing.Md5, beatmap.MD5Hash, StringComparison.Ordinal)
+                && existing.RulesetOnlineId == beatmap.Ruleset.OnlineID)
+            {
+                entry = existing;
+                return true;
+            }
+
+            entry = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Pending-write overlay plus the validity gate, applied on every read and never memoised.
+        /// </summary>
+        private bool resolveMemoEntry(BeatmapInfo beatmap, in MemoEntry entry, out EzAnalysisResult result)
+        {
+            result = default;
+
+            if (!entry.Found)
+            {
+                // A pending write may exist for a chart with no stored row yet (the uncached TryGet path serves
+                // exactly this case). Checked on every read, never memoised, so it cannot be missed.
+                if (pendingWrites.TryGetValue(beatmap.ID, out var pending)
+                    && String.Equals(pending.Hash, beatmap.Hash, StringComparison.Ordinal))
+                {
+                    result = pending.Analysis;
+                    return true;
+                }
+
+                return false;
+            }
+
+            result = entry.Result;
+
+            if (pendingWrites.TryGetValue(beatmap.ID, out var overlay)
+                && String.Equals(overlay.Hash, beatmap.Hash, StringComparison.Ordinal))
+                result = mergeAnalysisResult(result, overlay.Analysis);
+
+            if (!isValidAnalysisResult(result))
+            {
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Invalid analysis result for {beatmap.ID}, ignoring cached data.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// One connection + a per-chart memo for a single aggregation pass. Mirrors <see cref="TryGet"/>'s
         /// validation (hash / md5 / ruleset identity, pending-write overlay, validity gate) so a memo hit is
         /// indistinguishable from an uncached read.
@@ -316,56 +436,14 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 try
                 {
-                    long generation = Interlocked.Read(ref owner.writeGeneration);
-
-                    // A flushed batch can add or replace a row the memo already answered from; drop it.
-                    if (generation != observedGeneration)
-                    {
-                        memo.Clear();
-                        observedGeneration = generation;
-                    }
-
-                    string hash = beatmap.Hash;
-                    string md5 = beatmap.MD5Hash;
-                    int rulesetOnlineId = beatmap.Ruleset.OnlineID;
-
-                    if (!memo.TryGetValue(beatmap.ID, out var entry)
-                        || !String.Equals(entry.Hash, hash, StringComparison.Ordinal)
-                        || !String.Equals(entry.Md5, md5, StringComparison.Ordinal)
-                        || entry.RulesetOnlineId != rulesetOnlineId)
+                    if (!owner.tryReadMemo(memo, ref observedGeneration, beatmap, out var entry))
                     {
                         bool found = owner.tryGetRawData(connection, beatmap, out var stored);
-                        entry = new MemoEntry(found, hash, md5, rulesetOnlineId, stored);
+                        entry = new MemoEntry(found, beatmap.Hash, beatmap.MD5Hash, beatmap.Ruleset.OnlineID, stored);
                         memo[beatmap.ID] = entry;
                     }
 
-                    if (!entry.Found)
-                    {
-                        // A pending write may exist for a chart with no stored row yet (the uncached TryGet path
-                        // serves exactly this case). Checked on every read, never memoised, so it cannot be missed.
-                        if (owner.pendingWrites.TryGetValue(beatmap.ID, out var pending)
-                            && String.Equals(pending.Hash, hash, StringComparison.Ordinal))
-                        {
-                            result = pending.Analysis;
-                            return true;
-                        }
-
-                        return false;
-                    }
-
-                    result = entry.Result;
-
-                    if (owner.pendingWrites.TryGetValue(beatmap.ID, out var overlay)
-                        && String.Equals(overlay.Hash, hash, StringComparison.Ordinal))
-                        result = mergeAnalysisResult(result, overlay.Analysis);
-
-                    if (!isValidAnalysisResult(result))
-                    {
-                        Logger.Log($"[EzManiaAnalysisPersistentStore] Invalid analysis result for {beatmap.ID}, ignoring cached data.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                        return false;
-                    }
-
-                    return true;
+                    return owner.resolveMemoEntry(beatmap, entry, out result);
                 }
                 catch (Exception e)
                 {
@@ -375,8 +453,6 @@ namespace osu.Game.EzOsuGame.Analysis
             }
 
             public void Dispose() => connection.Dispose();
-
-            private readonly record struct MemoEntry(bool Found, string Hash, string Md5, int RulesetOnlineId, EzAnalysisResult Result);
         }
 
         /// <summary>

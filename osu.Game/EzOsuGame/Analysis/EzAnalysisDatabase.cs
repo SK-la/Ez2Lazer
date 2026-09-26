@@ -97,7 +97,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!tryCreateStoredLookup(beatmapInfo, rulesetInfo, mods: null, out var lookup))
                 return false;
 
-            return persistentStore.TryGet(lookup.BeatmapInfo, out result);
+            return persistentStore.TryGetMemoised(lookup.BeatmapInfo, out result);
         }
 
         /// <summary>
