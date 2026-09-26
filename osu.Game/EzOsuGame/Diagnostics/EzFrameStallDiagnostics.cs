@@ -77,30 +77,25 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         // 「FSC 子树 vs 其余」归因：FrameStabilityContainer 在每轮 UpdateSubTree 末尾回报一次，
         // 本探针在随后同帧的 RecordFrame 里读。
-        private static double subtreeMs;
-        private static double clockMs;
-        private static long loopAllocBytes;
-        private static bool frameValid;
-        private static int lastUpdateIterations;
 
         /// <summary>[Ez] 上一轮 FSC 子树（<c>base.UpdateSubTree</c>）耗时；供帧探针与按键探针读，不参与游戏逻辑。</summary>
-        public static double SubtreeMs => subtreeMs;
+        public static double SubtreeMs { get; private set; }
 
         /// <summary>[Ez] 上一轮 <c>FrameStabilityContainer.updateClock</c> 累计耗时（catch-up 时为多次之和）。</summary>
-        public static double ClockMs => clockMs;
+        public static double ClockMs { get; private set; }
 
         /// <summary>[Ez] 上一轮 FSC 全程（时钟 + 子树 + masking）的分配字节数；仅 Deep 模式有值。</summary>
-        public static long LoopAllocBytes => loopAllocBytes;
+        public static long LoopAllocBytes { get; private set; }
 
         /// <summary>[Ez] 上一轮是否真的跑了子树。暂停时 <c>updateClock</c> 提前返回、子树不跑，
         /// 这种帧的耗时不能算进归因均值，否则会把子树占比拉低。</summary>
-        public static bool FrameValid => frameValid;
+        public static bool FrameValid { get; private set; }
 
         /// <summary>
         /// [Ez] 上一轮 FSC <c>UpdateSubTree</c> 的子树趟数；大于 1 表示 catch-up。
         /// 帧探针写明细、按键探针记按键落在第几趟，都只读不改。不参与游戏逻辑。
         /// </summary>
-        public static int LastUpdateIterations => lastUpdateIterations;
+        public static int LastUpdateIterations { get; private set; }
 
         /// <summary>
         /// FSC 每轮 <c>UpdateSubTree</c> 末尾的归因回报（耗时/分配/趟数）。
@@ -108,11 +103,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// </summary>
         internal static void ReportLoop(double subtree, double clock, long allocBytes, bool ranSubtree, int iterations)
         {
-            subtreeMs = subtree;
-            clockMs = clock;
-            loopAllocBytes = allocBytes;
-            frameValid = ranSubtree;
-            lastUpdateIterations = iterations;
+            SubtreeMs = subtree;
+            ClockMs = clock;
+            LoopAllocBytes = allocBytes;
+            FrameValid = ranSubtree;
+            LastUpdateIterations = iterations;
         }
 
         /// <summary>
@@ -227,13 +222,13 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         // 桶宽 0.1ms，桶数 1024 → 覆盖到 102.3ms；超出者并入末桶。
         // 用 int 计数：一个 play 的帧数在十万量级，不会溢出。
-        private static readonly Histogram withoutPress = new Histogram();
-        private static readonly Histogram withPress = new Histogram();
+        private static readonly Histogram without_press = new Histogram();
+        private static readonly Histogram with_press = new Histogram();
 
         private static FrameSample[] details = new FrameSample[detail_capacity];
         private static int detailCursor;
         private static int detailCount;
-        private static long detailOverwritten;
+        public static long DetailOverwritten;
 
         // 帧边界状态
         private static long lastFrameTimestamp;
@@ -285,8 +280,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
         //   * presentAge 的分辨率是**一个 draw 周期**（读不到被绘制的 buffer 帧号，只能拿「上一次 update 帧边界」
         //     当零点，而 draw 手上的 buffer 可能更早），所以它只能判约 1ms 以上的滞后，判不了亚毫秒配对抖动。
         private static GameHost? gameHost;
-        private static readonly Histogram drawPeriod = new Histogram(0.02);
-        private static readonly Histogram presentAge = new Histogram(0.02);
+        private static readonly Histogram draw_period = new Histogram(0.02);
+        private static readonly Histogram present_age = new Histogram(0.02);
         private static double drawOriginOffsetMs = double.NaN;
         private static double lastDrawClockMs = double.NaN;
         private static double drawPeriodSumMs;
@@ -310,8 +305,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
         // 把报告值 + 距上次跳变的时长（缓冲内已播进度）还原成连续位置，再看 interp 离它多远。
         private static double prevAudioSrcMs = double.NaN;
         private static double prevInterpMs = double.NaN;
-        private static readonly Histogram audioStep = new Histogram();
-        private static readonly Histogram interpErr = new Histogram(0.01);
+        private static readonly Histogram audio_step = new Histogram();
+        private static readonly Histogram interp_err = new Histogram(0.01);
         private static double lastAudioStepWallMs = double.NaN;
 
         /// <summary>源位置「停走超过一个正常步进周期再补上」的次数与停走总时长。NAudio 漏拉一次 buffer 就是这个形状。</summary>
@@ -319,8 +314,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static double pullMissHoldMs;
 
         /// <summary>判定漏拉的停走窗口；正常步进周期是 10ms，一次漏拉停 ~20ms，再长的停走是暂停/seek，不算。</summary>
-        private const double PULL_MISS_HOLD_MS = 15;
-        private const double PULL_MISS_MAX_MS = 60;
+        private const double pull_miss_hold_ms = 15;
+        private const double pull_miss_max_ms = 60;
 
         private static long rateSkipped;
         private static long clockStoppedFrames;
@@ -331,7 +326,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// 歌曲结束后的退场 / 结算段是**另一个工况**：子树已拆（`subtree=0`）、update 掉到 ~120 Hz。
         /// 实测一次 39 s 的采集里 327 个 >5 ms 帧有 316 个落在这一段。present 采样要排除它，
         /// 否则 update 采样频率比 draw 还低，会整段整段漏掉 draw 帧，把 `coverage` 拉到 0.87 以下
-        /// （该数只能由 <see cref="FormatSummary"/> 的 present 行自检看出来）。帧耗时直方图不排除
+        /// （该数只能由 <see cref="formatSummary"/> 的 present 行自检看出来）。帧耗时直方图不排除
         /// （跨局可比性优先），但读 `over5` 时要记得减去这 300 帧量级的退场段。
         /// </remarks>
         private static bool clockFrozen;
@@ -345,7 +340,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         private static double errBaseline = double.NaN;
         private static long driftCount;
         /// <summary>时钟误差基线的 EMA 时间常数：估掉「音频输出延迟」那个常数，只留抖动。</summary>
-        private const double ERR_BASELINE_MS = 500;
+        private const double err_baseline_ms = 500;
         private static double driftMin = double.MaxValue;
         private static double driftMax = double.MinValue;
         private static double driftSum;
@@ -437,7 +432,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 drawOriginOffsetMs = originGapMs;
 
             presentFrames++;
-            drawPeriod.Add(periodMs);
+            draw_period.Add(periodMs);
             drawPeriodSumMs += periodMs;
             drawSleptTotalMs += drawClock.TimeSlept;
 
@@ -450,7 +445,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             // 「本帧什么时候上屏」估计为「本帧边界 + 本帧自身耗时」，而自身耗时只能拿上一帧的：
             //   ElapsedFrameTime = 上一帧的整周期 = 上一帧耗时 + 上一帧被限制器 sleep 的部分，
             // 所以上一帧耗时 = period − TimeSlept（两个读数恰好都来自上一帧）。用 period 会把它高估一个 sleep。
-            presentAge.Add(drawNowMs + drawOriginOffsetMs + periodMs - drawClock.TimeSlept - prevTicks * 1000.0 / Stopwatch.Frequency);
+            present_age.Add(drawNowMs + drawOriginOffsetMs + periodMs - drawClock.TimeSlept - prevTicks * 1000.0 / Stopwatch.Frequency);
         }
 
         /// <summary>
@@ -541,7 +536,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             if (pressesInFrame > 0)
             {
-                withPress.Add(elapsedMs);
+                with_press.Add(elapsedMs);
                 pressFrameCount++;
 
                 if (sincePrevFrameMinMs != double.MaxValue)
@@ -550,7 +545,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 pressColumnTotalMs += pressColumnMsInFrame;
             }
             else
-                withoutPress.Add(elapsedMs);
+                without_press.Add(elapsedMs);
 
             double gcPauseDeltaMs = Deep ? (gcPauseTicks - lastGcPauseTicks) / (double)TimeSpan.TicksPerMillisecond : 0;
             long threadAllocDelta = Deep ? threadAllocated - lastThreadAllocated : 0;
@@ -562,11 +557,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 processAllocatedTotal += processAllocated - lastProcessAllocated;
 
                 // 暂停帧没有子树，算进来会把子树占比拉低。
-                if (frameValid)
+                if (FrameValid)
                 {
-                    subtreeMsTotal += subtreeMs;
-                    clockMsTotal += clockMs;
-                    loopAllocTotal += loopAllocBytes;
+                    subtreeMsTotal += SubtreeMs;
+                    clockMsTotal += ClockMs;
+                    loopAllocTotal += LoopAllocBytes;
                     // 帧长必须用同一批帧，否则子树占比的分子分母不同源。
                     elapsedProbeTotalMs += elapsedMs;
                     probeFrames++;
@@ -589,11 +584,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     pressesInFrame,
                     pressColumnMsInFrame,
                     pressesInFrame > 0 && sincePrevFrameMinMs != double.MaxValue ? sincePrevFrameMinMs : double.NaN,
-                    lastUpdateIterations,
+                    LastUpdateIterations,
                     gen0 - lastGen0,
                     gen1 - lastGen1,
-                    subtreeMs,
-                    loopAllocBytes,
+                    SubtreeMs,
+                    LoopAllocBytes,
                     audioSrcMs,
                     interpMs);
 
@@ -602,7 +597,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 if (detailCursor >= detail_capacity)
                 {
                     detailCursor = 0;
-                    Interlocked.Increment(ref detailOverwritten);
+                    Interlocked.Increment(ref DetailOverwritten);
                 }
 
                 if (detailCount < detail_capacity)
@@ -633,7 +628,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
                 // 反向步进只可能来自 seek，不计入步长分布（Histogram 会把负值塞进第 0 桶，污染判读）。
                 if (step >= 0)
-                    audioStep.Add(step);
+                    audio_step.Add(step);
 
                 // 音频报告值跳变 ⇒ 一个新的缓冲被播完，缓冲内已播进度清零。
                 if (step != 0)
@@ -642,7 +637,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                     {
                         double holdMs = EzProbeOutput.WallClockMs - lastAudioStepWallMs;
 
-                        if (holdMs > PULL_MISS_HOLD_MS && holdMs < PULL_MISS_MAX_MS)
+                        if (holdMs > pull_miss_hold_ms && holdMs < pull_miss_max_ms)
                         {
                             pullMissCount++;
                             pullMissHoldMs += holdMs;
@@ -684,14 +679,14 @@ namespace osu.Game.EzOsuGame.Diagnostics
                         if (double.IsNaN(errBaseline))
                             errBaseline = err;
                         else
-                            errBaseline += (err - errBaseline) * Math.Min(1.0, elapsedMs / ERR_BASELINE_MS);
+                            errBaseline += (err - errBaseline) * Math.Min(1.0, elapsedMs / err_baseline_ms);
 
                         double dev = Math.Abs(err - errBaseline);
 
                         if (dev > errMaxAbs)
                             errMaxAbs = dev;
 
-                        interpErr.Add(dev);
+                        interp_err.Add(dev);
 
                         if (dev > 0.5) errOver05++;
                         if (dev > 1) errOver1++;
@@ -729,18 +724,18 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         public static void Clear()
         {
-            withoutPress.Reset();
-            withPress.Reset();
+            without_press.Reset();
+            with_press.Reset();
 
             Interlocked.Exchange(ref details, new FrameSample[detail_capacity]);
             detailCursor = 0;
             detailCount = 0;
-            Interlocked.Exchange(ref detailOverwritten, 0);
+            Interlocked.Exchange(ref DetailOverwritten, 0);
 
             lastFrameTimestamp = 0;
             frameIndex = 0;
-            drawPeriod.Reset();
-            presentAge.Reset();
+            draw_period.Reset();
+            present_age.Reset();
             presentFrames = 0;
             presentSkipped = 0;
             presentDuplicates = 0;
@@ -769,8 +764,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             prevAudioSrcMs = double.NaN;
             prevInterpMs = double.NaN;
-            audioStep.Reset();
-            interpErr.Reset();
+            audio_step.Reset();
+            interp_err.Reset();
             wasapiReadSnapshot = null;
             clockFrozen = false;
             lastAudioStepWallMs = double.NaN;
@@ -838,7 +833,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             // 全帧分布只存在于摘要里（CSV 按定义只有尾部），所以摘要必须和 CSV 一起落盘，
             // 不能只丢进日志——日志路径随运行方式变化，分析脚本没法可靠地找到它。
-            return EzProbeOutput.WriteAsync("framestall", sb.ToString(), sampleCount, "EzFrameStall", FormatSummary());
+            return EzProbeOutput.WriteAsync("framestall", sb.ToString(), sampleCount, "EzFrameStall", formatSummary());
         }
 
         private static long sumBuckets(long[] buckets)
@@ -896,9 +891,9 @@ namespace osu.Game.EzOsuGame.Diagnostics
             return count;
         }
 
-        private static string FormatSummary()
+        private static string formatSummary()
         {
-            long frames = withoutPress.Count + withPress.Count;
+            long frames = without_press.Count + with_press.Count;
 
             if (frames == 0)
                 return "[EzFrameStall] no frames";
@@ -910,7 +905,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 $"[EzFrameStall] frames={frames} span={wallSeconds:F1}s threshold={ThresholdMs:F2}ms "
                 + $"mode={(Deep ? "deep" : "light")} "
                 + $"stallFrames={stallFrames} (withPress={stallFramesWithPress}) "
-                + $"overwritten={Interlocked.Read(ref detailOverwritten)} ");
+                + $"overwritten={Interlocked.Read(ref DetailOverwritten)} ");
 
             if (!Deep)
             {
@@ -955,7 +950,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                   .Append(" frozenSkipped=").Append(presentFrozenSkipped)
                   .Append(CultureInfo.InvariantCulture, $" coverage={drawPeriodSumMs / Math.Max(1, presentLastWallMs - presentFirstWallMs):F3}")
                   .Append(" drawPeriod");
-                sb.Append(drawPeriod.Format());
+                sb.Append(draw_period.Format());
 
                 // 「相邻两次 present 的间隔」由 draw 线程自己的时钟测。update 侧看到的帧一直很稳，
                 // 但 draw 线程单独卡一下 update 探针是看不见的——那一下就是屏幕上的一次跳帧，所以这里要看的是尾部。
@@ -963,7 +958,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 // buffer 帧号），所以带一个 draw 周期量级的配对不确定度，只用来判毫秒级以上的滞后。
                 sb.Append(Environment.NewLine);
                 sb.Append("  presentAge");
-                sb.Append(presentAge.Format());
+                sb.Append(present_age.Format());
 
                 var host = gameHost;
 
@@ -985,10 +980,10 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             // 音频时钟：源是不是阶梯、插值有没有把阶梯抹平。note 位置取自插值时钟，所以这是「下落顺不顺滑」的直接判据；
             // 也是 ~10Hz 的判定/按键探针看不见 100Hz 结构的原因（见 docs/EZ-PERFORMANCE.md §2.4.11）。
-            if (audioStep.Count > 0)
+            if (audio_step.Count > 0)
             {
-                long stepFrames = audioStep.Count;
-                long stepNonZero = audioStep.CountOver(0.1);
+                long stepFrames = audio_step.Count;
+                long stepNonZero = audio_step.CountOver(0.1);
 
                 sb.Append(Environment.NewLine);
                 sb.Append(CultureInfo.InvariantCulture,
@@ -998,8 +993,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.Append(Environment.NewLine);
                 sb.Append(CultureInfo.InvariantCulture,
                     $"  audioStep nonzero={100 * stepNonZero / (double)stepFrames:F2}% "
-                    + $"mean={audioStep.Mean:F4}ms top:");
-                sb.Append(audioStep.FormatBuckets(5));
+                    + $"mean={audio_step.Mean:F4}ms top:");
+                sb.Append(audio_step.FormatBuckets(5));
 
                 if (errCount > 0)
                 {
@@ -1021,7 +1016,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                         sb.Append(CultureInfo.InvariantCulture, $" pullMiss={pullMissCount}({pullMissCount / Math.Max(1, spanS):F1}/s,hold{pullMissHoldMs:F0}ms)");
 
                     sb.Append(CultureInfo.InvariantCulture,
-                        $" std={errStd:F3}ms p99={interpErr.Percentile(0.99):F3}ms maxdev={errMaxAbs:F3}ms "
+                        $" std={errStd:F3}ms p99={interp_err.Percentile(0.99):F3}ms maxdev={errMaxAbs:F3}ms "
                         + $"offset={errMean:F2}ms 超[0.5/1/2]ms={100 * errOver05 / (double)errCount:F2}/{100 * errOver1 / (double)errCount:F2}/{100 * errOver2 / (double)errCount:F2}%");
 
                     // drift 只是 interp − 音频报告值：含音频偏移常数与缓冲锯齿，幅度天然≈缓冲步长，别单独当抖动读。
@@ -1056,13 +1051,13 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             // 两组分布并排，是「一次按键把帧拉长了多少」的直接答案。
             sb.Append(Environment.NewLine);
-            sb.Append("noPress  ").Append(withoutPress.Format());
+            sb.Append("noPress  ").Append(without_press.Format());
             sb.Append(Environment.NewLine);
-            sb.Append("withPress").Append(withPress.Format());
+            sb.Append("withPress").Append(with_press.Format());
 
             if (pressFrameCount > 0)
             {
-                double meanElapsed = withPress.Sum / pressFrameCount;
+                double meanElapsed = with_press.Sum / pressFrameCount;
                 double meanSincePrev = sincePrevFrameTotalMs / pressFrameCount;
                 double meanColumn = pressColumnTotalMs / pressFrameCount;
 

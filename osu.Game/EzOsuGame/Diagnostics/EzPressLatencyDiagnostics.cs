@@ -141,15 +141,15 @@ namespace osu.Game.EzOsuGame.Diagnostics
             double TotalMs);
 
         /// <summary>「本局前几次按键」配额：输入路径自身的冷成本（键音池、按键历史、路由惰性表）。</summary>
-        public const int BreakdownFirstPressQuota = 16;
+        public const int BREAKDOWN_FIRST_PRESS_QUOTA = 16;
 
         /// <summary>
         /// 「本局前几次已判定按键」配额：按判定与结果扇出（<c>UpdateResult</c> → <c>ApplyResult</c> → 结果订阅者）
         /// 的冷成本。它必须独立于按键配额——引导期空按可以把按键配额占满，而首个判定恰恰是要看的对象。
         /// </summary>
-        public const int BreakdownJudgedQuota = 8;
+        public const int BREAKDOWN_JUDGED_QUOTA = 8;
 
-        private const int breakdown_capacity = BreakdownFirstPressQuota + BreakdownJudgedQuota;
+        private const int breakdown_capacity = BREAKDOWN_FIRST_PRESS_QUOTA + BREAKDOWN_JUDGED_QUOTA;
 
         /// <summary>取时间戳的硬上限：判定极少（短局、或整局大量空按）时，防止整局都在取样。</summary>
         private const int breakdown_sample_cap = 192;
@@ -167,7 +167,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         public static bool BreakdownActive =>
             Enabled
             && breakdownSampled < breakdown_sample_cap
-            && (firstPressStored < BreakdownFirstPressQuota || judgedStored < BreakdownJudgedQuota);
+            && (firstPressStored < BREAKDOWN_FIRST_PRESS_QUOTA || judgedStored < BREAKDOWN_JUDGED_QUOTA);
 
         /// <summary>记一次按键的分段：先按「前几次按键」配额填，超出后只收已判定按键（判定配额）。</summary>
         public static void RecordBreakdown(in PressBreakdown sample)
@@ -175,7 +175,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             if (!Enabled || breakdownCount >= breakdown_capacity)
                 return;
 
-            if (firstPressStored < BreakdownFirstPressQuota)
+            if (firstPressStored < BREAKDOWN_FIRST_PRESS_QUOTA)
             {
                 breakdown[breakdownCount++] = sample;
                 firstPressStored++;
@@ -186,7 +186,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 return;
             }
 
-            if (sample.Judged && judgedStored < BreakdownJudgedQuota)
+            if (sample.Judged && judgedStored < BREAKDOWN_JUDGED_QUOTA)
             {
                 breakdown[breakdownCount++] = sample;
                 judgedStored++;
