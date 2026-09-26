@@ -3,6 +3,7 @@
 
 using System.Threading;
 using System.Threading.Tasks;
+using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
@@ -14,6 +15,7 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
     public class PixivBackgroundCoordinator
     {
         private readonly Ez2ConfigManager ezConfig;
+        private readonly IBindable<string> apiProxyBaseUrlBindable;
         private int songChangeDownloadInFlight;
 
         private long lastIllustId;
@@ -34,7 +36,9 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             Images = new PixivImageStore(storage, ezConfig);
             Catalog = new PixivFollowFeedCatalog(Api, Auth, Images);
 
-            ezConfig.GetBindable<string>(Ez2Setting.PixivApiProxyBaseUrl).BindValueChanged(_ => Catalog.Invalidate());
+            // 必须持有副本：框架只把绑定副本登记为 WeakReference，副本被 GC 回收后订阅会静默失效。
+            apiProxyBaseUrlBindable = ezConfig.GetBindable<string>(Ez2Setting.PixivApiProxyBaseUrl);
+            apiProxyBaseUrlBindable.BindValueChanged(_ => Catalog.Invalidate());
         }
 
         /// <summary>

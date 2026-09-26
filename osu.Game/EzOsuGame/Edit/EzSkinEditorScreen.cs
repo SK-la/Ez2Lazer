@@ -277,20 +277,7 @@ namespace osu.Game.EzOsuGame.Edit
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             bindConfigPreviewRefresh();
-            bindColumnKeyModePreviewRefresh();
             bindSceneBarPlayback();
-        }
-
-        private void bindColumnKeyModePreviewRefresh()
-        {
-            var keyModeBindable = ezSkinConfig.GetBindable<int>(Ez2Setting.ColumnTypeListSelect);
-            retainedBindingCopies.Add(keyModeBindable);
-
-            keyModeBindable.BindValueChanged(_ =>
-            {
-                if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Colour)
-                    Schedule(refreshPreviewContent);
-            });
         }
 
         protected override void Update()
@@ -1176,8 +1163,12 @@ namespace osu.Game.EzOsuGame.Edit
 
             configPreviewRefreshBound = true;
 
+            // 绑定副本必须由本屏幕持有：框架只登记 WeakReference，副本被 GC 回收后订阅会静默失效。
             foreach (var setting in EzSkinJsonSettingCatalog.All)
-                EzSkinJsonBridge.BindSettingValueChanged(ezSkinConfig, setting, () => Schedule(refreshPreviewContent));
+            {
+                if (EzSkinJsonBridge.BindSettingValueChanged(ezSkinConfig, setting, () => Schedule(refreshPreviewContent)) is IBindable bindable)
+                    retainedBindingCopies.Add(bindable);
+            }
         }
 
         private void refreshPreviewContent()

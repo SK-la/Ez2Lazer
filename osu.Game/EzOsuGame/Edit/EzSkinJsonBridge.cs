@@ -129,23 +129,30 @@ namespace osu.Game.EzOsuGame.Edit
 
         public static Type? GetBindableValueType(Ez2Setting setting) => getBindableValueType(setting);
 
-        public static void BindSettingValueChanged(Ez2ConfigManager config, Ez2Setting setting, Action onChanged)
+        /// <summary>
+        /// 订阅设置变化，返回承载该订阅的绑定副本。
+        /// 框架只把 <c>GetBindable</c> 返回的副本登记为 WeakReference，
+        /// 调用方必须持有返回值，否则副本被 GC 回收后订阅会静默失效。
+        /// </summary>
+        public static IBindable? BindSettingValueChanged(Ez2ConfigManager config, Ez2Setting setting, Action onChanged)
         {
             var valueType = getBindableValueType(setting);
 
             if (valueType == null)
-                return;
+                return null;
 
             var method = typeof(EzSkinJsonBridge).GetMethod(nameof(bindSettingValueChangedGeneric), BindingFlags.Static | BindingFlags.NonPublic)!
                                                  .MakeGenericMethod(valueType);
 
-            method.Invoke(null, new object[] { config, setting, onChanged });
+            return (IBindable?)method.Invoke(null, new object[] { config, setting, onChanged });
         }
 
-        private static void bindSettingValueChangedGeneric<T>(Ez2ConfigManager config, Ez2Setting setting, Action onChanged)
+        private static IBindable bindSettingValueChangedGeneric<T>(Ez2ConfigManager config, Ez2Setting setting, Action onChanged)
             where T : notnull
         {
-            config.GetBindable<T>(setting).BindValueChanged(_ => onChanged());
+            var bindable = config.GetBindable<T>(setting);
+            bindable.BindValueChanged(_ => onChanged());
+            return bindable;
         }
 
         private static Type? getBindableValueType(Ez2Setting setting)
