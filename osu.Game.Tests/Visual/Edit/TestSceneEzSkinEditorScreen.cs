@@ -43,6 +43,16 @@ namespace osu.Game.Tests.Visual.Edit
 
         private EzSkinEditorScreen editorScreen = null!;
 
+        [SetUpSteps]
+        public override void SetUpSteps()
+        {
+            base.SetUpSteps();
+
+            // 测试会导入并选中的皮肤会留在 SkinManager 里，影响后续用例（例如「内置皮肤下导出应禁用」）。
+            // 每个用例都从内置皮肤起步。
+            AddStep("reset skin", () => skinManager.CurrentSkinInfo.SetDefault());
+        }
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
