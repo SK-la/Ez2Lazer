@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
     /// </summary>
     /// <remarks>
     /// <para>
-    /// 池在开局（<see cref="LoadComplete"/>）就把本局 <see cref="DrawableRuleset.Objects"/>（含子对象与
+    /// 池在开局（<see cref="LoadAsyncComplete"/>）就把本局 <see cref="DrawableRuleset.Objects"/>（含子对象与
     /// <see cref="HitObject.AuxiliarySamples"/>）用到的 sample 全部解析掉，此后每次触发只做「查表 → 取通道 → 播」，
     /// 不再中途查皮肤、不再中途往 drawable 层级里增删任何东西。常驻通道数由音频名数量决定，不随进度增长。
     /// </para>
@@ -95,9 +95,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
             source.SourceChanged += onSourceChanged;
         }
 
-        protected override void LoadComplete()
+        protected override void LoadAsyncComplete()
         {
-            base.LoadComplete();
+            // 预解析放在加载线程的 LoadAsyncComplete（而非 update 线程的 LoadComplete）：
+            // 本局谱面用到的 sample 可能成千上万，放在 LoadComplete 会把整段皮肤查表压在进局首帧上。
+            // 时机与上游 SkinnableSound 解析 sample 的时机一致，且在 Ready 之前完成，调用方不可见。
+            base.LoadAsyncComplete();
 
             registerBeatmapSamples();
         }
