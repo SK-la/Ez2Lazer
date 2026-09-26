@@ -186,6 +186,9 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.HitPositionGlobalEnable, false);
             SetDefault(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange, false);
+
+            // 启动时读取一次（见 SkinManager.ScriptedSkinsEnabled），改动需重启生效。
+            SetDefault(Ez2Setting.EnableScriptedSkins, false);
             SetDefault(Ez2Setting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
             SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
             SetDefault(Ez2Setting.HitTargetAlpha, 0.6, 0, 1, 0.01);
@@ -1086,6 +1089,12 @@ namespace osu.Game.EzOsuGame.Configuration
         /// When enabled, switching skins applies per-skin EzSkin.json to in-memory Ez config only.
         /// </summary>
         EzSkinJsonAutoApplyOnSkinChange,
+
+        /// <summary>
+        /// 脚本皮肤总开关。关闭时不扫描 <c>EzResources/ScriptedSkin</c>、不监视脚本文件、不做任何脚本编译。
+        /// 属启动期一次性读取的开关（不参与响应式绑定），改动后需重启生效。
+        /// </summary>
+        EnableScriptedSkins,
         GlobalTextureName,
         GameThemeName,
 
