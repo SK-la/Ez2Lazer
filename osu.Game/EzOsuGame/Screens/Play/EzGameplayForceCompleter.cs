@@ -39,7 +39,7 @@ namespace osu.Game.EzOsuGame.Screens.Play
 
             if (!scoreProcessor.HasCompleted.Value && scoreProcessor.JudgedHits >= scoreProcessor.MaximumJudgements)
             {
-                double seekTarget = Math.Max(beatmap.GetLastObjectTime(), 0) + 100;
+                double seekTarget = Math.Max(beatmap.GetLastObjectTime(), 0) + 500;
                 clock.Seek(seekTarget);
             }
         }
