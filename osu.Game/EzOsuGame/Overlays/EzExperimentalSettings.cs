@@ -361,15 +361,16 @@ namespace osu.Game.EzOsuGame.Overlays
             + "\nDefault output path: Desktop/EzDiag/");
 
         internal static readonly LocalisableString EZ_TIMING_TRACE_ENABLED = new EzLocalizationManager.EzLocalisableString(
-            "启用 Ez 时序追踪", "Enable Ez Timing Trace");
+            "启用 Ez 结算流程时序追踪", "Enable Ez Results-Flow Timing Trace");
 
         internal static readonly LocalisableString EZ_TIMING_TRACE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(研究功能)在游戏结束后，输出本局判定信息到.csv文件。"
-            + "\n追踪按键输入与音频的时序关系, 用于检查打击音效的时序。"
-            + "\n默认输出路径：桌面/EzDiag/",
-            "(Testing feature) Output judgment information to a .csv file after the game ends."
-            + "\nTrack the timing relationship between key input and audio, used to check the timing of hit sounds."
-            + "\nDefault output path: Desktop/EzDiag/");
+            "(研究功能)在游戏结束时，把本局从开局到结算/退出的关键节点时序写入 .csv（列：WallMs / Tag / Extra）。"
+            + "\n用于诊断结算界面卡住、HasCompleted 与 HasPassed 来回翻转等状态竞争。"
+            + "\n默认输出路径：仓库目录下 diagnostics/；找不到仓库时退回桌面/EzDiag/。",
+            "(Testing feature) On gameplay exit, writes the wallclock timeline of key lifecycle nodes"
+            + " (gameplay start → results/exit) to a .csv (columns: WallMs / Tag / Extra)."
+            + "\nUse it to diagnose a stalled results screen and HasCompleted / HasPassed completion races."
+            + "\nDefault output path: <repo>/diagnostics/; falls back to Desktop/EzDiag/.");
 
         internal static readonly LocalisableString INPUT_AUDIO_LATENCY_TRACKER = new EzLocalizationManager.EzLocalisableString(
             "输入音频延迟追踪器", "Input Audio Latency Tracker");
