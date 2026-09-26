@@ -317,6 +317,12 @@ namespace osu.Game.Screens.Play
             if (game != null)
                 gameActive.BindTo(game.IsActive);
 
+            // [Ez] 进局前一口断定：诊断套件（总开关 + EZ_DIAG_PROBES 子项 + 探针调参环境变量）与结算流程
+            // 时序追踪都在这里读一次。之后局内任何代码只读冻结值、不再读配置，所以没有「运行到某处才发现
+            // 现在能不能用」的分支。放在这里而不是启动时，是为了让设置改完下一局即生效；热路径代价不变。
+            EzOsuGame.Diagnostics.EzDiagnosticSwitches.Apply(ez2Config);
+            EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
+
             DrawableRuleset = ruleset.CreateDrawableRulesetWith(playableBeatmap, gameplayMods);
             dependencies.CacheAs(DrawableRuleset);
 
@@ -340,10 +346,7 @@ namespace osu.Game.Screens.Play
                 LatencyTracker.Start();
             }
 
-            // [Ez] 诊断套件开关（总开关 + 子项 + 探针调参环境变量）是**进程级**的，启动时由
-            // `EzDiagnosticSwitches.Apply` 一次落地，这里不再重读配置与环境变量。
-            // 例外：结算流程时序追踪不在套件内，仍由自己的设置项控制 —— 进图读一次，改完下一局即生效（无需重启）。
-            EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
+            // [Ez] 诊断开关已在进局前落地（见本方法开头），这里只剩子帧校正自己的设置项。
             EzOsuGame.Timing.EzSubFrameCorrection.Enabled = ez2Config.Get<bool>(Ez2Setting.EzSubFrameCorrectionEnabled);
 
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);

@@ -1182,10 +1182,10 @@ namespace osu.Game.EzOsuGame.Configuration
 
         // 判定时序诊断与校正
         /// <summary>
-        /// 诊断套件总开关：决定启动时整套诊断是否工作。跑哪些内容由 <c>EZ_DIAG_PROBES</c>
-        /// 环境变量在启动时选择（见 <c>EzDiagnosticSwitches.Apply</c>），不落成设置项 ——
+        /// 诊断套件总开关：决定整套诊断是否工作。跑哪些内容由 <c>EZ_DIAG_PROBES</c>
+        /// 环境变量选择（见 <c>EzDiagnosticSwitches.Apply</c>），不落成设置项 ——
         /// 「这次实验想验什么」是实验意图，不是用户偏好。
-        /// 与子项选择一样是**进程级**的，启动时读一次，之后不再变化。
+        /// 与子项选择一样，进局前一口断定、本局内不再变化，所以改完下一局生效。
         /// </summary>
         EzJudgmentDiagEnabled,
 

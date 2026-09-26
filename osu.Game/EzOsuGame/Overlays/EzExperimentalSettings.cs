@@ -356,12 +356,12 @@ namespace osu.Game.EzOsuGame.Overlays
             "启用 Ez 诊断套件", "Enable Ez Diagnostics Suite");
 
         internal static readonly LocalisableString EZ_DIAG_SUITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(研究功能)总开关。开启后整套探针在启动时开始工作，每局结束把本局数据写成 CSV。"
-            + "\n**重启游戏后生效**（关闭时为零开销，热路径上不留任何探针逻辑）。"
+            "(研究功能)总开关。开启后整套探针在每次进局前开始工作，每局结束把本局数据写成 CSV。"
+            + "\n**下一局进局前生效**（关闭时为零开销，热路径上不留任何探针逻辑）。"
             + "\n跑哪些内容由环境变量 EZ_DIAG_PROBES 选择（judgment / press / frame / hotpath / all；空 = 全部）。"
             + "\n输出目录：仓库内 diagnostics/（找不到仓库时退回桌面 EzDiag/）。",
-            "(Testing feature) Master switch. When on, the probe suite starts working at launch and writes CSVs after every play."
-            + "\nTakes effect after restarting the game (zero cost while off)."
+            "(Testing feature) Master switch. When on, the probe suite starts working at the beginning of every play and writes CSVs after each play."
+            + "\nTakes effect at the beginning of the next play (zero cost while off)."
             + "\nWhich probes run is chosen by the EZ_DIAG_PROBES environment variable (judgment / press / frame / hotpath / all; empty = all)."
             + "\nOutput: diagnostics/ inside the repository (falls back to Desktop/EzDiag/).");
 

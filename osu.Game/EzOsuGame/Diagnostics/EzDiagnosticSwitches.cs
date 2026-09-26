@@ -8,13 +8,13 @@ using osu.Game.EzOsuGame.Configuration;
 namespace osu.Game.EzOsuGame.Diagnostics
 {
     /// <summary>
-    /// 诊断探针开关的唯一写入口：开机时读一次配置与环境变量，把结果下发到各探针，之后不再变化。
+    /// 诊断探针开关的唯一写入口：每次进局前读一次配置与环境变量，把结果下发到各探针，本局内不再变化。
     /// </summary>
     /// <remarks>
-    /// 必须是「启动时定死」而不是运行期 bindable：探针关闭时热路径上只允许剩下一次静态 bool 读取，
-    /// 只有进程级不变的值才让 JIT 有把整段采集消掉的可能（见 <c>docs/EZ-PERFORMANCE.md</c> §2.4.18）。
-    /// 总开关 <see cref="Ez2Setting.EzJudgmentDiagEnabled"/>（设置项）决定启动时整套诊断是否工作；
+    /// 必须是「进局前定死」而不是运行期 bindable：探针关闭时热路径上只允许剩下一次静态 bool 读取。
+    /// 总开关 <see cref="Ez2Setting.EzJudgmentDiagEnabled"/>（设置项）决定整套诊断是否工作；
     /// 跑哪些内容由 <c>EZ_DIAG_PROBES</c>（环境变量）选择，不进持久化设置。
+    /// 进局前一口断定，所以改设置下一局即生效，不需要重启。
     /// </remarks>
     public static class EzDiagnosticSwitches
     {
@@ -35,7 +35,8 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// <c>hotpath</c>、<c>all</c>；空 / 未设置 = 全部。
         /// <para>
         /// 结算流程时序追踪（<see cref="EzTimingTrace"/>）**不在此列**：它有独立设置项
-        /// <see cref="Ez2Setting.EzTimingTraceEnabled"/>，由 <c>Player</c> 进图时读一次。
+        /// <see cref="Ez2Setting.EzTimingTraceEnabled"/>，与套件同在 <c>Player</c> 进局前读一次，
+        /// 但不受总开关与 <see cref="probe_selection_env"/> 控制。
         /// </para>
         /// <para>
         /// 之所以是环境变量而不是设置项：它回答的是「这次实验想验什么」，不是用户偏好，
@@ -45,10 +46,10 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// </summary>
         private const string probe_selection_env = "EZ_DIAG_PROBES";
 
-        /// <summary>读总开关与内容选择并下发到所有探针。只应在启动时调用一次。</summary>
+        /// <summary>读总开关与内容选择并下发到所有探针。由 <c>Player</c> 每次进局前调用一次。</summary>
         public static void Apply(Ez2ConfigManager config)
         {
-            // 总开关决定启动时整套诊断是否工作；子项（内容选择）决定跑哪些。
+            // 总开关决定整套诊断是否工作；子项（内容选择）决定跑哪些。
             bool suite = config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
             var probes = resolveProbeSelection();
 
@@ -101,7 +102,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                         throw new InvalidOperationException(
                             $"{probe_selection_env} 无法识别的子项「{rawToken}」。"
                             + "可用：judgment, press, frame, hotpath, all（空 = 全部）。"
-                            + " 宁可现在启动失败，也不要静默降级后白跑一整局采集。");
+                            + " 宁可现在进局失败，也不要静默降级后白跑一整局采集。");
                 }
             }
 
@@ -110,7 +111,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         /// <summary>
         /// 消融与调参走环境变量，不进持久化设置：它们回答的是「这次实验想验证什么」，不是用户偏好，
-        /// 放进去只会把设置面板变成实验台。同样只在启动时读一次。
+        /// 放进去只会把设置面板变成实验台。同样每次进局前读一次。
         /// </summary>
         private static void applyPressTuning()
         {

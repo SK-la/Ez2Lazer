@@ -46,7 +46,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
     /// </summary>
     public static class EzFrameStallDiagnostics
     {
-        /// <summary>是否采集。启动时由 <see cref="EzDiagnosticSwitches.Apply"/> 写一次。</summary>
+        /// <summary>是否采集。进局前由 <see cref="EzDiagnosticSwitches.Apply"/> 写一次。</summary>
         public static bool Enabled { get; private set; }
 
         /// <summary>唯一的生产写入口；测试可直接调用。</summary>
