@@ -343,8 +343,8 @@ def _build_macos_launcher_script(executable_name: str | None) -> str:
 def velopack_framework_for(runtime: str) -> str | None:
     """Velopack bootstrap frameworks for framework-dependent publishes (Windows only)."""
     mapping = {
-        'win-x64': 'net8.0-x64-desktop',
-        'win-arm64': 'net8.0-arm64-desktop',
+        'win-x64': 'net10.0-x64-desktop',
+        'win-arm64': 'net10.0-arm64-desktop',
     }
     return mapping.get(runtime)
 
@@ -822,16 +822,16 @@ def main():
 
                     if proj_to_build:
                         print('Building dependency project', proj_to_build)
-                        bres = subprocess.run(["dotnet","build",proj_to_build,"-c","Release","-f","net8.0"])
+                        bres = subprocess.run(["dotnet","build",proj_to_build,"-c","Release","-f","net10.0"])
                         if bres.returncode != 0:
                             raise RuntimeError('dotnet build of deps failed')
-                        deps_src_path = os.path.join(os.path.dirname(proj_to_build), 'bin', 'Release', 'net8.0')
+                        deps_src_path = os.path.join(os.path.dirname(proj_to_build), 'bin', 'Release', 'net10.0')
                         if not os.path.exists(deps_src_path):
                             # sometimes the project is in a subfolder; search upwards
                             parent = os.path.dirname(proj_to_build)
                             found = False
                             for _ in range(4):
-                                candidate_bin = os.path.join(parent, 'bin', 'Release', 'net8.0')
+                                candidate_bin = os.path.join(parent, 'bin', 'Release', 'net10.0')
                                 if os.path.exists(candidate_bin):
                                     deps_src_path = candidate_bin
                                     found = True
@@ -841,7 +841,7 @@ def main():
                                 print('Warning: could not find built outputs in expected locations')
                     else:
                         print('Project path not found in cloned repo, attempting to find bin folder...')
-                        deps_src_path = os.path.join(tmp, 'bin', 'Release', 'net8.0')
+                        deps_src_path = os.path.join(tmp, 'bin', 'Release', 'net10.0')
                 else:
                     deps_src_path = None
 

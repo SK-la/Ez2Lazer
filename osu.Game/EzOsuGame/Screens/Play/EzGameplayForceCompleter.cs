@@ -43,7 +43,7 @@ namespace osu.Game.EzOsuGame.Screens.Play
 
             EzUnjudgedDiagnostics.Capture("after", ruleset, scoreProcessor, beatmap);
 
-            if (scoreProcessor.AllJudgementsApplied && !scoreProcessor.HasCompleted.Value)
+            if (scoreProcessor.HasCompleted.Value && !scoreProcessor.HasCompleted.Value)
             {
                 // 计数已补齐，只差时钟推过最后一个判定时刻。
                 double seekTarget = getLatestJudgementTime(beatmap);

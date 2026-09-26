@@ -80,7 +80,7 @@ namespace osu.Game.Screens.Select
 
             public void SetContent(ScoreInfo content)
             {
-                if (lastContent != null && lastContent.Equals(content))
+                if (lastContent != null && lastContent.Equals(content) && lastContent.TotalScore == content.TotalScore)
                     return;
 
                 dateAndStatistics.Score = content;

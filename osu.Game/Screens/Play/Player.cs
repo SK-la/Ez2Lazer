@@ -340,8 +340,10 @@ namespace osu.Game.Screens.Play
                 LatencyTracker.Start();
             }
 
-            // [Ez] 诊断开关（总开关 + 子项 + 探针调参环境变量）是**进程级**的，启动时由
-            // `EzDiagnosticSwitches.Apply` 一次落地；这里不再重读配置与环境变量，探针也不持有 bindable。
+            // [Ez] 诊断套件开关（总开关 + 子项 + 探针调参环境变量）是**进程级**的，启动时由
+            // `EzDiagnosticSwitches.Apply` 一次落地，这里不再重读配置与环境变量。
+            // 例外：结算流程时序追踪不在套件内，仍由自己的设置项控制 —— 进图读一次，改完下一局即生效（无需重启）。
+            EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
             EzOsuGame.Timing.EzSubFrameCorrection.Enabled = ez2Config.Get<bool>(Ez2Setting.EzSubFrameCorrectionEnabled);
 
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
@@ -1058,7 +1060,9 @@ namespace osu.Game.Screens.Play
             if (!ScoreProcessor.HasCompleted.Value)
             {
                 ezForceResultsImport = true;
-                EzOsuGame.Diagnostics.EzTimingTrace.Record("ForceResults.BypassHasCompleted", "HasCompleted still false after force completion");
+                EzOsuGame.Diagnostics.EzTimingTrace.Record(
+                    "ForceResults.BypassHasCompleted",
+                    $"judged={ScoreProcessor.JudgedHits}/{ScoreProcessor.MaximumJudgements} hasCompleted={ScoreProcessor.HasCompleted.Value}");
             }
 
             if (forceFailGrade)
@@ -1075,7 +1079,7 @@ namespace osu.Game.Screens.Play
 
             EzOsuGame.Diagnostics.EzTimingTrace.Record(
                 "ForceResults.End",
-                $"hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed} rank={ScoreProcessor.Rank.Value}");
+                $"judged={ScoreProcessor.JudgedHits}/{ScoreProcessor.MaximumJudgements} hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed} bypass={ezForceResultsImport} rank={ScoreProcessor.Rank.Value}");
         }
 
         /// <summary>

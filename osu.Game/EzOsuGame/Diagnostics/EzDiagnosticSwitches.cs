@@ -32,7 +32,11 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
         /// <summary>
         /// 内容选择环境变量。逗号 / 分号 / 空格分隔，取值：<c>judgment</c>、<c>press</c>、<c>frame</c>、
-        /// <c>hotpath</c>、<c>trace</c>、<c>all</c>；空 / 未设置 = 全部。
+        /// <c>hotpath</c>、<c>all</c>；空 / 未设置 = 全部。
+        /// <para>
+        /// 结算流程时序追踪（<see cref="EzTimingTrace"/>）**不在此列**：它有独立设置项
+        /// <see cref="Ez2Setting.EzTimingTraceEnabled"/>，由 <c>Player</c> 进图时读一次。
+        /// </para>
         /// <para>
         /// 之所以是环境变量而不是设置项：它回答的是「这次实验想验什么」，不是用户偏好，
         /// 放持久化设置里只会把设置面板变成实验台。解析失败直接抛异常 ——
@@ -51,7 +55,6 @@ namespace osu.Game.EzOsuGame.Diagnostics
             EzJudgmentDiagnostics.SetEnabled(suite && probes.Judgment);
             EzPressLatencyDiagnostics.SetEnabled(suite && probes.Press);
             EzFrameStallDiagnostics.SetEnabled(suite && probes.Frame);
-            EzTimingTrace.SetEnabled(suite && probes.Trace);
             JudgeHotPathTrace = suite && probes.JudgeHotPath;
 
             FrameLoopAttribution = EzFrameStallDiagnostics.Enabled || EzPressLatencyDiagnostics.Enabled;
@@ -61,14 +64,14 @@ namespace osu.Game.EzOsuGame.Diagnostics
         }
 
         /// <summary>解析 <see cref="probe_selection_env"/>；未设置时全部开启。</summary>
-        private static (bool Judgment, bool Press, bool Frame, bool JudgeHotPath, bool Trace) resolveProbeSelection()
+        private static (bool Judgment, bool Press, bool Frame, bool JudgeHotPath) resolveProbeSelection()
         {
             string? raw = Environment.GetEnvironmentVariable(probe_selection_env);
 
             if (string.IsNullOrWhiteSpace(raw))
-                return (true, true, true, true, true);
+                return (true, true, true, true);
 
-            bool judgment = false, press = false, frame = false, judgeHotPath = false, trace = false;
+            bool judgment = false, press = false, frame = false, judgeHotPath = false;
 
             foreach (string rawToken in raw.Split(new[] { ',', ';', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
             {
@@ -90,23 +93,19 @@ namespace osu.Game.EzOsuGame.Diagnostics
                         judgeHotPath = true;
                         break;
 
-                    case "trace":
-                        trace = true;
-                        break;
-
                     case "all":
-                        judgment = press = frame = judgeHotPath = trace = true;
+                        judgment = press = frame = judgeHotPath = true;
                         break;
 
                     default:
                         throw new InvalidOperationException(
                             $"{probe_selection_env} 无法识别的子项「{rawToken}」。"
-                            + "可用：judgment, press, frame, hotpath, trace, all（空 = 全部）。"
+                            + "可用：judgment, press, frame, hotpath, all（空 = 全部）。"
                             + " 宁可现在启动失败，也不要静默降级后白跑一整局采集。");
                 }
             }
 
-            return (judgment, press, frame, judgeHotPath, trace);
+            return (judgment, press, frame, judgeHotPath);
         }
 
         /// <summary>
