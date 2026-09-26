@@ -16,11 +16,6 @@ namespace osu.Game.EzOsuGame.Startup
         void ScheduleSettingsPreload();
 
         /// <summary>
-        /// Warm the detached beatmap store on a background thread. Avoid running during BDSP Ez backfill.
-        /// </summary>
-        void ScheduleDetachWarmup();
-
-        /// <summary>
         /// Emit a snapshot of preload state to the startup trace log.
         /// </summary>
         void LogStatus(string context);

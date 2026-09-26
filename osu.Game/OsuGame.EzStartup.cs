@@ -21,7 +21,7 @@ namespace osu.Game
             dependencies.CacheAs<ISongSelectScreenFactory>(factory);
 
             var preloader = new EzStartupContentPreloader();
-            preloader.Configure(Settings, detachedBeatmapStore, factory);
+            preloader.Configure(Settings, factory);
 
             var coordinator = new EzStartupWorkCoordinator();
             coordinator.Configure(preloader);
