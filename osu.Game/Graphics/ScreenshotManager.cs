@@ -3,12 +3,14 @@
 
 using System;
 using System.IO;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
@@ -19,6 +21,9 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Input.Bindings;
+using osu.Game.Localisation;
+using osu.Game.Online.API;
+using osu.Game.Online.API.Requests;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
@@ -31,6 +36,8 @@ namespace osu.Game.Graphics
 {
     public partial class ScreenshotManager : Component, IKeyBindingHandler<GlobalAction>, IHandleGlobalKeyboardInput
     {
+        private const int jpeg_quality = 92;
+
         private readonly BindableBool cursorVisibility = new BindableBool(true);
 
         /// <summary>
@@ -43,16 +50,25 @@ namespace osu.Game.Graphics
         private GameHost host { get; set; } = null!;
 
         [Resolved]
+        private OsuGame? game { get; set; }
+
+        [Resolved]
         private Clipboard clipboard { get; set; } = null!;
 
         [Resolved]
         private INotificationOverlay notificationOverlay { get; set; } = null!;
 
         [Resolved]
+        private IAPIProvider api { get; set; } = null!;
+
+        [Resolved]
         private OsuConfigManager config { get; set; } = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private Bindable<ScreenshotFormat> screenshotFormat = null!;
+        private Bindable<bool> captureMenuCursor = null!;
 
         private Storage storage = null!;
 
@@ -62,7 +78,10 @@ namespace osu.Game.Graphics
         private void load(Storage storage, AudioManager audio)
         {
             this.storage = storage.GetStorageForDirectory(@"screenshots");
-            shutter = audio.Samples.Get("UI/shutter");
+            shutter = audio.Samples.Get(@"UI/shutter");
+
+            screenshotFormat = config.GetBindable<ScreenshotFormat>(OsuSetting.ScreenshotFormat);
+            captureMenuCursor = config.GetBindable<bool>(OsuSetting.ScreenshotCaptureMenuCursor);
         }
 
         public bool OnPressed(KeyBindingPressEvent<GlobalAction> e)
@@ -76,6 +95,11 @@ namespace osu.Game.Graphics
                     shutter?.Play();
                     TakeScreenshotAsync().FireAndForget();
                     return true;
+
+                case GlobalAction.TakeAndUploadScreeshot:
+                    shutter?.Play();
+                    TakeAndUploadScreenshotAsync().FireAndForget();
+                    return true;
             }
 
             return false;
@@ -87,19 +111,87 @@ namespace osu.Game.Graphics
 
         private volatile int screenShotTasks;
 
-        public Task TakeScreenshotAsync() => Task.Run(async () =>
+        public Task TakeAndUploadScreenshotAsync() => Task.Run(async () =>
+        {
+            // Don't copy the image to clipboard when uploading a screenshot, as it's going to be overwritten by the URL
+            // anyway.
+            string? filename = await TakeScreenshotAsync(copyToClipboard: false, showNotification: false).ConfigureAwait(false);
+
+            if (filename == null)
+                return;
+
+            Stream stream;
+
+            switch (screenshotFormat.Value)
+            {
+                case ScreenshotFormat.Jpg:
+                    stream = storage.GetStream(filename, FileAccess.Read, FileMode.Open);
+                    break;
+
+                case ScreenshotFormat.Png:
+                    // Convert the taken screenshot to JPEG (to save storage) before uploading if user set their screenshots to
+                    // save in a different format.
+                    var image = await Image.LoadAsync(storage.GetFullPath(filename)).ConfigureAwait(false);
+
+                    stream = new MemoryStream();
+                    await image.SaveAsJpegAsync(stream, new JpegEncoder { Quality = jpeg_quality }).ConfigureAwait(false);
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+
+            var uploadRequest = new UploadScreenshot(await stream.ReadAllBytesToArrayAsync().ConfigureAwait(false));
+
+            var notification = new ProgressNotification
+            {
+                State = ProgressNotificationState.Active,
+                Text = NotificationsStrings.UploadingScreenshot,
+                CompletionText = NotificationsStrings.ScreenshotUploadSuccess,
+            };
+
+            uploadRequest.Progressed += (current, total) => notification.Progress = (float)current / total * 0.8f;
+            uploadRequest.Success += content =>
+            {
+                clipboard.SetText(content.Url);
+
+                notification.CompletionClickAction = () =>
+                {
+                    game?.OpenUrlExternally(content.Url);
+                    return true;
+                };
+
+                notification.Progress = 1;
+                notification.State = ProgressNotificationState.Completed;
+            };
+            uploadRequest.Failure += e =>
+            {
+                notification.State = ProgressNotificationState.Cancelled;
+
+                if (e is WebException webException && webException.Message == @"TooManyRequests")
+                    notification.Text = NotificationsStrings.ScreenshotTooManyUploads;
+                else
+                    notification.Text = NotificationsStrings.ScreenshotUploadFailure;
+            };
+
+            notificationOverlay.Post(notification);
+            api.Queue(uploadRequest);
+        });
+
+        public Task<string?> TakeScreenshotAsync(bool copyToClipboard = true, bool showNotification = true) => Task.Run<string?>(async () =>
         {
             Interlocked.Increment(ref screenShotTasks);
 
-            ScreenshotFormat screenshotFormat = config.Get<ScreenshotFormat>(OsuSetting.ScreenshotFormat);
             EzScreenshotAction screenshotAction = ezConfig.Get<EzScreenshotAction>(Ez2Setting.ScreenshotAction);
-            bool captureMenuCursor = config.Get<bool>(OsuSetting.ScreenshotCaptureMenuCursor);
-            bool shouldSave = screenshotAction != EzScreenshotAction.CopyOnly;
-            bool shouldCopy = screenshotAction != EzScreenshotAction.SaveOnly;
+
+            // The upload flow calls this with copyToClipboard: false and needs a file on disk to read back,
+            // so it must always save, regardless of the user's copy-only preference.
+            bool shouldSave = !copyToClipboard || screenshotAction != EzScreenshotAction.CopyOnly;
+            bool shouldCopy = copyToClipboard && screenshotAction != EzScreenshotAction.SaveOnly;
 
             try
             {
-                if (!captureMenuCursor)
+                if (!captureMenuCursor.Value)
                 {
                     cursorVisibility.Value = false;
 
@@ -153,31 +245,42 @@ namespace osu.Game.Graphics
                     if (shouldCopy)
                         clipboard.SetImage(image);
 
-                    if (shouldSave)
+                    if (!shouldSave)
                     {
-                        (string? filename, Stream? stream) = getWritableStream(screenshotFormat);
-
-                        if (filename == null) return;
-
-                        using (stream)
+                        if (showNotification)
                         {
-                            switch (screenshotFormat)
+                            notificationOverlay.Post(new SimpleNotification
                             {
-                                case ScreenshotFormat.Png:
-                                    await image.SaveAsPngAsync(stream).ConfigureAwait(false);
-                                    break;
-
-                                case ScreenshotFormat.Jpg:
-                                    const int jpeg_quality = 92;
-
-                                    await image.SaveAsJpegAsync(stream, new JpegEncoder { Quality = jpeg_quality }).ConfigureAwait(false);
-                                    break;
-
-                                default:
-                                    throw new InvalidOperationException($"Unknown enum member {nameof(ScreenshotFormat)} {screenshotFormat}.");
-                            }
+                                Text = EzSettingsStrings.SCREENSHOT_COPIED_TO_CLIPBOARD
+                            });
                         }
 
+                        return null;
+                    }
+
+                    (string? filename, Stream? stream) = getWritableStream(screenshotFormat.Value);
+
+                    if (filename == null) return null;
+
+                    using (stream)
+                    {
+                        switch (screenshotFormat.Value)
+                        {
+                            case ScreenshotFormat.Png:
+                                await image.SaveAsPngAsync(stream).ConfigureAwait(false);
+                                break;
+
+                            case ScreenshotFormat.Jpg:
+                                await image.SaveAsJpegAsync(stream, new JpegEncoder { Quality = jpeg_quality }).ConfigureAwait(false);
+                                break;
+
+                            default:
+                                throw new ArgumentOutOfRangeException();
+                        }
+                    }
+
+                    if (showNotification)
+                    {
                         notificationOverlay.Post(new SimpleNotification
                         {
                             Text = EzSettingsStrings.ScreenshotSaved(filename),
@@ -188,13 +291,8 @@ namespace osu.Game.Graphics
                             }
                         });
                     }
-                    else
-                    {
-                        notificationOverlay.Post(new SimpleNotification
-                        {
-                            Text = EzSettingsStrings.SCREENSHOT_COPIED_TO_CLIPBOARD
-                        });
-                    }
+
+                    return filename;
                 }
             }
             finally
