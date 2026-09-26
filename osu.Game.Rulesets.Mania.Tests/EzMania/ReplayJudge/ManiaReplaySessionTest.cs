@@ -413,5 +413,31 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             Assert.That(timeline.FinalTotalScore, Is.EqualTo(sessionTotal));
         }
+
+        /// <summary>
+        /// EZ2AC 的 16 分 LN tick 集合必须由「绑定的 hitmode」决定，而不是由「转换当时全局设置是不是 EZ2AC」决定：
+        /// 全局为 Lazer 时按 EZ2AC 环境跑，tick 判定必须与「转换时全局就是 EZ2AC」完全一致，
+        /// 否则同一份 EZ2AC 成绩在不同全局设置下会算出不同的 combo / 分数。
+        /// </summary>
+        [Test]
+        public void TestEz2AcTicksFollowBoundHitModeNotConversionGlobalSetting()
+        {
+            // 转换前全局显式设为非 EZ2AC：旧实现下转换期不生成 tick，只有 EZ2AC 环境这一侧才能暴露差异。
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer));
+
+            var (scoreUnderLazer, beatmapUnderLazer, environment) = HitModeReplayFixtures.CreateEz2AcHoldHeadPerfect(applyGlobalConfig: false);
+            var tickResultsUnderLazer = tickResults(ManiaReplaySession.RunHitEvents(scoreUnderLazer, beatmapUnderLazer, environment));
+
+            ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+
+            var (scoreUnderEz2Ac, beatmapUnderEz2Ac, environment2) = HitModeReplayFixtures.CreateEz2AcHoldHeadPerfect(applyGlobalConfig: false);
+            var tickResultsUnderEz2Ac = tickResults(ManiaReplaySession.RunHitEvents(scoreUnderEz2Ac, beatmapUnderEz2Ac, environment2));
+
+            Assert.That(tickResultsUnderEz2Ac, Is.Not.Empty, "EZ2AC 环境本身必须产生 tick 判定");
+            Assert.That(tickResultsUnderLazer, Is.EqualTo(tickResultsUnderEz2Ac));
+        }
+
+        private static List<HitResult> tickResults(IReadOnlyList<HitEvent> events)
+            => events.Where(e => e.HitObject is HoldNoteTick).Select(e => e.Result).ToList();
     }
 }

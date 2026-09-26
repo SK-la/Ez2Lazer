@@ -11,9 +11,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
-#if DEBUG
 using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
-#endif
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
@@ -116,6 +114,32 @@ namespace osu.Game.Rulesets.Mania.Objects
         /// 非 EZ2AC 下判定会被绑成 Ignore。
         /// </summary>
         public List<HoldNoteTick> Ticks { get; private set; }
+
+        /// <summary>
+        /// 按 hitmode 补齐 EZ2AC 的 16 分 tick（可重复调用，已有 tick 则直接返回）。
+        /// </summary>
+        /// <remarks>
+        /// 生成时机有两处，缺一不可：
+        /// <list type="bullet">
+        /// <item>转换期（<see cref="ApplyDefaultsToSelf"/>）：此时只能按「当时的全局设置」判 EZ2AC，live / 编辑器靠这一处拿到 tick；</item>
+        /// <item>绑定期（<see cref="EzMania.ReplayJudge.ManiaEnvironmentJudgements"/>）：按绑定的 hitmode 补生成。</item>
+        /// </list>
+        /// 后者是为了让 tick 集合取决于 hitmode 而不是转换时机：按 EZ2AC 作用域取出的仿真 / 分析副本，
+        /// 若在全局设置不是 EZ2AC 时转换，转换期不会生成 tick，只有这里补上才不会把 EZ2AC 的 LN 算成官方头尾语义。
+        /// </remarks>
+        public void EnsureEz2AcTicks(CancellationToken cancellationToken = default)
+        {
+            // 消融开关在 DEBUG 下要求「全局不生成 tick」，两处都必须遵守，否则测量会自相矛盾。
+            if (ManiaHoldAblation.DisableHoldTickGeneration)
+                return;
+
+            Ticks ??= new List<HoldNoteTick>();
+
+            if (Ticks.Count > 0)
+                return;
+
+            createTicks(cancellationToken);
+        }
 
         /// <summary>
         /// Whether sliding samples should be played when held.

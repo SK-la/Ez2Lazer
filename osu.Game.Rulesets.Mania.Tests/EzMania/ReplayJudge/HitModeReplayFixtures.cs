@@ -93,10 +93,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, environment);
         }
 
-        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateEz2AcHoldHeadPerfect()
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateEz2AcHoldHeadPerfect(bool applyGlobalConfig = true)
         {
             var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.EZ2AC, EzEnumHealthMode.Ez2Ac);
-            ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
+
+            if (applyGlobalConfig)
+                ReplayJudgeTestConfig.ApplyToGlobalConfig(environment);
 
             var ruleset = new ManiaRuleset();
             var beatmap = new TestBeatmap(ruleset.RulesetInfo)
