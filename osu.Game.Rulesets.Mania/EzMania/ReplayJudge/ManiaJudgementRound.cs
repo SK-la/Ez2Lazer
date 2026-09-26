@@ -77,9 +77,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         public void NotifyO2InputAt(double time)
         {
             O2PressBpm = resolveO2Bpm(time);
-
-            if (ManiaJudgeHotPathTrace.Enabled)
-                ManiaJudgeHotPathTrace.RecordO2BpmLookup();
+            ManiaJudgeHotPathTrace.RecordO2BpmLookup();
         }
 
         public double O2PressBpm { get; private set; }

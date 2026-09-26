@@ -53,7 +53,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         /// 判定诊断开关是进程级的静态值（启动时由 <c>OsuGameBase</c> 读一次），不持有 bindable：
         /// 这个开关不常开、也不会在运行期改，没必要为它在每个 helper 上常驻一个订阅。
         /// </summary>
-        private static bool JudgmentDiagEnabled => EzJudgmentDiagnostics.Enabled;
+        private static bool judgmentDiagEnabled => EzJudgmentDiagnostics.Enabled;
 
         public bool IsHittableWithPrecedence(DrawableHitObject hitObject, double time, EzEnumJudgePrecedence? precedenceOverride = null)
         {
@@ -108,7 +108,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             // 获取所有与当前时间重叠的活跃路由候选。
             if (candidateBuffer.Count == 0)
             {
-                if (JudgmentDiagEnabled)
+                if (judgmentDiagEnabled)
                     logDiag($"t={time:F3} no-overlap target={describe(hitObject)}");
 
                 return true;
@@ -117,7 +117,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             // 应用优先级策略来确定哪个对象应该被击中
             var selected = selectByPrecedence(candidateBuffer, time, judgePrecedence, allowFallbackToEarliest: isBmsMode);
 
-            if (JudgmentDiagEnabled)
+            if (judgmentDiagEnabled)
             {
                 logDiag(
                     $"t={time:F3} mode={(isBmsMode ? "bms" : "non-bms")} precedence={judgePrecedence} target={describe(hitObject)} " +
@@ -552,7 +552,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         private void logDiag(string message)
         {
-            if (!JudgmentDiagEnabled)
+            if (!judgmentDiagEnabled)
                 return;
 
             Logger.Log($"{log_prefix} {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
