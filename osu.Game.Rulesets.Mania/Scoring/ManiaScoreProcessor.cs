@@ -64,11 +64,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
             return base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
         }
 
-        // TODO(Ez 计分 v2)：现在 Ez 模式只是复用 Lazer 的形状（combo + acc），后续要引入难度 / 密度表现：
+        // TODO(Ez 计分 v2)：Ez 模式目前仍是 EX 占比（1_000_000 * MinimumAccuracy），与 acc 显示重复，
+        // 且不携带 combo / 难度信息。换版时要引入难度 / 密度表现：
         //  - 同为 miss，稀疏段的 miss 与全谱最难段的 miss 价值应不同；
         //  - combo 加成随该处 note 密度递减：密度越低，combo 项贡献越小，避免稀疏段白拿 combo 分。
         // 需要每个物件或时间窗的局部密度 / 难度权重（可基于现有 strain 分段或 Ez 自己的密度统计），
         // 并保证 live、Session、成绩图三方共用同一实现。
+        // 换版必须同时给存量成绩定版本策略：算法一改，历史成绩与重算结果就会对不齐。
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
             if (IsLegacyScore || hitMode == EzEnumHitMode.Classic)
@@ -78,10 +80,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
                        + bonusPortion;
             }
 
-            // Ez 各模式与 Lazer 共用同一形状：combo + acc。acc 的权重已按 hitMode 分派
-            // （见 GetBaseScoreForResult → HitModeHelper.GetBaseScoreForResult），无需再分叉。
-            // 不要退回 "1_000_000 * MinimumAccuracy" 的 EX 占比：整谱打完时它恒等于最终 acc，
-            // 与 acc 显示重复且完全不携带 combo 信息，live / Session / 成绩图还会各算一套。
+            if (hitMode != EzEnumHitMode.Lazer && hitMode != EzEnumHitMode.Classic)
+            {
+                // 满分制：TotalScore = 已获得 ex / 整谱最大 ex，从 0 随判定累积（非已判子集 acc 反算）
+                return 1_000_000 * MinimumAccuracy.Value;
+            }
+
             return 150000 * comboProgress
                    + 850000 * Math.Pow(Accuracy.Value, 2 + 2 * Accuracy.Value) * accuracyProgress
                    + bonusPortion;
@@ -89,7 +93,24 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override double ComputeTheoreticalPerfectJudgedTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
-            // 与 ComputeTotalScore 同形状，只是假设剩余全 Perfect：acc 项取满，只剩 combo 与已判定完成度。
+            if (IsLegacyScore || hitMode == EzEnumHitMode.Classic)
+            {
+                return 150000 * comboProgress
+                       + 850000 * accuracyProgress
+                       + bonusPortion;
+            }
+
+            if (hitMode != EzEnumHitMode.Lazer && hitMode != EzEnumHitMode.Classic)
+            {
+                var stats = GetScoreProcessorStatistics();
+                double maximumBaseScoreOnChart = MinimumAccuracy.Value > 0 ? stats.BaseScore / MinimumAccuracy.Value : 0;
+
+                if (maximumBaseScoreOnChart <= 0)
+                    return 0;
+
+                return MAX_SCORE * stats.MaximumBaseScore / maximumBaseScoreOnChart;
+            }
+
             return 150000 * comboProgress
                    + 850000 * accuracyProgress
                    + bonusPortion;
