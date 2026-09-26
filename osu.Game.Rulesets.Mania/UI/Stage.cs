@@ -1,8 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
-using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -16,14 +14,13 @@ using osu.Game.Rulesets.Judgements;
 using osu.Framework.Logging;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
@@ -189,9 +186,10 @@ namespace osu.Game.Rulesets.Mania.UI
                 AddNested(column);
             }
 
-            var hitWindows = new ManiaHitWindows();
-
-            AddInternal(judgementPooler = new JudgementPooler<DrawableManiaJudgement>(Enum.GetValues<HitResult>().Where(hitWindows.IsHitResultAllowed)));
+            // [Ez] 池按「任一 hitmode 下可能出现的判定」预热，不能按当前设置的 ManiaHitWindows 推导：
+            // 当局用的 hitmode / 血量模式取自冻结环境（回放是成绩里嵌入的模式），池缺项时
+            // JudgementPooler.Get 返回 null，该判定会被静默跳过不显示。
+            AddInternal(judgementPooler = new JudgementPooler<DrawableManiaJudgement>(HitModeHelper.AllModeValidHitResults));
 
             RegisterPool<BarLine, DrawableBarLine>(50, 200);
         }
@@ -204,8 +202,7 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             currentSkin = skin;
 
-            if (stageBackdropBlur != null)
-                stageBackdropBlur.CaptureSourceProvider = backdropCaptureSourceProvider;
+            stageBackdropBlur?.CaptureSourceProvider = backdropCaptureSourceProvider;
 
             currentSkin.SourceChanged += onSkinChanged;
             onSkinChanged();
@@ -371,10 +368,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void updateBackdropBlurState()
         {
-            if (stageBackdropBlur == null)
-                return;
-
-            stageBackdropBlur.EffectEnabled = blurEnabledByConfig;
+            stageBackdropBlur?.EffectEnabled = blurEnabledByConfig;
         }
     }
 }
