@@ -96,6 +96,25 @@
 
 结论：`insertEntryAt` / `Unregister` / `autoMissEntries` 的 O(n) 维护即使在 100 KPS / 40 存活每列的极端设定下也不进热榜，**不为它改数据结构**。BMS poor-select（`AllowBmsFallbackToEarliest` + `PoorEnabled`）同样 30 ms 量级、128 B/press，无需单独优化。
 
+#### 2.4.24 选歌 Panel 的 KPS 基线：memo 化读，去掉逐个建连接（2026-09-26）
+
+**问题**：`PanelBeatmap.PrepareForUse()`（`osu.Game/Screens/Select/PanelBeatmap.cs:355`）每次面板被取用 —— 初次填充、每次滚动物化、来回滚动的重新绑定 —— 都调 `EzPanelKpsMetrics.TryResolveBaselineFromSqlite` 取 NoMod KPS 基线，落到 `EzAnalysisPersistentStore.TryGet`：**每次** `new SqliteConnection` + `Open` + `PRAGMA foreign_keys=ON`，再跑一条 `entry LEFT JOIN mania` 的查询，并把 `KPS_LIST_JSON` / `COLUMN_COUNTS_JSON` / `HOLD_NOTE_COUNTS_JSON` **三个 JSON 列解析一遍**。滚动即重复，因为面板池会为同一批谱面反复 rebind。
+
+仓库里本来就有为此准备的 `EzAnalysisPersistentStore.ReadSession`（一条连接 + 逐谱面 memo，**未分析的负结果也 memo**，注释写明「大库上被反复命中的正是没分析的那些」），但它只被 `EzLocalProfileAggregator` 的批量聚合使用，面板路径没接。
+
+**为什么不复用 `ReadSession` 而是新加一个**：`ReadSession` 自带一条长连接且**非线程安全**（注释即写「one session belongs to one worker」）。面板路径只是 update 线程，但 `EzAnalysisCache.GetAnalysisAsync` 的 stored fallback 会走到 `await … ConfigureAwait(false)` 之后，可能落在池线程上；而长连接还会挡住切分支时的 `File.Delete` + `ClearAllPools`。因此共享 memo **不持有连接**。
+
+**改动（`EZ-PANEL-KPS-READ-MEMO`）**：
+
+- memo 语义抽成 `tryReadMemo`（指纹校验 + 按 `writeGeneration` 整体丢弃）与 `resolveMemoEntry`（`pendingWrites` 覆盖 + 有效性闸门，**每次读都做、从不 memo**）两个方法，`ReadSession.TryGet` 与新路径共用，语义不变；
+- 新增 `EzAnalysisPersistentStore.TryGetMemoised`：`ConcurrentDictionary` memo，只存 `tryGetRawData` 的**纯存储行**结果，未命中时才 `Initialise()` + 开连接；命中路径**不碰 SQLite**；
+- `MemoEntry` 从 `ReadSession` 内嵌提升到类级；容量上限 `shared_read_memo_capacity = 2048`，整体丢弃而非 LRU —— 一次重读屏幕上那点内容，比维护一套没人依赖的淘汰策略便宜；
+- `EzAnalysisDatabase.TryGetStoredSqliteSlice` 改走 `TryGetMemoised`，面板与 `EzAnalysisCache` 的 L1 读同时受益。
+
+- **不变量**：命中与未命中**不可区分** —— 同样校验 hash / md5 / ruleset OnlineID，同样按落地写入换代整体失效，同样每次读都套 pending 覆盖与有效性闸门。`backfillStoredData` 仍用未 memo 的 `TryGet`（它要的就是当前存储态）。
+- **代价 / 边界**：memo 持有 `EzAnalysisResult`（含 KPS 列表），上限 2048 条；切分支 / 换库仍靠 `writeGeneration` 换代清空。
+- **验证**：`EzAnalysisPersistentStoreMemoTest`（负结果被后续 pending 写入覆盖 / 同一谱面新结果覆盖旧 memo）；`EzLocalProfile*` + `EzAnalysis*` 共 54 项通过。端到端滚动手感数字**待下一次 dotTrace 快照复核**。
+
 ---
 
 ## 3. 2026-08-08 音频后端排查记录
