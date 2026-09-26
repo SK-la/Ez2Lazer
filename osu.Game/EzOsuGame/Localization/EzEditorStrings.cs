@@ -59,6 +59,16 @@ namespace osu.Game.EzOsuGame.Localization
             "手动重载 ScriptedSkin 目录下的脚本并刷新列表",
             "Manually reload scripts under ScriptedSkin and refresh the list");
 
+        public static readonly LocalisableString SETTINGS_ENABLE_SCRIPTED_SKINS = new EzLocalizationManager.EzLocalisableString(
+            "启用脚本皮肤",
+            "Enable scripted skins");
+
+        public static readonly LocalisableString SETTINGS_ENABLE_SCRIPTED_SKINS_NOTE = new EzLocalizationManager.EzLocalisableString(
+            "关闭时不扫描 ScriptedSkin 目录、不监视脚本文件、不做脚本编译，可省下启动期开销；修改后需重启生效。"
+            + "\n开启后列表显示目录名（脚本声明的名称需选中该皮肤时才编译读取）。",
+            "When disabled the ScriptedSkin directory is not scanned, watched, or compiled, saving startup cost. Requires a restart to take effect."
+            + "\nWhen enabled the list shows folder names; a script's declared name is only read once that skin is selected.");
+
         #endregion
 
         #region Menu bar
