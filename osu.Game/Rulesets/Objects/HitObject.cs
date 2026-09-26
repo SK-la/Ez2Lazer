@@ -97,6 +97,13 @@ namespace osu.Game.Rulesets.Objects
         // 而外部调用方依然无法替换引用。
         private List<HitObject> nestedHitObjects = new List<HitObject>();
 
+        /// <summary>
+        /// 构建中的嵌套对象列表。<see cref="ApplyDefaults"/> 重建嵌套对象期间非 null，<see cref="AddNested"/>
+        /// 会写入它；构建完成后才整体发布给 <see cref="nestedHitObjects"/>，因此读线程不会看到构建中的列表。
+        /// 写入方由 <see cref="ApplyDefaults"/> 的对象锁串行化，所以这里不需要是线程局部的。
+        /// </summary>
+        private List<HitObject> nestedHitObjectsUnderConstruction;
+
         [JsonIgnore]
         public SlimReadOnlyListWrapper<HitObject> NestedHitObjects => nestedHitObjects.AsSlimReadOnly();
 
@@ -108,45 +115,66 @@ namespace osu.Game.Rulesets.Objects
         /// <param name="cancellationToken">The cancellation token.</param>
         public void ApplyDefaults(ControlPointInfo controlPointInfo, IBeatmapDifficultyInfo difficulty, CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            ApplyDefaultsToSelf(controlPointInfo, difficulty);
-
-            nestedHitObjects.Clear();
-
-            CreateNestedHitObjects(cancellationToken);
-
-            if (this is IHasComboInformation hasCombo)
+            // 同一个 HitObject 可能被多个消费者并发 ApplyDefaults：当源对象已是目标类型时，转换产物会与源共享
+            // 实例，于是进图、后台难度计算、分析等各自转换时都在重建同一批对象。并发重建会在同一个 List 上竞争
+            // Add/增长（增长的实现会替换底层数组），留下没写过的 null 槽位，只读的枚举方随即便会读到 null。
+            // 这里按对象串行化写入方，列表再用整体替换的方式发布，使枚举方永远不会看到中间态。
+            lock (this)
             {
-                foreach (HitObject hitObject in nestedHitObjects)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
+                cancellationToken.ThrowIfCancellationRequested();
 
-                    if (hitObject is IHasComboInformation n)
+                ApplyDefaultsToSelf(controlPointInfo, difficulty);
+
+                // 在独立列表里重建，构建期间不动已发布的列表，完成后一次性发布引用。这样只读的枚举方（例如后台
+                // 难度计算）要么看到旧的完整列表、要么看到新的完整列表，既不会读到 Clear 留下的 null 槽位，也
+                // 不会撞上并发 Add 引发的 "Collection was modified"。
+                List<HitObject> rebuiltNestedHitObjects = new List<HitObject>();
+                nestedHitObjectsUnderConstruction = rebuiltNestedHitObjects;
+
+                try
+                {
+                    CreateNestedHitObjects(cancellationToken);
+                }
+                finally
+                {
+                    nestedHitObjectsUnderConstruction = null;
+                }
+
+                if (this is IHasComboInformation hasCombo)
+                {
+                    foreach (HitObject hitObject in rebuiltNestedHitObjects)
                     {
-                        n.ComboIndexBindable.BindTo(hasCombo.ComboIndexBindable);
-                        n.ComboIndexWithOffsetsBindable.BindTo(hasCombo.ComboIndexWithOffsetsBindable);
-                        n.IndexInCurrentComboBindable.BindTo(hasCombo.IndexInCurrentComboBindable);
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        if (hitObject is IHasComboInformation n)
+                        {
+                            n.ComboIndexBindable.BindTo(hasCombo.ComboIndexBindable);
+                            n.ComboIndexWithOffsetsBindable.BindTo(hasCombo.ComboIndexWithOffsetsBindable);
+                            n.IndexInCurrentComboBindable.BindTo(hasCombo.IndexInCurrentComboBindable);
+                        }
                     }
                 }
+
+                rebuiltNestedHitObjects.Sort((h1, h2) => h1.StartTime.CompareTo(h2.StartTime));
+
+                // 一次性发布：自此读线程看到的是完整的新列表。
+                nestedHitObjects = rebuiltNestedHitObjects;
+
+                foreach (var h in nestedHitObjects)
+                    h.ApplyDefaults(controlPointInfo, difficulty, cancellationToken);
+
+                // `ApplyDefaults()` may be called multiple times on a single hitobject.
+                // to prevent subscribing to `StartTimeBindable.ValueChanged` multiple times with the same callback,
+                // remove the previous subscription (if present) before (re-)registering.
+                StartTimeBindable.ValueChanged -= onStartTimeChanged;
+
+                // this callback must be (re-)registered after default application
+                // to ensure that the read of `this.GetEndTime()` within `onStartTimeChanged` doesn't return an invalid value
+                // if `StartTimeBindable` is changed prior to default application.
+                StartTimeBindable.ValueChanged += onStartTimeChanged;
+
+                DefaultsApplied?.Invoke(this);
             }
-
-            nestedHitObjects.Sort((h1, h2) => h1.StartTime.CompareTo(h2.StartTime));
-
-            foreach (var h in nestedHitObjects)
-                h.ApplyDefaults(controlPointInfo, difficulty, cancellationToken);
-
-            // `ApplyDefaults()` may be called multiple times on a single hitobject.
-            // to prevent subscribing to `StartTimeBindable.ValueChanged` multiple times with the same callback,
-            // remove the previous subscription (if present) before (re-)registering.
-            StartTimeBindable.ValueChanged -= onStartTimeChanged;
-
-            // this callback must be (re-)registered after default application
-            // to ensure that the read of `this.GetEndTime()` within `onStartTimeChanged` doesn't return an invalid value
-            // if `StartTimeBindable` is changed prior to default application.
-            StartTimeBindable.ValueChanged += onStartTimeChanged;
-
-            DefaultsApplied?.Invoke(this);
 
             void onStartTimeChanged(ValueChangedEvent<double> time)
             {
@@ -207,7 +235,7 @@ namespace osu.Game.Rulesets.Objects
         {
         }
 
-        protected void AddNested(HitObject hitObject) => nestedHitObjects.Add(hitObject);
+        protected void AddNested(HitObject hitObject) => (nestedHitObjectsUnderConstruction ?? nestedHitObjects).Add(hitObject);
 
         /// <summary>
         /// The <see cref="Judgement"/> that represents the scoring information for this <see cref="HitObject"/>.
