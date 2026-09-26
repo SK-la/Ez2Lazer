@@ -146,12 +146,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             timelineRecorder));
                 }
 
+                LaneTargetState? activeTail = null;
+
                 if (!input.IsPress)
                 {
                     // 局内松手只作用于「此刻正按住的那条 LN」（Column.OnReleased → LaneController.ActiveHold），
-                    // 不经过优先级选择器：候选窗对尾的提前侧是 Miss 窗口 × RELEASE_WINDOW_LENIENCE（OD8 下约 226ms），
-                    // 若让松手也参与折返仲裁，前一次松手会把后面那条 LN 的尾提前判掉，等真松手到达时它已被跳过。
-                    var activeTail = resolveActiveHoldTail(input.Column, activeHoldByColumn, holdByHead, wasHoldingBeforeEvent, candidates);
+                    // 且 TryColumnHoldTailRelease 不再做优先级/note-lock 判定，故此处直接以该尾为目标：
+                    // 不能再走 selectCandidate 的 Earliest 阻挡检查，否则更晚的尾已开始（StartTime <= 松手时刻）
+                    // 会把本次松手否决，导致这条尾留到后续按键被 ForceMissEarlier 补成 Miss。
+                    activeTail = resolveActiveHoldTail(input.Column, activeHoldByColumn, holdByHead, wasHoldingBeforeEvent, candidates);
 
                     activeHoldByColumn.Remove(input.Column);
 
@@ -161,12 +164,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
                         continue;
                     }
-
-                    candidates.Clear();
-                    candidates.Add(activeTail);
                 }
 
-                if (candidates.Count == 0)
+                if (candidates.Count == 0 && activeTail == null)
                 {
                     if (input.IsPress)
                         tryRearmActiveHold(input.Column, input.Time, laneStates, releaseColumns, holdByHead, holdStrategy, activeHoldByColumn);
@@ -177,7 +177,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     continue;
                 }
 
-                var selected = selectCandidate(
+                var selected = activeTail ?? selectCandidate(
                     candidates, laneStates, input.Time, environment);
 
                 if (selected == null || selected.Judged)

@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Configuration;
@@ -142,6 +143,24 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             var tailEvent = result.ScoreInfo.HitEvents.Single(e => e.HitObject is TailNote);
             Assert.That(tailEvent.Result, Is.EqualTo(HitResult.Meh));
+        }
+
+        /// <summary>
+        /// 松手落点越过下一条 LN 的尾开始时间时，前一条尾仍须被判定，且不受 JudgePrecedence 影响
+        /// （局内 OnReleased 不经过 note-lock；Earliest 的阻挡规则只用于按下选目标）。
+        /// </summary>
+        [TestCase(EzEnumJudgePrecedence.Earliest)]
+        [TestCase(EzEnumJudgePrecedence.Combo)]
+        [TestCase(EzEnumJudgePrecedence.Duration)]
+        public void TestReleasePastLaterTailIsJudged(EzEnumJudgePrecedence precedence)
+        {
+            var (score, beatmap, _) = LazerTapReplayFixtures.CreateChainedHoldsReleasePastNextTail();
+            var environment = ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer, precedence);
+
+            var tail = ManiaReplaySession.RunHitEvents(score, beatmap, environment)
+                                        .Single(e => e.HitObject is TailNote && Math.Abs(e.HitObject.StartTime - 1950) < 1);
+
+            Assert.That(tail.Result, Is.Not.EqualTo(HitResult.Miss));
         }
 
         [Test]

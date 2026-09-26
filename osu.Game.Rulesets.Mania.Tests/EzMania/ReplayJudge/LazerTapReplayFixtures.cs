@@ -227,6 +227,44 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return (createScore(ruleset, replay), beatmap, createEnvironment());
         }
 
+        /// <summary>
+        /// 两条先后 LN：松手落点已越过「后一条 LN 的尾开始时间」。
+        /// 回归 Earliest 的 note-lock 阻挡检查曾被误用到松手路径，会把本应判定的前一条尾否决。
+        /// </summary>
+        public static (Score score, IBeatmap beatmap, GameplayEnvironment environment) CreateChainedHoldsReleasePastNextTail()
+        {
+            const double head1 = 1000;
+            const double tail1 = 1950;
+            const double head2 = 2000;
+            const double tail2 = 2100;
+            const double release = 2150;
+
+            var ruleset = new ManiaRuleset();
+            var beatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HoldNote { StartTime = head1, Duration = tail1 - head1, Column = 0 },
+                    new HoldNote { StartTime = head2, Duration = tail2 - head2, Column = 0 },
+                },
+                ControlPointInfo = new ControlPointInfo(),
+            };
+
+            foreach (var obj in beatmap.HitObjects)
+                obj.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+
+            var replay = new Replay
+            {
+                Frames = new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(head1, ManiaAction.Key1),
+                    new ManiaReplayFrame(release),
+                },
+            };
+
+            return (createScore(ruleset, replay), beatmap, createEnvironment());
+        }
+
         private static GameplayEnvironment createEnvironment() => ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.Lazer);
 
         private static Score createScore(ManiaRuleset ruleset, Replay replay) => new Score
