@@ -394,8 +394,40 @@ namespace osu.Game.Rulesets
         /// </returns>
         public IEnumerable<(HitResult result, LocalisableString displayName)> GetHitResultsForDisplay(ScoreInfo? score = null)
         {
-            var validResults = GetValidHitResults(score);
+            var validResults = GetValidHitResults(score).ToHashSet();
 
+            return enumerateDisplayableHitResults(validResults.Contains, _ => score);
+        }
+
+        /// <summary>
+        /// Get all <see cref="HitResult"/>s to display for a set of scores, using the union of each score's own valid results.
+        /// </summary>
+        /// <remarks>
+        /// 多份成绩的展示集合必须逐份按成绩自身解析后取并集：这些成绩可能来自不同的 Ez 游玩环境
+        /// （例如同一张谱面既有 Lazer 成绩也有 BMS 成绩）。改用单份成绩重载（缺省等价于「当前全局 Ez 游玩环境」）
+        /// 会让集合窄于成绩本身，例如全局是 Lazer 时 <see cref="HitResult.Poor"/> 不在有效集合里，
+        /// 表格会整列丢掉 BMS 成绩的 KPoor。
+        /// </remarks>
+        public IEnumerable<(HitResult result, LocalisableString displayName)> GetHitResultsForDisplay(IEnumerable<ScoreInfo> scores)
+        {
+            ArgumentNullException.ThrowIfNull(scores);
+
+            var perScore = scores.Select(score => (score, validResults: GetValidHitResults(score).ToHashSet())).ToArray();
+
+            // 没有成绩时退回单份重载的语义（全局环境），而不是返回空集合。
+            if (perScore.Length == 0)
+                return GetHitResultsForDisplay();
+
+            var union = perScore.SelectMany(p => p.validResults).ToHashSet();
+
+            // 显示名取「有效集合含该判定的第一份成绩」所用的模式；判定不在任何成绩的有效集合里时不会被列出，
+            // 所以这里的缺省值只是兜底。
+            return enumerateDisplayableHitResults(union.Contains, result => perScore.FirstOrDefault(p => p.validResults.Contains(result)).score);
+        }
+
+        private IEnumerable<(HitResult result, LocalisableString displayName)> enumerateDisplayableHitResults(Func<HitResult, bool> isValid,
+                                                                                                              Func<HitResult, ScoreInfo?> nameSource)
+        {
             // enumerate over ordered list to guarantee return order is stable.
             foreach (var result in EnumExtensions.GetValuesInOrder<HitResult>())
             {
@@ -412,8 +444,8 @@ namespace osu.Game.Rulesets
                         continue;
                 }
 
-                if (result == HitResult.Miss || validResults.Contains(result))
-                    yield return (result, GetDisplayNameForHitResult(result, score));
+                if (result == HitResult.Miss || isValid(result))
+                    yield return (result, GetDisplayNameForHitResult(result, nameSource(result)));
             }
         }
 

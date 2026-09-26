@@ -28,6 +28,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         private readonly Bindable<EzEnumHitMode> hitMode;
         private readonly Bindable<bool> judgmentDiagEnabled;
 
+        /// <summary>
+        /// 判定优先级在构造时（进局前）取一次即固定：它决定每次按键的路由选择，
+        /// 而该设置只在进游戏前确认、局内不切换，所以不持有 bindable。
+        /// </summary>
+        private readonly EzEnumJudgePrecedence judgePrecedence;
+
         // 每判定复用同一批缓冲：候选与后判对象只在本次调用内有效，不去分配新的 List。
         private readonly List<PrecedenceCandidate> candidateBuffer = new List<PrecedenceCandidate>();
         private readonly List<DrawableHitObject> postJudgedBuffer = new List<DrawableHitObject>();
@@ -48,17 +54,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             // 缓存 bindable：命中模式与诊断开关在一次按键里要被读好几次，没必要每次都走配置查询。
             hitMode = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             judgmentDiagEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzJudgmentDiagEnabled);
+
+            // 取普通值：每次按键都要用，且该设置局内不变，无需为它常驻订阅。
+            judgePrecedence = ezConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
         }
 
         private bool JudgmentDiagEnabled => judgmentDiagEnabled.Value;
 
+        /// <summary>
+        /// 本 helper 冻结的判定优先级。调用方（如 <c>BMSOrderedHitPolicy</c>）在构造期读它来判断
+        /// 是否需要走优先级路由，避免每次按键再查一次配置。
+        /// </summary>
+        public EzEnumJudgePrecedence JudgePrecedence => judgePrecedence;
+
         public bool IsHittableWithPrecedence(DrawableHitObject hitObject, double time, EzEnumJudgePrecedence? precedenceOverride = null)
         {
-            var judgePrecedence = precedenceOverride ?? ezConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
+            var precedence = precedenceOverride ?? judgePrecedence;
             bool isBmsMode = isBMS();
 
             if (laneController != null && hitObject is not (DrawableHoldNoteTail or DrawableHoldNote))
-                return laneController.IsHittable(hitObject, time, judgePrecedence);
+                return laneController.IsHittable(hitObject, time, precedence);
 
             collectOverlappingCandidates(time, candidateBuffer);
 
@@ -112,12 +127,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             }
 
             // 应用优先级策略来确定哪个对象应该被击中
-            var selected = selectByPrecedence(candidateBuffer, time, judgePrecedence, allowFallbackToEarliest: isBmsMode);
+            var selected = selectByPrecedence(candidateBuffer, time, precedence, allowFallbackToEarliest: isBmsMode);
 
             if (JudgmentDiagEnabled)
             {
                 logDiag(
-                    $"t={time:F3} mode={(isBmsMode ? "bms" : "non-bms")} precedence={judgePrecedence} target={describe(hitObject)} " +
+                    $"t={time:F3} mode={(isBmsMode ? "bms" : "non-bms")} precedence={precedence} target={describe(hitObject)} " +
                     $"overlap=[{string.Join(", ", candidateBuffer.Select(describe))}] selected={describe(selected)}");
             }
 
@@ -549,7 +564,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         private void logDiag(string message)
         {
-            if (!ezConfig.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled))
+            // 调用点已用 JudgmentDiagEnabled 判过；不要再查一次配置。
+            if (!JudgmentDiagEnabled)
                 return;
 
             Logger.Log($"{log_prefix} {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);

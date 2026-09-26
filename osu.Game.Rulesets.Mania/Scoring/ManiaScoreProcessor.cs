@@ -64,6 +64,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
             return base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
         }
 
+        // TODO(Ez 计分 v2)：Ez 模式目前仍是 EX 占比（1_000_000 * MinimumAccuracy），与 acc 显示重复，
+        // 且不携带 combo / 难度信息。换版时要引入难度 / 密度表现：
+        //  - 同为 miss，稀疏段的 miss 与全谱最难段的 miss 价值应不同；
+        //  - combo 加成随该处 note 密度递减：密度越低，combo 项贡献越小，避免稀疏段白拿 combo 分。
+        // 需要每个物件或时间窗的局部密度 / 难度权重（可基于现有 strain 分段或 Ez 自己的密度统计），
+        // 并保证 live、Session、成绩图三方共用同一实现。
+        // 换版必须同时给存量成绩定版本策略：算法一改，历史成绩与重算结果就会对不齐。
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
             if (IsLegacyScore || hitMode == EzEnumHitMode.Classic)

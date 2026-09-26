@@ -90,6 +90,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
             scoreProcessor.ApplyBeatmap(playableBeatmap);
 
             healthProcessor = ruleset.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
+            // [Ez] 与 scoreProcessor 同源：冻结当前全局游玩环境，须先于 ApplyBeatmap。
+            healthProcessor.ApplyEzGameplayEnvironment();
             healthProcessor.ApplyBeatmap(playableBeatmap);
 
             dependencies.CacheAs(scoreProcessor);

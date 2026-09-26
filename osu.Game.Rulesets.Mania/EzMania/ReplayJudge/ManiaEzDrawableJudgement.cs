@@ -233,12 +233,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
         internal static bool TryBmsOnPressed(DrawableNote note, KeyBindingPressEvent<ManiaAction> e)
         {
-            if (note.HitObject.HitWindows is not ManiaHitWindows maniaWindows)
+            if (note.HitObject.HitWindows is not ManiaHitWindows)
                 return false;
 
             var round = getJudgementRound(note);
             var state = GetBmsState(note);
-            var action = BmsHitModeJudgement.Instance.TryPostBadOnPressed(maniaWindows, state, round.PoorEnabled);
+            var action = BmsHitModeJudgement.Instance.TryPostBadOnPressed(state, round.PoorEnabled);
 
             if (!action.Handled)
                 return false;
