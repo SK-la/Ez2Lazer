@@ -347,6 +347,8 @@ namespace osu.Game.Screens.Play
 
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
             HealthProcessor ??= ruleset.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
+            // [Ez] 与 ScoreProcessor 同源：冻结当前全局游玩环境（血量模式等）；必须先于 ApplyBeatmap。
+            HealthProcessor.ApplyEzGameplayEnvironment();
             HealthProcessor.ApplyBeatmap(playableBeatmap);
 
             dependencies.CacheAs(HealthProcessor);

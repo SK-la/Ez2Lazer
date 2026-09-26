@@ -2,10 +2,12 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using NUnit.Framework;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
+using osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge;
 
 namespace osu.Game.Rulesets.Mania.Tests
 {
@@ -27,6 +29,33 @@ namespace osu.Game.Rulesets.Mania.Tests
 
             // No matter what, mania doesn't have passive HP drain.
             Assert.That(processor.DrainRate, Is.Zero);
+        }
+
+        [Test]
+        public void TestHealthModeFrozenPerInstanceNotShared()
+        {
+            try
+            {
+                ReplayJudgeTestConfig.ApplyToGlobalConfig(ReplayJudgeTestConfig.Create(EzEnumHitMode.Lazer, EzEnumHealthMode.IIDX_HD));
+                var first = new ManiaHealthProcessor(0);
+                first.ApplyEzGameplayEnvironment();
+
+                // 第一局进行中时改设置：已开局的处理器必须保持开局冻结值。
+                ReplayJudgeTestConfig.ResetGlobalConfig();
+
+                var second = new ManiaHealthProcessor(0);
+                second.ApplyEzGameplayEnvironment();
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(first.ActiveHealthMode, Is.EqualTo(EzEnumHealthMode.IIDX_HD));
+                    Assert.That(second.ActiveHealthMode, Is.EqualTo(EzEnumHealthMode.Lazer));
+                });
+            }
+            finally
+            {
+                ReplayJudgeTestConfig.ResetGlobalConfig();
+            }
         }
 
         private static readonly object[][] test_cases =
