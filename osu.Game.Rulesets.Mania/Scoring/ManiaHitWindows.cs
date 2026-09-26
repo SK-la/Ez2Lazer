@@ -158,7 +158,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
         /// </summary>
         public EzEnumHitMode ActiveHitMode { get; private set; }
 
-        private readonly HitModeHelper helper = new HitModeHelper();
+        // 模式的唯一来源是本对象的 ActiveHitMode（构造参数 / SetHitMode）。默认用 Lazer 起步只为满足字段初始化，
+        // 构造体随后立刻用 ActiveHitMode 覆盖；不要让默认值再去回读全局配置。
+        private readonly HitModeHelper helper = new HitModeHelper(EzEnumHitMode.Lazer);
 
         public ManiaHitWindows(EzEnumHitMode? hitModeOverride = null)
         {

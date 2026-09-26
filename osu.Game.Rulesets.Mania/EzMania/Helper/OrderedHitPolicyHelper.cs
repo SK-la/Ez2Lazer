@@ -564,7 +564,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         private void logDiag(string message)
         {
-            if (!ezConfig.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled))
+            // 调用点已用 JudgmentDiagEnabled 判过；不要再查一次配置。
+            if (!JudgmentDiagEnabled)
                 return;
 
             Logger.Log($"{log_prefix} {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);

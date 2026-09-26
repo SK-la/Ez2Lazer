@@ -111,12 +111,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             }
         }
 
-        public HitModeHelper()
-            : this(GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode))
-        {
-            updateRanges();
-        }
-
         public HitModeHelper(EzEnumHitMode hitMode)
         {
             HitMode = hitMode;
