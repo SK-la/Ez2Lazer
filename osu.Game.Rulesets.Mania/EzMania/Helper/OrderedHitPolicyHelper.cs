@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Diagnostics;
@@ -26,7 +25,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         private readonly HitObjectContainer hitObjectContainer;
         private readonly ManiaLaneController? laneController;
         private readonly Ez2ConfigManager ezConfig;
-        private readonly Bindable<EzEnumHitMode> hitMode;
+
+        /// <summary>
+        /// 命中模式在本 helper 构造时（进图）取一次即固定：它决定 BMS 路由分支，
+        /// 而模式设置只在进游戏前确认、局内不切换，所以不持 bindable、不订阅变更。
+        /// </summary>
+        private readonly EzEnumHitMode hitMode;
 
         // 每判定复用同一批缓冲：候选与后判对象只在本次调用内有效，不去分配新的 List。
         private readonly List<PrecedenceCandidate> candidateBuffer = new List<PrecedenceCandidate>();
@@ -45,8 +49,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             this.laneController = laneController;
             ezConfig = GlobalConfigStore.EzConfig;
 
-            // 缓存 bindable：命中模式在一次按键里要被读好几次，没必要每次都走配置查询。
-            hitMode = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            // 取普通值：同一按键里 isBMS() 要读一次，且该设置局内不变，无需为它常驻订阅。
+            hitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
         }
 
         /// <summary>
@@ -394,7 +398,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         }
 
         private bool isBMS()
-            => HitModeHelper.IsBMSHitMode(hitMode.Value);
+            => HitModeHelper.IsBMSHitMode(hitMode);
 
         public static DrawableHitObject? SelectFoldDrawable(IReadOnlyList<DrawableHitObject> sortedByStartTime, double pressTime, bool comboAlgorithm)
         {
