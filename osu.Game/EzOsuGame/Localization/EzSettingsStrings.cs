@@ -460,10 +460,16 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS = new EzLocalizationManager.EzLocalisableString("使用Ez2Ac 10k2s1p", "Use Ez2Ac 10k2s1p");
 
         public static readonly LocalisableString SKIP_EMPTY_EDGE_COLUMNS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启后，14k谱面按13k显示（跳过最后一列），用于游玩Ez2Ac街机谱面（最后一列为空）。"
-            + "\n若最后一列有音符，请关闭此选项。",
-            "When enabled, 14K beatmaps display as 13K (last column hidden) for Ez2Ac arcade maps with an empty last column."
-            + "\nDisable this if the last column contains notes.");
+            "若最后一列有音符，请关闭此选项。"
+            + "\n开启后，用于游玩 Ez2Ac 街机谱面，以及一些街机风格内容。"
+            + "\n14k 且最后一列为空时，谱面按 13k 显示。"
+            + "\n启用 10k2s1p 等街机显示类型。"
+            + "\nEz2Cicle 皮肤将转为使用内置街机风格色彩模版。",
+            "Disable this if the last column contains notes."
+            + "\nWhen enabled, used for playing Ez2Ac arcade maps and some arcade-style content."
+            + "\nWhen enabled, 14K beatmaps display as 13K (last column hidden) if the last column is empty."
+            + "\nEnables arcade display types such as 10K2S1P."
+            + "\nEz2Cicle skin will switch to using built-in arcade-style color templates.");
 
         public static readonly LocalisableString SCRATCH_AXIS_ENABLED = new EzLocalizationManager.EzLocalisableString(
             "启用转盘轴（L/R Scratch）",
