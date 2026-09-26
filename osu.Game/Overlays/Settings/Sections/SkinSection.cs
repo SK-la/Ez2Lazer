@@ -60,7 +60,8 @@ namespace osu.Game.Overlays.Settings.Sections
         private Ez2ConfigManager ezConfig { get; set; }
 
         private IDisposable realmSubscription;
-        private IBindable<bool> autoApplyOnSkinChangeBindable;
+        private Bindable<bool> autoApplyOnSkinChangeBindable;
+        private bool restoringPersistedConfig;
 
         [BackgroundDependencyLoader(permitNulls: true)]
         private void load([CanBeNull] SkinEditorOverlay skinEditor, [CanBeNull] EzLayoutEditorOverlay ezLayoutEditor)
@@ -144,13 +145,32 @@ namespace osu.Game.Overlays.Settings.Sections
 
             // 必须持有副本：框架只把绑定副本登记为 WeakReference，副本被 GC 回收后订阅会静默失效。
             autoApplyOnSkinChangeBindable = ezConfig.GetBindable<bool>(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange);
-            autoApplyOnSkinChangeBindable.BindValueChanged(change =>
-            {
-                if (change.OldValue && !change.NewValue)
-                    ezConfig.Load();
-            });
+            autoApplyOnSkinChangeBindable.BindValueChanged(onAutoApplyOnSkinChangeChanged);
 
             skins.ScriptedSkinsCatalogUpdated += refreshSkinsList;
+        }
+
+        /// <summary>
+        /// 关闭 EzSkin.json 自动应用时，把 ini 里已落盘的值盖回内存，丢掉自动应用只写在内存里的那一份。
+        /// 保存走 100ms 去抖，此刻 ini 里本项仍是开启，<c>Ez2ConfigManager.Load()</c> 会连本项一起顶回开启，
+        /// 所以 Load 之后必须重设本项，否则开关关不掉；重入保护避免 Load 与重设互相触发。
+        /// </summary>
+        private void onAutoApplyOnSkinChangeChanged(ValueChangedEvent<bool> change)
+        {
+            if (restoringPersistedConfig || !change.OldValue || change.NewValue)
+                return;
+
+            restoringPersistedConfig = true;
+
+            try
+            {
+                ezConfig.Load();
+                autoApplyOnSkinChangeBindable.Value = false;
+            }
+            finally
+            {
+                restoringPersistedConfig = false;
+            }
         }
 
         private void skinsChanged(IRealmCollection<SkinInfo> sender, ChangeSet changes)
