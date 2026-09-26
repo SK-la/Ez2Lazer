@@ -52,6 +52,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             var headWasHit = new Dictionary<HeadNote, bool>();
             var keyHeldByColumn = new Dictionary<int, bool>();
+            var activeHoldByColumn = new Dictionary<int, HeadNote>();
             var ez2AcHoldStates = new Dictionary<HoldNote, Ez2AcHoldState>();
             var judgedTicks = new HashSet<HoldNoteTick>();
 
@@ -145,11 +146,34 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             timelineRecorder));
                 }
 
+                if (!input.IsPress)
+                {
+                    // 局内松手只作用于「此刻正按住的那条 LN」（Column.OnReleased → LaneController.ActiveHold），
+                    // 不经过优先级选择器：候选窗对尾的提前侧是 Miss 窗口 × RELEASE_WINDOW_LENIENCE（OD8 下约 226ms），
+                    // 若让松手也参与折返仲裁，前一次松手会把后面那条 LN 的尾提前判掉，等真松手到达时它已被跳过。
+                    var activeTail = resolveActiveHoldTail(input.Column, activeHoldByColumn, holdByHead, wasHoldingBeforeEvent, candidates);
+
+                    activeHoldByColumn.Remove(input.Column);
+
+                    if (activeTail == null)
+                    {
+                        tryApplyEz2AcHoldRelease(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
+                        tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
+                        continue;
+                    }
+
+                    candidates.Clear();
+                    candidates.Add(activeTail);
+                }
+
                 if (candidates.Count == 0)
                 {
+                    if (input.IsPress)
+                        tryRearmActiveHold(input.Column, input.Time, laneStates, releaseColumns, holdByHead, holdStrategy, activeHoldByColumn);
                     // [parity] 松手落在候选窗口外也可能断连（局内断连不受窗口限制）。
-                    if (!input.IsPress)
+                    else
                         tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
+
                     continue;
                 }
 
@@ -164,7 +188,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
                     }
                     else if (input.IsPress)
+                    {
                         tryApplyEz2AcHoldRepress(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
+                        tryRearmActiveHold(input.Column, input.Time, laneStates, releaseColumns, holdByHead, holdStrategy, activeHoldByColumn);
+                    }
 
                     continue;
                 }
@@ -180,16 +207,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                 bool headHit = target is TailNote tailNote && headByTail.TryGetValue(tailNote, out var linkedHead)
                                                            && headWasHit.TryGetValue(linkedHead, out bool wasHit) && wasHit;
-
-                // 局内松手只判「此刻正按住的那条 LN」（Column.OnReleased → LaneController.ActiveHold），
-                // 不会按时间邻近去够一条连头都还没按下的 LN。候选窗口对尾的提前侧是 Miss 窗口×RELEASE_WINDOW_LENIENCE
-                // （OD8 下约 226ms），密集段里前一键/前一条尾的松手会把后面那条 LN 的尾提前判成 Miss，
-                // 等它真正的松手到达时 selected.Judged 已置位而被跳过，于是只剩兜底补判。
-                if (isTail && !input.IsPress && !(headHit && wasHoldingBeforeEvent))
-                {
-                    tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
-                    continue;
-                }
 
                 // 局内 OnReleased 先判尾、后写 Body，因此这一投看到的 Body 断连必然仍是 false：
                 // 由「提前松手」反推 HoldBroken 会把合法的提前松手压成 Meh（Common，Lazer/Classic）或直接否决（O2）。
@@ -257,7 +274,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             PillModeEnabled = pillModeEnabled,
                         });
 
-                        if (environment.ManiaHitMode == EzEnumHitMode.Lazer && result == HitResult.None)
+                        // Lazer / Classic 共用 CommonHoldJudgementStrategy（LazerHoldJudgementReplica）：
+                        // 窗口外一律返回 None，局内此时不判尾、仅由 Body 断连收束。
+                        if (!judgementRound.IsEzHitMode && result == HitResult.None)
                         {
                             // [parity] 本次松手未判定尾键 → 检查是否构成断连（Body ComboBreak）。
                             if (!input.IsPress)
@@ -377,6 +396,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 if (target is HeadNote head)
                 {
                     headWasHit[head] = result.IsHit();
+
+                    // 局内 DrawableHoldNote.beginHoldAndJudgeHead 先 beginHoldAt（ReportHoldState(true)）再判头，
+                    // 因此头即使判 Miss，只要按下落在头 miss 窗内就进入持有；「松手判尾」只要求 IsHolding。
+                    // 头 miss 时尾仍会被尾判封顶（!Head.IsHit），故此处不按头结果过滤。
+                    if (holdByHead.ContainsKey(head) && IsWithinHeadBeginHoldWindow(head, input.Time))
+                        activeHoldByColumn[head.Column] = head;
 
                     if (environment.ManiaHitMode == EzEnumHitMode.EZ2AC
                         && holdByHead.TryGetValue(head, out var judgedHold))
@@ -668,6 +693,108 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 inputTime,
                 environment.JudgePrecedence,
                 HitModeHelper.IsBMSHitMode(environment.ManiaHitMode));
+        }
+
+        /// <summary>
+        /// 定位「此刻正按住的那条 LN」的尾候选，等价于局内 <c>Column.OnReleased</c> 读到的 <c>LaneController.ActiveHold</c>。
+        /// </summary>
+        /// <remarks>
+        /// 仅当该尾落在本次候选窗口内（即局内 <c>Tail.UpdateResult()</c> 会产生判定）时才返回；
+        /// 窗口外局内不判定尾、只由 Body 断连收束，故返回 null 让调用方走断连分支并保持尾未判（留给 auto-miss）。
+        /// 返回 null 表示本次松手不判任何尾（局内该分支不会去够同列相邻 LN）。
+        /// </remarks>
+        private static LaneTargetState? resolveActiveHoldTail(
+            int column,
+            Dictionary<int, HeadNote> activeHoldByColumn,
+            Dictionary<HeadNote, HoldNote> holdByHead,
+            bool wasHolding,
+            IReadOnlyList<LaneTargetState> candidates)
+        {
+            // 局内要求 activeHold.IsHolding：未持有（松手时 reading 为 false）时 OnReleased 不判尾。
+            if (!wasHolding || !activeHoldByColumn.TryGetValue(column, out var activeHead))
+                return null;
+
+            if (!holdByHead.TryGetValue(activeHead, out var activeHold))
+                return null;
+
+            foreach (var state in candidates)
+            {
+                if (ReferenceEquals(state.Target, activeHold.Tail))
+                    return state;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 局内 <c>DrawableHoldNote.OnPressed</c> 的重臂路径：列路由未选中目标时
+        /// （<c>ShouldSkipColumnRoutedPress</c> 仅在列已路由到目标时为真），drawable 自身仍会执行
+        /// <c>TryBeginHoldPress → beginHoldAt</c>，对「头已判定但尾未收束」的 LN 重新 <c>ReportHoldState(true)</c>。
+        /// Session 若不补这一步，「断连后重按、再到尾松手」会漏判尾（局内为 Meh，Session 会落成 Miss）。
+        /// </summary>
+        private static void tryRearmActiveHold(
+            int column,
+            double time,
+            IReadOnlyList<LaneTargetState> pressLaneStates,
+            IReadOnlyDictionary<int, List<LaneTargetState>> releaseColumns,
+            Dictionary<HeadNote, HoldNote> holdByHead,
+            IManiaHoldJudgementStrategy holdStrategy,
+            Dictionary<int, HeadNote> activeHoldByColumn)
+        {
+            if (!releaseColumns.TryGetValue(column, out var releaseStates))
+                return;
+
+            HeadNote? rearmed = null;
+            double rearmedHeadStart = double.PositiveInfinity;
+
+            foreach (var state in pressLaneStates)
+            {
+                // 仅头已判定的 LN 需要重臂；头未判定者由常规候选路径处理。
+                if (state.Target is not HeadNote head || !state.Judged)
+                    continue;
+
+                if (!holdByHead.TryGetValue(head, out var hold))
+                    continue;
+
+                if (!holdStrategy.CanBeginHoldAt(time, hold.Tail))
+                    continue;
+
+                if (!IsWithinHeadBeginHoldWindow(head, time))
+                    continue;
+
+                bool tailJudged = false;
+
+                foreach (var releaseState in releaseStates)
+                {
+                    if (ReferenceEquals(releaseState.Target, hold.Tail))
+                    {
+                        tailJudged = releaseState.Judged;
+                        break;
+                    }
+                }
+
+                // 尾已判定 → 局内父物件已收束，不再重臂。
+                if (tailJudged)
+                    continue;
+
+                if (head.StartTime < rearmedHeadStart)
+                {
+                    rearmed = head;
+                    rearmedHeadStart = head.StartTime;
+                }
+            }
+
+            if (rearmed != null)
+                activeHoldByColumn[column] = rearmed;
+        }
+
+        /// <summary>
+        /// 对齐 <c>DrawableHoldNote.beginHoldAt</c> 的守卫：按下早于头 Miss 窗左界时不进入持有。
+        /// </summary>
+        private static bool IsWithinHeadBeginHoldWindow(HeadNote head, double time)
+        {
+            double missWindow = head.HitWindows?.WindowFor(HitResult.Miss) ?? 0;
+            return time - head.StartTime >= -missWindow;
         }
 
         private static IEnumerable<LaneTargetState> collectCandidatesForInput(
