@@ -74,7 +74,7 @@
 ### 三、当前版里开销在哪（下一个目标）
 
 - **整段运行**（running 共 445.1 s）：`SwapBuffers → Present → amdxx64.dll` **123.8 s = 28%**（驱动自身 75.7 s）是最大单项，是呈现 / 限帧在驱动里等，**不是游戏逻辑**；`UpdateFrame` 117.2 s（26%）。子系统：Native 5146 s / System 3634 s / **User code 1287 s** / Sleep 890 s / GC Wait 87.6 s / **JIT 20.8 s** / Collections 5.8 s / Lock contention 0.055 s。
-- **启动窗口 0–20 s**（running 36.0 s）现在第一大户是**字体族枚举**：`OsuGameBase.InitialiseFonts → RegisterLocalizedFallbacks → EzSystemFontCatalog.FindByFamily → GetEntries` = **1.772 s（5%）**，其中 `OutlineFont.TryGetFamilyName` 有 **608 ms 直接烧在 freetype 内**；其次 `bootstrapSceneGraph` 4.973 s、`EzRealmRulesetStore..ctor → PrepareDetachedRulesets` 0.570 s。
+- **启动窗口 0–20 s**（running 36.0 s）现在第一大户是**字体族枚举**：`OsuGameBase.InitialiseFonts → RegisterLocalizedFallbacks → EzSystemFontCatalog.FindByFamily → GetEntries` = **1.772 s（5%）**，其中 `OutlineFont.TryGetFamilyName` 有 **608 ms 直接烧在 freetype 内**；其次 `bootstrapSceneGraph` 4.973 s、`EzRealmRulesetStore..ctor → PrepareDetachedRulesets` 0.570 s。**该项已按 §2.4.23 加族名落盘缓存（热启动预期归零，待下一次快照复核）**。
 - **反常点（未定案）**：当前版 4 次 UiFreeze 全部落在最后一个桶（234.4–239.1 s），前 234 秒一次都没有；那段 CPU 大头是 `GameThread → UpdateFrame → BeatmapCarousel.Update`（3.08 s，占该段 37%）。多为退出 / 保存路径，未深究。
 
 ---
@@ -534,6 +534,22 @@ EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzT
 **收益（A/B 同窗口对比）**：11.5–15.5 s 窗口 running CPU 4214.2 → **2524.1 ms（−40%）**，整棵 Roslyn 子树消失；三版快照的 UiFreeze/s 为 30.2 → 16.3 → **8.8**（见 §2.0）。
 
 **代价与前提**：① 皮肤列表显示**目录名**而非脚本声明的显示名（声明名要等选中时才拿到）；② 开关属**启动期快照**（`SkinManager` 构造时读一次、刻意不做响应式绑定）⇒ 设置页改动**需重启生效**，且老用户升级后脚本皮肤默认不出现。
+
+#### 2.4.23 字体族枚举：族名落盘缓存，启动不再逐个打开字体（2026-09-26）
+
+**问题**：启动期 `InitialiseFonts → RegisterLocalizedFallbacks → FindByFamily → GetEntries` 是**全量**目录扫描 + 逐文件 `FT_New_Face` + 遍历 SFNT name 表。dotTrace 实测 **1.772 s**，其中 `freetype.dll` 自身 607.8 ms、`[未知]` 259.0 ms，其余是 `tryGetSfntFamilyName` 对每个字体 name 表的逐条 P/Invoke。整条链跑在 `GameHost.Run → bootstrapSceneGraph` 的主线程上、**主循环启动之前**，所以是纯串行启动时间（不是局内冻结）。而启动真正只需要「配置里那一两个族名落在哪个文件」。
+
+两个前置事实，决定这条成本的归属：
+
+- `EzFontSettingsOverlay` 早已用 `Task.Run` 加载目录（状态栏先显示 `…`），**不是**它的问题；
+- 六个 UI 字体设置默认值全是 `string.Empty`，全空时 `FindByFamily` 根本不被调用 —— 这条成本**只落在配置过系统字体的用户**身上。
+
+**改动（`EZ-FONT-NAME-CACHE`）**：新增 `EzSystemFontNameCache`，把「文件 → 族名」按 `(length, lastWriteTimeUtc)` 指纹落盘（`ez-font-name-cache.json`，带格式版本，写入走 `Storage.CreateFileSafely` 的临时文件 + 替换）。`GetEntries()` 对每个文件先查缓存：命中且指纹一致就**直接复用族名，不再打开字体**；`OsuGameBase` 在 `InitialiseFonts()` 之前 `EzSystemFontCatalog.AttachCache(Storage)` 打开开关，未挂载时行为与改动前完全一致。
+
+- **不变量**：缓存**只对本次枚举到的文件**做查询。删掉的字体的条目永远查不到；被替换的字体指纹不匹配、自动重读。因此**不需要任何失效扫描**，也不存在「缓存说有、磁盘其实没有」的窗口 —— 这是选择「按文件指纹」而不是「按目录指纹」的原因。
+- **预期收益**：首次启动仍是 1.772 s（同时写入缓存），之后每次启动只剩目录枚举 + 每文件一次 stat。设置面板首次打开同样受益。
+- **代价 / 边界**：新增 `ez-font-name-cache.json`（数百条、几十 KB，放数据目录根部，与 `EzSkinSettings.ini` 同级）；指纹相同的替换（复制 + 保留时间戳）会复用旧族名。缓存缺失 / 损坏 / 版本不符 → 退化为全量扫描，不影响正确性。
+- **验证**：`EzSystemFontNameCacheTest`（round-trip / 指纹不匹配 / 缺失与损坏 / 无改动不写盘）。端到端数字**待下一次 dotTrace 快照复核**。
 
 ---
 

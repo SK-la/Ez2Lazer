@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using osu.Framework;
 using osu.Framework.Logging;
+using osu.Framework.Platform;
 using osu.Framework.Text;
 using osu.Game.EzOsuGame.Configuration;
 
@@ -24,6 +25,41 @@ namespace osu.Game.EzOsuGame.Fonts
         private static readonly Lock cache_lock = new Lock();
         private static IReadOnlyList<EzSystemFontEntry>? cached;
         public static IReadOnlyList<EzSystemFontEntry>? CachedEmoji;
+
+        private static Storage? nameCacheStorage;
+        private static EzSystemFontNameCache? name_cache;
+        private static bool nameCacheLoaded;
+
+        /// <summary>
+        /// Enables persistence of resolved family names under the given storage. Without it every scan reads
+        /// every installed font through FreeType.
+        /// </summary>
+        public static void AttachCache(Storage storage)
+        {
+            lock (cache_lock)
+            {
+                if (ReferenceEquals(nameCacheStorage, storage))
+                    return;
+
+                nameCacheStorage = storage;
+                name_cache = null;
+                nameCacheLoaded = false;
+            }
+        }
+
+        private static EzSystemFontNameCache? getNameCache()
+        {
+            if (nameCacheStorage == null)
+                return null;
+
+            if (!nameCacheLoaded)
+            {
+                name_cache = EzSystemFontNameCache.Load(nameCacheStorage);
+                nameCacheLoaded = true;
+            }
+
+            return name_cache;
+        }
 
         /// <summary>Sample emoji codepoints used to verify a face is emoji-capable.</summary>
         private static readonly int[] emoji_probe_codepoints =
@@ -46,6 +82,7 @@ namespace osu.Game.EzOsuGame.Fonts
                     CachedEmoji = null;
 
                 var byFamily = new Dictionary<string, EzSystemFontEntry>(StringComparer.OrdinalIgnoreCase);
+                var cache = getNameCache();
 
                 foreach (string directory in enumerateFontDirectories())
                 {
@@ -80,11 +117,18 @@ namespace osu.Game.EzOsuGame.Fonts
                     {
                         try
                         {
-                            // Face 0 only for v1 (collections may expose more later).
-                            string? family = OutlineFont.TryGetFamilyName(file, 0);
+                            var info = new FileInfo(file);
 
-                            if (string.IsNullOrWhiteSpace(family) || isPlaceholderFamilyName(family))
-                                family = Path.GetFileNameWithoutExtension(file);
+                            // Face 0 only for v1 (collections may expose more later).
+                            string family;
+
+                            if (cache != null && cache.TryGet(file, info.Length, info.LastWriteTimeUtc.Ticks, out string cachedFamily))
+                                family = cachedFamily;
+                            else
+                            {
+                                family = resolveFamilyName(file);
+                                cache?.Store(file, info.Length, info.LastWriteTimeUtc.Ticks, family);
+                            }
 
                             bool prefer = isPreferredStyleFile(file);
 
@@ -98,12 +142,24 @@ namespace osu.Game.EzOsuGame.Fonts
                     }
                 }
 
+                cache?.Save();
+
                 cached = byFamily.Values
                                  .OrderBy(e => e.DisplayName, StringComparer.CurrentCultureIgnoreCase)
                                  .ToList();
 
                 return cached;
             }
+        }
+
+        private static string resolveFamilyName(string file)
+        {
+            string? family = OutlineFont.TryGetFamilyName(file, 0);
+
+            if (string.IsNullOrWhiteSpace(family) || isPlaceholderFamilyName(family))
+                family = Path.GetFileNameWithoutExtension(file);
+
+            return family;
         }
 
         public static EzSystemFontEntry? FindByFamily(string? family)
