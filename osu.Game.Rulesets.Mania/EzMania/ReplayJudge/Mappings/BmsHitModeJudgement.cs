@@ -128,9 +128,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
             missLate = Math.Max(missLate, Math.Max(kPoorLateWindow, badLateWindow + kPoorEarlyWindow));
         }
 
-        public DrawableAction TryPostBadOnPressed(ManiaHitWindows windows, BmsRouteState state, bool poorEnabled)
+        public DrawableAction TryPostBadOnPressed(BmsRouteState state, bool poorEnabled)
         {
-            if (!poorEnabled || !state.CanRouteToKPoor || !windows.IsHitResultAllowed(MapTo(BmsJudge.KPoor)))
+            // poorEnabled 来自当局冻结环境（ManiaJudgementRound.PoorEnabled），已蕴含 BmsPoor 开关。
+            // 不要再回读 windows.IsHitResultAllowed(Poor)：那会读全局配置，与会用冻结值的 LaneController 结论不一致。
+            if (!poorEnabled || !state.CanRouteToKPoor)
                 return DrawableAction.NotHandled;
 
             return DrawableAction.Extra(BmsJudge.KPoor, clearCanRouteToKPoor: true);
@@ -330,7 +332,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
                 return new BmsPressCoreResult { Kind = BmsPressCoreKind.Ignore };
             }
 
-            if (checkCanRouteOnPress && state != null && poorEnabled && state.CanRouteToKPoor && windows.IsHitResultAllowed(MapTo(BmsJudge.KPoor)))
+            if (checkCanRouteOnPress && state != null && poorEnabled && state.CanRouteToKPoor)
                 return new BmsPressCoreResult { Kind = BmsPressCoreKind.DispatchExtra, Judge = BmsJudge.KPoor, ClearCanRouteToKPoor = true };
 
             var judge = resolvePressedJudge(windows, timeOffset, badLate);
@@ -343,7 +345,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Mappings
 
             if (judge == BmsJudge.KPoor)
             {
-                if (!poorEnabled || !windows.IsHitResultAllowed(MapTo(BmsJudge.KPoor)))
+                if (!poorEnabled)
                     return new BmsPressCoreResult { Kind = BmsPressCoreKind.Ignore };
 
                 bool isLatePress = IsLateOutsideBad(timeOffset, badLate);
