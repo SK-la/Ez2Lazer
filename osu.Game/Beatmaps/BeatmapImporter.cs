@@ -170,10 +170,6 @@ namespace osu.Game.Beatmaps
             if (archive != null)
                 beatmapSet.Beatmaps.AddRange(createBeatmapDifficulties(beatmapSet, realm));
 
-            // Zip entry names may have been decoded with the wrong encoding (e.g. UTF-8 bytes forced through CP932).
-            // .osu metadata keeps the original Unicode paths — rename Realm file entries to match when possible.
-            reconcileReferencedFilenames(beatmapSet);
-
             beatmapSet.DateAdded = getDateAdded(archive);
 
             foreach (BeatmapInfo b in beatmapSet.Beatmaps)
@@ -231,6 +227,14 @@ namespace osu.Game.Beatmaps
         protected override void PostImport(BeatmapSetInfo model, Realm realm, ImportParameters parameters)
         {
             base.PostImport(model, realm, parameters);
+
+            // Zip entry names may have been decoded with the wrong encoding (e.g. UTF-8 bytes forced through CP932).
+            // .osu metadata keeps the original Unicode paths — rename Realm file entries to match when possible.
+            //
+            // Deliberately not done in Populate: that runs before the duplicate check, and normalising the names there
+            // would make an archive whose entries merely were renamed look identical to the set already in the database,
+            // so genuinely changed archives would be deduplicated away instead of imported.
+            reconcileReferencedFilenames(model);
 
             // Scores are stored separately from beatmaps, and persist even when a beatmap is modified or deleted.
             // Let's reattach any matching scores that exist in the database, based on hash.
