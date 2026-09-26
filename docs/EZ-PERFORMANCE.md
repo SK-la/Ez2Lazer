@@ -104,9 +104,11 @@
 `AnalyzePressLatency.ps1` / `AnalyzeFrameStall.ps1` / `AnalyzePeriod.py`（周期性 / 跨探针相位）。
 总开关是 **ini 设置 `Ez2Setting.EzJudgmentDiagEnabled`**（`EzExperimentalSettings` 里的「启用 Ez 诊断套件」，
 不是环境变量）；它决定**启动时整套诊断是否工作**。**跑哪些内容**由环境变量 `EZ_DIAG_PROBES` 选择
-（`judgment` / `press` / `frame` / `hotpath` / `trace` / `all`；空 = 全部）——
+（`judgment` / `press` / `frame` / `hotpath` / `all`；空 = 全部）——
 子项选择刻意**不落成设置项**：「这次实验想验什么」是实验意图，不是用户偏好（同 §2.4.20）。开关、内容选择与
-其余调参都在**启动时读一次**，统一入口 `EzDiagnosticSwitches.Apply`。其余调参环境变量：
+其余调参都在**启动时读一次**，统一入口 `EzDiagnosticSwitches.Apply`。**例外**：结算流程时序追踪
+（`EzTimingTrace`→`trace_*.csv`）不属本套件，走自己的设置项 `Ez2Setting.EzTimingTraceEnabled`，进图读一次
+（改完下一局生效，无需重启）。其余调参环境变量：
 `EZ_FRAME_PROBE_MS`（stall 阈值，**0 = 抓全集**）、`EZ_FRAME_PROBE_LIGHT`（关掉每帧 GC/分配读数）、
 `EZ_PRESS_PROBE_SKIP_FORCE_MISS`（消融强制 miss 扫描）。**这些只在诊断开启时生效。**
 
@@ -882,14 +884,14 @@ judgment `AudioLag` 序列（= `BassSource − GameTime`，与 `Drift` 去趋势
 | | 旧（§2.4.18） | 新（本条） |
 |---|---|---|
 | 启动闸门 | ini 总开关，一开三个探针全跑 | 仍是 ini 总开关 `EzJudgmentDiagEnabled`，但它**只决定启动时整套诊断是否工作** |
-| 内容选择 | 无（一开就全跑） | 环境变量 `EZ_DIAG_PROBES`：`judgment` / `press` / `frame` / `hotpath` / `trace` / `all`；**空 = 全部** |
-| 谁下发 | 各探针各自 `SetEnabled` | `EzDiagnosticSwitches.Apply(config)` 唯一入口 |
+| 内容选择 | 无（一开就全跑） | 环境变量 `EZ_DIAG_PROBES`：`judgment` / `press` / `frame` / `hotpath` / `all`；**空 = 全部** |
+| 谁下发 | 各探针各自 `SetEnabled` | `EzDiagnosticSwitches.Apply(config)` 唯一入口；**例外**：`EzTimingTrace` 仍由自己的设置项 `EzTimingTraceEnabled` 在 `Player` 进图时读一次（不参与套件、也不进 `EZ_DIAG_PROBES`） |
 | 其余调参 env | 分散读取 | 同一入口内的 `applyPressTuning` / `applyFrameTuning` |
 | 热路径代价 | 一个静态 bool 分支 | **不变**（仍是启动时定死的静态位） |
 
 内容与产物的对应：`judgment`→`judgment_*.csv`、`press`→`presslatency_*.csv`、
-`frame`→`framestall_*.csv` + 摘要、`hotpath`→Mania 计数器（只进运行日志，不落 CSV）、
-`trace`→`trace_*.csv`。
+`frame`→`framestall_*.csv` + 摘要、`hotpath`→Mania 计数器（只进运行日志，不落 CSV）。
+`trace`→`trace_*.csv` 不属本套件（自己的设置项，见上方「例外」）。
 
 **为什么内容选择是环境变量而不是设置项**：子项回答的是「这次实验想验什么」，不是用户偏好 ——
 与 `EZ_FRAME_PROBE_MS` / `EZ_PRESS_PROBE_SKIP_FORCE_MISS` 同一条理由。曾经把它做成五个

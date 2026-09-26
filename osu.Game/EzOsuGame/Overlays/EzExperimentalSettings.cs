@@ -359,12 +359,10 @@ namespace osu.Game.EzOsuGame.Overlays
             "(研究功能)总开关。开启后整套探针在启动时开始工作，每局结束把本局数据写成 CSV。"
             + "\n**重启游戏后生效**（关闭时为零开销，热路径上不留任何探针逻辑）。"
             + "\n跑哪些内容由环境变量 EZ_DIAG_PROBES 选择（judgment / press / frame / hotpath / all；空 = 全部）。"
-            + "\n本开关不含「结算流程时序追踪」，那项由自己的设置项控制。"
             + "\n输出目录：仓库内 diagnostics/（找不到仓库时退回桌面 EzDiag/）。",
             "(Testing feature) Master switch. When on, the probe suite starts working at launch and writes CSVs after every play."
             + "\nTakes effect after restarting the game (zero cost while off)."
             + "\nWhich probes run is chosen by the EZ_DIAG_PROBES environment variable (judgment / press / frame / hotpath / all; empty = all)."
-            + "\nThe results-flow timing trace is not part of this switch; it has its own setting."
             + "\nOutput: diagnostics/ inside the repository (falls back to Desktop/EzDiag/).");
 
         internal static readonly LocalisableString EZ_TIMING_TRACE_ENABLED = new EzLocalizationManager.EzLocalisableString(
