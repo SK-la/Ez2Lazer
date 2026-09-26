@@ -23,6 +23,7 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens.Edit.Components.Menus;
 using osu.Game.Skinning;
 using osu.Game.Tests.Resources;
@@ -51,6 +52,9 @@ namespace osu.Game.Tests.Visual.Edit
             // 测试会导入并选中的皮肤会留在 SkinManager 里，影响后续用例（例如「内置皮肤下导出应禁用」）。
             // 每个用例都从内置皮肤起步。
             AddStep("reset skin", () => skinManager.CurrentSkinInfo.SetDefault());
+
+            // 色板场景的预览列数由该设置驱动，逐个用例重置以免顺序相关。
+            AddStep("reset preview key mode", () => ezConfig.SetValue(Ez2Setting.ColumnTypeListSelect, 4));
         }
 
         protected override void LoadComplete()
@@ -146,7 +150,7 @@ namespace osu.Game.Tests.Visual.Edit
         }
 
         [Test]
-        public void TestColourSceneComparisonDrawables()
+        public void TestColourSceneVirtualPreviewFollowsKeyMode()
         {
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
@@ -156,7 +160,13 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("comparison grid visible", () => editorScreen.ChildrenOfType<EzSkinEditorPreviewHost>().Single().ChildrenOfType<GridContainer>().Any());
             AddUntilStep("two sidebar groups", () => editorScreen.ChildrenOfType<EzSkinEditorSettingsGroup>().Count() == 2);
             AddAssert("comparison preview supported", () => editorScreen.ChildrenOfType<OsuSpriteText>().All(t => t.Text.ToString().Contains(EzEditorStrings.PLACEHOLDER_COMPARISON_NOT_SUPPORTED.ToString()) != true));
-            AddUntilStep("unified note comparison host visible", () => editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
+
+            // Colour drives one full-width virtual playfield from the sidebar key mode; the unified note comparison is Size/Note only.
+            AddUntilStep("virtual playfield has 4 columns", () => editorScreen.ChildrenOfType<Column>().Count() == 4);
+            AddAssert("no note comparison host", () => !editorScreen.ChildrenOfType<EzSkinEditorNoteComparisonHost>().Any());
+
+            AddStep("switch key mode to 7K", () => ezConfig.SetValue(Ez2Setting.ColumnTypeListSelect, 7));
+            AddUntilStep("virtual playfield follows to 7 columns", () => editorScreen.ChildrenOfType<Column>().Count() == 7);
         }
 
         [Test]

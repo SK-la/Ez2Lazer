@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -103,6 +104,11 @@ namespace osu.Game.EzOsuGame.Edit
         private bool noteSnapshotInitialized;
         private Guid noteSnapshotSkinId;
         private bool configPreviewRefreshBound;
+
+        /// <summary>
+        /// 框架把 <c>GetBindable</c> 返回的绑定副本只登记为 WeakReference；副本若无强引用会被 GC 回收，订阅会静默失效。
+        /// </summary>
+        private readonly List<IBindable> retainedBindingCopies = new List<IBindable>();
 
         private ISkinEditorVirtualProvider? provider;
         private EzSkinEditorSceneContext? sceneContext;
@@ -277,7 +283,10 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void bindColumnKeyModePreviewRefresh()
         {
-            ezSkinConfig.GetBindable<int>(Ez2Setting.ColumnTypeListSelect).BindValueChanged(_ =>
+            var keyModeBindable = ezSkinConfig.GetBindable<int>(Ez2Setting.ColumnTypeListSelect);
+            retainedBindingCopies.Add(keyModeBindable);
+
+            keyModeBindable.BindValueChanged(_ =>
             {
                 if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Colour)
                     Schedule(refreshPreviewContent);
