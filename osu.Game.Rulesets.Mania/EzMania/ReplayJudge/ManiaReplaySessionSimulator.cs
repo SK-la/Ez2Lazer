@@ -343,15 +343,31 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                     forced.Judged = true;
                     forced.Result = HitResult.Miss;
+                    double forcedOffset = ComputeStoredTimeOffset(input.Time, forced.Target);
                     ApplyFinalResult(
                         scoreProcessor,
                         forced.Target,
                         HitResult.Miss,
-                        ComputeStoredTimeOffset(input.Time, forced.Target),
+                        forcedOffset,
                         input.Time,
                         gameplayRate,
                         environment.ManiaHitMode,
                         timelineRecorder);
+
+                    // 局内尾被补判 Miss 时同样会产出 Body ComboBreak 与父物件 IgnoreMiss；
+                    // 此处前推补判若漏掉，统计会比原始成绩少这两个辅助判定。
+                    if (forced.Target is TailNote forcedTail
+                        && headByTail.TryGetValue(forcedTail, out var forcedHead)
+                        && holdByHead.TryGetValue(forcedHead, out var forcedHold))
+                    {
+                        if (forcedHold.Body != null && !forced.BodyJudged)
+                        {
+                            forced.BodyJudged = true;
+                            ApplyAuxiliaryResult(scoreProcessor, forcedHold.Body, HitResult.ComboBreak, forcedOffset, input.Time, gameplayRate, timelineRecorder);
+                        }
+
+                        ApplyAuxiliaryResult(scoreProcessor, forcedHold, HitResult.IgnoreMiss, forcedOffset, input.Time, gameplayRate, timelineRecorder);
+                    }
                 }
 
                 selected.Judged = true;
