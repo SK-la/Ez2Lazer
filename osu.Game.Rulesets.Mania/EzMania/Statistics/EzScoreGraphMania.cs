@@ -185,11 +185,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         /// <summary>
-        /// 按当前 HitMode 的基分权重计算 NowAccuracy 和 NowScore。
+        /// 按当前 HitMode 的基分权重计算 NowAccuracy。
         /// 公式：NowAccuracy = Σ(countᵢ × baseScoreᵢ) / (totalCount × maxBaseScore)
-        ///       NowScore = NowAccuracy × 1_000_000
         /// </summary>
-        private (double accuracy, long score) computeNowAccuracyAndScore(Dictionary<HitResult, int> counts, EzEnumHitMode hitMode)
+        /// <remarks>
+        /// 这里只算 acc，不碰 <see cref="EzScoreGraphBase.NowScore"/>：TotalScore 现在含 combo 成分
+        /// （见 ManiaScoreProcessor.ComputeTotalScore），而拖动 / 预提交阶段只有判定计数、拿不到 combo 进度。
+        /// 分数等 Session 提交后由 <see cref="CalculateNowAccuracy"/> 取权威结果，避免显示一个与最终值不符的读数。
+        /// </remarks>
+        private double computeNowAccuracy(Dictionary<HitResult, int> counts, EzEnumHitMode hitMode)
         {
             int total = 0;
             long totalBase = 0;
@@ -205,14 +209,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             }
 
             if (total == 0)
-                return (0, 0);
+                return 0;
 
             int maxBase = HitModeHelper.GetBaseScoreForResult(hitMode, HitResult.Perfect);
             long totalMax = (long)maxBase * total;
 
-            double accuracy = totalMax > 0 ? (double)totalBase / totalMax : 0;
-            long score = (long)(accuracy * 1_000_000);
-            return (accuracy, score);
+            return totalMax > 0 ? (double)totalBase / totalMax : 0;
         }
 
         /// <summary>
@@ -355,7 +357,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             }
 
             NowCounts = counts;
-            (NowAccuracy, NowScore) = computeNowAccuracyAndScore(counts, currentHitMode);
+            NowAccuracy = computeNowAccuracy(counts, currentHitMode);
         }
 
         /// <summary>
@@ -594,7 +596,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             long scScore = originalTotalScore;
 
             string nowAccText = (NowAccuracy * 100).ToString("F1") + "%";
-            string nowScoreText = (NowScore / 1000.0).ToString("F0") + "k";
+            // 未拿到 Session 结果前不显示分数：TotalScore 现在含 combo 成分，只有判定计数无法还原，
+            // 否则会先显示一个与最终值不符的读数再跳变。
+            string nowScoreText = CommittedNowScore == null ? "--" : (NowScore / 1000.0).ToString("F0") + "k";
 
             statItems[0].Value = scAcc.ToString("F1") + "%";
             statItems[1].Value = nowAccText;
