@@ -22,6 +22,7 @@ using osu.Framework.Platform;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.IO;
+using osu.Game.Resources;
 using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame
@@ -30,20 +31,21 @@ namespace osu.Game.EzOsuGame
     /// Ez2 资源提供者 - 基于官方 IStorageResourceProvider 接口设计
     ///
     /// 纹理路径（经 <see cref="EzTextureUsage"/> 选择，勿直接持有底层 store）；
-    /// 每个 atlas 档拥有<b>独立页</b>，互不挤占（见 <see cref="EzTextureUsage"/> 各档说明）：
+    /// 字形与段位标各自拥有独立页，不与其它纹理挤占（见 <see cref="EzTextureUsage.Glyph"/> / <see cref="EzTextureUsage.Badge"/>）：
     /// 1. <see cref="EzTextureUsage.Atlas"/> — 小 UI
     /// 2. <see cref="EzTextureUsage.AnimationSafe"/> — 多帧/循环动画（非 atlas，Dispose 为空操作）
     /// 3. <see cref="EzTextureUsage.Large"/> — 单帧大图（refcount，禁止给 TextureAnimation）
     /// 4. <see cref="EzTextureUsage.Glyph"/> — 位图字形（数字等成套纹理，必须同页）
-    /// 5. <see cref="EzTextureUsage.Badge"/> — 段位图类大件
+    /// 5. <see cref="EzTextureUsage.Badge"/> — 段位标（加载期限边后进页，成套共用）
     /// </summary>
     public partial class EzResourceStore : Component, IStorageResourceProvider
     {
         // 字形页尺寸。取值只为「一整套字形必然放得下」留余量：同页是硬要求，尺寸只是实现手段。
         private const int glyph_atlas_size = 2048;
 
-        // 段位图页尺寸。大件在 1024 页上每行只能放 1–2 张，2048 可放约 9 张，页数大幅下降。
-        private const int badge_atlas_size = 2048;
+        // 段位标规范边长。段位图最多 97 张，最大显示 33px（BadgeSize 22 × 父级 Scale 1.5），
+        // 128 约为其 4 倍（覆盖 HiDPI），再大只会多占页。
+        private const int dan_badge_texture_size = 128;
 
         #region IStorageResourceProvider 实现
 
@@ -74,12 +76,12 @@ namespace osu.Game.EzOsuGame
         private readonly Ez2ConfigManager ezConfig;
         private readonly Storage storage;
 
-        // 纹理加载器链（五路径，见 EzTextureUsage）
+        // 纹理加载器链（五个路径，见 EzTextureUsage）
         private readonly TextureStore textureStore;
         private readonly TextureStore animationSafeStore;
         private readonly LargeTextureStore largeTextureStore;
         private readonly TextureStore glyphStore;
-        private readonly TextureStore badgeStore;
+        private readonly TextureStore danStore;
 
         // 样本存储
         private readonly ISampleStore sampleStore;
@@ -113,8 +115,8 @@ namespace osu.Game.EzOsuGame
 
             // 创建组合资源存储：用户文件优先，DLL 回退
             var combinedStore = new ResourceStore<byte[]>();
-            combinedStore.AddStore(Files);        // 首先查找用户文件
-            combinedStore.AddStore(Resources);    // 找不到时回退到 DLL
+            combinedStore.AddStore(Files); // 首先查找用户文件
+            combinedStore.AddStore(Resources); // 找不到时回退到 DLL
 
             // 创建纹理加载器链（遵循官方模式）
             var baseTextureLoader = new TextureLoaderStore(combinedStore);
@@ -136,9 +138,15 @@ namespace osu.Game.EzOsuGame
             glyphStore = new TextureStore(renderer, textureLoaderStore1, preferredAtlasSize: glyph_atlas_size);
             glyphStore.AddTextureSource(baseTextureLoader);
 
-            // 段位图页：大件独占一页，避免把通用页挤到换页、也避免每张图各自占一页。
-            badgeStore = new TextureStore(renderer, textureLoaderStore1, preferredAtlasSize: badge_atlas_size);
-            badgeStore.AddTextureSource(baseTextureLoader);
+            // 段位标页：加载期把边长压到规范尺寸后再进页，故源图再大也只占一张页。
+            // 用户 EzResources/Dans/… 优先，其次内置 Textures/EzResources/Dans/…（含 MSBuild 的 _6k/_7k 目录变体）。
+            // 内置图源在 resources 包程序集里，不在 osu.Game.dll 的 Resources 下，故这里单独挂一份。
+            var danSource = new ResourceStore<byte[]>();
+            danSource.AddStore(Files);
+            danSource.AddStore(new NamespacedResourceStore<byte[]>(new DllResourceStore(OsuResources.ResourceAssembly), "Textures/EzResources"));
+
+            var danLoader = new MaxDimensionLimitedTextureLoaderStore(new TextureLoaderStore(danSource), dan_badge_texture_size);
+            danStore = new TextureStore(renderer, danLoader);
 
             // 创建样本存储
             sampleStore = audioManager.GetSampleStore(new NamespacedResourceStore<byte[]>(Files, "Samples"));
@@ -165,7 +173,7 @@ namespace osu.Game.EzOsuGame
                 EzTextureUsage.AnimationSafe => animationSafeStore.Get(path),
                 EzTextureUsage.Large => largeTextureStore.Get(path),
                 EzTextureUsage.Glyph => glyphStore.Get(path),
-                EzTextureUsage.Badge => badgeStore.Get(path),
+                EzTextureUsage.Badge => danStore.Get(path),
                 _ => textureStore.Get(path),
             };
         }
@@ -186,7 +194,7 @@ namespace osu.Game.EzOsuGame
                 EzTextureUsage.AnimationSafe => animationSafeStore,
                 EzTextureUsage.Large => largeTextureStore,
                 EzTextureUsage.Glyph => glyphStore,
-                EzTextureUsage.Badge => badgeStore,
+                EzTextureUsage.Badge => danStore,
                 _ => textureStore,
             };
         }
@@ -593,7 +601,7 @@ namespace osu.Game.EzOsuGame
                 animationSafeStore.Dispose();
                 largeTextureStore.Dispose();
                 glyphStore.Dispose();
-                badgeStore.Dispose();
+                danStore.Dispose();
                 sampleStore.Dispose();
 
                 if (Files is IDisposable filesDisposable)

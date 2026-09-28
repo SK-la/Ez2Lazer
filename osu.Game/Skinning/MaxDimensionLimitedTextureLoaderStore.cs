@@ -13,13 +13,27 @@ using SixLabors.ImageSharp.Processing;
 
 namespace osu.Game.Skinning
 {
+    /// <summary>
+    /// 在 <see cref="TextureUpload"/> 阶段限制纹理最长边：超过 <c>maxDimension</c> 时等比缩小后再交给 texture store。
+    /// </summary>
+    /// <remarks>
+    /// 缩小必须发生在创建纹理之前：能否进图集取决于上传尺寸，而显示期的缩放（<see cref="Texture.ScaleAdjust"/> 等）
+    /// 只改变绘制与度量，不会减少显存占用。
+    /// </remarks>
     public class MaxDimensionLimitedTextureLoaderStore : IResourceStore<TextureUpload>
     {
-        private readonly IResourceStore<TextureUpload>? textureStore;
+        // 仅防「大到 GPU 无法加载」的图，默认不该改变正常资源的尺寸。
+        private const int default_max_dimension = 8192;
 
-        public MaxDimensionLimitedTextureLoaderStore(IResourceStore<TextureUpload>? textureStore)
+        private readonly IResourceStore<TextureUpload>? textureStore;
+        private readonly int maxDimension;
+
+        public MaxDimensionLimitedTextureLoaderStore(IResourceStore<TextureUpload>? textureStore, int maxDimension = default_max_dimension)
         {
+            ArgumentOutOfRangeException.ThrowIfLessThan(maxDimension, 1);
+
             this.textureStore = textureStore;
+            this.maxDimension = maxDimension;
         }
 
         public void Dispose()
@@ -54,27 +68,24 @@ namespace osu.Game.Skinning
 
         private TextureUpload limitTextureUploadSize(TextureUpload textureUpload)
         {
-            // So there's a thing where some users have taken it upon themselves to create skin elements of insane dimensions.
-            // To the point where GPUs cannot load the textures (along with most image editor apps).
-            // To work around this, let's look out for any stupid images and shrink them down into a usable size.
-            const int max_supported_texture_size = 8192;
+            // 部分用户会自制尺寸夸张的皮肤元素，大到 GPU 无法加载（连带多数图片编辑器也打不开）。
+            // 这类图先缩到可用尺寸再上传。
+            if (textureUpload.Width <= maxDimension && textureUpload.Height <= maxDimension)
+                return textureUpload;
 
-            if (textureUpload.Height > max_supported_texture_size || textureUpload.Width > max_supported_texture_size)
+            var image = Image.LoadPixelData(textureUpload.Data, textureUpload.Width, textureUpload.Height);
+
+            // 原始 texture upload 不再返回也不再使用。
+            textureUpload.Dispose();
+
+            // ResizeMode.Max：只在 (maxDimension, maxDimension) 框内等比缩到最长边贴合，不改变宽高比。
+            image.Mutate(i => i.Resize(new ResizeOptions
             {
-                var image = Image.LoadPixelData(textureUpload.Data, textureUpload.Width, textureUpload.Height);
+                Mode = ResizeMode.Max,
+                Size = new Size(maxDimension, maxDimension),
+            }));
 
-                // The original texture upload will no longer be returned or used.
-                textureUpload.Dispose();
-
-                image.Mutate(i => i.Resize(new Size(
-                    Math.Min(textureUpload.Width, max_supported_texture_size),
-                    Math.Min(textureUpload.Height, max_supported_texture_size)
-                )));
-
-                return new TextureUpload(image);
-            }
-
-            return textureUpload;
+            return new TextureUpload(image);
         }
 
         public Stream? GetStream(string name) => textureStore?.GetStream(name);
