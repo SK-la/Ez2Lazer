@@ -540,7 +540,7 @@ def main():
     parser.add_argument('--deps-path', default=None, help='Path to folder containing dependency DLLs to include')
     parser.add_argument('--deps-pattern', default='*.dll', help='Glob pattern for dependency files to copy')
     parser.add_argument('--deps-source', choices=['local','github','none'], default='local', help='Where to get dependency DLLs')
-    parser.add_argument('--deps-github-repo', default='SK-la/osu-framework', help='GitHub repo (owner/repo) to clone when --deps-source=github')
+    parser.add_argument('--deps-github-repo', default='SK-la/ez2lazer-framework', help='GitHub repo (owner/repo) to clone when --deps-source=github')
     parser.add_argument('--deps-github-branch', default='master', help='Branch or ref to checkout when cloning deps github repo')
     parser.add_argument('--deps-github-project', default='osu.Framework/osu.Framework.csproj', help='Path to csproj inside cloned deps repo to build')
     parser.add_argument('--resources-github-repo', default='SK-la/ez2lazer-resources', help='GitHub repo for resources to clone')

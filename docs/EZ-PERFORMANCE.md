@@ -2,7 +2,7 @@
 
 > **用途**：集中记录 **帧率下降、卡顿、性能测试口径** 三类内容，供以后再遇到掉帧时直接查历史结论，避免重复排查。
 > **范围**：只收「性能与 FPS」相关描述。判定语义、数据来源、存储结构等仍留在各自文档，见 §8。
-> **跨仓库**：`osu`（游戏侧）与 `osu-framework`（渲染 / 音频线程）都在本文件登记，框架侧改动标注 commit。
+> **跨仓库**：`osu`（游戏侧）与 `ez2lazer-framework`（渲染 / 音频线程）都在本文件登记，框架侧改动标注 commit。
 > 注意：文档中记录的内容并不代表仓库当前状态，可能已被后续改动覆盖。请以实际代码为准。
 
 ---
@@ -26,7 +26,7 @@
 
 | 现象 | 根因 | 落地修复 | 归属 |
 |------|------|---------|------|
-| **传统（共享）输出播放时掉 500–700 FPS，暂停立刻回升** | 音频线程随 `GameThread.DEFAULT_ACTIVE_HZ` 提到 **8000Hz**，`TrackBass.UpdateState` 每帧都跑 `BassAmplitudeProcessor`（电平 + FFT512），播放态每秒约 8000 次昂贵 BASS 查询 | 振幅分析独立限频为 `max(显示器刷新率, 120Hz)`，音频控制仍 8000Hz | `osu-framework` `e22805587` |
+| **传统（共享）输出播放时掉 500–700 FPS，暂停立刻回升** | 音频线程随 `GameThread.DEFAULT_ACTIVE_HZ` 提到 **8000Hz**，`TrackBass.UpdateState` 每帧都跑 `BassAmplitudeProcessor`（电平 + FFT512），播放态每秒约 8000 次昂贵 BASS 查询 | 振幅分析独立限频为 `max(显示器刷新率, 120Hz)`，音频控制仍 8000Hz | `ez2lazer-framework` `e22805587` |
 | 选歌界面停留 3–5 秒后掉帧 | `BackgroundDataStoreProcessor` 回填 + `RealmDetachedBeatmapStore` 的 Replace 风暴 | `StartupBackfillDelay` = 5s（测试可覆写 0）；`DetachedBeatmapStoreFrameBudget` 每帧 Drain ≤ 24 | `osu` |
 | 打得越久越卡 | `Column.pressTimes` 整局无限增长，被动 Miss 时复制整表查最近邻 | `pressTimes` 有界裁剪 + `ManiaDrawableMissTiming` 零分配 | `osu` |
 | 列数 / LN 越多越卡 | 每个存活 drawable 每帧进 automiss 询问 | automiss 迁到 Column late-deadline 队列，每列每帧一次 poll；删除每 drawable 虚分派 | `osu` |
@@ -49,7 +49,7 @@
 | **SAMPLE-NO-LINQ** | `GameplaySampleTriggerSource` / `DrawableManiaHitObject` | `GetMostValidObject` 去掉 `Where`/`MinBy`/`OrderBy`/`SkipWhile` 与递归 `getAllNested`，改单遍最小扫描 + 显式栈先序（并列取舍规则与上游一致）；`Play()` / `PlaySamples()` 手动填充数组代替 `Cast().ToArray()`。数组仍每次新建，因为 `GameplayState.ApplySamples` 靠引用不等触发绑定变更（`StoryboardTriggerController` 消费 `LastPlayedSamples`） |
 | **LN-INPUT-SLOT** | `DrawableHoldNoteHead` / `DrawableHoldNoteTail` | 空实现移出非位置输入队列。父 Hold 仍处理 press/release |
 | **LN-HOLD-FBO** | `DefaultBodyPiece` | 按住隐藏减法层并跳过 `ForceRedraw`；松手恢复。仅 Default/Triangles |
-| **FW-BUTTON-QUEUE-REUSE** | `osu-framework` `ButtonEventManager<TButton>`（`osu-framework` `56e9beb2c`） | 每个按钮各持一份按下队列缓冲：按下时整体重填（替代 `InputQueue.ToList()`），抬起时就地压缩掉已脱离输入树的项（替代 `Where(...).ToList()`）。队列长度 = 整棵输入子树的非位置输入项，原实现每按一次分配一条等长列表 + 一个 LINQ 迭代器。快照语义不变（仍取本次按下时的队列，抬起按同一快照派发） |
+| **FW-BUTTON-QUEUE-REUSE** | `ez2lazer-framework` `ButtonEventManager<TButton>`（`ez2lazer-framework` `56e9beb2c`） | 每个按钮各持一份按下队列缓冲：按下时整体重填（替代 `InputQueue.ToList()`），抬起时就地压缩掉已脱离输入树的项（替代 `Where(...).ToList()`）。队列长度 = 整棵输入子树的非位置输入项，原实现每按一次分配一条等长列表 + 一个 LINQ 迭代器。快照语义不变（仍取本次按下时的队列，抬起按同一快照派发） |
 
 ### 已评估但**不做**（附原因，避免重复讨论）
 
@@ -79,7 +79,7 @@
 
 | 候选 | 结论 |
 |------|------|
-| 缓存 `DrawableManiaHitObject.PlaySamples` 的 samples 数组 | **不可行**。`Bindable<T>.Value` setter 在 `EqualityComparer<T>.Default.Equals` 相等时直接 return（数组即引用比较，`osu-framework/…/Bindable.cs:99`），缓存同一实例会让 `GameplayState.LastPlayedSamples` 对重复同音不再触发变更，而 `StoryboardTriggerController` 正消费它。数组必须每次新建（同 **SAMPLE-NO-LINQ**） |
+| 缓存 `DrawableManiaHitObject.PlaySamples` 的 samples 数组 | **不可行**。`Bindable<T>.Value` setter 在 `EqualityComparer<T>.Default.Equals` 相等时直接 return（数组即引用比较，`ez2lazer-framework/…/Bindable.cs:99`），缓存同一实例会让 `GameplayState.LastPlayedSamples` 对重复同音不再触发变更，而 `StoryboardTriggerController` 正消费它。数组必须每次新建（同 **SAMPLE-NO-LINQ**） |
 | HUD / 皮肤件「复用单个 `TransformSequence`」合并按键、判定动画 | **不可行（框架约束）**。`TransformSequence<T>` 在构造时固化 `startTime`/`currentTime`（`TransformSequence.cs:53`），复用实例再 `Append` 会把 transform 排到过去时刻 ⇒ 变成瞬跳而非动画；且 `PopulateTransform` 对同一 `Transform` 实例二次调用直接抛异常（`TransformableExtensions.cs:154`），即 transform 天然一次性、框架无池。单次 `MoveToY` 约 3 个小对象（`TransformSequence` + 其 1 槽 list + `TransformCustom`；`TransformID` 是 `ulong`，不产生字符串），`Ez2KeyAreaPlus` 里对 `Container<Circle>` 的 `foreach` 走结构体枚举器、本就不分配 |
 
 ---

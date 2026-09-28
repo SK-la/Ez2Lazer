@@ -31,7 +31,7 @@
 | **LN-INPUT-SLOT** | `DrawableHoldNoteHead` / `DrawableHoldNoteTail` 默认 `HandleNonPositionalInput = false`；按键仍由父 Hold 处理。Debug 可用 `ManiaHoldAblation.EnqueueHoldEnds` 强制入队 | LN |
 | **LN-HOLD-FBO** | `DefaultBodyPiece` 按住时隐藏减法层并跳过 `ForceRedraw`；松手恢复内孔。仅 Default/Triangles | LN |
 | **LN-ABLATION** | Debug-only：`ManiaHoldAblation` + `TestSceneManiaHoldDrawCost` + LN 热路径计数。Release 编译期剥离 | 观测 |
-| **FW-BUTTON-QUEUE-REUSE** | `osu-framework` `ButtonEventManager` 按下 / 抬起队列改为每按钮一份复用缓冲（去 `ToList()` 与 `Where().ToList()` 的按次列表分配） | 全部（framework `56e9beb2c`） |
+| **FW-BUTTON-QUEUE-REUSE** | `ez2lazer-framework` `ButtonEventManager` 按下 / 抬起队列改为每按钮一份复用缓冲（去 `ToList()` 与 `Where().ToList()` 的按次列表分配） | 全部（framework `56e9beb2c`） |
 
 ---
 

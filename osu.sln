@@ -47,9 +47,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CodeAnalysis", "CodeAnalysi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Resources", "..\ez2lazer-resources\osu.Game.Resources\osu.Game.Resources.csproj", "{C64CA87E-5D7F-45A4-9832-2570BFBAAB48}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Framework", "..\osu-framework\osu.Framework\osu.Framework.csproj", "{E1FF9149-86AF-4CB6-AABE-0D68AB7D70E4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Framework", "..\ez2lazer-framework\osu.Framework\osu.Framework.csproj", "{E1FF9149-86AF-4CB6-AABE-0D68AB7D70E4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Framework.NativeLibs", "..\osu-framework\osu.Framework.NativeLibs\osu.Framework.NativeLibs.csproj", "{258E5281-A34F-4949-9B00-66B174C45619}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Framework.NativeLibs", "..\ez2lazer-framework\osu.Framework.NativeLibs\osu.Framework.NativeLibs.csproj", "{258E5281-A34F-4949-9B00-66B174C45619}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.BMS", "osu.Game.Rulesets.BMS\osu.Game.Rulesets.BMS.csproj", "{DA53BD59-58E3-4BCC-81B1-EF77C30B9191}"
 EndProject

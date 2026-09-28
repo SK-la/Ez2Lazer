@@ -78,7 +78,7 @@
     <EmbeddedResource Remove="Resources\EzSkills\NOTICE.md" />
   </ItemGroup>
   <Target Name="ValidateEz2LazerSiblingProjects" BeforeTargets="BeforeBuild">
-    <Error Condition="'$(UseEz2LazerLocalFrameworkProject)' == 'true' and !Exists('$(Ez2LazerFrameworkProjectPath)')" Text="Missing sibling directory osu-framework. Please clone https://github.com/SK-la/ez2lazer-framework into $(MSBuildThisFileDirectory)..\..\osu-framework, or disable UseEz2LazerLocalFrameworkProject to rely on NuGet." />
+    <Error Condition="'$(UseEz2LazerLocalFrameworkProject)' == 'true' and !Exists('$(Ez2LazerFrameworkProjectPath)')" Text="Missing sibling directory ez2lazer-framework. Please clone https://github.com/SK-la/ez2lazer-framework into $(MSBuildThisFileDirectory)..\..\ez2lazer-framework, or disable UseEz2LazerLocalFrameworkProject to rely on NuGet." />
     <Error Condition="'$(UseEz2LazerLocalResourcesProject)' == 'true' and !Exists('$(Ez2LazerResourcesProjectPath)')" Text="Missing sibling directory ez2lazer-resources. Please clone https://github.com/SK-la/ez2lazer-resources into $(MSBuildThisFileDirectory)..\..\ez2lazer-resources, or disable UseEz2LazerLocalResourcesProject to rely on NuGet." />
   </Target>
 </Project>

@@ -5,8 +5,8 @@
     <Ez2LazerGameResourcesVersion>2026.922.0-ez2lazer</Ez2LazerGameResourcesVersion>
 
     <!-- ../ for repo root siblings (osu/, osu-Agent/); ../../ for Agent/osu-Agent worktree. -->
-    <_EzFwCandidate1>$(MSBuildThisFileDirectory)..\osu-framework\osu.Framework\osu.Framework.csproj</_EzFwCandidate1>
-    <_EzFwCandidate2>$(MSBuildThisFileDirectory)..\..\osu-framework\osu.Framework\osu.Framework.csproj</_EzFwCandidate2>
+    <_EzFwCandidate1>$(MSBuildThisFileDirectory)..\ez2lazer-framework\osu.Framework\osu.Framework.csproj</_EzFwCandidate1>
+    <_EzFwCandidate2>$(MSBuildThisFileDirectory)..\..\ez2lazer-framework\osu.Framework\osu.Framework.csproj</_EzFwCandidate2>
     <Ez2LazerFrameworkProjectPath Condition="Exists('$(_EzFwCandidate1)')">$(_EzFwCandidate1)</Ez2LazerFrameworkProjectPath>
     <Ez2LazerFrameworkProjectPath Condition="'$(Ez2LazerFrameworkProjectPath)' == '' and Exists('$(_EzFwCandidate2)')">$(_EzFwCandidate2)</Ez2LazerFrameworkProjectPath>
 
