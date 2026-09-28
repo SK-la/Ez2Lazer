@@ -6,6 +6,7 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas;
 using osu.Game.Rulesets.Mania.Judgements;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Scoring;
