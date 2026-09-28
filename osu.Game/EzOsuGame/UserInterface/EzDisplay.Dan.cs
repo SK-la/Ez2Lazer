@@ -183,7 +183,8 @@ namespace osu.Game.EzOsuGame.UserInterface
                 return;
 
             // User EzResources/Dans/… then bundled Textures/EzResources/Dans/…
-            Texture? texture = resources?.Get(relative, EzTextureUsage.Atlas);
+            // 段位图是大件，走专用页（见 EzTextureUsage.Badge），避免把字形页/通用页挤到换页。
+            Texture? texture = resources?.Get(relative, EzTextureUsage.Badge);
             texture ??= textures?.Get($"EzResources/{relative}");
 
             // MSBuild embeds folders whose names start with a digit as _6k / _7k.

@@ -29,13 +29,22 @@ namespace osu.Game.EzOsuGame
     /// <summary>
     /// Ez2 资源提供者 - 基于官方 IStorageResourceProvider 接口设计
     ///
-    /// 纹理三路径（经 <see cref="EzTextureUsage"/> 选择，勿直接持有底层 store）：
-    /// 1. <see cref="EzTextureUsage.Atlas"/> — 小 UI，可进 1024 atlas
+    /// 纹理路径（经 <see cref="EzTextureUsage"/> 选择，勿直接持有底层 store）；
+    /// 每个 atlas 档拥有<b>独立页</b>，互不挤占（见 <see cref="EzTextureUsage"/> 各档说明）：
+    /// 1. <see cref="EzTextureUsage.Atlas"/> — 小 UI
     /// 2. <see cref="EzTextureUsage.AnimationSafe"/> — 多帧/循环动画（非 atlas，Dispose 为空操作）
     /// 3. <see cref="EzTextureUsage.Large"/> — 单帧大图（refcount，禁止给 TextureAnimation）
+    /// 4. <see cref="EzTextureUsage.Glyph"/> — 位图字形（数字等成套纹理，必须同页）
+    /// 5. <see cref="EzTextureUsage.Badge"/> — 段位图类大件
     /// </summary>
     public partial class EzResourceStore : Component, IStorageResourceProvider
     {
+        // 字形页尺寸。取值只为「一整套字形必然放得下」留余量：同页是硬要求，尺寸只是实现手段。
+        private const int glyph_atlas_size = 2048;
+
+        // 段位图页尺寸。大件在 1024 页上每行只能放 1–2 张，2048 可放约 9 张，页数大幅下降。
+        private const int badge_atlas_size = 2048;
+
         #region IStorageResourceProvider 实现
 
         public IRenderer Renderer { get; }
@@ -65,10 +74,12 @@ namespace osu.Game.EzOsuGame
         private readonly Ez2ConfigManager ezConfig;
         private readonly Storage storage;
 
-        // 纹理加载器链（三路径，见 EzTextureUsage）
+        // 纹理加载器链（五路径，见 EzTextureUsage）
         private readonly TextureStore textureStore;
         private readonly TextureStore animationSafeStore;
         private readonly LargeTextureStore largeTextureStore;
+        private readonly TextureStore glyphStore;
+        private readonly TextureStore badgeStore;
 
         // 样本存储
         private readonly ISampleStore sampleStore;
@@ -121,6 +132,14 @@ namespace osu.Game.EzOsuGame
             largeTextureStore = new LargeTextureStore(renderer, textureLoaderStore1);
             largeTextureStore.AddTextureSource(baseTextureLoader);
 
+            // 字形页：独占一页，保证同一套字形（数字 0-9 等）永不被其它纹理挤到两页上。
+            glyphStore = new TextureStore(renderer, textureLoaderStore1, preferredAtlasSize: glyph_atlas_size);
+            glyphStore.AddTextureSource(baseTextureLoader);
+
+            // 段位图页：大件独占一页，避免把通用页挤到换页、也避免每张图各自占一页。
+            badgeStore = new TextureStore(renderer, textureLoaderStore1, preferredAtlasSize: badge_atlas_size);
+            badgeStore.AddTextureSource(baseTextureLoader);
+
             // 创建样本存储
             sampleStore = audioManager.GetSampleStore(new NamespacedResourceStore<byte[]>(Files, "Samples"));
             sampleStore.AddExtension("ogg");
@@ -145,6 +164,8 @@ namespace osu.Game.EzOsuGame
             {
                 EzTextureUsage.AnimationSafe => animationSafeStore.Get(path),
                 EzTextureUsage.Large => largeTextureStore.Get(path),
+                EzTextureUsage.Glyph => glyphStore.Get(path),
+                EzTextureUsage.Badge => badgeStore.Get(path),
                 _ => textureStore.Get(path),
             };
         }
@@ -156,6 +177,19 @@ namespace osu.Game.EzOsuGame
         [Obsolete("请使用 Get(path, EzTextureUsage)。动画帧务必传 AnimationSafe，勿用 Large。")]
         public Texture? Get(string path, bool useLargeStore)
             => Get(path, useLargeStore ? EzTextureUsage.Large : EzTextureUsage.Atlas);
+
+        // 按用途取底层 store，用于测试断言「各档图集页互相独立」。运行时请勿持有，一律走 Get(path, usage)。
+        internal ITextureStore StoreFor(EzTextureUsage usage)
+        {
+            return usage switch
+            {
+                EzTextureUsage.AnimationSafe => animationSafeStore,
+                EzTextureUsage.Large => largeTextureStore,
+                EzTextureUsage.Glyph => glyphStore,
+                EzTextureUsage.Badge => badgeStore,
+                _ => textureStore,
+            };
+        }
 
         /// <summary>
         /// 获取纹理（基础方法，从当前 note set 加载）。Note 帧走动画安全路径。
@@ -558,6 +592,8 @@ namespace osu.Game.EzOsuGame
                 textureStore.Dispose();
                 animationSafeStore.Dispose();
                 largeTextureStore.Dispose();
+                glyphStore.Dispose();
+                badgeStore.Dispose();
                 sampleStore.Dispose();
 
                 if (Files is IDisposable filesDisposable)
