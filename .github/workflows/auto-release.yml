@@ -228,14 +228,6 @@ jobs:
           fetch-depth: 1
           path: osu
 
-      - name: Checkout ez2lazer-resources (resources) as sibling
-        uses: actions/checkout@v5
-        with:
-          repository: SK-la/ez2lazer-resources
-          path: ez2lazer-resources
-          fetch-depth: 1
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
         with:
@@ -281,11 +273,9 @@ jobs:
           }
           Write-Output "Packaging with release tag '${{ needs.prepare.outputs.release_tag }}' and publish version '$tag'."
 
-          $workspace = '${{ github.workspace }}'
           $project = Join-Path (Get-Location) 'osu.Desktop\osu.Desktop.csproj'
           $workdir = (Get-Location).Path
           $outroot = $workdir
-          $resourcesPath = Join-Path $workspace 'ez2lazer-resources\osu.Game.Resources\Resources'
           $platform = '${{ matrix.platform }}'
           $arch = '${{ matrix.arch }}'
 
@@ -295,7 +285,6 @@ jobs:
             '--workdir', $workdir,
             '--outroot', $outroot,
             '--deps-source', 'none',
-            '--resources-path', $resourcesPath,
             '--tag', $tag,
             '--platform', $platform,
             '--arch', $arch,
