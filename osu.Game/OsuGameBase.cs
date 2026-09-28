@@ -53,6 +53,7 @@ using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
@@ -220,6 +221,8 @@ namespace osu.Game
 
         protected EzResourceStore EzResourceStore { get; private set; }
 
+        protected EzGameplayWarmUpService EzGameplayWarmUp { get; private set; }
+
         protected IEzReplaySession ReplaySession { get; private set; }
 
         private Bindable<FrameSync> ezUpdateFrameLimiter = null!;
@@ -349,6 +352,7 @@ namespace osu.Game
             dependencies.CacheAs(EzResourceStore = new EzResourceStore(Ez2ConfigManager, Host.Renderer, Audio, Storage, realm));
             dependencies.CacheAs<IStorageResourceProvider>(EzResourceStore);
             dependencies.Cache(new EzLocalTextureFactory(Ez2ConfigManager, EzResourceStore));
+            dependencies.Cache(EzGameplayWarmUp = new EzGameplayWarmUpService());
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
 

@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -18,6 +20,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Screens;
+using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Skinning;
@@ -30,7 +33,7 @@ namespace osu.Game.EzOsuGame.HUD
     /// A skinnable sprite that always loads from EzResources/Modify via <see cref="EzResourceStore"/>.
     /// Supports both single-image and frame animation loading.
     /// </summary>
-    public partial class EzHUDSpritePlus : CompositeDrawable, ISerialisableDrawable
+    public partial class EzHUDSpritePlus : CompositeDrawable, ISerialisableDrawable, IEzGameplayWarmUp
     {
         private const string modify_root = "Modify";
         private const int max_animation_frames = 240;
@@ -84,6 +87,10 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private EzResourceStore resource { get; set; } = null!;
 
+        /// <summary>预热登记用的服务；只有进图会话期间登记才生效。</summary>
+        [Resolved]
+        private EzGameplayWarmUpService warmUpService { get; set; } = null!;
+
         /// <summary>
         /// The beat length and rate the beat-synced playback follows, taken from the shared tracker: it resolves the
         /// timing section being played (or the selection, in song select) and the rate the music is actually played
@@ -122,6 +129,10 @@ namespace osu.Game.EzOsuGame.HUD
         [BackgroundDependencyLoader]
         private void load()
         {
+            // 在 BDL（而不是 LoadComplete）里登记：PlayerLoader 门控是在 Player 达到 `Ready` 时取快照的，
+            // 而 LoadComplete 跑在 `Ready` 之后，那时登记就已经晚了一帧、会被漏掉。
+            warmUpService.Register(this);
+
             AddInternal(speedTracker = new EzBeatmapSpeedTracker());
 
             scheduleReload();
@@ -190,6 +201,52 @@ namespace osu.Game.EzOsuGame.HUD
             applyVisualSettings();
         }
 
+        public Task WarmUpAsync(CancellationToken cancellationToken)
+        {
+            string spriteName = SpriteName.Value?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrEmpty(spriteName))
+                return Task.CompletedTask;
+
+            string baseLookup = buildBaseLookup(spriteName);
+            string template = FrameTemplate.Value?.Trim() ?? string.Empty;
+
+            // 只做「与 reloadDrawable 完全相同的那一串 lookup」的解码入缓存，不创建/挂载 drawable：
+            // Player 在门控放行之前根本不在场景树里，它那些 Schedule 出来的更新不会跑，
+            // 所以这里刻意不等 reloadDrawable（等它只能等超时）。解码进 store 缓存后，
+            // 进局时 reloadDrawable 逐条命中，不再有首次解码卡顿。
+            return Task.Run(() => warmUpFrames(baseLookup, template, cancellationToken), cancellationToken);
+        }
+
+        /// <summary>
+        /// 按 <see cref="reloadDrawable"/> 的同一串 lookup 完成解码（命中即停），但不创建 drawable。
+        /// </summary>
+        /// <remarks>
+        /// lookup 序列由 <see cref="enumerateFrameLookups"/> / <see cref="buildSingleLookup"/> 与进局共用，
+        /// 所以预热解出来的必然是进局会用的那些，不会多解一张进局用不到的图、也不会漏。
+        /// </remarks>
+        private void warmUpFrames(string baseLookup, string template, CancellationToken cancellationToken)
+        {
+            if (tryParseAnimationTemplate(template, out int start, out int width))
+            {
+                foreach (string lookup in enumerateFrameLookups(baseLookup, start, width))
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                        return;
+
+                    if (resource.Get(lookup, EzTextureUsage.AnimationSafe) == null)
+                        break;
+                }
+
+                return;
+            }
+
+            // 单图：与 createSingleDrawable 的 `Get(lookup) ?? Get(baseLookup)` 同序 ——
+            // lookup 命中即停，不再去解进局根本不会用到的 baseLookup。
+            if (resource.Get(buildSingleLookup(baseLookup, template), EzTextureUsage.AnimationSafe) == null)
+                resource.Get(baseLookup, EzTextureUsage.AnimationSafe);
+        }
+
         // Only the sprite is swapped out: the speed tracker is an internal child too, so a blanket ClearInternal would
         // dispose it along with the frames.
         private void clearDrawable()
@@ -219,11 +276,9 @@ namespace osu.Game.EzOsuGame.HUD
                 IsPlaying = false,
             };
 
-            for (int i = 0; i < max_animation_frames; i++)
+            foreach (string lookup in enumerateFrameLookups(baseLookup, start, width))
             {
-                int frameIndex = start + i;
-                string frameSuffix = frameIndex.ToString($"D{width}");
-                Texture? texture = resource.Get($"{baseLookup}{frameSuffix}", EzTextureUsage.AnimationSafe);
+                Texture? texture = resource.Get(lookup, EzTextureUsage.AnimationSafe);
                 if (texture == null)
                     break;
 
@@ -233,13 +288,27 @@ namespace osu.Game.EzOsuGame.HUD
             return animation.FrameCount > 0 ? animation : null;
         }
 
+        /// <summary>
+        /// 动画模板的帧 lookup 序列。进局建帧与进图预热共用，保证两边探的是同一串 key。
+        /// </summary>
+        private static IEnumerable<string> enumerateFrameLookups(string baseLookup, int start, int width)
+        {
+            for (int i = 0; i < max_animation_frames; i++)
+                yield return $"{baseLookup}{(start + i).ToString($"D{width}")}";
+        }
+
+        /// <summary>
+        /// 单图分支要查的 lookup：模板是「一段固定后缀」（不含占位符）时拼在末尾，否则就是 baseLookup 本身。
+        /// </summary>
+        private static string buildSingleLookup(string baseLookup, string template)
+            => !string.IsNullOrEmpty(template) && !template.Contains('{') && !template.Contains('}')
+                ? baseLookup + template
+                : baseLookup;
+
         private Drawable? createSingleDrawable(string baseLookup)
         {
             string template = FrameTemplate.Value?.Trim() ?? string.Empty;
-            string lookup = baseLookup;
-
-            if (!string.IsNullOrEmpty(template) && !template.Contains('{') && !template.Contains('}'))
-                lookup += template;
+            string lookup = buildSingleLookup(baseLookup, template);
 
             Texture? texture = resource.Get(lookup, EzTextureUsage.AnimationSafe)
                                ?? resource.Get(baseLookup, EzTextureUsage.AnimationSafe);
@@ -250,6 +319,14 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 Texture = texture,
             };
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+                warmUpService.Unregister(this);
+
+            base.Dispose(isDisposing);
         }
 
         private void applyVisualSettings()

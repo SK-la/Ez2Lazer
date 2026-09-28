@@ -19,7 +19,6 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Database;
 using osu.Game.Input.Bindings;
 using osu.Game.Input.Handlers;
-using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Scoring;
@@ -283,17 +282,6 @@ namespace osu.Game.Rulesets.Mania.UI
                     BarLines.ForEach(Playfield.Add);
                 }
             }, true);
-
-            // 幂等兜底：主预热已在 EzPlayerLoaderStartGate 完成；此处仅补漏。
-            try
-            {
-                var factory = Dependencies.Get<EzLocalTextureFactory>();
-                _ = factory.PreloadGameTextures();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
-            }
 
 #if DEBUG
             // TRACE-JUDGE 每局归零，使 Dispose 时的读数是本局累计。
