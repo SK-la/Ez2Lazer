@@ -3,6 +3,6 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/../osu-framework" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/../osu-resources" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../ez2lazer-resources" vcs="Git" />
   </component>
 </project>

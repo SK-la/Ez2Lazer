@@ -228,11 +228,11 @@ jobs:
           fetch-depth: 1
           path: osu
 
-      - name: Checkout osu-resources (resources) as sibling
+      - name: Checkout ez2lazer-resources (resources) as sibling
         uses: actions/checkout@v5
         with:
-          repository: SK-la/osu-resources
-          path: osu-resources
+          repository: SK-la/ez2lazer-resources
+          path: ez2lazer-resources
           fetch-depth: 1
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -285,7 +285,7 @@ jobs:
           $project = Join-Path (Get-Location) 'osu.Desktop\osu.Desktop.csproj'
           $workdir = (Get-Location).Path
           $outroot = $workdir
-          $resourcesPath = Join-Path $workspace 'osu-resources\osu.Game.Resources\Resources'
+          $resourcesPath = Join-Path $workspace 'ez2lazer-resources\osu.Game.Resources\Resources'
           $platform = '${{ matrix.platform }}'
           $arch = '${{ matrix.arch }}'
 

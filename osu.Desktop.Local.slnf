@@ -3,7 +3,7 @@
     "path": "osu.sln",
     "projects": [
       "..\\osu-framework\\osu.Framework\\osu.Framework.csproj",
-      "..\\osu-resources\\osu.Game.Resources\\osu.Game.Resources.csproj",
+      "..\\ez2lazer-resources\\osu.Game.Resources\\osu.Game.Resources.csproj",
       "osu.Desktop\\osu.Desktop.csproj",
       "osu.Game.Benchmarks\\osu.Game.Benchmarks.csproj",
       "osu.Game.Rulesets.BMS.Tests\\osu.Game.Rulesets.BMS.Tests.csproj",

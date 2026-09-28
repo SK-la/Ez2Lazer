@@ -7,7 +7,7 @@
     <a href="https://github.com/SK-la/Ez2Lazer/wiki" target="_blank"><img src="https://img.shields.io/badge/Wiki-0366d6.svg?logo=github" height="22px" alt="Wiki"></a>
     <a href="https://github.com/SK-la/Ez2Lazer" target="_blank"><img src="https://img.shields.io/badge/Game-181717.svg?logo=github" height="22px" alt="Game"></a>
     <a href="https://github.com/SK-la/osu-framework" target="_blank"><img src="https://img.shields.io/badge/Framework-black.svg?logo=github" height="22px" alt="Framework"></a>
-    <a href="https://github.com/SK-la/osu-resources" target="_blank"><img src="https://img.shields.io/badge/Resources-2ea44f.svg?logo=github" height="22px" alt="Resources"></a>
+    <a href="https://github.com/SK-la/ez2lazer-resources" target="_blank"><img src="https://img.shields.io/badge/Resources-2ea44f.svg?logo=github" height="22px" alt="Resources"></a>
     <a href="https://space.bilibili.com/4100834" target="_blank"><img src="https://img.shields.io/badge/Bilibili-00A1D6.svg?logo=bilibili&logoColor=white" height="22px" alt="Bilibili"></a>
 
 </div>
@@ -77,7 +77,7 @@ The full documentation now lives in Wiki; this README stays as a quick index.
 ```bash
 git clone https://github.com/SK-la/Ez2Lazer
 git clone https://github.com/SK-la/osu-framework
-git clone https://github.com/SK-la/osu-resources
+git clone https://github.com/SK-la/ez2lazer-resources
 ```
 
 `ez2lazer.Framework`、`ez2lazer.Game.Resources` 的版本在 [Ez2Lazer.Dependencies.props](Ez2Lazer.Dependencies.props) 中维护。

@@ -10,8 +10,8 @@
     <Ez2LazerFrameworkProjectPath Condition="Exists('$(_EzFwCandidate1)')">$(_EzFwCandidate1)</Ez2LazerFrameworkProjectPath>
     <Ez2LazerFrameworkProjectPath Condition="'$(Ez2LazerFrameworkProjectPath)' == '' and Exists('$(_EzFwCandidate2)')">$(_EzFwCandidate2)</Ez2LazerFrameworkProjectPath>
 
-    <_EzResCandidate1>$(MSBuildThisFileDirectory)..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj</_EzResCandidate1>
-    <_EzResCandidate2>$(MSBuildThisFileDirectory)..\..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj</_EzResCandidate2>
+    <_EzResCandidate1>$(MSBuildThisFileDirectory)..\ez2lazer-resources\osu.Game.Resources\osu.Game.Resources.csproj</_EzResCandidate1>
+    <_EzResCandidate2>$(MSBuildThisFileDirectory)..\..\ez2lazer-resources\osu.Game.Resources\osu.Game.Resources.csproj</_EzResCandidate2>
     <Ez2LazerResourcesProjectPath Condition="Exists('$(_EzResCandidate1)')">$(_EzResCandidate1)</Ez2LazerResourcesProjectPath>
     <Ez2LazerResourcesProjectPath Condition="'$(Ez2LazerResourcesProjectPath)' == '' and Exists('$(_EzResCandidate2)')">$(_EzResCandidate2)</Ez2LazerResourcesProjectPath>
 
