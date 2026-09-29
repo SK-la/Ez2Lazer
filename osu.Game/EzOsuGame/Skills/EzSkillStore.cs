@@ -963,6 +963,71 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
+        /// Of <paramref name="beatmapHashes"/>, the charts the dan stage can never write a row for: they are in the
+        /// chain's candidate set with a complete MSD, yet the stored inputs resolve to no dan at all (a keymode with
+        /// no table of its own and no star rating to borrow one from, or a non-positive Overall MSD). The dan pass
+        /// drops them from its missing set: reporting them as work re-ran a backfill that could never make progress,
+        /// which is what failed the same chart on every launch.
+        /// <para>
+        /// The predicate is the dan pass's own write gate (<see cref="EzChartDanEstimator.FromMsd"/> resolving
+        /// nothing), applied to the rows that pass reads - so the verdict retires itself the moment those rows
+        /// change, and no settled-miss row has to be written and then invalidated by hand when a star rating
+        /// arrives.
+        /// </para>
+        /// </summary>
+        public HashSet<string> GetUnresolvableChartDanHashes(IEnumerable<string> beatmapHashes)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapHashes);
+
+            var wanted = beatmapHashes.Where(static h => !string.IsNullOrEmpty(h)).ToHashSet(StringComparer.Ordinal);
+
+            if (wanted.Count == 0)
+                return new HashSet<string>(StringComparer.Ordinal);
+
+            int version = EzManiaSkillAlgorithm.VERSION;
+
+            return realmAccess.Run(r =>
+            {
+                var unresolvable = new HashSet<string>(StringComparer.Ordinal);
+
+                foreach (string hash in wanted)
+                {
+                    var beatmap = r.All<BeatmapInfo>().FirstOrDefault(b => b.Hash == hash);
+
+                    if (beatmap == null || !EzChartChainCoverage.IsRateableChart(beatmap))
+                        continue;
+
+                    var msd = r.All<EzBeatmapSkillValue>()
+                               .Where(v => v.BeatmapHash == hash
+                                           && v.SystemId == EzSkillSystems.BEATMAP_MSD
+                                           && v.AlgorithmVersion == version)
+                               .AsEnumerable()
+                               .ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
+
+                    if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
+                        continue;
+
+                    int keyCount = (int)Math.Round(beatmap.Difficulty.CircleSize);
+                    if (keyCount <= 0)
+                        keyCount = 4;
+
+                    // IsCurrentMsdCache guarantees the hold ratio column, so the write path's CSI LnRatio
+                    // fallback is dead here and deliberately not repeated.
+                    double holdRatio = msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double hold) && double.IsFinite(hold)
+                        ? Math.Clamp(hold, 0, 1)
+                        : 0;
+
+                    double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
+
+                    if (EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, xxySr) == null)
+                        unresolvable.Add(hash);
+                }
+
+                return unresolvable;
+            });
+        }
+
+        /// <summary>
         /// Snapshot of the chart skill chain's completeness, counted over every mania chart in Realm.
         /// <para>
         /// Reads all three facet tables in one run, so call it off the UI thread; it is meant for an
@@ -977,10 +1042,14 @@ namespace osu.Game.EzOsuGame.Skills
             int csiRevision = EzAnalysisRevision.ChartSkillInfo;
             int danRevision = EzAnalysisRevision.ChartDan;
 
+            var chartHashes = GetRateableChartHashes();
+
+            // Dan has no settled-miss row form, so a chart whose stored inputs can never resolve one has no row
+            // either - counting it as missing would report a backlog the dan pass no longer picks up.
+            var unresolvableDan = GetUnresolvableChartDanHashes(chartHashes);
+
             return realmAccess.Run(r =>
             {
-                var chartHashes = collectRateableChartHashes(r);
-
                 var msdByHash = r.All<EzBeatmapSkillValue>()
                                  .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD)
                                  .AsEnumerable()
@@ -1012,13 +1081,16 @@ namespace osu.Game.EzOsuGame.Skills
                         unrateableMsdHashes.Add(group.Key);
                 }
 
+                var settledChartDan = new HashSet<string>(unrateableMsdHashes, StringComparer.Ordinal);
+                settledChartDan.UnionWith(unresolvableDan);
+
                 return new EzSkillDataStatus
                 {
                     TotalCharts = chartHashes.Count,
                     Msd = EzSkillDataStatusCounting.Count(chartHashes, msdByHash, msdRevision, static v => v.AlgorithmVersion, EzSkillDataStatusCounting.IsMsdStub),
                     ChartSkillInfo = EzSkillDataStatusCounting.Count(chartHashes, csiByHash, csiRevision, static v => v.InfoVersion, EzSkillDataStatusCounting.IsChartSkillInfoStub, unrateableMsdHashes),
                     // ChartDan has no settled-miss row form: a row exists only when a dan was resolved.
-                    ChartDan = EzSkillDataStatusCounting.Count(chartHashes, danByHash, danRevision, static v => v.AlgorithmVersion, static _ => false, unrateableMsdHashes),
+                    ChartDan = EzSkillDataStatusCounting.Count(chartHashes, danByHash, danRevision, static v => v.AlgorithmVersion, static _ => false, settledChartDan),
                     MeasuredAt = measuredAt ?? DateTimeOffset.UtcNow,
                 };
             });

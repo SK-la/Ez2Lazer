@@ -1284,9 +1284,22 @@ namespace osu.Game.Database
             if (skippedUnrateableMsd > 0)
                 Logger.Log($"Skipping {skippedUnrateableMsd} ChartDan candidates with unrateable MSD.");
 
+            // A chart whose stored inputs resolve to no dan is settled, not missing: the write path below would
+            // reject it identically, so leaving it in the missing set re-attempted and re-notified the same charts
+            // on every launch. Same gate as the write (EzChartDanEstimator.FromMsd resolving nothing).
+            var unresolvable = missing.Count == 0
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : skillStore.GetUnresolvableChartDanHashes(missing.Select(static c => c.Hash));
+
+            if (unresolvable.Count > 0)
+            {
+                missing.RemoveAll(c => unresolvable.Contains(c.Hash));
+                Logger.Log($"Skipping {unresolvable.Count} ChartDan candidates whose stored inputs resolve to no dan.");
+            }
+
             if (missing.Count == 0)
             {
-                Logger.Log($"ChartDan backfill: nothing ready (have ChartDan or waiting on MSD). unsupportedKeymode={skippedUnsupportedKeyCount}, waitingOnMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}");
+                Logger.Log($"ChartDan backfill: nothing ready (have ChartDan or waiting on MSD). unsupportedKeymode={skippedUnsupportedKeyCount}, waitingOnMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}, unresolvable={unresolvable.Count}");
                 return;
             }
 
@@ -1379,11 +1392,11 @@ namespace osu.Game.Database
                 updateNotificationProgress(notification, attemptedCount, missing.Count);
 
                 if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
-                    Logger.Log($"ChartDan backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount}; deferredNoMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}, unsupportedKeymode={skippedUnsupportedKeyCount})");
+                    Logger.Log($"ChartDan backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount}; deferredNoMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}, unsupportedKeymode={skippedUnsupportedKeyCount}, unresolvable={unresolvable.Count})");
             }
 
             completeNotification(notification, processedCount, missing.Count, failedCount);
-            Logger.Log($"ChartDan backfill finished: ok={processedCount}, fail={failedCount}, deferredNoMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}, unsupportedKeymode={skippedUnsupportedKeyCount}");
+            Logger.Log($"ChartDan backfill finished: ok={processedCount}, fail={failedCount}, deferredNoMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}, unsupportedKeymode={skippedUnsupportedKeyCount}, unresolvable={unresolvable.Count}");
         }
 
         /// <summary>
