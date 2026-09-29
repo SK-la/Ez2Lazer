@@ -19,6 +19,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.IO;
 using osu.Game.Resources;
 using osu.Game.Skinning;
+using SixLabors.ImageSharp.Processing;
 
 namespace osu.Game.EzOsuGame
 {
@@ -145,8 +146,9 @@ namespace osu.Game.EzOsuGame
             glyphStore.AddTextureSource(baseTextureLoader);
 
             // 段位标页：加载期把边长压到规范尺寸后再进页，故源图再大也只占一张页。
+            // 段位图要按最长边等比缩小（不得拉变形），故显式用 ResizeMode.Max，与兜底路径的逐轴裁剪区分开。
             // 图源与其它池共用同一份 combinedStore（用户 EzResources 优先，其次内置 Textures/EzResources）。
-            var danLoader = new MaxDimensionLimitedTextureLoaderStore(new TextureLoaderStore(combinedStore), dan_badge_texture_size);
+            var danLoader = new MaxDimensionLimitedTextureLoaderStore(new TextureLoaderStore(combinedStore), dan_badge_texture_size, ResizeMode.Max);
             danStore = new TextureStore(renderer, danLoader);
 
             // 创建样本存储
