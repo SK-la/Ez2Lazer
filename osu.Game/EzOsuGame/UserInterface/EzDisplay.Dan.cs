@@ -198,17 +198,10 @@ namespace osu.Game.EzOsuGame.UserInterface
             contentPad.Padding = new MarginPadding { Horizontal = 1, Vertical = 0 };
         }
 
-        // 段位图查找：用户 EzResources/Dans/… 与内置 Textures/EzResources/Dans/… 都走 EzTextureUsage.Badge；
+        // 段位图查找：用户 EzResources/Dans/… 与内置 Textures/EzResources/Dans/… 都走段位标页；
+        // 内置目录的数字开头打包形式（_6k / _7k）已由内置根适配器归一，消费端不必知情。
         // 内置失败时再退回全局纹理存储（原尺寸，仅作兜底）。
         private Texture? loadDanTexture(string relative)
-        {
-            Texture? texture = resources?.Get(relative, EzTextureUsage.Badge) ?? textures?.Get($"EzResources/{relative}");
-
-            // MSBuild embeds folders whose names start with a digit as _6k / _7k.
-            if (texture == null && EzDanLadders.TryGetEmbeddedTexturePath(relative) is string embeddedRelative)
-                texture = resources?.Get(embeddedRelative, EzTextureUsage.Badge) ?? textures?.Get($"EzResources/{embeddedRelative}");
-
-            return texture;
-        }
+            => resources?.Get(relative, EzTextureUsage.Badge) ?? textures?.Get($"EzResources/{relative}");
     }
 }

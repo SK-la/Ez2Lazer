@@ -9,7 +9,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
-using osu.Framework.Platform;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -34,9 +33,6 @@ namespace osu.Game.EzOsuGame.Overlays
         private string? pendingSelectionKey;
 
         private EzResourcePickerDescriptor? session;
-
-        [Resolved]
-        private Storage storage { get; set; } = null!;
 
         [Resolved]
         private EzResourceStore resource { get; set; } = null!;
@@ -221,6 +217,11 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 session = descriptor;
                 pendingSelectionKey = descriptor.CurrentKey;
+
+                // 用户主动打开资源选择器：这是「外部往 EzResources 放了新图」唯一的冷入口，
+                // 在这里丢弃索引与帧缓存，新文件（含新增帧）才会出现在预览与网格里。
+                resource.InvalidateResourceCaches();
+
                 rebuild();
 
                 if (State.Value == Visibility.Hidden)
@@ -260,7 +261,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private Drawable createCell(string key, bool selected)
         {
-            return new PreviewSelectCell(resource, storage, session!, key, selected, colours, () =>
+            return new PreviewSelectCell(resource, session!, key, selected, colours, () =>
             {
                 pendingSelectionKey = key;
                 rebuild();
@@ -320,7 +321,6 @@ namespace osu.Game.EzOsuGame.Overlays
         private sealed partial class PreviewSelectCell : CompositeDrawable
         {
             private readonly EzResourceStore provider;
-            private readonly Storage cellStorage;
             private readonly EzResourcePickerDescriptor descriptor;
             private readonly string key;
             private readonly bool selected;
@@ -329,11 +329,10 @@ namespace osu.Game.EzOsuGame.Overlays
 
             private Box? hoverBox;
 
-            public PreviewSelectCell(EzResourceStore provider, Storage cellStorage, EzResourcePickerDescriptor descriptor, string key, bool selected,
+            public PreviewSelectCell(EzResourceStore provider, EzResourcePickerDescriptor descriptor, string key, bool selected,
                                      OsuColour osuColour, Action onCommit)
             {
                 this.provider = provider;
-                this.cellStorage = cellStorage;
                 this.descriptor = descriptor;
                 this.key = key;
                 this.selected = selected;
@@ -351,7 +350,7 @@ namespace osu.Game.EzOsuGame.Overlays
             [BackgroundDependencyLoader]
             private void load()
             {
-                var tex = EzResourceDiscovery.TryGetPreviewTexture(provider, cellStorage, descriptor.Category, key);
+                var tex = EzResourceDiscovery.TryGetPreviewTexture(provider, descriptor.Category, key);
 
                 hoverBox = new Box
                 {

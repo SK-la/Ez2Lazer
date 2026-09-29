@@ -25,8 +25,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Bindable<string> stageNameBindable = null!;
 
         private readonly Container sprite;
-        private TextureAnimation? upSprite;
-        private TextureAnimation? downSprite;
+        private Drawable? upSprite;
+        private Drawable? downSprite;
 
         // protected virtual bool IsKeyPress => true;
         // protected virtual bool UseColorization => true;
@@ -133,19 +133,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void loadAnimation()
         {
-            upSprite?.ClearFrames();
-            downSprite?.ClearFrames();
+            (upSprite as TextureAnimation)?.ClearFrames();
+            (downSprite as TextureAnimation)?.ClearFrames();
 
             upSprite = factory.CreateStageKeys("KeyBase", KeySuffix);
             downSprite = factory.CreateStageKeys("KeyPress", KeySuffix);
 
             // upSprite.DefaultFrameLength = beatInterval;
             // downSprite.DefaultFrameLength = beatInterval;
-            downSprite.Alpha = 0;
+            if (downSprite != null)
+                downSprite.Alpha = 0;
 
             sprite.Clear();
-            sprite.Add(upSprite);
-            sprite.Add(downSprite);
+            sprite.Add(upSprite ?? Empty());
+            sprite.Add(downSprite ?? Empty());
 
             OnConfigChanged();
         }

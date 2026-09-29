@@ -89,6 +89,9 @@ namespace osu.Game.EzOsuGame.Edit
         [Resolved]
         private MusicController musicController { get; set; } = null!;
 
+        [Resolved]
+        private EzResourceStore resource { get; set; } = null!;
+
         private Container? backgroundContainer;
         private Container sceneContentHost = null!;
         private EzSkinEditorMenuBar menuBar = null!;
@@ -689,6 +692,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (SkinIniSession is { IsSupported: true, IsDirty: true })
                 SkinIniSession.Commit();
 
+            invalidateResourceCaches();
             skinManager.CurrentSkinInfo.TriggerChange();
             refreshScene();
         }
@@ -699,8 +703,13 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
 
             SkinIniSession.Commit();
+            invalidateResourceCaches();
             refreshScene();
         }
+
+        // 用户可能在我们开着编辑器时往 EzResources 里丢/换图。保存与应用皮肤是用户主动的冷入口，
+        // 在这里丢弃目录索引、帧解析缓存与动画/大图两页，新文件才会立刻出现在预览里（与资源选择器同一套做法）。
+        private void invalidateResourceCaches() => resource.InvalidateResourceCaches();
 
         private bool isSkinIniSupported() => EzSkinIniSupport.IsSupported(skinManager.CurrentSkinInfo.Value);
 
@@ -916,6 +925,7 @@ namespace osu.Game.EzOsuGame.Edit
                 if (SkinIniSession is { IsDirty: true })
                 {
                     SkinIniSession.Commit();
+                    invalidateResourceCaches();
                     committedSkinIni = true;
                 }
 
