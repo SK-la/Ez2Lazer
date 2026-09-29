@@ -42,7 +42,7 @@ namespace osu.Game.EzOsuGame
 
         /// <summary>
         /// 取请求对应的帧纹理；无资源时返回空数组。同一请求只解析一次并复用帧纹理，
-        /// 但 <see cref="EzTextureUsage.Large"/> 例外（带引用计数，长期持有会让纹理无法回收）。
+        /// 但 <see cref="EzTextureUsage.Large"/> 例外。
         /// </summary>
         public Texture[] GetTextureFrames(EzAnimationRequest request)
         {
@@ -58,6 +58,8 @@ namespace osu.Game.EzOsuGame
 
             Texture[] materialised = materialiseFrames(set.Keys, request.Usage);
 
+            // Large 池是 LargeTextureStore：取像带引用计数，全部引用释放后才 Purge 掉纹理（见框架该实现）。
+            // 帧级缓存长期持有一份引用即等于「永不回收」，所以该池的帧每次现取、不落缓存。
             return request.Usage == EzTextureUsage.Large ? materialised : set.CacheTextures(materialised);
         }
 

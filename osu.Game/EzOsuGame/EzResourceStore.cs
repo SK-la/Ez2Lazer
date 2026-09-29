@@ -261,8 +261,10 @@ namespace osu.Game.EzOsuGame
         /// 丢弃层1 目录索引与层2 帧解析缓存，使新放进 <c>EzResources</c> 的图（含新增帧）重新可见。
         /// </summary>
         /// <remarks>
-        /// 只在冷的、用户主动的入口调用。纹理池只清动画帧与静态大图两池：字形页与通用图集页里的纹理
-        /// 可能正被绘制（TextStyle 反复复用），整体 <c>ClearCache</c> 会在用户操作时把已绘制的图集区域释放掉。
+        /// 只用框架原生的 <see cref="TextureStore.ClearCache"/>（<see cref="TextureStore"/> 会把未命中也缓存下来，
+        /// 故新增文件不清缓存就永远看不到）。纹理池只清动画帧与静态大图两池：字形页与通用图集页里的纹理
+        /// 可能正被绘制（TextStyle 反复复用），整体清会在用户操作时把已绘制的图集区域释放掉。
+        /// 只在冷的、用户主动的入口调用（资源选择器打开、皮肤编辑器保存/应用）。
         /// </remarks>
         internal void InvalidateResourceCaches()
         {

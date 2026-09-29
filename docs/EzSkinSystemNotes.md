@@ -52,7 +52,8 @@
 - 尾部必须是连续 ASCII 数字才算帧号；遇断号即止，故帧号断层就是天然的帧数上限（`EzAnimationRequest.MaxFrames` 只是额外上限）。
 - 取像键不带后缀（如 `note/circle/whitenote/000`）：纹理加载链自己会补 `png`/`jpg` 探针。只有加载链探不到的格式（如 `.gif`）才保留后缀。
 - 显式模板（`EzAnimationRequest.FrameTemplate`）：`{name}`（`{result}` 为别名）为资源名，`{0}`/`{00}`/`{000}` 为序号且位数只作说明（实际宽度按磁盘分组）；不含序号即表达单图（如 `{name}_overlay`）；含序号但不含 `{name}` 时自动前置资源名（`{0}` 等价于 `{name}{0}`）。
-- 往 `EzResources` 新增/替换图后不会自动可见，需 `EzResourceStore.InvalidateResourceCaches()`（资源选择器打开时会调用一次）。
+- 往 `EzResources` 新增/替换图后不会自动可见（底层 `TextureStore` 会把未命中也缓存下来），需 `EzResourceStore.InvalidateResourceCaches()`。它只用框架原生 `TextureStore.ClearCache()`，且只清动画帧与大图两池（字形/通用图集可能正被绘制，故不动）。触发点是冷的、用户主动的入口：资源选择器打开、皮肤编辑器保存/应用/导出。
+- `Large` 池（`LargeTextureStore`）取像带引用计数，全部引用释放后才回收纹理，故该池的帧**不进帧级缓存**（帧级长期持有等于永不回收），每次现取。
 
 ## 文件分工与层级（谁负责什么）
 
