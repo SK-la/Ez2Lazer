@@ -681,9 +681,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (customManiaStaticMode && maniaStaticRenderer != null)
             {
-                if (scrollMode)
-                    maniaStaticRenderer.SetDensity((float)previewDensity.Value);
-
+                maniaStaticRenderer.SetDensity((float)previewDensity.Value);
                 return;
             }
 
