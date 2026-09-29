@@ -21,6 +21,7 @@ using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
@@ -189,7 +190,9 @@ namespace osu.Game.Rulesets.Mania.UI
             // [Ez] 池按「任一 hitmode 下可能出现的判定」预热，不能按当前设置的 ManiaHitWindows 推导：
             // 当局用的 hitmode / 血量模式取自冻结环境（回放是成绩里嵌入的模式），池缺项时
             // JudgementPooler.Get 返回 null，该判定会被静默跳过不显示。
-            AddInternal(judgementPooler = new JudgementPooler<DrawableManiaJudgement>(HitModeHelper.AllModeValidHitResults));
+            // 但只预热能作为判定图展示的判定：IgnoreHit / IgnoreMiss / ComboBreak 仅供计分，
+            // 进池既白建 drawable，又会让缺资源的皮肤回退成默认文字判定（把内部结果名画到屏幕上）。
+            AddInternal(judgementPooler = new JudgementPooler<DrawableManiaJudgement>(HitModeHelper.AllModeDisplayableHitResults));
 
             RegisterPool<BarLine, DrawableBarLine>(50, 200);
         }
@@ -343,6 +346,12 @@ namespace osu.Game.Rulesets.Mania.UI
         internal void OnNewResult(DrawableHitObject judgedObject, JudgementResult result)
         {
             if (!judgedObject.DisplayResult || !DisplayJudgements.Value)
+                return;
+
+            // IgnoreHit / IgnoreMiss / ComboBreak 只是供分数统计使用的辅助结果（如 EZ2AC / Malody 的 LN 尾、
+            // HoldNote 父物件、tick 等），不是真正打在玩家身上的判定档。池里本就不该有它们（见 Stage 构造），
+            // 这里再兜一层：一旦被放进来，缺资源的皮肤会回退成默认文字判定，把内部结果名画到屏幕上。
+            if (!result.Type.IsBasic())
                 return;
 
             judgements.Clear(false);
