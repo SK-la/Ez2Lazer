@@ -260,7 +260,7 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         /// <summary>
-        /// 判定纹理的探测：原名 / 小写 / 大写变体各试两条加载路径，全失败再按同序试回退名，命中即停。
+        /// 判定纹理的探测：原名与回退名各解析一次，命中即停。
         /// </summary>
         /// <remarks>
         /// 进局（<see cref="CreateJudgementTexture"/>）与进图预热共用这一份，避免两套探测逻辑漂移——
@@ -269,52 +269,29 @@ namespace osu.Game.EzOsuGame.HUD
         /// </remarks>
         private Drawable? probeJudgementDrawable(HitResult result, string theme, string template, double frameLength, EzEnumHitMode activeTemplate)
         {
-            string baseDir = $@"GameTheme/{theme}/judgement/";
-
-            return probeJudgementVariants(baseDir, EzHitResultNameTemplate.GetResourceName(activeTemplate, result), template, frameLength)
-                   ?? probeJudgementVariants(baseDir, EzHitResultNameTemplate.GetFallbackResourceName(activeTemplate, result), template, frameLength);
+            return probeJudgementVariant(theme, EzHitResultNameTemplate.GetResourceName(activeTemplate, result), template, frameLength)
+                   ?? probeJudgementVariant(theme, EzHitResultNameTemplate.GetFallbackResourceName(activeTemplate, result), template, frameLength);
         }
 
         /// <summary>
-        /// 单个资源名：原名 / 小写 / 大写依次尝试，每个先 <c>GetAnimation</c> 再 <c>GetAnimationFromTemplate</c>，命中即停。
+        /// 单个资源名：按层2 一次解析（显式模板为空即三模板默认），大小写由资源索引统一负责。
         /// </summary>
-        private Drawable? probeJudgementVariants(string baseDir, string resultName, string template, double frameLength)
+        private Drawable? probeJudgementVariant(string theme, string resultName, string template, double frameLength)
         {
             if (string.IsNullOrEmpty(resultName))
                 return null;
 
-            // 尝试多种大小写变体以处理文件名大小写不确定性
-            string[] variants = { resultName, resultName.ToLowerInvariant(), resultName.ToUpperInvariant() };
-
-            foreach (string variant in variants)
-            {
-                if (string.IsNullOrEmpty(variant))
-                    continue;
-
-                Drawable? loaded = resources.GetAnimation(
-                    $@"{baseDir}{variant}",
-                    animatable: true,
-                    looping: false,
-                    startAtCurrentTime: true,
-                    frameLength: frameLength);
-
-                if (loaded != null)
-                    return loaded;
-
-                loaded = resources.GetAnimationFromTemplate(
-                    baseDir,
-                    variant,
-                    template,
-                    looping: false,
-                    startAtCurrentTime: true,
-                    frameLength: frameLength);
-
-                if (loaded != null)
-                    return loaded;
-            }
-
-            return null;
+            return resources.GetAnimation(buildJudgementRequest(theme, resultName, template), looping: false, startAtCurrentTime: true, frameLength: frameLength);
         }
+
+        /// <summary>
+        /// 判定动画请求；进局与预热构造同一份请求，故解析与解码都命中同一缓存。
+        /// </summary>
+        private static EzAnimationRequest buildJudgementRequest(string theme, string resultName, string template) => new EzAnimationRequest
+        {
+            Path = $"GameTheme/{theme}/judgement/{resultName}",
+            FrameTemplate = string.IsNullOrWhiteSpace(template) ? null : template,
+        };
 
         private void configureJudgementDrawable(HitResult result, Drawable drawable, double frameLength)
         {

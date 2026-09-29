@@ -129,30 +129,5 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
             return $"Dans/{ladder.TextureFolder}/{fileStem}";
         }
-
-        /// <summary>
-        /// DLL-embedded path for <see cref="TryGetTexturePath(int, EzDanSide, string)"/> when a folder starts with a digit
-        /// (MSBuild → <c>_6k</c> / <c>_7k</c>). Null if unchanged.
-        /// </summary>
-        public static string? TryGetEmbeddedTexturePath(string relativePathWithoutExtension)
-        {
-            if (string.IsNullOrEmpty(relativePathWithoutExtension))
-                return null;
-
-            string[] parts = relativePathWithoutExtension.Split('/');
-            bool changed = false;
-
-            // Only directory segments — file stems like "7" / "ln-7" stay as-is.
-            for (int i = 0; i < parts.Length - 1; i++)
-            {
-                if (parts[i].Length > 0 && char.IsDigit(parts[i][0]))
-                {
-                    parts[i] = "_" + parts[i];
-                    changed = true;
-                }
-            }
-
-            return changed ? string.Join('/', parts) : null;
-        }
     }
 }

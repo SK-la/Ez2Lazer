@@ -10,7 +10,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.Platform;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.LocalAvatar;
 using osu.Game.Graphics;
@@ -73,9 +72,9 @@ namespace osu.Game.Users.Drawables
         }
 
         [BackgroundDependencyLoader]
-        private void load(LargeTextureStore textures, OnlineAssetCachingStore onlineTextures, EzResourceStore ezResourceStore, Storage storage)
+        private void load(LargeTextureStore textures, OnlineAssetCachingStore onlineTextures, EzResourceStore ezResourceStore)
         {
-            avatarLoader = new EzLocalAvatarLoader(storage, ezResourceStore);
+            avatarLoader = new EzLocalAvatarLoader(ezResourceStore);
 
             if (tryShowLocalAvatar())
                 return;

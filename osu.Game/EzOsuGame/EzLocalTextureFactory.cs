@@ -9,8 +9,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osuTK;
@@ -21,7 +21,9 @@ namespace osu.Game.EzOsuGame
     public partial class EzLocalTextureFactory : CompositeDrawable
     {
         // private const int max_stage_frames = 120;
-        private const int max_frames_to_load = 240;
+        /// <summary>note 帧上限，与旧实现的 <c>Parallel.For(0, 60)</c> 一致。</summary>
+        private const int max_note_frames = 60;
+
         private const double default_frame_length = 1000.0 / 60.0 * 4;
         private const float square_ratio_threshold = 0.75f;
 
@@ -310,44 +312,27 @@ namespace osu.Game.EzOsuGame
             return animation;
         }
 
+        // note 帧的**命名**交由层2 三模板统一解析（子目录 {i:D3}、同层 {name}-0、{name}/frame_0 都在覆盖范围内），
+        // JudgementLine 这类单图由单图回退自然覆盖。比例由 store 构造期的 scaleAdjust 决定，故这里不再改写共享纹理。
+        // 帧的**并行预解码**保留在本工厂：这是既有并已验证的做法，且并行只作用于这一处。
         private List<Texture> loadNotesFrames(string component)
         {
-            string notePath = GetNotePath(component);
-            var frames = new List<Texture>();
-
-            if (component != "JudgementLine")
+            var request = new EzAnimationRequest
             {
-                var textures = new Texture?[60];
+                Path = GetNotePath(component),
+                MaxFrames = max_note_frames,
+                Usage = EzTextureUsage.AnimationSafe,
+            };
 
-                Parallel.For((long)0, 60, i =>
-                {
-                    string frameFile = $"{notePath}/{i:D3}";
-                    textures[i] = resource.Get(frameFile, EzTextureUsage.AnimationSafe);
-                });
+            IReadOnlyList<string> keys = resource.ResolveFrameKeys(request);
 
-                // 按顺序收集非空纹理
-                foreach (var texture in textures)
-                {
-                    if (texture == null) break;
-
-                    texture.ScaleAdjust = 2f;
-                    frames.Add(texture);
-                }
-            }
-            else
+            if (keys.Count > 1)
             {
-                string frameFile = notePath;
-                var texture = resource.Get(frameFile, EzTextureUsage.AnimationSafe);
-
-                if (texture != null)
-                {
-                    Logger.Log($"[EzLocalTextureFactory] Loading JudgementLine Frame: {frameFile}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                    frames.Add(texture);
-                }
+                // 帧互相独立、TextureStore 自身带锁，批量帧并行解码，避免逐帧串行拖慢进图。
+                Parallel.For(0, keys.Count, i => resource.Get(keys[i], EzTextureUsage.AnimationSafe));
             }
 
-            return frames;
+            return new List<Texture>(resource.GetTextureFrames(request));
         }
 
         #endregion
@@ -375,9 +360,27 @@ namespace osu.Game.EzOsuGame
             return container;
         }
 
-        private TextureAnimation getStageTextureAnimation(string basePath)
+        private Drawable getStageTextureAnimation(string basePath)
         {
             var frames = loadStageComponentFrames(basePath);
+
+            // 1 帧即普通纹理，不按动画加载。
+            if (frames.Count == 1)
+            {
+                var sprite = new Sprite
+                {
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    Y = 384f + 247f,
+                    Texture = frames[0],
+                };
+
+                if (basePath.Contains("GrooveLight"))
+                    sprite.Blending = BlendingParameters.Additive;
+
+                return sprite;
+            }
+
             var animation = new TextureAnimation
             {
                 Anchor = Anchor.BottomCentre,
@@ -386,6 +389,7 @@ namespace osu.Game.EzOsuGame
                 // RelativeSizeAxes = Axes.None,
                 // FillMode = FillMode.Fill,
             };
+
             if (basePath.Contains("GrooveLight"))
                 animation.Blending = BlendingParameters.Additive;
 
@@ -399,33 +403,8 @@ namespace osu.Game.EzOsuGame
             return animation;
         }
 
-        private List<Texture> loadStageComponentFrames(string basePath)
-        {
-            var frames = new List<Texture>();
-
-            for (int i = 0;; i++)
-            {
-                Texture? texture = resource.Get($"{basePath}_{i}", EzTextureUsage.AnimationSafe);
-                if (texture == null) break;
-
-                Logger.Log($"[EzLocalTextureFactory] Added Stage Frames: {basePath}_{i}.png", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                frames.Add(texture);
-            }
-
-            if (frames.Count == 0)
-            {
-                Texture? texture = resource.Get($"{basePath}", EzTextureUsage.Large);
-
-                if (texture != null)
-                {
-                    Logger.Log($"[EzLocalTextureFactory] Added Stage Frame: {basePath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                    frames.Add(texture);
-                }
-            }
-
-            return frames;
-        }
+        // Stage 组件帧：交给层2/层3 同一规则（多帧 AnimationSafe，空则回退 Large 单图）。
+        private List<Texture> loadStageComponentFrames(string basePath) => resource.LoadStageFrames(basePath);
 
         public TextureAnimation CreateStageKeys(string component, string? keySuffix = null)
         {
@@ -444,6 +423,7 @@ namespace osu.Game.EzOsuGame
             return animation;
         }
 
+        // keybase/keypress 四条路径的尝试与「累计为空才吃单图」属皮肤编排，留在工厂；单条路径的帧解析交给层2。
         private List<Texture> loadStageKeysFrames(string component, string? keySuffix = null)
         {
             var frames = new List<Texture>();
@@ -459,26 +439,20 @@ namespace osu.Game.EzOsuGame
 
             foreach (string basePath in pathsToTry)
             {
-                for (int i = 0;; i++)
+                // 这里刻意不让层2 回退单图：单图只在「累计仍为空」时补一张，与原行为一致。
+                frames.AddRange(resource.GetTextureFrames(new EzAnimationRequest
                 {
-                    Texture? texture = resource.Get($"{basePath}_frame{i}", EzTextureUsage.AnimationSafe);
-                    if (texture == null) break;
+                    Path = basePath,
+                    Usage = EzTextureUsage.AnimationSafe,
+                    AllowSingleFallback = false,
+                }));
 
-                    Logger.Log($"[EzLocalTextureFactory] Added Keys Frames: {basePath}_{i}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                    frames.Add(texture);
-                }
-
-                // 如果没有帧，加载单个纹理作为单帧
                 if (frames.Count == 0)
                 {
-                    Texture? texture = resource.Get($"{basePath}", EzTextureUsage.AnimationSafe);
+                    Texture? texture = resource.Get(basePath, EzTextureUsage.AnimationSafe);
 
                     if (texture != null)
-                    {
-                        Logger.Log($"[EzLocalTextureFactory] Added Keys Frame: {basePath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                         frames.Add(texture);
-                    }
                 }
             }
 

@@ -130,8 +130,6 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(EzDanLadders.TryGetTexturePath(6, DanSkillSystem.SIDE_RC, "7-"), Is.EqualTo("Dans/6k/7"));
             Assert.That(EzDanLadders.TryGetTexturePath(6, DanSkillSystem.SIDE_LN, "7"), Is.EqualTo("Dans/6k/ln-7"));
             Assert.That(EzDanLadders.TryGetTexturePath(7, DanSkillSystem.SIDE_RC, "zenith"), Is.EqualTo("Dans/7k/zenith"));
-            Assert.That(EzDanLadders.TryGetEmbeddedTexturePath("Dans/6k/7"), Is.EqualTo("Dans/_6k/7"));
-            Assert.That(EzDanLadders.TryGetEmbeddedTexturePath("Dans/reform/7"), Is.Null);
         }
 
         [Test]

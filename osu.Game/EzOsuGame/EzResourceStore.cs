@@ -4,17 +4,12 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
-using System.Linq;
-using System.Text.RegularExpressions;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Rendering;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
@@ -83,6 +78,9 @@ namespace osu.Game.EzOsuGame
         private readonly TextureStore glyphStore;
         private readonly TextureStore danStore;
 
+        // 层1 目录索引：帧查找的文件事实来源（用户 EzResources 与内置根双根合并）
+        private readonly EzResourceDirectoryIndex directoryIndex;
+
         // 样本存储
         private readonly ISampleStore sampleStore;
 
@@ -113,10 +111,18 @@ namespace osu.Game.EzOsuGame
             // 使用游戏内置资源作为回退
             Resources = new NamespacedResourceStore<byte[]>(new DllResourceStore(typeof(OsuGameBase).Assembly), "Resources");
 
-            // 创建组合资源存储：用户文件优先，DLL 回退
+            // 创建组合资源存储：用户 EzResources 优先，内置 Textures/EzResources 回退。
+            // 内置图源在 resources 包程序集里，不在 osu.Game.dll 的 Resources 下，故单独挂一层；
+            // 外面再套适配器，把 MSBuild 嵌入数字开头目录时的 _6k / _7k 归一，索引与调用方只见逻辑名。
+            var embeddedRoot = new EzEmbeddedResourceStore(
+                new NamespacedResourceStore<byte[]>(new DllResourceStore(OsuResources.ResourceAssembly), "Textures/EzResources"));
+
             var combinedStore = new ResourceStore<byte[]>();
             combinedStore.AddStore(Files); // 首先查找用户文件
-            combinedStore.AddStore(Resources); // 找不到时回退到 DLL
+            combinedStore.AddStore(embeddedRoot); // 找不到时回退到内置图源
+
+            // 层1 目录索引（双根合并，用户优先）
+            directoryIndex = new EzResourceDirectoryIndex(userStorage, embeddedRoot);
 
             // 创建纹理加载器链（遵循官方模式）
             var baseTextureLoader = new TextureLoaderStore(combinedStore);
@@ -139,13 +145,8 @@ namespace osu.Game.EzOsuGame
             glyphStore.AddTextureSource(baseTextureLoader);
 
             // 段位标页：加载期把边长压到规范尺寸后再进页，故源图再大也只占一张页。
-            // 用户 EzResources/Dans/… 优先，其次内置 Textures/EzResources/Dans/…（含 MSBuild 的 _6k/_7k 目录变体）。
-            // 内置图源在 resources 包程序集里，不在 osu.Game.dll 的 Resources 下，故这里单独挂一份。
-            var danSource = new ResourceStore<byte[]>();
-            danSource.AddStore(Files);
-            danSource.AddStore(new NamespacedResourceStore<byte[]>(new DllResourceStore(OsuResources.ResourceAssembly), "Textures/EzResources"));
-
-            var danLoader = new MaxDimensionLimitedTextureLoaderStore(new TextureLoaderStore(danSource), dan_badge_texture_size);
+            // 图源与其它池共用同一份 combinedStore（用户 EzResources 优先，其次内置 Textures/EzResources）。
+            var danLoader = new MaxDimensionLimitedTextureLoaderStore(new TextureLoaderStore(combinedStore), dan_badge_texture_size);
             danStore = new TextureStore(renderer, danLoader);
 
             // 创建样本存储
@@ -200,26 +201,6 @@ namespace osu.Game.EzOsuGame
         }
 
         /// <summary>
-        /// 获取纹理（基础方法，从当前 note set 加载）。Note 帧走动画安全路径。
-        /// </summary>
-        /// <param name="component">组件名称（如 "whitenote"）</param>
-        public Texture? GetNote(string component)
-        {
-            string path = $"note/{noteSetName.Value}/{component}";
-            return Get(path, EzTextureUsage.AnimationSafe);
-        }
-
-        /// <summary>
-        /// 获取 Stage 静态单帧大图（Large）。多帧 Stage 请用 <see cref="LoadStageFrames"/> 或 AnimationSafe。
-        /// </summary>
-        /// <param name="component">组件名称</param>
-        public Texture? GetStage(string component)
-        {
-            string path = $"Stage/{stageName.Value}/Stage/{component}";
-            return Get(path, EzTextureUsage.Large);
-        }
-
-        /// <summary>
         /// 获取 Note 宽高比（带缓存）
         /// </summary>
         public float GetNoteRatio(bool forceRecalculate = false)
@@ -260,246 +241,6 @@ namespace osu.Game.EzOsuGame
 
         #endregion
 
-        #region 动画加载 API
-
-        /// <summary>
-        /// 获取纹理或动画纹理（默认按 "-" 再 "_" 作为动画分隔符探测）。
-        /// 帧一律走 <see cref="EzTextureUsage.AnimationSafe"/>。
-        /// </summary>
-        public Drawable? GetAnimation(
-            string componentName,
-            bool animatable = true,
-            bool looping = true,
-            bool startAtCurrentTime = true,
-            double? frameLength = null,
-            int startFrameIndex = 0)
-        {
-            Texture[] textures = GetTextures(componentName, animatable, new[] { "-", "_" }, startFrameIndex, EzTextureUsage.AnimationSafe);
-            return createAnimationDrawable(textures, looping, startAtCurrentTime, frameLength);
-        }
-
-        /// <summary>
-        /// 获取纹理或动画纹理（使用指定动画分隔符探测）。
-        /// 帧一律走 <see cref="EzTextureUsage.AnimationSafe"/>。
-        /// </summary>
-        public Drawable? GetAnimation(
-            string componentName,
-            string animationSeparator,
-            bool animatable = true,
-            bool looping = true,
-            bool startAtCurrentTime = true,
-            double? frameLength = null,
-            int startFrameIndex = 0)
-        {
-            Texture[] textures = GetTextures(componentName, animatable, animationSeparator, startFrameIndex, EzTextureUsage.AnimationSafe);
-            return createAnimationDrawable(textures, looping, startAtCurrentTime, frameLength);
-        }
-
-        /// <summary>
-        /// 兼容旧签名：忽略 <paramref name="useLargeStore"/>，动画帧固定 AnimationSafe。
-        /// </summary>
-        [Obsolete("GetAnimation 已固定使用 AnimationSafe，请去掉 useLargeStore 参数。")]
-        public Drawable? GetAnimation(
-            string componentName,
-            bool animatable,
-            bool looping,
-            bool startAtCurrentTime,
-            double? frameLength,
-            int startFrameIndex,
-            bool useLargeStore)
-            => GetAnimation(componentName, animatable, looping, startAtCurrentTime, frameLength, startFrameIndex);
-
-        /// <summary>
-        /// 获取纹理序列；当 animatable 为 true 时优先探测动画帧，否则仅取静态纹理。
-        /// </summary>
-        public Texture[] GetTextures(
-            string componentName,
-            bool animatable,
-            IEnumerable<string> animationSeparators,
-            int startFrameIndex = 0,
-            EzTextureUsage usage = EzTextureUsage.AnimationSafe)
-        {
-            if (animatable)
-            {
-                foreach (string separator in animationSeparators)
-                {
-                    var textures = getAnimatedTextures(componentName, separator, startFrameIndex, usage).ToArray();
-                    if (textures.Length > 0)
-                        return textures;
-                }
-            }
-
-            Texture? singleTexture = Get(componentName, usage);
-            return singleTexture != null ? new[] { singleTexture } : Array.Empty<Texture>();
-        }
-
-        /// <summary>
-        /// 获取纹理序列（单一分隔符）。
-        /// </summary>
-        public Texture[] GetTextures(
-            string componentName,
-            bool animatable,
-            string animationSeparator,
-            int startFrameIndex = 0,
-            EzTextureUsage usage = EzTextureUsage.AnimationSafe)
-            => GetTextures(componentName, animatable, new[] { animationSeparator }, startFrameIndex, usage);
-
-        /// <summary>
-        /// 兼容旧签名：<c>useLargeStore</c> 仅影响「非动画」单帧回退；多帧探测始终 AnimationSafe。
-        /// </summary>
-        [Obsolete("请使用 GetTextures(..., EzTextureUsage)。")]
-        public Texture[] GetTextures(
-            string componentName,
-            bool animatable,
-            IEnumerable<string> animationSeparators,
-            int startFrameIndex,
-            bool useLargeStore)
-            => GetTextures(componentName, animatable, animationSeparators, startFrameIndex,
-                useLargeStore ? EzTextureUsage.Large : EzTextureUsage.AnimationSafe);
-
-        /// <summary>
-        /// 兼容旧签名。
-        /// </summary>
-        [Obsolete("请使用 GetTextures(..., EzTextureUsage)。")]
-        public Texture[] GetTextures(
-            string componentName,
-            bool animatable,
-            string animationSeparator,
-            int startFrameIndex,
-            bool useLargeStore)
-            => GetTextures(componentName, animatable, animationSeparator, startFrameIndex,
-                useLargeStore ? EzTextureUsage.Large : EzTextureUsage.AnimationSafe);
-
-        private static Drawable? createAnimationDrawable(Texture[] textures, bool looping, bool startAtCurrentTime, double? frameLength)
-        {
-            switch (textures.Length)
-            {
-                case 0:
-                    return null;
-
-                case 1:
-                    return new Sprite { Texture = textures[0] };
-
-                default:
-                    var animation = new TextureAnimation(startAtCurrentTime)
-                    {
-                        DefaultFrameLength = frameLength ?? 1000d / 60d,
-                        Loop = looping,
-                    };
-
-                    foreach (Texture texture in textures)
-                        animation.AddFrame(texture);
-
-                    return animation;
-            }
-        }
-
-        private IEnumerable<Texture> getAnimatedTextures(string componentName, string animationSeparator, int startFrameIndex, EzTextureUsage usage)
-        {
-            for (int i = 0;; i++)
-            {
-                int frameIndex = startFrameIndex + i;
-                string framePath = buildIndexedFramePath(componentName, animationSeparator, frameIndex);
-                Texture? texture = Get(framePath, usage);
-
-                if (texture == null)
-                    break;
-
-                yield return texture;
-            }
-        }
-
-        private static string buildIndexedFramePath(string componentName, string animationSeparator, int frameIndex)
-            => $"{componentName}{animationSeparator}{frameIndex.ToString(CultureInfo.InvariantCulture)}";
-
-        /// <summary>
-        /// 使用帧路径模板加载纹理序列（相对 <paramref name="baseDirectory"/> 的路径）。
-        /// 占位符：<c>{result}</c> 为判定名；<c>{0}</c>、<c>{00}</c>、<c>{000}</c> 等为指定宽度的帧序号。
-        /// 帧走 <see cref="EzTextureUsage.AnimationSafe"/>。
-        /// </summary>
-        public Drawable? GetAnimationFromTemplate(
-            string baseDirectory,
-            string resultName,
-            string frameTemplate,
-            bool looping = true,
-            bool startAtCurrentTime = true,
-            double? frameLength = null)
-        {
-            if (string.IsNullOrWhiteSpace(frameTemplate))
-                return null;
-
-            var textures = new List<Texture>();
-
-            for (int i = 0;; i++)
-            {
-                string relativePath = formatJudgementFrameTemplate(frameTemplate, resultName, i);
-                string fullPath = $"{baseDirectory}{relativePath}";
-                Texture? texture = Get(fullPath, EzTextureUsage.AnimationSafe);
-
-                if (texture == null)
-                    break;
-
-                textures.Add(texture);
-            }
-
-            return createAnimationDrawable(textures.ToArray(), looping, startAtCurrentTime, frameLength);
-        }
-
-        /// <summary>
-        /// 兼容旧签名：忽略 <paramref name="useLargeStore"/>。
-        /// </summary>
-        [Obsolete("GetAnimationFromTemplate 已固定使用 AnimationSafe，请去掉 useLargeStore 参数。")]
-        public Drawable? GetAnimationFromTemplate(
-            string baseDirectory,
-            string resultName,
-            string frameTemplate,
-            bool looping,
-            bool startAtCurrentTime,
-            double? frameLength,
-            bool useLargeStore)
-            => GetAnimationFromTemplate(baseDirectory, resultName, frameTemplate, looping, startAtCurrentTime, frameLength);
-
-        private static string formatJudgementFrameTemplate(string template, string resultName, int frameIndex)
-        {
-            string formatted = template.Replace("{result}", resultName, StringComparison.Ordinal);
-
-            return Regex.Replace(formatted, @"\{(0+)\}", m =>
-            {
-                int width = Math.Clamp(m.Groups[1].Value.Length, 1, 9);
-                return frameIndex.ToString($"D{width}", CultureInfo.InvariantCulture);
-            });
-        }
-
-        /// <summary>
-        /// 加载 Stage 组件帧：多帧走 AnimationSafe；仅单帧时走 Large。
-        /// </summary>
-        /// <param name="basePath">基础路径（不含扩展名）</param>
-        public List<Texture> LoadStageFrames(string basePath)
-        {
-            var frames = new List<Texture>();
-
-            for (int i = 0;; i++)
-            {
-                // TextureStore 自行探测扩展名，勿带 .png 以免路径重复
-                Texture? texture = Get($"{basePath}_{i}", EzTextureUsage.AnimationSafe);
-                if (texture == null)
-                    break;
-
-                frames.Add(texture);
-            }
-
-            if (frames.Count == 0)
-            {
-                Texture? texture = Get(basePath, EzTextureUsage.Large);
-                if (texture != null)
-                    frames.Add(texture);
-            }
-
-            return frames;
-        }
-
-        #endregion
-
         #region 样本获取 API
 
         /// <summary>
@@ -515,6 +256,22 @@ namespace osu.Game.EzOsuGame
         #endregion
 
         #region 工具方法
+
+        /// <summary>
+        /// 丢弃层1 目录索引与层2 帧解析缓存，使新放进 <c>EzResources</c> 的图（含新增帧）重新可见。
+        /// </summary>
+        /// <remarks>
+        /// 只在冷的、用户主动的入口调用。纹理池只清动画帧与静态大图两池：字形页与通用图集页里的纹理
+        /// 可能正被绘制（TextStyle 反复复用），整体 <c>ClearCache</c> 会在用户操作时把已绘制的图集区域释放掉。
+        /// </remarks>
+        internal void InvalidateResourceCaches()
+        {
+            directoryIndex.Invalidate();
+            frameSets.Clear();
+
+            animationSafeStore.ClearCache();
+            largeTextureStore.ClearCache();
+        }
 
         /// <summary>
         /// 构建 Note 组件路径

@@ -38,8 +38,6 @@ namespace osu.Game.EzOsuGame.HUD
         private const string modify_root = "Modify";
         private const int max_animation_frames = 240;
 
-        private static readonly Regex frame_template_regex = new Regex(@"^\{(0{1,3})\}$", RegexOptions.Compiled);
-
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SPRITE_PLUS_PATH_LABEL), nameof(EzHUDStrings.SPRITE_PLUS_PATH_DESCRIPTION), SettingControlType = typeof(ModifyPathSelectorControl))]
         public Bindable<string> ModifyPath { get; } = new Bindable<string>("Tachie");
 
@@ -184,22 +182,33 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
-            string baseLookup = buildBaseLookup(spriteName);
-            Drawable? newDrawable = createAnimatedDrawable(baseLookup) ?? createSingleDrawable(baseLookup);
+            Texture[] frames = getFrames(spriteName);
 
             // Keep the current drawable if a transient settings state cannot resolve a texture.
             // This avoids flickering/reset when dropdowns are rebuilding their item sources.
-            if (newDrawable == null)
+            if (frames.Length == 0)
                 return;
 
             clearDrawable();
-            currentDrawable = newDrawable;
-            currentAnimation = newDrawable as TextureAnimation;
+            currentDrawable = createDrawable(frames);
+            currentAnimation = currentDrawable as TextureAnimation;
             playbackTime = 0;
 
-            AddInternal(newDrawable);
+            AddInternal(currentDrawable);
             applyVisualSettings();
         }
+
+        // 帧加载请求：模板留空即走层2 三模板默认，否则按用户模板解析。
+        // 默认模板值 {0} 会展开成 {name}{0}，即允许「无连接符」——这是本组件刻意的特例
+        // （见 docs/EzSkinSystemNotes.md 三模板一节），默认三模板并不认这种命名。
+        private EzAnimationRequest buildRequest(string spriteName) => new EzAnimationRequest
+        {
+            Path = buildBaseLookup(spriteName),
+            FrameTemplate = string.IsNullOrWhiteSpace(FrameTemplate.Value) ? null : FrameTemplate.Value.Trim(),
+            MaxFrames = max_animation_frames,
+        };
+
+        private Texture[] getFrames(string spriteName) => resource.GetTextureFrames(buildRequest(spriteName));
 
         public Task WarmUpAsync(CancellationToken cancellationToken)
         {
@@ -208,43 +217,10 @@ namespace osu.Game.EzOsuGame.HUD
             if (string.IsNullOrEmpty(spriteName))
                 return Task.CompletedTask;
 
-            string baseLookup = buildBaseLookup(spriteName);
-            string template = FrameTemplate.Value?.Trim() ?? string.Empty;
-
-            // 只做「与 reloadDrawable 完全相同的那一串 lookup」的解码入缓存，不创建/挂载 drawable：
-            // Player 在门控放行之前根本不在场景树里，它那些 Schedule 出来的更新不会跑，
-            // 所以这里刻意不等 reloadDrawable（等它只能等超时）。解码进 store 缓存后，
-            // 进局时 reloadDrawable 逐条命中，不再有首次解码卡顿。
-            return Task.Run(() => warmUpFrames(baseLookup, template, cancellationToken), cancellationToken);
-        }
-
-        /// <summary>
-        /// 按 <see cref="reloadDrawable"/> 的同一串 lookup 完成解码（命中即停），但不创建 drawable。
-        /// </summary>
-        /// <remarks>
-        /// lookup 序列由 <see cref="enumerateFrameLookups"/> / <see cref="buildSingleLookup"/> 与进局共用，
-        /// 所以预热解出来的必然是进局会用的那些，不会多解一张进局用不到的图、也不会漏。
-        /// </remarks>
-        private void warmUpFrames(string baseLookup, string template, CancellationToken cancellationToken)
-        {
-            if (tryParseAnimationTemplate(template, out int start, out int width))
-            {
-                foreach (string lookup in enumerateFrameLookups(baseLookup, start, width))
-                {
-                    if (cancellationToken.IsCancellationRequested)
-                        return;
-
-                    if (resource.Get(lookup, EzTextureUsage.AnimationSafe) == null)
-                        break;
-                }
-
-                return;
-            }
-
-            // 单图：与 createSingleDrawable 的 `Get(lookup) ?? Get(baseLookup)` 同序 ——
-            // lookup 命中即停，不再去解进局根本不会用到的 baseLookup。
-            if (resource.Get(buildSingleLookup(baseLookup, template), EzTextureUsage.AnimationSafe) == null)
-                resource.Get(baseLookup, EzTextureUsage.AnimationSafe);
+            // 与 reloadDrawable 取同一份请求：解析命中同一帧集缓存，解码只发生一次，
+            // 且预热解出来的必然是进局会用的那些，不会多解也不会漏。
+            // 这里刻意不创建 / 挂载 drawable：Player 在门控放行之前不在场景树里，Schedule 出来的更新不会跑。
+            return Task.Run(() => getFrames(spriteName), cancellationToken);
         }
 
         // Only the sprite is swapped out: the speed tracker is an internal child too, so a blanket ClearInternal would
@@ -258,11 +234,10 @@ namespace osu.Game.EzOsuGame.HUD
             currentAnimation = null;
         }
 
-        private Drawable? createAnimatedDrawable(string baseLookup)
+        private static Drawable createDrawable(Texture[] frames)
         {
-            string template = FrameTemplate.Value?.Trim() ?? string.Empty;
-            if (!tryParseAnimationTemplate(template, out int start, out int width))
-                return null;
+            if (frames.Length == 1)
+                return new Sprite { Texture = frames[0] };
 
             var animation = new TextureAnimation
             {
@@ -276,49 +251,8 @@ namespace osu.Game.EzOsuGame.HUD
                 IsPlaying = false,
             };
 
-            foreach (string lookup in enumerateFrameLookups(baseLookup, start, width))
-            {
-                Texture? texture = resource.Get(lookup, EzTextureUsage.AnimationSafe);
-                if (texture == null)
-                    break;
-
-                animation.AddFrame(texture);
-            }
-
-            return animation.FrameCount > 0 ? animation : null;
-        }
-
-        /// <summary>
-        /// 动画模板的帧 lookup 序列。进局建帧与进图预热共用，保证两边探的是同一串 key。
-        /// </summary>
-        private static IEnumerable<string> enumerateFrameLookups(string baseLookup, int start, int width)
-        {
-            for (int i = 0; i < max_animation_frames; i++)
-                yield return $"{baseLookup}{(start + i).ToString($"D{width}")}";
-        }
-
-        /// <summary>
-        /// 单图分支要查的 lookup：模板是「一段固定后缀」（不含占位符）时拼在末尾，否则就是 baseLookup 本身。
-        /// </summary>
-        private static string buildSingleLookup(string baseLookup, string template)
-            => !string.IsNullOrEmpty(template) && !template.Contains('{') && !template.Contains('}')
-                ? baseLookup + template
-                : baseLookup;
-
-        private Drawable? createSingleDrawable(string baseLookup)
-        {
-            string template = FrameTemplate.Value?.Trim() ?? string.Empty;
-            string lookup = buildSingleLookup(baseLookup, template);
-
-            Texture? texture = resource.Get(lookup, EzTextureUsage.AnimationSafe)
-                               ?? resource.Get(baseLookup, EzTextureUsage.AnimationSafe);
-            if (texture == null)
-                return null;
-
-            return new Sprite
-            {
-                Texture = texture,
-            };
+            animation.AddFrames(frames);
+            return animation;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -363,24 +297,6 @@ namespace osu.Game.EzOsuGame.HUD
         {
             string path = normaliseModifyPath(ModifyPath.Value);
             return string.IsNullOrEmpty(path) ? $"{modify_root}/{spriteName}" : $"{modify_root}/{path}/{spriteName}";
-        }
-
-        private static bool tryParseAnimationTemplate(string template, out int start, out int width)
-        {
-            start = 0;
-            width = 1;
-
-            Match match = frame_template_regex.Match(template);
-            if (!match.Success)
-                return false;
-
-            string digits = match.Groups[1].Value;
-            if (digits.Length == 0 || digits.Length > 3)
-                return false;
-
-            start = 0;
-            width = digits.Length;
-            return true;
         }
 
         private static string normaliseModifyPath(string? path)
