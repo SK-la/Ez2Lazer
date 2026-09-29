@@ -37,9 +37,10 @@ namespace osu.Game.EzOsuGame.HUD.EzHealthDisplay
         {
             foreach (string suffix in TextureSuffixes)
             {
-                var texture = TextureFactory.CreateAnimation(TexturePrefix + suffix);
+                Drawable? texture = TextureFactory.CreateAnimation(TexturePrefix + suffix);
 
-                Content.Add(texture);
+                if (texture != null)
+                    Content.Add(texture);
             }
         }
     }

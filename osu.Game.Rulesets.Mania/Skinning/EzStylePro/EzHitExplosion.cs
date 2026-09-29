@@ -25,8 +25,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         // 不要启用，此功能会直接释放预加载纹理，导致预加载白玩。
         // public override bool RemoveWhenNotAlive => true;
 
-        private TextureAnimation? primaryAnimation;
-        private TextureAnimation? goodAnimation;
+        private Drawable? primaryAnimation;
+        private Drawable? goodAnimation;
 
         public EzHitExplosion()
         {
@@ -60,17 +60,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         public void Animate(JudgementResult result)
         {
-            if (primaryAnimation?.FrameCount > 0)
-            {
-                primaryAnimation.GotoFrame(0);
-                // primaryAnimation.Restart();
-            }
+            if (primaryAnimation is TextureAnimation primary)
+                primary.GotoFrame(0);
+            // 1 帧时为 Sprite，无需定位帧。
 
-            if (goodAnimation?.FrameCount > 0 && result.Type >= HitResult.Great)
+            if (goodAnimation != null && result.Type >= HitResult.Great)
             {
                 goodAnimation.Alpha = 1;
-                goodAnimation.GotoFrame(0);
-                // goodAnimation.Restart();
+
+                if (goodAnimation is TextureAnimation good)
+                    good.GotoFrame(0);
             }
         }
     }

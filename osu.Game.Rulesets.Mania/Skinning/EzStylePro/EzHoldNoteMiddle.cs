@@ -102,15 +102,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 hittingLayer = null;
             }
 
-            var body = Factory.CreateAnimation(ColorPrefix + "longnote/middle");
-            var tail = Factory.CreateAnimation(ColorPrefix + "longnote/tail");
+            Drawable? body = Factory.CreateAnimation(ColorPrefix + "longnote/middle");
+            Drawable? tail = Factory.CreateAnimation(ColorPrefix + "longnote/tail");
 
             string newComponentName = ColorPrefix + "note";
-            if (body.FrameCount == 0)
-                body = Factory.CreateAnimation(newComponentName);
-
-            if (tail.FrameCount == 0)
-                tail = Factory.CreateAnimation(newComponentName);
+            body ??= Factory.CreateAnimation(newComponentName);
+            tail ??= Factory.CreateAnimation(newComponentName);
 
             topContainer?.Expire();
             bodyContainer?.Expire();
@@ -128,7 +125,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         RelativeSizeAxes = Axes.X,
                         Anchor = Anchor.TopCentre,
                         Origin = Anchor.TopCentre,
-                        Child = tail
+                        Child = tail ?? Empty()
                     }
                 };
             }
@@ -152,7 +149,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     Child = bodyInnerContainer = new Container
                     {
                         RelativeSizeAxes = Axes.X,
-                        Child = body
+                        Child = body ?? Empty()
                     }
                 }
             };

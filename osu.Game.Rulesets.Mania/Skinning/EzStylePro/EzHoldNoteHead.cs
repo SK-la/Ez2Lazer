@@ -4,7 +4,6 @@
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -14,7 +13,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override bool UseColorization => true;
         protected override bool ShowSeparators => true;
 
-        private TextureAnimation? animation;
+        private Drawable? noteDrawable;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -25,18 +24,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateTexture()
         {
-            animation = Factory.CreateAnimation(HeadName);
+            noteDrawable = Factory.CreateAnimation(HeadName);
 
-            if (animation.FrameCount == 0)
+            if (noteDrawable == null)
             {
-                animation.Dispose();
-                animation = Factory.CreateAnimation(NoteName);
+                noteDrawable = Factory.CreateAnimation(NoteName);
 
-                if (animation.FrameCount == 0)
-                {
-                    animation.Dispose();
+                if (noteDrawable == null)
                     return;
-                }
 
                 MainContainer.Anchor = Anchor.BottomCentre;
                 MainContainer.Origin = Anchor.BottomCentre;
@@ -48,12 +43,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     Origin = Anchor.BottomCentre,
                     RelativeSizeAxes = Axes.X,
                     Masking = true,
-                    Child = animation,
+                    Child = noteDrawable,
                 };
             }
             else
             {
-                MainContainer.Child = animation;
+                MainContainer.Child = noteDrawable;
             }
         }
 

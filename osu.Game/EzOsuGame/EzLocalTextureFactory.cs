@@ -278,21 +278,47 @@ namespace osu.Game.EzOsuGame
         #region 组件构造
 
         /// <summary>
-        /// 构造Note、光效等动画组件。
+        /// 构造Note、光效等动画组件。遵循 ISkin 的 <c>GetAnimation</c> 约定：0 帧返回 <c>null</c>，1 帧返回 <see cref="Sprite"/>，多帧才返回动画。
         /// </summary>
         /// <param name="component"></param>
         /// <param name="isFlare">是否为光效</param>
-        /// <returns></returns>
-        public TextureAnimation CreateAnimation(string component, bool? isFlare = null)
+        /// <returns>纹理 drawable；无资源时为 <c>null</c>。</returns>
+        public Drawable? CreateAnimation(string component, bool? isFlare = null)
         {
             bool isHit = isFlare is true;
 
+            if (component == "JudgementLine")
+                FillMode = FillMode.Fill;
+
+            // 直接加载纹理帧，不缓存
+            var frames = loadNotesFrames(component);
+
+            if (frames.Count == 0)
+                return null;
+
+            Anchor anchor = isHit ? Anchor.BottomCentre : Anchor.Centre;
+            Axes relativeSizeAxes = isHit ? Axes.None : Axes.Both;
+            FillMode fillMode = isHit ? FillMode.Fit : FillMode.Stretch;
+
+            // 1 帧即普通纹理，不按动画加载。
+            if (frames.Count == 1)
+            {
+                return new Sprite
+                {
+                    Anchor = anchor,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = relativeSizeAxes,
+                    FillMode = fillMode,
+                    Texture = frames[0],
+                };
+            }
+
             var animation = new TextureAnimation
             {
-                Anchor = isHit ? Anchor.BottomCentre : Anchor.Centre,
+                Anchor = anchor,
                 Origin = Anchor.Centre,
-                RelativeSizeAxes = isHit ? Axes.None : Axes.Both,
-                FillMode = isHit ? FillMode.Fit : FillMode.Stretch,
+                RelativeSizeAxes = relativeSizeAxes,
+                FillMode = fillMode,
                 Loop = !isHit
             };
 
@@ -302,11 +328,6 @@ namespace osu.Game.EzOsuGame
                 // animation.Blending = BlendingParameters.Inherit;
             }
 
-            if (component == "JudgementLine")
-                FillMode = FillMode.Fill;
-
-            // 直接加载纹理帧，不缓存
-            var frames = loadNotesFrames(component);
             animation.AddFrames(frames);
 
             return animation;
@@ -406,10 +427,30 @@ namespace osu.Game.EzOsuGame
         // Stage 组件帧：交给层2/层3 同一规则（多帧 AnimationSafe，空则回退 Large 单图）。
         private List<Texture> loadStageComponentFrames(string basePath) => resource.LoadStageFrames(basePath);
 
-        public TextureAnimation CreateStageKeys(string component, string? keySuffix = null)
+        /// <summary>
+        /// 构造 Key 底/压图。同样遵循 0 帧 <c>null</c>、1 帧 <see cref="Sprite"/>、多帧动画。
+        /// </summary>
+        public Drawable? CreateStageKeys(string component, string? keySuffix = null)
         {
             // 直接加载纹理帧，不缓存
             var frames = loadStageKeysFrames(component, keySuffix);
+
+            if (frames.Count == 0)
+                return null;
+
+            // 1 帧即普通纹理，不按动画加载。
+            if (frames.Count == 1)
+            {
+                return new Sprite
+                {
+                    Anchor = Anchor.TopCentre,
+                    Origin = Anchor.TopCentre,
+                    RelativeSizeAxes = Axes.None,
+                    FillMode = FillMode.Stretch,
+                    Texture = frames[0],
+                };
+            }
+
             var animation = new TextureAnimation
             {
                 Anchor = Anchor.TopCentre,

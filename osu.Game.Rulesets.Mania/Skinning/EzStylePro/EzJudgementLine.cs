@@ -18,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Bindable<string> noteSetName = null!;
 
         private Container sprite = null!;
-        private TextureAnimation? container;
+        private Drawable? container;
 
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
@@ -55,9 +55,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected void OnDrawableChanged()
         {
             sprite.Clear();
-            container?.ClearFrames();
+            (container as TextureAnimation)?.ClearFrames();
             container = factory.CreateAnimation("JudgementLine");
-            sprite.Add(container);
+            sprite.Add(container ?? Empty());
 
             Scheduler.AddOnce(updateSizes);
         }
