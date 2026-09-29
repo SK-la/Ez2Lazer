@@ -563,6 +563,40 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SCRATCH_AXIS_STATUS_CCW = new EzLocalizationManager.EzLocalisableString("状态：逆时针（按下）", "Status: Counter-clockwise (pressed)");
 
+        public static readonly LocalisableString SCRATCH_AXIS_SONGSELECT_ENABLED = new EzLocalizationManager.EzLocalisableString(
+            "启用转盘选曲（常规选歌）",
+            "Enable turntable selection (solo song select)");
+
+        public static readonly LocalisableString SCRATCH_AXIS_SONGSELECT_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后在常规单人选歌界面：转动 L/R 转盘逐格切换谱面，等价于按 ↑/↓。"
+            + "\n• 顺时针 = 下一首，逆时针 = 上一首（可反转）。"
+            + "\n• 沿用上方 L/R 绑定；转得越快移动越快。"
+            + "\n• 与上方「启用转盘轴」互相独立，只开这一项也能用（上方开关只影响 Mania / Catch）。",
+            "When enabled, spinning the L/R turntable steps through beatmaps in solo song select, equivalent to ↑/↓."
+            + "\n• Clockwise = next, counter-clockwise = previous (can be inverted)."
+            + "\n• Reuses the L/R bindings above; spin faster to move faster."
+            + "\n• Independent of \"Enable turntable axis\" above, which only affects Mania / Catch.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_SONGSELECT_STEP = new EzLocalizationManager.EzLocalisableString(
+            "每格转动量",
+            "Movement per step");
+
+        public static readonly LocalisableString SCRATCH_AXIS_SONGSELECT_STEP_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "累计转过这么多轴位移算一格（切换一首谱面）。1.0 ≈ 一整圈，0.2 ≈ 每圈 10 格。"
+            + "\n调小 = 更灵敏（转一点就走得多），调大 = 更迟钝。"
+            + "\n受选曲列表限制，最快约每秒 60 格，因此调到 0.2 以下差异会变小。",
+            "Accumulated axis travel required per step (one beatmap). 1.0 ≈ a full turn, 0.2 ≈ 10 steps per turn."
+            + "\nSmaller = more sensitive, larger = more sluggish."
+            + "\nThe carousel caps at roughly 60 steps per second, so values below 0.2 differ less.");
+
+        public static readonly LocalisableString SCRATCH_AXIS_SONGSELECT_INVERT = new EzLocalizationManager.EzLocalisableString(
+            "反转转动方向",
+            "Invert spin direction");
+
+        public static readonly LocalisableString SCRATCH_AXIS_SONGSELECT_INVERT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后逆时针 = 下一首、顺时针 = 上一首。",
+            "When enabled, counter-clockwise = next and clockwise = previous.");
+
         public static readonly LocalisableString SKIP_WITH_GAMEPLAY_KEYS = new EzLocalizationManager.EzLocalisableString(
             "跳过可由游戏按键触发",
             "Allow gameplay keys to trigger skip");

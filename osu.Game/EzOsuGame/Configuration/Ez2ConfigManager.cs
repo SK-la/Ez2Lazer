@@ -112,6 +112,9 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ScratchAxisStopThreshold, 30, 10, 150);
             SetDefault(Ez2Setting.CatchScratchDashEnterAcceleration, 0.0005, 0.0001, 0.0010, 0.00005);
             SetDefault(Ez2Setting.CatchScratchDashExitVelocity, 0.00010, 0.00010, 0.00020, 0.00001);
+            SetDefault(Ez2Setting.ScratchAxisSongSelectEnabled, false);
+            SetDefault(Ez2Setting.ScratchAxisSongSelectStep, 0.2, 0.05, 1, 0.01);
+            SetDefault(Ez2Setting.ScratchAxisSongSelectInvert, false);
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
             SetDefault(Ez2Setting.TurboMode, false);
@@ -958,6 +961,22 @@ namespace osu.Game.EzOsuGame.Configuration
         /// Ez2Catch 转盘退出 Dash 的平滑角速度阈值（轴单位/ms）。
         /// </summary>
         CatchScratchDashExitVelocity,
+
+        /// <summary>
+        /// 开启后在常规 song select 界面用转盘选曲（转动一格 ≈ 按一次 ↑/↓）。
+        /// 仅单人常规选曲生效，与 <see cref="ScratchAxisEnabled"/> 互相独立。
+        /// </summary>
+        ScratchAxisSongSelectEnabled,
+
+        /// <summary>
+        /// 转盘选曲每格所需累计位移（轴单位，1.0 ≈ 一整圈）。数值越小越灵敏。
+        /// </summary>
+        ScratchAxisSongSelectStep,
+
+        /// <summary>
+        /// 转盘选曲方向反转（默认顺时针 = 下一首）。
+        /// </summary>
+        ScratchAxisSongSelectInvert,
 
         SkipWithGameplayKeys,
 
