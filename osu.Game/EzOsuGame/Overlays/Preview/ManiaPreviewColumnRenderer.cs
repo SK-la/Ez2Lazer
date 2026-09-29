@@ -27,6 +27,8 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                 int rowStart = col * layout.RowsPerColumn;
                 int rowEnd = Math.Min(totalRows, rowStart + layout.RowsPerColumn);
 
+                // 轨道区底色：轻微提亮，与预览背景区分。
+                quads.Add(new PreviewQuad(panelX, 0, layout.ColumnWidth, panelHeight, Color4.White.Opacity(0.01f)));
                 quads.Add(new PreviewQuad(panelX, 0, 1f, panelHeight, Color4.White.Opacity(0.18f)));
                 quads.Add(new PreviewQuad(panelX + layout.ColumnWidth - 1f, 0, 1f, panelHeight, Color4.White.Opacity(0.18f)));
 
