@@ -206,6 +206,11 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 var store = new EzSkillStore(realm);
                 const string stub_hash = "unavailable-stub-hash";
                 const string real_hash = "real-csi-hash";
+                const string legacy_stub_hash = "legacy-wrong-version-stub";
+
+                seedChart(realm, stub_hash);
+                seedChart(realm, real_hash);
+                seedChart(realm, legacy_stub_hash);
 
                 // Implicit stub upsert is a no-op: an Unavailable DTO must never fake "already processed".
                 store.UpsertChartSkillInfo(stub_hash, EzChartSkillInfo.Unavailable);
@@ -224,7 +229,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 {
                     r.Add(new EzBeatmapChartSkillInfo
                     {
-                        BeatmapHash = "legacy-wrong-version-stub",
+                        BeatmapHash = legacy_stub_hash,
                         InfoVersion = EzChartSkillInfo.VERSION,
                         ComputedAt = DateTimeOffset.UtcNow,
                         KeyCount = -1,
@@ -239,15 +244,15 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                     KeyCount = 4,
                 });
 
-                var hashes = store.GetPersistedChartSkillInfoHashes();
-                Assert.That(hashes.Contains(real_hash), Is.True);
-                Assert.That(hashes.Contains(stub_hash), Is.False);
+                var chain = store.CollectChartChainState();
 
-                var settledHashes = store.GetSettledChartSkillInfoHashes();
-                Assert.That(settledHashes.Contains(real_hash), Is.True);
-                Assert.That(settledHashes.Contains(stub_hash), Is.True);
+                Assert.That(chain.CompleteChartSkillInfo.Contains(real_hash), Is.True);
+                Assert.That(chain.CompleteChartSkillInfo.Contains(stub_hash), Is.False);
+
+                Assert.That(chain.SettledChartSkillInfo.Contains(real_hash), Is.True);
+                Assert.That(chain.SettledChartSkillInfo.Contains(stub_hash), Is.True);
                 // A row stamped with the bare CSI constant (pre-revision / upstream-bumped) is not settled.
-                Assert.That(settledHashes.Contains("legacy-wrong-version-stub"), Is.False);
+                Assert.That(chain.SettledChartSkillInfo.Contains(legacy_stub_hash), Is.False);
             });
         }
 
@@ -300,6 +305,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string hash = "unrateable-with-complete-csi";
                 var id = Guid.NewGuid();
 
+                seedChart(realm, hash);
+
                 // What an earlier pass stamped from the stub axis.
                 store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
                 store.WriteBeatmapMsdUnrateable(hash, id);
@@ -307,9 +314,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 var beatmap = maniaBeatmap(hash, id);
 
                 Assert.That(provider.TryEnsureChartSkillInfoForBackfill(beatmap), Is.True);
-                Assert.That(store.GetPersistedChartSkillInfoHashes().Contains(hash), Is.False,
+                Assert.That(store.CollectChartChainState().CompleteChartSkillInfo.Contains(hash), Is.False,
                     "a complete row on an unrateable chart re-queues the backfill forever");
-                Assert.That(store.GetSettledChartSkillInfoHashes().Contains(hash), Is.True);
+                Assert.That(store.CollectChartChainState().SettledChartSkillInfo.Contains(hash), Is.True);
 
                 // The stub then answers the next run, so the repair set stays empty.
                 Assert.That(provider.TryEnsureChartSkillInfoForBackfill(beatmap), Is.True);
@@ -365,6 +372,32 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             Assert.That(RealmAccess.EZ_REALM_SCHEMA_VERSION, Is.EqualTo(10));
             Assert.That(RealmAccess.EzFileSchemaVersion, Is.EqualTo(RealmAccess.UpstreamSchemaVersion * 1000 + 10));
+        }
+
+        private static void seedChart(RealmAccess realm, string hash, float circleSize = 4)
+        {
+            realm.Write(r =>
+            {
+                var ruleset = r.All<RulesetInfo>().FirstOrDefault(s => s.ShortName == "mania");
+
+                if (ruleset == null)
+                {
+                    ruleset = new RulesetInfo { OnlineID = 3, ShortName = "mania", Available = true };
+                    r.Add(ruleset);
+                }
+
+                var set = new BeatmapSetInfo();
+                r.Add(set);
+
+                r.Add(new BeatmapInfo
+                {
+                    Hash = hash,
+                    BeatmapSet = set,
+                    Ruleset = ruleset,
+                    DifficultyName = hash,
+                    Difficulty = new BeatmapDifficulty { CircleSize = circleSize },
+                });
+            });
         }
 
         private static BeatmapInfo maniaBeatmap(string hash, Guid id)

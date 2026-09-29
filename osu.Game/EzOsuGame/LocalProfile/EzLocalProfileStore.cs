@@ -273,9 +273,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
-        /// Score ids already analysed for one player: the reconciliation ledger, shaped like
-        /// <c>EzSkillStore.GetPersistedChartDanHashes</c>. The compute path diffs this against the live score ids
-        /// and analyses only the difference, so an interrupted run resumes instead of starting over.
+        /// Score ids already analysed for one player: the reconciliation ledger, shaped like a chain facet's
+        /// per-key row set. The compute path diffs this against the live score ids and analyses only the
+        /// difference, so an interrupted run resumes instead of starting over.
         /// </summary>
         public HashSet<Guid> GetAnalyzedScoreIds(string username)
         {

@@ -675,19 +675,10 @@ namespace osu.Game.Database
             // incremental pass keyed on its facet revision (EzAnalysisRevision), so bumping a stage
             // version (or an upstream one) retires exactly the affected rows and this job recomputes
             // them - no bulk clearing, and "stale" stays observable.
-            bool chartChainScope = scope.HasFlag(EzRealmMetadataScope.Msd)
-                                   || scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
-                                   || scope.HasFlag(EzRealmMetadataScope.ChartDan);
-
-            List<ManiaChartCandidate>? candidates = null;
-
-            if (chartChainScope)
+            if (scope.HasFlag(EzRealmMetadataScope.Msd)
+                || scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
+                || scope.HasFlag(EzRealmMetadataScope.ChartDan))
             {
-                candidates = collectManiaChartCandidates();
-
-                if (candidates.Count == 0)
-                    return;
-
                 // Names the revisions in force, so a version bump reads as an explanation for the
                 // recompute instead of the job appearing to act for no reason. Rows stamped with an
                 // older revision are simply "missing" to the incremental passes below (nothing is
@@ -696,8 +687,7 @@ namespace osu.Game.Database
                 Logger.Log("Ez chart chain revisions: "
                            + $"MSD v{EzAnalysisRevision.Msd}, "
                            + $"CSI v{EzAnalysisRevision.ChartSkillInfo} ({EzAnalysisRevision.DescribeChartSkillInfo(EzAnalysisRevision.ChartSkillInfo)}), "
-                           + $"Dan v{EzAnalysisRevision.ChartDan} ({EzAnalysisRevision.DescribeChartDan(EzAnalysisRevision.ChartDan)}); "
-                           + $"{candidates.Count} candidate charts.");
+                           + $"Dan v{EzAnalysisRevision.ChartDan} ({EzAnalysisRevision.DescribeChartDan(EzAnalysisRevision.ChartDan)}).");
             }
 
             // Defer the MSD side-upsert whenever CSI shares this job: the chain-end Dan pass owns the
@@ -713,7 +703,7 @@ namespace osu.Game.Database
 
                 try
                 {
-                    populateMissingBeatmapMsd(candidates!);
+                    populateMissingBeatmapMsd();
                 }
                 finally
                 {
@@ -722,45 +712,11 @@ namespace osu.Game.Database
             }
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo))
-                populateMissingChartSkillInfo(candidates!);
+                populateMissingChartSkillInfo();
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartDan))
-                populateMissingChartDan(candidates!);
+                populateMissingChartDan();
         }
-
-        /// <summary>
-        /// One mania candidate list for the whole chart chain, so a full job scans
-        /// <see cref="BeatmapInfo"/> once instead of once per stage.
-        /// </summary>
-        private List<ManiaChartCandidate> collectManiaChartCandidates()
-        {
-            var candidates = new List<ManiaChartCandidate>();
-
-            realmAccess.Run(r =>
-            {
-                foreach (var b in r.All<BeatmapInfo>())
-                {
-                    if (b.BeatmapSet == null)
-                        continue;
-
-                    if (b.Ruleset.OnlineID != 3)
-                        continue;
-
-                    if (string.IsNullOrEmpty(b.Hash))
-                        continue;
-
-                    candidates.Add(new ManiaChartCandidate(b.ID, b.Hash, (int)Math.Round(b.Difficulty.CircleSize)));
-                }
-            });
-
-            return candidates;
-        }
-
-        /// <summary>
-        /// A mania chart the chain may rate. <paramref name="KeyCount"/> is the raw CS-derived column
-        /// count; stages apply their own supported-keymode gate.
-        /// </summary>
-        private readonly record struct ManiaChartCandidate(Guid Id, string Hash, int KeyCount);
 
         private void clearEzRealmMetadata(EzRealmMetadataScope scope)
         {
@@ -1024,34 +980,15 @@ namespace osu.Game.Database
         /// Backfill NoMod 1.0x beatmap MSD axes into <see cref="EzBeatmapSkillValue"/>.
         /// Behaviour mirrors <see cref="populateMissingXxyStarRatings"/>: beatmap-level query, compute and write.
         /// </summary>
-        private void populateMissingBeatmapMsd(List<ManiaChartCandidate> candidates)
+        private void populateMissingBeatmapMsd()
         {
             Logger.Log("Querying for mania beatmaps with missing MSD...");
 
-            // Exclude keymodes the n-key engine cannot rate at candidate time so they never enter
-            // the missing set (a loop-only skip left them as perpetual false-missing every launch).
-            int skippedUnsupportedKeyCount = 0;
-            var supported = new List<ManiaChartCandidate>(candidates.Count);
-
-            foreach (var candidate in candidates)
-            {
-                if (candidate.KeyCount > 0 && !EzNKeyMsdEngine.IsSupportedKeyCount(candidate.KeyCount))
-                {
-                    ++skippedUnsupportedKeyCount;
-                    continue;
-                }
-
-                supported.Add(candidate);
-            }
-
-            if (skippedUnsupportedKeyCount > 0)
-                Logger.Log($"Skipping {skippedUnsupportedKeyCount} mania beatmaps with unsupported keycounts for MSD.");
-
-            if (supported.Count == 0)
-                return;
-
-            var completeHashes = skillStore.GetSettledBeatmapMsdHashes();
-            var missing = supported.Where(c => !completeHashes.Contains(c.Hash)).ToList();
+            // The chain's candidate universe already excludes the keymodes the n-key engine cannot rate (the same
+            // gate the write path uses), so they never enter the missing set - a loop-only skip left them as
+            // perpetual false-missing every launch.
+            var chain = skillStore.CollectChartChainState();
+            var missing = chain.MsdOwed.ToList();
 
             if (missing.Count == 0)
                 return;
@@ -1065,14 +1002,22 @@ namespace osu.Game.Database
             int attemptedCount = 0;
             const int log_every = 25;
 
-            foreach (var candidate in missing)
+            foreach (string hash in missing)
             {
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
 
                 sleepIfRequired();
 
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(candidate.Id)?.Detach());
+                if (!chain.RateableBeatmapIds.TryGetValue(hash, out Guid id))
+                {
+                    ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
+                    continue;
+                }
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
 
                 if (beatmap == null)
                 {
@@ -1118,41 +1063,21 @@ namespace osu.Game.Database
         /// stored axes, so a CSI row computed without MSD would silently stamp a wrong value. Candidates
         /// whose MSD is still pending are deferred to a later run rather than analysed on partial input.
         /// </summary>
-        private void populateMissingChartSkillInfo(List<ManiaChartCandidate> candidates)
+        private void populateMissingChartSkillInfo()
         {
             Logger.Log("Querying for mania beatmaps with missing ChartSkillInfo...");
 
-            var settledMsd = skillStore.GetSettledBeatmapMsdHashes();
+            var chain = skillStore.CollectChartChainState();
 
-            int waitingOnMsd = 0;
-            var ready = new List<ManiaChartCandidate>(candidates.Count);
-
-            foreach (var candidate in candidates)
-            {
-                if (!settledMsd.Contains(candidate.Hash))
-                {
-                    ++waitingOnMsd;
-                    continue;
-                }
-
-                ready.Add(candidate);
-            }
+            int waitingOnMsd = chain.RateableChartCount - chain.SettledMsd.Count;
 
             if (waitingOnMsd > 0)
                 Logger.Log($"Deferring {waitingOnMsd} ChartSkillInfo candidates until MSD is complete (run Realm MSD first).");
 
             // Settled includes a stamped unavailable stub: that stub exists precisely so a chart which
-            // cannot be loaded is not re-converted on every run.
-            var settled = skillStore.GetSettledChartSkillInfoHashes();
-            var missing = ready.Where(c => !settled.Contains(c.Hash)).ToList();
-
-            // A CSI row that a complete row already answers counts as settled, so nothing else would ever revisit
-            // it. When its MSD settled as unrateable that row was derived from the stub axis rather than from real
-            // axes, so it is re-queued here to be replaced by the stub form the chain settles with.
-            var unrateableMsd = skillStore.GetUnrateableMsdHashes();
-            var completeCsi = skillStore.GetPersistedChartSkillInfoHashes();
-
-            missing.AddRange(ready.Where(c => unrateableMsd.Contains(c.Hash) && completeCsi.Contains(c.Hash)));
+            // cannot be loaded is not re-converted on every run. A complete CSI row that an unrateable MSD
+            // invalidated is the one settled case still owed work, and the derivation folds it in here.
+            var missing = chain.ChartSkillInfoOwed.ToList();
 
             if (missing.Count == 0)
             {
@@ -1169,14 +1094,22 @@ namespace osu.Game.Database
             int attemptedCount = 0;
             const int log_every = 25;
 
-            foreach (var candidate in missing)
+            foreach (string hash in missing)
             {
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
 
                 sleepIfRequired();
 
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(candidate.Id)?.Detach());
+                if (!chain.RateableBeatmapIds.TryGetValue(hash, out Guid id))
+                {
+                    ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
+                    continue;
+                }
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
 
                 if (beatmap == null)
                 {
@@ -1225,81 +1158,32 @@ namespace osu.Game.Database
         /// backfill recompute the whole library.
         /// </para>
         /// </summary>
-        private void populateMissingChartDan(List<ManiaChartCandidate> candidates)
+        private void populateMissingChartDan()
         {
             Logger.Log("Querying for mania beatmaps with missing ChartDan...");
 
-            int skippedUnsupportedKeyCount = 0;
-            var supported = new List<ManiaChartCandidate>(candidates.Count);
+            // The derivation applies the dan stage's own gates: the chain's candidate universe (which already
+            // excludes unrateable keymodes), a settled MSD, and the write path's own "can these inputs produce a
+            // dan at all" check. A chart that fails the last one is settled rather than missing, so it is not
+            // re-attempted and re-notified on every launch.
+            var chain = skillStore.CollectChartChainState();
+            var missing = chain.ChartDanOwed.ToList();
 
-            foreach (var candidate in candidates)
-            {
-                if (candidate.KeyCount > 0 && !EzNKeyMsdEngine.IsSupportedKeyCount(candidate.KeyCount))
-                {
-                    ++skippedUnsupportedKeyCount;
-                    continue;
-                }
-
-                supported.Add(candidate);
-            }
-
-            if (skippedUnsupportedKeyCount > 0)
-                Logger.Log($"Skipping {skippedUnsupportedKeyCount} mania beatmaps with unsupported keycounts for ChartDan (same as MSD).");
-
-            if (supported.Count == 0)
-                return;
-
-            var completeChartDan = skillStore.GetPersistedChartDanHashes();
-            var settledMsd = skillStore.GetSettledBeatmapMsdHashes();
-            var completeMsd = skillStore.GetCompleteBeatmapMsdHashes();
-
-            int waitingOnMsd = 0;
-            int skippedUnrateableMsd = 0;
-            var missing = new List<ManiaChartCandidate>();
-
-            foreach (var candidate in supported)
-            {
-                if (completeChartDan.Contains(candidate.Hash))
-                    continue;
-
-                if (!settledMsd.Contains(candidate.Hash))
-                {
-                    ++waitingOnMsd;
-                    continue;
-                }
-
-                // Settled as unrateable: no ChartDan possible; do not fail-loop.
-                if (!completeMsd.Contains(candidate.Hash))
-                {
-                    ++skippedUnrateableMsd;
-                    continue;
-                }
-
-                missing.Add(candidate);
-            }
+            int waitingOnMsd = chain.RateableChartCount - chain.SettledMsd.Count;
+            int unrateableMsd = chain.SettledMsd.Count - chain.CompleteMsd.Count;
 
             if (waitingOnMsd > 0)
                 Logger.Log($"Deferring {waitingOnMsd} ChartDan candidates until MSD is complete (run Realm MSD first).");
 
-            if (skippedUnrateableMsd > 0)
-                Logger.Log($"Skipping {skippedUnrateableMsd} ChartDan candidates with unrateable MSD.");
+            if (unrateableMsd > 0)
+                Logger.Log($"Skipping {unrateableMsd} ChartDan candidates with unrateable MSD.");
 
-            // A chart whose stored inputs resolve to no dan is settled, not missing: the write path below would
-            // reject it identically, so leaving it in the missing set re-attempted and re-notified the same charts
-            // on every launch. Same gate as the write (EzChartDanEstimator.FromMsd resolving nothing).
-            var unresolvable = missing.Count == 0
-                ? new HashSet<string>(StringComparer.Ordinal)
-                : skillStore.GetUnresolvableChartDanHashes(missing.Select(static c => c.Hash));
-
-            if (unresolvable.Count > 0)
-            {
-                missing.RemoveAll(c => unresolvable.Contains(c.Hash));
-                Logger.Log($"Skipping {unresolvable.Count} ChartDan candidates whose stored inputs resolve to no dan.");
-            }
+            if (chain.UnresolvableChartDan.Count > 0)
+                Logger.Log($"Skipping {chain.UnresolvableChartDan.Count} ChartDan candidates whose stored inputs resolve to no dan.");
 
             if (missing.Count == 0)
             {
-                Logger.Log($"ChartDan backfill: nothing ready (have ChartDan or waiting on MSD). unsupportedKeymode={skippedUnsupportedKeyCount}, waitingOnMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}, unresolvable={unresolvable.Count}");
+                Logger.Log($"ChartDan backfill: nothing ready (have ChartDan, waiting on MSD, or settled). waitingOnMsd={waitingOnMsd}, unrateableMsd={unrateableMsd}, unresolvable={chain.UnresolvableChartDan.Count}");
                 return;
             }
 
@@ -1312,14 +1196,22 @@ namespace osu.Game.Database
             int attemptedCount = 0;
             const int log_every = 25;
 
-            foreach (var candidate in missing)
+            foreach (string hash in missing)
             {
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
 
                 sleepIfRequired();
 
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(candidate.Id)?.Detach());
+                if (!chain.RateableBeatmapIds.TryGetValue(hash, out Guid id))
+                {
+                    ++failedCount;
+                    ++attemptedCount;
+                    updateNotificationProgress(notification, attemptedCount, missing.Count);
+                    continue;
+                }
+
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
 
                 if (beatmap == null)
                 {
@@ -1331,7 +1223,7 @@ namespace osu.Game.Database
 
                 try
                 {
-                    var msd = skillStore.GetBeatmapSkills(candidate.Hash, EzSkillSystems.BEATMAP_MSD);
+                    var msd = skillStore.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD);
 
                     // completeMsd already filtered; re-check guards races / version drift mid-run.
                     if (!EzBeatmapMsdComputer.IsCurrentMsdCache(msd))
@@ -1349,11 +1241,11 @@ namespace osu.Game.Database
                     double holdRatio = 0;
                     if (msd.TryGetValue(EzSkillSystems.MsdHoldRatioSkillId, out double cachedHold) && double.IsFinite(cachedHold))
                         holdRatio = Math.Clamp(cachedHold, 0, 1);
-                    else if (skillStore.TryGetChartSkillInfo(candidate.Hash, out var csiHold) && csiHold?.LnRatio is double lnRatio && double.IsFinite(lnRatio))
+                    else if (skillStore.TryGetChartSkillInfo(hash, out var csiHold) && csiHold?.LnRatio is double lnRatio && double.IsFinite(lnRatio))
                         holdRatio = Math.Clamp(lnRatio, 0, 1);
 
                     // An unavailable stub is not usable input; fall back to the MSD-derived values.
-                    skillStore.TryGetChartSkillInfo(candidate.Hash, out var chartInfo);
+                    skillStore.TryGetChartSkillInfo(hash, out var chartInfo);
                     if (chartInfo is { IsUnavailable: true })
                         chartInfo = null;
 
@@ -1363,7 +1255,7 @@ namespace osu.Game.Database
                     int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmap);
 
                     var persisted = EzPersistedChartDan.TryComputeFromStored(
-                        candidate.Hash,
+                        hash,
                         beatmap.ID,
                         msd,
                         keyCount,
@@ -1392,11 +1284,11 @@ namespace osu.Game.Database
                 updateNotificationProgress(notification, attemptedCount, missing.Count);
 
                 if (attemptedCount % log_every == 0 || attemptedCount >= missing.Count)
-                    Logger.Log($"ChartDan backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount}; deferredNoMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}, unsupportedKeymode={skippedUnsupportedKeyCount}, unresolvable={unresolvable.Count})");
+                    Logger.Log($"ChartDan backfill progress: {attemptedCount} of {missing.Count} (ok={processedCount}, fail={failedCount}; deferredNoMsd={waitingOnMsd}, unrateableMsd={unrateableMsd}, unresolvable={chain.UnresolvableChartDan.Count})");
             }
 
             completeNotification(notification, processedCount, missing.Count, failedCount);
-            Logger.Log($"ChartDan backfill finished: ok={processedCount}, fail={failedCount}, deferredNoMsd={waitingOnMsd}, unrateableMsd={skippedUnrateableMsd}, unsupportedKeymode={skippedUnsupportedKeyCount}, unresolvable={unresolvable.Count}");
+            Logger.Log($"ChartDan backfill finished: ok={processedCount}, fail={failedCount}, deferredNoMsd={waitingOnMsd}, unrateableMsd={unrateableMsd}, unresolvable={chain.UnresolvableChartDan.Count}");
         }
 
         /// <summary>
