@@ -82,18 +82,20 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                         break;
                     }
 
-                    case ManiaPreviewNoteKind.HoldTail:
-                    {
-                        // Tail at top of LN (release / end time row).
-                        float y = GetSlotTopY(entry.Row, rowStep, height);
-                        quads.Add(new PreviewQuad(x, y, laneW, headHeight, getColour(entry.Kind)));
-                        break;
-                    }
+                    // 不绘制面尾，更容易分辨缝隙
+                    // case ManiaPreviewNoteKind.HoldTail:
+                    // {
+                    //     // Tail at top of LN (release / end time row).
+                    //     float y = GetSlotTopY(entry.Row, rowStep, height);
+                    //     quads.Add(new PreviewQuad(x, y, laneW, headHeight, getColour(entry.Kind)));
+                    //     break;
+                    // }
 
                     case ManiaPreviewNoteKind.HoldBody:
                     {
+                        // Body spans from the head up to the LN end row; no separate tail block is drawn.
                         float bodyBottom = GetSlotBottomY(entry.Row, rowStep, height) - headHeight;
-                        float bodyTop = GetSlotTopY(entry.EndRow, rowStep, height) + headHeight;
+                        float bodyTop = GetSlotTopY(entry.EndRow, rowStep, height);
                         float h = Math.Max(headHeight, bodyBottom - bodyTop);
                         quads.Add(new PreviewQuad(x, bodyTop, laneW, h, getColour(entry.Kind)));
                         break;
