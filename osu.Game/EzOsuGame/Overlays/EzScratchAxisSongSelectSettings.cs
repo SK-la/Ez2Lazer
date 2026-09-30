@@ -15,14 +15,12 @@ using osuTK;
 namespace osu.Game.EzOsuGame.Overlays
 {
     /// <summary>
-    /// 转盘选曲设置（常规 song select），紧跟在 <see cref="EzScratchAxisSettings"/> 下方，
-    /// 复用同一份 L/R 绑定。
+    /// 转盘选曲设置（常规 song select），紧跟在 <see cref="EzScratchAxisSettings"/> 下方。
+    /// 选曲本身随「使用 Ez2Ac 10k2s1p」启用、每格固定 1/24 圈，因此这里只保留方向反转。
     /// </summary>
     public partial class EzScratchAxisSongSelectSettings : FillFlowContainer
     {
-        private Bindable<bool> songSelectEnabled = null!;
         private Bindable<bool> invertEnabled = null!;
-        private Bindable<double> stepSize = null!;
 
         public EzScratchAxisSongSelectSettings()
         {
@@ -35,33 +33,10 @@ namespace osu.Game.EzOsuGame.Overlays
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
         {
-            songSelectEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisSongSelectEnabled);
             invertEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisSongSelectInvert);
-            stepSize = ezConfig.GetBindable<double>(Ez2Setting.ScratchAxisSongSelectStep);
 
             Children = new Drawable[]
             {
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = EzSettingsStrings.SCRATCH_AXIS_SONGSELECT_ENABLED,
-                    HintText = EzSettingsStrings.SCRATCH_AXIS_SONGSELECT_ENABLED_TOOLTIP,
-                    Current = songSelectEnabled,
-                })
-                {
-                    Keywords = new[] { "ez", "scratch", "songselect", "select", "turntable", "转盘", "选歌" }
-                },
-                new SettingsItemV2(new FormSliderBar<double>
-                {
-                    Caption = EzSettingsStrings.SCRATCH_AXIS_SONGSELECT_STEP,
-                    HintText = EzSettingsStrings.SCRATCH_AXIS_SONGSELECT_STEP_TOOLTIP,
-                    RelativeSizeAxes = Axes.X,
-                    Current = stepSize,
-                    KeyboardStep = 0.01f,
-                    LabelFormat = v => $"{v:0.###}",
-                })
-                {
-                    Keywords = new[] { "ez", "scratch", "songselect", "step", "sensitivity", "转盘", "灵敏度" }
-                },
                 new SettingsItemV2(new FormCheckBox
                 {
                     Caption = EzSettingsStrings.SCRATCH_AXIS_SONGSELECT_INVERT,

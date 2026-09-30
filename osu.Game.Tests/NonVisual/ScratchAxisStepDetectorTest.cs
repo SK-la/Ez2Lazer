@@ -11,14 +11,8 @@ namespace osu.Game.Tests.NonVisual
     {
         private static ScratchAxisStepDetector createDetector(double deadzone, double stepSize) => new ScratchAxisStepDetector
         {
-            Deadzone =
-            {
-                Value = deadzone
-            },
-            StepSize =
-            {
-                Value = stepSize
-            }
+            Deadzone = deadzone,
+            StepSize = stepSize,
         };
 
         [Test]

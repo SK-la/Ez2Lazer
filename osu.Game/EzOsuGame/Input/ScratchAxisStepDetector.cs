@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Framework.Bindables;
 
 namespace osu.Game.EzOsuGame.Input
 {
@@ -25,35 +24,23 @@ namespace osu.Game.EzOsuGame.Input
     public class ScratchAxisStepDetector
     {
         /// <summary>
+        /// 每格所需累计位移（轴单位，1.0 ≈ 一整圈）。固定 1/24，不提供设置项。
+        /// </summary>
+        public double StepSize { get; init; } = 1.0 / 24;
+
+        /// <summary>
         /// 单帧位移低于此值视为抖动，不参与累积。
         /// </summary>
         /// <remarks>
         /// 必须远小于转盘的「最小位移阈值」（默认 0.005）：本类是累积语义，
         /// 若直接沿用打击用的单帧死区，慢速转动（每帧位移 &lt; 死区）会永远无法累积、完全不响应。
         /// </remarks>
-        public BindableDouble Deadzone { get; } = new BindableDouble(0.001)
-        {
-            MinValue = 0,
-            MaxValue = 0.05,
-        };
-
-        /// <summary>
-        /// 每格所需累计位移（轴单位，1.0 ≈ 一整圈）。
-        /// </summary>
-        public BindableDouble StepSize { get; } = new BindableDouble(0.2)
-        {
-            MinValue = 0.05,
-            MaxValue = 1,
-        };
+        public double Deadzone { get; init; } = 0.001;
 
         /// <summary>
         /// 停转超过此时长后丢弃尚未输出的欠账（避免松手后继续跳格）。
         /// </summary>
-        public BindableDouble IdleResetMs { get; } = new BindableDouble(80)
-        {
-            MinValue = 10,
-            MaxValue = 1000,
-        };
+        public double IdleResetMs { get; init; } = 80;
 
         private float lastValue;
         private bool hasSample;
@@ -79,16 +66,16 @@ namespace osu.Game.EzOsuGame.Input
             lastValue = axisValue;
 
             // 停转：丢弃尚未输出的余量（不影响之后的继续累积）。
-            if (currentTime - lastMotionTime > IdleResetMs.Value)
+            if (currentTime - lastMotionTime > IdleResetMs)
                 accumulated = 0;
 
-            if (Math.Abs(delta) < Deadzone.Value)
+            if (Math.Abs(delta) < Deadzone)
                 return 0;
 
             lastMotionTime = currentTime;
             accumulated += delta;
 
-            double step = Math.Max(StepSize.Value, 0.001);
+            double step = Math.Max(StepSize, 0.001);
 
             if (Math.Abs(accumulated) < step)
                 return 0;
