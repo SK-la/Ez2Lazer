@@ -28,7 +28,7 @@ namespace osu.Game.Tests.Beatmaps
         private BeatmapSetInfo importedSet = null!;
 
         [BackgroundDependencyLoader]
-        private void load(GameHost host, AudioManager audio, RulesetStore rulesets)
+        private void load(GameHost host, AudioManager audio)
         {
             Dependencies.Cache(beatmaps = new BeatmapManager(LocalStorage, Realm, null, audio, Resources, host, Beatmap.Default));
         }
