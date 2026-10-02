@@ -28,9 +28,6 @@ namespace osu.Game.EzOsuGame.Skills
     /// </summary>
     public sealed class EzChartChainState
     {
-        private readonly IReadOnlyDictionary<string, Guid> rateableBeatmapIds;
-        private readonly IReadOnlyList<EzDataStateFacet> facets;
-
         private EzChartChainState(
             IReadOnlyDictionary<string, Guid> rateableBeatmapIds,
             IReadOnlyList<EzDataStateFacet> facets,
@@ -42,8 +39,8 @@ namespace osu.Game.EzOsuGame.Skills
             IReadOnlySet<string> completeDan,
             IReadOnlySet<string> unresolvableDan)
         {
-            this.rateableBeatmapIds = rateableBeatmapIds;
-            this.facets = facets;
+            RateableBeatmapIds = rateableBeatmapIds;
+            Facets = facets;
 
             RateableCharts = rateableBeatmapIds.Keys.ToHashSet(StringComparer.Ordinal);
             SettledMsd = settledMsd;
@@ -77,9 +74,9 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlySet<string> RateableCharts { get; }
 
         /// <summary>Rateable charts grouped by hash to their Realm id, so a stage can load the beatmap it rates.</summary>
-        public IReadOnlyDictionary<string, Guid> RateableBeatmapIds => rateableBeatmapIds;
+        public IReadOnlyDictionary<string, Guid> RateableBeatmapIds { get; }
 
-        public int RateableChartCount => rateableBeatmapIds.Count;
+        public int RateableChartCount => RateableBeatmapIds.Count;
 
         /// <summary>Charts MSD settled - with a complete axis set or as a settled unrateable.</summary>
         public IReadOnlySet<string> SettledMsd { get; }
@@ -121,7 +118,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// The facets this state declares, in dependency order, ready for the generic
         /// <see cref="EzDataStateChecker"/>. A facet added to the chain shows up in the readout without touching it.
         /// </summary>
-        public IReadOnlyList<EzDataStateFacet> Facets => facets;
+        public IReadOnlyList<EzDataStateFacet> Facets { get; }
 
         /// <summary>
         /// The completeness report for this state. Counted from the same rows the stages filter on, so
@@ -131,7 +128,7 @@ namespace osu.Game.EzOsuGame.Skills
             => new EzDataStateReport
             {
                 UniverseCount = RateableChartCount,
-                Facets = facets.Select(EzDataStateChecker.Count).ToList(),
+                Facets = Facets.Select(EzDataStateChecker.Count).ToList(),
                 MeasuredAt = measuredAt,
             };
 
