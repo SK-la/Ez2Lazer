@@ -11,7 +11,6 @@ using osu.Game.Rulesets.Catch.Judgements;
 using osu.Game.Rulesets.Catch.Objects;
 using osu.Game.Rulesets.Catch.Replays;
 using osu.Game.Rulesets.Catch.UI;
-using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -95,8 +94,9 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
 
             if (hitObject is PalpableCatchHitObject fruit && !judged.Contains(fruit) && fruit.Judgement.MaxResult != HitResult.IgnoreHit)
             {
-                float catcherX = interpolateCatcherX(frames, fruit.StartTime);
-                bool caught = fruit.EffectiveX >= catcherX - halfCatchWidth && fruit.EffectiveX <= catcherX + halfCatchWidth;
+                // Drawable：timeOffset>=0 开始检、>0 才 Miss。近似下一帧 Update（~1ms）再给一次机会。
+                bool caught = isCaughtAt(fruit, frames, halfCatchWidth, fruit.StartTime)
+                              || isCaughtAt(fruit, frames, halfCatchWidth, fruit.StartTime + 1);
                 apply(fruit, caught ? fruit.Judgement.MaxResult : fruit.Judgement.MinResult, fruit.StartTime, scoreProcessor, gameplayRate, inputOffset, recorder);
                 judged.Add(fruit);
             }
@@ -114,6 +114,16 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
 
             foreach (var nested in hitObject.NestedHitObjects)
                 judgeTree(nested, frames, halfCatchWidth, inputOffset, scoreProcessor, gameplayRate, recorder, judged, cancellationToken);
+        }
+
+        private static bool isCaughtAt(
+            PalpableCatchHitObject fruit,
+            IReadOnlyList<CatchReplayFrame> frames,
+            float halfCatchWidth,
+            double time)
+        {
+            float catcherX = interpolateCatcherX(frames, time);
+            return fruit.EffectiveX >= catcherX - halfCatchWidth && fruit.EffectiveX <= catcherX + halfCatchWidth;
         }
 
         private static float interpolateCatcherX(IReadOnlyList<CatchReplayFrame> frames, double time)

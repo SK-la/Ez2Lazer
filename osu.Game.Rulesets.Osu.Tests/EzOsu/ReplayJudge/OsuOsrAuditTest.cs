@@ -23,7 +23,7 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
 {
     /// <summary>
-    /// Osu osr 完整金标门禁。CI 断言解码后全部基线字段；Session 对齐用同一套金标（Explicit：纯净 master 已知缺口）。
+    /// Osu osr 完整金标门禁。Header 与 Session 共用同一套 Parse 金标。
     /// </summary>
     [TestFixture]
     public class OsuOsrAuditTest
@@ -75,7 +75,6 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         }
 
         [Test]
-        [Explicit("master 纯净环境实测 Session≠锚点。全模式-Session 修判定后去掉 Explicit。")]
         public void AuditEmbeddedScoreStatisticsMatchSession()
         {
             assumeResourcesPresent();

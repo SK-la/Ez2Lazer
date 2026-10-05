@@ -13,6 +13,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Taiko.Objects;
+using osu.Game.Rulesets.Taiko.Objects.Drawables;
 using osu.Game.Rulesets.Taiko.Replays;
 using osu.Game.Scoring;
 using osu.Game.Utils;
@@ -95,7 +96,7 @@ namespace osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge
                 if (hitObject.Judgement.MaxResult == HitResult.IgnoreHit)
                     continue;
 
-                apply(hitObject, HitResult.Miss, hitObject.GetEndTime(), scoreProcessor, gameplayRate, inputOffset, recorder);
+                apply(hitObject, hitObject.Judgement.MinResult, hitObject.GetEndTime(), scoreProcessor, gameplayRate, inputOffset, recorder);
                 judged.Add(hitObject);
 
                 forceMissRemaining(hitObject.NestedHitObjects, scoreProcessor, gameplayRate, inputOffset, recorder, judged);
@@ -212,8 +213,70 @@ namespace osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge
                 TaikoReplaySession.apply(hit, result, time, scoreProcessor, gameplayRate, inputOffset, recorder);
                 judged.Add(hit);
                 pressUsed[p] = true;
+
+                // Strong nested：父击中后 30ms 内同色第二键 → LargeBonus，否则留给 missTree→IgnoreMiss
+                foreach (var strong in hit.NestedHitObjects.OfType<Hit.StrongNestedHit>())
+                {
+                    if (judged.Contains(strong))
+                        continue;
+
+                    if (result.IsHit())
+                    {
+                        int second = findStrongSecondPress(pressTimes, pressUsed, time, hit.Type, p);
+                        if (second >= 0)
+                        {
+                            pressUsed[second] = true;
+                            TaikoReplaySession.apply(strong, strong.Judgement.MaxResult, pressTimes[second].Time, scoreProcessor, gameplayRate, inputOffset, recorder);
+                            judged.Add(strong);
+                        }
+                    }
+                    else
+                    {
+                        TaikoReplaySession.apply(strong, strong.Judgement.MinResult, time, scoreProcessor, gameplayRate, inputOffset, recorder);
+                        judged.Add(strong);
+                    }
+                }
+
                 hitIndex++;
             }
+        }
+
+        private static int findStrongSecondPress(
+            List<(double Time, TaikoAction Action)> pressTimes,
+            bool[] pressUsed,
+            double firstPressTime,
+            HitType hitType,
+            int firstPressIndex)
+        {
+            const double second_hit_window = DrawableHit.StrongNestedHit.SECOND_HIT_WINDOW;
+
+            int best = -1;
+            double bestDelta = double.MaxValue;
+
+            for (int i = 0; i < pressTimes.Count; i++)
+            {
+                if (i == firstPressIndex || pressUsed[i])
+                    continue;
+
+                double delta = pressTimes[i].Time - firstPressTime;
+                if (delta < 0 || delta > second_hit_window)
+                    continue;
+
+                bool valid = hitType == HitType.Centre
+                    ? pressTimes[i].Action is TaikoAction.LeftCentre or TaikoAction.RightCentre
+                    : pressTimes[i].Action is TaikoAction.LeftRim or TaikoAction.RightRim;
+
+                if (!valid)
+                    continue;
+
+                if (delta < bestDelta)
+                {
+                    bestDelta = delta;
+                    best = i;
+                }
+            }
+
+            return best;
         }
 
         private static void judgeDrumRolls(
@@ -376,12 +439,12 @@ namespace osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge
             double inputOffset,
             EzReplayTimelineRecorder? recorder)
         {
-            if (!judged.Contains(hitObject) && hitObject.Judgement.MaxResult != HitResult.IgnoreHit)
-            {
-                double t = hitObject.StartTime + (hitObject.HitWindows?.WindowFor(HitResult.Miss) ?? 0);
-                TaikoReplaySession.apply(hitObject, HitResult.Miss, t, scoreProcessor, gameplayRate, inputOffset, recorder);
-                judged.Add(hitObject);
-            }
+                if (!judged.Contains(hitObject) && hitObject.Judgement.MaxResult != HitResult.IgnoreHit)
+                {
+                    double t = hitObject.StartTime + (hitObject.HitWindows?.WindowFor(HitResult.Miss) ?? 0);
+                    TaikoReplaySession.apply(hitObject, hitObject.Judgement.MinResult, t, scoreProcessor, gameplayRate, inputOffset, recorder);
+                    judged.Add(hitObject);
+                }
 
             foreach (var nested in hitObject.NestedHitObjects)
                 missTree(nested, judged, scoreProcessor, gameplayRate, inputOffset, recorder);

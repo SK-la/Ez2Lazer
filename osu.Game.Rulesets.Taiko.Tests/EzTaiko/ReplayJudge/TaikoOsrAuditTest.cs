@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,7 +22,7 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.Taiko.Tests.EzTaiko.ReplayJudge
 {
     /// <summary>
-    /// Taiko osr 完整金标门禁。CI 断言解码后全部基线字段；Session 未接线 Ignore，接线后同一套金标断言对齐。
+    /// Taiko osr 完整金标门禁。Header 与 Session 共用同一套 Parse 金标。
     /// </summary>
     [TestFixture]
     public class TaikoOsrAuditTest
@@ -73,9 +74,8 @@ namespace osu.Game.Rulesets.Taiko.Tests.EzTaiko.ReplayJudge
         {
             assumeResourcesPresent();
 
-            var sessionApi = new TaikoRuleset().CreateEzReplaySession();
-            if (sessionApi == null)
-                Assert.Ignore("CreateEzReplaySession 未接线；全模式-Session 变基落地后此门禁生效");
+            var sessionApi = new TaikoRuleset().CreateEzReplaySession()
+                             ?? throw new InvalidOperationException("Taiko CreateEzReplaySession 未接线");
 
             var decoder = new HarnessScoreDecoder();
             Score score;
@@ -86,7 +86,7 @@ namespace osu.Game.Rulesets.Taiko.Tests.EzTaiko.ReplayJudge
             assertFullBaseline(score.ScoreInfo);
 
             var playable = decoder.LastWorkingBeatmap!.GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
-            Score result = await sessionApi!.RunAsync(score, playable, ReplayRunPurpose.ForStored).ConfigureAwait(true);
+            Score result = await sessionApi.RunAsync(score, playable, ReplayRunPurpose.ForStored).ConfigureAwait(true);
 
             string report = buildReport(result);
             archiveReport(report);

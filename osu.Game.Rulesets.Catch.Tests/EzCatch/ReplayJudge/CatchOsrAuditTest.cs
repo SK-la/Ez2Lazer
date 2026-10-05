@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,7 +22,7 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.Catch.Tests.EzCatch.ReplayJudge
 {
     /// <summary>
-    /// Catch osr 完整金标门禁。CI 断言解码后全部基线字段；Session 未接线 Ignore，接线后同一套金标断言对齐。
+    /// Catch osr 完整金标门禁。Header 与 Session 共用同一套 Parse 金标。
     /// </summary>
     [TestFixture]
     public class CatchOsrAuditTest
@@ -74,9 +75,8 @@ namespace osu.Game.Rulesets.Catch.Tests.EzCatch.ReplayJudge
         {
             assumeResourcesPresent();
 
-            var sessionApi = new CatchRuleset().CreateEzReplaySession();
-            if (sessionApi == null)
-                Assert.Ignore("CreateEzReplaySession 未接线；全模式-Session 变基落地后此门禁生效");
+            var sessionApi = new CatchRuleset().CreateEzReplaySession()
+                             ?? throw new InvalidOperationException("Catch CreateEzReplaySession 未接线");
 
             var decoder = new HarnessScoreDecoder();
             Score score;
@@ -87,7 +87,7 @@ namespace osu.Game.Rulesets.Catch.Tests.EzCatch.ReplayJudge
             assertFullBaseline(score.ScoreInfo);
 
             var playable = decoder.LastWorkingBeatmap!.GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
-            Score result = await sessionApi!.RunAsync(score, playable, ReplayRunPurpose.ForStored).ConfigureAwait(true);
+            Score result = await sessionApi.RunAsync(score, playable, ReplayRunPurpose.ForStored).ConfigureAwait(true);
 
             string report = buildReport(result);
             archiveReport(report);
