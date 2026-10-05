@@ -91,8 +91,10 @@ namespace osu.Game.EzOsuGame.Scoring
                         break;
                     }
 
-                    // 与 EzReplaySessionRouter 同契约：Mania 由此挂上 SimulationBeatmapProvider → GetBound。
-                    session.AttachBeatmaps(beatmaps);
+                    // Race Mania 传 null shared → AttachBeatmaps → provider GetBound（隔离 + 转谱 cache）。
+                    // 显式 shared（同 Mod 复用的 session-ready / 测试夹具）时不挂 provider，以免盖掉调用方实例。
+                    if (sharedPlayableBeatmap == null)
+                        session.AttachBeatmaps(beatmaps);
 
                     // 本方法已在 Service 的后台 Task.Run 中串行执行；直接同步运行，
                     // 避免嵌套 Task.Run + GetResult 同步阻塞额外占用线程池线程。

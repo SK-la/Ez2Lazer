@@ -466,10 +466,16 @@ namespace osu.Game.EzOsuGame.Scoring
 
             var rulesetInfo = beatmapInfo.Ruleset;
             var allLocalScores = EzLocalScoreQueries.GetLocalScoresWithReplay(realm, beatmapInfo, rulesetInfo);
+
+            // Mod 过滤仅 Mania 产品化；Osu/Taiko/Catch 恒 Any（混模幽灵池 → 构建侧必须按 ghost Mods 分键取谱）。
+            var modFilter = EzScoreRaceRulesetSupport.GetGhostTimelineMode(rulesetInfo) == EzScoreRaceGhostTimelineMode.ManiaSession
+                ? ModFilter.Value
+                : EzScoreModFilter.Any;
+
             var ghostScores = EzLocalScoreQueries.SelectGhostCandidates(
                 allLocalScores,
                 getCurrentMods(),
-                ModFilter.Value,
+                modFilter,
                 MaxEntries.Value);
 
             var metadataStates = ghostScores
@@ -705,7 +711,14 @@ namespace osu.Game.EzOsuGame.Scoring
         }
 
         private string buildQueryKey(Guid beatmapId)
-            => $"{beatmapId}|{ModFilter.Value}|{EzLocalScoreQueries.GetModFilterCacheFingerprint(ModFilter.Value, getCurrentMods())}|{MaxEntries.Value}";
+        {
+            var rulesetInfo = currentBeatmap.Value?.BeatmapInfo?.Ruleset;
+            var modFilter = EzScoreRaceRulesetSupport.GetGhostTimelineMode(rulesetInfo) == EzScoreRaceGhostTimelineMode.ManiaSession
+                ? ModFilter.Value
+                : EzScoreModFilter.Any;
+
+            return $"{beatmapId}|{modFilter}|{EzLocalScoreQueries.GetModFilterCacheFingerprint(modFilter, getCurrentMods())}|{MaxEntries.Value}";
+        }
 
         private void storeMetadataCache(string queryKey, List<EzScoreRaceState> statesToStore)
         {

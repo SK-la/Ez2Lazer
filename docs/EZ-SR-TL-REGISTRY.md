@@ -170,7 +170,7 @@ Cache key 对**已解析** env 建键。
 - **Taiko（TTL-001）**：**done** — Mapping Session + Race；全指标 + TimelineDirect + Strong/Roll/Swell helper 深 parity。**禁止**永久 Shadow。
 - **Catch（TSL-001）**：**done** — Mapping Session + Race；全指标 + TimelineDirect；`CatchPlateJudgement` 与 Catcher 同调。**禁止**永久 Shadow。
 - **Mania**：能力维持；Session 金标收敛 **另开**（不纳入本验收线）。
-- **Race 多幽灵（P6）**：**in progress** — Builder 须 `AttachBeatmaps`；转谱经 `EzPlayableBeatmapCache`（Mania=`GetBound` via provider；Osu/Taiko/Catch=`GetBound` session-ready）；禁 Empty-Mods 全员复用 / 禁 `GetShared` 喂会写谱的 Session。软预算 **non-gating**。
+- **Race 多幽灵（P6）**：**done** — Builder：`shared==null` 时 `AttachBeatmaps`（Mania provider→`GetBound`）；Osu/Taiko/Catch 经 `EzScoreRacePlayableResolver`/`GetBound` session-ready，按 ghost Mods 分组。非 Mania 候选池恒 `Any`（不经 Mod 过滤）。软预算 **non-gating**。
 ---
 
 ## §1.8 KPoor 与成绩重算（2026-07）
@@ -422,7 +422,7 @@ flowchart LR
 | OSL-013 | **in progress** | Osu | ClassicNative 窗口注入 + Session 轨切换；两轨晚点分叉门禁已加；stable 满分同顶 / 细部 parity 仍 open |
 | TTL-001 | **done** | Taiko | Mapping Session + Race；全指标 OsrAudit + TimelineDirect；Strong/Roll/Swell helper 深 parity 测试 |
 | TSL-001 | **done** | Catch | Mapping Session + Race；全指标 OsrAudit + TimelineDirect；`CatchPlateJudgement` 与 Catcher 同调 |
-| P6 | **in progress** | Race | Builder `AttachBeatmaps` + `EzPlayableBeatmapCache` 取谱；四模式 TryBuild 产品门禁；软预算 non-gating |
+| P6 | **done** | Race | `AttachBeatmaps`（shared=null）；`EzPlayableBeatmapCache` session-ready / Mania provider；非 Mania 恒 Any；四模式 TryBuild 门禁；预算 non-gating |
 
 ---
 
@@ -431,6 +431,7 @@ flowchart LR
 | Cache | 持有者 | 用途 |
 |-------|--------|------|
 | `IEzScoreTimelineCache` | EzScoreRaceService / Player | 角逐 timeline 结果 |
+| `EzPlayableBeatmapCache` | 进程级 | 带 Mod 转谱；Race/Builder session-ready `GetBound`；Mania provider `GetBound`(hitmode) |
 | `EzReplaySession` `sessionRunCache` / Score/Timeline/Combined | Session Service | Panel / Graph / RunRequest（§1.7c） |
 | Graph offset debounce | 新 env key | 精确重算，独立条目 |
 

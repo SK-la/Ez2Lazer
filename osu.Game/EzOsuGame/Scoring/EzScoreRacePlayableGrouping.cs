@@ -10,7 +10,8 @@ using osu.Game.Scoring;
 namespace osu.Game.EzOsuGame.Scoring
 {
     /// <summary>
-    /// Race 多幽灵构建时按 playable 转换相关 Mod 分组，避免「全员共用 Empty-Mods playable」把 HR/DT 幽灵判到 NM 谱上。
+    /// Race 多幽灵构建时按 playable 转换相关 Mod 分组。
+    /// 非 Mania 候选池恒 Any（混模），必须按 ghost Mods 分键，禁止 Empty-Mods 全员复用。
     /// </summary>
     public static class EzScoreRacePlayableGrouping
     {

@@ -123,15 +123,17 @@ namespace osu.Game.EzOsuGame.HUD
             var beatmapInfo = GameplayState.Beatmap.BeatmapInfo;
             var rulesetInfo = GameplayState.Ruleset.RulesetInfo;
 
-            if (beatmapInfo == null)
-                return new List<ScoreInfo>();
-
             var allLocalScores = EzLocalScoreQueries.GetLocalScoresWithReplay(realm, beatmapInfo, rulesetInfo);
+
+            // 与 EzScoreRaceService 一致：非 Mania 不跑 Mod 过滤。
+            var effectiveFilter = EzScoreRaceRulesetSupport.GetGhostTimelineMode(rulesetInfo) == EzScoreRaceGhostTimelineMode.ManiaSession
+                ? modFilter
+                : EzScoreModFilter.Any;
 
             return EzLocalScoreQueries.SelectGhostCandidates(
                 allLocalScores,
                 GameplayState.Mods.ToArray(),
-                modFilter,
+                effectiveFilter,
                 maxEntries);
         }
 
