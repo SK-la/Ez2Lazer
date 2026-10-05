@@ -174,7 +174,7 @@ namespace osu.Game.EzOsuGame.HUD
         private EzSkillProvider? skillProvider { get; set; }
 
         [Resolved(CanBeNull = true)]
-        private EzBeatmapOsuDiffComputer? beatmapOsuDiffComputer { get; set; }
+        private EzBeatmapPpPlusComputer? beatmapPpPlusComputer { get; set; }
 
         [Resolved]
         private EzAnalysisPlayerSelection? ezAnalysisPlayerSelection { get; set; }
@@ -630,11 +630,11 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateOsuSkillRadarPresentation(BeatmapInfo beatmapInfo, EzSkillProfile profile)
         {
-            string chartSystemId = profile.DefaultChartSystemId ?? EzSkillSystems.BEATMAP_OSU_DIFF;
-            string playerSystemId = profile.DefaultPlayerSystemId ?? EzSkillSystems.PLAYER_OSU_PERF;
+            string chartSystemId = profile.DefaultChartSystemId ?? EzSkillSystems.BEATMAP_PPPLUS;
+            string playerSystemId = profile.DefaultPlayerSystemId ?? EzSkillSystems.PLAYER_PPPLUS;
 
             IReadOnlyDictionary<string, double> chartSkills =
-                beatmapOsuDiffComputer?.TryGetOrCompute(beatmapInfo)
+                beatmapPpPlusComputer?.TryGetOrCompute(beatmapInfo)
                 ?? skillProvider?.GetBeatmapSystemSkills(beatmapInfo.Hash, chartSystemId)
                 ?? new Dictionary<string, double>();
 
@@ -649,9 +649,9 @@ namespace osu.Game.EzOsuGame.HUD
 
             var selected = new List<EzOsuSkillAxis>();
 
-            foreach (var axis in EzOsuSkillAxisExtensions.ChartAxes)
+            foreach (var axis in EzOsuSkillAxisExtensions.RadarAxes)
             {
-                double chartValue = chartSkills.GetValueOrDefault(axis.ToDiffSkillId(), 0);
+                double chartValue = chartSkills.GetValueOrDefault(axis.ToChartSkillId(), 0);
                 if (!double.IsFinite(chartValue) || chartValue < display_min)
                     continue;
 
@@ -661,7 +661,7 @@ namespace osu.Game.EzOsuGame.HUD
                     continue;
                 }
 
-                double playerValue = playerSkills.GetValueOrDefault(axis.ToPerfSkillId(), 0);
+                double playerValue = playerSkills.GetValueOrDefault(axis.ToPlayerSkillId(), 0);
                 if (!double.IsFinite(playerValue) || playerValue < display_min)
                     continue;
 
@@ -670,9 +670,9 @@ namespace osu.Game.EzOsuGame.HUD
 
             if (selected.Count == 0 && !beatmapOnly)
             {
-                foreach (var axis in EzOsuSkillAxisExtensions.ChartAxes)
+                foreach (var axis in EzOsuSkillAxisExtensions.RadarAxes)
                 {
-                    double chartValue = chartSkills.GetValueOrDefault(axis.ToDiffSkillId(), 0);
+                    double chartValue = chartSkills.GetValueOrDefault(axis.ToChartSkillId(), 0);
                     if (double.IsFinite(chartValue) && chartValue >= display_min)
                         selected.Add(axis);
                 }
@@ -697,8 +697,8 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 var axis = selected[i];
                 activeAxisLabels[i] = axis.Meta().NameEn;
-                double beatmapValue = chartSkills.GetValueOrDefault(axis.ToDiffSkillId(), 0);
-                double playerValue = beatmapOnly ? 0 : playerSkills.GetValueOrDefault(axis.ToPerfSkillId(), 0);
+                double beatmapValue = chartSkills.GetValueOrDefault(axis.ToChartSkillId(), 0);
+                double playerValue = beatmapOnly ? 0 : playerSkills.GetValueOrDefault(axis.ToPlayerSkillId(), 0);
                 if (playerValue < display_min)
                     playerValue = 0;
 

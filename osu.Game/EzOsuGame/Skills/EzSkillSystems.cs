@@ -5,7 +5,7 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Realm <c>SystemId</c> namespaces and meta skill ids.
-    /// Mania (Mina / pattern / dan) and osu (diff / perf) are peer plugins under <see cref="EzSkillRegistry"/>;
+    /// Mania (Mina / pattern / dan) and osu (PP+ chart / player) are peer plugins under <see cref="EzSkillRegistry"/>;
     /// ruleset wiring is <see cref="EzSkillProfile"/>.
     /// </summary>
     public static class EzSkillSystems
@@ -21,11 +21,11 @@ namespace osu.Game.EzOsuGame.Skills
 
         public const string DAN = "dan";
 
-        /// <summary>osu!standard chart difficulty axes (<see cref="EzOsuSkillAxis"/>).</summary>
-        public const string BEATMAP_OSU_DIFF = "beatmap_osu_diff";
+        /// <summary>osu!standard PP+-shaped chart axes (<see cref="EzOsuSkillAxis"/>).</summary>
+        public const string BEATMAP_PPPLUS = "beatmap_ppplus";
 
-        /// <summary>osu!standard player performance axes (pp portions).</summary>
-        public const string PLAYER_OSU_PERF = "player_osu_perf";
+        /// <summary>osu!standard PP+-shaped player axes (aggregated plays).</summary>
+        public const string PLAYER_PPPLUS = "player_ppplus";
 
         /// <summary>
         /// Realm <see cref="EzPlayerSkillValue.KeyCount"/> sentinel for rulesets without keymode slices (osu).
@@ -56,7 +56,7 @@ namespace osu.Game.EzOsuGame.Skills
         public static int ResolveAlgorithmVersion(string systemId) => systemId switch
         {
             BEATMAP_MSD or PLAYER_SSR or PLAYER_PATTERN => EzManiaSkillAlgorithm.VERSION,
-            BEATMAP_OSU_DIFF or PLAYER_OSU_PERF => EzOsuSkillAlgorithm.VERSION,
+            BEATMAP_PPPLUS or PLAYER_PPPLUS => EzOsuSkillAlgorithm.VERSION,
             _ => 0,
         };
     }
@@ -72,9 +72,10 @@ namespace osu.Game.EzOsuGame.Skills
 
     /// <summary>
     /// Bump when osu chart/player skill mapping or aggregation semantics change.
+    /// 2: PP+-shaped axes + stub engine (was official Diff aim/speed/FL/reading).
     /// </summary>
     public static class EzOsuSkillAlgorithm
     {
-        public const int VERSION = 1;
+        public const int VERSION = 2;
     }
 }

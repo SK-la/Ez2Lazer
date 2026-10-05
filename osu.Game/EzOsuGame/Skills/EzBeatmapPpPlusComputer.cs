@@ -12,17 +12,19 @@ using osu.Game.Rulesets.Mods;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Computes NoMod osu!standard difficulty skill axes and writes them as independent Realm skills.
+    /// Computes NoMod osu PP+-shaped chart axes via <see cref="IEzPpPlusEngine"/> and writes Realm skills.
     /// </summary>
-    public sealed class EzBeatmapOsuDiffComputer
+    public sealed class EzBeatmapPpPlusComputer
     {
         private readonly BeatmapManager beatmapManager;
         private readonly EzSkillStore skillStore;
+        private readonly IEzPpPlusEngine engine;
 
-        public EzBeatmapOsuDiffComputer(BeatmapManager beatmapManager, EzSkillStore skillStore)
+        public EzBeatmapPpPlusComputer(BeatmapManager beatmapManager, EzSkillStore skillStore, IEzPpPlusEngine? engine = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
+            this.engine = engine ?? new EzPpPlusStubEngine();
         }
 
         public IReadOnlyDictionary<string, double>? TryGetOrCompute(BeatmapInfo beatmapInfo)
@@ -32,9 +34,9 @@ namespace osu.Game.EzOsuGame.Skills
             if (beatmapInfo.Ruleset.OnlineID != EzLocalProfileConstants.OSU_RULESET_ID)
                 return null;
 
-            var existing = skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_OSU_DIFF);
+            var existing = skillStore.GetBeatmapSkills(beatmapInfo.Hash, EzSkillSystems.BEATMAP_PPPLUS);
 
-            if (EzOsuSkillMapping.IsCurrentDiffCache(existing))
+            if (EzPpPlusAttributes.IsCompleteChartCache(existing))
                 return existing;
 
             return ComputeAndStore(beatmapInfo);
@@ -60,11 +62,13 @@ namespace osu.Game.EzOsuGame.Skills
                 var ruleset = beatmapInfo.Ruleset.CreateInstance();
                 var calculator = ruleset.CreateDifficultyCalculator(working);
                 var attributes = calculator.Calculate(mods ?? Array.Empty<Mod>());
-                var skills = EzOsuSkillMapping.FromDifficultyAttributes(attributes);
+                double lengthSeconds = Math.Max(0, beatmapInfo.Length / 1000.0);
+                var chart = engine.CalculateChart(attributes, beatmapInfo.Difficulty, lengthSeconds);
+                var skills = chart.ToChartSkills();
 
                 skillStore.WriteBeatmapSystemSkills(
                     beatmapInfo.Hash,
-                    EzSkillSystems.BEATMAP_OSU_DIFF,
+                    EzSkillSystems.BEATMAP_PPPLUS,
                     skills,
                     beatmapInfo.ID);
 
@@ -72,7 +76,7 @@ namespace osu.Game.EzOsuGame.Skills
             }
             catch (Exception e)
             {
-                Logger.Log($"[EzSkills] osu diff compute failed for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
+                Logger.Log($"[EzSkills] osu PP+ chart compute failed for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return null;
             }
         }

@@ -7,14 +7,13 @@ using osu.Game.EzOsuGame.LocalProfile;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// osu!standard player-side performance axes (pp portions aggregated across local scores).
-    /// Slice key in Realm is <see cref="EzSkillSystems.OSU_SLICE_KEY"/> (no keymode).
+    /// osu!standard chart-side PP+-shaped axes (Jump / Flow / Precision / Speed / Stamina / Accuracy + Aim Total).
     /// </summary>
-    public sealed class PlayerOsuPerfSkillSystem : IEzSkillSystem
+    public sealed class BeatmapPpPlusSkillSystem : IEzSkillSystem
     {
-        public string SystemId => EzSkillSystems.PLAYER_OSU_PERF;
+        public string SystemId => EzSkillSystems.BEATMAP_PPPLUS;
 
-        public EzSkillScope Scope => EzSkillScope.Player;
+        public EzSkillScope Scope => EzSkillScope.Beatmap;
 
         public bool IsDefaultRadar => true;
 
@@ -25,16 +24,16 @@ namespace osu.Game.EzOsuGame.Skills
 
         private static IReadOnlyList<EzSkillDefinition> createSkills()
         {
-            var list = new List<EzSkillDefinition>(EzOsuSkillAxisExtensions.PlayerAxes.Length);
+            var list = new List<EzSkillDefinition>(EzOsuSkillAxisExtensions.ChartAxes.Length);
 
-            foreach (var axis in EzOsuSkillAxisExtensions.PlayerAxes)
+            foreach (var axis in EzOsuSkillAxisExtensions.ChartAxes)
             {
                 var chip = axis.Chip();
                 list.Add(new EzSkillDefinition(
-                    EzSkillSystems.PLAYER_OSU_PERF,
-                    axis.ToPerfSkillId(),
+                    EzSkillSystems.BEATMAP_PPPLUS,
+                    axis.ToChartSkillId(),
                     chip.Name,
-                    EzSkillScope.Player,
+                    EzSkillScope.Beatmap,
                     chip.AccentHex));
             }
 

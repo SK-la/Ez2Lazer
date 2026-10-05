@@ -7,13 +7,14 @@ using osu.Game.EzOsuGame.LocalProfile;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// osu!standard chart-side difficulty axes (Aim / Speed / Flashlight / Reading).
+    /// osu!standard player-side PP+-shaped axes (aggregated across local scores).
+    /// Slice key in Realm is <see cref="EzSkillSystems.OSU_SLICE_KEY"/> (no keymode).
     /// </summary>
-    public sealed class BeatmapOsuDiffSkillSystem : IEzSkillSystem
+    public sealed class PlayerPpPlusSkillSystem : IEzSkillSystem
     {
-        public string SystemId => EzSkillSystems.BEATMAP_OSU_DIFF;
+        public string SystemId => EzSkillSystems.PLAYER_PPPLUS;
 
-        public EzSkillScope Scope => EzSkillScope.Beatmap;
+        public EzSkillScope Scope => EzSkillScope.Player;
 
         public bool IsDefaultRadar => true;
 
@@ -24,16 +25,16 @@ namespace osu.Game.EzOsuGame.Skills
 
         private static IReadOnlyList<EzSkillDefinition> createSkills()
         {
-            var list = new List<EzSkillDefinition>(EzOsuSkillAxisExtensions.ChartAxes.Length);
+            var list = new List<EzSkillDefinition>(EzOsuSkillAxisExtensions.PlayerAxes.Length);
 
-            foreach (var axis in EzOsuSkillAxisExtensions.ChartAxes)
+            foreach (var axis in EzOsuSkillAxisExtensions.PlayerAxes)
             {
                 var chip = axis.Chip();
                 list.Add(new EzSkillDefinition(
-                    EzSkillSystems.BEATMAP_OSU_DIFF,
-                    axis.ToDiffSkillId(),
+                    EzSkillSystems.PLAYER_PPPLUS,
+                    axis.ToPlayerSkillId(),
                     chip.Name,
-                    EzSkillScope.Beatmap,
+                    EzSkillScope.Player,
                     chip.AccentHex));
             }
 

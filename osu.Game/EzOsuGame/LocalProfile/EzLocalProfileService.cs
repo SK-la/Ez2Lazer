@@ -28,7 +28,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private readonly EzLocalProfileAggregator aggregator;
         private readonly EzPlayerSsrAggregator? ssrAggregator;
         private readonly EzPlayerDanAggregator? danAggregator;
-        private readonly EzPlayerOsuPerfAggregator? osuPerfAggregator;
+        private readonly EzPlayerPpPlusAggregator? osuPpPlusAggregator;
         private readonly EzSkillProvider? skillProvider;
         private readonly Lock computeLock = new Lock();
 
@@ -78,13 +78,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
             EzPlayerDanAggregator? danAggregator = null,
             EzLocalProfileStore? sharedStore = null,
             EzSkillProvider? skillProvider = null,
-            EzPlayerOsuPerfAggregator? osuPerfAggregator = null)
+            EzPlayerPpPlusAggregator? osuPpPlusAggregator = null)
         {
             Store = sharedStore ?? new EzLocalProfileStore(storage);
             aggregator = new EzLocalProfileAggregator(realm, analysisStore, beatmapManager);
             this.ssrAggregator = ssrAggregator;
             this.danAggregator = danAggregator;
-            this.osuPerfAggregator = osuPerfAggregator;
+            this.osuPpPlusAggregator = osuPpPlusAggregator;
             this.skillProvider = skillProvider;
             Snapshot.Value = Store.LoadSnapshot();
         }
@@ -564,7 +564,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// </summary>
         private void refreshAllPlayerSkills()
         {
-            if (ssrAggregator == null && danAggregator == null && osuPerfAggregator == null)
+            if (ssrAggregator == null && danAggregator == null && osuPpPlusAggregator == null)
                 return;
 
             var included = Store.LoadIncludedUsernames()
@@ -1036,8 +1036,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             return tryComputeAndPersist(
                 username,
-                () => osuPerfAggregator!.ComputeAndStore(username, plays, aggregator.CreateWindowedScoreResolver(plays, token), token, tick),
-                osuPerfAggregator != null,
+                () => osuPpPlusAggregator!.ComputeAndStore(username, plays, aggregator.CreateWindowedScoreResolver(plays, token), token, tick),
+                osuPpPlusAggregator != null,
                 "[EzLocalProfile] Failed to compute/persist player osu perf skills after profile save.");
         }
 

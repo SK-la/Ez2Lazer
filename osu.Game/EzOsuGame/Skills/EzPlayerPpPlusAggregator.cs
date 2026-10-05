@@ -13,17 +13,19 @@ using osu.Game.Scoring;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Aggregates per-play osu PP portions into player skills (Etterna AggregateSSRs per axis).
+    /// Aggregates per-play PP+-shaped vectors into player skills (Etterna AggregateSSRs per axis).
     /// </summary>
-    public sealed class EzPlayerOsuPerfAggregator
+    public sealed class EzPlayerPpPlusAggregator
     {
         private readonly BeatmapManager beatmapManager;
         private readonly EzSkillStore skillStore;
+        private readonly IEzPpPlusEngine engine;
 
-        public EzPlayerOsuPerfAggregator(BeatmapManager beatmapManager, EzSkillStore skillStore)
+        public EzPlayerPpPlusAggregator(BeatmapManager beatmapManager, EzSkillStore skillStore, IEzPpPlusEngine? engine = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
+            this.engine = engine ?? new EzPpPlusStubEngine();
         }
 
         public void ComputeAndStore(
@@ -58,18 +60,16 @@ namespace osu.Game.EzOsuGame.Skills
                 try
                 {
                     var ruleset = score.Ruleset.CreateInstance();
-                    var calculator = ruleset.CreatePerformanceCalculator();
-                    if (calculator == null)
-                        continue;
-
                     var working = beatmapManager.GetWorkingBeatmap(score.BeatmapInfo);
                     var diffAttrs = ruleset.CreateDifficultyCalculator(working).Calculate(score.Mods);
-                    var perf = calculator.Calculate(score, diffAttrs);
-                    var portions = EzOsuSkillMapping.FromPerformanceAttributes(perf);
+                    double lengthSeconds = Math.Max(0, (score.BeatmapInfo?.Length ?? 0) / 1000.0);
+                    var difficulty = score.BeatmapInfo?.Difficulty ?? working.BeatmapInfo.Difficulty;
+                    var chart = engine.CalculateChart(diffAttrs, difficulty, lengthSeconds);
+                    var portions = engine.CalculatePlay(chart, score).ToPlayerSkills();
 
                     foreach (var axis in EzOsuSkillAxisExtensions.PlayerAxes)
                     {
-                        double value = portions.GetValueOrDefault(axis.ToPerfSkillId(), 0);
+                        double value = portions.GetValueOrDefault(axis.ToPlayerSkillId(), 0);
                         if (double.IsFinite(value) && value > 0)
                             byAxis[axis].Add(value);
                     }
@@ -78,19 +78,19 @@ namespace osu.Game.EzOsuGame.Skills
                 }
                 catch (Exception e)
                 {
-                    Logger.Log($"[EzSkills] osu perf failed for score {play.ScoreId}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
+                    Logger.Log($"[EzSkills] osu PP+ play failed for score {play.ScoreId}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
                 }
             }
 
             var aggregated = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var axis in EzOsuSkillAxisExtensions.PlayerAxes)
-                aggregated[axis.ToPerfSkillId()] = EzSsrAggregator.Aggregate(byAxis[axis]);
+                aggregated[axis.ToPlayerSkillId()] = EzSsrAggregator.Aggregate(byAxis[axis]);
 
             skillStore.WritePlayerSystemSkills(
                 username,
                 EzSkillSystems.OSU_SLICE_KEY,
-                EzSkillSystems.PLAYER_OSU_PERF,
+                EzSkillSystems.PLAYER_PPPLUS,
                 aggregated,
                 analyzed);
         }
