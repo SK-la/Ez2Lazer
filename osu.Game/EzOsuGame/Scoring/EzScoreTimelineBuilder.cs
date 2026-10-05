@@ -42,7 +42,7 @@ namespace osu.Game.EzOsuGame.Scoring
             if (timelineMode == EzScoreRaceGhostTimelineMode.None)
                 return null;
 
-            var playableBeatmap = resolvePlayableBeatmap(beatmaps, scoreInfo, sharedPlayableBeatmap);
+            var playableBeatmap = resolvePlayableBeatmap(beatmaps, scoreInfo, sharedPlayableBeatmap, cancellationToken);
             var resolvedEnvironment = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, scoreInfo, ignoreOffset: true);
 
             string? cacheKey = playableBeatmap != null
@@ -91,6 +91,9 @@ namespace osu.Game.EzOsuGame.Scoring
                         break;
                     }
 
+                    // 与 EzReplaySessionRouter 同契约：Mania 由此挂上 SimulationBeatmapProvider → GetBound。
+                    session.AttachBeatmaps(beatmaps);
+
                     // 本方法已在 Service 的后台 Task.Run 中串行执行；直接同步运行，
                     // 避免嵌套 Task.Run + GetResult 同步阻塞额外占用线程池线程。
                     timeline = session.RunTimelineDirect(
@@ -120,7 +123,8 @@ namespace osu.Game.EzOsuGame.Scoring
             return timeline;
         }
 
-        private static IBeatmap? resolvePlayableBeatmap(BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap)
+        private static IBeatmap? resolvePlayableBeatmap(BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap,
+                                                        CancellationToken cancellationToken)
         {
             if (sharedPlayableBeatmap != null)
                 return sharedPlayableBeatmap;
@@ -130,7 +134,8 @@ namespace osu.Game.EzOsuGame.Scoring
             if (workingBeatmap is DummyWorkingBeatmap)
                 return null;
 
-            return workingBeatmap.GetPlayableBeatmap(scoreInfo.Ruleset, scoreInfo.Mods);
+            // 经全局带 Mod 转谱 cache；禁止裸 GetPlayableBeatmap（与 Analysis/Mania provider 同层）。
+            return EzScoreRacePlayableResolver.GetSessionReady(workingBeatmap, scoreInfo.Ruleset, scoreInfo.Mods, cancellationToken);
         }
 
         private static string? getCacheKey(ScoreInfo? scoreInfo, EzScoreRaceGhostTimelineMode timelineMode, IGameplayEnvironment environment, IBeatmap? beatmap)
