@@ -33,8 +33,8 @@ Parity：`TestSceneOsuReplaySessionParity`（circle / slider / spinner）。
 | Timeline | `OsuReplayTimelineRecorder.cs` | done |
 | Session 引擎（Mapping） | `ReplayJudge/Session/*` | **done（OSL-011）**；原 `Shadow/` 已删 |
 | 判定 helper / Drawable 一行 | `ReplayJudge/Judgement` | **done（OSL-011）** |
-| Session 读 env | Simulator / Engine | **OSL-012**：已读 `OffsetPlusNonMania` / `OsuJudgementTrack`；**Offset 不进判窗**（见下） |
-| ClassicNative 轨 | Mapping + ScoreProcessor | **open（OSL-013）** |
+| Session 读 env | Simulator / Engine | **OSL-012**：已读轨/offset；Offset 不进判窗；Panel `RunHitEventsAsync` 不可变门禁 |
+| ClassicNative 轨 | Mapping + ScoreProcessor | **OSL-013 in progress**：窗注入 + Session 晚点 Lazer≠Classic 门禁；stable 满分细部仍 open |
 
 ### OffsetPlusNonMania（禁叠判）
 

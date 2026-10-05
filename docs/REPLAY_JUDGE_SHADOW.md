@@ -80,7 +80,7 @@ Parity：各 ruleset `TestScene*ReplaySessionParity` + `*OsrAuditTest`。
 |------|---------|---------|------|------|
 | done | Osu | OSL-007~010 | 壳 + Shadow 桥 + Parity | 归档 |
 | **done** | Osu | **OSL-011** | Mapping 毕业；删 Shadow 生产路径 | **done** |
-| open | Osu | OSL-012 / 013 | env 矩阵 / ClassicNative | open |
+| open | Osu | OSL-012 / 013 | Panel 不可变 / ClassicNative 晚点分叉门禁已加；stable 细部仍 open | open |
 | **done** | Taiko | TTL-001 | Mapping + 深 parity + 全指标 | **done** |
 | **done** | Catch | TSL-001 | Mapping + **全指标 ≡ 原成绩** | **done** |
 | 另开 | Mania | — | Session 金标收敛 | 另开 |

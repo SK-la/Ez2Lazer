@@ -417,8 +417,8 @@ flowchart LR
 | OSL-009 | **done** | Osu | Generator 瘦身为 Session 委托 |
 | OSL-010 | **done**（bridge） | Osu | Shadow 桥 + Parity；**非** Mania 级终态 |
 | OSL-011 | **done** | Osu | `Shadow/` 已删除；生产路径 `ReplayJudge/Session/*` + Judgement helpers；Drawable Circle/Slider/Spinner 同调 |
-| OSL-012 | **in progress** | Osu | env 已读 `OffsetPlusNonMania`/`OsuJudgementTrack`；**Offset 不进 Session 判窗**（§1.7b）；Graph/Panel 矩阵复核仍 open |
-| OSL-013 | **in progress** | Osu | ClassicNative：窗口注入 Drawable+Session（`OsuScoreProcessor.ApplyBeatmap`）+ `IsLegacyScore`；设置项已挂；stable 总分细节 / 两轨 parity 仍 open |
+| OSL-012 | **in progress** | Osu | env 已读；Offset 不进判窗（§1.7b）；`RunHitEventsAsync` 不污染调用方 + HitEvents≡Session Statistics 门禁已加；Osu 无独立 Graph（走 Panel） |
+| OSL-013 | **in progress** | Osu | ClassicNative 窗口注入 + Session 轨切换；两轨晚点分叉门禁已加；stable 满分同顶 / 细部 parity 仍 open |
 | TTL-001 | **done** | Taiko | Mapping Session + Race；全指标 OsrAudit + TimelineDirect；Strong/Roll/Swell helper 深 parity 测试 |
 | TSL-001 | **done** | Catch | Mapping Session + Race；全指标 OsrAudit + TimelineDirect；`CatchPlateJudgement` 与 Catcher 同调 |
 
