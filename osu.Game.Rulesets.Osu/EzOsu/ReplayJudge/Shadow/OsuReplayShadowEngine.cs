@@ -84,6 +84,10 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
 
                 foreach (var slider in sliders)
                 {
+                    // 非活跃滑条跳过：避免「每帧 × 全图滑条」二次放大。
+                    if (time < slider.StartTime || time > slider.EndTime + 1)
+                        continue;
+
                     slider.ProcessTime(time, cursor.Position, cursor.GetPressedActions(), (hitObject, result, judgementTime, cursorPosition) =>
                         applyJudgement(hitObject, result, judgementTime, cursorPosition, gameplayRate, inputOffset, scoreProcessor, timelineRecorder));
                 }

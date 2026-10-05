@@ -42,6 +42,10 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
             this.headMissWindow = headMissWindow;
         }
 
+        public double StartTime => slider.StartTime;
+
+        public double EndTime => slider.EndTime;
+
         public static IReadOnlyList<OsuShadowSliderState> CreateAll(IBeatmap beatmap, CancellationToken cancellationToken)
         {
             var list = new List<OsuShadowSliderState>();
@@ -73,11 +77,13 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                 yield return head.StartTime + headMissWindow;
 
             foreach (var nested in nestedInOrder)
+            {
                 yield return nested.StartTime;
 
-            const double step = 1;
-            for (double t = slider.StartTime; t <= slider.EndTime; t += step)
-                yield return t;
+                // Tail 在 StartTime+TAIL_LENIENCY 才开判；无 1ms 密采样时必须显式打点。
+                if (nested is SliderTailCircle)
+                    yield return nested.StartTime + SliderEventGenerator.TAIL_LENIENCY;
+            }
 
             yield return slider.EndTime;
         }
