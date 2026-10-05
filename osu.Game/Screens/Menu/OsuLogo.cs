@@ -90,15 +90,12 @@ namespace osu.Game.Screens.Menu
         /// <remarks>Does not account for the scale of this <see cref="OsuLogo"/></remarks>
         public float SizeForFlow => logo == null ? 0 : logo.DrawSize.X * logo.Scale.X * logoBounceContainer.Scale.X * logoHoverContainer.Scale.X;
 
-        private const double shrink_duration = 1000;
-
         private Bindable<double> holdActivationDelay;
         private bool isHolding;
         private bool minReached;
         private bool ready;
         private bool suppressNextClick;
         private ScheduledDelegate readyDelegate;
-        private readonly CircularContainer armedGlowRing;
 
         public bool IsTracking { get; set; }
 
@@ -252,28 +249,6 @@ namespace osu.Game.Screens.Menu
                                                     RelativeSizeAxes = Axes.Both,
                                                     BorderThickness = 10,
                                                     Masking = true,
-                                                    Children = new Drawable[]
-                                                    {
-                                                        new Box
-                                                        {
-                                                            RelativeSizeAxes = Axes.Both,
-                                                            AlwaysPresent = true,
-                                                            Alpha = 0,
-                                                        }
-                                                    }
-                                                },
-                                                // Outside the cookie sprite so the ring is not covered by logo texture.
-                                                armedGlowRing = new CircularContainer
-                                                {
-                                                    Anchor = Anchor.Centre,
-                                                    Origin = Anchor.Centre,
-                                                    RelativeSizeAxes = Axes.Both,
-                                                    Scale = new Vector2(1.08f),
-                                                    BorderColour = Color4.White,
-                                                    BorderThickness = 14,
-                                                    Masking = true,
-                                                    Blending = BlendingParameters.Additive,
-                                                    Alpha = 0,
                                                     Children = new Drawable[]
                                                     {
                                                         new Box
@@ -459,7 +434,7 @@ namespace osu.Game.Screens.Menu
             }
 
             if (isHolding && ready)
-                updateArmedGlow();
+                updateArmedDim();
         }
 
         public override bool HandlePositionalInput => base.HandlePositionalInput && Alpha > 0.2f;
@@ -523,7 +498,7 @@ namespace osu.Game.Screens.Menu
                 logoHoverContainer.ScaleTo(1.1f, 500, Easing.OutElastic);
 
             if (isHolding && ready)
-                updateArmedGlow();
+                updateArmedDim();
 
             return true;
         }
@@ -533,7 +508,7 @@ namespace osu.Game.Screens.Menu
             logoHoverContainer.ScaleTo(1, 500, Easing.OutElastic);
 
             if (isHolding)
-                hideArmedGlow();
+                clearArmedDim();
         }
 
         private void beginHoldGesture()
@@ -545,7 +520,7 @@ namespace osu.Game.Screens.Menu
             ready = false;
             suppressNextClick = false;
 
-            logoBounceContainer.ScaleTo(0.9f, shrink_duration, Easing.Out).OnComplete(_ =>
+            logoBounceContainer.ScaleTo(0.9f, 1000, Easing.Out).OnComplete(_ =>
             {
                 if (!isHolding) return;
 
@@ -558,9 +533,9 @@ namespace osu.Game.Screens.Menu
                     ready = true;
 
                     if (isPointerInLogo())
-                        flashArmedGlow();
+                        applyArmedDim();
                     else
-                        hideArmedGlow();
+                        clearArmedDim();
                 }, holdActivationDelay.Value);
             });
         }
@@ -572,7 +547,7 @@ namespace osu.Game.Screens.Menu
             ready = false;
             readyDelegate?.Cancel();
             readyDelegate = null;
-            hideArmedGlow();
+            clearArmedDim();
         }
 
         private bool isPointerInLogo()
@@ -581,30 +556,22 @@ namespace osu.Game.Screens.Menu
             return inputManager != null && ReceivePositionalInputAt(inputManager.CurrentState.Mouse.Position);
         }
 
-        private void updateArmedGlow()
+        private void updateArmedDim()
         {
             if (isHolding && ready && isPointerInLogo())
-            {
-                if (armedGlowRing.Alpha <= 0)
-                    flashArmedGlow();
-            }
+                applyArmedDim();
             else
-                hideArmedGlow();
+                clearArmedDim();
         }
 
-        private void flashArmedGlow()
+        private void applyArmedDim()
         {
-            armedGlowRing.ClearTransforms();
-            armedGlowRing
-                .FadeTo(1f, 80, Easing.Out)
-                .Then()
-                .FadeTo(0.65f, 220, Easing.Out);
+            logoContainer.FadeTo(0.85f, 120, Easing.Out);
         }
 
-        private void hideArmedGlow()
+        private void clearArmedDim()
         {
-            armedGlowRing.ClearTransforms();
-            armedGlowRing.Hide();
+            logoContainer.FadeTo(1f, 100, Easing.Out);
         }
 
         public void Impact()
