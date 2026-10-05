@@ -39,7 +39,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         private static readonly DllResourceStore resources = new DllResourceStore(typeof(OsrAuditTest).Assembly);
 
-        /// <summary>本机复现「无法结算 → 强制结算」那一局：53 miss、Lazer、offset 0、6K LN 图。</summary>
+        /// <summary>
+        /// 高难度 LN 判定数量闭环对账：53 miss、Lazer、offset 0、6K LN 图（GramNibelungen23）。
+        /// 勿当金标。Lazer/Classic 分轨金标见 <see cref="ManiaOsrAuditAssertTest"/>。
+        /// </summary>
         private const string osr_resource = "Resources/Testing/Replays/GramNibelungen23-53miss.osr";
 
         /// <summary>配套谱面；.osr 里带的是它的 MD5。</summary>
