@@ -142,7 +142,7 @@ namespace osu.Game.EzOsuGame
             largeTextureStore.AddTextureSource(baseTextureLoader);
 
             // 字形页：独占一页，保证同一套字形（数字 0-9 等）永不被其它纹理挤到两页上。
-            glyphStore = new TextureStore(renderer, textureLoaderStore1, preferredAtlasSize: glyph_atlas_size);
+            glyphStore = new TextureStore(renderer, textureLoaderStore1, true, TextureFilteringMode.Linear, false, 2, glyph_atlas_size, null);
             glyphStore.AddTextureSource(baseTextureLoader);
 
             // 段位标页：加载期把边长压到规范尺寸后再进页，故源图再大也只占一张页。
