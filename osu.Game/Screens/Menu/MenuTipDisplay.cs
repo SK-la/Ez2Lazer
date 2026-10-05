@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input;
@@ -118,7 +119,7 @@ namespace osu.Game.Screens.Menu
                 .FadeOutFromOne(2000, Easing.OutQuint);
         }
 
-        private const int available_tips = 30;
+        private const int available_tips = 31;
 
         private LocalisableString getRandomTip()
         {
@@ -223,6 +224,9 @@ namespace osu.Game.Screens.Menu
 
                 case 29:
                     return MenuTipStrings.ShiftClickInBeatmapOverlay;
+
+                case 30:
+                    return EzMenuTipStrings.VISUALIZER_PLAYER;
             }
 
             return string.Empty;
