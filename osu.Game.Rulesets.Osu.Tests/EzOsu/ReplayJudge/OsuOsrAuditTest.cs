@@ -97,6 +97,26 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
             assertFullBaseline(score.ScoreInfo, report);
         }
 
+        [Test]
+        public void AuditEmbeddedScoreTimelineDirectMatchesFullBaseline()
+        {
+            assumeResourcesPresent();
+
+            var decoder = new HarnessScoreDecoder();
+            Score score;
+
+            using (var stream = resources.GetStream(osr_resource))
+                score = decoder.Parse(stream);
+
+            var playable = decoder.LastWorkingBeatmap!.GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
+            var environment = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, score.ScoreInfo);
+
+            var (_, timeline) = OsuReplaySession.RunWithTimeline(score, playable, environment);
+
+            Assert.That(timeline.FinalTotalScore, Is.EqualTo(expected_total_score));
+            assertFullBaseline(score.ScoreInfo);
+        }
+
         private static void assertFullBaseline(ScoreInfo info, string? report = null)
         {
             Assert.Multiple(() =>

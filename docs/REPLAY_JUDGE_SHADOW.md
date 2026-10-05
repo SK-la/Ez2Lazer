@@ -81,8 +81,8 @@ Parity：各 ruleset `TestScene*ReplaySessionParity` + `*OsrAuditTest`。
 | done | Osu | OSL-007~010 | 壳 + Shadow 桥 + Parity | 归档 |
 | **done** | Osu | **OSL-011** | Mapping 毕业；删 Shadow 生产路径 | **done** |
 | open | Osu | OSL-012 / 013 | env 矩阵 / ClassicNative | open |
-| **必达** | Taiko | TTL-001 | Mapping + 深 parity + 全指标 | in progress |
-| **必达** | Catch | TSL-001 | Mapping + **全指标 ≡ 原成绩** | in progress |
+| **done** | Taiko | TTL-001 | Mapping + 深 parity + 全指标 | **done** |
+| **done** | Catch | TSL-001 | Mapping + **全指标 ≡ 原成绩** | **done** |
 | 另开 | Mania | — | Session 金标收敛 | 另开 |
 
 ---
