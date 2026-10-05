@@ -94,6 +94,29 @@ namespace osu.Game.Rulesets.Catch.Tests.EzCatch.ReplayJudge
             assertFullBaseline(result.ScoreInfo, report);
         }
 
+        [Test]
+        public async Task AuditEmbeddedScoreTimelineDirectMatchesFullBaseline()
+        {
+            assumeResourcesPresent();
+
+            var sessionApi = new CatchRuleset().CreateEzReplaySession()
+                             ?? throw new InvalidOperationException("Catch CreateEzReplaySession 未接线");
+
+            var decoder = new HarnessScoreDecoder();
+            Score score;
+
+            using (var stream = resources.GetStream(osr_resource))
+                score = decoder.Parse(stream);
+
+            var playable = decoder.LastWorkingBeatmap!.GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
+            var timeline = await sessionApi.RunTimelineDirectAsync(score, playable, ReplayRunPurpose.ForStored).ConfigureAwait(true);
+            Score result = await sessionApi.RunAsync(score, playable, ReplayRunPurpose.ForStored).ConfigureAwait(true);
+
+            Assert.That(timeline, Is.Not.Null);
+            Assert.That(timeline.FinalTotalScore, Is.EqualTo(expected_total_score));
+            assertFullBaseline(result.ScoreInfo);
+        }
+
         private static void assertFullBaseline(ScoreInfo info, string? report = null)
         {
             Assert.Multiple(() =>

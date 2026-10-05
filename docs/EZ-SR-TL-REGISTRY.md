@@ -157,8 +157,8 @@ Cache key 对**已解析** env 建键。
 ### 1.7f 远期 / 开放（验收线 1）
 
 - **Osu**：**壳 + OSL-010 桥归档**；**OSL-011 必达** = 生产路径在 `ReplayJudge/Session/`（Mapping 形态事件引擎），**无** `ReplayJudge/Shadow/`；helper 与 Drawable 同调。OSL-012/013 继续推进。禁止「Sparse Shadow 够用」作为关闭条件。
-- **Taiko（TTL-001）**：Mapping Session + Race 已接线；深 parity + 原成绩全指标对齐仍 open。**禁止**永久 Shadow。
-- **Catch（TSL-001）**：Mapping Session + Race 已接线；**硬门禁** = Session ≡ 原成绩全指标（TotalScore / MaxCombo / Accuracy / Rank / Statistics 全键）。**禁止**永久 Shadow。
+- **Taiko（TTL-001）**：**done** — Mapping Session + Race；全指标 + TimelineDirect + Strong/Roll/Swell helper 深 parity。**禁止**永久 Shadow。
+- **Catch（TSL-001）**：**done** — Mapping Session + Race；全指标 + TimelineDirect；`CatchPlateJudgement` 与 Catcher 同调。**禁止**永久 Shadow。
 - **Mania**：能力维持；Session 金标收敛 **另开**（不纳入本验收线）。
 ---
 
@@ -409,8 +409,8 @@ flowchart LR
 | OSL-011 | **done** | Osu | `Shadow/` 已删除；生产路径 `ReplayJudge/Session/*` + Judgement helpers；Drawable Circle/Slider/Spinner 同调 |
 | OSL-012 | **in progress** | Osu | `OffsetPlusNonMania` + `OsuJudgementTrack` 进 env/Session/Race cache；SongProgress `IsMiss`；Graph/Panel 矩阵复核仍 open |
 | OSL-013 | **in progress** | Osu | ClassicNative：窗口注入 Drawable+Session（`OsuScoreProcessor.ApplyBeatmap`）+ `IsLegacyScore`；设置项已挂；stable 总分细节 / 两轨 parity 仍 open |
-| TTL-001 | **in progress** | Taiko | Mapping Session + Race 已接线；关闭条件 = 深 parity + 原成绩全指标 |
-| TSL-001 | **in progress** | Catch | Mapping Session + Race 已接线；**关闭条件** = Session ≡ 原成绩全指标（含 Statistics 全键） |
+| TTL-001 | **done** | Taiko | Mapping Session + Race；全指标 OsrAudit + TimelineDirect；Strong/Roll/Swell helper 深 parity 测试 |
+| TSL-001 | **done** | Catch | Mapping Session + Race；全指标 OsrAudit + TimelineDirect；`CatchPlateJudgement` 与 Catcher 同调 |
 
 ---
 
