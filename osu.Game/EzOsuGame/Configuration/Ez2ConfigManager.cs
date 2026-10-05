@@ -112,6 +112,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ScratchAxisStopThreshold, 30, 10, 150);
             SetDefault(Ez2Setting.CatchScratchDashEnterAcceleration, 0.0005, 0.0001, 0.0010, 0.00005);
             SetDefault(Ez2Setting.CatchScratchDashExitVelocity, 0.00010, 0.00010, 0.00020, 0.00001);
+            SetDefault(Ez2Setting.ScratchAxisInvert, false);
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
             SetDefault(Ez2Setting.TurboMode, false);
@@ -958,6 +959,12 @@ namespace osu.Game.EzOsuGame.Configuration
         /// Ez2Catch 转盘退出 Dash 的平滑角速度阈值（轴单位/ms）。
         /// </summary>
         CatchScratchDashExitVelocity,
+
+        /// <summary>
+        /// 反转转盘方向：交换顺/逆时针的含义（Catch 左右移动，以及选歌界面的上一首/下一首）。
+        /// 与「使用 Ez2Ac 10k2s1p」无关；Mania 顺逆均视为按下，不受影响。
+        /// </summary>
+        ScratchAxisInvert,
 
         SkipWithGameplayKeys,
 
