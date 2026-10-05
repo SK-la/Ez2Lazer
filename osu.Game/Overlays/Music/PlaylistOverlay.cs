@@ -12,8 +12,10 @@ using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Acrylic;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
-using osuTK;
 using osuTK.Graphics;
 using Realms;
 
@@ -25,11 +27,16 @@ namespace osu.Game.Overlays.Music
         public Bindable<Live<BeatmapSetInfo>?> SelectedSet = new Bindable<Live<BeatmapSetInfo>?>();
 
         private const float transition_duration = 600;
+        private const float filter_area_height = 60;
+
         public const float PLAYLIST_HEIGHT = 510;
 
         private readonly BindableList<Live<BeatmapSetInfo>> beatmapSets = new BindableList<Live<BeatmapSetInfo>>();
+        private readonly BindableList<Live<BeatmapSetInfo>> filteredSets = new BindableList<Live<BeatmapSetInfo>>();
 
         private readonly Bindable<WorkingBeatmap> beatmap = new Bindable<WorkingBeatmap>();
+
+        private FilterCriteria currentCriteria = new FilterCriteria();
 
         [Resolved]
         private BeatmapManager beatmaps { get; set; } = null!;
@@ -39,12 +46,17 @@ namespace osu.Game.Overlays.Music
 
         private IDisposable? beatmapSubscription;
 
+        private FilterControl filter = null!;
         private Playlist list = null!;
+        private Box classicBackground = null!;
+        private EzAcrylicPanelBackground acrylicBackground = null!;
+        private Bindable<bool> acrylicUiEnabled = null!;
 
         [BackgroundDependencyLoader]
-        private void load(OsuColour colours, Bindable<WorkingBeatmap> beatmap)
+        private void load(OsuColour colours, Bindable<WorkingBeatmap> beatmap, Ez2ConfigManager ezConfig)
         {
             this.beatmap.BindTo(beatmap);
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
 
             Children = new Drawable[]
             {
@@ -61,7 +73,11 @@ namespace osu.Game.Overlays.Music
                     },
                     Children = new Drawable[]
                     {
-                        new Box
+                        acrylicBackground = new EzAcrylicPanelBackground(EzAcrylicStyle.FooterVeil)
+                        {
+                            AcrylicCaptureVisible = false,
+                        },
+                        classicBackground = new Box
                         {
                             Colour = colours.Gray3,
                             RelativeSizeAxes = Axes.Both,
@@ -69,10 +85,33 @@ namespace osu.Game.Overlays.Music
                         list = new Playlist
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Padding = new MarginPadding { Vertical = 10, Right = 10 },
+                            Padding = new MarginPadding { Top = filter_area_height, Bottom = 10, Right = 10 },
+                        },
+                        filter = new FilterControl
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Padding = new MarginPadding(10),
+                            FilterChanged = applyFilter,
                         },
                     },
                 },
+            };
+
+            filter.Search.OnCommit += (_, _) =>
+            {
+                var first = filteredSets.FirstOrDefault();
+                if (first == null)
+                    return;
+
+                first.PerformRead(set =>
+                {
+                    var toSelect = set.Beatmaps.FirstOrDefault();
+                    if (toSelect == null)
+                        return;
+
+                    beatmap.Value = beatmaps.GetWorkingBeatmap(toSelect);
+                    beatmap.Value.Track.Restart();
+                });
             };
         }
 
@@ -82,17 +121,57 @@ namespace osu.Game.Overlays.Music
 
             beatmapSubscription = realm.RegisterForNotifications(r => r.All<BeatmapSetInfo>().Where(s => !s.DeletePending && !s.Protected), beatmapsChanged);
 
-            list.RowData.BindTo(beatmapSets);
+            list.RowData.BindTo(filteredSets);
             beatmap.BindValueChanged(working => SelectedSet.Value = working.NewValue.BeatmapSetInfo.ToLive(realm), true);
+
+            EzAcrylicOverlayAlpha.BindExclusive(classicBackground, acrylicBackground, acrylicUiEnabled);
         }
+
+        private void applyFilter(FilterCriteria criteria)
+        {
+            currentCriteria = criteria;
+            rebuildFilteredList();
+        }
+
+        private void rebuildFilteredList()
+        {
+            string query = currentCriteria.SearchText.Trim();
+
+            filteredSets.Clear();
+
+            if (string.IsNullOrEmpty(query))
+            {
+                filteredSets.AddRange(beatmapSets);
+                return;
+            }
+
+            filteredSets.AddRange(beatmapSets.Where(s => setMatches(s, query)));
+        }
+
+        private static bool setMatches(Live<BeatmapSetInfo> liveSet, string query)
+        {
+            return liveSet.PerformRead(set =>
+            {
+                var metadata = set.Metadata;
+                return contains(metadata.Title, query)
+                       || contains(metadata.TitleUnicode, query)
+                       || contains(metadata.Artist, query)
+                       || contains(metadata.ArtistUnicode, query)
+                       || contains(metadata.Author.Username, query)
+                       || set.Beatmaps.Any(b => contains(b.DifficultyName, query));
+            });
+        }
+
+        private static bool contains(string? source, string query) =>
+            !string.IsNullOrEmpty(source) && source.Contains(query, StringComparison.OrdinalIgnoreCase);
 
         private void beatmapsChanged(IRealmCollection<BeatmapSetInfo> sender, ChangeSet? changes)
         {
             if (changes == null)
             {
                 beatmapSets.Clear();
-                // must use AddRange to avoid RearrangeableList sort overhead per add op.
                 beatmapSets.AddRange(sender.Select(b => b.ToLive(realm)));
+                rebuildFilteredList();
                 return;
             }
 
@@ -101,25 +180,42 @@ namespace osu.Game.Overlays.Music
 
             foreach (int i in changes.DeletedIndices.OrderDescending())
                 beatmapSets.RemoveAt(i);
+
+            rebuildFilteredList();
         }
 
         protected override void PopIn()
         {
-            this.ResizeTo(new Vector2(1, RelativeSizeAxes.HasFlag(Axes.Y) ? 1f : PLAYLIST_HEIGHT), transition_duration, Easing.OutQuint);
+            filter.Search.HoldFocus = true;
+            Schedule(() => filter.Search.TakeFocus());
+
+            setAcrylicCaptureVisible(true);
+
+            this.ResizeHeightTo(RelativeSizeAxes.HasFlag(Axes.Y) ? 1f : PLAYLIST_HEIGHT, transition_duration, Easing.OutQuint);
             this.FadeIn(transition_duration, Easing.OutQuint);
         }
 
         protected override void PopOut()
         {
-            this.ResizeTo(new Vector2(1, 0), transition_duration, Easing.OutQuint);
+            filter.Search.HoldFocus = false;
+
+            setAcrylicCaptureVisible(false);
+
+            this.ResizeHeightTo(0, transition_duration, Easing.OutQuint);
             this.FadeOut(transition_duration);
+        }
+
+        private void setAcrylicCaptureVisible(bool visible)
+        {
+            acrylicBackground.AcrylicCaptureVisible = visible;
+            acrylicBackground.SyncAcrylicCaptureState();
         }
 
         public void ItemSelected(Live<BeatmapSetInfo> beatmapSet)
         {
             beatmapSet.PerformRead(set =>
             {
-                if (set.Equals((beatmap.Value?.BeatmapSetInfo)))
+                if (set.Equals(beatmap.Value?.BeatmapSetInfo))
                 {
                     beatmap.Value?.Track.Seek(0);
                     return;
