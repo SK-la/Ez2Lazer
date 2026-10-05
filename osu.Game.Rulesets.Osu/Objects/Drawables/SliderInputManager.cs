@@ -9,6 +9,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Input;
 using osu.Framework.Input.Events;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Types;
@@ -141,32 +142,12 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
         public void TryJudgeNestedObject(DrawableOsuHitObject nestedObject, double timeOffset)
         {
-            switch (nestedObject)
-            {
-                case DrawableSliderRepeat:
-                case DrawableSliderTick:
-                    if (timeOffset < 0)
-                        return;
-
-                    break;
-
-                case DrawableSliderTail:
-                    if (timeOffset < SliderEventGenerator.TAIL_LENIENCY)
-                        return;
-
-                    // Ensure the tail can only activate after all previous ticks/repeats already have.
-                    //
-                    // This covers the edge case where the lenience may allow the tail to activate before
-                    // the last tick, changing ordering of score/combo awarding.
-                    var lastTick = slider.NestedHitObjects.LastOrDefault(o => o.HitObject is SliderTick || o.HitObject is SliderRepeat);
-                    if (lastTick?.Judged == false)
-                        return;
-
-                    break;
-
-                default:
-                    return;
-            }
+            if (!OsuSliderJudgement.CanJudgeNestedAtOffset(
+                    nestedObject.HitObject,
+                    timeOffset,
+                    isJudged: ho => slider.NestedHitObjects.FirstOrDefault(d => d.HitObject == ho)?.Judged == true,
+                    nestedInOrder: slider.HitObject.NestedHitObjects))
+                return;
 
             if (!slider.HeadCircle.Judged)
                 return;
@@ -186,13 +167,17 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             if (screenSpaceMousePosition is not Vector2 pos)
                 return false;
 
-            float radius = getFollowRadius(expanded);
-
-            double followProgress = Math.Clamp((Time.Current - slider.HitObject.StartTime) / slider.HitObject.Duration, 0, 1);
-            Vector2 followCirclePosition = slider.HitObject.CurvePositionAt(followProgress);
             Vector2 mousePositionInSlider = slider.ToLocalSpace(pos) - slider.OriginPosition;
 
-            return (mousePositionInSlider - followCirclePosition).LengthSquared <= radius * radius;
+            return OsuSliderJudgement.IsInFollowArea(
+                mousePositionInSlider,
+                Vector2.Zero,
+                slider.HitObject.CurvePositionAt,
+                slider.HitObject.StartTime,
+                slider.HitObject.Duration,
+                Time.Current,
+                slider.HitObject.Radius,
+                expanded);
         }
 
         /// <summary>
@@ -200,14 +185,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         /// </summary>
         /// <param name="expanded">Whether to return the maximum area of the follow circle.</param>
         private float getFollowRadius(bool expanded)
-        {
-            float radius = (float)slider.HitObject.Radius;
-
-            if (expanded)
-                radius *= DrawableSliderBall.FOLLOW_AREA;
-
-            return radius;
-        }
+            => OsuSliderJudgement.FollowRadius(slider.HitObject.Radius, expanded);
 
         /// <summary>
         /// Updates the tracking state.

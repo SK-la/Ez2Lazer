@@ -44,7 +44,9 @@ using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
 using osu.Game.EzOsuGame.Mods.LAsMods;
 using osu.Game.EzOsuGame.Mods.CommunityMod;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Statistics;
+using osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge;
 using osu.Game.Utils;
 using osuTK;
 
@@ -55,6 +57,8 @@ namespace osu.Game.Rulesets.Taiko
         public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) => new DrawableTaikoRuleset(this, beatmap, mods);
 
         public override ScoreProcessor CreateScoreProcessor() => new TaikoScoreProcessor();
+
+        public override IEzReplaySession CreateEzReplaySession() => new TaikoReplaySessionService();
 
         public override HealthProcessor CreateHealthProcessor(double drainStartTime) => new TaikoHealthProcessor();
 

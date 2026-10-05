@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Pooling;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.Rulesets.Catch.EzCatch.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Catch.Judgements;
 using osu.Game.Rulesets.Catch.Objects;
 using osu.Game.Rulesets.Catch.Objects.Drawables;
@@ -194,12 +195,10 @@ namespace osu.Game.Rulesets.Catch.UI
         /// </summary>
         public bool CanCatch(CatchHitObject hitObject)
         {
-            if (!(hitObject is PalpableCatchHitObject fruit))
+            if (hitObject is not PalpableCatchHitObject fruit)
                 return false;
 
-            float halfCatchWidth = CatchWidth * 0.5f;
-            return fruit.EffectiveX >= X - halfCatchWidth &&
-                   fruit.EffectiveX <= X + halfCatchWidth;
+            return CatchPlateJudgement.CanCatch(fruit, X, CatchWidth * 0.5f);
         }
 
         public void OnNewResult(DrawableCatchHitObject drawableObject, JudgementResult result)

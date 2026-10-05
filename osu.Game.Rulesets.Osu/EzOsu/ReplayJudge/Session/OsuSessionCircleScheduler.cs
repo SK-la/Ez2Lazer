@@ -7,16 +7,17 @@ using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 
-namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
+namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 {
     /// <summary>
     /// 待判定目标队列：顶层 HitCircle；Slider/Spinner 由 Shadow 状态机处理。
     /// </summary>
-    internal sealed class OsuReplayObjectScheduler
+    internal sealed class OsuSessionCircleScheduler
     {
         internal sealed class PendingTarget
         {
@@ -28,12 +29,12 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
 
         private readonly List<PendingTarget> targets;
 
-        private OsuReplayObjectScheduler(List<PendingTarget> targets)
+        private OsuSessionCircleScheduler(List<PendingTarget> targets)
         {
             this.targets = targets;
         }
 
-        public static OsuReplayObjectScheduler Create(IBeatmap beatmap, CancellationToken cancellationToken)
+        public static OsuSessionCircleScheduler Create(IBeatmap beatmap, CancellationToken cancellationToken)
         {
             var list = new List<PendingTarget>();
 
@@ -45,7 +46,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                     tryAddTarget(hitObject, beatmap, list, cancellationToken);
             }
 
-            return new OsuReplayObjectScheduler(list.OrderBy(t => t.HitObject.StartTime).ToList());
+            return new OsuSessionCircleScheduler(list.OrderBy(t => t.HitObject.StartTime).ToList());
         }
 
         public IReadOnlyList<double> CollectMissDeadlines()
@@ -66,14 +67,13 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                 if (time > target.HitObject.StartTime + target.MissWindow)
                     break;
 
-                if (Vector2.Distance(position, target.OsuTarget.StackedPosition) > target.OsuTarget.Radius)
+                if (!OsuCircleJudgement.IsInHitRadius(position, target.OsuTarget.StackedPosition, target.OsuTarget.Radius))
                     continue;
 
                 double startOffset = time - target.HitObject.StartTime;
-                HitResult result = target.HitObject.HitWindows!.ResultFor(startOffset);
-
+                HitResult result = OsuCircleJudgement.ResultForPress(target.HitObject.HitWindows!, startOffset);
                 if (result == HitResult.None)
-                    result = HitResult.Miss;
+                    continue;
 
                 apply(target, result, time, position);
                 target.Judged = true;
@@ -125,7 +125,8 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                 {
                     HitObject = hitObject,
                     OsuTarget = osuTarget,
-                    MissWindow = hitObject.HitWindows.WindowFor(HitResult.Miss),
+                    // 对齐 DrawableHitCircle：!CanBeHit 即自动 Miss（Meh 窗），不是固定 400ms Miss 窗。
+                    MissWindow = OsuCircleJudgement.AutoMissWindow(hitObject.HitWindows),
                 });
             }
         }

@@ -8,6 +8,7 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Objects.Drawables;
@@ -16,12 +17,12 @@ using osu.Game.Rulesets.Osu.Skinning.Default;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 
-namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
+namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 {
     /// <summary>
     /// Spinner 影子状态：移植 <see cref="SpinnerRotationTracker"/> + <see cref="DrawableSpinner"/> tick/EndTime 判定。
     /// </summary>
-    internal sealed class OsuShadowSpinnerState
+    internal sealed class OsuSessionSpinnerState
     {
         internal delegate void JudgementApplier(HitObject hitObject, HitResult result, double judgementClockTime, Vector2? cursorPositionAtHit, Action<JudgementResult>? configureResult);
 
@@ -36,15 +37,15 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
         private double? timeStarted;
         private double? timeCompleted;
 
-        private OsuShadowSpinnerState(Spinner spinner, List<HitObject> ticksInOrder)
+        private OsuSessionSpinnerState(Spinner spinner, List<HitObject> ticksInOrder)
         {
             this.spinner = spinner;
             this.ticksInOrder = ticksInOrder;
         }
 
-        public static IReadOnlyList<OsuShadowSpinnerState> CreateAll(IBeatmap beatmap, CancellationToken cancellationToken)
+        public static IReadOnlyList<OsuSessionSpinnerState> CreateAll(IBeatmap beatmap, CancellationToken cancellationToken)
         {
-            var list = new List<OsuShadowSpinnerState>();
+            var list = new List<OsuSessionSpinnerState>();
 
             foreach (var hitObject in beatmap.HitObjects)
             {
@@ -58,7 +59,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                                    .OrderBy(o => o.StartTime)
                                    .ToList();
 
-                list.Add(new OsuShadowSpinnerState(spinner, ticks));
+                list.Add(new OsuSessionSpinnerState(spinner, ticks));
             }
 
             return list;
@@ -93,22 +94,15 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
             if (tracking && timeStarted == null)
                 timeStarted = sampleStart;
 
-            float? angleAtStart = lastAngle ?? computeAngle(OsuShadowReplayCursor.InterpolatePosition(frames, sampleStart), spinner.StackedPosition);
-            float angleAtEnd = computeAngle(OsuShadowReplayCursor.InterpolatePosition(frames, sampleEnd), spinner.StackedPosition);
+            float? angleAtStart = lastAngle ?? computeAngle(OsuReplayCursor.InterpolatePosition(frames, sampleStart), spinner.StackedPosition);
+            float angleAtEnd = computeAngle(OsuReplayCursor.InterpolatePosition(frames, sampleEnd), spinner.StackedPosition);
 
             lastAngle = angleAtEnd;
 
             if (!tracking || angleAtStart == null)
                 return;
 
-            float delta = angleAtEnd - angleAtStart.Value;
-
-            if (delta > 180)
-                delta -= 360;
-            if (delta < -180)
-                delta += 360;
-
-            delta = (float)(delta * Math.Abs(gameplayRate));
+            float delta = OsuSpinnerJudgement.NormaliseRotationDelta(angleAtStart.Value, angleAtEnd, gameplayRate);
             rotationHistory.ReportDelta(sampleEnd, delta);
 
             if (progress >= 1)
@@ -130,17 +124,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                 applyTick(tick, hit: false, time, apply);
             }
 
-            HitResult result;
-
-            if (progress >= 1)
-                result = HitResult.Great;
-            else if (progress > .9)
-                result = HitResult.Ok;
-            else if (progress > .75)
-                result = HitResult.Meh;
-            else
-                result = spinner.Judgement.MinResult;
-
+            HitResult result = OsuSpinnerJudgement.BodyResultForProgress(progress, spinner.Judgement.MinResult);
             spinnerBodyJudged = true;
 
             apply(spinner, result, time, null, judgementResult =>
@@ -199,7 +183,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
             if (frames.Count == 0 || time < frames[0].Time)
                 return false;
 
-            foreach (var action in OsuShadowReplayCursor.GetPressedActionsAt(frames, time))
+            foreach (var action in OsuReplayCursor.GetPressedActionsAt(frames, time))
             {
                 if (action is OsuAction.LeftButton or OsuAction.RightButton)
                     return true;

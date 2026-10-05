@@ -8,6 +8,8 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Utils;
@@ -18,7 +20,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
     /// 无绘制 Osu replay Session：影子判定 → <see cref="JudgementProcessor.ApplyResult"/> → PopulateScore。
     /// </summary>
     /// <remarks>
-    /// 判定由 <see cref="Shadow.OsuReplayShadowEngine"/> 驱动（OSL-010 Shadow Judgement）。
+    /// 判定由 <see cref="Session.OsuReplaySessionEngine"/> 驱动（OSL-011 Mapping；ClassicNative 见 OSL-013）。
     /// </remarks>
     public static class OsuReplaySession
     {
@@ -77,10 +79,14 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
 
             beatmapProcessor?.PostProcess();
 
-            scoreProcessor.ApplyBeatmap(beatmap);
+            if (scoreProcessor is OsuScoreProcessor osuSp)
+                osuSp.JudgementTrackOverride = environment.OsuJudgementTrack;
 
-            if (score.ScoreInfo.IsLegacyScore)
+            if (score.ScoreInfo.IsLegacyScore || OsuClassicNativeScoring.ShouldUseLegacyScoreAlgorithm(environment.OsuJudgementTrack))
                 scoreProcessor.IsLegacyScore = true;
+
+            // ClassicNative 窗口在 OsuScoreProcessor.ApplyBeatmap 内注入（与 live Drawable 同路）。
+            scoreProcessor.ApplyBeatmap(beatmap);
 
             foreach (var mod in resolvedMods.OfType<IApplicableToScoreProcessor>())
                 mod.ApplyToScoreProcessor(scoreProcessor);

@@ -265,7 +265,7 @@ namespace osu.Game.EzOsuGame.HUD
         private void applyMissEvents(IEnumerable<HitEvent> events)
         {
             var missTimes = events
-                            .Where(e => e.Result == HitResult.Miss)
+                            .Where(e => e.Result.IsMiss() && e.Result != HitResult.IgnoreMiss)
                             .Select(e => e.HitObject.StartTime)
                             .ToList();
 

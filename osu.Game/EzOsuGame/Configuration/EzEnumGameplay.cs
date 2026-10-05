@@ -92,4 +92,16 @@ namespace osu.Game.EzOsuGame.Configuration
         // [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.JUDGE_PRECEDENCE_SCORE))]
         // Score = 3,
     }
+
+    /// <summary>
+    /// Osu 判定轨（OSL-013）。Lazer = 现行 Drawable/Shadow 语义；ClassicNative = stable 原生窗口/计分（进行中）。
+    /// </summary>
+    public enum EzEnumOsuJudgementTrack
+    {
+        [Description("Lazer")]
+        Lazer = 0,
+
+        [Description("Classic Native")]
+        ClassicNative = 1,
+    }
 }

@@ -79,6 +79,9 @@ namespace osu.Game.EzOsuGame.Scoring
             switch (timelineMode)
             {
                 case EzScoreRaceGhostTimelineMode.ManiaSession:
+                case EzScoreRaceGhostTimelineMode.OsuSession:
+                case EzScoreRaceGhostTimelineMode.TaikoSession:
+                case EzScoreRaceGhostTimelineMode.CatchSession:
                 {
                     var session = ruleset.CreateEzReplaySession();
 
@@ -90,24 +93,6 @@ namespace osu.Game.EzOsuGame.Scoring
 
                     // 本方法已在 Service 的后台 Task.Run 中串行执行；直接同步运行，
                     // 避免嵌套 Task.Run + GetResult 同步阻塞额外占用线程池线程。
-                    timeline = session.RunTimelineDirect(
-                        databasedScore,
-                        playableBeatmap,
-                        ReplayRunPurpose.ForLive,
-                        cancellationToken);
-                    break;
-                }
-
-                case EzScoreRaceGhostTimelineMode.OsuSession:
-                {
-                    var session = ruleset.CreateEzReplaySession();
-
-                    if (session == null)
-                    {
-                        timeline = null;
-                        break;
-                    }
-
                     timeline = session.RunTimelineDirect(
                         databasedScore,
                         playableBeatmap,
@@ -166,7 +151,9 @@ namespace osu.Game.EzOsuGame.Scoring
                     return $"{identity}|m|{modFp}|{beatmapFp}|hm{(int)environment.ManiaHitMode}|hh{(int)environment.ManiaHealthMode}|jp{(int)environment.JudgePrecedence}";
 
                 case EzScoreRaceGhostTimelineMode.OsuSession:
-                    return $"{identity}|m|{modFp}|{beatmapFp}|jp{(int)environment.JudgePrecedence}";
+                case EzScoreRaceGhostTimelineMode.TaikoSession:
+                case EzScoreRaceGhostTimelineMode.CatchSession:
+                    return $"{identity}|m|{modFp}|{beatmapFp}|jp{(int)environment.JudgePrecedence}|osuTrack:{(int)environment.OsuJudgementTrack}|offsetNM:{environment.OffsetPlusNonMania:F3}";
 
                 default:
                     return null;

@@ -597,6 +597,12 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString HIT_MODE = new EzLocalizationManager.EzLocalisableString("Mania 判定系统", "Mania Hit Mode");
 
+        public static readonly LocalisableString OSU_JUDGEMENT_TRACK = new EzLocalizationManager.EzLocalisableString("Osu 判定轨", "Osu Judgement Track");
+
+        public static readonly LocalisableString OSU_JUDGEMENT_TRACK_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Lazer = 现行判定窗口与计分；Classic Native = stable OD 窗口 + classic 总分算法（实验，Session/Drawable 同调）。",
+            "Lazer = current windows/scoring; Classic Native = stable OD windows + classic total score (experimental; Session/Drawable aligned).");
+
         public static readonly LocalisableString HIT_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             @"
 |  305 |  300 |  Good |   OK |  Meh |  Miss |   Poor |  MapTo |
