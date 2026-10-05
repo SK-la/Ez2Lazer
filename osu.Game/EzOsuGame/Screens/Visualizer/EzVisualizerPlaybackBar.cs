@@ -42,13 +42,13 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         private IconButton prevButton = null!;
         private IconButton playButton = null!;
         private IconButton nextButton = null!;
-        private IconButton shuffleButton = null!;
+        private IconButton loopButton = null!;
         private IconButton favouriteButton = null!;
         private IconButton jumpButton = null!;
         private IconButton playlistButton = null!;
         private Drawable controls = null!;
 
-        private readonly BindableBool shuffle = new BindableBool(true);
+        private readonly Bindable<MusicLoopMode> loopMode = new Bindable<MusicLoopMode>();
         private Bindable<bool> allowTrackControl = null!;
         private bool setInFavourites;
 
@@ -145,12 +145,12 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
                                         },
                                     }
                                 },
-                                shuffleButton = new MusicIconButton
+                                loopButton = new MusicIconButton
                                 {
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.Centre,
                                     Position = new Vector2(bar_height / 2, 0),
-                                    Action = shuffle.Toggle,
+                                    Action = () => musicController.CycleLoopMode(),
                                     Icon = FontAwesome.Solid.Random,
                                 },
                                 favouriteButton = new MusicIconButton
@@ -195,8 +195,8 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
             allowTrackControl = musicController.AllowTrackControl.GetBoundCopy();
             allowTrackControl.BindValueChanged(_ => Scheduler.AddOnce(updateEnabledStates), true);
 
-            shuffle.BindTo(musicController.Shuffle);
-            shuffle.BindValueChanged(s => shuffleButton.FadeColour(s.NewValue ? colours.Yellow : Color4.White, 200, Easing.OutQuint), true);
+            loopMode.BindTo(musicController.LoopMode);
+            loopMode.BindValueChanged(_ => updateLoopButton(), true);
 
             musicController.TrackChanged += onTrackChanged;
             Scheduler.AddOnce(updateFavouriteButtonState);
@@ -324,7 +324,31 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
             favouriteButton.Enabled.Value = !beatmapDisabled && !trackControlDisabled && !beatmap.IsDefault;
             jumpButton.Enabled.Value = !beatmapDisabled && !trackControlDisabled && !beatmap.IsDefault && game != null;
             playButton.Enabled.Value = !trackControlDisabled;
-            shuffleButton.Enabled.Value = !trackControlDisabled;
+            loopButton.Enabled.Value = !trackControlDisabled;
+        }
+
+        private void updateLoopButton()
+        {
+            switch (loopMode.Value)
+            {
+                case MusicLoopMode.Single:
+                    loopButton.Icon = FontAwesome.Solid.Redo;
+                    loopButton.FadeColour(colours.Yellow, 200, Easing.OutQuint);
+                    loopButton.TooltipText = @"单曲循环";
+                    break;
+
+                case MusicLoopMode.Sequential:
+                    loopButton.Icon = FontAwesome.Solid.Sync;
+                    loopButton.FadeColour(Color4.White, 200, Easing.OutQuint);
+                    loopButton.TooltipText = @"顺序循环";
+                    break;
+
+                default:
+                    loopButton.Icon = FontAwesome.Solid.Random;
+                    loopButton.FadeColour(colours.Yellow, 200, Easing.OutQuint);
+                    loopButton.TooltipText = @"随机循环";
+                    break;
+            }
         }
 
         protected override void Dispose(bool isDisposing)
