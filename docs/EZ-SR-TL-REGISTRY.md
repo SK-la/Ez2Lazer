@@ -152,12 +152,14 @@ Cache key 对**已解析** env 建键。
 | 何时必须要完整 Score | Graph Now、Parity 测试、跨源不变量（HitEvents 聚合 ≡ Statistics） |
 | 何时用 Timeline 而非 Score | 角逐 HUD 实时分；**禁止**用终局 `TotalScore` 充当时钟查询结果 |
 | Mania 能否 HitEvents→SP 建 Timeline | **禁止**（F/E 类）；Timeline 必须 replay 一遍 SP 快照 |
-| Osu 角逐 | Session 一遍 SP + **Shadow 桥**（OSL-010 ✓）；共用判官见 **OSL-011** |
+| Osu 角逐 | Session 一遍 SP；**OSL-011 毕业目标** = Mapping 引擎（删除 Shadow 生产路径）；OSL-010 仅桥归档 |
 
-### 1.7f 远期 / 开放
+### 1.7f 远期 / 开放（验收线 1）
 
-- Osu：**壳 + Shadow 桥 done**（OSL-001~010）；**Mapping 毕业 / env / ClassicNative open**（OSL-011~013）— 有 Session ≠ Mania 级能力
-- Taiko / Catch：Mapping 形态 Session（TTL/TSL）；**禁止**永久 Shadow 树
+- **Osu**：**壳 + OSL-010 桥归档**；**OSL-011 必达** = Session 生产路径不再经 `OsuReplayShadowEngine`，删除 `Shadow/*State`（cursor 可改名迁出）；OSL-012/013 继续推进。禁止「Sparse Shadow 够用」作为关闭条件。
+- **Taiko（TTL-001）**：Mapping Session + Race 已接线；深 parity + 原成绩全指标对齐仍 open。**禁止**永久 Shadow。
+- **Catch（TSL-001）**：Mapping Session + Race 已接线；**硬门禁** = Session ≡ 原成绩全指标（TotalScore / MaxCombo / Accuracy / Rank / Statistics 全键）。**禁止**永久 Shadow。
+- **Mania**：能力维持；Session 金标收敛 **另开**（不纳入本验收线）。
 ---
 
 ## §1.8 KPoor 与成绩重算（2026-07）
@@ -349,10 +351,12 @@ flowchart LR
 ### §4.2 Phase 3 范围备忘
 
 - **Osu Shadow 桥（OSL-010 ✓）** — `ReplayJudge/Shadow/`；Parity；**桥不是终态**。
-- **OSL-011** — 抽判定 helper，Drawable 一行，缩/删 ShadowState。
+- **OSL-011（验收线 1 必达）** — helper 同调 + **删除 Shadow 生产路径**（`*Shadow*State` / ShadowEngine）；非「抽完 helper 仍走 Shadow」。
 - **OSL-012** — Session 真读 `IGameplayEnvironment`；消费矩阵对齐 Mania。
 - **OSL-013** — ClassicNative 第二轨（修订原「三模式永不引入轨切换」）；计分 + parity。
-- **TTL / TSL** — Taiko / Catch Mapping 形态 Session；禁永久 Shadow。
+- **TTL-001** — Taiko Mapping；深 parity + 全指标。
+- **TSL-001** — Catch Mapping；**全指标 ≡ 原成绩** 硬门禁。
+- **Mania 金标收敛** — 另开，不在本 Phase 关闭。
 - **TL-021** — 动态变速 Mod ghost 时钟 — doc-only。
 
 ---
@@ -402,11 +406,11 @@ flowchart LR
 | OSL-008 | **done** | Osu | 删 `EzScoreTimelineHitEventsLegacy` + `RegisterHitEventFallback` |
 | OSL-009 | **done** | Osu | Generator 瘦身为 Session 委托 |
 | OSL-010 | **done**（bridge） | Osu | Shadow 桥 + Parity；**非** Mania 级终态 |
-| OSL-011 | **in progress** | Osu | Circle/Spinner/Slider body+follow helpers 已抽；Drawable Slider/Circle/Head 与 Shadow 同调。全量删 ShadowState 仍 open |
+| OSL-011 | **in progress** | Osu | helpers 部分抽出；**关闭条件** = 非 Shadow 引擎生产 + 删除 `Shadow/*State`（cursor 可迁出改名）。禁止 Sparse Shadow 停留关闭 |
 | OSL-012 | **in progress** | Osu | `OffsetPlusNonMania` + `OsuJudgementTrack` 进 env/Session/Race cache；SongProgress `IsMiss`；Graph/Panel 矩阵复核仍 open |
 | OSL-013 | **in progress** | Osu | ClassicNative：窗口注入 Drawable+Session（`OsuScoreProcessor.ApplyBeatmap`）+ `IsLegacyScore`；设置项已挂；stable 总分细节 / 两轨 parity 仍 open |
-| TTL-001 | **in progress** | Taiko | Hit + DrumRoll tick + Swell 交替按键 Session；Race/Builder 已接线；深 parity 仍 open |
-| TSL-001 | **in progress** | Catch | Mapping 形态 Session bootstrap（水果接盘）；Race/Builder 已接线 |
+| TTL-001 | **in progress** | Taiko | Mapping Session + Race 已接线；关闭条件 = 深 parity + 原成绩全指标 |
+| TSL-001 | **in progress** | Catch | Mapping Session + Race 已接线；**关闭条件** = Session ≡ 原成绩全指标（含 Statistics 全键） |
 
 ---
 
