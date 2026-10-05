@@ -9,8 +9,10 @@ using osu.Framework.Input.Events;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
 using osu.Game.Screens.Play;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Screens.Visualizer
@@ -20,6 +22,13 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         public override bool HideOverlaysOnEnter => true;
 
         public override bool? AllowGlobalTrackControl => true;
+
+        protected override bool InitialBackButtonVisibility => false;
+
+        /// <summary>
+        /// Slightly larger than the legacy back button so the cursor can move onto it without hiding.
+        /// </summary>
+        private static readonly Vector2 back_reveal_size = TwoLayerButton.SIZE_EXTENDED + new Vector2(48, 48);
 
         private readonly Bindable<WorkingBeatmap> beatmap = new Bindable<WorkingBeatmap>();
 
@@ -44,6 +53,27 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
             });
         }
 
+        protected override void Update()
+        {
+            base.Update();
+
+            if (!this.IsCurrentScreen())
+                return;
+
+            var inputManager = GetContainingInputManager();
+            if (inputManager == null)
+                return;
+
+            var mouse = inputManager.CurrentState.Mouse.Position;
+            var quad = ScreenSpaceDrawQuad;
+
+            bool nearBackCorner = mouse.X <= quad.TopLeft.X + back_reveal_size.X
+                                  && mouse.Y >= quad.BottomLeft.Y - back_reveal_size.Y;
+
+            if (BackButtonVisibility.Value != nearBackCorner)
+                BackButtonVisibility.Value = nearBackCorner;
+        }
+
         public override void OnEntering(ScreenTransitionEvent e)
         {
             base.OnEntering(e);
@@ -61,6 +91,8 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
 
         public override bool OnExiting(ScreenExitEvent e)
         {
+            BackButtonVisibility.Value = false;
+
             this.FadeOut(250, Easing.OutQuint);
 
             ApplyToBackground(b => b.FadeColour(Color4.White, 250, Easing.OutQuint));
