@@ -145,8 +145,6 @@ namespace osu.Game.EzOsuGame.Overlays
                     Keywords = new[] { "ez", "skip", "empty", "column" }
                 },
                 new EzScratchAxisSettings(),
-                // 转盘选曲（常规 song select），紧跟在转盘设置下方
-                new EzScratchAxisSongSelectSettings(),
             };
 
             maniaHealthModeBindable.BindValueChanged(e =>

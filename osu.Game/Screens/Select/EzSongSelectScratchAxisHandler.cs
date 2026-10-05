@@ -66,7 +66,7 @@ namespace osu.Game.Screens.Select
             // 注意：GetBindable 返回的是弱绑定的副本，必须用字段持有强引用，
             // 否则 load 结束后副本被 GC 回收、绑定断开（表现为「设置只在启动时读一次」）。
             ez2Ac10K2S1P = ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
-            invert = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisSongSelectInvert);
+            invert = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisInvert);
             leftBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisL);
             rightBinding = ezConfig.GetBindable<string>(Ez2Setting.ScratchAxisR);
 

@@ -563,15 +563,19 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SCRATCH_AXIS_STATUS_CCW = new EzLocalizationManager.EzLocalisableString("状态：逆时针（按下）", "Status: Counter-clockwise (pressed)");
 
-        public static readonly LocalisableString SCRATCH_AXIS_SONGSELECT_INVERT = new EzLocalizationManager.EzLocalisableString(
-            "反转转动方向",
-            "Invert spin direction");
+        public static readonly LocalisableString SCRATCH_AXIS_INVERT = new EzLocalizationManager.EzLocalisableString(
+            "反转转盘方向",
+            "Invert turntable direction");
 
-        public static readonly LocalisableString SCRATCH_AXIS_SONGSELECT_INVERT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "转盘选曲随「使用 Ez2Ac 10k2s1p」开关启用（每格 1/24 圈）：在常规选歌界面转动 L/R 转盘即可逐格切换谱面。"
-            + "\n默认顺时针 = 下一首、逆时针 = 上一首；开启本项后反转。",
-            "Turntable selection follows the \"Use Ez2Ac 10k2s1p\" toggle (1/24 turn per step): in solo song select, spin the L/R turntable to step through beatmaps."
-            + "\nBy default clockwise = next and counter-clockwise = previous; enable this to invert.");
+        public static readonly LocalisableString SCRATCH_AXIS_INVERT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后交换转盘顺/逆时针的含义："
+            + "\n• Catch：逆时针 = 右移、顺时针 = 左移（默认为逆时针左、顺时针右）。"
+            + "\n• 选歌界面：逆时针 = 下一首、顺时针 = 上一首。"
+            + "\n• Mania 顺逆均视为按下，不受影响。",
+            "When enabled, swaps the clockwise / counter-clockwise meaning of the turntable:"
+            + "\n• Catch: CCW = move right, CW = move left (default is CCW left / CW right)."
+            + "\n• Song select: CCW = next, CW = previous."
+            + "\n• Mania treats both directions as presses, so it is unaffected.");
 
         public static readonly LocalisableString SKIP_WITH_GAMEPLAY_KEYS = new EzLocalizationManager.EzLocalisableString(
             "跳过可由游戏按键触发",
