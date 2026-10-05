@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Catch.EzCatch.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Catch.Judgements;
 using osu.Game.Rulesets.Catch.Objects;
 using osu.Game.Rulesets.Catch.Replays;
@@ -20,7 +21,7 @@ using osu.Game.Utils;
 namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
 {
     /// <summary>
-    /// Catch Session（TSL-001 bootstrap）：按 replay 插值接盘位置判定可接水果；其余到期 Miss。
+    /// Catch Session（TSL-001）：Mapping 形态；接盘与 <see cref="CatchPlateJudgement"/> / Drawable 同调；按判定时钟序 ApplyResult。
     /// </summary>
     public static class CatchReplaySession
     {
@@ -66,88 +67,63 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
             double gameplayRate = ModUtils.CalculateRateWithMods(resolvedMods);
             recorder?.RecordInitial(scoreProcessor, gameplayRate);
 
-            float catchWidth = Catcher.CalculateCatchWidth(beatmap.Difficulty);
-            float halfWidth = catchWidth * 0.5f;
+            float halfWidth = Catcher.CalculateCatchWidth(beatmap.Difficulty) * 0.5f;
             double inputOffset = environment.OffsetPlusNonMania;
 
             var frames = score.Replay.Frames.OfType<CatchReplayFrame>().OrderBy(f => f.Time).ToList();
-            var judged = new HashSet<HitObject>();
 
-            foreach (var hitObject in beatmap.HitObjects)
-                judgeTree(hitObject, frames, halfWidth, inputOffset, scoreProcessor, gameplayRate, recorder, judged, cancellationToken);
+            // Session 无 live Scratch 轴：assist=false（与默认键盘局同窗）。
+            double earlyMs = CatchScratchJudgmentWindow.EarlyWindow(assist: false);
+            double lateMs = CatchScratchJudgmentWindow.LateWindow(assist: false);
+
+            var events = new List<(double Time, HitObject HitObject, HitResult Result)>();
+            collectJudgements(beatmap.HitObjects, frames, halfWidth, earlyMs, lateMs, events, cancellationToken);
+            events.Sort((a, b) =>
+            {
+                int cmp = a.Time.CompareTo(b.Time);
+                return cmp != 0 ? cmp : a.HitObject.NestedHitObjects.Count.CompareTo(b.HitObject.NestedHitObjects.Count);
+            });
+
+            foreach (var (time, hitObject, result) in events)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                apply(hitObject, result, time, scoreProcessor, gameplayRate, inputOffset, recorder);
+            }
 
             return (scoreProcessor, recorder?.Build());
         }
 
-        private static void judgeTree(
-            HitObject hitObject,
+        private static void collectJudgements(
+            IEnumerable<HitObject> hitObjects,
             IReadOnlyList<CatchReplayFrame> frames,
             float halfCatchWidth,
-            double inputOffset,
-            ScoreProcessor scoreProcessor,
-            double gameplayRate,
-            EzReplayTimelineRecorder? recorder,
-            HashSet<HitObject> judged,
+            double earlyMs,
+            double lateMs,
+            List<(double Time, HitObject HitObject, HitResult Result)> events,
             CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (hitObject is PalpableCatchHitObject fruit && !judged.Contains(fruit) && fruit.Judgement.MaxResult != HitResult.IgnoreHit)
+            foreach (var hitObject in hitObjects)
             {
-                // Drawable：timeOffset>=0 开始检、>0 才 Miss。近似下一帧 Update（~1ms）再给一次机会。
-                bool caught = isCaughtAt(fruit, frames, halfCatchWidth, fruit.StartTime)
-                              || isCaughtAt(fruit, frames, halfCatchWidth, fruit.StartTime + 1);
-                apply(fruit, caught ? fruit.Judgement.MaxResult : fruit.Judgement.MinResult, fruit.StartTime, scoreProcessor, gameplayRate, inputOffset, recorder);
-                judged.Add(fruit);
-            }
-            else if (!judged.Contains(hitObject) && hitObject is JuiceStream or BananaShower)
-            {
-                // Drawable：CanCatch 对非 Palpable 恒 false → ApplyMinResult（IgnoreMiss）。
-                apply(hitObject, hitObject.Judgement.MinResult, hitObject.GetEndTime(), scoreProcessor, gameplayRate, inputOffset, recorder);
-                judged.Add(hitObject);
-            }
-            else if (!judged.Contains(hitObject) && hitObject.Judgement.MaxResult != HitResult.IgnoreHit)
-            {
-                apply(hitObject, hitObject.Judgement.MinResult, hitObject.GetEndTime(), scoreProcessor, gameplayRate, inputOffset, recorder);
-                judged.Add(hitObject);
-            }
+                cancellationToken.ThrowIfCancellationRequested();
 
-            foreach (var nested in hitObject.NestedHitObjects)
-                judgeTree(nested, frames, halfCatchWidth, inputOffset, scoreProcessor, gameplayRate, recorder, judged, cancellationToken);
-        }
-
-        private static bool isCaughtAt(
-            PalpableCatchHitObject fruit,
-            IReadOnlyList<CatchReplayFrame> frames,
-            float halfCatchWidth,
-            double time)
-        {
-            float catcherX = interpolateCatcherX(frames, time);
-            return fruit.EffectiveX >= catcherX - halfCatchWidth && fruit.EffectiveX <= catcherX + halfCatchWidth;
-        }
-
-        private static float interpolateCatcherX(IReadOnlyList<CatchReplayFrame> frames, double time)
-        {
-            if (frames.Count == 0)
-                return 0;
-
-            if (time <= frames[0].Time)
-                return frames[0].Position;
-
-            for (int i = 1; i < frames.Count; i++)
-            {
-                if (time <= frames[i].Time)
+                if (hitObject is PalpableCatchHitObject fruit && fruit.Judgement.MaxResult != HitResult.IgnoreHit)
                 {
-                    double span = frames[i].Time - frames[i - 1].Time;
-                    if (span <= 0)
-                        return frames[i].Position;
-
-                    float t = (float)((time - frames[i - 1].Time) / span);
-                    return frames[i - 1].Position + (frames[i].Position - frames[i - 1].Position) * t;
+                    bool caught = CatchPlateJudgement.IsCaughtInWindow(fruit, frames, halfCatchWidth, earlyMs, lateMs);
+                    events.Add((fruit.StartTime, fruit, caught ? fruit.Judgement.MaxResult : fruit.Judgement.MinResult));
                 }
-            }
+                else if (hitObject is JuiceStream or BananaShower)
+                {
+                    // Drawable：CanCatch 对非 Palpable 恒 false → ApplyMinResult（IgnoreMiss），时刻为 EndTime。
+                    events.Add((hitObject.GetEndTime(), hitObject, hitObject.Judgement.MinResult));
+                }
+                else if (hitObject.Judgement.MaxResult != HitResult.IgnoreHit)
+                {
+                    events.Add((hitObject.GetEndTime(), hitObject, hitObject.Judgement.MinResult));
+                }
 
-            return frames[^1].Position;
+                if (hitObject.NestedHitObjects.Count > 0)
+                    collectJudgements(hitObject.NestedHitObjects, frames, halfCatchWidth, earlyMs, lateMs, events, cancellationToken);
+            }
         }
 
         private static void apply(
