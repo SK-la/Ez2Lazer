@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Screens;
@@ -11,12 +12,14 @@ using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
+using osu.Game.Overlays.Music;
 using osu.Game.Screens.Play;
 using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Screens.Visualizer
 {
+    [Cached]
     public partial class EzVisualizerScreen : ScreenWithBeatmapBackground, IKeyBindingHandler<GlobalAction>
     {
         public override bool HideOverlaysOnEnter => true;
@@ -30,14 +33,32 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         /// </summary>
         private static readonly Vector2 back_reveal_size = TwoLayerButton.SIZE_EXTENDED + new Vector2(48, 48);
 
+        private const float playlist_width = 400;
+
         private readonly Bindable<WorkingBeatmap> beatmap = new Bindable<WorkingBeatmap>();
+
+        private PlaylistOverlay playlist = null!;
 
         [BackgroundDependencyLoader]
         private void load()
         {
-            // Stage already uses Centre/Centre; do not also offset by RelativePosition 0.5
-            // (that double-shifts it toward the bottom-right).
-            InternalChild = new EzVisualizerStage();
+            InternalChildren = new Drawable[]
+            {
+                new EzVisualizerStage(),
+                new Container
+                {
+                    Anchor = Anchor.CentreRight,
+                    Origin = Anchor.CentreRight,
+                    Width = playlist_width,
+                    Height = PlaylistOverlay.PLAYLIST_HEIGHT,
+                    Margin = new MarginPadding { Right = 24 },
+                    Masking = true,
+                    Child = playlist = new PlaylistOverlay
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                    }
+                },
+            };
         }
 
         protected override void LoadComplete()
@@ -52,6 +73,16 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
                 ApplyToBackground(bg => bg.Beatmap = b.NewValue);
             });
         }
+
+        public void TogglePlaylist()
+        {
+            if (Beatmap.Disabled)
+                return;
+
+            playlist.ToggleVisibility();
+        }
+
+        public IBindable<Visibility> PlaylistState => playlist.State;
 
         protected override void Update()
         {
@@ -91,6 +122,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
 
         public override bool OnExiting(ScreenExitEvent e)
         {
+            playlist.Hide();
             BackButtonVisibility.Value = false;
 
             this.FadeOut(250, Easing.OutQuint);
@@ -105,6 +137,12 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
             switch (e.Action)
             {
                 case GlobalAction.Back:
+                    if (playlist.State.Value == Visibility.Visible)
+                    {
+                        playlist.Hide();
+                        return true;
+                    }
+
                     this.Exit();
                     return true;
             }

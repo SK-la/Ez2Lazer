@@ -71,7 +71,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         private OsuGame? game { get; set; }
 
         [Resolved(canBeNull: true)]
-        private NowPlayingOverlay? nowPlayingOverlay { get; set; }
+        private EzVisualizerScreen? visualizerScreen { get; set; }
 
         public EzVisualizerPlaybackBar()
         {
@@ -82,7 +82,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         [BackgroundDependencyLoader]
         private void load()
         {
-            InternalChildren = new Drawable[]
+            InternalChildren = new[]
             {
                 // Always-present full-area target: hover anywhere in the bar region shows controls.
                 new Box
@@ -177,7 +177,8 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
                                     Anchor = Anchor.CentreRight,
                                     Position = new Vector2(-bar_height / 2, 0),
                                     Icon = FontAwesome.Solid.Bars,
-                                    Action = () => nowPlayingOverlay?.ToggleVisibility(),
+                                    Action = () => visualizerScreen?.TogglePlaylist(),
+                                    TooltipText = @"Playlist",
                                 },
                             }
                         }
@@ -197,6 +198,9 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
 
             loopMode.BindTo(musicController.LoopMode);
             loopMode.BindValueChanged(_ => updateLoopButton(), true);
+
+            visualizerScreen?.PlaylistState.BindValueChanged(s =>
+                playlistButton.FadeColour(s.NewValue == Visibility.Visible ? colours.Yellow : Color4.White, 200, Easing.OutQuint), true);
 
             musicController.TrackChanged += onTrackChanged;
             Scheduler.AddOnce(updateFavouriteButtonState);
