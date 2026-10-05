@@ -11,6 +11,7 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Taiko.Objects;
 using osu.Game.Rulesets.Taiko.Replays;
 using osu.Game.Scoring;
@@ -19,8 +20,8 @@ using osu.Game.Utils;
 namespace osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge
 {
     /// <summary>
-    /// Taiko Session（TTL-001 bootstrap）：Hit 按键判定 + 其余对象到期 Miss。
-    /// Mapping 形态入口；DrumRoll/Swell 完整状态机仍 open（非永久 Shadow 树）。
+    /// Taiko Session（TTL-001）：Hit + DrumRoll tick + Swell 交替按键；其余到期 Miss。
+    /// Mapping 形态入口；非永久 Shadow 树。
     /// </summary>
     public static class TaikoReplaySession
     {
@@ -130,10 +131,7 @@ namespace osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge
             CancellationToken cancellationToken)
         {
             var frames = score.Replay.Frames.OfType<TaikoReplayFrame>().OrderBy(f => f.Time).ToList();
-            var hits = beatmap.HitObjects.OfType<Hit>().OrderBy(h => h.StartTime).ToList();
             var judged = new HashSet<HitObject>();
-            int hitIndex = 0;
-
             var pressTimes = new List<(double Time, TaikoAction Action)>();
 
             for (int i = 0; i < frames.Count; i++)
@@ -146,9 +144,35 @@ namespace osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge
                 }
             }
 
-            foreach (var (time, action) in pressTimes)
+            var pressUsed = new bool[pressTimes.Count];
+
+            judgeHits(beatmap, pressTimes, pressUsed, judged, scoreProcessor, gameplayRate, inputOffset, recorder, cancellationToken);
+            judgeDrumRolls(beatmap, pressTimes, pressUsed, judged, scoreProcessor, gameplayRate, inputOffset, recorder, cancellationToken);
+            judgeSwells(beatmap, pressTimes, pressUsed, judged, scoreProcessor, gameplayRate, inputOffset, recorder, cancellationToken);
+
+            foreach (var hitObject in beatmap.HitObjects)
+                missTree(hitObject, judged, scoreProcessor, gameplayRate, inputOffset, recorder);
+        }
+
+        private static void judgeHits(
+            IBeatmap beatmap,
+            List<(double Time, TaikoAction Action)> pressTimes,
+            bool[] pressUsed,
+            HashSet<HitObject> judged,
+            ScoreProcessor scoreProcessor,
+            double gameplayRate,
+            double inputOffset,
+            EzReplayTimelineRecorder? recorder,
+            CancellationToken cancellationToken)
+        {
+            var hits = beatmap.HitObjects.OfType<Hit>().OrderBy(h => h.StartTime).ToList();
+            int hitIndex = 0;
+
+            for (int p = 0; p < pressTimes.Count; p++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (pressUsed[p])
+                    continue;
 
                 while (hitIndex < hits.Count && judged.Contains(hits[hitIndex]))
                     hitIndex++;
@@ -156,6 +180,7 @@ namespace osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge
                 if (hitIndex >= hits.Count)
                     break;
 
+                var (time, action) = pressTimes[p];
                 var hit = hits[hitIndex];
                 double missWindow = hit.HitWindows?.WindowFor(HitResult.Miss) ?? 0;
 
@@ -167,6 +192,7 @@ namespace osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge
                     TaikoReplaySession.apply(hit, HitResult.Miss, hit.StartTime + missWindow, scoreProcessor, gameplayRate, inputOffset, recorder);
                     judged.Add(hit);
                     hitIndex++;
+                    p--;
                     continue;
                 }
 
@@ -185,11 +211,161 @@ namespace osu.Game.Rulesets.Taiko.EzTaiko.ReplayJudge
 
                 TaikoReplaySession.apply(hit, result, time, scoreProcessor, gameplayRate, inputOffset, recorder);
                 judged.Add(hit);
+                pressUsed[p] = true;
                 hitIndex++;
             }
+        }
 
-            foreach (var hitObject in beatmap.HitObjects)
-                missTree(hitObject, judged, scoreProcessor, gameplayRate, inputOffset, recorder);
+        private static void judgeDrumRolls(
+            IBeatmap beatmap,
+            List<(double Time, TaikoAction Action)> pressTimes,
+            bool[] pressUsed,
+            HashSet<HitObject> judged,
+            ScoreProcessor scoreProcessor,
+            double gameplayRate,
+            double inputOffset,
+            EzReplayTimelineRecorder? recorder,
+            CancellationToken cancellationToken)
+        {
+            foreach (var roll in beatmap.HitObjects.OfType<DrumRoll>().OrderBy(r => r.StartTime))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                foreach (var tick in roll.NestedHitObjects.OfType<DrumRollTick>().OrderBy(t => t.StartTime))
+                {
+                    if (judged.Contains(tick))
+                        continue;
+
+                    int pressIndex = findTickPress(pressTimes, pressUsed, tick.StartTime, tick.HitWindow);
+                    bool hit = pressIndex >= 0;
+
+                    if (hit)
+                        pressUsed[pressIndex] = true;
+
+                    HitResult tickResult = TaikoRollingJudgement.TickResult(hit, tick.Judgement.MaxResult, tick.Judgement.MinResult);
+                    double clock = hit ? pressTimes[pressIndex].Time : tick.StartTime + tick.HitWindow;
+                    TaikoReplaySession.apply(tick, tickResult, clock, scoreProcessor, gameplayRate, inputOffset, recorder);
+                    judged.Add(tick);
+
+                    foreach (var nested in tick.NestedHitObjects)
+                    {
+                        if (judged.Contains(nested))
+                            continue;
+
+                        HitResult nestedResult = TaikoRollingJudgement.StrongNestedResult(hit, nested.Judgement.MaxResult, nested.Judgement.MinResult);
+                        TaikoReplaySession.apply(nested, nestedResult, clock, scoreProcessor, gameplayRate, inputOffset, recorder);
+                        judged.Add(nested);
+                    }
+                }
+
+                if (!judged.Contains(roll))
+                {
+                    // DrawableDrumRoll：结束后恒 ApplyMaxResult（DisplayResult=false，计分靠 tick）。
+                    TaikoReplaySession.apply(roll, roll.Judgement.MaxResult, roll.EndTime, scoreProcessor, gameplayRate, inputOffset, recorder);
+                    judged.Add(roll);
+                }
+
+                foreach (var nested in roll.NestedHitObjects)
+                {
+                    if (nested is DrumRollTick || judged.Contains(nested))
+                        continue;
+
+                    HitResult nestedResult = TaikoRollingJudgement.StrongNestedResult(true, nested.Judgement.MaxResult, nested.Judgement.MinResult);
+                    TaikoReplaySession.apply(nested, nestedResult, roll.EndTime, scoreProcessor, gameplayRate, inputOffset, recorder);
+                    judged.Add(nested);
+                }
+            }
+        }
+
+        private static void judgeSwells(
+            IBeatmap beatmap,
+            List<(double Time, TaikoAction Action)> pressTimes,
+            bool[] pressUsed,
+            HashSet<HitObject> judged,
+            ScoreProcessor scoreProcessor,
+            double gameplayRate,
+            double inputOffset,
+            EzReplayTimelineRecorder? recorder,
+            CancellationToken cancellationToken)
+        {
+            foreach (var swell in beatmap.HitObjects.OfType<Swell>().OrderBy(s => s.StartTime))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var ticks = swell.NestedHitObjects.OfType<SwellTick>().ToList();
+                int hitCount = 0;
+                bool? lastWasCentre = null;
+
+                for (int p = 0; p < pressTimes.Count && hitCount < swell.RequiredHits; p++)
+                {
+                    if (pressUsed[p])
+                        continue;
+
+                    var (time, action) = pressTimes[p];
+                    if (time < swell.StartTime || time > swell.EndTime)
+                        continue;
+
+                    bool isCentre = TaikoRollingJudgement.IsCentreAction(action);
+                    if (!TaikoRollingJudgement.IsValidSwellPress(isCentre, lastWasCentre, mustAlternate: true))
+                        continue;
+
+                    lastWasCentre = isCentre;
+                    pressUsed[p] = true;
+
+                    if (hitCount < ticks.Count && !judged.Contains(ticks[hitCount]))
+                    {
+                        TaikoReplaySession.apply(ticks[hitCount], ticks[hitCount].Judgement.MaxResult, time, scoreProcessor, gameplayRate, inputOffset, recorder);
+                        judged.Add(ticks[hitCount]);
+                    }
+
+                    hitCount++;
+                }
+
+                for (int i = hitCount; i < ticks.Count; i++)
+                {
+                    if (judged.Contains(ticks[i]))
+                        continue;
+
+                    TaikoReplaySession.apply(ticks[i], ticks[i].Judgement.MinResult, swell.EndTime, scoreProcessor, gameplayRate, inputOffset, recorder);
+                    judged.Add(ticks[i]);
+                }
+
+                if (!judged.Contains(swell))
+                {
+                    HitResult body = TaikoRollingJudgement.SwellBodyResult(
+                        hitCount, swell.RequiredHits, swell.Judgement.MaxResult, swell.Judgement.MinResult);
+                    TaikoReplaySession.apply(swell, body, swell.EndTime, scoreProcessor, gameplayRate, inputOffset, recorder);
+                    judged.Add(swell);
+                }
+            }
+        }
+
+        private static int findTickPress(
+            List<(double Time, TaikoAction Action)> pressTimes,
+            bool[] pressUsed,
+            double tickStartTime,
+            double hitWindow)
+        {
+            int best = -1;
+            double bestDelta = double.MaxValue;
+
+            for (int i = 0; i < pressTimes.Count; i++)
+            {
+                if (pressUsed[i])
+                    continue;
+
+                if (!TaikoRollingJudgement.IsTickHit(pressTimes[i].Time, tickStartTime, hitWindow))
+                    continue;
+
+                double delta = Math.Abs(pressTimes[i].Time - tickStartTime);
+                if (delta < bestDelta)
+                {
+                    bestDelta = delta;
+                    best = i;
+                }
+            }
+
+            return best;
         }
 
         private static void missTree(

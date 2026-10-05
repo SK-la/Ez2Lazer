@@ -6,11 +6,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
+using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Utils;
@@ -80,13 +79,14 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
 
             beatmapProcessor?.PostProcess();
 
-            scoreProcessor.ApplyBeatmap(beatmap);
+            if (scoreProcessor is OsuScoreProcessor osuSp)
+                osuSp.JudgementTrackOverride = environment.OsuJudgementTrack;
 
             if (score.ScoreInfo.IsLegacyScore || OsuClassicNativeScoring.ShouldUseLegacyScoreAlgorithm(environment.OsuJudgementTrack))
                 scoreProcessor.IsLegacyScore = true;
 
-            if (environment.OsuJudgementTrack == EzEnumOsuJudgementTrack.ClassicNative)
-                applyClassicNativeHitWindows(beatmap);
+            // ClassicNative 窗口在 OsuScoreProcessor.ApplyBeatmap 内注入（与 live Drawable 同路）。
+            scoreProcessor.ApplyBeatmap(beatmap);
 
             foreach (var mod in resolvedMods.OfType<IApplicableToScoreProcessor>())
                 mod.ApplyToScoreProcessor(scoreProcessor);
@@ -103,27 +103,6 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
             OsuReplaySessionSimulator.Simulate(score, beatmap, environment, scoreProcessor, gameplayRate, recorder, cancellationToken);
 
             return (scoreProcessor, recorder?.Build());
-        }
-
-        private static void applyClassicNativeHitWindows(IBeatmap beatmap)
-        {
-            double od = beatmap.Difficulty.OverallDifficulty;
-
-            foreach (var hitObject in beatmap.HitObjects)
-                applyClassicNativeHitWindowsRecursive(hitObject, od);
-        }
-
-        private static void applyClassicNativeHitWindowsRecursive(HitObject hitObject, double overallDifficulty)
-        {
-            if (hitObject.HitWindows != null && !ReferenceEquals(hitObject.HitWindows, HitWindows.Empty))
-            {
-                var classic = new OsuClassicNativeHitWindows();
-                classic.SetDifficulty(overallDifficulty);
-                hitObject.HitWindows = classic;
-            }
-
-            foreach (var nested in hitObject.NestedHitObjects)
-                applyClassicNativeHitWindowsRecursive(nested, overallDifficulty);
         }
     }
 }

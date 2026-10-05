@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Catch.Judgements;
 using osu.Game.Rulesets.Catch.Objects;
 using osu.Game.Rulesets.Catch.Replays;
 using osu.Game.Rulesets.Catch.UI;
@@ -68,12 +69,13 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
 
             float catchWidth = Catcher.CalculateCatchWidth(beatmap.Difficulty);
             float halfWidth = catchWidth * 0.5f;
+            double inputOffset = environment.OffsetPlusNonMania;
 
             var frames = score.Replay.Frames.OfType<CatchReplayFrame>().OrderBy(f => f.Time).ToList();
             var judged = new HashSet<HitObject>();
 
             foreach (var hitObject in beatmap.HitObjects)
-                judgeTree(hitObject, frames, halfWidth, scoreProcessor, gameplayRate, recorder, judged, cancellationToken);
+                judgeTree(hitObject, frames, halfWidth, inputOffset, scoreProcessor, gameplayRate, recorder, judged, cancellationToken);
 
             return (scoreProcessor, recorder?.Build());
         }
@@ -82,6 +84,7 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
             HitObject hitObject,
             IReadOnlyList<CatchReplayFrame> frames,
             float halfCatchWidth,
+            double inputOffset,
             ScoreProcessor scoreProcessor,
             double gameplayRate,
             EzReplayTimelineRecorder? recorder,
@@ -94,17 +97,23 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
             {
                 float catcherX = interpolateCatcherX(frames, fruit.StartTime);
                 bool caught = fruit.EffectiveX >= catcherX - halfCatchWidth && fruit.EffectiveX <= catcherX + halfCatchWidth;
-                apply(fruit, caught ? HitResult.Great : HitResult.Miss, fruit.StartTime, scoreProcessor, gameplayRate, recorder);
+                apply(fruit, caught ? fruit.Judgement.MaxResult : fruit.Judgement.MinResult, fruit.StartTime, scoreProcessor, gameplayRate, inputOffset, recorder);
                 judged.Add(fruit);
             }
-            else if (!judged.Contains(hitObject) && hitObject.Judgement.MaxResult != HitResult.IgnoreHit && hitObject is not JuiceStream && hitObject is not BananaShower)
+            else if (!judged.Contains(hitObject) && hitObject is JuiceStream or BananaShower)
             {
-                apply(hitObject, HitResult.Miss, hitObject.GetEndTime(), scoreProcessor, gameplayRate, recorder);
+                // Drawable：CanCatch 对非 Palpable 恒 false → ApplyMinResult（IgnoreMiss）。
+                apply(hitObject, hitObject.Judgement.MinResult, hitObject.GetEndTime(), scoreProcessor, gameplayRate, inputOffset, recorder);
+                judged.Add(hitObject);
+            }
+            else if (!judged.Contains(hitObject) && hitObject.Judgement.MaxResult != HitResult.IgnoreHit)
+            {
+                apply(hitObject, hitObject.Judgement.MinResult, hitObject.GetEndTime(), scoreProcessor, gameplayRate, inputOffset, recorder);
                 judged.Add(hitObject);
             }
 
             foreach (var nested in hitObject.NestedHitObjects)
-                judgeTree(nested, frames, halfCatchWidth, scoreProcessor, gameplayRate, recorder, judged, cancellationToken);
+                judgeTree(nested, frames, halfCatchWidth, inputOffset, scoreProcessor, gameplayRate, recorder, judged, cancellationToken);
         }
 
         private static float interpolateCatcherX(IReadOnlyList<CatchReplayFrame> frames, double time)
@@ -137,10 +146,11 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
             double judgementClockTime,
             ScoreProcessor scoreProcessor,
             double gameplayRate,
+            double inputOffset,
             EzReplayTimelineRecorder? recorder)
         {
-            var judgementResult = new JudgementResult(hitObject, hitObject.Judgement) { Type = result };
-            double timeOffset = Math.Min(judgementClockTime - hitObject.GetEndTime(), hitObject.MaximumJudgementOffset);
+            var judgementResult = new CatchJudgementResult(hitObject, hitObject.Judgement) { Type = result };
+            double timeOffset = Math.Min(judgementClockTime - hitObject.GetEndTime() + inputOffset, hitObject.MaximumJudgementOffset);
             JudgementResultTimingHelper.ApplyTiming(judgementResult, timeOffset, gameplayRate);
             scoreProcessor.ApplyResult(judgementResult);
             recorder?.Record(scoreProcessor, judgementClockTime, gameplayRate);

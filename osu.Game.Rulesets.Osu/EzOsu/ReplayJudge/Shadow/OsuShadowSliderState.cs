@@ -10,14 +10,13 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.Objects;
-using osu.Game.Rulesets.Osu.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 
 namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
 {
     /// <summary>
-    /// Slider 影子状态：移植 <see cref="SliderInputManager"/> head/nested/tracking 逻辑。
+    /// Slider 影子状态：移植 SliderInputManager head/nested/tracking 逻辑（OSL-011 抽 helper 中）。
     /// </summary>
     internal sealed class OsuShadowSliderState
     {
@@ -142,7 +141,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
 
         private void applyHeadMiss(double judgementTime, JudgementApplier apply)
         {
-            HitResult result = head.ClassicSliderBehaviour ? HitResult.LargeTickMiss : HitResult.Miss;
+            HitResult result = OsuSliderJudgement.HeadMissResult(head.ClassicSliderBehaviour);
             applyJudgement(head, result, judgementTime, null, apply);
             markJudged(head, result);
         }
@@ -188,28 +187,8 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
 
         private void tryJudgeNestedObject(HitObject nestedObject, double startOffset, double judgementTime, JudgementApplier apply)
         {
-            switch (nestedObject)
-            {
-                case SliderRepeat:
-                case SliderTick:
-                    if (startOffset < 0)
-                        return;
-
-                    break;
-
-                case SliderTailCircle:
-                    if (startOffset < SliderEventGenerator.TAIL_LENIENCY)
-                        return;
-
-                    var lastTick = nestedInOrder.LastOrDefault(o => o is SliderTick or SliderRepeat);
-                    if (lastTick != null && !isJudged(lastTick))
-                        return;
-
-                    break;
-
-                default:
-                    return;
-            }
+            if (!OsuSliderJudgement.CanJudgeNestedAtOffset(nestedObject, startOffset, isJudged, nestedInOrder))
+                return;
 
             if (!isJudged(head))
                 return;
@@ -233,31 +212,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
         private void applySliderBodyJudgement(double judgementTime, JudgementApplier apply)
         {
             sliderBodyJudged = true;
-
-            HitResult result;
-
-            if (slider.ClassicSliderBehaviour)
-            {
-                int totalTicks = slider.NestedHitObjects.Count;
-                int hitTicks = slider.NestedHitObjects.Count(h => results.TryGetValue(h, out HitResult nestedResult) && nestedResult.IsHit());
-
-                if (hitTicks == totalTicks)
-                    result = HitResult.Great;
-                else if (hitTicks == 0)
-                    result = HitResult.Miss;
-                else
-                {
-                    double hitFraction = (double)hitTicks / totalTicks;
-                    result = hitFraction >= 0.5 ? HitResult.Ok : HitResult.Meh;
-                }
-            }
-            else
-            {
-                result = slider.NestedHitObjects.Any(h => results.TryGetValue(h, out HitResult nestedResult) && nestedResult.IsHit())
-                    ? slider.Judgement.MaxResult
-                    : slider.Judgement.MinResult;
-            }
-
+            HitResult result = OsuSliderJudgement.BodyResultFromNestedObjects(slider, wasHit);
             apply(slider, result, judgementTime, null);
         }
 
@@ -302,26 +257,25 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
         }
 
         private bool isMouseInFollowArea(Vector2 cursorPosition, double time, bool expanded)
-        {
-            float radius = (float)slider.Radius;
-
-            if (expanded)
-                radius *= DrawableSliderBall.FOLLOW_AREA;
-
-            double followProgress = Math.Clamp((time - slider.StartTime) / slider.Duration, 0, 1);
-            Vector2 followCirclePosition = slider.StackedPosition + slider.CurvePositionAt(followProgress);
-
-            return (cursorPosition - followCirclePosition).LengthSquared <= radius * radius;
-        }
+            => OsuSliderJudgement.IsInFollowArea(
+                cursorPosition,
+                slider.StackedPosition,
+                slider.CurvePositionAt,
+                slider.StartTime,
+                slider.Duration,
+                time,
+                slider.Radius,
+                expanded);
 
         private bool isNestedInExpandedFollowArea(HitObject nested, Vector2 cursorPosition)
-        {
-            float radius = (float)slider.Radius * DrawableSliderBall.FOLLOW_AREA;
-            double objectProgress = Math.Clamp((nested.StartTime - slider.StartTime) / slider.Duration, 0, 1);
-            Vector2 objectPosition = slider.StackedPosition + slider.CurvePositionAt(objectProgress);
-
-            return (cursorPosition - objectPosition).LengthSquared <= radius * radius;
-        }
+            => OsuSliderJudgement.IsNestedInExpandedFollowArea(
+                nested,
+                cursorPosition,
+                slider.StackedPosition,
+                slider.CurvePositionAt,
+                slider.StartTime,
+                slider.Duration,
+                slider.Radius);
 
         private bool isTailJudged()
         {

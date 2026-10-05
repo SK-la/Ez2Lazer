@@ -8,7 +8,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
 {
     /// <summary>
     /// ClassicNative 轨命中窗口（OSL-013）：对齐 osu!stable OD 公式的近似表。
-    /// Drawable 接线与 classic 总分公式仍 open。
+    /// 由 <see cref="OsuClassicNativeScoring.ApplyHitWindowsToBeatmap"/> 注入 Drawable/Session 共享谱面。
     /// </summary>
     public class OsuClassicNativeHitWindows : HitWindows
     {

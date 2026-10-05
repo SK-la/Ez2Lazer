@@ -402,10 +402,10 @@ flowchart LR
 | OSL-008 | **done** | Osu | 删 `EzScoreTimelineHitEventsLegacy` + `RegisterHitEventFallback` |
 | OSL-009 | **done** | Osu | Generator 瘦身为 Session 委托 |
 | OSL-010 | **done**（bridge） | Osu | Shadow 桥 + Parity；**非** Mania 级终态 |
-| OSL-011 | **in progress** | Osu | `Judgement/OsuCircleJudgement` + `OsuSpinnerJudgement`；Drawable Circle/SliderHead 一行；Session Shadow 同调。Slider body / 全量删 Shadow 仍 open |
-| OSL-012 | **in progress** | Osu | `OffsetPlusNonMania` 进 env + Session 判定侧；SongProgress `IsMiss`；轨字段见 OSL-013 |
-| OSL-013 | **in progress** | Osu | `EzEnumOsuJudgementTrack` + ClassicNative 窗口；计分公式 / Drawable 接线仍 open |
-| TTL-001 | **in progress** | Taiko | Mapping 形态 Session bootstrap（Hit + 余 Miss）；Race/Builder 已接线；DrumRoll/Swell 完整判定 open |
+| OSL-011 | **in progress** | Osu | Circle/Spinner/Slider body+follow helpers 已抽；Drawable Slider/Circle/Head 与 Shadow 同调。全量删 ShadowState 仍 open |
+| OSL-012 | **in progress** | Osu | `OffsetPlusNonMania` + `OsuJudgementTrack` 进 env/Session/Race cache；SongProgress `IsMiss`；Graph/Panel 矩阵复核仍 open |
+| OSL-013 | **in progress** | Osu | ClassicNative：窗口注入 Drawable+Session（`OsuScoreProcessor.ApplyBeatmap`）+ `IsLegacyScore`；设置项已挂；stable 总分细节 / 两轨 parity 仍 open |
+| TTL-001 | **in progress** | Taiko | Hit + DrumRoll tick + Swell 交替按键 Session；Race/Builder 已接线；深 parity 仍 open |
 | TSL-001 | **in progress** | Catch | Mapping 形态 Session bootstrap（水果接盘）；Race/Builder 已接线 |
 
 ---
