@@ -15,12 +15,12 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osuTK;
 
-namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
+namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 {
     /// <summary>
-    /// Osu 影子判定主循环：replay 时钟 → Shadow 状态 → 一遍 <see cref="JudgementProcessor.ApplyResult"/>。
+    /// Osu Session 判定主循环（Mapping）：replay 事件时钟 → Session 状态 → 一遍 <see cref="JudgementProcessor.ApplyResult"/>。
     /// </summary>
-    internal static class OsuReplayShadowEngine
+    internal static class OsuReplaySessionEngine
     {
         internal static void Run(
             Score score,
@@ -40,14 +40,14 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
             if (frames.Count == 0)
                 return;
 
-            var cursor = new OsuShadowReplayCursor(frames);
-            var scheduler = OsuReplayObjectScheduler.Create(beatmap, cancellationToken);
-            var sliders = OsuShadowSliderState.CreateAll(beatmap, cancellationToken);
-            var spinners = OsuShadowSpinnerState.CreateAll(beatmap, cancellationToken);
-            var pressEdges = OsuShadowReplayCursor.CollectPressEdges(frames);
+            var cursor = new OsuReplayCursor(frames);
+            var scheduler = OsuSessionCircleScheduler.Create(beatmap, cancellationToken);
+            var sliders = OsuSessionSliderState.CreateAll(beatmap, cancellationToken);
+            var spinners = OsuSessionSpinnerState.CreateAll(beatmap, cancellationToken);
+            var pressEdges = OsuReplayCursor.CollectPressEdges(frames);
             int nextPressIndex = 0;
 
-            var simulationTimes = OsuShadowReplayCursor.CollectSimulationTimes(
+            var simulationTimes = OsuReplayCursor.CollectSimulationTimes(
                 frames,
                 scheduler.CollectMissDeadlines(),
                 sliders.Select(s => s.CollectSimulationTimes()).Concat(spinners.Select(s => s.CollectSimulationTimes())));

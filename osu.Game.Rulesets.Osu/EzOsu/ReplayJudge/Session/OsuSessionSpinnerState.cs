@@ -17,12 +17,12 @@ using osu.Game.Rulesets.Osu.Skinning.Default;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 
-namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
+namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 {
     /// <summary>
     /// Spinner 影子状态：移植 <see cref="SpinnerRotationTracker"/> + <see cref="DrawableSpinner"/> tick/EndTime 判定。
     /// </summary>
-    internal sealed class OsuShadowSpinnerState
+    internal sealed class OsuSessionSpinnerState
     {
         internal delegate void JudgementApplier(HitObject hitObject, HitResult result, double judgementClockTime, Vector2? cursorPositionAtHit, Action<JudgementResult>? configureResult);
 
@@ -37,15 +37,15 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
         private double? timeStarted;
         private double? timeCompleted;
 
-        private OsuShadowSpinnerState(Spinner spinner, List<HitObject> ticksInOrder)
+        private OsuSessionSpinnerState(Spinner spinner, List<HitObject> ticksInOrder)
         {
             this.spinner = spinner;
             this.ticksInOrder = ticksInOrder;
         }
 
-        public static IReadOnlyList<OsuShadowSpinnerState> CreateAll(IBeatmap beatmap, CancellationToken cancellationToken)
+        public static IReadOnlyList<OsuSessionSpinnerState> CreateAll(IBeatmap beatmap, CancellationToken cancellationToken)
         {
-            var list = new List<OsuShadowSpinnerState>();
+            var list = new List<OsuSessionSpinnerState>();
 
             foreach (var hitObject in beatmap.HitObjects)
             {
@@ -59,7 +59,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                                    .OrderBy(o => o.StartTime)
                                    .ToList();
 
-                list.Add(new OsuShadowSpinnerState(spinner, ticks));
+                list.Add(new OsuSessionSpinnerState(spinner, ticks));
             }
 
             return list;
@@ -94,8 +94,8 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
             if (tracking && timeStarted == null)
                 timeStarted = sampleStart;
 
-            float? angleAtStart = lastAngle ?? computeAngle(OsuShadowReplayCursor.InterpolatePosition(frames, sampleStart), spinner.StackedPosition);
-            float angleAtEnd = computeAngle(OsuShadowReplayCursor.InterpolatePosition(frames, sampleEnd), spinner.StackedPosition);
+            float? angleAtStart = lastAngle ?? computeAngle(OsuReplayCursor.InterpolatePosition(frames, sampleStart), spinner.StackedPosition);
+            float angleAtEnd = computeAngle(OsuReplayCursor.InterpolatePosition(frames, sampleEnd), spinner.StackedPosition);
 
             lastAngle = angleAtEnd;
 
@@ -183,7 +183,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
             if (frames.Count == 0 || time < frames[0].Time)
                 return false;
 
-            foreach (var action in OsuShadowReplayCursor.GetPressedActionsAt(frames, time))
+            foreach (var action in OsuReplayCursor.GetPressedActionsAt(frames, time))
             {
                 if (action is OsuAction.LeftButton or OsuAction.RightButton)
                     return true;

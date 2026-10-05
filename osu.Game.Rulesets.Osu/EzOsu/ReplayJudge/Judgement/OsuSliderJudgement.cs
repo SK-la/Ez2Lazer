@@ -13,7 +13,7 @@ using osuTK;
 namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
 {
     /// <summary>
-    /// Slider nested / body / follow-area 判定纯函数（OSL-011）：Drawable 与 Session Shadow 同调。
+    /// Slider nested / body / follow-area 判定纯函数（OSL-011）：Drawable 与 Session 同调。
     /// </summary>
     public static class OsuSliderJudgement
     {

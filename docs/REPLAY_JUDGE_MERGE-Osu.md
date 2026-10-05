@@ -31,9 +31,9 @@ Parity：`TestSceneOsuReplaySessionParity`（circle / slider / spinner）。
 | Session API | `OsuReplaySession.cs` | done（OSL-007） |
 | Service + cache | `OsuReplaySessionService.cs` | done |
 | Timeline | `OsuReplayTimelineRecorder.cs` | done |
-| Shadow 引擎（桥） | `Shadow/*` | **bridge done**（OSL-010） |
-| 判定 helper / Drawable 一行 | `ReplayJudge/Judgement` 或 `Mappings/` | **open（OSL-011）** |
-| Session 读 env | Simulator / Engine | **open（OSL-012）**；桥期曾丢弃 environment |
+| Session 引擎（Mapping） | `ReplayJudge/Session/*` | **done（OSL-011）**；原 `Shadow/` 已删 |
+| 判定 helper / Drawable 一行 | `ReplayJudge/Judgement` | **done（OSL-011）** |
+| Session 读 env | Simulator / Engine | **open（OSL-012）** |
 | ClassicNative 轨 | Mapping + ScoreProcessor | **open（OSL-013）** |
 
 ---
@@ -41,4 +41,4 @@ Parity：`TestSceneOsuReplaySessionParity`（circle / slider / spinner）。
 ## OSL-010（归档）
 
 - **S0–S4 done**：Circle + Slider + Spinner + Parity  
-- 精度来源现为 `OsuReplayShadowEngine`；毕业后改为与 Drawable 共用的 helper（OSL-011）
+- 精度来源：`OsuReplaySessionEngine` + Judgement helpers（OSL-011 done）

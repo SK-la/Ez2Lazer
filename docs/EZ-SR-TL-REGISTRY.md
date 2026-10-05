@@ -156,7 +156,7 @@ Cache key 对**已解析** env 建键。
 
 ### 1.7f 远期 / 开放（验收线 1）
 
-- **Osu**：**壳 + OSL-010 桥归档**；**OSL-011 必达** = Session 生产路径不再经 `OsuReplayShadowEngine`，删除 `Shadow/*State`（cursor 可改名迁出）；OSL-012/013 继续推进。禁止「Sparse Shadow 够用」作为关闭条件。
+- **Osu**：**壳 + OSL-010 桥归档**；**OSL-011 必达** = 生产路径在 `ReplayJudge/Session/`（Mapping 形态事件引擎），**无** `ReplayJudge/Shadow/`；helper 与 Drawable 同调。OSL-012/013 继续推进。禁止「Sparse Shadow 够用」作为关闭条件。
 - **Taiko（TTL-001）**：Mapping Session + Race 已接线；深 parity + 原成绩全指标对齐仍 open。**禁止**永久 Shadow。
 - **Catch（TSL-001）**：Mapping Session + Race 已接线；**硬门禁** = Session ≡ 原成绩全指标（TotalScore / MaxCombo / Accuracy / Rank / Statistics 全键）。**禁止**永久 Shadow。
 - **Mania**：能力维持；Session 金标收敛 **另开**（不纳入本验收线）。
@@ -276,7 +276,7 @@ bool poorEnabled = IsBMSHealthMode(HealthMode) && BmsPoorHitResultEnable;
 |------|------|--------|
 | `osu.Game/EzOsuGame/Scoring/*` | IEzReplaySession、Timeline/Race 编排、cache 接口、ReplayRunPurpose | Shadow 判定实现、HitMode Mapping |
 | `Rulesets.Mania/.../ReplayJudge/*` | ManiaReplaySession、HitMode Mapping、CreateEzReplaySession | Race HUD |
-| `Rulesets.Osu/.../ReplayJudge/Shadow/*` | **OSL-010** Shadow **桥**（待 OSL-011 拆） | Race HUD |
+| `Rulesets.Osu/.../ReplayJudge/Session/*` | **OSL-011 done** Mapping 形态事件引擎（原 Shadow 桥已删） | Race HUD |
 | `Rulesets.Osu/.../ReplayJudge/*` | OsuReplaySession、Service、Timeline；**OSL-011** helper | 判定细节最终进 helper |
 | `Rulesets.Osu/.../OsuScoreHitEventGenerator` | 薄壳委托 Session | 独立算判 |
 | Catch / Taiko（TTL/TSL） | **Mapping 形态** Session（非永久 Shadow） | Mania 式多 HitMode 菜单 |
@@ -350,8 +350,8 @@ flowchart LR
 
 ### §4.2 Phase 3 范围备忘
 
-- **Osu Shadow 桥（OSL-010 ✓）** — `ReplayJudge/Shadow/`；Parity；**桥不是终态**。
-- **OSL-011（验收线 1 必达）** — helper 同调 + **删除 Shadow 生产路径**（`*Shadow*State` / ShadowEngine）；非「抽完 helper 仍走 Shadow」。
+- **Osu Shadow 桥（OSL-010 ✓）** — `ReplayJudge/Session/`；Parity；**桥不是终态**。
+- **OSL-011（验收线 1 必达）** — helper 同调 + **删除 `ReplayJudge/Shadow/` 生产路径**（迁入 `Session/` Mapping 引擎）；非 Sparse Shadow 停留。
 - **OSL-012** — Session 真读 `IGameplayEnvironment`；消费矩阵对齐 Mania。
 - **OSL-013** — ClassicNative 第二轨（修订原「三模式永不引入轨切换」）；计分 + parity。
 - **TTL-001** — Taiko Mapping；深 parity + 全指标。
@@ -406,7 +406,7 @@ flowchart LR
 | OSL-008 | **done** | Osu | 删 `EzScoreTimelineHitEventsLegacy` + `RegisterHitEventFallback` |
 | OSL-009 | **done** | Osu | Generator 瘦身为 Session 委托 |
 | OSL-010 | **done**（bridge） | Osu | Shadow 桥 + Parity；**非** Mania 级终态 |
-| OSL-011 | **in progress** | Osu | helpers 部分抽出；**关闭条件** = 非 Shadow 引擎生产 + 删除 `Shadow/*State`（cursor 可迁出改名）。禁止 Sparse Shadow 停留关闭 |
+| OSL-011 | **done** | Osu | `Shadow/` 已删除；生产路径 `ReplayJudge/Session/*` + Judgement helpers；Drawable Circle/Slider/Spinner 同调 |
 | OSL-012 | **in progress** | Osu | `OffsetPlusNonMania` + `OsuJudgementTrack` 进 env/Session/Race cache；SongProgress `IsMiss`；Graph/Panel 矩阵复核仍 open |
 | OSL-013 | **in progress** | Osu | ClassicNative：窗口注入 Drawable+Session（`OsuScoreProcessor.ApplyBeatmap`）+ `IsLegacyScore`；设置项已挂；stable 总分细节 / 两轨 parity 仍 open |
 | TTL-001 | **in progress** | Taiko | Mapping Session + Race 已接线；关闭条件 = 深 parity + 原成绩全指标 |

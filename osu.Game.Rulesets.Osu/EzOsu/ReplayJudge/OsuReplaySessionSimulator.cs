@@ -5,17 +5,17 @@ using System;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
 {
     /// <summary>
-    /// Osu Session 仿真入口；委托 <see cref="OsuReplayShadowEngine"/>（OSL-010 Shadow 桥）。
+    /// Osu Session 仿真入口；委托 <see cref="OsuReplaySessionEngine"/>（OSL-011 Mapping）。
     /// </summary>
     /// <remarks>
-    /// 见 docs/REPLAY_JUDGE_SHADOW.md · MERGE-Osu。env 消费见 TODO(EZ-SR-OSL-012)；判定毕业见 TODO(EZ-SR-OSL-011)。
+    /// 见 docs/REPLAY_JUDGE_SHADOW.md · MERGE-Osu。env 消费见 TODO(EZ-SR-OSL-012)。
     /// </remarks>
     internal static class OsuReplaySessionSimulator
     {
@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
             ArgumentNullException.ThrowIfNull(score.Replay);
 
             // TODO(EZ-SR-OSL-012): 已消费 OffsetPlusNonMania；轨字段（ClassicNative）见 OSL-013。
-            OsuReplayShadowEngine.Run(score, beatmap, scoreProcessor, gameplayRate, environment, timelineRecorder, cancellationToken);
+            OsuReplaySessionEngine.Run(score, beatmap, scoreProcessor, gameplayRate, environment, timelineRecorder, cancellationToken);
         }
     }
 }

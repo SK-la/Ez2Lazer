@@ -49,18 +49,18 @@ Ez2Lazer 在 **Osu** 曾用 **Shadow** 作为 Session 脱离 Drawable 的**过�
 | 层级 | 职责 | Osu | Catch / Taiko |
 |------|------|-----|----------------|
 | `EzOsuGame/Scoring` | `IEzReplaySession`、Timeline、Race、cache | ✓ | ✓ 已接线 |
-| `Rulesets.*/Ez*/ReplayJudge/` | `*ReplaySession` / Service / Judgement helpers | OSL-007 done；OSL-011 拆桥中 | Mapping Session **已接线**（TTL/TSL） |
-| `.../ReplayJudge/Shadow/` | 过渡桥（待删） | OSL-010 归档；**OSL-011 删除里程碑** | **禁** |
+| `Rulesets.*/Ez*/ReplayJudge/` | `*ReplaySession` / Service / Judgement helpers | OSL-007 + **OSL-011 done** | Mapping Session **已接线**（TTL/TSL） |
+| `.../ReplayJudge/Session/` | Mapping 事件引擎（原 Shadow 已删） | **OSL-011 done** | **禁** Shadow |
 | `*ScoreHitEventGenerator` | 薄壳委托 Service | done | 同形 |
 
-### Osu Shadow 删除里程碑（OSL-011）
+### Osu Shadow 删除里程碑（OSL-011）— 已关闭
 
-| 步骤 | 内容 | 关闭条件 |
-|------|------|----------|
-| H1 | Circle / Slider / Spinner helper 齐；Drawable 一行 | helpers 无双份语义 |
-| H2 | 非 Shadow Session 引擎替换 `OsuReplayShadowEngine` | 生产路径无 ShadowEngine |
-| H3 | 删 `OsuShadowSliderState` / `OsuShadowSpinnerState` / `OsuReplayObjectScheduler`（或迁出非 Shadow） | `Shadow/*State` 不存在 |
-| H4 | cursor 改名迁出 `Shadow/`（可选） | 包名不再暗示永久 Shadow |
+| 步骤 | 内容 | 状态 |
+|------|------|------|
+| H1 | Circle / Slider / Spinner helper；Drawable 一行 | done |
+| H2 | `ReplayJudge/Session/` + `OsuReplaySessionEngine` | done |
+| H3 | 无 `ReplayJudge/Shadow/` | done |
+| H4 | `OsuReplayCursor`（Session 包） | done |
 
 ---
 
@@ -79,7 +79,7 @@ Parity：各 ruleset `TestScene*ReplaySessionParity` + `*OsrAuditTest`。
 | 阶段 | Ruleset | 注册 ID | 内容 | 状态 |
 |------|---------|---------|------|------|
 | done | Osu | OSL-007~010 | 壳 + Shadow 桥 + Parity | 归档 |
-| **必达** | Osu | **OSL-011** | Mapping 毕业；删 Shadow 生产路径 | open |
+| **done** | Osu | **OSL-011** | Mapping 毕业；删 Shadow 生产路径 | **done** |
 | open | Osu | OSL-012 / 013 | env 矩阵 / ClassicNative | open |
 | **必达** | Taiko | TTL-001 | Mapping + 深 parity + 全指标 | in progress |
 | **必达** | Catch | TSL-001 | Mapping + **全指标 ≡ 原成绩** | in progress |

@@ -12,12 +12,12 @@ using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 
-namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
+namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 {
     /// <summary>
     /// Slider 影子状态：移植 SliderInputManager head/nested/tracking 逻辑（OSL-011 抽 helper 中）。
     /// </summary>
-    internal sealed class OsuShadowSliderState
+    internal sealed class OsuSessionSliderState
     {
         internal delegate void JudgementApplier(HitObject hitObject, HitResult result, double judgementClockTime, Vector2? cursorPositionAtHit);
 
@@ -34,7 +34,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
         private readonly List<OsuAction> lastPressedActions = new List<OsuAction>();
         private bool sliderBodyJudged;
 
-        private OsuShadowSliderState(Slider slider, SliderHeadCircle head, List<HitObject> nestedInOrder, double headMissWindow)
+        private OsuSessionSliderState(Slider slider, SliderHeadCircle head, List<HitObject> nestedInOrder, double headMissWindow)
         {
             this.slider = slider;
             this.head = head;
@@ -46,9 +46,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
 
         public double EndTime => slider.EndTime;
 
-        public static IReadOnlyList<OsuShadowSliderState> CreateAll(IBeatmap beatmap, CancellationToken cancellationToken)
+        public static IReadOnlyList<OsuSessionSliderState> CreateAll(IBeatmap beatmap, CancellationToken cancellationToken)
         {
-            var list = new List<OsuShadowSliderState>();
+            var list = new List<OsuSessionSliderState>();
 
             foreach (var hitObject in beatmap.HitObjects)
             {
@@ -65,7 +65,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                                    .Where(o => o.Judgement.MaxResult != HitResult.IgnoreHit)
                                    .ToList();
 
-                list.Add(new OsuShadowSliderState(slider, head, nested, missWindow));
+                list.Add(new OsuSessionSliderState(slider, head, nested, missWindow));
             }
 
             return list;

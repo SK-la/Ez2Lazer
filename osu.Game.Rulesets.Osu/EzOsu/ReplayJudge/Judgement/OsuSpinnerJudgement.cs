@@ -6,7 +6,7 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
 {
     /// <summary>
-    /// Spinner 判定纯函数（OSL-011）：Session Shadow 与后续 Drawable 抽离共用。
+    /// Spinner 判定纯函数（OSL-011）：Drawable 与 Session 同调。
     /// </summary>
     public static class OsuSpinnerJudgement
     {

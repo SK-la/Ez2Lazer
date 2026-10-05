@@ -8,12 +8,12 @@ using osu.Framework.Utils;
 using osu.Game.Rulesets.Osu.Replays;
 using osuTK;
 
-namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
+namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 {
     /// <summary>
     /// Replay 光标与按键状态；位置插值对齐 <see cref="OsuFramedReplayInputHandler"/>，按键边沿在帧时刻检测。
     /// </summary>
-    internal sealed class OsuShadowReplayCursor
+    internal sealed class OsuReplayCursor
     {
         private readonly IReadOnlyList<OsuReplayFrame> frames;
         private int currentFrameIndex = -1;
@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
 
         public Vector2 Position { get; private set; }
 
-        public OsuShadowReplayCursor(IReadOnlyList<OsuReplayFrame> frames)
+        public OsuReplayCursor(IReadOnlyList<OsuReplayFrame> frames)
         {
             this.frames = frames;
         }

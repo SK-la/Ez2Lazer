@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Statistics
     /// Osu 成绩 <see cref="HitEvent"/> 生成器；委托 <see cref="OsuReplaySessionService"/> 作为唯一判定源。
     /// </summary>
     /// <remarks>
-    /// 精度随 Session 判定路径（当前为 OSL-010 Shadow 桥；毕业见 TODO(EZ-SR-OSL-011)）。
+    /// 精度随 Session 判定路径（OSL-011 Mapping / <c>OsuReplaySessionEngine</c>）。
     /// </remarks>
     public sealed class OsuScoreHitEventGenerator
     {
