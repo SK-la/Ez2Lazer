@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
@@ -66,15 +67,11 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                 if (time > target.HitObject.StartTime + target.MissWindow)
                     break;
 
-                if (Vector2.Distance(position, target.OsuTarget.StackedPosition) > target.OsuTarget.Radius)
+                if (!OsuCircleJudgement.IsInHitRadius(position, target.OsuTarget.StackedPosition, target.OsuTarget.Radius))
                     continue;
 
                 double startOffset = time - target.HitObject.StartTime;
-                HitResult result = target.HitObject.HitWindows!.ResultFor(startOffset);
-
-                if (result == HitResult.None)
-                    result = HitResult.Miss;
-
+                HitResult result = OsuCircleJudgement.ResultForPress(target.HitObject.HitWindows!, startOffset);
                 apply(target, result, time, position);
                 target.Judged = true;
                 return;

@@ -14,8 +14,10 @@ using osu.Game.Beatmaps.Legacy;
 using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Mods.LAsMods;
 using osu.Game.EzOsuGame.Mods.CommunityMod;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Localisation;
 using osu.Game.Localisation.Catch;
+using osu.Game.Rulesets.Catch.EzCatch.ReplayJudge;
 using osu.Game.Rulesets.Catch.Beatmaps;
 using osu.Game.Rulesets.Catch.Difficulty;
 using osu.Game.Rulesets.Catch.Edit;
@@ -50,6 +52,8 @@ namespace osu.Game.Rulesets.Catch
         public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) => new DrawableCatchRuleset(this, beatmap, mods);
 
         public override ScoreProcessor CreateScoreProcessor() => new CatchScoreProcessor();
+
+        public override IEzReplaySession CreateEzReplaySession() => new CatchReplaySessionService();
 
         public override HealthProcessor CreateHealthProcessor(double drainStartTime) => new CatchHealthProcessor(drainStartTime);
 

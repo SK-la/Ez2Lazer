@@ -84,17 +84,16 @@ Score Race Timeline 架构的**唯一权威文档**。代码中 `TODO(EZ-SR-TL-*
 
 | 路径 | API | 谁调用 | offset |
 |------|-----|--------|--------|
-| Session / Graph / 重算 / 角逐 | `ResolveForSession(purpose, score)` | `EzReplaySession` 内部 | 恒 0 |
-| Drawable 判定 | `ResolveForDrawable(replayScore?)` | `ManiaEzDrawableJudgement` | Replay: 0；Live: 全局 |
+| Session / Graph / 重算 / 角逐 | `ResolveEnvironment(purpose, score)`（文档旧称 `ResolveForSession`） | `EzReplaySession` 内部 | ForStored 恒 0；ForLive 可由 `ignoreOffset` 控制 |
+| Drawable 判定（Mania） | `ResolveEnvironment` / 局内冻结 env（文档旧称 `ResolveForDrawable`） | `ManiaEzDrawableJudgement` 等 | Replay: 0；Live: 全局 |
 | 测试 / 静态仿真 | 显式 `IGameplayEnvironment` | `ManiaReplaySession.Run*` 等 | 测试自定 |
 
 **对外公开 API**（`Ez2ConfigManager`）：
 
-- **`GetGameplayEnvironment()`** — 实时全局快照（含 `OffsetPlusMania`）
-- **`ResolveForSession(purpose, score)`** — 一切非对局 replay
-- **`ResolveForDrawable(score?)`** — Drawable 专用分支
+- **`GetGameplayEnvironment()`** — 实时全局快照（含 `OffsetPlusMania`）；等同 `ResolveEnvironment(ForLive)`
+- **`ResolveEnvironment(purpose, score?, ignoreOffset?)`** — Session / 重算 / Graph 统一入口（**现行代码名**；旧文档 `ResolveForSession` / `ResolveForDrawable` 已弃用称呼）
 
-`IEzReplaySession` 仅接受 `(score, beatmap, purpose)`；环境在 Session 内统一 `ResolveForSession`。`ReplayRunResult.ResolvedEnvironment` 供重算写回，避免二次 resolve。`environmentOverride` 已移除。
+`IEzReplaySession` 仅接受 `(score, beatmap, purpose)`；环境在 Session 内统一 `ResolveEnvironment`。`ReplayRunResult.ResolvedEnvironment` 供重算写回，避免二次 resolve。`environmentOverride` 已移除。
 
 | 消费方 | Purpose | 谁 Resolve | 传 env？ |
 |--------|---------|------------|----------|
@@ -104,7 +103,7 @@ Score Race Timeline 架构的**唯一权威文档**。代码中 `TODO(EZ-SR-TL-*
 | Graph offset 落定（D） | ForLive | Session | 否 |
 | 角逐 ghost Timeline | ForLive | `EzScoreTimelineBuilder` cache key + Session | 否 |
 | 成绩重算 | ForStored / ForLive | Session → `ReplayRunResult.ResolvedEnvironment` 写 Realm | 否 |
-| Drawable 判定 | ForStored / Live | `ResolveForDrawable` | 不经 Session |
+| Drawable 判定 | ForStored / Live | Mania：局内 env / `ResolveEnvironment` | 不经 Session |
 | parity 测试 | ForStored | `ManiaReplaySession.Run*(..., env)` 或 `ApplyToGlobalConfig` + Service | 静态注入 / 全局 |
 
 Cache key 对**已解析** env 建键。
@@ -153,12 +152,12 @@ Cache key 对**已解析** env 建键。
 | 何时必须要完整 Score | Graph Now、Parity 测试、跨源不变量（HitEvents 聚合 ≡ Statistics） |
 | 何时用 Timeline 而非 Score | 角逐 HUD 实时分；**禁止**用终局 `TotalScore` 充当时钟查询结果 |
 | Mania 能否 HitEvents→SP 建 Timeline | **禁止**（F/E 类）；Timeline 必须 replay 一遍 SP 快照 |
-| Osu 角逐 | Session 一遍 SP + **Shadow** 判定（OSL-010 ✓） |
+| Osu 角逐 | Session 一遍 SP + **Shadow 桥**（OSL-010 ✓）；共用判官见 **OSL-011** |
 
-### 1.7f 远期
+### 1.7f 远期 / 开放
 
-- Osu/Taiko/Catch Session 黄金路径 — Osu **done**（OSL）；Taiko/Catch 远期
-
+- Osu：**壳 + Shadow 桥 done**（OSL-001~010）；**Mapping 毕业 / env / ClassicNative open**（OSL-011~013）— 有 Session ≠ Mania 级能力
+- Taiko / Catch：Mapping 形态 Session（TTL/TSL）；**禁止**永久 Shadow 树
 ---
 
 ## §1.8 KPoor 与成绩重算（2026-07）
@@ -184,7 +183,7 @@ bool poorEnabled = IsBMSHealthMode(HealthMode) && BmsPoorHitResultEnable;
 
 - replay 帧时间**不变**。
 - **当前环境重算 ≡ Graph Now @ offset=0**（同 `score + env` cache key；`RunRequestAsync(..., ForLive)` 一次 resolve）。
-- 写回 Realm 使用 `ReplayRunResult.ResolvedEnvironment`，不再二次 `ResolveForSession`。
+- 写回 Realm 使用 `ReplayRunResult.ResolvedEnvironment`，不再二次 `ResolveEnvironment`。
 - 非 Mania 或无 replay：回退 vanilla `ScoreManager.Recalculate`。
 
 ---
@@ -265,7 +264,7 @@ bool poorEnabled = IsBMSHealthMode(HealthMode) && BmsPoorHitResultEnable;
 | Graph offset | C / D | ForLive（D 为新 env） | ✓ | — | 不污染 base；见 §1.7d |
 | 角逐 Timeline | EzScoreTimeline | ForLive | RunTimelineDirect | RunTimelineDirect | 一遍 SP |
 | 角逐 HUD 实时分 | Timeline 快照 | — | ✓ | ✓ | 不用终局 TotalScore |
-| Parity | Score + HitEvents 字段级 | ForStored/ForLive | Drawable ≡ Session | ✓ Shadow（**OSL-010**） | REPLAY_JUDGE_MERGE |
+| Parity | Score + HitEvents 字段级 | ForStored/ForLive | Drawable ≡ Session | ✓ Shadow 桥（**OSL-010**）；毕业后 helper（**OSL-011**） | REPLAY_JUDGE_MERGE |
 
 ---
 
@@ -275,10 +274,10 @@ bool poorEnabled = IsBMSHealthMode(HealthMode) && BmsPoorHitResultEnable;
 |------|------|--------|
 | `osu.Game/EzOsuGame/Scoring/*` | IEzReplaySession、Timeline/Race 编排、cache 接口、ReplayRunPurpose | Shadow 判定实现、HitMode Mapping |
 | `Rulesets.Mania/.../ReplayJudge/*` | ManiaReplaySession、HitMode Mapping、CreateEzReplaySession | Race HUD |
-| `Rulesets.Osu/.../ReplayJudge/Shadow/*` | **OSL-010** 影子判定引擎 | Race HUD |
-| `Rulesets.Osu/.../ReplayJudge/*` | OsuReplaySession、Service、Timeline | 判定细节 |
-| `Rulesets.Osu/.../OsuScoreHitEventGenerator` | 薄壳委托 Session | Shadow 判定 |
-| Catch / Taiko（远期） | 同 Shadow 分层，见 REPLAY_JUDGE_SHADOW.md | Mania 式 HitMode 双轨 |
+| `Rulesets.Osu/.../ReplayJudge/Shadow/*` | **OSL-010** Shadow **桥**（待 OSL-011 拆） | Race HUD |
+| `Rulesets.Osu/.../ReplayJudge/*` | OsuReplaySession、Service、Timeline；**OSL-011** helper | 判定细节最终进 helper |
+| `Rulesets.Osu/.../OsuScoreHitEventGenerator` | 薄壳委托 Session | 独立算判 |
+| Catch / Taiko（TTL/TSL） | **Mapping 形态** Session（非永久 Shadow） | Mania 式多 HitMode 菜单 |
 | ~~EzScoreTimelineBridge~~ | **已删除（TL-005）** | 静态注册反模式 |
 
 目标：`ruleset.CreateEzReplaySession()` → `RunTimelineDirectAsync` / `RunAsync`。
@@ -298,8 +297,9 @@ bool poorEnabled = IsBMSHealthMode(HealthMode) && BmsPoorHitResultEnable;
 | **1** | Mania Session + Timeline + Race | 基本完成 |
 | **1.5** | Graph Now；RunRequestAsync(ForLive)（TL-024/025） | 基本完成 |
 | **1.5b** | TL-026 单次 run 多出口 | 基本完成 |
-| **2** | API 收敛：purpose 优先 + optional env override；Session 统一 ResolveForSession/ResolveForReplay | 完成 |
-| **3** | Osu Session（OSL）；Taiko/Catch 远期 | **Osu done**（OSL-001~009） |
+| **2** | API 收敛：purpose + `ResolveEnvironment`；Session cache | 完成（文档旧称 ResolveForSession 已弃用） |
+| **3** | Osu Session 壳（OSL-001~010 桥） | **桥 done**；毕业/Classic/Taiko/Catch **open** |
+| **3.1+** | OSL-011~013；TTL/TSL | open |
 
 ### §4.1 Phase 3 工作列表（OSL，影响面轻→重）
 
@@ -346,12 +346,14 @@ flowchart LR
   OSL005 --> OSL009
 ```
 
-### §4.2 Phase 3 范围备忘（无 OSL 编号）
+### §4.2 Phase 3 范围备忘
 
-- **Osu Shadow（OSL-010 ✓）** — `ReplayJudge/Shadow/` 帧时钟 + Circle/Slider/Spinner 状态机；`TestSceneOsuReplaySessionParity`；**不**拆 Mania 式 HitMode。
-- **Catch / Taiko Session** — 远期；**沿用 Shadow 统一思路**（见 REPLAY_JUDGE_SHADOW.md §5），不破坏各 mode Drawable 元机制。
-- **Ruleset 级 `ResolveEnvironment`** — Phase 3 各 ruleset Session 时再评估（§1.7f）。
-- **TL-021 动态变速 Mod ghost 时钟** — doc-only，不阻塞 OSL。
+- **Osu Shadow 桥（OSL-010 ✓）** — `ReplayJudge/Shadow/`；Parity；**桥不是终态**。
+- **OSL-011** — 抽判定 helper，Drawable 一行，缩/删 ShadowState。
+- **OSL-012** — Session 真读 `IGameplayEnvironment`；消费矩阵对齐 Mania。
+- **OSL-013** — ClassicNative 第二轨（修订原「三模式永不引入轨切换」）；计分 + parity。
+- **TTL / TSL** — Taiko / Catch Mapping 形态 Session；禁永久 Shadow。
+- **TL-021** — 动态变速 Mod ghost 时钟 — doc-only。
 
 ---
 
@@ -399,7 +401,12 @@ flowchart LR
 | OSL-007 | **done** | Osu | `OsuReplaySession` + Service + `CreateEzReplaySession` |
 | OSL-008 | **done** | Osu | 删 `EzScoreTimelineHitEventsLegacy` + `RegisterHitEventFallback` |
 | OSL-009 | **done** | Osu | Generator 瘦身为 Session 委托 |
-| OSL-010 | **done** | Osu | Shadow 判定：`OsuShadowSliderState` / `OsuShadowSpinnerState` + Parity 测试 |
+| OSL-010 | **done**（bridge） | Osu | Shadow 桥 + Parity；**非** Mania 级终态 |
+| OSL-011 | **in progress** | Osu | `Judgement/OsuCircleJudgement` + `OsuSpinnerJudgement`；Drawable Circle/SliderHead 一行；Session Shadow 同调。Slider body / 全量删 Shadow 仍 open |
+| OSL-012 | **in progress** | Osu | `OffsetPlusNonMania` 进 env + Session 判定侧；SongProgress `IsMiss`；轨字段见 OSL-013 |
+| OSL-013 | **in progress** | Osu | `EzEnumOsuJudgementTrack` + ClassicNative 窗口；计分公式 / Drawable 接线仍 open |
+| TTL-001 | **in progress** | Taiko | Mapping 形态 Session bootstrap（Hit + 余 Miss）；Race/Builder 已接线；DrumRoll/Swell 完整判定 open |
+| TSL-001 | **in progress** | Catch | Mapping 形态 Session bootstrap（水果接盘）；Race/Builder 已接线 |
 
 ---
 

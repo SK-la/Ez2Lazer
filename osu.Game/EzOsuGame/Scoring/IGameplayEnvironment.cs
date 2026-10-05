@@ -19,6 +19,12 @@ namespace osu.Game.EzOsuGame.Scoring
 
         double OffsetPlusMania { get; }
 
+        /// <summary>非 Mania（Osu/Taiko/Catch）判定侧输入偏移；Session ForStored / ignoreOffset 时为 0。</summary>
+        double OffsetPlusNonMania { get; }
+
+        /// <summary>Osu 判定轨；非 Osu 规则集可忽略（默认 Lazer）。</summary>
+        EzEnumOsuJudgementTrack OsuJudgementTrack { get; }
+
         bool BmsPoorHitResultEnable { get; }
 
         bool ApplyInputOffsetViaReplayFrameShift { get; }

@@ -8,6 +8,7 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -91,17 +92,13 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
             if (time < head.StartTime - headMissWindow || time > head.StartTime + headMissWindow)
                 return;
 
-            if (Vector2.Distance(position, head.StackedPosition) > head.Radius)
+            if (!OsuCircleJudgement.IsInHitRadius(position, head.StackedPosition, head.Radius))
                 return;
 
             double timeOffset = time - head.StartTime;
-            HitResult result = head.HitWindows!.ResultFor(timeOffset);
-
-            if (result == HitResult.None)
-                result = HitResult.Miss;
-
-            if (head.ClassicSliderBehaviour)
-                result = result.IsHit() ? HitResult.LargeTickHit : HitResult.LargeTickMiss;
+            HitResult result = OsuCircleJudgement.MapClassicSliderHeadIfNeeded(
+                OsuCircleJudgement.ResultForPress(head.HitWindows!, timeOffset),
+                head.ClassicSliderBehaviour);
 
             if (result.IsHit())
                 headHitAction = action;

@@ -1,6 +1,7 @@
-# Osu ReplayJudge — Session 与 Shadow 判定
+# Osu ReplayJudge — Session、Shadow 桥与毕业路径
 
-Osu 采用 **Shadow Judgement**（影子判定），与 Mania 的 HitMode/Mapping 路径分离。三模式统一设计见 [REPLAY_JUDGE_SHADOW.md](./REPLAY_JUDGE_SHADOW.md)。
+Osu 曾用 **Shadow Judgement** 作为脱离 Drawable 的过渡桥（OSL-010）。  
+**壳 + 桥已通 ≠ Mania 级能力**：缺共用判官、env 重算、ClassicNative。见 [REPLAY_JUDGE_SHADOW.md](./REPLAY_JUDGE_SHADOW.md)、[EZ-SR-TL-REGISTRY.md](./EZ-SR-TL-REGISTRY.md) OSL-011+。
 
 ---
 
@@ -19,22 +20,25 @@ Osu 采用 **Shadow Judgement**（影子判定），与 Mania 的 HitMode/Mappin
 
 **Osu HitEvent 额外字段**：`CursorPositionAtHit`（`OsuHitCircleJudgementResult`）须在 parity 中一并断言。
 
-Parity 测试（OSL-010 S4）：`TestSceneOsuReplaySessionParity`（circle / slider / spinner）。
+Parity：`TestSceneOsuReplaySessionParity`（circle / slider / spinner）。
 
 ---
 
-## 架构（OSL-007 + OSL-010）
+## 架构状态
 
 | 组件 | 路径 | 状态 |
 |------|------|------|
-| Session API | `OsuReplaySession.cs` | done |
+| Session API | `OsuReplaySession.cs` | done（OSL-007） |
 | Service + cache | `OsuReplaySessionService.cs` | done |
 | Timeline | `OsuReplayTimelineRecorder.cs` | done |
-| **Shadow 引擎** | `Shadow/OsuReplayShadowEngine.cs` 等 | **done**（OSL-010） |
-| 旧 press 循环 | ~~`OsuReplaySessionSimulator` 内启发式~~ | S1 起由 Shadow 替代 |
+| Shadow 引擎（桥） | `Shadow/*` | **bridge done**（OSL-010） |
+| 判定 helper / Drawable 一行 | `ReplayJudge/Judgement` 或 `Mappings/` | **open（OSL-011）** |
+| Session 读 env | Simulator / Engine | **open（OSL-012）**；桥期曾丢弃 environment |
+| ClassicNative 轨 | Mapping + ScoreProcessor | **open（OSL-013）** |
 
 ---
 
-## OSL-010 进度
+## OSL-010（归档）
 
-- **S0–S4 done**：Circle + Slider tracking + Spinner 转速 + `TestSceneOsuReplaySessionParity`
+- **S0–S4 done**：Circle + Slider + Spinner + Parity  
+- 精度来源现为 `OsuReplayShadowEngine`；毕业后改为与 Drawable 共用的 helper（OSL-011）

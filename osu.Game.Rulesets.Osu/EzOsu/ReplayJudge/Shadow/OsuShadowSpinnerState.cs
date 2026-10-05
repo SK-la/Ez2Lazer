@@ -8,6 +8,7 @@ using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Objects.Drawables;
@@ -101,14 +102,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
             if (!tracking || angleAtStart == null)
                 return;
 
-            float delta = angleAtEnd - angleAtStart.Value;
-
-            if (delta > 180)
-                delta -= 360;
-            if (delta < -180)
-                delta += 360;
-
-            delta = (float)(delta * Math.Abs(gameplayRate));
+            float delta = OsuSpinnerJudgement.NormaliseRotationDelta(angleAtStart.Value, angleAtEnd, gameplayRate);
             rotationHistory.ReportDelta(sampleEnd, delta);
 
             if (progress >= 1)
@@ -130,17 +124,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                 applyTick(tick, hit: false, time, apply);
             }
 
-            HitResult result;
-
-            if (progress >= 1)
-                result = HitResult.Great;
-            else if (progress > .9)
-                result = HitResult.Ok;
-            else if (progress > .75)
-                result = HitResult.Meh;
-            else
-                result = spinner.Judgement.MinResult;
-
+            HitResult result = OsuSpinnerJudgement.BodyResultForProgress(progress, spinner.Judgement.MinResult);
             spinnerBodyJudged = true;
 
             apply(spinner, result, time, null, judgementResult =>
