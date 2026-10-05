@@ -170,6 +170,7 @@ Cache key 对**已解析** env 建键。
 - **Taiko（TTL-001）**：**done** — Mapping Session + Race；全指标 + TimelineDirect + Strong/Roll/Swell helper 深 parity。**禁止**永久 Shadow。
 - **Catch（TSL-001）**：**done** — Mapping Session + Race；全指标 + TimelineDirect；`CatchPlateJudgement` 与 Catcher 同调。**禁止**永久 Shadow。
 - **Mania**：能力维持；Session 金标收敛 **另开**（不纳入本验收线）。
+- **Race 多幽灵（P6）**：**in progress** — Builder 须 `AttachBeatmaps`；转谱经 `EzPlayableBeatmapCache`（Mania=`GetBound` via provider；Osu/Taiko/Catch=`GetBound` session-ready）；禁 Empty-Mods 全员复用 / 禁 `GetShared` 喂会写谱的 Session。软预算 **non-gating**。
 ---
 
 ## §1.8 KPoor 与成绩重算（2026-07）
@@ -266,17 +267,17 @@ bool poorEnabled = IsBMSHealthMode(HealthMode) && BmsPoorHitResultEnable;
 
 ## §2 消费场景矩阵
 
-| 消费场景 | 所需出口 | Purpose | Mania | Osu | 原则 |
-|----------|----------|---------|-------|-----|------|
-| Realm 持久化 | Statistics / Acc / TotalScore | — | ✓ | ✓ | HitEvents `[Ignored]` |
-| StatisticsPanel 补 HitEvents | HitEvents | ForStored | Router ✓ | Router ✓ | 只 patch HitEvents；见 §1.7b/c |
-| Graph Original | Realm 静态 | — | ✓ | — | 不跑 Session |
-| Graph Now 基线 | 完整 Score | ForLive | RunRequestAsync ✓ | — | 与 Panel **可**共 key（若 purpose/env 一致） |
-| 选歌成绩重算（Mania） | 完整 Score | ForStored / ForLive | Session Run → 写 Realm | — | §1.8；REPLAY_JUDGE |
-| Graph offset | C / D | ForLive（D 为新 env） | ✓ | — | 不污染 base；见 §1.7d |
-| 角逐 Timeline | EzScoreTimeline | ForLive | RunTimelineDirect | RunTimelineDirect | 一遍 SP |
-| 角逐 HUD 实时分 | Timeline 快照 | — | ✓ | ✓ | 不用终局 TotalScore |
-| Parity | Score + HitEvents 字段级 | ForStored/ForLive | Drawable ≡ Session | ✓ Shadow 桥（**OSL-010**）；毕业后 helper（**OSL-011**） | REPLAY_JUDGE_MERGE |
+| 消费场景 | 所需出口 | Purpose | Mania | Osu | Taiko | Catch | 原则 |
+|----------|----------|---------|-------|-----|-------|-------|------|
+| Realm 持久化 | Statistics / Acc / TotalScore | — | ✓ | ✓ | ✓ | ✓ | HitEvents `[Ignored]` |
+| StatisticsPanel 补 HitEvents | HitEvents | ForStored | Router ✓ | Router ✓ | Router ✓ | Router ✓ | 只 patch HitEvents；见 §1.7b/c |
+| Graph Original | Realm 静态 | — | ✓ | — | — | — | 不跑 Session |
+| Graph Now 基线 | 完整 Score | ForLive | RunRequestAsync ✓ | — | — | — | 与 Panel **可**共 key（若 purpose/env 一致） |
+| 选歌成绩重算（Mania） | 完整 Score | ForStored / ForLive | Session Run → 写 Realm | — | — | — | §1.8；REPLAY_JUDGE |
+| Graph offset | C / D | ForLive（D 为新 env） | ✓ | — | — | — | 不污染 base；见 §1.7d |
+| 角逐 Timeline | EzScoreTimeline | ForLive | RunTimelineDirect | RunTimelineDirect | RunTimelineDirect | RunTimelineDirect | 一遍 SP；转谱经 `EzPlayableBeatmapCache` |
+| 角逐 HUD 实时分 | Timeline 快照 | — | ✓ | ✓ | ✓ | ✓ | 不用终局 TotalScore |
+| Parity | Score + HitEvents 字段级 | ForStored/ForLive | Drawable ≡ Session | helper（**OSL-011**） | Mapping | Mapping | REPLAY_JUDGE_MERGE |
 
 ---
 
@@ -421,6 +422,7 @@ flowchart LR
 | OSL-013 | **in progress** | Osu | ClassicNative 窗口注入 + Session 轨切换；两轨晚点分叉门禁已加；stable 满分同顶 / 细部 parity 仍 open |
 | TTL-001 | **done** | Taiko | Mapping Session + Race；全指标 OsrAudit + TimelineDirect；Strong/Roll/Swell helper 深 parity 测试 |
 | TSL-001 | **done** | Catch | Mapping Session + Race；全指标 OsrAudit + TimelineDirect；`CatchPlateJudgement` 与 Catcher 同调 |
+| P6 | **in progress** | Race | Builder `AttachBeatmaps` + `EzPlayableBeatmapCache` 取谱；四模式 TryBuild 产品门禁；软预算 non-gating |
 
 ---
 
