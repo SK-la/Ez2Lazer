@@ -112,7 +112,6 @@ namespace osu.Game.Overlays
             LoopMode.BindValueChanged(mode =>
             {
                 Shuffle.Value = mode.NewValue == MusicLoopMode.Shuffle;
-                applyCurrentTrackLooping();
             }, true);
 
             // Tests / callers that still toggle Shuffle map onto LoopMode.
@@ -141,11 +140,6 @@ namespace osu.Game.Overlays
                 MusicLoopMode.Sequential => MusicLoopMode.Shuffle,
                 _ => MusicLoopMode.Single,
             };
-        }
-
-        private void applyCurrentTrackLooping()
-        {
-            CurrentTrack.Looping = LoopMode.Value == MusicLoopMode.Single;
         }
 
         /// <summary>
@@ -573,7 +567,6 @@ namespace osu.Game.Overlays
             lastTrack.VolumeTo(0, track_fade_out_time, Easing.Out).Expire();
 
             CurrentTrack = queuedTrack;
-            applyCurrentTrackLooping();
 
             queuedTrack.Volume.Value = 0;
             AddInternal(queuedTrack);
@@ -591,8 +584,18 @@ namespace osu.Game.Overlays
 
         private void onTrackCompleted()
         {
-            if (!CurrentTrack.Looping && !beatmap.Disabled && AllowTrackControl.Value)
-                NextTrack(allowProtectedTracks: true);
+            // Respect consumers that set Looping (e.g. song select PrepareTrackForPreview).
+            // LoopMode must not write CurrentTrack.Looping — that overwrites preview looping.
+            if (CurrentTrack.Looping || beatmap.Disabled || !AllowTrackControl.Value)
+                return;
+
+            if (LoopMode.Value == MusicLoopMode.Single)
+            {
+                Schedule(() => CurrentTrack.RestartAsync());
+                return;
+            }
+
+            NextTrack(allowProtectedTracks: true);
         }
 
         private bool applyModTrackAdjustments;
