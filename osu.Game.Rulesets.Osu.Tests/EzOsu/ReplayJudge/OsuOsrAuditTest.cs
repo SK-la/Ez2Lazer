@@ -23,7 +23,7 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
 {
     /// <summary>
-    /// Osu osr 完整金标门禁。Header 与 Session 共用同一套 Parse 金标。
+    /// Osu osr 金标门禁。契约：Session 产物对照「冻结的原始 osr 快照」——禁止用同一载体属性自洽顶替。
     /// </summary>
     [TestFixture]
     public class OsuOsrAuditTest
@@ -32,7 +32,6 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         private const string osr_resource = "Resources/Testing/Replays/OsuAudit-SaikouNoKataomoi.osr";
         private const string beatmap_resource = "Resources/Testing/Beatmaps/OsuAudit-SaikouNoKataomoi.osu";
 
-        // Anchored from OsuAudit-SaikouNoKataomoi.osr after LegacyScoreDecoder.Parse (lazer v30000019, user=SK_la).
         private const string expected_beatmap_md5 = "a961fc95f5678f61810ca205903c51da";
         private const long expected_total_score = 329109;
         private const int expected_max_combo = 139;
@@ -65,17 +64,14 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
         {
             assumeResourcesPresent();
 
-            var decoder = new HarnessScoreDecoder();
-            Score score;
+            using var stream = resources.GetStream(osr_resource);
+            Score score = new HarnessScoreDecoder().Parse(stream);
 
-            using (var stream = resources.GetStream(osr_resource))
-                score = decoder.Parse(stream);
-
-            assertFullBaseline(score.ScoreInfo);
+            assertMatchesAnchor(score.ScoreInfo);
         }
 
         [Test]
-        public void AuditEmbeddedScoreStatisticsMatchSession()
+        public void AuditSessionProductMatchesFrozenOsrSnapshot()
         {
             assumeResourcesPresent();
 
@@ -85,20 +81,25 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
             using (var stream = resources.GetStream(osr_resource))
                 score = decoder.Parse(stream);
 
-            assertFullBaseline(score.ScoreInfo);
+            ScoreInfo original = score.ScoreInfo.DeepClone();
+            assertMatchesAnchor(original);
 
             var playable = decoder.LastWorkingBeatmap!.GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
             var environment = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, score.ScoreInfo);
 
-            OsuReplaySession.Run(score, playable, environment);
+            // 静态 Run 会 PopulateScore 写回入参；必须喂克隆，保留 original / 调用方。
+            Score session = OsuReplaySession.Run(score.DeepClone(), playable, environment);
 
-            string report = buildReport(score, playable);
+            string report = buildReport(original, session, playable);
             archiveReport(report);
-            assertFullBaseline(score.ScoreInfo, report);
+
+            assertMatchesOriginal(session.ScoreInfo, original, report);
+            assertHitEventsMatchOriginalStatistics(session.ScoreInfo, original, report);
+            assertMatchesOriginal(score.ScoreInfo, original, "Session 写回污染了调用方 ScoreInfo");
         }
 
         [Test]
-        public void AuditEmbeddedScoreTimelineDirectMatchesFullBaseline()
+        public void AuditTimelineDirectMatchesFrozenOsrSnapshot()
         {
             assumeResourcesPresent();
 
@@ -108,16 +109,18 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
             using (var stream = resources.GetStream(osr_resource))
                 score = decoder.Parse(stream);
 
+            ScoreInfo original = score.ScoreInfo.DeepClone();
             var playable = decoder.LastWorkingBeatmap!.GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
             var environment = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, score.ScoreInfo);
 
-            var (_, timeline) = OsuReplaySession.RunWithTimeline(score, playable, environment);
+            var (session, timeline) = OsuReplaySession.RunWithTimeline(score.DeepClone(), playable, environment);
 
-            Assert.That(timeline.FinalTotalScore, Is.EqualTo(expected_total_score));
-            assertFullBaseline(score.ScoreInfo);
+            Assert.That(timeline.FinalTotalScore, Is.EqualTo(original.TotalScore));
+            assertMatchesOriginal(session.ScoreInfo, original);
+            assertMatchesOriginal(score.ScoreInfo, original, "RunWithTimeline 污染了调用方 ScoreInfo");
         }
 
-        private static void assertFullBaseline(ScoreInfo info, string? report = null)
+        private static void assertMatchesAnchor(ScoreInfo info, string? report = null)
         {
             Assert.Multiple(() =>
             {
@@ -131,6 +134,27 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
                 Assert.That(info.Mods.Select(m => m.Acronym).ToArray(), Is.Empty, report);
                 assertStatisticsEqual(info.Statistics, expected_statistics, report);
             });
+        }
+
+        private static void assertMatchesOriginal(ScoreInfo actual, ScoreInfo original, string? report = null)
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(actual.TotalScore, Is.EqualTo(original.TotalScore), report);
+                Assert.That(actual.MaxCombo, Is.EqualTo(original.MaxCombo), report);
+                Assert.That(actual.Accuracy, Is.EqualTo(original.Accuracy).Within(1e-12), report);
+                Assert.That(actual.Rank, Is.EqualTo(original.Rank), report);
+                assertStatisticsEqual(actual.Statistics, original.Statistics, report);
+            });
+        }
+
+        private static void assertHitEventsMatchOriginalStatistics(ScoreInfo session, ScoreInfo original, string? report)
+        {
+            var fromEvents = session.HitEvents
+                                    .GroupBy(e => e.Result)
+                                    .ToDictionary(g => g.Key, g => g.Count());
+
+            assertStatisticsEqual(fromEvents, original.Statistics, report);
         }
 
         private static void assertStatisticsEqual(
@@ -153,17 +177,20 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
                 Assert.Ignore($"缺少内嵌资源：{osr_resource} / {beatmap_resource}");
         }
 
-        private static string buildReport(Score score, IBeatmap playable)
+        private static string buildReport(ScoreInfo original, Score session, IBeatmap playable)
         {
             var sb = new StringBuilder();
             sb.AppendLine($"osr: {osr_resource}");
             sb.AppendLine($"objects: circles={countObjects<HitCircle>(playable)} sliders={countObjects<Slider>(playable)} spinners={countObjects<Spinner>(playable)}");
-            sb.AppendLine($"anchor: acc={expected_accuracy:R} rank={expected_rank} total={expected_total_score} combo={expected_max_combo}");
-            sb.AppendLine($"anchor stats: {string.Join(", ", expected_statistics.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}"))}");
-            sb.AppendLine($"session: acc={score.ScoreInfo.Accuracy:R} rank={score.ScoreInfo.Rank} total={score.ScoreInfo.TotalScore} combo={score.ScoreInfo.MaxCombo}");
-            sb.AppendLine($"session stats: {string.Join(", ", score.ScoreInfo.Statistics.Where(kv => kv.Value != 0).OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}"))}");
+            sb.AppendLine($"original: acc={original.Accuracy:R} rank={original.Rank} total={original.TotalScore} combo={original.MaxCombo}");
+            sb.AppendLine($"session:  acc={session.ScoreInfo.Accuracy:R} rank={session.ScoreInfo.Rank} total={session.ScoreInfo.TotalScore} combo={session.ScoreInfo.MaxCombo}");
+            sb.AppendLine($"original stats: {formatStats(original.Statistics)}");
+            sb.AppendLine($"session stats:  {formatStats(session.ScoreInfo.Statistics)}");
             return sb.ToString();
         }
+
+        private static string formatStats(IReadOnlyDictionary<HitResult, int> stats)
+            => string.Join(", ", stats.Where(kv => kv.Value != 0).OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}"));
 
         private static void archiveReport(string report)
         {
