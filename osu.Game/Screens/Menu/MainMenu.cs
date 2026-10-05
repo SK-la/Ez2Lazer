@@ -41,6 +41,7 @@ using osu.Game.Screens.Edit;
 using osu.Game.Screens.OnlinePlay.DailyChallenge;
 using osu.Game.Screens.OnlinePlay.Multiplayer;
 using osu.Game.Screens.OnlinePlay.Playlists;
+using osu.Game.EzOsuGame.Screens.Visualizer;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Screens.Select;
 using osu.Game.Seasonal;
@@ -314,6 +315,7 @@ namespace osu.Game.Screens.Menu
             logo.FadeIn(100, Easing.OutQuint);
 
             logoProxy = logo.ProxyToContainer(logoTarget);
+            logo.ActionOnFullyShrunk = tryEnterVisualizer;
 
             if (resuming)
             {
@@ -334,6 +336,19 @@ namespace osu.Game.Screens.Menu
                 // this ensures that the OsuLogo sample does not play when it is not desired.
                 logo.Action = () => onLogoClick(previousAction);
             }
+        }
+
+        private bool tryEnterVisualizer()
+        {
+            switch (Buttons.State)
+            {
+                case ButtonSystemState.Exit:
+                case ButtonSystemState.EnteringMode:
+                    return false;
+            }
+
+            this.Push(new EzVisualizerScreen());
+            return true;
         }
 
         private bool onLogoClick(Func<bool> originalAction)
@@ -370,6 +385,8 @@ namespace osu.Game.Screens.Menu
 
         protected override void LogoSuspending(OsuLogo logo)
         {
+            logo.ActionOnFullyShrunk = null;
+
             var seq = logo.FadeOut(300, Easing.InSine)
                           .ScaleTo(0.2f, 300, Easing.InSine);
 
@@ -383,6 +400,8 @@ namespace osu.Game.Screens.Menu
         protected override void LogoExiting(OsuLogo logo)
         {
             base.LogoExiting(logo);
+
+            logo.ActionOnFullyShrunk = null;
 
             logoProxy?.Dispose();
             logoProxy = null;

@@ -9,6 +9,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
@@ -18,8 +19,10 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
 using osu.Framework.Logging;
+using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
@@ -76,10 +79,26 @@ namespace osu.Game.Screens.Menu
         public Func<bool> Action;
 
         /// <summary>
+        /// Invoked when a fully-armed hold-to-shrink gesture is released while the pointer is still over the logo.
+        /// Return value decides whether the logo should play its select sample.
+        /// </summary>
+        public Func<bool> ActionOnFullyShrunk;
+
+        /// <summary>
         /// The size of the logo Sprite with respect to the scale of its hover and bounce containers.
         /// </summary>
         /// <remarks>Does not account for the scale of this <see cref="OsuLogo"/></remarks>
         public float SizeForFlow => logo == null ? 0 : logo.DrawSize.X * logo.Scale.X * logoBounceContainer.Scale.X * logoHoverContainer.Scale.X;
+
+        private const double shrink_duration = 1000;
+
+        private Bindable<double> holdActivationDelay;
+        private bool isHolding;
+        private bool minReached;
+        private bool ready;
+        private bool suppressNextClick;
+        private ScheduledDelegate readyDelegate;
+        private readonly CircularContainer armedGlowRing;
 
         public bool IsTracking { get; set; }
 
@@ -242,6 +261,28 @@ namespace osu.Game.Screens.Menu
                                                             Alpha = 0,
                                                         }
                                                     }
+                                                },
+                                                // Outside the cookie sprite so the ring is not covered by logo texture.
+                                                armedGlowRing = new CircularContainer
+                                                {
+                                                    Anchor = Anchor.Centre,
+                                                    Origin = Anchor.Centre,
+                                                    RelativeSizeAxes = Axes.Both,
+                                                    Scale = new Vector2(1.08f),
+                                                    BorderColour = Color4.White,
+                                                    BorderThickness = 14,
+                                                    Masking = true,
+                                                    Blending = BlendingParameters.Additive,
+                                                    Alpha = 0,
+                                                    Children = new Drawable[]
+                                                    {
+                                                        new Box
+                                                        {
+                                                            RelativeSizeAxes = Axes.Both,
+                                                            AlwaysPresent = true,
+                                                            Alpha = 0,
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -281,12 +322,14 @@ namespace osu.Game.Screens.Menu
         }
 
         [BackgroundDependencyLoader]
-        private void load(TextureStore textures, AudioManager audio)
+        private void load(TextureStore textures, AudioManager audio, OsuConfigManager config)
         {
             sampleClick = audio.Samples.Get(@"Menu/osu-logo-select");
 
             SampleBeat = audio.Samples.Get(@"Menu/osu-logo-heartbeat");
             SampleDownbeat = audio.Samples.Get(@"Menu/osu-logo-downbeat");
+
+            holdActivationDelay = config.GetBindable<double>(OsuSetting.UIHoldActivationDelay);
 
             if (ezConfig != null)
             {
@@ -414,6 +457,9 @@ namespace osu.Game.Screens.Menu
             {
                 triangles.Velocity = (float)Interpolation.Damp(triangles.Velocity, triangles_paused_velocity, 0.9f, Time.Elapsed);
             }
+
+            if (isHolding && ready)
+                updateArmedGlow();
         }
 
         public override bool HandlePositionalInput => base.HandlePositionalInput && Alpha > 0.2f;
@@ -422,7 +468,7 @@ namespace osu.Game.Screens.Menu
         {
             if (e.Button != MouseButton.Left) return true;
 
-            logoBounceContainer.ScaleTo(0.9f, 1000, Easing.Out);
+            beginHoldGesture();
             return true;
         }
 
@@ -430,11 +476,33 @@ namespace osu.Game.Screens.Menu
         {
             if (e.Button != MouseButton.Left) return;
 
+            bool canEnter = isHolding && ready && isPointerInLogo() && ActionOnFullyShrunk != null;
+
             logoBounceContainer.ScaleTo(1f, 500, Easing.OutElastic);
+
+            if (canEnter)
+            {
+                suppressNextClick = true;
+
+                if (ActionOnFullyShrunk.Invoke())
+                {
+                    StopSamplePlayback();
+                    sampleClickChannel = sampleClick.GetChannel();
+                    sampleClickChannel.Play();
+                }
+            }
+
+            endHoldGesture();
         }
 
         protected override bool OnClick(ClickEvent e)
         {
+            if (suppressNextClick)
+            {
+                suppressNextClick = false;
+                return true;
+            }
+
             flashLayer.ClearTransforms();
             flashLayer.Alpha = 0.4f;
             flashLayer.FadeOut(1500, Easing.OutExpo);
@@ -454,12 +522,89 @@ namespace osu.Game.Screens.Menu
             if (Action != null)
                 logoHoverContainer.ScaleTo(1.1f, 500, Easing.OutElastic);
 
+            if (isHolding && ready)
+                updateArmedGlow();
+
             return true;
         }
 
         protected override void OnHoverLost(HoverLostEvent e)
         {
             logoHoverContainer.ScaleTo(1, 500, Easing.OutElastic);
+
+            if (isHolding)
+                hideArmedGlow();
+        }
+
+        private void beginHoldGesture()
+        {
+            endHoldGesture();
+
+            isHolding = true;
+            minReached = false;
+            ready = false;
+            suppressNextClick = false;
+
+            logoBounceContainer.ScaleTo(0.9f, shrink_duration, Easing.Out).OnComplete(_ =>
+            {
+                if (!isHolding) return;
+
+                minReached = true;
+                readyDelegate?.Cancel();
+                readyDelegate = Scheduler.AddDelayed(() =>
+                {
+                    if (!isHolding || !minReached) return;
+
+                    ready = true;
+
+                    if (isPointerInLogo())
+                        flashArmedGlow();
+                    else
+                        hideArmedGlow();
+                }, holdActivationDelay.Value);
+            });
+        }
+
+        private void endHoldGesture()
+        {
+            isHolding = false;
+            minReached = false;
+            ready = false;
+            readyDelegate?.Cancel();
+            readyDelegate = null;
+            hideArmedGlow();
+        }
+
+        private bool isPointerInLogo()
+        {
+            var inputManager = GetContainingInputManager();
+            return inputManager != null && ReceivePositionalInputAt(inputManager.CurrentState.Mouse.Position);
+        }
+
+        private void updateArmedGlow()
+        {
+            if (isHolding && ready && isPointerInLogo())
+            {
+                if (armedGlowRing.Alpha <= 0)
+                    flashArmedGlow();
+            }
+            else
+                hideArmedGlow();
+        }
+
+        private void flashArmedGlow()
+        {
+            armedGlowRing.ClearTransforms();
+            armedGlowRing
+                .FadeTo(1f, 80, Easing.Out)
+                .Then()
+                .FadeTo(0.65f, 220, Easing.Out);
+        }
+
+        private void hideArmedGlow()
+        {
+            armedGlowRing.ClearTransforms();
+            armedGlowRing.Hide();
         }
 
         public void Impact()
