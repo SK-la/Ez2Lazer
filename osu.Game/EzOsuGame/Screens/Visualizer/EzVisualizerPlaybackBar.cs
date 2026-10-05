@@ -17,6 +17,9 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Acrylic;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
@@ -47,9 +50,12 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         private IconButton jumpButton = null!;
         private IconButton playlistButton = null!;
         private Drawable controls = null!;
+        private Box classicBackground = null!;
+        private EzAcrylicPanelBackground acrylicBackground = null!;
 
         private readonly Bindable<MusicLoopMode> loopMode = new Bindable<MusicLoopMode>();
         private Bindable<bool> allowTrackControl = null!;
+        private Bindable<bool> acrylicUiEnabled = null!;
         private bool setInFavourites;
 
         [Resolved]
@@ -80,8 +86,10 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(Ez2ConfigManager ezConfig)
         {
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+
             InternalChildren = new[]
             {
                 // Always-present full-area target: hover anywhere in the bar region shows controls.
@@ -101,7 +109,11 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
                     Alpha = 0,
                     Children = new Drawable[]
                     {
-                        new Box
+                        acrylicBackground = new EzAcrylicPanelBackground(EzAcrylicStyle.FooterVeil)
+                        {
+                            AcrylicCaptureVisible = false,
+                        },
+                        classicBackground = new Box
                         {
                             RelativeSizeAxes = Axes.Both,
                             Colour = Color4.Black.Opacity(0.55f),
@@ -199,6 +211,8 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
             loopMode.BindTo(musicController.LoopMode);
             loopMode.BindValueChanged(_ => updateLoopButton(), true);
 
+            EzAcrylicOverlayAlpha.BindExclusive(classicBackground, acrylicBackground, acrylicUiEnabled);
+
             visualizerScreen?.PlaylistState.BindValueChanged(s =>
                 playlistButton.FadeColour(s.NewValue == Visibility.Visible ? colours.Yellow : Color4.White, 200, Easing.OutQuint), true);
 
@@ -220,13 +234,21 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
         protected override bool OnHover(HoverEvent e)
         {
             controls.FadeIn(fade_duration, Easing.OutQuint);
+            setAcrylicCaptureVisible(true);
             return base.OnHover(e);
         }
 
         protected override void OnHoverLost(HoverLostEvent e)
         {
             controls.FadeOut(fade_duration, Easing.OutQuint);
+            setAcrylicCaptureVisible(false);
             base.OnHoverLost(e);
+        }
+
+        private void setAcrylicCaptureVisible(bool visible)
+        {
+            acrylicBackground.AcrylicCaptureVisible = visible;
+            acrylicBackground.SyncAcrylicCaptureState();
         }
 
         private void onTrackChanged(WorkingBeatmap working, TrackChangeDirection direction = TrackChangeDirection.None)

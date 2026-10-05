@@ -12,6 +12,9 @@ using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Acrylic;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osuTK.Graphics;
 using Realms;
@@ -45,11 +48,15 @@ namespace osu.Game.Overlays.Music
 
         private FilterControl filter = null!;
         private Playlist list = null!;
+        private Box classicBackground = null!;
+        private EzAcrylicPanelBackground acrylicBackground = null!;
+        private Bindable<bool> acrylicUiEnabled = null!;
 
         [BackgroundDependencyLoader]
-        private void load(OsuColour colours, Bindable<WorkingBeatmap> beatmap)
+        private void load(OsuColour colours, Bindable<WorkingBeatmap> beatmap, Ez2ConfigManager ezConfig)
         {
             this.beatmap.BindTo(beatmap);
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
 
             Children = new Drawable[]
             {
@@ -66,7 +73,11 @@ namespace osu.Game.Overlays.Music
                     },
                     Children = new Drawable[]
                     {
-                        new Box
+                        acrylicBackground = new EzAcrylicPanelBackground(EzAcrylicStyle.FooterVeil)
+                        {
+                            AcrylicCaptureVisible = false,
+                        },
+                        classicBackground = new Box
                         {
                             Colour = colours.Gray3,
                             RelativeSizeAxes = Axes.Both,
@@ -112,6 +123,8 @@ namespace osu.Game.Overlays.Music
 
             list.RowData.BindTo(filteredSets);
             beatmap.BindValueChanged(working => SelectedSet.Value = working.NewValue.BeatmapSetInfo.ToLive(realm), true);
+
+            EzAcrylicOverlayAlpha.BindExclusive(classicBackground, acrylicBackground, acrylicUiEnabled);
         }
 
         private void applyFilter(FilterCriteria criteria)
@@ -176,6 +189,8 @@ namespace osu.Game.Overlays.Music
             filter.Search.HoldFocus = true;
             Schedule(() => filter.Search.TakeFocus());
 
+            setAcrylicCaptureVisible(true);
+
             this.ResizeHeightTo(RelativeSizeAxes.HasFlag(Axes.Y) ? 1f : PLAYLIST_HEIGHT, transition_duration, Easing.OutQuint);
             this.FadeIn(transition_duration, Easing.OutQuint);
         }
@@ -184,8 +199,16 @@ namespace osu.Game.Overlays.Music
         {
             filter.Search.HoldFocus = false;
 
+            setAcrylicCaptureVisible(false);
+
             this.ResizeHeightTo(0, transition_duration, Easing.OutQuint);
             this.FadeOut(transition_duration);
+        }
+
+        private void setAcrylicCaptureVisible(bool visible)
+        {
+            acrylicBackground.AcrylicCaptureVisible = visible;
+            acrylicBackground.SyncAcrylicCaptureState();
         }
 
         public void ItemSelected(Live<BeatmapSetInfo> beatmapSet)
