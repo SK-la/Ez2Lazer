@@ -202,7 +202,8 @@ namespace osu.Game.Scoring
 
         public IEnumerable<string> HandledExtensions => scoreImporter.HandledExtensions;
 
-        public Task<IEnumerable<Live<ScoreInfo>>> Import(ProgressNotification notification, ImportTask[] tasks, ImportParameters parameters = default) => scoreImporter.Import(notification, tasks);
+        public Task<IEnumerable<Live<ScoreInfo>>> Import(ProgressNotification notification, ImportTask[] tasks, ImportParameters parameters = default) =>
+            scoreImporter.Import(notification, tasks, parameters);
 
         /// <summary>
         /// Export a replay from a given <see cref="IScoreInfo"/>.

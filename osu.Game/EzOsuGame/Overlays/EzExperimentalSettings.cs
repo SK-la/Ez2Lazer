@@ -278,61 +278,29 @@ namespace osu.Game.EzOsuGame.Overlays
                         return;
                     }
 
-                    notifications?.Post(new SimpleNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_BUSY });
-
-                    onlinePullService.PullAsync(request).ContinueWith(t => Schedule(() =>
+                    if (notifications == null)
                     {
-                        if (t.IsFaulted)
-                        {
-                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_FAILED });
-                            return;
-                        }
+                        onlinePullService.PullAsync(request);
+                        return;
+                    }
 
-                        if (t.IsCanceled)
-                            return;
+                    var notification = EzLocalProfileOnlinePullNotification.Create();
+                    notifications.Post(notification);
 
-                        var result = t.GetResultSafely();
+                    var progress = new EzLocalProfileOnlinePullNotification.Forwarder(notification);
 
-                        if (result.ErrorMessage == "need_online")
-                        {
-                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_NEED_ONLINE });
-                            return;
-                        }
+                    onlinePullService.PullAsync(request, progress, notification.CancellationToken)
+                                    .ContinueWith(t =>
+                                    {
+                                        var result = EzLocalProfileOnlinePullNotification.Finish(t, notification, notifications);
 
-                        if (result.ErrorMessage == "already_pulling")
-                        {
-                            notifications?.Post(new SimpleNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_BUSY });
-                            return;
-                        }
-
-                        if (!string.IsNullOrEmpty(result.ErrorMessage) && result.ErrorMessage != "cancelled")
-                        {
-                            notifications?.Post(new SimpleErrorNotification { Text = EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_FAILED });
-                            return;
-                        }
-
-                        if (result.ErrorMessage == "cancelled")
-                            return;
-
-                        notifications?.Post(new SimpleNotification
-                        {
-                            Text = string.Format(
-                                EzSettingsProfile.LOCAL_PROFILE_ONLINE_PULL_DONE.ToString(),
-                                result.Candidates,
-                                result.Imported,
-                                result.AlreadyOwned,
-                                result.NoReplay,
-                                result.MissingBeatmap,
-                                result.Failed,
-                                result.StatsRecorded,
-                                result.MapsDownloaded,
-                                result.MapsAlreadyLocal,
-                                result.CollectionAdds),
-                        });
-
-                        if (result.StatsRecorded > 0 && localProfileService is not null && !localProfileService.IsComputing.Value)
-                            runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), clearRebuild: false, notifications);
-                    }));
+                                        if (result is { StatsRecorded: > 0 }
+                                            && localProfileService is not null
+                                            && !localProfileService.IsComputing.Value)
+                                        {
+                                            runCompute(localProfileService, localProfileService.GetPreviouslyIncludedUsernames(), clearRebuild: false, notifications);
+                                        }
+                                    });
                 }));
         }
 
