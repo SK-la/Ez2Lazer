@@ -56,9 +56,30 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var ez2AcHoldStates = new Dictionary<HoldNote, Ez2AcHoldState>();
             var judgedTicks = new HashSet<HoldNoteTick>();
 
+            // 对齐局内 Column.ProcessAutoMiss：越过 late miss 边界立刻被动 Miss，
+            // 否则未命中会拖到 end-sweep，中段 combo 不断 → MaxCombo 虚高。
+            var autoMissQueue = buildAutoMissQueue(pressColumns, releaseColumns, environment.ManiaHitMode);
+            int autoMissCursor = 0;
+
             foreach (var input in inputData.SortedEvents)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                // 间隙内到期的被动 Miss 必须先于本次按键生效（否则 MaxCombo 会跨过空窗继续涨）。
+                // 与局内同帧「先输入、后 UpdateAfterChildren.ProcessAutoMiss」对齐：本帧 =t 的到期留到输入之后。
+                applyAutoMissesUpTo(
+                    input.Time,
+                    autoMissQueue,
+                    ref autoMissCursor,
+                    holdByHead,
+                    headByTail,
+                    activeHoldByColumn,
+                    inputData.PressTimesByColumn,
+                    scoreProcessor,
+                    gameplayRate,
+                    environment.ManiaHitMode,
+                    timelineRecorder,
+                    endExclusive: true);
 
                 bool wasHoldingBeforeEvent = keyHeldByColumn.TryGetValue(input.Column, out bool held) && held;
 
@@ -426,12 +447,41 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         state.OnHeadJudged(Ez2AcHitModeJudgement.FromHitResult(result), preHeld: wasHoldingBeforeEvent);
                     }
                 }
+
+                // 局内同帧：输入之后 Column.ProcessAutoMiss(Time.Current)。
+                applyAutoMissesUpTo(
+                    input.Time,
+                    autoMissQueue,
+                    ref autoMissCursor,
+                    holdByHead,
+                    headByTail,
+                    activeHoldByColumn,
+                    inputData.PressTimesByColumn,
+                    scoreProcessor,
+                    gameplayRate,
+                    environment.ManiaHitMode,
+                    timelineRecorder,
+                    endExclusive: false);
             }
 
             // 收尾：剩余 tick + EZ2AC 未判尾（持满不松）
             double endTime = inputData.SortedEvents.Count > 0
                 ? inputData.SortedEvents[^1].Time + 1
                 : beatmap.HitObjects.LastOrDefault()?.GetEndTime() ?? 0;
+
+            applyAutoMissesUpTo(
+                endTime + 10_000,
+                autoMissQueue,
+                ref autoMissCursor,
+                holdByHead,
+                headByTail,
+                activeHoldByColumn,
+                inputData.PressTimesByColumn,
+                scoreProcessor,
+                gameplayRate,
+                environment.ManiaHitMode,
+                timelineRecorder,
+                endExclusive: false);
 
             applyEz2AcTicksUpTo(
                 endTime + 10_000,
@@ -464,6 +514,128 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 map[hold] = state = new Ez2AcHoldState();
 
             return state;
+        }
+
+        private static List<(double Deadline, LaneTargetState State)> buildAutoMissQueue(
+            Dictionary<int, List<LaneTargetState>> pressColumns,
+            Dictionary<int, List<LaneTargetState>> releaseColumns,
+            EzEnumHitMode hitMode)
+        {
+            var queue = new List<(double Deadline, LaneTargetState State)>();
+
+            foreach (var list in pressColumns.Values.Concat(releaseColumns.Values))
+            {
+                foreach (var state in list)
+                    queue.Add((GetSessionAutoMissDeadline(state.Target, hitMode), state));
+            }
+
+            queue.Sort((a, b) => a.Deadline.CompareTo(b.Deadline));
+            return queue;
+        }
+
+        /// <summary>
+        /// 对齐局内 <see cref="ManiaLaneController.GetAutoMissEvaluationTime"/> + Tail 松手宽限下
+        /// <c>CanBeHit(offset / RELEASE_WINDOW_LENIENCE)</c> 首次失败的时刻。
+        /// </summary>
+        internal static double GetSessionAutoMissDeadline(HitObject target, EzEnumHitMode hitMode)
+        {
+            if (target.HitWindows == null || ReferenceEquals(target.HitWindows, HitWindows.Empty))
+                return target.GetEndTime();
+
+            // Note/Head：与 GetAutoMissEvaluationTime 一致（晚侧 Miss 窗起开始被动 Miss）。
+            // Tail：局内从 MissLate 起轮询，真正 Apply 在 !CanBeHit(offset/lenience) 时
+            // （LowestSuccessful=Meh），即 End + MehWindow * RELEASE_WINDOW_LENIENCE。
+            double missLate = target.HitWindows is ManiaHitWindows maniaWindows
+                ? maniaWindows.MissLateWindow
+                : target.HitWindows.WindowFor(HitResult.Miss);
+
+            double deadline = target.GetEndTime() + missLate;
+
+            if (target is TailNote && usesTailReleaseLenience(hitMode))
+            {
+                // CanBeHit 用 LowestSuccessful（Mania=Meh）；Tail 先 / lenience 再判断。
+                double canBeHitWindow = target.HitWindows.WindowFor(HitResult.Meh) * TailNote.RELEASE_WINDOW_LENIENCE;
+                deadline = Math.Max(deadline, target.GetEndTime() + canBeHitWindow);
+            }
+
+            return deadline;
+        }
+
+        private static void applyAutoMissesUpTo(
+            double time,
+            List<(double Deadline, LaneTargetState State)> autoMissQueue,
+            ref int autoMissCursor,
+            Dictionary<HeadNote, HoldNote> holdByHead,
+            Dictionary<TailNote, HeadNote> headByTail,
+            Dictionary<int, HeadNote> activeHoldByColumn,
+            IReadOnlyDictionary<int, List<double>> pressTimesByColumn,
+            ScoreProcessor scoreProcessor,
+            double gameplayRate,
+            EzEnumHitMode hitMode,
+            ManiaReplayTimelineRecorder? timelineRecorder,
+            bool endExclusive = false)
+        {
+            while (autoMissCursor < autoMissQueue.Count
+                   && (endExclusive
+                       ? autoMissQueue[autoMissCursor].Deadline < time
+                       : autoMissQueue[autoMissCursor].Deadline <= time))
+            {
+                var (deadline, state) = autoMissQueue[autoMissCursor];
+                autoMissCursor++;
+
+                if (state.Judged)
+                    continue;
+
+                state.Judged = true;
+                state.Result = HitResult.Miss;
+
+                double missEventTime = deadline;
+                double storedOffset = ResolveMissStoredOffset(state.Target, pressTimesByColumn, missEventTime);
+
+                ApplyFinalResult(
+                    scoreProcessor,
+                    state.Target,
+                    HitResult.Miss,
+                    storedOffset,
+                    missEventTime,
+                    gameplayRate,
+                    hitMode,
+                    timelineRecorder);
+
+                clearActiveHoldAfterPassiveMiss(state.Target, headByTail, activeHoldByColumn);
+
+                if (state.Target is TailNote tailNote
+                    && headByTail.TryGetValue(tailNote, out var linkedHead)
+                    && holdByHead.TryGetValue(linkedHead, out var hold))
+                {
+                    if (hold.Body != null && !state.BodyJudged)
+                    {
+                        state.BodyJudged = true;
+                        ApplyAuxiliaryResult(scoreProcessor, hold.Body, HitResult.ComboBreak, storedOffset, missEventTime, gameplayRate, timelineRecorder);
+                    }
+
+                    ApplyAuxiliaryResult(scoreProcessor, hold, HitResult.IgnoreMiss, storedOffset, missEventTime, gameplayRate, timelineRecorder);
+                }
+            }
+        }
+
+        private static void clearActiveHoldAfterPassiveMiss(
+            HitObject target,
+            Dictionary<TailNote, HeadNote> headByTail,
+            Dictionary<int, HeadNote> activeHoldByColumn)
+        {
+            HeadNote? head = target switch
+            {
+                HeadNote h => h,
+                TailNote t when headByTail.TryGetValue(t, out var linked) => linked,
+                _ => null,
+            };
+
+            if (head == null)
+                return;
+
+            if (activeHoldByColumn.TryGetValue(head.Column, out var active) && ReferenceEquals(active, head))
+                activeHoldByColumn.Remove(head.Column);
         }
 
         private static void tryApplyEz2AcHoldRelease(
