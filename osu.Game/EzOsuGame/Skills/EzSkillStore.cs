@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyDictionary<string, double> GetBeatmapSkills(string beatmapHash, string systemId, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
             return realmAccess.Run(r =>
             {
@@ -57,7 +57,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (hashSet.Count == 0)
                 return new Dictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal);
 
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
             return realmAccess.Run(r =>
             {
@@ -252,7 +252,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public IReadOnlyDictionary<string, double> GetPlayerSkills(string username, int keyCount, string systemId, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
 
             return realmAccess.Run(r =>
             {

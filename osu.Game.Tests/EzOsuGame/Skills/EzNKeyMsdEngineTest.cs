@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -249,14 +250,40 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(registry.GetSystem(EzSkillSystems.BEATMAP_MSD), Is.Not.Null);
             Assert.That(registry.GetSystem(EzSkillSystems.PLAYER_SSR), Is.Not.Null);
             Assert.That(registry.GetSystem(EzSkillSystems.DAN), Is.Not.Null);
+            Assert.That(registry.GetSystem(EzSkillSystems.BEATMAP_OSU_DIFF), Is.Not.Null);
+            Assert.That(registry.GetSystem(EzSkillSystems.PLAYER_OSU_PERF), Is.Not.Null);
 
             Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.BEATMAP_MSD}.", StringComparison.Ordinal)));
             Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.PLAYER_SSR}.", StringComparison.Ordinal)));
             Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.DAN}.", StringComparison.Ordinal)));
+            Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.BEATMAP_OSU_DIFF}.", StringComparison.Ordinal)));
+            Assert.That(registry.AllSkills.Any(s => s.SkillId.StartsWith($"{EzSkillSystems.PLAYER_OSU_PERF}.", StringComparison.Ordinal)));
 
             // No skill id is shared across systems.
             var ids = registry.AllSkills.Select(s => s.SkillId).ToList();
             Assert.That(ids.Distinct().Count(), Is.EqualTo(ids.Count));
+        }
+
+        [Test]
+        public void Profiles_split_mania_and_osu_plugins()
+        {
+            var registry = new EzSkillRegistry();
+
+            var mania = registry.GetProfile(EzLocalProfileConstants.MANIA_RULESET_ID);
+            Assert.That(mania, Is.Not.Null);
+            Assert.That(mania!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_MSD));
+            Assert.That(mania.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_SSR));
+            Assert.That(mania.ContainsSystem(EzSkillSystems.DAN), Is.True);
+            Assert.That(mania.ContainsSystem(EzSkillSystems.BEATMAP_OSU_DIFF), Is.False);
+
+            var osu = registry.GetProfile(EzLocalProfileConstants.OSU_RULESET_ID);
+            Assert.That(osu, Is.Not.Null);
+            Assert.That(osu!.DefaultChartSystemId, Is.EqualTo(EzSkillSystems.BEATMAP_OSU_DIFF));
+            Assert.That(osu.DefaultPlayerSystemId, Is.EqualTo(EzSkillSystems.PLAYER_OSU_PERF));
+            Assert.That(osu.ContainsSystem(EzSkillSystems.BEATMAP_MSD), Is.False);
+
+            Assert.That(registry.GetProfile(1), Is.Null); // taiko — no plugin yet
+            Assert.That(registry.GetProfile(2), Is.Null); // catch
         }
     }
 

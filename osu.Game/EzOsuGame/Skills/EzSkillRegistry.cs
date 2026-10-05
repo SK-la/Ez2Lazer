@@ -8,9 +8,8 @@ using System.Linq;
 namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
-    /// Catalog of skill systems. Default systems cover current Mina MSD/SSR + dan tracks for keys 4–9.
-    /// Reserved: register additional <see cref="IEzSkillSystem"/> implementations for keymode-specific axis sets
-    /// (do not replace this with a hard-coded Mina-only list when that lands).
+    /// Catalog of skill systems (mania Mina/SSR/pattern/dan + osu diff/perf, …).
+    /// Ruleset consumers should prefer <see cref="GetProfile"/> over hard-coded OnlineID checks.
     /// </summary>
     public sealed class EzSkillRegistry
     {
@@ -36,12 +35,23 @@ namespace osu.Game.EzOsuGame.Skills
         public IEnumerable<EzSkillDefinition> AllSkills
             => systems.Values.SelectMany(s => s.Skills);
 
+        public IEnumerable<IEzSkillSystem> GetSystemsForRuleset(int rulesetOnlineId)
+            => systems.Values.Where(s => s.AppliesToRuleset(rulesetOnlineId));
+
+        public EzSkillProfile? GetProfile(int rulesetOnlineId)
+            => EzSkillProfile.TryBuild(rulesetOnlineId, this);
+
         public static IEnumerable<IEzSkillSystem> CreateDefaultSystems()
         {
+            // Mania plugins
             yield return new BeatmapMsdSkillSystem();
             yield return new PlayerSsrSkillSystem();
             yield return new PlayerPatternSkillSystem();
             yield return new DanSkillSystem();
+
+            // osu!standard plugins
+            yield return new BeatmapOsuDiffSkillSystem();
+            yield return new PlayerOsuPerfSkillSystem();
         }
     }
 }
