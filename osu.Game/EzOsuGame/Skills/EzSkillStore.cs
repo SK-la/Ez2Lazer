@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using Realms;
@@ -98,6 +97,100 @@ namespace osu.Game.EzOsuGame.Skills
 
             value = found;
             return true;
+        }
+
+        /// <summary>
+        /// Replace all beatmap skill rows for <paramref name="systemId"/> with <paramref name="skills"/>.
+        /// </summary>
+        public void WriteBeatmapSystemSkills(
+            string beatmapHash,
+            string systemId,
+            IReadOnlyDictionary<string, double> skills,
+            Guid beatmapId = default,
+            DateTimeOffset? computedAt = null,
+            int? algorithmVersion = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(beatmapHash);
+            ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
+            ArgumentNullException.ThrowIfNull(skills);
+
+            DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzBeatmapSkillValue>()
+                                .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+
+                foreach (var (skillId, value) in skills)
+                {
+                    r.Add(new EzBeatmapSkillValue
+                    {
+                        BeatmapHash = beatmapHash,
+                        BeatmapId = beatmapId,
+                        SystemId = systemId,
+                        SkillId = skillId,
+                        Value = value,
+                        AlgorithmVersion = version,
+                        ComputedAt = at,
+                    });
+                }
+            });
+        }
+
+        /// <summary>
+        /// Replace all player skill rows for (<paramref name="username"/>, <paramref name="sliceKey"/>, <paramref name="systemId"/>).
+        /// </summary>
+        public void WritePlayerSystemSkills(
+            string username,
+            int sliceKey,
+            string systemId,
+            IReadOnlyDictionary<string, double> skills,
+            int analyzedPlays,
+            bool provisional = false,
+            bool stale = false,
+            DateTimeOffset? computedAt = null,
+            int? algorithmVersion = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(username);
+            ArgumentException.ThrowIfNullOrWhiteSpace(systemId);
+            ArgumentNullException.ThrowIfNull(skills);
+
+            DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
+
+            realmAccess.Write(r =>
+            {
+                var existing = r.All<EzPlayerSkillValue>()
+                                .Where(v => v.Username == username
+                                            && v.KeyCount == sliceKey
+                                            && v.SystemId == systemId)
+                                .ToList();
+
+                foreach (var row in existing)
+                    r.Remove(row);
+
+                foreach (var (skillId, value) in skills)
+                {
+                    r.Add(new EzPlayerSkillValue
+                    {
+                        Username = username,
+                        KeyCount = sliceKey,
+                        SystemId = systemId,
+                        SkillId = skillId,
+                        Value = value,
+                        AnalyzedPlays = analyzedPlays,
+                        Provisional = provisional,
+                        Stale = stale,
+                        AlgorithmVersion = version,
+                        ComputedAt = at,
+                    });
+                }
+            });
         }
 
         public void WriteBeatmapMsd(string beatmapHash, EzSkillsetVector vector, Guid beatmapId = default, DateTimeOffset? computedAt = null, double? holdRatio = null)

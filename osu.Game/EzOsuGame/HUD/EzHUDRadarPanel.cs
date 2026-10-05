@@ -22,6 +22,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics.Sprites;
@@ -171,6 +172,9 @@ namespace osu.Game.EzOsuGame.HUD
 
         [Resolved]
         private EzSkillProvider? skillProvider { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private EzBeatmapOsuDiffComputer? beatmapOsuDiffComputer { get; set; }
 
         [Resolved]
         private EzAnalysisPlayerSelection? ezAnalysisPlayerSelection { get; set; }
@@ -448,7 +452,35 @@ namespace osu.Game.EzOsuGame.HUD
         {
             var beatmapInfo = beatmap.Value.BeatmapInfo;
 
-            if (beatmapInfo == null || beatmapInfo.Ruleset.OnlineID != 3)
+            if (beatmapInfo == null)
+            {
+                cancelLiveKick();
+                cancelRadarAnalysis();
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            var profile = skillProvider?.GetProfile(beatmapInfo.Ruleset.OnlineID);
+
+            if (profile == null)
+            {
+                cancelLiveKick();
+                cancelRadarAnalysis();
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            if (beatmapInfo.Ruleset.OnlineID == EzLocalProfileConstants.OSU_RULESET_ID)
+            {
+                cancelLiveKick();
+                cancelRadarAnalysis();
+                updateOsuSkillRadarPresentation(beatmapInfo, profile);
+                return;
+            }
+
+            if (beatmapInfo.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
             {
                 cancelLiveKick();
                 cancelRadarAnalysis();
@@ -594,6 +626,117 @@ namespace osu.Game.EzOsuGame.HUD
             int holdCount = EzChartDanEstimator.TryHoldCountFromBeatmapInfo(beatmapInfo);
 
             return EzDanAlgorithm.AllowsPersistedChartLnHalf(keyCount, holdRatio, holdCount);
+        }
+
+        private void updateOsuSkillRadarPresentation(BeatmapInfo beatmapInfo, EzSkillProfile profile)
+        {
+            string chartSystemId = profile.DefaultChartSystemId ?? EzSkillSystems.BEATMAP_OSU_DIFF;
+            string playerSystemId = profile.DefaultPlayerSystemId ?? EzSkillSystems.PLAYER_OSU_PERF;
+
+            IReadOnlyDictionary<string, double> chartSkills =
+                beatmapOsuDiffComputer?.TryGetOrCompute(beatmapInfo)
+                ?? skillProvider?.GetBeatmapSystemSkills(beatmapInfo.Hash, chartSystemId)
+                ?? new Dictionary<string, double>();
+
+            string? username = TargetUsername.Value;
+            IReadOnlyDictionary<string, double> playerSkills = new Dictionary<string, double>();
+
+            if (!string.IsNullOrWhiteSpace(username) && skillProvider != null)
+                playerSkills = skillProvider.GetPlayerSystemSkills(username, EzSkillSystems.OSU_SLICE_KEY, playerSystemId);
+
+            bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.SkillChart;
+            const double display_min = 0.01;
+
+            var selected = new List<EzOsuSkillAxis>();
+
+            foreach (var axis in EzOsuSkillAxisExtensions.ChartAxes)
+            {
+                double chartValue = chartSkills.GetValueOrDefault(axis.ToDiffSkillId(), 0);
+                if (!double.IsFinite(chartValue) || chartValue < display_min)
+                    continue;
+
+                if (beatmapOnly)
+                {
+                    selected.Add(axis);
+                    continue;
+                }
+
+                double playerValue = playerSkills.GetValueOrDefault(axis.ToPerfSkillId(), 0);
+                if (!double.IsFinite(playerValue) || playerValue < display_min)
+                    continue;
+
+                selected.Add(axis);
+            }
+
+            if (selected.Count == 0 && !beatmapOnly)
+            {
+                foreach (var axis in EzOsuSkillAxisExtensions.ChartAxes)
+                {
+                    double chartValue = chartSkills.GetValueOrDefault(axis.ToDiffSkillId(), 0);
+                    if (double.IsFinite(chartValue) && chartValue >= display_min)
+                        selected.Add(axis);
+                }
+            }
+
+            if (selected.Count == 0)
+            {
+                clearChartData();
+                chart?.ClearSecondaryData();
+                return;
+            }
+
+            AxisCount = Math.Max(3, selected.Count);
+            activeAxisLabels = new string[AxisCount];
+            activeAxisFormats = Enumerable.Repeat("0.00", AxisCount).ToArray();
+
+            double maxValue = 0;
+            double[] chartValues = new double[AxisCount];
+            double[] playerValues = new double[AxisCount];
+
+            for (int i = 0; i < selected.Count; i++)
+            {
+                var axis = selected[i];
+                activeAxisLabels[i] = axis.Meta().NameEn;
+                double beatmapValue = chartSkills.GetValueOrDefault(axis.ToDiffSkillId(), 0);
+                double playerValue = beatmapOnly ? 0 : playerSkills.GetValueOrDefault(axis.ToPerfSkillId(), 0);
+                if (playerValue < display_min)
+                    playerValue = 0;
+
+                chartValues[i] = beatmapValue;
+                playerValues[i] = playerValue;
+                parameterValues[i] = (float)beatmapValue;
+                maxValue = Math.Max(maxValue, Math.Max(beatmapValue, playerValue));
+            }
+
+            for (int i = selected.Count; i < AxisCount; i++)
+            {
+                activeAxisLabels[i] = string.Empty;
+                chartValues[i] = 0;
+                playerValues[i] = 0;
+                parameterValues[i] = 0;
+            }
+
+            if (maxValue <= 0)
+                maxValue = 1;
+
+            float[] beatmapRatios = new float[AxisCount];
+            float[] playerRatios = new float[AxisCount];
+
+            for (int i = 0; i < AxisCount; i++)
+            {
+                beatmapRatios[i] = (float)(chartValues[i] / maxValue);
+                playerRatios[i] = (float)(playerValues[i] / maxValue);
+            }
+
+            chart?.SetData(beatmapRatios);
+
+            if (beatmapOnly)
+                chart?.ClearSecondaryData();
+            else
+                chart?.SetSecondaryData(playerRatios);
+
+            updateAxisTexts();
+            applyChartColours();
         }
 
         private void applySkillRadarLayers(
