@@ -14,6 +14,7 @@ namespace osu.Game.Screens.Menu
     {
         private IBindable<APIUser> user = null!;
         private Bindable<Skin> skin = null!;
+        private Color4? colourOverride;
 
         [BackgroundDependencyLoader]
         private void load(IAPIProvider api, SkinManager skinManager)
@@ -25,8 +26,26 @@ namespace osu.Game.Screens.Menu
             skin.BindValueChanged(_ => UpdateColour(), true);
         }
 
+        /// <summary>
+        /// Temporarily overrides skin/user glow colour. Pass <c>null</c> to restore immediately.
+        /// When setting a colour, the caller may animate with <c>FadeColour</c>; skin updates still respect the override.
+        /// </summary>
+        public void SetColourOverride(Color4? colour)
+        {
+            colourOverride = colour;
+
+            if (colour == null)
+                UpdateColour();
+        }
+
         protected virtual void UpdateColour()
         {
+            if (colourOverride != null)
+            {
+                Colour = colourOverride.Value;
+                return;
+            }
+
             if (user.Value?.IsSupporter ?? false)
                 Colour = skin.Value.GetConfig<GlobalSkinColours, Color4>(GlobalSkinColours.MenuGlow)?.Value ?? Color4.White;
             else

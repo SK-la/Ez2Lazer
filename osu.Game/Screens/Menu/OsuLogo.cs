@@ -118,6 +118,8 @@ namespace osu.Game.Screens.Menu
 
         private const float visualizer_default_alpha = 0.5f;
 
+        private static readonly Color4 armed_visualiser_colour = Color4Extensions.FromHex(@"00A8E8");
+
         private readonly Box flashLayer;
 
         private readonly Container impactContainer;
@@ -567,11 +569,16 @@ namespace osu.Game.Screens.Menu
         private void applyArmedDim()
         {
             logoContainer.FadeTo(0.85f, 120, Easing.Out);
+            visualizer.SetColourOverride(armed_visualiser_colour);
+            visualizer.FadeColour(armed_visualiser_colour, 120, Easing.Out);
+            ripple.FadeColour(armed_visualiser_colour, 120, Easing.Out);
         }
 
         private void clearArmedDim()
         {
             logoContainer.FadeTo(1f, 100, Easing.Out);
+            visualizer.SetColourOverride(null);
+            ripple.FadeColour(Color4.White, 100, Easing.Out);
         }
 
         public void Impact()
