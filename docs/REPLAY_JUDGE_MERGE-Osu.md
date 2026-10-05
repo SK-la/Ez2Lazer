@@ -33,8 +33,16 @@ Parity：`TestSceneOsuReplaySessionParity`（circle / slider / spinner）。
 | Timeline | `OsuReplayTimelineRecorder.cs` | done |
 | Session 引擎（Mapping） | `ReplayJudge/Session/*` | **done（OSL-011）**；原 `Shadow/` 已删 |
 | 判定 helper / Drawable 一行 | `ReplayJudge/Judgement` | **done（OSL-011）** |
-| Session 读 env | Simulator / Engine | **open（OSL-012）** |
+| Session 读 env | Simulator / Engine | **OSL-012**：已读 `OffsetPlusNonMania` / `OsuJudgementTrack`；**Offset 不进判窗**（见下） |
 | ClassicNative 轨 | Mapping + ScoreProcessor | **open（OSL-013）** |
+
+### OffsetPlusNonMania（禁叠判）
+
+权威：[EZ-SR-TL-REGISTRY.md](./EZ-SR-TL-REGISTRY.md) §1.7b Offset 原则。
+
+- **Drawable 局内**：裸输入 → `timeOffset += OffsetPlusNonMania` 再进判窗。
+- **Session 吃 replay**：帧时刻已是有效输入；`ResultForPress` / 滑条头窗用裸帧差；**禁止**再把 OffsetPlus 叠进判窗（相对帧 = 加两次）。
+- Resolve：ForStored / 分析 ignoreOffset → `OffsetPlusNonMania=0`。非 0 时至多影响 HitEvent.`TimeOffset` 元数据，不改 `HitResult`。
 
 ---
 

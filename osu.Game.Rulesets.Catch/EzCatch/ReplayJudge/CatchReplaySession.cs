@@ -68,6 +68,7 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
             recorder?.RecordInitial(scoreProcessor, gameplayRate);
 
             float halfWidth = Catcher.CalculateCatchWidth(beatmap.Difficulty) * 0.5f;
+            // REGISTRY §1.7b：接盘用裸帧时刻；OffsetPlus 不进 IsCaughtInWindow（禁相对 replay 叠两遍）。
             double inputOffset = environment.OffsetPlusNonMania;
 
             var frames = score.Replay.Frames.OfType<CatchReplayFrame>().OrderBy(f => f.Time).ToList();
@@ -145,6 +146,7 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
             EzReplayTimelineRecorder? recorder)
         {
             var judgementResult = new CatchJudgementResult(hitObject, hitObject.Judgement) { Type = result };
+            // 仅 HitEvent.TimeOffset 元数据；Result 已由接盘判定给定。
             double timeOffset = Math.Min(judgementClockTime - hitObject.GetEndTime() + inputOffset, hitObject.MaximumJudgementOffset);
             JudgementResultTimingHelper.ApplyTiming(judgementResult, timeOffset, gameplayRate);
             scoreProcessor.ApplyResult(judgementResult);

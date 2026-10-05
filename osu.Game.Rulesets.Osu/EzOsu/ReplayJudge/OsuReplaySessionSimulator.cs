@@ -15,7 +15,8 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
     /// Osu Session 仿真入口；委托 <see cref="OsuReplaySessionEngine"/>（OSL-011 Mapping）。
     /// </summary>
     /// <remarks>
-    /// 见 docs/REPLAY_JUDGE_SHADOW.md · MERGE-Osu。env 消费见 TODO(EZ-SR-OSL-012)。
+    /// 见 docs/REPLAY_JUDGE_SHADOW.md · MERGE-Osu。
+    /// OffsetPlusNonMania：REGISTRY §1.7b — Session 不叠进判窗；轨字段见 OSL-013。
     /// </remarks>
     internal static class OsuReplaySessionSimulator
     {
@@ -30,7 +31,6 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
         {
             ArgumentNullException.ThrowIfNull(score.Replay);
 
-            // TODO(EZ-SR-OSL-012): 已消费 OffsetPlusNonMania；轨字段（ClassicNative）见 OSL-013。
             OsuReplaySessionEngine.Run(score, beatmap, scoreProcessor, gameplayRate, environment, timelineRecorder, cancellationToken);
         }
     }

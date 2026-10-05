@@ -33,6 +33,8 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
         {
             ArgumentNullException.ThrowIfNull(score.Replay);
 
+            // REGISTRY §1.7b：replay 帧已是有效输入；ForStored/分析路径 Resolve 后多为 0。
+            // 禁止把 OffsetPlus 再叠进下方 ResultForPress / 滑条头窗（相对帧会判两次）。
             double inputOffset = environment.OffsetPlusNonMania;
 
             var frames = score.Replay.Frames.OfType<OsuReplayFrame>().OrderBy(f => f.Time).ToList();
@@ -127,7 +129,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session
 
             configureResult?.Invoke(judgementResult);
 
-            // 对齐 Mania：判定侧加 input offset（帧时间不平移）。
+            // HitEvent.TimeOffset 元数据：可带 env offset。判窗已在 Scheduler/Slider 用裸帧时刻算完 Result，此处不得再改 Type。
             double timeOffset = Math.Min(judgementClockTime - hitObject.GetEndTime() + inputOffset, hitObject.MaximumJudgementOffset);
             JudgementResultTimingHelper.ApplyTiming(judgementResult, timeOffset, gameplayRate);
             scoreProcessor.ApplyResult(judgementResult);

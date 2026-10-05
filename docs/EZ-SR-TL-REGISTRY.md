@@ -116,7 +116,17 @@ Cache key 对**已解析** env 建键。
 | Graph offset 拖动（C） | — | fake 平移 HitEvents + Rejudge 预览，**不跑 Session** | — |
 | Graph offset 落定（D） | ForLive | debounce → `RefreshFromService`（Session offset=0，重置 DisplayOffset） | 与 base ForLive 同 key |
 
-**Offset 原则**：除真实对局 Drawable 外，replay Session 不考虑 `OffsetPlusMania`。Graph 假 offset（C/D）为**既有 UX**，本 epic 不改。
+**Offset 原则**（Mania / Osu / Taiko / Catch 共用）：
+
+| 路径 | OffsetPlus* 是否进**判窗**（ResultFor / 接盘） |
+|------|-----------------------------------------------|
+| 真实对局 Drawable | **是**（裸输入需加全局 offset） |
+| replay Session（Panel / Graph Now / Race / 重算 / OsrAudit） | **否** — Resolve 后多为 `0`；帧已是「有效输入时刻」 |
+
+- 字段含 `OffsetPlusMania` 与 `OffsetPlusNonMania`。
+- **禁止**：见 Drawable 在 `timeOffset` 上加了 offset，就再给 Session 的 `ResultForPress` / 接盘采样叠一遍 → **相对 replay 帧叠加两次**。
+- Session 若携带非 0 env offset，只允许进 HitEvent.`TimeOffset` 元数据路径（与判窗解耦）；分析基线仍以 offset=0 为准。
+- Graph 假 offset（C/D）为**既有 UX**，本 epic 不改。
 
 ### 1.7c 共出口分组（Mania / Osu，已实现）
 
@@ -407,7 +417,7 @@ flowchart LR
 | OSL-009 | **done** | Osu | Generator 瘦身为 Session 委托 |
 | OSL-010 | **done**（bridge） | Osu | Shadow 桥 + Parity；**非** Mania 级终态 |
 | OSL-011 | **done** | Osu | `Shadow/` 已删除；生产路径 `ReplayJudge/Session/*` + Judgement helpers；Drawable Circle/Slider/Spinner 同调 |
-| OSL-012 | **in progress** | Osu | `OffsetPlusNonMania` + `OsuJudgementTrack` 进 env/Session/Race cache；SongProgress `IsMiss`；Graph/Panel 矩阵复核仍 open |
+| OSL-012 | **in progress** | Osu | env 已读 `OffsetPlusNonMania`/`OsuJudgementTrack`；**Offset 不进 Session 判窗**（§1.7b）；Graph/Panel 矩阵复核仍 open |
 | OSL-013 | **in progress** | Osu | ClassicNative：窗口注入 Drawable+Session（`OsuScoreProcessor.ApplyBeatmap`）+ `IsLegacyScore`；设置项已挂；stable 总分细节 / 两轨 parity 仍 open |
 | TTL-001 | **done** | Taiko | Mapping Session + Race；全指标 OsrAudit + TimelineDirect；Strong/Roll/Swell helper 深 parity 测试 |
 | TSL-001 | **done** | Catch | Mapping Session + Race；全指标 OsrAudit + TimelineDirect；`CatchPlateJudgement` 与 Catcher 同调 |

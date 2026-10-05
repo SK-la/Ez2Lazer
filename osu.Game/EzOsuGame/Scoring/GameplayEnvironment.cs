@@ -19,6 +19,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
         public double OffsetPlusMania { get; init; }
 
+        /// <inheritdoc cref="IGameplayEnvironment.OffsetPlusNonMania"/>
         public double OffsetPlusNonMania { get; init; }
 
         public EzEnumOsuJudgementTrack OsuJudgementTrack { get; init; }
