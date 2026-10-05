@@ -19,6 +19,7 @@ using osu.Game.Collections;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
@@ -172,7 +173,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
                                     Position = new Vector2(bar_height / 2 + side_button_spacing, 0),
                                     Action = addCurrentSetToFavourites,
                                     Icon = FontAwesome.Regular.Heart,
-                                    TooltipText = @"Add to Favourites",
+                                    TooltipText = EzMusicStrings.ADD_TO_FAVOURITES,
                                 },
                                 jumpButton = new MusicIconButton
                                 {
@@ -190,7 +191,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
                                     Position = new Vector2(-bar_height / 2, 0),
                                     Icon = FontAwesome.Solid.Bars,
                                     Action = () => visualizerScreen?.TogglePlaylist(),
-                                    TooltipText = @"Playlist",
+                                    TooltipText = EzMusicStrings.PLAYLIST,
                                 },
                             }
                         }
@@ -336,7 +337,7 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
 
             favouriteButton.Icon = setInFavourites ? FontAwesome.Solid.Heart : FontAwesome.Regular.Heart;
             favouriteButton.FadeColour(setInFavourites ? colours.Pink1 : Color4.White, 200, Easing.OutQuint);
-            favouriteButton.TooltipText = setInFavourites ? @"In Favourites" : @"Add to Favourites";
+            favouriteButton.TooltipText = setInFavourites ? EzMusicStrings.IN_FAVOURITES : EzMusicStrings.ADD_TO_FAVOURITES;
         }
 
         private void updateEnabledStates()
@@ -360,19 +361,19 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
                 case MusicLoopMode.Single:
                     loopButton.Icon = FontAwesome.Solid.Redo;
                     loopButton.FadeColour(colours.Yellow, 200, Easing.OutQuint);
-                    loopButton.TooltipText = @"单曲循环";
+                    loopButton.TooltipText = EzMusicStrings.LOOP_SINGLE;
                     break;
 
                 case MusicLoopMode.Sequential:
                     loopButton.Icon = FontAwesome.Solid.Sync;
                     loopButton.FadeColour(Color4.White, 200, Easing.OutQuint);
-                    loopButton.TooltipText = @"顺序循环";
+                    loopButton.TooltipText = EzMusicStrings.LOOP_SEQUENTIAL;
                     break;
 
                 default:
                     loopButton.Icon = FontAwesome.Solid.Random;
                     loopButton.FadeColour(colours.Yellow, 200, Easing.OutQuint);
-                    loopButton.TooltipText = @"随机循环";
+                    loopButton.TooltipText = EzMusicStrings.LOOP_SHUFFLE;
                     break;
             }
         }
