@@ -72,6 +72,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
 
                 double startOffset = time - target.HitObject.StartTime;
                 HitResult result = OsuCircleJudgement.ResultForPress(target.HitObject.HitWindows!, startOffset);
+                if (result == HitResult.None)
+                    continue;
+
                 apply(target, result, time, position);
                 target.Judged = true;
                 return;
@@ -122,7 +125,8 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                 {
                     HitObject = hitObject,
                     OsuTarget = osuTarget,
-                    MissWindow = hitObject.HitWindows.WindowFor(HitResult.Miss),
+                    // 对齐 DrawableHitCircle：!CanBeHit 即自动 Miss（Meh 窗），不是固定 400ms Miss 窗。
+                    MissWindow = OsuCircleJudgement.AutoMissWindow(hitObject.HitWindows),
                 });
             }
         }

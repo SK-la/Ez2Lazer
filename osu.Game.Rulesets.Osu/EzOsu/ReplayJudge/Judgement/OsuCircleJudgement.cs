@@ -16,14 +16,14 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement
             => hitWindows.ResultFor(timeOffset);
 
         /// <summary>
-        /// Session / Auto 按键路径：窗口内按键若 <see cref="HitResult.None"/> 则落为 Miss
-        /// （对齐 Shadow 桥既有语义，与 Drawable「None 则等待」在边界上仍可能不同——Drawable 另有 CheckHittable）。
+        /// Session 按键：与 Drawable 同调——<see cref="HitResult.None"/> 表示尚未可判，不落 Miss。
         /// </summary>
         public static HitResult ResultForPress(HitWindows hitWindows, double timeOffset)
-        {
-            HitResult result = hitWindows.ResultFor(timeOffset);
-            return result == HitResult.None ? HitResult.Miss : result;
-        }
+            => hitWindows.ResultFor(timeOffset);
+
+        /// <summary>对齐 Drawable <c>!CanBeHit</c> 自动 Miss 的半窗（LowestSuccessful，osu 为 Meh）。</summary>
+        public static double AutoMissWindow(HitWindows hitWindows)
+            => hitWindows.WindowFor(HitResult.Meh);
 
         public static bool IsInHitRadius(Vector2 cursorPosition, Vector2 stackedPosition, double radius)
             => Vector2.Distance(cursorPosition, stackedPosition) <= radius;

@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -55,7 +54,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
                     continue;
 
                 var head = slider.NestedHitObjects.OfType<SliderHeadCircle>().Single();
-                double missWindow = head.HitWindows?.WindowFor(HitResult.Miss) ?? 0;
+                double missWindow = head.HitWindows != null ? OsuCircleJudgement.AutoMissWindow(head.HitWindows) : 0;
 
                 var nested = slider.NestedHitObjects
                                    .Where(o => o is not SliderHeadCircle)
@@ -98,6 +97,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
             HitResult result = OsuCircleJudgement.MapClassicSliderHeadIfNeeded(
                 OsuCircleJudgement.ResultForPress(head.HitWindows!, timeOffset),
                 head.ClassicSliderBehaviour);
+
+            if (result == HitResult.None)
+                return;
 
             if (result.IsHit())
                 headHitAction = action;
@@ -218,7 +220,8 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow
 
         private void updateTracking(double time, Vector2 cursorPosition, IReadOnlyList<OsuAction> pressedActions, bool? forceValidPosition = null)
         {
-            bool isValidTrackingPosition = forceValidPosition ?? isMouseInFollowArea(cursorPosition, time, expanded: false);
+            // Align SliderInputManager.Update: once tracking, use expanded follow area; otherwise ball radius only.
+            bool isValidTrackingPosition = forceValidPosition ?? isMouseInFollowArea(cursorPosition, time, expanded: tracking);
 
             if (headHitAction == null)
                 timeToAcceptAnyKeyAfter = null;
