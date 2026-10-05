@@ -76,15 +76,23 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
             double earlyMs = CatchScratchJudgmentWindow.EarlyWindow(assist: false);
             double lateMs = CatchScratchJudgmentWindow.LateWindow(assist: false);
 
-            var events = new List<(double Time, HitObject HitObject, HitResult Result)>();
-            collectJudgements(beatmap.HitObjects, frames, halfWidth, earlyMs, lateMs, events, cancellationToken);
+            var events = new List<(double Time, HitObject HitObject, HitResult Result, int NestDepth)>();
+            collectJudgements(beatmap.HitObjects, frames, halfWidth, earlyMs, lateMs, events, nestDepth: 0, cancellationToken);
+            // 同时刻：先深层 nested（水果/滴），再父级 JuiceStream/BananaShower IgnoreMiss。
             events.Sort((a, b) =>
             {
                 int cmp = a.Time.CompareTo(b.Time);
-                return cmp != 0 ? cmp : a.HitObject.NestedHitObjects.Count.CompareTo(b.HitObject.NestedHitObjects.Count);
+                if (cmp != 0)
+                    return cmp;
+
+                cmp = b.NestDepth.CompareTo(a.NestDepth);
+                if (cmp != 0)
+                    return cmp;
+
+                return a.HitObject.StartTime.CompareTo(b.HitObject.StartTime);
             });
 
-            foreach (var (time, hitObject, result) in events)
+            foreach (var (time, hitObject, result, _) in events)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 apply(hitObject, result, time, scoreProcessor, gameplayRate, inputOffset, recorder);
@@ -99,7 +107,8 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
             float halfCatchWidth,
             double earlyMs,
             double lateMs,
-            List<(double Time, HitObject HitObject, HitResult Result)> events,
+            List<(double Time, HitObject HitObject, HitResult Result, int NestDepth)> events,
+            int nestDepth,
             CancellationToken cancellationToken)
         {
             foreach (var hitObject in hitObjects)
@@ -109,20 +118,20 @@ namespace osu.Game.Rulesets.Catch.EzCatch.ReplayJudge
                 if (hitObject is PalpableCatchHitObject fruit && fruit.Judgement.MaxResult != HitResult.IgnoreHit)
                 {
                     bool caught = CatchPlateJudgement.IsCaughtInWindow(fruit, frames, halfCatchWidth, earlyMs, lateMs);
-                    events.Add((fruit.StartTime, fruit, caught ? fruit.Judgement.MaxResult : fruit.Judgement.MinResult));
+                    events.Add((fruit.StartTime, fruit, caught ? fruit.Judgement.MaxResult : fruit.Judgement.MinResult, nestDepth));
                 }
                 else if (hitObject is JuiceStream or BananaShower)
                 {
                     // Drawable：CanCatch 对非 Palpable 恒 false → ApplyMinResult（IgnoreMiss），时刻为 EndTime。
-                    events.Add((hitObject.GetEndTime(), hitObject, hitObject.Judgement.MinResult));
+                    events.Add((hitObject.GetEndTime(), hitObject, hitObject.Judgement.MinResult, nestDepth));
                 }
                 else if (hitObject.Judgement.MaxResult != HitResult.IgnoreHit)
                 {
-                    events.Add((hitObject.GetEndTime(), hitObject, hitObject.Judgement.MinResult));
+                    events.Add((hitObject.GetEndTime(), hitObject, hitObject.Judgement.MinResult, nestDepth));
                 }
 
                 if (hitObject.NestedHitObjects.Count > 0)
-                    collectJudgements(hitObject.NestedHitObjects, frames, halfCatchWidth, earlyMs, lateMs, events, cancellationToken);
+                    collectJudgements(hitObject.NestedHitObjects, frames, halfCatchWidth, earlyMs, lateMs, events, nestDepth + 1, cancellationToken);
             }
         }
 

@@ -92,6 +92,16 @@ namespace osu.Game.Rulesets.Catch.Tests.EzCatch.ReplayJudge
             string report = buildReport(result);
             archiveReport(report);
             assertFullBaseline(result.ScoreInfo, report);
+            assertHitEventsAggregateToStatistics(result.ScoreInfo, report);
+        }
+
+        private static void assertHitEventsAggregateToStatistics(ScoreInfo info, string? report)
+        {
+            var fromEvents = info.HitEvents
+                                 .GroupBy(e => e.Result)
+                                 .ToDictionary(g => g.Key, g => g.Count());
+
+            assertStatisticsEqual(fromEvents, info.Statistics, report);
         }
 
         [Test]

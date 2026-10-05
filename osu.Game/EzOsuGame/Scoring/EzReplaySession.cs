@@ -54,7 +54,7 @@ namespace osu.Game.EzOsuGame.Scoring
         {
             cancellationToken.ThrowIfCancellationRequested();
             var resolvedEnv = ResolveEnvironment(score, purpose);
-            var (_, timeline) = RunWithTimeline(score, beatmap, resolvedEnv, cancellationToken);
+            var (_, timeline) = RunWithTimeline(score.DeepClone(), beatmap, resolvedEnv, cancellationToken);
             return timeline;
         }
 
@@ -108,7 +108,8 @@ namespace osu.Game.EzOsuGame.Scoring
             return Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return RunWithTimeline(score, beatmap, environment, cancellationToken);
+                // PopulateScore 会写回 ScoreInfo；必须克隆，避免 StatisticsPanel / GetScore 路径污染调用方原成绩。
+                return RunWithTimeline(score.DeepClone(), beatmap, environment, cancellationToken);
             }, cancellationToken);
         }
 
