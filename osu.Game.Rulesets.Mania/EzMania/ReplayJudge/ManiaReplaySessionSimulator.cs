@@ -382,42 +382,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     result = outcome.Result;
                 }
 
-                foreach (var forced in ForceMissEarlier(laneStates, target.StartTime))
-                {
-                    // 局内 Column.handleHit → IsUserTriggerJudgeableNow：仍 CanBeHit 则不补 Miss。
-                    // 旧逻辑用 Miss 窗反了——Meh 窗内的更早物件会被误杀，后续按键配对漂移（Perfect↑ / Miss↑）。
-                    if (isStillUserTriggerJudgeable(forced.Target, input.Time, headWasHit, holdByHead))
-                        return;
-
-                    forced.Judged = true;
-                    forced.Result = HitResult.Miss;
-                    double forcedOffset = ComputeStoredTimeOffset(input.Time, forced.Target);
-                    ApplyFinalResult(
-                        scoreProcessor,
-                        forced.Target,
-                        HitResult.Miss,
-                        forcedOffset,
-                        input.Time,
-                        gameplayRate,
-                        environment.ManiaHitMode,
-                        timelineRecorder);
-
-                    // 局内尾被补判 Miss 时同样会产出 Body ComboBreak 与父物件 IgnoreMiss；
-                    // 此处前推补判若漏掉，统计会比原始成绩少这两个辅助判定。
-                    if (forced.Target is TailNote forcedTail
-                        && headByTail.TryGetValue(forcedTail, out var forcedHead)
-                        && holdByHead.TryGetValue(forcedHead, out var forcedHold))
-                    {
-                        if (forcedHold.Body != null && !forced.BodyJudged)
-                        {
-                            forced.BodyJudged = true;
-                            ApplyAuxiliaryResult(scoreProcessor, forcedHold.Body, HitResult.ComboBreak, forcedOffset, input.Time, gameplayRate, timelineRecorder);
-                        }
-
-                        ApplyAuxiliaryResult(scoreProcessor, forcedHold, HitResult.IgnoreMiss, forcedOffset, input.Time, gameplayRate, timelineRecorder);
-                    }
-                }
-
                 selected.Judged = true;
                 selected.Result = result;
 
@@ -430,6 +394,44 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     gameplayRate,
                     environment.ManiaHitMode,
                     timelineRecorder);
+
+                // 局内 Column.OnNewResult：仅 IsHit 时 handleHit → CollectForceMissBefore；
+                // 仍 CanBeHit 的更早物件 continue 跳过（不 abort 本次已落判定）。
+                // 旧 Session 在 Apply 前 ForceMiss 且用 return，会把本次命中整段吞掉。
+                if (result.IsHit())
+                {
+                    foreach (var forced in ForceMissEarlier(laneStates, target.StartTime))
+                    {
+                        if (isStillUserTriggerJudgeable(forced.Target, input.Time, headWasHit, holdByHead))
+                            continue;
+
+                        forced.Judged = true;
+                        forced.Result = HitResult.Miss;
+                        double forcedOffset = ComputeStoredTimeOffset(input.Time, forced.Target);
+                        ApplyFinalResult(
+                            scoreProcessor,
+                            forced.Target,
+                            HitResult.Miss,
+                            forcedOffset,
+                            input.Time,
+                            gameplayRate,
+                            environment.ManiaHitMode,
+                            timelineRecorder);
+
+                        if (forced.Target is TailNote forcedTail
+                            && headByTail.TryGetValue(forcedTail, out var forcedHead)
+                            && holdByHead.TryGetValue(forcedHead, out var forcedHold))
+                        {
+                            if (forcedHold.Body != null && !forced.BodyJudged)
+                            {
+                                forced.BodyJudged = true;
+                                ApplyAuxiliaryResult(scoreProcessor, forcedHold.Body, HitResult.ComboBreak, forcedOffset, input.Time, gameplayRate, timelineRecorder);
+                            }
+
+                            ApplyAuxiliaryResult(scoreProcessor, forcedHold, HitResult.IgnoreMiss, forcedOffset, input.Time, gameplayRate, timelineRecorder);
+                        }
+                    }
+                }
 
                 // After tail judgement, also apply HoldNote parent and Body auxiliary results
                 // to match live play behaviour (DrawableHoldNote.CheckForResult + DrawableHoldNoteBody.TriggerResult).
