@@ -40,8 +40,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         private static readonly DllResourceStore resources = new DllResourceStore(typeof(OsrAuditTest).Assembly);
 
         /// <summary>
-        /// 高难度 LN 判定数量闭环对账：53 miss、Lazer、offset 0、6K LN 图（GramNibelungen23）。
-        /// 勿当金标。Lazer/Classic 分轨金标见 <see cref="ManiaOsrAuditAssertTest"/>。
+        /// 高难度 LN 判定数量闭环：GramNibelungen23，嵌入成绩 Miss=53。
+        /// Session 的 Miss/Meh/Ok/Ignore*/ComboBreak ≡ 嵌入；Good+Great+Perfect 合计闭合（档位缝不锁死）。
+        /// 每个 Note/Head/Tail/Tick 恰有一条 HitEvent。勿当金标。
+        /// Lazer/Classic 分轨金标见 <see cref="ManiaOsrAuditAssertTest"/>。
         /// </summary>
         private const string osr_resource = "Resources/Testing/Replays/GramNibelungen23-53miss.osr";
 
@@ -49,7 +51,6 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         private const string beatmap_resource = "Resources/Testing/Beatmaps/GramNibelungen23.osu";
 
         [Test]
-        [Explicit("问题成绩人工对账：需要 Resources/Testing 下的 osr+谱面。CI 默认不跑，改动 Session 判定后手动执行。")]
         public void AuditProblemScore()
         {
             var decoder = new HarnessScoreDecoder();
@@ -316,6 +317,40 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             File.WriteAllText(reportPath, sb.ToString());
             TestContext.AddTestAttachment(reportPath);
             TestContext.WriteLine(sb.ToString());
+
+            string delta = describeDelta(original, sessionCounts);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(original.GetValueOrDefault(HitResult.Miss), Is.EqualTo(53), "夹具嵌入 Miss");
+
+                foreach (HitResult key in new[]
+                         {
+                             HitResult.Miss, HitResult.Meh, HitResult.Ok,
+                             HitResult.IgnoreMiss, HitResult.IgnoreHit, HitResult.ComboBreak,
+                         })
+                    Assert.That(sessionCounts.GetValueOrDefault(key), Is.EqualTo(original.GetValueOrDefault(key)), $"{key} {delta}");
+
+                int gradeBand(IReadOnlyDictionary<HitResult, int> counts)
+                    => counts.GetValueOrDefault(HitResult.Good)
+                       + counts.GetValueOrDefault(HitResult.Great)
+                       + counts.GetValueOrDefault(HitResult.Perfect);
+
+                Assert.That(gradeBand(sessionCounts), Is.EqualTo(gradeBand(original)), "Good+Great+Perfect " + delta);
+
+                assertJudgementCount<Note>(playable, score, exact: true);
+                assertJudgementCount<HeadNote>(playable, score);
+                assertJudgementCount<TailNote>(playable, score);
+                assertJudgementCount<HoldNoteTick>(playable, score);
+            });
+        }
+
+        private static void assertJudgementCount<T>(IBeatmap beatmap, Score score, bool exact = false)
+            where T : HitObject
+        {
+            int objects = countObjects<T>(beatmap, exact);
+            int judged = score.ScoreInfo.HitEvents.Count(e => exact ? e.HitObject?.GetType() == typeof(T) : e.HitObject is T);
+            Assert.That(judged, Is.EqualTo(objects), typeof(T).Name);
         }
 
         private static string bucketOf(double offset)
