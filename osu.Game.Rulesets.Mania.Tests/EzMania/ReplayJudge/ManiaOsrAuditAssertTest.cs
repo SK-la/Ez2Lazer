@@ -151,7 +151,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 prepareScoreForClassicSession(score, fixture);
 
             var playable = decoder.LastWorkingBeatmap!.GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
-            var environment = ReplayJudgeTestConfig.Create(fixture.HitMode, EzEnumHealthMode.Lazer);
+            // 金标环境固定：不得扫 JudgePrecedence / OffsetPlusMania。
+            var environment = ReplayJudgeTestConfig.Create(
+                fixture.HitMode,
+                EzEnumHealthMode.Lazer,
+                EzEnumJudgePrecedence.Earliest,
+                offsetPlusMania: 0);
 
             ManiaReplaySession.Run(score, playable, environment);
 
@@ -259,6 +264,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             sb.AppendLine($"fixture: {fixture.Name}");
             sb.AppendLine($"osr: {fixture.OsrResource}");
             sb.AppendLine($"hitMode: {fixture.HitMode}");
+            sb.AppendLine($"env: HitMode={fixture.HitMode} HealthMode=Lazer JudgePrecedence=Earliest OffsetPlusMania=0");
             sb.AppendLine($"anchor: acc={fixture.ExpectedAccuracy:R} total={fixture.ExpectedTotalScore} combo={fixture.ExpectedMaxCombo}");
             sb.AppendLine($"session: acc={score.ScoreInfo.Accuracy:R} rank={score.ScoreInfo.Rank} total={score.ScoreInfo.TotalScore} combo={score.ScoreInfo.MaxCombo}");
             sb.AppendLine($"session mods: {string.Join(",", score.ScoreInfo.Mods.Select(m => m.Acronym))}");

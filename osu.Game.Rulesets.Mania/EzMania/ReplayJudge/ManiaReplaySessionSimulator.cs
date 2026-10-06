@@ -448,6 +448,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     }
                 }
 
+                // 局内：列路由已命中其它物件时，同列 DrawableHoldNote.OnPressed 仍会 TryBeginHoldPress 重臂。
+                // Session 若只在「无候选」时 rearm，断连后下一击打到 tap/其它头会漏掉 ActiveHold，尾被 auto-miss。
+                if (input.IsPress
+                    && !activeHoldByColumn.ContainsKey(input.Column)
+                    && pressColumns.TryGetValue(input.Column, out var pressLaneStatesForRearm))
+                {
+                    tryRearmActiveHold(
+                        input.Column,
+                        input.Time,
+                        pressLaneStatesForRearm,
+                        releaseColumns,
+                        holdByHead,
+                        holdStrategy,
+                        activeHoldByColumn);
+                }
+
                 // 局内同帧：输入之后 Column.ProcessAutoMiss(Time.Current)。
                 applyAutoMissesUpTo(
                     input.Time,
