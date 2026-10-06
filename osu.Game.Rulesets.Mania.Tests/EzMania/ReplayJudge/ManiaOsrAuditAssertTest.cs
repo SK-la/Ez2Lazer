@@ -453,6 +453,38 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 }
 
                 sb.AppendLine($"  Great just over P (P,P+0.5]: n={greatJustOver} Note={greatJustOverNote} Head={greatJustOverHead} Tail={greatJustOverTail}");
+
+                int exactBoundary = hitEvents.Count(ev =>
+                {
+                    if (ev.Result != HitResult.Great || ev.HitObject?.HitWindows == null) return false;
+                    bool tail = ev.HitObject is TailNote;
+                    double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                    return Math.Abs(j - (pWin + 0.5)) < 1e-9;
+                });
+                int perfectAtP = hitEvents.Count(ev =>
+                {
+                    if (ev.Result != HitResult.Perfect || ev.HitObject?.HitWindows == null) return false;
+                    bool tail = ev.HitObject is TailNote;
+                    double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                    return Math.Abs(j - pWin) < 1e-9;
+                });
+                sb.AppendLine($"  exact |j|=P+0.5 Great={exactBoundary}; exact |j|=P Perfect={perfectAtP}");
+
+                foreach (var e in hitEvents
+                                   .Where(ev => ev.Result == HitResult.Great && ev.HitObject?.HitWindows != null)
+                                   .Select(ev =>
+                                   {
+                                       bool tail = ev.HitObject is TailNote;
+                                       double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                                       return (ev, j, tail);
+                                   })
+                                   .Where(x => x.j > pWin && x.j <= pWin + 0.5)
+                                   .OrderBy(x => x.ev.HitObject!.StartTime)
+                                   .Take(15))
+                {
+                    string column = e.ev.HitObject is IHasColumn c ? c.Column.ToString() : "-";
+                    sb.AppendLine($"    {kind(e.ev)}@{e.ev.HitObject!.StartTime:F3} col={column} off={e.ev.TimeOffset:R} j={e.j:R}");
+                }
             }
 
             foreach ((double lo, double hi, string label) in new[]
