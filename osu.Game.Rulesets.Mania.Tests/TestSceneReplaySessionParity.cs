@@ -25,6 +25,7 @@ namespace osu.Game.Rulesets.Mania.Tests
 {
     /// <summary>
     /// Drawable replay 路径与 <see cref="ManiaReplaySession"/> 的 parity（Lazer + Ez HitMode）。
+    /// 高精度夹具用 <see cref="ManiaReplayJsonFixture"/>（JSON double ms）；勿用 osr 验局内。
     /// </summary>
     public partial class TestSceneReplaySessionParity : RateAdjustedBeatmapTestScene
     {
@@ -65,6 +66,21 @@ namespace osu.Game.Rulesets.Mania.Tests
                     new ManiaReplayFrame(2100),
                 });
         }
+
+        /// <summary>
+        /// 高精度 JSON 回放（亚毫秒）→ Drawable ≡ Session。不用 osr（整数 ms）。
+        /// </summary>
+        [Test]
+        public void TestJsonLazerTwoNoteTapDrawableMatchesSession()
+            => runDrawableParityFromJson("Resources/Testing/ReplayJson/Lazer-two-note-tap.json");
+
+        [Test]
+        public void TestJsonLazerHoldBreakRepressMehDrawableMatchesSession()
+            => runDrawableParityFromJson("Resources/Testing/ReplayJson/Lazer-hold-break-repress-meh.json");
+
+        [Test]
+        public void TestJsonLazerJackAutoMissDrawableMatchesSession()
+            => runDrawableParityFromJson("Resources/Testing/ReplayJson/Lazer-jack-auto-miss.json");
 
         [Test]
         public void TestLazerHoldDrawableMatchesSession()
@@ -531,13 +547,22 @@ namespace osu.Game.Rulesets.Mania.Tests
                 fixture.score.Replay.Frames);
         }
 
-        private void runDrawableParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames)
+        private void runDrawableParityFromJson(string resourcePath)
+        {
+            var document = ManiaReplayJsonFixture.ReadResource(resourcePath);
+            var (environment, columns, hitObjects, frames, _) = ManiaReplayJsonFixture.ToParts(document);
+
+            parityEnvironment = environment;
+            runDrawableParityTest(hitObjects, frames, columns);
+        }
+
+        private void runDrawableParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames, int columns = 4)
         {
             AddStep("configure environment", () => ReplayJudgeTestConfig.ApplyToGlobalConfig(parityEnvironment));
 
             AddStep("load player", () =>
             {
-                var beatmap = new ManiaBeatmap(new StageDefinition(4))
+                var beatmap = new ManiaBeatmap(new StageDefinition(columns))
                 {
                     HitObjects = hitObjects,
                     BeatmapInfo =

@@ -1,0 +1,15 @@
+{
+  "hitMode": "Lazer",
+  "healthMode": "Lazer",
+  "judgePrecedence": "Earliest",
+  "columns": 4,
+  "hitObjects": [
+    { "type": "Hold", "time": 1500.0, "end": 4000.0, "column": 0 }
+  ],
+  "frames": [
+    { "t": 1500.0, "keys": 1 },
+    { "t": 2500.5, "keys": 0 },
+    { "t": 3900.25, "keys": 1 },
+    { "t": 4000.0, "keys": 0 }
+  ]
+}

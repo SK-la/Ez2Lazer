@@ -27,7 +27,12 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     /// <summary>
-    ///     Mania osr 双轨金标门禁（多谱面套件）：
+    ///     Mania osr 双轨金标旁证（多谱面套件）——<b>不是</b>局内对齐门禁。
+    ///     <para>
+    ///     局内 Drawable ≡ Session 走高精度 JSON：
+    ///     <see cref="ManiaReplayJsonFixture"/> + <c>TestSceneReplaySessionParity.TestJson_*</c>。
+    ///     osr 为整数 ms Round，不能单独定责 Drawable/列管理器拆分。
+    ///     </para>
     ///     <list type="bullet">
     ///         <item><b>Lazer</b>：冻结 osr 嵌入 Statistics；Header 对解码字段，Session 用 <see cref="EzEnumHitMode.Lazer" />。</item>
     ///         <item>
