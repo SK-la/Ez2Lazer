@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Replays;
@@ -279,6 +280,90 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 () => $"early release inside lenience must be a hit: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
             Assert.That(tail.Result, Is.Not.EqualTo(HitResult.Meh),
                 () => $"early release inside lenience must not be capped to Meh: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+        }
+
+        /// <summary>
+        /// 断连后同列按下若已路由到 tap，局内 <c>ShouldSkipColumnRoutedPress</c> 会跳过 Hold 重臂；
+        /// 随后在尾点松手不得把尾救成 Meh，尾应走被动 Miss。
+        /// </summary>
+        [Test]
+        public void TestPressHittingNoteAfterBreakDoesNotRearmHold()
+        {
+            var hitObjects = new List<HitObject>
+            {
+                new HoldNote { StartTime = 1000, Duration = 400, Column = 0 },
+                new Note { StartTime = 1300, Column = 0 },
+            };
+
+            var frames = new List<ReplayFrame>
+            {
+                new ManiaReplayFrame(1000, ManiaAction.Key1),
+                new ManiaReplayFrame(1001),
+                new ManiaReplayFrame(1300, ManiaAction.Key1),
+                new ManiaReplayFrame(1400),
+                new ManiaReplayFrame(3000),
+            };
+
+            var events = runEvents(hitObjects, frames);
+            var note = events.Single(e => e.HitObject is Note and not HeadNote and not TailNote);
+            var tail = events.Single(e => e.HitObject is TailNote);
+
+            Assert.That(note.Result.IsHit(), Is.True,
+                () => $"tap after break must still hit: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+            Assert.That(tail.Result, Is.EqualTo(HitResult.Miss),
+                () => $"tail must not be rearmed by tap press: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+        }
+
+        /// <summary>
+        /// 局内 ForceMiss 条目不含 Tail（TryCreateEntry 拒绝 Head/Tail）。同列后一条 LN 尾命中时，
+        /// 不得把前一条尚未 auto-miss、且已落在 raw CanBeHit 外（但仍在 release-lenience / 被动窗内）的尾 ForceMiss 掉。
+        /// </summary>
+        [Test]
+        public void TestLaterTailHitDoesNotForceMissEarlierUnjudgedTail()
+        {
+            var probe = new HoldNote { StartTime = 1000, Duration = 400, Column = 0 };
+            probe.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
+
+            double meh = probe.Tail.HitWindows.WindowFor(HitResult.Meh);
+            double gapStart = probe.EndTime + meh + 1;
+            double gapEnd = probe.EndTime + meh * TailNote.RELEASE_WINDOW_LENIENCE - 1;
+
+            Assume.That(gapEnd > gapStart, "need a non-empty CanBeHit-fail / pre-auto-miss gap for Tail");
+
+            double laterTailTime = (gapStart + gapEnd) / 2;
+            double laterHeadTime = laterTailTime - 80;
+            Assume.That(laterHeadTime > probe.EndTime, "later hold must start after earlier tail");
+
+            var hitObjects = new List<HitObject>
+            {
+                new HoldNote { StartTime = 1000, Duration = 400, Column = 0 },
+                new HoldNote { StartTime = laterHeadTime, Duration = laterTailTime - laterHeadTime, Column = 0 },
+            };
+
+            // 前一条：按下后立刻远早松手 → Body 断连，尾留给被动窗；后一条干净松手命中尾。
+            var frames = new List<ReplayFrame>
+            {
+                new ManiaReplayFrame(1000, ManiaAction.Key1),
+                new ManiaReplayFrame(1000 + 1),
+                new ManiaReplayFrame(laterHeadTime, ManiaAction.Key1),
+                new ManiaReplayFrame(laterTailTime),
+                new ManiaReplayFrame(laterTailTime + 2000),
+            };
+
+            var events = runEvents(hitObjects, frames);
+            var tails = events.Where(e => e.HitObject is TailNote).OrderBy(e => e.HitObject.StartTime).ToList();
+
+            Assert.That(tails, Has.Count.EqualTo(2),
+                () => $"expected two tail judgements: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+            Assert.That(tails[1].Result.IsHit(), Is.True,
+                () => $"later tail must hit: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+
+            // ForceMissEarlier 会用后尾命中时刻写 stored offset；auto-miss 用自身 deadline / 按键史，两者可分。
+            double forceMissOffset = laterTailTime - tails[0].HitObject.StartTime;
+            Assert.That(tails[0].TimeOffset, Is.Not.EqualTo(forceMissOffset).Within(0.5),
+                () => $"earlier tail must not be force-missed at later-tail hit ({laterTailTime}): [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+            Assert.That(tails[0].Result, Is.EqualTo(HitResult.Miss),
+                () => $"earlier tail must still settle as Miss via auto-miss: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
         }
 
         private static void assertMisses(List<HitObject> hitObjects, List<ReplayFrame> frames, int expectedMisses,

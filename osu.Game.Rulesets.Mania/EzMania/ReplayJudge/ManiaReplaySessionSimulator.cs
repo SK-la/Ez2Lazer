@@ -401,10 +401,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     // 局内 Column.OnNewResult：仅 IsHit 时 handleHit → CollectForceMissBefore；
                     // 仍 CanBeHit 的更早物件 continue 跳过（不 abort 本次已落判定）。
                     // 旧 Session 在 Apply 前 ForceMiss 且用 return，会把本次命中整段吞掉。
+                    //
+                    // 局内 TryCreateEntry 拒绝 Head/Tail，ForceMiss 只钉 HoldNote（按头）与 Note；
+                    // Session 的 releaseColumns 是 Tail，绝不能 ForceMiss 尾——否则松手命中后一条
+                    // 会把更早、尚未 auto-miss 的尾提前钉成 Miss（CanBeHit 还不带 release lenience）。
                     if (result.IsHit())
                     {
                         foreach (var forced in ForceMissEarlier(laneStates, target.StartTime))
                         {
+                            if (forced.Target is TailNote)
+                                continue;
+
                             if (isStillUserTriggerJudgeable(forced.Target, input.Time, headWasHit, holdByHead))
                                 continue;
 
@@ -420,19 +427,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                                 gameplayRate,
                                 environment.ManiaHitMode,
                                 timelineRecorder);
-
-                            if (forced.Target is TailNote forcedTail
-                                && headByTail.TryGetValue(forcedTail, out var forcedHead)
-                                && holdByHead.TryGetValue(forcedHead, out var forcedHold))
-                            {
-                                if (forcedHold.Body != null && !forced.BodyJudged)
-                                {
-                                    forced.BodyJudged = true;
-                                    ApplyAuxiliaryResult(scoreProcessor, forcedHold.Body, HitResult.ComboBreak, forcedOffset, input.Time, gameplayRate, timelineRecorder);
-                                }
-
-                                ApplyAuxiliaryResult(scoreProcessor, forcedHold, HitResult.IgnoreMiss, forcedOffset, input.Time, gameplayRate, timelineRecorder);
-                            }
                         }
                     }
 
@@ -480,20 +474,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         }
                     }
 
-                    // 局内：列路由已命中其它物件时，同列 DrawableHoldNote.OnPressed 仍会 TryBeginHoldPress 重臂。
-                    if (input.IsPress
-                        && !activeHoldByColumn.ContainsKey(input.Column)
-                        && pressColumns.TryGetValue(input.Column, out var pressLaneStatesForRearm))
-                    {
-                        tryRearmActiveHold(
-                            input.Column,
-                            input.Time,
-                            pressLaneStatesForRearm,
-                            releaseColumns,
-                            holdByHead,
-                            holdStrategy,
-                            activeHoldByColumn);
-                    }
+                    // 重臂只在「本列按下未路由到任何目标」时发生（见上方 candidates 空 / selected 空分支）。
+                    // 局内 Column 先路由：命中 Note/其它头后 columnRoutedPressTarget != null，
+                    // DrawableHoldNote.OnPressed 因 ShouldSkipColumnRoutedPress 直接 return，不会重臂。
                 } // processInputEvent
             }
 
@@ -948,10 +931,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         }
 
         /// <summary>
-        /// 局内 <c>DrawableHoldNote.OnPressed</c> 的重臂路径：列路由未选中目标时
-        /// （<c>ShouldSkipColumnRoutedPress</c> 仅在列已路由到目标时为真），drawable 自身仍会执行
-        /// <c>TryBeginHoldPress → beginHoldAt</c>，对「头已判定但尾未收束」的 LN 重新 <c>ReportHoldState(true)</c>。
-        /// Session 若不补这一步，「断连后重按、再到尾松手」会漏判尾（局内为 Meh，Session 会落成 Miss）。
+        /// 局内重臂：仅当列路由未选中目标时，<c>DrawableHoldNote.OnPressed</c> 仍会
+        /// <c>TryBeginHoldPress → beginHoldAt</c>（头已判定、尾未收束 → 重新 holding）。
+        /// 列已路由到其它物件时 <c>ShouldSkipColumnRoutedPress</c> 为真，不会重臂。
         /// </summary>
         private static void tryRearmActiveHold(
             int column,
