@@ -81,7 +81,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 AutoSizeAxes = Axes.Y,
                 Direction = FillDirection.Full,
                 Spacing = new Vector2(8),
-                Alpha = presenter.HasSliceChips ? 1 : 0,
             };
             headerSlot = new Container
             {
@@ -114,7 +113,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 AutoSizeAxes = Axes.Y,
             };
 
-            var leftColumnChildren = new List<Drawable> { keyChipFlow, headerSlot };
+            var leftColumnChildren = new List<Drawable>();
+
+            if (presenter.HasSliceChips)
+                leftColumnChildren.Add(keyChipFlow);
+
+            leftColumnChildren.Add(headerSlot);
 
             if (presenter.HasSidePanel)
             {
