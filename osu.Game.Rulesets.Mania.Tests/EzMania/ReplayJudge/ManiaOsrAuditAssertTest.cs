@@ -25,14 +25,13 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     /// <summary>
-    /// Mania osr 双轨金标门禁：
+    /// Mania osr 双轨金标门禁（同谱 Hanatachi）：
     /// <list type="bullet">
-    /// <item><b>Lazer</b>：Eviternity，Lazer 客户端成绩；Header 对解码嵌入字段，Session 用 <see cref="EzEnumHitMode.Lazer"/>。</item>
-    /// <item><b>Classic</b>：Hanatachi，Classic 客户端静态锚点；禁止把 osr 经 Lazer 解码嵌入 Statistics/TotalScore 当金标
-    /// （会经 Lazer 机制二次处理）。osr 仅提供 replay 帧 + beatmap MD5；Session 用 <see cref="EzEnumHitMode.Classic"/> + DT/CL。</item>
+    /// <item><b>Lazer</b>：<c>ManiaAudit-Lazer-Hanatachi.osr</c>（≈2026-06 / 30000016）；Header 对解码嵌入字段，Session 用 <see cref="EzEnumHitMode.Lazer"/>。</item>
+    /// <item><b>Classic</b>：<c>ManiaAudit-Classic-Hanatachi.osr</c>（≈2026-09 / stable 20260711）；主判定/分/combo 以 osr 二进制头为准，
+    /// 禁止把 Lazer 解码后的 TotalScore 当金标。osr 供帧 + MD5；Session 用 <see cref="EzEnumHitMode.Classic"/> + CL。</item>
     /// </list>
-    /// 用户每次给出主判定/分/combo/acc/mods 后，夹具须补齐：MD5、Rank、精确 Acc、IsLegacy 等；
-    /// IgnoreHit/IgnoreMiss/ComboBreak 若用户未给则不进 Classic 门禁（待补）。
+    /// IgnoreHit/IgnoreMiss/ComboBreak 若 Classic 未给则不进本轨门禁。
     /// 高难度 LN 判定数量闭环仍用 <see cref="OsrAuditTest"/> + GramNibelungen23（勿当金标）。
     /// </summary>
     [TestFixture]
@@ -43,51 +42,43 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [OneTimeSetUp]
         public void OneTimeSetUp() => GlobalConfigStore.EnsureInitialized();
 
-        // ── Lazer 轨（Eviternity / Lazer 客户端冻结 osr）────────────────────────
-        // osr 头：gameVersion=30000013，时间戳≈2024-03-16。当前 Session 按现行窗口（Floor+0.5 等）
-        // 回放时 Perfect 会比该旧客户端多一截（探针：仅收紧 Perfect 到 17.0 可消掉 +17，剩 Perfect+16 / Miss+3）。
+        // ── Lazer 轨（Hanatachi / Lazer 客户端冻结 osr，≈2026-06）──────────────
+        // 嵌入解码：total=920155 combo=3451 acc≈0.980118 rank=S ver=30000019 legacy=false mods=[]
+        // Session 初测 delta：Perfect-10 Great+10 Miss-1 Meh+3 … MaxCombo 已对齐。
 
         private static readonly AuditFixture lazer = new AuditFixture(
-            Name: "Lazer-Eviternity",
-            OsrResource: "Resources/Testing/Replays/ManiaAudit-Lazer-solo-replay-mania_4065226_2514660202.osr",
-            BeatmapResource: "Resources/Testing/Beatmaps/ManiaAudit-Lazer-Xyris - Eviternity (Critical_Star) [Eternity].osu",
+            Name: "Lazer-Hanatachi",
+            OsrResource: "Resources/Testing/Replays/ManiaAudit-Lazer-Hanatachi.osr",
+            BeatmapResource: "Resources/Testing/Beatmaps/ManiaAudit-Classic-Hanatachi.osu",
             HitMode: EzEnumHitMode.Lazer,
-            ExpectedBeatmapMd5: "a3b809c1406a9c47c1af6600743511b6",
-            ExpectedTotalScore: 835479,
-            ExpectedMaxCombo: 673,
-            ExpectedAccuracy: 0.9597103052141494,
+            ExpectedBeatmapMd5: "29278f227275b1720e995d532130710b",
+            ExpectedTotalScore: 920155,
+            ExpectedMaxCombo: 3451,
+            ExpectedAccuracy: 0.9801182063007212,
             ExpectedRank: ScoreRank.S,
             ExpectedTotalScoreVersion: 30000019,
             ExpectedIsLegacy: false,
             ExpectedModAcronyms: System.Array.Empty<string>(),
             ExpectedStatistics: new Dictionary<HitResult, int>
             {
-                [HitResult.Miss] = 40,
-                [HitResult.Meh] = 10,
-                [HitResult.Ok] = 24,
-                [HitResult.Good] = 275,
-                [HitResult.Great] = 1584,
-                [HitResult.Perfect] = 2662,
-                [HitResult.IgnoreMiss] = 12,
-                [HitResult.IgnoreHit] = 2064,
-                [HitResult.ComboBreak] = 12,
+                [HitResult.Miss] = 15,
+                [HitResult.Meh] = 12,
+                [HitResult.Ok] = 22,
+                [HitResult.Good] = 148,
+                [HitResult.Great] = 1063,
+                [HitResult.Perfect] = 4182,
+                [HitResult.IgnoreMiss] = 5,
+                [HitResult.IgnoreHit] = 2093,
+                [HitResult.ComboBreak] = 8,
             },
             AssertFullNonZeroStatistics: true,
             AssertDecodedHeader: true);
 
-        // ── Classic 轨（Hanatachi / Classic 客户端静态锚点；osr 只供帧）──────────
-        //
-        // 用户提供（Classic 客户端展示，禁止用 Lazer 解码嵌入分顶替）：
-        //   TotalScore=915171 Acc≈97.70% MaxCombo=1553
-        //   Perfect=3100 Great=1127 Good=110 Ok=20 Meh=6 Miss=26
-        //   Mods=DoubleTime,Classic
-        // 补充：
-        //   MD5=osr/谱面头 29278f227275b1720e995d532130710b（元数据，非 Statistics）
-        //   Acc 精确值=0.9770327457989235（305 权显示 97.70%；与 HitMode.Classic 现行 300/300 权不同，收敛时一并处理）
-        //   Rank=S（acc≥0.95 且非全 Perfect/Great）
-        //   IsLegacy=true（Classic 客户端）
-        //   未给：IgnoreHit / IgnoreMiss / ComboBreak → 不进本轨门禁
-        // 备注：osr 二进制头 TotalScore=915692、mods 位仅 DT；金标以用户静态为准。
+        // ── Classic 轨（Hanatachi / Classic 客户端，≈2026-09 / stable 20260711）──
+        // osr 二进制头：TotalScore=904544 MaxCombo=1728 mods位=0
+        //   Perfect=3423 Great=808 Good=103 Ok=9 Meh=10 Miss=36
+        // Lazer 解码会把总分抬成 912264 并补 CL——总分金标仍用二进制头；Session 注入 CL。
+        // 未给：IgnoreHit / IgnoreMiss / ComboBreak → 不进本轨门禁。
 
         private static readonly AuditFixture classic = new AuditFixture(
             Name: "Classic-Hanatachi",
@@ -95,21 +86,21 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             BeatmapResource: "Resources/Testing/Beatmaps/ManiaAudit-Classic-Hanatachi.osu",
             HitMode: EzEnumHitMode.Classic,
             ExpectedBeatmapMd5: "29278f227275b1720e995d532130710b",
-            ExpectedTotalScore: 915171,
-            ExpectedMaxCombo: 1553,
-            ExpectedAccuracy: 0.9770327457989235,
+            ExpectedTotalScore: 904544,
+            ExpectedMaxCombo: 1728,
+            ExpectedAccuracy: 0.9774174631810525,
             ExpectedRank: ScoreRank.S,
             ExpectedTotalScoreVersion: null,
             ExpectedIsLegacy: true,
-            ExpectedModAcronyms: new[] { "DT", "CL" },
+            ExpectedModAcronyms: new[] { "CL" },
             ExpectedStatistics: new Dictionary<HitResult, int>
             {
-                [HitResult.Miss] = 26,
-                [HitResult.Meh] = 6,
-                [HitResult.Ok] = 20,
-                [HitResult.Good] = 110,
-                [HitResult.Great] = 1127,
-                [HitResult.Perfect] = 3100,
+                [HitResult.Miss] = 36,
+                [HitResult.Meh] = 10,
+                [HitResult.Ok] = 9,
+                [HitResult.Good] = 103,
+                [HitResult.Great] = 808,
+                [HitResult.Perfect] = 3423,
             },
             AssertFullNonZeroStatistics: false,
             AssertDecodedHeader: false);
