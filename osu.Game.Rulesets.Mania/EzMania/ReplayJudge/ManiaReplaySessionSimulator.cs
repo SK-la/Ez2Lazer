@@ -470,13 +470,22 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         // HoldNoteBody: IgnoreHit on hit, ComboBreak on miss
                         // (matches DrawableHoldNoteBody.TriggerResult → ApplyMaxResult/ApplyMinResult)
                         // 断连时刻已产出 Body ComboBreak 的（BodyJudged），对齐局内不重复补判。
+                        // Body 用 Drawable 同款 offset（Empty HitWindows → MaximumJudgementOffset=0 上截断），
+                        // 勿复用 Tail 的 ResolveMissStoredOffset（会落到 head-press 哨兵如 -1000）。
                         double tailStoredOffset = ComputeStoredTimeOffset(input.Time, judgedTail);
 
                         if (tailHold.Body != null && !selected.BodyJudged)
                         {
                             selected.BodyJudged = true;
                             HitResult bodyResult = result.IsHit() ? HitResult.IgnoreHit : HitResult.ComboBreak;
-                            ApplyAuxiliaryResult(scoreProcessor, tailHold.Body, bodyResult, tailStoredOffset, input.Time, gameplayRate, timelineRecorder);
+                            ApplyAuxiliaryResult(
+                                scoreProcessor,
+                                tailHold.Body,
+                                bodyResult,
+                                ComputeDrawableStoredTimeOffset(input.Time, tailHold.Body),
+                                input.Time,
+                                gameplayRate,
+                                timelineRecorder);
                         }
 
                         // HoldNote parent: IgnoreHit on hit, IgnoreMiss on miss
@@ -652,7 +661,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     if (hold.Body != null && !state.BodyJudged)
                     {
                         state.BodyJudged = true;
-                        ApplyAuxiliaryResult(scoreProcessor, hold.Body, HitResult.ComboBreak, storedOffset, missEventTime, gameplayRate, timelineRecorder);
+                        ApplyAuxiliaryResult(
+                            scoreProcessor,
+                            hold.Body,
+                            HitResult.ComboBreak,
+                            ComputeDrawableStoredTimeOffset(missEventTime, hold.Body),
+                            missEventTime,
+                            gameplayRate,
+                            timelineRecorder);
                     }
 
                     ApplyAuxiliaryResult(scoreProcessor, hold, HitResult.IgnoreMiss, storedOffset, missEventTime, gameplayRate, timelineRecorder);
@@ -1263,8 +1279,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             state.HoldBroken = true;
             state.BodyJudged = true;
             ApplyAuxiliaryResult(scoreProcessor, hold.Body, HitResult.ComboBreak,
-                ComputeStoredTimeOffset(eventTime, hold.Body), eventTime, gameplayRate, timelineRecorder);
+                ComputeDrawableStoredTimeOffset(eventTime, hold.Body), eventTime, gameplayRate, timelineRecorder);
         }
+
+        /// <summary>
+        /// 对齐局内 <see cref="JudgementResult.TimeOffset"/>：
+        /// <c>min(eventTime - EndTime, MaximumJudgementOffset)</c>（Body Empty 窗上截断为 ≤0）。
+        /// </summary>
+        internal static double ComputeDrawableStoredTimeOffset(double eventTime, HitObject target)
+            => Math.Min(eventTime - target.GetEndTime(), target.MaximumJudgementOffset);
 
         internal static void ApplyAuxiliaryResult(
             ScoreProcessor scoreProcessor,
