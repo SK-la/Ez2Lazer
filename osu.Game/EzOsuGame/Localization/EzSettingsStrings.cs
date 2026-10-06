@@ -642,6 +642,45 @@ namespace osu.Game.EzOsuGame.Localization
             "允许无密码登录本地账户。跳过一切成绩上传、网络账户检查。",
             "Allows local account login without password. Skip all score submissions and online account checks.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_MANAGER =
+            new EzLocalizationManager.EzLocalisableString("外部谱面路径", "External Beatmap Paths");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_MANAGER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "按模式配置外部谱面目录，并手动重建以对齐增减。已有分析结果保留；新增谱面留给启动后补算。",
+            "Configure per-mode external beatmap folders and rebuild to align add/remove. Existing analysis is kept; new maps are backfilled after startup.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_MANAGER_HEADER =
+            new EzLocalizationManager.EzLocalisableString("外部谱面路径", "External Beatmap Paths");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_MANAGER_BODY = new EzLocalizationManager.EzLocalisableString(
+            "重建只对齐目录增减，不会清空或重算已有分析。新增项目启动后由后台补算。",
+            "Rebuild only aligns catalog add/remove and never clears existing analysis. New items are backfilled after startup.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_ADD_PATH =
+            new EzLocalizationManager.EzLocalisableString("添加路径", "Add path");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_PATH_PLACEHOLDER =
+            new EzLocalizationManager.EzLocalisableString("粘贴绝对路径（如 stable Songs）", "Paste absolute path (e.g. stable Songs)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_REBUILD =
+            new EzLocalizationManager.EzLocalisableString("重建外部库", "Rebuild external library");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_REBUILD_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "扫描已启用路径并对齐 Realm：删除缺失、新增空壳、更新元数据；保留 SR / xxy / PP / Skill。",
+            "Scan enabled paths and align Realm: remove missing, add shells, update metadata; keep SR / xxy / PP / Skills.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_REBUILDING =
+            new EzLocalizationManager.EzLocalisableString("正在对齐外部谱面库…", "Aligning external beatmap library…");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_REBUILD_DONE =
+            new EzLocalizationManager.EzLocalisableString("外部谱面库对齐完成", "External beatmap library aligned");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_REBUILD_FAILED =
+            new EzLocalizationManager.EzLocalisableString("外部谱面库对齐失败", "External beatmap library align failed");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BEATMAP_POOL_NO_PATHS =
+            new EzLocalizationManager.EzLocalisableString("该模式尚未配置路径。添加后点「重建外部库」。", "No paths for this mode yet. Add paths, then Rebuild.");
+
         public static readonly EzLocalizationManager.EzLocalisableString EXTERNAL_RULESET_MANAGER =
             new EzLocalizationManager.EzLocalisableString("外部规则集管理器", "External Ruleset Manager");
 
