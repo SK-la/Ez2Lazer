@@ -315,6 +315,70 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         /// <summary>
+        /// 断连后重按落在下一颗头的候选窗但 <c>CanBeginHoldAt</c> 拒绝（已过该尾 raw CanBeHit）：
+        /// 局内 apply 失败且不设 columnRoutedPressTarget，仍应重臂本条 LN；尾点松手 → Meh。
+        /// </summary>
+        [Test]
+        public void TestRejectedNextHeadPressStillRearmsBrokenHold()
+        {
+            var hitObjects = new List<HitObject>
+            {
+                new HoldNote { StartTime = 1000, Duration = 400, Column = 0 },
+                new HoldNote { StartTime = 1200, Duration = 10, Column = 0 },
+            };
+
+            var frames = new List<ReplayFrame>
+            {
+                new ManiaReplayFrame(1000, ManiaAction.Key1),
+                new ManiaReplayFrame(1050),
+                // 1250：后条尾 1210 已过 Meh 窗 → CanBeginHoldAt 失败；前条尾 1400 仍可重臂
+                new ManiaReplayFrame(1250, ManiaAction.Key1),
+                new ManiaReplayFrame(1400),
+                new ManiaReplayFrame(4000),
+            };
+
+            var events = runEvents(hitObjects, frames);
+            var firstTail = events.Where(e => e.HitObject is TailNote).OrderBy(e => e.HitObject!.StartTime).First();
+
+            Assert.That(firstTail.Result, Is.EqualTo(HitResult.Meh),
+                () => $"rejected next-head press must still rearm: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+        }
+
+        /// <summary>
+        /// 早松落在 Tail Miss 窗内：须当场 Tail Miss（对齐 DrawableHoldNoteTail），不能留给重臂挽救。
+        /// Hanatachi Hold@262905 即此形态（rawOff≈-215 → j≈-143 ∈ Miss）。
+        /// </summary>
+        [Test]
+        public void TestEarlyReleaseInsideMissWindowJudgesTailMissImmediately()
+        {
+            const double head = 1000;
+            const double tail = 1321;
+            const double breakAt = 1106; // rawOff=-215
+
+            var hitObjects = new List<HitObject>
+            {
+                new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+            };
+
+            var frames = new List<ReplayFrame>
+            {
+                new ManiaReplayFrame(head - 6, ManiaAction.Key1),
+                new ManiaReplayFrame(breakAt),
+                new ManiaReplayFrame(breakAt + 50, ManiaAction.Key1),
+                new ManiaReplayFrame(tail + 6),
+                new ManiaReplayFrame(tail + 2000),
+            };
+
+            var events = runEvents(hitObjects, frames);
+            var tailEv = events.Single(e => e.HitObject is TailNote);
+
+            Assert.That(tailEv.Result, Is.EqualTo(HitResult.Miss),
+                () => $"early release inside miss window must miss tail immediately: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+            Assert.That(tailEv.TimeOffset, Is.EqualTo(breakAt - tail).Within(0.5),
+                () => $"tail miss offset must be the early-release edge: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+        }
+
+        /// <summary>
         /// 局内 ForceMiss 条目不含 Tail（TryCreateEntry 拒绝 Head/Tail）。同列后一条 LN 尾命中时，
         /// 不得把前一条尚未 auto-miss、且已落在 raw CanBeHit 外（但仍在 release-lenience / 被动窗内）的尾 ForceMiss 掉。
         /// </summary>

@@ -12,8 +12,10 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.IO;
+using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -358,11 +360,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             if (comboDelta != 0)
                 sb.AppendLine($"  MaxCombo: {comboDelta:+#;-#;0}");
 
-            appendHitEventAttribution(sb, score.ScoreInfo.HitEvents);
+            appendHitEventAttribution(sb, score.ScoreInfo.HitEvents, score.Replay);
             return sb.ToString();
         }
 
-        private static void appendHitEventAttribution(StringBuilder sb, IReadOnlyList<HitEvent> hitEvents)
+        private static void appendHitEventAttribution(StringBuilder sb, IReadOnlyList<HitEvent> hitEvents, Replay? replay = null)
         {
             static string kind(HitEvent e) => e.HitObject switch
             {
@@ -588,10 +590,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 sb.AppendLine($"MissWindow={missWindowMs}: Meh near miss-edge={mehAtMissEdge}; Miss near miss-edge={missAtMissEdge}");
             }
 
-            appendHoldOutcomeBuckets(sb, hitEvents);
+            appendHoldOutcomeBuckets(sb, hitEvents, replay);
         }
 
-        private static void appendHoldOutcomeBuckets(StringBuilder sb, IReadOnlyList<HitEvent> hitEvents)
+        private static void appendHoldOutcomeBuckets(StringBuilder sb, IReadOnlyList<HitEvent> hitEvents, Replay? replay)
         {
             var holds = hitEvents.Select(ev => ev.HitObject).OfType<HoldNote>().Distinct().ToArray();
             var buckets = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -640,6 +642,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 sb.AppendLine($"  {kv.Key}: {kv.Value}");
 
             // Head 命中但尾 Miss：典型「断连后未重臂 → 尾被动 Miss」；列出时刻便于对照回放。
+            // sameColHit=同列在 (head,tail) 内命中其它物件（列路由占键 → 不应重臂）；none=期间无同列命中（若仍有空按应能重臂）。
             sb.AppendLine("hold HeadHit|TailMiss detail:");
             foreach (var hold in holds.OrderBy(h => h.StartTime))
             {
@@ -654,8 +657,33 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                     continue;
 
                 string body = bodyEv.HitObject != null ? bodyEv.Result.ToString() : "none";
+
+                var sameColHits = hitEvents
+                    .Where(ev => ev.HitObject is IHasColumn hc
+                                 && hc.Column == hold.Column
+                                 && !ReferenceEquals(ev.HitObject, hold.Head)
+                                 && !ReferenceEquals(ev.HitObject, hold.Tail)
+                                 && !ReferenceEquals(ev.HitObject, hold.Body)
+                                 && !ReferenceEquals(ev.HitObject, hold)
+                                 && ev.HitObject!.StartTime > hold.StartTime - 200
+                                 && ev.HitObject.StartTime < hold.EndTime + 400)
+                    .Select(ev =>
+                    {
+                        string k = ev.HitObject switch
+                        {
+                            HeadNote => "Head",
+                            Note => "Note",
+                            _ => ev.HitObject!.GetType().Name,
+                        };
+                        double abs = ev.HitObject!.StartTime + ev.TimeOffset;
+                        return $"{k}@{ev.HitObject.StartTime:0.###}:{ev.Result}@t{abs:0.###}";
+                    })
+                    .ToArray();
+
+                string routeTag = sameColHits.Length == 0 ? "nearCol=none" : $"nearCol={string.Join(',', sameColHits)}";
+                string repressTag = describeColumnRepress(replay, hold);
                 sb.AppendLine(
-                    $"  Hold@{hold.StartTime:0.###} col={hold.Column} end={hold.EndTime:0.###} H={headEv.Result}@{headEv.TimeOffset:0.###} T=Miss@{tailEv.TimeOffset:0.###} B={body}");
+                    $"  Hold@{hold.StartTime:0.###} col={hold.Column} end={hold.EndTime:0.###} H={headEv.Result}@{headEv.TimeOffset:0.###} T=Miss@{tailEv.TimeOffset:0.###} B={body} {routeTag} {repressTag}");
             }
 
             sb.AppendLine("Note Miss (|off|<80):");
@@ -672,6 +700,49 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             sb.AppendLine("hold outcome top:");
             foreach (var kv in buckets.OrderByDescending(kv => kv.Value).Take(12))
                 sb.AppendLine($"  {kv.Key}: {kv.Value}");
+        }
+
+        /// <summary>
+        /// 在 (head+1ms, tail+Meh*lenience] 内该列的按下边沿：empty=可能重臂；无边沿=未重按。
+        /// </summary>
+        private static string describeColumnRepress(Replay? replay, HoldNote hold)
+        {
+            if (replay?.Frames == null || replay.Frames.Count == 0)
+                return "repress=?";
+
+            var action = ManiaAction.Key1 + hold.Column;
+            double from = hold.StartTime + 1;
+            double to = hold.EndTime + (hold.Tail.HitWindows?.WindowFor(HitResult.Meh) ?? 0) * TailNote.RELEASE_WINDOW_LENIENCE;
+
+            bool wasDown = false;
+            var edges = new List<string>();
+
+            foreach (var frame in replay.Frames.OrderBy(f => f.Time))
+            {
+                if (frame.Time < from)
+                {
+                    if (frame is ManiaReplayFrame early)
+                        wasDown = early.Actions.Contains(action);
+                    continue;
+                }
+
+                if (frame.Time > to)
+                    break;
+
+                if (frame is not ManiaReplayFrame mania)
+                    continue;
+
+                bool down = mania.Actions.Contains(action);
+
+                if (down && !wasDown)
+                    edges.Add($"↓{frame.Time:0.###}");
+                else if (!down && wasDown)
+                    edges.Add($"↑{frame.Time:0.###}");
+
+                wasDown = down;
+            }
+
+            return edges.Count == 0 ? "repress=none" : $"repress={string.Join(',', edges)}";
         }
 
         private static void archiveReport(AuditFixture fixture, string report)

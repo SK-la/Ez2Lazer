@@ -107,6 +107,35 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                 void processInputEvent()
                 {
+                    // 局内：Column 路由 apply 失败时 columnRoutedPressTarget 仍为 null，Hold.OnPressed 可重臂。
+                    // Session 在「选中候选但未 Apply」的 return 路径上必须同样重臂，不能只在 candidates 空时做。
+                    bool pressRouteApplied = false;
+
+                    try
+                    {
+                        processInputEventCore(ref pressRouteApplied);
+                    }
+                    finally
+                    {
+                        if (input.IsPress
+                            && !pressRouteApplied
+                            && !activeHoldByColumn.ContainsKey(input.Column)
+                            && pressColumns.TryGetValue(input.Column, out var rearmLaneStates))
+                        {
+                            tryRearmActiveHold(
+                                input.Column,
+                                input.Time,
+                                rearmLaneStates,
+                                releaseColumns,
+                                holdByHead,
+                                holdStrategy,
+                                activeHoldByColumn);
+                        }
+                    }
+                }
+
+                void processInputEventCore(ref bool pressRouteApplied)
+                {
                     // Drawable：同帧先 Update tick 再（或交错）处理按键。
                     // 松手：先结算 <t 的持有 tick，再松，再结算 =t 为 Miss。
                     // 重按：先结算 <=t（仍为 Broken）为 Miss，再 Recover，避免 =t 被算进涨 combo。
@@ -217,10 +246,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                     if (candidates.Count == 0 && activeTail == null)
                     {
-                        if (input.IsPress)
-                            tryRearmActiveHold(input.Column, input.Time, laneStates, releaseColumns, holdByHead, holdStrategy, activeHoldByColumn);
+                        // 按下重臂改由 processInputEvent.finally 统一处理。
                         // [parity] 松手落在候选窗口外也可能断连（局内断连不受窗口限制）。
-                        else
+                        if (!input.IsPress)
                             tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
 
                         return;
@@ -236,11 +264,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             tryApplyEz2AcHoldRelease(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
                             tryApplyEarlyHoldBreakBody(releasingHoldHead, input.Time, environment, holdByHead, releaseColumns, scoreProcessor, gameplayRate, timelineRecorder);
                         }
-                        else if (input.IsPress)
-                        {
+                        else
                             tryApplyEz2AcHoldRepress(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
-                            tryRearmActiveHold(input.Column, input.Time, laneStates, releaseColumns, holdByHead, holdStrategy, activeHoldByColumn);
-                        }
 
                         return;
                     }
@@ -398,6 +423,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         environment.ManiaHitMode,
                         timelineRecorder);
 
+                    // 按下已落到 Note/Head（含 Miss）：等价局内 columnRoutedPressTarget != null，finally 不再重臂。
+                    if (input.IsPress && !isTail)
+                        pressRouteApplied = true;
+
                     // 局内 Column.OnNewResult：仅 IsHit 时 handleHit → CollectForceMissBefore；
                     // 仍 CanBeHit 的更早物件 continue 跳过（不 abort 本次已落判定）。
                     // 旧 Session 在 Apply 前 ForceMiss 且用 return，会把本次命中整段吞掉。
@@ -473,11 +502,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             state.OnHeadJudged(Ez2AcHitModeJudgement.FromHitResult(result), preHeld: wasHoldingBeforeEvent);
                         }
                     }
-
-                    // 重臂只在「本列按下未路由到任何目标」时发生（见上方 candidates 空 / selected 空分支）。
-                    // 局内 Column 先路由：命中 Note/其它头后 columnRoutedPressTarget != null，
-                    // DrawableHoldNote.OnPressed 因 ShouldSkipColumnRoutedPress 直接 return，不会重臂。
-                } // processInputEvent
+                } // processInputEventCore
             }
 
             // 收尾：剩余 tick + EZ2AC 未判尾（持满不松）
