@@ -359,7 +359,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                 foreach (var forced in ForceMissEarlier(laneStates, target.StartTime))
                 {
-                    if (!IsWithinMissWindow(forced.Target, input.Time, useTailReleaseLenience: false))
+                    // 局内 Column.handleHit → IsUserTriggerJudgeableNow：仍 CanBeHit 则不补 Miss。
+                    // 旧逻辑用 Miss 窗反了——Meh 窗内的更早物件会被误杀，后续按键配对漂移（Perfect↑ / Miss↑）。
+                    if (isStillUserTriggerJudgeable(forced.Target, input.Time, headWasHit, holdByHead))
                         continue;
 
                     forced.Judged = true;
@@ -999,6 +1001,43 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         {
             double missWindow = head.HitWindows?.WindowFor(HitResult.Miss) ?? 0;
             return time - head.StartTime >= -missWindow;
+        }
+
+        /// <summary>
+        /// Session 版 <see cref="OrderedHitPolicyHelper.IsUserTriggerJudgeableNow"/>：
+        /// 仍落在 LowestSuccessful（Mania=Meh）窗内则不可被 ForceMiss 提前钉死。
+        /// </summary>
+        private static bool isStillUserTriggerJudgeable(
+            HitObject target,
+            double time,
+            IReadOnlyDictionary<HeadNote, bool> headWasHit,
+            IReadOnlyDictionary<HeadNote, HoldNote> holdByHead)
+        {
+            if (target.HitWindows == null || ReferenceEquals(target.HitWindows, HitWindows.Empty))
+                return false;
+
+            if (target is HeadNote head && holdByHead.TryGetValue(head, out var hold))
+            {
+                if (!head.HitWindows.CanBeHit(time - head.StartTime))
+                    return false;
+
+                if (time > hold.Tail.StartTime)
+                {
+                    bool headHit = headWasHit.TryGetValue(head, out bool hit) && hit;
+
+                    if (!headHit
+                        && hold.Tail.HitWindows != null
+                        && !ReferenceEquals(hold.Tail.HitWindows, HitWindows.Empty)
+                        && !hold.Tail.HitWindows.CanBeHit(time - hold.Tail.StartTime))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            return target.HitWindows.CanBeHit(time - target.StartTime);
         }
 
         private static IEnumerable<LaneTargetState> collectCandidatesForInput(
