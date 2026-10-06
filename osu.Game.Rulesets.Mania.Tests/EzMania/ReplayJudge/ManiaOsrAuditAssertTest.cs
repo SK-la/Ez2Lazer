@@ -540,6 +540,53 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 string tag = missWin > 0 && absForWin <= missWin ? "in-miss-win" : "outside/passive";
                 sb.AppendLine($"  {kind(e)}@{e.HitObject?.StartTime:F0} end={end:F0} col={column} offset={e.TimeOffset:F1} {tag}");
             }
+
+            // Small stored offset + Body ComboBreak: usually auto-miss after early break when the next
+            // press was column-routed elsewhere (no rearm). Not EvaluateTail(ResultFor=Miss).
+            sb.AppendLine("Tail Miss (|off|<40) with Head/Body:");
+
+            foreach (var e in hitEvents.Where(ev => ev.Result == HitResult.Miss && ev.HitObject is TailNote)
+                                       .Where(ev => Math.Abs(ev.TimeOffset) < 40)
+                                       .OrderBy(ev => ev.HitObject!.StartTime)
+                                       .Take(15))
+            {
+                var tail = (TailNote)e.HitObject!;
+                var hold = hitEvents.Select(ev => ev.HitObject).OfType<HoldNote>()
+                                    .FirstOrDefault(h => ReferenceEquals(h.Tail, tail));
+                string headInfo = "-";
+                string bodyInfo = "-";
+
+                if (hold != null)
+                {
+                    var headEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Head));
+                    var bodyEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Body));
+                    headInfo = headEv.HitObject != null ? $"{headEv.Result}@{headEv.TimeOffset:F1}" : "no-head-event";
+                    bodyInfo = bodyEv.HitObject != null ? $"{bodyEv.Result}" : "no-body-event";
+                }
+
+                string column = tail is IHasColumn c2 ? c2.Column.ToString() : "-";
+                sb.AppendLine($"  Tail@{tail.StartTime:F0} col={column} off={e.TimeOffset:F1} head={headInfo} body={bodyInfo}");
+            }
+
+            double? sampleMissWindow = hitEvents.Select(ev => ev.HitObject?.HitWindows?.WindowFor(HitResult.Miss)).FirstOrDefault(w => w is > 0);
+            if (sampleMissWindow is double missWindowMs)
+            {
+                int mehAtMissEdge = hitEvents.Count(ev =>
+                {
+                    if (ev.Result != HitResult.Meh || ev.HitObject?.HitWindows == null) return false;
+                    bool tail = ev.HitObject is TailNote;
+                    double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                    return Math.Abs(j - missWindowMs) <= 1.0 || Math.Abs(j - (missWindowMs + 0.5)) < 1e-9;
+                });
+                int missAtMissEdge = hitEvents.Count(ev =>
+                {
+                    if (ev.Result != HitResult.Miss || ev.HitObject?.HitWindows == null) return false;
+                    bool tail = ev.HitObject is TailNote;
+                    double j = Math.Abs(ev.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                    return Math.Abs(j - missWindowMs) <= 1.0 || Math.Abs(j - (missWindowMs + 0.5)) < 1e-9;
+                });
+                sb.AppendLine($"MissWindow={missWindowMs}: Meh near miss-edge={mehAtMissEdge}; Miss near miss-edge={missAtMissEdge}");
+            }
         }
 
         private static void archiveReport(AuditFixture fixture, string report)
