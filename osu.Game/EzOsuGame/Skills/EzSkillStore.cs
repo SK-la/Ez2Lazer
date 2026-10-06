@@ -359,6 +359,29 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        /// <summary>Row metadata for a player system slice (analyzed plays / provisional / stale).</summary>
+        public (int AnalyzedPlays, bool Provisional, bool Stale) GetPlayerSystemSkillMeta(
+            string username,
+            int keyCount,
+            string systemId,
+            int? algorithmVersion = null)
+        {
+            int version = algorithmVersion ?? EzSkillSystems.ResolveAlgorithmVersion(systemId);
+
+            return realmAccess.Run(r =>
+            {
+                var row = r.All<EzPlayerSkillValue>()
+                           .FirstOrDefault(v => v.Username == username
+                                                && v.KeyCount == keyCount
+                                                && v.SystemId == systemId
+                                                && v.AlgorithmVersion == version);
+
+                return row == null
+                    ? (0, false, false)
+                    : (row.AnalyzedPlays, row.Provisional, row.Stale);
+            });
+        }
+
         public EzPlayerSsrSnapshot GetPlayerSsrSnapshot(string username, int keyCount, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzManiaSkillAlgorithm.VERSION;

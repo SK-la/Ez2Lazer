@@ -125,6 +125,18 @@ namespace osu.Game.EzOsuGame.Skills
             return Store.GetPlayerSkills(username, sliceKey, systemId);
         }
 
+        public (int AnalyzedPlays, bool Provisional, bool Stale) GetPlayerSystemSkillMeta(string username, int sliceKey, string systemId)
+        {
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(systemId))
+                return (0, false, false);
+
+            var meta = Store.GetPlayerSystemSkillMeta(username, sliceKey, systemId);
+            if (meta.AnalyzedPlays > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
+                return meta;
+
+            return Store.GetPlayerSystemSkillMeta(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, sliceKey, systemId);
+        }
+
         public IReadOnlyDictionary<string, double> GetBeatmapMsd(string beatmapHash)
         {
             if (string.IsNullOrEmpty(beatmapHash))
