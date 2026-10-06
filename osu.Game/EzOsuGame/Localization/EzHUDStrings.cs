@@ -261,5 +261,44 @@ namespace osu.Game.EzOsuGame.Localization
             "Auto by width; Horizontal side-by-side; Vertical stacked.");
 
         public static readonly LocalisableString DAN_PANEL_RATING = new EzLocalizationManager.EzLocalisableString("Rating", "Rating");
+
+        public static readonly LocalisableString CAMERA_SOURCE_LABEL = new EzLocalizationManager.EzLocalisableString("来源类型", "Source");
+        public static readonly LocalisableString CAMERA_SOURCE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("物理摄像头或虚拟摄像头。", "Physical camera or virtual camera.");
+        public static readonly LocalisableString CAMERA_SOURCE_PHYSICAL = new EzLocalizationManager.EzLocalisableString("物理", "Physical");
+        public static readonly LocalisableString CAMERA_SOURCE_VIRTUAL = new EzLocalizationManager.EzLocalisableString("虚拟", "Virtual");
+
+        public static readonly LocalisableString CAMERA_DEVICE_LABEL = new EzLocalizationManager.EzLocalisableString("设备", "Device");
+        public static readonly LocalisableString CAMERA_DEVICE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按来源类型过滤。留空则使用该类型的第一台设备。", "Filtered by source. Empty uses the first device of that kind.");
+        public static readonly LocalisableString CAMERA_DEVICE_DEFAULT = new EzLocalizationManager.EzLocalisableString("默认（该类型第一台）", "Default (first of this kind)");
+
+        public static readonly LocalisableString CAMERA_AUTO_FOCUS_LABEL = new EzLocalizationManager.EzLocalisableString("自动对焦", "Auto focus");
+        public static readonly LocalisableString CAMERA_AUTO_FOCUS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设备不支持时不会生效。", "Ignored when the device does not support it.");
+        public static readonly LocalisableString CAMERA_FOCUS_LABEL = new EzLocalizationManager.EzLocalisableString("手动对焦", "Manual focus");
+        public static readonly LocalisableString CAMERA_FOCUS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭自动对焦后，在设备支持的范围内调节。", "Used when auto focus is off, mapped across the device range.");
+
+        public static readonly LocalisableString CAMERA_AUTO_EXPOSURE_LABEL = new EzLocalizationManager.EzLocalisableString("自动曝光", "Auto exposure");
+        public static readonly LocalisableString CAMERA_AUTO_EXPOSURE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设备不支持时不会生效。", "Ignored when the device does not support it.");
+        public static readonly LocalisableString CAMERA_EXPOSURE_LABEL = new EzLocalizationManager.EzLocalisableString("曝光", "Exposure");
+        public static readonly LocalisableString CAMERA_EXPOSURE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭自动曝光后，在设备支持的范围内调节。", "Used when auto exposure is off, mapped across the device range.");
+
+        public static readonly LocalisableString CAMERA_AUTO_WHITE_BALANCE_LABEL = new EzLocalizationManager.EzLocalisableString("自动白平衡", "Auto white balance");
+        public static readonly LocalisableString CAMERA_AUTO_WHITE_BALANCE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设备不支持时不会生效。", "Ignored when the device does not support it.");
+        public static readonly LocalisableString CAMERA_WHITE_BALANCE_LABEL = new EzLocalizationManager.EzLocalisableString("白平衡", "White balance");
+        public static readonly LocalisableString CAMERA_WHITE_BALANCE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭自动白平衡后，在设备色温范围内调节。", "Used when auto white balance is off, mapped across the device kelvin range.");
+
+        public static readonly LocalisableString CAMERA_FPS_LABEL = new EzLocalizationManager.EzLocalisableString("目标帧率", "Target frame rate");
+        public static readonly LocalisableString CAMERA_FPS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "采集优先不超过 720p，并尽量贴近此帧率。60 更耗上传带宽。",
+            "Capture prefers ≤720p and the closest rate. 60 costs more to upload.");
+        public static readonly LocalisableString CAMERA_FPS_15 = new EzLocalizationManager.EzLocalisableString("15", "15");
+        public static readonly LocalisableString CAMERA_FPS_24 = new EzLocalizationManager.EzLocalisableString("24", "24");
+        public static readonly LocalisableString CAMERA_FPS_30 = new EzLocalizationManager.EzLocalisableString("30", "30");
+        public static readonly LocalisableString CAMERA_FPS_60 = new EzLocalizationManager.EzLocalisableString("60（更耗）", "60 (higher cost)");
+
+        public static readonly LocalisableString CAMERA_CORNER_RADIUS_LABEL = new EzLocalizationManager.EzLocalisableString("圆角", "Corner radius");
+        public static readonly LocalisableString CAMERA_CORNER_RADIUS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("相对短边的圆角比例。", "Corner radius as a fraction of the shorter side.");
+
+        public static readonly LocalisableString CAMERA_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString("摄像头未能打开。", "The camera could not be opened.");
+        public static readonly LocalisableString CAMERA_PLATFORM_UNSUPPORTED = new EzLocalizationManager.EzLocalisableString("当前平台没有本地摄像头后端。", "This platform has no local camera backend.");
     }
 }

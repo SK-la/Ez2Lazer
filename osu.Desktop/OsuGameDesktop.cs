@@ -35,6 +35,8 @@ namespace osu.Desktop
         [Cached(typeof(IHighPerformanceSessionManager))]
         private readonly HighPerformanceSessionManager highPerformanceSessionManager = new HighPerformanceSessionManager();
 
+        protected override bool EnableWindowsCameraBackend => true;
+
         public bool IsFirstRun { get; init; }
 
         public bool EnableWebSocketServer { get; init; }

@@ -44,6 +44,7 @@ using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Background.Pixiv;
+using osu.Game.EzOsuGame.Camera;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.ExternalRulesets;
 using osu.Game.EzOsuGame.Fonts;
@@ -217,6 +218,14 @@ namespace osu.Game
 
         protected Ez2ConfigManager Ez2ConfigManager { get; private set; }
 
+        private EzCameraHost ezCameraHost;
+
+        /// <summary>
+        /// Desktop overrides this so the Windows capture assembly can be loaded after the camera HUD switch is turned on.
+        /// The assembly is not loaded until that switch is on.
+        /// </summary>
+        protected virtual bool EnableWindowsCameraBackend => false;
+
         protected EzSkinInfo EzSkinInfo { get; private set; }
 
         protected EzResourceStore EzResourceStore { get; private set; }
@@ -345,6 +354,14 @@ namespace osu.Game
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);
             dependencies.Cache(new PixivBackgroundCoordinator(Storage, Ez2ConfigManager));
+
+            Func<IEzCameraBackend> cameraFactory = null;
+
+            if (EnableWindowsCameraBackend && OperatingSystem.IsWindows())
+                cameraFactory = EzCameraBackendLoader.Create;
+
+            ezCameraHost = new EzCameraHost(Ez2ConfigManager.GetBindable<bool>(Ez2Setting.EzHudCameraEnabled), cameraFactory);
+            dependencies.Cache(ezCameraHost);
 
             bindFrameLimiter(Ez2ConfigManager, frameworkConfig);
             EzSkinInfo = new EzSkinInfo(Ez2ConfigManager);
@@ -1033,6 +1050,7 @@ namespace osu.Game
             base.Dispose(isDisposing);
 
             ezAnalysisPersistentStore?.Dispose();
+            ezCameraHost?.Dispose();
 
             RulesetStore?.Dispose();
             LocalConfig?.Dispose();

@@ -268,6 +268,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.EzTimingTraceEnabled, false);
             SetDefault(Ez2Setting.EzScoreRaceServiceEnabled, true);
             SetDefault(Ez2Setting.EzScoreRaceFeedMode, EzReplayFeedMode.BatchAllEvents);
+            SetDefault(Ez2Setting.EzHudCameraEnabled, false);
 
             #endregion
         }
@@ -1228,6 +1229,9 @@ namespace osu.Game.EzOsuGame.Configuration
 
         /// <summary>角逐 timeline 喂入：BatchAllEvents=进局前预建；StreamByClock=进局不阻塞，后台按时钟就绪。</summary>
         EzScoreRaceFeedMode,
+
+        /// <summary>摄像头 HUD 总开关。关闭时不加载采集后端、不枚举设备、不打开摄像头、不上传纹理。</summary>
+        EzHudCameraEnabled,
 
         // Ez 技能
         /// <summary>
