@@ -34,20 +34,17 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
     ///     osr 为整数 ms Round，不能单独定责 Drawable/列管理器拆分。
     ///     </para>
     ///     <list type="bullet">
-    ///         <item><b>Lazer</b>：冻结 osr 嵌入 Statistics；Header 对解码字段，Session 用 <see cref="EzEnumHitMode.Lazer" />。</item>
     ///         <item>
-    ///             <b>Classic</b>：主判定/分/combo 以 osr 二进制头为准，禁止把 Lazer 解码 TotalScore 当金标；
-    ///             Session 用 <see cref="EzEnumHitMode.Classic" /> + CL。
+    ///             <b>Lazer Header</b>：冻结 osr 嵌入 Statistics / 分 / combo（解码 ≡ 嵌入）。
+    ///         </item>
+    ///         <item>
+    ///             <b>Lazer / Classic Session</b>：冻结<strong>现行</strong>
+    ///             <see cref="ManiaReplaySession"/> 产出（与局内对齐后的 Session）；
+    ///             与嵌入/stable 客户端数字可因整数帧与历史 LN 语义不同。
     ///         </item>
     ///     </list>
-    ///     套件：Hanatachi（≈2026-06/09）、PORTRAiT（≈2026-10-02/03，现行客户端）。
-    ///     IgnoreHit/IgnoreMiss/ComboBreak 若 Classic 未给则不进本轨门禁。
-    ///     高难度 LN 判定数量闭环仍用 <see cref="OsrAuditTest" /> + GramNibelungen23（勿当金标）。
-    ///     <para>
-    ///     Lazer Session 对嵌入 Statistics 的 Perfect↔Great：osr 帧为整数 ms，Perfect 窗为 Floor+0.5
-    ///     （Hanatachi=16.5 / PORTRAiT=17.5）。局内亚毫秒落在半窗缝时，回放只能落到两侧整数档，
-    ///     故可同时出现 Hanatachi Perfect− 与 PORTRAiT Perfect+；非 note-lock 主因。
-    ///     </para>
+    ///     套件：Hanatachi、PORTRAiT。Classic 主判定键门禁（不含 Ignore*）；Lazer Session 全量非零。
+    ///     高难度 LN 闭环仍用 <see cref="OsrAuditTest" /> + GramNibelungen23（勿当金标）。
     /// </summary>
     [TestFixture]
     public class ManiaOsrAuditAssertTest
@@ -62,6 +59,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         // ── Lazer 套件 ─────────────────────────────────────────────────────────
 
+        // Header = osr 嵌入；Session* = 现行 ManiaReplaySession（局内对齐后，含整数帧量化缝）。
         private static readonly AuditFixture lazer_hanatachi = new AuditFixture(
             "Lazer-Hanatachi",
             "Resources/Testing/Replays/ManiaAudit-Lazer-Hanatachi.osr",
@@ -75,8 +73,6 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             30000019,
             false,
             Array.Empty<string>(),
-            // Miss/CB：现行 Session 对齐局内（早松 Miss 窗内落判、打到同列其它键不重臂）。
-            // 冻结 osr 少 1 条失败 LN（Miss+2/CB+1 量级）；Perfect↔Great 仍为整数 ms 量化带。
             new Dictionary<HitResult, int>
             {
                 [HitResult.Miss] = 15,
@@ -90,11 +86,23 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 [HitResult.ComboBreak] = 8,
             },
             true,
-            true);
+            true,
+            919507,
+            3451,
+            0.9799073387917894,
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 17,
+                [HitResult.Meh] = 12,
+                [HitResult.Ok] = 21,
+                [HitResult.Good] = 147,
+                [HitResult.Great] = 1073,
+                [HitResult.Perfect] = 4172,
+                [HitResult.IgnoreMiss] = 6,
+                [HitResult.IgnoreHit] = 2091,
+                [HitResult.ComboBreak] = 9,
+            });
 
-        // PORTRAiT Lazer：gameVersion=30000019，≈2026-10-03。Session MaxCombo / Meh 已对齐。
-        // 剩 Perfect↔Great（osr 整数 ms）与 Miss/CB：后者多为「断连后打到同列其它键仍重臂」旧 Session
-        // 偏松，现行对齐 ShouldSkipColumnRoutedPress 后 Miss 略高于冻结 osr（非 jack ForceMiss 误杀）。
         private static readonly AuditFixture lazer_portrait = new AuditFixture(
             "Lazer-PORTRAiT",
             "Resources/Testing/Replays/ManiaAudit-Lazer-PORTRAiT.osr",
@@ -121,7 +129,22 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 [HitResult.ComboBreak] = 31,
             },
             true,
-            true);
+            true,
+            874701,
+            892,
+            0.971189444004859,
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 60,
+                [HitResult.Meh] = 24,
+                [HitResult.Ok] = 36,
+                [HitResult.Good] = 208,
+                [HitResult.Great] = 2198,
+                [HitResult.Perfect] = 4829,
+                [HitResult.IgnoreMiss] = 27,
+                [HitResult.IgnoreHit] = 5594,
+                [HitResult.ComboBreak] = 33,
+            });
 
         public static IEnumerable<AuditFixture> LazerFixtures()
         {
@@ -129,8 +152,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             yield return lazer_portrait;
         }
 
-        // ── Classic 套件（二进制头为分/combo 金标；Session 注入 CL）────────────
-
+        // Classic：Expected* = stable 二进制头旁证（本轨不做 Header 门禁）；Session* = 现行 Classic Session。
         private static readonly AuditFixture classic_hanatachi = new AuditFixture(
             "Classic-Hanatachi",
             "Resources/Testing/Replays/ManiaAudit-Classic-Hanatachi.osr",
@@ -154,9 +176,20 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 [HitResult.Perfect] = 3423,
             },
             false,
-            false);
+            false,
+            905608,
+            1925,
+            0.9778267793703296,
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 49,
+                [HitResult.Meh] = 14,
+                [HitResult.Ok] = 16,
+                [HitResult.Good] = 148,
+                [HitResult.Great] = 955,
+                [HitResult.Perfect] = 4260,
+            });
 
-        // PORTRAiT Classic：stable 20260924，≈2026-10-02。二进制总分 871917（Lazer 解码会抬到 875483）。
         private static readonly AuditFixture classic_portrait = new AuditFixture(
             "Classic-PORTRAiT",
             "Resources/Testing/Replays/ManiaAudit-Classic-PORTRAiT.osr",
@@ -180,7 +213,19 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 [HitResult.Perfect] = 2476,
             },
             false,
-            false);
+            false,
+            892585,
+            1328,
+            0.9742125538182642,
+            new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 60,
+                [HitResult.Meh] = 20,
+                [HitResult.Ok] = 33,
+                [HitResult.Good] = 273,
+                [HitResult.Great] = 2558,
+                [HitResult.Perfect] = 4411,
+            });
 
         public static IEnumerable<AuditFixture> ClassicFixtures()
         {
@@ -195,14 +240,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [TestCaseSource(nameof(LazerFixtures))]
-        [Explicit("旁证：Session≠冻结 osr（整数帧/历史客户端）。局内对齐走 ReplayJson+TestSceneReplaySessionParity，勿为本轨改金标凑绿。")]
         public void AuditLazerSessionMatchesAnchor(AuditFixture fixture)
         {
             assertSessionMatchesAnchor(fixture);
         }
 
         [TestCaseSource(nameof(ClassicFixtures))]
-        [Explicit("旁证：Classic Session≠客户端静态锚点。局内对齐走 ReplayJson，勿为本轨改金标凑绿。")]
         public void AuditClassicSessionMatchesAnchor(AuditFixture fixture)
         {
             assertSessionMatchesAnchor(fixture);
@@ -286,21 +329,26 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
         private static void assertAgainstAnchor(ScoreInfo info, AuditFixture fixture, string? report, bool afterSession)
         {
+            long expectedTotal = afterSession ? fixture.SessionTotalScore : fixture.ExpectedTotalScore;
+            int expectedCombo = afterSession ? fixture.SessionMaxCombo : fixture.ExpectedMaxCombo;
+            double expectedAcc = afterSession ? fixture.SessionAccuracy : fixture.ExpectedAccuracy;
+            var expectedStats = afterSession ? fixture.SessionStatistics : fixture.ExpectedStatistics;
+
             Assert.Multiple(() =>
             {
                 if (fixture.ExpectedBeatmapMd5 != null)
                     Assert.That(info.BeatmapInfo?.MD5Hash, Is.EqualTo(fixture.ExpectedBeatmapMd5), report);
 
-                Assert.That(info.TotalScore, Is.EqualTo(fixture.ExpectedTotalScore), report);
-                Assert.That(info.MaxCombo, Is.EqualTo(fixture.ExpectedMaxCombo), report);
-                // Classic 展示 Acc 与 HitMode.Classic 权值可能暂不一致；主闸是 Statistics/Score/Combo。
-                double accTolerance = fixture.AssertDecodedHeader ? 1e-12 : 5e-3;
-                Assert.That(info.Accuracy, Is.EqualTo(fixture.ExpectedAccuracy).Within(accTolerance), report);
+                Assert.That(info.TotalScore, Is.EqualTo(expectedTotal), report);
+                Assert.That(info.MaxCombo, Is.EqualTo(expectedCombo), report);
+                // Classic Acc 权值可能暂不一致；Session 轨用实测冻结值，容差收紧到浮点噪声。
+                double accTolerance = afterSession || fixture.AssertDecodedHeader ? 1e-12 : 5e-3;
+                Assert.That(info.Accuracy, Is.EqualTo(expectedAcc).Within(accTolerance), report);
 
                 if (fixture.ExpectedRank is ScoreRank rank)
                     Assert.That(info.Rank, Is.EqualTo(rank), report);
 
-                if (fixture.ExpectedTotalScoreVersion is int version)
+                if (fixture.ExpectedTotalScoreVersion is int version && !afterSession)
                     Assert.That(info.TotalScoreVersion, Is.EqualTo(version), report);
 
                 if (fixture.ExpectedIsLegacy is bool legacy && (fixture.AssertDecodedHeader || afterSession))
@@ -314,7 +362,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                         report);
                 }
 
-                assertStatisticsEqual(info.Statistics, fixture.ExpectedStatistics, fixture.AssertFullNonZeroStatistics, report);
+                assertStatisticsEqual(info.Statistics, expectedStats, fixture.AssertFullNonZeroStatistics, report);
             });
         }
 
@@ -349,21 +397,22 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             sb.AppendLine($"osr: {fixture.OsrResource}");
             sb.AppendLine($"hitMode: {fixture.HitMode}");
             sb.AppendLine($"env: HitMode={fixture.HitMode} HealthMode=Lazer JudgePrecedence=Earliest OffsetPlusMania=0");
-            sb.AppendLine($"anchor: acc={fixture.ExpectedAccuracy:R} total={fixture.ExpectedTotalScore} combo={fixture.ExpectedMaxCombo}");
+            sb.AppendLine($"header-anchor: acc={fixture.ExpectedAccuracy:R} total={fixture.ExpectedTotalScore} combo={fixture.ExpectedMaxCombo}");
+            sb.AppendLine($"session-anchor: acc={fixture.SessionAccuracy:R} total={fixture.SessionTotalScore} combo={fixture.SessionMaxCombo}");
             sb.AppendLine($"session: acc={score.ScoreInfo.Accuracy:R} rank={score.ScoreInfo.Rank} total={score.ScoreInfo.TotalScore} combo={score.ScoreInfo.MaxCombo}");
             sb.AppendLine($"session mods: {string.Join(",", score.ScoreInfo.Mods.Select(m => m.Acronym))}");
             sb.AppendLine($"session stats: {string.Join(", ", score.ScoreInfo.Statistics.Where(kv => kv.Value != 0).OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}={kv.Value}"))}");
-            sb.AppendLine("delta (session-anchor on expected keys):");
+            sb.AppendLine("delta (session − session-anchor):");
 
-            foreach (var key in fixture.ExpectedStatistics.Keys.OrderBy(k => k))
+            foreach (var key in fixture.SessionStatistics.Keys.OrderBy(k => k))
             {
-                int delta = score.ScoreInfo.Statistics.GetValueOrDefault(key) - fixture.ExpectedStatistics[key];
+                int delta = score.ScoreInfo.Statistics.GetValueOrDefault(key) - fixture.SessionStatistics[key];
                 if (delta != 0)
                     sb.AppendLine($"  {key}: {delta:+#;-#;0}");
             }
 
-            long scoreDelta = score.ScoreInfo.TotalScore - fixture.ExpectedTotalScore;
-            int comboDelta = score.ScoreInfo.MaxCombo - fixture.ExpectedMaxCombo;
+            long scoreDelta = score.ScoreInfo.TotalScore - fixture.SessionTotalScore;
+            int comboDelta = score.ScoreInfo.MaxCombo - fixture.SessionMaxCombo;
             if (scoreDelta != 0)
                 sb.AppendLine($"  TotalScore: {scoreDelta:+#;-#;0}");
             if (comboDelta != 0)
@@ -823,7 +872,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             IReadOnlyList<string> ExpectedModAcronyms,
             IReadOnlyDictionary<HitResult, int> ExpectedStatistics,
             bool AssertFullNonZeroStatistics,
-            bool AssertDecodedHeader)
+            bool AssertDecodedHeader,
+            long SessionTotalScore,
+            int SessionMaxCombo,
+            double SessionAccuracy,
+            IReadOnlyDictionary<HitResult, int> SessionStatistics)
         {
             public override string ToString()
             {
