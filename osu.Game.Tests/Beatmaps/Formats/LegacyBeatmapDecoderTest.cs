@@ -379,12 +379,13 @@ namespace osu.Game.Tests.Beatmaps.Formats
         }
 
         /// <summary>
-        /// [Ez] BMS conversions may emit beatLength far above Parsing.MAX_PARSE_VALUE; decode must keep the point and clamp via TimingControlPoint.
+        /// [Ez] BMS / corrupt exports may emit beatLength far above any fixed parse cap; decode must keep the point and clamp via TimingControlPoint.
         /// </summary>
-        [Test]
-        public void TestDecodeExtremeBeatLengthClampsToEzTimingRange()
+        [TestCase("999999999999999")]
+        [TestCase("6E+16")]
+        public void TestDecodeExtremeBeatLengthClampsToEzTimingRange(string beatLengthText)
         {
-            const string contents = @"osu file format v14
+            string contents = $@"osu file format v14
 
 [General]
 AudioFilename: audio.mp3
@@ -392,7 +393,7 @@ Mode: 3
 
 [TimingPoints]
 0,500,4,2,0,100,1,0
-70916,999999999999999,4,2,0,5,1,0
+70916,{beatLengthText},4,2,0,5,1,0
 ";
 
             var decoder = new LegacyBeatmapDecoder { ApplyOffsets = false };

@@ -41,6 +41,9 @@ namespace osu.Game.Beatmaps.Formats
 
             string? line;
             int lineNumber = 0;
+            // [Ez] Cap per-decode failure spam (corrupt TimingPoints etc.) to avoid log OOM during analysis reloads.
+            const int max_logged_line_failures = 5;
+            int lineFailureCount = 0;
 
             while ((line = stream.ReadLine()) != null)
             {
@@ -72,10 +75,18 @@ namespace osu.Game.Beatmaps.Formats
                 }
                 catch (Exception e)
                 {
-                    const int line_length_limit = 50;
-                    Logger.Log($"Failed to process line {lineNumber} \"{(line.Length <= line_length_limit ? line : string.Concat(line.AsSpan(0, line_length_limit), "…"))}\" into \"{output}\": {e.Message}");
+                    lineFailureCount++;
+
+                    if (lineFailureCount <= max_logged_line_failures)
+                    {
+                        const int line_length_limit = 50;
+                        Logger.Log($"Failed to process line {lineNumber} \"{(line.Length <= line_length_limit ? line : string.Concat(line.AsSpan(0, line_length_limit), "…"))}\" into \"{output}\": {e.Message}");
+                    }
                 }
             }
+
+            if (lineFailureCount > max_logged_line_failures)
+                Logger.Log($"Failed to process {lineFailureCount - max_logged_line_failures} more line(s) into \"{output}\"");
         }
 
         protected virtual bool ShouldSkipLine(string line) => string.IsNullOrWhiteSpace(line) || line.AsSpan().TrimStart().StartsWith("//".AsSpan(), StringComparison.Ordinal);
