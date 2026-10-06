@@ -13,6 +13,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.IO.Archives;
 using osu.Game.Rulesets;
 using osu.Game.Scoring.Legacy;
@@ -28,7 +29,7 @@ namespace osu.Game.Scoring
     {
         public override IEnumerable<string> HandledExtensions => new[] { ".osr" };
 
-        protected override string[] HashableFileTypes => new[] { ".osr" };
+        protected override string[] HashableFileTypes => new[] { ".osr", EzHighPrecisionReplayFrames.EXTENSION };
 
         private readonly RulesetStore rulesets;
         private readonly Func<BeatmapManager> beatmaps;

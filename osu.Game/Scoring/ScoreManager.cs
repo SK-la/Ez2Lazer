@@ -53,7 +53,16 @@ namespace osu.Game.Scoring
                 PostNotification = obj => PostNotification?.Invoke(obj)
             };
 
-            scoreExporter = new LegacyScoreExporter(storage)
+            scoreExporter = new LegacyScoreExporter(storage, info =>
+            {
+                var score = scoreImporter.GetScore(info);
+                if (score?.ScoreInfo.BeatmapInfo == null || score.Replay == null)
+                    return null;
+
+                var playable = beatmaps().GetWorkingBeatmap(score.ScoreInfo.BeatmapInfo)
+                                        .GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
+                return (score, playable);
+            })
             {
                 PostNotification = obj => PostNotification?.Invoke(obj)
             };

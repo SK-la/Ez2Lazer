@@ -1581,10 +1581,11 @@ namespace osu.Game.Screens.Play
 
             if (score.ScoreInfo.Ruleset.IsLegacyRuleset())
             {
+                // Internal source of truth: absolute-time frames. Round .osr is produced only on user export.
                 using (var stream = new MemoryStream())
                 {
-                    new LegacyScoreEncoder(score, GameplayState.Beatmap).Encode(stream);
-                    replayReader = new ByteArrayArchiveReader(stream.ToArray(), "replay.osr");
+                    EzHighPrecisionReplayFrames.Write(stream, score, GameplayState.Beatmap);
+                    replayReader = new ByteArrayArchiveReader(stream.ToArray(), EzHighPrecisionReplayFrames.FILENAME);
                 }
             }
 
