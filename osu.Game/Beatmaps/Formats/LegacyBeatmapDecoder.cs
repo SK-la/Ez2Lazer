@@ -488,8 +488,8 @@ namespace osu.Game.Beatmaps.Formats
             double time = getOffsetTime(Parsing.ParseDouble(split[0].Trim()));
 
             // beatLength is allowed to be NaN to handle an edge case in which some beatmaps use NaN slider velocity to disable slider tick generation (see LegacyDifficultyControlPoint).
-            // [Ez] BMS conversions may write beatLength far beyond int.MaxValue; raise the parse limit so TimingControlPoint can clamp (0.6–600000).
-            double beatLength = Parsing.ParseDouble(split[1].Trim(), parseLimit: 1e15, allowNaN: true);
+            // [Ez] BMS / corrupt exports may write beatLength beyond any fixed parse cap (e.g. 6E+16); accept finite doubles then clamp on assign.
+            double beatLength = Parsing.ParseDouble(split[1].Trim(), parseLimit: double.MaxValue, allowNaN: true);
 
             // If beatLength is NaN, speedMultiplier should still be 1 because all comparisons against NaN are false.
             double speedMultiplier = beatLength < 0 ? 100.0 / -beatLength : 1;
@@ -535,7 +535,8 @@ namespace osu.Game.Beatmaps.Formats
 
                 var controlPoint = CreateTimingControlPoint();
 
-                controlPoint.BeatLength = beatLength;
+                // Match TimingControlPoint.BeatLengthBindable range (Ez: 0.6–600000) without relying on Bindable side effects alone.
+                controlPoint.BeatLength = Math.Clamp(beatLength, controlPoint.BeatLengthBindable.MinValue, controlPoint.BeatLengthBindable.MaxValue);
                 controlPoint.TimeSignature = timeSignature;
                 controlPoint.OmitFirstBarLine = omitFirstBarSignature;
 

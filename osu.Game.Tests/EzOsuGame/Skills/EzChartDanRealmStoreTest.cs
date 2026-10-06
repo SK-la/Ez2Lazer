@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
@@ -23,6 +24,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             {
                 var store = new EzSkillStore(realm);
                 const string hash = "chart-dan-hash-1";
+
+                seedChart(realm, hash);
 
                 var dto = new EzPersistedChartDan
                 {
@@ -55,7 +58,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(loaded.LnRawDan, Is.EqualTo(-1));
                 Assert.That(loaded.RcSkillsetLabels["jack"], Is.EqualTo("Shodan"));
                 Assert.That(loaded.RcSkillsetLabels["tech"], Is.EqualTo("Shodan"));
-                Assert.That(store.GetPersistedChartDanHashes(), Does.Contain(hash));
+                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash));
             });
         }
 
@@ -66,6 +69,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             {
                 var store = new EzSkillStore(realm);
                 const string hash = "chart-dan-stale-version";
+
+                seedChart(realm, hash);
 
                 realm.Write(r =>
                 {
@@ -85,7 +90,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 Assert.That(store.TryGetChartDan(hash, out var missing), Is.False);
                 Assert.That(missing, Is.Null);
-                Assert.That(store.GetPersistedChartDanHashes(), Does.Not.Contain(hash));
+                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Not.Contain(hash));
             });
         }
 
@@ -105,6 +110,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                              ("chart-dan-missing-msd-upstream", EzChartSkillInfo.VERSION),
                          })
                 {
+                    seedChart(realm, hash);
+
                     realm.Write(r =>
                     {
                         r.Add(new EzBeatmapChartDan
@@ -123,7 +130,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                     Assert.That(store.TryGetChartDan(hash, out var stale), Is.False, $"revision {stamp} should be stale");
                     Assert.That(stale, Is.Null);
-                    Assert.That(store.GetPersistedChartDanHashes(), Does.Not.Contain(hash));
+                    Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Not.Contain(hash));
                 }
             });
         }
@@ -192,10 +199,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 var store = new EzSkillStore(realm);
                 const string hash = "msd-unrateable-hash";
 
+                seedChart(realm, hash);
+
                 store.WriteBeatmapMsdUnrateable(hash, Guid.NewGuid());
 
-                Assert.That(store.GetCompleteBeatmapMsdHashes(), Does.Not.Contain(hash));
-                Assert.That(store.GetSettledBeatmapMsdHashes(), Does.Contain(hash));
+                Assert.That(store.CollectChartChainState().CompleteMsd, Does.Not.Contain(hash));
+                Assert.That(store.CollectChartChainState().SettledMsd, Does.Contain(hash));
 
                 var skills = store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD);
                 Assert.That(EzBeatmapMsdComputer.IsUnrateableMsd(skills), Is.True);
@@ -203,8 +212,63 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 // Successful MSD write replaces the marker.
                 store.WriteBeatmapMsd(hash, new EzSkillsetVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
-                Assert.That(store.GetCompleteBeatmapMsdHashes(), Does.Contain(hash));
+                Assert.That(store.CollectChartChainState().CompleteMsd, Does.Contain(hash));
                 Assert.That(EzBeatmapMsdComputer.IsUnrateableMsd(store.GetBeatmapSkills(hash, EzSkillSystems.BEATMAP_MSD)), Is.False);
+            });
+        }
+
+        /// <summary>
+        /// A chart that is rateable and has a complete MSD, yet whose stored inputs resolve to no dan (a keymode with
+        /// no table of its own and no star rating to borrow one from), is settled for the dan facet rather than
+        /// missing: counting it as missing is what made the backfill re-attempt and re-report it on every launch.
+        /// </summary>
+        [Test]
+        public void Chart_whose_inputs_resolve_to_no_dan_is_settled_not_owed()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzSkillStore(realm);
+                const string hash = "chart-dan-unresolvable";
+
+                // 5K: not a 4/6/7K interval table, and no xxy star rating to borrow one from.
+                seedChart(realm, hash, circleSize: 5);
+                store.WriteBeatmapMsd(hash, new EzSkillsetVector(20, 18, 16, 14, 12, 10, 8, 6), holdRatio: 0.1);
+
+                var chain = store.CollectChartChainState();
+
+                Assert.That(chain.CompleteMsd, Does.Contain(hash));
+                Assert.That(chain.UnresolvableChartDan, Does.Contain(hash));
+                Assert.That(chain.ChartDanOwed, Does.Not.Contain(hash));
+
+                var status = store.GetSkillDataStatus();
+                Assert.That(status["Dan"].Missing, Is.EqualTo(0));
+                Assert.That(status["Dan"].Settled, Is.EqualTo(1));
+            });
+        }
+
+        private static void seedChart(RealmAccess realm, string hash, float circleSize = 4)
+        {
+            realm.Write(r =>
+            {
+                var ruleset = r.All<RulesetInfo>().FirstOrDefault(s => s.ShortName == "mania");
+
+                if (ruleset == null)
+                {
+                    ruleset = new RulesetInfo { OnlineID = 3, ShortName = "mania", Available = true };
+                    r.Add(ruleset);
+                }
+
+                var set = new BeatmapSetInfo();
+                r.Add(set);
+
+                r.Add(new BeatmapInfo
+                {
+                    Hash = hash,
+                    BeatmapSet = set,
+                    Ruleset = ruleset,
+                    DifficultyName = hash,
+                    Difficulty = new BeatmapDifficulty { CircleSize = circleSize },
+                });
             });
         }
 

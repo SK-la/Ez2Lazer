@@ -38,6 +38,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             // Skin-specific
             Ez2Setting.ManiaLNGradientEnable,
+            Ez2Setting.ManiaHoldTailMaskDynamicEnable,
             Ez2Setting.ManiaHoldTailMaskGradientHeight,
             Ez2Setting.ManiaHoldTailAlpha,
             Ez2Setting.NoteTrackLineHeight,

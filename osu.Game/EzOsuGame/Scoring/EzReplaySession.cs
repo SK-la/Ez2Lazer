@@ -23,6 +23,14 @@ namespace osu.Game.EzOsuGame.Scoring
         protected abstract (Score Score, EzScoreTimeline Timeline) RunWithTimeline(
             Score score, IBeatmap beatmap, IGameplayEnvironment environment, CancellationToken cancellationToken);
 
+        /// <summary>
+        /// 注入 beatmap 来源，供需要「仿真副本」的规则集在 <see cref="RunWithTimeline"/> 里取独立实例。
+        /// 不需要隔离的规则集保持无操作。
+        /// </summary>
+        public virtual void AttachBeatmaps(IWorkingBeatmapCache beatmapCache)
+        {
+        }
+
         public async Task<Score> RunAsync(Score score, IBeatmap beatmap, ReplayRunPurpose purpose, CancellationToken cancellationToken = default)
         {
             var (resultScore, _, _) = await getOrRunSession(score, beatmap, purpose, cancellationToken).ConfigureAwait(false);
@@ -46,7 +54,7 @@ namespace osu.Game.EzOsuGame.Scoring
         {
             cancellationToken.ThrowIfCancellationRequested();
             var resolvedEnv = ResolveEnvironment(score, purpose);
-            var (_, timeline) = RunWithTimeline(score, beatmap, resolvedEnv, cancellationToken);
+            var (_, timeline) = RunWithTimeline(score.DeepClone(), beatmap, resolvedEnv, cancellationToken);
             return timeline;
         }
 
@@ -100,7 +108,8 @@ namespace osu.Game.EzOsuGame.Scoring
             return Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                return RunWithTimeline(score, beatmap, environment, cancellationToken);
+                // PopulateScore 会写回 ScoreInfo；必须克隆，避免 StatisticsPanel / GetScore 路径污染调用方原成绩。
+                return RunWithTimeline(score.DeepClone(), beatmap, environment, cancellationToken);
             }, cancellationToken);
         }
 
@@ -140,7 +149,7 @@ namespace osu.Game.EzOsuGame.Scoring
             string scoreKey = $"hash:{score.ScoreInfo.Hash}|id:{score.ScoreInfo.ID}";
             string beatmapKey = $"hash:{beatmap.BeatmapInfo.Hash}|id:{beatmap.BeatmapInfo.ID}";
             string bmsPoorKey = environment.BmsPoorHitResultEnable.ToString();
-            string envKey = $"hm:{(int)environment.ManiaHitMode}|health:{(int)environment.ManiaHealthMode}|judge:{(int)environment.JudgePrecedence}|offset:{environment.OffsetPlusMania:F3}|bmsPoor:{bmsPoorKey}|frameShift:{environment.ApplyInputOffsetViaReplayFrameShift}";
+            string envKey = $"hm:{(int)environment.ManiaHitMode}|health:{(int)environment.ManiaHealthMode}|judge:{(int)environment.JudgePrecedence}|offset:{environment.OffsetPlusMania:F3}|offsetNM:{environment.OffsetPlusNonMania:F3}|osuTrack:{(int)environment.OsuJudgementTrack}|bmsPoor:{bmsPoorKey}|frameShift:{environment.ApplyInputOffsetViaReplayFrameShift}";
 
             string raw = $"{purpose}|{scoreKey}|{beatmapKey}|{envKey}|rule:{score.ScoreInfo.Ruleset.OnlineID}";
             return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(raw)));

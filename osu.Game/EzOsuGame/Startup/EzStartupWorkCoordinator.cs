@@ -21,18 +21,10 @@ namespace osu.Game.EzOsuGame.Startup
 
         private const double late_song_select_delay_ms = 1000;
 
-        /// <summary>
-        /// Defer detach until after song-select preload window; avoids stacking with BDSP Ez backfill.
-        /// </summary>
-        private const double main_menu_detach_delay_ms = 7000;
-
-        private const double bdsp_poll_interval_ms = 500;
-
         private const double bdsp_availability_poll_interval_ms = 100;
 
         private IEzStartupContentPreloader preloader = null!;
         private IEzStartupSongSelectPreloadHost? songSelectHost;
-        private bool detachWarmupScheduled;
         private bool songSelectScheduleRegistered;
         private bool songSelectPreloadStarted;
         private bool mainMenuEntered;
@@ -60,16 +52,9 @@ namespace osu.Game.EzOsuGame.Startup
                     break;
 
                 case EzStartupPreloadTiming.PipelineEarlySongSelect:
-                    preloader.BeginLight();
-                    break;
-
                 case EzStartupPreloadTiming.PipelineLateSongSelect:
-                    preloader.BeginLight();
-                    break;
-
                 case EzStartupPreloadTiming.ImmediateAll:
                     preloader.BeginLight();
-                    preloader.ScheduleDetachWarmup();
                     break;
             }
         }
@@ -93,16 +78,6 @@ namespace osu.Game.EzOsuGame.Startup
             // Fallback if offscreen MainMenu load finished after Push.
             if (!songSelectScheduleRegistered)
                 registerSongSelectPreloadSchedule();
-
-            switch (EzStartupTuning.PreloadTiming)
-            {
-                case EzStartupPreloadTiming.PipelineDefault:
-                case EzStartupPreloadTiming.PipelineEarlySongSelect:
-                case EzStartupPreloadTiming.PipelineLateSongSelect:
-                case EzStartupPreloadTiming.ImmediateAll:
-                    scheduleDetachWarmupWhenSafe(main_menu_detach_delay_ms);
-                    break;
-            }
         }
 
         private void registerSongSelectPreloadSchedule()
@@ -194,26 +169,6 @@ namespace osu.Game.EzOsuGame.Startup
                 songSelectHost.ScheduleSongSelectPreloadAfterUiSettle();
             else
                 songSelectHost.ScheduleSongSelectPreload();
-        }
-
-        private void scheduleDetachWarmupWhenSafe(double delayMs)
-        {
-            if (detachWarmupScheduled)
-                return;
-
-            detachWarmupScheduled = true;
-
-            Scheduler.AddDelayed(() =>
-            {
-                if (backgroundDataStoreProcessor?.IsEzRealmMetadataBackfillRunning == true)
-                {
-                    detachWarmupScheduled = false;
-                    scheduleDetachWarmupWhenSafe(bdsp_poll_interval_ms);
-                    return;
-                }
-
-                preloader.ScheduleDetachWarmup();
-            }, delayMs);
         }
 
         protected override void Dispose(bool isDisposing)

@@ -18,8 +18,11 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
   - `EzDanSkillsetBuckets`
 - The revision system that decides when the above recompute:
   - `EzAnalysisRevision` (`Analysis/` folder) — facet revisions + dependency edges.
-  - `EzSkillDataStatus` — ready / unrateable / stale / missing per facet, via
-    `EzSkillStore.GetSkillDataStatus()`.
+  - `EzDataState` (`Analysis/` folder) — the generic status kernel: a facet declares the rows it holds,
+    `EzDataStateChecker` counts ready / settled / stale / missing, `EzDataStateReport` is the list the readout
+    renders. Storage-agnostic, so a Realm table and a SQLite table report the same way.
+  - `EzChartChainState` — the chart chain's Realm adapter: one read of MSD / CSI / Dan into facets, plus the
+    per-stage owed sets. `EzSkillStore.GetSkillDataStatus()` returns its report.
 - Player SSR aggregation:
   - `EzPlayerSsrAggregator`
   - `EzDanPlaySsrIndex`
@@ -108,6 +111,20 @@ This folder contains the skill computation pipeline used by Ez2Lazer's mania-rel
   （`LOCAL_PROFILE_SKILL_STALE`）；手动「计算成绩分析」弹 `EzLocalProfileComputeNotification` 进度
   通知（一次点击只弹一轮）。
 
+### 加一个分析 facet（xxySR / KPS …）
+
+状态显示不逐个属性硬编码，所以新增一类分析状态只需要三步：
+
+1. `EzAnalysisFacet` 加成员（`Analysis/EzAnalysisRevision.cs`），有级联就在 `DownstreamOf` 里写下依赖边。
+2. 给一个 reader：把那张表读成 `<key, EzFacetRowState>`。Realm 表直接用
+   `EzRealmFacetReader.Read(...)`；SQLite / 内存来源自己产 `EzFacetRowState` 即可，内核不认识 Realm。
+3. 把 facet 挂到状态入口产出的 `EzDataStateFacet` 列表里（图表链是 `EzChartChainState.Build`）。
+   `Id` 就是显示名，`CurrentRevision` 是这条数据要对比的版本（没有版本体系就用常量的单调值）。
+
+`EzDataStateChecker` 与 `EzDataStateReport` 不用动：计数口径（当前修订且非 stub = ready，stub 或上游
+已结算 = settled，旧修订 = stale，无行 = missing）只有一份，UI 遍历 `report.Facets` 渲染，新 facet 自动
+出现在状态行里。
+
 ## 玩家链（成绩分析）：与图表链不同的第二套失效机制
 
 图表链（上面那套）失效靠**组合修订号**；玩家链（SSR / pattern / Dan 的玩家侧汇总）失效靠
@@ -167,7 +184,7 @@ mod 影响谱面时的现场估算。前两样**只读不写**：读不到就跳
 | 行存在但版本旧 | 会（增量重算） | 缺失，排队 |
 | 行不存在，MSD 未结算 | 会（同一轮里 MSD → CSI → Dan） | 缺失，排队 |
 | 键数不在引擎 `4–18` 范围 | **不会**（候选期就被丢弃） | 已结算，不报缺 |
-| 没有 beatmap set / 转谱图（mania 成绩挂在 non-mania 谱面） | **不会**（`collectManiaChartCandidates` 只收 `Ruleset == mania` 且有 set 的谱面） | 已结算，不报缺 |
+| 没有 beatmap set / 转谱图（mania 成绩挂在 non-mania 谱面） | **不会**（`EzChartChainState` 的候选宇宙只收 `Ruleset == mania` 且有 set 的谱面） | 已结算，不报缺 |
 | MSD 结算为 unrateable | **不会**（CSI 与 Dan 都显式跳过） | 已结算，不报缺 |
 | CSI 结算为 unavailable stub | 不会 | 已结算，不报缺 |
 

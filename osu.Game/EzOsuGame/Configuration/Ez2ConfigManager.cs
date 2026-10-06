@@ -113,6 +113,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ScratchAxisStopThreshold, 30, 10, 150);
             SetDefault(Ez2Setting.CatchScratchDashEnterAcceleration, 0.0005, 0.0001, 0.0010, 0.00005);
             SetDefault(Ez2Setting.CatchScratchDashExitVelocity, 0.00010, 0.00010, 0.00020, 0.00001);
+            SetDefault(Ez2Setting.ScratchAxisInvert, false);
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
 
             SetDefault(Ez2Setting.TurboMode, false);
@@ -170,6 +171,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
             SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
+            SetDefault(Ez2Setting.OsuJudgementTrack, EzEnumOsuJudgementTrack.Lazer);
 
             #endregion
 
@@ -187,6 +189,9 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.HitPositionGlobalEnable, false);
             SetDefault(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange, false);
+
+            // 启动时读取一次（见 SkinManager.ScriptedSkinsEnabled），改动需重启生效。
+            SetDefault(Ez2Setting.EnableScriptedSkins, false);
             SetDefault(Ez2Setting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
             SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
             SetDefault(Ez2Setting.HitTargetAlpha, 0.6, 0, 1, 0.01);
@@ -278,8 +283,10 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.ManiaPseudo3DRotation, 0.0, 0.0, 75.0, 1.0);
             SetDefault(Ez2Setting.ManiaHoldTailAlpha, 1.0, 0.0, 1.0, 0.01);
-            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 100.0, 1.0);
+            // UI 0-8，除 32 得到节拍；0 关闭投皮额外负担，默认 4 = 4/32 = 2/16。旧存档 >8 的像素值钳回默认 4。
+            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 8.0, 1.0);
             SetDefault(Ez2Setting.ManiaLNGradientEnable, true);
+            SetDefault(Ez2Setting.ManiaHoldTailMaskDynamicEnable, false);
         }
 
         #region 列类型管理
@@ -351,8 +358,15 @@ namespace osu.Game.EzOsuGame.Configuration
                 _ => live,
             };
 
-            double offset = purpose == ReplayRunPurpose.ForStored || ignoreOffset ? 0 : live.OffsetPlusMania;
-            return resolved with { OffsetPlusMania = offset };
+            double offsetMania = purpose == ReplayRunPurpose.ForStored || ignoreOffset ? 0 : live.OffsetPlusMania;
+            double offsetNonMania = purpose == ReplayRunPurpose.ForStored || ignoreOffset ? 0 : live.OffsetPlusNonMania;
+            var osuTrack = resolveOsuJudgementTrack(purpose, live, score);
+            return resolved with
+            {
+                OffsetPlusMania = offsetMania,
+                OffsetPlusNonMania = offsetNonMania,
+                OsuJudgementTrack = osuTrack,
+            };
         }
 
         private GameplayEnvironment readLiveGameplayEnvironment() => new GameplayEnvironment
@@ -361,8 +375,22 @@ namespace osu.Game.EzOsuGame.Configuration
             ManiaHealthMode = Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode),
             JudgePrecedence = Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence),
             OffsetPlusMania = Get<double>(Ez2Setting.OffsetPlusMania),
+            OffsetPlusNonMania = Get<double>(Ez2Setting.OffsetPlusNonMania),
+            OsuJudgementTrack = Get<EzEnumOsuJudgementTrack>(Ez2Setting.OsuJudgementTrack),
             BmsPoorHitResultEnable = Get<bool>(Ez2Setting.BmsPoorHitResultEnable),
         };
+
+        private static EzEnumOsuJudgementTrack resolveOsuJudgementTrack(ReplayRunPurpose purpose, GameplayEnvironment live, ScoreInfo? score)
+        {
+            if (purpose == ReplayRunPurpose.ForLive)
+                return live.OsuJudgementTrack;
+
+            // ForStored：优先成绩内存嵌入（[Ignored]，未升 Realm）；否则 Lazer。
+            if (score != null && score.Ruleset.OnlineID == 0 && score.OsuJudgementTrack >= 0)
+                return (EzEnumOsuJudgementTrack)score.OsuJudgementTrack;
+
+            return EzEnumOsuJudgementTrack.Lazer;
+        }
 
         private static GameplayEnvironment resolveStoredModes(GameplayEnvironment live, ScoreInfo? score)
         {
@@ -957,6 +985,12 @@ namespace osu.Game.EzOsuGame.Configuration
         /// </summary>
         CatchScratchDashExitVelocity,
 
+        /// <summary>
+        /// 反转转盘方向：交换顺/逆时针的含义（Catch 左右移动，以及选歌界面的上一首/下一首）。
+        /// 与「使用 Ez2Ac 10k2s1p」无关；Mania 顺逆均视为按下，不受影响。
+        /// </summary>
+        ScratchAxisInvert,
+
         SkipWithGameplayKeys,
 
         /// <summary>
@@ -1077,6 +1111,7 @@ namespace osu.Game.EzOsuGame.Configuration
         AsioUseExternalPCM,
         OffsetPlusMania,
         OffsetPlusNonMania,
+        OsuJudgementTrack,
         HitObjectLifetimeUsesOwnTime,
 
         // 皮肤与舞台资源
@@ -1087,6 +1122,12 @@ namespace osu.Game.EzOsuGame.Configuration
         /// When enabled, switching skins applies per-skin EzSkin.json to in-memory Ez config only.
         /// </summary>
         EzSkinJsonAutoApplyOnSkinChange,
+
+        /// <summary>
+        /// 脚本皮肤总开关。关闭时不扫描 <c>EzResources/ScriptedSkin</c>、不监视脚本文件、不做任何脚本编译。
+        /// 属启动期一次性读取的开关（不参与响应式绑定），改动后需重启生效。
+        /// </summary>
+        EnableScriptedSkins,
         GlobalTextureName,
         GameThemeName,
 
@@ -1113,8 +1154,15 @@ namespace osu.Game.EzOsuGame.Configuration
         ManiaPseudo3DRotation,
 
         ManiaHoldTailAlpha,
-        ManiaHoldTailMaskGradientHeight, // 投皮面尾
+        /// <summary>
+        /// LN 投皮距离档位。UI 0-8，除 32 得到节拍；0 关闭投皮额外负担，默认 4 = 4/32 = 2/16。进局 Get 一次快照。
+        /// </summary>
+        ManiaHoldTailMaskGradientHeight,
         ManiaLNGradientEnable,
+        /// <summary>
+        /// 动态投皮。进局时 Get 一次快照，局内不跟随设置变更；开启后按 tracker 当前拍长调整投皮距离。
+        /// </summary>
+        ManiaHoldTailMaskDynamicEnable,
         NoteCornerRadius,
 
         // 列着色与配色系统

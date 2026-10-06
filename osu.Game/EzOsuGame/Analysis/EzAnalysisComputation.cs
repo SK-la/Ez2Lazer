@@ -8,6 +8,7 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -40,8 +41,8 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             xxySr = 0;
 
-            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
-            IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup.Ruleset, lookup.OrderedMods,
+                cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -129,10 +130,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static EzAnalysisResult ComputePersistedSqliteSlice(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
         {
-            PlayableCachedWorkingBeatmap playableWorkingBeatmap = new PlayableCachedWorkingBeatmap(workingBeatmap);
-
             bool onlyKps = !EzAnalysisProviderBridge.HasAnalysisProvider(lookup.Ruleset);
-            IBeatmap analysisBeatmap = playableWorkingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(workingBeatmap, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -167,10 +166,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static EzAnalysisResult Compute(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
         {
-            PlayableCachedWorkingBeatmap playableWorkingBeatmap = new PlayableCachedWorkingBeatmap(workingBeatmap);
-
             bool onlyKps = !EzAnalysisProviderBridge.HasAnalysisProvider(lookup.Ruleset);
-            IBeatmap analysisBeatmap = playableWorkingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(workingBeatmap, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -223,8 +220,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             radarResult = default;
 
-            PlayableCachedWorkingBeatmap playableWorkingBeatmap = new PlayableCachedWorkingBeatmap(workingBeatmap);
-            IBeatmap analysisBeatmap = playableWorkingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(workingBeatmap, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 

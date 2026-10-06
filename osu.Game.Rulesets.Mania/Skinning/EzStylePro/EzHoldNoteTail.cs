@@ -5,7 +5,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
@@ -25,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private readonly EzHoldNoteHittingLayer hittingLayer = new EzHoldNoteHittingLayer();
 
-        private TextureAnimation? animation;
+        private Drawable? tailDrawable;
 
         private IBindable<double> tailAlpha = null!;
 
@@ -70,35 +69,29 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             useNoteTopHalfLayout = false;
 
-            animation = Factory.CreateAnimation(TailName);
+            tailDrawable = Factory.CreateAnimation(TailName);
 
-            if (animation.FrameCount > 0)
+            if (tailDrawable != null)
             {
                 MainContainer.Rotation = 0;
-                MainContainer.Child = animation;
+                MainContainer.Child = tailDrawable;
                 return;
             }
-
-            animation.Dispose();
 
             // 与 EzHoldNoteHead 相同：HeadName -> NoteName
-            animation = Factory.CreateAnimation(HeadName);
+            tailDrawable = Factory.CreateAnimation(HeadName);
 
-            if (animation.FrameCount > 0)
+            if (tailDrawable != null)
             {
                 MainContainer.Rotation = 180;
-                MainContainer.Child = animation;
+                MainContainer.Child = tailDrawable;
                 return;
             }
 
-            animation.Dispose();
-            animation = Factory.CreateAnimation(NoteName);
+            tailDrawable = Factory.CreateAnimation(NoteName);
 
-            if (animation.FrameCount == 0)
-            {
-                animation = null;
+            if (tailDrawable == null)
                 return;
-            }
 
             useNoteTopHalfLayout = true;
             applyNoteTopHalfLayout();
@@ -106,7 +99,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void applyNoteTopHalfLayout()
         {
-            if (animation == null)
+            if (tailDrawable == null)
                 return;
 
             if (useNoteTopHalfLayout)
@@ -121,13 +114,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     Origin = Anchor.TopCentre,
                     RelativeSizeAxes = Axes.X,
                     Masking = true,
-                    Child = animation,
+                    Child = tailDrawable,
                 };
             }
             else
             {
                 // 与 EzHoldNoteHead 有 head 资源时一致，仅附加旋转
-                MainContainer.Child = animation;
+                MainContainer.Child = tailDrawable;
             }
         }
 
@@ -169,7 +162,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (drawableObject.IsNotNull())
                 drawableObject.HitObjectApplied -= hitObjectApplied;
 
-            animation = null;
+            tailDrawable = null;
             base.Dispose(isDisposing);
         }
     }

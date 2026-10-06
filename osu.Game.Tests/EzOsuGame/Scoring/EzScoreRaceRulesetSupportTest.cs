@@ -30,19 +30,19 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         }
 
         [Test]
-        public void TestTaikoDoesNotSupportGhostRace()
+        public void TestTaikoSupportsGhostRace()
         {
             var ruleset = new TaikoRuleset().RulesetInfo;
-            Assert.That(EzScoreRaceRulesetSupport.SupportsGhostRace(ruleset), Is.False);
-            Assert.That(EzScoreRaceRulesetSupport.GetGhostTimelineMode(ruleset), Is.EqualTo(EzScoreRaceGhostTimelineMode.None));
+            Assert.That(EzScoreRaceRulesetSupport.SupportsGhostRace(ruleset), Is.True);
+            Assert.That(EzScoreRaceRulesetSupport.GetGhostTimelineMode(ruleset), Is.EqualTo(EzScoreRaceGhostTimelineMode.TaikoSession));
         }
 
         [Test]
-        public void TestCatchDoesNotSupportGhostRace()
+        public void TestCatchSupportsGhostRace()
         {
             var ruleset = new CatchRuleset().RulesetInfo;
-            Assert.That(EzScoreRaceRulesetSupport.SupportsGhostRace(ruleset), Is.False);
-            Assert.That(EzScoreRaceRulesetSupport.GetGhostTimelineMode(ruleset), Is.EqualTo(EzScoreRaceGhostTimelineMode.None));
+            Assert.That(EzScoreRaceRulesetSupport.SupportsGhostRace(ruleset), Is.True);
+            Assert.That(EzScoreRaceRulesetSupport.GetGhostTimelineMode(ruleset), Is.EqualTo(EzScoreRaceGhostTimelineMode.CatchSession));
         }
     }
 }

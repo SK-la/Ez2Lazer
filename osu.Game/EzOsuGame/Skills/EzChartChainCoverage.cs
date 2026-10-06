@@ -14,10 +14,10 @@ namespace osu.Game.EzOsuGame.Skills
     /// <remarks>
     /// The player pass reads chart-side data but never computes it, so a chart with no row has to be handed to the
     /// chain. Reporting a chart the chain never even looks at leaves a stale flag the status readout can never clear
-    /// and re-queues the chain on every pass, so this mirrors the chain's own candidate gate
-    /// (<c>BackgroundDataStoreProcessor.collectManiaChartCandidates</c> plus its keymode filter) instead of judging
-    /// the chart on its own merits: a chart with no beatmap set, and a mania score played on a non-mania beatmap
-    /// (convert), never reach a stage that could write a row.
+    /// and re-queues the chain on every pass, so this is the chain's own candidate gate
+    /// (<see cref="EzChartChainState.Build"/>'s universe, keymode filter included) instead of judging the chart on
+    /// its own merits: a chart with no beatmap set, and a mania score played on a non-mania beatmap (convert), never
+    /// reach a stage that could write a row.
     /// </remarks>
     internal static class EzChartChainCoverage
     {

@@ -17,9 +17,9 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Osu.Skinning.Default;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -297,30 +297,28 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
             if (HitObject.ClassicSliderBehaviour)
             {
-                // Classic behaviour means a slider is judged proportionally to the number of nested hitobjects hit. This is the classic osu!stable scoring.
-                ApplyResult(static (r, hitObject) =>
+                ApplyResult(static (r, drawable) =>
                 {
-                    int totalTicks = hitObject.NestedHitObjects.Count;
-                    int hitTicks = hitObject.NestedHitObjects.Count(h => h.IsHit);
-
-                    if (hitTicks == totalTicks)
-                        r.Type = HitResult.Great;
-                    else if (hitTicks == 0)
-                        r.Type = HitResult.Miss;
-                    else
-                    {
-                        double hitFraction = (double)hitTicks / totalTicks;
-                        r.Type = hitFraction >= 0.5 ? HitResult.Ok : HitResult.Meh;
-                    }
+                    var slider = (Slider)drawable.HitObject;
+                    r.Type = OsuSliderJudgement.BodyResultFromNestedHits(
+                        slider.ClassicSliderBehaviour,
+                        drawable.NestedHitObjects.Count,
+                        drawable.NestedHitObjects.Count(h => h.IsHit),
+                        r.Judgement.MaxResult,
+                        r.Judgement.MinResult);
                 });
             }
             else
             {
-                // If only the nested hitobjects are judged, then the slider's own judgement is ignored for scoring purposes.
-                // But the slider needs to still be judged with a reasonable hit/miss result for visual purposes (hit/miss transforms, etc).
-                ApplyResult(static (r, hitObject) =>
+                ApplyResult(static (r, drawable) =>
                 {
-                    r.Type = hitObject.NestedHitObjects.Any(h => h.Result.IsHit) ? r.Judgement.MaxResult : r.Judgement.MinResult;
+                    var slider = (Slider)drawable.HitObject;
+                    r.Type = OsuSliderJudgement.BodyResultFromNestedHits(
+                        slider.ClassicSliderBehaviour,
+                        drawable.NestedHitObjects.Count,
+                        drawable.NestedHitObjects.Count(h => h.Result.IsHit),
+                        r.Judgement.MaxResult,
+                        r.Judgement.MinResult);
                 });
             }
         }

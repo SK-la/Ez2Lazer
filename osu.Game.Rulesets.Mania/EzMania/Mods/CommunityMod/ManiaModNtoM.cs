@@ -102,22 +102,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             var newColumnObjects = new List<ManiaHitObject>();
 
+            // 与 newColumnObjects 同步维护的按列索引：第一轮的重叠判定原本每列都要扫全表。
+            var columnIndex = new ManiaObjectColumnIndex(Key.Value);
+
             var fixedColumnObjects = new List<ManiaHitObject>();
 
-            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n => (
-                                            startTime: n.StartTime,
-                                            samples: n.Samples,
-                                            column: n.Column,
-                                            endTime: n.StartTime,
-                                            duration: n.StartTime - n.StartTime
-                                        ))
-                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h => (
-                                            startTime: h.StartTime,
-                                            samples: h.Samples,
-                                            column: h.Column,
-                                            endTime: h.EndTime,
-                                            duration: h.EndTime - h.StartTime
-                                        ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
+            // 每个键数轮次都要重建这份快照（原来是 OfType/Select/Concat/OrderBy/ThenBy 的迭代器 + 元组列表），
+            // 改成结构体列表 + 带原始序号的稳定键排序：同一 (开始时间, 列) 的先后与 OrderBy().ThenBy() 一致。
+            var locations = new List<Location>();
+            buildLocations(maniaBeatmap.HitObjects, locations);
 
             #region Null column
 
@@ -158,10 +151,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
                 for (int i = 0; i < locations.Count; i++)
                 {
-                    bool isLN = false;
-                    var note = new Note();
-                    var hold = new HoldNote();
-                    int columnNum = locations[i].column;
+                    // 原来这里无条件 new 了一个 Note 和一个 HoldNote（随后又各自被全新的对象取代），
+                    // 两个分配与它们的 Samples setter 拷贝都是纯浪费，只留判定。
+                    bool isLN = locations[i].StartTime != locations[i].EndTime;
+                    int columnNum = locations[i].Column;
                     int minusColumn = 0;
 
                     foreach (int nul in nullColumnList)
@@ -176,20 +169,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
                     atLeast--;
 
-                    if (locations[i].startTime == locations[i].endTime)
-                    {
-                        note.StartTime = locations[i].startTime;
-                        note.Samples = locations[i].samples;
-                    }
-                    else
-                    {
-                        hold.StartTime = locations[i].startTime;
-                        hold.Samples = locations[i].samples;
-                        hold.EndTime = locations[i].endTime;
-                        isLN = true;
-                    }
-
-                    bool error = changeTime != locations[i].startTime;
+                    bool error = changeTime != locations[i].StartTime;
 
                     if (keys < 4) // why you are converting 1k 2k 3k into upper keys?
                         columnNum = rng.Next(keyValue);
@@ -197,7 +177,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                     {
                         if (error && rng.Next(100) < Probability.Value && atLeast < 0)
                         {
-                            changeTime = locations[i].startTime;
+                            changeTime = locations[i].StartTime;
                             atLeast = keys - 2;
                             next = true;
                         }
@@ -230,15 +210,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                         if (columnNum > emptyColumn) columnNum++;
                     }
 
-                    bool overlap = ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum, locations[i].startTime, locations[i].endTime);
+                    bool overlap = columnIndex.Overlaps(columnNum, locations[i].StartTime);
 
                     if (overlap)
                     {
                         for (int k = 0; k < keyValue; k++)
                         {
-                            if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum - k, locations[i].startTime, locations[i].endTime) && columnNum - k >= 0)
+                            if (!columnIndex.Overlaps(columnNum - k, locations[i].StartTime) && columnNum - k >= 0)
                                 columnNum -= k;
-                            else if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum + k, locations[i].startTime, locations[i].endTime)
+                            else if (!columnIndex.Overlaps(columnNum + k, locations[i].StartTime)
                                      && columnNum + k <= keyValue - 1) columnNum += k;
                         }
                     }
@@ -248,9 +228,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                         newColumnObjects.Add(new HoldNote
                         {
                             Column = Math.Clamp(columnNum, 0, Key.Value - 1),
-                            StartTime = locations[i].startTime,
-                            Duration = locations[i].endTime - locations[i].startTime,
-                            NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
+                            StartTime = locations[i].StartTime,
+                            Duration = locations[i].EndTime - locations[i].StartTime,
+                            NodeSamples = [locations[i].Samples, Array.Empty<HitSampleInfo>()]
                         });
                     }
                     else
@@ -258,10 +238,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                         newColumnObjects.Add(new Note
                         {
                             Column = Math.Clamp(columnNum, 0, Key.Value - 1),
-                            StartTime = locations[i].startTime,
-                            Samples = locations[i].samples
+                            StartTime = locations[i].StartTime,
+                            Samples = locations[i].Samples
                         });
                     }
+
+                    columnIndex.Add(newColumnObjects[^1]);
                 }
 
                 for (int i = 0; i < newColumnObjects.Count; i++)
@@ -276,6 +258,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
                     for (int j = i + 1; j < newColumnObjects.Count; j++)
                     {
+                        // 两个分支都要求 newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2，
+                        // 而本列表按开始时间非降序（由 locations 的顺序追加而来），所以 j 的开始时间一旦超出 i+2，
+                        // 后面的 j 只会更晚，直接收尾。原来这里每轮都要把整表扫完。
+                        if (newColumnObjects[j].StartTime > newColumnObjects[i].StartTime + 2)
+                            break;
+
                         if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2
                                                                                      && newColumnObjects[i].StartTime <= newColumnObjects[j].StartTime + 2) overlap = true;
 
@@ -293,13 +281,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                         fixedColumnObjects.Add(newColumnObjects[i]);
                     else
                     {
-                        for (int k = 0; k < keyValue; k++)
+                        // 原来的两次 FindOverlapInList(obj, 过滤到某列的列表) 恒为 true（判定内部按 obj.Column 比较，
+                        // 而列表已按别的列过滤），于是这个循环实际只是在边界内按 k 挪列。删掉每轮 keyValue 次
+                        // 「过滤 + 全表扫描 + 临时列表」，语义不变。
+                        for (int k = 1; k < keyValue; k++)
                         {
-                            if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column - k).ToList())
-                                && newColumnObjects[i].Column - k >= 0)
+                            if (newColumnObjects[i].Column - k >= 0)
                                 newColumnObjects[i].Column -= k;
-                            else if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column + k).ToList())
-                                     && newColumnObjects[i].Column + k <= keyValue - 1) newColumnObjects[i].Column += k;
+                            else if (newColumnObjects[i].Column + k <= keyValue - 1) newColumnObjects[i].Column += k;
                         }
 
                         fixedColumnObjects.Add(newColumnObjects[i]);
@@ -311,24 +300,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                     keys++;
                     keyValue = keys + 1;
 
-                    locations = fixedColumnObjects.OfType<Note>().Select(n => (
-                                                      startTime: n.StartTime,
-                                                      samples: n.Samples,
-                                                      column: n.Column,
-                                                      endTime: n.StartTime,
-                                                      duration: n.StartTime - n.StartTime
-                                                  ))
-                                                  .Concat(fixedColumnObjects.OfType<HoldNote>().Select(h => (
-                                                      startTime: h.StartTime,
-                                                      samples: h.Samples,
-                                                      column: h.Column,
-                                                      endTime: h.EndTime,
-                                                      duration: h.EndTime - h.StartTime
-                                                  ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
+                    // 复用同一个 locations 列表：原来是每轮重建一份匿名元组列表。
+                    buildLocations(fixedColumnObjects, locations);
 
                     emptyColumn = -1;
                     fixedColumnObjects.Clear();
                     newColumnObjects.Clear();
+                    columnIndex.Clear();
                 }
                 else
                     break;
@@ -337,6 +315,65 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             newObjects.AddRange(fixedColumnObjects);
 
             maniaBeatmap.HitObjects = newObjects;
+        }
+
+        /// <summary>
+        /// 把一份 <see cref="ManiaHitObject"/> 列表压成按 (开始时间, 列) 升序的快照。
+        /// </summary>
+        /// <remarks>
+        /// 顺序必须与原来的 <c>OfType&lt;Note&gt;().Select(…).Concat(OfType&lt;HoldNote&gt;().Select(…)).OrderBy(startTime).ThenBy(column)</c>
+        /// 完全一致：先非长条、后长条，再按 (开始时间, 列) 稳定排序。<see cref="Location.Order"/>
+        /// 记录进入排序前的序号并作为最终比较键，从而在没有稳定排序原语时复现 <c>OrderBy</c> 的稳定性。
+        /// </remarks>
+        private static void buildLocations(IReadOnlyList<ManiaHitObject> source, List<Location> destination)
+        {
+            destination.Clear();
+
+            addLocations(source, destination, holds: false);
+            addLocations(source, destination, holds: true);
+
+            destination.Sort(static (a, b) => compare(a, b));
+        }
+
+        private static void addLocations(IReadOnlyList<ManiaHitObject> source, List<Location> destination, bool holds)
+        {
+            foreach (var hitObject in source)
+            {
+                if (holds ? hitObject is not HoldNote : hitObject is not Note)
+                    continue;
+
+                destination.Add(new Location
+                {
+                    StartTime = hitObject.StartTime,
+                    Column = hitObject.Column,
+                    EndTime = hitObject.GetEndTime(),
+                    Samples = hitObject.Samples,
+                    Order = destination.Count
+                });
+            }
+        }
+
+        private static int compare(Location a, Location b)
+        {
+            int byStartTime = a.StartTime.CompareTo(b.StartTime);
+
+            if (byStartTime != 0)
+                return byStartTime;
+
+            int byColumn = a.Column.CompareTo(b.Column);
+
+            return byColumn != 0 ? byColumn : a.Order.CompareTo(b.Order);
+        }
+
+        private struct Location
+        {
+            public double StartTime;
+            public int Column;
+            public double EndTime;
+            public IList<HitSampleInfo> Samples;
+
+            /// <summary>进入排序前的序号，用作最终比较键以复现稳定排序。</summary>
+            public int Order;
         }
     }
 

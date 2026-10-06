@@ -66,15 +66,15 @@ namespace osu.Game.EzOsuGame.Overlays
         /// <summary>
         /// 获取缩略图纹理（可能为 null，调用方使用占位）。
         /// </summary>
-        public static Texture? TryGetPreviewTexture(EzResourceStore provider, Storage storage, EzResourcePickerCategory category, string key)
+        public static Texture? TryGetPreviewTexture(EzResourceStore provider, EzResourcePickerCategory category, string key)
         {
             switch (category)
             {
                 case EzResourcePickerCategory.GameTheme:
-                    return tryGameThemeJudgementPreview(provider, storage, key);
+                    return tryGameThemeJudgementPreview(provider, key);
 
                 case EzResourcePickerCategory.NoteSet:
-                    return provider.Get($"note/{key}/whitenote/000") ?? provider.Get($"note/{key}/whitenote/001");
+                    return tryNoteSetPreview(provider, key);
 
                 case EzResourcePickerCategory.Stage:
                     return tryStagePreview(provider, key);
@@ -84,34 +84,52 @@ namespace osu.Game.EzOsuGame.Overlays
             }
         }
 
-        private static Texture? tryGameThemeJudgementPreview(EzResourceStore provider, Storage storage, string key)
+        // 预览缩略图走 Atlas 池（小图，与既有行为一致），帧上限 1 —— 只解一张，不为一格预览拉起整段动画。
+        private static Texture? tryNoteSetPreview(EzResourceStore provider, string key)
         {
-            string judgementDir = Path.Combine(storage.GetFullPath(EzModifyPath.GAME_THEME_PATH), key, "judgement");
+            Texture[] frames = provider.GetTextureFrames(new EzAnimationRequest
+            {
+                Path = $"note/{key}/whitenote",
+                MaxFrames = 1,
+                Usage = EzTextureUsage.Atlas,
+            });
 
-            if (!Directory.Exists(judgementDir))
-                return null;
+            return frames.Length > 0 ? frames[0] : null;
+        }
 
-            string? first = Directory.EnumerateFiles(judgementDir, "*.png", SearchOption.TopDirectoryOnly).FirstOrDefault();
+        // 判定目录里取第一张图作预览：走层1 的图片清单，内置主题（图源在程序集里）也能取到，
+        // 不再「枚举用户磁盘的首个 png 再拼名字」。
+        private static Texture? tryGameThemeJudgementPreview(EzResourceStore provider, string key)
+        {
+            foreach (string imageKey in provider.ListImageKeys($"GameTheme/{key}/judgement"))
+            {
+                Texture? texture = provider.Get(imageKey, EzTextureUsage.Atlas);
 
-            if (string.IsNullOrEmpty(first))
-                return null;
+                if (texture != null)
+                    return texture;
+            }
 
-            string fileName = Path.GetFileNameWithoutExtension(first);
-            return provider.Get($@"GameTheme/{key}/judgement/{fileName}");
+            return null;
         }
 
         private static Texture? tryStagePreview(EzResourceStore provider, string key)
         {
             const string groove_base = "GrooveLight";
+            string basePath = $"Stage/{key}/Stage/{groove_base}";
 
-            for (int i = 0; i < 8; i++)
+            Texture[] frames = provider.GetTextureFrames(new EzAnimationRequest
             {
-                var t = provider.Get($"Stage/{key}/Stage/{groove_base}_{i}");
-                if (t != null)
-                    return t;
-            }
+                Path = basePath,
+                MaxFrames = 1,
+                Usage = EzTextureUsage.Atlas,
+                AllowSingleFallback = false,
+            });
 
-            return provider.Get($"Stage/{key}/Stage/{groove_base}", EzTextureUsage.Large);
+            if (frames.Length > 0)
+                return frames[0];
+
+            // 单张静态图与原实现一致走 Large：这类图可能超出图集页，进页只会被绕过并打日志。
+            return provider.Get(basePath, EzTextureUsage.Large);
         }
     }
 }

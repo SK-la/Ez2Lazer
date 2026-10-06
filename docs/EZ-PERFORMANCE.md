@@ -2,7 +2,7 @@
 
 > **用途**：集中记录 **帧率下降、卡顿、性能测试口径** 三类内容，供以后再遇到掉帧时直接查历史结论，避免重复排查。
 > **范围**：只收「性能与 FPS」相关描述。判定语义、数据来源、存储结构等仍留在各自文档，见 §8。
-> **跨仓库**：`osu`（游戏侧）与 `osu-framework`（渲染 / 音频线程）都在本文件登记，框架侧改动标注 commit。
+> **跨仓库**：`osu`（游戏侧）与 `ez2lazer-framework`（渲染 / 音频线程）都在本文件登记，框架侧改动标注 commit。
 > 注意：文档中记录的内容并不代表仓库当前状态，可能已被后续改动覆盖。请以实际代码为准。
 
 ---
@@ -26,7 +26,7 @@
 
 | 现象 | 根因 | 落地修复 | 归属 |
 |------|------|---------|------|
-| **传统（共享）输出播放时掉 500–700 FPS，暂停立刻回升** | 音频线程随 `GameThread.DEFAULT_ACTIVE_HZ` 提到 **8000Hz**，`TrackBass.UpdateState` 每帧都跑 `BassAmplitudeProcessor`（电平 + FFT512），播放态每秒约 8000 次昂贵 BASS 查询 | 振幅分析独立限频为 `max(显示器刷新率, 120Hz)`，音频控制仍 8000Hz | `osu-framework` `e22805587` |
+| **传统（共享）输出播放时掉 500–700 FPS，暂停立刻回升** | 音频线程随 `GameThread.DEFAULT_ACTIVE_HZ` 提到 **8000Hz**，`TrackBass.UpdateState` 每帧都跑 `BassAmplitudeProcessor`（电平 + FFT512），播放态每秒约 8000 次昂贵 BASS 查询 | 振幅分析独立限频为 `max(显示器刷新率, 120Hz)`，音频控制仍 8000Hz | `ez2lazer-framework` `e22805587` |
 | 选歌界面停留 3–5 秒后掉帧 | `BackgroundDataStoreProcessor` 回填 + `RealmDetachedBeatmapStore` 的 Replace 风暴 | `StartupBackfillDelay` = 5s（测试可覆写 0）；`DetachedBeatmapStoreFrameBudget` 每帧 Drain ≤ 24 | `osu` |
 | 打得越久越卡 | `Column.pressTimes` 整局无限增长，被动 Miss 时复制整表查最近邻 | `pressTimes` 有界裁剪 + `ManiaDrawableMissTiming` 零分配 | `osu` |
 | 列数 / LN 越多越卡 | 每个存活 drawable 每帧进 automiss 询问 | automiss 迁到 Column late-deadline 队列，每列每帧一次 poll；删除每 drawable 虚分派 | `osu` |
@@ -49,7 +49,7 @@
 | **SAMPLE-NO-LINQ** | `GameplaySampleTriggerSource` / `DrawableManiaHitObject` | `GetMostValidObject` 去掉 `Where`/`MinBy`/`OrderBy`/`SkipWhile` 与递归 `getAllNested`，改单遍最小扫描 + 显式栈先序（并列取舍规则与上游一致）；`Play()` / `PlaySamples()` 手动填充数组代替 `Cast().ToArray()`。数组仍每次新建，因为 `GameplayState.ApplySamples` 靠引用不等触发绑定变更（`StoryboardTriggerController` 消费 `LastPlayedSamples`） |
 | **LN-INPUT-SLOT** | `DrawableHoldNoteHead` / `DrawableHoldNoteTail` | 空实现移出非位置输入队列。父 Hold 仍处理 press/release |
 | **LN-HOLD-FBO** | `DefaultBodyPiece` | 按住隐藏减法层并跳过 `ForceRedraw`；松手恢复。仅 Default/Triangles |
-| **FW-BUTTON-QUEUE-REUSE** | `osu-framework` `ButtonEventManager<TButton>`（`osu-framework` `56e9beb2c`） | 每个按钮各持一份按下队列缓冲：按下时整体重填（替代 `InputQueue.ToList()`），抬起时就地压缩掉已脱离输入树的项（替代 `Where(...).ToList()`）。队列长度 = 整棵输入子树的非位置输入项，原实现每按一次分配一条等长列表 + 一个 LINQ 迭代器。快照语义不变（仍取本次按下时的队列，抬起按同一快照派发） |
+| **FW-BUTTON-QUEUE-REUSE** | `ez2lazer-framework` `ButtonEventManager<TButton>`（`ez2lazer-framework` `56e9beb2c`） | 每个按钮各持一份按下队列缓冲：按下时整体重填（替代 `InputQueue.ToList()`），抬起时就地压缩掉已脱离输入树的项（替代 `Where(...).ToList()`）。队列长度 = 整棵输入子树的非位置输入项，原实现每按一次分配一条等长列表 + 一个 LINQ 迭代器。快照语义不变（仍取本次按下时的队列，抬起按同一快照派发） |
 
 ### 已评估但**不做**（附原因，避免重复讨论）
 
@@ -60,6 +60,60 @@
 | 去掉通道级 `BindAdjustments`（每击 4 路 `AddSource`） | **不可行（Ez 侧）**。`PlaybackConcurrency` / 音量 / 平衡 / 频率都必须跟随 `drawableRuleset.Audio`，其中频率来自 `ModRateAdjust` 系列（`AddAdjustment(Frequency, SpeedChange)`）；`AdjustableAudioComponent.Adjustments` 是 `protected internal`，Ez 无法只绑部分属性。真正做法是框架级通道复用（BASS 通道无法重播，见 `SampleChannelBass.playInternal` 的 `Played` 守卫） |
 | `Column.OnPressed` 每键都 `sampleTriggerSource.Play()` | 已有代号 **SOUND-DECOUPLE**（`HIGH_KPS_JUDGE_BACKLOG.md`），**附条件**：仅在 profile 证明其阻塞时做。`KeySoundPreviewMode.Off` 目前也会触发取样（只有 `AutoPlayPlus` 排除），会让按键与 note 音互相 choke |
 | 爆炸池 `DrawablePool<PoolableHitExplosion>(5)` 扩容 | **无依据**。爆炸按列产生，每列一次按键最多 1 个，初始容量 5 已覆盖单次按键；仅在单列 >25 hit/s 的极端 jack 下才会增长。首击掉帧不是它 |
+
+---
+
+## 2.2 2026-09-23 局内判定 / HUD 热路径
+
+### 已落地
+
+| 项 | 位置 | 说明 |
+|----|------|------|
+| **HITPOS-CACHE** | `DrawableManiaRuleset` | `updateTimeRange()` 原先**每帧**调 `skinChanged()`，即每帧构造 `ManiaSkinConfigurationLookup` 走一次皮肤配置链。改为 `updateHitPosition()` 只在皮肤 / `HitPosition` / `HitPositionGlobalEnable` 变更时重算并缓存字段，`updateTimeRange()` 只做算术。判定线绑定前置到 `ScrollStyle` 之前，保证首次 `updateTimeRange()` 读到已算好的值 |
+| **JUDGE-NO-CLOSURE** | `Column.OnNewResult` / `Stage.OnNewResult` | `hitExplosionPool.Get(e => e.Apply(result))` 与 `judgementPooler.Get(type, j => j.Apply(result, judgedObject))` 每判定各造一个捕获 `result` 的闭包。两者 `Apply` 都只做字段赋值（真正动画在下一帧 `PrepareForUse`），改为 `Get()` 后再赋值。注意 `JudgementContainer.Add` 会**同步**读 `JudgedHitObject`，赋值必须仍在 `Add` 之前 |
+| **POLICY-SCRATCH** | `OrderedHitPolicyHelper` | 候选 / 后判对象改复用缓冲（去掉每次判定的 `ToList()` 拷贝）；`OrderBy(...).ToList()` 改复用缓冲上的稳定插入排序；诊断串整段门控在 `EzJudgmentDiagEnabled` 之后（关闭时不再执行 `describe` / `string.Join`）；命中模式与诊断开关缓存 bindable，取代一次判定里 3 次 `ezConfig.Get` |
+| **FORCEMISS-SNAPSHOT** | `Column.handleHit` / `ManiaLaneController.CollectForceMissBefore` | 命中时「提前判 miss」的 `yield` 迭代器改为写调用方缓冲（每次命中省一个迭代器对象），处理时按实时 `IsPressJudged` 复核以保持惰性枚举语义；`EnumerateForceMissBefore` 无调用方，已由新方法取代 |
+| **MARKER-EASE-FIX** | `EzHUDHitTimingColumns.moveMarker` | `marker.Y = targetY;` 紧接着 `MoveToY(targetY, 800, OutQuint)`：设值后新变换的 `StartValue` 由 `ReadIntoStartValue` 在首次 `Apply` 时读到（`TransformCustom.cs:186`），即 `start == end`，缓动恒为空变换 ⇒ 标记瞬跳。这行是从上游 `BarHitErrorMeter` 那条**一次性池化判定线**（对象是新的，直接赋值才对）抄过来的，常驻 marker 不该有。删掉后恢复成上游 `arrow`（同一 EMA、同一 `800ms OutQuint`）的「只发缓动」语义。附带两处交互：`MoveHeight` 改高时先 `ClearTransforms(false, "Y")` 再按比例赋值（在途变换每帧回写自己的插值，不清就会覆盖赋值、拖滑块时标记卡在旧范围）；`StopMovement` 开启时 `FinishTransforms(false, "Y")` 收尾到目标，而不是停在中间插值上 |
+
+### 已评估但**不做**（附原因，避免重复讨论）
+
+| 候选 | 结论 |
+|------|------|
+| 缓存 `DrawableManiaHitObject.PlaySamples` 的 samples 数组 | **不可行**。`Bindable<T>.Value` setter 在 `EqualityComparer<T>.Default.Equals` 相等时直接 return（数组即引用比较，`ez2lazer-framework/…/Bindable.cs:99`），缓存同一实例会让 `GameplayState.LastPlayedSamples` 对重复同音不再触发变更，而 `StoryboardTriggerController` 正消费它。数组必须每次新建（同 **SAMPLE-NO-LINQ**） |
+| HUD / 皮肤件「复用单个 `TransformSequence`」合并按键、判定动画 | **不可行（框架约束）**。`TransformSequence<T>` 在构造时固化 `startTime`/`currentTime`（`TransformSequence.cs:53`），复用实例再 `Append` 会把 transform 排到过去时刻 ⇒ 变成瞬跳而非动画；且 `PopulateTransform` 对同一 `Transform` 实例二次调用直接抛异常（`TransformableExtensions.cs:154`），即 transform 天然一次性、框架无池。单次 `MoveToY` 约 3 个小对象（`TransformSequence` + 其 1 槽 list + `TransformCustom`；`TransformID` 是 `ulong`，不产生字符串），`Ez2KeyAreaPlus` 里对 `Container<Circle>` 的 `foreach` 走结构体枚举器、本就不分配 |
+
+---
+
+## 2.3 lane controller 索引维护是否需要改结构（2026-09-23 实测结论：不改）
+
+口径：`ManiaLaneHotPathMicroBenchTest`（跑真实 `ManiaLaneController`，10 列 × PeakKps 100 × alive 40 × 2000 帧，含 Select + automiss deadline 队列 + `pressTimes`）。
+
+| 指标 | 实测 | 判读 |
+|------|------|------|
+| 总耗时 | 21–33 ms / 2000 帧（Earliest / Combo / Duration 分别 33 / 28 / 27 ms） | ≈ 10–16 µs/帧，约为 16.6 ms 帧预算的 0.1% |
+| 分配 | 15–128 B/press，`gen0=0` | 不构成 GC 压力 |
+| automiss 队列 | 每帧每列 1 次 poll，`dueVisits` ≈ 22/poll（alive 40） | 已含在上面耗时里，不是瓶颈 |
+
+结论：`insertEntryAt` / `Unregister` / `autoMissEntries` 的 O(n) 维护即使在 100 KPS / 40 存活每列的极端设定下也不进热榜，**不为它改数据结构**。BMS poor-select（`AllowBmsFallbackToEarliest` + `PoorEnabled`）同样 30 ms 量级、128 B/press，无需单独优化。
+
+#### 2.4.24 选歌 Panel 的 KPS 基线：memo 化读，去掉逐个建连接（2026-09-26）
+
+**问题**：`PanelBeatmap.PrepareForUse()`（`osu.Game/Screens/Select/PanelBeatmap.cs:355`）每次面板被取用 —— 初次填充、每次滚动物化、来回滚动的重新绑定 —— 都调 `EzPanelKpsMetrics.TryResolveBaselineFromSqlite` 取 NoMod KPS 基线，落到 `EzAnalysisPersistentStore.TryGet`：**每次** `new SqliteConnection` + `Open` + `PRAGMA foreign_keys=ON`，再跑一条 `entry LEFT JOIN mania` 的查询，并把 `KPS_LIST_JSON` / `COLUMN_COUNTS_JSON` / `HOLD_NOTE_COUNTS_JSON` **三个 JSON 列解析一遍**。滚动即重复，因为面板池会为同一批谱面反复 rebind。
+
+仓库里本来就有为此准备的 `EzAnalysisPersistentStore.ReadSession`（一条连接 + 逐谱面 memo，**未分析的负结果也 memo**，注释写明「大库上被反复命中的正是没分析的那些」），但它只被 `EzLocalProfileAggregator` 的批量聚合使用，面板路径没接。
+
+**为什么不复用 `ReadSession` 而是新加一个**：`ReadSession` 自带一条长连接且**非线程安全**（注释即写「one session belongs to one worker」）。面板路径只是 update 线程，但 `EzAnalysisCache.GetAnalysisAsync` 的 stored fallback 会走到 `await … ConfigureAwait(false)` 之后，可能落在池线程上；而长连接还会挡住切分支时的 `File.Delete` + `ClearAllPools`。因此共享 memo **不持有连接**。
+
+**改动（`EZ-PANEL-KPS-READ-MEMO`）**：
+
+- memo 语义抽成 `tryReadMemo`（指纹校验 + 按 `writeGeneration` 整体丢弃）与 `resolveMemoEntry`（`pendingWrites` 覆盖 + 有效性闸门，**每次读都做、从不 memo**）两个方法，`ReadSession.TryGet` 与新路径共用，语义不变；
+- 新增 `EzAnalysisPersistentStore.TryGetMemoised`：`ConcurrentDictionary` memo，只存 `tryGetRawData` 的**纯存储行**结果，未命中时才 `Initialise()` + 开连接；命中路径**不碰 SQLite**；
+- `MemoEntry` 从 `ReadSession` 内嵌提升到类级；容量上限 `shared_read_memo_capacity = 2048`，整体丢弃而非 LRU —— 一次重读屏幕上那点内容，比维护一套没人依赖的淘汰策略便宜；
+- `EzAnalysisDatabase.TryGetStoredSqliteSlice` 改走 `TryGetMemoised`，面板与 `EzAnalysisCache` 的 L1 读同时受益。
+
+- **不变量**：命中与未命中**不可区分** —— 同样校验 hash / md5 / ruleset OnlineID，同样按落地写入换代整体失效，同样每次读都套 pending 覆盖与有效性闸门。`backfillStoredData` 仍用未 memo 的 `TryGet`（它要的就是当前存储态）。
+- **代价 / 边界**：memo 持有 `EzAnalysisResult`（含 KPS 列表），上限 2048 条；切分支 / 换库仍靠 `writeGeneration` 换代清空。
+- **验证**：`EzAnalysisPersistentStoreMemoTest`（负结果被后续 pending 写入覆盖 / 同一谱面新结果覆盖旧 memo）；`EzLocalProfile*` + `EzAnalysis*` 共 54 项通过。端到端滚动手感数字**待下一次 dotTrace 快照复核**。
 
 ---
 
@@ -183,3 +237,5 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 2026-08-08 | 初版：汇总各文档 FPS / 性能测试描述；记录音频后端排查与振幅限频（框架 `e22805587`） |
 | 2026-09-20 | §2.1：输入队列按帧物化、取样去 LINQ、框架侧按键队列去分配（**FW-BUTTON-QUEUE-REUSE**）落地；登记 5 项「评估后不做」的候选与原因（含被 `TestSceneInputQueueChange.CombinedClicks` 证伪的 **FW-INPUT-QUEUE-DISPATCH**）；§9 登记首次命中 / LN / 多显示器三条待排查现象与测量口径 |
 | 2026-09-21 | **LN-HOLD-FBO** / **LN-INPUT-SLOT** 生产落地。消融证实按住才 ForceRedraw；观测代码 `#if DEBUG` 剥离 |
+| 2026-09-23 | §2.2/§2.3：局内判定与 HUD 热路径去分配（**HITPOS-CACHE** / **JUDGE-NO-CLOSURE** / **POLICY-SCRATCH** / **FORCEMISS-SNAPSHOT**），并记录 3 项「评估后不做」（samples 数组缓存、transform 序列复用、`moveMarker` 手写插值）与 lane controller 索引维护「实测不改」结论 |
+| 2026-09-24 | §2.2：**MARKER-EASE-FIX**——`EzHUDHitTimingColumns` 的判定标记恢复为真正的缓动（去掉把缓动变成空变换的直接赋值），并补上 `MoveHeight` / `StopMovement` 与在途变换的两处交互；原「`moveMarker` 手写插值」候选按「保留框架缓动」结案，不再列为待办 |

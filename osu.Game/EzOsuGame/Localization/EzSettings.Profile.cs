@@ -399,6 +399,12 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_BUSY =
             new EzLocalizationManager.EzLocalisableString("正在下载线上成绩…", "Downloading online scores…");
 
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_PROGRESS =
+            new EzLocalizationManager.EzLocalisableString("正在下载线上成绩… {0}/{1}", "Downloading online scores… {0}/{1}");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_PROGRESS_MAP =
+            new EzLocalizationManager.EzLocalisableString("正在下载缺失谱面… {0}/{1}", "Downloading missing beatmap… {0}/{1}");
+
         public static readonly EzLocalizationManager.EzLocalisableString LOCAL_PROFILE_ONLINE_PULL_DONE =
             new EzLocalizationManager.EzLocalisableString(
                 "线上下载完成：候选 {0}，成绩导入 {1}，已有成绩 {2}，无回放 {3}，缺图成绩 {4}，失败 {5}，统计写入 {6}，下图 {7}，本地已有图 {8}，收藏夹新增 {9}。",

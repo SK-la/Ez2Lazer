@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
@@ -109,12 +110,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 bpm = value;
                 updateRanges();
             }
-        }
-
-        public HitModeHelper()
-            : this(GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode))
-        {
-            updateRanges();
         }
 
         public HitModeHelper(EzEnumHitMode hitMode)
@@ -323,7 +318,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             }
         }
 
-#region 分数
+        #region 分数
 
         /// <summary>
         /// Compute LN (long note) tail score given head and tail offsets using this helper's ranges.
@@ -500,9 +495,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             }
         }
 
-#endregion
+        #endregion
 
-#region 公共静态工具
+        #region 公共静态工具
 
         public static bool IsBMSHitMode(EzEnumHitMode hitMode)
         {
@@ -615,6 +610,30 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             HitResult.IgnoreMiss,
         };
 
+        /// <summary>
+        /// 任一 hitmode 下可能出现的判定并集（判定池预热用）。
+        /// </summary>
+        /// <remarks>
+        /// 池缺项时 <c>JudgementPooler.Get</c> 返回 null，该判定会被静默跳过不显示；而当局用的
+        /// hitmode / 血量模式取自冻结环境（回放是成绩里嵌入的模式），可能与展示时的当前设置不同，
+        /// 所以池内容不能按当前设置推导。
+        /// </remarks>
+        public static IReadOnlyList<HitResult> AllModeValidHitResults { get; } = Enum.GetValues<EzEnumHitMode>()
+                                                                                     .SelectMany(GetHitModeValidHitResults)
+                                                                                     .Distinct()
+                                                                                     .ToArray();
+
+        /// <summary>
+        /// <see cref="AllModeValidHitResults"/> 中真正会渲染成判定图的子集（判定池实际预热的内容）。
+        /// </summary>
+        /// <remarks>
+        /// <see cref="HitResult.IgnoreHit"/> / <see cref="HitResult.IgnoreMiss"/> / <see cref="HitResult.ComboBreak"/>
+        /// 只为分数统计存在，不作为判定图展示。放进池除了白建 drawable，还会让大多数没有对应判定资源的皮肤
+        /// 回退到默认文字判定，把内部结果名（IGNOREHIT / IGNOREMISS）直接画到屏幕上。
+        /// </remarks>
+        public static IReadOnlyList<HitResult> AllModeDisplayableHitResults { get; } =
+            AllModeValidHitResults.Where(r => r.IsBasic()).ToArray();
+
         public static IReadOnlyList<HitResult> GetHitModeValidHitResults(EzEnumHitMode mode)
         {
             switch (mode)
@@ -653,6 +672,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         public static IReadOnlyList<HitResult> GetHitModeValidHitResultsForDisplay(ScoreInfo? score)
             => GetHitModeValidHitResults(EzManiaScoreModeExtensions.ResolveDisplayHitMode(score));
 
-#endregion
+        #endregion
     }
 }

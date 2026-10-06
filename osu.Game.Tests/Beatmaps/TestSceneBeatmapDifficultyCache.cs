@@ -174,13 +174,33 @@ namespace osu.Game.Tests.Beatmaps
         }
 
         [Test]
-        public void TestKeyEqualsWithDifferentModOrder()
+        public void TestKeyNotEqualWithDifferentModOrder()
         {
             var key1 = new BeatmapDifficultyCache.DifficultyCacheLookup(new BeatmapInfo { ID = guid }, new RulesetInfo { OnlineID = 0 }, new Mod[] { new OsuModHardRock(), new OsuModHidden() });
             var key2 = new BeatmapDifficultyCache.DifficultyCacheLookup(new BeatmapInfo { ID = guid }, new RulesetInfo { OnlineID = 0 }, new Mod[] { new OsuModHidden(), new OsuModHardRock() });
 
-            Assert.That(key1, Is.EqualTo(key2));
-            Assert.That(key1.GetHashCode(), Is.EqualTo(key2.GetHashCode()));
+            // 转换只对 ApplyOrder 做稳定排序，同 order 的 mod 按列表序生效，所以两种顺序是两个不同输入。
+            Assert.That(key1, Is.Not.EqualTo(key2));
+            Assert.That(key1.GetHashCode(), Is.Not.EqualTo(key2.GetHashCode()));
+        }
+
+        [Test]
+        public void TestKeyPreservesCallerModOrder()
+        {
+            var key = new BeatmapDifficultyCache.DifficultyCacheLookup(new BeatmapInfo { ID = guid }, new RulesetInfo { OnlineID = 0 }, new Mod[] { new OsuModHidden(), new OsuModHardRock() });
+
+            Assert.That(key.OrderedMods.Select(m => m.Acronym), Is.EqualTo(new[] { "HD", "HR" }));
+        }
+
+        [Test]
+        public void TestKeyNotEqualWithDifferentBeatmapContentHash()
+        {
+            // 同一 BeatmapInfo.ID 但内容已换（重新导入 / 外部同步）：不能命中旧难度。
+            var key1 = new BeatmapDifficultyCache.DifficultyCacheLookup(new BeatmapInfo { ID = guid, Hash = "hash-a" }, new RulesetInfo { OnlineID = 0 }, Array.Empty<Mod>());
+            var key2 = new BeatmapDifficultyCache.DifficultyCacheLookup(new BeatmapInfo { ID = guid, Hash = "hash-b" }, new RulesetInfo { OnlineID = 0 }, Array.Empty<Mod>());
+
+            Assert.That(key1, Is.Not.EqualTo(key2));
+            Assert.That(key1.GetHashCode(), Is.Not.EqualTo(key2.GetHashCode()));
         }
 
         [Test]
@@ -193,6 +213,23 @@ namespace osu.Game.Tests.Beatmaps
 
             Assert.That(key1, Is.Not.EqualTo(key2));
             Assert.That(key1.GetHashCode(), Is.Not.EqualTo(key2.GetHashCode()));
+        }
+
+        /// <summary>
+        /// 「设置未填（null）」与「设置填 0」在指纹里会撞哈希（boxed <c>0f</c> 的 GetHashCode 就是 0），
+        /// 所以键的相等必须是真正的设置比较，不能只看指纹——否则会把一种设置的难度当成另一种返回。
+        /// </summary>
+        [Test]
+        public void TestKeyNotEqualWhenSettingHashesCollide()
+        {
+            var key1 = new BeatmapDifficultyCache.DifficultyCacheLookup(new BeatmapInfo { ID = guid }, new RulesetInfo { OnlineID = 0 },
+                new Mod[] { new OsuModDifficultyAdjust() });
+            var key2 = new BeatmapDifficultyCache.DifficultyCacheLookup(new BeatmapInfo { ID = guid }, new RulesetInfo { OnlineID = 0 },
+                new Mod[] { new OsuModDifficultyAdjust { OverallDifficulty = { Value = 0 } } });
+
+            Assert.That(key1, Is.Not.EqualTo(key2));
+            Assert.That(key1.GetHashCode(), Is.EqualTo(key2.GetHashCode()),
+                "前置条件：本用例正是要覆盖哈希相同但设置不同的情形");
         }
 
         [Test]

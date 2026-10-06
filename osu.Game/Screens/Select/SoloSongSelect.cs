@@ -59,6 +59,8 @@ namespace osu.Game.Screens.Select
             sampleConfirmSelection = audio.Samples.Get(@"SongSelect/confirm-selection");
 
             AddInternal(new SongSelectTouchInputDetector());
+            // 常规选曲界面：转盘转动 → 逐格选曲（等价 ↑/↓），见 Ez2Setting.ScratchAxisSongSelectEnabled
+            AddInternal(new EzSongSelectScratchAxisHandler(() => this.IsCurrentScreen()));
         }
 
         public override IEnumerable<OsuMenuItem> GetForwardActions(BeatmapInfo beatmap)

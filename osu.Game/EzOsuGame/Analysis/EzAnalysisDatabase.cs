@@ -97,7 +97,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!tryCreateStoredLookup(beatmapInfo, rulesetInfo, mods: null, out var lookup))
                 return false;
 
-            return persistentStore.TryGet(lookup.BeatmapInfo, out result);
+            return persistentStore.TryGetMemoised(lookup.BeatmapInfo, out result);
         }
 
         /// <summary>
@@ -582,6 +582,12 @@ namespace osu.Game.EzOsuGame.Analysis
                     continue;
                 }
 
+                int effectiveXxy = supportsXxy ? currentXxyVersion : 0;
+                int effectivePp = supportsPp ? currentPpVersion : 0;
+
+                if (persistentStore.SongsBranchContentHashMatches(branch.DatabasePath, branch.Metadata, effectiveXxy, effectivePp))
+                    continue;
+
                 persistentStore.TryGetSongsBranchStoredXxyVersion(branch.DatabasePath, out int storedXxyVersion);
                 persistentStore.TryGetSongsBranchStoredPpVersion(branch.DatabasePath, out int storedPpVersion);
 
@@ -590,6 +596,10 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 if (supportsPp && storedPpVersion <= 0)
                     persistentStore.EnsureSongsBranchPpVersionMeta(branch.DatabasePath, currentPpVersion);
+
+                // Legacy branches without content_hash get stamped during Ensure* above; re-check before planning work.
+                if (persistentStore.SongsBranchContentHashMatches(branch.DatabasePath, branch.Metadata, effectiveXxy, effectivePp))
+                    continue;
 
                 bool refreshXxy = supportsXxy && persistentStore.SongsBranchNeedsXxyRefresh(storedXxyVersion, currentXxyVersion);
                 bool refreshPp = supportsPp && persistentStore.SongsBranchNeedsPpRefresh(storedPpVersion, currentPpVersion);
@@ -1095,7 +1105,7 @@ namespace osu.Game.EzOsuGame.Analysis
         #region 收藏夹隐藏功能
 
         public bool TryToggleCollectionHidden(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes, out LocalisableString message,
-                                              out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+                                              out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets, long lastModifiedUnixMilliseconds = 0)
         {
             nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
 
@@ -1114,12 +1124,14 @@ namespace osu.Game.EzOsuGame.Analysis
             if (hiddenApplied)
                 return tryRestoreCollectionHiddenState(collectionId, collectionName, localBeatmapsByMd5, collectionBeatmaps, out message);
 
-            return tryApplyCollectionHiddenState(collectionId, collectionName, beatmapMd5Hashes, localBeatmapsByMd5, collectionBeatmaps, out message, out nonHideableBeatmapSets);
+            return tryApplyCollectionHiddenState(collectionId, collectionName, beatmapMd5Hashes, localBeatmapsByMd5, collectionBeatmaps, out message, out nonHideableBeatmapSets,
+                lastModifiedUnixMilliseconds);
         }
 
         private bool tryApplyCollectionHiddenState(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes,
                                                    IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5, IReadOnlyList<BeatmapInfo> collectionBeatmaps,
-                                                   out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+                                                   out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets,
+                                                   long lastModifiedUnixMilliseconds = 0)
         {
             HashSet<Guid> hiddenByOtherSources = getHiddenBeatmapIdsFromOtherSources(localBeatmapsByMd5, excludedCollectionId: collectionId);
             var preexistingHiddenBeatmapIds = new HashSet<Guid>();
@@ -1151,7 +1163,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             nonHideableBeatmapSets = nonHideableBeatmapSetList;
 
-            if (!persistentStore.TrySetCollectionHideState(collectionId, true, preexistingHiddenBeatmapIds, beatmapMd5Hashes))
+            if (!persistentStore.TrySetCollectionHideState(collectionId, true, preexistingHiddenBeatmapIds, beatmapMd5Hashes, lastModifiedUnixMilliseconds))
             {
                 nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
                 message = SongsBranchStrings.HIDE_COLLECTION_FAILED;

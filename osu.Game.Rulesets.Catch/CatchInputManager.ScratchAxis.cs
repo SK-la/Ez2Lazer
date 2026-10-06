@@ -29,6 +29,9 @@ namespace osu.Game.Rulesets.Catch
         private Bindable<double> dashEnterAcceleration = null!;
         private Bindable<double> dashExitVelocity = null!;
 
+        /// <summary>反转转盘方向：交换顺/逆时针与左右移动的对应关系。</summary>
+        private Bindable<bool> scratchAxisInvert = null!;
+
         private bool moveLeftInjected;
         private bool moveRightInjected;
         private bool dashInjected;
@@ -67,6 +70,7 @@ namespace osu.Game.Rulesets.Catch
             stopThreshold = ezConfig.GetBindable<int>(Ez2Setting.ScratchAxisStopThreshold);
             dashEnterAcceleration = ezConfig.GetBindable<double>(Ez2Setting.CatchScratchDashEnterAcceleration);
             dashExitVelocity = ezConfig.GetBindable<double>(Ez2Setting.CatchScratchDashExitVelocity);
+            scratchAxisInvert = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisInvert);
 
             scratchAxes.LeftBinding.BindTo(leftBinding);
             scratchAxes.RightBinding.BindTo(rightBinding);
@@ -118,8 +122,15 @@ namespace osu.Game.Rulesets.Catch
             else
                 scratchDashState.Reset();
 
-            syncInjection(active?.Direction.Value == ScratchAxisDirection.CounterClockwise, CatchAction.MoveLeft, ref moveLeftInjected);
-            syncInjection(active?.Direction.Value == ScratchAxisDirection.Clockwise, CatchAction.MoveRight, ref moveRightInjected);
+            bool moveLeft = active?.Direction.Value == ScratchAxisDirection.CounterClockwise;
+            bool moveRight = active?.Direction.Value == ScratchAxisDirection.Clockwise;
+
+            // [Ez] 反转转盘方向：交换左右对应关系。
+            if (scratchAxisInvert.Value)
+                (moveLeft, moveRight) = (moveRight, moveLeft);
+
+            syncInjection(moveLeft, CatchAction.MoveLeft, ref moveLeftInjected);
+            syncInjection(moveRight, CatchAction.MoveRight, ref moveRightInjected);
             syncInjection(ScratchDashActive, CatchAction.Dash, ref dashInjected);
         }
 

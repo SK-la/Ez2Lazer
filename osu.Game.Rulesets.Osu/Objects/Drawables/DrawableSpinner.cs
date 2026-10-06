@@ -16,11 +16,11 @@ using osu.Game.Audio;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Osu.Scoring;
 using osu.Game.Rulesets.Osu.Skinning;
 using osu.Game.Rulesets.Osu.Skinning.Default;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Ranking;
 using osu.Game.Skinning;
 
@@ -265,14 +265,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
             ApplyResult(static (r, hitObject) =>
             {
                 var spinner = (DrawableSpinner)hitObject;
-                if (spinner.Progress >= 1)
-                    r.Type = HitResult.Great;
-                else if (spinner.Progress > .9)
-                    r.Type = HitResult.Ok;
-                else if (spinner.Progress > .75)
-                    r.Type = HitResult.Meh;
-                else if (spinner.Time.Current >= spinner.HitObject.EndTime)
-                    r.Type = r.Judgement.MinResult;
+                r.Type = OsuSpinnerJudgement.BodyResultForProgress(spinner.Progress, r.Judgement.MinResult);
             });
         }
 

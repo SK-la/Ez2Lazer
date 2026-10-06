@@ -16,6 +16,8 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -110,31 +112,38 @@ namespace osu.Game.Rulesets.Mania.Tests
             performTest(objects, frames);
 
             addJudgementAssert(objects[0], HitResult.IgnoreHit);
-            addJudgementAssert("first head", () => ((HoldNote)objects[0]).Head, HitResult.Perfect);
-            addJudgementAssert("first tail", () => ((HoldNote)objects[0]).Tail, HitResult.Perfect);
+            addJudgementAssert("first head", r => r.HitObject is HeadNote && r.HitObject.StartTime == 1000, HitResult.Perfect);
+            addJudgementAssert("first tail", r => r.HitObject is TailNote && r.HitObject.StartTime == 1010, HitResult.Perfect);
 
             addJudgementAssert(objects[1], HitResult.IgnoreHit);
-            addJudgementAssert("second head", () => ((HoldNote)objects[1]).Head, HitResult.Great);
-            addJudgementAssert("second tail", () => ((HoldNote)objects[1]).Tail, HitResult.Perfect);
+            addJudgementAssert("second head", r => r.HitObject is HeadNote && r.HitObject.StartTime == 1020, HitResult.Great);
+            addJudgementAssert("second tail", r => r.HitObject is TailNote && r.HitObject.StartTime == 1030, HitResult.Perfect);
         }
 
         private void addJudgementAssert(ManiaHitObject hitObject, HitResult result)
         {
             AddAssert($"({hitObject.GetType().ReadableName()} @ {hitObject.StartTime}) judgement is {result}",
-                () => judgementResults.Single(r => r.HitObject == hitObject).Type == result);
+                () => judgementResults.Single(r => isSameObject(r.HitObject, hitObject)).Type == result);
         }
 
-        private void addJudgementAssert(string name, Func<ManiaHitObject> hitObject, HitResult result)
+        private void addJudgementAssert(string name, Func<JudgementResult, bool> match, HitResult result)
         {
-            AddAssert($"{name} judgement is {result}",
-                () => judgementResults.Single(r => r.HitObject == hitObject()).Type == result);
+            AddAssert($"{name} judgement is {result}", () => judgementResults.Single(match).Type == result);
         }
 
         private void addJudgementOffsetAssert(ManiaHitObject hitObject, double offset)
         {
             AddAssert($"({hitObject.GetType().ReadableName()} @ {hitObject.StartTime}) judged at {offset}",
-                () => Precision.AlmostEquals(judgementResults.Single(r => r.HitObject == hitObject).TimeOffset, offset, 100));
+                () => Precision.AlmostEquals(judgementResults.Single(r => isSameObject(r.HitObject, hitObject)).TimeOffset, offset, 100));
         }
+
+        /// <summary>
+        /// 转换产物拥有自己的 HitObject，所以本用例持有的源对象并不是被判定的那个实例；按类型 / 时间 / 列认同一个对象。
+        /// </summary>
+        private static bool isSameObject(HitObject judged, ManiaHitObject source)
+            => judged?.GetType() == source.GetType()
+               && judged.StartTime == source.StartTime
+               && (judged as IHasColumn)?.Column == source.Column;
 
         private ScoreAccessibleReplayPlayer currentPlayer;
         private List<JudgementResult> judgementResults;

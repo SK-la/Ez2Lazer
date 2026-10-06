@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Game.Audio;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 
@@ -25,6 +26,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Audio
         private GameplayState? gameplayState { get; set; }
 
         private EzManiaSampleChannelPool? fallbackPool;
+
+        /// <summary>
+        /// 下一颗未判定 note 还太远、或本列已无未判定 note 时，退回「本列最近一颗已经过线的 note」。
+        /// </summary>
+        /// <remarks>
+        /// BMS 键音谱的按键取样语义（beatoraja 的判定外按键分支即取「时间早于按下时刻的最后一颗」）：
+        /// 有 note 可打就打那颗，没有也照常发声，取样点只随进度前进。上游的两个退回目标都不满足这点：
+        /// 「本容器第一项」会被 latch 在谱面开头某颗上（键音谱里 sample 就是 note 自己的音频，那颗若带
+        /// 超长键音，此后每次远离 note 的按键都会把它再打断重播一次），「沿用上次取样对象」在长间隔处
+        /// 也会停在旧 note 上。
+        /// </remarks>
+        protected override HitObjectLifetimeEntry? FindFallbackEntry(HitObjectLifetimeEntry? nextUnjudged, double referenceTime)
+            => FindLatestPassedEntry(referenceTime);
 
         public EzGameplaySampleTriggerSource(HitObjectContainer hitObjectContainer)
             : base(hitObjectContainer)

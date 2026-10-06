@@ -93,10 +93,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             foreach (var column in maniaBeatmap.HitObjects.GroupBy(h => h.Column))
             {
                 var locations = column.OfType<Note>().Select(n => (startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                                      .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                      {
-                                          (startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))
-                                      }))
+                                      .Concat(column.OfType<HoldNote>().Select(h => (startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))))
                                       .OrderBy(h => h.startTime).ToList();
 
                 var newColumnObjects = new List<ManiaHitObject>();

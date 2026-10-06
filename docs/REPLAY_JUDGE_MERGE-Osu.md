@@ -1,6 +1,7 @@
-# Osu ReplayJudge — Session 与 Shadow 判定
+# Osu ReplayJudge — Session、Shadow 桥与毕业路径
 
-Osu 采用 **Shadow Judgement**（影子判定），与 Mania 的 HitMode/Mapping 路径分离。三模式统一设计见 [REPLAY_JUDGE_SHADOW.md](./REPLAY_JUDGE_SHADOW.md)。
+Osu 曾用 **Shadow Judgement** 作为脱离 Drawable 的过渡桥（OSL-010）。  
+**壳 + 桥已通 ≠ Mania 级能力**：缺共用判官、env 重算、ClassicNative。见 [REPLAY_JUDGE_SHADOW.md](./REPLAY_JUDGE_SHADOW.md)、[EZ-SR-TL-REGISTRY.md](./EZ-SR-TL-REGISTRY.md) OSL-011+。
 
 ---
 
@@ -19,22 +20,33 @@ Osu 采用 **Shadow Judgement**（影子判定），与 Mania 的 HitMode/Mappin
 
 **Osu HitEvent 额外字段**：`CursorPositionAtHit`（`OsuHitCircleJudgementResult`）须在 parity 中一并断言。
 
-Parity 测试（OSL-010 S4）：`TestSceneOsuReplaySessionParity`（circle / slider / spinner）。
+Parity：`TestSceneOsuReplaySessionParity`（circle / slider / spinner）。
 
 ---
 
-## 架构（OSL-007 + OSL-010）
+## 架构状态
 
 | 组件 | 路径 | 状态 |
 |------|------|------|
-| Session API | `OsuReplaySession.cs` | done |
+| Session API | `OsuReplaySession.cs` | done（OSL-007） |
 | Service + cache | `OsuReplaySessionService.cs` | done |
 | Timeline | `OsuReplayTimelineRecorder.cs` | done |
-| **Shadow 引擎** | `Shadow/OsuReplayShadowEngine.cs` 等 | **done**（OSL-010） |
-| 旧 press 循环 | ~~`OsuReplaySessionSimulator` 内启发式~~ | S1 起由 Shadow 替代 |
+| Session 引擎（Mapping） | `ReplayJudge/Session/*` | **done（OSL-011）**；原 `Shadow/` 已删 |
+| 判定 helper / Drawable 一行 | `ReplayJudge/Judgement` | **done（OSL-011）** |
+| Session 读 env | Simulator / Engine | **OSL-012**：已读轨/offset；Offset 不进判窗；Panel `RunHitEventsAsync` 不可变门禁 |
+| ClassicNative 轨 | Mapping + ScoreProcessor | **OSL-013 in progress**：窗注入 + Session 晚点 Lazer≠Classic 门禁；stable 满分细部仍 open |
+
+### OffsetPlusNonMania（禁叠判）
+
+权威：[EZ-SR-TL-REGISTRY.md](./EZ-SR-TL-REGISTRY.md) §1.7b Offset 原则。
+
+- **Drawable 局内**：裸输入 → `timeOffset += OffsetPlusNonMania` 再进判窗。
+- **Session 吃 replay**：帧时刻已是有效输入；`ResultForPress` / 滑条头窗用裸帧差；**禁止**再把 OffsetPlus 叠进判窗（相对帧 = 加两次）。
+- Resolve：ForStored / 分析 ignoreOffset → `OffsetPlusNonMania=0`。非 0 时至多影响 HitEvent.`TimeOffset` 元数据，不改 `HitResult`。
 
 ---
 
-## OSL-010 进度
+## OSL-010（归档）
 
-- **S0–S4 done**：Circle + Slider tracking + Spinner 转速 + `TestSceneOsuReplaySessionParity`
+- **S0–S4 done**：Circle + Slider + Spinner + Parity  
+- 精度来源：`OsuReplaySessionEngine` + Judgement helpers（OSL-011 done）

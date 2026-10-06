@@ -81,15 +81,25 @@ namespace osu.Game.Overlays.SkinEditor
             if (internalPositionUpdate)
                 return;
 
+            // 同步期间必须屏蔽回写：设置 positionX 会经 ValueChanged 立刻调回 updateComponentPositionFromSliders，
+            // 而那时 positionY 还是旧值，组件 Y 会被静默改成滑条旧值；等轮到 Y 时组件已被改回旧值，
+            // 比较相等于是跳过，组件就永久停在错的 Y 上（组件实例复用后换了位置时必现）。
+            internalPositionUpdate = true;
+
             if (positionX.Value != component.Position.X)
                 positionX.Value = component.Position.X;
 
             if (positionY.Value != component.Position.Y)
                 positionY.Value = component.Position.Y;
+
+            internalPositionUpdate = false;
         }
 
         private void updateComponentPositionFromSliders()
         {
+            if (internalPositionUpdate)
+                return;
+
             internalPositionUpdate = true;
             component.Position = new Vector2(positionX.Value, positionY.Value);
             internalPositionUpdate = false;

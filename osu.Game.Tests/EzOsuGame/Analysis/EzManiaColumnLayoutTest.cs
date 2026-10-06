@@ -96,16 +96,16 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
         #endregion
 
-        #region scratch 标签：尾部空列
+        #region scratch 标签
 
         [Test]
         public void TestTrailingEmptyColumnFallsBackToRealKeyCount()
         {
             // dense 后 N = 真实列数；末列为 0 -> 不显著 -> 落回 [Nk]。
-            Assert.That(scratch(dense(5, 5, 5, 5, 5, 0), 10), Is.EqualTo("[6k] "));
-            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 0), 10), Is.EqualTo("[7k] "));
-            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0), 10), Is.EqualTo("[12k] "));
-            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0), 10), Is.EqualTo("[16k] "));
+            Assert.That(scratch(dense(5, 5, 5, 5, 5, 0), 10), Is.EqualTo("6k"));
+            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 0), 10), Is.EqualTo("7k"));
+            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0), 10), Is.EqualTo("12k"));
+            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0), 10), Is.EqualTo("16k"));
         }
 
         [Test]
@@ -115,7 +115,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             // 说明补列就是修复点本身，而不是靠 UI 层兜底。
             var unpadded = dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5);
 
-            Assert.That(scratch(unpadded, 10), Is.EqualTo("[14k] "));
+            Assert.That(scratch(unpadded, 10), Is.EqualTo("14k"));
         }
 
         [Test]
@@ -126,13 +126,13 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var denseCounts = dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5);
 
             Assert.That(scratch(sparse, 10), Is.EqualTo(scratch(denseCounts, 10)));
-            Assert.That(scratch(denseCounts, 10), Is.EqualTo("[16k] "));
+            Assert.That(scratch(denseCounts, 10), Is.EqualTo("16k"));
         }
 
         [Test]
         public void TestNoKpsStillUsesRealKeyCount()
         {
-            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0), 0), Is.EqualTo("[16k] "));
+            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0), 0), Is.EqualTo("16k"));
         }
 
         [Test]
@@ -152,10 +152,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var counts = dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5);
 
             config.SetValue(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
-            Assert.That(scratch(counts, 10), Is.EqualTo("[13k] "));
+            Assert.That(scratch(counts, 10), Is.EqualTo("13k"));
 
             config.SetValue(Ez2Setting.ManiaSkipEmptyEdgeColumns, true);
-            Assert.That(scratch(counts, 10), Is.EqualTo("[10k2s1p] "));
+            Assert.That(scratch(counts, 10), Is.EqualTo("10k2s1p"));
         }
 
         [Test]
@@ -163,8 +163,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             config.SetValue(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
 
-            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0), 10), Is.EqualTo("[14k] "));
-            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5), 10), Is.EqualTo("[14k] "));
+            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0), 10), Is.EqualTo("14k"));
+            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5), 10), Is.EqualTo("14k"));
         }
 
         [Test]
@@ -173,10 +173,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             config.SetValue(Ez2Setting.ManiaSkipEmptyEdgeColumns, true);
 
             // 第 14 列（索引 13，ez2ac alpha 列）为空 -> 10k2s1p
-            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0), 10), Is.EqualTo("[10k2s1p] "));
+            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0), 10), Is.EqualTo("10k2s1p"));
 
             // 第 14 列有音符 -> 仍按真实 14k
-            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5), 10), Is.EqualTo("[14k] "));
+            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5), 10), Is.EqualTo("14k"));
 
             // 真实 14k 且 alpha 列为 0 时，才触达显示列数 13。
             Assert.That(EzManiaColumnLayout.GetDisplayColumnCount(14), Is.EqualTo(13));
@@ -193,16 +193,16 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var mixed = dense(30, 5, 5, 5, 5, 5, 5, 5, 1);
 
             config.SetValue(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
-            Assert.That(scratch(mixed, 10), Is.EqualTo("[7k2s] "));
+            Assert.That(scratch(mixed, 10), Is.EqualTo("7k2s"));
 
             config.SetValue(Ez2Setting.ManiaSkipEmptyEdgeColumns, true);
-            Assert.That(scratch(mixed, 10), Is.EqualTo("[5k1s2e1p] "));
+            Assert.That(scratch(mixed, 10), Is.EqualTo("5k1s2e1p"));
 
             // 双低 + 开关开
-            Assert.That(scratch(dense(1, 5, 5, 5, 5, 5, 5, 5, 1), 10), Is.EqualTo("[5k1s2e1p] "));
+            Assert.That(scratch(dense(1, 5, 5, 5, 5, 5, 5, 5, 1), 10), Is.EqualTo("5k1s2e1p"));
 
             // 无显著列 -> [9k]
-            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5), 10), Is.EqualTo("[9k] "));
+            Assert.That(scratch(dense(5, 5, 5, 5, 5, 5, 5, 5, 5), 10), Is.EqualTo("9k"));
         }
 
         [Test]
@@ -213,11 +213,11 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 counts[i] = 5;
 
             // 无显著 -> [18k]
-            Assert.That(scratch(dense(counts), 10), Is.EqualTo("[18k] "));
+            Assert.That(scratch(dense(counts), 10), Is.EqualTo("18k"));
 
             // 首列显著 -> 16k2s
             counts[0] = 30;
-            Assert.That(scratch(dense(counts), 10), Is.EqualTo("[16k2s] "));
+            Assert.That(scratch(dense(counts), 10), Is.EqualTo("16k2s"));
         }
 
         [Test]
@@ -226,10 +226,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             config.SetValue(Ez2Setting.ManiaSkipEmptyEdgeColumns, true);
 
             // 双显著 + 开关开 -> 10k2s4e
-            Assert.That(scratch(dense(30, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 30), 10), Is.EqualTo("[10k2s4e] "));
+            Assert.That(scratch(dense(30, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 30), 10), Is.EqualTo("10k2s4e"));
 
             config.SetValue(Ez2Setting.ManiaSkipEmptyEdgeColumns, false);
-            Assert.That(scratch(dense(30, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 30), 10), Is.EqualTo("[14k2s] "));
+            Assert.That(scratch(dense(30, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 30), 10), Is.EqualTo("14k2s"));
         }
 
         #endregion

@@ -141,7 +141,7 @@ namespace osu.Game.EzOsuGame.HUD
 
                     foreach (string path in possiblePaths)
                     {
-                        var texture = resources.Get(path);
+                        var texture = resources.Get(path, EzTextureUsage.Glyph);
 
                         if (texture != null)
                         {

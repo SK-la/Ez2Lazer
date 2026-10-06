@@ -16,6 +16,7 @@ using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Localisation.HUD;
 using osu.Game.Localisation.SkinComponents;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
@@ -189,7 +190,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void onReplayOrMissSettingChanged()
         {
-            if (!Interactive.Value || !ShowMissMarkers.Value)
+            if (!Interactive.Value || !ShowMissMarkers.Value || isAutoplayScore())
             {
                 cancelMissLoad();
                 markers.ClearMisses();
@@ -199,6 +200,12 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             ensureMissMarkersLoaded();
+        }
+
+        private bool isAutoplayScore()
+        {
+            var mods = player?.Score?.ScoreInfo.Mods;
+            return mods != null && mods.Any(m => m is ModAutoplay);
         }
 
         private void ensureMissMarkersLoaded()
@@ -258,7 +265,7 @@ namespace osu.Game.EzOsuGame.HUD
         private void applyMissEvents(IEnumerable<HitEvent> events)
         {
             var missTimes = events
-                            .Where(e => e.Result == HitResult.Miss)
+                            .Where(e => e.Result.IsMiss() && e.Result != HitResult.IgnoreMiss)
                             .Select(e => e.HitObject.StartTime)
                             .ToList();
 

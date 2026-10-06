@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -88,6 +89,9 @@ namespace osu.Game.EzOsuGame.Edit
         [Resolved]
         private MusicController musicController { get; set; } = null!;
 
+        [Resolved]
+        private EzResourceStore resource { get; set; } = null!;
+
         private Container? backgroundContainer;
         private Container sceneContentHost = null!;
         private EzSkinEditorMenuBar menuBar = null!;
@@ -103,6 +107,11 @@ namespace osu.Game.EzOsuGame.Edit
         private bool noteSnapshotInitialized;
         private Guid noteSnapshotSkinId;
         private bool configPreviewRefreshBound;
+
+        /// <summary>
+        /// 框架把 <c>GetBindable</c> 返回的绑定副本只登记为 WeakReference；副本若无强引用会被 GC 回收，订阅会静默失效。
+        /// </summary>
+        private readonly List<IBindable> retainedBindingCopies = new List<IBindable>();
 
         private ISkinEditorVirtualProvider? provider;
         private EzSkinEditorSceneContext? sceneContext;
@@ -271,17 +280,7 @@ namespace osu.Game.EzOsuGame.Edit
             sceneBar.CurrentScene.BindValueChanged(onSceneChanged, true);
             skinManager.CurrentSkinInfo.BindValueChanged(onCurrentSkinInfoChanged);
             bindConfigPreviewRefresh();
-            bindColumnKeyModePreviewRefresh();
             bindSceneBarPlayback();
-        }
-
-        private void bindColumnKeyModePreviewRefresh()
-        {
-            ezSkinConfig.GetBindable<int>(Ez2Setting.ColumnTypeListSelect).BindValueChanged(_ =>
-            {
-                if (sceneBar.CurrentScene.Value == EzSkinEditorSceneType.Colour)
-                    Schedule(refreshPreviewContent);
-            });
         }
 
         protected override void Update()
@@ -693,6 +692,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (SkinIniSession is { IsSupported: true, IsDirty: true })
                 SkinIniSession.Commit();
 
+            invalidateResourceCaches();
             skinManager.CurrentSkinInfo.TriggerChange();
             refreshScene();
         }
@@ -703,8 +703,13 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
 
             SkinIniSession.Commit();
+            invalidateResourceCaches();
             refreshScene();
         }
+
+        // 用户可能在我们开着编辑器时往 EzResources 里丢/换图。保存与应用皮肤是用户主动的冷入口，
+        // 在这里丢弃目录索引、帧解析缓存与动画/大图两页，新文件才会立刻出现在预览里（与资源选择器同一套做法）。
+        private void invalidateResourceCaches() => resource.InvalidateResourceCaches();
 
         private bool isSkinIniSupported() => EzSkinIniSupport.IsSupported(skinManager.CurrentSkinInfo.Value);
 
@@ -920,6 +925,7 @@ namespace osu.Game.EzOsuGame.Edit
                 if (SkinIniSession is { IsDirty: true })
                 {
                     SkinIniSession.Commit();
+                    invalidateResourceCaches();
                     committedSkinIni = true;
                 }
 
@@ -1167,8 +1173,12 @@ namespace osu.Game.EzOsuGame.Edit
 
             configPreviewRefreshBound = true;
 
+            // 绑定副本必须由本屏幕持有：框架只登记 WeakReference，副本被 GC 回收后订阅会静默失效。
             foreach (var setting in EzSkinJsonSettingCatalog.All)
-                EzSkinJsonBridge.BindSettingValueChanged(ezSkinConfig, setting, () => Schedule(refreshPreviewContent));
+            {
+                if (EzSkinJsonBridge.BindSettingValueChanged(ezSkinConfig, setting, () => Schedule(refreshPreviewContent)) is IBindable bindable)
+                    retainedBindingCopies.Add(bindable);
+            }
         }
 
         private void refreshPreviewContent()

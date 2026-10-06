@@ -5,17 +5,18 @@ using System;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Shadow;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Session;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
 {
     /// <summary>
-    /// Osu Session 仿真入口；委托 <see cref="OsuReplayShadowEngine"/>（OSL-010 影子判定）。
+    /// Osu Session 仿真入口；委托 <see cref="OsuReplaySessionEngine"/>（OSL-011 Mapping）。
     /// </summary>
     /// <remarks>
-    /// 设计见 <c>docs/REPLAY_JUDGE_SHADOW.md</c> · <c>docs/REPLAY_JUDGE_MERGE-Osu.md</c> · <c>TODO(EZ-SR-OSL-010)</c>。
+    /// 见 docs/REPLAY_JUDGE_SHADOW.md · MERGE-Osu。
+    /// OffsetPlusNonMania：REGISTRY §1.7b — Session 不叠进判窗；轨字段见 OSL-013。
     /// </remarks>
     internal static class OsuReplaySessionSimulator
     {
@@ -30,10 +31,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
         {
             ArgumentNullException.ThrowIfNull(score.Replay);
 
-            // environment 保留签名；Osu 无 Mania HitMode，Shadow 路径暂不读取。
-            _ = environment;
-
-            OsuReplayShadowEngine.Run(score, beatmap, scoreProcessor, gameplayRate, timelineRecorder, cancellationToken);
+            OsuReplaySessionEngine.Run(score, beatmap, scoreProcessor, gameplayRate, environment, timelineRecorder, cancellationToken);
         }
     }
 }

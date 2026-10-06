@@ -3,38 +3,43 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
-using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.UI.Scrolling;
-using osuTK;
-using osuTK.Graphics;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    public partial class Ez2HoldNoteTailPiece : CompositeDrawable
+    public partial class Ez2HoldNoteTailPiece : FastNoteBase
     {
+        private Box foreground = null!;
+        private Box foregroundAdditive = null!;
+
         [Resolved]
-        private DrawableHitObject? drawableObject { get; set; }
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        private IBindable<ScrollingDirection> direction = null!;
-        private IBindable<Color4> accentColour = null!;
+        [Resolved]
+        private StageDefinition stageDefinition { get; set; } = null!;
 
-        private readonly Box foreground;
+        // 10k2s1p 开启时用 Ez 内置色彩模板，关闭时回到 FastNoteBase 的编辑器列色。
+        protected override IBindable<bool>? BuiltInColourTemplateSwitch => ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
 
-        // private readonly Ez2HoldNoteHittingLayer hittingLayer;
-        private readonly Box foregroundAdditive;
+        protected override Colour4 BuiltInColourTemplate => stageDefinition.GetColourForLayout(Column.Index);
 
         public Ez2HoldNoteTailPiece()
         {
             RelativeSizeAxes = Axes.X;
             Height = 0f;
+        }
 
-            InternalChildren = new Drawable[]
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            MainContainer.RelativeSizeAxes = Axes.X;
+            MainContainer.Children = new Drawable[]
             {
                 new Container
                 {
@@ -47,7 +52,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         new Box
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Colour = ColourInfo.GradientVertical(Color4.Black.Opacity(0), Colour4.Black),
+                            Colour = ColourInfo.GradientVertical(Colour4.Black.Opacity(0), Colour4.Black),
                             // Avoid ugly single pixel overlap.
                             Height = 0.9f,
                         },
@@ -79,55 +84,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             };
         }
 
-        [BackgroundDependencyLoader(true)]
-        private void load(IScrollingInfo scrollingInfo)
+        protected override void UpdateColor()
         {
-            direction = scrollingInfo.Direction;
-            direction.BindValueChanged(onDirectionChanged, true);
+            var noteColour = NoteColor;
 
-            if (drawableObject != null)
-            {
-                accentColour = drawableObject.AccentColour;
-                accentColour.BindValueChanged(onAccentChanged, true);
-
-                drawableObject.HitObjectApplied += hitObjectApplied;
-            }
-        }
-
-        private void hitObjectApplied(DrawableHitObject drawableHitObject)
-        {
-            // var holdNoteTail = (DrawableHoldNoteTail)drawableHitObject;
-
-            // hittingLayer.Recycle();
-            //
-            // hittingLayer.AccentColour.UnbindBindings();
-            // hittingLayer.AccentColour.BindTo(holdNoteTail.HoldNote.AccentColour);
-            //
-            // hittingLayer.IsHitting.UnbindBindings();
-            // ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNoteTail.HoldNote.IsHitting);
-        }
-
-        private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
-        {
-            Scale = new Vector2(1, direction.NewValue == ScrollingDirection.Up ? -1 : 1);
-        }
-
-        private void onAccentChanged(ValueChangedEvent<Color4> accent)
-        {
-            foreground.Colour = accent.NewValue.Darken(0.6f); // matches body
+            foreground.Colour = noteColour.Darken(0.6f); // matches body
 
             foregroundAdditive.Colour = ColourInfo.GradientVertical(
-                accent.NewValue.Opacity(0.4f),
-                accent.NewValue.Opacity(0)
+                noteColour.Opacity(0.4f),
+                noteColour.Opacity(0)
             );
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (drawableObject.IsNotNull())
-                drawableObject.HitObjectApplied -= hitObjectApplied;
         }
     }
 }

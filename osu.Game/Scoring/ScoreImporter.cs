@@ -4,13 +4,17 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using Newtonsoft.Json;
+using osu.Framework.Extensions;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Database;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.IO.Archives;
 using osu.Game.Rulesets;
 using osu.Game.Scoring.Legacy;
@@ -26,7 +30,7 @@ namespace osu.Game.Scoring
     {
         public override IEnumerable<string> HandledExtensions => new[] { ".osr" };
 
-        protected override string[] HashableFileTypes => new[] { ".osr" };
+        protected override string[] HashableFileTypes => new[] { ".osr", EzHighPrecisionReplayFrames.EXTENSION };
 
         private readonly RulesetStore rulesets;
         private readonly Func<BeatmapManager> beatmaps;
@@ -57,9 +61,11 @@ namespace osu.Game.Scoring
 
                     if (!parameters.Batch)
                     {
-                        // In the case of a missing beatmap, let's attempt to resolve it and show a prompt to the user to download the required beatmap.
+                        // Retain bytes now: download temp .osr files are not guaranteed to still exist when the beatmap later arrives.
+                        ArchiveReader? retainedArchive = retainScoreArchive(archive, name);
+
                         var req = new GetBeatmapRequest(new BeatmapInfo { MD5Hash = notFound.Hash });
-                        req.Success += res => PostNotification?.Invoke(new MissingBeatmapNotification(res, notFound.Hash, archive));
+                        req.Success += res => PostNotification?.Invoke(new MissingBeatmapNotification(res, notFound.Hash, retainedArchive));
                         api.Queue(req);
                     }
 
@@ -74,6 +80,20 @@ namespace osu.Game.Scoring
         }
 
         public Score GetScore(ScoreInfo score) => new LegacyDatabasedScore(score, rulesets, beatmaps(), Files.Store);
+
+        private static ArchiveReader? retainScoreArchive(ArchiveReader archive, string name)
+        {
+            try
+            {
+                using var copyStream = archive.GetStream(name);
+                return new MemoryStreamArchiveReader(new MemoryStream(copyStream.ReadAllBytesToArray()), name);
+            }
+            catch (Exception e)
+            {
+                Logger.Log($@"Failed to retain score archive '{archive.Name}' for delayed re-import: {e}.", LoggingTarget.Database);
+                return null;
+            }
+        }
 
         protected override void Populate(ScoreInfo model, ArchiveReader? archive, Realm realm, CancellationToken cancellationToken = default)
         {
@@ -123,6 +143,8 @@ namespace osu.Game.Scoring
             // This needs to be run after user detail population to ensure we have a valid user id.
             if (api.IsLoggedIn && api.LocalUser.Value.OnlineID == model.UserID && (model.BeatmapInfo.LastPlayed == null || model.Date > model.BeatmapInfo.LastPlayed))
                 model.BeatmapInfo.LastPlayed = model.Date;
+
+            EzScoreScanStamp.Invalidate(Files.Storage);
         }
 
         /// <summary>

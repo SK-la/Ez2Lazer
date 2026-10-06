@@ -352,7 +352,7 @@ namespace osu.Game.Screens.Select
             });
 
             configBackgroundBlur = config.GetBindable<bool>(OsuSetting.SongSelectBackgroundBlur);
-            configBackgroundBlur.BindValueChanged(e =>
+            configBackgroundBlur.BindValueChanged(_ =>
             {
                 if (!this.IsCurrentScreen())
                     return;

@@ -36,6 +36,25 @@
 
 - Pooled drawable 管理：复用时显式重置颜色、尺寸、alpha、Transform、Bindable 订阅状态等，确保复用对象不带残留状态。
 
+## Ez 资源帧命名与解析（三模板）
+
+帧加载只有一条通道：`EzResourceStore.GetAnimation(EzAnimationRequest)` 与 `GetTextureFrames(EzAnimationRequest)`（`GetAnimation(path)` 为路径快捷重载）。解析时按下列顺序探测，命中即停；文件事实来自 `EzResourceDirectoryIndex`（大小写不敏感，用户 `EzResources/**` 优先、内置 `Textures/EzResources/**` 回退，内置的 `_6k` 打包形式已归一）：
+
+1. 子目录 + 连接符（只用于多帧动画）：`[dir]/[name]/[前缀][连接符][数值].png`，连接符只认 `-` 与 `_`；前缀为空即纯数字（`note/circle/whitenote/000.png`），带前缀如 `GameTheme/AIR/judgement/Cool/frame_0.png`。
+2. 同层 + 连接符：`[dir]/[name][连接符][数值].png`，优先级 `[name]-` → `[name]_`；资源名后紧跟字母数字的组不算同族（`ln` 不吃 `ln2_0`）。
+3. 单图：`[dir]/[name].png`，1 帧，返回 `Sprite`。
+
+- 优先级固定为 1 > 2 > 3，命中即停，**不比较帧数**。
+- 连接符只认 `-` 与 `_`：`{name}{数值}` 这种无分隔符命名（如 `ColumnLight1.png`）**不由默认三模板加载**，避免把「单图带数字 ID / 同名前缀的其它资源」误当成帧序列。`EzHUDSpritePlus` 允许无连接符是它的自定义模板特例（默认 `{0}`），要同形态就在 `FrameTemplate` 里显式写 `{name}{0}`。
+- 任何场景下只有 1 帧时都转为普通纹理（`Sprite`），不按动画加载。
+- 后缀不折叠：查什么名字匹配什么名字；同名不同后缀的优先级 png → jpg → jpeg → gif（gif 最低）。
+
+- 尾部必须是连续 ASCII 数字才算帧号；遇断号即止，故帧号断层就是天然的帧数上限（`EzAnimationRequest.MaxFrames` 只是额外上限）。
+- 取像键不带后缀（如 `note/circle/whitenote/000`）：纹理加载链自己会补 `png`/`jpg` 探针。只有加载链探不到的格式（如 `.gif`）才保留后缀。
+- 显式模板（`EzAnimationRequest.FrameTemplate`）：`{name}`（`{result}` 为别名）为资源名，`{0}`/`{00}`/`{000}` 为序号且位数只作说明（实际宽度按磁盘分组）；不含序号即表达单图（如 `{name}_overlay`）；含序号但不含 `{name}` 时自动前置资源名（`{0}` 等价于 `{name}{0}`）。
+- 往 `EzResources` 新增/替换图后不会自动可见（底层 `TextureStore` 会把未命中也缓存下来），需 `EzResourceStore.InvalidateResourceCaches()`。它只用框架原生 `TextureStore.ClearCache()`，且只清动画帧与大图两池（字形/通用图集可能正被绘制，故不动）。触发点是冷的、用户主动的入口：资源选择器打开、皮肤编辑器保存/应用/导出。
+- `Large` 池（`LargeTextureStore`）取像带引用计数，全部引用释放后才回收纹理，故该池的帧**不进帧级缓存**（帧级长期持有等于永不回收），每次现取。
+
 ## 文件分工与层级（谁负责什么）
 
 - `EzColumnTab.cs`（EzOsuGame/Screens）
@@ -75,6 +94,8 @@
 - `osu.Game.Rulesets.Mania/EzMania/Editor/EzSkinLNEditorProvider_Static.cs` — 静态预览容器与 `PreviewDependencyContainer` 实现。
 - `osu.Game.Rulesets.Mania/Skinning/EzStylePro/EzNoteBase.cs` — note 基类的颜色/尺寸应用与列 watcher。
 - `osu.Game.EzOsuGame/EzLocalTextureFactory.cs` — 纹理/尺寸缓存与刷新广播入口。
+- `osu.Game/EzOsuGame/EzResourceStore.Animation.cs` — 三模板解析与层2/层3 动画 API 的唯一实现处。
+- `osu.Game/EzOsuGame/EzResourceDirectoryIndex.cs` — 层1 目录索引（文件事实、帧分组、双根合并）。
 - `osu.Game.EzOsuGame/Configuration/Ez2ConfigManager.cs` — Ez 专用配置 bindable 与列级设置入口。
 - `osu.Game.Rulesets.Mania/UI/Column.cs` & `ColumnFlow.cs` — 列宽、列级广播与布局变更处。
 

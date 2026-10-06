@@ -1,1 +1,147 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.// See the LICENCE file in the repository root for full licence text.// See the LICENCE file in the repository root for full licence text.using System;namespace osu.Game.EzOsuGame.Overlays.Preview{    public readonly struct ManiaPreviewColumnLayout    {        public const float COLUMN_SPACING = 16f;        /// <summary>Fixed row height in the time grid (maps to a fixed ms-per-row via beatmap timing).</summary>        public const float UNIT_ROW_STEP = 8f;        /// <summary>Fixed note height; always half of <see cref="UNIT_ROW_STEP"/>.</summary>        public const float UNIT_NOTE_HEIGHT = UNIT_ROW_STEP * 0.5f;        /// <summary>Fixed measure height in the abstract grid.</summary>        public const float UNIT_MEASURE_HEIGHT = ManiaPreviewFixedLayout.ROWS_PER_MEASURE * UNIT_ROW_STEP;        /// <summary>Fixed measure width in the abstract grid.</summary>        public const float UNIT_MEASURE_WIDTH = 96f;        public const float REFERENCE_NOTE_HEIGHT = 8f;        public int MeasuresPerColumn { get; init; }        public int RowsPerColumn { get; init; }        public int ColumnCount { get; init; }        public int TotalMeasures { get; init; }        public float ColumnWidth { get; init; }        public float RowStep { get; init; }        public float NoteHeight { get; init; }        public float PanelHeight { get; init; }        public float ContentWidth { get; init; }        public float FitScale { get; init; }        public int TotalGridRows => TotalMeasures * ManiaPreviewFixedLayout.ROWS_PER_MEASURE;        public static ManiaPreviewColumnLayout ForScroll(int totalRows, float viewportWidth, float viewportHeight, float density)        {            int measuresPerColumn = Math.Clamp((int)Math.Round(2f / density), 1, 8);            int rowsPerColumn = measuresPerColumn * ManiaPreviewFixedLayout.ROWS_PER_MEASURE;            int columnCount = Math.Max(1, (totalRows + rowsPerColumn - 1) / rowsPerColumn);            float columnWidth = Math.Max(96f, viewportWidth * 0.22f);            (float rowStep, float noteHeight) = ManiaPreviewDrawHelper.ComputeRowMetrics(rowsPerColumn, viewportHeight);            return new ManiaPreviewColumnLayout            {                MeasuresPerColumn = measuresPerColumn,                RowsPerColumn = rowsPerColumn,                ColumnCount = columnCount,                ColumnWidth = columnWidth,                RowStep = rowStep,                NoteHeight = noteHeight,                PanelHeight = viewportHeight,                ContentWidth = columnCount * columnWidth + Math.Max(0, columnCount - 1) * COLUMN_SPACING,                FitScale = 1f,            };        }        /// <summary>        /// Full-map layout: fixed measure units, time-based rows, search column split to match viewport aspect and fill.        /// </summary>        public static ManiaPreviewColumnLayout ForFullMapMeasureGrid(double durationMs, double msPerMeasure, float viewportWidth, float viewportHeight)        {            if (msPerMeasure <= 0)                msPerMeasure = 2000;            if (durationMs <= 0)                durationMs = msPerMeasure;            int totalMeasures = Math.Max(1, (int)Math.Ceiling(durationMs / msPerMeasure));            float viewportAspect = viewportWidth / Math.Max(1f, viewportHeight);            ManiaPreviewColumnLayout best = default;            float bestScore = float.MinValue;            for (int measuresPerColumn = 1; measuresPerColumn <= totalMeasures; measuresPerColumn++)            {                var layout = buildMeasureGridLayout(totalMeasures, measuresPerColumn);                float scale = Math.Min(viewportWidth / layout.ContentWidth, viewportHeight / layout.PanelHeight);                scale = Math.Clamp(scale, 0.05f, 16f);                float contentAspect = layout.ContentWidth / Math.Max(1f, layout.PanelHeight);                float fillRatio = layout.ContentWidth * scale * layout.PanelHeight * scale / (viewportWidth * viewportHeight);                float aspectPenalty = Math.Abs(MathF.Log(viewportAspect) - MathF.Log(contentAspect));                int measuresInLastColumn = totalMeasures - (layout.ColumnCount - 1) * measuresPerColumn;                float trailingBlank = 1f - measuresInLastColumn / (float)measuresPerColumn;                float score = fillRatio - aspectPenalty * 0.18f - trailingBlank * 0.08f;                if (score <= bestScore)                    continue;                bestScore = score;                best = layout with { FitScale = scale };            }            if (best.ColumnCount != 0)                return best;            return buildMeasureGridLayout(totalMeasures, 1) with            {                FitScale = Math.Clamp(                    Math.Min(viewportWidth / UNIT_MEASURE_WIDTH, viewportHeight / UNIT_MEASURE_HEIGHT),                    0.05f,                    16f),            };        }        private static ManiaPreviewColumnLayout buildMeasureGridLayout(int totalMeasures, int measuresPerColumn)        {            int columnCount = (totalMeasures + measuresPerColumn - 1) / measuresPerColumn;            int rowsPerColumn = measuresPerColumn * ManiaPreviewFixedLayout.ROWS_PER_MEASURE;            float panelHeight = measuresPerColumn * UNIT_MEASURE_HEIGHT;            float contentWidth = columnCount * UNIT_MEASURE_WIDTH + Math.Max(0, columnCount - 1) * COLUMN_SPACING;            return new ManiaPreviewColumnLayout            {                MeasuresPerColumn = measuresPerColumn,                RowsPerColumn = rowsPerColumn,                ColumnCount = columnCount,                TotalMeasures = totalMeasures,                ColumnWidth = UNIT_MEASURE_WIDTH,                RowStep = UNIT_ROW_STEP,                NoteHeight = UNIT_NOTE_HEIGHT,                PanelHeight = panelHeight,                ContentWidth = contentWidth,                FitScale = 1f,            };        }    }}
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+
+namespace osu.Game.EzOsuGame.Overlays.Preview
+{
+    public readonly struct ManiaPreviewColumnLayout
+    {
+        public const float COLUMN_SPACING = 16f;
+
+        /// <summary>Fixed row height in the time grid (maps to a fixed ms-per-row via beatmap timing).</summary>
+        public const float UNIT_ROW_STEP = 8f;
+
+        /// <summary>Fixed note height; always half of <see cref="UNIT_ROW_STEP" />.</summary>
+        public const float UNIT_NOTE_HEIGHT = UNIT_ROW_STEP * 0.5f;
+
+        /// <summary>Fixed measure height in the abstract grid.</summary>
+        public const float UNIT_MEASURE_HEIGHT = ManiaPreviewFixedLayout.ROWS_PER_MEASURE * UNIT_ROW_STEP;
+
+        /// <summary>Fixed measure width in the abstract grid.</summary>
+        public const float UNIT_MEASURE_WIDTH = 96f;
+
+        public const float REFERENCE_NOTE_HEIGHT = 8f;
+
+        public int MeasuresPerColumn { get; init; }
+        public int RowsPerColumn { get; init; }
+        public int ColumnCount { get; init; }
+        public int TotalMeasures { get; init; }
+        public float ColumnWidth { get; init; }
+        public float RowStep { get; init; }
+        public float NoteHeight { get; init; }
+        public float PanelHeight { get; init; }
+        public float ContentWidth { get; init; }
+        public float FitScale { get; init; }
+
+        public int TotalGridRows => TotalMeasures * ManiaPreviewFixedLayout.ROWS_PER_MEASURE;
+
+        public static ManiaPreviewColumnLayout ForScroll(int totalRows, float viewportWidth, float viewportHeight, float density)
+        {
+            int measuresPerColumn = Math.Clamp((int)Math.Round(2f / density), 1, 8);
+            int rowsPerColumn = measuresPerColumn * ManiaPreviewFixedLayout.ROWS_PER_MEASURE;
+            int columnCount = Math.Max(1, (totalRows + rowsPerColumn - 1) / rowsPerColumn);
+            float columnWidth = Math.Max(96f, viewportWidth * 0.22f);
+
+            (float rowStep, float noteHeight) = ManiaPreviewDrawHelper.ComputeRowMetrics(rowsPerColumn, viewportHeight);
+
+            return new ManiaPreviewColumnLayout
+            {
+                MeasuresPerColumn = measuresPerColumn,
+                RowsPerColumn = rowsPerColumn,
+                ColumnCount = columnCount,
+                ColumnWidth = columnWidth,
+                RowStep = rowStep,
+                NoteHeight = noteHeight,
+                PanelHeight = viewportHeight,
+                ContentWidth = columnCount * columnWidth + Math.Max(0, columnCount - 1) * COLUMN_SPACING,
+                FitScale = 1f
+            };
+        }
+
+        /// <summary>
+        ///     Full-map layout: fixed measure units, time-based rows, search column split to match viewport aspect and fill.
+        /// </summary>
+        /// <param name="density">Biases measures-per-column to adjust beat row pixel spacing; 1 keeps the auto-filled layout.</param>
+        public static ManiaPreviewColumnLayout ForFullMapMeasureGrid(double durationMs, double msPerMeasure, float viewportWidth, float viewportHeight, float density = 1f)
+        {
+            if (msPerMeasure <= 0)
+                msPerMeasure = 2000;
+
+            if (durationMs <= 0)
+                durationMs = msPerMeasure;
+
+            int totalMeasures = Math.Max(1, (int)Math.Ceiling(durationMs / msPerMeasure));
+
+            float viewportAspect = viewportWidth / Math.Max(1f, viewportHeight);
+
+            ManiaPreviewColumnLayout best = default;
+
+            float bestScore = float.MinValue;
+
+            for (int measuresPerColumn = 1; measuresPerColumn <= totalMeasures; measuresPerColumn++)
+            {
+                var layout = buildMeasureGridLayout(totalMeasures, measuresPerColumn);
+                float scale = computeFitScale(layout, viewportWidth, viewportHeight);
+                float contentAspect = layout.ContentWidth / Math.Max(1f, layout.PanelHeight);
+                float fillRatio = layout.ContentWidth * scale * layout.PanelHeight * scale / (viewportWidth * viewportHeight);
+                float aspectPenalty = Math.Abs(MathF.Log(viewportAspect) - MathF.Log(contentAspect));
+                int measuresInLastColumn = totalMeasures - (layout.ColumnCount - 1) * measuresPerColumn;
+                float trailingBlank = 1f - measuresInLastColumn / (float)measuresPerColumn;
+                float score = fillRatio - aspectPenalty * 0.18f - trailingBlank * 0.08f;
+
+                if (score <= bestScore)
+                    continue;
+
+                bestScore = score;
+                best = layout with { FitScale = scale };
+            }
+
+            if (best.ColumnCount != 0)
+            {
+                if (Math.Abs(density - 1f) <= 0.001f)
+                    return best;
+
+                int measuresPerColumnTarget = Math.Clamp((int)Math.Round(best.MeasuresPerColumn / density), 1, totalMeasures);
+                var biased = buildMeasureGridLayout(totalMeasures, measuresPerColumnTarget);
+
+                return biased with { FitScale = computeFitScale(biased, viewportWidth, viewportHeight) };
+            }
+
+            return buildMeasureGridLayout(totalMeasures, 1) with
+            {
+                FitScale = Math.Clamp(
+                    Math.Min(viewportWidth / UNIT_MEASURE_WIDTH, viewportHeight / UNIT_MEASURE_HEIGHT),
+                    0.05f,
+                    16f)
+            };
+        }
+
+        private static float computeFitScale(in ManiaPreviewColumnLayout layout, float viewportWidth, float viewportHeight)
+        {
+            return Math.Clamp(Math.Min(viewportWidth / layout.ContentWidth, viewportHeight / layout.PanelHeight), 0.05f, 16f);
+        }
+
+        private static ManiaPreviewColumnLayout buildMeasureGridLayout(int totalMeasures, int measuresPerColumn)
+        {
+            int columnCount = (totalMeasures + measuresPerColumn - 1) / measuresPerColumn;
+            int rowsPerColumn = measuresPerColumn * ManiaPreviewFixedLayout.ROWS_PER_MEASURE;
+            float panelHeight = measuresPerColumn * UNIT_MEASURE_HEIGHT;
+            float contentWidth = columnCount * UNIT_MEASURE_WIDTH + Math.Max(0, columnCount - 1) * COLUMN_SPACING;
+
+            return new ManiaPreviewColumnLayout
+            {
+                MeasuresPerColumn = measuresPerColumn,
+                RowsPerColumn = rowsPerColumn,
+                ColumnCount = columnCount,
+                TotalMeasures = totalMeasures,
+                ColumnWidth = UNIT_MEASURE_WIDTH,
+                RowStep = UNIT_ROW_STEP,
+                NoteHeight = UNIT_NOTE_HEIGHT,
+                PanelHeight = panelHeight,
+                ContentWidth = contentWidth,
+                FitScale = 1f
+            };
+        }
+    }
+}

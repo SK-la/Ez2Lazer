@@ -9,6 +9,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
@@ -18,8 +19,10 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
 using osu.Framework.Logging;
+using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
@@ -76,10 +79,23 @@ namespace osu.Game.Screens.Menu
         public Func<bool> Action;
 
         /// <summary>
+        /// Invoked when a fully-armed hold-to-shrink gesture is released while the pointer is still over the logo.
+        /// Return value decides whether the logo should play its select sample.
+        /// </summary>
+        public Func<bool> ActionOnFullyShrunk;
+
+        /// <summary>
         /// The size of the logo Sprite with respect to the scale of its hover and bounce containers.
         /// </summary>
         /// <remarks>Does not account for the scale of this <see cref="OsuLogo"/></remarks>
         public float SizeForFlow => logo == null ? 0 : logo.DrawSize.X * logo.Scale.X * logoBounceContainer.Scale.X * logoHoverContainer.Scale.X;
+
+        private Bindable<double> holdActivationDelay;
+        private bool isHolding;
+        private bool minReached;
+        private bool ready;
+        private bool suppressNextClick;
+        private ScheduledDelegate readyDelegate;
 
         public bool IsTracking { get; set; }
 
@@ -101,6 +117,8 @@ namespace osu.Game.Screens.Menu
         }
 
         private const float visualizer_default_alpha = 0.5f;
+
+        private static readonly Color4 armed_visualiser_colour = Color4Extensions.FromHex(@"00A8E8");
 
         private readonly Box flashLayer;
 
@@ -281,12 +299,14 @@ namespace osu.Game.Screens.Menu
         }
 
         [BackgroundDependencyLoader]
-        private void load(TextureStore textures, AudioManager audio)
+        private void load(TextureStore textures, AudioManager audio, OsuConfigManager config)
         {
             sampleClick = audio.Samples.Get(@"Menu/osu-logo-select");
 
             SampleBeat = audio.Samples.Get(@"Menu/osu-logo-heartbeat");
             SampleDownbeat = audio.Samples.Get(@"Menu/osu-logo-downbeat");
+
+            holdActivationDelay = config.GetBindable<double>(OsuSetting.UIHoldActivationDelay);
 
             if (ezConfig != null)
             {
@@ -414,6 +434,9 @@ namespace osu.Game.Screens.Menu
             {
                 triangles.Velocity = (float)Interpolation.Damp(triangles.Velocity, triangles_paused_velocity, 0.9f, Time.Elapsed);
             }
+
+            if (isHolding && ready)
+                updateArmedDim();
         }
 
         public override bool HandlePositionalInput => base.HandlePositionalInput && Alpha > 0.2f;
@@ -422,7 +445,7 @@ namespace osu.Game.Screens.Menu
         {
             if (e.Button != MouseButton.Left) return true;
 
-            logoBounceContainer.ScaleTo(0.9f, 1000, Easing.Out);
+            beginHoldGesture();
             return true;
         }
 
@@ -430,11 +453,33 @@ namespace osu.Game.Screens.Menu
         {
             if (e.Button != MouseButton.Left) return;
 
+            bool canEnter = isHolding && ready && isPointerInLogo() && ActionOnFullyShrunk != null;
+
             logoBounceContainer.ScaleTo(1f, 500, Easing.OutElastic);
+
+            if (canEnter)
+            {
+                suppressNextClick = true;
+
+                if (ActionOnFullyShrunk.Invoke())
+                {
+                    StopSamplePlayback();
+                    sampleClickChannel = sampleClick.GetChannel();
+                    sampleClickChannel.Play();
+                }
+            }
+
+            endHoldGesture();
         }
 
         protected override bool OnClick(ClickEvent e)
         {
+            if (suppressNextClick)
+            {
+                suppressNextClick = false;
+                return true;
+            }
+
             flashLayer.ClearTransforms();
             flashLayer.Alpha = 0.4f;
             flashLayer.FadeOut(1500, Easing.OutExpo);
@@ -454,12 +499,86 @@ namespace osu.Game.Screens.Menu
             if (Action != null)
                 logoHoverContainer.ScaleTo(1.1f, 500, Easing.OutElastic);
 
+            if (isHolding && ready)
+                updateArmedDim();
+
             return true;
         }
 
         protected override void OnHoverLost(HoverLostEvent e)
         {
             logoHoverContainer.ScaleTo(1, 500, Easing.OutElastic);
+
+            if (isHolding)
+                clearArmedDim();
+        }
+
+        private void beginHoldGesture()
+        {
+            endHoldGesture();
+
+            isHolding = true;
+            minReached = false;
+            ready = false;
+            suppressNextClick = false;
+
+            logoBounceContainer.ScaleTo(0.9f, 1000, Easing.Out).OnComplete(_ =>
+            {
+                if (!isHolding) return;
+
+                minReached = true;
+                readyDelegate?.Cancel();
+                readyDelegate = Scheduler.AddDelayed(() =>
+                {
+                    if (!isHolding || !minReached) return;
+
+                    ready = true;
+
+                    if (isPointerInLogo())
+                        applyArmedDim();
+                    else
+                        clearArmedDim();
+                }, holdActivationDelay.Value);
+            });
+        }
+
+        private void endHoldGesture()
+        {
+            isHolding = false;
+            minReached = false;
+            ready = false;
+            readyDelegate?.Cancel();
+            readyDelegate = null;
+            clearArmedDim();
+        }
+
+        private bool isPointerInLogo()
+        {
+            var inputManager = GetContainingInputManager();
+            return inputManager != null && ReceivePositionalInputAt(inputManager.CurrentState.Mouse.Position);
+        }
+
+        private void updateArmedDim()
+        {
+            if (isHolding && ready && isPointerInLogo())
+                applyArmedDim();
+            else
+                clearArmedDim();
+        }
+
+        private void applyArmedDim()
+        {
+            logoContainer.FadeTo(0.85f, 120, Easing.Out);
+            visualizer.SetColourOverride(armed_visualiser_colour);
+            visualizer.FadeColour(armed_visualiser_colour, 120, Easing.Out);
+            ripple.FadeColour(armed_visualiser_colour, 120, Easing.Out);
+        }
+
+        private void clearArmedDim()
+        {
+            logoContainer.FadeTo(1f, 100, Easing.Out);
+            visualizer.SetColourOverride(null);
+            ripple.FadeColour(Color4.White, 100, Easing.Out);
         }
 
         public void Impact()

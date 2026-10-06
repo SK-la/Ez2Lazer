@@ -30,12 +30,9 @@ namespace osu.Game.IO.Archives
         /// </summary>
         public static readonly ArchiveEncoding DEFAULT_ENCODING;
 
-        private static readonly Encoding utf8_strict = Encoding.GetEncoding(
-            "utf-8",
-            EncoderFallback.ExceptionFallback,
-            DecoderFallback.ExceptionFallback);
+        private static readonly Encoding utf8_strict;
 
-        private static readonly Encoding shift_jis = Encoding.GetEncoding(932);
+        private static readonly Encoding shift_jis;
 
         private readonly Stream archiveStream;
         private readonly IWritableArchive archive;
@@ -49,8 +46,15 @@ namespace osu.Game.IO.Archives
 
         static ZipArchiveReader()
         {
-            // Required to support rare code pages.
+            // Required to support rare code pages. Must run before any CP932 lookup, since static field
+            // initialisers would otherwise resolve before this constructor body.
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+            utf8_strict = Encoding.GetEncoding(
+                "utf-8",
+                EncoderFallback.ExceptionFallback,
+                DecoderFallback.ExceptionFallback);
+            shift_jis = Encoding.GetEncoding(932);
 
             DEFAULT_ENCODING = new ArchiveEncoding
             {

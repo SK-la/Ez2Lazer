@@ -10,10 +10,12 @@ namespace osu.Game.EzOsuGame.Scoring
         None,
         OsuSession,
         ManiaSession,
+        TaikoSession,
+        CatchSession,
     }
 
     /// <summary>
-    /// 角逐 HUD 规则集能力：Mania + Osu 支持 ghost 时间线；其余规则集仅当前局/理论柱，不加载 ghost。
+    /// 角逐 HUD 规则集能力：Mania / Osu / Taiko / Catch 支持 ghost 时间线。
     /// </summary>
     public static class EzScoreRaceRulesetSupport
     {
@@ -32,6 +34,12 @@ namespace osu.Game.EzOsuGame.Scoring
 
                 case 0:
                     return EzScoreRaceGhostTimelineMode.OsuSession;
+
+                case 1:
+                    return EzScoreRaceGhostTimelineMode.TaikoSession;
+
+                case 2:
+                    return EzScoreRaceGhostTimelineMode.CatchSession;
 
                 default:
                     return EzScoreRaceGhostTimelineMode.None;

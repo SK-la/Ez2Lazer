@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -18,6 +20,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Screens;
+using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Skinning;
@@ -30,12 +33,10 @@ namespace osu.Game.EzOsuGame.HUD
     /// A skinnable sprite that always loads from EzResources/Modify via <see cref="EzResourceStore"/>.
     /// Supports both single-image and frame animation loading.
     /// </summary>
-    public partial class EzHUDSpritePlus : CompositeDrawable, ISerialisableDrawable
+    public partial class EzHUDSpritePlus : CompositeDrawable, ISerialisableDrawable, IEzGameplayWarmUp
     {
         private const string modify_root = "Modify";
         private const int max_animation_frames = 240;
-
-        private static readonly Regex frame_template_regex = new Regex(@"^\{(0{1,3})\}$", RegexOptions.Compiled);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SPRITE_PLUS_PATH_LABEL), nameof(EzHUDStrings.SPRITE_PLUS_PATH_DESCRIPTION), SettingControlType = typeof(ModifyPathSelectorControl))]
         public Bindable<string> ModifyPath { get; } = new Bindable<string>("Tachie");
@@ -84,6 +85,10 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private EzResourceStore resource { get; set; } = null!;
 
+        /// <summary>预热登记用的服务；只有进图会话期间登记才生效。</summary>
+        [Resolved]
+        private EzGameplayWarmUpService warmUpService { get; set; } = null!;
+
         /// <summary>
         /// The beat length and rate the beat-synced playback follows, taken from the shared tracker: it resolves the
         /// timing section being played (or the selection, in song select) and the rate the music is actually played
@@ -122,6 +127,10 @@ namespace osu.Game.EzOsuGame.HUD
         [BackgroundDependencyLoader]
         private void load()
         {
+            // 在 BDL（而不是 LoadComplete）里登记：PlayerLoader 门控是在 Player 达到 `Ready` 时取快照的，
+            // 而 LoadComplete 跑在 `Ready` 之后，那时登记就已经晚了一帧、会被漏掉。
+            warmUpService.Register(this);
+
             AddInternal(speedTracker = new EzBeatmapSpeedTracker());
 
             scheduleReload();
@@ -173,21 +182,45 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
             }
 
-            string baseLookup = buildBaseLookup(spriteName);
-            Drawable? newDrawable = createAnimatedDrawable(baseLookup) ?? createSingleDrawable(baseLookup);
+            Texture[] frames = getFrames(spriteName);
 
             // Keep the current drawable if a transient settings state cannot resolve a texture.
             // This avoids flickering/reset when dropdowns are rebuilding their item sources.
-            if (newDrawable == null)
+            if (frames.Length == 0)
                 return;
 
             clearDrawable();
-            currentDrawable = newDrawable;
-            currentAnimation = newDrawable as TextureAnimation;
+            currentDrawable = createDrawable(frames);
+            currentAnimation = currentDrawable as TextureAnimation;
             playbackTime = 0;
 
-            AddInternal(newDrawable);
+            AddInternal(currentDrawable);
             applyVisualSettings();
+        }
+
+        // 帧加载请求：模板留空即走层2 三模板默认，否则按用户模板解析。
+        // 默认模板值 {0} 会展开成 {name}{0}，即允许「无连接符」——这是本组件刻意的特例
+        // （见 docs/EzSkinSystemNotes.md 三模板一节），默认三模板并不认这种命名。
+        private EzAnimationRequest buildRequest(string spriteName) => new EzAnimationRequest
+        {
+            Path = buildBaseLookup(spriteName),
+            FrameTemplate = string.IsNullOrWhiteSpace(FrameTemplate.Value) ? null : FrameTemplate.Value.Trim(),
+            MaxFrames = max_animation_frames,
+        };
+
+        private Texture[] getFrames(string spriteName) => resource.GetTextureFrames(buildRequest(spriteName));
+
+        public Task WarmUpAsync(CancellationToken cancellationToken)
+        {
+            string spriteName = SpriteName.Value?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrEmpty(spriteName))
+                return Task.CompletedTask;
+
+            // 与 reloadDrawable 取同一份请求：解析命中同一帧集缓存，解码只发生一次，
+            // 且预热解出来的必然是进局会用的那些，不会多解也不会漏。
+            // 这里刻意不创建 / 挂载 drawable：Player 在门控放行之前不在场景树里，Schedule 出来的更新不会跑。
+            return Task.Run(() => getFrames(spriteName), cancellationToken);
         }
 
         // Only the sprite is swapped out: the speed tracker is an internal child too, so a blanket ClearInternal would
@@ -201,11 +234,10 @@ namespace osu.Game.EzOsuGame.HUD
             currentAnimation = null;
         }
 
-        private Drawable? createAnimatedDrawable(string baseLookup)
+        private static Drawable createDrawable(Texture[] frames)
         {
-            string template = FrameTemplate.Value?.Trim() ?? string.Empty;
-            if (!tryParseAnimationTemplate(template, out int start, out int width))
-                return null;
+            if (frames.Length == 1)
+                return new Sprite { Texture = frames[0] };
 
             var animation = new TextureAnimation
             {
@@ -219,37 +251,16 @@ namespace osu.Game.EzOsuGame.HUD
                 IsPlaying = false,
             };
 
-            for (int i = 0; i < max_animation_frames; i++)
-            {
-                int frameIndex = start + i;
-                string frameSuffix = frameIndex.ToString($"D{width}");
-                Texture? texture = resource.Get($"{baseLookup}{frameSuffix}", EzTextureUsage.AnimationSafe);
-                if (texture == null)
-                    break;
-
-                animation.AddFrame(texture);
-            }
-
-            return animation.FrameCount > 0 ? animation : null;
+            animation.AddFrames(frames);
+            return animation;
         }
 
-        private Drawable? createSingleDrawable(string baseLookup)
+        protected override void Dispose(bool isDisposing)
         {
-            string template = FrameTemplate.Value?.Trim() ?? string.Empty;
-            string lookup = baseLookup;
+            if (isDisposing)
+                warmUpService.Unregister(this);
 
-            if (!string.IsNullOrEmpty(template) && !template.Contains('{') && !template.Contains('}'))
-                lookup += template;
-
-            Texture? texture = resource.Get(lookup, EzTextureUsage.AnimationSafe)
-                               ?? resource.Get(baseLookup, EzTextureUsage.AnimationSafe);
-            if (texture == null)
-                return null;
-
-            return new Sprite
-            {
-                Texture = texture,
-            };
+            base.Dispose(isDisposing);
         }
 
         private void applyVisualSettings()
@@ -286,24 +297,6 @@ namespace osu.Game.EzOsuGame.HUD
         {
             string path = normaliseModifyPath(ModifyPath.Value);
             return string.IsNullOrEmpty(path) ? $"{modify_root}/{spriteName}" : $"{modify_root}/{path}/{spriteName}";
-        }
-
-        private static bool tryParseAnimationTemplate(string template, out int start, out int width)
-        {
-            start = 0;
-            width = 1;
-
-            Match match = frame_template_regex.Match(template);
-            if (!match.Success)
-                return false;
-
-            string digits = match.Groups[1].Value;
-            if (digits.Length == 0 || digits.Length > 3)
-                return false;
-
-            start = 0;
-            width = digits.Length;
-            return true;
         }
 
         private static string normaliseModifyPath(string? path)

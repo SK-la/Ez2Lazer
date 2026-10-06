@@ -45,6 +45,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                         Anchor = Anchor.TopLeft,
                         Origin = Anchor.TopLeft,
                     },
+                    new SettingsCheckbox
+                    {
+                        LabelText = EzSkinStrings.LN_DYNAMIC_TAIL,
+                        TooltipText = EzSkinStrings.LN_DYNAMIC_TAIL_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.ManiaHoldTailMaskDynamicEnable),
+                    },
                     new SettingsSlider<double>
                     {
                         LabelText = EzSkinStrings.LN_GRADIENT_TAIL_HEIGHT,

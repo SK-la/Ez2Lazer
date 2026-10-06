@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osuTK;
@@ -24,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         public readonly Bindable<bool> IsHitting = new Bindable<bool>();
         // public IBindable<double> HitPosition = null!;
 
-        private TextureAnimation? animation;
+        private Drawable? animation;
 
         public EzHoldNoteHittingLayer()
         {
@@ -54,10 +53,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 ClearTransforms();
 
-                if (hitting.NewValue && animation.IsNotNull() && animation.FrameCount > 0)
+                if (hitting.NewValue && animation != null)
                 {
                     Alpha = 1;
-                    animation.Restart();
+
+                    if (animation is TextureAnimation textureAnimation)
+                        textureAnimation.Restart();
                 }
                 else
                 {
@@ -83,14 +84,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
                 if (animation != null)
                 {
-                    if (animation.FrameCount > 0)
-                    {
-                        animation.Loop = true;
-                        AddInternal(animation);
-                        break;
-                    }
+                    if (animation is TextureAnimation textureAnimation)
+                        textureAnimation.Loop = true;
 
-                    animation.Dispose();
+                    AddInternal(animation);
+                    break;
                 }
             }
         }

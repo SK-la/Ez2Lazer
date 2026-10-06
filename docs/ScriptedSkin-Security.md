@@ -13,7 +13,8 @@ Ez2Lazer scripted skins (`.csx` under `EzResources/ScriptedSkin/`) are **trusted
 - Scripts are compiled with Roslyn and loaded with `Assembly.Load` in the game AppDomain. This is **not** a sandbox.
 - Blacklist checks are trivially bypassed (`global::System.IO.File`, type aliases, indirect calls).
 - Referenced game assemblies expose full game APIs (graphics, audio, configuration, Mania HUD, etc.).
-- `LoadScriptInfoAsync` may invoke static `CreateInfo()` during catalog scan; avoid side effects in constructors when possible.
+- Scripted skins are opt-in: with `EnableScriptedSkins` off (`EzSkinSettings.ini`), the `ScriptedSkin` directory is neither scanned nor watched, and no script is compiled. Turning it on requires a restart.
+- Catalog listing only reads directory names; a script is compiled (and its static `CreateInfo()` invoked) when the skin is first selected, not at startup. Still, avoid side effects in constructors/`CreateInfo()`.
 
 ## User expectations
 

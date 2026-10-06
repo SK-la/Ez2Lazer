@@ -13,22 +13,28 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public partial class ManiaHealthProcessor : LegacyDrainingHealthProcessor
     {
-        private static int row;
-
         /// <summary>
-        /// The health mode locked in for the current play session.
+        /// 本局冻结算式下的血量模式。未注入（无头 / 非 gameplay 路径）时按 <see cref="EzEnumHealthMode.Lazer"/> 处理。
         /// </summary>
-        public static EzEnumHealthMode ActiveHealthMode { get; private set; } = EzEnumHealthMode.Lazer;
+        /// <remarks>
+        /// 实例状态而非 static：同一进程内回放、录像、多规则集（BMS 复用 Mania 的 Drawable）会并存多个处理器，
+        /// static 会让后建的那个（甚至根本没建 Mania 处理器的 BMS 局）读到上一局的遗留值。
+        /// </remarks>
+        public EzEnumHealthMode ActiveHealthMode { get; private set; } = EzEnumHealthMode.Lazer;
+
+        private int row = switchHealthMode(EzEnumHealthMode.Lazer);
 
         public ManiaHealthProcessor(double drainStartTime)
             : base(drainStartTime)
         {
-            try
-            {
-                ActiveHealthMode = GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
-            }
-            catch { }
+        }
 
+        /// <summary>
+        /// 进局前读一次全局血量模式，之后局内行为一律读本实例的冻结值。
+        /// </summary>
+        public override void ApplyEzGameplayEnvironment()
+        {
+            ActiveHealthMode = GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             row = switchHealthMode(ActiveHealthMode);
         }
 
@@ -188,7 +194,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             return scaled;
         }
 
-        private int switchHealthMode(EzEnumHealthMode mode)
+        private static int switchHealthMode(EzEnumHealthMode mode)
         {
             int idx = (int)mode;
 

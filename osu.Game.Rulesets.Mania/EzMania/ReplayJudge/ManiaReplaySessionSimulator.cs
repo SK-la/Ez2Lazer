@@ -52,12 +52,34 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
             var headWasHit = new Dictionary<HeadNote, bool>();
             var keyHeldByColumn = new Dictionary<int, bool>();
+            var activeHoldByColumn = new Dictionary<int, HeadNote>();
             var ez2AcHoldStates = new Dictionary<HoldNote, Ez2AcHoldState>();
             var judgedTicks = new HashSet<HoldNoteTick>();
+
+            // 对齐局内 Column.ProcessAutoMiss：越过 late miss 边界立刻被动 Miss，
+            // 否则未命中会拖到 end-sweep，中段 combo 不断 → MaxCombo 虚高。
+            var autoMissQueue = buildAutoMissQueue(pressColumns, releaseColumns, environment.ManiaHitMode);
+            int autoMissCursor = 0;
 
             foreach (var input in inputData.SortedEvents)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                // 间隙内到期的被动 Miss 必须先于本次按键生效（否则 MaxCombo 会跨过空窗继续涨）。
+                // 与局内同帧「先输入、后 UpdateAfterChildren.ProcessAutoMiss」对齐：本帧 =t 的到期留到输入之后。
+                applyAutoMissesUpTo(
+                    input.Time,
+                    autoMissQueue,
+                    ref autoMissCursor,
+                    holdByHead,
+                    headByTail,
+                    activeHoldByColumn,
+                    inputData.PressTimesByColumn,
+                    scoreProcessor,
+                    gameplayRate,
+                    environment.ManiaHitMode,
+                    timelineRecorder,
+                    endExclusive: true);
 
                 bool wasHoldingBeforeEvent = keyHeldByColumn.TryGetValue(input.Column, out bool held) && held;
 
@@ -118,7 +140,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 if (!perColumnDict.TryGetValue(input.Column, out var laneStates))
                     continue;
 
-                if (judgementRound.IsO2Jam)
+                // 局内只在按下时刷新 press-time BPM（Column.OnPressed）；松手沿用按下那一刻的值，
+                // 尾判取的是同一份 BPM。
+                if (judgementRound.IsO2Jam && input.IsPress)
                     judgementRound.NotifyO2InputAt(input.Time);
 
                 hitWindowHelper.BPM = resolveSimulationBpm(beatmap, input.Time, environment.ManiaHitMode);
@@ -143,15 +167,38 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             timelineRecorder));
                 }
 
-                if (candidates.Count == 0)
+                LaneTargetState? activeTail = null;
+
+                if (!input.IsPress)
                 {
-                    // [parity] 松手落在候选窗口外也可能断连（局内断连不受窗口限制）。
-                    if (!input.IsPress)
+                    // 局内松手只作用于「此刻正按住的那条 LN」（Column.OnReleased → LaneController.ActiveHold），
+                    // 且 TryColumnHoldTailRelease 不再做优先级/note-lock 判定，故此处直接以该尾为目标：
+                    // 不能再走 selectCandidate 的 Earliest 阻挡检查，否则更晚的尾已开始（StartTime <= 松手时刻）
+                    // 会把本次松手否决，导致这条尾留到后续按键被 ForceMissEarlier 补成 Miss。
+                    activeTail = resolveActiveHoldTail(input.Column, activeHoldByColumn, holdByHead, wasHoldingBeforeEvent, candidates);
+
+                    activeHoldByColumn.Remove(input.Column);
+
+                    if (activeTail == null)
+                    {
+                        tryApplyEz2AcHoldRelease(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
                         tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
+                        continue;
+                    }
+                }
+
+                if (candidates.Count == 0 && activeTail == null)
+                {
+                    if (input.IsPress)
+                        tryRearmActiveHold(input.Column, input.Time, laneStates, releaseColumns, holdByHead, holdStrategy, activeHoldByColumn);
+                    // [parity] 松手落在候选窗口外也可能断连（局内断连不受窗口限制）。
+                    else
+                        tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
+
                     continue;
                 }
 
-                var selected = selectCandidate(
+                var selected = activeTail ?? selectCandidate(
                     candidates, laneStates, input.Time, environment);
 
                 if (selected == null || selected.Judged)
@@ -162,7 +209,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
                     }
                     else if (input.IsPress)
+                    {
                         tryApplyEz2AcHoldRepress(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
+                        tryRearmActiveHold(input.Column, input.Time, laneStates, releaseColumns, holdByHead, holdStrategy, activeHoldByColumn);
+                    }
 
                     continue;
                 }
@@ -179,7 +229,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 bool headHit = target is TailNote tailNote && headByTail.TryGetValue(tailNote, out var linkedHead)
                                                            && headWasHit.TryGetValue(linkedHead, out bool wasHit) && wasHit;
 
-                if (!input.IsPress && isTail && headHit && wasHoldingBeforeEvent && rawOffset < 0)
+                // 局内 OnReleased 先判尾、后写 Body，因此这一投看到的 Body 断连必然仍是 false：
+                // 由「提前松手」反推 HoldBroken 会把合法的提前松手压成 Meh（Common，Lazer/Classic）或直接否决（O2）。
+                // 仅 BMS 尾语义按自身规则消费 HoldBroken。
+                if (HitModeHelper.IsBMSHitMode(environment.ManiaHitMode) && !input.IsPress && isTail && headHit && wasHoldingBeforeEvent && rawOffset < 0)
                     selected.HoldBroken = true;
 
                 if (input.IsPress && target is HeadNote headNote && holdByHead.TryGetValue(headNote, out var hold))
@@ -242,7 +295,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             PillModeEnabled = pillModeEnabled,
                         });
 
-                        if (environment.ManiaHitMode == EzEnumHitMode.Lazer && result == HitResult.None)
+                        // Lazer / Classic 共用 CommonHoldJudgementStrategy（LazerHoldJudgementReplica）：
+                        // 窗口外一律返回 None，局内此时不判尾、仅由 Body 断连收束。
+                        if (!judgementRound.IsEzHitMode && result == HitResult.None)
                         {
                             // [parity] 本次松手未判定尾键 → 检查是否构成断连（Body ComboBreak）。
                             if (!input.IsPress)
@@ -309,15 +364,31 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                     forced.Judged = true;
                     forced.Result = HitResult.Miss;
+                    double forcedOffset = ComputeStoredTimeOffset(input.Time, forced.Target);
                     ApplyFinalResult(
                         scoreProcessor,
                         forced.Target,
                         HitResult.Miss,
-                        ComputeStoredTimeOffset(input.Time, forced.Target),
+                        forcedOffset,
                         input.Time,
                         gameplayRate,
                         environment.ManiaHitMode,
                         timelineRecorder);
+
+                    // 局内尾被补判 Miss 时同样会产出 Body ComboBreak 与父物件 IgnoreMiss；
+                    // 此处前推补判若漏掉，统计会比原始成绩少这两个辅助判定。
+                    if (forced.Target is TailNote forcedTail
+                        && headByTail.TryGetValue(forcedTail, out var forcedHead)
+                        && holdByHead.TryGetValue(forcedHead, out var forcedHold))
+                    {
+                        if (forcedHold.Body != null && !forced.BodyJudged)
+                        {
+                            forced.BodyJudged = true;
+                            ApplyAuxiliaryResult(scoreProcessor, forcedHold.Body, HitResult.ComboBreak, forcedOffset, input.Time, gameplayRate, timelineRecorder);
+                        }
+
+                        ApplyAuxiliaryResult(scoreProcessor, forcedHold, HitResult.IgnoreMiss, forcedOffset, input.Time, gameplayRate, timelineRecorder);
+                    }
                 }
 
                 selected.Judged = true;
@@ -363,6 +434,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 {
                     headWasHit[head] = result.IsHit();
 
+                    // 局内 DrawableHoldNote.beginHoldAndJudgeHead 先 beginHoldAt（ReportHoldState(true)）再判头，
+                    // 因此头即使判 Miss，只要按下落在头 miss 窗内就进入持有；「松手判尾」只要求 IsHolding。
+                    // 头 miss 时尾仍会被尾判封顶（!Head.IsHit），故此处不按头结果过滤。
+                    if (holdByHead.ContainsKey(head) && IsWithinHeadBeginHoldWindow(head, input.Time))
+                        activeHoldByColumn[head.Column] = head;
+
                     if (environment.ManiaHitMode == EzEnumHitMode.EZ2AC
                         && holdByHead.TryGetValue(head, out var judgedHold))
                     {
@@ -370,12 +447,41 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         state.OnHeadJudged(Ez2AcHitModeJudgement.FromHitResult(result), preHeld: wasHoldingBeforeEvent);
                     }
                 }
+
+                // 局内同帧：输入之后 Column.ProcessAutoMiss(Time.Current)。
+                applyAutoMissesUpTo(
+                    input.Time,
+                    autoMissQueue,
+                    ref autoMissCursor,
+                    holdByHead,
+                    headByTail,
+                    activeHoldByColumn,
+                    inputData.PressTimesByColumn,
+                    scoreProcessor,
+                    gameplayRate,
+                    environment.ManiaHitMode,
+                    timelineRecorder,
+                    endExclusive: false);
             }
 
             // 收尾：剩余 tick + EZ2AC 未判尾（持满不松）
             double endTime = inputData.SortedEvents.Count > 0
                 ? inputData.SortedEvents[^1].Time + 1
                 : beatmap.HitObjects.LastOrDefault()?.GetEndTime() ?? 0;
+
+            applyAutoMissesUpTo(
+                endTime + 10_000,
+                autoMissQueue,
+                ref autoMissCursor,
+                holdByHead,
+                headByTail,
+                activeHoldByColumn,
+                inputData.PressTimesByColumn,
+                scoreProcessor,
+                gameplayRate,
+                environment.ManiaHitMode,
+                timelineRecorder,
+                endExclusive: false);
 
             applyEz2AcTicksUpTo(
                 endTime + 10_000,
@@ -408,6 +514,128 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 map[hold] = state = new Ez2AcHoldState();
 
             return state;
+        }
+
+        private static List<(double Deadline, LaneTargetState State)> buildAutoMissQueue(
+            Dictionary<int, List<LaneTargetState>> pressColumns,
+            Dictionary<int, List<LaneTargetState>> releaseColumns,
+            EzEnumHitMode hitMode)
+        {
+            var queue = new List<(double Deadline, LaneTargetState State)>();
+
+            foreach (var list in pressColumns.Values.Concat(releaseColumns.Values))
+            {
+                foreach (var state in list)
+                    queue.Add((GetSessionAutoMissDeadline(state.Target, hitMode), state));
+            }
+
+            queue.Sort((a, b) => a.Deadline.CompareTo(b.Deadline));
+            return queue;
+        }
+
+        /// <summary>
+        /// 对齐局内 <see cref="ManiaLaneController.GetAutoMissEvaluationTime"/> + Tail 松手宽限下
+        /// <c>CanBeHit(offset / RELEASE_WINDOW_LENIENCE)</c> 首次失败的时刻。
+        /// </summary>
+        internal static double GetSessionAutoMissDeadline(HitObject target, EzEnumHitMode hitMode)
+        {
+            if (target.HitWindows == null || ReferenceEquals(target.HitWindows, HitWindows.Empty))
+                return target.GetEndTime();
+
+            // Note/Head：与 GetAutoMissEvaluationTime 一致（晚侧 Miss 窗起开始被动 Miss）。
+            // Tail：局内从 MissLate 起轮询，真正 Apply 在 !CanBeHit(offset/lenience) 时
+            // （LowestSuccessful=Meh），即 End + MehWindow * RELEASE_WINDOW_LENIENCE。
+            double missLate = target.HitWindows is ManiaHitWindows maniaWindows
+                ? maniaWindows.MissLateWindow
+                : target.HitWindows.WindowFor(HitResult.Miss);
+
+            double deadline = target.GetEndTime() + missLate;
+
+            if (target is TailNote && usesTailReleaseLenience(hitMode))
+            {
+                // CanBeHit 用 LowestSuccessful（Mania=Meh）；Tail 先 / lenience 再判断。
+                double canBeHitWindow = target.HitWindows.WindowFor(HitResult.Meh) * TailNote.RELEASE_WINDOW_LENIENCE;
+                deadline = Math.Max(deadline, target.GetEndTime() + canBeHitWindow);
+            }
+
+            return deadline;
+        }
+
+        private static void applyAutoMissesUpTo(
+            double time,
+            List<(double Deadline, LaneTargetState State)> autoMissQueue,
+            ref int autoMissCursor,
+            Dictionary<HeadNote, HoldNote> holdByHead,
+            Dictionary<TailNote, HeadNote> headByTail,
+            Dictionary<int, HeadNote> activeHoldByColumn,
+            IReadOnlyDictionary<int, List<double>> pressTimesByColumn,
+            ScoreProcessor scoreProcessor,
+            double gameplayRate,
+            EzEnumHitMode hitMode,
+            ManiaReplayTimelineRecorder? timelineRecorder,
+            bool endExclusive = false)
+        {
+            while (autoMissCursor < autoMissQueue.Count
+                   && (endExclusive
+                       ? autoMissQueue[autoMissCursor].Deadline < time
+                       : autoMissQueue[autoMissCursor].Deadline <= time))
+            {
+                var (deadline, state) = autoMissQueue[autoMissCursor];
+                autoMissCursor++;
+
+                if (state.Judged)
+                    continue;
+
+                state.Judged = true;
+                state.Result = HitResult.Miss;
+
+                double missEventTime = deadline;
+                double storedOffset = ResolveMissStoredOffset(state.Target, pressTimesByColumn, missEventTime);
+
+                ApplyFinalResult(
+                    scoreProcessor,
+                    state.Target,
+                    HitResult.Miss,
+                    storedOffset,
+                    missEventTime,
+                    gameplayRate,
+                    hitMode,
+                    timelineRecorder);
+
+                clearActiveHoldAfterPassiveMiss(state.Target, headByTail, activeHoldByColumn);
+
+                if (state.Target is TailNote tailNote
+                    && headByTail.TryGetValue(tailNote, out var linkedHead)
+                    && holdByHead.TryGetValue(linkedHead, out var hold))
+                {
+                    if (hold.Body != null && !state.BodyJudged)
+                    {
+                        state.BodyJudged = true;
+                        ApplyAuxiliaryResult(scoreProcessor, hold.Body, HitResult.ComboBreak, storedOffset, missEventTime, gameplayRate, timelineRecorder);
+                    }
+
+                    ApplyAuxiliaryResult(scoreProcessor, hold, HitResult.IgnoreMiss, storedOffset, missEventTime, gameplayRate, timelineRecorder);
+                }
+            }
+        }
+
+        private static void clearActiveHoldAfterPassiveMiss(
+            HitObject target,
+            Dictionary<TailNote, HeadNote> headByTail,
+            Dictionary<int, HeadNote> activeHoldByColumn)
+        {
+            HeadNote? head = target switch
+            {
+                HeadNote h => h,
+                TailNote t when headByTail.TryGetValue(t, out var linked) => linked,
+                _ => null,
+            };
+
+            if (head == null)
+                return;
+
+            if (activeHoldByColumn.TryGetValue(head.Column, out var active) && ReferenceEquals(active, head))
+                activeHoldByColumn.Remove(head.Column);
         }
 
         private static void tryApplyEz2AcHoldRelease(
@@ -653,6 +881,108 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 inputTime,
                 environment.JudgePrecedence,
                 HitModeHelper.IsBMSHitMode(environment.ManiaHitMode));
+        }
+
+        /// <summary>
+        /// 定位「此刻正按住的那条 LN」的尾候选，等价于局内 <c>Column.OnReleased</c> 读到的 <c>LaneController.ActiveHold</c>。
+        /// </summary>
+        /// <remarks>
+        /// 仅当该尾落在本次候选窗口内（即局内 <c>Tail.UpdateResult()</c> 会产生判定）时才返回；
+        /// 窗口外局内不判定尾、只由 Body 断连收束，故返回 null 让调用方走断连分支并保持尾未判（留给 auto-miss）。
+        /// 返回 null 表示本次松手不判任何尾（局内该分支不会去够同列相邻 LN）。
+        /// </remarks>
+        private static LaneTargetState? resolveActiveHoldTail(
+            int column,
+            Dictionary<int, HeadNote> activeHoldByColumn,
+            Dictionary<HeadNote, HoldNote> holdByHead,
+            bool wasHolding,
+            IReadOnlyList<LaneTargetState> candidates)
+        {
+            // 局内要求 activeHold.IsHolding：未持有（松手时 reading 为 false）时 OnReleased 不判尾。
+            if (!wasHolding || !activeHoldByColumn.TryGetValue(column, out var activeHead))
+                return null;
+
+            if (!holdByHead.TryGetValue(activeHead, out var activeHold))
+                return null;
+
+            foreach (var state in candidates)
+            {
+                if (ReferenceEquals(state.Target, activeHold.Tail))
+                    return state;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 局内 <c>DrawableHoldNote.OnPressed</c> 的重臂路径：列路由未选中目标时
+        /// （<c>ShouldSkipColumnRoutedPress</c> 仅在列已路由到目标时为真），drawable 自身仍会执行
+        /// <c>TryBeginHoldPress → beginHoldAt</c>，对「头已判定但尾未收束」的 LN 重新 <c>ReportHoldState(true)</c>。
+        /// Session 若不补这一步，「断连后重按、再到尾松手」会漏判尾（局内为 Meh，Session 会落成 Miss）。
+        /// </summary>
+        private static void tryRearmActiveHold(
+            int column,
+            double time,
+            IReadOnlyList<LaneTargetState> pressLaneStates,
+            IReadOnlyDictionary<int, List<LaneTargetState>> releaseColumns,
+            Dictionary<HeadNote, HoldNote> holdByHead,
+            IManiaHoldJudgementStrategy holdStrategy,
+            Dictionary<int, HeadNote> activeHoldByColumn)
+        {
+            if (!releaseColumns.TryGetValue(column, out var releaseStates))
+                return;
+
+            HeadNote? rearmed = null;
+            double rearmedHeadStart = double.PositiveInfinity;
+
+            foreach (var state in pressLaneStates)
+            {
+                // 仅头已判定的 LN 需要重臂；头未判定者由常规候选路径处理。
+                if (state.Target is not HeadNote head || !state.Judged)
+                    continue;
+
+                if (!holdByHead.TryGetValue(head, out var hold))
+                    continue;
+
+                if (!holdStrategy.CanBeginHoldAt(time, hold.Tail))
+                    continue;
+
+                if (!IsWithinHeadBeginHoldWindow(head, time))
+                    continue;
+
+                bool tailJudged = false;
+
+                foreach (var releaseState in releaseStates)
+                {
+                    if (ReferenceEquals(releaseState.Target, hold.Tail))
+                    {
+                        tailJudged = releaseState.Judged;
+                        break;
+                    }
+                }
+
+                // 尾已判定 → 局内父物件已收束，不再重臂。
+                if (tailJudged)
+                    continue;
+
+                if (head.StartTime < rearmedHeadStart)
+                {
+                    rearmed = head;
+                    rearmedHeadStart = head.StartTime;
+                }
+            }
+
+            if (rearmed != null)
+                activeHoldByColumn[column] = rearmed;
+        }
+
+        /// <summary>
+        /// 对齐 <c>DrawableHoldNote.beginHoldAt</c> 的守卫：按下早于头 Miss 窗左界时不进入持有。
+        /// </summary>
+        private static bool IsWithinHeadBeginHoldWindow(HeadNote head, double time)
+        {
+            double missWindow = head.HitWindows?.WindowFor(HitResult.Miss) ?? 0;
+            return time - head.StartTime >= -missWindow;
         }
 
         private static IEnumerable<LaneTargetState> collectCandidatesForInput(

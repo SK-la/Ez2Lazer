@@ -2,6 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
@@ -13,6 +15,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
+using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Judgements;
@@ -25,7 +28,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.HUD
 {
-    public partial class EzHUDHitResultScore : CompositeDrawable, ISerialisableDrawable //, IPreviewable //, IAnimatableJudgement
+    public partial class EzHUDHitResultScore : CompositeDrawable, ISerialisableDrawable, IEzGameplayWarmUp //, IPreviewable //, IAnimatableJudgement
     {
         public bool UsesFixedAnchor { get; set; }
 
@@ -99,6 +102,9 @@ namespace osu.Game.EzOsuGame.HUD
         private EzResourceStore resources { get; set; } = null!;
 
         [Resolved]
+        private EzGameplayWarmUpService warmUpService { get; set; } = null!;
+
+        [Resolved]
         private ScoreProcessor processor { get; set; } = null!;
 
         [Resolved]
@@ -121,6 +127,10 @@ namespace osu.Game.EzOsuGame.HUD
         private void load()
         {
             AlwaysPresent = true;
+
+            // 在 BDL（而不是 LoadComplete）里登记：PlayerLoader 门控是在 Player 达到 `Ready` 时取快照的，
+            // 而 LoadComplete 跑在 `Ready` 之后，那时登记就已经晚了一帧、会被漏掉。
+            warmUpService.Register(this);
 
             themeName = ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
             themeName.BindValueChanged(e =>
@@ -228,96 +238,15 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected Drawable CreateJudgementTexture(HitResult result)
         {
-            string resultName = getHitResultToString(result);
-            string name = ThemeName.Value.ToString();
-
-            string baseDir = $@"GameTheme/{name}/judgement/";
-
-            // 尝试多种大小写变体以处理文件名大小写不确定性
-            string[] possibleResultNames = { resultName, resultName.ToLowerInvariant(), resultName.ToUpperInvariant() };
-
             double frameLength = 1000.0 / FPS.Value;
-            string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/frame_{0}";
 
-            // 首先尝试加载原始判定资源
-            foreach (string rn in possibleResultNames)
+            hitAnimation = probeJudgementDrawable(result, ThemeName.Value.ToString(),
+                AnimationFrameTemplate.Value?.Trim() ?? "{result}/frame_{0}", frameLength, resolveActiveTemplate());
+
+            if (hitAnimation != null)
             {
-                if (string.IsNullOrEmpty(rn))
-                    continue;
-
-                string basePath = $@"{baseDir}{rn}";
-
-                hitAnimation = resources.GetAnimation(
-                    basePath,
-                    animatable: true,
-                    looping: false,
-                    startAtCurrentTime: true,
-                    frameLength: frameLength);
-
-                if (hitAnimation != null)
-                {
-                    configureJudgementDrawable(result, hitAnimation, frameLength);
-                    return hitAnimation;
-                }
-
-                hitAnimation = resources.GetAnimationFromTemplate(
-                    baseDir,
-                    rn,
-                    template,
-                    looping: false,
-                    startAtCurrentTime: true,
-                    frameLength: frameLength);
-
-                if (hitAnimation != null)
-                {
-                    configureJudgementDrawable(result, hitAnimation, frameLength);
-                    return hitAnimation;
-                }
-            }
-
-            // 如果原始资源找不到，尝试回退逻辑
-            var activeTemplate = resolveActiveTemplate();
-            string fallbackName = EzHitResultNameTemplate.GetFallbackResourceName(activeTemplate, result);
-
-            if (!string.IsNullOrEmpty(fallbackName))
-            {
-                // 尝试加载回退资源
-                string[] possibleFallbackNames = { fallbackName, fallbackName.ToLowerInvariant(), fallbackName.ToUpperInvariant() };
-
-                foreach (string fn in possibleFallbackNames)
-                {
-                    if (string.IsNullOrEmpty(fn))
-                        continue;
-
-                    string fallbackPath = $@"{baseDir}{fn}";
-
-                    hitAnimation = resources.GetAnimation(
-                        fallbackPath,
-                        animatable: true,
-                        looping: false,
-                        startAtCurrentTime: true,
-                        frameLength: frameLength);
-
-                    if (hitAnimation != null)
-                    {
-                        configureJudgementDrawable(result, hitAnimation, frameLength);
-                        return hitAnimation;
-                    }
-
-                    hitAnimation = resources.GetAnimationFromTemplate(
-                        baseDir,
-                        fn,
-                        template,
-                        looping: false,
-                        startAtCurrentTime: true,
-                        frameLength: frameLength);
-
-                    if (hitAnimation != null)
-                    {
-                        configureJudgementDrawable(result, hitAnimation, frameLength);
-                        return hitAnimation;
-                    }
-                }
+                configureJudgementDrawable(result, hitAnimation, frameLength);
+                return hitAnimation;
             }
 
             // 所有尝试都失败，返回空动画（跳过显示）
@@ -329,6 +258,40 @@ namespace osu.Game.EzOsuGame.HUD
                 Alpha = 0 // 完全透明，不显示
             };
         }
+
+        /// <summary>
+        /// 判定纹理的探测：原名与回退名各解析一次，命中即停。
+        /// </summary>
+        /// <remarks>
+        /// 进局（<see cref="CreateJudgementTexture"/>）与进图预热共用这一份，避免两套探测逻辑漂移——
+        /// 漂移会让预热解码出进局用不到的帧、或漏掉进局真正要用的那一条。
+        /// 这里刻意不读写组件字段、不做 configure / 播放，所以预热侧可以安全调用后直接 Dispose。
+        /// </remarks>
+        private Drawable? probeJudgementDrawable(HitResult result, string theme, string template, double frameLength, EzEnumHitMode activeTemplate)
+        {
+            return probeJudgementVariant(theme, EzHitResultNameTemplate.GetResourceName(activeTemplate, result), template, frameLength)
+                   ?? probeJudgementVariant(theme, EzHitResultNameTemplate.GetFallbackResourceName(activeTemplate, result), template, frameLength);
+        }
+
+        /// <summary>
+        /// 单个资源名：按层2 一次解析（显式模板为空即三模板默认），大小写由资源索引统一负责。
+        /// </summary>
+        private Drawable? probeJudgementVariant(string theme, string resultName, string template, double frameLength)
+        {
+            if (string.IsNullOrEmpty(resultName))
+                return null;
+
+            return resources.GetAnimation(buildJudgementRequest(theme, resultName, template), looping: false, startAtCurrentTime: true, frameLength: frameLength);
+        }
+
+        /// <summary>
+        /// 判定动画请求；进局与预热构造同一份请求，故解析与解码都命中同一缓存。
+        /// </summary>
+        private static EzAnimationRequest buildJudgementRequest(string theme, string resultName, string template) => new EzAnimationRequest
+        {
+            Path = $"GameTheme/{theme}/judgement/{resultName}",
+            FrameTemplate = string.IsNullOrWhiteSpace(template) ? null : template,
+        };
 
         private void configureJudgementDrawable(HitResult result, Drawable drawable, double frameLength)
         {
@@ -366,9 +329,56 @@ namespace osu.Game.EzOsuGame.HUD
         private EzEnumHitMode resolveActiveTemplate()
             => AutoMapHitMode.Value ? maniaHitModeConfig.Value : HitModeTemplate.Value;
 
-        // 如果考虑拓展能力，则倾向nameof(HitResult)，并回退到这个方法
-        private string getHitResultToString(HitResult hitResult)
-            => EzHitResultNameTemplate.GetResourceName(resolveActiveTemplate(), hitResult);
+        #region 自述预热
+
+        /// <summary>可能出现的判定结果；预热只针对这些做帧探测。</summary>
+        private static readonly HitResult[] warm_up_results =
+        {
+            HitResult.Perfect,
+            HitResult.Great,
+            HitResult.Good,
+            HitResult.Ok,
+            HitResult.Meh,
+            HitResult.Miss,
+            HitResult.Poor,
+        };
+
+        /// <summary>
+        /// 把 <c>GameTheme/{theme}/judgement/*</c> 与 <c>FullCombo/full-combo</c> 的帧解码提前到 PlayerLoader 期间。
+        /// </summary>
+        /// <remarks>
+        /// 这些资源原先只在**首次**判定/首个满连时才被解码，表现为进局后第一次判定 update/draw 各掉一帧。
+        /// 这里按当前 <see cref="ThemeName"/> / <see cref="AnimationFrameTemplate"/> / 生效的 HitMode 模板
+        /// 复刻 <see cref="CreateJudgementTexture"/> 的探测路径（含回退名），在线程池里完成解码。
+        /// </remarks>
+        public Task WarmUpAsync(CancellationToken cancellationToken)
+        {
+            // 与 CreateJudgementTexture 取同一来源：那是组件自己的 ThemeName 设置，不一定是全局配置。
+            string theme = ThemeName.Value.ToString();
+            string template = AnimationFrameTemplate.Value?.Trim() ?? "{result}/frame_{0}";
+            double frameLength = 1000.0 / FPS.Value;
+            EzEnumHitMode activeTemplate = resolveActiveTemplate();
+
+            return Task.Run(() => warmUpJudgementResources(theme, template, frameLength, activeTemplate, cancellationToken), cancellationToken);
+        }
+
+        private void warmUpJudgementResources(string theme, string template, double frameLength, EzEnumHitMode activeTemplate, CancellationToken cancellationToken)
+        {
+            foreach (HitResult result in warm_up_results)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+
+                // 与进局走同一份探测（命中即停）：解出来的必然是进局会命中的那一条，
+                // 既不会多探后面那些永远用不到的变体 / 回退名，也不会漏掉真正要用的。
+                probeJudgementDrawable(result, theme, template, frameLength, activeTemplate)?.Dispose();
+            }
+
+            // checkFullCombo 直接取 FullCombo/full-combo（不带 GameTheme 前缀）。
+            resources.GetAnimation(@"FullCombo/full-combo", looping: false)?.Dispose();
+        }
+
+        #endregion
 
         private void invalidateCurrentAnimation()
         {
@@ -565,6 +575,9 @@ namespace osu.Game.EzOsuGame.HUD
         protected override void Dispose(bool isDisposing)
         {
             processor.NewJudgement -= processorNewJudgement;
+
+            if (isDisposing)
+                warmUpService.Unregister(this);
 
             if (gameplayClockContainer != null)
                 gameplayClockContainer.OnSeek -= Clear;

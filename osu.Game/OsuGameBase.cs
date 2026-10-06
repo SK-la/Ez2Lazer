@@ -54,6 +54,7 @@ using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
@@ -221,6 +222,8 @@ namespace osu.Game
 
         protected EzResourceStore EzResourceStore { get; private set; }
 
+        protected EzGameplayWarmUpService EzGameplayWarmUp { get; private set; }
+
         protected IEzReplaySession ReplaySession { get; private set; }
 
         private Bindable<FrameSync> ezUpdateFrameLimiter = null!;
@@ -351,6 +354,7 @@ namespace osu.Game
             dependencies.CacheAs(EzResourceStore = new EzResourceStore(Ez2ConfigManager, Host.Renderer, Audio, Storage, realm));
             dependencies.CacheAs<IStorageResourceProvider>(EzResourceStore);
             dependencies.Cache(new EzLocalTextureFactory(Ez2ConfigManager, EzResourceStore));
+            dependencies.Cache(EzGameplayWarmUp = new EzGameplayWarmUpService());
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
 
@@ -370,6 +374,8 @@ namespace osu.Game
             dependencies.CacheAs(LocalConfig);
             dependencies.CacheAs<IGameplaySettings>(LocalConfig);
 
+            // The catalog scan opens every installed font; reuse the persisted name map when possible.
+            EzSystemFontCatalog.AttachCache(Storage);
             InitialiseFonts();
             EzUiFontBootstrap.Apply(this, Ez2ConfigManager);
 
@@ -377,7 +383,7 @@ namespace osu.Game
 
             Audio.Samples.PlaybackConcurrency = SAMPLE_CONCURRENCY;
 
-            dependencies.Cache(SkinManager = new SkinManager(Storage, realm, Host, Resources, Audio, Scheduler));
+            dependencies.Cache(SkinManager = new SkinManager(Storage, realm, Host, Resources, Audio, Scheduler, Ez2ConfigManager));
             dependencies.CacheAs<ISkinSource>(SkinManager);
 
             EndpointConfiguration endpoints = CreateEndpoints();
@@ -414,7 +420,7 @@ namespace osu.Game
             dependencies.Cache(ezAnalysisPersistentStore);
             dependencies.Cache(ezAnalysisDatabase);
             dependencies.Cache(ezAnalysisCache = new EzAnalysisCache());
-            ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets);
+            ReplaySession = new EzReplaySessionRouter(RulesetStore.AvailableRulesets, BeatmapManager);
             dependencies.CacheAs<IEzReplaySession>(ReplaySession);
 
             // Skill metrics: MSD (beatmap), SSR + Dan (player). Read via EzSkillProvider; writers stay separate.

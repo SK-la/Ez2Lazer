@@ -106,6 +106,22 @@ namespace osu.Game.Rulesets.UI
         }
 
         /// <summary>
+        /// 下一颗未判定物件还太远、或本容器已无未判定物件时，退回取样的对象。
+        /// </summary>
+        /// <param name="nextUnjudged">下一颗未判定物件；已无未判定物件时为 <c>null</c>。</param>
+        /// <param name="referenceTime">当前参考时间（与物件开始时间同一时间轴）。</param>
+        /// <remarks>
+        /// 上游语义：还有未判定物件（只是太远）时沿用当前取样对象，没有则退回本容器第一项；已无未判定物件时退回最后一项。
+        /// </remarks>
+        protected virtual HitObjectLifetimeEntry? FindFallbackEntry(HitObjectLifetimeEntry? nextUnjudged, double referenceTime)
+        {
+            if (nextUnjudged == null)
+                return findLastEntry();
+
+            return mostValidObject ?? findFirstEntry();
+        }
+
+        /// <summary>
         /// 取「下一个最该发声的物件」。
         /// </summary>
         /// <remarks>
@@ -124,21 +140,15 @@ namespace osu.Game.Rulesets.UI
                     findEarliestNonJudged(hitObjectContainer.AliveEntries.Keys)
                     ?? findEarliestNonJudged(hitObjectContainer.Entries);
 
-                // In the case there are no non-judged objects, the last hit object should be used instead.
-                if (candidate == null)
+                if (candidate != null && isCloseEnoughToCurrentTime(candidate.HitObject))
                 {
-                    mostValidObject = findLastEntry();
+                    mostValidObject = candidate;
                 }
                 else
                 {
-                    if (isCloseEnoughToCurrentTime(candidate.HitObject))
-                    {
-                        mostValidObject = candidate;
-                    }
-                    else
-                    {
-                        mostValidObject ??= findFirstEntry();
-                    }
+                    // Either there is no non-judged object left, or the next one is still too far away;
+                    // let the ruleset pick what to sample instead.
+                    mostValidObject = FindFallbackEntry(candidate, getReferenceTime());
                 }
             }
 
@@ -200,6 +210,42 @@ namespace osu.Game.Rulesets.UI
                 last = entry;
 
             return last;
+        }
+
+        /// <summary>
+        /// 取本容器中「最近一颗已经过线的物件」：开始时间不晚于 <paramref name="time"/> 的最晚一项；
+        /// 尚无物件过线（按键早于本列第一颗）时取开始时间最早的一颗。
+        /// </summary>
+        /// <remarks>
+        /// <paramref name="time"/> 是时钟时间，与物件的开始时间是同一时间轴。
+        /// </remarks>
+        protected HitObjectLifetimeEntry? FindLatestPassedEntry(double time)
+        {
+            HitObjectLifetimeEntry? latestPassed = null;
+            HitObjectLifetimeEntry? earliest = null;
+            double latestPassedStartTime = double.MinValue;
+            double earliestStartTime = double.MaxValue;
+
+            foreach (var entry in hitObjectContainer.Entries)
+            {
+                double startTime = entry.HitObject.StartTime;
+
+                if (startTime <= time)
+                {
+                    if (startTime > latestPassedStartTime)
+                    {
+                        latestPassedStartTime = startTime;
+                        latestPassed = entry;
+                    }
+                }
+                else if (startTime < earliestStartTime)
+                {
+                    earliestStartTime = startTime;
+                    earliest = entry;
+                }
+            }
+
+            return latestPassed ?? earliest;
         }
 
         private readonly Stack<HitObject> nestedSearchStack = new Stack<HitObject>();

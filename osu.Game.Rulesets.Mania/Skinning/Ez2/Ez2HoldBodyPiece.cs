@@ -3,11 +3,13 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -15,14 +17,30 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    public partial class Ez2HoldBodyPiece : CompositeDrawable, IHoldNoteBody
+    public partial class Ez2HoldBodyPiece : FastNoteBase, IHoldNoteBody
     {
-        private IBindable<Color4> accentColour = null!;
+        /// <summary>
+        /// 本列当前颜色的 live 副本，供按住高亮层（<see cref="Ez2HoldNoteHittingLayer"/>）在松手后还原。
+        /// </summary>
+        public IBindable<Color4> LiveColour => liveColour;
+
+        private readonly Bindable<Color4> liveColour = new Bindable<Color4>();
 
         private Drawable background = null!;
         private Container tailContainer = null!;
 
         private Ez2HoldNoteHittingLayer hittingLayer = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
+        private StageDefinition stageDefinition { get; set; } = null!;
+
+        // 10k2s1p 开启时用 Ez 内置色彩模板，关闭时回到 FastNoteBase 的编辑器列色。
+        protected override IBindable<bool>? BuiltInColourTemplateSwitch => ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
+
+        protected override Colour4 BuiltInColourTemplate => stageDefinition.GetColourForLayout(Column.Index);
 
         public Ez2HoldBodyPiece()
         {
@@ -30,13 +48,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.BottomCentre;
             Masking = true;
-            Colour = ColourInfo.GradientVertical(Color4.White.Opacity(0.35f), Color4.White.Opacity(1.0f));
+            Colour = ColourInfo.GradientVertical(Colour4.White.Opacity(0.35f), Colour4.White.Opacity(1.0f));
         }
 
         [BackgroundDependencyLoader(true)]
         private void load(DrawableHitObject? drawableObject)
         {
-            InternalChildren = new Drawable[]
+            MainContainer.Children = new Drawable[]
             {
                 new Container
                 {
@@ -70,30 +88,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         }
                     }
                 },
-                hittingLayer = new Ez2HoldNoteHittingLayer(this)
             };
 
-            if (drawableObject != null)
-            {
-                var holdNote = (DrawableHoldNote)drawableObject;
+            hittingLayer = new Ez2HoldNoteHittingLayer(this);
+            hittingLayer.BindAccentColour(LiveColour);
+            AddInternal(hittingLayer);
 
-                accentColour = holdNote.AccentColour;
-                hittingLayer.BindAccentColour(holdNote.AccentColour);
+            if (drawableObject is DrawableHoldNote holdNote)
                 ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNote.IsHolding);
-            }
+        }
 
-            accentColour.BindValueChanged(colour =>
-            {
-                background.Colour = colour.NewValue.Darken(0.0f).Opacity(1f);
-                tailContainer.Colour = ColourInfo.GradientVertical(colour.NewValue.Opacity(1f), colour.NewValue.Opacity(1f));
-                // background.Colour = new ColourInfo
-                // {
-                //     TopLeft = colour.NewValue.Opacity(1.0f),
-                //     TopRight = colour.NewValue.Opacity(1.0f),
-                //     BottomLeft = colour.NewValue.Opacity(1.0f),
-                //     BottomRight = colour.NewValue.Opacity(0.05f)
-                // };
-            }, true);
+        protected override void UpdateColor()
+        {
+            var noteColour = NoteColor;
+
+            liveColour.Value = noteColour;
+
+            background.Colour = noteColour.Opacity(1f);
+            tailContainer.Colour = ColourInfo.GradientVertical(noteColour.Opacity(1f), noteColour.Opacity(1f));
         }
 
         protected override void Update()

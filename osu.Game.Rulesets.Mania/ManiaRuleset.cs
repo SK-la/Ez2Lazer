@@ -18,7 +18,9 @@ using osu.Game.EzOsuGame.BeatmapPools;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Rulesets.Mania.EzMania.Editor;
+using osu.Game.Rulesets.Mania.EzMania.WarmUp;
 using osu.Game.Localisation;
 using osu.Game.Localisation.Mania;
 using osu.Game.Overlays.Settings;
@@ -61,7 +63,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania
 {
-    public partial class ManiaRuleset : Ruleset, ILegacyRuleset
+    public partial class ManiaRuleset : Ruleset, ILegacyRuleset, IEzGameplayWarmUpSource
     {
         static ManiaRuleset()
         {
@@ -130,6 +132,28 @@ namespace osu.Game.Rulesets.Mania
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// 规则集侧自述预热：按当前皮肤产出 gameplay 组件离屏加载，供 <see cref="osu.Game.Screens.Play.PlayerLoader"/> 门控等待。
+        /// </summary>
+        /// <param name="skin">当前皮肤。</param>
+        /// <param name="beatmapInfo">当前谱面元数据。</param>
+        /// <param name="mods">本局 mods（key mod 会改键数，进而改列宽 / 布局尺度）。</param>
+        /// <remarks>
+        /// 键数只从元数据算（<see cref="GetKeyCount"/> 读 Realm 里的 CircleSize / 对象计数），
+        /// 然后现搭一个只含 Stage 的 <see cref="ManiaBeatmap"/>：预热要的只是「组件树 + 布局尺度」，
+        /// 不碰谱面内容——解码 / 转换一张图的代价远大于它省下的那几帧纹理解码。
+        /// 各皮肤 transformer 只用这个 beatmap 取 Stage / TotalColumns（列色、列宽），不读 HitObject。
+        /// </remarks>
+        public Drawable? CreateWarmUpDrawable(ISkin? skin, IBeatmapInfo? beatmapInfo, IReadOnlyList<Mod> mods)
+        {
+            if (skin == null || beatmapInfo == null)
+                return null;
+
+            int keyCount = Math.Max(1, GetKeyCount(beatmapInfo, mods));
+
+            return new ManiaGameplayWarmUpDrawable(this, skin, new ManiaBeatmap(new StageDefinition(keyCount)));
         }
 
         public override IEnumerable<Mod> ConvertFromLegacyMods(LegacyMods mods)

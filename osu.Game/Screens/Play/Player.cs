@@ -317,6 +317,12 @@ namespace osu.Game.Screens.Play
             if (game != null)
                 gameActive.BindTo(game.IsActive);
 
+            // [Ez] 进局前一口断定：诊断与结算流程
+            // 时序追踪都在这里读一次。之后局内任何代码只读冻结值、不再读配置，所以没有「运行到某处才发现
+            // 现在能不能用」的分支。放在这里而不是启动时，是为了让设置改完下一局即生效；热路径代价不变。
+            EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
+            EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
+
             DrawableRuleset = ruleset.CreateDrawableRulesetWith(playableBeatmap, gameplayMods);
             dependencies.CacheAs(DrawableRuleset);
 
@@ -340,13 +346,12 @@ namespace osu.Game.Screens.Play
                 LatencyTracker.Start();
             }
 
-            // [Ez] Wire judgment diagnostics, sub-frame correction, and timing trace to config toggles.
-            EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
             EzOsuGame.Timing.EzSubFrameCorrection.Enabled = ez2Config.Get<bool>(Ez2Setting.EzSubFrameCorrectionEnabled);
-            EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
 
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
             HealthProcessor ??= ruleset.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
+            // [Ez] 与 ScoreProcessor 同源：冻结当前全局游玩环境（血量模式等）；必须先于 ApplyBeatmap。
+            HealthProcessor.ApplyEzGameplayEnvironment();
             HealthProcessor.ApplyBeatmap(playableBeatmap);
 
             dependencies.CacheAs(HealthProcessor);
@@ -1059,7 +1064,9 @@ namespace osu.Game.Screens.Play
             if (!ScoreProcessor.HasCompleted.Value)
             {
                 ezForceResultsImport = true;
-                EzOsuGame.Diagnostics.EzTimingTrace.Record("ForceResults.BypassHasCompleted", "HasCompleted still false after force completion");
+                EzOsuGame.Diagnostics.EzTimingTrace.Record(
+                    "ForceResults.BypassHasCompleted",
+                    $"judged={ScoreProcessor.JudgedHits}/{ScoreProcessor.MaximumJudgements} hasCompleted={ScoreProcessor.HasCompleted.Value}");
             }
 
             if (forceFailGrade)
@@ -1076,7 +1083,7 @@ namespace osu.Game.Screens.Play
 
             EzOsuGame.Diagnostics.EzTimingTrace.Record(
                 "ForceResults.End",
-                $"hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed} rank={ScoreProcessor.Rank.Value}");
+                $"judged={ScoreProcessor.JudgedHits}/{ScoreProcessor.MaximumJudgements} hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed} bypass={ezForceResultsImport} rank={ScoreProcessor.Rank.Value}");
         }
 
         /// <summary>
@@ -1574,10 +1581,11 @@ namespace osu.Game.Screens.Play
 
             if (score.ScoreInfo.Ruleset.IsLegacyRuleset())
             {
+                // Internal source of truth: absolute-time frames. Round .osr is produced only on user export.
                 using (var stream = new MemoryStream())
                 {
-                    new LegacyScoreEncoder(score, GameplayState.Beatmap).Encode(stream);
-                    replayReader = new ByteArrayArchiveReader(stream.ToArray(), "replay.osr");
+                    EzHighPrecisionReplayFrames.Write(stream, score, GameplayState.Beatmap);
+                    replayReader = new ByteArrayArchiveReader(stream.ToArray(), EzHighPrecisionReplayFrames.FILENAME);
                 }
             }
 
@@ -1590,7 +1598,7 @@ namespace osu.Game.Screens.Play
             var imported = scoreManager.Import(importableScore, replayReader);
             Debug.Assert(imported != null);
 
-            imported.PerformRead(s =>
+            imported!.PerformRead(s =>
             {
                 // because of the clone above, it's required that we copy back the post-import hash/ID to use for availability matching.
                 score.ScoreInfo.Hash = s.Hash;

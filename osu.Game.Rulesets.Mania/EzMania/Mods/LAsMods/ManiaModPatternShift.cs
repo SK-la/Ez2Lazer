@@ -27,6 +27,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
     {
         private const double min_column_spacing_ms = 8;
 
+        private static readonly int[] DENSE_SUBDIVISIONS = [2, 4, 8, 16];
+        private static readonly int[] SPARSE_SUBDIVISIONS = [2, 4, 8];
+
         public override string Name => "Pattern Shift";
 
         public override string Acronym => "PS";
@@ -179,16 +182,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             if (chord.Notes.Count <= newSize)
                 return;
 
-            chord.Notes = chord.Notes.OrderBy(n => n.SourceColumn).ToList();
+            // buildChords 按 (StartTime, SourceColumn) 保序建组，这里通常已经是升序；只有真被改乱才付排序钱。
+            if (!isAscendingBySourceColumn(chord.Notes))
+                chord.Notes = chord.Notes.OrderBy(n => n.SourceColumn).ToList();
 
-            while (chord.Notes.Count > newSize)
-                chord.Notes.RemoveAt(0);
+            chord.Notes.RemoveRange(0, chord.Notes.Count - newSize);
         }
 
         private static void applyDelay(List<PatternShiftChord> chords, ControlPointInfo controlPoints, int delayLevel, Random rng)
         {
             if (delayLevel <= 0)
                 return;
+
+            // stackalloc 必须留在循环外，否则多个 chord 会让栈帧持续增长（CA2014）。
+            int maxChordNotes = 0;
+
+            foreach (var chord in chords)
+                maxChordNotes = Math.Max(maxChordNotes, chord.Notes.Count);
+
+            Span<int> keys = maxChordNotes <= 64 ? stackalloc int[maxChordNotes] : new int[maxChordNotes];
+            Span<bool> picked = maxChordNotes <= 64 ? stackalloc bool[maxChordNotes] : new bool[maxChordNotes];
 
             foreach (var chord in chords)
             {
@@ -201,11 +214,33 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 double beatLength = controlPoints.TimingPointAt(chord.Time).BeatLength;
                 double offsetAmount = beatLength * ManiaKeyPatternHelp.GetDelayBeatFraction(delayLevel);
 
-                var indexes = Enumerable.Range(0, noteCount).OrderBy(_ => rng.Next()).Take(maxShift).ToList();
+                // 等价于 Enumerable.Range(0, noteCount).OrderBy(_ => rng.Next()).Take(maxShift)：
+                // 先按下标顺序各抽一次随机数，再取 key 最小（并列取小下标）的 maxShift 个。
+                // 手写的原因是这个式子原来每个 chord 都要分配 Range 迭代器、排序缓冲和结果 List，
+                // 而 chord 本身很小（≤ 键数），随机数消费次数却必须逐次对齐。
+                picked[..noteCount].Clear();
 
-                foreach (int index in indexes)
+                for (int i = 0; i < noteCount; i++)
+                    keys[i] = rng.Next();
+
+                int take = Math.Min(maxShift, noteCount);
+
+                for (int n = 0; n < take; n++)
                 {
-                    var note = chord.Notes[index];
+                    int best = -1;
+
+                    for (int i = 0; i < noteCount; i++)
+                    {
+                        if (picked[i])
+                            continue;
+
+                        if (best < 0 || keys[i] < keys[best])
+                            best = i;
+                    }
+
+                    picked[best] = true;
+
+                    var note = chord.Notes[best];
                     double direction = rng.NextDouble() < 0.5 ? -1 : 1;
                     double offset = direction * offsetAmount;
 
@@ -218,7 +253,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         private static void assignColumns(List<PatternShiftChord> chords, int keyCount, Random rng)
         {
             double[] lastColumnTime = new double[keyCount];
-            var placedNotes = new List<PatternShiftNote>();
+            bool[] usedColumns = new bool[keyCount];
+            var placedTimes = new PlacedNoteTimes(keyCount);
+            var candidates = new List<int>(keyCount);
+            var minIndexList = new List<int>(keyCount);
 
             for (int i = 0; i < keyCount; i++)
                 lastColumnTime[i] = -1000;
@@ -227,37 +265,45 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
             foreach (var chord in chords)
             {
-                chord.Notes = chord.Notes.OrderBy(n => n.SourceColumn).ToList();
-                var usedColumns = new HashSet<int>();
-                var assigned = new List<PatternShiftNote>();
+                // buildChords 按 (StartTime, SourceColumn) 保序建组，这里通常已经是升序；只有真被改乱才付排序钱。
+                if (!isAscendingBySourceColumn(chord.Notes))
+                    chord.Notes = chord.Notes.OrderBy(n => n.SourceColumn).ToList();
+
+                Array.Clear(usedColumns);
+                var assigned = new List<PatternShiftNote>(chord.Notes.Count);
 
                 foreach (var note in chord.Notes)
                 {
-                    int column = chooseColumn(keyCount, lastColumnTime, lastNote, rng, note.StartTime, min_column_spacing_ms);
+                    int column = chooseColumn(keyCount, lastColumnTime, lastNote, rng, note.StartTime, min_column_spacing_ms, candidates, minIndexList);
                     if (column < 0)
                         continue;
 
-                    if (usedColumns.Contains(column))
+                    if (usedColumns[column])
                         continue;
 
-                    if (hasAssignedNoteAtTime(placedNotes, column, note.StartTime, min_column_spacing_ms))
+                    if (placedTimes.HasWithin(column, note.StartTime, min_column_spacing_ms))
                         continue;
 
                     note.AssignedColumn = column;
                     lastNote = column;
                     lastColumnTime[column] = note.IsHold ? note.EndTime : note.StartTime;
-                    usedColumns.Add(column);
+                    usedColumns[column] = true;
                     assigned.Add(note);
-                    placedNotes.Add(note);
+
+                    // 只有短音参与「同列同刻」判定，长按不进索引（与原线性扫描的过滤条件一致）。
+                    if (!note.IsHold)
+                        placedTimes.Add(column, note.StartTime);
                 }
 
                 chord.Notes = assigned;
             }
         }
 
-        private static int chooseColumn(int keys, double[] lastUsedTime, int lastNote, Random rng, double currentTime, double minSpacingMs)
+        private static int chooseColumn(int keys, double[] lastUsedTime, int lastNote, Random rng, double currentTime, double minSpacingMs,
+                                        List<int> candidates, List<int> minIndexList)
         {
-            var candidates = new List<int>();
+            candidates.Clear();
+            minIndexList.Clear();
 
             double safeTime = currentTime - Math.Max(0, minSpacingMs);
 
@@ -281,7 +327,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 return -1;
 
             double minTime = double.MaxValue;
-            var minIndexList = new List<int>();
 
             for (int i = 0; i < candidates.Count; i++)
             {
@@ -296,31 +341,105 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 else if (lastUsedTime[index] <= minTime + 24 && lastUsedTime[index] >= minTime - 24) minIndexList.Add(index);
             }
 
-            int noteLeft = minIndexList.Count(i => i < keys / 2);
-            int noteRight = minIndexList.Count(i => i >= (keys + 1) / 2);
+            int leftBound = keys / 2;
+            int rightBound = (keys + 1) / 2;
+            int noteLeft = 0;
+            int noteRight = 0;
+
+            for (int i = 0; i < minIndexList.Count; i++)
+            {
+                if (minIndexList[i] < leftBound)
+                    noteLeft++;
+                else if (minIndexList[i] >= rightBound)
+                    noteRight++;
+            }
 
             if (noteRight > 0 && noteLeft > 0)
             {
-                bool lastOnLeft = lastNote < keys / 2;
-                minIndexList = minIndexList.Where(i => lastOnLeft ? i >= (keys + 1) / 2 : i < keys / 2).ToList();
+                bool lastOnLeft = lastNote < leftBound;
+                int kept = 0;
+
+                for (int i = 0; i < minIndexList.Count; i++)
+                {
+                    int index = minIndexList[i];
+
+                    if (lastOnLeft ? index >= rightBound : index < leftBound)
+                        minIndexList[kept++] = index;
+                }
+
+                minIndexList.RemoveRange(kept, minIndexList.Count - kept);
             }
 
             return minIndexList.Count > 0 ? minIndexList[rng.Next(minIndexList.Count)] : -1;
         }
 
-        private static bool hasAssignedNoteAtTime(List<PatternShiftNote> notes, int column, double time, double tolerance = 0.5)
+        private static bool isAscendingBySourceColumn(List<PatternShiftNote> notes)
         {
-            for (int i = 0; i < notes.Count; i++)
+            for (int i = 1; i < notes.Count; i++)
             {
-                var note = notes[i];
-                if (note.AssignedColumn != column)
-                    continue;
-
-                if (!note.IsHold && Math.Abs(note.StartTime - time) <= tolerance)
-                    return true;
+                if (notes[i - 1].SourceColumn > notes[i].SourceColumn)
+                    return false;
             }
 
-            return false;
+            return true;
+        }
+
+        /// <summary>
+        /// 每列已放置短音的开始时间（升序），替代原来「每次候选 note 都线性扫一遍全部已放置 note」的 O(n²) 判定。
+        /// </summary>
+        /// <remarks>
+        /// 与 <c>Math.Abs(note.StartTime - time) &lt;= tolerance</c> 完全同义：查 <c>[time - tolerance, time + tolerance]</c>
+        /// 内是否存在该列的值，边界含等号。长按不参与判定，因此也不进索引。
+        /// </remarks>
+        private sealed class PlacedNoteTimes
+        {
+            private readonly List<double>[] byColumn;
+
+            public PlacedNoteTimes(int columns)
+            {
+                byColumn = new List<double>[Math.Max(columns, 0)];
+
+                for (int i = 0; i < byColumn.Length; i++)
+                    byColumn[i] = new List<double>();
+            }
+
+            public void Add(int column, double startTime)
+            {
+                if ((uint)column >= (uint)byColumn.Length)
+                    return;
+
+                List<double> times = byColumn[column];
+                times.Insert(lowerBound(times, startTime), startTime);
+            }
+
+            public bool HasWithin(int column, double time, double tolerance)
+            {
+                if ((uint)column >= (uint)byColumn.Length)
+                    return false;
+
+                List<double> times = byColumn[column];
+                int index = lowerBound(times, time - tolerance);
+
+                return index < times.Count && times[index] <= time + tolerance;
+            }
+
+            private static int lowerBound(List<double> times, double value)
+            {
+                int lo = 0;
+                int hi = times.Count;
+
+                while (lo < hi)
+                {
+                    int mid = (lo + hi) / 2;
+
+                    if (times[mid] < value)
+                        lo = mid + 1;
+                    else
+                        hi = mid;
+                }
+
+                return lo;
+            }
         }
 
         private List<PatternShiftNote> modifyNotesByDifficulty(List<PatternShiftNote> originalNotes, ManiaBeatmap beatmap, int targetColumns, int stars, Random rng)
@@ -402,8 +521,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     var tp = beatmap.ControlPointInfo.TimingPointAt(anchor.StartTime);
                     double beatLength = tp.BeatLength;
 
-                    int[] allowedSubdiv = new[] { 2, 4, 8, 16 };
-                    int subdiv = allowedSubdiv[rng.Next(allowedSubdiv.Length)];
+                    int subdiv = DENSE_SUBDIVISIONS[rng.Next(DENSE_SUBDIVISIONS.Length)];
 
                     double offset = (rng.NextDouble() - 0.5) * (beatLength / subdiv) * (1.0 + 0.5 * (1.0 - osc.Next()));
                     double newTime = Math.Max(0, anchor.StartTime + offset);
@@ -451,8 +569,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                             double t = left + (osc.Next() * 0.75 + 0.125) * gap; // biased away from edges
 
                             // snap to a subdivision of local beat
-                            int[] allowedSubdiv = new[] { 2, 4, 8 };
-                            int subdiv = allowedSubdiv[rng.Next(allowedSubdiv.Length)];
+                            int subdiv = SPARSE_SUBDIVISIONS[rng.Next(SPARSE_SUBDIVISIONS.Length)];
                             double step = localBeat / subdiv;
                             double snapped = Math.Round(t / step) * step;
 

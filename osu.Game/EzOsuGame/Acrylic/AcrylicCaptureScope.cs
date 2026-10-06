@@ -22,6 +22,7 @@ namespace osu.Game.EzOsuGame.Acrylic
     /// The capture buffer uses linear filtering (not pixel-snapped nearest). Nearest on a fullscreen
     /// wrap around song-select backgrounds makes nested blur/dim look sharp or ineffective.
     /// Pixel alignment stays on <c>AcrylicBackdropDrawable</c> effect buffers instead.
+    /// Acrylic对性能基本无任何影响
     /// </remarks>
     [Cached(typeof(IAcrylicCaptureRegistrar))]
     public partial class AcrylicCaptureScope : CompositeDrawable, IAcrylicCaptureRegistrar

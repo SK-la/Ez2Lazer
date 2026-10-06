@@ -67,7 +67,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public int PeekPullOffset(EzLocalProfileOnlinePullKind kind, int rulesetId) =>
             store.GetPullOffset(kind, rulesetId);
 
-        public Task<EzLocalProfileOnlinePullResult> PullAsync(EzLocalProfileOnlinePullRequest request, CancellationToken cancellationToken = default)
+        public Task<EzLocalProfileOnlinePullResult> PullAsync(
+            EzLocalProfileOnlinePullRequest request,
+            IProgress<EzLocalProfileOnlinePullProgress>? progress = null,
+            CancellationToken cancellationToken = default)
         {
             lock (pullLock)
             {
@@ -83,7 +86,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 {
                     try
                     {
-                        return await pullCoreAsync(request, token).ConfigureAwait(false);
+                        return await pullCoreAsync(request, progress, token).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException)
                     {
@@ -102,7 +105,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        private async Task<EzLocalProfileOnlinePullResult> pullCoreAsync(EzLocalProfileOnlinePullRequest request, CancellationToken token)
+        private async Task<EzLocalProfileOnlinePullResult> pullCoreAsync(
+            EzLocalProfileOnlinePullRequest request,
+            IProgress<EzLocalProfileOnlinePullProgress>? progress,
+            CancellationToken token)
         {
             var result = new EzLocalProfileOnlinePullResult();
 
@@ -142,15 +148,30 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 : null;
 
             var downloadedSetIds = new HashSet<int>();
+            int total = Math.Max(1, candidates.Count);
 
-            foreach (var solo in candidates)
+            progress?.Report(new EzLocalProfileOnlinePullProgress { Processed = 0, Total = total });
+
+            for (int i = 0; i < candidates.Count; i++)
             {
                 token.ThrowIfCancellationRequested();
 
-                if (request.DownloadMissingBeatmaps)
-                    await ensureBeatmapAndCollectionAsync(solo, collectionName!, downloadedSetIds, result, token).ConfigureAwait(false);
+                var solo = candidates[i];
 
+                if (request.DownloadMissingBeatmaps)
+                {
+                    progress?.Report(new EzLocalProfileOnlinePullProgress
+                    {
+                        Processed = i,
+                        Total = total,
+                        DownloadingMap = true,
+                    });
+                    await ensureBeatmapAndCollectionAsync(solo, collectionName!, downloadedSetIds, result, token).ConfigureAwait(false);
+                }
+
+                progress?.Report(new EzLocalProfileOnlinePullProgress { Processed = i, Total = total });
                 await processCandidateAsync(solo, request.IncludeInStatsWithoutImport, result, token).ConfigureAwait(false);
+                progress?.Report(new EzLocalProfileOnlinePullProgress { Processed = i + 1, Total = total });
                 await Task.Delay(request_delay, token).ConfigureAwait(false);
             }
 
@@ -312,13 +333,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             try
             {
-                var notification = new ProgressNotification
-                {
-                    State = ProgressNotificationState.Active,
-                    Text = $"Importing beatmapset {setOnlineId}…",
-                };
-
+                var notification = createDetachedImportNotification($"Importing beatmapset {setOnlineId}…");
                 var imported = (await beatmapManager.Import(notification, new[] { new ImportTask(path) }, new ImportParameters { Batch = true }).ConfigureAwait(false)).ToList();
+                finishDetachedImportNotification(notification);
                 return imported.Count > 0;
             }
             finally
@@ -393,13 +410,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     return;
                 }
 
-                var notification = new ProgressNotification
-                {
-                    State = ProgressNotificationState.Active,
-                    Text = $"Importing online score {onlineId}…",
-                };
-
+                var notification = createDetachedImportNotification($"Importing online score {onlineId}…");
                 var imported = (await scoreManager.Import(notification, new[] { new ImportTask(path) }, new ImportParameters { Batch = true }).ConfigureAwait(false)).ToList();
+                finishDetachedImportNotification(notification);
 
                 if (imported.Count > 0)
                     result.Imported++;
@@ -431,6 +444,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     }
                 }
             }
+        }
+
+        private static ProgressNotification createDetachedImportNotification(string text) => new ProgressNotification
+        {
+            State = ProgressNotificationState.Active,
+            Text = text,
+        };
+
+        private static void finishDetachedImportNotification(ProgressNotification notification)
+        {
+            if (notification.State is ProgressNotificationState.Active or ProgressNotificationState.Queued)
+                notification.CompleteSilently();
         }
 
         /// <summary>

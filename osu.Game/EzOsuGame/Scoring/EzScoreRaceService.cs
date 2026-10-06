@@ -16,7 +16,6 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.Rulesets;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
@@ -467,10 +466,16 @@ namespace osu.Game.EzOsuGame.Scoring
 
             var rulesetInfo = beatmapInfo.Ruleset;
             var allLocalScores = EzLocalScoreQueries.GetLocalScoresWithReplay(realm, beatmapInfo, rulesetInfo);
+
+            // Mod 过滤仅 Mania 产品化；Osu/Taiko/Catch 恒 Any（混模幽灵池 → 构建侧必须按 ghost Mods 分键取谱）。
+            var modFilter = EzScoreRaceRulesetSupport.GetGhostTimelineMode(rulesetInfo) == EzScoreRaceGhostTimelineMode.ManiaSession
+                ? ModFilter.Value
+                : EzScoreModFilter.Any;
+
             var ghostScores = EzLocalScoreQueries.SelectGhostCandidates(
                 allLocalScores,
                 getCurrentMods(),
-                ModFilter.Value,
+                modFilter,
                 MaxEntries.Value);
 
             var metadataStates = ghostScores
@@ -545,58 +550,70 @@ namespace osu.Game.EzOsuGame.Scoring
                 var rulesetInfo = beatmapInfo.Ruleset;
                 var results = new EzScoreTimeline?[scoreInfos.Count];
 
-                // 同一谱面只转一次 playable，各 ghost 只读共享。
-                IBeatmap? sharedPlayable = null;
-
-                bool anyNeedsBuild = false;
-
                 for (int i = 0; i < scoreInfos.Count; i++)
                 {
                     if (states.TryGetValue(scoreInfos[i].ID.ToString(), out var existing) && existing.Timeline != null)
-                    {
                         results[i] = existing.Timeline;
-                        continue;
-                    }
-
-                    anyNeedsBuild = true;
                 }
 
-                if (anyNeedsBuild)
-                    sharedPlayable = workingBeatmap.GetPlayableBeatmap(rulesetInfo, Array.Empty<Mod>());
+                // 按 ghost Mods 分组；转谱经 EzPlayableBeatmapCache（禁 Empty-Mods 全员复用 / 裸 GetPlayableBeatmap）。
+                var pendingGroups = EzScoreRacePlayableGrouping.GroupIndicesByPlayableMods(
+                    scoreInfos,
+                    i => results[i] == null);
+
+                bool maniaUsesProvider = EzScoreRaceRulesetSupport.GetGhostTimelineMode(rulesetInfo)
+                                         == EzScoreRaceGhostTimelineMode.ManiaSession;
 
                 await Task.Run(() =>
                 {
-                    for (int i = 0; i < scoreInfos.Count; i++)
+                    foreach (var group in pendingGroups.Values)
                     {
-                        token.ThrowIfCancellationRequested();
-
                         if (version != timelineBuildVersion)
                             return;
 
-                        if (results[i] != null)
-                            continue;
+                        token.ThrowIfCancellationRequested();
 
-                        try
-                        {
-                            results[i] = EzScoreTimelineBuilder.TryBuild(
-                                scoreManager,
-                                beatmaps,
-                                scoreInfos[i],
-                                sharedPlayable,
-                                timelineCache,
+                        int representative = group[0];
+
+                        // Mania：AttachBeatmaps 后由 SimulationBeatmapProvider.GetBound(hitmode) 取谱；不传 shared。
+                        // 其余模式：GetBound(session-ready) 同 Mod 复用。
+                        IBeatmap? sharedPlayable = maniaUsesProvider
+                            ? null
+                            : EzScoreRacePlayableResolver.GetSessionReady(
+                                workingBeatmap,
+                                rulesetInfo,
+                                scoreInfos[representative].Mods,
                                 token);
-                        }
-                        catch (OperationCanceledException)
+
+                        foreach (int i in group)
                         {
-                            throw;
-                        }
-                        catch (Exception ex)
-                        {
-                            // One bad ghost (e.g. leftover deleted-mod edge case) must not abort the whole batch.
-                            results[i] = null;
-                            Logger.Error(ex,
-                                $"[EzScoreRaceService] Timeline build failed for score {scoreInfos[i].ID}",
-                                Ez2ConfigManager.LOGGER_NAME);
+                            token.ThrowIfCancellationRequested();
+
+                            if (version != timelineBuildVersion)
+                                return;
+
+                            try
+                            {
+                                results[i] = EzScoreTimelineBuilder.TryBuild(
+                                    scoreManager,
+                                    beatmaps,
+                                    scoreInfos[i],
+                                    sharedPlayable,
+                                    timelineCache,
+                                    token);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception ex)
+                            {
+                                // One bad ghost (e.g. leftover deleted-mod edge case) must not abort the whole batch.
+                                results[i] = null;
+                                Logger.Error(ex,
+                                    $"[EzScoreRaceService] Timeline build failed for score {scoreInfos[i].ID}",
+                                    Ez2ConfigManager.LOGGER_NAME);
+                            }
                         }
                     }
                 }, token).ConfigureAwait(false);
@@ -694,7 +711,14 @@ namespace osu.Game.EzOsuGame.Scoring
         }
 
         private string buildQueryKey(Guid beatmapId)
-            => $"{beatmapId}|{ModFilter.Value}|{EzLocalScoreQueries.GetModFilterCacheFingerprint(ModFilter.Value, getCurrentMods())}|{MaxEntries.Value}";
+        {
+            var rulesetInfo = currentBeatmap.Value?.BeatmapInfo?.Ruleset;
+            var modFilter = EzScoreRaceRulesetSupport.GetGhostTimelineMode(rulesetInfo) == EzScoreRaceGhostTimelineMode.ManiaSession
+                ? ModFilter.Value
+                : EzScoreModFilter.Any;
+
+            return $"{beatmapId}|{modFilter}|{EzLocalScoreQueries.GetModFilterCacheFingerprint(modFilter, getCurrentMods())}|{MaxEntries.Value}";
+        }
 
         private void storeMetadataCache(string queryKey, List<EzScoreRaceState> statesToStore)
         {

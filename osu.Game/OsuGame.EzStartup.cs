@@ -18,19 +18,19 @@ namespace osu.Game
         private void loadStartupContentPreloader()
         {
             var factory = new SongSelectScreenFactory(this);
-            dependencies.CacheAs<ISongSelectScreenFactory>(factory);
+            Dependencies.CacheAs<ISongSelectScreenFactory>(factory);
 
             var preloader = new EzStartupContentPreloader();
-            preloader.Configure(Settings, detachedBeatmapStore, factory);
+            preloader.Configure(Settings, factory);
 
             var coordinator = new EzStartupWorkCoordinator();
             coordinator.Configure(preloader);
 
             loadComponentSingleFile(coordinator, Add, true);
-            dependencies.CacheAs<IEzStartupWorkCoordinator>(coordinator);
+            Dependencies.CacheAs<IEzStartupWorkCoordinator>(coordinator);
 
             loadComponentSingleFile(preloader, Add, true);
-            dependencies.CacheAs<IEzStartupContentPreloader>(preloader);
+            Dependencies.CacheAs<IEzStartupContentPreloader>(preloader);
 
             preloader.ScheduleSettingsPreload();
         }

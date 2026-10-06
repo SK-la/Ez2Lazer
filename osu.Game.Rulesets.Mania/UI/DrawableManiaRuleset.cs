@@ -19,10 +19,9 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Database;
 using osu.Game.Input.Bindings;
 using osu.Game.Input.Handlers;
-using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Scoring;
-using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
@@ -103,7 +102,11 @@ namespace osu.Game.Rulesets.Mania.UI
         private bool suppressHitModeRevert;
 
         int IManiaGameplayModeSnapshot.HitMode => (int)gameplayHitMode;
-        int IManiaGameplayModeSnapshot.HealthMode => (int)ManiaHealthProcessor.ActiveHealthMode;
+
+        // 以本局冻结环境为准，而不是某个 ManiaHealthProcessor 实例：BMS 复用本 Drawable 但用的是
+        // BMSNoFailHealthProcessor，没有 Ez 血量模式，读处理器实例会把 BMS 记成 Lazer（旧实现更糟：
+        // 读 ManiaHealthProcessor 的 static，记的是上一局 Mania 的遗留值）。
+        int IManiaGameplayModeSnapshot.HealthMode => (int)(JudgementRound?.Environment.ManiaHealthMode ?? EzEnumHealthMode.Lazer);
 
         /// <summary>
         /// 列级按键输入由 <see cref="UI.Column"/> 路由到单一 press 目标（C2 COLUMN-INPUT）。
@@ -115,6 +118,26 @@ namespace osu.Game.Rulesets.Mania.UI
         /// 本局冻结的判定上下文；热路径读取此实例，禁止再解析全局配置。
         /// </summary>
         public ManiaJudgementRound? JudgementRound { get; private set; }
+
+        /// <summary>
+        /// 进局时确认的主 BPM 拍长（ms）。由 <see cref="EzBeatmapSpeedTracker.ResolveBeatLength"/> 在 loading 时计算一次，之后不再更新。
+        /// </summary>
+        public double MainBeatLength { get; private set; }
+
+        /// <summary>
+        /// 进局时确认的投皮档位。UI 0-8，除 32 得到节拍；0 关闭投皮额外负担。局内不跟随设置变更。
+        /// </summary>
+        public double HoldTailMaskLevel { get; private set; }
+
+        /// <summary>
+        /// 进局时确认的动态投皮开关。局内不跟随设置变更；开启后 LN 投皮按 tracker 当前拍长调整。
+        /// </summary>
+        public bool DynamicHoldTailMask { get; private set; }
+
+        /// <summary>
+        /// 仅在 <see cref="DynamicHoldTailMask"/> 开启时提供当前拍长。LN 侧只读 <see cref="EzBeatmapSpeedTracker.BeatLength"/>.Value，不 BindValueChanged。
+        /// </summary>
+        public EzBeatmapSpeedTracker? HoldTailSpeedTracker { get; private set; }
 
         private readonly Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
         private readonly BindableDouble configBaseMs = new BindableDouble();
@@ -172,6 +195,14 @@ namespace osu.Game.Rulesets.Mania.UI
 
             TimeRange.Value = TargetTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
+            // 判定线位置先绑定并立即算一次：下面 scrollingStyle 的立即回调会调用 updateTimeRange()，
+            // 而它依赖已缓存的 hitPosition。
+            ezConfig.BindWith(Ez2Setting.HitPosition, hitPositonBindable);
+            hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
+
+            ezConfig.BindWith(Ez2Setting.HitPositionGlobalEnable, globalHitPosition);
+            globalHitPosition.BindValueChanged(_ => skinChanged(), true);
+
             Config.BindWith(ManiaRulesetSetting.ScrollStyle, scrollingStyle);
             scrollingStyle.BindValueChanged(style =>
             {
@@ -185,14 +216,19 @@ namespace osu.Game.Rulesets.Mania.UI
             Config.BindWith(ManiaRulesetSetting.TouchOverlay, touchOverlay);
             touchOverlay.BindValueChanged(_ => updateMobileLayout(), true);
 
-            ezConfig.BindWith(Ez2Setting.HitPosition, hitPositonBindable);
-            hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
-
-            ezConfig.BindWith(Ez2Setting.HitPositionGlobalEnable, globalHitPosition);
-            globalHitPosition.BindValueChanged(_ => skinChanged(), true);
-
             ezConfig.BindWith(Ez2Setting.ManiaBarLinesBool, barLinesBindable);
             ezConfig.BindWith(Ez2Setting.ManiaHitMode, hitModeBindable);
+
+            // 进局快照：不 Bindable。档位（含 0）和动态开关局内都不跟随设置变更。
+            HoldTailMaskLevel = ezConfig.Get<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
+            DynamicHoldTailMask = ezConfig.Get<bool>(Ez2Setting.ManiaHoldTailMaskDynamicEnable);
+            MainBeatLength = EzBeatmapSpeedTracker.ResolveBeatLength(Beatmap, null, Beatmap.BeatmapInfo.BPM);
+
+            if (!(MainBeatLength > 0))
+                MainBeatLength = 500;
+
+            if (ManiaHoldTailMask.IsEnabled(HoldTailMaskLevel) && DynamicHoldTailMask)
+                FrameStableComponents.Add(HoldTailSpeedTracker = new EzBeatmapSpeedTracker());
         }
 
         protected override void LoadComplete()
@@ -204,8 +240,9 @@ namespace osu.Game.Rulesets.Mania.UI
             JudgementRound = ManiaJudgementRound.Create(
                 ezConfig.ResolveEnvironment(ReplayRunPurpose.ForLive, ReplayScore?.ScoreInfo, ignoreOffset: ReplayScore != null),
                 Beatmap);
-            ManiaWindowBaker.AlignForLive(Beatmap, JudgementRound.Environment);
-            ManiaEnvironmentJudgements.ApplyToBeatmap(Beatmap, JudgementRound.Environment.ManiaHitMode);
+            // 本局实例的 hitmode 绑定。仿真一律在 ManiaSimulationBeatmapProvider 产出的独立副本上绑定
+            // （见 ManiaReplaySessionService），所以这里不再需要「本局实例」登记。
+            ManiaBeatmapBinding.BindForLive(Beatmap, JudgementRound.Environment);
 
             hitModeBindable.BindValueChanged(h =>
             {
@@ -245,17 +282,6 @@ namespace osu.Game.Rulesets.Mania.UI
                     BarLines.ForEach(Playfield.Add);
                 }
             }, true);
-
-            // 幂等兜底：主预热已在 EzPlayerLoaderStartGate 完成；此处仅补漏。
-            try
-            {
-                var factory = Dependencies.Get<EzLocalTextureFactory>();
-                _ = factory.PreloadGameTextures();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
-            }
 
 #if DEBUG
             // TRACE-JUDGE 每局归零，使 Dispose 时的读数是本局累计。
@@ -356,6 +382,19 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void skinChanged()
         {
+            updateHitPosition();
+            pendingSkinChange = null;
+        }
+
+        /// <summary>
+        /// 重算并缓存判定线位置。只在皮肤或相关设置变化时调用。
+        /// </summary>
+        /// <remarks>
+        /// <see cref="updateTimeRange"/> 每帧都会被 <see cref="Update"/> 调到，而皮肤配置查询（<c>GetConfig</c>）
+        /// 需要构造 lookup 并走一遍皮肤配置链，放在每帧里纯属白烧。这里把结果缓存下来供其直接使用。
+        /// </remarks>
+        private void updateHitPosition()
+        {
             if (globalHitPosition.Value)
                 hitPosition = (float)hitPositonBindable.Value;
             else
@@ -364,15 +403,13 @@ namespace osu.Game.Rulesets.Mania.UI
                                   new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
                               ?? (float)hitPositonBindable.Value;
             }
-
-            pendingSkinChange = null;
         }
 
         private void updateTimeRange()
         {
             const float length_to_default_hit_position = 768 - LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION;
 
-            skinChanged();
+            // hitPosition 由 skinChanged() 缓存在字段里，这里只做算术。
             float lengthToHitPosition = 768 - hitPosition;
 
             // This scaling factor preserves the scroll speed as the scroll length varies from changes to the hit position.

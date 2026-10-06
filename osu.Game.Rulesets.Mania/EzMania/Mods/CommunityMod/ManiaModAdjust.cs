@@ -392,11 +392,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             if (TrueRandom.Value)
             {
+                // 每个时间组都要重抽一次列号：取样缓冲与列号列表搬到循环外复用，逐次清空即可。
+                var columnList = new List<int>();
+                var newColumn = new List<int>();
+
                 foreach (var obj in beatmap.HitObjects.OfType<ManiaHitObject>().GroupBy(c => c.StartTime))
                 {
-                    var columnList = new List<int>();
+                    columnList.Clear();
                     foreach (var hit in obj) columnList.Add(hit.Column);
-                    var newColumn = Enumerable.Range(0, availableColumns).SelectRandom(rng, columnList.Count).ToList();
+
+                    ManiaModYuModHelper.SelectRandomColumns(rng, availableColumns, columnList.Count, newColumn);
+
                     int index = 0;
 
                     foreach (var hit in obj)

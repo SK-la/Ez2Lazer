@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Diagnostics;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -23,61 +24,118 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
     {
         private readonly HitObjectContainer hitObjectContainer;
         private readonly ManiaLaneController? laneController;
-        private readonly Ez2ConfigManager ezConfig;
+
+        /// <summary>
+        /// 命中模式在本 helper 构造时（进图）取一次即固定：它决定 BMS 路由分支，
+        /// 而模式设置只在进游戏前确认、局内不切换，所以不持 bindable、不订阅变更。
+        /// </summary>
+        private readonly EzEnumHitMode hitMode;
+
+        // 每判定复用同一批缓冲：候选与后判对象只在本次调用内有效，不去分配新的 List。
+        private readonly List<PrecedenceCandidate> candidateBuffer = new List<PrecedenceCandidate>();
+        private readonly List<DrawableHitObject> postJudgedBuffer = new List<DrawableHitObject>();
+        private readonly List<PrecedenceCandidate> sortedBuffer = new List<PrecedenceCandidate>();
+
+        // 候选对象同样复用：LN 兜底路径下每个存活对象各造一个候选，是每次按键唯一的 O(alive) 分配来源。
+        private readonly List<PrecedenceCandidate> candidatePool = new List<PrecedenceCandidate>();
+        private int candidatePoolCursor;
+
         private const string log_prefix = "[JudgeDiag][PolicyHelper]";
 
         public OrderedHitPolicyHelper(HitObjectContainer hitObjectContainer, ManiaLaneController? laneController = null)
         {
             this.hitObjectContainer = hitObjectContainer;
             this.laneController = laneController;
-            ezConfig = GlobalConfigStore.EzConfig;
+            var ezConfig1 = GlobalConfigStore.EzConfig;
+
+            // 取普通值：同一按键里 isBMS() 要读一次，且该设置局内不变，无需为它常驻订阅。
+            hitMode = ezConfig1.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+
+            // 取普通值：每次按键都要用，且该设置局内不变，无需为它常驻订阅。
+            JudgePrecedence = ezConfig1.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
         }
+
+        /// <summary>
+        /// 判定诊断开关是进程级的静态值（启动时由 <c>OsuGameBase</c> 读一次），不持有 bindable：
+        /// 这个开关不常开、也不会在运行期改，没必要为它在每个 helper 上常驻一个订阅。
+        /// </summary>
+        private static bool judgmentDiagEnabled => EzJudgmentDiagnostics.Enabled;
+
+        /// <summary>
+        /// 本 helper 冻结的判定优先级。调用方（如 <c>BMSOrderedHitPolicy</c>）在构造期读它来判断
+        /// 是否需要走优先级路由，避免每次按键再查一次配置。
+        /// </summary>
+        public EzEnumJudgePrecedence JudgePrecedence { get; }
 
         public bool IsHittableWithPrecedence(DrawableHitObject hitObject, double time, EzEnumJudgePrecedence? precedenceOverride = null)
         {
-            var judgePrecedence = precedenceOverride ?? ezConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
+            var precedence = precedenceOverride ?? JudgePrecedence;
+            bool isBmsMode = isBMS();
 
             if (laneController != null && hitObject is not (DrawableHoldNoteTail or DrawableHoldNote))
-                return laneController.IsHittable(hitObject, time, judgePrecedence);
+                return laneController.IsHittable(hitObject, time, precedence);
 
-            if (isBMS())
+            collectOverlappingCandidates(time, candidateBuffer);
+
+            if (isBmsMode)
             {
-                var postJudged = getPostBadJudgedObjects(time).ToList();
+                collectPostBadJudgedObjects(time, postJudgedBuffer);
 
-                if (postJudged.Count > 0)
+                if (postJudgedBuffer.Count > 0)
                 {
-                    var nearestPostJudged = postJudged
-                                            .OrderBy(o => distanceToNonBadWindow(o, time))
-                                            .ThenBy(o => o.HitObject.StartTime)
-                                            .First();
+                    // 等价于 OrderBy(distance).ThenBy(StartTime).First()：按 (距离, 开始时间) 取最小，并列时保留先出现的。
+                    DrawableHitObject nearestPostJudged = postJudgedBuffer[0];
+                    double nearestPostJudgedDistance = distanceToNonBadWindow(nearestPostJudged, time);
 
-                    double postJudgedDistance = distanceToNonBadWindow(nearestPostJudged, time);
+                    for (int i = 1; i < postJudgedBuffer.Count; i++)
+                    {
+                        var candidate = postJudgedBuffer[i];
+                        double distance = distanceToNonBadWindow(candidate, time);
 
-                    double nearestUnjudgedDistance = getOverlappingCandidates(time)
-                                                     .Where(o => !o.IsJudged)
-                                                     .Select(o => distanceToNonBadWindow(o, time))
-                                                     .DefaultIfEmpty(double.PositiveInfinity)
-                                                     .Min();
+                        if (distance < nearestPostJudgedDistance
+                            || (distance == nearestPostJudgedDistance && candidate.HitObject.StartTime < nearestPostJudged.HitObject.StartTime))
+                        {
+                            nearestPostJudged = candidate;
+                            nearestPostJudgedDistance = distance;
+                        }
+                    }
 
-                    if (postJudgedDistance <= nearestUnjudgedDistance)
+                    double nearestUnjudgedDistance = double.PositiveInfinity;
+
+                    for (int i = 0; i < candidateBuffer.Count; i++)
+                    {
+                        var candidate = candidateBuffer[i];
+
+                        if (candidate.IsJudged)
+                            continue;
+
+                        nearestUnjudgedDistance = Math.Min(nearestUnjudgedDistance, distanceToNonBadWindow(candidate, time));
+                    }
+
+                    if (nearestPostJudgedDistance <= nearestUnjudgedDistance)
                         return hitObject == nearestPostJudged;
                 }
             }
 
             // 获取所有与当前时间重叠的活跃路由候选。
-            var overlappingCandidates = getOverlappingCandidates(time).ToList();
-
-            if (overlappingCandidates.Count == 0)
+            if (candidateBuffer.Count == 0)
             {
-                logDiag($"t={time:F3} no-overlap target={describe(hitObject)}");
+                if (judgmentDiagEnabled)
+                    logDiag($"t={time:F3} no-overlap target={describe(hitObject)}");
+
                 return true;
             }
 
             // 应用优先级策略来确定哪个对象应该被击中
-            var selected = selectByPrecedence(overlappingCandidates, time, judgePrecedence, allowFallbackToEarliest: isBMS());
-            logDiag(
-                $"t={time:F3} mode={(isBMS() ? "bms" : "non-bms")} precedence={judgePrecedence} target={describe(hitObject)} " +
-                $"overlap=[{string.Join(", ", overlappingCandidates.Select(describe))}] selected={describe(selected)}");
+            var selected = selectByPrecedence(candidateBuffer, time, precedence, allowFallbackToEarliest: isBmsMode);
+
+            if (judgmentDiagEnabled)
+            {
+                logDiag(
+                    $"t={time:F3} mode={(isBmsMode ? "bms" : "non-bms")} precedence={precedence} target={describe(hitObject)} " +
+                    $"overlap=[{string.Join(", ", candidateBuffer.Select(describe))}] selected={describe(selected)}");
+            }
+
             return selected?.RoutedObject == hitObject;
         }
 
@@ -103,12 +161,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             => Math.Abs(t1NoteTime - pressTime) > Math.Abs(t2NoteTime - pressTime);
 
         /// <summary>
-        /// 获取所有判定窗口与给定时间重叠的活跃击打对象。
+        /// 收集所有判定窗口与给定时间重叠的活跃击打对象，写入调用方提供的缓冲（不清空）。
         /// </summary>
         /// <param name="time">检查重叠对象的时间点。</param>
-        /// <returns>重叠的可绘制击打对象的可枚举集合。</returns>
-        private IEnumerable<PrecedenceCandidate> getOverlappingCandidates(double time)
+        /// <param name="buffer">接收候选的缓冲，调用前应已清空。</param>
+        private void collectOverlappingCandidates(double time, List<PrecedenceCandidate> buffer)
         {
+            buffer.Clear();
+            candidatePoolCursor = 0;
+
             foreach (var obj in hitObjectContainer.AliveObjects)
             {
                 if (!tryCreatePressCandidate(obj, out var candidate))
@@ -119,11 +180,30 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
                 // 检查时间是否落在此对象的判定窗口内
                 if (time >= candidate.StartTime - earlyWindow && time <= candidate.StartTime + lateWindow)
-                    yield return candidate;
+                    buffer.Add(candidate);
             }
         }
 
-        private static bool tryCreatePressCandidate(DrawableHitObject obj, out PrecedenceCandidate candidate)
+        private PrecedenceCandidate rentCandidate(DrawableHitObject routedObject, DrawableHitObject judgementObject, double startTime, ManiaHitWindows windows)
+        {
+            PrecedenceCandidate candidate;
+
+            if (candidatePoolCursor < candidatePool.Count)
+            {
+                candidate = candidatePool[candidatePoolCursor];
+            }
+            else
+            {
+                candidate = new PrecedenceCandidate();
+                candidatePool.Add(candidate);
+            }
+
+            candidatePoolCursor++;
+            candidate.Set(routedObject, judgementObject, startTime, windows);
+            return candidate;
+        }
+
+        private bool tryCreatePressCandidate(DrawableHitObject obj, out PrecedenceCandidate candidate)
         {
             candidate = null!;
 
@@ -140,7 +220,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 if (hold.Head.HitObject.HitWindows is not ManiaHitWindows headWindows || headWindows.WindowFor(HitResult.Miss) == 0)
                     return false;
 
-                candidate = new PrecedenceCandidate(hold, hold.Head, hold.Head.HitObject.StartTime, headWindows);
+                candidate = rentCandidate(hold, hold.Head, hold.Head.HitObject.StartTime, headWindows);
                 return true;
             }
 
@@ -150,19 +230,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             if (obj.HitObject.HitWindows is not ManiaHitWindows windows || windows.WindowFor(HitResult.Miss) == 0)
                 return false;
 
-            candidate = new PrecedenceCandidate(obj, obj, obj.HitObject.StartTime, windows);
+            candidate = rentCandidate(obj, obj, obj.HitObject.StartTime, windows);
             return true;
         }
 
-        private IEnumerable<DrawableHitObject> getPostBadJudgedObjects(double time)
+        private void collectPostBadJudgedObjects(double time, List<DrawableHitObject> buffer)
         {
+            buffer.Clear();
+
             foreach (var obj in hitObjectContainer.AliveObjects)
             {
                 if (!obj.Judged || !isWithinMissWindow(obj, time))
                     continue;
 
                 if (isPostBadKPoorRoutable(obj))
-                    yield return obj;
+                    buffer.Add(obj);
             }
         }
 
@@ -184,13 +266,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 return false;
 
             double startTime = obj.HitObject.StartTime;
-            double earlyWindow = hitWindow.WindowFor(HitResult.Miss);
-            double lateWindow = hitWindow.WindowFor(HitResult.Miss);
+            double earlyWindow;
+            double lateWindow;
 
             if (hitWindow is ManiaHitWindows maniaHitWindow)
             {
                 earlyWindow = maniaHitWindow.WindowFor(HitResult.Miss, true);
                 lateWindow = maniaHitWindow.WindowFor(HitResult.Miss, false);
+            }
+            else
+            {
+                earlyWindow = hitWindow.WindowFor(HitResult.Miss);
+                lateWindow = hitWindow.WindowFor(HitResult.Miss);
             }
 
             return time >= startTime - earlyWindow && time <= startTime + lateWindow;
@@ -244,15 +331,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         /// 根据优先级策略选择当前输入应命中的对象。
         /// BMS 模式走折叠比较；其它模式走通用优先级。
         /// </summary>
-        /// <param name="candidates">候选击打对象列表。</param>
+        /// <param name="candidateList">候选击打对象列表（不会被修改）。</param>
         /// <param name="time">当前时间（按键时间）。</param>
         /// <param name="precedence">要使用的优先级策略。</param>
         /// <param name="allowFallbackToEarliest">没有候选能产生常规判定时，是否回退到最早候选。</param>
         /// <returns>选中的击打对象，如果没有候选则返回 null。</returns>
-        private PrecedenceCandidate? selectByPrecedence(IEnumerable<PrecedenceCandidate> candidates, double time, EzEnumJudgePrecedence precedence, bool allowFallbackToEarliest)
+        private PrecedenceCandidate? selectByPrecedence(IReadOnlyList<PrecedenceCandidate> candidateList, double time, EzEnumJudgePrecedence precedence, bool allowFallbackToEarliest)
         {
-            var candidateList = candidates.ToList();
-
             if (candidateList.Count == 0)
                 return null;
 
@@ -263,23 +348,65 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             switch (precedence)
             {
                 case EzEnumJudgePrecedence.Duration:
-                    var orderedD = candidateList.OrderBy(c => c.StartTime).ToList();
+                    var orderedD = sortByStartTime(candidateList);
                     var pickedD = selectFoldCandidate(orderedD, time, comboAlgorithm: false);
                     return pickedD ?? (allowFallbackToEarliest ? orderedD[0] : null);
 
                 case EzEnumJudgePrecedence.Combo:
-                    var orderedC = candidateList.OrderBy(c => c.StartTime).ToList();
+                    var orderedC = sortByStartTime(candidateList);
                     var pickedC = selectFoldCandidate(orderedC, time, comboAlgorithm: true);
                     return pickedC ?? (allowFallbackToEarliest ? orderedC[0] : null);
 
                 case EzEnumJudgePrecedence.Earliest:
                 default:
-                    return candidateList.OrderBy(c => c.StartTime).First();
+                    // 等价于 OrderBy(StartTime).First()：并列时取先出现的。
+                    var earliest = candidateList[0];
+
+                    for (int i = 1; i < candidateList.Count; i++)
+                    {
+                        if (candidateList[i].StartTime < earliest.StartTime)
+                            earliest = candidateList[i];
+                    }
+
+                    return earliest;
             }
         }
 
+        /// <summary>
+        /// 按开始时间稳定排序到内部复用缓冲，等价于 <c>OrderBy(c => c.StartTime).ToList()</c> 但不分配。
+        /// </summary>
+        /// <remarks>返回的列表在下一次调用本方法时被覆写，只可在当前选择流程内使用。</remarks>
+        private IReadOnlyList<PrecedenceCandidate> sortByStartTime(IReadOnlyList<PrecedenceCandidate> source)
+        {
+            sortedBuffer.Clear();
+
+            for (int i = 0; i < source.Count; i++)
+            {
+                var item = source[i];
+                int j = sortedBuffer.Count;
+
+                // 严格大于才后移，保证与 OrderBy 相同的稳定性（等值保持原有先后）。
+                while (j > 0 && sortedBuffer[j - 1].StartTime > item.StartTime)
+                {
+                    if (j == sortedBuffer.Count)
+                        sortedBuffer.Add(sortedBuffer[j - 1]);
+                    else
+                        sortedBuffer[j] = sortedBuffer[j - 1];
+
+                    j--;
+                }
+
+                if (j == sortedBuffer.Count)
+                    sortedBuffer.Add(item);
+                else
+                    sortedBuffer[j] = item;
+            }
+
+            return sortedBuffer;
+        }
+
         private bool isBMS()
-            => HitModeHelper.IsBMSHitMode(ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode));
+            => HitModeHelper.IsBMSHitMode(hitMode);
 
         public static DrawableHitObject? SelectFoldDrawable(IReadOnlyList<DrawableHitObject> sortedByStartTime, double pressTime, bool comboAlgorithm)
         {
@@ -437,7 +564,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         private void logDiag(string message)
         {
-            if (!ezConfig.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled))
+            // 调用点已用 JudgmentDiagEnabled 判过；不要再查一次配置。
+            if (!judgmentDiagEnabled)
                 return;
 
             Logger.Log($"{log_prefix} {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
@@ -461,12 +589,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         private sealed class PrecedenceCandidate
         {
-            public readonly DrawableHitObject RoutedObject;
-            public readonly DrawableHitObject JudgementObject;
-            public readonly double StartTime;
-            public readonly ManiaHitWindows Windows;
+            public DrawableHitObject RoutedObject = null!;
+            public DrawableHitObject JudgementObject = null!;
+            public double StartTime;
+            public ManiaHitWindows Windows = null!;
 
-            public PrecedenceCandidate(DrawableHitObject routedObject, DrawableHitObject judgementObject, double startTime, ManiaHitWindows windows)
+            /// <summary>复用池租用时写入本次候选内容。</summary>
+            public void Set(DrawableHitObject routedObject, DrawableHitObject judgementObject, double startTime, ManiaHitWindows windows)
             {
                 RoutedObject = routedObject;
                 JudgementObject = judgementObject;

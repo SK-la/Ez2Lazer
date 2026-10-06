@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables.Cards;
 using osu.Game.Configuration;
@@ -90,7 +91,10 @@ namespace osu.Game.Database
         {
             if (changes?.InsertedIndices == null) return;
 
-            if (sender.Any(s => s.Beatmaps.Any(b => b.MD5Hash == beatmapHash)))
+            if (!sender.Any(s => s.Beatmaps.Any(b => b.MD5Hash == beatmapHash)))
+                return;
+
+            try
             {
                 if (scoreArchive != null)
                 {
@@ -98,8 +102,16 @@ namespace osu.Game.Database
                     var importTask = new ImportTask(scoreArchive.GetStream(name), name);
                     scoreManager.Import(new[] { importTask });
                 }
-
+            }
+            catch (Exception e)
+            {
+                // Must not throw from a Realm notification callback — that cascades into further subscription crashes.
+                Logger.Log($@"Failed to re-import score after missing beatmap became available: {e}", LoggingTarget.Database);
+            }
+            finally
+            {
                 realmSubscription?.Dispose();
+                realmSubscription = null;
                 Close(false);
             }
         }

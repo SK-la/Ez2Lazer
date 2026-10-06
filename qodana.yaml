@@ -13,7 +13,7 @@ exclude:
   - name: DuplicateSectionInFile
   - name: All
     paths:
-      - ..\osu-resources\
+      - ..\ez2lazer-resources\
       - osu.sln.DotSettings
       - *.xml
       - *.ini

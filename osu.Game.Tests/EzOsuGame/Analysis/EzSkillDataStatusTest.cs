@@ -36,10 +36,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 var status = store.GetSkillDataStatus();
 
-                Assert.That(status.TotalCharts, Is.EqualTo(3));
-                Assert.That(status.Msd.Missing, Is.EqualTo(3));
-                Assert.That(status.ChartSkillInfo.Missing, Is.EqualTo(3));
-                Assert.That(status.ChartDan.Missing, Is.EqualTo(3));
+                Assert.That(status.UniverseCount, Is.EqualTo(3));
+                Assert.That(status["MSD"].Missing, Is.EqualTo(3));
+                Assert.That(status["CSI"].Missing, Is.EqualTo(3));
+                Assert.That(status["Dan"].Missing, Is.EqualTo(3));
                 Assert.That(status.HasWorkToDo, Is.True);
                 Assert.That(status.TotalPending, Is.EqualTo(9));
             });
@@ -80,31 +80,31 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 var status = store.GetSkillDataStatus();
 
-                Assert.That(status.TotalCharts, Is.EqualTo(3));
+                Assert.That(status.UniverseCount, Is.EqualTo(3));
 
-                Assert.That(status.Msd.Ready, Is.EqualTo(1));
-                Assert.That(status.Msd.Unrateable, Is.EqualTo(1));
-                Assert.That(status.Msd.Stale, Is.EqualTo(0));
-                Assert.That(status.Msd.Missing, Is.EqualTo(1));
-                Assert.That(status.Msd.CurrentRevision, Is.EqualTo(EzAnalysisRevision.Msd));
+                Assert.That(status["MSD"].Ready, Is.EqualTo(1));
+                Assert.That(status["MSD"].Settled, Is.EqualTo(1));
+                Assert.That(status["MSD"].Stale, Is.EqualTo(0));
+                Assert.That(status["MSD"].Missing, Is.EqualTo(1));
+                Assert.That(status["MSD"].CurrentRevision, Is.EqualTo(EzAnalysisRevision.Msd));
 
-                Assert.That(status.ChartSkillInfo.Ready, Is.EqualTo(1));
-                Assert.That(status.ChartSkillInfo.Unrateable, Is.EqualTo(1));
-                Assert.That(status.ChartSkillInfo.Missing, Is.EqualTo(1));
-                Assert.That(status.ChartSkillInfo.CurrentRevision, Is.EqualTo(EzAnalysisRevision.ChartSkillInfo));
+                Assert.That(status["CSI"].Ready, Is.EqualTo(1));
+                Assert.That(status["CSI"].Settled, Is.EqualTo(1));
+                Assert.That(status["CSI"].Missing, Is.EqualTo(1));
+                Assert.That(status["CSI"].CurrentRevision, Is.EqualTo(EzAnalysisRevision.ChartSkillInfo));
 
                 // Dan: a is ready, b is settled by its unrateable MSD (the row written for it is not read as a
                 // result), c is left behind by an older revision.
-                Assert.That(status.ChartDan.Ready, Is.EqualTo(1));
-                Assert.That(status.ChartDan.Unrateable, Is.EqualTo(1));
-                Assert.That(status.ChartDan.Stale, Is.EqualTo(1));
-                Assert.That(status.ChartDan.Missing, Is.EqualTo(0));
-                Assert.That(status.ChartDan.CurrentRevision, Is.EqualTo(EzAnalysisRevision.ChartDan));
+                Assert.That(status["Dan"].Ready, Is.EqualTo(1));
+                Assert.That(status["Dan"].Settled, Is.EqualTo(1));
+                Assert.That(status["Dan"].Stale, Is.EqualTo(1));
+                Assert.That(status["Dan"].Missing, Is.EqualTo(0));
+                Assert.That(status["Dan"].CurrentRevision, Is.EqualTo(EzAnalysisRevision.ChartDan));
 
                 // a is complete everywhere; b has MSD+CSI settled and a current Dan; c has only a stale Dan row.
-                Assert.That(status.Msd.Pending, Is.EqualTo(1));
-                Assert.That(status.ChartSkillInfo.Pending, Is.EqualTo(1));
-                Assert.That(status.ChartDan.Pending, Is.EqualTo(1));
+                Assert.That(status["MSD"].Pending, Is.EqualTo(1));
+                Assert.That(status["CSI"].Pending, Is.EqualTo(1));
+                Assert.That(status["Dan"].Pending, Is.EqualTo(1));
                 Assert.That(status.TotalPending, Is.EqualTo(3));
 
                 string described = status.Describe();
@@ -128,11 +128,11 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 var status = store.GetSkillDataStatus();
 
-                Assert.That(status.TotalCharts, Is.EqualTo(3));
-                Assert.That(status.Msd.Ready, Is.EqualTo(0));
-                Assert.That(status.Msd.Missing, Is.EqualTo(3));
-                Assert.That(status.ChartSkillInfo.Ready, Is.EqualTo(0));
-                Assert.That(status.ChartSkillInfo.Missing, Is.EqualTo(3));
+                Assert.That(status.UniverseCount, Is.EqualTo(3));
+                Assert.That(status["MSD"].Ready, Is.EqualTo(0));
+                Assert.That(status["MSD"].Missing, Is.EqualTo(3));
+                Assert.That(status["CSI"].Ready, Is.EqualTo(0));
+                Assert.That(status["CSI"].Missing, Is.EqualTo(3));
             });
         }
 
@@ -169,8 +169,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var store = new EzSkillStore(realm);
                 var status = store.GetSkillDataStatus();
 
-                Assert.That(status.TotalCharts, Is.EqualTo(3));
-                Assert.That(status.Msd.Missing, Is.EqualTo(3));
+                Assert.That(status.UniverseCount, Is.EqualTo(3));
+                Assert.That(status["MSD"].Missing, Is.EqualTo(3));
                 Assert.That(status.TotalPending, Is.EqualTo(9));
             });
         }
@@ -191,10 +191,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 var status = store.GetSkillDataStatus();
 
-                Assert.That(status.Msd.Unrateable, Is.EqualTo(1));
-                Assert.That(status.ChartDan.Ready, Is.EqualTo(0));
-                Assert.That(status.ChartDan.Unrateable, Is.EqualTo(1));
-                Assert.That(status.ChartDan.Missing, Is.EqualTo(2));
+                Assert.That(status["MSD"].Settled, Is.EqualTo(1));
+                Assert.That(status["Dan"].Ready, Is.EqualTo(0));
+                Assert.That(status["Dan"].Settled, Is.EqualTo(1));
+                Assert.That(status["Dan"].Missing, Is.EqualTo(2));
                 Assert.That(status.HasWorkToDo, Is.True);
             });
         }
@@ -291,10 +291,10 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 var status = store.GetSkillDataStatus();
 
-                Assert.That(status.ChartSkillInfo.Ready, Is.EqualTo(0));
-                Assert.That(status.ChartSkillInfo.Unrateable, Is.EqualTo(1));
-                Assert.That(status.ChartSkillInfo.Missing, Is.EqualTo(2));
-                Assert.That(status.ChartSkillInfo.Pending, Is.EqualTo(2));
+                Assert.That(status["CSI"].Ready, Is.EqualTo(0));
+                Assert.That(status["CSI"].Settled, Is.EqualTo(1));
+                Assert.That(status["CSI"].Missing, Is.EqualTo(2));
+                Assert.That(status["CSI"].Pending, Is.EqualTo(2));
             });
         }
 

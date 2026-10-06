@@ -20,7 +20,7 @@ namespace osu.Game.EzOsuGame.Scoring
     {
         private readonly Dictionary<int, IEzReplaySession> sessionsByOnlineId = new Dictionary<int, IEzReplaySession>();
 
-        public EzReplaySessionRouter(IEnumerable<RulesetInfo> availableRulesets)
+        public EzReplaySessionRouter(IEnumerable<RulesetInfo> availableRulesets, IWorkingBeatmapCache? beatmapCache = null)
         {
             foreach (var rulesetInfo in availableRulesets)
             {
@@ -29,6 +29,16 @@ namespace osu.Game.EzOsuGame.Scoring
                 if (session != null)
                     sessionsByOnlineId[rulesetInfo.OnlineID] = session;
             }
+
+            // 无 beatmap 来源（测试）时 session 沿用调用方提供的 beatmap。
+            if (beatmapCache != null)
+                AttachBeatmaps(beatmapCache);
+        }
+
+        public void AttachBeatmaps(IWorkingBeatmapCache beatmapCache)
+        {
+            foreach (var session in sessionsByOnlineId.Values)
+                session.AttachBeatmaps(beatmapCache);
         }
 
         public Task<Score> RunAsync(Score score, IBeatmap beatmap, ReplayRunPurpose purpose, CancellationToken cancellationToken = default)

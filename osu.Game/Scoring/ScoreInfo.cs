@@ -210,9 +210,16 @@ namespace osu.Game.Scoring
         [MapTo(nameof(Rank))]
         public int RankInt { get; set; }
 
+        #region IScoreInfo
+
         IRulesetInfo IScoreInfo.Ruleset => Ruleset;
         IBeatmapInfo? IScoreInfo.Beatmap => BeatmapInfo;
         IUser IScoreInfo.User => User;
+        IEnumerable<IConfiguredMod> IScoreInfo.Mods => APIMods;
+        IReadOnlyDictionary<HitResult, int> IScoreInfo.Statistics => Statistics;
+        IReadOnlyDictionary<HitResult, int> IScoreInfo.MaximumStatistics => MaximumStatistics;
+
+        #endregion
 
         #region Properties required to make things work with existing usages
 
@@ -246,6 +253,7 @@ namespace osu.Game.Scoring
             clone.ManiaHealthMode = ManiaHealthMode;
             clone.SessionOffsetPlusMania = SessionOffsetPlusMania;
             clone.SessionOffsetPlusNonMania = SessionOffsetPlusNonMania;
+            clone.OsuJudgementTrack = OsuJudgementTrack;
             clone.SessionAccuracyCutoffA = SessionAccuracyCutoffA;
             clone.SessionAccuracyCutoffS = SessionAccuracyCutoffS;
             clone.SessionSettingsCaptured = SessionSettingsCaptured;
@@ -297,6 +305,13 @@ namespace osu.Game.Scoring
         /// </summary>
         [Ignored]
         public double SessionOffsetPlusNonMania { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: Osu 判定轨嵌入（OSL-013）。暂 [Ignored] 不升 Realm；持久化升版需确认后 bump EZ_REALM_SCHEMA_VERSION。
+        /// -1 = 未设置（ForStored 回退 Lazer）；0 = Lazer；1 = ClassicNative。
+        /// </summary>
+        [Ignored]
+        public int OsuJudgementTrack { get; set; } = -1;
 
         /// <summary>
         /// Ez2Lazer: Accuracy cutoff A at gameplay start (submission eligibility snapshot).

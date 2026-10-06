@@ -20,11 +20,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
         {
             data = new int[rows, cols];
 
-            for (int i = 0; i < rows; i++)
-            {
-                for (int j = 0; j < cols; j++)
-                    data[i, j] = EMPTY;
-            }
+            // 数组本身已经是 0，只有 EMPTY(-1) 需要显式填一遍；用扁平 span 单趟填充代替双层索引循环。
+            AsSpan().Fill(EMPTY);
         }
 
         public int this[int row, int col]
@@ -45,22 +42,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             }
         }
 
-        public Span<int> AsSpan() => MemoryMarshal.CreateSpan(ref data[0, 0], data.Length);
+        // 空矩阵（0 行或 0 列）下 data[0, 0] 越界：返回空 span，让调用方的 Fill / 循环自然成为空操作。
+        public Span<int> AsSpan() => data.Length == 0 ? Span<int>.Empty : MemoryMarshal.CreateSpan(ref data[0, 0], data.Length);
 
         public Span<int> GetRowSpan(int row)
         {
             if (row < 0 || row >= Rows)
                 throw new ArgumentOutOfRangeException($"Index out of range: row={row}");
 
-            return MemoryMarshal.CreateSpan(ref data[row, 0], Cols);
+            return Cols == 0 ? Span<int>.Empty : MemoryMarshal.CreateSpan(ref data[row, 0], Cols);
         }
 
-        public NoteMatrix Clone()
+        private NoteMatrix(int[,] data)
         {
-            var clone = new NoteMatrix(Rows, Cols);
-            Array.Copy(data, clone.data, data.Length);
-            return clone;
+            this.data = data;
         }
+
+        public NoteMatrix Clone() => new NoteMatrix((int[,])data.Clone());
 
         public void SwapColumns(int colA, int colB)
         {
@@ -106,7 +104,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             }
         }
 
-        public Span<bool> AsSpan() => MemoryMarshal.CreateSpan(ref data[0, 0], data.Length);
+        public Span<bool> AsSpan() => data.Length == 0 ? Span<bool>.Empty : MemoryMarshal.CreateSpan(ref data[0, 0], data.Length);
     }
 
     public class DoubleMatrix
@@ -139,6 +137,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
             }
         }
 
-        public Span<double> AsSpan() => MemoryMarshal.CreateSpan(ref data[0, 0], data.Length);
+        public Span<double> AsSpan() => data.Length == 0 ? Span<double>.Empty : MemoryMarshal.CreateSpan(ref data[0, 0], data.Length);
     }
 }

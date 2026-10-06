@@ -175,7 +175,9 @@ namespace osu.Game.EzOsuGame.HUD
                             break;
 
                         case EzAccuracyDisplayMode.Classic:
-                            scoreProcessor.IsLegacyScore = true;
+                            // 只切换显示绑定。AccuracyClassic 由 ScoreProcessor.ApplyScoreChange 无条件维护
+                            // （见 ScoreProcessor.cs 的 UpdateScoreClassic），与本档位无关；这里一旦改
+                            // scoreProcessor.IsLegacyScore，就等于用显示设置去改 TotalScore 计分口径。
                             accuracyCounters[index].Current.UnbindBindings();
                             accuracyCounters[index].Current.BindTo(scoreProcessor.AccuracyClassic);
                             accuracyCounters[index].Show();

@@ -92,7 +92,7 @@ namespace osu.Game.EzOsuGame.Overlays
             Task.Run(() =>
             {
                 bool failed = false;
-                EzSkillDataStatus? status = null;
+                EzDataStateReport? status = null;
                 IReadOnlyList<EzStalePlayerSkill> stalePlayers = Array.Empty<EzStalePlayerSkill>();
                 EzChartChainDebt debt = EzChartChainDebt.EMPTY;
                 bool backfillRunning = false;
@@ -134,14 +134,14 @@ namespace osu.Game.EzOsuGame.Overlays
             => new SettingsNote.Data($"{EzSettingsStrings.SKILL_DATA_STATUS} · {text}", type);
 
         private static SettingsNote.Data describe(
-            EzSkillDataStatus status,
+            EzDataStateReport status,
             IReadOnlyList<EzStalePlayerSkill> stalePlayers,
             EzChartChainDebt debt,
             bool backfillRunning)
         {
-            string describeFacet(string name, EzFacetStatus facet)
-                => $"{name} {EzSettingsStrings.SKILL_DATA_STATUS_READY} {facet.Ready}"
-                   + $" {EzSettingsStrings.SKILL_DATA_STATUS_UNRATEABLE} {facet.Unrateable}"
+            string describeFacet(EzFacetStatus facet)
+                => $"{facet.Id} {EzSettingsStrings.SKILL_DATA_STATUS_READY} {facet.Ready}"
+                   + $" {EzSettingsStrings.SKILL_DATA_STATUS_UNRATEABLE} {facet.Settled}"
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_STALE} {facet.Stale}"
                    + $" {EzSettingsStrings.SKILL_DATA_STATUS_MISSING} {facet.Missing}";
 
@@ -170,10 +170,8 @@ namespace osu.Game.EzOsuGame.Overlays
                   + $"({EzSettingsStrings.SKILL_DATA_STATUS_WAITING_MSD} {debt.WaitingOnMsdByUser.Values.Sum()})"
                 : $"{EzSettingsStrings.SKILL_DATA_STATUS_WAITING_CHART} {EzSettingsStrings.SKILL_DATA_STATUS_ALL_CURRENT}";
 
-            string line = $"{EzSettingsStrings.SKILL_DATA_STATUS_CHARTS} {status.TotalCharts}"
-                          + $"\n · {describeFacet("MSD", status.Msd)}"
-                          + $"\n · {describeFacet("CSI", status.ChartSkillInfo)}"
-                          + $"\n · {describeFacet("Dan", status.ChartDan)}"
+            string line = $"{EzSettingsStrings.SKILL_DATA_STATUS_CHARTS} {status.UniverseCount}"
+                          + string.Concat(status.Facets.Select(f => $"\n · {describeFacet(f)}"))
                           + $"\n · {pending}"
                           + $"\n · {players}"
                           + $"\n · {waiting}";

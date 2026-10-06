@@ -42,9 +42,10 @@ namespace osu.Game.EzOsuGame.HUD.EzHealthDisplay
 
         public EzHealthDisplayBar(EzLocalTextureFactory textureFactory, string textureName)
         {
-            var textureAnimation1 = textureFactory.CreateAnimation(textureName);
+            Drawable? texture = textureFactory.CreateAnimation(textureName);
 
-            Add(textureAnimation1);
+            if (texture != null)
+                Add(texture);
 
             Masking = true;
         }

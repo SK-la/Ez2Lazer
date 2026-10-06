@@ -65,6 +65,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private EzEnumJudgePrecedence judgePrecedence;
         private EzEnumHitMode? configuredMissCollectionHitMode;
 
+        /// <summary>命中时「提前判定为 miss」的条目缓冲，避免每次命中分配一个迭代器。</summary>
+        private readonly List<ManiaLaneEntry> forceMissScratch = new List<ManiaLaneEntry>();
+
         public Container UnderlayElements => HitObjectArea.UnderlayElements;
 
         private GameplaySampleTriggerSource sampleTriggerSource = null!;
@@ -375,7 +378,11 @@ namespace osu.Game.Rulesets.Mania.UI
             if (!result.IsHit || !judgedObject.DisplayResult || !DisplayJudgements.Value)
                 return;
 
-            HitObjectArea.Explosions.Add(hitExplosionPool.Get(e => e.Apply(result)));
+            // 不用 setup 委托：`Apply` 只是记录 Result，而 `PrepareForUse`（真正读它的地方）在下一帧 Update 才跑，
+            // 所以拿到实例后再赋值等价，且省掉每次判定一个捕获 result 的闭包。
+            var explosion = hitExplosionPool.Get();
+            explosion.Apply(result);
+            HitObjectArea.Explosions.Add(explosion);
         }
 
         private bool isHittable(DrawableHitObject drawable, double time, EzEnumJudgePrecedence precedence)
@@ -429,8 +436,18 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             double judgementTime = hitObject.Result.TimeAbsolute;
 
-            foreach (var entry in LaneController.EnumerateForceMissBefore(hitObject.HitObject.StartTime))
+            forceMissScratch.Clear();
+            LaneController.CollectForceMissBefore(hitObject.HitObject.StartTime, forceMissScratch);
+
+            for (int i = 0; i < forceMissScratch.Count; i++)
             {
+                var entry = forceMissScratch[i];
+
+                // 走快照而不是实时枚举：其间 MissForcefully 会判掉条目（含其它条目），
+                // 这里按实时状态再确认一次，语义与原来的惰性枚举一致。
+                if (entry.IsPressJudged)
+                    continue;
+
                 if (OrderedHitPolicyHelper.IsUserTriggerJudgeableNow(entry.RoutedObject, judgementTime))
                     continue;
 
@@ -449,13 +466,21 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InputAudioLatencyTracker.Instance?.RecordColumnPress(Index);
 
+            // 按键历史是 Ez 被动 miss stored TimeOffset 的输入（ManiaDrawableMissTiming → Session parity），
+            // 保留时长也由判定窗口算出，属生产数据；只有计数埋点受 ManiaJudgeHotPathTrace.Enabled 控制。
+            pressTimes.Add(time);
+            pressTimes.Trim(time - pressHistoryRetentionMs);
+
             if (ManiaJudgeHotPathTrace.Enabled)
             {
-                pressTimes.Add(time);
-                pressTimes.Trim(time - pressHistoryRetentionMs);
                 ManiaJudgeHotPathTrace.RecordPressTimesCount(pressTimes.Count);
                 ManiaJudgeHotPathTrace.RecordColumnOnPressed();
             }
+
+            // 取样必须先于路由判定：判定一落地，本次 note 即为「已判定」，触发源会改取「下一颗」或回退到
+            // 「上一个已判定对象」，后者会把上一颗的键音再触发一次（同名键音被发声池打断后从头重播）。
+            if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
+                sampleTriggerSource.Play();
 
             if (drawableRuleset?.ColumnRoutesInput == true)
             {
@@ -471,9 +496,6 @@ namespace osu.Game.Rulesets.Mania.UI
                 if (entry != null)
                     applyRoutedPress(entry.RoutedObject, time, e);
             }
-
-            if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
-                sampleTriggerSource.Play();
 
             return false;
         }

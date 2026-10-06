@@ -150,6 +150,44 @@ namespace osu.Game.Rulesets.Osu.Tests.EzOsu.ReplayJudge
             return (score, beatmap, environment);
         }
 
+        /// <summary>
+        /// 单圈迟到 tap：OD5 下约 90ms 晚于起拍 — Lazer 多为 Ok，ClassicNative 多为 Meh（OK 半窗更紧）。
+        /// </summary>
+        public static (Score score, IBeatmap beatmap, IGameplayEnvironment environment) CreateSingleCircleLateTap(double lateMs = 90)
+        {
+            var ruleset = new OsuRuleset();
+            var testBeatmap = new TestBeatmap(ruleset.RulesetInfo)
+            {
+                HitObjects = new List<HitObject>
+                {
+                    new HitCircle { StartTime = 1000, Position = new Vector2(256, 192) },
+                },
+            };
+
+            var beatmap = prepareBeatmap(ruleset, testBeatmap);
+            var circle = (HitCircle)beatmap.HitObjects[0];
+
+            var scoreInfo = new ScoreInfo
+            {
+                Ruleset = ruleset.RulesetInfo,
+                BeatmapInfo = beatmap.BeatmapInfo,
+            };
+
+            var replay = new Replay
+            {
+                Frames = new List<ReplayFrame>
+                {
+                    new OsuReplayFrame(1000 + lateMs, circle.StackedPosition, OsuAction.LeftButton),
+                    new OsuReplayFrame(1000 + lateMs + 50, circle.StackedPosition),
+                },
+            };
+
+            var score = new Score { ScoreInfo = scoreInfo, Replay = replay };
+            var environment = GlobalConfigStore.EzConfig.ResolveEnvironment(ReplayRunPurpose.ForStored, scoreInfo);
+
+            return (score, beatmap, environment);
+        }
+
         private static IBeatmap prepareBeatmap(OsuRuleset ruleset, TestBeatmap testBeatmap)
         {
             var beatmap = ruleset.CreateBeatmapConverter(testBeatmap).Convert();

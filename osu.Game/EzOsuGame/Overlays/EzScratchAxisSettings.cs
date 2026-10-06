@@ -48,6 +48,9 @@ namespace osu.Game.EzOsuGame.Overlays
         private Bindable<double> dashEnterAcceleration = null!;
         private Bindable<double> dashExitVelocity = null!;
 
+        /// <summary>反转转盘方向（Catch 左右移动 / 选歌界面上一首下一首）。</summary>
+        private Bindable<bool> scratchAxisInvert = null!;
+
         private ScratchAxisDeviceTracker tracker = null!;
 
         private FillFlowContainer catchEz2SettingsContainer = null!;
@@ -83,6 +86,7 @@ namespace osu.Game.EzOsuGame.Overlays
             stopThreshold = ezConfig.GetBindable<int>(Ez2Setting.ScratchAxisStopThreshold);
             dashEnterAcceleration = ezConfig.GetBindable<double>(Ez2Setting.CatchScratchDashEnterAcceleration);
             dashExitVelocity = ezConfig.GetBindable<double>(Ez2Setting.CatchScratchDashExitVelocity);
+            scratchAxisInvert = ezConfig.GetBindable<bool>(Ez2Setting.ScratchAxisInvert);
 
             leftMonitor.Deadzone.BindTo(deadzone);
             rightMonitor.Deadzone.BindTo(deadzone);
@@ -207,6 +211,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 })
                 {
                     Keywords = new[] { "ez", "scratch", "stop", "threshold" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.SCRATCH_AXIS_INVERT,
+                    HintText = EzSettingsStrings.SCRATCH_AXIS_INVERT_TOOLTIP,
+                    Current = scratchAxisInvert,
+                })
+                {
+                    Keywords = new[] { "ez", "scratch", "invert", "reverse", "catch", "转盘", "反转" }
                 },
             };
 

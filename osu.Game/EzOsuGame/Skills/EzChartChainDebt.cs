@@ -69,10 +69,11 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentNullException.ThrowIfNull(plays);
             ArgumentNullException.ThrowIfNull(store);
 
-            var rateableCharts = store.GetRateableChartHashes();
-            var settledCsi = store.GetSettledChartSkillInfoHashes();
-            var settledMsd = store.GetSettledBeatmapMsdHashes();
-            var unrateableMsd = store.GetUnrateableMsdHashes();
+            var chain = store.CollectChartChainState();
+            var rateableCharts = chain.RateableCharts;
+            var settledCsi = chain.SettledChartSkillInfo;
+            var settledMsd = chain.SettledMsd;
+            var unrateableMsd = chain.UnrateableMsd;
 
             var waitingOnMsd = new Dictionary<string, int>(StringComparer.Ordinal);
             var waitingOnCsi = new Dictionary<string, int>(StringComparer.Ordinal);

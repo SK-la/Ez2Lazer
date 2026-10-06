@@ -343,8 +343,8 @@ def _build_macos_launcher_script(executable_name: str | None) -> str:
 def velopack_framework_for(runtime: str) -> str | None:
     """Velopack bootstrap frameworks for framework-dependent publishes (Windows only)."""
     mapping = {
-        'win-x64': 'net8.0-x64-desktop',
-        'win-arm64': 'net8.0-arm64-desktop',
+        'win-x64': 'net10.0-x64-desktop',
+        'win-arm64': 'net10.0-arm64-desktop',
     }
     return mapping.get(runtime)
 
@@ -540,10 +540,10 @@ def main():
     parser.add_argument('--deps-path', default=None, help='Path to folder containing dependency DLLs to include')
     parser.add_argument('--deps-pattern', default='*.dll', help='Glob pattern for dependency files to copy')
     parser.add_argument('--deps-source', choices=['local','github','none'], default='local', help='Where to get dependency DLLs')
-    parser.add_argument('--deps-github-repo', default='SK-la/osu-framework', help='GitHub repo (owner/repo) to clone when --deps-source=github')
+    parser.add_argument('--deps-github-repo', default='SK-la/ez2lazer-framework', help='GitHub repo (owner/repo) to clone when --deps-source=github')
     parser.add_argument('--deps-github-branch', default='master', help='Branch or ref to checkout when cloning deps github repo')
     parser.add_argument('--deps-github-project', default='osu.Framework/osu.Framework.csproj', help='Path to csproj inside cloned deps repo to build')
-    parser.add_argument('--resources-github-repo', default='SK-la/osu-resources', help='GitHub repo for resources to clone')
+    parser.add_argument('--resources-github-repo', default='SK-la/ez2lazer-resources', help='GitHub repo for resources to clone')
     parser.add_argument('--resources-github-path', default='osu.Game.Resources/Resources', help='Path inside resources repo to copy')
     parser.add_argument('--resources-path', default=None, help='Local path to resources to include in package')
     args = parser.parse_args()
@@ -822,16 +822,16 @@ def main():
 
                     if proj_to_build:
                         print('Building dependency project', proj_to_build)
-                        bres = subprocess.run(["dotnet","build",proj_to_build,"-c","Release","-f","net8.0"])
+                        bres = subprocess.run(["dotnet","build",proj_to_build,"-c","Release","-f","net10.0"])
                         if bres.returncode != 0:
                             raise RuntimeError('dotnet build of deps failed')
-                        deps_src_path = os.path.join(os.path.dirname(proj_to_build), 'bin', 'Release', 'net8.0')
+                        deps_src_path = os.path.join(os.path.dirname(proj_to_build), 'bin', 'Release', 'net10.0')
                         if not os.path.exists(deps_src_path):
                             # sometimes the project is in a subfolder; search upwards
                             parent = os.path.dirname(proj_to_build)
                             found = False
                             for _ in range(4):
-                                candidate_bin = os.path.join(parent, 'bin', 'Release', 'net8.0')
+                                candidate_bin = os.path.join(parent, 'bin', 'Release', 'net10.0')
                                 if os.path.exists(candidate_bin):
                                     deps_src_path = candidate_bin
                                     found = True
@@ -841,7 +841,7 @@ def main():
                                 print('Warning: could not find built outputs in expected locations')
                     else:
                         print('Project path not found in cloned repo, attempting to find bin folder...')
-                        deps_src_path = os.path.join(tmp, 'bin', 'Release', 'net8.0')
+                        deps_src_path = os.path.join(tmp, 'bin', 'Release', 'net10.0')
                 else:
                     deps_src_path = None
 

@@ -271,6 +271,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
                 foreach (var marker in judgementMarkers)
                 {
+                    // 在途的缓动会每帧把 Y 写回它自己的插值（目标还是按旧高度算的），必须先清掉，
+                    // 否则下面这次按比例赋值会被覆盖，拖动滑块时标记会卡在旧范围里。
+                    marker.ClearTransforms(false, nameof(Drawable.Y));
+
                     // 按比例调整marker的Y位置
                     marker.Y = marker.Y * (height.NewValue / height.OldValue);
                     marker.Y = Math.Clamp(marker.Y, -height.NewValue / 2, height.NewValue / 2);
@@ -289,8 +293,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             {
                 if (e.NewValue)
                 {
+                    // 收尾到目标而不是停在半途：开启前标记本来就停在最近一次判定的位置（那时缓动是空变换），
+                    // 保持这个观感，否则会在「停止移动」时停在一个中间插值上。
                     foreach (var marker in judgementMarkers)
-                        marker.ClearTransforms();
+                        marker.FinishTransforms(false, nameof(Drawable.Y));
                 }
                 else
                     updateAllMarkerPositions();
@@ -456,7 +462,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
             const int marker_move_duration = 800;
 
-            marker.Y = targetY;
+            // 只发缓动，不要先直接赋值。
+            // marker 是常驻对象（不像 BarHitErrorMeter 里那条一次性的池化判定线，那边直接赋值是对的）：
+            // 先把 Y 钉到目标的话，紧随其后的 MoveToY 就是 start == end 的空变换，缓动等于没有。
             marker.MoveToY(targetY, marker_move_duration, Easing.OutQuint);
         }
 

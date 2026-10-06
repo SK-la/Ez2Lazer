@@ -15,6 +15,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Osu.Configuration;
+using osu.Game.Rulesets.Osu.EzOsu.ReplayJudge.Judgement;
 using osu.Game.Rulesets.Osu.Judgements;
 using osu.Game.Rulesets.Osu.Skinning;
 using osu.Game.Rulesets.Osu.Skinning.Default;
@@ -185,7 +186,7 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
         /// </summary>
         /// <param name="timeOffset">The time offset.</param>
         /// <returns>The hit result, or <see cref="HitResult.None"/> if <paramref name="timeOffset"/> doesn't result in a judgement.</returns>
-        protected virtual HitResult ResultFor(double timeOffset) => HitObject.HitWindows.ResultFor(timeOffset);
+        protected virtual HitResult ResultFor(double timeOffset) => OsuCircleJudgement.ResultFor(HitObject.HitWindows, timeOffset);
 
         protected override void UpdateInitialTransforms()
         {

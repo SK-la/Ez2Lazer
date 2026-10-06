@@ -60,10 +60,20 @@ namespace osu.Game.Overlays.Settings.Sections
         private Ez2ConfigManager ezConfig { get; set; }
 
         private IDisposable realmSubscription;
+        private Bindable<bool> autoApplyOnSkinChangeBindable;
+
+        /// <summary>
+        /// 脚本皮肤开关。刻意不使用 <c>ezConfig.GetBindable</c>：启动期只读一次，改动直接写回 ini。
+        /// </summary>
+        private Bindable<bool> enableScriptedSkinsBindable;
+
+        private bool restoringPersistedConfig;
 
         [BackgroundDependencyLoader(permitNulls: true)]
         private void load([CanBeNull] SkinEditorOverlay skinEditor, [CanBeNull] EzLayoutEditorOverlay ezLayoutEditor)
         {
+            enableScriptedSkinsBindable = new Bindable<bool>(ezConfig.Get<bool>(Ez2Setting.EnableScriptedSkins));
+
             Children = new Drawable[]
             {
                 new SettingsItemV2(skinDropdown = new SkinDropdown
@@ -112,11 +122,20 @@ namespace osu.Game.Overlays.Settings.Sections
                 {
                     Note = { Value = new SettingsNote.Data(EzEditorStrings.SETTINGS_AUTO_APPLY_SKIN_JSON_NOTE, SettingsNote.Type.Informational) },
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzEditorStrings.SETTINGS_ENABLE_SCRIPTED_SKINS,
+                    Current = enableScriptedSkinsBindable,
+                })
+                {
+                    Note = { Value = new SettingsNote.Data(EzEditorStrings.SETTINGS_ENABLE_SCRIPTED_SKINS_NOTE, SettingsNote.Type.Informational) },
+                },
                 new SettingsButtonV2
                 {
                     Text = EzEditorStrings.SETTINGS_RELOAD_SCRIPTED_SKINS,
                     TooltipText = EzEditorStrings.SETTINGS_RELOAD_SCRIPTED_SKINS_TOOLTIP,
                     Action = reloadScriptedSkins,
+                    Enabled = { Value = skins.ScriptedSkinsEnabled },
                 },
             };
         }
@@ -141,13 +160,46 @@ namespace osu.Game.Overlays.Settings.Sections
                 }
             });
 
-            ezConfig.GetBindable<bool>(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange).BindValueChanged(change =>
-            {
-                if (change.OldValue && !change.NewValue)
-                    ezConfig.Load();
-            });
+            // 必须持有副本：框架只把绑定副本登记为 WeakReference，副本被 GC 回收后订阅会静默失效。
+            autoApplyOnSkinChangeBindable = ezConfig.GetBindable<bool>(Ez2Setting.EzSkinJsonAutoApplyOnSkinChange);
+            autoApplyOnSkinChangeBindable.BindValueChanged(onAutoApplyOnSkinChangeChanged);
+
+            enableScriptedSkinsBindable.BindValueChanged(onEnableScriptedSkinsChanged);
 
             skins.ScriptedSkinsCatalogUpdated += refreshSkinsList;
+        }
+
+        /// <summary>
+        /// 写回 ini 即可（保存走 100ms 去抖，不作任何 <c>Load()</c>，避免本项被磁盘值顶回）。
+        /// 该开关的生效时机是启动期，见 <see cref="SkinManager.ScriptedSkinsEnabled"/>。
+        /// </summary>
+        private void onEnableScriptedSkinsChanged(ValueChangedEvent<bool> change)
+        {
+            if (ezConfig.Get<bool>(Ez2Setting.EnableScriptedSkins) != change.NewValue)
+                ezConfig.SetValue(Ez2Setting.EnableScriptedSkins, change.NewValue);
+        }
+
+        /// <summary>
+        /// 关闭 EzSkin.json 自动应用时，把 ini 里已落盘的值盖回内存，丢掉自动应用只写在内存里的那一份。
+        /// 保存走 100ms 去抖，此刻 ini 里本项仍是开启，<c>Ez2ConfigManager.Load()</c> 会连本项一起顶回开启，
+        /// 所以 Load 之后必须重设本项，否则开关关不掉；重入保护避免 Load 与重设互相触发。
+        /// </summary>
+        private void onAutoApplyOnSkinChangeChanged(ValueChangedEvent<bool> change)
+        {
+            if (restoringPersistedConfig || !change.OldValue || change.NewValue)
+                return;
+
+            restoringPersistedConfig = true;
+
+            try
+            {
+                ezConfig.Load();
+                autoApplyOnSkinChangeBindable.Value = false;
+            }
+            finally
+            {
+                restoringPersistedConfig = false;
+            }
         }
 
         private void skinsChanged(IRealmCollection<SkinInfo> sender, ChangeSet changes)
@@ -185,6 +237,8 @@ namespace osu.Game.Overlays.Settings.Sections
             base.Dispose(isDisposing);
 
             realmSubscription?.Dispose();
+            autoApplyOnSkinChangeBindable?.UnbindAll();
+            enableScriptedSkinsBindable?.UnbindAll();
         }
 
         private partial class SkinDropdown : FormDropdown<Live<SkinInfo>>
