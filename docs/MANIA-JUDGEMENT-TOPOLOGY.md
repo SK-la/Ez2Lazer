@@ -1,9 +1,10 @@
 # Mania 判定 — 总拓扑（活文档）
 
 > **用途**：全场景部件上台面、M/N 分叉、与「中央判定机」设想的差距；**实施优先级与批次**以此为准。  
-> **姊妹文档**：[`MANIA-JUDGEMENT-RUNTIME.md`](./MANIA-JUDGEMENT-RUNTIME.md)（叙事/角色）、[`MANIA-SCORE-DATA-SOURCE-REGISTRY.md`](./MANIA-SCORE-DATA-SOURCE-REGISTRY.md)（数据面）。  
+> **姊妹文档**：[`MANIA-JUDGEMENT-RUNTIME.md`](./MANIA-JUDGEMENT-RUNTIME.md)（局内拓扑、M/N 共享边界、删双份 U1–U3）、[`MANIA-SCORE-DATA-SOURCE-REGISTRY.md`](./MANIA-SCORE-DATA-SOURCE-REGISTRY.md)（数据面）。  
 > **Cursor 详稿**：`ez2lazer-framework/.cursor/plans/mania_判定总拓扑_04712845.plan.md`（讨论过程可更长，本文件收收敛结论）。  
-> **状态**：2026-07-13 初版；2026-07-14 以 `702be7` / `2026.614.0` 锁定月度架构基线。`ae471f` 仅是当日批次点，不再作为架构基线。
+> **状态**：2026-07-13 初版；2026-07-14 以 `702be7` / `2026.614.0` 锁定月度架构基线。`ae471f` 仅是当日批次点，不再作为架构基线。  
+> **删双份统一**：痛点标注与改文件清单见 RUNTIME §5–§6（本文件批次表只管已落地的性能/拓扑收拢）。
 
 ---
 
@@ -256,3 +257,4 @@ FPS 观测口径、跨模块掉帧结论与复现步骤统一见 [`EZ-PERFORMANC
 | 2026-07-14 | 判定收敛：O2 Round 状态单源；Session/Race 不写 Live HUD；变量 BPM 改由 Round 持有 beatmap 解析 |
 | 2026-07-14 | Live automiss 迁到 Column late-deadline 队列；删除 `ShouldDeferAutoMissUpdate` 虚分派与 `ManiaAutoMissGate` |
 | 2026-07-14 | 删除 Mania `OrderedHitPolicy`；Column 直连 MLC；bench 改测真实队列；48 项全模式 parity / 121 项 ReplayJudge 通过 |
+| 2026-10-06 | 链到 RUNTIME §5–§6（局内拓扑定稿 + Lazer 单源 / AutoMiss·LN 统一顺序）；本表不重复 U 批次 |

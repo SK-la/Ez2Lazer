@@ -1,234 +1,268 @@
-# Mania 局内判定 — 运行时大局观
+# Mania 局内判定 — 运行时架构
 
-> **写给谁**：需要「谁是谁、为什么有两套、6–7 月改了什么」的人；**不**要求先认类名。  
-> **和别的文档关系**：[`MANIA-SCORE-DATA-SOURCE-REGISTRY.md`](./MANIA-SCORE-DATA-SOURCE-REGISTRY.md) 管 **成绩数字从哪读**；本文件管 **局里怎么判**。  
-> **状态**：2026-07-13 第二版（叙事优先）；细节代码见文末附录。
-
----
-
-## 0. 先用一句话说清楚
-
-Ez Mania 在官方 osu! lazer 的「画面上有音符、按了算分」之上，加了两件大事：
-
-1. **多种 HitMode**（IIDX / O2 / EZ2AC / BMS…）——同一种 Perfect，窗口和名字都不一样。  
-2. **两套算分路径必须一致**——你**亲手打**出来的结果（**M**），和用**同一份 replay 在后台重放**算出来的结果（**N**），在相同环境下必须一样。
-
-6–7 月的大量改动，本质都是在追第 2 条（M ≡ N），同时把按键从「每个音符自己抢输入」收成「每列只判一个目标」。  
-**性能卡顿、offset 偏后**，是这套改动在 **局内 Drawable 路径**上叠出来的副作用，不是单独某个 HUD 的小 bug。
+> **写给谁**：要弄清「局里怎么判、哪层与 Session 同调、哪层仍双份」的人。  
+> **姊妹文档**：[`MANIA-SCORE-DATA-SOURCE-REGISTRY.md`](./MANIA-SCORE-DATA-SOURCE-REGISTRY.md)（成绩数字从哪读）；[`MANIA-JUDGEMENT-TOPOLOGY.md`](./MANIA-JUDGEMENT-TOPOLOGY.md)（全场景批次与部件登记）。  
+> **本文件职责**：局内（M）运行时拓扑 + M/N 共享边界 + 删双份统一顺序。  
+> **状态**：2026-10-06 — 局内拓扑定稿；痛点为证据暂定，可覆盖；统一顺序按暂定痛点钉死（未改判定逻辑）。
 
 ---
 
-## 1. 角色表：谁是谁（先记人名，再记类名）
+## 0. 一句话
 
-把系统想成一场演出里的岗位，而不是一堆 C# 文件。
-
-| 你心里的名字 | 实际上是 | 干什么 | 什么时候出现 |
-|-------------|---------|--------|-------------|
-| **你 / 键盘** | 输入 | 按下某一列 | 全程 |
-| **舞台列** | `Column` | 8K 就有 8 个「竖条接待员」；先接到键，再决定这键判给谁 | 只在**局内** |
-| **列内调度员** | `ManiaLaneController` | 一列里很多 note 叠在一起时，按 Combo/Duration/Earliest 规则**只选一个**该吃的 note | 只在**局内** |
-| **音符演员** | `DrawableNote` / Hold | 在屏幕上滚动；被选中才「吃键」并出分 | 只在**局内** |
-| **本局规则手册** | `ManiaJudgementRound` | 开局冻结：这局是 IIDX 还是 Lazer、KPoor 开不开、优先级是什么 | 局内开局读一次 |
-| **判官** | `ManiaJudgementKernel` + 各 HitMode 策略 | 给定「谁被选中 + 按早了还是晚了」，产出 Perfect/Miss… | 局内 + 后台**共用** |
-| **记分员** | `ScoreProcessor` | 把判官结果变成分数、连击、Statistics | 两边最后都找它 |
-| **M：当场裁判** | Drawable 整条链 | 你打 / 看回放时，**真的在画面上玩**走的路径 | 打完、ReplayPlayer |
-| **N：录像室裁判** | `ManiaReplaySession` | **不画画面**，只读 replay 时间轴，在内存里模拟同样规则 | 重算、统计图 Now、补 HitEvents |
-| **统计图** | `EzScoreGraphMania` | 左栏 Original = 进面板时快照；Now = 叫 **N** 用当前设置再算一遍 | 选歌拓展分析 |
-| **角逐幽灵** | `EzScoreRaceService` + Timeline | 只要「分数随时间曲线」，不要完整 HitEvents 故事 | 打歌 HUD |
-| **薄转发** | `ManiaScoreHitEventGenerator` | 几乎不判 note，只是帮面板去叫 **N** | 缺 HitEvents 时 |
-
-**关键关系**：
-
-- **M 和 N 不是两个产品功能**，是同一套规则的两种跑法。设计目标是 **结果一致**。  
-- **列 / 调度员 / 音符** 只存在于 **M（有画面）**。  
-- **N** 用另一套数据结构（列上的「目标列表」）做**同一件事**，不经过 Column 画出来。
+Ez Mania 在官方「画面上有音符、按了算分」之上加了：多 HitMode，以及 **M（局内 Drawable）≡ N（Session 无画面重算）**。  
+**Ez 轨的「等级怎么判」已进共用 Kernel**；对齐税集中在 **Lazer 数学双轨 + 驱动层镜像（AutoMiss / LN / miss offset）**。
 
 ---
 
-## 2. 两条世界线（M 和 N）
+## 1. 角色速查
+
+| 角色 | 类 / 模块 | 出现 |
+|------|-----------|------|
+| 舞台列 | `Column` | 仅 M |
+| 列状态机 | `ManiaLaneController` | 仅 M |
+| press 选目标（纯函数） | `ManiaLanePressSelector` | **M+N** |
+| 音符 / LN | `DrawableNote` / `DrawableHoldNote` | 仅 M |
+| 本局规则手册 | `ManiaJudgementRound` | M+N 各建，语义同源 |
+| 判官 | `ManiaJudgementKernel` + Mapping | **Ez M+N 共用** |
+| Lazer 数学 | M：Drawable inline；N：`Lazer*JudgementReplica` | **双轨** |
+| 记分员 | `ScoreProcessor` | M+N |
+| N 录像室 | `ManiaReplaySession` / `Simulator` | 仅 N |
+
+---
+
+## 2. 局内判定拓扑（不含 Session 驱动）
+
+```mermaid
+flowchart TB
+  subgraph L0 [开局冻结]
+    Env[GameplayEnvironment FromLive]
+    Round[ManiaJudgementRound]
+    Bind[ManiaBeatmapBinding]
+    Env --> Round
+    Round --> Bind
+  end
+
+  subgraph L3input [输入与列]
+    MIM[ManiaInputManager]
+    Col[Column.OnPressed]
+    PT[pressTimes RingBuffer 有界]
+    MIM --> Col
+    Col --> PT
+  end
+
+  subgraph L2route [目标选择]
+    LC[ManiaLaneController]
+    MLPS[ManiaLanePressSelector]
+    Col --> LC
+    LC --> MLPS
+  end
+
+  subgraph L3apply [落到物件]
+    ARP[applyRoutedPress]
+    DN[DrawableNote]
+    DH[DrawableHoldNote]
+    MLPS --> ARP
+    ARP --> DN
+    ARP --> DH
+  end
+
+  subgraph branch [HitMode 分叉]
+    EzFlag{UsesEzJudgement?}
+    DN --> EzFlag
+    EzBridge[ManiaEzDrawableJudgement]
+    Kernel[ManiaJudgementKernel.EvaluateNote]
+    Map[IManiaHitModeJudgement Mapping]
+    LazerInline["HitWindows.ResultFor + GetCappedResult inline"]
+    EzFlag -->|Ez HitMode| EzBridge
+    EzBridge --> Kernel
+    Kernel --> Map
+    EzFlag -->|Lazer Classic| LazerInline
+  end
+
+  subgraph L3passive [被动 / AutoMiss]
+    PAM[LaneController.ProcessAutoMiss late-deadline]
+    UFR["UpdateResult false → CheckForResult"]
+    Col -.-> PAM
+    PAM --> UFR
+    UFR --> EzFlag
+  end
+
+  subgraph out [出口]
+    AR[ApplyResult / MissForcefully]
+    SP[ScoreProcessor]
+    Kernel --> AR
+    LazerInline --> AR
+    AR --> SP
+  end
+
+  Round -.->|策略 PoorEnabled O2| Kernel
+  Round -.->|IsEzHitMode| EzFlag
+```
+
+### 2.1 层职责
+
+| 层 | 锚点 | 做什么 | 不该做 |
+|----|------|--------|--------|
+| **L0 冻结** | `ManiaJudgementRound`（`DrawableManiaRuleset.LoadComplete`） | HitMode / Strategy / PoorEnabled / Precedence 开局一次 | 热路径再读 `GlobalConfigStore` |
+| **L3 输入** | `Column.OnPressed` | 记有界 `pressTimes`、键音、列路由 | 自己算 HitResult |
+| **L2 路由** | `ManiaLaneController` + `ManiaLanePressSelector` | 叠键目标、force-miss 前序、AutoMiss 队列 | 窗口→等级映射 |
+| **L2 判官** | `ManiaJudgementKernel` → Mapping | `timeOffset → HitResult` / BMS action | UI、输入历史 |
+| **L3 呈现壳** | `DrawableNote` / Hold | `ApplyResult`、视觉、LN 持有态 | 复制第二套窗口数学 |
+
+### 2.2 路径 A — 用户按键（列路由开）
+
+1. `ManiaInputManager` → `Column.OnPressed`
+2. `pressTimes.Add` + 有界 `Trim`（miss stored offset / parity）
+3. `LaneController.SelectPressEntry` → **`ManiaLanePressSelector`**
+4. `applyRoutedPress` → Note / Hold
+5. **Ez**：`TryBmsOnPressed` 或 `UpdateResult(true)` → `ManiaEzDrawableJudgement` → **Kernel** → Mapping  
+   **Lazer**：`HitWindows.ResultFor` **写在 Drawable 里**（不经 Kernel）
+6. 命中后 `handleHit` → `CollectForceMissBefore` → 前序 `MissForcefully`
+
+### 2.3 路径 B — 被动 AutoMiss
+
+1. `Column` late-deadline → `LaneController.ProcessAutoMiss`
+2. 到期物件 `UpdateResult(false)` → `CheckForResult(false, …)`
+3. Ez 仍进 Kernel；Lazer 走 `CanBeHit` → `EzApplyPassiveMissWithStoredOffset`
+
+---
+
+## 3. M/N 共享与双份表（标在同一拓扑上）
+
+| 盒子 | Session 同调？ | 现状 | 对齐税 |
+|------|----------------|------|--------|
+| L0 Round / env | 是（各建一份，语义同源） | 单源概念 | 低 |
+| Kernel + Mapping（Ez） | **是** — Simulator 调 `EvaluateNote` / `EvaluateHoldTail` | Ez 判定数学单源 | 低 |
+| `ManiaLanePressSelector` | **是** — MLC 与 Simulator 同调纯选择 | 选择语义已单源 | 低 |
+| `ManiaLaneController` 状态 | **否** — N 用 `LaneTargetState` | 状态机分离（刻意） | 中（语义漂移时） |
+| AutoMiss 时机 | **镜像** — N 自有 deadline；公式应对齐 | 驱动双份 | **高** |
+| Lazer `CheckForResult` inline | **否** — N 用 `Lazer*JudgementReplica` | **最重数学双份** | **最高** |
+| `pressTimes` / miss stored offset | **镜像** — N 用 replay 边沿；公式应对齐 | Fix-1 后 M 侧有界 | 中 |
+| LN ActiveHold | **镜像** — Simulator 对齐 `OnReleased` | 状态机双份 | **高** |
+| Drawable 视觉 / 键音 | 仅 M | 不必进 Session | — |
+
+**结论**：Ez「等级怎么判」已共用 Kernel；痛点在 **Lazer 数学双轨** 与 **AutoMiss / LN / miss-offset 驱动镜像**。
+
+---
+
+## 4. 反模式目录
+
+| ID | 反模式 | 现状 |
+|----|--------|------|
+| AP-1 | Drawable 无限 `pressTimes` + Miss 全表拷贝 | **已修**（有界 RingBuffer + 零分配 MissTiming） |
+| AP-2 | 每 alive Drawable 每帧 `UpdateResult` automiss | **已修**（Column late-deadline 队列；旧 `ManiaAutoMissGate` 已删） |
+| AP-3 | 每按整列扫 overlap | **已修**（register 时 max 窗缓存） |
+| AP-4 | 热路径读全局 config | L0 Round 冻结；少数预览旁路仍 ❓ |
+| AP-5 | 为 parity 在 L3 再造一套窗口数学 | **Lazer inline vs Replica 仍违** |
+| AP-6 | Headless 整棵 DrawableRuleset 当 Session | **禁止** |
+| AP-7 | 把 Shadow 树当终态复制到其它模式 | **禁止** |
+
+---
+
+## 5. 痛点盒子标注
+
+> 下列为 **证据暂定**（来自 §3 对齐税列 + TOPOLOGY 真谱缝）。可覆盖改标；改标后同步修订 §6。
+
+| 盒子 | 暂定税级 | 依据 |
+|------|----------|------|
+| **Lazer inline ↔ Replica** | **P0** | 唯一仍「两份窗口数学」；改一侧必人工对齐另一侧 |
+| **AutoMiss 时机（M 队列 ↔ N deadline）** | **P1** | 驱动镜像；被动 Miss / stored offset 易漂 |
+| **LN ActiveHold / 断连补判** | **P1** | Simulator 注释对齐局内；历史上 ComboBreak 缝已修过多轮 |
+| **pressTimes ↔ replay 边沿 miss offset** | **P2** | 公式应对齐；Fix-1 后性能税下降，语义仍要测 |
+| **LaneController ↔ LaneTargetState** | **P2** | 状态分离刻意；只共享 MLPS/Kernel，不合并状态机 |
+| SelectPress 选择语义 | **已降** | 已共用 `ManiaLanePressSelector` |
+
+**覆盖方式**：在本节表格改「暂定税级」列，或回复一句「P0=…；P1=…」即可。
+
+---
+
+## 6. 统一顺序与改文件清单（按 §5 暂定）
+
+本阶段 **不改代码**；下列为钉死的落地顺序，供下一实施 PR 使用。
+
+### 批次 U1 — Lazer/Classic 数学单源（P0）
+
+**目标**：Drawable Lazer 路径与 Session 共用同一 Lazer 策略实现；删除「inline 一份、Replica 一份」维护税。
+
+| 动作 | 文件 |
+|------|------|
+| 将 Lazer note/tail/hold 窗口数学收进可被 Kernel 或 Registry 调用的策略（可先让 `LazerNoteJudgementReplica` / `LazerHoldJudgementReplica` 成为唯一数学源） | `EzMania/ReplayJudge/Replicas/LazerNoteJudgementReplica.cs`、`LazerHoldJudgementReplica.cs` |
+| Registry：Lazer/Classic 也返回该策略（今日已对 Session 返回 Replica） | `ManiaJudgementRegistry.cs` |
+| Drawable：`CheckForResult` Lazer 分支一行委托（经 `ManiaEzDrawableJudgement` 或 Kernel `NotHandled`→Lazer 策略），禁止再写第二套 `ResultFor` | `Objects/Drawables/DrawableNote.cs`、`DrawableHoldNoteTail.cs`、相关 Hold |
+| 接口注释：去掉「Lazer 不实现本接口」的长期双轨表述，改为「Lazer 策略亦单源」 | `IManiaHitModeJudgement.cs` |
+
+**验收**：
+
+- 现有 `TestSceneReplaySessionParity` / OsrAudit / BMS×Lazer HM 小谱 **保持绿**
+- 新增或扩展：**Lazer HitMode** 下 Drawable replay HitEvents ≡ Session（note + hold tail + passive miss）
+- Graph Now / Rejudge 仍只走 Session，不新开第三套
+
+### 批次 U2 — AutoMiss / LN 驱动同 API（P1）
+
+**目标**：M/N **选择与判定公式**继续单源；AutoMiss 截止时刻与 LN 松手/断连语义抽成无 Drawable 依赖的纯函数，两边只注入状态。
+
+| 动作 | 文件 |
+|------|------|
+| 抽出/对齐 AutoMiss evaluation time（今日 Simulator 注释对齐 `GetAutoMissEvaluationTime`） | `ManiaLaneController.cs`、`ManiaReplaySessionSimulator.cs` |
+| LN ActiveHold / 断连 Body 补判：共享决策函数，M 读 Drawable 态、N 读 `LaneTargetState` | `DrawableHoldNote.cs`、`ManiaEzDrawableJudgement.cs`、`ManiaReplaySessionSimulator.cs` |
+| miss stored offset：确认 `ManiaDrawableMissTiming` 与 Simulator `ResolveMissStoredOffset` 同公式、无旁路 | `ManiaDrawableMissTiming`（若独立文件）、Simulator |
+
+**验收**：
+
+- Hold 断连 / 重按到尾 / Malody Ignore 路径 parity
+- 被动 Miss `TimeOffset` M≡N（含 OffsetPlusMania 存储约定）
+- `ManiaLaneHotPathMicroBench` 不回退（不恢复每 Drawable 每帧 automiss）
+
+### 批次 U3 — 收尾与跨模式（后置）
+
+| 动作 | 说明 |
+|------|------|
+| Osu Session 编排 vs Drawable | helper 已共用；状态机后置，不挡 Mania U1/U2 |
+| Taiko / Catch | 跟 Mapping 纪律；禁止永久 Shadow |
+| 更新本文件 §3/§5 税级 | U1/U2 合入后把对应盒子标「已单源」 |
+
+### 明确不做
+
+- Headless 整棵 `DrawableRuleset` 当生产 Session  
+- 把 `ManiaLaneController` 状态塞进 Session（只共享纯函数）  
+- 未跑完 U1 就大拆 Session 边沿解析  
+- 本文件阶段改判定业务逻辑（文档-only）
+
+---
+
+## 7. Osu 对照（简）
 
 ```mermaid
 flowchart LR
-    subgraph M [M 当场玩 有画面]
-        Key[按键] --> Col[舞台列]
-        Col --> Lane[列内调度员]
-        Lane --> Note[音符演员]
-        Note --> Judge[判官]
-        Judge --> SP[记分员]
-    end
-
-    subgraph N [N 后台重放 无画面]
-        Rep[replay 时间轴] --> Sim[模拟器]
-        Sim --> LaneN[列上目标列表]
-        LaneN --> Judge2[同一套判官/策略]
-        Judge2 --> SP2[记分员]
-    end
-
-    M -.->|应一致| N
+  Input[点击 / 时钟]
+  DHC[DrawableHitCircle.CheckForResult]
+  Helper[OsuCircleJudgement helpers]
+  SIM[SliderInputManager]
+  DSp[DrawableSpinner]
+  SP[ScoreProcessor]
+  Input --> DHC
+  DHC --> Helper
+  Input --> SIM
+  SIM --> Helper
+  Input --> DSp
+  DHC --> SP
+  SIM --> SP
+  DSp --> SP
 ```
 
-| | M（Drawable） | N（Session） |
-|---|---------------|--------------|
-| **典型场景** | 本地打完；点「观看回放」 | 选歌「重算」；统计图 **Now**；面板补 HitEvents |
-| **有没有画面** | 有 | 无 |
-| **输入从哪来** | 键盘 / 回放驱动 Column | replay 里记录的 press 时间 |
-| **谁负责「叠键选哪一个」** | 列内调度员 | 模拟器里的列目标列表 |
-| **产品上的地位** | 玩家体感的「真相」 | 离线分析、入库重算的「标准答案」 |
-| **当前关系** | 设计：**应相等**；实践：部分 HitMode / 真谱仍有缝（见 REGISTRY §6.3） |
-
-你不需要先记住 `ManiaReplaySessionSimulator` 这个名字——记住 **N = 不看屏幕的录像室重判** 即可。
+- 数学：`OsuCircleJudgement` 等已 M+N 共用。  
+- Session：`OsuReplaySessionEngine` + Circle/Slider/Spinner **编排状态机**仍双份。  
+- 无 HitMode 分叉、无列级 SelectPress / BMS 状态机 → 复杂度低于 Mania。
 
 ---
 
-## 3. 两个故事：按一次键 / 过一帧
+## 8. 相关文档
 
-### 3.1 你按一次键（局内 M）
-
-以前（COLUMN-INPUT 之前）：一按可能触发一列上**很多音符**各自处理，成本高、规则和 N 也容易分叉。
-
-现在（6–7 月之后） intended 流程：
-
-1. **舞台列**接到键（每列一个接待员，8K 就 8 路并行）。  
-2. **列内调度员**看：这一列此刻叠着哪些 note？按你设的 Combo/Duration/Earliest，**只挑一个**作为本键目标。  
-3. 挑中的 **音符演员** 去请 **判官**：早了还是晚了 → Perfect / Good / Miss…  
-4. **记分员**记一笔；光效、音效在列上播（和判几分是两条线，但绑在同一次按键附近）。
-
-BMS 还多一步：先 Bad 再 KPoor 之类的「二次路由」，调度员和判官都要认同一套状态——这是 M/N 对齐最难的一块之一。
-
-### 3.2 过了一帧（你没按键）
-
-画面上还有很多 **还没判** 的 note。引擎**每帧**问一遍：「是不是已经错过到该算 Miss 了？」——这叫 **automiss**。
-
-- 这和「你按了键」是**另一条路**，但共用同一判官规则。  
-- 6–7 月加了 **早退**：离判定线还远就先不算，省 CPU。  
-- 但 note 只要在屏幕上活着，仍可能**每帧被问一次**——列越多、同时可见 note 越多，问得越频繁。这是你体感「4K 就开始沉」的重要来源之一。
-
-### 3.3 被动 Miss 为什么要记「你什么时候按过键」
-
-有一类 Miss 不是你松手打空的，而是 **note 滑过线自动 Miss**。为了和 **N** 统计一致，这类 Miss 的「事件时间」不总是「当前帧」，而是：**这一列你最近一次按键，离这个 note 有多近**。
-
-- **N** 的做法：replay 里本来就有每次 press 的时间，模拟时查表即可。  
-- **M** 的做法（6–7 月）：Column 自己 **一直记着** 你按过的时间列表，Miss 时去查最近的一次。
-
-**想法是对的**（和 N 对齐）。**实现上**在 M 侧做成了「整局无限变长的列表 + 每次 Miss 复制整份列表去查」——这是当前最可疑的性能/偏后根源（见 §5）。
-
----
-
-## 4. 6–7 月到底加了什么？初衷 vs 现状
-
-不用记代号，按「想解决什么问题」记：
-
-| 想解决的问题 | 加了什么（白话） | 初衷 | 现状判断 |
-|-------------|-----------------|------|----------|
-| M 和 N 判定规则两套、越修越分叉 | 共用 **判官** + HitMode 策略文件 | **对的方向** | 大体成立；BMS press、个别 HitMode 仍有旁路 |
-| 一按触发一列无数个 note | **列先接键**，每键只选一个目标 | **对的方向** | 局内已为主路径；回放与本地同路 |
-| 开局 HitMode 还在变 | **本局规则手册**开局冻结 | **对的方向** | 少数预览场景仍会临时读配置 |
-| 叠键 Combo/Duration 和 N 不一致 | 列内调度员与 N 模拟器**对齐算法** | **对的方向** | 小谱测试绿；真谱、个别 Mode 仍偏 |
-| automiss 每帧太重 | **早退**：还进不了 Miss 窗就不跑判官 | **对的方向** | 早退太晚，帧入口仍进得去 |
-| 被动 Miss 的 TimeOffset 和 N 不一致 | M 也记 press 时间，用**同一套**「最近邻」公式 | **想法对** | **M 侧记法过重**（无限列表+快照），可疑 |
-| 成绩分析要 Now / Timeline / Race | 一律叫 **N** 算，不另写第三套判定 | **对的方向** | Graph/Race 与局内 Drawable 已隔离 |
-| 统计图拖 offset 要即时反馈 | **Rejudge 预览**（只改展示，不全局重仿真） | **产品上对** | 容易和 Now=Session 混淆，见 §6 |
-
-**一句话**：6–7 月大方向（M≡N、列级路由、共用判官、开局冻结）**整体是对的**；痛点集中在 **「为对齐 N 而在 Drawable 上复制的数据」做得太重**，以及 **automiss 仍按「屏幕上活着的 note 数」线性放大**。
-
----
-
-## 5. 当前判断：什么算对、什么算偏、什么算错
-
-不用符号堆砌；这是**审查结论**，你可整段推翻或标「待定」。
-
-### 认为 **方向对**（值得保留，最多优化实现）
-
-- M 与 N 双路径，且以 **M 游玩体验为参照、N 必须追上**。  
-- 按键先进 **列**，再选唯一 note，而不是每个 note 抢输入。  
-- 开局冻结 HitMode / HealthMode / 优先级，局内少读配置。  
-- Ez HitMode 的判定语义进 **判官 + 策略**，Drawable 和 Session 共用。  
-- 统计图 **Now、重算、补 HitEvents** 都走 **N**，不另造第三套判定。  
-- Timeline / 角逐只要曲线，也走 **N** 的专用出口，不绑局内 Drawable。
-
-### 认为 **实现偏重**（方向对，但可能是你卡顿/粘滞的主因）
-
-- **列上无限增长的按键时间列表** + Miss 时整表复制查找。  
-- **每个可见 note 每帧** 仍进入 automiss 询问（早退在链条偏后）。  
-- Combo/Duration 选叠键目标时，仍可能 **扫整列** 算窗口。  
-- 每按一次就播 keysound，和是否打中 note 不完全绑定。  
-- 每列爆炸特效池很小，极高 KPS 时视觉像「跟不上手速」。
-
-### 认为 **仍待对齐**（更偏正确性，不只是 FPS）
-
-- 部分 HitMode 真谱上 **M 比 N 好**（Perfect 多、Miss 少）——REGISTRY §6.3。  
-- BMS + Lazer 血量等边界场景曾大量 Miss(Poor)——小谱已修，真谱待你复测。  
-- 结算 **offset 整体偏后**：可能与上面「按键时间列表配错旧按键」有关，也可能与 note-lock、子帧修正有关，**需分轨验证**。
-
-### 容易 **想错** 的概念（读文档时别混）
-
-| 容易以为 | 实际是 |
-|---------|--------|
-| 统计图拖 offset 时在重跑整局判定 | 多数是 **预览映射**；落定 debounce 后才叫 N |
-| `HitEventGenerator` 是第二套判定 | **薄转发**，内部就是 N |
-| M 和 N 各有一套「判官公式」 | Ez 路径应 **共用**；Lazer 是官方 inline vs Replica 双轨 |
-| 为性能应让 Drawable 直接调 Session | **不对**；应让 **规则一致**，不是局内再跑一遍录像室 |
-| 6–7 月改坏了，应整体回滚 | **不对**；应减掉 **错重的实现**（如无限 press 列表），保留列路由与 M≡N 目标 |
-
----
-
-## 6. 和你的体感的对应
-
-| 你的体感 | 更可能对应什么（按优先级猜） |
-|---------|---------------------------|
-| 列数越多越沉 | 列数 × 每列可见 note 数 × 每帧 automiss 询问；8 条列各维护自己的状态 |
-| 打得越久越沉 | 列上 **按键时间列表从不裁剪**，Miss 时查找越来越贵 |
-| 6kps 手感像 3kps 光效 | 特效池 / keysound 与判定解耦不足（**反馈层**，不一定判晚了） |
-| 很少负 offset、整体偏后 | 被动 Miss 的「最近按键」配到 **更早的另一次按键**；或 note-lock；或子帧修正默认关——**和 FPS 分开查** |
-| LN 多的谱更卡 | 更多 **活着的 drawable** 参与每帧 automiss；hold 还有额外每帧逻辑 |
-
----
-
-## 7. 接下来建议怎么走（仍不写具体改哪行）
-
-1. **你读一遍 §1–§5**，在 §5 表格旁直接批「不同意 / 待定」——比改代码重要。  
-2. **验证只盯 §5「实现偏重」前两条**：按键列表长度 vs 游玩时长；每帧 automiss 调用次数 vs 列数——用 bench 或诊断计数，不是堆日志。  
-3. **改代码顺序**：先瘦 **按键时间列表**（和 N 公式一致、但 M 侧别无限记），再瘦 **automiss 帧入口**，再动叠键扫描和光效。  
-4. **offset 偏后** 在 2 做完后复测；仍偏再开「玩法 / 时钟」线，不和 FPS 混在一个 PR。
-
-详细文件索引、旧版符号表见 **附录**；日常讨论以 **§1–§6** 为准。
-
----
-
-## 附录 A. 符号与层级（给要改代码的人）
-
-| 符号 | 含义 |
-|------|------|
-| L1 | 开局冻结环境 |
-| L2 | 判定语义（调度、判官、miss 公式） |
-| L3 | 输入、绘制、音效 |
-
-M/N 边界、P0 疑点、反模式 ID 的细表见 git 历史 `40e9e6d60d` 初稿；需要时再拉回正文。
-
----
-
-## 附录 B. 类名 ↔ 角色速查
-
-| 角色（§1） | 类 / 模块 |
-|-----------|----------|
-| 舞台列 | `Column`, `OrderedHitPolicy` |
-| 列内调度员 | `ManiaLaneController`（M）/ `LaneTargetState` + `ManiaLanePressSelector`（N） |
-| 本局规则手册 | `ManiaJudgementRound` |
-| 判官 | `ManiaJudgementKernel`, `*HitModeJudgement`, `Lazer*Replica` |
-| N 录像室 | `ManiaReplaySession`, `ManiaReplaySessionSimulator`, `ManiaReplaySessionService` |
-| 被动 Miss 时间 | `ManiaDrawableMissTiming`（M）→ `ResolveMissStoredOffset`（公式在 Simulator） |
-| automiss 早退 | `ManiaAutoMissGate` |
-
----
-
-## 附录 C. 相关文档
-
-- **总拓扑与批次**：[`MANIA-JUDGEMENT-TOPOLOGY.md`](./MANIA-JUDGEMENT-TOPOLOGY.md)  
-- 数据面：[`MANIA-SCORE-DATA-SOURCE-REGISTRY.md`](./MANIA-SCORE-DATA-SOURCE-REGISTRY.md)  
-- Session 字段 parity：[`REPLAY_JUDGE_MERGE.md`](./REPLAY_JUDGE_MERGE-Mania.md)  
-- Timeline/Race：[`EZ-SR-TL-REGISTRY.md`](./EZ-SR-TL-REGISTRY.md)  
-- 性能 backlog：[`HIGH_KPS_JUDGE_BACKLOG.md`](./HIGH_KPS_JUDGE_BACKLOG.md)
-- FPS / 性能汇总：[`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)
+- 总拓扑与历史批次：[`MANIA-JUDGEMENT-TOPOLOGY.md`](./MANIA-JUDGEMENT-TOPOLOGY.md)
+- 数据面：[`MANIA-SCORE-DATA-SOURCE-REGISTRY.md`](./MANIA-SCORE-DATA-SOURCE-REGISTRY.md)
+- Session 字段 parity：[`REPLAY_JUDGE_MERGE-Mania.md`](./REPLAY_JUDGE_MERGE-Mania.md)
+- Timeline/Race：[`EZ-SR-TL-REGISTRY.md`](./EZ-SR-TL-REGISTRY.md)
+- 性能：[`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)、[`HIGH_KPS_JUDGE_BACKLOG.md`](./HIGH_KPS_JUDGE_BACKLOG.md)
 
 ---
 
@@ -236,5 +270,5 @@ M/N 边界、P0 疑点、反模式 ID 的细表见 git 历史 `40e9e6d60d` 初�
 
 | 日期 | 说明 |
 |------|------|
-| 2026-07-13 | 初稿（代码锚点、符号表为主） |
-| 2026-07-13 | **第二版**：叙事优先；角色表、M/N 故事线、6–7 月初衷 vs 现状；细则下沉附录 |
+| 2026-07-13 | 初稿 / 第二版叙事（角色表、M/N 故事线） |
+| 2026-10-06 | **局内拓扑定稿**：三层图、共享/双份表、反模式、痛点暂定、U1–U3 统一顺序与文件清单；对齐 Fix-1/late-deadline/MLPS 现状 |
