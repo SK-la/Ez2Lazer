@@ -14,16 +14,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas
         public static LazerHoldJudgementReplica Instance { get; } = new LazerHoldJudgementReplica();
 
         /// <summary>
-        /// 对齐 <c>ManiaScoreHitEventGenerator.evaluateLazerResult</c> 的 tail 分支。
+        /// 对齐局内 <see cref="Objects.Drawables.DrawableHoldNoteTail.CheckForResult"/>：
+        /// <c>ResultFor(offset/lenience)</c> 后直接落判（含 Miss）；窗外 <see cref="HitResult.None"/>
+        /// 不落判，由 Body 断连 / 重按重臂 / 被动 auto-miss 收束。
         /// </summary>
         public HitResult EvaluateTail(double rawOffset, HitWindows hitWindows, bool headHit, bool holdBreak)
         {
             double timeOffsetForJudgement = rawOffset / TailNote.RELEASE_WINDOW_LENIENCE;
             var result = hitWindows.ResultFor(timeOffsetForJudgement);
 
+            // 窗外：局内 userTriggered 路径对 None 直接 return，不终判尾。
             if (result == HitResult.None)
                 return HitResult.None;
 
+            // Meh+ 且（头未中或已断连）→ 封顶 Meh（对齐 GetCappedResult）。Miss 不升不降。
             if (result > HitResult.Meh && (!headHit || holdBreak))
                 return HitResult.Meh;
 

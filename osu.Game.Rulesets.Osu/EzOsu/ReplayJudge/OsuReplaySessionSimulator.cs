@@ -15,7 +15,7 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
     /// Osu Session 仿真入口；委托 <see cref="OsuReplaySessionEngine"/>（OSL-011 Mapping）。
     /// </summary>
     /// <remarks>
-    /// 见 docs/REPLAY_JUDGE_SHADOW.md · MERGE-Osu。
+    /// 见 docs/scoring/session.md · docs/scoring/mania.md。
     /// OffsetPlusNonMania：REGISTRY §1.7b — Session 不叠进判窗；轨字段见 OSL-013。
     /// </remarks>
     internal static class OsuReplaySessionSimulator
