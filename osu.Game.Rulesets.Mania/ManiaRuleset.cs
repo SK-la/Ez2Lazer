@@ -14,6 +14,7 @@ using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.BeatmapPools;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Scoring;
@@ -96,6 +97,8 @@ namespace osu.Game.Rulesets.Mania
         public override IEzAnalysisProvider CreateEzAnalysisProvider() => new EzManiaAnalysisProvider();
 
         public override IEzReplaySession CreateEzReplaySession() => new ManiaReplaySessionService();
+
+        public override RulesetBeatmapPoolProvider CreateBeatmapPoolProvider() => new OsuFolderBeatmapPoolProvider(this);
 
         public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap)
         {

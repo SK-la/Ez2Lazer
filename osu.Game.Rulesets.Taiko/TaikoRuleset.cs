@@ -14,6 +14,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
+using osu.Game.EzOsuGame.BeatmapPools;
 using osu.Game.Localisation;
 using osu.Game.Localisation.Taiko;
 using osu.Game.Overlays.Settings;
@@ -59,6 +60,8 @@ namespace osu.Game.Rulesets.Taiko
         public override ScoreProcessor CreateScoreProcessor() => new TaikoScoreProcessor();
 
         public override IEzReplaySession CreateEzReplaySession() => new TaikoReplaySessionService();
+
+        public override RulesetBeatmapPoolProvider CreateBeatmapPoolProvider() => new OsuFolderBeatmapPoolProvider(this);
 
         public override HealthProcessor CreateHealthProcessor(double drainStartTime) => new TaikoHealthProcessor();
 

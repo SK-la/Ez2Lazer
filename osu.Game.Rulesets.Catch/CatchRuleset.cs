@@ -12,6 +12,7 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Graphics;
+using osu.Game.EzOsuGame.BeatmapPools;
 using osu.Game.EzOsuGame.Mods.LAsMods;
 using osu.Game.EzOsuGame.Mods.CommunityMod;
 using osu.Game.EzOsuGame.Scoring;
@@ -54,6 +55,8 @@ namespace osu.Game.Rulesets.Catch
         public override ScoreProcessor CreateScoreProcessor() => new CatchScoreProcessor();
 
         public override IEzReplaySession CreateEzReplaySession() => new CatchReplaySessionService();
+
+        public override RulesetBeatmapPoolProvider CreateBeatmapPoolProvider() => new OsuFolderBeatmapPoolProvider(this);
 
         public override HealthProcessor CreateHealthProcessor(double drainStartTime) => new CatchHealthProcessor(drainStartTime);
 

@@ -95,6 +95,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.UpdateFrameLimiter, FrameSync.Unlimited);
             SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
             SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
+            SetDefault(Ez2Setting.BeatmapPoolDocument, "{\"Version\":1,\"Paths\":[]}");
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
             SetDefault(Ez2Setting.MenuLogoPath, @"Menu/logo");
             SetDefault(Ez2Setting.MenuLogoText, "(´・ω・｀),120");
@@ -921,6 +922,8 @@ namespace osu.Game.EzOsuGame.Configuration
         /// Ez 分析 SQLite 主库与分支曲库读写总开关；与 <see cref="EzAnalysisRecEnabled"/> 分工（存储 vs 即时计算）。
         /// </summary>
         EzAnalysisSqliteEnabled,
+
+        BeatmapPoolDocument,
 
         HideMainMenuOnlineBanner,
 
