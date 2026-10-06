@@ -36,6 +36,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
     ///     套件：Hanatachi（≈2026-06/09）、PORTRAiT（≈2026-10-02/03，现行客户端）。
     ///     IgnoreHit/IgnoreMiss/ComboBreak 若 Classic 未给则不进本轨门禁。
     ///     高难度 LN 判定数量闭环仍用 <see cref="OsrAuditTest" /> + GramNibelungen23（勿当金标）。
+    ///     <para>
+    ///     Lazer Session 对嵌入 Statistics 的 Perfect↔Great：osr 帧为整数 ms，Perfect 窗为 Floor+0.5
+    ///     （Hanatachi=16.5 / PORTRAiT=17.5）。局内亚毫秒落在半窗缝时，回放只能落到两侧整数档，
+    ///     故可同时出现 Hanatachi Perfect− 与 PORTRAiT Perfect+；非 note-lock 主因。
+    ///     </para>
     /// </summary>
     [TestFixture]
     public class ManiaOsrAuditAssertTest
@@ -524,11 +529,16 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             sb.AppendLine("first misses:");
 
-            foreach (var e in hitEvents.Where(e => e.Result == HitResult.Miss).OrderBy(e => e.HitObject?.StartTime ?? 0).Take(20))
+            foreach (var e in hitEvents.Where(ev => ev.Result == HitResult.Miss).OrderBy(ev => ev.HitObject?.StartTime ?? 0).Take(20))
             {
                 string column = e.HitObject is IHasColumn c ? c.Column.ToString() : "-";
                 double end = e.HitObject?.GetEndTime() ?? 0;
-                sb.AppendLine($"  {kind(e)}@{e.HitObject?.StartTime:F0} end={end:F0} col={column} offset={e.TimeOffset:F1}");
+                double missWin = e.HitObject?.HitWindows?.WindowFor(HitResult.Miss) ?? 0;
+                double absForWin = e.HitObject is TailNote
+                    ? Math.Abs(e.TimeOffset) / TailNote.RELEASE_WINDOW_LENIENCE
+                    : Math.Abs(e.TimeOffset);
+                string tag = missWin > 0 && absForWin <= missWin ? "in-miss-win" : "outside/passive";
+                sb.AppendLine($"  {kind(e)}@{e.HitObject?.StartTime:F0} end={end:F0} col={column} offset={e.TimeOffset:F1} {tag}");
             }
         }
 
