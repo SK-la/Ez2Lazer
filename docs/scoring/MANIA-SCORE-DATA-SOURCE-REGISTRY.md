@@ -15,11 +15,10 @@
 | ✎ \| Osu / Catch / Taiko 影子判定 | ✎ \| [`REPLAY_JUDGE_SHADOW.md`](./REPLAY_JUDGE_SHADOW.md)                                               | ✎ \| **是**（本对话） |
 | ✎ \| Osu Session              | ✎ \| [`Osu REPLAY_JUDGE_MERGE.md`](./REPLAY_JUDGE_MERGE-Osu.md) | ✎ \| **是**（本对话） |
 | ✎ \| Session/Timeline 注册表     | ✎ \| [`EZ-SR-TL-REGISTRY.md`](./EZ-SR-TL-REGISTRY.md)                                                   | ✎ \| **是**（本对话） |
-| ✎ \| [`MANIA-JUDGEMENT-RUNTIME.md`](./MANIA-JUDGEMENT-RUNTIME.md)                                       | ✎ \| **是**（2026-10-06 局内拓扑 + U1–U3） |
-| ✎ \| [`MANIA-JUDGEMENT-TOPOLOGY.md`](./MANIA-JUDGEMENT-TOPOLOGY.md)                                     | ✎ \| **是**（2026-07-13 总拓扑活文档） |
+| ✎ \| [`MANIA-JUDGEMENT-RUNTIME.md`](./MANIA-JUDGEMENT-RUNTIME.md)                                       | ✎ \| **是**（2026-10-06 局内拓扑 + U1–U3；含原 TOPOLOGY） |
 
 **说明**：✎ \| 上述参考 MD 若与本 MD 有偏差，以 **本 MD + 代码** 为准，并应回头修改参考 MD 对齐。  
-**运行时分层**（局内谁算什么、pressTimes 等状态归属）以 **MANIA-JUDGEMENT-RUNTIME** 为准；**全场景拓扑与实施批次** 以 **MANIA-JUDGEMENT-TOPOLOGY** 为准；本表管 **数据面**。
+**运行时分层**（局内谁算什么、pressTimes 等状态归属、删双份顺序）以 **MANIA-JUDGEMENT-RUNTIME** 为准；本表管 **数据面**。
 
 ---
 
@@ -261,6 +260,7 @@ flowchart TD
 | ✎ \| 2026-07-12 | ✎ \| 改为 **每单元格独立标记**，删除整行「标记」列 |
 | 2026-07-13 | 链到 MANIA-JUDGEMENT-RUNTIME.md（局内运行时 Arch-A） |
 | 2026-10-06 | RUNTIME 升为局内拓扑定稿（共享/双份表 + 删双份 U1–U3）；本表仍只管数据面 |
+| 2026-10-06 | 文档迁入 `docs/scoring/`；删除 TOPOLOGY（并入 RUNTIME） |
 | ✎ \| 2026-07-12 | ✎ \| ReplayPlayer 启用列路由；补 EZ2AC/Malody_E/O2 与重算后 c/d parity 测试 |
 | ✎ \| 2026-07-12 | ✎ \| 重算写回统一将双 Lazer HM/HM 归一为空；非 Lazer ForLive 环境仍持久化 |
 | ✎ \| 2026-07-12 | ✎ \| 引入 **M/N** 标定；记录 EZ2AC/Malody −1P、O2 −4P 残留与 BMS Lazer HM 异常 |

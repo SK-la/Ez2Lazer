@@ -1,9 +1,9 @@
 # Mania 局内判定 — 运行时架构
 
 > **写给谁**：要弄清「局里怎么判、哪层与 Session 同调、哪层仍双份」的人。  
-> **姊妹文档**：[`MANIA-SCORE-DATA-SOURCE-REGISTRY.md`](./MANIA-SCORE-DATA-SOURCE-REGISTRY.md)（成绩数字从哪读）；[`MANIA-JUDGEMENT-TOPOLOGY.md`](./MANIA-JUDGEMENT-TOPOLOGY.md)（全场景批次与部件登记）。  
-> **本文件职责**：局内（M）运行时拓扑 + M/N 共享边界 + 删双份统一顺序。  
-> **状态**：2026-10-06 — 局内拓扑定稿；痛点为证据暂定，可覆盖；统一顺序按暂定痛点钉死（未改判定逻辑）。
+> **姊妹文档**：[`MANIA-SCORE-DATA-SOURCE-REGISTRY.md`](./MANIA-SCORE-DATA-SOURCE-REGISTRY.md)（成绩数字从哪读）；[`REPLAY_JUDGE_MERGE-Mania.md`](./REPLAY_JUDGE_MERGE-Mania.md)（Session 字段 parity）；[`EZ-SR-TL-REGISTRY.md`](./EZ-SR-TL-REGISTRY.md)（跨模式 Timeline/Race）。  
+> **本文件职责**：局内（M）拓扑 + M/N 共享边界 + 部件/绑定决策 + 删双份统一顺序（已吸收原 TOPOLOGY 现行架构；历史性能批次见 [`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)）。  
+> **状态**：2026-10-06 — 定稿；痛点证据暂定可覆盖。
 
 ---
 
@@ -230,7 +230,83 @@ flowchart TB
 
 ---
 
-## 7. Osu 对照（简）
+## 7. M+N 总览与部件（原 TOPOLOGY 现行部分）
+
+```mermaid
+flowchart TB
+  subgraph inputs [输入]
+    KB[键盘]
+    RP[ReplayPlayer]
+    DB[ReplayFrame]
+  end
+  subgraph M [M Drawable]
+    Col[Column]
+    MLC[ManiaLaneController]
+    DHO[DrawableNote Hold]
+    MEJ[ManiaEzDrawableJudgement]
+  end
+  subgraph N [N Session]
+    Parse[FrameEdgeParser]
+    Sim[Simulator]
+    MLPS[ManiaLanePressSelector]
+    FM[applyForcedMisses]
+  end
+  subgraph shared [M加N共享]
+    Round[ManiaJudgementRound]
+    Kernel[ManiaJudgementKernel]
+  end
+  subgraph out [输出]
+    SP[ScoreProcessor]
+    Graph[EzScoreGraphMania]
+    Race[EzScoreRaceService]
+  end
+  KB --> Col --> MLC --> MLPS
+  MLC --> DHO --> MEJ --> Kernel
+  MLC -->|late deadline automiss| MEJ
+  RP --> Col
+  DB --> Parse --> Sim --> MLPS --> Kernel
+  Sim --> FM
+  Round --> MLC
+  Round --> MEJ
+  Round --> Sim
+  MEJ --> SP
+  Sim --> SP
+  SP --> Graph
+  SP --> Race
+```
+
+| 部件 | M/N | 备注 |
+|------|-----|------|
+| `ManiaJudgementKernel` | M+N | note/hold 评估核心 |
+| `ManiaJudgementRound` | M+N | 开局冻结 |
+| `ManiaLaneController` | M | Live 列状态机 |
+| `ManiaLanePressSelector` | M+N | press 选目标纯函数 |
+| `Column.pressTimes` | M | 有界；miss offset |
+| `ManiaReplayFrameEdgeParser` | N | Session 边沿 |
+| `ManiaFramedReplayInputHandler` | M | Drawable 回放喂入（与边沿解析分工） |
+| `ManiaBeatmapBinding` | M+N | 唯一 hitmode 绑定入口 |
+| `ManiaSimulationBeatmapProvider` | N | 仿真副本 |
+| `ManiaScoreHitEventGenerator` | — | **Obsolete** → `RunHitEventsAsync` |
+
+### 7.1 设计决策（现行）
+
+- **MLC / MLPS**：MLC 只持 Live 状态；Session 用 `LaneTargetState`；只共享 MLPS + Kernel。
+- **ReplayFrame**：Session 边沿解析 vs Drawable `FramedReplayInputHandler` 分工保留。
+- **Race**：`EzReplayFeedMode` BatchAllEvents / StreamByClock。
+- **绑定**：一个 beatmap 实例 = 一个 hitmode；仿真副本由 provider 在转换边界产出；勿把 M live 实例喂进 Session。违规计数：`BeatmapRebindConflicts` / `ResultDowngrade` / `SimFallback`（`ManiaJudgeHotPathTrace`）。
+
+### 7.2 场景喂入
+
+| 场景 | 路径 |
+|------|------|
+| 本地玩 / 看回放 | M |
+| 入库 Statistics | M → Realm |
+| 重算 / Graph Now / 补 HitEvents | N |
+| Race timeline | N |
+
+---
+
+## 8. Osu 对照（简）
 
 ```mermaid
 flowchart LR
@@ -256,13 +332,12 @@ flowchart LR
 
 ---
 
-## 8. 相关文档
+## 9. 相关文档
 
-- 总拓扑与历史批次：[`MANIA-JUDGEMENT-TOPOLOGY.md`](./MANIA-JUDGEMENT-TOPOLOGY.md)
 - 数据面：[`MANIA-SCORE-DATA-SOURCE-REGISTRY.md`](./MANIA-SCORE-DATA-SOURCE-REGISTRY.md)
 - Session 字段 parity：[`REPLAY_JUDGE_MERGE-Mania.md`](./REPLAY_JUDGE_MERGE-Mania.md)
 - Timeline/Race：[`EZ-SR-TL-REGISTRY.md`](./EZ-SR-TL-REGISTRY.md)
-- 性能：[`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)、[`HIGH_KPS_JUDGE_BACKLOG.md`](./HIGH_KPS_JUDGE_BACKLOG.md)
+- 性能：[`EZ-PERFORMANCE.md`](./EZ-PERFORMANCE.md)
 
 ---
 
@@ -270,5 +345,6 @@ flowchart LR
 
 | 日期 | 说明 |
 |------|------|
-| 2026-07-13 | 初稿 / 第二版叙事（角色表、M/N 故事线） |
-| 2026-10-06 | **局内拓扑定稿**：三层图、共享/双份表、反模式、痛点暂定、U1–U3 统一顺序与文件清单；对齐 Fix-1/late-deadline/MLPS 现状 |
+| 2026-07-13 | 初稿 / 第二版叙事 |
+| 2026-10-06 | 局内拓扑定稿（共享/双份、U1–U3） |
+| 2026-10-06 | **合并**原 `MANIA-JUDGEMENT-TOPOLOGY.md` 现行架构（总览图、部件、绑定、场景喂入）；TOPOLOGY 删除 |

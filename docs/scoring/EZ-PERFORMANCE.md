@@ -58,7 +58,7 @@
 | `Column.OnPressed` 返回 `true` 让 `PropagatePressed` early-out | **不可行**。`PropagatePressed` 成功后 `inputQueue.RemoveRange(...)` 会截断该 binding 的**同一条缓存列表**，而 `handleNewReleased` 用同一条列表派发 Release。列在队列头部 ⇒ `ReplayRecorder` / `KeyCounterActionTrigger` 收不到 Release（回放帧丢 KeyUp、按键显示粘键）。要做得先把观察者排到列之前并按类型识别，收益不抵风险 |
 | **FW-INPUT-QUEUE-DISPATCH**：一次输入派发窗口内共享一次队列构建（框架侧） | **不可行（已被测试证伪，改动已撤回）**。前提「窗口内可进入队列的 drawable 不变」不成立：`TestSceneInputQueueChange.CombinedClicks` 在共享构建下必失败——drawable 在 `OnMouseDown` 里 `MoveToX`（duration 0，同步生效）后，同帧第二次按键必须看到**按新位置重建**的队列，否则再次命中已移开的 box（`HitCount == 2`）。同类情形还有事件处理中隐藏 / 移除 drawable、焦点改变非位置队列末位优先级。按调用点重建是刻意的新鲜度语义，不可跨事件共享；框架侧只保留去分配（见 **FW-BUTTON-QUEUE-REUSE**） |
 | 去掉通道级 `BindAdjustments`（每击 4 路 `AddSource`） | **不可行（Ez 侧）**。`PlaybackConcurrency` / 音量 / 平衡 / 频率都必须跟随 `drawableRuleset.Audio`，其中频率来自 `ModRateAdjust` 系列（`AddAdjustment(Frequency, SpeedChange)`）；`AdjustableAudioComponent.Adjustments` 是 `protected internal`，Ez 无法只绑部分属性。真正做法是框架级通道复用（BASS 通道无法重播，见 `SampleChannelBass.playInternal` 的 `Played` 守卫） |
-| `Column.OnPressed` 每键都 `sampleTriggerSource.Play()` | 已有代号 **SOUND-DECOUPLE**（`HIGH_KPS_JUDGE_BACKLOG.md`），**附条件**：仅在 profile 证明其阻塞时做。`KeySoundPreviewMode.Off` 目前也会触发取样（只有 `AutoPlayPlus` 排除），会让按键与 note 音互相 choke |
+| `Column.OnPressed` 每键都 `sampleTriggerSource.Play()` | 已有代号 **SOUND-DECOUPLE**（§8），**附条件**：仅在 profile 证明其阻塞时做。`KeySoundPreviewMode.Off` 目前也会触发取样（只有 `AutoPlayPlus` 排除），会让按键与 note 音互相 choke |
 | 爆炸池 `DrawablePool<PoolableHitExplosion>(5)` 扩容 | **无依据**。爆炸按列产生，每列一次按键最多 1 个，初始容量 5 已覆盖单次按键；仅在单列 >25 hit/s 的极端 jack 下才会增长。首击掉帧不是它 |
 
 ---
@@ -206,17 +206,32 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 
 ---
 
-## 8. 相关文档
+## 8. 高 KPS 判定 backlog（原 `HIGH_KPS_JUDGE_BACKLOG` 精简）
 
-- 高 KPS 判定优化 backlog：[`HIGH_KPS_JUDGE_BACKLOG.md`](./HIGH_KPS_JUDGE_BACKLOG.md)
-- 判定总拓扑与批次：[`MANIA-JUDGEMENT-TOPOLOGY.md`](./MANIA-JUDGEMENT-TOPOLOGY.md)
-- 局内判定叙事：[`MANIA-JUDGEMENT-RUNTIME.md`](./MANIA-JUDGEMENT-RUNTIME.md)
-- 分析存储与启动期 GC：[`EZ_ANALYSIS_STORAGE_REDESIGN.md`](./EZ_ANALYSIS_STORAGE_REDESIGN.md)
-- 皮肤系统热路径纪律：[`EzSkinSystemNotes.md`](./EzSkinSystemNotes.md)
+已落地主线（ROUND-FREEZE / COLUMN-INPUT / KERNEL-ONE / pressTimes 有界 / late-deadline automiss / LN-HOLD-FBO 等）见 §2。此处只留**未结**项。
+
+| 代号 | 状态 | 说明 |
+|------|------|------|
+| **STATE-ONE** | 暂缓 | O2 Pill / BMS KPoor 状态合并进 `ManiaReplayJudgementState` |
+| **BMS-ROUTE-COL** | 待办 | tail `BmsRouteState` 完全列级化 |
+| **HOLD-TAIL-FAST** | 待办 | `Column.OnReleased` → 列级 tail release |
+| **SOUND-DECOUPLE** | 待办 | 判定与 `sampleTriggerSource.Play()` 解耦；仅 profile 证阻塞时做 |
+| **COLUMN-EARLY-OUT** | 待办 | 列路由成功后早退（须先调派发顺序，免伤 ReplayRecorder） |
+| **INPUT-QUEUE-FW** | 不做 | 框架共享队列构建证伪；见 §2.1 |
+
+不在本 backlog：Lazer Replica 与 Drawable 合并（见 RUNTIME U1）、OffsetPlus Realm 持久化。
 
 ---
 
-## 9. 局内掉帧待排查（2026-09-20 登记）
+## 9. 相关文档
+
+- 局内判定 / M≡N：[`MANIA-JUDGEMENT-RUNTIME.md`](./MANIA-JUDGEMENT-RUNTIME.md)
+- 分析存储与启动期 GC：[`../EZ_ANALYSIS_STORAGE_REDESIGN.md`](../EZ_ANALYSIS_STORAGE_REDESIGN.md)
+- 皮肤系统热路径纪律：[`../EzSkinSystemNotes.md`](../EzSkinSystemNotes.md)
+
+---
+
+## 10. 局内掉帧待排查（2026-09-20 登记）
 
 三条现象来自实机观察，**均未定案**；LN 相关项按用户要求先量后改。
 
@@ -235,7 +250,8 @@ fork 将 `GameThread.DEFAULT_ACTIVE_HZ` 从上游 1000 提到 **8000**（`524d84
 | 日期 | 说明 |
 |------|------|
 | 2026-08-08 | 初版：汇总各文档 FPS / 性能测试描述；记录音频后端排查与振幅限频（框架 `e22805587`） |
-| 2026-09-20 | §2.1：输入队列按帧物化、取样去 LINQ、框架侧按键队列去分配（**FW-BUTTON-QUEUE-REUSE**）落地；登记 5 项「评估后不做」的候选与原因（含被 `TestSceneInputQueueChange.CombinedClicks` 证伪的 **FW-INPUT-QUEUE-DISPATCH**）；§9 登记首次命中 / LN / 多显示器三条待排查现象与测量口径 |
+| 2026-09-20 | §2.1：输入队列按帧物化、取样去 LINQ、框架侧按键队列去分配（**FW-BUTTON-QUEUE-REUSE**）落地；登记 5 项「评估后不做」的候选与原因（含被 `TestSceneInputQueueChange.CombinedClicks` 证伪的 **FW-INPUT-QUEUE-DISPATCH**）；§10 登记首次命中 / LN / 多显示器三条待排查现象与测量口径 |
 | 2026-09-21 | **LN-HOLD-FBO** / **LN-INPUT-SLOT** 生产落地。消融证实按住才 ForceRedraw；观测代码 `#if DEBUG` 剥离 |
 | 2026-09-23 | §2.2/§2.3：局内判定与 HUD 热路径去分配（**HITPOS-CACHE** / **JUDGE-NO-CLOSURE** / **POLICY-SCRATCH** / **FORCEMISS-SNAPSHOT**），并记录 3 项「评估后不做」（samples 数组缓存、transform 序列复用、`moveMarker` 手写插值）与 lane controller 索引维护「实测不改」结论 |
 | 2026-09-24 | §2.2：**MARKER-EASE-FIX**——`EzHUDHitTimingColumns` 的判定标记恢复为真正的缓动（去掉把缓动变成空变换的直接赋值），并补上 `MoveHeight` / `StopMovement` 与在途变换的两处交互；原「`moveMarker` 手写插值」候选按「保留框架缓动」结案，不再列为待办 |
+| 2026-10-06 | **合并**原 `HIGH_KPS_JUDGE_BACKLOG.md` 未结项为 §8；删除独立 backlog 文件 |

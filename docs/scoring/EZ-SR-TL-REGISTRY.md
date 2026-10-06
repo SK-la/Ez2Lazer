@@ -299,7 +299,7 @@ bool poorEnabled = IsBMSHealthMode(HealthMode) && BmsPoorHitResultEnable;
 `ManiaSimulationBeatmapProvider` 在转换边界产出（与 live 同一条 `GetPlayableBeatmap` 管线，按
 `(谱面, ruleset, mods, hitmode)` 缓存），Session **不接受外部传入的共享实例**；调用方传进来的 beatmap
 只服务静态 `Run*` 注入（测试 / parity）。hitmode 绑定统一走 `ManiaBeatmapBinding`，一个实例只绑一个 hitmode。
-详见 [MANIA-JUDGEMENT-TOPOLOGY.md](./MANIA-JUDGEMENT-TOPOLOGY.md) §5.6。
+详见 [MANIA-JUDGEMENT-RUNTIME.md](./MANIA-JUDGEMENT-RUNTIME.md) §7.1（绑定语义；原 TOPOLOGY §5.6）。
 
 ---
 

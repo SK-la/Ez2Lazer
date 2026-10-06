@@ -21,7 +21,7 @@
 4. **强制审计**：`pwsh ./scripts/AuditUpstreamHotspots.ps1 -OldTag <上一合并tag> -NewTag <本次tag>`
 5. 对报告中可疑项：补吃上游或标 `intentional-Ez`
 6. `dotnet build osu.Desktop`（**不要**擅自 `dotnet run` / 打开用户 `client.realm`）
-7. 领域 checklist：Realm sidecar 跨版本、Select 过滤/排序冒烟、Mania 见 [REPLAY_JUDGE_MERGE-Mania.md](REPLAY_JUDGE_MERGE-Mania.md)、BMS 见 wiki
+7. 领域 checklist：Realm sidecar 跨版本、Select 过滤/排序冒烟、Mania 见 [scoring/REPLAY_JUDGE_MERGE-Mania.md](scoring/REPLAY_JUDGE_MERGE-Mania.md)、BMS 见 wiki
 
 Push / PR 只走 `SK-la` fork，禁止推 `ppy` / `upstream`。
 
@@ -68,7 +68,7 @@ Push / PR 只走 `SK-la` fork，禁止推 `ppy` / `upstream`。
 |------|------|----------|--------|
 | `osu.Game/Overlays/SkinEditor/*` | Ez 菜单 partial | 优先 `*.Ez.cs` | 皮肤编辑 |
 | `osu.Game/Overlays/FirstRunSetup/ScreenBehaviour.cs` | 与 Settings 段列表同步 | 跟 SettingsOverlay | 首次引导 |
-| Mania 判定/计分链路 | 见 REPLAY_JUDGE_MERGE-Mania | 按该文档 | parity 测试 |
+| Mania 判定/计分链路 | 见 scoring/REPLAY_JUDGE_MERGE-Mania | 按该文档 | parity 测试 |
 | `osu.Game/Configuration/OsuConfigManager.cs` | 上游新 Setting + Ez | 保留双方 setting | 配置读写 |
 
 ## 2026.819 清查记录
