@@ -345,6 +345,39 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         /// <summary>
+        /// 同列 jack：一按吃到前键（迟到），后键无第二次按下 → auto-miss。
+        /// stored TimeOffset 会回落到该次按键（看起来像「小 offset Miss」），但后键 StartTime 更大，
+        /// 不可能是 ForceMissEarlier（只钉更早物件）。OsrAudit Note@300446 即此形态。
+        /// </summary>
+        [Test]
+        public void TestJackPressHitsEarlierNoteLaterAutoMissesWithPressHistoryOffset()
+        {
+            var hitObjects = new List<HitObject>
+            {
+                new Note { StartTime = 1000, Column = 0 },
+                new Note { StartTime = 1161, Column = 0 },
+            };
+
+            var frames = new List<ReplayFrame>
+            {
+                new ManiaReplayFrame(1097, ManiaAction.Key1),
+                new ManiaReplayFrame(1200),
+                new ManiaReplayFrame(3000),
+            };
+
+            var events = runEvents(hitObjects, frames);
+            var first = events.Single(e => e.HitObject is Note n && n.StartTime == 1000);
+            var second = events.Single(e => e.HitObject is Note n && n.StartTime == 1161);
+
+            Assert.That(first.Result.IsHit(), Is.True,
+                () => $"earlier jack note must be hit: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+            Assert.That(second.Result, Is.EqualTo(HitResult.Miss),
+                () => $"later jack note must auto-miss: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+            Assert.That(second.TimeOffset, Is.EqualTo(1097 - 1161).Within(0.5),
+                () => $"auto-miss stored offset should track the earlier press: [{ManiaReplayParityHelper.DescribeHitEvents(events)}]");
+        }
+
+        /// <summary>
         /// 早松落在 Tail Miss 窗内：须当场 Tail Miss（对齐 DrawableHoldNoteTail），不能留给重臂挽救。
         /// Hanatachi Hold@262905 即此形态（rawOff≈-215 → j≈-143 ∈ Miss）。
         /// </summary>

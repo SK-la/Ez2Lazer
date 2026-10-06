@@ -70,6 +70,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             30000019,
             false,
             Array.Empty<string>(),
+            // Miss/CB：现行 Session 对齐局内（早松 Miss 窗内落判、打到同列其它键不重臂）。
+            // 冻结 osr 少 1 条失败 LN（Miss+2/CB+1 量级）；Perfect↔Great 仍为整数 ms 量化带。
             new Dictionary<HitResult, int>
             {
                 [HitResult.Miss] = 15,
@@ -85,7 +87,9 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             true,
             true);
 
-        // PORTRAiT Lazer：gameVersion=30000019，≈2026-10-03。Session MaxCombo 已对齐；剩 Perfect+21 / Miss-10 等。
+        // PORTRAiT Lazer：gameVersion=30000019，≈2026-10-03。Session MaxCombo / Meh 已对齐。
+        // 剩 Perfect↔Great（osr 整数 ms）与 Miss/CB：后者多为「断连后打到同列其它键仍重臂」旧 Session
+        // 偏松，现行对齐 ShouldSkipColumnRoutedPress 后 Miss 略高于冻结 osr（非 jack ForceMiss 误杀）。
         private static readonly AuditFixture lazer_portrait = new AuditFixture(
             "Lazer-PORTRAiT",
             "Resources/Testing/Replays/ManiaAudit-Lazer-PORTRAiT.osr",
@@ -694,7 +698,50 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                     continue;
 
                 var note = (Note)ev.HitObject!;
-                sb.AppendLine($"  Note@{note.StartTime:0.###} col={note.Column} off={ev.TimeOffset:0.###}");
+                double abs = note.StartTime + ev.TimeOffset;
+                double missWin = note.HitWindows?.WindowFor(HitResult.Miss) ?? 0;
+                // ForceMiss 用命中时刻写 offset；auto-miss 用 deadline/按键史。列边沿可区分「有按下未吃到」vs「被后键钉死」。
+                string edges = describeColumnEdgesNear(replay, note.Column, note.StartTime - missWin, note.StartTime + missWin + 50);
+                var laterHit = hitEvents.FirstOrDefault(x =>
+                    x.Result.IsHit()
+                    && x.HitObject is IHasColumn hc
+                    && hc.Column == note.Column
+                    && x.HitObject!.StartTime > note.StartTime
+                    && Math.Abs((x.HitObject.StartTime + x.TimeOffset) - abs) < 0.75);
+                string forceTag = laterHit.HitObject != null
+                    ? $"forceVia={laterHit.HitObject.GetType().Name}@{laterHit.HitObject.StartTime:0.###}"
+                    : "forceVia=none";
+
+                var atPress = hitEvents
+                    .Where(x => x.HitObject is IHasColumn hc
+                                && hc.Column == note.Column
+                                && Math.Abs((x.HitObject!.StartTime + x.TimeOffset) - abs) < 0.75)
+                    .Select(x =>
+                    {
+                        string k = x.HitObject switch
+                        {
+                            HeadNote => "Head",
+                            TailNote => "Tail",
+                            Note => "Note",
+                            _ => x.HitObject!.GetType().Name,
+                        };
+                        return $"{k}@{x.HitObject!.StartTime:0.###}:{x.Result}";
+                    })
+                    .ToArray();
+                string atTag = atPress.Length == 0 ? "atPress=none" : $"atPress={string.Join(',', atPress)}";
+
+                var earlierUnhit = hitEvents
+                    .Where(x => x.HitObject is IHasColumn hc
+                                && hc.Column == note.Column
+                                && x.HitObject is Note
+                                && x.HitObject!.StartTime < note.StartTime
+                                && x.HitObject.StartTime > note.StartTime - missWin - 50
+                                && (x.Result == HitResult.Miss || !x.Result.IsHit()))
+                    .Select(x => $"{x.HitObject!.StartTime:0.###}:{x.Result}")
+                    .ToArray();
+                string lockTag = earlierUnhit.Length == 0 ? "prev=none" : $"prevMiss={string.Join(',', earlierUnhit)}";
+
+                sb.AppendLine($"  Note@{note.StartTime:0.###} col={note.Column} off={ev.TimeOffset:0.###} abs={abs:0.###} {forceTag} {atTag} {lockTag} {edges}");
             }
 
             sb.AppendLine("hold outcome top:");
@@ -707,13 +754,16 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         /// </summary>
         private static string describeColumnRepress(Replay? replay, HoldNote hold)
         {
-            if (replay?.Frames == null || replay.Frames.Count == 0)
-                return "repress=?";
-
-            var action = ManiaAction.Key1 + hold.Column;
-            double from = hold.StartTime + 1;
             double to = hold.EndTime + (hold.Tail.HitWindows?.WindowFor(HitResult.Meh) ?? 0) * TailNote.RELEASE_WINDOW_LENIENCE;
+            return describeColumnEdgesNear(replay, hold.Column, hold.StartTime + 1, to, "repress");
+        }
 
+        private static string describeColumnEdgesNear(Replay? replay, int column, double from, double to, string label = "edges")
+        {
+            if (replay?.Frames == null || replay.Frames.Count == 0)
+                return $"{label}=?";
+
+            var action = ManiaAction.Key1 + column;
             bool wasDown = false;
             var edges = new List<string>();
 
@@ -742,7 +792,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 wasDown = down;
             }
 
-            return edges.Count == 0 ? "repress=none" : $"repress={string.Join(',', edges)}";
+            return edges.Count == 0 ? $"{label}=none" : $"{label}={string.Join(',', edges)}";
         }
 
         private static void archiveReport(AuditFixture fixture, string report)
