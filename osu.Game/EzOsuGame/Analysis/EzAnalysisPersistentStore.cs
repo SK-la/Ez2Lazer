@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -156,6 +157,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private const string meta_key_source_collection_name = "source_collection_name";
         private const string meta_key_source_collection_last_modified = "source_collection_last_modified";
         private const string meta_key_source_collection_beatmap_count = "source_collection_beatmap_count";
+        private const string meta_key_content_hash = "content_hash";
 
         // songs branch tables
         private const string table_songs_branch_entry = "songs_branch_entry";
@@ -965,6 +967,21 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
                 setMeta(connection, meta_key_source_collection_last_modified, sourceCollectionLastModified.ToString(CultureInfo.InvariantCulture));
                 setMeta(connection, meta_key_source_collection_beatmap_count, sourceCollectionBeatmapCount.ToString(CultureInfo.InvariantCulture));
 
+                IReadOnlyList<string> contentHashMd5s = sourceCollection?.BeatmapMd5Hashes
+                                                                          .Where(hash => !IsNullOrWhiteSpace(hash))
+                                                                          .Distinct(StringComparer.OrdinalIgnoreCase)
+                                                                          .OrderBy(hash => hash, StringComparer.OrdinalIgnoreCase)
+                                                                          .ToList()
+                                                      ?? (IReadOnlyList<string>)Array.Empty<string>();
+
+                setMeta(connection, meta_key_content_hash, ComputeSongsBranchContentHash(
+                    metadata.SourceCollectionId == Guid.Empty ? sourceCollection?.CollectionId ?? Guid.Empty : metadata.SourceCollectionId,
+                    sourceCollectionLastModified,
+                    sourceCollectionBeatmapCount,
+                    contentHashMd5s,
+                    xxySrAlgorithmVersion > 0 ? xxySrAlgorithmVersion : 0,
+                    ppAlgorithmVersion > 0 ? ppAlgorithmVersion : 0));
+
                 using var transaction = connection.BeginTransaction();
 
                 if (sourceCollection is SourceCollectionSnapshot sourceCollectionSnapshot)
@@ -981,7 +998,7 @@ ON CONFLICT({col_beatmap_md5}) DO NOTHING;
                     sourceCollectionMd5Param.ParameterName = "$md5";
                     insertSourceCollection.Parameters.Add(sourceCollectionMd5Param);
 
-                    foreach (string beatmapMd5 in sourceCollectionSnapshot.BeatmapMd5Hashes.Where(hash => !IsNullOrWhiteSpace(hash)).Distinct(StringComparer.OrdinalIgnoreCase))
+                    foreach (string beatmapMd5 in contentHashMd5s)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
                         sourceCollectionMd5Param.Value = beatmapMd5;
@@ -1321,6 +1338,25 @@ FROM {table_songs_branch_entry};
             }
         }
 
+        private static void readSourceCollectionMd5Hashes(SqliteConnection connection, List<string> output)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = $@"
+SELECT {col_beatmap_md5}
+FROM {table_songs_branch_source_collection};
+";
+
+            using var reader = command.ExecuteReader();
+
+            while (reader.Read())
+            {
+                string beatmapMd5 = reader.GetString(0);
+
+                if (!IsNullOrWhiteSpace(beatmapMd5))
+                    output.Add(beatmapMd5);
+            }
+        }
+
         private static void queryMatchedMd5Hashes(SqliteConnection connection, string tableName, IReadOnlyList<string> candidates, HashSet<string> output)
         {
             for (int offset = 0; offset < candidates.Count; offset += 800)
@@ -1437,6 +1473,35 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
                     setMeta(connection, meta_key_pp_version, currentPpVersion.ToString(CultureInfo.InvariantCulture));
 
                 setMeta(connection, meta_key_analysis_version, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
+
+                if (IsNullOrEmpty(tryGetMeta(connection, meta_key_content_hash))
+                    && tryReadSongsBranchMetadata(connection, out var metadata))
+                {
+                    int storedXxy = int.TryParse(tryGetMeta(connection, meta_key_xxy_sr_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedXxy)
+                        ? parsedXxy
+                        : currentXxyVersion;
+                    int storedPp = int.TryParse(tryGetMeta(connection, meta_key_pp_version), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedPp)
+                        ? parsedPp
+                        : currentPpVersion;
+
+                    var md5Hashes = new List<string>();
+
+                    try
+                    {
+                        readSourceCollectionMd5Hashes(connection, md5Hashes);
+                    }
+                    catch (SqliteException)
+                    {
+                    }
+
+                    setMeta(connection, meta_key_content_hash, ComputeSongsBranchContentHash(
+                        metadata.SourceCollectionId,
+                        metadata.SourceCollectionLastModifiedUnixMilliseconds,
+                        metadata.SourceCollectionBeatmapCount,
+                        md5Hashes,
+                        storedXxy,
+                        storedPp));
+                }
             }
             catch (Exception e)
             {
@@ -1460,6 +1525,107 @@ WHERE {col_beatmap_md5} IN ({Join(", ", parameterNames)});
                 return false;
 
             return storedXxyVersion < currentXxyVersion;
+        }
+
+        /// <summary>
+        /// When the stored content hash matches the current algorithm + source-collection snapshot, the branch needs no refresh.
+        /// </summary>
+        public bool SongsBranchContentHashMatches(string databasePath, SongsBranchMetadata metadata, int currentXxyVersion, int currentPpVersion)
+        {
+            if (!Enabled || IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return false;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!prepareSongsBranchConnection(connection))
+                    return false;
+
+                string? storedHash = tryGetMeta(connection, meta_key_content_hash);
+
+                if (IsNullOrEmpty(storedHash))
+                    return false;
+
+                var md5Hashes = new List<string>();
+
+                try
+                {
+                    readSourceCollectionMd5Hashes(connection, md5Hashes);
+                }
+                catch (SqliteException)
+                {
+                }
+
+                string expected = ComputeSongsBranchContentHash(
+                    metadata.SourceCollectionId,
+                    metadata.SourceCollectionLastModifiedUnixMilliseconds,
+                    metadata.SourceCollectionBeatmapCount,
+                    md5Hashes,
+                    currentXxyVersion,
+                    currentPpVersion);
+
+                return string.Equals(storedHash, expected, StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore SongsBranchContentHashMatches failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
+        public static string ComputeSongsBranchContentHash(
+            Guid sourceCollectionId,
+            long sourceCollectionLastModifiedUnixMilliseconds,
+            int sourceCollectionBeatmapCount,
+            IEnumerable<string> beatmapMd5Hashes,
+            int xxyVersion,
+            int ppVersion)
+        {
+            var builder = new StringBuilder(256);
+            builder.Append(sourceCollectionId.ToString("D"));
+            builder.Append('|');
+            builder.Append(sourceCollectionLastModifiedUnixMilliseconds.ToString(CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(sourceCollectionBeatmapCount.ToString(CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(xxyVersion.ToString(CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(ppVersion.ToString(CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(songs_branch_schema_version.ToString(CultureInfo.InvariantCulture));
+            builder.Append('|');
+            builder.Append(ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
+
+            foreach (string md5 in beatmapMd5Hashes
+                                   .Where(hash => !IsNullOrWhiteSpace(hash))
+                                   .Select(hash => hash.ToLowerInvariant())
+                                   .Distinct(StringComparer.Ordinal)
+                                   .OrderBy(hash => hash, StringComparer.Ordinal))
+            {
+                builder.Append('|');
+                builder.Append(md5);
+            }
+
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString())));
+        }
+
+        public static string ComputeCollectionContentHash(long lastModifiedUnixMilliseconds, IEnumerable<string> beatmapMd5Hashes)
+        {
+            var builder = new StringBuilder(128);
+            builder.Append(lastModifiedUnixMilliseconds.ToString(CultureInfo.InvariantCulture));
+
+            foreach (string md5 in beatmapMd5Hashes
+                                   .Where(hash => !IsNullOrWhiteSpace(hash))
+                                   .Select(hash => hash.ToLowerInvariant())
+                                   .Distinct(StringComparer.Ordinal)
+                                   .OrderBy(hash => hash, StringComparer.Ordinal))
+            {
+                builder.Append('|');
+                builder.Append(md5);
+            }
+
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString())));
         }
 
         public bool TryGetSongsBranchRequiresPostMigrationRefresh(string databasePath, out bool requiresRefresh)
@@ -1701,7 +1867,8 @@ WHERE {col_beatmap_id} = $id;
 //             }
 //         }
 
-        public bool TrySetCollectionHideState(Guid collectionId, bool hiddenApplied, IEnumerable<Guid> preexistingHiddenBeatmapIds, IEnumerable<string> beatmapMd5Hashes)
+        public bool TrySetCollectionHideState(Guid collectionId, bool hiddenApplied, IEnumerable<Guid> preexistingHiddenBeatmapIds, IEnumerable<string> beatmapMd5Hashes,
+                                             long lastModifiedUnixMilliseconds = 0)
         {
             if (!Enabled || collectionId == Guid.Empty)
                 return false;
@@ -1713,19 +1880,25 @@ WHERE {col_beatmap_id} = $id;
                 using var connection = openConnection();
                 ensureCollectionHideTables(connection);
 
+                string contentHash = hiddenApplied
+                    ? ComputeCollectionContentHash(lastModifiedUnixMilliseconds, beatmapMd5Hashes)
+                    : string.Empty;
+
                 using var transaction = connection.BeginTransaction();
 
                 using (var upsertState = connection.CreateCommand())
                 {
                     upsertState.Transaction = transaction;
                     upsertState.CommandText = @"
-INSERT INTO collection_hidden_state(collection_id, hidden_applied)
-VALUES($collection_id, $hidden_applied)
+INSERT INTO collection_hidden_state(collection_id, hidden_applied, content_hash)
+VALUES($collection_id, $hidden_applied, $content_hash)
 ON CONFLICT(collection_id) DO UPDATE SET
-    hidden_applied = excluded.hidden_applied;
+    hidden_applied = excluded.hidden_applied,
+    content_hash = excluded.content_hash;
 ";
                     upsertState.Parameters.AddWithValue("$collection_id", collectionId.ToString());
                     upsertState.Parameters.AddWithValue("$hidden_applied", hiddenApplied ? 1 : 0);
+                    upsertState.Parameters.AddWithValue("$content_hash", contentHash);
                     upsertState.ExecuteNonQuery();
                 }
 
@@ -2388,11 +2561,13 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_hidden_preexisting} (
 
         private static void ensureCollectionHideTables(SqliteConnection connection)
         {
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
 CREATE TABLE IF NOT EXISTS collection_hidden_state (
     collection_id TEXT PRIMARY KEY,
-    hidden_applied INTEGER NOT NULL DEFAULT 0
+    hidden_applied INTEGER NOT NULL DEFAULT 0,
+    content_hash TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS collection_hidden_preexisting_beatmap (
@@ -2407,7 +2582,84 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
     PRIMARY KEY(collection_id, beatmap_md5)
 );
 ";
-            cmd.ExecuteNonQuery();
+                cmd.ExecuteNonQuery();
+            }
+
+            ensureCollectionHideContentHashColumn(connection);
+        }
+
+        private static void ensureCollectionHideContentHashColumn(SqliteConnection connection)
+        {
+            using var pragma = connection.CreateCommand();
+            pragma.CommandText = "PRAGMA table_info(collection_hidden_state);";
+
+            bool hasContentHash = false;
+
+            using (var reader = pragma.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader.GetString(1), "content_hash", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasContentHash = true;
+                        break;
+                    }
+                }
+            }
+
+            if (hasContentHash)
+                return;
+
+            using var alter = connection.CreateCommand();
+            alter.CommandText = "ALTER TABLE collection_hidden_state ADD COLUMN content_hash TEXT NOT NULL DEFAULT '';";
+            alter.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// Returns true when hide is already applied and the stored content hash matches the live collection snapshot.
+        /// </summary>
+        public bool IsCollectionHideContentCurrent(Guid collectionId, long lastModifiedUnixMilliseconds, IEnumerable<string> beatmapMd5Hashes)
+        {
+            if (!Enabled || collectionId == Guid.Empty)
+                return false;
+
+            try
+            {
+                Initialise();
+
+                using var connection = openConnection();
+                ensureCollectionHideTables(connection);
+
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+SELECT hidden_applied, content_hash
+FROM collection_hidden_state
+WHERE collection_id = $collection_id
+LIMIT 1;
+";
+                cmd.Parameters.AddWithValue("$collection_id", collectionId.ToString());
+
+                using var reader = cmd.ExecuteReader();
+
+                if (!reader.Read())
+                    return false;
+
+                if (reader.GetInt64(0) != 1)
+                    return false;
+
+                string storedHash = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+
+                if (IsNullOrEmpty(storedHash))
+                    return false;
+
+                string expected = ComputeCollectionContentHash(lastModifiedUnixMilliseconds, beatmapMd5Hashes);
+                return string.Equals(storedHash, expected, StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore IsCollectionHideContentCurrent failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
         }
 
         private bool isCurrentSongsBranchPath(string databasePath)

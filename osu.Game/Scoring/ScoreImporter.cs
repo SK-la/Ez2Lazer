@@ -13,6 +13,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.IO.Archives;
 using osu.Game.Rulesets;
@@ -142,6 +143,8 @@ namespace osu.Game.Scoring
             // This needs to be run after user detail population to ensure we have a valid user id.
             if (api.IsLoggedIn && api.LocalUser.Value.OnlineID == model.UserID && (model.BeatmapInfo.LastPlayed == null || model.Date > model.BeatmapInfo.LastPlayed))
                 model.BeatmapInfo.LastPlayed = model.Date;
+
+            EzScoreScanStamp.Invalidate(Files.Storage);
         }
 
         /// <summary>

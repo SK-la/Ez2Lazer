@@ -14,6 +14,7 @@ using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Database;
 using osu.Game.IO.Archives;
 using osu.Game.Models;
 using osu.Game.Online.API;
@@ -30,6 +31,7 @@ namespace osu.Game.Scoring
         private readonly OsuConfigManager? configManager;
         private readonly ScoreImporter scoreImporter;
         private readonly LegacyScoreExporter scoreExporter;
+        private readonly Storage storage;
 
         public override bool PauseImports
         {
@@ -47,6 +49,7 @@ namespace osu.Game.Scoring
         {
             this.beatmaps = beatmaps;
             this.configManager = configManager;
+            this.storage = storage;
 
             scoreImporter = new ScoreImporter(rulesets, beatmaps, storage, realm, api)
             {
@@ -188,6 +191,8 @@ namespace osu.Game.Scoring
 
                 Delete(items.ToList(), silent);
             });
+
+            EzScoreScanStamp.Invalidate(storage);
         }
 
         public void Delete(BeatmapInfo beatmap, bool silent = false)
@@ -197,6 +202,8 @@ namespace osu.Game.Scoring
                 var beatmapScores = r.Find<BeatmapInfo>(beatmap.ID)!.Scores.ToList();
                 Delete(beatmapScores, silent);
             });
+
+            EzScoreScanStamp.Invalidate(storage);
         }
 
         public Task Import(params string[] paths) => scoreImporter.Import(paths);

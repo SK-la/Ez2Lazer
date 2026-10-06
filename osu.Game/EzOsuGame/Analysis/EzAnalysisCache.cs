@@ -245,8 +245,8 @@ namespace osu.Game.EzOsuGame.Analysis
         //     => analysisDatabase.TryToggleSongsBranchHidden(databasePath, out message, out nonHideableBeatmapSets);
 
         public bool TryToggleCollectionHidden(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes, out LocalisableString message,
-                                              out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
-            => analysisDatabase.TryToggleCollectionHidden(collectionId, collectionName, beatmapMd5Hashes, out message, out nonHideableBeatmapSets);
+                                              out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets, long lastModifiedUnixMilliseconds = 0)
+            => analysisDatabase.TryToggleCollectionHidden(collectionId, collectionName, beatmapMd5Hashes, out message, out nonHideableBeatmapSets, lastModifiedUnixMilliseconds);
 
         public IReadOnlySet<Guid> GetHiddenCollectionIds()
             => analysisDatabase.GetHiddenCollectionIds();

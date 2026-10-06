@@ -244,11 +244,13 @@ WHERE {COL_UPDATED_AT} <> 0;
 
         public static void EnsureCollectionHideTables(SqliteConnection connection)
         {
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = @"
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
 CREATE TABLE IF NOT EXISTS collection_hidden_state (
     collection_id TEXT PRIMARY KEY,
-    hidden_applied INTEGER NOT NULL DEFAULT 0
+    hidden_applied INTEGER NOT NULL DEFAULT 0,
+    content_hash TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS collection_hidden_preexisting_beatmap (
@@ -263,7 +265,32 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
     PRIMARY KEY(collection_id, beatmap_md5)
 );
 ";
-            cmd.ExecuteNonQuery();
+                cmd.ExecuteNonQuery();
+            }
+
+            using var pragma = connection.CreateCommand();
+            pragma.CommandText = "PRAGMA table_info(collection_hidden_state);";
+
+            bool hasContentHash = false;
+
+            using (var reader = pragma.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (string.Equals(reader.GetString(1), "content_hash", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasContentHash = true;
+                        break;
+                    }
+                }
+            }
+
+            if (hasContentHash)
+                return;
+
+            using var alter = connection.CreateCommand();
+            alter.CommandText = "ALTER TABLE collection_hidden_state ADD COLUMN content_hash TEXT NOT NULL DEFAULT '';";
+            alter.ExecuteNonQuery();
         }
 
         public static void SetMeta(SqliteConnection connection, string key, string value)
@@ -561,17 +588,22 @@ VALUES (
 
             if (tableExists(source, "collection_hidden_state"))
             {
+                bool sourceHasContentHash = hasColumn(source, "collection_hidden_state", "content_hash");
+
                 using var select = source.CreateCommand();
-                select.CommandText = "SELECT collection_id, hidden_applied FROM collection_hidden_state;";
+                select.CommandText = sourceHasContentHash
+                    ? "SELECT collection_id, hidden_applied, COALESCE(content_hash, '') FROM collection_hidden_state;"
+                    : "SELECT collection_id, hidden_applied, '' FROM collection_hidden_state;";
                 using var reader = select.ExecuteReader();
                 using var insert = destination.CreateCommand();
-                insert.CommandText = "INSERT OR IGNORE INTO collection_hidden_state(collection_id, hidden_applied) VALUES($collection_id, $hidden_applied);";
+                insert.CommandText = "INSERT OR IGNORE INTO collection_hidden_state(collection_id, hidden_applied, content_hash) VALUES($collection_id, $hidden_applied, $content_hash);";
 
                 while (reader.Read())
                 {
                     insert.Parameters.Clear();
                     insert.Parameters.AddWithValue("$collection_id", reader.GetString(0));
                     insert.Parameters.AddWithValue("$hidden_applied", reader.GetInt64(1));
+                    insert.Parameters.AddWithValue("$content_hash", reader.IsDBNull(2) ? string.Empty : reader.GetString(2));
                     insert.ExecuteNonQuery();
                 }
             }

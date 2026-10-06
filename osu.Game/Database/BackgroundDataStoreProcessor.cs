@@ -297,7 +297,7 @@ namespace osu.Game.Database
         /// <item>其余：官方 <see cref="ScoreManager.Recalculate"/>。</item>
         /// </list>
         /// </summary>
-        /// <param name="includeAllRulesets">false 仅处理 mania 成绩（对应设置「尝试补算」）；true 处理全部游戏模式（「完全重算」）。</param>
+        /// <param name="includeAllRulesets">false 仅处理 mania 成绩（对应设置「尝试补算」）；true 处理当前已加载规则集（「完全重算」）。</param>
         public EzDataRebuildDispatchResult QueueEzScoreFullRecalculation(bool includeAllRulesets)
         {
             lock (ezScoreRecalculationLock)
@@ -310,6 +310,8 @@ namespace osu.Game.Database
 
                 ezScoreRecalculationQueued = true;
             }
+
+            EzScoreScanStamp.Invalidate(storage);
 
             Task.Factory.StartNew(() =>
             {
@@ -333,14 +335,35 @@ namespace osu.Game.Database
 
         private void runEzScoreFullRecalculation(bool includeAllRulesets)
         {
-            Logger.Log($"Querying local scores for full recalculation (all rulesets: {includeAllRulesets})...");
+            Logger.Log($"Querying local scores for full recalculation (all available rulesets: {includeAllRulesets})...");
 
-            List<Guid> scoreIds = realmAccess.Run(r => r.All<ScoreInfo>()
-                                                        .Where(s => !s.DeletePending)
-                                                        .AsEnumerable()
-                                                        .Where(s => includeAllRulesets || s.Ruleset.OnlineID == 3)
-                                                        .Select(s => s.ID)
-                                                        .ToList());
+            int skippedUnavailable = 0;
+
+            List<Guid> scoreIds = realmAccess.Run(r =>
+            {
+                var ids = new List<Guid>();
+
+                foreach (var score in r.All<ScoreInfo>().Where(s => !s.DeletePending))
+                {
+                    if (!includeAllRulesets)
+                    {
+                        if (score.Ruleset.OnlineID != 3)
+                            continue;
+                    }
+                    else if (!score.Ruleset.Available)
+                    {
+                        skippedUnavailable++;
+                        continue;
+                    }
+
+                    ids.Add(score.ID);
+                }
+
+                return ids;
+            });
+
+            if (skippedUnavailable > 0)
+                Logger.Log($"Skipped {skippedUnavailable} scores whose rulesets are not currently loaded.");
 
             Logger.Log($"Found {scoreIds.Count} local scores for full recalculation.");
 
@@ -393,6 +416,12 @@ namespace osu.Game.Database
             if (score == null)
             {
                 Logger.Log($"Score {id} no longer exists, skipping.");
+                return false;
+            }
+
+            if (!score.Ruleset.Available)
+            {
+                Logger.Log($"Skipping score {id}: ruleset '{score.Ruleset.ShortName}' is not currently loaded.");
                 return false;
             }
 
@@ -503,15 +532,30 @@ namespace osu.Game.Database
                     processOnlineBeatmapSetsWithNoUpdate();
                     // Note that the previous method will also update these on a fresh run.
                     processBeatmapsWithMissingObjectCounts();
-                    processScoresWithMissingStatistics();
-                    // [Ez] Must run before all official score upgrade passes: scores judged under an Ez
-                    // gameplay mode must never be rewritten by official conversion algorithms.
-                    stampEzGameplayModeScores();
-                    // ordering significant, `upgradeModMultipliers()` should run first as it will handle all scores
-                    // (rather than only lazer scores, if it was called after `convertLegacyTotalScoreToStandardised()`)
-                    upgradeModMultipliers();
-                    convertLegacyTotalScoreToStandardised();
-                    upgradeScoreRanks();
+
+                    // [Ez] Skip full score-upgrade table scans when a prior clean pass left a matching stamp.
+                    var scoreScanSnapshot = readScoreScanSnapshot();
+
+                    if (EzScoreScanStamp.Matches(storage, scoreScanSnapshot))
+                    {
+                        Logger.Log("Ez score scan stamp matched; skipping startup score upgrade passes.");
+                    }
+                    else
+                    {
+                        processScoresWithMissingStatistics();
+                        // [Ez] Must run before all official score upgrade passes: scores judged under an Ez
+                        // gameplay mode must never be rewritten by official conversion algorithms.
+                        stampEzGameplayModeScores();
+                        // ordering significant, `upgradeModMultipliers()` should run first as it will handle all scores
+                        // (rather than only lazer scores, if it was called after `convertLegacyTotalScoreToStandardised()`)
+                        upgradeModMultipliers();
+                        convertLegacyTotalScoreToStandardised();
+                        upgradeScoreRanks();
+
+                        EzScoreScanStamp.Write(storage, readScoreScanSnapshot());
+                        Logger.Log("Ez score scan stamp written after startup score upgrade passes.");
+                    }
+
                     backpopulateMissingSubmissionAndRankDates();
                     backpopulateUserTags();
                 }
@@ -1668,6 +1712,16 @@ namespace osu.Game.Database
             completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
         }
 
+        private EzScoreScanStamp.Snapshot readScoreScanSnapshot()
+        {
+            return realmAccess.Run(r =>
+            {
+                int scoreCount = r.All<ScoreInfo>().Count(s => !s.DeletePending);
+                int failedCount = r.All<ScoreInfo>().Count(s => !s.DeletePending && s.BackgroundReprocessingFailed);
+                return new EzScoreScanStamp.Snapshot(scoreCount, failedCount);
+            });
+        }
+
         private void processScoresWithMissingStatistics()
         {
             HashSet<Guid> scoreIds = new HashSet<Guid>();
@@ -1676,14 +1730,17 @@ namespace osu.Game.Database
 
             realmAccess.Run(r =>
             {
-                foreach (var score in r.All<ScoreInfo>().Where(s => !s.BackgroundReprocessingFailed))
+                // Filter on persisted JSON strings so we never deserialize Statistics for the whole table.
+                foreach (var score in r.All<ScoreInfo>().Where(s => !s.BackgroundReprocessingFailed
+                                                                   && !s.DeletePending
+                                                                   && s.BeatmapInfo != null
+                                                                   && (s.MaximumStatisticsJson == string.Empty
+                                                                       || s.MaximumStatisticsJson == "{}")))
                 {
-                    if (score.BeatmapInfo != null
-                        && score.Statistics.Sum(kvp => kvp.Value) > 0
-                        && score.MaximumStatistics.Sum(kvp => kvp.Value) == 0)
-                    {
-                        scoreIds.Add(score.ID);
-                    }
+                    if (string.IsNullOrEmpty(score.StatisticsJson) || score.StatisticsJson == "{}")
+                        continue;
+
+                    scoreIds.Add(score.ID);
                 }
             });
 
@@ -1827,7 +1884,7 @@ namespace osu.Game.Database
                 r.All<ScoreInfo>()
                  .Where(s => !s.BackgroundReprocessingFailed
                              && s.BeatmapInfo != null
-                             && s.TotalScoreVersion < 30000017 // version number represents version with latest mod multiplier change
+                             && s.TotalScoreVersion < EzScoreScanStamp.MOD_MULTIPLIER_GATE_VERSION
                              && s.TotalScoreWithoutMods > 0
                              // [Ez] non-official judge semantics are exempt from official upgrades (see stampEzGameplayModeScores).
                              // Lazer (0) and unset (-1) both follow ppy upstream behaviour.
@@ -1984,7 +2041,7 @@ namespace osu.Game.Database
 
             HashSet<Guid> scoreIds = realmAccess.Run(r => new HashSet<Guid>(
                 r.All<ScoreInfo>()
-                 .Where(s => s.TotalScoreVersion < 30000013 // last total score version with a significant change to ranks
+                 .Where(s => s.TotalScoreVersion < EzScoreScanStamp.RANK_GATE_VERSION
                              && !s.BackgroundReprocessingFailed
                              // [Ez] non-official judge semantics are exempt from official upgrades (see stampEzGameplayModeScores).
                              // Lazer (0) and unset (-1) both follow ppy upstream behaviour.
