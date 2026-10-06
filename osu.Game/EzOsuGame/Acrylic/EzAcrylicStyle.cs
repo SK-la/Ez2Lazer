@@ -32,5 +32,10 @@ namespace osu.Game.EzOsuGame.Acrylic
 
         /// <summary>Downscale panel acrylic blur to limit cost with many visible cards.</summary>
         public static readonly Vector2 PanelFrameBufferScale = new Vector2(0.5f);
+
+        /// <summary>
+        /// Main-menu button glass tint strength. The hue is the button accent; kept low so the blur stays visible.
+        /// </summary>
+        public const float MENU_BUTTON_TINT_ALPHA = 0.55f;
     }
 }

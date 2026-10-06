@@ -7,9 +7,13 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.EzOsuGame.Acrylic;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Sprites;
 using osuTK;
 using osuTK.Graphics;
@@ -67,8 +71,19 @@ namespace osu.Game.Screens.Menu
 
         private readonly Container background;
         private readonly Drawable backgroundContent;
+        private readonly EzAcrylicPanelBackground acrylicBackground;
         private readonly Box boxHoverLayer;
         private readonly SpriteIcon icon;
+
+        private Bindable<bool> acrylicUiEnabled = null!;
+
+        private static readonly EdgeEffectParameters classic_edge_effect = new EdgeEffectParameters
+        {
+            Type = EdgeEffectType.Shadow,
+            Colour = Color4.Black.Opacity(0.2f),
+            Roundness = 5,
+            Radius = 8,
+        };
 
         private Vector2 initialSize => BaseSize + Padding.Total;
 
@@ -100,17 +115,18 @@ namespace osu.Game.Screens.Menu
                     AlwaysPresent = true,
                     Masking = true,
                     MaskingSmoothness = 2,
-                    EdgeEffect = new EdgeEffectParameters
-                    {
-                        Type = EdgeEffectType.Shadow,
-                        Colour = Color4.Black.Opacity(0.2f),
-                        Roundness = 5,
-                        Radius = 8,
-                    },
+                    EdgeEffect = classic_edge_effect,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Children = new[]
+                    Children = new Drawable[]
                     {
+                        acrylicBackground = new EzAcrylicPanelBackground(colour.Opacity(EzAcrylicStyle.MENU_BUTTON_TINT_ALPHA), EzAcrylicStyle.PanelFrameBufferScale)
+                        {
+                            AcrylicCaptureVisible = false,
+                            RelativeSizeAxes = Axes.Y,
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                        },
                         backgroundContent = CreateBackground(colour).With(bg =>
                         {
                             bg.RelativeSizeAxes = Axes.Y;
@@ -186,9 +202,26 @@ namespace osu.Game.Screens.Menu
             // (which can exceed the [0;1] range during interpolation).
             backgroundContent.Width = 2 * initialSize.X;
             backgroundContent.Shear = -background.Shear;
+            acrylicBackground.Width = backgroundContent.Width;
+            acrylicBackground.Shear = backgroundContent.Shear;
 
             animateState();
             FinishTransforms(true);
+
+            EzAcrylicOverlayAlpha.BindExclusive(backgroundContent, acrylicBackground, acrylicUiEnabled);
+            acrylicUiEnabled.BindValueChanged(_ => updateAcrylicChrome(), true);
+        }
+
+        private void updateAcrylicChrome()
+        {
+            // Drop shadows flicker on the blur pass.
+            background.EdgeEffect = acrylicUiEnabled.Value ? new EdgeEffectParameters() : classic_edge_effect;
+        }
+
+        private void syncAcrylicCapture()
+        {
+            acrylicBackground.AcrylicCaptureVisible = State == ButtonState.Expanded;
+            acrylicBackground.SyncAcrylicCaptureState();
         }
 
         private bool rightward;
@@ -242,8 +275,10 @@ namespace osu.Game.Screens.Menu
         }
 
         [BackgroundDependencyLoader]
-        private void load(AudioManager audio)
+        private void load(AudioManager audio, Ez2ConfigManager ezConfig)
         {
+            acrylicUiEnabled = ezConfig.GetBindable<bool>(Ez2Setting.AcrylicUiEnabled);
+
             sampleHover = audio.Samples.Get(@"Menu/button-hover");
             sampleClick = audio.Samples.Get(!string.IsNullOrEmpty(sampleName) ? $@"Menu/{sampleName}" : @"UI/button-select");
         }
@@ -356,6 +391,8 @@ namespace osu.Game.Screens.Menu
                     this.FadeOut(explode_duration / 4f * 3);
                     break;
             }
+
+            syncAcrylicCapture();
         }
 
         private ButtonSystemState buttonSystemState;
