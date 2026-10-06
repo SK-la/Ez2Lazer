@@ -14,19 +14,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge.Replicas
         public static LazerHoldJudgementReplica Instance { get; } = new LazerHoldJudgementReplica();
 
         /// <summary>
-        /// 对齐局内松手：仅 Meh+ 成功窗内落判；Miss 窗（Meh..Miss）与窗外一律 None，
-        /// 由 Body 断连 / 重按重臂 / 被动 auto-miss 收束，避免提前松手直接 Miss 堵死后续合法松手。
+        /// 对齐局内 <see cref="Objects.Drawables.DrawableHoldNoteTail.CheckForResult"/>：
+        /// <c>ResultFor(offset/lenience)</c> 后直接落判（含 Miss）；窗外 <see cref="HitResult.None"/>
+        /// 不落判，由 Body 断连 / 重按重臂 / 被动 auto-miss 收束。
         /// </summary>
         public HitResult EvaluateTail(double rawOffset, HitWindows hitWindows, bool headHit, bool holdBreak)
         {
             double timeOffsetForJudgement = rawOffset / TailNote.RELEASE_WINDOW_LENIENCE;
             var result = hitWindows.ResultFor(timeOffsetForJudgement);
 
-            // ResultFor 在 Meh..Miss 之间会返回 Miss；用户松手路径不得据此终判尾，
-            // 否则「断连后重按再松」无法重臂判尾（Eviternity 金标 Miss+4 主因）。
-            if (result == HitResult.None || result == HitResult.Miss)
+            // 窗外：局内 userTriggered 路径对 None 直接 return，不终判尾。
+            if (result == HitResult.None)
                 return HitResult.None;
 
+            // Meh+ 且（头未中或已断连）→ 封顶 Meh（对齐 GetCappedResult）。Miss 不升不降。
             if (result > HitResult.Meh && (!headHit || holdBreak))
                 return HitResult.Meh;
 

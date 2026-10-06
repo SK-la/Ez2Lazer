@@ -320,8 +320,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             PillModeEnabled = pillModeEnabled,
                         });
 
-                        // Lazer / Classic 共用 CommonHoldJudgementStrategy（LazerHoldJudgementReplica）：
-                        // 窗口外一律返回 None，局内此时不判尾、仅由 Body 断连收束。
+                        // Lazer / Classic：窗外 None → 不判尾（断连 / 重臂 / auto-miss）；
+                        // Miss 窗内 ResultFor=Miss 须落判（对齐 DrawableHoldNoteTail），不得吞成 None。
                         if (!judgementRound.IsEzHitMode && result == HitResult.None)
                         {
                             // [parity] 本次松手未判定尾键 → 检查是否构成断连（Body ComboBreak）。

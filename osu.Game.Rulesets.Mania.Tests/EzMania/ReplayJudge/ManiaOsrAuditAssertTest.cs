@@ -412,6 +412,41 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             dumpBucket("Great by type", HitResult.Great);
             dumpBucket("Perfect by type", HitResult.Perfect);
 
+            // Perfect/Great 边界带：判据 offset（Tail 除 lenience）相对 Perfect 窗。
+            double? perfectWindow = hitEvents.Select(e => e.HitObject?.HitWindows?.WindowFor(HitResult.Perfect)).FirstOrDefault(w => w is > 0);
+            sb.AppendLine($"PerfectWindow={perfectWindow}");
+            foreach (var (lo, hi, label) in new (double, double, string)[]
+                     {
+                         (0, 16.5, "j(0,16.5]"),
+                         (16.5, 17.0, "j(16.5,17]"),
+                         (17.0, 17.5, "j(17,17.5]"),
+                         (17.5, 18.5, "j(17.5,18.5]"),
+                         (18.5, 22, "j(18.5,22]"),
+                     })
+            {
+                int great = 0, perfect = 0, greatTail = 0, perfectTail = 0;
+                foreach (var e in hitEvents)
+                {
+                    if (e.HitObject?.HitWindows == null) continue;
+                    if (e.Result is not (HitResult.Great or HitResult.Perfect)) continue;
+                    bool tail = e.HitObject is TailNote;
+                    double j = Math.Abs(e.TimeOffset) / (tail ? TailNote.RELEASE_WINDOW_LENIENCE : 1.0);
+                    if (j <= lo || j > hi) continue;
+                    if (e.Result == HitResult.Great)
+                    {
+                        great++;
+                        if (tail) greatTail++;
+                    }
+                    else
+                    {
+                        perfect++;
+                        if (tail) perfectTail++;
+                    }
+                }
+
+                sb.AppendLine($"  {label}: Great={great}(T={greatTail}) Perfect={perfect}(T={perfectTail})");
+            }
+
             sb.AppendLine("first misses:");
             foreach (var e in hitEvents.Where(e => e.Result == HitResult.Miss).OrderBy(e => e.HitObject?.StartTime ?? 0).Take(20))
             {
