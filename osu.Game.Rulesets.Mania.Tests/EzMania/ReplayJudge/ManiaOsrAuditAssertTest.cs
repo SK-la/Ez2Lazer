@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -12,7 +13,10 @@ using osu.Game.Beatmaps.Formats;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.IO;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
@@ -40,6 +44,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         public void OneTimeSetUp() => GlobalConfigStore.EnsureInitialized();
 
         // ── Lazer 轨（Eviternity / Lazer 客户端冻结 osr）────────────────────────
+        // osr 头：gameVersion=30000013，时间戳≈2024-03-16。当前 Session 按现行窗口（Floor+0.5 等）
+        // 回放时 Perfect 会比该旧客户端多一截（探针：仅收紧 Perfect 到 17.0 可消掉 +17，剩 Perfect+16 / Miss+3）。
 
         private static readonly AuditFixture lazer = new AuditFixture(
             Name: "Lazer-Eviternity",
@@ -285,7 +291,81 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             if (comboDelta != 0)
                 sb.AppendLine($"  MaxCombo: {comboDelta:+#;-#;0}");
 
+            appendHitEventAttribution(sb, score.ScoreInfo.HitEvents);
             return sb.ToString();
+        }
+
+        private static void appendHitEventAttribution(StringBuilder sb, IReadOnlyList<HitEvent> hitEvents)
+        {
+            static string kind(HitEvent e) => e.HitObject switch
+            {
+                HeadNote => "Head",
+                TailNote => "Tail",
+                Note => "Note",
+                HoldNoteTick => "Tick",
+                HoldNoteBody => "Body",
+                HoldNote => "Hold",
+                _ => e.HitObject?.GetType().Name ?? "?"
+            };
+
+            void dumpBucket(string title, HitResult result)
+            {
+                var items = hitEvents.Where(e => e.Result == result).ToArray();
+                var byKind = items.GroupBy(kind).OrderBy(g => g.Key)
+                                  .Select(g => $"{g.Key}={g.Count()}");
+                sb.AppendLine($"{title}: total={items.Length} [{string.Join(", ", byKind)}]");
+
+                if (result != HitResult.Perfect)
+                    return;
+
+                int overJudged = 0;
+                int tailSeamRaw26 = 0; // |raw|∈(P, P*lenience] — 靠 release lenience 抬进 Perfect
+                int noteHeadOver = 0;
+
+                foreach (var e in items)
+                {
+                    if (e.HitObject?.HitWindows == null)
+                        continue;
+
+                    double abs = Math.Abs(e.TimeOffset);
+                    double perfect = e.HitObject.HitWindows.WindowFor(HitResult.Perfect);
+                    bool isTail = e.HitObject is TailNote;
+                    double judgedAbs = isTail ? abs / TailNote.RELEASE_WINDOW_LENIENCE : abs;
+
+                    if (judgedAbs > perfect)
+                        overJudged++;
+
+                    if (isTail && abs > perfect && judgedAbs <= perfect)
+                        tailSeamRaw26++;
+                    else if (!isTail && abs > perfect)
+                        noteHeadOver++;
+                }
+
+                int tailRaw26 = items.Count(e => e.HitObject is TailNote && Math.Abs(e.TimeOffset) == 26);
+                int seam172 = items.Count(e =>
+                {
+                    if (e.HitObject?.HitWindows == null) return false;
+                    double judgedAbs = e.HitObject is TailNote
+                        ? Math.Abs(e.TimeOffset) / TailNote.RELEASE_WINDOW_LENIENCE
+                        : Math.Abs(e.TimeOffset);
+                    return judgedAbs > 17.0 && judgedAbs <= 17.5;
+                });
+                sb.AppendLine($"  Perfect window: overJudged={overJudged} noteHeadOver={noteHeadOver} tailLenienceSeam={tailSeamRaw26} tailRawEq26={tailRaw26} seam(17,17.5]={seam172}");
+            }
+
+            dumpBucket("Miss by type", HitResult.Miss);
+            dumpBucket("Meh by type", HitResult.Meh);
+            dumpBucket("Good by type", HitResult.Good);
+            dumpBucket("Great by type", HitResult.Great);
+            dumpBucket("Perfect by type", HitResult.Perfect);
+
+            sb.AppendLine("first misses:");
+            foreach (var e in hitEvents.Where(e => e.Result == HitResult.Miss).OrderBy(e => e.HitObject?.StartTime ?? 0).Take(20))
+            {
+                string column = e.HitObject is IHasColumn c ? c.Column.ToString() : "-";
+                double end = e.HitObject?.GetEndTime() ?? 0;
+                sb.AppendLine($"  {kind(e)}@{e.HitObject?.StartTime:F0} end={end:F0} col={column} offset={e.TimeOffset:F1}");
+            }
         }
 
         private static void archiveReport(AuditFixture fixture, string report)
