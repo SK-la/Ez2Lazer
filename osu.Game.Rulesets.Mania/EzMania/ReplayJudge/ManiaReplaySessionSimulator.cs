@@ -83,6 +83,31 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                 bool wasHoldingBeforeEvent = keyHeldByColumn.TryGetValue(input.Column, out bool held) && held;
 
+                // 任意 continue 都不得跳过「输入后 auto-miss」，否则同帧到期尾/头会拖到下一事件，配对漂移。
+                try
+                {
+                    processInputEvent();
+                }
+                finally
+                {
+                    applyAutoMissesUpTo(
+                        input.Time,
+                        autoMissQueue,
+                        ref autoMissCursor,
+                        holdByHead,
+                        headByTail,
+                        activeHoldByColumn,
+                        inputData.PressTimesByColumn,
+                        scoreProcessor,
+                        gameplayRate,
+                        environment.ManiaHitMode,
+                        timelineRecorder,
+                        endExclusive: false);
+                }
+
+                void processInputEvent()
+                {
+
                 // Drawable：同帧先 Update tick 再（或交错）处理按键。
                 // 松手：先结算 <t 的持有 tick，再松，再结算 =t 为 Miss。
                 // 重按：先结算 <=t（仍为 Broken）为 Miss，再 Recover，避免 =t 被算进涨 combo。
@@ -138,7 +163,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
 
                 var perColumnDict = input.IsPress ? pressColumns : releaseColumns;
                 if (!perColumnDict.TryGetValue(input.Column, out var laneStates))
-                    continue;
+                    return;
 
                 // 局内只在按下时刷新 press-time BPM（Column.OnPressed）；松手沿用按下那一刻的值，
                 // 尾判取的是同一份 BPM。
@@ -183,7 +208,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     {
                         tryApplyEz2AcHoldRelease(input.Column, holdByHead, headWasHit, headByTail, releaseColumns, ez2AcHoldStates, environment);
                         tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
-                        continue;
+                        return;
                     }
                 }
 
@@ -195,7 +220,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     else
                         tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
 
-                    continue;
+                    return;
                 }
 
                 var selected = activeTail ?? selectCandidate(
@@ -214,7 +239,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         tryRearmActiveHold(input.Column, input.Time, laneStates, releaseColumns, holdByHead, holdStrategy, activeHoldByColumn);
                     }
 
-                    continue;
+                    return;
                 }
 
                 var target = selected.Target;
@@ -238,7 +263,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 if (input.IsPress && target is HeadNote headNote && holdByHead.TryGetValue(headNote, out var hold))
                 {
                     if (!holdStrategy.CanBeginHoldAt(input.Time, hold.Tail))
-                        continue;
+                        return;
                 }
 
                 double pressBpm = judgementRound.IsO2Jam ? judgementRound.O2PressBpm : hitWindowHelper.BPM;
@@ -275,7 +300,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                                 tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
                             }
 
-                            continue;
+                            return;
                         }
                     }
                     else
@@ -302,7 +327,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             // [parity] 本次松手未判定尾键 → 检查是否构成断连（Body ComboBreak）。
                             if (!input.IsPress)
                                 tryApplyEarlyHoldBreakBody(laneStates, input.Time, wasHoldingBeforeEvent, environment, headByTail, holdByHead, headWasHit, scoreProcessor, gameplayRate, timelineRecorder);
-                            continue;
+                            return;
                         }
                     }
                 }
@@ -311,7 +336,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     var sessionOutcome = bms.EvaluateSessionPress(bmsWindows, timeOffsetForJudgement, selected.BmsRoute, poorEnabled);
 
                     if (sessionOutcome.Kind == BmsHitModeJudgement.SessionPressKind.None)
-                        continue;
+                        return;
 
                     if (sessionOutcome.Kind == BmsHitModeJudgement.SessionPressKind.DispatchExtra)
                     {
@@ -323,7 +348,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                             input.Time,
                             gameplayRate,
                             timelineRecorder);
-                        continue;
+                        return;
                     }
 
                     result = BmsHitModeJudgement.MapTo(sessionOutcome.Judge);
@@ -345,14 +370,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     });
 
                     if (!tryMapNoteEvaluation(noteEval, out result))
-                        continue;
+                        return;
                 }
                 else
                 {
                     var outcome = noteStrategy.EvaluatePress(timeOffsetForJudgement, target.HitWindows!);
 
                     if (outcome.Kind != ManiaNoteJudgementOutcomeKind.Apply)
-                        continue;
+                        return;
 
                     result = outcome.Result;
                 }
@@ -362,7 +387,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                     // 局内 Column.handleHit → IsUserTriggerJudgeableNow：仍 CanBeHit 则不补 Miss。
                     // 旧逻辑用 Miss 窗反了——Meh 窗内的更早物件会被误杀，后续按键配对漂移（Perfect↑ / Miss↑）。
                     if (isStillUserTriggerJudgeable(forced.Target, input.Time, headWasHit, holdByHead))
-                        continue;
+                        return;
 
                     forced.Judged = true;
                     forced.Result = HitResult.Miss;
@@ -451,7 +476,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                 }
 
                 // 局内：列路由已命中其它物件时，同列 DrawableHoldNote.OnPressed 仍会 TryBeginHoldPress 重臂。
-                // Session 若只在「无候选」时 rearm，断连后下一击打到 tap/其它头会漏掉 ActiveHold，尾被 auto-miss。
                 if (input.IsPress
                     && !activeHoldByColumn.ContainsKey(input.Column)
                     && pressColumns.TryGetValue(input.Column, out var pressLaneStatesForRearm))
@@ -465,21 +489,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
                         holdStrategy,
                         activeHoldByColumn);
                 }
-
-                // 局内同帧：输入之后 Column.ProcessAutoMiss(Time.Current)。
-                applyAutoMissesUpTo(
-                    input.Time,
-                    autoMissQueue,
-                    ref autoMissCursor,
-                    holdByHead,
-                    headByTail,
-                    activeHoldByColumn,
-                    inputData.PressTimesByColumn,
-                    scoreProcessor,
-                    gameplayRate,
-                    environment.ManiaHitMode,
-                    timelineRecorder,
-                    endExclusive: false);
+                } // processInputEvent
             }
 
             // 收尾：剩余 tick + EZ2AC 未判尾（持满不松）
