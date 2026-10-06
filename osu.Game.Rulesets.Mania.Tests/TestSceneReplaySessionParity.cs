@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -88,18 +89,18 @@ namespace osu.Game.Rulesets.Mania.Tests
         /// <summary>
         /// 全谱：JSON 帧 + 嵌入 .osu（OD/timing）。帧源为 Lazer osr 解码 double（整数档）；
         /// 亚毫秒局内抓帧后可覆盖同路径 JSON。
-        /// Visual ReplayPlayer 约 5 分钟谱面，默认 UntilStep 10s 不够；本地用
-        /// <c>OSU_TESTS_NO_TIMEOUT=1</c> 跑。CI 用 <see cref="ManiaReplayJsonFixtureTest.TestAuditChartSessionRunsFromJson"/>。
+        /// Visual ≈5min，用 <see cref="LongUntilStepButton"/>（10min）；CI 默认不跑。
+        /// CI Session smoke：<see cref="ManiaReplayJsonFixtureTest.TestAuditChartSessionRunsFromJson"/>。
         /// </summary>
         [Test]
-        [Explicit("全谱 Visual ≈5min；设 OSU_TESTS_NO_TIMEOUT=1 后手动跑 Drawable≡Session。")]
+        [Explicit("全谱 Visual ≈5–10min；手动跑 Drawable≡Session（LongUntilStep 10min）。")]
         public void TestJsonLazerHanatachiDrawableMatchesSession()
-            => runDrawableParityFromJson("Resources/Testing/ReplayJson/Lazer-Hanatachi.json");
+            => runDrawableParityFromJson("Resources/Testing/ReplayJson/Lazer-Hanatachi.json", longWait: true);
 
         [Test]
-        [Explicit("全谱 Visual ≈5min；设 OSU_TESTS_NO_TIMEOUT=1 后手动跑 Drawable≡Session。")]
+        [Explicit("全谱 Visual ≈5–10min；手动跑 Drawable≡Session（LongUntilStep 10min）。")]
         public void TestJsonLazerPORTRAiTDrawableMatchesSession()
-            => runDrawableParityFromJson("Resources/Testing/ReplayJson/Lazer-PORTRAiT.json");
+            => runDrawableParityFromJson("Resources/Testing/ReplayJson/Lazer-PORTRAiT.json", longWait: true);
 
         [Test]
         public void TestLazerHoldDrawableMatchesSession()
@@ -560,7 +561,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                 fixture.score.Replay.Frames);
         }
 
-        private void runDrawableParityFromJson(string resourcePath)
+        private void runDrawableParityFromJson(string resourcePath, bool longWait = false)
         {
             var document = ManiaReplayJsonFixture.ReadResource(resourcePath);
             var (environment, columns, hitObjects, frames, _) = ManiaReplayJsonFixture.ToParts(document);
@@ -568,12 +569,12 @@ namespace osu.Game.Rulesets.Mania.Tests
             parityEnvironment = environment;
 
             if (!string.IsNullOrWhiteSpace(document.BeatmapResource))
-                runDrawableParityTestWithBeatmapResource(document.BeatmapResource!, frames);
+                runDrawableParityTestWithBeatmapResource(document.BeatmapResource!, frames, longWait);
             else
-                runDrawableParityTest(hitObjects, frames, columns);
+                runDrawableParityTest(hitObjects, frames, columns, longWait);
         }
 
-        private void runDrawableParityTestWithBeatmapResource(string beatmapResource, List<ReplayFrame> frames)
+        private void runDrawableParityTestWithBeatmapResource(string beatmapResource, List<ReplayFrame> frames, bool longWait = false)
         {
             AddStep("configure environment", () => ReplayJudgeTestConfig.ApplyToGlobalConfig(parityEnvironment));
 
@@ -591,10 +592,10 @@ namespace osu.Game.Rulesets.Mania.Tests
                 LoadScreen(currentPlayer = new ScoreAccessibleReplayPlayer(replayScore));
             });
 
-            waitCaptureAndAssertParity(beatmapResource);
+            waitCaptureAndAssertParity(beatmapResource, columns: 4, longWait);
         }
 
-        private void runDrawableParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames, int columns = 4)
+        private void runDrawableParityTest(List<ManiaHitObject> hitObjects, List<ReplayFrame> frames, int columns = 4, bool longWait = false)
         {
             AddStep("configure environment", () => ReplayJudgeTestConfig.ApplyToGlobalConfig(parityEnvironment));
 
@@ -620,16 +621,30 @@ namespace osu.Game.Rulesets.Mania.Tests
                 LoadScreen(currentPlayer = new ScoreAccessibleReplayPlayer(replayScore));
             });
 
-            waitCaptureAndAssertParity(beatmapResource: null, columns);
+            waitCaptureAndAssertParity(beatmapResource: null, columns, longWait);
         }
 
-        private void waitCaptureAndAssertParity(string? beatmapResource, int columns = 4)
+        private void waitCaptureAndAssertParity(string? beatmapResource, int columns = 4, bool longWait = false)
         {
             // 玩家是异步加载的：ScoreProcessor 由 Player 的 [BackgroundDependencyLoader] load() 建出，
             // 在此之前访问它会 NRE（本夹具当进程首个测试时必现）。LoadedBeatmapSuccessfully 为 true
             // 即 load() 已跑到 ScoreProcessor 赋值之后。
-            AddUntilStep("wait for player", () => currentPlayer.LoadedBeatmapSuccessfully);
-            AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value);
+            AddUntilStep("wait for player", () =>
+                currentPlayer is { LoadedBeatmapSuccessfully: true, ScoreProcessor: not null });
+
+            if (longWait)
+            {
+                AddStep(new LongUntilStepButton
+                {
+                    Text = "wait for completion",
+                    IsSetupStep = false,
+                    CallStack = new StackTrace(1, true),
+                    TimeoutMilliseconds = 600_000,
+                    Assertion = () => currentPlayer.ScoreProcessor?.HasCompleted.Value == true,
+                });
+            }
+            else
+                AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor?.HasCompleted.Value == true);
 
             AddStep("capture drawable hit events", () =>
             {
@@ -637,32 +652,36 @@ namespace osu.Game.Rulesets.Mania.Tests
                 playableBeatmap = Beatmap.Value.GetPlayableBeatmap(new ManiaRuleset().RulesetInfo);
             });
 
-            AddStep("dump ReplayJson", () =>
+            // 按需 dump：环境变量 EZ_DUMP_REPLAY_JSON=1
+            if (ManiaReplayJsonFixture.DumpEnabled)
             {
-                int dumpColumns = playableBeatmap is ManiaBeatmap mania
-                    ? mania.TotalColumns
-                    : columns;
+                AddStep("dump ReplayJson", () =>
+                {
+                    int dumpColumns = playableBeatmap is ManiaBeatmap mania
+                        ? mania.TotalColumns
+                        : columns;
 
-                string path = Path.Combine(
-                    TestContext.CurrentContext.WorkDirectory,
-                    "ReplayJsonDump",
-                    $"{TestContext.CurrentContext.Test.Name}.json");
+                    string path = Path.Combine(
+                        TestContext.CurrentContext.WorkDirectory,
+                        "ReplayJsonDump",
+                        $"{TestContext.CurrentContext.Test.Name}.json");
 
-                var hitObjects = string.IsNullOrWhiteSpace(beatmapResource)
-                    ? playableBeatmap.HitObjects.OfType<ManiaHitObject>().Where(h => h is Note or HoldNote).ToList()
-                    : new List<ManiaHitObject>();
+                    var hitObjects = string.IsNullOrWhiteSpace(beatmapResource)
+                        ? playableBeatmap.HitObjects.OfType<ManiaHitObject>().Where(h => h is Note or HoldNote).ToList()
+                        : new List<ManiaHitObject>();
 
-                ManiaReplayJsonFixture.Write(
-                    path,
-                    ManiaReplayJsonFixture.FromParts(
-                        parityEnvironment,
-                        dumpColumns,
-                        hitObjects,
-                        replayScore.Replay.Frames,
-                        beatmapResource));
+                    ManiaReplayJsonFixture.Write(
+                        path,
+                        ManiaReplayJsonFixture.FromParts(
+                            parityEnvironment,
+                            dumpColumns,
+                            hitObjects,
+                            replayScore.Replay.Frames,
+                            beatmapResource));
 
-                TestContext.WriteLine($"ReplayJson dumped to {path}");
-            });
+                    TestContext.WriteLine($"ReplayJson dumped to {path}");
+                });
+            }
 
             AddAssert("session hit events match drawable replay path", () =>
             {

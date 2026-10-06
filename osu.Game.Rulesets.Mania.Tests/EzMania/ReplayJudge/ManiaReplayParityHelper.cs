@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Utils;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
@@ -48,7 +49,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         private static IEnumerable<HitEvent> orderedJudgementEvents(IReadOnlyList<HitEvent> hitEvents)
             => judgementEvents(hitEvents)
                 .OrderBy(e => e.HitObject.StartTime)
-                .ThenBy(e => e.HitObject.GetEndTime());
+                .ThenBy(e => e.HitObject.GetEndTime())
+                // 同刻 Note/Head/Tail 在 Drawable 与 Session 产出顺序可能不同；列+类型作稳定键。
+                .ThenBy(e => e.HitObject is IHasColumn c ? c.Column : -1)
+                .ThenBy(e => e.HitObject.GetType().Name)
+                .ThenBy(e => e.Result);
 
         private static IEnumerable<HitEvent> judgementEvents(IReadOnlyList<HitEvent> hitEvents)
             => hitEvents.Where(e => e.Result != HitResult.IgnoreHit && e.Result != HitResult.IgnoreMiss);

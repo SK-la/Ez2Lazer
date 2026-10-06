@@ -3,6 +3,7 @@
   "healthMode": "Lazer",
   "judgePrecedence": "Earliest",
   "columns": 4,
+  "frameSource": "synthetic-subms",
   "hitObjects": [
     { "type": "Note", "time": 1000.25, "column": 0 },
     { "type": "Note", "time": 2000.75, "column": 0 }

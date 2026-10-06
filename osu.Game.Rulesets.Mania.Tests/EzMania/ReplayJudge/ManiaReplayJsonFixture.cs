@@ -25,18 +25,35 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
     /// </summary>
     internal static class ManiaReplayJsonFixture
     {
-        private static readonly JsonSerializerOptions json_options = new JsonSerializerOptions
+        /// <summary>设为 1/true 时，parity TestScene 写出 ReplayJsonDump。</summary>
+        public const string DUMP_ENV = "EZ_DUMP_REPLAY_JSON";
+
+        private static readonly JsonSerializerOptions json_read_options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             ReadCommentHandling = JsonCommentHandling.Skip,
             AllowTrailingCommas = true,
         };
 
+        private static readonly JsonSerializerOptions json_pretty_options = createWriteOptions(indented: true);
+        private static readonly JsonSerializerOptions json_compact_options = createWriteOptions(indented: false);
+
+        private static JsonSerializerOptions createWriteOptions(bool indented) => new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = indented,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            AllowTrailingCommas = true,
+        };
+
+        public static bool DumpEnabled
+            => parseEnvBool(Environment.GetEnvironmentVariable(DUMP_ENV));
+
         public static Document Read(Stream stream)
         {
-            var doc = JsonSerializer.Deserialize<Document>(stream, json_options)
+            var doc = JsonSerializer.Deserialize<Document>(stream, json_read_options)
                       ?? throw new InvalidDataException("ReplayJson deserialize returned null");
             validate(doc);
             return doc;
@@ -49,11 +66,13 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             return Read(stream);
         }
 
-        public static void Write(string path, Document document)
+        public static void Write(string path, Document document, bool? compact = null)
         {
             validate(document);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, JsonSerializer.Serialize(document, json_options));
+            bool useCompact = compact ?? !string.IsNullOrWhiteSpace(document.BeatmapResource);
+            var options = useCompact ? json_compact_options : json_pretty_options;
+            File.WriteAllText(path, JsonSerializer.Serialize(document, options));
         }
 
         public static void Write(
@@ -61,9 +80,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             GameplayEnvironment environment,
             int columns,
             IReadOnlyList<ManiaHitObject> hitObjects,
-            IReadOnlyList<ReplayFrame> frames)
+            IReadOnlyList<ReplayFrame> frames,
+            string? beatmapResource = null,
+            bool? compact = null)
         {
-            Write(path, FromParts(environment, columns, hitObjects, frames));
+            Write(path, FromParts(environment, columns, hitObjects, frames, beatmapResource), compact);
         }
 
         public static Document FromParts(
@@ -80,6 +101,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 JudgePrecedence = environment.JudgePrecedence.ToString(),
                 Columns = columns,
                 BeatmapResource = beatmapResource,
+                FrameSource = string.IsNullOrWhiteSpace(beatmapResource) ? "synthetic-subms" : "osr-decoded",
                 // 全谱夹具用 beatmapResource 挂真实 OD/timing；hitObjects 可省略以控体积。
                 HitObjects = string.IsNullOrWhiteSpace(beatmapResource)
                     ? hitObjects.Select(toHitObjectDto).ToList()
@@ -116,6 +138,21 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 
             return (environment, document.Columns, hitObjects, frames, score);
         }
+
+        /// <summary>
+        /// 计划契约名：合成夹具 → Score + 内存谱面信息；全谱仍需 <see cref="Document.BeatmapResource"/> 另载 .osu。
+        /// </summary>
+        public static (Score Score, List<ManiaHitObject> HitObjects, int Columns, GameplayEnvironment Environment)
+            ToScoreAndBeatmap(Document document)
+        {
+            var (environment, columns, hitObjects, _, score) = ToParts(document);
+            return (score, hitObjects, columns, environment);
+        }
+
+        private static bool parseEnvBool(string? value)
+            => !string.IsNullOrWhiteSpace(value)
+               && (value == "1" || value.Equals("true", StringComparison.OrdinalIgnoreCase)
+                                || value.Equals("yes", StringComparison.OrdinalIgnoreCase));
 
         private static void validate(Document document)
         {
@@ -207,6 +244,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             /// 可选：嵌入 .osu 资源路径。全谱夹具用此挂真实难度/timing；此时 hitObjects 可空。
             /// </summary>
             public string? BeatmapResource { get; set; }
+
+            /// <summary>
+            /// 帧来源标记：<c>synthetic-subms</c>（合成亚毫秒）/ <c>osr-decoded</c>（osr 整数档 double）。
+            /// </summary>
+            public string? FrameSource { get; set; }
 
             public List<HitObjectDto> HitObjects { get; set; } = new List<HitObjectDto>();
             public List<FrameDto> Frames { get; set; } = new List<FrameDto>();

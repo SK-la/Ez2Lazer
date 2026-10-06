@@ -56,6 +56,20 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             assertAuditFixture("Resources/Testing/ReplayJson/Lazer-PORTRAiT.json", "Resources/Testing/Beatmaps/ManiaAudit-PORTRAiT.osu");
         }
 
+        [Test]
+        public void TestToScoreAndBeatmapMatchesToParts()
+        {
+            var document = ManiaReplayJsonFixture.ReadResource("Resources/Testing/ReplayJson/Lazer-two-note-tap.json");
+            var (score, hitObjects, columns, environment) = ManiaReplayJsonFixture.ToScoreAndBeatmap(document);
+            var (env2, columns2, hitObjects2, frames2, score2) = ManiaReplayJsonFixture.ToParts(document);
+
+            Assert.That(columns, Is.EqualTo(columns2));
+            Assert.That(environment.ManiaHitMode, Is.EqualTo(env2.ManiaHitMode));
+            Assert.That(hitObjects, Has.Count.EqualTo(hitObjects2.Count));
+            Assert.That(score.Replay.Frames, Has.Count.EqualTo(score2.Replay.Frames.Count));
+            Assert.That(score.Replay.Frames, Has.Count.EqualTo(frames2.Count));
+        }
+
         /// <summary>
         /// CI 可跑：全谱 JSON→Session 能完整出 HitEvents（Visual Drawable≡Session 见 Explicit TestJson_*）。
         /// </summary>
@@ -88,6 +102,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         {
             var document = ManiaReplayJsonFixture.ReadResource(jsonResource);
             Assert.That(document.BeatmapResource, Is.EqualTo(expectedBeatmapResource));
+            Assert.That(document.FrameSource, Is.EqualTo("osr-decoded"));
             Assert.That(document.Frames, Has.Count.GreaterThan(100));
             Assert.That(document.HitMode, Is.EqualTo(nameof(EzEnumHitMode.Lazer)));
         }

@@ -195,14 +195,14 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         }
 
         [TestCaseSource(nameof(LazerFixtures))]
-        [Explicit("Lazer Session≠冻结 osr 锚点。修判定后去掉 Explicit。")]
+        [Explicit("旁证：Session≠冻结 osr（整数帧/历史客户端）。局内对齐走 ReplayJson+TestSceneReplaySessionParity，勿为本轨改金标凑绿。")]
         public void AuditLazerSessionMatchesAnchor(AuditFixture fixture)
         {
             assertSessionMatchesAnchor(fixture);
         }
 
         [TestCaseSource(nameof(ClassicFixtures))]
-        [Explicit("Classic Session≠Classic 客户端静态锚点。修判定后去掉 Explicit。")]
+        [Explicit("旁证：Classic Session≠客户端静态锚点。局内对齐走 ReplayJson，勿为本轨改金标凑绿。")]
         public void AuditClassicSessionMatchesAnchor(AuditFixture fixture)
         {
             assertSessionMatchesAnchor(fixture);
