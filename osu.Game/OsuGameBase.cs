@@ -44,6 +44,7 @@ using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Background.Pixiv;
+using osu.Game.EzOsuGame.BeatmapPools;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.ExternalRulesets;
 using osu.Game.EzOsuGame.Fonts;
@@ -341,6 +342,7 @@ namespace osu.Game
             GlobalConfigStore.Config = LocalConfig;
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);
+            dependencies.Cache(new EzBeatmapPoolStore(Ez2ConfigManager));
             dependencies.Cache(new PixivBackgroundCoordinator(Storage, Ez2ConfigManager));
 
             bindFrameLimiter(Ez2ConfigManager, frameworkConfig);

@@ -19,6 +19,7 @@ using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.BeatmapPools;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
@@ -234,6 +235,11 @@ namespace osu.Game.Rulesets
 
         public virtual IEzAnalysisProvider? CreateEzAnalysisProvider() => null;
         public virtual IEzReplaySession? CreateEzReplaySession() => null;
+
+        /// <summary>
+        /// Optional bridge for the unified external beatmap pool manager.
+        /// </summary>
+        public virtual RulesetBeatmapPoolProvider CreateBeatmapPoolProvider() => new StorageOnlyBeatmapPoolProvider(this);
 
         protected Ruleset()
         {
