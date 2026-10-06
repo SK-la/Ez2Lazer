@@ -25,25 +25,27 @@ using osuTK;
 namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
-    /// Track-mode skills: key chips + rating beside radar; RC|LN DualPanel; SSR bars; skill detail.
+    /// Track-mode skills shell: presenter-driven chips / radar / bars / detail; optional Dan side panel.
     /// </summary>
     public partial class EzLocalProfileTrackSkillsBody : FillFlowContainer
     {
         private const int axis_plays_top_n = 15;
 
         private readonly string username;
+        private readonly IEzTrackSkillsPresenter presenter;
         private readonly Bindable<EzLocalProfileDrillScoreRow?>? selectDrillScore;
         private readonly IReadOnlyList<EzLocalProfileDrillScoreRow>? preloadedDrillScores;
 
-        private readonly BindableInt selectedKeyCount = new BindableInt();
+        private readonly BindableInt selectedSliceKey = new BindableInt();
         private readonly Bindable<string?> selectedSkillId = new Bindable<string?>();
+        private bool slicesReady;
 
         private Container overviewContainer = null!;
         private FillFlowContainer keyChipFlow = null!;
         private Container headerSlot = null!;
         private Container radarSlot = null!;
-        private EzHUDDanDualPanel danPanel = null!;
-        private EzLocalProfileDanClearsPanel danClearsPanel = null!;
+        private EzHUDDanDualPanel? danPanel;
+        private EzLocalProfileDanClearsPanel? danClearsPanel;
         private FillFlowContainer skillBarsFlow = null!;
         private Container detailContainer = null!;
         private OsuSpriteText emptyHint = null!;
@@ -55,10 +57,12 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private RulesetStore rulesets { get; set; } = null!;
 
         public EzLocalProfileTrackSkillsBody(string username,
+                                             IEzTrackSkillsPresenter presenter,
                                              Bindable<EzLocalProfileDrillScoreRow?>? selectDrillScore = null,
                                              IReadOnlyList<EzLocalProfileDrillScoreRow>? preloadedDrillScores = null)
         {
             this.username = username;
+            this.presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
             this.selectDrillScore = selectDrillScore;
             this.preloadedDrillScores = preloadedDrillScores;
 
@@ -71,97 +75,111 @@ namespace osu.Game.EzOsuGame.LocalProfile
         [BackgroundDependencyLoader]
         private void load()
         {
-            Children = new Drawable[]
+            keyChipFlow = new FillFlowContainer
             {
-                overviewContainer = new Container
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Full,
+                Spacing = new Vector2(8),
+                Alpha = presenter.HasSliceChips ? 1 : 0,
+            };
+            headerSlot = new Container
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+            };
+            emptyHint = new OsuSpriteText
+            {
+                RelativeSizeAxes = Axes.X,
+                Font = OsuFont.GetFont(size: 14),
+                Alpha = 0,
+            };
+            radarSlot = new Container
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                RelativeSizeAxes = Axes.Both,
+                Width = 0.58f,
+            };
+            skillBarsFlow = new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 6),
+            };
+            detailContainer = new Container
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+            };
+
+            var leftColumnChildren = new List<Drawable> { keyChipFlow, headerSlot };
+
+            if (presenter.HasSidePanel)
+            {
+                danPanel = new EzHUDDanDualPanel
                 {
                     RelativeSizeAxes = Axes.X,
-                    Height = SkillsRadarPanel.RequiredHeight,
-                    Children = new Drawable[]
+                };
+                leftColumnChildren.Add(danPanel);
+            }
+
+            leftColumnChildren.Add(emptyHint);
+
+            overviewContainer = new Container
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = SkillsRadarPanel.RequiredHeight,
+                Children = new Drawable[]
+                {
+                    // Left: key chips + rating + optional dan — no background; sibling of radar.
+                    new FillFlowContainer
                     {
-                        // Left: key chips + rating + dan — no background; sibling of radar.
-                        new FillFlowContainer
-                        {
-                            Anchor = Anchor.TopLeft,
-                            Origin = Anchor.TopLeft,
-                            RelativeSizeAxes = Axes.X,
-                            Width = 0.4f,
-                            AutoSizeAxes = Axes.Y,
-                            Direction = FillDirection.Vertical,
-                            Spacing = new Vector2(0, 12),
-                            Children = new Drawable[]
-                            {
-                                keyChipFlow = new FillFlowContainer
-                                {
-                                    RelativeSizeAxes = Axes.X,
-                                    AutoSizeAxes = Axes.Y,
-                                    Direction = FillDirection.Full,
-                                    Spacing = new Vector2(8),
-                                },
-                                headerSlot = new Container
-                                {
-                                    RelativeSizeAxes = Axes.X,
-                                    AutoSizeAxes = Axes.Y,
-                                },
-                                danPanel = new EzHUDDanDualPanel
-                                {
-                                    RelativeSizeAxes = Axes.X,
-                                },
-                                emptyHint = new OsuSpriteText
-                                {
-                                    RelativeSizeAxes = Axes.X,
-                                    Font = OsuFont.GetFont(size: 14),
-                                    Alpha = 0,
-                                },
-                            },
-                        },
-                        radarSlot = new Container
-                        {
-                            Anchor = Anchor.Centre,
-                            Origin = Anchor.Centre,
-                            RelativeSizeAxes = Axes.Both,
-                            Width = 0.58f,
-                        },
+                        Anchor = Anchor.TopLeft,
+                        Origin = Anchor.TopLeft,
+                        RelativeSizeAxes = Axes.X,
+                        Width = 0.4f,
+                        AutoSizeAxes = Axes.Y,
+                        Direction = FillDirection.Vertical,
+                        Spacing = new Vector2(0, 12),
+                        Children = leftColumnChildren,
                     },
+                    radarSlot,
                 },
+            };
+
+            var children = new List<Drawable> { overviewContainer };
+
+            if (presenter.HasSidePanel)
+            {
                 danClearsPanel = new EzLocalProfileDanClearsPanel(
                     username,
-                    selectedKeyCount,
+                    selectedSliceKey,
                     preloadedDrillScores,
                     selectDrillScore != null
                         ? drill => selectDrillScore.Value = drill
                         : null)
                 {
                     RelativeSizeAxes = Axes.X,
-                },
-                skillBarsFlow = new FillFlowContainer
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Direction = FillDirection.Vertical,
-                    Spacing = new Vector2(0, 6),
-                },
-                detailContainer = new Container
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                },
-            };
+                };
+                children.Add(danClearsPanel);
+            }
+
+            children.Add(skillBarsFlow);
+            children.Add(detailContainer);
+
+            Children = children;
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            // Detach shared SongSelect player selection before applying archive filter username.
-            danPanel.TargetUsername.UnbindBindings();
-            danPanel.TargetUsername.Value = username;
-            danPanel.KeyCount.BindTo(selectedKeyCount);
-            danPanel.DataSource.Value = EzDanPanelDataSource.Player;
-            danPanel.DualLayout.Value = EzDanPanelDualLayout.Auto;
-            danPanel.ShowClearCounts.Value = true;
+            if (danPanel != null)
+                presenter.ConfigureSidePanel(danPanel, selectedSliceKey, username);
 
-            selectedKeyCount.BindValueChanged(_ =>
+            selectedSliceKey.BindValueChanged(_ =>
             {
                 clearDetailSelection();
                 refreshSkills();
@@ -194,6 +212,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private void rebuild()
         {
+            slicesReady = false;
             keyChipFlow.Clear();
             headerSlot.Clear();
             radarSlot.Clear();
@@ -201,74 +220,70 @@ namespace osu.Game.EzOsuGame.LocalProfile
             detailContainer.Clear();
             clearDetailSelection();
 
-            var keyCounts = skillProvider.GetPlayerSsrKeyCounts(username);
+            var sliceKeys = presenter.GetSliceKeys(username);
 
-            if (keyCounts.Count == 0)
+            if (sliceKeys.Count == 0)
             {
                 emptyHint.Text = EzSettingsProfile.LOCAL_PROFILE_TRACK_EMPTY;
                 emptyHint.Show();
                 overviewContainer.Hide();
-                danPanel.Hide();
-                danClearsPanel.Hide();
+                danPanel?.Hide();
+                danClearsPanel?.Hide();
                 return;
             }
 
             emptyHint.Hide();
             overviewContainer.Show();
-            danPanel.Show();
-            danClearsPanel.Show();
-            Scheduler.AddDelayed(() => danClearsPanel.Refresh(), 0);
+            danPanel?.Show();
+            danClearsPanel?.Show();
 
-            foreach (int key in keyCounts)
+            if (danClearsPanel != null)
+                Scheduler.AddDelayed(() => danClearsPanel.Refresh(), 0);
+
+            if (presenter.HasSliceChips)
             {
-                keyChipFlow.Add(new KeyChip(key, selectedKeyCount)
+                foreach (int key in sliceKeys)
                 {
-                    Anchor = Anchor.TopLeft,
-                    Origin = Anchor.TopLeft,
-                });
+                    keyChipFlow.Add(new KeyChip(key, selectedSliceKey)
+                    {
+                        Anchor = Anchor.TopLeft,
+                        Origin = Anchor.TopLeft,
+                    });
+                }
             }
 
-            if (!keyCounts.Contains(selectedKeyCount.Value))
-                selectedKeyCount.Value = keyCounts[0];
+            slicesReady = true;
+
+            if (!sliceKeys.Contains(selectedSliceKey.Value))
+                selectedSliceKey.Value = sliceKeys[0];
             else
                 refreshSkills();
         }
 
         private void refreshSkills()
         {
+            if (!slicesReady)
+                return;
+
             headerSlot.Clear();
             radarSlot.Clear();
             skillBarsFlow.Clear();
 
-            int keyCount = selectedKeyCount.Value;
-            if (keyCount <= 0)
-                return;
+            var snapshot = presenter.Load(username, selectedSliceKey.Value);
 
-            var snapshot = skillProvider.GetPlayerSsrSnapshot(username, keyCount);
-            var modeEntries = skillProvider.GetSkillModeEntries(username, keyCount);
+            headerSlot.Child = new SkillsHeader(snapshot);
 
-            headerSlot.Child = new SkillsHeader(keyCount, snapshot);
+            double radarMax = snapshot.RadarAxes.Select(static a => a.Value).DefaultIfEmpty(0).Max();
 
-            double radarMax = modeEntries.Select(static e => e.Value).DefaultIfEmpty(0).Max();
-
-            if (modeEntries.Count >= 3 && radarMax > 0)
+            if (snapshot.RadarAxes.Count >= 3 && radarMax > 0)
             {
-                var axes = modeEntries
-                           .Select(e =>
-                           {
-                               var axis = EzMinaSkillAxisExtensions.TryParse(e.SkillId, out var parsed)
-                                   ? parsed
-                                   : EzMinaSkillAxis.Stream;
-                               return new SkillsRadarPanel.AxisData(
-                                   axis,
-                                   e.Value,
-                                   (float)(e.Value / radarMax),
-                                   Colour4.FromHex(e.AccentHex),
-                                   keyCount,
-                                   EzDanSide.Rc,
-                                   e.DisplayName);
-                           })
-                           .ToList();
+                var axes = snapshot.RadarAxes
+                                   .Select(a => new SkillsRadarPanel.AxisData(
+                                       a.Value,
+                                       (float)(a.Value / radarMax),
+                                       Colour4.FromHex(a.AccentHex),
+                                       a.DisplayName))
+                                   .ToList();
 
                 radarSlot.Child = new SkillsRadarPanel(axes)
                 {
@@ -277,37 +292,21 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 };
             }
 
-            double barMax = modeEntries.Select(static e => e.Value).DefaultIfEmpty(0).Max();
+            double barMax = snapshot.BarAxes.Select(static a => a.Value).DefaultIfEmpty(0).Max();
             barMax = Math.Max(barMax, snapshot.Overall);
             if (barMax <= 0)
                 barMax = 1;
 
-            if (snapshot.Overall >= EzPatternRatings.DISPLAY_MIN)
+            foreach (var axis in snapshot.BarAxes)
             {
-                var overallMeta = EzMinaSkillAxis.Overall.Meta();
-                string overallSkillId = EzMinaSkillAxis.Overall.ToSsrSkillId();
-
-                skillBarsFlow.Add(new SkillBarRow(
-                    overallSkillId,
-                    overallMeta.DisplayName,
-                    snapshot.Overall,
-                    (float)(snapshot.Overall / barMax),
-                    Colour4.FromHex(overallMeta.AccentHex),
-                    selectedSkillId,
-                    () => toggleSkill(overallSkillId)));
-            }
-
-            foreach (var entry in modeEntries)
-            {
-                float ratio = (float)(entry.Value / barMax);
-                string skillId = entry.SkillId;
+                string skillId = axis.SkillId;
 
                 skillBarsFlow.Add(new SkillBarRow(
                     skillId,
-                    entry.DisplayName,
-                    entry.Value,
-                    ratio,
-                    Colour4.FromHex(entry.AccentHex),
+                    axis.DisplayName,
+                    axis.Value,
+                    (float)(axis.Value / barMax),
+                    Colour4.FromHex(axis.AccentHex),
                     selectedSkillId,
                     () => toggleSkill(skillId)));
             }
@@ -325,15 +324,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             detailContainer.Clear();
 
-            int keyCount = selectedKeyCount.Value;
-            if (keyCount <= 0)
+            if (!slicesReady)
                 return;
 
             string? skillId = selectedSkillId.Value;
             if (string.IsNullOrEmpty(skillId))
                 return;
 
-            string displayName = resolveDisplayName(skillId);
+            int sliceKey = selectedSliceKey.Value;
+            string displayName = presenter.ResolveDisplayName(skillId).ToString();
 
             detailContainer.Child = new FillFlowContainer
             {
@@ -343,15 +342,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 Spacing = new Vector2(0, 12),
                 Children = new[]
                 {
-                    buildHistoryCard(skillId, keyCount, displayName),
-                    buildAxisPlaysCard(skillId, keyCount, displayName),
+                    buildHistoryCard(skillId, sliceKey, displayName),
+                    buildAxisPlaysCard(skillId, sliceKey, displayName),
                 },
             };
         }
 
-        private Drawable buildHistoryCard(string skillId, int keyCount, string displayName)
+        private Drawable buildHistoryCard(string skillId, int sliceKey, string displayName)
         {
-            var points = skillProvider.GetPlayerSkillHistory(username, keyCount, skillId);
+            var points = skillProvider.GetPlayerSkillHistory(username, sliceKey, skillId);
 
             string cardTitle = EzSettingsProfile.LOCAL_PROFILE_SKILL_HISTORY_FOR.Format(displayName);
 
@@ -386,10 +385,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
                    .ToArray();
         }
 
-        private Drawable buildAxisPlaysCard(string skillId, int keyCount, string displayName)
+        private Drawable buildAxisPlaysCard(string skillId, int sliceKey, string displayName)
         {
             var plays = skillProvider
-                        .GetAxisPlays(username, keyCount, skillId, EzManiaSkillAlgorithm.VERSION)
+                        .GetAxisPlays(username, sliceKey, skillId, presenter.AlgorithmVersion)
                         .Take(axis_plays_top_n)
                         .ToList();
 
@@ -438,29 +437,6 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 list);
         }
 
-        private string resolveDisplayName(string skillId)
-        {
-            foreach (string systemId in new[] { EzSkillSystems.PLAYER_PATTERN, EzSkillSystems.PLAYER_SSR })
-            {
-                foreach (var def in skillProvider.Registry.GetSystem(systemId)?.Skills
-                                    ?? Array.Empty<EzSkillDefinition>())
-                {
-                    if (def.SkillId == skillId)
-                        return def.DisplayName.ToString();
-                }
-            }
-
-            if (EzPatternRatings.TryParseSkillId(skillId, out string patternId)
-                && EzPlayerPatternAxisExtensions.TryParse(patternId, out var patternAxis))
-            {
-                return patternAxis.Meta().DisplayName.ToString();
-            }
-
-            return EzMinaSkillAxisExtensions.TryParse(skillId, out var axis)
-                ? axis.Chip().Name.ToString()
-                : skillId;
-        }
-
         private EzLocalProfileDrillScoreRow? findDrillRow(string beatmapHash)
         {
             if (string.IsNullOrEmpty(beatmapHash) || preloadedDrillScores == null)
@@ -488,7 +464,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         /// <summary>
         /// Radar chart with per-axis value indicators outside the polygon
-        /// (dan badge slot above, numeric value below).
+        /// (label above, numeric value below).
         /// </summary>
         private partial class SkillsRadarPanel : Container
         {
@@ -499,12 +475,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
             public static float RequiredHeight => CHART_SIZE + panel_padding * 2;
 
             public readonly record struct AxisData(
-                EzMinaSkillAxis Axis,
                 double Value,
                 float Ratio,
                 Colour4 Accent,
-                int KeyCount,
-                EzDanSide Side,
                 LocalisableString Label);
 
             public SkillsRadarPanel(IReadOnlyList<AxisData> axes)
@@ -582,7 +555,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         }
 
         /// <summary>
-        /// One axis metric: skill short name + numeric SSR. Skillset dans live on DualPanel only (no SrToRawDan badges).
+        /// One axis metric: skill short name + numeric value.
         /// </summary>
         private partial class RadarAxisIndicator : FillFlowContainer
         {
@@ -616,7 +589,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private partial class SkillsHeader : FillFlowContainer
         {
-            public SkillsHeader(int keyCount, EzPlayerSsrSnapshot snapshot)
+            public SkillsHeader(EzTrackSkillsSnapshot snapshot)
             {
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
@@ -627,7 +600,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 {
                     new OsuSpriteText
                     {
-                        Text = EzSettingsProfile.LOCAL_PROFILE_SKILL_RATING.Format(keyCount),
+                        Text = snapshot.HeaderTitle,
                         Font = OsuFont.GetFont(size: 13, weight: FontWeight.SemiBold),
                     },
                     new OsuSpriteText
@@ -652,11 +625,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     Children[2].Colour = colours.Content2;
             }
 
-            private static string buildMeta(EzPlayerSsrSnapshot snapshot)
+            private static string buildMeta(EzTrackSkillsSnapshot snapshot)
             {
                 var parts = new List<string>
                 {
-                    EzSettingsProfile.LOCAL_PROFILE_SKILL_PLAYS.Format(snapshot.AnalyzedPlays),
+                    EzSettingsProfile.LOCAL_PROFILE_SKILL_PLAYS.Format(snapshot.PlaysAnalyzed),
                 };
 
                 if (snapshot.IsEffectivelyProvisional)
