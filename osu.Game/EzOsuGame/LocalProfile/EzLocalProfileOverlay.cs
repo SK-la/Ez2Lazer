@@ -13,6 +13,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -51,6 +52,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         [Resolved]
         private IBindable<RulesetInfo> gameRuleset { get; set; } = null!;
+
+        [Resolved]
+        private EzSkillProvider skillProvider { get; set; } = null!;
 
         public EzLocalProfileOverlay()
             : base(OverlayColourScheme.Pink)
@@ -270,10 +274,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         private void updateAnalysisSystemVisibility()
         {
-            bool mania = (ruleset.Value?.OnlineID ?? -1) == EzLocalProfileConstants.MANIA_RULESET_ID;
-            analysisSystemSelector.Alpha = mania ? 1 : 0;
+            int rulesetId = ruleset.Value?.OnlineID ?? -1;
+            bool hasSkills = skillProvider.GetProfile(rulesetId)?.HasSkills == true;
+            analysisSystemSelector.Alpha = hasSkills ? 1 : 0;
 
-            if (!mania && analysisSystem.Value != EzLocalProfileAnalysisSystem.Ez)
+            if (!hasSkills && analysisSystem.Value != EzLocalProfileAnalysisSystem.Ez)
                 analysisSystem.Value = EzLocalProfileAnalysisSystem.Ez;
         }
 
@@ -363,11 +368,32 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             var rulesetStats = snapshot.RulesetStats.FirstOrDefault(s => s.RulesetId == rulesetId);
             bool mania = rulesetId == EzLocalProfileConstants.MANIA_RULESET_ID;
-            bool trackMode = mania && analysis == EzLocalProfileAnalysisSystem.Track;
+            var skillProfile = skillProvider.GetProfile(rulesetId);
+            bool hasSkills = skillProfile?.HasSkills == true;
+            bool trackMode = hasSkills && analysis == EzLocalProfileAnalysisSystem.Track;
+            var trackPresenter = trackMode
+                ? EzTrackSkillsPresenterFactory.Create(skillProfile, skillProvider)
+                : null;
+
+            if (trackPresenter == null)
+                trackMode = false;
 
             contentFlow.Add(new EzLocalProfileSection(
                 EzSettingsProfile.LOCAL_PROFILE_SECTION_CAREER,
                 new EzLocalProfileCareerBody(rulesetStats, snapshot.GradeCounts.Where(g => g.RulesetId == rulesetId))));
+
+            // osu Track: Career + Skills + Drill only (no Insights / Mode Data / Trends).
+            if (trackMode && !mania)
+            {
+                var skillsHost = createDeferredSectionHost();
+                contentFlow.Add(new EzLocalProfileSection(EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_SKILLS, skillsHost));
+
+                var drillHostOsuTrack = createDeferredSectionHost();
+                contentFlow.Add(new EzLocalProfileSection(EzSettingsProfile.LOCAL_PROFILE_SECTION_SCORE_DRILL, drillHostOsuTrack));
+
+                beginDeferredTrackSkillsLoad(token, rulesetId, player, trackPresenter!, skillsHost, drillHostOsuTrack);
+                return;
+            }
 
             if (!mania)
             {
@@ -385,6 +411,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 return;
             }
 
+            // Mania: Insights always; Skills (Track) or Mode Data (Ez); Drill + Trends.
             var insightsHost = createDeferredSectionHost();
             contentFlow.Add(new EzLocalProfileSection(EzSettingsProfile.LOCAL_PROFILE_SECTION_TRACK_INSIGHTS, insightsHost));
 
@@ -436,8 +463,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     if (token.IsCancellationRequested)
                         return;
 
-                    if (trackMode)
-                        skillsOrModeHost.Child = new EzLocalProfileTrackSkillsBody(player, currentDrillScore, drills);
+                    if (trackMode && trackPresenter != null)
+                        skillsOrModeHost.Child = new EzLocalProfileTrackSkillsBody(player, trackPresenter, currentDrillScore, drills);
 
                     Scheduler.AddDelayed(() =>
                     {
@@ -446,6 +473,40 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                         drillHostMania.Child = new EzLocalProfileScoreDrillPanel(currentDrillScore, drillSearchQuery, drills, profileService.LoadKpsList);
                     }, 0);
+                }, 0);
+            }), token);
+        }
+
+        private void beginDeferredTrackSkillsLoad(
+            CancellationToken token,
+            int rulesetId,
+            string player,
+            IEzTrackSkillsPresenter presenter,
+            Container skillsHost,
+            Container drillHost)
+        {
+            Task.Run(() => profileService.LoadDrillScores(rulesetId, player), token).ContinueWith(task => Schedule(() =>
+            {
+                if (token.IsCancellationRequested || task.IsCanceled)
+                    return;
+
+                if (task.IsFaulted)
+                {
+                    skillsHost.Child = createLoadFailedHint();
+                    drillHost.Child = createLoadFailedHint();
+                    return;
+                }
+
+                var drills = task.GetResultSafely();
+
+                skillsHost.Child = new EzLocalProfileTrackSkillsBody(player, presenter, currentDrillScore, drills);
+
+                Scheduler.AddDelayed(() =>
+                {
+                    if (token.IsCancellationRequested)
+                        return;
+
+                    drillHost.Child = new EzLocalProfileScoreDrillPanel(currentDrillScore, drillSearchQuery, drills, profileService.LoadKpsList);
                 }, 0);
             }), token);
         }
