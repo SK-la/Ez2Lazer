@@ -70,7 +70,8 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             GameplayEnvironment environment,
             int columns,
             IReadOnlyList<ManiaHitObject> hitObjects,
-            IReadOnlyList<ReplayFrame> frames)
+            IReadOnlyList<ReplayFrame> frames,
+            string? beatmapResource = null)
         {
             var doc = new Document
             {
@@ -78,7 +79,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 HealthMode = environment.ManiaHealthMode.ToString(),
                 JudgePrecedence = environment.JudgePrecedence.ToString(),
                 Columns = columns,
-                HitObjects = hitObjects.Select(toHitObjectDto).ToList(),
+                BeatmapResource = beatmapResource,
+                // 全谱夹具用 beatmapResource 挂真实 OD/timing；hitObjects 可省略以控体积。
+                HitObjects = string.IsNullOrWhiteSpace(beatmapResource)
+                    ? hitObjects.Select(toHitObjectDto).ToList()
+                    : new List<HitObjectDto>(),
                 Frames = frames.OfType<ManiaReplayFrame>().Select(toFrameDto).ToList(),
             };
             validate(doc);
@@ -95,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 Enum.Parse<EzEnumHealthMode>(document.HealthMode, ignoreCase: true),
                 Enum.Parse<EzEnumJudgePrecedence>(document.JudgePrecedence ?? nameof(EzEnumJudgePrecedence.Earliest), ignoreCase: true));
 
-            var hitObjects = document.HitObjects.Select(toHitObject).ToList();
+            var hitObjects = (document.HitObjects ?? new List<HitObjectDto>()).Select(toHitObject).ToList();
             var frames = document.Frames.Select(toFrame).Cast<ReplayFrame>().ToList();
 
             var score = new Score
@@ -117,8 +122,11 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             if (document.Columns < 1)
                 throw new InvalidDataException("ReplayJson columns must be >= 1");
 
-            if (document.HitObjects == null || document.HitObjects.Count == 0)
-                throw new InvalidDataException("ReplayJson hitObjects required");
+            bool hasBeatmap = !string.IsNullOrWhiteSpace(document.BeatmapResource);
+            bool hasHitObjects = document.HitObjects != null && document.HitObjects.Count > 0;
+
+            if (!hasBeatmap && !hasHitObjects)
+                throw new InvalidDataException("ReplayJson requires hitObjects or beatmapResource");
 
             if (document.Frames == null)
                 throw new InvalidDataException("ReplayJson frames required");
@@ -194,6 +202,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             public string HealthMode { get; set; } = string.Empty;
             public string? JudgePrecedence { get; set; }
             public int Columns { get; set; } = 4;
+
+            /// <summary>
+            /// 可选：嵌入 .osu 资源路径。全谱夹具用此挂真实难度/timing；此时 hitObjects 可空。
+            /// </summary>
+            public string? BeatmapResource { get; set; }
+
             public List<HitObjectDto> HitObjects { get; set; } = new List<HitObjectDto>();
             public List<FrameDto> Frames { get; set; } = new List<FrameDto>();
         }
