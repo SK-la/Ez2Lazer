@@ -122,7 +122,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 Enum.Parse<EzEnumHealthMode>(document.HealthMode, ignoreCase: true),
                 Enum.Parse<EzEnumJudgePrecedence>(document.JudgePrecedence ?? nameof(EzEnumJudgePrecedence.Earliest), ignoreCase: true));
 
-            var hitObjects = (document.HitObjects ?? new List<HitObjectDto>()).Select(toHitObject).ToList();
+            var hitObjects = (document.HitObjects).Select(toHitObject).ToList();
             var frames = document.Frames.Select(toFrame).Cast<ReplayFrame>().ToList();
 
             var score = new Score

@@ -5,12 +5,10 @@ using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Objects.Types;
-using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {

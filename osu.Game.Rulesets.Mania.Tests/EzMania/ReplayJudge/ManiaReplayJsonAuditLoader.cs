@@ -6,7 +6,6 @@ using osu.Framework.IO.Stores;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.IO;
-using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
@@ -42,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             using var stream = OpenBeatmap(beatmapResource)
                                ?? throw new FileNotFoundException($"beatmap resource missing: {beatmapResource}");
             IBeatmap decoded = new LegacyBeatmapDecoder().Decode(new LineBufferedReader(stream));
-            decoded.BeatmapInfo.Ruleset = score.ScoreInfo.Ruleset ?? new ManiaRuleset().RulesetInfo;
+            decoded.BeatmapInfo.Ruleset = score.ScoreInfo.Ruleset;
             return new TestWorkingBeatmap(decoded).GetPlayableBeatmap(score.ScoreInfo.Ruleset, score.ScoreInfo.Mods);
         }
 

@@ -640,11 +640,11 @@ namespace osu.Game.Rulesets.Mania.Tests
                     IsSetupStep = false,
                     CallStack = new StackTrace(1, true),
                     TimeoutMilliseconds = 600_000,
-                    Assertion = () => currentPlayer.ScoreProcessor?.HasCompleted.Value == true,
+                    Assertion = () => currentPlayer.ScoreProcessor.HasCompleted.Value == true,
                 });
             }
             else
-                AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor?.HasCompleted.Value == true);
+                AddUntilStep("wait for completion", () => currentPlayer.ScoreProcessor.HasCompleted.Value == true);
 
             AddStep("capture drawable hit events", () =>
             {

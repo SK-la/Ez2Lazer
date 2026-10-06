@@ -1882,7 +1882,7 @@ WHERE {col_beatmap_id} = $id;
 
                 string contentHash = hiddenApplied
                     ? ComputeCollectionContentHash(lastModifiedUnixMilliseconds, beatmapMd5Hashes)
-                    : string.Empty;
+                    : Empty;
 
                 using var transaction = connection.BeginTransaction();
 
@@ -2647,7 +2647,7 @@ LIMIT 1;
                 if (reader.GetInt64(0) != 1)
                     return false;
 
-                string storedHash = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+                string storedHash = reader.IsDBNull(1) ? Empty : reader.GetString(1);
 
                 if (IsNullOrEmpty(storedHash))
                     return false;

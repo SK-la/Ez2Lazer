@@ -12,7 +12,6 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
@@ -26,9 +25,6 @@ using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.EzMania;
-#if DEBUG
-using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
-#endif
 using osu.Game.Rulesets.Mania.EzMania.ReplayJudge;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
@@ -43,6 +39,11 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK.Input;
+
+#if DEBUG
+using osu.Framework.Logging;
+using osu.Game.Rulesets.Mania.EzMania.Diagnostics;
+#endif
 
 namespace osu.Game.Rulesets.Mania.UI
 {
