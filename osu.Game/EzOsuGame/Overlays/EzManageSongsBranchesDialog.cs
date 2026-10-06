@@ -1085,7 +1085,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         return (success: false, message: EzManageSongsBranchesDialogStrings.SELECT_COLLECTION_FIRST, nonHideableBeatmapSets: Array.Empty<BeatmapSetInfo>());
 
                     bool success = ezAnalysisCache.TryToggleCollectionHidden(sourceCollection.Value.CollectionId, sourceCollection.Value.Name, sourceCollection.Value.BeatmapMd5Hashes,
-                        out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets);
+                        out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets, sourceCollection.Value.LastModifiedUnixMilliseconds);
 
                     return (success, message, nonHideableBeatmapSets);
                 }).ConfigureAwait(false);

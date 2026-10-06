@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         /// <summary>
         /// 全量成绩重算（修复被错误后台转换破坏的本地成绩）。
-        /// 尝试补算 = 仅 mania；完全重算 = 全部游戏模式。
+        /// 尝试补算 = 仅 mania；完全重算 = 当前已加载（Available）规则集。
         /// </summary>
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.DATA_REBUILD_TARGET_REALM_SCORES))]
         RealmScores = 4,
