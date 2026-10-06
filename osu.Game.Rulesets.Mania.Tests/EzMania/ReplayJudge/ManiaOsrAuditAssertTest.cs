@@ -587,6 +587,91 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 });
                 sb.AppendLine($"MissWindow={missWindowMs}: Meh near miss-edge={mehAtMissEdge}; Miss near miss-edge={missAtMissEdge}");
             }
+
+            appendHoldOutcomeBuckets(sb, hitEvents);
+        }
+
+        private static void appendHoldOutcomeBuckets(StringBuilder sb, IReadOnlyList<HitEvent> hitEvents)
+        {
+            var holds = hitEvents.Select(ev => ev.HitObject).OfType<HoldNote>().Distinct().ToArray();
+            var buckets = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            int tailMiss = 0, tailMeh = 0, tailOtherHit = 0;
+            int bodyCb = 0, bodyIgnoreHit = 0, bodyMissing = 0;
+            int holdIgnoreMiss = 0, holdIgnoreHit = 0;
+
+            foreach (var hold in holds)
+            {
+                var headEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Head));
+                var tailEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Tail));
+                var bodyEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Body));
+                var holdEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold));
+
+                string head = headEv.HitObject != null ? headEv.Result.ToString() : "none";
+                string tail = tailEv.HitObject != null ? tailEv.Result.ToString() : "none";
+                string body = bodyEv.HitObject != null ? bodyEv.Result.ToString() : "none";
+                string holdAux = holdEv.HitObject != null ? holdEv.Result.ToString() : "none";
+                string key = $"H={head}|T={tail}|B={body}|P={holdAux}";
+                buckets[key] = buckets.GetValueOrDefault(key) + 1;
+
+                if (tailEv.HitObject != null)
+                {
+                    if (tailEv.Result == HitResult.Miss) tailMiss++;
+                    else if (tailEv.Result == HitResult.Meh) tailMeh++;
+                    else if (tailEv.Result.IsHit()) tailOtherHit++;
+                }
+
+                if (bodyEv.HitObject == null) bodyMissing++;
+                else if (bodyEv.Result == HitResult.ComboBreak) bodyCb++;
+                else if (bodyEv.Result == HitResult.IgnoreHit) bodyIgnoreHit++;
+
+                if (holdEv.Result == HitResult.IgnoreMiss) holdIgnoreMiss++;
+                else if (holdEv.Result == HitResult.IgnoreHit) holdIgnoreHit++;
+            }
+
+            sb.AppendLine($"hold outcomes: n={holds.Length} TailMiss={tailMiss} TailMeh={tailMeh} TailOtherHit={tailOtherHit} BodyCB={bodyCb} BodyIH={bodyIgnoreHit} BodyNone={bodyMissing} HoldIM={holdIgnoreMiss} HoldIH={holdIgnoreHit}");
+
+            sb.AppendLine("hold Body=ComboBreak:");
+            foreach (var kv in buckets.Where(kv => kv.Key.Contains("|B=ComboBreak|", StringComparison.Ordinal)).OrderByDescending(kv => kv.Value))
+                sb.AppendLine($"  {kv.Key}: {kv.Value}");
+
+            sb.AppendLine("hold Tail=Meh (all):");
+            foreach (var kv in buckets.Where(kv => kv.Key.Contains("|T=Meh|", StringComparison.Ordinal)).OrderByDescending(kv => kv.Value))
+                sb.AppendLine($"  {kv.Key}: {kv.Value}");
+
+            // Head 命中但尾 Miss：典型「断连后未重臂 → 尾被动 Miss」；列出时刻便于对照回放。
+            sb.AppendLine("hold HeadHit|TailMiss detail:");
+            foreach (var hold in holds.OrderBy(h => h.StartTime))
+            {
+                var headEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Head));
+                var tailEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Tail));
+                var bodyEv = hitEvents.FirstOrDefault(ev => ReferenceEquals(ev.HitObject, hold.Body));
+
+                if (headEv.HitObject == null || tailEv.HitObject == null)
+                    continue;
+
+                if (!headEv.Result.IsHit() || tailEv.Result != HitResult.Miss)
+                    continue;
+
+                string body = bodyEv.HitObject != null ? bodyEv.Result.ToString() : "none";
+                sb.AppendLine(
+                    $"  Hold@{hold.StartTime:0.###} col={hold.Column} end={hold.EndTime:0.###} H={headEv.Result}@{headEv.TimeOffset:0.###} T=Miss@{tailEv.TimeOffset:0.###} B={body}");
+            }
+
+            sb.AppendLine("Note Miss (|off|<80):");
+            foreach (var ev in hitEvents.Where(e => e.HitObject is Note and not HeadNote and not TailNote && e.Result == HitResult.Miss)
+                                        .OrderBy(e => e.HitObject!.StartTime))
+            {
+                if (Math.Abs(ev.TimeOffset) >= 80)
+                    continue;
+
+                var note = (Note)ev.HitObject!;
+                sb.AppendLine($"  Note@{note.StartTime:0.###} col={note.Column} off={ev.TimeOffset:0.###}");
+            }
+
+            sb.AppendLine("hold outcome top:");
+            foreach (var kv in buckets.OrderByDescending(kv => kv.Value).Take(12))
+                sb.AppendLine($"  {kv.Key}: {kv.Value}");
         }
 
         private static void archiveReport(AuditFixture fixture, string report)
