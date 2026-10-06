@@ -25,12 +25,13 @@ using osu.Game.Tests.Beatmaps;
 namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
 {
     /// <summary>
-    /// Mania osr 双轨金标门禁（同谱 Hanatachi）：
+    /// Mania osr 双轨金标门禁（多谱面套件）：
     /// <list type="bullet">
-    /// <item><b>Lazer</b>：<c>ManiaAudit-Lazer-Hanatachi.osr</c>（≈2026-06 / 30000016）；Header 对解码嵌入字段，Session 用 <see cref="EzEnumHitMode.Lazer"/>。</item>
-    /// <item><b>Classic</b>：<c>ManiaAudit-Classic-Hanatachi.osr</c>（≈2026-09 / stable 20260711）；主判定/分/combo 以 osr 二进制头为准，
-    /// 禁止把 Lazer 解码后的 TotalScore 当金标。osr 供帧 + MD5；Session 用 <see cref="EzEnumHitMode.Classic"/> + CL。</item>
+    /// <item><b>Lazer</b>：冻结 osr 嵌入 Statistics；Header 对解码字段，Session 用 <see cref="EzEnumHitMode.Lazer"/>。</item>
+    /// <item><b>Classic</b>：主判定/分/combo 以 osr 二进制头为准，禁止把 Lazer 解码 TotalScore 当金标；
+    /// Session 用 <see cref="EzEnumHitMode.Classic"/> + CL。</item>
     /// </list>
+    /// 套件：Hanatachi（≈2026-06/09）、PORTRAiT（≈2026-10-02/03，现行客户端）。
     /// IgnoreHit/IgnoreMiss/ComboBreak 若 Classic 未给则不进本轨门禁。
     /// 高难度 LN 判定数量闭环仍用 <see cref="OsrAuditTest"/> + GramNibelungen23（勿当金标）。
     /// </summary>
@@ -42,14 +43,12 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
         [OneTimeSetUp]
         public void OneTimeSetUp() => GlobalConfigStore.EnsureInitialized();
 
-        // ── Lazer 轨（Hanatachi / Lazer 客户端冻结 osr，≈2026-06）──────────────
-        // 嵌入解码：total=920155 combo=3451 acc≈0.980118 rank=S ver=30000019 legacy=false mods=[]
-        // Session 初测 delta：Perfect-10 Great+10 Miss-1 Meh+3 … MaxCombo 已对齐。
+        // ── Lazer 套件 ─────────────────────────────────────────────────────────
 
-        private static readonly AuditFixture lazer = new AuditFixture(
+        private static readonly AuditFixture lazer_hanatachi = new AuditFixture(
             Name: "Lazer-Hanatachi",
             OsrResource: "Resources/Testing/Replays/ManiaAudit-Lazer-Hanatachi.osr",
-            BeatmapResource: "Resources/Testing/Beatmaps/ManiaAudit-Classic-Hanatachi.osu",
+            BeatmapResource: "Resources/Testing/Beatmaps/ManiaAudit-Hanatachi.osu",
             HitMode: EzEnumHitMode.Lazer,
             ExpectedBeatmapMd5: "29278f227275b1720e995d532130710b",
             ExpectedTotalScore: 920155,
@@ -74,16 +73,47 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             AssertFullNonZeroStatistics: true,
             AssertDecodedHeader: true);
 
-        // ── Classic 轨（Hanatachi / Classic 客户端，≈2026-09 / stable 20260711）──
-        // osr 二进制头：TotalScore=904544 MaxCombo=1728 mods位=0
-        //   Perfect=3423 Great=808 Good=103 Ok=9 Meh=10 Miss=36
-        // Lazer 解码会把总分抬成 912264 并补 CL——总分金标仍用二进制头；Session 注入 CL。
-        // 未给：IgnoreHit / IgnoreMiss / ComboBreak → 不进本轨门禁。
+        // PORTRAiT Lazer：gameVersion=30000019，≈2026-10-03。Session MaxCombo 已对齐；剩 Perfect+21 / Miss-10 等。
+        private static readonly AuditFixture lazer_portrait = new AuditFixture(
+            Name: "Lazer-PORTRAiT",
+            OsrResource: "Resources/Testing/Replays/ManiaAudit-Lazer-PORTRAiT.osr",
+            BeatmapResource: "Resources/Testing/Beatmaps/ManiaAudit-PORTRAiT.osu",
+            HitMode: EzEnumHitMode.Lazer,
+            ExpectedBeatmapMd5: "5737c0072e3c1319d95cf117b3f78648",
+            ExpectedTotalScore: 876539,
+            ExpectedMaxCombo: 892,
+            ExpectedAccuracy: 0.9716775696247674,
+            ExpectedRank: ScoreRank.S,
+            ExpectedTotalScoreVersion: 30000019,
+            ExpectedIsLegacy: false,
+            ExpectedModAcronyms: System.Array.Empty<string>(),
+            ExpectedStatistics: new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 56,
+                [HitResult.Meh] = 24,
+                [HitResult.Ok] = 37,
+                [HitResult.Good] = 206,
+                [HitResult.Great] = 2224,
+                [HitResult.Perfect] = 4808,
+                [HitResult.IgnoreMiss] = 25,
+                [HitResult.IgnoreHit] = 5598,
+                [HitResult.ComboBreak] = 31,
+            },
+            AssertFullNonZeroStatistics: true,
+            AssertDecodedHeader: true);
 
-        private static readonly AuditFixture classic = new AuditFixture(
+        public static IEnumerable<AuditFixture> lazerFixtures()
+        {
+            yield return lazer_hanatachi;
+            yield return lazer_portrait;
+        }
+
+        // ── Classic 套件（二进制头为分/combo 金标；Session 注入 CL）────────────
+
+        private static readonly AuditFixture classic_hanatachi = new AuditFixture(
             Name: "Classic-Hanatachi",
             OsrResource: "Resources/Testing/Replays/ManiaAudit-Classic-Hanatachi.osr",
-            BeatmapResource: "Resources/Testing/Beatmaps/ManiaAudit-Classic-Hanatachi.osu",
+            BeatmapResource: "Resources/Testing/Beatmaps/ManiaAudit-Hanatachi.osu",
             HitMode: EzEnumHitMode.Classic,
             ExpectedBeatmapMd5: "29278f227275b1720e995d532130710b",
             ExpectedTotalScore: 904544,
@@ -105,19 +135,51 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             AssertFullNonZeroStatistics: false,
             AssertDecodedHeader: false);
 
-        [Test]
-        public void AuditLazerEmbeddedScoreHeaderMatchesAnchor()
-            => assertDecodedHeader(lazer);
+        // PORTRAiT Classic：stable 20260924，≈2026-10-02。二进制总分 871917（Lazer 解码会抬到 875483）。
+        private static readonly AuditFixture classic_portrait = new AuditFixture(
+            Name: "Classic-PORTRAiT",
+            OsrResource: "Resources/Testing/Replays/ManiaAudit-Classic-PORTRAiT.osr",
+            BeatmapResource: "Resources/Testing/Beatmaps/ManiaAudit-PORTRAiT.osu",
+            HitMode: EzEnumHitMode.Classic,
+            ExpectedBeatmapMd5: "5737c0072e3c1319d95cf117b3f78648",
+            ExpectedTotalScore: 871917,
+            ExpectedMaxCombo: 1340,
+            ExpectedAccuracy: 0.9669379597984128,
+            ExpectedRank: ScoreRank.S,
+            ExpectedTotalScoreVersion: null,
+            ExpectedIsLegacy: true,
+            ExpectedModAcronyms: new[] { "CL" },
+            ExpectedStatistics: new Dictionary<HitResult, int>
+            {
+                [HitResult.Miss] = 38,
+                [HitResult.Meh] = 8,
+                [HitResult.Ok] = 15,
+                [HitResult.Good] = 190,
+                [HitResult.Great] = 1801,
+                [HitResult.Perfect] = 2476,
+            },
+            AssertFullNonZeroStatistics: false,
+            AssertDecodedHeader: false);
 
-        [Test]
+        public static IEnumerable<AuditFixture> classicFixtures()
+        {
+            yield return classic_hanatachi;
+            yield return classic_portrait;
+        }
+
+        [TestCaseSource(nameof(lazerFixtures))]
+        public void AuditLazerEmbeddedScoreHeaderMatchesAnchor(AuditFixture fixture)
+            => assertDecodedHeader(fixture);
+
+        [TestCaseSource(nameof(lazerFixtures))]
         [Explicit("Lazer Session≠冻结 osr 锚点。修判定后去掉 Explicit。")]
-        public void AuditLazerSessionMatchesAnchor()
-            => assertSessionMatchesAnchor(lazer);
+        public void AuditLazerSessionMatchesAnchor(AuditFixture fixture)
+            => assertSessionMatchesAnchor(fixture);
 
-        [Test]
+        [TestCaseSource(nameof(classicFixtures))]
         [Explicit("Classic Session≠Classic 客户端静态锚点。修判定后去掉 Explicit。")]
-        public void AuditClassicSessionMatchesAnchor()
-            => assertSessionMatchesAnchor(classic);
+        public void AuditClassicSessionMatchesAnchor(AuditFixture fixture)
+            => assertSessionMatchesAnchor(fixture);
 
         private static void assertDecodedHeader(AuditFixture fixture)
         {
@@ -367,7 +429,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             TestContext.WriteLine(report);
         }
 
-        private sealed record AuditFixture(
+        public sealed record AuditFixture(
             string Name,
             string OsrResource,
             string BeatmapResource,
@@ -382,7 +444,10 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
             IReadOnlyList<string> ExpectedModAcronyms,
             IReadOnlyDictionary<HitResult, int> ExpectedStatistics,
             bool AssertFullNonZeroStatistics,
-            bool AssertDecodedHeader);
+            bool AssertDecodedHeader)
+        {
+            public override string ToString() => Name;
+        }
 
         private sealed class HarnessScoreDecoder : LegacyScoreDecoder
         {
