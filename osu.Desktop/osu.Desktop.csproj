@@ -60,4 +60,28 @@
   <ItemGroup Label="Windows Icons">
     <Content Include="*.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="StageEzCameraBackend" AfterTargets="Build" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)..\osu.Game.EzCamera.Windows\osu.Game.EzCamera.Windows.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)..\osu.Game.EzCamera.Windows\osu.Game.EzCamera.Windows.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_EzCameraDll" />
+    </MSBuild>
+    <ItemGroup>
+      <_EzCameraCopy Include="@(_EzCameraDll)" />
+      <_EzCameraCopy Include="@(_EzCameraDll->'%(RootDir)%(Directory)Microsoft.Windows.SDK.NET.dll')" />
+      <_EzCameraCopy Include="@(_EzCameraDll->'%(RootDir)%(Directory)WinRT.Runtime.dll')" />
+      <_EzCameraCopy Remove="@(_EzCameraCopy)" Condition="!Exists('%(Identity)')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_EzCameraCopy)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishEzCameraBackend" AfterTargets="ComputeFilesToPublish" Condition="$([MSBuild]::IsOSPlatform('Windows'))" DependsOnTargets="StageEzCameraBackend">
+    <ItemGroup>
+      <_EzCameraPublish Include="$(OutputPath)osu.Game.EzCamera.Windows.dll" />
+      <_EzCameraPublish Include="$(OutputPath)Microsoft.Windows.SDK.NET.dll" Condition="Exists('$(OutputPath)Microsoft.Windows.SDK.NET.dll')" />
+      <_EzCameraPublish Include="$(OutputPath)WinRT.Runtime.dll" Condition="Exists('$(OutputPath)WinRT.Runtime.dll')" />
+      <ResolvedFileToPublish Include="@(_EzCameraPublish)">
+        <RelativePath>%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 </Project>
