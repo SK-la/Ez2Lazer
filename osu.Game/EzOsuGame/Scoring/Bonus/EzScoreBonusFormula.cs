@@ -15,6 +15,10 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
         public const double OFFSET_FULL_MS = 6;
         public const double OFFSET_CROSS_MS = 44;
+
+        /// <summary>
+        /// 谱面没有判定窗口时的 Miss 边界。有窗口时用该模式 Miss 区间，不用这个常数。
+        /// </summary>
         public const double OFFSET_MISS_MS = 200;
 
         // (44-16)/(44-6) 的这个次方等于 0.30，使类余切在 16ms 约为 0.30、11ms 约为 0.57。
@@ -50,40 +54,49 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
         /// <summary>
         /// offset 价值，范围 [-1, 1]。默认类反余切。<paramref name="cotangent"/> 为 true 时用贴横轴的类余切。
-        /// Miss 传 <see cref="OFFSET_MISS_MS"/>。
+        /// <paramref name="missBoundaryMs"/> 是当前模式的 Miss 窗口；Miss 事件传同一个值。
         /// </summary>
-        public static double OffsetQuality(double absoluteErrorMs, bool cotangent = false)
+        public static double OffsetQuality(double absoluteErrorMs, bool cotangent = false, double missBoundaryMs = OFFSET_MISS_MS)
         {
             if (double.IsNaN(absoluteErrorMs))
                 return 0;
 
+            double miss = missBoundaryMs > OFFSET_FULL_MS && !double.IsNaN(missBoundaryMs) ? missBoundaryMs : OFFSET_MISS_MS;
             double e = Math.Abs(absoluteErrorMs);
-            double cot = cotangentValue(e);
 
-            if (cotangent || e <= OFFSET_FULL_MS || e >= OFFSET_MISS_MS)
-                return cot;
+            if (e >= miss)
+                return -1;
+
+            if (cotangent || e <= OFFSET_FULL_MS)
+                return cotangentValue(e, miss);
 
             if (e <= OFFSET_CROSS_MS)
-                return 1 - cotangentValue(OFFSET_FULL_MS + OFFSET_CROSS_MS - e);
+                return 1 - cotangentValue(OFFSET_FULL_MS + OFFSET_CROSS_MS - e, miss);
 
-            return -1 - cotangentValue(OFFSET_CROSS_MS + OFFSET_MISS_MS - e);
+            if (miss <= OFFSET_CROSS_MS)
+                return -1;
+
+            return -1 - cotangentValue(OFFSET_CROSS_MS + miss - e, miss);
         }
 
         /// <summary>
-        /// 贴横轴的价值。6ms 为 1，44ms 为 0，200ms 为 -1。44→16 慢，16→6 快。
+        /// 贴横轴的价值。6ms 为 1，44ms 为 0，Miss 窗口处为 -1。44→16 慢，16→6 快。
         /// </summary>
-        private static double cotangentValue(double e)
+        private static double cotangentValue(double e, double miss)
         {
             if (e <= OFFSET_FULL_MS)
                 return 1;
 
-            if (e >= OFFSET_MISS_MS)
+            if (e >= miss)
                 return -1;
 
             if (e <= OFFSET_CROSS_MS)
                 return Math.Pow((OFFSET_CROSS_MS - e) / (OFFSET_CROSS_MS - OFFSET_FULL_MS), OFFSET_CURVE_POWER);
 
-            return -Math.Pow((e - OFFSET_CROSS_MS) / (OFFSET_MISS_MS - OFFSET_CROSS_MS), OFFSET_CURVE_POWER);
+            if (miss <= OFFSET_CROSS_MS)
+                return -1;
+
+            return -Math.Pow((e - OFFSET_CROSS_MS) / (miss - OFFSET_CROSS_MS), OFFSET_CURVE_POWER);
         }
     }
 }

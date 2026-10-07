@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
     /// 两种曲线一次算出。
     /// </summary>
     /// <remarks>
-    /// 头和尾都进入价值。尾判 Miss 按 200ms 计。
+    /// 头和尾都进入价值。Miss 按当前模式判定窗口的 Miss 区间计，没有窗口时用 <see cref="EzScoreBonusFormula.OFFSET_MISS_MS"/>。
     /// <see cref="HitResult.Poor"/>（BMS 空 POOR）不参与。
     /// </remarks>
     public static class EzScoreBonusCalculator
@@ -75,11 +75,13 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
                 double sectionKps = kps.KpsAt(e.HitObject.StartTime);
                 double weight = EzScoreBonusFormula.JudgeWeight(sectionKps, favourHighKps: true);
+                double gameplayRate = e.GameplayRate is > 0 ? e.GameplayRate.Value : rate;
                 bool isMiss = e.Result == HitResult.Miss;
-                double errorMs = isMiss ? EzScoreBonusFormula.OFFSET_MISS_MS : Math.Abs(e.TimeOffset) / (e.GameplayRate is > 0 ? e.GameplayRate.Value : rate);
+                double missBoundary = resolveMissBoundary(e.HitObject, gameplayRate);
+                double errorMs = isMiss ? missBoundary : Math.Abs(e.TimeOffset) / gameplayRate;
 
-                cotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, cotangent: true));
-                inverseCotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs));
+                cotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, cotangent: true, missBoundary));
+                inverseCotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, missBoundaryMs: missBoundary));
             }
 
             if (counted == 0)
@@ -119,7 +121,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         }
 
         /// <summary>
-        /// 由 <see cref="ScoreInfo.HitEvents"/> 计算并写入临时字段 <see cref="ScoreInfo.EzBonus"/>；非 mania 或无 HitEvents 时置空。
+        /// 由 <see cref="ScoreInfo.HitEvents"/> 计算并写入临时字段 <see cref="ScoreInfo.EzBonus"/>；无 HitEvents 时置空。
         /// </summary>
         /// <param name="playableBeatmap">与 <see cref="ScoreInfo.HitEvents"/> 同一次运行的可玩谱面。</param>
         public static void Apply(ScoreInfo score, IBeatmap playableBeatmap)
@@ -137,8 +139,41 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             => (hitObject is IHasColumn c ? c.Column : -1, hitObject.StartTime);
 
         /// <summary>
-        /// 普通 Note 计 1。LN 计头和尾，各 1；body 与 tick 不计。
+        /// 物件上的 Miss 窗口是游玩时钟；价值轴用真实时间，所以再除以速率。没有窗口时用常数。
         /// </summary>
+        private static double resolveMissBoundary(HitObject hitObject, double rate)
+        {
+            double window = findMissWindow(hitObject);
+
+            if (window <= 0)
+                return EzScoreBonusFormula.OFFSET_MISS_MS;
+
+            return window / rate;
+        }
+
+        private static double findMissWindow(HitObject hitObject)
+        {
+            var windows = hitObject.HitWindows;
+
+            if (windows != null && !ReferenceEquals(windows, HitWindows.Empty) && windows.IsHitResultAllowed(HitResult.Miss))
+            {
+                double window = windows.WindowFor(HitResult.Miss);
+
+                if (window > 0 && double.IsFinite(window))
+                    return window;
+            }
+
+            foreach (var nested in hitObject.NestedHitObjects)
+            {
+                double window = findMissWindow(nested);
+
+                if (window > 0)
+                    return window;
+            }
+
+            return 0;
+        }
+
         private static List<HitObject> judgedLeaves(HitObject hitObject)
         {
             var leaves = new List<HitObject>();
