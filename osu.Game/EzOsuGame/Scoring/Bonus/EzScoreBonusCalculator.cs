@@ -30,8 +30,6 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
     /// </remarks>
     public static class EzScoreBonusCalculator
     {
-        public const int MANIA_RULESET_ID = 3;
-
         public static EzScoreBonusSet Calculate(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents, double rate, IEzKpsSectionLookup? kps = null)
         {
             if (rate <= 0 || double.IsNaN(rate))
@@ -126,7 +124,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         /// <param name="playableBeatmap">与 <see cref="ScoreInfo.HitEvents"/> 同一次运行的可玩谱面。</param>
         public static void Apply(ScoreInfo score, IBeatmap playableBeatmap)
         {
-            if (score.Ruleset.OnlineID != MANIA_RULESET_ID || score.HitEvents.Count == 0 || playableBeatmap.HitObjects.Count == 0)
+            if (score.HitEvents.Count == 0 || playableBeatmap.HitObjects.Count == 0)
             {
                 score.EzBonus = null;
                 return;

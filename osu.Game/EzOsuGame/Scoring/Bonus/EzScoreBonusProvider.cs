@@ -58,13 +58,10 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
         /// <param name="isBusy">返回 true 时补算等待（例如游玩中），避免与 gameplay 抢资源。</param>
         public static Task<EzScoreBonusSet?> GetAsync(ScoreInfo score, ScoreManager scoreManager, BeatmapManager beatmapManager, IEzReplaySession replaySession,
-                                                         Func<bool>? isBusy = null, CancellationToken cancellationToken = default)
+                                                      Func<bool>? isBusy = null, CancellationToken cancellationToken = default)
         {
             if (score.EzBonus != null)
                 return Task.FromResult(score.EzBonus);
-
-            if (score.Ruleset.OnlineID != EzScoreBonusCalculator.MANIA_RULESET_ID)
-                return Task.FromResult<EzScoreBonusSet?>(null);
 
             string? key = keyOf(score);
 

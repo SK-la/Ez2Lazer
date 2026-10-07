@@ -9,6 +9,7 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Tests.EzOsuGame.Scoring
@@ -89,6 +90,24 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             Assert.That(result.CountedNotes, Is.EqualTo(2));
             Assert.That(result.JudgeBonus, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX / 2));
             Assert.That(result.MissPenalty, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX / 2));
+        }
+
+        [Test]
+        public void TestOsuHitCircleUsesTheSameValueCurve()
+        {
+            var beatmap = new Beatmap();
+            var circle = new HitCircle { StartTime = 1000 };
+            beatmap.HitObjects.Add(circle);
+
+            var events = new List<HitEvent>
+            {
+                new HitEvent(6, 1, HitResult.Great, circle, null, null),
+            };
+
+            var result = EzScoreBonusCalculator.Calculate(beatmap, events, 1, new FixedKps(40)).MissToJudge;
+
+            Assert.That(result.JudgeBonus, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX));
+            Assert.That(result.MissPenalty, Is.EqualTo(0));
         }
 
         private static Beatmap createChart(double bpm, int chordSize, int quarterBeats)
