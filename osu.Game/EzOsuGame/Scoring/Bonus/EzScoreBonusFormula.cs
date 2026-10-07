@@ -25,17 +25,27 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const int JUDGE_BONUS_MAX = 9999;
 
         /// <summary>
-        /// 所在区间 KPS ≥ <see cref="KPS_SATURATION"/> 时一次 Miss 的额外罚分。
-        /// </summary>
-        public const double MISS_PENALTY_UNIT = 800;
-
-        /// <summary>
-        /// KPS 为 0 时一次 Miss 仍保留的罚分比例；任何区间的 Miss 都计罚分。
+        /// Miss 权重下限：权重最低的区间里 Miss 仍按此比例计入加权 Miss 率。
         /// </summary>
         public const double MISS_WEIGHT_FLOOR = 0.2;
 
         /// <summary>
-        /// Miss 罚分总量上限（绝对值）。
+        /// 鼓励区：加权 Miss 率不超过此值时，罚分不超过「接受偏差」下的判定加成。
+        /// </summary>
+        public const double MISS_RATE_ACCEPTED = 0.005;
+
+        /// <summary>
+        /// 不鼓励区：加权 Miss 率达到此值时罚满 <see cref="MISS_PENALTY_CAP"/>。
+        /// </summary>
+        public const double MISS_RATE_DISCOURAGED = 0.02;
+
+        /// <summary>
+        /// 接受偏差：在 <see cref="MISS_RATE_ACCEPTED"/> 处，罚分等于全谱按此误差命中可得的判定加成。
+        /// </summary>
+        public const double ACCEPTED_ERROR_MS = 11;
+
+        /// <summary>
+        /// Miss 罚分上限（绝对值）。
         /// </summary>
         public const int MISS_PENALTY_CAP = 20000;
 
@@ -64,9 +74,35 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             return MISS_WEIGHT_FLOOR + (1 - MISS_WEIGHT_FLOOR) * (favourHighKps ? t : 1 - t);
         }
 
-        /// <param name="missWeightSum">各 Miss 的 <see cref="MissWeight"/> 之和。</param>
-        public static int MissPenalty(double missWeightSum)
-            => -(int)Math.Round(Math.Min(MISS_PENALTY_CAP, MISS_PENALTY_UNIT * Math.Max(0, missWeightSum)));
+        /// <summary>
+        /// 由加权 Miss 率得到罚分（≤ 0）：0 到鼓励点线性升到锚点，鼓励点到不鼓励点 Smoothstep 升到上限，之后封顶。
+        /// </summary>
+        /// <param name="weightedMissRate">Σ(Miss 的 <see cref="MissWeight"/>) / Σ(全部计入 Note 的 <see cref="MissWeight"/>)。</param>
+        /// <param name="judgeCoverage">同一倾向下 Σ<see cref="JudgeWeight"/> / 计入 Note 数，用于计算鼓励点锚值。</param>
+        public static int MissPenalty(double weightedMissRate, double judgeCoverage)
+        {
+            double rate = Math.Max(0, weightedMissRate);
+            double anchor = AcceptedMissPenalty(judgeCoverage);
+            double penalty;
+
+            if (rate <= MISS_RATE_ACCEPTED)
+                penalty = anchor * rate / MISS_RATE_ACCEPTED;
+            else if (rate >= MISS_RATE_DISCOURAGED)
+                penalty = MISS_PENALTY_CAP;
+            else
+            {
+                double x = (rate - MISS_RATE_ACCEPTED) / (MISS_RATE_DISCOURAGED - MISS_RATE_ACCEPTED);
+                penalty = anchor + (MISS_PENALTY_CAP - anchor) * x * x * (3 - 2 * x);
+            }
+
+            return -(int)Math.Round(penalty);
+        }
+
+        /// <summary>
+        /// 鼓励点罚分（正值）：全谱按 <see cref="ACCEPTED_ERROR_MS"/> 命中时的判定加成。
+        /// </summary>
+        public static double AcceptedMissPenalty(double judgeCoverage)
+            => JUDGE_BONUS_MAX * OffsetQuality(ACCEPTED_ERROR_MS) * Math.Clamp(judgeCoverage, 0, 1);
 
         /// <summary>
         /// Offset 精度价值 F(E)，E 为绝对误差（ms）。F(0)=1，F(b)=c，E ≥ 16ms 时为 0。

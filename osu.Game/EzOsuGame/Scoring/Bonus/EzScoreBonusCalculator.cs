@@ -12,13 +12,14 @@ using osu.Game.Utils;
 
 namespace osu.Game.EzOsuGame.Scoring.Bonus
 {
-    public readonly record struct EzScoreBonusResult(int JudgeBonus, int MissPenalty, int CountedNotes)
+    /// <param name="WeightedMissRate">Σ(Miss 的 KPS 权重) / Σ(全部计入 Note 的 KPS 权重)。</param>
+    public readonly record struct EzScoreBonusResult(int JudgeBonus, int MissPenalty, int CountedNotes, double WeightedMissRate = 0)
     {
         public int Total => JudgeBonus + MissPenalty;
     }
 
     /// <summary>
-    /// Mania 附加分计算：判定加成（KPS 加权 offset 精度 × 覆盖率）与 Miss 罚分（按次扣分、按所在区间 KPS 加权，有上限）。
+    /// Mania 附加分计算：判定加成（KPS 加权 offset 精度 × 覆盖率）与 Miss 罚分（KPS 加权 Miss 率映射到罚分曲线）。
     /// 两种 <see cref="EzScoreBonusTendency"/> 一次算出。
     /// </summary>
     /// <remarks>
@@ -41,10 +42,9 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             foreach (var hitObject in playableBeatmap.HitObjects)
                 pending.Add(keyOf(hitObject));
 
-            double judgeHighSum = 0;
-            double judgeLowSum = 0;
-            double missHighSum = 0;
-            double missLowSum = 0;
+            // JudgeToMiss：判定看重低 KPS、Miss 看重高 KPS；MissToJudge 相反。
+            var judgeToMiss = new Accumulator(judgeFavoursHighKps: false);
+            var missToJudge = new Accumulator(judgeFavoursHighKps: true);
             int counted = 0;
 
             foreach (var e in hitEvents)
@@ -56,32 +56,65 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                     continue;
 
                 counted++;
-                double sectionKps = kps.KpsAt(e.HitObject.StartTime);
 
-                if (e.Result == HitResult.Miss)
+                double sectionKps = kps.KpsAt(e.HitObject.StartTime);
+                bool isMiss = e.Result == HitResult.Miss;
+                double quality = 0;
+
+                if (!isMiss)
                 {
-                    missHighSum += EzScoreBonusFormula.MissWeight(sectionKps, favourHighKps: true);
-                    missLowSum += EzScoreBonusFormula.MissWeight(sectionKps, favourHighKps: false);
-                    continue;
+                    double eventRate = e.GameplayRate is > 0 ? e.GameplayRate.Value : rate;
+                    quality = EzScoreBonusFormula.OffsetQuality(e.TimeOffset / eventRate);
                 }
 
-                double eventRate = e.GameplayRate is > 0 ? e.GameplayRate.Value : rate;
-                double quality = EzScoreBonusFormula.OffsetQuality(e.TimeOffset / eventRate);
-
-                judgeHighSum += EzScoreBonusFormula.JudgeWeight(sectionKps, favourHighKps: true) * quality;
-                judgeLowSum += EzScoreBonusFormula.JudgeWeight(sectionKps, favourHighKps: false) * quality;
+                judgeToMiss.Add(sectionKps, isMiss, quality);
+                missToJudge.Add(sectionKps, isMiss, quality);
             }
 
             if (counted == 0)
                 return new EzScoreBonusSet(default, default);
 
-            return new EzScoreBonusSet(
-                JudgeToMiss: new EzScoreBonusResult(judgeBonus(judgeLowSum, counted), EzScoreBonusFormula.MissPenalty(missHighSum), counted),
-                MissToJudge: new EzScoreBonusResult(judgeBonus(judgeHighSum, counted), EzScoreBonusFormula.MissPenalty(missLowSum), counted));
+            return new EzScoreBonusSet(judgeToMiss.ToResult(counted), missToJudge.ToResult(counted));
         }
 
-        private static int judgeBonus(double weightedQualitySum, int counted)
-            => Math.Clamp((int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * weightedQualitySum / counted), 0, EzScoreBonusFormula.JUDGE_BONUS_MAX);
+        private struct Accumulator
+        {
+            private readonly bool judgeFavoursHighKps;
+
+            private double judgeQualitySum;
+            private double judgeWeightSum;
+            private double missWeightSum;
+            private double allMissWeightSum;
+
+            public Accumulator(bool judgeFavoursHighKps)
+            {
+                this.judgeFavoursHighKps = judgeFavoursHighKps;
+                judgeQualitySum = judgeWeightSum = missWeightSum = allMissWeightSum = 0;
+            }
+
+            public void Add(double kps, bool isMiss, double quality)
+            {
+                double judgeWeight = EzScoreBonusFormula.JudgeWeight(kps, judgeFavoursHighKps);
+                double missWeight = EzScoreBonusFormula.MissWeight(kps, !judgeFavoursHighKps);
+
+                judgeWeightSum += judgeWeight;
+                judgeQualitySum += judgeWeight * quality;
+                allMissWeightSum += missWeight;
+
+                if (isMiss)
+                    missWeightSum += missWeight;
+            }
+
+            public readonly EzScoreBonusResult ToResult(int counted)
+            {
+                int judgeBonus = Math.Clamp((int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * judgeQualitySum / counted), 0, EzScoreBonusFormula.JUDGE_BONUS_MAX);
+
+                // MissWeight ≥ MISS_WEIGHT_FLOOR，counted > 0 时分母恒为正。
+                double missRate = missWeightSum / allMissWeightSum;
+
+                return new EzScoreBonusResult(judgeBonus, EzScoreBonusFormula.MissPenalty(missRate, judgeWeightSum / counted), counted, missRate);
+            }
+        }
 
         /// <summary>
         /// 由 <see cref="ScoreInfo.HitEvents"/> 计算并写入临时字段 <see cref="ScoreInfo.EzBonus"/>；非 mania 或无 HitEvents 时置空。
