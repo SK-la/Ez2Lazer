@@ -97,6 +97,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         public void TestOffsetQualityMatchesResearchTable()
         {
             Assert.That(EzScoreBonusFormula.OffsetQuality(0), Is.EqualTo(1).Within(1e-9));
+            Assert.That(EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.OFFSET_FULL_MS), Is.EqualTo(1).Within(1e-9));
             Assert.That(EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.OFFSET_BOUNDARY_MS), Is.EqualTo(EzScoreBonusFormula.OFFSET_BOUNDARY_VALUE).Within(1e-9));
             Assert.That(EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.OFFSET_ZERO_MS), Is.EqualTo(0));
             Assert.That(EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.OFFSET_ZERO_MS + 1), Is.EqualTo(0));
@@ -285,7 +286,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             int expected = (int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * 0.25 * EzScoreBonusFormula.OffsetQuality(6));
 
             Assert.That(result.JudgeBonus, Is.EqualTo(expected).Within(1));
-            Assert.That(result.JudgeBonus, Is.EqualTo(20000).Within(1000));
+            Assert.That(result.JudgeBonus, Is.EqualTo(22500).Within(1));
         }
 
         [Test]

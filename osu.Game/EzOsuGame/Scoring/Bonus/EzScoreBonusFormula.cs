@@ -13,7 +13,8 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const double KPS_START = 5;
         public const double KPS_SATURATION = 40;
 
-        public const double OFFSET_BOUNDARY_MS = 11; // 0 与归零点的中点。类对数缓降到这里，价值剩 0.5，之后急坠。
+        public const double OFFSET_FULL_MS = 6; // 这个误差及以内吃满，价值为 1。
+        public const double OFFSET_BOUNDARY_MS = 11; // 类对数缓降到这里，价值剩 0.5，之后急坠。
         public const double OFFSET_BOUNDARY_VALUE = 0.5;
         public const double OFFSET_LOG_K = 9;
 
@@ -22,7 +23,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const double OFFSET_ZERO_MS = 22; // 到这里判定加成变成 0，再大也不再算。
 
         /// <summary>
-        /// 判定加成上限。25% 的 Note 在 6ms 内且权重为 1、其余无价值时约 +2 万；0ms 且权重为 1 时为 +9 万。
+        /// 判定加成上限。6ms 及以内吃满；25% 的 Note 在 6ms 内且权重为 1、其余无价值时为 +2.25 万。0ms 不再单独更高。
         /// </summary>
         public const int JUDGE_BONUS_MAX = 90000;
 
@@ -139,7 +140,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             => MISS_CAP_RATIO * AcceptedMissPenalty(judgeCoverage);
 
         /// <summary>
-        /// Offset 精度价值 F(E)，E 为绝对误差（ms）。F(0)=1，F(中点)=0.5，E ≥ <see cref="OFFSET_ZERO_MS"/> 时为 0。
+        /// Offset 精度价值 F(E)，E 为绝对误差（ms）。E ≤ <see cref="OFFSET_FULL_MS"/> 时为 1，F(中点)=0.5，E ≥ <see cref="OFFSET_ZERO_MS"/> 时为 0。
         /// </summary>
         public static double OffsetQuality(double absoluteErrorMs)
         {
@@ -148,9 +149,13 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             if (double.IsNaN(e) || e >= OFFSET_ZERO_MS)
                 return 0;
 
+            if (e <= OFFSET_FULL_MS)
+                return 1;
+
             if (e <= OFFSET_BOUNDARY_MS)
             {
-                double inner = 1 + OFFSET_LOG_K * (1 - e / OFFSET_BOUNDARY_MS);
+                double t = (e - OFFSET_FULL_MS) / (OFFSET_BOUNDARY_MS - OFFSET_FULL_MS);
+                double inner = 1 + OFFSET_LOG_K * (1 - t);
                 return OFFSET_BOUNDARY_VALUE + (1 - OFFSET_BOUNDARY_VALUE) * Math.Log(inner) / log_k_denominator;
             }
 
