@@ -45,7 +45,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const double ACCEPTED_ERROR_MS = 11;
 
         /// <summary>
-        /// Miss 罚分上限（绝对值）。高于打满的判定加成，使 2% Miss 的净值仍为负。
+        /// Miss 罚分上限（绝对值）。高于打满的判定加成，使 3% Miss 的净值仍为负。
         /// </summary>
         public const int MISS_PENALTY_CAP = 120000;
 
@@ -84,7 +84,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         /// 鼓励点到不鼓励点按等比（对数尺度线性）升到上限；之后封顶。
         /// KPS 倍率只乘在鼓励区内，并随 Miss 率向不鼓励点收拢到 1。
         /// </summary>
-        /// <param name="missRate">Miss 个数 / 谱面总 Note 数（普通 Note + LN）。</param>
+        /// <param name="missRate">Miss 个数 / 谱面总 Note 数（普通 Note 各 1，LN 的头和尾各 1）。</param>
         /// <param name="judgeCoverage">同一倾向下 Σ<see cref="JudgeWeight"/> / 计入 Note 数，用于计算鼓励点锚值。</param>
         /// <param name="missWeight">各 Miss 的 <see cref="MissWeight"/> 平均值。鼓励区内作为整体倍率。</param>
         public static int MissPenalty(double missRate, double judgeCoverage, double missWeight = 1)

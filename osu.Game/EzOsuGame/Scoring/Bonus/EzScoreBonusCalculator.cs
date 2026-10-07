@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
@@ -12,7 +13,7 @@ using osu.Game.Utils;
 
 namespace osu.Game.EzOsuGame.Scoring.Bonus
 {
-    /// <param name="MissRate">Miss 个数 / 谱面总 Note 数（普通 Note + LN）。</param>
+    /// <param name="MissRate">Miss 个数 / 谱面总 Note 数（普通 Note 各 1，LN 的头和尾各 1）。</param>
     public readonly record struct EzScoreBonusResult(int JudgeBonus, int MissPenalty, int CountedNotes, double MissRate = 0)
     {
         public int Total => JudgeBonus + MissPenalty;
@@ -23,7 +24,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
     /// 两种 <see cref="EzScoreBonusTendency"/> 一次算出。
     /// </summary>
     /// <remarks>
-    /// V1 只统计顶层 Note 与 LN 头（按列 + 起始时间匹配），LN 尾 / body / tick 不参与。
+    /// V1 的判定加成只统计普通 Note 与 LN 头。Miss 率的分母把 LN 头和尾都算进去，尾判 Miss 也计入分子。
     /// <see cref="HitResult.Poor"/>（BMS 空 POOR）不参与。
     /// </remarks>
     public static class EzScoreBonusCalculator
@@ -38,9 +39,26 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             kps ??= EzKpsListLookup.FromBeatmap(playableBeatmap, rate);
 
             var pending = new HashSet<(int column, double time)>();
+            var releaseNotes = new HashSet<(int column, double time)>();
+            int totalNotes = 0;
 
             foreach (var hitObject in playableBeatmap.HitObjects)
-                pending.Add(keyOf(hitObject));
+            {
+                var leaves = judgedLeaves(hitObject);
+
+                if (leaves.Count == 0)
+                    continue;
+
+                totalNotes += leaves.Count;
+
+                foreach (var leaf in leaves)
+                {
+                    if (leaf.StartTime == hitObject.StartTime)
+                        pending.Add(keyOf(leaf));
+                    else
+                        releaseNotes.Add(keyOf(leaf));
+                }
+            }
 
             // JudgeToMiss：判定看重低 KPS、Miss 看重高 KPS；MissToJudge 相反。
             var judgeToMiss = new Accumulator(judgeFavoursHighKps: false);
@@ -52,8 +70,20 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                 if (!e.Result.IsBasic() || e.Result == HitResult.Poor || e.HitObject == null)
                     continue;
 
-                if (!pending.Remove(keyOf(e.HitObject)))
+                var key = keyOf(e.HitObject);
+
+                if (!pending.Remove(key))
+                {
+                    // LN 尾只进入 Miss 率，不进入判定加成。
+                    if (e.Result == HitResult.Miss && releaseNotes.Remove(key))
+                    {
+                        double releaseKps = kps.KpsAt(e.HitObject.StartTime);
+                        judgeToMiss.AddMiss(releaseKps);
+                        missToJudge.AddMiss(releaseKps);
+                    }
+
                     continue;
+                }
 
                 counted++;
 
@@ -71,11 +101,8 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                 missToJudge.Add(sectionKps, isMiss, quality);
             }
 
-            if (counted == 0)
+            if (totalNotes == 0)
                 return new EzScoreBonusSet(default, default);
-
-            // 顶层物件数 = 普通 Note + LN（每个 LN 计一次）。
-            int totalNotes = playableBeatmap.HitObjects.Count;
 
             return new EzScoreBonusSet(judgeToMiss.ToResult(counted, totalNotes), missToJudge.ToResult(counted, totalNotes));
         }
@@ -96,6 +123,12 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                 missCount = 0;
             }
 
+            public void AddMiss(double kps)
+            {
+                missCount++;
+                missWeightSum += EzScoreBonusFormula.MissWeight(kps, !judgeFavoursHighKps);
+            }
+
             public void Add(double kps, bool isMiss, double quality)
             {
                 double judgeWeight = EzScoreBonusFormula.JudgeWeight(kps, judgeFavoursHighKps);
@@ -112,7 +145,9 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
             public readonly EzScoreBonusResult ToResult(int counted, int totalNotes)
             {
-                int judgeBonus = Math.Clamp((int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * judgeQualitySum / counted), 0, EzScoreBonusFormula.JUDGE_BONUS_MAX);
+                int judgeBonus = counted == 0
+                    ? 0
+                    : Math.Clamp((int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * judgeQualitySum / counted), 0, EzScoreBonusFormula.JUDGE_BONUS_MAX);
 
                 double missRate = (double)missCount / Math.Max(1, totalNotes);
                 double missWeight = missCount > 0 ? missWeightSum / missCount : 0;
@@ -138,5 +173,31 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
         private static (int column, double time) keyOf(HitObject hitObject)
             => (hitObject is IHasColumn c ? c.Column : -1, hitObject.StartTime);
+
+        /// <summary>
+        /// 普通 Note 计 1。LN 计头和尾，各 1；body 与 tick 不计。
+        /// </summary>
+        private static List<HitObject> judgedLeaves(HitObject hitObject)
+        {
+            var leaves = new List<HitObject>();
+            collectJudgedLeaves(hitObject, leaves);
+            return leaves;
+        }
+
+        private static void collectJudgedLeaves(HitObject hitObject, List<HitObject> leaves)
+        {
+            if (hitObject.NestedHitObjects.Count > 0)
+            {
+                foreach (var nested in hitObject.NestedHitObjects)
+                    collectJudgedLeaves(nested, leaves);
+
+                return;
+            }
+
+            if (hitObject is IHasDuration || hitObject.CreateJudgement() is IgnoreJudgement)
+                return;
+
+            leaves.Add(hitObject);
+        }
     }
 }

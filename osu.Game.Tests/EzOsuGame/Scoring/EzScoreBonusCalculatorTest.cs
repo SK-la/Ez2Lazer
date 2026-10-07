@@ -146,9 +146,9 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         }
 
         [Test]
-        public void TestMissRateDenominatorIsTotalNoteCountWithLnOnce()
+        public void TestMissRateCountsLnHeadAndTail()
         {
-            // 4 个普通 Note + 1 个 LN = 5 个 Note；LN 尾的 Miss 不计入分子。
+            // 4 个普通 Note + 1 个 LN（头和尾）= 6。普通 Note 的 1 次 Miss 和 LN 尾的 Miss 都计入分子。
             var beatmap = new Beatmap();
             beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = 250 });
 
@@ -171,7 +171,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
 
             var result = EzScoreBonusCalculator.Calculate(beatmap, events, 1, new FixedKps(40)).JudgeToMiss;
 
-            Assert.That(result.MissRate, Is.EqualTo(1.0 / 5).Within(1e-9));
+            Assert.That(result.MissRate, Is.EqualTo(2.0 / 6).Within(1e-9));
         }
 
         [Test]
@@ -269,7 +269,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
 
             Assert.That(result.CountedNotes, Is.EqualTo(1));
             Assert.That(result.JudgeBonus, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX));
-            Assert.That(result.MissPenalty, Is.EqualTo(0));
+            Assert.That(result.MissRate, Is.EqualTo(0.5).Within(1e-9));
+            Assert.That(result.MissPenalty, Is.LessThan(0));
         }
 
         [Test]
@@ -289,7 +290,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         }
 
         [Test]
-        public void TestTwoPercentMissBeatsMaxedJudgeBonus()
+        public void TestThreePercentMissBeatsMaxedJudgeBonus()
         {
             int penalty = EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_DISCOURAGED, judgeCoverage: 1, EzScoreBonusFormula.MISS_WEIGHT_FLOOR);
             int maxedJudge = (int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * (1 - EzScoreBonusFormula.MISS_RATE_DISCOURAGED));
