@@ -421,7 +421,7 @@ namespace osu.Game.Database
                     if (realm.All<ScoreInfo>().Any())
                     {
                         Logger.Log(@"Recovery aborted as the existing database has scores set already.", LoggingTarget.Database);
-                        Logger.Log($@"To perform recovery, delete {OsuGameBase.CLIENT_DATABASE_FILENAME} while osu! is not running.", LoggingTarget.Database);
+                        Logger.Log($@"To perform recovery, delete {OsuGameBase.CLIENT_DATABASE_FILENAME} while client is not running.", LoggingTarget.Database);
                         return;
                     }
                 }
@@ -441,7 +441,7 @@ namespace osu.Game.Database
             }
             catch
             {
-                Logger.Log(@"Recovery aborted as the newer version could not be loaded by this osu! version.", LoggingTarget.Database);
+                Logger.Log(@"Recovery aborted as the newer version could not be loaded by this client version.", LoggingTarget.Database);
                 return;
             }
 
@@ -493,7 +493,7 @@ namespace osu.Game.Database
                 // This is the best way we can detect a schema version downgrade.
                 if (e.Message.StartsWith(@"Provided schema version", StringComparison.Ordinal))
                 {
-                    Logger.Error(e, "Your local database is too new to work with this version of osu!. Please close osu! and install the latest release to recover your data.");
+                    Logger.Error(e, "Your local database is too new to work with this version of ez2lazer. Please close ez2lazer and install the latest release to recover your data.");
 
                     if (!allowDestructiveRecoveryOnSchemaMismatch)
                     {
