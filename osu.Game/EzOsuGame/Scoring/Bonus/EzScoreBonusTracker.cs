@@ -59,9 +59,9 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public static bool AppliesTo(ScoreInfo score) => score.Ruleset.OnlineID == EzScoreBonusCalculator.MANIA_RULESET_ID;
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezConfig)
+        private void load(Ez2ConfigManager? ezConfig)
         {
-            ezConfig.BindWith(Ez2Setting.ScoreBonusTendency, tendency);
+            ezConfig?.BindWith(Ez2Setting.ScoreBonusTendency, tendency);
         }
 
         protected override void LoadComplete()
