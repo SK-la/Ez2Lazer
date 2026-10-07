@@ -208,6 +208,8 @@ namespace osu.Game.Screens.Select
                                     Size = new Vector2(300, 30),
                                     HoverValueEnabled = true,
                                     Margin = new MarginPadding { Left = 5f },
+                                    Blending = BlendingParameters.Mixture,
+                                    LineColour = Colour4.IndianRed,
                                 },
                             },
                         }),
@@ -358,8 +360,7 @@ namespace osu.Game.Screens.Select
                 metrics.KpsList,
                 sourceLengthMs: lastDrainLengthMs,
                 baselineLengthMs: lastBaselineLengthMs,
-                extendToBaseline: true,
-                heatmapEnabled: true);
+                extendToBaseline: true);
 
             Scheduler.Add(updateKPSGraphSize);
         }

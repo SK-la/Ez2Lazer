@@ -14,13 +14,14 @@ using osu.Framework.Layout;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
     /// KPS折线图
     /// </summary>
-    /// 支持可选的尾部补零与热力颜色渲染，默认关闭。
+    /// 支持可选的尾部补零，默认单色 TriangleBorder 折线。
     public partial class EzDisplayKpsGraph : CompositeDrawable
     {
         private const float line_thickness = 1.5f;
@@ -32,16 +33,29 @@ namespace osu.Game.EzOsuGame.UserInterface
         private readonly TriangleBorderPath graphPath;
 
         private float[] values;
+        private Color4 lineColour = Colour4.CornflowerBlue;
 
         public float ActualMaxValue { get; private set; } = float.NaN;
         public float ActualMinValue { get; private set; } = float.NaN;
         public float? MaxValue { get; set; }
         public float? MinValue { get; set; }
 
+        public Color4 LineColour
+        {
+            get => lineColour;
+            set
+            {
+                if (lineColour == value)
+                    return;
+
+                lineColour = value;
+                graphColourContainer.Colour = ColourInfo.SingleColour(value);
+            }
+        }
+
         private int valuesCount;
         private bool hasData;
         private bool lastExtendToBaseline;
-        private bool lastHeatmapEnabled;
         private double lastSourceLengthMs;
         private double lastBaselineLengthMs;
 
@@ -71,6 +85,31 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         private readonly LayoutValue pathCached = new LayoutValue(Invalidation.DrawSize);
 
+        /// <summary>
+        /// 不参与父级 AutoSize（用于谱面 Panel 等紧凑布局：折线叠在指标行右侧，不撑开上下行）。
+        /// </summary>
+        public bool ExcludeFromParentAutoSize
+        {
+            get => BypassAutoSizeAxes == Axes.Both;
+            set => BypassAutoSizeAxes = value ? Axes.Both : Axes.None;
+        }
+
+        /// <summary>
+        /// 与 <see cref="ExcludeFromParentAutoSize"/> 配合：折线叠在该行右侧并随其尺寸更新。
+        /// </summary>
+        public Drawable OverlayAnchorRow { get; set; }
+
+        public float OverlayLeftMargin { get; set; } = 4f;
+
+        /// <summary>
+        /// 将折线叠在已排版指标行右侧（需 <see cref="ExcludeFromParentAutoSize"/>）。
+        /// </summary>
+        public void AlignBesideRow(Drawable row, float leftMargin = 4f)
+        {
+            float y = (row.DrawHeight - DrawHeight) * 0.5f;
+            Position = new Vector2(row.DrawWidth + leftMargin, y);
+        }
+
         public EzDisplayKpsGraph()
         {
             Blending = BlendingParameters.Additive;
@@ -79,6 +118,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 Masking = true,
                 RelativeSizeAxes = Axes.Both,
+                Colour = ColourInfo.SingleColour(lineColour),
                 Child = graphPath = new TriangleBorderPath(border_thickness, border_texel_size)
                 {
                     AutoSizeAxes = Axes.None,
@@ -109,12 +149,17 @@ namespace osu.Game.EzOsuGame.UserInterface
                         CornerRadius = 4,
                         Children = new Drawable[]
                         {
-                            new Box { RelativeSizeAxes = Axes.Both, Colour = Colour4.Black, Alpha = 0.8f },
+                            new Box
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                                Colour = Colour4.Black, Alpha = 0.35f
+                            },
                             hoverText = new OsuSpriteText
                             {
                                 Anchor = Anchor.Centre,
                                 Origin = Anchor.Centre,
                                 Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
+                                Margin = new MarginPadding(4),
                                 Colour = Colour4.White,
                             }
                         }
@@ -126,7 +171,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             hoverCreated = true;
         }
 
-        public void SetPoints(IReadOnlyList<double> source, double sourceLengthMs = 0, double baselineLengthMs = 0, bool extendToBaseline = false, bool heatmapEnabled = false)
+        public void SetPoints(IReadOnlyList<double> source, double sourceLengthMs = 0, double baselineLengthMs = 0, bool extendToBaseline = false)
         {
             if (source == null)
                 return;
@@ -147,7 +192,6 @@ namespace osu.Game.EzOsuGame.UserInterface
                 graphPath.ClearVertices();
                 pathCached.Invalidate();
                 lastExtendToBaseline = extendToBaseline;
-                lastHeatmapEnabled = heatmapEnabled;
                 lastSourceLengthMs = sourceLengthMs;
                 lastBaselineLengthMs = baselineLengthMs;
                 return;
@@ -172,7 +216,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             float max = float.MinValue;
             float min = float.MaxValue;
-            bool same = hasData && valuesCount == sampledCount && lastExtendToBaseline == extendToBaseline && lastHeatmapEnabled == heatmapEnabled;
+            bool same = hasData && valuesCount == sampledCount && lastExtendToBaseline == extendToBaseline;
 
             if (same && extendToBaseline)
                 same = lastSourceLengthMs == sourceLengthMs && lastBaselineLengthMs == baselineLengthMs;
@@ -199,7 +243,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             hasData = true;
             valuesCount = sampledCount;
             lastExtendToBaseline = extendToBaseline;
-            lastHeatmapEnabled = heatmapEnabled;
             lastSourceLengthMs = sourceLengthMs;
             lastBaselineLengthMs = baselineLengthMs;
 
@@ -218,6 +261,9 @@ namespace osu.Game.EzOsuGame.UserInterface
                 applyPath();
                 pathCached.Validate();
             }
+
+            if (OverlayAnchorRow != null && ExcludeFromParentAutoSize)
+                AlignBesideRow(OverlayAnchorRow, OverlayLeftMargin);
         }
 
         private void applyPath()
@@ -237,17 +283,6 @@ namespace osu.Game.EzOsuGame.UserInterface
                 float x = i / (float)denominator * availableWidth;
                 float y = getYPosition(values[i]) * availableHeight;
                 graphPath.AddVertex(new Vector2(x, y));
-            }
-
-            if (lastHeatmapEnabled)
-            {
-                graphColourContainer.Colour = ColourInfo.GradientHorizontal(
-                    getHeatColour(values[0], ActualMaxValue),
-                    getHeatColour(values[valuesCount - 1], ActualMaxValue));
-            }
-            else
-            {
-                graphColourContainer.Colour = ColourInfo.SingleColour(Colour4.CornflowerBlue);
             }
         }
 
@@ -306,9 +341,9 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             // 将屏幕空间坐标转换到图表容器的本地坐标，以匹配当前线段布局。
             var thisLocal = ToLocalSpace(screenSpaceMousePos);
-            var graphLocal = graphPath.ToLocalSpace(screenSpaceMousePos);
+            var graphLocal = graphColourContainer.ToLocalSpace(screenSpaceMousePos);
 
-            float availableWidth = Math.Max(0, graphPath.DrawWidth);
+            float availableWidth = Math.Max(0, graphColourContainer.DrawWidth);
             if (availableWidth <= 0) availableWidth = Math.Max(0, DrawWidth);
 
             float xInAvailable = Math.Clamp(graphLocal.X, 0, availableWidth);
@@ -335,14 +370,5 @@ namespace osu.Game.EzOsuGame.UserInterface
         }
 
         private float getYPosition(float value) => getYPosition(value, ActualMinValue, ActualMaxValue);
-
-        private static Colour4 getHeatColour(float value, float maxValue)
-        {
-            if (value <= 0 || maxValue <= 0)
-                return Colour4.White;
-
-            float t = Math.Clamp(value / maxValue, 0, 1);
-            return new Colour4(1f, 1f - t, 1f - t, 1f);
-        }
     }
 }

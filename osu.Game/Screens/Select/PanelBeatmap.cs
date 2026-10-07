@@ -50,6 +50,7 @@ namespace osu.Game.Screens.Select
         private OsuSpriteText difficultyText = null!;
         private OsuSpriteText authorText = null!;
         private FillFlowContainer mainFill = null!;
+        private FillFlowContainer starMetricsFlow = null!;
 
         private IBindable<StarDifficulty>? starDifficultyBindable;
         private CancellationTokenSource? starDifficultyCancellationSource;
@@ -233,38 +234,44 @@ namespace osu.Game.Screens.Select
                                         }
                                     }
                                 },
-                                new FillFlowContainer
+                                new Container
                                 {
-                                    Direction = FillDirection.Horizontal,
-                                    Spacing = new Vector2(3),
                                     AutoSizeAxes = Axes.Both,
                                     Children = new Drawable[]
                                     {
-                                        starRatingDisplay = new StarRatingDisplay(default, StarRatingDisplaySize.Small, animated: true)
+                                        starMetricsFlow = new FillFlowContainer
                                         {
-                                            Origin = Anchor.CentreLeft,
-                                            Anchor = Anchor.CentreLeft,
-                                            Scale = new Vector2(0.875f),
-                                        },
-                                        displaySR = new EzDisplaySR(EzManiaSummary.EMPTY, StarRatingDisplaySize.Small, animated: true)
-                                        {
-                                            Origin = Anchor.CentreLeft,
-                                            Anchor = Anchor.CentreLeft,
-                                            Scale = new Vector2(0.875f),
-                                        },
-                                        starCounter = new StarCounter
-                                        {
-                                            Anchor = Anchor.CentreLeft,
-                                            Origin = Anchor.CentreLeft,
-                                            Scale = new Vector2(0.4f)
+                                            Direction = FillDirection.Horizontal,
+                                            Spacing = new Vector2(2),
+                                            AutoSizeAxes = Axes.Both,
+                                            Children = new Drawable[]
+                                            {
+                                                starRatingDisplay = new StarRatingDisplay(default, StarRatingDisplaySize.Small, animated: true)
+                                                {
+                                                    Origin = Anchor.CentreLeft,
+                                                    Anchor = Anchor.CentreLeft,
+                                                    Scale = new Vector2(0.875f),
+                                                },
+                                                displaySR = new EzDisplaySR(EzManiaSummary.EMPTY, StarRatingDisplaySize.Small, animated: true)
+                                                {
+                                                    Origin = Anchor.CentreLeft,
+                                                    Anchor = Anchor.CentreLeft,
+                                                    Scale = new Vector2(0.875f),
+                                                },
+                                                starCounter = new StarCounter
+                                                {
+                                                    Anchor = Anchor.CentreLeft,
+                                                    Origin = Anchor.CentreLeft,
+                                                    Scale = new Vector2(0.4f)
+                                                },
+                                            },
                                         },
                                         ezDisplayKpsGraph = new EzDisplayKpsGraph
                                         {
+                                            ExcludeFromParentAutoSize = true,
+                                            OverlayAnchorRow = starMetricsFlow,
                                             Size = new Vector2(300, 15),
                                             Blending = BlendingParameters.Mixture,
-                                            Anchor = Anchor.CentreLeft,
-                                            Origin = Anchor.CentreLeft,
-                                            Margin = new MarginPadding { Left = 4f },
                                         },
                                     },
                                 },
