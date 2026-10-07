@@ -10,7 +10,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
     /// </summary>
     public static class EzScoreBonusFormula
     {
-        public const double KPS_START = 15;
+        public const double KPS_START = 5;
         public const double KPS_SATURATION = 40;
 
         public const double OFFSET_BOUNDARY_MS = 13;
@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         /// <summary>
         /// Miss 权重下限：Miss 全落在权重最低的区间时，罚分仍保留此比例。
         /// </summary>
-        public const double MISS_WEIGHT_FLOOR = 0.2;
+        public const double MISS_WEIGHT_FLOOR = 0.3;
 
         /// <summary>
         /// 鼓励区：Miss 率不超过此值时，罚分不超过「接受偏差」下的判定加成。
@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         /// <summary>
         /// 不鼓励区：Miss 率达到此值时罚满 <see cref="MISS_PENALTY_CAP"/>（再乘 KPS 倍率）。
         /// </summary>
-        public const double MISS_RATE_DISCOURAGED = 0.02;
+        public const double MISS_RATE_DISCOURAGED = 0.03;
 
         /// <summary>
         /// 接受偏差：在 <see cref="MISS_RATE_ACCEPTED"/> 处，罚分等于全谱按此误差命中可得的判定加成。
