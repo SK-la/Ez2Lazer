@@ -69,12 +69,23 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         {
             base.LoadComplete();
 
+            tracker.Tendency.BindValueChanged(_ => updateText());
             tracker.Current.BindValueChanged(_ => updateText());
             tracker.State.BindValueChanged(_ => updateText(), true);
         }
 
         private void updateText()
         {
+            if (!tracker.Shown)
+            {
+                Alpha = 0;
+                Height = 0;
+                return;
+            }
+
+            Alpha = 1;
+            Height = HEIGHT;
+
             if (tracker.Current.Value is not EzScoreBonusResult bonus)
             {
                 string placeholder = tracker.State.Value == EzScoreBonusState.Pending ? "\u2026" : unavailable_text;

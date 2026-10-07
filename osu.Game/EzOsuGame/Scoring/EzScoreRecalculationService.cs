@@ -75,19 +75,23 @@ namespace osu.Game.EzOsuGame.Scoring
                 return;
             }
 
-            IReadOnlyList<double>? cachedKps = null;
-
-            if (analysisCache != null && scoreInfo.BeatmapInfo is BeatmapInfo beatmapInfo)
+            if (EzScoreBonusTracker.IsEnabled)
             {
-                var analysis = await analysisCache.GetAnalysisAsync(beatmapInfo, scoreInfo.Ruleset, scoreInfo.Mods, cancellationToken).ConfigureAwait(false);
+                IReadOnlyList<double>? cachedKps = null;
 
-                if (analysis is EzAnalysisResult cached && cached.KpsList.Count > 0)
-                    cachedKps = cached.KpsList;
+                if (analysisCache != null && scoreInfo.BeatmapInfo is BeatmapInfo beatmapInfo)
+                {
+                    var analysis = await analysisCache.GetAnalysisAsync(beatmapInfo, scoreInfo.Ruleset, scoreInfo.Mods, cancellationToken).ConfigureAwait(false);
+
+                    if (analysis is EzAnalysisResult cached && cached.KpsList.Count > 0)
+                        cachedKps = cached.KpsList;
+                }
+
+                EzScoreBonusCalculator.Apply(result.Score.ScoreInfo, playableBeatmap, cachedKps);
+                EzScoreBonusProvider.Store(scoreInfo, result.Score.ScoreInfo.EzBonus);
             }
 
-            EzScoreBonusCalculator.Apply(result.Score.ScoreInfo, playableBeatmap, cachedKps);
             scoreManager.ApplyEzSessionRecalculation(scoreInfo, result.Score.ScoreInfo, purpose, result.ResolvedEnvironment!);
-            EzScoreBonusProvider.Store(scoreInfo, result.Score.ScoreInfo.EzBonus);
         }
 
         /// <summary>
@@ -102,6 +106,9 @@ namespace osu.Game.EzOsuGame.Scoring
             CancellationToken cancellationToken = default,
             EzAnalysisCache? analysisCache = null)
         {
+            if (!EzScoreBonusTracker.IsEnabled)
+                return null;
+
             var databasedScore = scoreManager.GetScore(scoreInfo);
 
             if (databasedScore?.Replay == null || databasedScore.Replay.Frames.Count == 0)

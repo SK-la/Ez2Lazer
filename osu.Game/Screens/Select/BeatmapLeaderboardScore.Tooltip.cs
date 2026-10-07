@@ -474,6 +474,11 @@ namespace osu.Game.Screens.Select
                             UseFullGlyphHeight = false,
                         },
                     };
+
+                    bonusLines.VisibilityChanged = shown =>
+                    {
+                        totalScore.Margin = new MarginPadding { Bottom = shown ? 52f : 25f, Top = 10f + spacing };
+                    };
                 }
             }
 
@@ -519,10 +524,13 @@ namespace osu.Game.Screens.Select
                     updateText();
                 }
 
+                public Action<bool>? VisibilityChanged { get; set; }
+
                 public void SetScore(ScoreInfo score)
                 {
                     tracker?.Expire();
                     AddInternal(tracker = new EzScoreBonusTracker(score));
+                    tracker.Tendency.BindValueChanged(_ => updateText());
                     tracker.Current.BindValueChanged(_ => updateText(), true);
                     tracker.State.BindValueChanged(_ => updateText(), true);
                 }
@@ -530,6 +538,14 @@ namespace osu.Game.Screens.Select
                 private void updateText()
                 {
                     if (judgeText == null)
+                        return;
+
+                    bool shown = tracker?.Shown != false;
+                    Alpha = shown ? 1 : 0;
+                    Margin = new MarginPadding { Bottom = shown ? 22f : 0f };
+                    VisibilityChanged?.Invoke(shown);
+
+                    if (!shown)
                         return;
 
                     if (tracker?.Current.Value is not EzScoreBonusResult bonus)

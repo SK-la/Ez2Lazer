@@ -38,6 +38,10 @@ namespace osu.Game.EzOsuGame.Localization
             "低失误率",
             "Low Error Rate");
 
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_HIDDEN = new EzLocalizationManager.EzLocalisableString(
+            "不展示",
+            "Hidden");
+
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NORMAL = new EzLocalizationManager.EzLocalisableString("正常", "Normal");
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_IN_GAME_FOCUS = new EzLocalizationManager.EzLocalisableString("游戏内聚焦", "In-game focus");
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NEVER = new EzLocalizationManager.EzLocalisableString("永不通知", "Never notify");

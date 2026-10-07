@@ -60,7 +60,14 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             this.score = score;
         }
 
-        public static bool AppliesTo(ScoreInfo score) => true;
+        public IBindable<EzScoreBonusTendency> Tendency => tendency;
+
+        public bool Shown => tendency.Value != EzScoreBonusTendency.Hidden;
+
+        public static bool IsEnabled
+            => GlobalConfigStore.EzConfig.Get<EzScoreBonusTendency>(Ez2Setting.ScoreBonusTendency) != EzScoreBonusTendency.Hidden;
+
+        public static bool AppliesTo(ScoreInfo score) => IsEnabled;
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager? ezConfig)
@@ -72,13 +79,30 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         {
             base.LoadComplete();
 
-            tendency.BindValueChanged(_ => updateCurrent());
+            tendency.BindValueChanged(_ => onTendency(), true);
+        }
 
-            if (!AppliesTo(score))
+        private bool requested;
+
+        private void onTendency()
+        {
+            if (!Shown)
             {
-                setBonus(null);
+                Current.Value = null;
+                State.Value = EzScoreBonusState.Unavailable;
                 return;
             }
+
+            if (bonusSet != null)
+            {
+                updateCurrent();
+                return;
+            }
+
+            if (requested)
+                return;
+
+            requested = true;
 
             if (EzScoreBonusProvider.TryGet(score, out var cached))
             {
@@ -120,13 +144,21 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         private void setBonus(EzScoreBonusSet? value)
         {
             bonusSet = value;
+
+            if (!Shown)
+            {
+                Current.Value = null;
+                State.Value = EzScoreBonusState.Unavailable;
+                return;
+            }
+
             State.Value = value == null ? EzScoreBonusState.Unavailable : EzScoreBonusState.Available;
             updateCurrent();
         }
 
         private void updateCurrent()
         {
-            Current.Value = bonusSet?.For(tendency.Value);
+            Current.Value = Shown ? bonusSet?.For(tendency.Value) : null;
         }
 
         protected override void Dispose(bool isDisposing)

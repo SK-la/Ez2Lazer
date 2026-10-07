@@ -470,9 +470,10 @@ namespace osu.Game.Screens.Select
                                                         Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                                         Children = new Drawable[]
                                                         {
-                                                            EzScoreBonusTracker.AppliesTo(Score)
-                                                                ? new EzScoreBonusChip(Score) { Anchor = Anchor.CentreRight, Origin = Anchor.CentreRight }
-                                                                : Empty(),
+                                                            new EzScoreBonusChip(Score)
+                                                            {
+                                                                Anchor = Anchor.CentreRight, Origin = Anchor.CentreRight
+                                                            },
                                                             modsContainer = new FillFlowContainer<Drawable>
                                                             {
                                                                 Anchor = Anchor.CentreRight,

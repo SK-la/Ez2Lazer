@@ -55,12 +55,25 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         {
             base.LoadComplete();
 
+            tracker.Tendency.BindValueChanged(_ => updateDisplay());
+            tracker.Tendency.BindValueChanged(_ => updateDisplay());
             tracker.Current.BindValueChanged(_ => updateDisplay());
             tracker.State.BindValueChanged(_ => updateDisplay(), true);
         }
 
         private void updateDisplay()
         {
+            if (!tracker.Shown)
+            {
+                Alpha = 0;
+                BypassAutoSizeAxes = Axes.Both;
+                TooltipText = default;
+                return;
+            }
+
+            Alpha = 1;
+            BypassAutoSizeAxes = Axes.None;
+
             if (tracker.Current.Value is not EzScoreBonusResult bonus)
             {
                 bool pending = tracker.State.Value == EzScoreBonusState.Pending;

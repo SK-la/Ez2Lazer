@@ -12,16 +12,22 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
     public enum EzScoreBonusTendency
     {
         /// <summary>
+        /// 不计算、不展示附加分。
+        /// </summary>
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.SCORE_BONUS_TENDENCY_HIDDEN))]
+        Hidden = 0,
+
+        /// <summary>
         /// 类余切：价值贴着横轴，44ms 到 16ms 加得很慢，16ms 到 6ms 加得快。
         /// </summary>
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.SCORE_BONUS_TENDENCY_HIGH_JUDGE_RATIO))]
-        HighJudgeRatio = 0,
+        HighJudgeRatio = 1,
 
         /// <summary>
         /// 类反余切：6–44 是类余切绕中心转 180°，价值贴着 +1 和 -1。默认。
         /// </summary>
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.SCORE_BONUS_TENDENCY_LOW_ERROR_RATE))]
-        LowErrorRate = 1,
+        LowErrorRate = 2,
     }
 
     /// <summary>
