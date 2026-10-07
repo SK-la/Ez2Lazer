@@ -296,11 +296,11 @@ namespace osu.Game.Scoring
         public int ManiaHealthMode { get; set; }
 
         /// <summary>
-        /// Ez2Lazer: 附加分原始值（未按倾向加权），与 <see cref="HitEvents"/> 同为临时数据：游玩结束或 Session 重跑后才有，
+        /// Ez2Lazer: 附加分（两种倾向各一份），与 <see cref="HitEvents"/> 同为临时数据：游玩结束或 Session 重跑后才有，
         /// 不入 Realm。<see langword="null"/> 表示未计算。
         /// </summary>
         [Ignored]
-        public EzOsuGame.Scoring.Bonus.EzScoreBonusResult? EzBonus { get; set; }
+        public EzOsuGame.Scoring.Bonus.EzScoreBonusSet? EzBonus { get; set; }
 
         /// <summary>
         /// Ez2Lazer: Mania offset-plus setting at gameplay start (submission eligibility snapshot).

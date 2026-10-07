@@ -69,7 +69,7 @@ namespace osu.Game.EzOsuGame.Scoring
         /// 回放重跑（ForStored）只为得到附加分；不写 Realm，原分 / 判定统计不变。
         /// </summary>
         /// <returns><see langword="null"/>：非 mania、无回放或谱面不可用。</returns>
-        public static async Task<EzScoreBonusResult?> CalculateBonusAsync(
+        public static async Task<EzScoreBonusSet?> CalculateBonusAsync(
             ScoreManager scoreManager,
             BeatmapManager beatmapManager,
             IEzReplaySession replaySession,

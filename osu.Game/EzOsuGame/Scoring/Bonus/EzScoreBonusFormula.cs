@@ -25,9 +25,14 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const int JUDGE_BONUS_MAX = 9999;
 
         /// <summary>
-        /// 每次 Miss 的额外罚分（与所在区间 KPS 无关）。
+        /// 所在区间 KPS ≥ <see cref="KPS_SATURATION"/> 时一次 Miss 的额外罚分。
         /// </summary>
-        public const int MISS_PENALTY_UNIT = 500;
+        public const double MISS_PENALTY_UNIT = 800;
+
+        /// <summary>
+        /// KPS 为 0 时一次 Miss 仍保留的罚分比例；任何区间的 Miss 都计罚分。
+        /// </summary>
+        public const double MISS_WEIGHT_FLOOR = 0.2;
 
         /// <summary>
         /// Miss 罚分总量上限（绝对值）。
@@ -40,16 +45,28 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             => Math.Clamp((kps - KPS_START) / (KPS_SATURATION - KPS_START), 0, 1);
 
         /// <summary>
-        /// 判定用 KPS 权重 W(K)：Smoothstep，15 以下为 0，40 以上为 1。
+        /// 判定用 KPS 权重 W(K)。正向：Smoothstep，15 以下为 0，40 以上为 1；颠倒：镜像，15 以下为 1，40 以上为 0。
         /// </summary>
-        public static double JudgeWeight(double kps)
+        public static double JudgeWeight(double kps, bool favourHighKps = true)
         {
             double z = NormalisedKps(kps);
-            return z * z * (3 - 2 * z);
+            double w = z * z * (3 - 2 * z);
+            return favourHighKps ? w : 1 - w;
         }
 
-        public static int MissPenalty(int missCount)
-            => -Math.Min(MISS_PENALTY_CAP, MISS_PENALTY_UNIT * Math.Max(0, missCount));
+        /// <summary>
+        /// Miss 用 KPS 权重。正向：从 0 KPS 的 <see cref="MISS_WEIGHT_FLOOR"/> 线性升到 <see cref="KPS_SATURATION"/> 的 1；
+        /// 颠倒：镜像，0 KPS 为 1，降到 <see cref="KPS_SATURATION"/> 及以上的 <see cref="MISS_WEIGHT_FLOOR"/>。任何区间的 Miss 都计罚分。
+        /// </summary>
+        public static double MissWeight(double kps, bool favourHighKps = true)
+        {
+            double t = Math.Clamp(kps / KPS_SATURATION, 0, 1);
+            return MISS_WEIGHT_FLOOR + (1 - MISS_WEIGHT_FLOOR) * (favourHighKps ? t : 1 - t);
+        }
+
+        /// <param name="missWeightSum">各 Miss 的 <see cref="MissWeight"/> 之和。</param>
+        public static int MissPenalty(double missWeightSum)
+            => -(int)Math.Round(Math.Min(MISS_PENALTY_CAP, MISS_PENALTY_UNIT * Math.Max(0, missWeightSum)));
 
         /// <summary>
         /// Offset 精度价值 F(E)，E 为绝对误差（ms）。F(0)=1，F(b)=c，E ≥ 16ms 时为 0。

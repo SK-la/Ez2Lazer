@@ -652,8 +652,8 @@ namespace osu.Game.EzOsuGame.Localization
             "Score Bonus Tendency");
 
         public static readonly LocalisableString SCORE_BONUS_TENDENCY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "按谱面星级在判定加成与 Miss 罚分之间分配权重（3★ 以下偏向前者，8★ 以上偏向后者）。只影响附加分展示，不改原分。",
-            "Shifts weight between the timing bonus and the miss penalty by star rating (below 3★ favours the first, above 8★ the second). Display only; the base score is unchanged.");
+            "两项附加分按 Note 所在区间 KPS 加权，方向互为镜像：判定加成看重低 KPS 时，Miss 罚分 KPS 越高越重；反之亦然。只影响附加分，不改原分。",
+            "Both bonus parts are weighted by the KPS of each note's section, in mirrored directions: when timing favours low KPS, misses cost more at high KPS, and vice versa. Affects the bonus only; the base score is unchanged.");
 
         public static readonly LocalisableString JUDGE_PRECEDENCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "设置优先级算法。当按键点在多个note的判定重叠区时，选择如何计算判定。"

@@ -55,13 +55,13 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         {
             base.LoadComplete();
 
-            tracker.Weighted.BindValueChanged(_ => updateDisplay());
+            tracker.Current.BindValueChanged(_ => updateDisplay());
             tracker.State.BindValueChanged(_ => updateDisplay(), true);
         }
 
         private void updateDisplay()
         {
-            if (tracker.Weighted.Value is not EzScoreBonusResult bonus)
+            if (tracker.Current.Value is not EzScoreBonusResult bonus)
             {
                 bool pending = tracker.State.Value == EzScoreBonusState.Pending;
 

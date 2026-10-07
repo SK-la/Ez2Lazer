@@ -69,13 +69,13 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         {
             base.LoadComplete();
 
-            tracker.Weighted.BindValueChanged(_ => updateText());
+            tracker.Current.BindValueChanged(_ => updateText());
             tracker.State.BindValueChanged(_ => updateText(), true);
         }
 
         private void updateText()
         {
-            if (tracker.Weighted.Value is not EzScoreBonusResult bonus)
+            if (tracker.Current.Value is not EzScoreBonusResult bonus)
             {
                 string placeholder = tracker.State.Value == EzScoreBonusState.Pending ? "\u2026" : unavailable_text;
                 judgeText.Text = missText.Text = totalText.Text = placeholder;

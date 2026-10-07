@@ -22,22 +22,22 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
     }
 
     /// <summary>
-    /// 为单个成绩取得附加分（成绩自带 / 进程缓存 / 按需回放补算），并按当前倾向设置与谱面星级加权。
+    /// 为单个成绩取得附加分（成绩自带 / 进程缓存 / 按需回放补算），并按当前倾向设置取值。
     /// </summary>
     public partial class EzScoreBonusTracker : Component
     {
         public readonly Bindable<EzScoreBonusState> State = new Bindable<EzScoreBonusState>();
 
         /// <summary>
-        /// 已加权的附加分；<see cref="State"/> 非 Available 时为 null。
+        /// 当前倾向下的附加分；<see cref="State"/> 非 Available 时为 null。
         /// </summary>
-        public readonly Bindable<EzScoreBonusResult?> Weighted = new Bindable<EzScoreBonusResult?>();
+        public readonly Bindable<EzScoreBonusResult?> Current = new Bindable<EzScoreBonusResult?>();
 
         private readonly ScoreInfo score;
         private readonly Bindable<EzScoreBonusTendency> tendency = new Bindable<EzScoreBonusTendency>();
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
 
-        private EzScoreBonusResult? raw;
+        private EzScoreBonusSet? bonusSet;
 
         [Resolved]
         private ScoreManager scoreManager { get; set; } = null!;
@@ -68,23 +68,23 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         {
             base.LoadComplete();
 
-            tendency.BindValueChanged(_ => updateWeighted());
+            tendency.BindValueChanged(_ => updateCurrent());
 
             if (!AppliesTo(score))
             {
-                setRaw(null);
+                setBonus(null);
                 return;
             }
 
             if (EzScoreBonusProvider.TryGet(score, out var cached))
             {
-                setRaw(cached);
+                setBonus(cached);
                 return;
             }
 
             if (replaySession == null)
             {
-                setRaw(null);
+                setBonus(null);
                 return;
             }
 
@@ -107,22 +107,22 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                                         return;
                                     }
 
-                                    setRaw(t.IsCompletedSuccessfully ? t.GetAwaiter().GetResult() : null);
+                                    setBonus(t.IsCompletedSuccessfully ? t.GetAwaiter().GetResult() : null);
                                 }), TaskScheduler.Default);
         }
 
         private bool isPlaying() => localUserPlayInfo != null && localUserPlayInfo.PlayingState.Value != LocalUserPlayingState.NotPlaying;
 
-        private void setRaw(EzScoreBonusResult? value)
+        private void setBonus(EzScoreBonusSet? value)
         {
-            raw = value;
+            bonusSet = value;
             State.Value = value == null ? EzScoreBonusState.Unavailable : EzScoreBonusState.Available;
-            updateWeighted();
+            updateCurrent();
         }
 
-        private void updateWeighted()
+        private void updateCurrent()
         {
-            Weighted.Value = raw == null ? null : EzScoreBonusWeighting.Resolve(raw.Value, score.BeatmapInfo?.StarRating ?? 0, tendency.Value);
+            Current.Value = bonusSet?.For(tendency.Value);
         }
 
         protected override void Dispose(bool isDisposing)

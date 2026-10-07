@@ -18,14 +18,14 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
     /// </summary>
     public static class EzScoreBonusProvider
     {
-        private static readonly ConcurrentDictionary<string, Task<EzScoreBonusResult?>> entries = new ConcurrentDictionary<string, Task<EzScoreBonusResult?>>();
+        private static readonly ConcurrentDictionary<string, Task<EzScoreBonusSet?>> entries = new ConcurrentDictionary<string, Task<EzScoreBonusSet?>>();
 
         // 回放 Session 较重，补算串行执行，避免选歌界面一次性占满线程池。
         private static readonly SemaphoreSlim gate = new SemaphoreSlim(1, 1);
 
         private const int busy_poll_interval_ms = 1000;
 
-        public static void Store(ScoreInfo score, EzScoreBonusResult? bonus)
+        public static void Store(ScoreInfo score, EzScoreBonusSet? bonus)
         {
             string? key = keyOf(score);
 
@@ -36,7 +36,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         /// <summary>
         /// 已有结果（成绩自带或缓存已完成）时同步返回 true；<paramref name="bonus"/> 为 null 表示该成绩无法计算。
         /// </summary>
-        public static bool TryGet(ScoreInfo score, out EzScoreBonusResult? bonus)
+        public static bool TryGet(ScoreInfo score, out EzScoreBonusSet? bonus)
         {
             if (score.EzBonus != null)
             {
@@ -57,19 +57,19 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         }
 
         /// <param name="isBusy">返回 true 时补算等待（例如游玩中），避免与 gameplay 抢资源。</param>
-        public static Task<EzScoreBonusResult?> GetAsync(ScoreInfo score, ScoreManager scoreManager, BeatmapManager beatmapManager, IEzReplaySession replaySession,
+        public static Task<EzScoreBonusSet?> GetAsync(ScoreInfo score, ScoreManager scoreManager, BeatmapManager beatmapManager, IEzReplaySession replaySession,
                                                          Func<bool>? isBusy = null, CancellationToken cancellationToken = default)
         {
             if (score.EzBonus != null)
                 return Task.FromResult(score.EzBonus);
 
             if (score.Ruleset.OnlineID != EzScoreBonusCalculator.MANIA_RULESET_ID)
-                return Task.FromResult<EzScoreBonusResult?>(null);
+                return Task.FromResult<EzScoreBonusSet?>(null);
 
             string? key = keyOf(score);
 
             if (key == null)
-                return Task.FromResult<EzScoreBonusResult?>(null);
+                return Task.FromResult<EzScoreBonusSet?>(null);
 
             var detached = score.Detach();
 
