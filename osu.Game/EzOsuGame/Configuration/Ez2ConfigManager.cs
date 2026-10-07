@@ -280,7 +280,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
             SetDefault(Ez2Setting.BmsPoorHitResultEnable, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.JudgePrecedence, EzEnumJudgePrecedence.Earliest);
-            SetDefault(Ez2Setting.ScoreBonusTendency, EzScoreBonusTendency.JudgeToMiss);
+            SetDefault(Ez2Setting.ScoreBonusTendency, EzScoreBonusTendency.MissToJudge);
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);
 
             SetDefault(Ez2Setting.ManiaPseudo3DRotation, 0.0, 0.0, 75.0, 1.0);

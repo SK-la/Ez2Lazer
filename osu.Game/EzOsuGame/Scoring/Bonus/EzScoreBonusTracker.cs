@@ -34,7 +34,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public readonly Bindable<EzScoreBonusResult?> Current = new Bindable<EzScoreBonusResult?>();
 
         private readonly ScoreInfo score;
-        private readonly Bindable<EzScoreBonusTendency> tendency = new Bindable<EzScoreBonusTendency>();
+        private readonly Bindable<EzScoreBonusTendency> tendency = new Bindable<EzScoreBonusTendency>(EzScoreBonusTendency.MissToJudge);
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
 
         private EzScoreBonusSet? bonusSet;
