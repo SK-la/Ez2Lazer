@@ -135,8 +135,14 @@ namespace osu.Game.Overlays.Mods
         [BackgroundDependencyLoader]
         private void load(OsuGameBase game, AudioManager audio, OsuConfigManager configManager)
         {
-            Header.Title = ModSelectOverlayStrings.ModSelectTitle;
-            Header.Description = ModSelectOverlayStrings.ModSelectDescription;
+            // Header.Title = ModSelectOverlayStrings.ModSelectTitle;
+            // Header.Description = ModSelectOverlayStrings.ModSelectDescription;
+            Header.Alpha = 0;
+            MainAreaContent.Padding = new MarginPadding
+            {
+                Top = PADDING,
+                Bottom = ScreenFooter.HEIGHT + PADDING,
+            };
 
             columnAppearSample = audio.Samples.Get(@"SongSelect/mod-column-pop-in");
 
@@ -196,6 +202,7 @@ namespace osu.Game.Overlays.Mods
                                     Anchor = Anchor.TopRight,
                                     Origin = Anchor.TopRight,
                                     Width = 400,
+                                    Shear = OsuGame.SHEAR,
                                     State = { Value = Visibility.Visible },
                                 }
                             }
