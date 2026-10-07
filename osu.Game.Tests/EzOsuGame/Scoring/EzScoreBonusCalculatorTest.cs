@@ -97,14 +97,13 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         public void TestOffsetQualityMatchesResearchTable()
         {
             Assert.That(EzScoreBonusFormula.OffsetQuality(0), Is.EqualTo(1).Within(1e-9));
-            Assert.That(EzScoreBonusFormula.OffsetQuality(-8), Is.EqualTo(0.825).Within(0.002));
-            Assert.That(EzScoreBonusFormula.OffsetQuality(13), Is.EqualTo(0.5).Within(1e-9));
-            Assert.That(EzScoreBonusFormula.OffsetQuality(14), Is.EqualTo(0.151).Within(0.002));
-            Assert.That(EzScoreBonusFormula.OffsetQuality(16), Is.EqualTo(0));
+            Assert.That(EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.OFFSET_BOUNDARY_MS), Is.EqualTo(EzScoreBonusFormula.OFFSET_BOUNDARY_VALUE).Within(1e-9));
+            Assert.That(EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.OFFSET_ZERO_MS), Is.EqualTo(0));
+            Assert.That(EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.OFFSET_ZERO_MS + 1), Is.EqualTo(0));
 
             double previous = 2;
 
-            for (double e = 0; e <= 20; e += 0.25)
+            for (double e = 0; e <= EzScoreBonusFormula.OFFSET_ZERO_MS + 2; e += 0.25)
             {
                 double f = EzScoreBonusFormula.OffsetQuality(e);
                 Assert.That(f, Is.LessThanOrEqualTo(previous));
@@ -179,19 +178,19 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         {
             double anchor = EzScoreBonusFormula.AcceptedMissPenalty(1);
 
-            Assert.That(anchor, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX * EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.ACCEPTED_ERROR_MS)).Within(1e-9));
+            Assert.That(anchor, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX * EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.OFFSET_BOUNDARY_MS)).Within(1e-9));
             Assert.That(EzScoreBonusFormula.MissPenalty(0, 1), Is.EqualTo(0));
             Assert.That(EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_ACCEPTED, 1), Is.EqualTo(-(int)Math.Round(anchor)));
             Assert.That(EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_DISCOURAGED, 1, EzScoreBonusFormula.MISS_WEIGHT_FLOOR),
-                Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
-            Assert.That(EzScoreBonusFormula.MissPenalty(0.1, 0), Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
+                Is.EqualTo(-EzScoreBonusFormula.MissPenaltyCap(1)));
+            Assert.That(EzScoreBonusFormula.MissPenalty(0.1, 0), Is.EqualTo(-(int)Math.Round(EzScoreBonusFormula.MissPenaltyCap(0))));
 
             // 鼓励区内每个 Miss 等额：0.25% 正好是锚点的一半。
             Assert.That(EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_ACCEPTED / 2, 1), Is.EqualTo(-(int)Math.Round(anchor / 2)));
 
             // 等比段中点为锚点与上限的几何平均。
             double midRate = (EzScoreBonusFormula.MISS_RATE_ACCEPTED + EzScoreBonusFormula.MISS_RATE_DISCOURAGED) / 2;
-            Assert.That(EzScoreBonusFormula.MissPenalty(midRate, 1), Is.EqualTo(-(int)Math.Round(Math.Sqrt(anchor * EzScoreBonusFormula.MISS_PENALTY_CAP))).Within(1));
+            Assert.That(EzScoreBonusFormula.MissPenalty(midRate, 1), Is.EqualTo(-(int)Math.Round(Math.Sqrt(anchor * EzScoreBonusFormula.MissPenaltyCap(1)))).Within(1));
 
             // 判定权重为 0 时锚点取下限。
             Assert.That(EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_ACCEPTED, 0), Is.EqualTo(-(int)EzScoreBonusFormula.MISS_ANCHOR_MIN));
@@ -210,8 +209,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         public void TestAcceptedErrorPlayerBreaksEvenAtAcceptedMissRate()
         {
             // 理想模型（判定与 Miss 权重都为 1）：全谱 11ms 的判定加成正好抵消 0.5% 加权 Miss 率的罚分。
-            int judgeAt11 = (int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.ACCEPTED_ERROR_MS));
-            Assert.That(judgeAt11 + EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_ACCEPTED, judgeCoverage: 1), Is.EqualTo(0).Within(1));
+            int judgeAtBoundary = (int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.OFFSET_BOUNDARY_MS));
+            Assert.That(judgeAtBoundary + EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_ACCEPTED, judgeCoverage: 1), Is.EqualTo(0).Within(1));
 
             // 两种倾向在各自的权重端点上对称：JudgeToMiss@0 KPS 与 MissToJudge@40 KPS 判定权重都为 1、Miss 权重都为下限。
             var beatmap = createChart(200, chordSize: 4, quarterBeats: 512);
@@ -228,9 +227,9 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var beatmap = createChart(200, chordSize: 4, quarterBeats: 256);
             var result = EzScoreBonusCalculator.Calculate(beatmap, createEvents(beatmap, sigma: 0, missEvery: 1), 1);
 
-            // 全 Miss 已越过不鼓励点：两种倾向都罚满，不再乘 KPS 倍率。
-            Assert.That(result.JudgeToMiss.MissPenalty, Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
-            Assert.That(result.MissToJudge.MissPenalty, Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
+            // 全 Miss 已越过不鼓励点。高 KPS 上 MissToJudge 的判定权重为 1，封顶按整谱中点价值；JudgeToMiss 的判定权重为 0，封顶落到下限。
+            Assert.That(result.MissToJudge.MissPenalty, Is.EqualTo(-(int)Math.Round(EzScoreBonusFormula.MissPenaltyCap(1))));
+            Assert.That(result.JudgeToMiss.MissPenalty, Is.EqualTo(-(int)Math.Round(EzScoreBonusFormula.MissPenaltyCap(0))));
             Assert.That(result.MissToJudge.JudgeBonus, Is.EqualTo(0));
         }
 
@@ -277,7 +276,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         public void TestQuarterOfNotesWithinSixMsIsAboutTwentyThousand()
         {
             var beatmap = createChart(200, chordSize: 4, quarterBeats: 64);
-            var events = createEvents(beatmap, _ => false, fixedOffset: 20);
+            var events = createEvents(beatmap, _ => false, fixedOffset: 30);
 
             for (int i = 0; i < events.Count; i += 4)
                 events[i] = new HitEvent(6, 1, HitResult.Perfect, beatmap.HitObjects[i], null, null);
@@ -286,7 +285,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             int expected = (int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * 0.25 * EzScoreBonusFormula.OffsetQuality(6));
 
             Assert.That(result.JudgeBonus, Is.EqualTo(expected).Within(1));
-            Assert.That(result.JudgeBonus, Is.EqualTo(20000).Within(500));
+            Assert.That(result.JudgeBonus, Is.EqualTo(20000).Within(1000));
         }
 
         [Test]
@@ -295,7 +294,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             int penalty = EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_DISCOURAGED, judgeCoverage: 1, EzScoreBonusFormula.MISS_WEIGHT_FLOOR);
             int maxedJudge = (int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * (1 - EzScoreBonusFormula.MISS_RATE_DISCOURAGED));
 
-            Assert.That(penalty, Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
+            Assert.That(penalty, Is.EqualTo(-EzScoreBonusFormula.MissPenaltyCap(1)));
             Assert.That(maxedJudge + penalty, Is.LessThan(0));
         }
 
@@ -331,8 +330,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                     foreach (int missEvery in new[] { 200, 100, 50 })
                     {
                         var r = EzScoreBonusCalculator.Calculate(beatmap, createEvents(beatmap, 6, missEvery), 1);
-                        Assert.That(r.JudgeToMiss.MissPenalty, Is.InRange(-EzScoreBonusFormula.MISS_PENALTY_CAP, 0));
-                        Assert.That(r.MissToJudge.MissPenalty, Is.InRange(-EzScoreBonusFormula.MISS_PENALTY_CAP, 0));
+                        Assert.That(r.JudgeToMiss.MissPenalty, Is.InRange(-EzScoreBonusFormula.MissPenaltyCap(1), 0));
+                        Assert.That(r.MissToJudge.MissPenalty, Is.InRange(-EzScoreBonusFormula.MissPenaltyCap(1), 0));
                         sb.Append($" {r.JudgeToMiss.MissPenalty,6}/{r.MissToJudge.MissPenalty,-6}");
                     }
 

@@ -13,11 +13,13 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const double KPS_START = 5;
         public const double KPS_SATURATION = 40;
 
-        public const double OFFSET_BOUNDARY_MS = 13;
+        public const double OFFSET_BOUNDARY_MS = 11; // 0 与归零点的中点。类对数缓降到这里，价值剩 0.5，之后急坠。
         public const double OFFSET_BOUNDARY_VALUE = 0.5;
         public const double OFFSET_LOG_K = 9;
-        public const double OFFSET_DECAY_LAMBDA = 1.2;
-        public const double OFFSET_ZERO_MS = 16;
+
+        // 急坠段的衰减量与原先 3ms、λ=1.2 相同，只是摊到中点至归零点的整段上。
+        public const double OFFSET_DECAY_LAMBDA = 3.6 / (OFFSET_ZERO_MS - OFFSET_BOUNDARY_MS);
+        public const double OFFSET_ZERO_MS = 22; // 到这里判定加成变成 0，再大也不再算。
 
         /// <summary>
         /// 判定加成上限。25% 的 Note 在 6ms 内且权重为 1、其余无价值时约 +2 万；0ms 且权重为 1 时为 +9 万。
@@ -35,19 +37,14 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const double MISS_RATE_ACCEPTED = 0.005;
 
         /// <summary>
-        /// 不鼓励区：Miss 率达到此值时罚满 <see cref="MISS_PENALTY_CAP"/>，不再乘 KPS 倍率。
+        /// 不鼓励区：Miss 率达到此值时罚满 <see cref="MissPenaltyCap"/>，不再乘 KPS 倍率。
         /// </summary>
         public const double MISS_RATE_DISCOURAGED = 0.03;
 
         /// <summary>
-        /// 接受偏差：在 <see cref="MISS_RATE_ACCEPTED"/> 处，罚分等于全谱按此误差命中可得的判定加成。
+        /// 不鼓励区罚满金额 = 该比例 × 整谱打在 <see cref="OFFSET_BOUNDARY_MS"/> 的判定加成。8/3 时，权重为 1 的封顶为 12 万。
         /// </summary>
-        public const double ACCEPTED_ERROR_MS = 11;
-
-        /// <summary>
-        /// Miss 罚分上限（绝对值）。高于打满的判定加成，使 3% Miss 的净值仍为负。
-        /// </summary>
-        public const int MISS_PENALTY_CAP = 120000;
+        public const double MISS_CAP_RATIO = 8.0 / 3.0;
 
         private static readonly double log_k_denominator = Math.Log(1 + OFFSET_LOG_K);
 
@@ -119,24 +116,30 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             if (rate <= MISS_RATE_ACCEPTED)
                 penalty = anchor * rate / MISS_RATE_ACCEPTED;
             else if (rate >= MISS_RATE_DISCOURAGED)
-                penalty = MISS_PENALTY_CAP;
+                penalty = MissPenaltyCap(judgeCoverage);
             else
             {
                 double x = (rate - MISS_RATE_ACCEPTED) / (MISS_RATE_DISCOURAGED - MISS_RATE_ACCEPTED);
-                penalty = anchor * Math.Pow(MISS_PENALTY_CAP / anchor, x);
+                penalty = anchor * Math.Pow(MissPenaltyCap(judgeCoverage) / anchor, x);
             }
 
             return penalty;
         }
 
         /// <summary>
-        /// 鼓励点罚分（正值）：全谱按 <see cref="ACCEPTED_ERROR_MS"/> 命中时的判定加成，不低于 <see cref="MISS_ANCHOR_MIN"/>。
+        /// 鼓励点罚分（正值）：全谱按 <see cref="OFFSET_BOUNDARY_MS"/> 命中时的判定加成，不低于 <see cref="MISS_ANCHOR_MIN"/>。
         /// </summary>
         public static double AcceptedMissPenalty(double judgeCoverage)
-            => Math.Max(MISS_ANCHOR_MIN, JUDGE_BONUS_MAX * OffsetQuality(ACCEPTED_ERROR_MS) * Math.Clamp(judgeCoverage, 0, 1));
+            => Math.Max(MISS_ANCHOR_MIN, JUDGE_BONUS_MAX * OffsetQuality(OFFSET_BOUNDARY_MS) * Math.Clamp(judgeCoverage, 0, 1));
 
         /// <summary>
-        /// Offset 精度价值 F(E)，E 为绝对误差（ms）。F(0)=1，F(b)=c，E ≥ 16ms 时为 0。
+        /// 不鼓励点罚满金额：<see cref="MISS_CAP_RATIO"/> × <see cref="AcceptedMissPenalty"/>。
+        /// </summary>
+        public static double MissPenaltyCap(double judgeCoverage)
+            => MISS_CAP_RATIO * AcceptedMissPenalty(judgeCoverage);
+
+        /// <summary>
+        /// Offset 精度价值 F(E)，E 为绝对误差（ms）。F(0)=1，F(中点)=0.5，E ≥ <see cref="OFFSET_ZERO_MS"/> 时为 0。
         /// </summary>
         public static double OffsetQuality(double absoluteErrorMs)
         {
