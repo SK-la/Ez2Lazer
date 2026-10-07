@@ -5,16 +5,12 @@
 
 using System;
 using System.Collections.Generic;
-using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
-using osu.Framework.Graphics.Rendering;
-using osu.Framework.Graphics.Rendering.Vertices;
-using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
+using osu.Framework.Layout;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK;
@@ -28,9 +24,12 @@ namespace osu.Game.EzOsuGame.UserInterface
     public partial class EzDisplayKpsGraph : CompositeDrawable
     {
         private const float line_thickness = 1.5f;
+        private const float border_thickness = 0.15f;
+        private const float border_texel_size = 0.005f;
         private const int max_display_points = 128;
 
-        private readonly KpsLineDrawable graphDrawable;
+        private readonly Container graphColourContainer;
+        private readonly TriangleBorderPath graphPath;
 
         private float[] values;
 
@@ -70,17 +69,25 @@ namespace osu.Game.EzOsuGame.UserInterface
         private OsuSpriteText hoverText = null!;
         private bool hoverCreated;
 
+        private readonly LayoutValue pathCached = new LayoutValue(Invalidation.DrawSize);
+
         public EzDisplayKpsGraph()
         {
-            AddInternal(new Container
+            Blending = BlendingParameters.Additive;
+
+            AddInternal(graphColourContainer = new Container
             {
                 Masking = true,
                 RelativeSizeAxes = Axes.Both,
-                Child = graphDrawable = new KpsLineDrawable
+                Child = graphPath = new TriangleBorderPath(border_thickness, border_texel_size)
                 {
+                    AutoSizeAxes = Axes.None,
                     RelativeSizeAxes = Axes.Both,
+                    PathRadius = line_thickness / 2f,
                 }
             });
+
+            AddLayout(pathCached);
         }
 
         private void createHoverContainers()
@@ -137,9 +144,8 @@ namespace osu.Game.EzOsuGame.UserInterface
                 ActualMaxValue = float.NaN;
                 ActualMinValue = float.NaN;
 
-                // maskingContainer.ClearTransforms();
-                // maskingContainer.Width = 1;
-                graphDrawable.Clear();
+                graphPath.ClearVertices();
+                pathCached.Invalidate();
                 lastExtendToBaseline = extendToBaseline;
                 lastHeatmapEnabled = heatmapEnabled;
                 lastSourceLengthMs = sourceLengthMs;
@@ -200,11 +206,49 @@ namespace osu.Game.EzOsuGame.UserInterface
             if (same)
                 return;
 
-            graphDrawable.SetValues(values, valuesCount, ActualMinValue, ActualMaxValue, line_thickness, heatmapEnabled);
+            pathCached.Invalidate();
+        }
 
-            // // 直接显示完整图表，避免从左到右的展开动画。
-            // maskingContainer.ClearTransforms();
-            // maskingContainer.Width = 1;
+        protected override void Update()
+        {
+            base.Update();
+
+            if (!pathCached.IsValid)
+            {
+                applyPath();
+                pathCached.Validate();
+            }
+        }
+
+        private void applyPath()
+        {
+            graphPath.ClearVertices();
+
+            if (valuesCount < 2)
+                return;
+
+            float inset = 2 * graphPath.PathRadius;
+            float availableWidth = Math.Max(0, graphPath.DrawWidth - inset);
+            float availableHeight = Math.Max(0, graphPath.DrawHeight - inset);
+            int denominator = Math.Max(1, valuesCount - 1);
+
+            for (int i = 0; i < valuesCount; i++)
+            {
+                float x = i / (float)denominator * availableWidth;
+                float y = getYPosition(values[i]) * availableHeight;
+                graphPath.AddVertex(new Vector2(x, y));
+            }
+
+            if (lastHeatmapEnabled)
+            {
+                graphColourContainer.Colour = ColourInfo.GradientHorizontal(
+                    getHeatColour(values[0], ActualMaxValue),
+                    getHeatColour(values[valuesCount - 1], ActualMaxValue));
+            }
+            else
+            {
+                graphColourContainer.Colour = ColourInfo.SingleColour(Colour4.CornflowerBlue);
+            }
         }
 
         private static int getSourceIndex(int index, int sampledCount, int sourceCount)
@@ -262,9 +306,9 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             // 将屏幕空间坐标转换到图表容器的本地坐标，以匹配当前线段布局。
             var thisLocal = ToLocalSpace(screenSpaceMousePos);
-            var graphLocal = graphDrawable.ToLocalSpace(screenSpaceMousePos);
+            var graphLocal = graphPath.ToLocalSpace(screenSpaceMousePos);
 
-            float availableWidth = Math.Max(0, graphDrawable.DrawWidth);
+            float availableWidth = Math.Max(0, graphPath.DrawWidth);
             if (availableWidth <= 0) availableWidth = Math.Max(0, DrawWidth);
 
             float xInAvailable = Math.Clamp(graphLocal.X, 0, availableWidth);
@@ -282,217 +326,23 @@ namespace osu.Game.EzOsuGame.UserInterface
             hoverLabel.Y = -(hoverLabel.DrawHeight + 4);
         }
 
-        private partial class KpsLineDrawable : Drawable
+        private static float getYPosition(float value, float minValue, float maxValue)
         {
-            private float[] points = Array.Empty<float>();
-            private float minValue;
-            private float maxValue;
-            private float thickness;
-            private bool heatmapEnabled;
-            private long version;
+            if (maxValue == minValue)
+                return value > 1 ? 0 : 1;
 
-            private Texture texture = null!;
-            private IShader shader = null!;
+            return (maxValue - value) / (maxValue - minValue);
+        }
 
-            [BackgroundDependencyLoader]
-            private void load(IRenderer renderer, ShaderManager shaders)
-            {
-                texture = renderer.WhitePixel;
-                shader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.TEXTURE);
-            }
+        private float getYPosition(float value) => getYPosition(value, ActualMinValue, ActualMaxValue);
 
-            public void SetValues(float[] source, int count, float minValue, float maxValue, float thickness, bool heatmapEnabled)
-            {
-                float[] snapshot = new float[count];
-                Array.Copy(source, snapshot, count);
+        private static Colour4 getHeatColour(float value, float maxValue)
+        {
+            if (value <= 0 || maxValue <= 0)
+                return Colour4.White;
 
-                points = snapshot;
-
-                this.minValue = minValue;
-                this.maxValue = maxValue;
-                this.thickness = thickness;
-                this.heatmapEnabled = heatmapEnabled;
-                version++;
-
-                Invalidate(Invalidation.DrawNode);
-            }
-
-            public void Clear()
-            {
-                if (points.Length == 0)
-                    return;
-
-                points = Array.Empty<float>();
-                version++;
-                Invalidate(Invalidation.DrawNode);
-            }
-
-            protected override void Dispose(bool isDisposing)
-            {
-                if (isDisposing)
-                {
-                    // 使用数组快照，避免绘制线程遍历时被更新线程改写导致越界。
-                    points = Array.Empty<float>();
-                    texture = null!;
-                    shader = null!;
-                }
-
-                base.Dispose(isDisposing);
-            }
-
-            protected override DrawNode CreateDrawNode() => new KpsLineDrawNode(this);
-
-            private class KpsLineDrawNode : DrawNode
-            {
-                private Texture texture = null!;
-                private IShader shader = null!;
-                private float[] points = Array.Empty<float>();
-                private Vector2 drawSize;
-                private float minValue;
-                private float maxValue;
-                private float thickness;
-                private bool heatmapEnabled;
-                private long version = -1;
-
-                private IVertexBatch<TexturedVertex2D> quadBatch;
-
-                protected new KpsLineDrawable Source => (KpsLineDrawable)base.Source;
-
-                public KpsLineDrawNode(KpsLineDrawable source)
-                    : base(source)
-                {
-                }
-
-                public override void ApplyState()
-                {
-                    base.ApplyState();
-
-                    texture = Source.texture;
-                    shader = Source.shader;
-                    drawSize = Source.DrawSize;
-                    minValue = Source.minValue;
-                    maxValue = Source.maxValue;
-                    thickness = Source.thickness;
-                    heatmapEnabled = Source.heatmapEnabled;
-
-                    if (version == Source.version)
-                        return;
-
-                    points = Source.points;
-                    version = Source.version;
-                }
-
-                protected override void Draw(IRenderer renderer)
-                {
-                    base.Draw(renderer);
-
-                    float[] localPoints = points;
-                    int pointCount = localPoints.Length;
-
-                    if (pointCount < 2 || !texture.Available)
-                        return;
-
-                    shader.Bind();
-
-                    if (!renderer.BindTexture(texture))
-                        return;
-
-                    quadBatch ??= renderer.CreateQuadBatch<TexturedVertex2D>(Math.Min(pointCount - 1, 1024), 4);
-
-                    renderer.PushLocalMatrix(DrawInfo.Matrix);
-
-                    RectangleF textureRect = texture.GetTextureRect();
-                    Vector4 textureRectangle = new Vector4(0, 0, 1, 1);
-                    Vector2 blendRange = Vector2.One;
-                    var add = quadBatch.AddAction;
-
-                    float halfThickness = thickness / 2f;
-                    int denominator = Math.Max(1, pointCount - 1);
-
-                    for (int i = 0; i < pointCount - 1; i++)
-                    {
-                        Vector2 start = new Vector2(i / (float)denominator * drawSize.X, getYPosition(localPoints[i]) * drawSize.Y);
-                        Vector2 end = new Vector2((i + 1) / (float)denominator * drawSize.X, getYPosition(localPoints[i + 1]) * drawSize.Y);
-                        Colour4 startColour = heatmapEnabled ? getHeatColour(localPoints[i]) : Colour4.CornflowerBlue;
-                        Colour4 endColour = heatmapEnabled ? getHeatColour(localPoints[i + 1]) : Colour4.CornflowerBlue;
-
-                        Vector2 direction = end - start;
-                        float length = direction.Length;
-
-                        if (length <= 0)
-                            continue;
-
-                        direction /= length;
-                        Vector2 extension = direction * halfThickness;
-                        Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfThickness;
-
-                        Vector2 topLeft = start - extension - perpendicular;
-                        Vector2 topRight = end + extension - perpendicular;
-                        Vector2 bottomRight = end + extension + perpendicular;
-                        Vector2 bottomLeft = start - extension + perpendicular;
-
-                        add(new TexturedVertex2D(renderer)
-                        {
-                            Position = topLeft,
-                            TexturePosition = textureRect.TopLeft,
-                            TextureRect = textureRectangle,
-                            BlendRange = blendRange,
-                            Colour = startColour
-                        });
-                        add(new TexturedVertex2D(renderer)
-                        {
-                            Position = topRight,
-                            TexturePosition = textureRect.TopRight,
-                            TextureRect = textureRectangle,
-                            BlendRange = blendRange,
-                            Colour = endColour
-                        });
-                        add(new TexturedVertex2D(renderer)
-                        {
-                            Position = bottomRight,
-                            TexturePosition = textureRect.BottomRight,
-                            TextureRect = textureRectangle,
-                            BlendRange = blendRange,
-                            Colour = endColour
-                        });
-                        add(new TexturedVertex2D(renderer)
-                        {
-                            Position = bottomLeft,
-                            TexturePosition = textureRect.BottomLeft,
-                            TextureRect = textureRectangle,
-                            BlendRange = blendRange,
-                            Colour = startColour
-                        });
-                    }
-
-                    quadBatch.Draw();
-                    renderer.PopLocalMatrix();
-                    shader.Unbind();
-                }
-
-                private float getYPosition(float value)
-                {
-                    if (maxValue == minValue)
-                        return value > 1 ? 0 : 1;
-
-                    return (maxValue - value) / (maxValue - minValue);
-                }
-
-                private Colour4 getHeatColour(float value)
-                {
-                    if (value <= 0 || maxValue <= 0)
-                        return Colour4.White;
-
-                    float t = Math.Clamp(value / maxValue, 0, 1);
-                    return new Colour4(1f, 1f - t, 1f - t, 1f);
-                }
-
-                protected override void Dispose(bool isDisposing)
-                {
-                    base.Dispose(isDisposing);
-                    quadBatch?.Dispose();
-                }
-            }
+            float t = Math.Clamp(value / maxValue, 0, 1);
+            return new Colour4(1f, 1f - t, 1f - t, 1f);
         }
     }
 }
