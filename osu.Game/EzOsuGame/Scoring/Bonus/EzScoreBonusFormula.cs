@@ -25,9 +25,14 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public static readonly double OFFSET_CURVE_POWER = Math.Log(0.30) / Math.Log((OFFSET_CROSS_MS - 16.0) / (OFFSET_CROSS_MS - OFFSET_FULL_MS));
 
         /// <summary>
-        /// 单次价值的分数尺度。价值为 1 时加成等于此值，价值为 -1（极大 offset / Miss）时罚分等于此值。
+        /// 单次价值的分数尺度。价值为 1 时加成等于此值，价值为 -1 时罚分等于此值。
         /// </summary>
         public const int JUDGE_BONUS_MAX = 90000;
+
+        /// <summary>
+        /// 失误折算系数。判定和失误都除以总 Note 数，失误再乘这个系数。
+        /// </summary>
+        public const double ERROR_INFLUENCE = 50;
 
         public static double NormalisedKps(double kps)
             => Math.Clamp((kps - KPS_START) / (KPS_SATURATION - KPS_START), 0, 1);
