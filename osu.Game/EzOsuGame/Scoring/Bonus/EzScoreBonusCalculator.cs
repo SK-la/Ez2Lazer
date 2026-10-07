@@ -13,21 +13,16 @@ using osu.Game.Utils;
 
 namespace osu.Game.EzOsuGame.Scoring.Bonus
 {
-    /// <param name="MissRate">Miss 个数 / 谱面总 Note 数（普通 Note 各 1，LN 的头和尾各 1）。</param>
-    public readonly record struct EzScoreBonusResult(int JudgeBonus, int MissPenalty, int CountedNotes, double MissRate = 0)
+    public readonly record struct EzScoreBonusResult(int JudgeBonus, int ErrorPenalty, int CountedNotes)
     {
-        public int Total => JudgeBonus + MissPenalty;
+        public int Total => JudgeBonus + ErrorPenalty;
     }
 
     /// <summary>
-    /// Mania 附加分：每颗 Note 的 offset 价值（默认类反余切，另一条是类余切）再乘 KPS 权重。
-    /// Miss 按 <see cref="EzScoreBonusFormula.OFFSET_MISS_MS"/> 计入同一条轴。
-    /// 两种曲线一次算出。
+    /// 附加分：每颗 Note 的 offset 价值再乘 KPS 权重。
+    /// 44ms 及以内算判定加成，超过 44ms 和 Miss 算失误罚分。
+    /// 组内每颗先占 1/本组数量，拿分再乘该组占全部 Note 的比例。
     /// </summary>
-    /// <remarks>
-    /// 头和尾都进入价值。Miss 按当前模式判定窗口的 Miss 区间计，没有窗口时用 <see cref="EzScoreBonusFormula.OFFSET_MISS_MS"/>。
-    /// <see cref="HitResult.Poor"/>（BMS 空 POOR）不参与。
-    /// </remarks>
     public static class EzScoreBonusCalculator
     {
         public static EzScoreBonusSet Calculate(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents, double rate, IEzKpsSectionLookup? kps = null,
@@ -80,9 +75,10 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                 bool isMiss = e.Result == HitResult.Miss;
                 double missBoundary = resolveMissBoundary(e.HitObject, gameplayRate);
                 double errorMs = isMiss ? missBoundary : Math.Abs(e.TimeOffset) / gameplayRate;
+                bool error = isMiss || errorMs > EzScoreBonusFormula.OFFSET_CROSS_MS;
 
-                cotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, cotangent: true, missBoundary));
-                inverseCotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, missBoundaryMs: missBoundary));
+                cotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, cotangent: true, missBoundary), error);
+                inverseCotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, missBoundaryMs: missBoundary), error);
             }
 
             if (counted == 0)
@@ -93,30 +89,26 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
         private struct Accumulator
         {
-            private double positive;
-            private double negative;
+            private double judgeSum;
+            private double errorSum;
 
-            public void Add(double weight, double quality)
+            public void Add(double weight, double quality, bool error)
             {
-                double weighted = weight * quality;
-
-                if (weighted >= 0)
-                    positive += weighted;
+                if (error)
+                    errorSum += weight * quality;
                 else
-                    negative += weighted;
+                    judgeSum += weight * quality;
             }
 
             public readonly EzScoreBonusResult ToResult(int counted)
             {
-                if (counted == 0)
-                    return default;
-
-                int judgeBonus = (int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * positive / counted);
-                int missPenalty = (int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * negative / counted);
+                int max = EzScoreBonusFormula.JUDGE_BONUS_MAX;
+                int judge = counted == 0 ? 0 : (int)Math.Round(max * judgeSum / counted);
+                int error = counted == 0 ? 0 : (int)Math.Round(max * errorSum / counted);
 
                 return new EzScoreBonusResult(
-                    Math.Clamp(judgeBonus, 0, EzScoreBonusFormula.JUDGE_BONUS_MAX),
-                    Math.Clamp(missPenalty, -EzScoreBonusFormula.JUDGE_BONUS_MAX, 0),
+                    Math.Clamp(judge, 0, max),
+                    Math.Clamp(error, -max, 0),
                     counted);
             }
         }

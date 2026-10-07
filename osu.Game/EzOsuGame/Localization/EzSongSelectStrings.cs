@@ -8,7 +8,7 @@ namespace osu.Game.EzOsuGame.Localization
     public static class EzSongSelectStrings
     {
         public static readonly EzLocalizationManager.EzLocalisableString SCORE_BONUS_JUDGE = new EzLocalizationManager.EzLocalisableString("判定加成", "Timing bonus");
-        public static readonly EzLocalizationManager.EzLocalisableString SCORE_BONUS_MISS = new EzLocalizationManager.EzLocalisableString("Miss 罚分", "Miss penalty");
+        public static readonly EzLocalizationManager.EzLocalisableString SCORE_BONUS_MISS = new EzLocalizationManager.EzLocalisableString("失误罚分", "Error malus");
         public static readonly EzLocalizationManager.EzLocalisableString SCORE_BONUS_TOTAL = new EzLocalizationManager.EzLocalisableString("含附加分", "With bonus");
         public static readonly EzLocalizationManager.EzLocalisableString SCORE_BONUS_PENDING = new EzLocalizationManager.EzLocalisableString("附加分补算中", "Calculating bonus");
         public static readonly EzLocalizationManager.EzLocalisableString SCORE_BONUS_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString("无回放，无法计算附加分", "No replay, bonus unavailable");

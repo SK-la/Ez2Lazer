@@ -15,7 +15,7 @@ using osuTK.Graphics;
 namespace osu.Game.EzOsuGame.Scoring.Bonus
 {
     /// <summary>
-    /// 结算成绩卡上的附加分算式行：判定加成 / Miss 罚分 / 含附加分合计（原分由上方计分器显示）。
+    /// 结算成绩卡上的附加分算式行：判定加成 / 失误罚分 / 含附加分合计（原分由上方计分器显示）。
     /// </summary>
     public partial class EzScoreBonusBreakdown : CompositeDrawable
     {
@@ -83,7 +83,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             }
 
             judgeText.Text = EzScoreBonusTracker.FormatSigned(bonus.JudgeBonus);
-            missText.Text = EzScoreBonusTracker.FormatSigned(bonus.MissPenalty);
+            missText.Text = EzScoreBonusTracker.FormatSigned(bonus.ErrorPenalty);
             totalText.Text = EzScoreBonusTracker.TotalWithBonus(score, bonus).ToLocalisableString("N0");
         }
 

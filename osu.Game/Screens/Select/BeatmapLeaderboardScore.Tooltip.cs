@@ -478,7 +478,7 @@ namespace osu.Game.Screens.Select
             }
 
             /// <summary>
-            /// 悬停卡片里、分数和评价之间的两项：判定加成、Miss 罚分。
+            /// 悬停卡片里、分数和评价之间的两项：判定加成、失误罚分。
             /// </summary>
             private partial class BonusLines : CompositeDrawable
             {
@@ -540,7 +540,7 @@ namespace osu.Game.Screens.Select
                     }
 
                     judgeText.Text = EzScoreBonusTracker.FormatSigned(bonus.JudgeBonus);
-                    missText.Text = EzScoreBonusTracker.FormatSigned(bonus.MissPenalty);
+                    missText.Text = EzScoreBonusTracker.FormatSigned(bonus.ErrorPenalty);
                 }
 
                 private static Container createLine(LocalisableString label, Color4 valueColour, out OsuSpriteText valueText)
