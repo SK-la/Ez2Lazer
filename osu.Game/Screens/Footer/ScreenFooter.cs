@@ -129,21 +129,21 @@ namespace osu.Game.Screens.Footer
                                 Origin = Anchor.BottomLeft,
                                 Y = ScreenFooterButton.CORNER_RADIUS,
                                 Direction = FillDirection.Horizontal,
-                                Spacing = new Vector2(7, 0),
+                                Spacing = new Vector2(0, 0),
                                 AutoSizeAxes = Axes.Both,
                             },
                             overlayContentContainer = new Container
                             {
                                 Name = "Overlay-provided extra content",
                                 RelativeSizeAxes = Axes.Both,
-                                Y = -OsuGame.SCREEN_EDGE_MARGIN,
+                                // Y = -OsuGame.SCREEN_EDGE_MARGIN,
                             },
                         },
                     }
                 },
                 BackButton = new ScreenBackButton
                 {
-                    Margin = new MarginPadding { Bottom = OsuGame.SCREEN_EDGE_MARGIN, Left = OsuGame.SCREEN_EDGE_MARGIN },
+                    Margin = new MarginPadding { Bottom = 0, Left = OsuGame.SCREEN_EDGE_MARGIN },
                     Anchor = Anchor.BottomLeft,
                     Origin = Anchor.BottomLeft,
                     Action = onBackPressed,

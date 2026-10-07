@@ -28,7 +28,6 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Screens.Footer;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -64,7 +63,6 @@ namespace osu.Game.EzOsuGame.HUD
     {
         // Layout constants
         private const float chart_size = 144f;
-        private const float corner_radius = ScreenFooterButton.CORNER_RADIUS;
         private const float axis_label_padding = 36f;
         private const float axis_label_offset = 24f; // Offset from chart edge to label center
         private const float axis_label_alpha = 1f;
@@ -234,7 +232,7 @@ namespace osu.Game.EzOsuGame.HUD
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both,
                     Masking = true,
-                    CornerRadius = corner_radius,
+                    CornerRadius = 10, //ScreenFooterButton.CORNER_RADIUS,
                     Children = new Drawable[]
                     {
                         background = new Box
