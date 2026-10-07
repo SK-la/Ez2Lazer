@@ -30,7 +30,9 @@ using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Scoring;
 using osu.Game.Utils;
 using osuTK;
@@ -405,6 +407,7 @@ namespace osu.Game.Screens.Select
                 private Box rankBackground = null!;
                 private Container<DrawableRank> rankContainer = null!;
                 private OsuSpriteText totalScore = null!;
+                private BonusLines bonusLines = null!;
 
                 [Resolved]
                 private ScoreManager scoreManager { get; set; } = null!;
@@ -418,6 +421,7 @@ namespace osu.Game.Screens.Select
                             OsuColour.ForRank(value.Rank).Opacity(0.5f));
                         rankContainer.Child = new DrawableRank(value.Rank);
                         totalScore.Current = scoreManager.GetBindableTotalScoreString(value);
+                        bonusLines.SetScore(value);
                     }
                 }
 
@@ -454,16 +458,117 @@ namespace osu.Game.Screens.Select
                             Size = new Vector2(25f, 14f),
                             Margin = new MarginPadding { Bottom = 5f },
                         },
+                        bonusLines = new BonusLines
+                        {
+                            Anchor = Anchor.BottomCentre,
+                            Origin = Anchor.BottomCentre,
+                            Margin = new MarginPadding { Bottom = 22f },
+                        },
                         totalScore = new OsuSpriteText
                         {
                             Anchor = Anchor.BottomCentre,
                             Origin = Anchor.BottomCentre,
-                            Margin = new MarginPadding { Bottom = 25f, Top = 10f + spacing },
+                            Margin = new MarginPadding { Bottom = 52f, Top = 10f + spacing },
                             Font = OsuFont.Style.Subtitle.With(weight: FontWeight.Light, fixedWidth: true),
                             Spacing = new Vector2(-1.5f),
                             UseFullGlyphHeight = false,
                         },
                     };
+                }
+            }
+
+            /// <summary>
+            /// 悬停卡片里、分数和评价之间的两项：判定加成、Miss 罚分。
+            /// </summary>
+            private partial class BonusLines : CompositeDrawable
+            {
+                private OsuSpriteText judgeText = null!;
+                private OsuSpriteText missText = null!;
+                private EzScoreBonusTracker? tracker;
+
+                [Resolved]
+                private OsuColour colours { get; set; } = null!;
+
+                public BonusLines()
+                {
+                    RelativeSizeAxes = Axes.X;
+                    AutoSizeAxes = Axes.Y;
+                }
+
+                [BackgroundDependencyLoader]
+                private void load()
+                {
+                    InternalChild = new FillFlowContainer
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Direction = FillDirection.Vertical,
+                        Spacing = new Vector2(0f, 2f),
+                        Padding = new MarginPadding { Horizontal = 10f },
+                        Children = new[]
+                        {
+                            createLine(EzSongSelectStrings.SCORE_BONUS_JUDGE, colours.Pink1, out judgeText),
+                            createLine(EzSongSelectStrings.SCORE_BONUS_MISS, colours.Red1, out missText),
+                        },
+                    };
+                }
+
+                protected override void LoadComplete()
+                {
+                    base.LoadComplete();
+                    updateText();
+                }
+
+                public void SetScore(ScoreInfo score)
+                {
+                    tracker?.Expire();
+                    AddInternal(tracker = new EzScoreBonusTracker(score));
+                    tracker.Current.BindValueChanged(_ => updateText(), true);
+                    tracker.State.BindValueChanged(_ => updateText(), true);
+                }
+
+                private void updateText()
+                {
+                    if (judgeText == null)
+                        return;
+
+                    if (tracker?.Current.Value is not EzScoreBonusResult bonus)
+                    {
+                        string placeholder = tracker?.State.Value == EzScoreBonusState.Pending ? "\u2026" : "\u2014";
+                        judgeText.Text = missText.Text = placeholder;
+                        return;
+                    }
+
+                    judgeText.Text = EzScoreBonusTracker.FormatSigned(bonus.JudgeBonus);
+                    missText.Text = EzScoreBonusTracker.FormatSigned(bonus.MissPenalty);
+                }
+
+                private static Container createLine(LocalisableString label, Color4 valueColour, out OsuSpriteText valueText)
+                {
+                    var line = new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Anchor = Anchor.TopCentre,
+                        Origin = Anchor.TopCentre,
+                    };
+
+                    line.Add(new OsuSpriteText
+                    {
+                        Text = label,
+                        Font = OsuFont.Style.Caption2.With(weight: FontWeight.SemiBold),
+                        UseFullGlyphHeight = false,
+                    });
+                    line.Add(valueText = new OsuSpriteText
+                    {
+                        Anchor = Anchor.TopRight,
+                        Origin = Anchor.TopRight,
+                        Colour = valueColour,
+                        Font = OsuFont.Style.Caption2.With(fixedWidth: true),
+                        UseFullGlyphHeight = false,
+                    });
+
+                    return line;
                 }
             }
         }
