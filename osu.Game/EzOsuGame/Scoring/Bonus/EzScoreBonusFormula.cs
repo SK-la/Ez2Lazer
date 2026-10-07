@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const int JUDGE_BONUS_MAX = 9999;
 
         /// <summary>
-        /// Miss 权重下限：权重最低的区间里 Miss 仍按此比例计入加权 Miss 率。
+        /// Miss 权重下限：权重最低的区间里一个 Miss 仍按此比例计入加权 Miss 率。
         /// </summary>
         public const double MISS_WEIGHT_FLOOR = 0.2;
 
@@ -75,9 +75,15 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         }
 
         /// <summary>
-        /// 由加权 Miss 率得到罚分（≤ 0）：0 到鼓励点线性升到锚点，鼓励点到不鼓励点 Smoothstep 升到上限，之后封顶。
+        /// 鼓励点罚分下限：判定权重接近 0 时仍保证等比段有有限倍率。
         /// </summary>
-        /// <param name="weightedMissRate">Σ(Miss 的 <see cref="MissWeight"/>) / Σ(全部计入 Note 的 <see cref="MissWeight"/>)。</param>
+        public const double MISS_ANCHOR_MIN = 200;
+
+        /// <summary>
+        /// 由加权 Miss 率得到罚分（≤ 0）：0 到鼓励点线性升到锚点（每个 Miss 等额、不叠加）；
+        /// 鼓励点到不鼓励点按等比（对数尺度线性）升到上限；之后封顶。
+        /// </summary>
+        /// <param name="weightedMissRate">Σ(Miss 的 <see cref="MissWeight"/>) / 谱面总 Note 数（普通 Note + LN）。</param>
         /// <param name="judgeCoverage">同一倾向下 Σ<see cref="JudgeWeight"/> / 计入 Note 数，用于计算鼓励点锚值。</param>
         public static int MissPenalty(double weightedMissRate, double judgeCoverage)
         {
@@ -92,17 +98,17 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             else
             {
                 double x = (rate - MISS_RATE_ACCEPTED) / (MISS_RATE_DISCOURAGED - MISS_RATE_ACCEPTED);
-                penalty = anchor + (MISS_PENALTY_CAP - anchor) * x * x * (3 - 2 * x);
+                penalty = anchor * Math.Pow(MISS_PENALTY_CAP / anchor, x);
             }
 
             return -(int)Math.Round(penalty);
         }
 
         /// <summary>
-        /// 鼓励点罚分（正值）：全谱按 <see cref="ACCEPTED_ERROR_MS"/> 命中时的判定加成。
+        /// 鼓励点罚分（正值）：全谱按 <see cref="ACCEPTED_ERROR_MS"/> 命中时的判定加成，不低于 <see cref="MISS_ANCHOR_MIN"/>。
         /// </summary>
         public static double AcceptedMissPenalty(double judgeCoverage)
-            => JUDGE_BONUS_MAX * OffsetQuality(ACCEPTED_ERROR_MS) * Math.Clamp(judgeCoverage, 0, 1);
+            => Math.Max(MISS_ANCHOR_MIN, JUDGE_BONUS_MAX * OffsetQuality(ACCEPTED_ERROR_MS) * Math.Clamp(judgeCoverage, 0, 1));
 
         /// <summary>
         /// Offset 精度价值 F(E)，E 为绝对误差（ms）。F(0)=1，F(b)=c，E ≥ 16ms 时为 0。
