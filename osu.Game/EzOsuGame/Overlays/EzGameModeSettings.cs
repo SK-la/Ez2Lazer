@@ -138,6 +138,18 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
+                    Caption = EzSettingsStrings.SCORE_BONUS_CROSS,
+                    HintText = EzSettingsStrings.SCORE_BONUS_CROSS_TOOLTIP,
+                    RelativeSizeAxes = Axes.X,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.ScoreBonusCrossMs),
+                    KeyboardStep = 1,
+                    LabelFormat = v => $"{v:N0} ms",
+                })
+                {
+                    Keywords = new[] { "ez", "bonus", "boundary", "分界", "44" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
                     Caption = EzSettingsStrings.OFFSET_PLUS_MANIA,
                     HintText = EzSettingsStrings.OFFSET_PLUS_MANIA_TOOLTIP,
                     RelativeSizeAxes = Axes.X,

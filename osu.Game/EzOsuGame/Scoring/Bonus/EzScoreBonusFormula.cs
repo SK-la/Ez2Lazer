@@ -57,37 +57,49 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             return floor + (1 - floor) * (favourHighKps ? t : 1 - t);
         }
 
-        /// <summary>
-        /// offset 价值，范围 [-1, 1]。默认类反余切。<paramref name="cotangent"/> 为 true 时用贴横轴的类余切。
-        /// <paramref name="missBoundaryMs"/> 是当前模式的 Miss 窗口；Miss 事件传同一个值。
-        /// </summary>
-        public static double OffsetQuality(double absoluteErrorMs, bool cotangent = false, double missBoundaryMs = OFFSET_MISS_MS)
+        /// <param name="crossMs">判定与失误的分界。默认 <see cref="OFFSET_CROSS_MS"/>。</param>
+        public static double OffsetQuality(double absoluteErrorMs, bool cotangent = false, double missBoundaryMs = OFFSET_MISS_MS, double crossMs = OFFSET_CROSS_MS)
         {
             if (double.IsNaN(absoluteErrorMs))
                 return 0;
 
+            double cross = crossMs > OFFSET_FULL_MS && !double.IsNaN(crossMs) ? crossMs : OFFSET_CROSS_MS;
             double miss = missBoundaryMs > OFFSET_FULL_MS && !double.IsNaN(missBoundaryMs) ? missBoundaryMs : OFFSET_MISS_MS;
             double e = Math.Abs(absoluteErrorMs);
+            double power = curvePower(cross);
 
-            if (e >= miss)
+            if (e >= miss || (miss <= cross && e > cross))
                 return -1;
+
+            if (miss <= cross)
+                miss = cross + 1;
 
             if (cotangent || e <= OFFSET_FULL_MS)
-                return cotangentValue(e, miss);
+                return cotangentValue(e, miss, cross, power);
 
-            if (e <= OFFSET_CROSS_MS)
-                return 1 - cotangentValue(OFFSET_FULL_MS + OFFSET_CROSS_MS - e, miss);
+            if (e <= cross)
+                return 1 - cotangentValue(OFFSET_FULL_MS + cross - e, miss, cross, power);
 
-            if (miss <= OFFSET_CROSS_MS)
-                return -1;
-
-            return -1 - cotangentValue(OFFSET_CROSS_MS + miss - e, miss);
+            return -1 - cotangentValue(cross + miss - e, miss, cross, power);
         }
 
         /// <summary>
-        /// 贴横轴的价值。6ms 为 1，44ms 为 0，Miss 窗口处为 -1。44→16 慢，16→6 快。
+        /// 16ms 仍落在分界左侧时，保持类余切在 16ms 约为 0.30。分界不超过 16ms 时改为线性。
         /// </summary>
-        private static double cotangentValue(double e, double miss)
+        private static double curvePower(double cross)
+        {
+            if (cross <= 16)
+                return 1;
+
+            double ratio = (cross - 16.0) / (cross - OFFSET_FULL_MS);
+
+            if (ratio <= 0 || ratio >= 1)
+                return 1;
+
+            return Math.Log(0.30) / Math.Log(ratio);
+        }
+
+        private static double cotangentValue(double e, double miss, double cross, double power)
         {
             if (e <= OFFSET_FULL_MS)
                 return 1;
@@ -95,13 +107,10 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             if (e >= miss)
                 return -1;
 
-            if (e <= OFFSET_CROSS_MS)
-                return Math.Pow((OFFSET_CROSS_MS - e) / (OFFSET_CROSS_MS - OFFSET_FULL_MS), OFFSET_CURVE_POWER);
+            if (e <= cross)
+                return Math.Pow((cross - e) / (cross - OFFSET_FULL_MS), power);
 
-            if (miss <= OFFSET_CROSS_MS)
-                return -1;
-
-            return -Math.Pow((e - OFFSET_CROSS_MS) / (miss - OFFSET_CROSS_MS), OFFSET_CURVE_POWER);
+            return -Math.Pow((e - cross) / (miss - cross), power);
         }
     }
 }

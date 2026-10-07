@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -32,6 +33,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                 rate = 1;
 
             kps ??= resolveKps(playableBeatmap, rate, cachedKps);
+            double cross = resolveCrossMs();
 
             var pending = new HashSet<(int column, double time)>();
             var releaseNotes = new HashSet<(int column, double time)>();
@@ -75,10 +77,10 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                 bool isMiss = e.Result == HitResult.Miss;
                 double missBoundary = resolveMissBoundary(e.HitObject, gameplayRate);
                 double errorMs = isMiss ? missBoundary : Math.Abs(e.TimeOffset) / gameplayRate;
-                bool error = isMiss || errorMs > EzScoreBonusFormula.OFFSET_CROSS_MS;
+                bool error = isMiss || errorMs > cross;
 
-                cotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, cotangent: true, missBoundary), error);
-                inverseCotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, missBoundaryMs: missBoundary), error);
+                cotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, cotangent: true, missBoundary, cross), error);
+                inverseCotangent.Add(weight, EzScoreBonusFormula.OffsetQuality(errorMs, missBoundaryMs: missBoundary, crossMs: cross), error);
             }
 
             if (counted == 0)
@@ -138,6 +140,16 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             }
 
             return EzKpsListLookup.FromBeatmap(playableBeatmap, rate);
+        }
+
+        private static double resolveCrossMs()
+        {
+            double cross = GlobalConfigStore.EzConfig.Get<double>(Ez2Setting.ScoreBonusCrossMs);
+
+            if (double.IsNaN(cross) || cross <= EzScoreBonusFormula.OFFSET_FULL_MS)
+                return EzScoreBonusFormula.OFFSET_CROSS_MS;
+
+            return cross;
         }
 
         private static (int column, double time) keyOf(HitObject hitObject)

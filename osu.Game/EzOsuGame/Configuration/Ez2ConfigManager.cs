@@ -281,6 +281,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.BmsPoorHitResultEnable, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.JudgePrecedence, EzEnumJudgePrecedence.Earliest);
             SetDefault(Ez2Setting.ScoreBonusTendency, EzScoreBonusTendency.MissToJudge);
+            SetDefault(Ez2Setting.ScoreBonusCrossMs, EzScoreBonusFormula.OFFSET_CROSS_MS, EzScoreBonusFormula.OFFSET_FULL_MS + 1, EzScoreBonusFormula.OFFSET_MISS_MS, 1.0);
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);
 
             SetDefault(Ez2Setting.ManiaPseudo3DRotation, 0.0, 0.0, 75.0, 1.0);
@@ -1145,6 +1146,11 @@ namespace osu.Game.EzOsuGame.Configuration
         BmsPoorHitResultEnable,
         JudgePrecedence,
         ScoreBonusTendency,
+
+        /// <summary>
+        /// 判定加成与 Error Malus 的分界，毫秒。
+        /// </summary>
+        ScoreBonusCrossMs,
 
         HitTargetFloatFixed,
         HitTargetAlpha,

@@ -661,6 +661,14 @@ namespace osu.Game.EzOsuGame.Localization
             + "\nHigh Judge Ratio: extreme Judge are more valuable (6ms as the upper limit), and 'No-Hit' is worse than 'Miss'."
             + "\nLow Error Rate: reducing 'near or below Good' is more valuable, and malus for 'near or below OK' are nearly equivalent to 'Miss'.");
 
+        public static readonly LocalisableString SCORE_BONUS_CROSS = new EzLocalizationManager.EzLocalisableString(
+            "附加分分界",
+            "Bonus boundary");
+
+        public static readonly LocalisableString SCORE_BONUS_CROSS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "该毫秒及以内记入判定加成，超过记入 Error Malus。步进 1ms。",
+            "Offsets at or within this value count as timing bonus. Beyond it they count as Error Malus. Steps of 1ms.");
+
         public static readonly LocalisableString JUDGE_PRECEDENCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "设置优先级算法。当按键点在多个note的判定重叠区时，选择如何计算判定。"
             + "\n Combo优先(LR2风格): 选择对score有利的note进行判定；"
