@@ -25,17 +25,17 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const int JUDGE_BONUS_MAX = 9999;
 
         /// <summary>
-        /// Miss 权重下限：权重最低的区间里一个 Miss 仍按此比例计入加权 Miss 率。
+        /// Miss 权重下限：Miss 全落在权重最低的区间时，罚分仍保留此比例。
         /// </summary>
         public const double MISS_WEIGHT_FLOOR = 0.2;
 
         /// <summary>
-        /// 鼓励区：加权 Miss 率不超过此值时，罚分不超过「接受偏差」下的判定加成。
+        /// 鼓励区：Miss 率不超过此值时，罚分不超过「接受偏差」下的判定加成。
         /// </summary>
         public const double MISS_RATE_ACCEPTED = 0.005;
 
         /// <summary>
-        /// 不鼓励区：加权 Miss 率达到此值时罚满 <see cref="MISS_PENALTY_CAP"/>。
+        /// 不鼓励区：Miss 率达到此值时罚满 <see cref="MISS_PENALTY_CAP"/>（再乘 KPS 倍率）。
         /// </summary>
         public const double MISS_RATE_DISCOURAGED = 0.02;
 
@@ -80,14 +80,18 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const double MISS_ANCHOR_MIN = 200;
 
         /// <summary>
-        /// 由加权 Miss 率得到罚分（≤ 0）：0 到鼓励点线性升到锚点（每个 Miss 等额、不叠加）；
-        /// 鼓励点到不鼓励点按等比（对数尺度线性）升到上限；之后封顶。
+        /// 由 Miss 率得到罚分（≤ 0）：0 到鼓励点线性升到锚点（每个 Miss 等额、不叠加）；
+        /// 鼓励点到不鼓励点按等比（对数尺度线性）升到上限；之后封顶。整条曲线再乘 Miss 所在区间的平均 KPS 权重。
         /// </summary>
-        /// <param name="weightedMissRate">Σ(Miss 的 <see cref="MissWeight"/>) / 谱面总 Note 数（普通 Note + LN）。</param>
+        /// <param name="missRate">Miss 个数 / 谱面总 Note 数（普通 Note + LN）。</param>
         /// <param name="judgeCoverage">同一倾向下 Σ<see cref="JudgeWeight"/> / 计入 Note 数，用于计算鼓励点锚值。</param>
-        public static int MissPenalty(double weightedMissRate, double judgeCoverage)
+        /// <param name="missWeight">各 Miss 的 <see cref="MissWeight"/> 平均值，作为整体倍率。</param>
+        public static int MissPenalty(double missRate, double judgeCoverage, double missWeight = 1)
+            => -(int)Math.Round(missPenaltyMagnitude(missRate, judgeCoverage) * Math.Clamp(missWeight, 0, 1));
+
+        private static double missPenaltyMagnitude(double missRate, double judgeCoverage)
         {
-            double rate = Math.Max(0, weightedMissRate);
+            double rate = Math.Max(0, missRate);
             double anchor = AcceptedMissPenalty(judgeCoverage);
             double penalty;
 
@@ -101,7 +105,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                 penalty = anchor * Math.Pow(MISS_PENALTY_CAP / anchor, x);
             }
 
-            return -(int)Math.Round(penalty);
+            return penalty;
         }
 
         /// <summary>

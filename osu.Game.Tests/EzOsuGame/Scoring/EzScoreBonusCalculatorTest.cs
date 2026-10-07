@@ -84,9 +84,10 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var missInSparse = EzScoreBonusCalculator.Calculate(mixed, createEvents(mixed, i => i == 5 || i == 100), 1);
             var missInDense = EzScoreBonusCalculator.Calculate(mixed, createEvents(mixed, i => i == sparseCount + 5 || i == sparseCount + 500), 1);
 
-            // JudgeToMiss：密集段 Miss 更重；MissToJudge：稀疏段 Miss 更重。
-            Assert.That(missInDense.JudgeToMiss.WeightedMissRate, Is.GreaterThan(missInSparse.JudgeToMiss.WeightedMissRate));
-            Assert.That(missInSparse.MissToJudge.WeightedMissRate, Is.GreaterThan(missInDense.MissToJudge.WeightedMissRate));
+            // Miss 率相同（原始个数）；JudgeToMiss：密集段 Miss 罚得更重；MissToJudge：稀疏段 Miss 罚得更重。
+            Assert.That(missInDense.JudgeToMiss.MissRate, Is.EqualTo(missInSparse.JudgeToMiss.MissRate));
+            Assert.That(missInDense.JudgeToMiss.MissPenalty, Is.LessThan(missInSparse.JudgeToMiss.MissPenalty));
+            Assert.That(missInSparse.MissToJudge.MissPenalty, Is.LessThan(missInDense.MissToJudge.MissPenalty));
         }
 
         [Test]
@@ -125,18 +126,17 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         public void TestEasyChartGetsNoJudgeBonusButMissesStillCount()
         {
             // 120 BPM 单键 1/4（8 KPS）：MissToJudge 下判定加成为 0，但 Miss 仍计罚分。
-            // 加权 Miss 率 = 4 个 Miss × 该区间 Miss 权重 / 256 个 Note。
+            // Miss 率 = 4 / 256；罚分再乘该区间（8 KPS）的 Miss 权重。
             var beatmap = createChart(120, chordSize: 1, quarterBeats: 256);
             var result = EzScoreBonusCalculator.Calculate(beatmap, createEvents(beatmap, sigma: 0, missEvery: 64), 1);
 
-            double highRate = 4 * EzScoreBonusFormula.MissWeight(8) / 256;
-            double lowRate = 4 * EzScoreBonusFormula.MissWeight(8, favourHighKps: false) / 256;
+            const double rate = 4.0 / 256;
 
             Assert.That(result.MissToJudge.JudgeBonus, Is.EqualTo(0));
-            Assert.That(result.JudgeToMiss.WeightedMissRate, Is.EqualTo(highRate).Within(1e-9));
-            Assert.That(result.MissToJudge.WeightedMissRate, Is.EqualTo(lowRate).Within(1e-9));
-            Assert.That(result.JudgeToMiss.MissPenalty, Is.EqualTo(EzScoreBonusFormula.MissPenalty(highRate, judgeCoverage: 1)));
-            Assert.That(result.MissToJudge.MissPenalty, Is.EqualTo(EzScoreBonusFormula.MissPenalty(lowRate, judgeCoverage: 0)));
+            Assert.That(result.JudgeToMiss.MissRate, Is.EqualTo(rate).Within(1e-9));
+            Assert.That(result.MissToJudge.MissRate, Is.EqualTo(rate).Within(1e-9));
+            Assert.That(result.JudgeToMiss.MissPenalty, Is.EqualTo(EzScoreBonusFormula.MissPenalty(rate, judgeCoverage: 1, EzScoreBonusFormula.MissWeight(8))));
+            Assert.That(result.MissToJudge.MissPenalty, Is.EqualTo(EzScoreBonusFormula.MissPenalty(rate, judgeCoverage: 0, EzScoreBonusFormula.MissWeight(8, favourHighKps: false))));
             Assert.That(result.MissToJudge.MissPenalty, Is.LessThan(0));
         }
 
@@ -166,7 +166,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
 
             var result = EzScoreBonusCalculator.Calculate(beatmap, events, 1, new FixedKps(40)).JudgeToMiss;
 
-            Assert.That(result.WeightedMissRate, Is.EqualTo(1.0 / 5).Within(1e-9));
+            Assert.That(result.MissRate, Is.EqualTo(1.0 / 5).Within(1e-9));
         }
 
         [Test]
@@ -222,8 +222,9 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var beatmap = createChart(200, chordSize: 4, quarterBeats: 256);
             var result = EzScoreBonusCalculator.Calculate(beatmap, createEvents(beatmap, sigma: 0, missEvery: 1), 1);
 
+            // 48 KPS：JudgeToMiss 倍率为 1 罚满；MissToJudge 倍率为下限。
             Assert.That(result.JudgeToMiss.MissPenalty, Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
-            Assert.That(result.MissToJudge.MissPenalty, Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
+            Assert.That(result.MissToJudge.MissPenalty, Is.EqualTo(-(int)Math.Round(EzScoreBonusFormula.MISS_PENALTY_CAP * EzScoreBonusFormula.MISS_WEIGHT_FLOOR)));
             Assert.That(result.MissToJudge.JudgeBonus, Is.EqualTo(0));
         }
 
