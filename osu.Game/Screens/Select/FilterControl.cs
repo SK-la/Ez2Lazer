@@ -131,7 +131,7 @@ namespace osu.Game.Screens.Select
                     AutoSizeAxes = Axes.Y,
                     Direction = FillDirection.Vertical,
                     Spacing = new Vector2(0f, 5f),
-                    Padding = new MarginPadding { Top = corner_radius + 5, Bottom = 2, Right = 40f, Left = 2f },
+                    Padding = new MarginPadding { Top = corner_radius - 0.5f, Bottom = 2, Right = 40f, Left = 2f },
                     Children = new Drawable[]
                     {
                         new ReverseChildIDFillFlowContainer<Drawable>
@@ -139,7 +139,7 @@ namespace osu.Game.Screens.Select
                             RelativeSizeAxes = Axes.X,
                             AutoSizeAxes = Axes.Y,
                             Direction = FillDirection.Vertical,
-                            Spacing = new Vector2(0f, 5f),
+                            Spacing = new Vector2(0f, 0.5f),
                             Children = new Drawable[]
                             {
                                 new Container
