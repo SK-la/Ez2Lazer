@@ -30,12 +30,13 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
     /// </remarks>
     public static class EzScoreBonusCalculator
     {
-        public static EzScoreBonusSet Calculate(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents, double rate, IEzKpsSectionLookup? kps = null)
+        public static EzScoreBonusSet Calculate(IBeatmap playableBeatmap, IReadOnlyList<HitEvent> hitEvents, double rate, IEzKpsSectionLookup? kps = null,
+                                                IReadOnlyList<double>? cachedKps = null)
         {
             if (rate <= 0 || double.IsNaN(rate))
                 rate = 1;
 
-            kps ??= EzKpsListLookup.FromBeatmap(playableBeatmap, rate);
+            kps ??= resolveKps(playableBeatmap, rate, cachedKps);
 
             var pending = new HashSet<(int column, double time)>();
             var releaseNotes = new HashSet<(int column, double time)>();
@@ -124,7 +125,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         /// 由 <see cref="ScoreInfo.HitEvents"/> 计算并写入临时字段 <see cref="ScoreInfo.EzBonus"/>；无 HitEvents 时置空。
         /// </summary>
         /// <param name="playableBeatmap">与 <see cref="ScoreInfo.HitEvents"/> 同一次运行的可玩谱面。</param>
-        public static void Apply(ScoreInfo score, IBeatmap playableBeatmap)
+        public static void Apply(ScoreInfo score, IBeatmap playableBeatmap, IReadOnlyList<double>? cachedKps = null)
         {
             if (score.HitEvents.Count == 0 || playableBeatmap.HitObjects.Count == 0)
             {
@@ -132,7 +133,19 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                 return;
             }
 
-            score.EzBonus = Calculate(playableBeatmap, score.HitEvents, ModUtils.CalculateRateWithMods(score.Mods));
+            score.EzBonus = Calculate(playableBeatmap, score.HitEvents, ModUtils.CalculateRateWithMods(score.Mods), cachedKps: cachedKps);
+        }
+
+        private static IEzKpsSectionLookup resolveKps(IBeatmap playableBeatmap, double rate, IReadOnlyList<double>? cachedKps)
+        {
+            // 与 KPS 图同一份已换算列表。有这份列表就按歌曲进度取样，不再现场重算、也不再乘一次速率。
+            if (cachedKps != null && cachedKps.Count > 0)
+            {
+                double songEnd = playableBeatmap.HitObjects.Count == 0 ? 0 : playableBeatmap.HitObjects[^1].StartTime;
+                return EzKpsListLookup.FromAnalysis(cachedKps, songEnd);
+            }
+
+            return EzKpsListLookup.FromBeatmap(playableBeatmap, rate);
         }
 
         private static (int column, double time) keyOf(HitObject hitObject)

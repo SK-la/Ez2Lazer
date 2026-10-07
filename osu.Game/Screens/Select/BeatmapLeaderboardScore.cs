@@ -35,6 +35,7 @@ using osu.Game.Rulesets.UI;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Scoring;
@@ -83,6 +84,9 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private IEzReplaySession replaySession { get; set; } = null!;
+
+        [Resolved]
+        private EzAnalysisCache? ezAnalysisCache { get; set; }
 
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
@@ -654,9 +658,9 @@ namespace osu.Game.Screens.Select
                     items.Add(new OsuMenuItem(CommonStrings.CopyLink, MenuItemType.Standard, () => game?.CopyToClipboard($@"{api.Endpoints.WebsiteUrl}/scores/{Score.OnlineID}")));
 
                 items.Add(new OsuMenuItem(EzSongSelectStrings.RECALCULATE_SCORE_ORIGINAL_ENV, MenuItemType.Standard,
-                    () => _ = EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmaps, replaySession, Score, ReplayRunPurpose.ForStored)));
+                    () => _ = EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmaps, replaySession, Score, ReplayRunPurpose.ForStored, analysisCache: ezAnalysisCache)));
                 items.Add(new OsuMenuItem(EzSongSelectStrings.RECALCULATE_SCORE_CURRENT_ENV, MenuItemType.Standard,
-                    () => _ = EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmaps, replaySession, Score, ReplayRunPurpose.ForLive)));
+                    () => _ = EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmaps, replaySession, Score, ReplayRunPurpose.ForLive, analysisCache: ezAnalysisCache)));
                 items.Add(new OsuMenuItem(EzSongSelectStrings.RENAME_PLAYER, MenuItemType.Standard, () => dialogOverlay?.Push(new RenamePlayerDialog(Score, scoreManager))));
 
                 if (Score.Files.Count <= 0) return items.ToArray();

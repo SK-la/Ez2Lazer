@@ -93,6 +93,52 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         }
 
         [Test]
+        public void TestMissBoundaryComesFromHitWindows()
+        {
+            const double miss_window = 80;
+
+            var beatmap = new Beatmap();
+            var note = new Note { StartTime = 1000 };
+            note.HitWindows = new FixedMissWindows(miss_window);
+            beatmap.HitObjects.Add(note);
+
+            var atWindow = EzScoreBonusCalculator.Calculate(beatmap, new[]
+            {
+                new HitEvent(miss_window, 1, HitResult.Ok, note, null, null),
+            }, 1, new FixedKps(40)).MissToJudge;
+
+            Assert.That(atWindow.JudgeBonus, Is.EqualTo(0));
+            Assert.That(atWindow.MissPenalty, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
+
+            var withoutWindow = new Note { StartTime = 1000 };
+            var fallback = EzScoreBonusCalculator.Calculate(new Beatmap { HitObjects = { withoutWindow } }, new[]
+            {
+                new HitEvent(miss_window, 1, HitResult.Ok, withoutWindow, null, null),
+            }, 1, new FixedKps(40)).MissToJudge;
+
+            Assert.That(fallback.MissPenalty, Is.Not.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
+        }
+
+        [Test]
+        public void TestMissBoundaryScalesWithRate()
+        {
+            const double miss_window = 120;
+            const double rate = 1.5;
+
+            var beatmap = new Beatmap();
+            var note = new Note { StartTime = 1000 };
+            note.HitWindows = new FixedMissWindows(miss_window);
+            beatmap.HitObjects.Add(note);
+
+            var result = EzScoreBonusCalculator.Calculate(beatmap, new[]
+            {
+                new HitEvent(miss_window, rate, HitResult.Ok, note, null, null),
+            }, rate, new FixedKps(40)).MissToJudge;
+
+            Assert.That(result.MissPenalty, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
+        }
+
+        [Test]
         public void TestOsuHitCircleUsesTheSameValueCurve()
         {
             var beatmap = new Beatmap();
@@ -167,6 +213,22 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             }
 
             public double KpsAt(double time) => kps;
+        }
+
+        private class FixedMissWindows : HitWindows
+        {
+            private readonly double miss;
+
+            public FixedMissWindows(double miss)
+            {
+                this.miss = miss;
+            }
+
+            public override void SetDifficulty(double difficulty)
+            {
+            }
+
+            public override double WindowFor(HitResult result) => result == HitResult.Miss ? miss : 16;
         }
     }
 }

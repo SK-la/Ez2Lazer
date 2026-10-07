@@ -8,6 +8,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
@@ -47,6 +48,9 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
         [Resolved]
         private IEzReplaySession? replaySession { get; set; }
+
+        [Resolved]
+        private EzAnalysisCache? analysisCache { get; set; }
 
         [Resolved]
         private ILocalUserPlayInfo? localUserPlayInfo { get; set; }
@@ -94,7 +98,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
         private void request()
         {
-            EzScoreBonusProvider.GetAsync(score, scoreManager, beatmapManager, replaySession!, isPlaying, cancellation.Token)
+            EzScoreBonusProvider.GetAsync(score, scoreManager, beatmapManager, replaySession!, isPlaying, cancellation.Token, analysisCache)
                                 .ContinueWith(t => Schedule(() =>
                                 {
                                     if (cancellation.IsCancellationRequested)

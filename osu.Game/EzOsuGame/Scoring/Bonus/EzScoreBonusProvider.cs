@@ -9,6 +9,7 @@ using osu.Framework.Extensions;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Scoring.Bonus
@@ -58,7 +59,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
         /// <param name="isBusy">返回 true 时补算等待（例如游玩中），避免与 gameplay 抢资源。</param>
         public static Task<EzScoreBonusSet?> GetAsync(ScoreInfo score, ScoreManager scoreManager, BeatmapManager beatmapManager, IEzReplaySession replaySession,
-                                                      Func<bool>? isBusy = null, CancellationToken cancellationToken = default)
+                                                      Func<bool>? isBusy = null, CancellationToken cancellationToken = default, EzAnalysisCache? analysisCache = null)
         {
             if (score.EzBonus != null)
                 return Task.FromResult(score.EzBonus);
@@ -81,12 +82,13 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    return await EzScoreRecalculationService.CalculateBonusAsync(scoreManager, beatmapManager, replaySession, detached, cancellationToken)
+                    return await EzScoreRecalculationService.CalculateBonusAsync(scoreManager, beatmapManager, replaySession, detached, cancellationToken, analysisCache)
                                                             .ConfigureAwait(false);
                 }
                 catch (Exception e) when (e is not OperationCanceledException)
                 {
                     Logger.Log($"Score bonus calculation failed for {k}: {e.Message}");
+                    entries.TryRemove(k, out _);
                     return null;
                 }
                 finally
