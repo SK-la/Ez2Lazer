@@ -647,6 +647,14 @@ namespace osu.Game.EzOsuGame.Localization
             "判定优先级",
             "Judge Precedence");
 
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY = new EzLocalizationManager.EzLocalisableString(
+            "附加分倾向",
+            "Score Bonus Tendency");
+
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "按谱面星级在判定加成与 Miss 罚分之间分配权重（3★ 以下偏向前者，8★ 以上偏向后者）。只影响附加分展示，不改原分。",
+            "Shifts weight between the timing bonus and the miss penalty by star rating (below 3★ favours the first, above 8★ the second). Display only; the base score is unchanged.");
+
         public static readonly LocalisableString JUDGE_PRECEDENCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "设置优先级算法。当按键点在多个note的判定重叠区时，选择如何计算判定。"
             + "\n Combo优先(LR2风格): 选择对score有利的note进行判定；"

@@ -16,6 +16,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Configuration
@@ -279,6 +280,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
             SetDefault(Ez2Setting.BmsPoorHitResultEnable, !DebugUtils.IsNUnitRunning);
             SetDefault(Ez2Setting.JudgePrecedence, EzEnumJudgePrecedence.Earliest);
+            SetDefault(Ez2Setting.ScoreBonusTendency, EzScoreBonusTendency.JudgeToMiss);
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);
 
             SetDefault(Ez2Setting.ManiaPseudo3DRotation, 0.0, 0.0, 75.0, 1.0);
@@ -1142,6 +1144,7 @@ namespace osu.Game.EzOsuGame.Configuration
         ManiaHealthMode,
         BmsPoorHitResultEnable,
         JudgePrecedence,
+        ScoreBonusTendency,
 
         HitTargetFloatFixed,
         HitTargetAlpha,
