@@ -29,9 +29,12 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                 previous = judge;
             }
 
-            Assert.That(EzScoreBonusFormula.JudgeWeight(15), Is.EqualTo(0));
-            Assert.That(EzScoreBonusFormula.JudgeWeight(40), Is.EqualTo(1));
-            Assert.That(EzScoreBonusFormula.JudgeWeight(30), Is.EqualTo(0.648).Within(0.001));
+            Assert.That(EzScoreBonusFormula.JudgeWeight(EzScoreBonusFormula.KPS_START), Is.EqualTo(0));
+            Assert.That(EzScoreBonusFormula.JudgeWeight(EzScoreBonusFormula.KPS_SATURATION), Is.EqualTo(1));
+
+            // Smoothstep 在区间中点为 0.5。
+            double midpoint = (EzScoreBonusFormula.KPS_START + EzScoreBonusFormula.KPS_SATURATION) / 2;
+            Assert.That(EzScoreBonusFormula.JudgeWeight(midpoint), Is.EqualTo(0.5).Within(1e-9));
         }
 
         [Test]
@@ -123,20 +126,22 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         }
 
         [Test]
-        public void TestEasyChartGetsNoJudgeBonusButMissesStillCount()
+        public void TestEasyChartStillCountsMisses()
         {
-            // 120 BPM 单键 1/4（8 KPS）：MissToJudge 下判定加成为 0，但 Miss 仍计罚分。
-            // Miss 率 = 4 / 256；罚分再乘该区间（8 KPS）的 Miss 权重。
+            // 120 BPM 单键 1/4（8 KPS）：高于 5 KPS 起效点，两种倾向都有判定加成，Miss 也计罚分。
             var beatmap = createChart(120, chordSize: 1, quarterBeats: 256);
             var result = EzScoreBonusCalculator.Calculate(beatmap, createEvents(beatmap, sigma: 0, missEvery: 64), 1);
 
             const double rate = 4.0 / 256;
+            const int hits = 252;
+            double high = EzScoreBonusFormula.JudgeWeight(8, favourHighKps: true);
 
-            Assert.That(result.MissToJudge.JudgeBonus, Is.EqualTo(0));
+            Assert.That(result.MissToJudge.JudgeBonus, Is.EqualTo((int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * high * hits / 256.0)).Within(1));
             Assert.That(result.JudgeToMiss.MissRate, Is.EqualTo(rate).Within(1e-9));
             Assert.That(result.MissToJudge.MissRate, Is.EqualTo(rate).Within(1e-9));
-            Assert.That(result.JudgeToMiss.MissPenalty, Is.EqualTo(EzScoreBonusFormula.MissPenalty(rate, judgeCoverage: 1, EzScoreBonusFormula.MissWeight(8))));
-            Assert.That(result.MissToJudge.MissPenalty, Is.EqualTo(EzScoreBonusFormula.MissPenalty(rate, judgeCoverage: 0, EzScoreBonusFormula.MissWeight(8, favourHighKps: false))));
+            Assert.That(result.JudgeToMiss.MissPenalty, Is.EqualTo(EzScoreBonusFormula.MissPenalty(rate, 1 - high, EzScoreBonusFormula.MissWeight(8))));
+            Assert.That(result.MissToJudge.MissPenalty, Is.EqualTo(EzScoreBonusFormula.MissPenalty(rate, high, EzScoreBonusFormula.MissWeight(8, favourHighKps: false))));
+            Assert.That(result.JudgeToMiss.MissPenalty, Is.LessThan(0));
             Assert.That(result.MissToJudge.MissPenalty, Is.LessThan(0));
         }
 
@@ -177,7 +182,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             Assert.That(anchor, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX * EzScoreBonusFormula.OffsetQuality(EzScoreBonusFormula.ACCEPTED_ERROR_MS)).Within(1e-9));
             Assert.That(EzScoreBonusFormula.MissPenalty(0, 1), Is.EqualTo(0));
             Assert.That(EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_ACCEPTED, 1), Is.EqualTo(-(int)Math.Round(anchor)));
-            Assert.That(EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_DISCOURAGED, 1), Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
+            Assert.That(EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_DISCOURAGED, 1, EzScoreBonusFormula.MISS_WEIGHT_FLOOR),
+                Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
             Assert.That(EzScoreBonusFormula.MissPenalty(0.1, 0), Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
 
             // 鼓励区内每个 Miss 等额：0.25% 正好是锚点的一半。
@@ -222,20 +228,21 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var beatmap = createChart(200, chordSize: 4, quarterBeats: 256);
             var result = EzScoreBonusCalculator.Calculate(beatmap, createEvents(beatmap, sigma: 0, missEvery: 1), 1);
 
-            // 48 KPS：JudgeToMiss 倍率为 1 罚满；MissToJudge 倍率为下限。
+            // 全 Miss 已越过不鼓励点：两种倾向都罚满，不再乘 KPS 倍率。
             Assert.That(result.JudgeToMiss.MissPenalty, Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
-            Assert.That(result.MissToJudge.MissPenalty, Is.EqualTo(-(int)Math.Round(EzScoreBonusFormula.MISS_PENALTY_CAP * EzScoreBonusFormula.MISS_WEIGHT_FLOOR)));
+            Assert.That(result.MissToJudge.MissPenalty, Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
             Assert.That(result.MissToJudge.JudgeBonus, Is.EqualTo(0));
         }
 
         [Test]
         public void TestRateScalesOffsetsAndKps()
         {
-            // 100 BPM 双押 1/4 = 13.3 KPS；1.5x 后 20 KPS 才起效。track 时间 15ms 在 1.5x 下为真实 10ms。
+            // 100 BPM 双押 1/4 ≈ 13.3 KPS。1.5x 后为 20 KPS，track 时间 15ms 折成真实 10ms。
             var beatmap = createChart(100, chordSize: 2, quarterBeats: 128);
             var events = createEvents(beatmap, sigma: 0, missEvery: 0, fixedOffset: 15);
 
-            Assert.That(EzScoreBonusCalculator.Calculate(beatmap, events, 1).MissToJudge.JudgeBonus, Is.EqualTo(0));
+            double slowExpected = EzScoreBonusFormula.JUDGE_BONUS_MAX * EzScoreBonusFormula.JudgeWeight(40.0 / 3) * EzScoreBonusFormula.OffsetQuality(15);
+            Assert.That(EzScoreBonusCalculator.Calculate(beatmap, events, 1).MissToJudge.JudgeBonus, Is.EqualTo((int)Math.Round(slowExpected)).Within(1));
 
             var fast = EzScoreBonusCalculator.Calculate(beatmap, createEvents(beatmap, sigma: 0, missEvery: 0, fixedOffset: 15, gameplayRate: 1.5), 1.5);
             double expected = EzScoreBonusFormula.JUDGE_BONUS_MAX * EzScoreBonusFormula.JudgeWeight(20) * EzScoreBonusFormula.OffsetQuality(10);
@@ -263,6 +270,32 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             Assert.That(result.CountedNotes, Is.EqualTo(1));
             Assert.That(result.JudgeBonus, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX));
             Assert.That(result.MissPenalty, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void TestQuarterOfNotesWithinSixMsIsAboutTwentyThousand()
+        {
+            var beatmap = createChart(200, chordSize: 4, quarterBeats: 64);
+            var events = createEvents(beatmap, _ => false, fixedOffset: 20);
+
+            for (int i = 0; i < events.Count; i += 4)
+                events[i] = new HitEvent(6, 1, HitResult.Perfect, beatmap.HitObjects[i], null, null);
+
+            var result = EzScoreBonusCalculator.Calculate(beatmap, events, 1, new FixedKps(40)).MissToJudge;
+            int expected = (int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * 0.25 * EzScoreBonusFormula.OffsetQuality(6));
+
+            Assert.That(result.JudgeBonus, Is.EqualTo(expected).Within(1));
+            Assert.That(result.JudgeBonus, Is.EqualTo(20000).Within(500));
+        }
+
+        [Test]
+        public void TestTwoPercentMissBeatsMaxedJudgeBonus()
+        {
+            int penalty = EzScoreBonusFormula.MissPenalty(EzScoreBonusFormula.MISS_RATE_DISCOURAGED, judgeCoverage: 1, EzScoreBonusFormula.MISS_WEIGHT_FLOOR);
+            int maxedJudge = (int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * (1 - EzScoreBonusFormula.MISS_RATE_DISCOURAGED));
+
+            Assert.That(penalty, Is.EqualTo(-EzScoreBonusFormula.MISS_PENALTY_CAP));
+            Assert.That(maxedJudge + penalty, Is.LessThan(0));
         }
 
         /// <summary>

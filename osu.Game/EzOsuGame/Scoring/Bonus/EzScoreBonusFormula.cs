@@ -20,9 +20,9 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const double OFFSET_ZERO_MS = 16;
 
         /// <summary>
-        /// 判定加成上限（严格小于 1 万，保持在千位量级）。
+        /// 判定加成上限。25% 的 Note 在 6ms 内且权重为 1、其余无价值时约 +2 万；0ms 且权重为 1 时为 +9 万。
         /// </summary>
-        public const int JUDGE_BONUS_MAX = 9999;
+        public const int JUDGE_BONUS_MAX = 90000;
 
         /// <summary>
         /// Miss 权重下限：Miss 全落在权重最低的区间时，罚分仍保留此比例。
@@ -35,7 +35,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const double MISS_RATE_ACCEPTED = 0.005;
 
         /// <summary>
-        /// 不鼓励区：Miss 率达到此值时罚满 <see cref="MISS_PENALTY_CAP"/>（再乘 KPS 倍率）。
+        /// 不鼓励区：Miss 率达到此值时罚满 <see cref="MISS_PENALTY_CAP"/>，不再乘 KPS 倍率。
         /// </summary>
         public const double MISS_RATE_DISCOURAGED = 0.03;
 
@@ -45,9 +45,9 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
         public const double ACCEPTED_ERROR_MS = 11;
 
         /// <summary>
-        /// Miss 罚分上限（绝对值）。
+        /// Miss 罚分上限（绝对值）。高于打满的判定加成，使 2% Miss 的净值仍为负。
         /// </summary>
-        public const int MISS_PENALTY_CAP = 20000;
+        public const int MISS_PENALTY_CAP = 120000;
 
         private static readonly double log_k_denominator = Math.Log(1 + OFFSET_LOG_K);
 
@@ -55,7 +55,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             => Math.Clamp((kps - KPS_START) / (KPS_SATURATION - KPS_START), 0, 1);
 
         /// <summary>
-        /// 判定用 KPS 权重 W(K)。正向：Smoothstep，15 以下为 0，40 以上为 1；颠倒：镜像，15 以下为 1，40 以上为 0。
+        /// 判定用 KPS 权重 W(K)。正向：Smoothstep，<see cref="KPS_START"/> 以下为 0，<see cref="KPS_SATURATION"/> 以上为 1；颠倒后镜像。
         /// </summary>
         public static double JudgeWeight(double kps, bool favourHighKps = true)
         {
@@ -81,13 +81,34 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
         /// <summary>
         /// 由 Miss 率得到罚分（≤ 0）：0 到鼓励点线性升到锚点（每个 Miss 等额、不叠加）；
-        /// 鼓励点到不鼓励点按等比（对数尺度线性）升到上限；之后封顶。整条曲线再乘 Miss 所在区间的平均 KPS 权重。
+        /// 鼓励点到不鼓励点按等比（对数尺度线性）升到上限；之后封顶。
+        /// KPS 倍率只乘在鼓励区内，并随 Miss 率向不鼓励点收拢到 1。
         /// </summary>
         /// <param name="missRate">Miss 个数 / 谱面总 Note 数（普通 Note + LN）。</param>
         /// <param name="judgeCoverage">同一倾向下 Σ<see cref="JudgeWeight"/> / 计入 Note 数，用于计算鼓励点锚值。</param>
-        /// <param name="missWeight">各 Miss 的 <see cref="MissWeight"/> 平均值，作为整体倍率。</param>
+        /// <param name="missWeight">各 Miss 的 <see cref="MissWeight"/> 平均值。鼓励区内作为整体倍率。</param>
         public static int MissPenalty(double missRate, double judgeCoverage, double missWeight = 1)
-            => -(int)Math.Round(missPenaltyMagnitude(missRate, judgeCoverage) * Math.Clamp(missWeight, 0, 1));
+        {
+            double rate = Math.Max(0, missRate);
+            return -(int)Math.Round(missPenaltyMagnitude(rate, judgeCoverage) * effectiveMissWeight(rate, missWeight));
+        }
+
+        /// <summary>
+        /// 鼓励区内用 Miss 的 KPS 权重；到不鼓励点收拢为 1，差成绩不再因落在低权重区间而少罚。
+        /// </summary>
+        private static double effectiveMissWeight(double rate, double missWeight)
+        {
+            double weight = Math.Clamp(missWeight, 0, 1);
+
+            if (rate <= MISS_RATE_ACCEPTED)
+                return weight;
+
+            if (rate >= MISS_RATE_DISCOURAGED)
+                return 1;
+
+            double fade = (rate - MISS_RATE_ACCEPTED) / (MISS_RATE_DISCOURAGED - MISS_RATE_ACCEPTED);
+            return weight + (1 - weight) * fade;
+        }
 
         private static double missPenaltyMagnitude(double missRate, double judgeCoverage)
         {
