@@ -232,7 +232,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             #region 服务器与账号
 
-            SetDefault(Ez2Setting.ServerPreset, ServerPreset.Official);
+            SetDefault(Ez2Setting.ServerPreset, ServerPreset.g0v0);
             SetDefault(Ez2Setting.CustomApiUrl, string.Empty);
             SetDefault(Ez2Setting.CustomWebsiteUrl, string.Empty);
             SetDefault(Ez2Setting.CustomClientId, string.Empty);

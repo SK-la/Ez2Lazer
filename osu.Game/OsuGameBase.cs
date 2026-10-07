@@ -134,7 +134,7 @@ namespace osu.Game
 
                 return serverPreset switch
                 {
-                    ServerPreset.Gu => new GuServerEndpointConfiguration(),
+                    ServerPreset.g0v0 => new GuServerEndpointConfiguration(),
                     ServerPreset.Manual => new ManualServerEndpointConfiguration(Ez2ConfigManager),
                     _ => new ProductionEndpointConfiguration()
                 };
