@@ -54,7 +54,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var result = EzScoreBonusCalculator.Calculate(beatmap, createEvents(beatmap, sigma: 0, missEvery: 0), 1, new FixedKps(40));
 
             Assert.That(result.MissToJudge.JudgeBonus, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX));
-            Assert.That(result.MissToJudge.ErrorPenalty, Is.EqualTo(0));
+            Assert.That(result.MissToJudge.ErrorMalus, Is.EqualTo(0));
             Assert.That(result.JudgeToMiss.JudgeBonus, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX));
         }
 
@@ -65,8 +65,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var result = EzScoreBonusCalculator.Calculate(beatmap, createEvents(beatmap, sigma: 0, missEvery: 1), 1, new FixedKps(40));
 
             Assert.That(result.MissToJudge.JudgeBonus, Is.EqualTo(0));
-            Assert.That(result.MissToJudge.ErrorPenalty, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
-            Assert.That(result.JudgeToMiss.ErrorPenalty, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
+            Assert.That(result.MissToJudge.ErrorMalus, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
+            Assert.That(result.JudgeToMiss.ErrorMalus, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
         }
 
         [Test]
@@ -89,8 +89,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
 
             Assert.That(result.CountedNotes, Is.EqualTo(2));
             Assert.That(result.JudgeBonus, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX / 2));
-            Assert.That(result.ErrorPenalty, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
-            Assert.That(result.Total, Is.EqualTo(result.JudgeBonus + result.ErrorPenalty));
+            Assert.That(result.ErrorMalus, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
+            Assert.That(result.Total, Is.EqualTo(result.JudgeBonus + result.ErrorMalus));
         }
 
         [Test]
@@ -109,8 +109,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             }, 1, new FixedKps(40)).MissToJudge;
 
             Assert.That(result.JudgeBonus, Is.GreaterThan(0));
-            Assert.That(result.ErrorPenalty, Is.LessThan(0));
-            Assert.That(result.ErrorPenalty, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
+            Assert.That(result.ErrorMalus, Is.LessThan(0));
+            Assert.That(result.ErrorMalus, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
         }
 
         [Test]
@@ -127,8 +127,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var result = EzScoreBonusCalculator.Calculate(beatmap, events, 1, new FixedKps(40)).MissToJudge;
 
             Assert.That(result.JudgeBonus, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX * 9 / 10));
-            Assert.That(result.ErrorPenalty, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
-            Assert.That(result.Total, Is.EqualTo(result.JudgeBonus + result.ErrorPenalty));
+            Assert.That(result.ErrorMalus, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
+            Assert.That(result.Total, Is.EqualTo(result.JudgeBonus + result.ErrorMalus));
         }
 
         [Test]
@@ -147,7 +147,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             }, 1, new FixedKps(40)).MissToJudge;
 
             Assert.That(atWindow.JudgeBonus, Is.EqualTo(0));
-            Assert.That(atWindow.ErrorPenalty, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
+            Assert.That(atWindow.ErrorMalus, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
 
             var diluted = createChart(200, chordSize: 1, quarterBeats: 100);
             var dilutedEvents = new List<HitEvent>();
@@ -161,8 +161,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             double quality = EzScoreBonusFormula.OffsetQuality(miss_window);
             int expected = (int)Math.Round(EzScoreBonusFormula.JUDGE_BONUS_MAX * quality * EzScoreBonusFormula.ERROR_INFLUENCE / diluted.HitObjects.Count);
 
-            Assert.That(fallback.ErrorPenalty, Is.EqualTo(expected));
-            Assert.That(fallback.ErrorPenalty, Is.GreaterThan(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
+            Assert.That(fallback.ErrorMalus, Is.EqualTo(expected));
+            Assert.That(fallback.ErrorMalus, Is.GreaterThan(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
         }
 
         [Test]
@@ -181,7 +181,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                 new HitEvent(miss_window, rate, HitResult.Ok, note, null, null),
             }, rate, new FixedKps(40)).MissToJudge;
 
-            Assert.That(result.ErrorPenalty, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
+            Assert.That(result.ErrorMalus, Is.EqualTo(-EzScoreBonusFormula.JUDGE_BONUS_MAX));
         }
 
         [Test]
@@ -199,7 +199,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var result = EzScoreBonusCalculator.Calculate(beatmap, events, 1, new FixedKps(40)).MissToJudge;
 
             Assert.That(result.JudgeBonus, Is.EqualTo(EzScoreBonusFormula.JUDGE_BONUS_MAX));
-            Assert.That(result.ErrorPenalty, Is.EqualTo(0));
+            Assert.That(result.ErrorMalus, Is.EqualTo(0));
         }
 
         private static Beatmap createChart(double bpm, int chordSize, int quarterBeats)

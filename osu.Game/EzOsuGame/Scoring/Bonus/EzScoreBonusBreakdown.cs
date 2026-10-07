@@ -57,7 +57,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
                         new[]
                         {
                             createCell(EzSongSelectStrings.SCORE_BONUS_JUDGE, colours.Pink1, out judgeText),
-                            createCell(EzSongSelectStrings.SCORE_BONUS_MISS, colours.Red1, out missText),
+                            createCell(EzSongSelectStrings.SCORE_BONUS_ERROR, colours.Red1, out missText),
                             createCell(EzSongSelectStrings.SCORE_BONUS_TOTAL, Color4.White, out totalText),
                         }
                     }
@@ -83,7 +83,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
             }
 
             judgeText.Text = EzScoreBonusTracker.FormatSigned(bonus.JudgeBonus);
-            missText.Text = EzScoreBonusTracker.FormatSigned(bonus.ErrorPenalty);
+            missText.Text = EzScoreBonusTracker.FormatSigned(bonus.ErrorMalus);
             totalText.Text = EzScoreBonusTracker.TotalWithBonus(score, bonus).ToLocalisableString("N0");
         }
 

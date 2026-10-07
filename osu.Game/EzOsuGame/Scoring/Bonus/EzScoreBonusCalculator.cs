@@ -13,14 +13,14 @@ using osu.Game.Utils;
 
 namespace osu.Game.EzOsuGame.Scoring.Bonus
 {
-    public readonly record struct EzScoreBonusResult(int JudgeBonus, int ErrorPenalty, int CountedNotes)
+    public readonly record struct EzScoreBonusResult(int JudgeBonus, int ErrorMalus, int CountedNotes)
     {
-        public int Total => JudgeBonus + ErrorPenalty;
+        public int Total => JudgeBonus + ErrorMalus;
     }
 
     /// <summary>
     /// 附加分：每颗 Note 的 offset 价值再乘 KPS 权重。
-    /// 44ms 及以内算判定加成，超过 44ms 和 Miss 算失误罚分。
+    /// 44ms 及以内算判定加成，超过 44ms 和 Miss 算 Error Malus。
     /// 两边都除以总 Note 数，失误再乘 <see cref="EzScoreBonusFormula.ERROR_INFLUENCE"/>。
     /// </summary>
     public static class EzScoreBonusCalculator

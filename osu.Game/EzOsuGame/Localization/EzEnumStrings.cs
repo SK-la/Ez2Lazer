@@ -31,12 +31,12 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString JUDGE_PRECEDENCE_SCORE = new EzLocalizationManager.EzLocalisableString("分数优先(势利)", "By Score");
 
         public static readonly LocalisableString SCORE_BONUS_TENDENCY_JUDGE_TO_MISS = new EzLocalizationManager.EzLocalisableString(
-            "类余切（贴横轴）",
-            "Cotangent-like (along the axis)");
+            "高判定比例",
+            "High Judge Rate");
 
         public static readonly LocalisableString SCORE_BONUS_TENDENCY_MISS_TO_JUDGE = new EzLocalizationManager.EzLocalisableString(
-            "类反余切（贴两端）",
-            "Inverse cotangent (along ±1)");
+            "低失误率",
+            "Low Error Rate");
 
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NORMAL = new EzLocalizationManager.EzLocalisableString("正常", "Normal");
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_IN_GAME_FOCUS = new EzLocalizationManager.EzLocalisableString("游戏内聚焦", "In-game focus");

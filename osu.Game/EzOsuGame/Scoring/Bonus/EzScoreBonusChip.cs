@@ -76,7 +76,7 @@ namespace osu.Game.EzOsuGame.Scoring.Bonus
 
             TooltipText = LocalisableString.Format("{0} {1}\n{2} {3}\n{4} {5}",
                 EzSongSelectStrings.SCORE_BONUS_JUDGE, EzScoreBonusTracker.FormatSigned(bonus.JudgeBonus),
-                EzSongSelectStrings.SCORE_BONUS_MISS, EzScoreBonusTracker.FormatSigned(bonus.ErrorPenalty),
+                EzSongSelectStrings.SCORE_BONUS_ERROR, EzScoreBonusTracker.FormatSigned(bonus.ErrorMalus),
                 EzSongSelectStrings.SCORE_BONUS_TOTAL, EzScoreBonusTracker.TotalWithBonus(score, bonus).ToLocalisableString("N0"));
         }
     }
