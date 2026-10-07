@@ -647,6 +647,28 @@ namespace osu.Game.EzOsuGame.Localization
             "判定优先级",
             "Judge Precedence");
 
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY = new EzLocalizationManager.EzLocalisableString(
+            "附加分倾向",
+            "Score Bonus Tendency");
+
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "选择附加分（加成和罚分）的计算倾向。"
+            + "\n系统会根据每项『判定误差』，以及所在节拍区间的 KPS 来修正累计价值。"
+            + "\n高判定比：极致判定更有价值（6ms为上限），且『漏判』比『Miss』更糟糕。"
+            + "\n低失误率：减少『Good及以下的判定』更有价值，且『OK以下』的罚分近似『Miss』。",
+            "Choose the calculation tendency of additional scores (bonus and malus)."
+            + "\nThe system will adjust the cumulative value of each HitResult based on its 'hit offset' and the KPS of the beat interval."
+            + "\nHigh Judge Ratio: extreme Judge are more valuable (6ms as the upper limit), and 'No-Hit' is worse than 'Miss'."
+            + "\nLow Error Rate: reducing 'near or below Good' is more valuable, and malus for 'near or below OK' are nearly equivalent to 'Miss'.");
+
+        public static readonly LocalisableString SCORE_BONUS_CROSS = new EzLocalizationManager.EzLocalisableString(
+            "附加分分界",
+            "Bonus boundary");
+
+        public static readonly LocalisableString SCORE_BONUS_CROSS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "该毫秒及以内记入判定加成，超过记入 Error Malus。",
+            "Offsets at or within this value count as timing bonus. Beyond it they count as Error Malus.");
+
         public static readonly LocalisableString JUDGE_PRECEDENCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "设置优先级算法。当按键点在多个note的判定重叠区时，选择如何计算判定。"
             + "\n Combo优先(LR2风格): 选择对score有利的note进行判定；"

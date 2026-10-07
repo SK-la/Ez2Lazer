@@ -35,6 +35,8 @@ using osu.Game.Rulesets.UI;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Scoring;
 using osu.Game.Users;
@@ -82,6 +84,9 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private IEzReplaySession replaySession { get; set; } = null!;
+
+        [Resolved]
+        private EzAnalysisCache? ezAnalysisCache { get; set; }
 
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
@@ -455,14 +460,28 @@ namespace osu.Game.Screens.Select
                                                         Font = OsuFont.Style.Subtitle.With(weight: FontWeight.Light, fixedWidth: true),
                                                         Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
                                                     },
-                                                    modsContainer = new FillFlowContainer<Drawable>
+                                                    new FillFlowContainer
                                                     {
                                                         Anchor = Anchor.TopRight,
                                                         Origin = Anchor.TopRight,
                                                         AutoSizeAxes = Axes.Both,
                                                         Direction = FillDirection.Horizontal,
-                                                        Spacing = new Vector2(-10, 0),
+                                                        Spacing = new Vector2(4, 0),
                                                         Shear = sheared ? -OsuGame.SHEAR : Vector2.Zero,
+                                                        Children = new Drawable[]
+                                                        {
+                                                            EzScoreBonusTracker.AppliesTo(Score)
+                                                                ? new EzScoreBonusChip(Score) { Anchor = Anchor.CentreRight, Origin = Anchor.CentreRight }
+                                                                : Empty(),
+                                                            modsContainer = new FillFlowContainer<Drawable>
+                                                            {
+                                                                Anchor = Anchor.CentreRight,
+                                                                Origin = Anchor.CentreRight,
+                                                                AutoSizeAxes = Axes.Both,
+                                                                Direction = FillDirection.Horizontal,
+                                                                Spacing = new Vector2(-10, 0),
+                                                            },
+                                                        }
                                                     },
                                                 }
                                             }
@@ -639,9 +658,9 @@ namespace osu.Game.Screens.Select
                     items.Add(new OsuMenuItem(CommonStrings.CopyLink, MenuItemType.Standard, () => game?.CopyToClipboard($@"{api.Endpoints.WebsiteUrl}/scores/{Score.OnlineID}")));
 
                 items.Add(new OsuMenuItem(EzSongSelectStrings.RECALCULATE_SCORE_ORIGINAL_ENV, MenuItemType.Standard,
-                    () => _ = EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmaps, replaySession, Score, ReplayRunPurpose.ForStored)));
+                    () => _ = EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmaps, replaySession, Score, ReplayRunPurpose.ForStored, analysisCache: ezAnalysisCache)));
                 items.Add(new OsuMenuItem(EzSongSelectStrings.RECALCULATE_SCORE_CURRENT_ENV, MenuItemType.Standard,
-                    () => _ = EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmaps, replaySession, Score, ReplayRunPurpose.ForLive)));
+                    () => _ = EzScoreRecalculationService.RecalculateAsync(scoreManager, beatmaps, replaySession, Score, ReplayRunPurpose.ForLive, analysisCache: ezAnalysisCache)));
                 items.Add(new OsuMenuItem(EzSongSelectStrings.RENAME_PLAYER, MenuItemType.Standard, () => dialogOverlay?.Push(new RenamePlayerDialog(Score, scoreManager))));
 
                 if (Score.Files.Count <= 0) return items.ToArray();

@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
@@ -125,6 +126,27 @@ namespace osu.Game.EzOsuGame.Overlays
                 })
                 {
                     Keywords = new[] { "ez", "mania", "bms", "judge" }
+                },
+                new SettingsItemV2(new FormEnumDropdown<EzScoreBonusTendency>
+                {
+                    Caption = EzSettingsStrings.SCORE_BONUS_TENDENCY,
+                    HintText = EzSettingsStrings.SCORE_BONUS_TENDENCY_TOOLTIP,
+                    Current = ezConfig.GetBindable<EzScoreBonusTendency>(Ez2Setting.ScoreBonusTendency),
+                })
+                {
+                    Keywords = new[] { "ez", "mania", "bonus", "miss", "附加分" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.SCORE_BONUS_CROSS,
+                    HintText = EzSettingsStrings.SCORE_BONUS_CROSS_TOOLTIP,
+                    RelativeSizeAxes = Axes.X,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.ScoreBonusCrossMs),
+                    KeyboardStep = 1,
+                    LabelFormat = v => $"{v:N0} ms",
+                })
+                {
+                    Keywords = new[] { "ez", "bonus", "boundary", "分界", "44" }
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
