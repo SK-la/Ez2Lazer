@@ -666,8 +666,8 @@ namespace osu.Game.EzOsuGame.Localization
             "Bonus boundary");
 
         public static readonly LocalisableString SCORE_BONUS_CROSS_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "该毫秒及以内记入判定加成，超过记入 Error Malus。步进 1ms。",
-            "Offsets at or within this value count as timing bonus. Beyond it they count as Error Malus. Steps of 1ms.");
+            "该毫秒及以内记入判定加成，超过记入 Error Malus。",
+            "Offsets at or within this value count as timing bonus. Beyond it they count as Error Malus.");
 
         public static readonly LocalisableString JUDGE_PRECEDENCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "设置优先级算法。当按键点在多个note的判定重叠区时，选择如何计算判定。"

@@ -478,7 +478,7 @@ namespace osu.Game.Screens.Select
             }
 
             /// <summary>
-            /// 悬停卡片里、分数和评价之间的两项：判定加成、Error Malus。
+            /// 悬停卡片里、分数和评价之间的两项：判定加成、失误罚分。
             /// </summary>
             private partial class BonusLines : CompositeDrawable
             {

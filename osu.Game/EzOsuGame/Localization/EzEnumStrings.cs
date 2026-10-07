@@ -30,11 +30,11 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString JUDGE_PRECEDENCE_EARLIEST = new EzLocalizationManager.EzLocalisableString("最早note优先(osu风格)", "By Earliest Note");
         public static readonly LocalisableString JUDGE_PRECEDENCE_SCORE = new EzLocalizationManager.EzLocalisableString("分数优先(势利)", "By Score");
 
-        public static readonly LocalisableString SCORE_BONUS_TENDENCY_JUDGE_TO_MISS = new EzLocalizationManager.EzLocalisableString(
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_HIGH_JUDGE_RATIO = new EzLocalizationManager.EzLocalisableString(
             "高判定比例",
-            "High Judge Rate");
+            "High Judge Ratio");
 
-        public static readonly LocalisableString SCORE_BONUS_TENDENCY_MISS_TO_JUDGE = new EzLocalizationManager.EzLocalisableString(
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_LOW_ERROR_RATE = new EzLocalizationManager.EzLocalisableString(
             "低失误率",
             "Low Error Rate");
 
