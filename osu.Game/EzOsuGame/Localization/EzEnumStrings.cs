@@ -30,6 +30,14 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString JUDGE_PRECEDENCE_EARLIEST = new EzLocalizationManager.EzLocalisableString("最早note优先(osu风格)", "By Earliest Note");
         public static readonly LocalisableString JUDGE_PRECEDENCE_SCORE = new EzLocalizationManager.EzLocalisableString("分数优先(势利)", "By Score");
 
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_JUDGE_TO_MISS = new EzLocalizationManager.EzLocalisableString(
+            "低星注重判定 → 高星注重 Miss",
+            "Low stars: timing → High stars: misses");
+
+        public static readonly LocalisableString SCORE_BONUS_TENDENCY_MISS_TO_JUDGE = new EzLocalizationManager.EzLocalisableString(
+            "低星注重 Miss → 高星注重判定",
+            "Low stars: misses → High stars: timing");
+
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NORMAL = new EzLocalizationManager.EzLocalisableString("正常", "Normal");
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_IN_GAME_FOCUS = new EzLocalizationManager.EzLocalisableString("游戏内聚焦", "In-game focus");
         public static readonly LocalisableString NOTIFICATION_BEHAVIOUR_NEVER = new EzLocalizationManager.EzLocalisableString("永不通知", "Never notify");
@@ -46,7 +54,6 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_PP = new EzLocalizationManager.EzLocalisableString("Realm PP", "Realm PP");
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_ALL = new EzLocalizationManager.EzLocalisableString("Realm 全部元数据", "Realm all metadata");
         public static readonly LocalisableString DATA_REBUILD_TARGET_REALM_SCORES = new EzLocalizationManager.EzLocalisableString("Realm 成绩全量重算", "Realm full score recalculation");
-
         public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_MAIN = new EzLocalizationManager.EzLocalisableString("SQLite 主库 kps/KPC", "SQLite main kps/KPC");
         public static readonly LocalisableString DATA_REBUILD_TARGET_SQLITE_BRANCHES = new EzLocalizationManager.EzLocalisableString("SQLite 分支曲库 xxy/PP", "SQLite songs branches xxy/PP");
 

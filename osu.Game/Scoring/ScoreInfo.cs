@@ -257,6 +257,7 @@ namespace osu.Game.Scoring
             clone.SessionAccuracyCutoffA = SessionAccuracyCutoffA;
             clone.SessionAccuracyCutoffS = SessionAccuracyCutoffS;
             clone.SessionSettingsCaptured = SessionSettingsCaptured;
+            clone.EzBonus = EzBonus;
 
             return clone;
         }
@@ -293,6 +294,13 @@ namespace osu.Game.Scoring
         /// had a default and read back as Lazer.
         /// </summary>
         public int ManiaHealthMode { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: 附加分原始值（未按倾向加权），与 <see cref="HitEvents"/> 同为临时数据：游玩结束或 Session 重跑后才有，
+        /// 不入 Realm。<see langword="null"/> 表示未计算。
+        /// </summary>
+        [Ignored]
+        public EzOsuGame.Scoring.Bonus.EzScoreBonusResult? EzBonus { get; set; }
 
         /// <summary>
         /// Ez2Lazer: Mania offset-plus setting at gameplay start (submission eligibility snapshot).
