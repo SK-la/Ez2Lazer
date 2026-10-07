@@ -7,18 +7,18 @@ using osu.Game.EzOsuGame.Localization;
 namespace osu.Game.EzOsuGame.Scoring.Bonus
 {
     /// <summary>
-    /// 附加分倾向：两项 KPS 权重方向互为镜像。
+    /// 附加分倾向：类余切贴横轴，类反余切是它转 180° 后贴着 ±1。默认类反余切。
     /// </summary>
     public enum EzScoreBonusTendency
     {
         /// <summary>
-        /// 判定加成看重低 KPS 区间；Miss 罚分 KPS 越高越重。
+        /// 类余切：价值贴着横轴，44ms 到 16ms 加得很慢，16ms 到 6ms 加得快。
         /// </summary>
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.SCORE_BONUS_TENDENCY_JUDGE_TO_MISS))]
         JudgeToMiss = 0,
 
         /// <summary>
-        /// 判定加成看重高 KPS 区间；Miss 罚分 KPS 越低越重。
+        /// 类反余切：6–44 是类余切绕中心转 180°，价值贴着 +1 和 -1。默认。
         /// </summary>
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.SCORE_BONUS_TENDENCY_MISS_TO_JUDGE))]
         MissToJudge = 1,
