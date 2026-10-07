@@ -32,6 +32,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Performance;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.EzOsuGame.Screens.Play;
 using osu.Game.EzOsuGame.Screens.Rotation;
 using osu.Game.Online.API;
@@ -1588,6 +1589,8 @@ namespace osu.Game.Screens.Play
                 }
             }
 
+            EzScoreBonusCalculator.Apply(score.ScoreInfo, GameplayState.Beatmap);
+
             // the import process will re-attach managed beatmap/rulesets to this score. we don't want this for now, so create a temporary copy to import.
             var importableScore = score.ScoreInfo.DeepClone();
 
@@ -1612,6 +1615,8 @@ namespace osu.Game.Screens.Play
                 s.ManiaHitMode = maniaHitMode;
                 s.ManiaHealthMode = maniaHealthMode;
             });
+
+            EzScoreBonusProvider.Store(score.ScoreInfo, score.ScoreInfo.EzBonus);
 
             // [Ez] The score is now in Realm, so fold it into the local profile analysis here — the same place the
             // score lands. Fire-and-forget: the call only touches SQLite and returns, and it is idempotent, while

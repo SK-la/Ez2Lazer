@@ -4,6 +4,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Scoring
@@ -59,7 +60,47 @@ namespace osu.Game.EzOsuGame.Scoring
                 new ReplayRunRequest(databasedScore.DeepClone(), playableBeatmap, purpose),
                 cancellationToken).ConfigureAwait(false);
 
+            EzScoreBonusCalculator.Apply(result.Score.ScoreInfo, playableBeatmap);
             scoreManager.ApplyEzSessionRecalculation(scoreInfo, result.Score.ScoreInfo, purpose, result.ResolvedEnvironment!);
+            EzScoreBonusProvider.Store(scoreInfo, result.Score.ScoreInfo.EzBonus);
+        }
+
+        /// <summary>
+        /// 回放重跑（ForStored）只为得到附加分；不写 Realm，原分 / 判定统计不变。
+        /// </summary>
+        /// <returns><see langword="null"/>：非 mania、无回放或谱面不可用。</returns>
+        public static async Task<EzScoreBonusResult?> CalculateBonusAsync(
+            ScoreManager scoreManager,
+            BeatmapManager beatmapManager,
+            IEzReplaySession replaySession,
+            ScoreInfo scoreInfo,
+            CancellationToken cancellationToken = default)
+        {
+            if (scoreInfo.Ruleset.OnlineID != EzScoreBonusCalculator.MANIA_RULESET_ID)
+                return null;
+
+            var databasedScore = scoreManager.GetScore(scoreInfo);
+
+            if (databasedScore?.Replay == null || databasedScore.Replay.Frames.Count == 0)
+                return null;
+
+            var workingBeatmap = beatmapManager.GetWorkingBeatmap(scoreInfo.BeatmapInfo);
+
+            if (workingBeatmap is DummyWorkingBeatmap)
+                return null;
+
+            var playableBeatmap = workingBeatmap.GetPlayableBeatmap(scoreInfo.Ruleset, scoreInfo.Mods);
+
+            if (playableBeatmap.HitObjects.Count == 0)
+                return null;
+
+            var result = await replaySession.RunRequestAsync(
+                new ReplayRunRequest(databasedScore.DeepClone(), playableBeatmap, ReplayRunPurpose.ForStored),
+                cancellationToken).ConfigureAwait(false);
+
+            var sessionInfo = result.Score.ScoreInfo;
+            EzScoreBonusCalculator.Apply(sessionInfo, playableBeatmap);
+            return sessionInfo.EzBonus;
         }
     }
 }

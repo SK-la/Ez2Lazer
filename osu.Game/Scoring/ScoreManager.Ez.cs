@@ -68,6 +68,7 @@ namespace osu.Game.Scoring
 
             scoreInfo.ManiaHitMode = maniaHitMode!.Value;
             scoreInfo.ManiaHealthMode = maniaHealthMode!.Value;
+            scoreInfo.EzBonus = sessionInfo.EzBonus;
 
             if (scoreInfo.OnlineID > 0 || scoreInfo.LegacyOnlineID > 0)
             {
