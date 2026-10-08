@@ -11,11 +11,13 @@ using osuTK;
 namespace osu.Game.Overlays.SkinEditor
 {
     /// <summary>
-    /// 皮肤编辑器 HUD 组件通用的 X/Y 坐标滑条。
+    /// 皮肤编辑器 HUD 组件的通用设置（坐标、等比缩放）。
     /// </summary>
-    internal sealed class SkinHudPositionSettings
+    internal sealed class SkinHudCommonSettings
     {
         private const float position_slider_range = 2000;
+        private const float scale_min = 0.01f;
+        private const float scale_max = 10f;
 
         private readonly Drawable component;
 
@@ -37,25 +39,36 @@ namespace osu.Game.Overlays.SkinEditor
             Value = 0,
         };
 
-        private bool internalPositionUpdate;
+        private readonly BindableFloat scale = new BindableFloat
+        {
+            MinValue = scale_min,
+            MaxValue = scale_max,
+            Precision = 0.01f,
+            Default = 1,
+            Value = 1,
+        };
 
-        public static SkinHudPositionSettings? TryCreate(Drawable component)
+        private bool internalSliderUpdate;
+
+        public static SkinHudCommonSettings? TryCreate(Drawable component)
         {
             if (component is not ISerialisableDrawable)
                 return null;
 
-            return new SkinHudPositionSettings(component);
+            return new SkinHudCommonSettings(component);
         }
 
-        private SkinHudPositionSettings(Drawable component)
+        private SkinHudCommonSettings(Drawable component)
         {
             this.component = component;
 
             positionX.Value = component.Position.X;
             positionY.Value = component.Position.Y;
+            scale.Value = component.Scale.X;
 
             positionX.BindValueChanged(_ => updateComponentPositionFromSliders());
             positionY.BindValueChanged(_ => updateComponentPositionFromSliders());
+            scale.BindValueChanged(_ => updateComponentScaleFromSlider());
         }
 
         public Drawable[] CreateControls() => new Drawable[]
@@ -74,17 +87,23 @@ namespace osu.Game.Overlays.SkinEditor
                 Current = positionY,
                 KeyboardStep = positionY.Precision,
             },
+            new SettingsSlider<float>
+            {
+                LabelText = "Scale",
+                TooltipText = SkinEditorStrings.ResetScale,
+                Current = scale,
+                KeyboardStep = scale.Precision,
+            },
         };
 
         public void SyncFromComponent()
         {
-            if (internalPositionUpdate)
+            if (internalSliderUpdate)
                 return;
 
-            // 同步期间必须屏蔽回写：设置 positionX 会经 ValueChanged 立刻调回 updateComponentPositionFromSliders，
-            // 而那时 positionY 还是旧值，组件 Y 会被静默改成滑条旧值；等轮到 Y 时组件已被改回旧值，
-            // 比较相等于是跳过，组件就永久停在错的 Y 上（组件实例复用后换了位置时必现）。
-            internalPositionUpdate = true;
+            // 同步期间必须屏蔽回写：设置其中一个滑条会经 ValueChanged 立刻写回组件，
+            // 而其余滑条还是旧值，组件会被静默改回去。
+            internalSliderUpdate = true;
 
             if (positionX.Value != component.Position.X)
                 positionX.Value = component.Position.X;
@@ -92,17 +111,30 @@ namespace osu.Game.Overlays.SkinEditor
             if (positionY.Value != component.Position.Y)
                 positionY.Value = component.Position.Y;
 
-            internalPositionUpdate = false;
+            if (scale.Value != component.Scale.X)
+                scale.Value = component.Scale.X;
+
+            internalSliderUpdate = false;
         }
 
         private void updateComponentPositionFromSliders()
         {
-            if (internalPositionUpdate)
+            if (internalSliderUpdate)
                 return;
 
-            internalPositionUpdate = true;
+            internalSliderUpdate = true;
             component.Position = new Vector2(positionX.Value, positionY.Value);
-            internalPositionUpdate = false;
+            internalSliderUpdate = false;
+        }
+
+        private void updateComponentScaleFromSlider()
+        {
+            if (internalSliderUpdate)
+                return;
+
+            internalSliderUpdate = true;
+            component.Scale = new Vector2(scale.Value);
+            internalSliderUpdate = false;
         }
     }
 }

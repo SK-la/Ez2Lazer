@@ -25,7 +25,6 @@ using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Skinning;
 using osu.Game.Utils;
-using osuTK;
 
 namespace osu.Game.EzOsuGame.HUD
 {
@@ -53,14 +52,6 @@ namespace osu.Game.EzOsuGame.HUD
             MinValue = 1,
             MaxValue = 240,
             Precision = 1f
-        };
-
-        [SettingSource("Scale")]
-        public BindableNumber<float> TextureScale { get; } = new BindableNumber<float>(1)
-        {
-            MinValue = 0.01f,
-            MaxValue = 10f,
-            Precision = 0.01f
         };
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), SettingControlType = typeof(EzSettingsColour))]
@@ -119,7 +110,6 @@ namespace osu.Game.EzOsuGame.HUD
             SpriteName.BindValueChanged(_ => scheduleReload());
             FrameTemplate.BindValueChanged(_ => scheduleReload());
 
-            TextureScale.BindValueChanged(_ => applyVisualSettings(), true);
             AccentColour.BindValueChanged(_ => applyVisualSettings(), true);
             Blend.BindValueChanged(_ => applyVisualSettings(), true);
         }
@@ -267,7 +257,6 @@ namespace osu.Game.EzOsuGame.HUD
         {
             if (currentDrawable != null)
             {
-                currentDrawable.Scale = new Vector2(TextureScale.Value);
                 currentDrawable.Colour = AccentColour.Value;
                 currentDrawable.Blending = getBlendingParameters(Blend.Value);
             }

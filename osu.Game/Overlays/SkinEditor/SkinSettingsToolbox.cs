@@ -22,7 +22,7 @@ namespace osu.Game.Overlays.SkinEditor
         protected override Container<Drawable> Content { get; }
 
         private readonly Drawable component;
-        private SkinHudPositionSettings? positionSettings;
+        private SkinHudCommonSettings? commonSettings;
 
         public SkinSettingsToolbox(Drawable component)
             : base(SkinEditorStrings.Settings(component.GetType().Name))
@@ -44,11 +44,11 @@ namespace osu.Game.Overlays.SkinEditor
             var controls = component.CreateSettingsControls().ToArray();
             Drawable[] positionControls = [];
 
-            positionSettings = SkinHudPositionSettings.TryCreate(component);
+            commonSettings = SkinHudCommonSettings.TryCreate(component);
 
-            if (positionSettings != null)
+            if (commonSettings != null)
             {
-                positionControls = positionSettings.CreateControls();
+                positionControls = commonSettings.CreateControls();
                 Content.AddRange(positionControls);
             }
 
@@ -66,7 +66,7 @@ namespace osu.Game.Overlays.SkinEditor
         protected override void Update()
         {
             base.Update();
-            positionSettings?.SyncFromComponent();
+            commonSettings?.SyncFromComponent();
         }
     }
 }
