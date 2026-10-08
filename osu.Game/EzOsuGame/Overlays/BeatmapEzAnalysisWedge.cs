@@ -86,11 +86,13 @@ namespace osu.Game.EzOsuGame.Overlays
                                         {
                                             Anchor = Anchor.TopLeft,
                                             Origin = Anchor.TopLeft,
+                                            BackgroundColour = { Value= Colour4.Transparent },
                                         },
                                         rightRadar = new EzHUDRadarPanel
                                         {
                                             Anchor = Anchor.TopLeft,
                                             Origin = Anchor.TopLeft,
+                                            BackgroundColour = { Value= Colour4.Transparent },
                                         },
                                     },
                                 },

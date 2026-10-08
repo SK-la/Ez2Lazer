@@ -67,20 +67,12 @@ namespace osu.Game.Skinning
                 case GlobalSkinnableContainerLookup containerLookup:
                     switch (containerLookup.Lookup)
                     {
-                        case GlobalSkinnableContainers.SongSelect:
-                            var songSelectComponents = new DefaultSkinComponentsContainer(c =>
-                            {
-                                var dim = c.OfType<EzHUDRadarPanel>().FirstOrDefault();
-
-                                if (dim != null)
-                                {
-                                    dim.Anchor = Anchor.BottomCentre;
-                                    dim.Origin = Anchor.Centre;
-                                    dim.Position = new Vector2(-80, -150);
-                                }
-                            });
-
-                            return songSelectComponents;
+                        // case GlobalSkinnableContainers.SongSelect:
+                        //     var songSelectComponents = new DefaultSkinComponentsContainer(c =>
+                        //     {
+                        //     });
+                        //
+                        //     return songSelectComponents;
 
                         case GlobalSkinnableContainers.MainHUDComponents:
 

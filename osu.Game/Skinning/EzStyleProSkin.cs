@@ -77,44 +77,12 @@ namespace osu.Game.Skinning
                 case GlobalSkinnableContainerLookup containerLookup:
                     switch (containerLookup.Lookup)
                     {
-                        case GlobalSkinnableContainers.SongSelect:
-                            var songSelectComponents = new DefaultSkinComponentsContainer(c =>
-                            {
-                                var radars = c.OfType<EzHUDRadarPanel>().ToArray();
-
-                                if (radars.Length >= 2)
-                                {
-                                    var r1 = radars[0];
-                                    var r2 = radars[1];
-
-                                    r1.Anchor = Anchor.BottomLeft;
-                                    r1.Origin = Anchor.BottomLeft;
-                                    r1.Position = new Vector2(-1, -65);
-                                    r1.RadarDisplayMode.Value = EzRadarDisplayMode.XxySrPattern;
-
-                                    r2.Anchor = Anchor.BottomLeft;
-                                    r2.Origin = Anchor.BottomLeft;
-                                    r2.Position = new Vector2(r1.DrawWidth - 2, -65);
-                                    r2.RadarDisplayMode.Value = EzRadarDisplayMode.KeyPattern;
-                                }
-
-                                var p = c.OfType<EzHUDSpritePlus>().FirstOrDefault();
-
-                                if (p != null)
-                                {
-                                    p.ModifyPath.Value = "Tachie";
-                                    p.SpriteName.Value = "plus";
-                                }
-                            })
-                            {
-                                Children = new Drawable[]
-                                {
-                                    new EzHUDRadarPanel(),
-                                    new EzHUDRadarPanel()
-                                }
-                            };
-
-                            return songSelectComponents;
+                        // case GlobalSkinnableContainers.SongSelect:
+                        //     var songSelectComponents = new DefaultSkinComponentsContainer(c =>
+                        //     {
+                        //     });
+                        //
+                        //     return songSelectComponents;
 
                         case GlobalSkinnableContainers.MainHUDComponents:
 
