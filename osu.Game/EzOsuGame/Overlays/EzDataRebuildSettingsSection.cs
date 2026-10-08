@@ -85,7 +85,7 @@ namespace osu.Game.EzOsuGame.Overlays
             refreshButton.Enabled.Value = skillStore != null;
             refreshButton.Action = statusNote.Measure;
 
-            // The note measures when present on-screen; keep the button disabled while a measurement is in flight.
+            // The note auto-measures after scroll-into-view; keep the button disabled while a measurement is in flight.
             statusNote.Measuring.BindValueChanged(m => refreshButton.Enabled.Value = skillStore != null && !m.NewValue);
 
             subsection.Add(refreshButton);

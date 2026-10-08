@@ -12,6 +12,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
+using osu.Framework.Utils;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
@@ -26,7 +27,7 @@ namespace osu.Game.EzOsuGame.Overlays
 {
     /// <summary>
     /// Readout for the chart / player skill chains. The sweep walks every mania chart plus the three facet tables,
-    /// so measurement stays on a background task and is deferred until this control is on-screen in settings.
+    /// so measurement stays on a background task and runs only after the user scrolls this readout into the settings viewport.
     /// Reports through a <see cref="SettingsNote"/>: informational when everything is current, warning when a pass
     /// would still have work to do, critical when the measurement itself failed.
     /// </summary>
@@ -44,7 +45,10 @@ namespace osu.Game.EzOsuGame.Overlays
         public readonly BindableBool Measuring = new BindableBool();
 
         private int measuring;
-        private bool autoMeasureScheduled;
+        private bool autoMeasureCompleted;
+        private double? scrolledIntoViewAt;
+
+        private const double auto_measure_dwell_ms = 500;
 
         /// <param name="profileStore">
         /// The SQLite archive, read to name the players whose plays the chart chain has not rated yet. Without it the
@@ -76,14 +80,39 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             base.UpdateAfterChildren();
 
-            if (autoMeasureScheduled || skillStore == null)
+            if (autoMeasureCompleted || skillStore == null)
                 return;
 
-            if (!IsPresent)
+            if (!isScrolledIntoView())
+            {
+                scrolledIntoViewAt = null;
+                return;
+            }
+
+            scrolledIntoViewAt ??= Time.Current;
+
+            if (Time.Current - scrolledIntoViewAt < auto_measure_dwell_ms)
                 return;
 
-            autoMeasureScheduled = true;
+            autoMeasureCompleted = true;
+            EzStartupTrace.Log("SkillDataStatus.Measure scheduled (scrolled into view)");
             Measure();
+        }
+
+        private bool isScrolledIntoView()
+        {
+            if (!IsPresent)
+                return false;
+
+            for (Drawable? node = this; node != null; node = node.Parent as Drawable)
+            {
+                if (node is not IScrollContainer)
+                    continue;
+
+                return Precision.AlmostIntersects(node.ScreenSpaceDrawQuad.AABBFloat, ScreenSpaceDrawQuad.AABBFloat);
+            }
+
+            return false;
         }
 
         /// <summary>
