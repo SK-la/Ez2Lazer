@@ -202,7 +202,6 @@ namespace osu.Game.Overlays.Mods
                                     Anchor = Anchor.TopRight,
                                     Origin = Anchor.TopRight,
                                     Width = 400,
-                                    Shear = OsuGame.SHEAR,
                                     State = { Value = Visibility.Visible },
                                 }
                             }
