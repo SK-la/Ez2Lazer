@@ -10,7 +10,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Sprites;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
@@ -45,7 +44,7 @@ namespace osu.Game.EzOsuGame.HUD
         public Bindable<EzEnumHitResult> SkipBetterJudgement { get; } = new Bindable<EzEnumHitResult>();
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.PLAYBACK_FPS_LABEL), nameof(EzHUDStrings.PLAYBACK_FPS_DESCRIPTION))]
-        public BindableNumber<float> FPS { get; } = new BindableNumber<float>(60)
+        public BindableNumber<float> FPS { get; } = new BindableNumber<float>(30)
         {
             MinValue = 1,
             MaxValue = 240,
@@ -54,6 +53,9 @@ namespace osu.Game.EzOsuGame.HUD
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_ANIMATION_TEMPLATE_LABEL), nameof(EzHUDStrings.HITRESULT_ANIMATION_TEMPLATE_DESCRIPTION), SettingControlType = typeof(SettingsTextBox))]
         public Bindable<string> AnimationFrameTemplate { get; } = new Bindable<string>("{result}/frame_{0}");
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_FORCE_DEFORM_LABEL), nameof(EzHUDStrings.HITRESULT_FORCE_DEFORM_DESCRIPTION))]
+        public BindableBool ForceDeformAnimation { get; } = new BindableBool(true);
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
@@ -295,32 +297,43 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void configureJudgementDrawable(HitResult result, Drawable drawable, double frameLength)
         {
-            if (drawable is Sprite)
-            {
-                drawable.Anchor = Anchor.Centre;
-                drawable.Origin = Anchor.Centre;
-                drawable.Scale = new Vector2(0.5f);
-                drawable.Alpha = 0;
-                drawable.Blending = hitResultBlending.Value;
+            drawable.Anchor = Anchor.Centre;
+            drawable.Origin = Anchor.Centre;
+            drawable.Blending = hitResultBlending.Value;
 
-                Schedule(() => PlayAnimation(result, drawable));
-            }
-            else if (drawable is TextureAnimation animation)
+            if (drawable is TextureAnimation animation)
             {
-                animation.Anchor = Anchor.Centre;
-                animation.Origin = Anchor.Centre;
-                animation.Scale = new Vector2(1.2f);
-                animation.Loop = false;
+                // 强制变形时多帧只负责循环，播完与否由变形的淡出决定。
+                animation.Loop = ForceDeformAnimation.Value;
                 animation.DefaultFrameLength = frameLength;
+            }
 
-                PlayAnimationGif(result, animation);
+            if (ForceDeformAnimation.Value)
+            {
+                drawable.Alpha = 0;
 
-                animation.OnUpdate += _ =>
+                if (drawable is not TextureAnimation)
+                    drawable.Scale = new Vector2(0.5f);
+
+                // 等加载后再变形，避免 applyFadeEffect 因未加载直接返回。
+                Schedule(() => PlayAnimation(result, drawable));
+                return;
+            }
+
+            drawable.Alpha = 1;
+
+            if (drawable is TextureAnimation playing)
+            {
+                playing.Scale = new Vector2(1.2f);
+                Schedule(() => PlayAnimationGif(result, playing));
+                playing.OnUpdate += _ =>
                 {
-                    if (animation.CurrentFrameIndex == animation.FrameCount - 1)
-                        animation.Expire();
+                    if (playing.CurrentFrameIndex == playing.FrameCount - 1)
+                        playing.Expire();
                 };
             }
+            else
+                drawable.Scale = new Vector2(0.5f);
         }
 
         /// <summary>
@@ -475,8 +488,12 @@ namespace osu.Game.EzOsuGame.HUD
             // 防止空引用异常
             if (drawable == null) return;
 
-            double flashSpeed = FPS.Value * 2;
-            applyFadeEffect(hitResult, drawable, flashSpeed);
+            // 这里只保留变形。
+            if (drawable is not TextureAnimation)
+            {
+                double flashSpeed = FPS.Value * 2;
+                applyFadeEffect(hitResult, drawable, flashSpeed);
+            }
 
             switch (hitResult)
             {

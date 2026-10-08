@@ -114,6 +114,17 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString HITRESULT_ANIMATION_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString(
             "动画路径模板", "Animation Path Template");
 
+        public static readonly LocalisableString HITRESULT_FORCE_DEFORM_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "强制变形动画", "Force Deform Animation");
+
+        public static readonly LocalisableString HITRESULT_FORCE_DEFORM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后，强制使用内部变形动画模板。"
+            + "\n多帧在变形期间循环播放，结束时机由变形动画决定。"
+            + "\n关闭后按资源本身播放，播完即结束。",
+            "When enabled, the internal deformation animation template is enforced."
+            + "\nMultiple frames loop during deformation; the end timing is determined by the deformation animation."
+            + "\nWhen disabled, the animation plays according to the resource itself and ends once finished.");
+
         public static readonly LocalisableString HITRESULT_ANIMATION_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "在 GameTheme/…/judgement/ 下按帧加载时的相对路径模板（在自动探测 result-0、result_0 之后尝试）。"
             + "\n占位符：{result} 为判定资源名；{0}、{00} 等为帧序号。"
