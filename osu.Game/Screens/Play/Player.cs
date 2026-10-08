@@ -1593,11 +1593,8 @@ namespace osu.Game.Screens.Play
                 }
             }
 
-            if (!EzScoreBonusTracker.IsEnabled)
-            {
-                EzScoreBonusCalculator.Apply(score.ScoreInfo, GameplayState.Beatmap, cachedKps: null);
-            }
-            else
+            // Hidden skips bonus calculation only. The score itself still has to be imported.
+            if (EzScoreBonusTracker.IsEnabled)
             {
                 IReadOnlyList<double> cachedKps = null;
 
@@ -1610,39 +1607,40 @@ namespace osu.Game.Screens.Play
                 }
 
                 EzScoreBonusCalculator.Apply(score.ScoreInfo, GameplayState.Beatmap, cachedKps);
+            }
 
-                // the import process will re-attach managed beatmap/rulesets to this score. we don't want this for now, so create a temporary copy to import.
-                var importableScore = score.ScoreInfo.DeepClone();
+            // the import process will re-attach managed beatmap/rulesets to this score. we don't want this for now, so create a temporary copy to import.
+            var importableScore = score.ScoreInfo.DeepClone();
 
-                int maniaHitMode = importableScore.ManiaHitMode;
-                int maniaHealthMode = importableScore.ManiaHealthMode;
+            int maniaHitMode = importableScore.ManiaHitMode;
+            int maniaHealthMode = importableScore.ManiaHealthMode;
 
-                var imported = scoreManager.Import(importableScore, replayReader);
-                Debug.Assert(imported != null);
+            var imported = scoreManager.Import(importableScore, replayReader);
+            Debug.Assert(imported != null);
 
-                imported!.PerformRead(s =>
-                {
-                    // because of the clone above, it's required that we copy back the post-import hash/ID to use for availability matching.
-                    score.ScoreInfo.Hash = s.Hash;
-                    score.ScoreInfo.ID = s.ID;
-                    score.ScoreInfo.Files.AddRange(s.Files.Detach());
-                    score.ScoreInfo.ManiaHitMode = s.ManiaHitMode;
-                    score.ScoreInfo.ManiaHealthMode = s.ManiaHealthMode;
-                });
+            imported!.PerformRead(s =>
+            {
+                // because of the clone above, it's required that we copy back the post-import hash/ID to use for availability matching.
+                score.ScoreInfo.Hash = s.Hash;
+                score.ScoreInfo.ID = s.ID;
+                score.ScoreInfo.Files.AddRange(s.Files.Detach());
+                score.ScoreInfo.ManiaHitMode = s.ManiaHitMode;
+                score.ScoreInfo.ManiaHealthMode = s.ManiaHealthMode;
+            });
 
-                imported.PerformWrite(s =>
-                {
-                    s.ManiaHitMode = maniaHitMode;
-                    s.ManiaHealthMode = maniaHealthMode;
-                });
+            imported.PerformWrite(s =>
+            {
+                s.ManiaHitMode = maniaHitMode;
+                s.ManiaHealthMode = maniaHealthMode;
+            });
 
+            if (EzScoreBonusTracker.IsEnabled)
                 EzScoreBonusProvider.Store(score.ScoreInfo, score.ScoreInfo.EzBonus);
 
-                // [Ez] The score is now in Realm, so fold it into the local profile analysis here — the same place the
-                // score lands. Fire-and-forget: the call only touches SQLite and returns, and it is idempotent, while
-                // the startup warmup re-derives the Realm-side skill rows from whatever the slice now holds.
-                ezLocalProfileService?.IngestSettledScore(score.ScoreInfo.ID);
-            }
+            // [Ez] The score is now in Realm, so fold it into the local profile analysis here — the same place the
+            // score lands. Fire-and-forget: the call only touches SQLite and returns, and it is idempotent, while
+            // the startup warmup re-derives the Realm-side skill rows from whatever the slice now holds.
+            ezLocalProfileService?.IngestSettledScore(score.ScoreInfo.ID);
         }
 
         /// <summary>
