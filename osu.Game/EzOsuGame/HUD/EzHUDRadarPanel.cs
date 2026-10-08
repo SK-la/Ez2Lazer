@@ -11,10 +11,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
@@ -31,10 +28,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
-using Triangle = osu.Framework.Graphics.Primitives.Triangle;
 
 namespace osu.Game.EzOsuGame.HUD
 {
@@ -108,22 +102,22 @@ namespace osu.Game.EzOsuGame.HUD
         public BindableColour4 LabelColour { get; } = new BindableColour4(new Color4(255, 230, 128, 255));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(255, 255, 210, 230));
+        public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(32, 32, 32, 240));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_AREA_COLOUR), nameof(EzHUDStrings.RADAR_BASE_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 BaseAreaColour { get; } = new BindableColour4(new Color4(255, 255, 200, 128));
+        public BindableColour4 BaseAreaColour { get; } = new BindableColour4(new Color4(44, 44, 50, 128));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DATA_LINE_COLOUR), nameof(EzHUDStrings.RADAR_DATA_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 DataLineColour { get; } = new BindableColour4(new Color4(255, 230, 128, 230));
+        public BindableColour4 DataLineColour { get; } = new BindableColour4(new Color4(255, 217, 102, 230));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 DataAreaColour { get; } = new BindableColour4(new Color4(255, 215, 0, 128));
+        public BindableColour4 DataAreaColour { get; } = new BindableColour4(new Color4(255, 217, 102, 128));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_PLAYER_DATA_LINE_COLOUR), nameof(EzHUDStrings.RADAR_PLAYER_DATA_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 PlayerDataLineColour { get; } = new BindableColour4(new Color4(80, 220, 120, 230));
+        public BindableColour4 PlayerDataLineColour { get; } = new BindableColour4(new Color4(133, 196, 108, 230));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_PLAYER_DATA_AREA_COLOUR), nameof(EzHUDStrings.RADAR_PLAYER_DATA_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 PlayerDataAreaColour { get; } = new BindableColour4(new Color4(80, 220, 120, 128));
+        public BindableColour4 PlayerDataAreaColour { get; } = new BindableColour4(new Color4(133, 196, 108, 128));
 
         /// <summary>Target player for Skill-mode SSR overlay. Externally bindable (e.g. EzAnalysis header).</summary>
         public Bindable<string?> TargetUsername { get; } = new Bindable<string?>();
@@ -179,7 +173,7 @@ namespace osu.Game.EzOsuGame.HUD
         private ModSettingChangeTracker? modSettingTracker;
 
         private Container? axisLabelContainer;
-        private RadarChart? chart;
+        private EzHUDRadarChart? chart;
         private Box background = null!;
         private FillFlowContainer[] axisLabelContainers = Array.Empty<FillFlowContainer>();
         private string[] activeAxisLabels = default_axis_labels;
@@ -242,10 +236,8 @@ namespace osu.Game.EzOsuGame.HUD
                         },
                     },
                 },
-                chart = new RadarChart
+                chart = new EzHUDRadarChart
                 {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
                     AxisCount = parameterRatios.Length,
                     Size = new Vector2(chart_size),
                     GridLevels = 4,
@@ -642,7 +634,7 @@ namespace osu.Game.EzOsuGame.HUD
                 selected.Add(axis);
             }
 
-            // Beatmap: show every real MSD axis above the hub display floor (pad to 3 for RadarChart).
+            // Beatmap: show every real MSD axis above the hub display floor (pad to 3 for EzRadarChart).
             // Dual with no overlap: fall back to chart axes.
             if (selected.Count == 0 && !beatmapOnly)
             {
@@ -992,7 +984,7 @@ namespace osu.Game.EzOsuGame.HUD
             chart.SecondaryDataStrokeColour = PlayerDataLineColour.Value;
             chart.SecondaryDataPointColour = PlayerDataLineColour.Value;
             chart.SecondaryDataFillColour = PlayerDataAreaColour.Value;
-            chart.Invalidate(Invalidation.DrawNode);
+            chart.InvalidateChartGeometry();
 
             foreach (var container in axisLabelContainers)
             {
@@ -1107,403 +1099,6 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             base.Dispose(isDisposing);
-        }
-    }
-
-    public partial class RadarChart : Drawable
-    {
-        private int axisCount = 6;
-        private float[] dataRatios = new float[6];
-        private float[]? secondaryDataRatios;
-        private Texture? whitePixel;
-
-        public int AxisCount
-        {
-            get => axisCount;
-            set
-            {
-                int clamped = Math.Max(3, value);
-
-                if (axisCount == clamped)
-                    return;
-
-                axisCount = clamped;
-                Array.Resize(ref dataRatios, axisCount);
-                if (secondaryDataRatios != null)
-                    Array.Resize(ref secondaryDataRatios, axisCount);
-                Invalidate(Invalidation.DrawNode);
-            }
-        }
-
-        public int GridLevels { get; set; } = 4;
-
-        public float RadiusRatio { get; set; } = 0.82f;
-
-        public float GridThickness { get; set; } = 1.5f;
-
-        public float AxisThickness { get; set; } = 1.5f;
-
-        public float DataOutlineThickness { get; set; } = 2.2f;
-
-        public float DataPointSize { get; set; } = 5f;
-
-        public Color4 GridColour { get; set; } = new Color4(255, 255, 210, 110);
-
-        public Color4 AxisColour { get; set; } = new Color4(255, 255, 210, 95);
-
-        public Color4 BaseFillColour { get; set; } = new Color4(255, 255, 200, 30);
-
-        public Color4 DataFillColour { get; set; } = new Color4(255, 215, 0, 95);
-
-        public Color4 DataStrokeColour { get; set; } = new Color4(255, 230, 128, 230);
-
-        public Color4 DataPointColour { get; set; } = new Color4(255, 242, 176, 255);
-
-        public Color4 SecondaryDataFillColour { get; set; } = new Color4(80, 220, 120, 95);
-
-        public Color4 SecondaryDataStrokeColour { get; set; } = new Color4(80, 220, 120, 230);
-
-        public Color4 SecondaryDataPointColour { get; set; } = new Color4(120, 240, 160, 255);
-
-        public RadarChart()
-        {
-            Anchor = Anchor.Centre;
-            Origin = Anchor.Centre;
-        }
-
-        [BackgroundDependencyLoader]
-        private void load(IRenderer renderer)
-        {
-            whitePixel = createWhitePixelTexture(renderer);
-        }
-
-        private static Texture createWhitePixelTexture(IRenderer renderer)
-        {
-            var texture = renderer.CreateTexture(1, 1, true);
-            var image = new Image<Rgba32>(1, 1);
-            image[0, 0] = new Rgba32(255, 255, 255, 255);
-            texture.SetData(new TextureUpload(image));
-            return texture;
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-                whitePixel?.Dispose();
-
-            base.Dispose(isDisposing);
-        }
-
-        public void SetData(IReadOnlyList<float> ratios)
-        {
-            for (int i = 0; i < axisCount; i++)
-                dataRatios[i] = i < ratios.Count ? Math.Clamp(ratios[i], 0, 1) : 0;
-
-            Invalidate(Invalidation.DrawNode);
-        }
-
-        public void SetSecondaryData(IReadOnlyList<float> ratios)
-        {
-            secondaryDataRatios ??= new float[axisCount];
-            if (secondaryDataRatios.Length != axisCount)
-                Array.Resize(ref secondaryDataRatios, axisCount);
-
-            for (int i = 0; i < axisCount; i++)
-                secondaryDataRatios[i] = i < ratios.Count ? Math.Clamp(ratios[i], 0, 1) : 0;
-
-            Invalidate(Invalidation.DrawNode);
-        }
-
-        public void ClearSecondaryData()
-        {
-            secondaryDataRatios = null;
-            Invalidate(Invalidation.DrawNode);
-        }
-
-        protected override DrawNode CreateDrawNode() => new RadarChartDrawNode(this);
-
-        private class RadarChartDrawNode : DrawNode
-        {
-            private readonly RadarChart source;
-
-            private float[] ratios = Array.Empty<float>();
-            private float[]? secondaryRatios;
-            private int axisCount;
-
-            private int gridLevels;
-            private float radiusRatio;
-            private float gridThickness;
-            private float axisThickness;
-            private float dataOutlineThickness;
-            private float dataPointSize;
-
-            private Color4 gridColour;
-            private Color4 axisColour;
-            private Color4 baseFillColour;
-            private Color4 dataFillColour;
-            private Color4 dataStrokeColour;
-            private Color4 dataPointColour;
-            private Color4 secondaryDataFillColour;
-            private Color4 secondaryDataStrokeColour;
-            private Color4 secondaryDataPointColour;
-
-            private Vector2 drawSize;
-            private Texture? texture;
-
-            // Reused across Draw frames — never allocate Vector2[] per frame.
-            private Vector2[] outerVertices = Array.Empty<Vector2>();
-            private Vector2[] levelVertices = Array.Empty<Vector2>();
-            private Vector2[] primaryVertices = Array.Empty<Vector2>();
-            private Vector2[] secondaryVertices = Array.Empty<Vector2>();
-
-            public RadarChartDrawNode(RadarChart chart)
-                : base(chart)
-            {
-                source = chart;
-            }
-
-            public override void ApplyState()
-            {
-                base.ApplyState();
-
-                texture = source.whitePixel;
-
-                drawSize = source.DrawSize;
-                axisCount = source.AxisCount;
-
-                if (ratios.Length != axisCount)
-                    Array.Resize(ref ratios, axisCount);
-
-                ensureVertexCapacity(ref outerVertices, axisCount);
-                ensureVertexCapacity(ref levelVertices, axisCount);
-                ensureVertexCapacity(ref primaryVertices, axisCount);
-                ensureVertexCapacity(ref secondaryVertices, axisCount);
-
-                gridLevels = Math.Max(1, source.GridLevels);
-                radiusRatio = Math.Clamp(source.RadiusRatio, 0.1f, 1);
-                gridThickness = Math.Max(0.5f, source.GridThickness);
-                axisThickness = Math.Max(0.5f, source.AxisThickness);
-                dataOutlineThickness = Math.Max(0.5f, source.DataOutlineThickness);
-                dataPointSize = Math.Max(1, source.DataPointSize);
-
-                gridColour = source.GridColour;
-                axisColour = source.AxisColour;
-                baseFillColour = source.BaseFillColour;
-                dataFillColour = source.DataFillColour;
-                dataStrokeColour = source.DataStrokeColour;
-                dataPointColour = source.DataPointColour;
-                secondaryDataFillColour = source.SecondaryDataFillColour;
-                secondaryDataStrokeColour = source.SecondaryDataStrokeColour;
-                secondaryDataPointColour = source.SecondaryDataPointColour;
-
-                for (int i = 0; i < axisCount; i++)
-                    ratios[i] = source.dataRatios[i];
-
-                if (source.secondaryDataRatios == null)
-                {
-                    secondaryRatios = null;
-                }
-                else
-                {
-                    secondaryRatios ??= new float[axisCount];
-                    if (secondaryRatios.Length != axisCount)
-                        Array.Resize(ref secondaryRatios, axisCount);
-
-                    for (int i = 0; i < axisCount; i++)
-                        secondaryRatios[i] = source.secondaryDataRatios[i];
-                }
-            }
-
-            protected override void Draw(IRenderer renderer)
-            {
-                if (texture == null)
-                    return;
-
-                float radius = Math.Min(drawSize.X, drawSize.Y) * 0.5f * radiusRatio;
-                if (radius <= 0)
-                    return;
-
-                Vector2 center = drawSize * 0.5f;
-
-                renderer.PushLocalMatrix(DrawInfo.Matrix);
-
-                fillVerticesUniform(outerVertices, center, radius, 1);
-                drawPolygonFill(renderer, outerVertices, baseFillColour);
-
-                for (int level = 1; level <= gridLevels; level++)
-                {
-                    float ratio = level / (float)gridLevels;
-                    fillVerticesUniform(levelVertices, center, radius, ratio);
-                    drawPolygonOutline(renderer, levelVertices, gridColour, gridThickness);
-                }
-
-                for (int i = 0; i < axisCount; i++)
-                    drawLine(renderer, center, outerVertices[i], axisColour, axisThickness);
-
-                fillVerticesFromRatios(primaryVertices, center, radius, ratios);
-
-                if (secondaryRatios == null)
-                {
-                    drawFanFill(renderer, center, primaryVertices, dataFillColour);
-                    drawPolygonOutline(renderer, primaryVertices, dataStrokeColour, dataOutlineThickness);
-                    drawPoints(renderer, primaryVertices, dataPointColour, dataPointSize);
-                }
-                else
-                {
-                    fillVerticesFromRatios(secondaryVertices, center, radius, secondaryRatios);
-
-                    // Smaller coverage draws above so both polygons stay readable when nested.
-                    bool primaryIsSmaller = averageRatio(ratios) <= averageRatio(secondaryRatios);
-
-                    if (primaryIsSmaller)
-                    {
-                        drawFanFill(renderer, center, secondaryVertices, secondaryDataFillColour);
-                        drawPolygonOutline(renderer, secondaryVertices, secondaryDataStrokeColour, dataOutlineThickness);
-                        drawFanFill(renderer, center, primaryVertices, dataFillColour);
-                        drawPolygonOutline(renderer, primaryVertices, dataStrokeColour, dataOutlineThickness);
-                    }
-                    else
-                    {
-                        drawFanFill(renderer, center, primaryVertices, dataFillColour);
-                        drawPolygonOutline(renderer, primaryVertices, dataStrokeColour, dataOutlineThickness);
-                        drawFanFill(renderer, center, secondaryVertices, secondaryDataFillColour);
-                        drawPolygonOutline(renderer, secondaryVertices, secondaryDataStrokeColour, dataOutlineThickness);
-                    }
-
-                    // Endpoint nodes always on top of both fills/strokes.
-                    drawPoints(renderer, primaryVertices, dataPointColour, dataPointSize);
-                    drawPoints(renderer, secondaryVertices, secondaryDataPointColour, dataPointSize);
-                }
-
-                renderer.PopLocalMatrix();
-            }
-
-            private static float averageRatio(IReadOnlyList<float> values)
-            {
-                if (values.Count == 0)
-                    return 0;
-
-                float sum = 0;
-
-                for (int i = 0; i < values.Count; i++)
-                    sum += Math.Clamp(values[i], 0, 1);
-
-                return sum / values.Count;
-            }
-
-            private static void ensureVertexCapacity(ref Vector2[] buffer, int count)
-            {
-                if (buffer.Length != count)
-                    Array.Resize(ref buffer, count);
-            }
-
-            private void fillVerticesUniform(Vector2[] vertices, Vector2 center, float radius, float ratio)
-            {
-                for (int i = 0; i < axisCount; i++)
-                {
-                    float angle = MathHelper.DegreesToRadians(360f / axisCount * i - 90);
-                    vertices[i] = new Vector2(
-                        center.X + radius * ratio * (float)Math.Cos(angle),
-                        center.Y + radius * ratio * (float)Math.Sin(angle)
-                    );
-                }
-            }
-
-            private void fillVerticesFromRatios(Vector2[] vertices, Vector2 center, float radius, IReadOnlyList<float> axisRatios)
-            {
-                for (int i = 0; i < axisCount; i++)
-                {
-                    float clampedRatio = Math.Clamp(axisRatios[i], 0, 1);
-                    float angle = MathHelper.DegreesToRadians(360f / axisCount * i - 90);
-                    vertices[i] = new Vector2(
-                        center.X + radius * clampedRatio * (float)Math.Cos(angle),
-                        center.Y + radius * clampedRatio * (float)Math.Sin(angle)
-                    );
-                }
-            }
-
-            private void drawPolygonFill(IRenderer renderer, IReadOnlyList<Vector2> polygonVertices, Color4 colour)
-            {
-                for (int i = 1; i < polygonVertices.Count - 1; i++)
-                {
-                    renderer.DrawTriangle(
-                        texture!,
-                        new Triangle(
-                            polygonVertices[0],
-                            polygonVertices[i],
-                            polygonVertices[i + 1]),
-                        colour);
-                }
-            }
-
-            private void drawFanFill(IRenderer renderer, Vector2 center, IReadOnlyList<Vector2> polygonVertices, Color4 colour)
-            {
-                for (int i = 0; i < polygonVertices.Count; i++)
-                {
-                    renderer.DrawTriangle(
-                        texture!,
-                        new Triangle(
-                            center,
-                            polygonVertices[i],
-                            polygonVertices[(i + 1) % polygonVertices.Count]),
-                        colour);
-                }
-            }
-
-            private void drawPolygonOutline(IRenderer renderer, IReadOnlyList<Vector2> polygonVertices, Color4 colour, float thickness)
-            {
-                for (int i = 0; i < polygonVertices.Count; i++)
-                {
-                    Vector2 start = polygonVertices[i];
-                    Vector2 end = polygonVertices[(i + 1) % polygonVertices.Count];
-                    drawLine(renderer, start, end, colour, thickness);
-                }
-            }
-
-            private void drawPoints(IRenderer renderer, IReadOnlyList<Vector2> polygonVertices, Color4 colour, float pointSize)
-            {
-                float half = pointSize * 0.5f;
-
-                for (int i = 0; i < polygonVertices.Count; i++)
-                {
-                    Vector2 point = polygonVertices[i];
-
-                    renderer.DrawTriangle(
-                        texture!,
-                        new Triangle(
-                            new Vector2(point.X - half, point.Y - half),
-                            new Vector2(point.X + half, point.Y - half),
-                            new Vector2(point.X + half, point.Y + half)),
-                        colour);
-
-                    renderer.DrawTriangle(
-                        texture!,
-                        new Triangle(
-                            new Vector2(point.X - half, point.Y - half),
-                            new Vector2(point.X + half, point.Y + half),
-                            new Vector2(point.X - half, point.Y + half)),
-                        colour);
-                }
-            }
-
-            private void drawLine(IRenderer renderer, Vector2 start, Vector2 end, Color4 colour, float thickness)
-            {
-                Vector2 direction = end - start;
-                if (direction.LengthSquared <= float.Epsilon)
-                    return;
-
-                direction.Normalize();
-                Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * (thickness * 0.5f);
-
-                renderer.DrawQuad(
-                    texture!,
-                    new Quad(
-                        start - perpendicular,
-                        start + perpendicular,
-                        end - perpendicular,
-                        end + perpendicular),
-                    colour);
-            }
         }
     }
 }

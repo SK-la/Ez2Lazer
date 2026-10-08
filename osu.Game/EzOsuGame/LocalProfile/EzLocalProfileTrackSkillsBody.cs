@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.HUD;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics;
@@ -513,7 +514,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 var ratios = axes.Select(a => a.Ratio).ToList();
 
-                var chart = new RadarChart
+                var chart = new EzRadarChart
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
