@@ -39,5 +39,11 @@ namespace osu.Game.EzOsuGame.Startup
         /// instead of starting from game load. Set false for A/B against immediate preload.
         /// </summary>
         public static bool DeferSettingsPreloadUntilBdspFinished { get; set; } = true;
+
+        /// <summary>
+        /// After BDSP finishes, wait this long before settings async preload (song select preload uses its own +500ms buffer).
+        /// Spreads Gen2 pressure on the main menu.
+        /// </summary>
+        public static double SettingsPreloadDelayAfterBdspMs { get; set; } = 1_500;
     }
 }

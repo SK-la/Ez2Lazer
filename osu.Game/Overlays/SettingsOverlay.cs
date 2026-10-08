@@ -47,12 +47,6 @@ namespace osu.Game.Overlays
         {
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-            BeginLoadingSections();
-        }
-
         public override bool AcceptsFocus => lastOpenedSubPanel == null || lastOpenedSubPanel.State.Value == Visibility.Hidden;
 
         public void ShowAtControl<T>() where T : Drawable

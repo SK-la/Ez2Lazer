@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -158,7 +159,12 @@ namespace osu.Game.EzOsuGame.Startup
             if (!EzStartupTuning.DeferSettingsPreloadUntilBdspFinished)
                 return;
 
-            preloader.ScheduleSettingsPreload();
+            double delay = Math.Max(0, EzStartupTuning.SettingsPreloadDelayAfterBdspMs);
+
+            if (delay > 0)
+                Scheduler.AddDelayed(() => preloader.ScheduleSettingsPreload(), delay);
+            else
+                preloader.ScheduleSettingsPreload();
         }
 
         private void startSongSelectPreload(string reason)
