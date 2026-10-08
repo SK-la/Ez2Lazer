@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Animation;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
@@ -56,6 +57,9 @@ namespace osu.Game.EzOsuGame.HUD
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_FORCE_DEFORM_LABEL), nameof(EzHUDStrings.HITRESULT_FORCE_DEFORM_DESCRIPTION))]
         public BindableBool ForceDeformAnimation { get; } = new BindableBool(true);
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_DEFORM_TEMPLATE_LABEL), nameof(EzHUDStrings.HITRESULT_DEFORM_TEMPLATE_DESCRIPTION))]
+        public Bindable<EzEnumDeformTemplate> DeformTemplate { get; } = new Bindable<EzEnumDeformTemplate>();
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
@@ -167,6 +171,11 @@ namespace osu.Game.EzOsuGame.HUD
                 if (AutoMapHitMode.Value)
                     invalidateCurrentAnimation();
             });
+
+            ForceDeformAnimation.BindValueChanged(e =>
+            {
+                DeformTemplate.Disabled = !e.NewValue;
+            }, true);
 
             HitResultBlendModeSetting.BindValueChanged(mode =>
             {
@@ -488,7 +497,10 @@ namespace osu.Game.EzOsuGame.HUD
             // 防止空引用异常
             if (drawable == null) return;
 
-            // 这里只保留变形。
+            if (tryPlayExtractedAnimation(hitResult, drawable))
+                return;
+
+            // 该主题没有提取到片段时，仍走手写变形。
             if (drawable is not TextureAnimation)
             {
                 double flashSpeed = FPS.Value * 2;
@@ -528,6 +540,23 @@ namespace osu.Game.EzOsuGame.HUD
                     applyEzStyleEffect(drawable, new Vector2(1.2f));
                     break;
             }
+        }
+
+        private bool tryPlayExtractedAnimation(HitResult hitResult, Drawable drawable)
+        {
+            if (!EzAnimationLibrary.TryGetDeformTheme(DeformTemplate.Value, out EzEnumGameThemeName theme))
+                return false;
+
+            string primary = hitResult == HitResult.Perfect ? EzAnimationLibrary.JUDGEMENT_ANI_KOOL_1 : EzAnimationLibrary.JUDGEMENT_ANI_1;
+            string fallback = hitResult == HitResult.Perfect ? EzAnimationLibrary.JUDGEMENT_ANI_KOOL : EzAnimationLibrary.JUDGEMENT_ANI;
+
+            if (!EzAnimationLibrary.TryGet(EzAnimationLibrary.JUDGEMENT, primary, theme, out EzAnimationTemplate template)
+                && !EzAnimationLibrary.TryGet(EzAnimationLibrary.JUDGEMENT, fallback, theme, out template))
+                return false;
+
+            // 多帧的闪烁来自帧本身，不套片段里的透明度。
+            template.Play(drawable, includeAlpha: drawable is not TextureAnimation);
+            return true;
         }
 
         private void applyEzStyleEffect(Drawable drawable, Vector2 scaleUp, float moveDistance = 0)
