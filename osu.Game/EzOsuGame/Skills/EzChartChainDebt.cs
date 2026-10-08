@@ -69,7 +69,7 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentNullException.ThrowIfNull(plays);
             ArgumentNullException.ThrowIfNull(store);
 
-            return Collect(plays, store.CollectChartChainState());
+            return Collect(plays, store.CollectChartChainState("debt"));
         }
 
         public static EzChartChainDebt Collect(IEnumerable<(string Username, string BeatmapHash)> plays, EzChartChainState chain)

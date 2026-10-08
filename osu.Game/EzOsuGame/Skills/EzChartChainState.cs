@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.LocalProfile;
 using Realms;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -28,6 +29,18 @@ namespace osu.Game.EzOsuGame.Skills
     /// </summary>
     public sealed class EzChartChainState
     {
+        private readonly struct RateableChartMeta
+        {
+            public readonly int KeyCount;
+            public readonly double? XxyStarRating;
+
+            public RateableChartMeta(int keyCount, double? xxyStarRating)
+            {
+                KeyCount = keyCount;
+                XxyStarRating = xxyStarRating;
+            }
+        }
+
         private EzChartChainState(
             IReadOnlyDictionary<string, Guid> rateableBeatmapIds,
             IReadOnlyList<EzDataStateFacet> facets,
@@ -145,22 +158,52 @@ namespace osu.Game.EzOsuGame.Skills
             int danRevision = EzAnalysisRevision.ChartDan;
 
             var rateableBeatmapIds = new Dictionary<string, Guid>(StringComparer.Ordinal);
-            var rateableBeatmaps = new Dictionary<string, BeatmapInfo>(StringComparer.Ordinal);
+            var rateableChartMeta = new Dictionary<string, RateableChartMeta>(StringComparer.Ordinal);
 
-            foreach (var beatmap in r.All<BeatmapInfo>())
+            foreach (var beatmap in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null).AsEnumerable())
             {
-                if (string.IsNullOrEmpty(beatmap.Hash) || !EzChartChainCoverage.IsRateableChart(beatmap))
+                if (beatmap.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
+                    continue;
+
+                if (string.IsNullOrEmpty(beatmap.Hash))
+                    continue;
+
+                if (!EzChartChainCoverage.IsRateableKeyCount((int)Math.Round(beatmap.Difficulty.CircleSize)))
                     continue;
 
                 rateableBeatmapIds[beatmap.Hash] = beatmap.ID;
-                rateableBeatmaps[beatmap.Hash] = beatmap;
+
+                int keyCount = (int)Math.Round(beatmap.Difficulty.CircleSize);
+                double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
+                rateableChartMeta[beatmap.Hash] = new RateableChartMeta(keyCount, xxySr);
+            }
+
+            var msdRowsForReader = new List<EzBeatmapSkillValue>();
+            var msdSkillsAtRevision = new Dictionary<string, Dictionary<string, double>>(StringComparer.Ordinal);
+
+            foreach (var value in r.All<EzBeatmapSkillValue>()
+                                   .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD)
+                                   .AsEnumerable())
+            {
+                if (!rateableBeatmapIds.ContainsKey(value.BeatmapHash))
+                    continue;
+
+                msdRowsForReader.Add(value);
+
+                if (value.AlgorithmVersion != msdRevision)
+                    continue;
+
+                if (!msdSkillsAtRevision.TryGetValue(value.BeatmapHash, out var skills))
+                {
+                    skills = new Dictionary<string, double>(StringComparer.Ordinal);
+                    msdSkillsAtRevision[value.BeatmapHash] = skills;
+                }
+
+                skills[value.SkillId] = value.Value;
             }
 
             var msdRows = EzRealmFacetReader.Read(
-                r.All<EzBeatmapSkillValue>()
-                 .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD)
-                 .AsEnumerable()
-                 .Where(v => rateableBeatmapIds.ContainsKey(v.BeatmapHash)),
+                msdRowsForReader,
                 static v => v.BeatmapHash,
                 static v => v.AlgorithmVersion,
                 msdRevision,
@@ -188,7 +231,7 @@ namespace osu.Game.EzOsuGame.Skills
             // MSD settles either with a complete axis set or as the unrateable stub. Completeness is a property of
             // the whole axis set, so it is read separately from the per-row revision state above.
             var unrateableMsd = msdRows.Where(static kv => kv.Value.CurrentStub).Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
-            var completeMsdSkills = readCompleteMsdSkills(r, msdRows, msdRevision);
+            var completeMsdSkills = readCompleteMsdSkills(msdRows, msdSkillsAtRevision);
             var completeMsd = completeMsdSkills.Keys.ToHashSet(StringComparer.Ordinal);
             var settledMsd = completeMsd.Union(unrateableMsd, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
 
@@ -196,7 +239,7 @@ namespace osu.Game.EzOsuGame.Skills
             var completeCsi = csiRows.Where(kv => kv.Value.Revision == csiRevision && !kv.Value.CurrentStub).Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
             var completeDan = danRows.Where(kv => kv.Value.Revision == danRevision).Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
 
-            var unresolvableDan = deriveUnresolvableChartDan(completeMsdSkills, rateableBeatmaps);
+            var unresolvableDan = deriveUnresolvableChartDan(completeMsdSkills, rateableChartMeta);
             var settledChartDan = unrateableMsd.Union(unresolvableDan, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
 
             int universe = rateableBeatmapIds.Count;
@@ -248,26 +291,18 @@ namespace osu.Game.EzOsuGame.Skills
         /// need the axes rather than a row's revision: whether MSD settled, and whether a dan resolves from them.
         /// </summary>
         private static Dictionary<string, IReadOnlyDictionary<string, double>> readCompleteMsdSkills(
-            Realm r,
             IReadOnlyDictionary<string, EzFacetRowState> msdRows,
-            int msdRevision)
+            IReadOnlyDictionary<string, Dictionary<string, double>> msdSkillsAtRevision)
         {
             var complete = new Dictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal);
 
-            var groups = r.All<EzBeatmapSkillValue>()
-                          .Where(v => v.SystemId == EzSkillSystems.BEATMAP_MSD && v.AlgorithmVersion == msdRevision)
-                          .AsEnumerable()
-                          .GroupBy(v => v.BeatmapHash, StringComparer.Ordinal);
-
-            foreach (var group in groups)
+            foreach (var (hash, skills) in msdSkillsAtRevision)
             {
-                if (!msdRows.TryGetValue(group.Key, out var state) || state.CurrentStub)
+                if (!msdRows.TryGetValue(hash, out var state) || state.CurrentStub)
                     continue;
 
-                var skills = group.ToDictionary(v => v.SkillId, v => v.Value, StringComparer.Ordinal);
-
                 if (EzBeatmapMsdComputer.IsCurrentMsdCache(skills))
-                    complete[group.Key] = skills;
+                    complete[hash] = skills;
             }
 
             return complete;
@@ -279,16 +314,16 @@ namespace osu.Game.EzOsuGame.Skills
         /// </summary>
         private static HashSet<string> deriveUnresolvableChartDan(
             IReadOnlyDictionary<string, IReadOnlyDictionary<string, double>> completeMsdSkills,
-            IReadOnlyDictionary<string, BeatmapInfo> rateableBeatmaps)
+            IReadOnlyDictionary<string, RateableChartMeta> rateableChartMeta)
         {
             var unresolvable = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var (hash, msd) in completeMsdSkills)
             {
-                if (!rateableBeatmaps.TryGetValue(hash, out var beatmap))
+                if (!rateableChartMeta.TryGetValue(hash, out var meta))
                     continue;
 
-                int keyCount = (int)Math.Round(beatmap.Difficulty.CircleSize);
+                int keyCount = meta.KeyCount;
                 if (keyCount <= 0)
                     keyCount = 4;
 
@@ -298,9 +333,7 @@ namespace osu.Game.EzOsuGame.Skills
                     ? Math.Clamp(hold, 0, 1)
                     : 0;
 
-                double? xxySr = beatmap.XxyStarRating >= 0 ? beatmap.XxyStarRating : null;
-
-                if (EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, xxySr) == null)
+                if (EzChartDanEstimator.FromMsd(msd, keyCount, holdRatio, meta.XxyStarRating) == null)
                     unresolvable.Add(hash);
             }
 

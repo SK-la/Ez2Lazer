@@ -97,7 +97,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 try
                 {
-                    var chain = skillStore.CollectChartChainState();
+                    var chain = skillStore.CollectChartChainState("settings");
                     status = chain.ToReport(DateTimeOffset.UtcNow);
                     stalePlayers = skillStore.GetStalePlayerSkillDetails();
 

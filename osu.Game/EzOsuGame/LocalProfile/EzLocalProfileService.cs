@@ -554,7 +554,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (skillProvider == null)
                 return EzChartChainDebt.EMPTY;
 
-            var chain = skillProvider.Store.CollectChartChainState();
+            var chain = skillProvider.Store.CollectChartChainState("profile");
             return EzChartChainDebt.Collect(Store.LoadManiaDrillChartPlays(), chain);
         }
 

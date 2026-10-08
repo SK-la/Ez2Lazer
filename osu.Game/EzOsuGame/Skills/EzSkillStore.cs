@@ -3,9 +3,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Startup;
 using Realms;
 
 namespace osu.Game.EzOsuGame.Skills
@@ -225,7 +227,19 @@ namespace osu.Game.EzOsuGame.Skills
         /// readout, the player-chain debt) reads this, so they cannot disagree about what is settled, missing or
         /// worth another pass.
         /// </summary>
-        public EzChartChainState CollectChartChainState() => realmAccess.Run(EzChartChainState.Build);
+        public EzChartChainState CollectChartChainState() => CollectChartChainState(null);
+
+        public EzChartChainState CollectChartChainState(string? traceCaller)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var chain = realmAccess.Run(EzChartChainState.Build);
+            stopwatch.Stop();
+
+            if (traceCaller != null)
+                EzStartupTrace.Log($"ChartChainState caller={traceCaller} elapsedMs={stopwatch.ElapsedMilliseconds} rateable={chain.RateableChartCount}");
+
+            return chain;
+        }
 
         /// <summary>
         /// Charts whose MSD settled as unrateable at the current revision. Every later facet (CSI included) is

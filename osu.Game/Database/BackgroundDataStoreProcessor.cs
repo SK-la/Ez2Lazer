@@ -744,13 +744,23 @@ namespace osu.Game.Database
             bool deferChartDanSideUpsert = scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
                                            || scope.HasFlag(EzRealmMetadataScope.ChartDan);
 
+            bool needsChartChain = scope.HasFlag(EzRealmMetadataScope.Msd)
+                                   || scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo)
+                                   || scope.HasFlag(EzRealmMetadataScope.ChartDan);
+
+            EzChartChainState? chartChain = needsChartChain
+                ? skillStore.CollectChartChainState("BDSP")
+                : null;
+
             if (scope.HasFlag(EzRealmMetadataScope.Msd))
             {
                 beatmapMsdComputer.SuppressChartDanSideUpsert = deferChartDanSideUpsert;
 
                 try
                 {
-                    populateMissingBeatmapMsd();
+                    if (populateMissingBeatmapMsd(chartChain!)
+                        && (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo) || scope.HasFlag(EzRealmMetadataScope.ChartDan)))
+                        chartChain = skillStore.CollectChartChainState("BDSP");
                 }
                 finally
                 {
@@ -759,10 +769,14 @@ namespace osu.Game.Database
             }
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartSkillInfo))
-                populateMissingChartSkillInfo();
+            {
+                if (populateMissingChartSkillInfo(chartChain!)
+                    && scope.HasFlag(EzRealmMetadataScope.ChartDan))
+                    chartChain = skillStore.CollectChartChainState("BDSP");
+            }
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartDan))
-                populateMissingChartDan();
+                populateMissingChartDan(chartChain!);
 
             EzStartupTrace.Log($"BDSP EzRealm backfill end scope={scope}");
         }
@@ -1029,18 +1043,17 @@ namespace osu.Game.Database
         /// Backfill NoMod 1.0x beatmap MSD axes into <see cref="EzBeatmapSkillValue"/>.
         /// Behaviour mirrors <see cref="populateMissingXxyStarRatings"/>: beatmap-level query, compute and write.
         /// </summary>
-        private void populateMissingBeatmapMsd()
+        private bool populateMissingBeatmapMsd(EzChartChainState chain)
         {
             Logger.Log("Querying for mania beatmaps with missing MSD...");
 
             // The chain's candidate universe already excludes the keymodes the n-key engine cannot rate (the same
             // gate the write path uses), so they never enter the missing set - a loop-only skip left them as
             // perpetual false-missing every launch.
-            var chain = skillStore.CollectChartChainState();
             var missing = chain.MsdOwed.ToList();
 
             if (missing.Count == 0)
-                return;
+                return false;
 
             Logger.Log($"Found {missing.Count} beatmaps which require MSD reprocessing (revision {EzAnalysisRevision.Msd}).");
 
@@ -1104,6 +1117,7 @@ namespace osu.Game.Database
             }
 
             completeNotification(notification, processedCount, missing.Count, failedCount);
+            return processedCount > 0;
         }
 
         /// <summary>
@@ -1112,11 +1126,9 @@ namespace osu.Game.Database
         /// stored axes, so a CSI row computed without MSD would silently stamp a wrong value. Candidates
         /// whose MSD is still pending are deferred to a later run rather than analysed on partial input.
         /// </summary>
-        private void populateMissingChartSkillInfo()
+        private bool populateMissingChartSkillInfo(EzChartChainState chain)
         {
             Logger.Log("Querying for mania beatmaps with missing ChartSkillInfo...");
-
-            var chain = skillStore.CollectChartChainState();
 
             int waitingOnMsd = chain.RateableChartCount - chain.SettledMsd.Count;
 
@@ -1131,7 +1143,7 @@ namespace osu.Game.Database
             if (missing.Count == 0)
             {
                 Logger.Log($"ChartSkillInfo backfill: nothing ready (have CSI or waiting on MSD). waitingOnMsd={waitingOnMsd}");
-                return;
+                return false;
             }
 
             Logger.Log($"Found {missing.Count} beatmaps which require ChartSkillInfo reprocessing (revision {EzAnalysisRevision.ChartSkillInfo}).");
@@ -1194,6 +1206,7 @@ namespace osu.Game.Database
             }
 
             completeNotification(notification, processedCount, missing.Count, failedCount);
+            return processedCount > 0;
         }
 
         /// <summary>
@@ -1207,7 +1220,7 @@ namespace osu.Game.Database
         /// backfill recompute the whole library.
         /// </para>
         /// </summary>
-        private void populateMissingChartDan()
+        private void populateMissingChartDan(EzChartChainState chain)
         {
             Logger.Log("Querying for mania beatmaps with missing ChartDan...");
 
@@ -1215,7 +1228,6 @@ namespace osu.Game.Database
             // excludes unrateable keymodes), a settled MSD, and the write path's own "can these inputs produce a
             // dan at all" check. A chart that fails the last one is settled rather than missing, so it is not
             // re-attempted and re-notified on every launch.
-            var chain = skillStore.CollectChartChainState();
             var missing = chain.ChartDanOwed.ToList();
 
             int waitingOnMsd = chain.RateableChartCount - chain.SettledMsd.Count;
@@ -1465,14 +1477,8 @@ namespace osu.Game.Database
 
             realmAccess.Run(r =>
             {
-                foreach (var b in r.All<BeatmapInfo>())
+                foreach (var b in r.All<BeatmapInfo>().Where(b => b.PerformancePoints < 0 && b.BeatmapSet != null))
                 {
-                    if (b.BeatmapSet == null)
-                        continue;
-
-                    if (b.PerformancePoints >= 0)
-                        continue;
-
                     if (!EzXxyStarRatingSupport.IsRulesetAvailable(b.Ruleset))
                         continue;
 
