@@ -37,5 +37,7 @@ namespace osu.Game.EzOsuGame.Acrylic
         /// Main-menu button glass tint strength. The hue is the button accent; kept low so the blur stays visible.
         /// </summary>
         public const float MENU_BUTTON_TINT_ALPHA = 0.55f;
+
+        public const float CORNER_RADIUS_DISPLAY = 4f;
     }
 }

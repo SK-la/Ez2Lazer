@@ -11,6 +11,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Layout;
+using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK;
@@ -146,7 +147,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                         Origin = Anchor.TopCentre,
                         Position = new Vector2(0, -4),
                         Masking = true,
-                        CornerRadius = 4,
+                        CornerRadius = EzAcrylicStyle.CORNER_RADIUS_DISPLAY,
                         Children = new Drawable[]
                         {
                             new Box

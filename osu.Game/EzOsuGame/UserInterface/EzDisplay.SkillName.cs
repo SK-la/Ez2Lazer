@@ -5,6 +5,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Acrylic;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -28,7 +29,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 AutoSizeAxes = Axes.Both,
                 Masking = true,
-                CornerRadius = 4,
+                CornerRadius = EzAcrylicStyle.CORNER_RADIUS_DISPLAY,
                 BorderThickness = 1.5f,
                 Children = new Drawable[]
                 {
