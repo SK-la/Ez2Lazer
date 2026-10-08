@@ -69,7 +69,14 @@ namespace osu.Game.EzOsuGame.Skills
             ArgumentNullException.ThrowIfNull(plays);
             ArgumentNullException.ThrowIfNull(store);
 
-            var chain = store.CollectChartChainState();
+            return Collect(plays, store.CollectChartChainState());
+        }
+
+        public static EzChartChainDebt Collect(IEnumerable<(string Username, string BeatmapHash)> plays, EzChartChainState chain)
+        {
+            ArgumentNullException.ThrowIfNull(plays);
+            ArgumentNullException.ThrowIfNull(chain);
+
             var rateableCharts = chain.RateableCharts;
             var settledCsi = chain.SettledChartSkillInfo;
             var settledMsd = chain.SettledMsd;

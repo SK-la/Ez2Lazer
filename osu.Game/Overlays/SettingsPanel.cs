@@ -317,6 +317,7 @@ namespace osu.Game.Overlays
 
         private void beginAsyncSectionLoad()
         {
+            EzStartupTrace.Log($"Settings.asyncPreload begin sections={loadableSections.Count}");
             sectionsLoadStopwatch = Stopwatch.StartNew();
             startLoadHeartbeat();
 
@@ -389,6 +390,9 @@ namespace osu.Game.Overlays
                 return;
             }
 
+            if (startIndex == 0)
+                EzStartupTrace.Log($"Settings.mount batches begin count={sections.Count}");
+
             int endIndex = Math.Min(startIndex + sections_add_batch_size, sections.Count);
 
             for (int i = startIndex; i < endIndex; i++)
@@ -401,6 +405,7 @@ namespace osu.Game.Overlays
             }
 
             sectionsMountInProgress = false;
+            EzStartupTrace.Log("Settings.mount batches complete");
             finishSectionsDisplay();
         }
 
@@ -413,43 +418,43 @@ namespace osu.Game.Overlays
 
             SearchTextBox.Current.BindValueChanged(term => SectionsContainer.SearchTerm = term.NewValue, true);
 
-            loadSidebarButtons();
+            mountSidebarButtons();
         }
 
-        private void loadSidebarButtons()
+        private void mountSidebarButtons()
         {
             if (Sidebar == null)
                 return;
 
-            LoadComponentsAsync(createSidebarButtons(), buttons =>
+            EzStartupTrace.Log("Settings.sidebar mount begin (sync)");
+
+            float delay = 0;
+
+            foreach (var button in createSidebarButtons())
             {
-                float delay = 0;
+                Sidebar.Add(button);
 
-                foreach (var button in buttons)
-                {
-                    Sidebar.Add(button);
+                button.FadeOut()
+                      .Delay(delay)
+                      .FadeInFromZero(fade_in_duration, Easing.OutQuint);
 
-                    button.FadeOut()
-                          .Delay(delay)
-                          .FadeInFromZero(fade_in_duration, Easing.OutQuint);
+                delay += 40;
+            }
 
-                    delay += 40;
-                }
+            SectionsContainer.SelectedSection.BindValueChanged(section =>
+            {
+                selectedSidebarButton?.Selected = false;
 
-                SectionsContainer.SelectedSection.BindValueChanged(section =>
-                {
-                    selectedSidebarButton?.Selected = false;
+                selectedSidebarButton = Sidebar.Children.OfType<SidebarIconButton>().FirstOrDefault(b => b.Section == section.NewValue);
 
-                    selectedSidebarButton = Sidebar.Children.OfType<SidebarIconButton>().FirstOrDefault(b => b.Section == section.NewValue);
+                selectedSidebarButton?.Selected = true;
+            }, true);
 
-                    selectedSidebarButton?.Selected = true;
-                }, true);
-
-                AreSectionsReadyForDisplay = true;
-                loadHeartbeatActive = false;
-                sectionsPreloadDurationMs = sectionsLoadStopwatch.ElapsedMilliseconds;
-                sectionsLoadStopwatch.Stop();
-            }, scheduler: preloadScheduler);
+            AreSectionsReadyForDisplay = true;
+            loadHeartbeatActive = false;
+            sectionsPreloadDurationMs = sectionsLoadStopwatch.ElapsedMilliseconds;
+            sectionsLoadStopwatch.Stop();
+            EzStartupTrace.Log($"Settings.ready mount+sidebar {sectionsPreloadDurationMs}ms");
         }
 
         private IEnumerable<SidebarIconButton> createSidebarButtons()

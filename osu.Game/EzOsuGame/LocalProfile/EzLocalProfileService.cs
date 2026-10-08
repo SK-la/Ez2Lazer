@@ -550,9 +550,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// coverage. Reads SQLite and Realm, so call it off the UI thread.
         /// </summary>
         public EzChartChainDebt CollectChartChainDebt()
-            => skillProvider == null
-                ? EzChartChainDebt.EMPTY
-                : EzChartChainDebt.Collect(Store.LoadManiaDrillChartPlays(), skillProvider.Store);
+        {
+            if (skillProvider == null)
+                return EzChartChainDebt.EMPTY;
+
+            var chain = skillProvider.Store.CollectChartChainState();
+            return EzChartChainDebt.Collect(Store.LoadManiaDrillChartPlays(), chain);
+        }
 
         /// <summary>
         /// Re-derive the archive-wide <see cref="EzLocalProfileConstants.ALL_PLAYERS"/> skill rows from whatever

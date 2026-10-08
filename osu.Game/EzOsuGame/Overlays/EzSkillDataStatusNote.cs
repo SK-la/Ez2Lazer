@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -17,17 +18,17 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
     /// <summary>
-    /// Readout for the chart / player skill chains. Measures itself once on load (the sweep walks every
-    /// mania chart plus the three facet tables, so it stays on a background task) and reports through a
-    /// <see cref="SettingsNote"/>: informational when everything is current, warning when a pass would
-    /// still have work to do, critical when the measurement itself failed. The note's colour is the
-    /// status marker; its text carries the per-facet counts.
+    /// Readout for the chart / player skill chains. The sweep walks every mania chart plus the three facet tables,
+    /// so measurement stays on a background task and is deferred until this control is on-screen in settings.
+    /// Reports through a <see cref="SettingsNote"/>: informational when everything is current, warning when a pass
+    /// would still have work to do, critical when the measurement itself failed.
     /// </summary>
     public partial class EzSkillDataStatusNote : CompositeDrawable
     {
@@ -43,6 +44,7 @@ namespace osu.Game.EzOsuGame.Overlays
         public readonly BindableBool Measuring = new BindableBool();
 
         private int measuring;
+        private bool autoMeasureScheduled;
 
         /// <param name="profileStore">
         /// The SQLite archive, read to name the players whose plays the chart chain has not rated yet. Without it the
@@ -70,11 +72,17 @@ namespace osu.Game.EzOsuGame.Overlays
             };
         }
 
-        protected override void LoadComplete()
+        protected override void UpdateAfterChildren()
         {
-            base.LoadComplete();
+            base.UpdateAfterChildren();
 
-            // No button press needed: the status is measured as soon as the settings panel is shown.
+            if (autoMeasureScheduled || skillStore == null)
+                return;
+
+            if (!IsPresent)
+                return;
+
+            autoMeasureScheduled = true;
             Measure();
         }
 
@@ -91,6 +99,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
             Task.Run(() =>
             {
+                var stopwatch = Stopwatch.StartNew();
+                EzStartupTrace.Log($"SkillDataStatus.Measure begin thread={Environment.CurrentManagedThreadId}");
+
                 bool failed = false;
                 EzDataStateReport? status = null;
                 IReadOnlyList<EzStalePlayerSkill> stalePlayers = Array.Empty<EzStalePlayerSkill>();
@@ -99,13 +110,14 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 try
                 {
-                    status = skillStore.GetSkillDataStatus();
+                    var chain = skillStore.CollectChartChainState();
+                    status = chain.ToReport(DateTimeOffset.UtcNow);
                     stalePlayers = skillStore.GetStalePlayerSkillDetails();
 
                     // Derived, not stored: the debt is the drill ledger joined against the chain's own coverage, so it
                     // disappears on its own once the chain writes the row instead of needing a flag cleared.
                     if (profileStore != null)
-                        debt = EzChartChainDebt.Collect(profileStore.LoadManiaDrillChartPlays(), skillStore);
+                        debt = EzChartChainDebt.Collect(profileStore.LoadManiaDrillChartPlays(), chain);
 
                     backfillRunning = backgroundDataStoreProcessor?.IsEzRealmMetadataBackfillRunning == true;
                 }
@@ -115,6 +127,8 @@ namespace osu.Game.EzOsuGame.Overlays
                         Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                     failed = true;
                 }
+
+                EzStartupTrace.Log($"SkillDataStatus.Measure worker done {stopwatch.ElapsedMilliseconds}ms failed={failed}");
 
                 // Only the Realm reads stay off-thread; the note text is composed back on the update thread
                 // so its localisable labels resolve against the UI culture.

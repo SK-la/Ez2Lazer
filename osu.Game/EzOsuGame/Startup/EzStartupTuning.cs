@@ -33,5 +33,11 @@ namespace osu.Game.EzOsuGame.Startup
         /// First carousel filter after entering song select from main menu; staggers with screen fade-in.
         /// </summary>
         public static double SongSelectEnterFilterDelayMs { get; set; } = 400;
+
+        /// <summary>
+        /// When true, settings section async preload waits for BDSP startup processing to finish
+        /// instead of starting from game load. Set false for A/B against immediate preload.
+        /// </summary>
+        public static bool DeferSettingsPreloadUntilBdspFinished { get; set; } = true;
     }
 }

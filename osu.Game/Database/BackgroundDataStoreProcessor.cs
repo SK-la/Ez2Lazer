@@ -498,6 +498,7 @@ namespace osu.Game.Database
                 try
                 {
                     Logger.Log("Beginning background data store processing..");
+                    EzStartupTrace.Log("BDSP processing begin");
 
                     // Let SongSelect settle before Invalidate storms from Ez/official backfill
                     // (users see a 3–5s FPS cliff when unlimited carousel Replaces land in one burst).
@@ -706,6 +707,8 @@ namespace osu.Game.Database
 
         private void runEzRealmMetadataBackfill(EzRealmMetadataScope scope)
         {
+            EzStartupTrace.Log($"BDSP EzRealm backfill begin scope={scope}");
+
             if (scope.HasFlag(EzRealmMetadataScope.Xxy))
                 populateMissingXxyStarRatings();
 
@@ -760,6 +763,8 @@ namespace osu.Game.Database
 
             if (scope.HasFlag(EzRealmMetadataScope.ChartDan))
                 populateMissingChartDan();
+
+            EzStartupTrace.Log($"BDSP EzRealm backfill end scope={scope}");
         }
 
         private void clearEzRealmMetadata(EzRealmMetadataScope scope)

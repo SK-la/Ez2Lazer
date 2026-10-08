@@ -48,7 +48,7 @@ namespace osu.Game.EzOsuGame.Startup
             switch (EzStartupTuning.PreloadTiming)
             {
                 case EzStartupPreloadTiming.PipelineDefault:
-                    // Settings preload is started from OsuGame.loadStartupContentPreloader.
+                    // Settings preload: OsuGame immediately, or after BDSP when DeferSettingsPreloadUntilBdspFinished.
                     break;
 
                 case EzStartupPreloadTiming.PipelineEarlySongSelect:
@@ -115,6 +115,7 @@ namespace osu.Game.EzOsuGame.Startup
 
             if (backgroundDataStoreProcessor.IsStartupProcessingFinished)
             {
+                tryScheduleDeferredSettingsPreload();
                 Scheduler.AddDelayed(() => startSongSelectPreload("BDSP-already-finished"), bdsp_finished_song_select_buffer_ms);
                 return;
             }
@@ -131,6 +132,7 @@ namespace osu.Game.EzOsuGame.Startup
             if (!backgroundDataStoreProcessor.IsStartupProcessingFinished)
                 return;
 
+            tryScheduleDeferredSettingsPreload();
             songSelectFallbackDelegate?.Cancel();
             songSelectFallbackDelegate = null;
             backgroundDataStoreProcessor.StartupProcessingFinished -= onBdspStartupProcessingFinished;
@@ -147,7 +149,16 @@ namespace osu.Game.EzOsuGame.Startup
 
         private void onBdspStartupProcessingFinished()
         {
+            tryScheduleDeferredSettingsPreload();
             Scheduler.AddDelayed(() => startSongSelectPreload("BDSP-finished"), bdsp_finished_song_select_buffer_ms);
+        }
+
+        private void tryScheduleDeferredSettingsPreload()
+        {
+            if (!EzStartupTuning.DeferSettingsPreloadUntilBdspFinished)
+                return;
+
+            preloader.ScheduleSettingsPreload();
         }
 
         private void startSongSelectPreload(string reason)
