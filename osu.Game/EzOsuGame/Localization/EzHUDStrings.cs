@@ -118,12 +118,24 @@ namespace osu.Game.EzOsuGame.Localization
             "强制变形动画", "Force Deform Animation");
 
         public static readonly LocalisableString HITRESULT_FORCE_DEFORM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "开启后，强制使用内部变形动画模板。"
+            "开启后，按下方选择的变形模板播放。"
             + "\n多帧在变形期间循环播放，结束时机由变形动画决定。"
             + "\n关闭后按资源本身播放，播完即结束。",
-            "When enabled, the internal deformation animation template is enforced."
+            "When enabled, the deformation template selected below is played."
             + "\nMultiple frames loop during deformation; the end timing is determined by the deformation animation."
             + "\nWhen disabled, the animation plays according to the resource itself and ends once finished.");
+
+        public static readonly LocalisableString HITRESULT_DEFORM_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "变形模板", "Deform Template");
+
+        public static readonly LocalisableString HITRESULT_DEFORM_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "强制变形开启后使用的动画，与判定字体分开选择。"
+            + "\n内置为手写压扁。其余项是该主题提取出的判定曲线；该主题没有曲线时仍用手写压扁。",
+            "Animation used while force deform is on. Chosen separately from the judgement font."
+            + "\nBuilt-in is the handwritten squash. Other entries are that theme's extracted judgement curves; a theme with no curves still uses the handwritten squash.");
+
+        public static readonly LocalisableString HITRESULT_DEFORM_TEMPLATE_BUILTIN = new EzLocalizationManager.EzLocalisableString(
+            "内置", "Built-in");
 
         public static readonly LocalisableString HITRESULT_ANIMATION_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "在 GameTheme/…/judgement/ 下按帧加载时的相对路径模板（在自动探测 result-0、result_0 之后尝试）。"
