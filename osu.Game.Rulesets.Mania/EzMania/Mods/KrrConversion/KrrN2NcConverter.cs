@@ -551,12 +551,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion
                 int preOldIndex = newMatrixSpan[preRowI];
                 int row = i / targetKeys;
                 int col = i % targetKeys;
-                double space = beatLengthAxis[row - 1] / 4;
+                // 单点和换列保持 1/4 拍。1/8 拍只放宽长条头，避免把原来会删掉的单点留成双倍密度。
+                double beat = beatLengthAxis[row - 1];
+                double space = beat / 4;
+                double tailSpace = oldIndex >= 0 && endTimeIndexAxis[oldIndex] > timeAxis[row] ? beat / 8 : space;
 
                 if (preOldIndex >= 0)
                     endTimeTempRow[col] = Math.Max(endTimeIndexAxis[preOldIndex], endTimeTempRow[col]);
 
-                if (timeAxis[row] < endTimeTempRow[col] + space - 10)
+                if (timeAxis[row] < endTimeTempRow[col] + tailSpace - 10)
                     markSpan[i] = true;
 
                 if (oldIndex >= 0 && orgColIndexAxis[oldIndex] != orgColIndexRow[col])

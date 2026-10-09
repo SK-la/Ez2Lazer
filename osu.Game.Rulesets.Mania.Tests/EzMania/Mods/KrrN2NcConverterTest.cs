@@ -60,6 +60,108 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
         }
 
         /// <summary>
+        /// 满键长条、尾巴后隔 1/8 拍再接下一根。加键的过近窗口也是 1/8 拍，这段头要留下来。
+        /// </summary>
+        [Test]
+        public void TestExpandKeepsEighthBeatLnGaps()
+        {
+            const double beatLength = 480;
+            const double eighth = beatLength / 8;
+            const double start = 1000;
+            const double next = start + beatLength + eighth;
+
+            var beatmap = new ManiaBeatmap(new StageDefinition(7))
+            {
+                Difficulty =
+                {
+                    CircleSize = 7,
+                },
+            };
+            beatmap.BeatmapInfo.Difficulty.CircleSize = 7;
+            beatmap.BeatmapInfo.BPM = 60000 / beatLength;
+            beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = beatLength });
+
+            for (int column = 0; column < 7; column++)
+            {
+                beatmap.HitObjects.Add(new HoldNote { StartTime = start, Duration = beatLength, Column = column });
+                beatmap.HitObjects.Add(new HoldNote { StartTime = next, Duration = beatLength, Column = column });
+            }
+
+            KrrN2NcConverter.Transform(beatmap, new KrrOptions
+            {
+                TargetKeys = 8,
+                MaxKeys = 8,
+                MinKeys = 0,
+                BeatSpeed = 4,
+                Seed = 114514,
+            });
+
+            int kept = 0;
+
+            foreach (var hitObject in beatmap.HitObjects)
+            {
+                if (hitObject is HoldNote hold && hold.StartTime == next)
+                    kept++;
+            }
+
+            Assert.That(kept, Is.GreaterThanOrEqualTo(7));
+        }
+
+        /// <summary>
+        /// 单点间隔仍按 1/4 拍删。落在 1/8 和 1/4 之间的单点不能因为长条宽容被留下来。
+        /// </summary>
+        [Test]
+        public void TestExpandStillDropsTapsInsideQuarterBeat()
+        {
+            const double beatLength = 480;
+            const double first = 1000;
+            const double middle = first + 400;
+            const double close = middle + 80;
+
+            var beatmap = new ManiaBeatmap(new StageDefinition(7))
+            {
+                Difficulty =
+                {
+                    CircleSize = 7,
+                },
+            };
+            beatmap.BeatmapInfo.Difficulty.CircleSize = 7;
+            beatmap.BeatmapInfo.BPM = 60000 / beatLength;
+            beatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = beatLength });
+
+            for (int column = 0; column < 7; column++)
+            {
+                beatmap.HitObjects.Add(new Note { StartTime = first, Column = column });
+                beatmap.HitObjects.Add(new Note { StartTime = middle, Column = column });
+                beatmap.HitObjects.Add(new Note { StartTime = close, Column = column });
+            }
+
+            KrrN2NcConverter.Transform(beatmap, new KrrOptions
+            {
+                TargetKeys = 8,
+                MaxKeys = 8,
+                MinKeys = 0,
+                BeatSpeed = 4,
+                Seed = 114514,
+            });
+
+            int keptMiddle = 0;
+            int keptClose = 0;
+
+            foreach (var hitObject in beatmap.HitObjects)
+            {
+                if (hitObject.StartTime == middle)
+                    keptMiddle++;
+
+                if (hitObject.StartTime == close)
+                    keptClose++;
+            }
+
+            Assert.That(keptMiddle, Is.GreaterThanOrEqualTo(7));
+            Assert.That(keptClose, Is.Zero);
+        }
+
+        /// <summary>
         /// 空谱面（无 note）+ 改键数：矩阵为 0 行，下游所有 span 访问都必须退化成空操作而不是越界。
         /// </summary>
         [Test]
@@ -161,7 +263,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
 
         /// <remarks>
         /// 降键后的重叠和过密由 NCL 收尾，长条不再因为尾部过近被整段丢掉。
-        /// 扩展键数的两条没有重叠，序列与改前一致。
+        /// 加键单点仍按 1/4 拍删，长条头可以近到 1/8 拍。
         /// </remarks>
         private const string golden =
             "8/114514: N0@1000 N3@1000 N1@1250 N2@1500 N6@1500 H0@1750+750 N4@2000 N5@2000 H2@2250+1250 N1@2400 N7@2500 N0@2650 N6@2800 H4@3000+500 H5@3000+500 N1@3500 N3@3500 N7@3750 N2@4000 N5@4000 H3@4250+1000 H6@4250+1000 N4@4500 N1@4750 N0@5000 N5@5250\n"
