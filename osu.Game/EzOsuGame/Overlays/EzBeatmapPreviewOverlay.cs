@@ -28,6 +28,7 @@ using osu.Game.Rulesets;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Footer;
+using osu.Game.Screens.Select;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -36,10 +37,11 @@ namespace osu.Game.EzOsuGame.Overlays
 {
     public partial class EzBeatmapPreviewOverlay : CompositeDrawable
     {
-        private const float max_panel_width = 720;
+        private const float max_panel_width_ratio = 1f;
+        private const float max_panel_height_ratio = 1f;
+
         private const float min_panel_width = 360;
-        private const float min_panel_height = 180;
-        private const float max_panel_height = 560;
+        private const float min_panel_height = 160;
 
         private const float panel_width_ratio = 0.6f;
         private const float panel_background_focus_opacity = 0.92f;
@@ -47,7 +49,10 @@ namespace osu.Game.EzOsuGame.Overlays
         private const float button_height = 30;
         private const float button_width = 90;
 
-        private const float resize_handle_thickness = 10;
+        // 大于框架 ClickDragDistance（10）。视觉条和命中范围用同一厚度。
+        private const float resize_grip_extent = 16f;
+        private static readonly Color4 resize_grip_idle_colour = new Color4(255, 255, 255, 32);
+        private static readonly Color4 resize_grip_hover_colour = new Color4(255, 255, 255, 128);
 
         private const float dynamic_preview_duration = 10000;
         private const float dynamic_preview_repeat_delay = 500;
@@ -75,13 +80,15 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private bool heightResizeActive;
         private bool widthResizeActive;
+        private bool topGripHovered;
+        private bool rightGripHovered;
         private bool panelWidthManuallyAdjusted;
         private bool selectionDirty;
         private float dragStartPanelWidth;
         private float dragStartPanelHeight;
 
         private float panelWidth;
-        private float panelHeight = max_panel_width / 2;
+        private float panelHeight;
 
         private double playbackStartTime;
         private double beatmapMinTime;
@@ -180,7 +187,7 @@ namespace osu.Game.EzOsuGame.Overlays
                                 Anchor = Anchor.TopLeft,
                                 Origin = Anchor.TopLeft,
                                 Depth = float.MinValue,
-                                Position = new Vector2(8, resize_handle_thickness + 8),
+                                Position = new Vector2(8, resize_grip_extent + 8),
                                 Width = button_width,
                                 AutoSizeAxes = Axes.Y,
                                 Direction = FillDirection.Vertical,
@@ -191,10 +198,10 @@ namespace osu.Game.EzOsuGame.Overlays
                                 RelativeSizeAxes = Axes.Both,
                                 Padding = new MarginPadding
                                 {
-                                    Top = resize_handle_thickness,
+                                    Top = resize_grip_extent,
                                     Bottom = button_height,
                                     Left = button_width + 16,
-                                    Right = 8
+                                    Right = resize_grip_extent
                                 },
                                 Children = new Drawable[]
                                 {
@@ -274,18 +281,18 @@ namespace osu.Game.EzOsuGame.Overlays
                             topResizeHandle = new Box
                             {
                                 RelativeSizeAxes = Axes.X,
-                                Height = resize_handle_thickness,
+                                Height = resize_grip_extent,
                                 Anchor = Anchor.TopLeft,
                                 Origin = Anchor.TopLeft,
-                                Colour = Color4.White.Opacity(0.22f)
+                                Colour = resize_grip_idle_colour
                             },
                             rightResizeHandle = new Box
                             {
                                 RelativeSizeAxes = Axes.Y,
-                                Width = resize_handle_thickness,
+                                Width = resize_grip_extent,
                                 Anchor = Anchor.TopRight,
                                 Origin = Anchor.TopRight,
-                                Colour = Color4.White.Opacity(0.15f)
+                                Colour = resize_grip_idle_colour
                             }
                         }
                     }
@@ -605,6 +612,8 @@ namespace osu.Game.EzOsuGame.Overlays
             if (!expanded && !panelTransitionActive)
                 return;
 
+            updateResizeGripHover();
+
             if (lastLoadTimeMs > 0)
             {
                 double displayed = Math.Round(lastLoadTimeMs);
@@ -626,13 +635,16 @@ namespace osu.Game.EzOsuGame.Overlays
                     ? clampPanelWidth(panelWidth <= 0 ? getDefaultPanelWidth() : panelWidth)
                     : getDefaultPanelWidth();
 
+                if (panelHeight <= 0)
+                    panelHeight = getMaxPanelHeight();
+
                 panelHeight = clampPanelHeight(panelHeight);
                 displayPanelWidth = panelWidth;
                 displayPanelHeight = panelHeight;
             }
             else
             {
-                // 全谱聚焦铺满可用区域。DrawSize 含 footer 留白，底边用 ChildSize 才贴在 footer 上沿。
+                // 按住全屏铺满 footer 以上的区域，不受面板最大宽高比例限制。
                 displayPanelWidth = ChildSize.X;
                 displayPanelHeight = ChildSize.Y;
                 targetPanelY = 0;
@@ -717,11 +729,12 @@ namespace osu.Game.EzOsuGame.Overlays
 
         protected override bool OnDragStart(DragStartEvent e)
         {
-            if (!expanded)
+            if (!expanded || fullMapFocusActive)
                 return false;
 
-            bool inWidthHandle = isWithinWidthResizeHandle(e.ScreenSpaceMousePosition);
-            bool inHeightHandle = isWithinHeightResizeHandle(e.ScreenSpaceMousePosition);
+            // 拖拽在移动超过阈值后才触发。用按下位置判定，避免先离开细边才开始检测。
+            bool inWidthHandle = isWithinWidthResizeHandle(e.ScreenSpaceMouseDownPosition);
+            bool inHeightHandle = isWithinHeightResizeHandle(e.ScreenSpaceMouseDownPosition);
 
             if (!inWidthHandle && !inHeightHandle)
                 return base.OnDragStart(e);
@@ -740,8 +753,11 @@ namespace osu.Game.EzOsuGame.Overlays
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
-            if (!expanded)
+            if (!expanded || fullMapFocusActive)
                 return base.OnMouseDown(e);
+
+            if (isWithinHeightResizeHandle(e.ScreenSpaceMousePosition) || isWithinWidthResizeHandle(e.ScreenSpaceMousePosition))
+                return true;
 
             if (base.OnMouseDown(e))
                 return true;
@@ -1061,10 +1077,10 @@ namespace osu.Game.EzOsuGame.Overlays
 
             stageAreaContainer.Padding = new MarginPadding
             {
-                Top = resize_handle_thickness,
+                Top = resize_grip_extent,
                 Bottom = showTimeline ? button_height : 8,
                 Left = button_width + 16,
-                Right = 8
+                Right = resize_grip_extent
             };
         }
 
@@ -1104,58 +1120,49 @@ namespace osu.Game.EzOsuGame.Overlays
                 stageScaleContainer.Clear(true);
         }
 
-        private float getWedgeAlignedMaxPanelWidth()
+        private float getMaxPanelWidth() => DrawWidth * max_panel_width_ratio;
+
+        private float getMaxPanelHeight()
         {
-            if (DefaultPanelRightEdgeInScreenSpace != null)
-            {
-                float targetRightEdge = ToLocalSpace(new Vector2(DefaultPanelRightEdgeInScreenSpace(), 0)).X;
-
-                if (!float.IsNaN(targetRightEdge) && !float.IsInfinity(targetRightEdge))
-                    return Math.Max(min_panel_width, targetRightEdge);
-            }
-
-            return Math.Min(max_panel_width, DrawWidth - resize_handle_thickness);
+            float bodyHeight = DrawHeight - ScreenFooter.HEIGHT - FilterControl.HEIGHT_FROM_SCREEN_TOP;
+            return Math.Max(0, bodyHeight) * max_panel_height_ratio;
         }
 
         private float clampPanelWidth(float width)
         {
-            float maxWidth = getWedgeAlignedMaxPanelWidth();
+            float maxWidth = getMaxPanelWidth();
             return Math.Clamp(width, min_panel_width, Math.Max(min_panel_width, maxWidth));
         }
 
         private float clampPanelHeight(float height)
         {
-            float maxHeight = Math.Min(max_panel_height, ChildSize.Y - 30);
+            float maxHeight = getMaxPanelHeight();
             return Math.Clamp(height, min_panel_height, Math.Max(min_panel_height, maxHeight));
         }
 
         private bool isWithinPanel(Vector2 screenSpacePosition) => panelContainer.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
 
-        private bool isWithinWidthResizeHandle(Vector2 screenSpacePosition)
+        private void updateResizeGripHover()
         {
-            var quad = rightResizeHandle.ScreenSpaceDrawQuad;
-            // 扩展检测区域到面板右边缘，补偿圆角裁剪
-            var expandedQuad = new Quad(
-                new Vector2(quad.TopLeft.X - resize_handle_thickness, quad.TopLeft.Y),
-                new Vector2(quad.TopRight.X + resize_handle_thickness, quad.TopRight.Y),
-                new Vector2(quad.BottomLeft.X - resize_handle_thickness, quad.BottomLeft.Y),
-                new Vector2(quad.BottomRight.X + resize_handle_thickness, quad.BottomRight.Y)
-            );
-            return expandedQuad.AABBFloat.Contains(screenSpacePosition);
+            bool allowHover = expanded && !fullMapFocusActive;
+            setResizeGripColour(topResizeHandle, allowHover && topResizeHandle.IsHovered, ref topGripHovered);
+            setResizeGripColour(rightResizeHandle, allowHover && rightResizeHandle.IsHovered, ref rightGripHovered);
         }
 
-        private bool isWithinHeightResizeHandle(Vector2 screenSpacePosition)
+        private static void setResizeGripColour(Box grip, bool hovered, ref bool storedHovered)
         {
-            var quad = topResizeHandle.ScreenSpaceDrawQuad;
-            // 扩展检测区域到面板左右边缘，补偿圆角裁剪
-            var expandedQuad = new Quad(
-                new Vector2(quad.TopLeft.X - resize_handle_thickness, quad.TopLeft.Y - resize_handle_thickness),
-                new Vector2(quad.TopRight.X + resize_handle_thickness, quad.TopRight.Y - resize_handle_thickness),
-                new Vector2(quad.BottomLeft.X - resize_handle_thickness, quad.BottomLeft.Y),
-                new Vector2(quad.BottomRight.X + resize_handle_thickness, quad.BottomRight.Y)
-            );
-            return expandedQuad.AABBFloat.Contains(screenSpacePosition);
+            if (storedHovered == hovered)
+                return;
+
+            storedHovered = hovered;
+            grip.FadeColour(hovered ? resize_grip_hover_colour : resize_grip_idle_colour, 80, Easing.OutQuint);
         }
+
+        private bool isWithinWidthResizeHandle(Vector2 screenSpacePosition)
+            => rightResizeHandle.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
+
+        private bool isWithinHeightResizeHandle(Vector2 screenSpacePosition)
+            => topResizeHandle.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
 
         private double computeDefaultStartTime(IBeatmap playableBeatmap, RulesetInfo ruleset, double fallback)
         {
