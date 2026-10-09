@@ -59,7 +59,18 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                     entry.Column,
                     entry.Row - rowStart,
                     Math.Min(entry.EndRow, rowEnd - 1) - rowStart,
-                    entry.Kind);
+                    entry.Kind,
+                    entry.StartTime,
+                    entry.EndTime);
+
+                double msPerRow = 0;
+                double columnStart = double.NaN;
+
+                if (layout.TimeMapped && data.MsPerMeasure > 0)
+                {
+                    msPerRow = data.MsPerMeasure / ManiaPreviewFixedLayout.ROWS_PER_MEASURE;
+                    columnStart = data.StartTimeMs + rowStart * msPerRow;
+                }
 
                 ManiaPreviewDrawHelper.AddLayoutEntries(
                     quads,
@@ -70,7 +81,9 @@ namespace osu.Game.EzOsuGame.Overlays.Preview
                     panelHeight,
                     layout.RowStep,
                     layout.NoteHeight,
-                    flatNotes: false);
+                    flatNotes: false,
+                    columnStart,
+                    msPerRow);
             }
         }
     }

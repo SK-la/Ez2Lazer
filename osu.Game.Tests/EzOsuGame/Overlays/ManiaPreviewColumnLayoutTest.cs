@@ -19,7 +19,7 @@ namespace osu.Game.Tests.EzOsuGame.Overlays
 
             Assert.That(layout.RowStep, Is.EqualTo(ManiaPreviewColumnLayout.UNIT_ROW_STEP));
             Assert.That(layout.NoteHeight, Is.EqualTo(ManiaPreviewColumnLayout.UNIT_NOTE_HEIGHT));
-            Assert.That(layout.NoteHeight, Is.EqualTo(layout.RowStep * 0.5f));
+            Assert.That(layout.NoteHeight, Is.EqualTo(layout.RowStep * (ManiaPreviewColumnLayout.UNIT_NOTE_HEIGHT / ManiaPreviewColumnLayout.UNIT_ROW_STEP)).Within(0.001f));
             Assert.That(layout.ColumnWidth, Is.EqualTo(ManiaPreviewColumnLayout.UNIT_MEASURE_WIDTH));
         }
 
@@ -63,17 +63,21 @@ namespace osu.Game.Tests.EzOsuGame.Overlays
             var dense = ManiaPreviewColumnLayout.ForFullMapMeasureGrid(duration, ms_per_measure, 400f, 300f, 2f);
 
             Assert.That(dense.NoteHeight * dense.FitScale, Is.EqualTo(normal.NoteHeight * normal.FitScale).Within(0.01f));
-            Assert.That(dense.RowStep * dense.FitScale, Is.Not.EqualTo(normal.RowStep * normal.FitScale).Within(0.01f));
+            Assert.That(dense.RowStep * dense.FitScale, Is.EqualTo(normal.RowStep * normal.FitScale * 2f).Within(0.01f));
+
+            var nudged = ManiaPreviewColumnLayout.ForFullMapMeasureGrid(duration, ms_per_measure, 400f, 300f, 1.05f);
+            Assert.That(nudged.NoteHeight * nudged.FitScale, Is.EqualTo(normal.NoteHeight * normal.FitScale).Within(0.01f));
+            Assert.That(nudged.RowStep * nudged.FitScale, Is.EqualTo(normal.RowStep * normal.FitScale * 1.05f).Within(0.01f));
         }
 
         [Test]
         public void ForScroll_density_changes_row_step_not_note_height()
         {
             var normal = ManiaPreviewColumnLayout.ForScroll(128, 400f, 300f, 1f);
-            var dense = ManiaPreviewColumnLayout.ForScroll(128, 400f, 300f, 2f);
+            var nudged = ManiaPreviewColumnLayout.ForScroll(128, 400f, 300f, 1.05f);
 
-            Assert.That(dense.NoteHeight, Is.EqualTo(normal.NoteHeight).Within(0.01f));
-            Assert.That(dense.RowStep, Is.GreaterThan(normal.RowStep));
+            Assert.That(nudged.NoteHeight, Is.EqualTo(normal.NoteHeight).Within(0.01f));
+            Assert.That(nudged.RowStep, Is.EqualTo(normal.RowStep * 1.05f).Within(0.01f));
         }
     }
 }
