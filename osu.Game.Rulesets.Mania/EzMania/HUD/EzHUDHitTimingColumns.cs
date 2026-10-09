@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         public BindableBool MatchManiaPanelWidth { get; } = ManiaPlayfieldLayoutHelper.CreateDefaultMatchPanelWidthBindable();
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.MATCH_HIT_POSITION_LAYOUT_LABEL), nameof(EzHUDManiaStrings.MATCH_HIT_POSITION_LAYOUT_DESCRIPTION))]
-        public BindableBool MatchManiaHitPositionLayout { get; } = new BindableBool();
+        public BindableBool MatchManiaHitPositionLayout { get; } = new BindableBool(true);
 
         private Container[]? columns;
         private Box[] judgementMarkers = null!;

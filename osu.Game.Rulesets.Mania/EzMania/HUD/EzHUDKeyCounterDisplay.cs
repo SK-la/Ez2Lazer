@@ -6,7 +6,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Localization;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
@@ -16,10 +18,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
     public partial class EzHUDKeyCounterDisplay : Container, ISerialisableDrawable
     {
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.MATCH_HIT_POSITION_LAYOUT_LABEL), nameof(EzHUDManiaStrings.MATCH_HIT_POSITION_LAYOUT_DESCRIPTION))]
+        public BindableBool MatchManiaHitPositionLayout { get; } = new BindableBool(true);
+
         private readonly FillFlowContainer<EzKeyCounter> keyFlow;
         private readonly IBindableList<InputTrigger> triggers = new BindableList<InputTrigger>();
         private IBindable<double> columnWidth = null!;
         private IBindable<double> specialFactor = null!;
+        private Bindable<bool> hitPositionGlobalEnable = null!;
+        private Bindable<double> hitPosition = null!;
+
+        private Anchor savedAnchor;
+        private Anchor savedOrigin;
+        private Vector2 savedPosition;
+        private bool savedLayout;
 
         [Resolved]
         private InputCountController controller { get; set; } = null!;
@@ -45,6 +57,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         {
             columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
             specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
+            hitPositionGlobalEnable = ezSkinConfig.GetBindable<bool>(Ez2Setting.HitPositionGlobalEnable);
+            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
             updateWidths();
         }
 
@@ -55,6 +69,40 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             triggers.BindCollectionChanged(triggersChanged, true);
             columnWidth.BindValueChanged(_ => updateWidths(), true);
             specialFactor.BindValueChanged(_ => updateWidths(), true);
+
+            hitPositionGlobalEnable.BindValueChanged(_ => updateHitPositionLayout());
+            hitPosition.BindValueChanged(_ => updateHitPositionLayout());
+            MatchManiaHitPositionLayout.BindValueChanged(_ => updateHitPositionLayout(), true);
+            skin.SourceChanged += onSkinChanged;
+        }
+
+        private void onSkinChanged() => updateHitPositionLayout();
+
+        private void updateHitPositionLayout()
+        {
+            if (MatchManiaHitPositionLayout.Value)
+            {
+                if (!savedLayout)
+                {
+                    savedAnchor = Anchor;
+                    savedOrigin = Origin;
+                    savedPosition = Position;
+                    savedLayout = true;
+                }
+
+                ManiaPlayfieldLayoutHelper.ApplyHitPositionPlacement(
+                    this,
+                    ManiaPlayfieldLayoutHelper.GetHitPosition(skin, hitPositionGlobalEnable.Value, hitPosition.Value));
+                return;
+            }
+
+            if (!savedLayout)
+                return;
+
+            Anchor = savedAnchor;
+            Origin = savedOrigin;
+            Position = savedPosition;
+            savedLayout = false;
         }
 
         private void updateWidths()
